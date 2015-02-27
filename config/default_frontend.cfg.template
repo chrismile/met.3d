@@ -1,0 +1,126 @@
+# Configure synchronization controls.
+# =============================================================================
+
+[Synchronization]
+size=1
+
+1\name=Synchronization
+1\initialiseFromDatasource=ECMWF ENS EUR_LL10
+1\initialiseFromLeveltype=HYBRID_SIGMA_PRESSURE_3D
+1\initialiseFromVariable=eastward_wind
+
+
+# Define scenes.
+# =============================================================================
+
+[Scenes]
+size=4
+
+1\name=Scene 1
+2\name=Scene 2
+3\name=Scene 3
+4\name=Scene 4
+
+
+# Configure waypoint model(s).
+# =============================================================================
+
+[WaypointsModel]
+size=1
+
+1\name=Waypoints
+1\datafile=config/default_waypoints.ftml
+
+
+# Configure text rendering.
+# =============================================================================
+
+[Text]
+fontfile=../third-party/freefont-20120503/FreeSans.ttf
+fontsize=24
+
+
+# Configure coastlines and country borderlines geometry.
+# =============================================================================
+
+[CoastCountryLines]
+coastfile=../third-party/naturalearth/ne_50m_coastline.shp
+countryfile=../third-party/naturalearth/ne_50m_admin_0_boundary_lines_land.shp
+
+
+# Define initial actor(s) from config files.
+# =============================================================================
+
+# Use this section to specify actors that should be loaded on system
+# start-up. Specify paths to actor configuration files that have previously
+# been saved from Met.3D.
+
+[Actors]
+size=0
+
+1\config=../config/graticule_default.actor.conf
+1\scenes=Scene 1
+
+2\config=../config/basemap_default.actor.conf
+2\scenes=Scene 1
+
+3\config=../config/volumeboundingbox_default.actor.conf
+3\scenes=Scene 1
+
+
+# Define initial predefined actor(s).
+# =============================================================================
+
+# Use this section to load predefined actors on system start-up. Mainly
+# intended for development purposes.
+
+[PredefinedActors]
+size=0
+
+1\type=Basemap
+1\datafile=../third-party/naturalearth/HYP_50M_SR_W/HYP_50M_SR_W.tif
+1\bbox=-90./0./180./90.
+1\scenes=Scene 1/Scene 2/Scene 3/Scene 4
+
+2\type=VolumeBox
+2\bbox=-60./30./100./40.
+2\scenes=Scene 1/Scene 2/Scene 3/Scene 4
+
+#3\type=HSec_MSLP
+#3\dataSource=ECMWF ENS EUR_LL10 ENSFilter
+#3\bbox=-60./30./100./40.
+#3\scenes=Scene 1/Scene 2
+
+#4\type=VSec_PV
+#4\dataSource=ECMWF ENS EUR_LL10 ENSFilter
+#4\scenes=Scene 1
+
+#5\type=Surface
+#5\dataSource=ECMWF ENS EUR_LL10 ENSFilter
+#5\bbox=-60./30./100./40.
+#5\scenes=Scene 3
+
+#6\type=VSec_Clouds
+#6\dataSource=ECMWF ENS EUR_LL10 ENSFilter
+#6\scenes=Scene 4
+
+#7\type=Volume
+#7\dataSource=ECMWF ENS EUR_LL10 ENSFilter
+#7\bbox=-60./30./100./40.
+#7\scenes=Scene 1
+
+#8\type=Trajectories
+#8\dataSource=Lagranto ENS EUR_LL10 DF-T psfc_1000hPa_L62
+#8\scenes=Scene 1
+
+#9\type=WCB_Probability
+#9\dataSource=Lagranto ENS EUR_LL10 DF-T psfc_1000hPa_L62
+#9\levelType=PRESSURE_LEVELS_3D
+#9\nwpDataSource=ECMWF ENS EUR_LL10 ENSFilter
+#9\bbox=-60./30./100./40.
+#9\scenes=Scene 1
+
+#10\type=HSec
+#10\dataSource=ECMWF ENS EUR_LL10 ENSFilter
+#10\bbox=-60./30./100./40.
+#10\scenes=Scene 1

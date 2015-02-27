@@ -1,0 +1,195 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MWaypointsView</class>
+ <widget class="QWidget" name="MWaypointsView">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>1186</width>
+    <height>336</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Waypoints</string>
+  </property>
+  <layout class="QHBoxLayout" name="horizontalLayout">
+   <item>
+    <layout class="QVBoxLayout" name="verticalLayout">
+     <item>
+      <widget class="QPushButton" name="pushButton_2">
+       <property name="text">
+        <string>Save Track As ...</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="pushButton_3">
+       <property name="text">
+        <string>Open Track File ...</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="saveTrack">
+       <property name="text">
+        <string>Save Track ...</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <spacer name="verticalSpacer">
+       <property name="orientation">
+        <enum>Qt::Vertical</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>20</width>
+         <height>40</height>
+        </size>
+       </property>
+      </spacer>
+     </item>
+     <item>
+      <widget class="QPushButton" name="pushButton">
+       <property name="text">
+        <string>Insert Way Point</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="pushButton_4">
+       <property name="text">
+        <string>Delete Selected</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <spacer name="verticalSpacer_2">
+       <property name="orientation">
+        <enum>Qt::Vertical</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>20</width>
+         <height>40</height>
+        </size>
+       </property>
+      </spacer>
+     </item>
+    </layout>
+   </item>
+   <item>
+    <widget class="QTableView" name="tableView">
+     <property name="font">
+      <font>
+       <pointsize>9</pointsize>
+      </font>
+     </property>
+     <property name="alternatingRowColors">
+      <bool>true</bool>
+     </property>
+     <property name="selectionMode">
+      <enum>QAbstractItemView::SingleSelection</enum>
+     </property>
+     <property name="selectionBehavior">
+      <enum>QAbstractItemView::SelectRows</enum>
+     </property>
+     <property name="gridStyle">
+      <enum>Qt::SolidLine</enum>
+     </property>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections>
+  <connection>
+   <sender>pushButton</sender>
+   <signal>clicked()</signal>
+   <receiver>MWaypointsView</receiver>
+   <slot>addNewWaypoint()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>968</x>
+     <y>489</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>231</x>
+     <y>45</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>saveTrack</sender>
+   <signal>clicked()</signal>
+   <receiver>MWaypointsView</receiver>
+   <slot>saveTrack()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>77</x>
+     <y>24</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>408</x>
+     <y>22</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>pushButton_2</sender>
+   <signal>clicked()</signal>
+   <receiver>MWaypointsView</receiver>
+   <slot>saveAsTrack()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>292</x>
+     <y>22</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>792</x>
+     <y>17</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>pushButton_3</sender>
+   <signal>clicked()</signal>
+   <receiver>MWaypointsView</receiver>
+   <slot>openTrack()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>507</x>
+     <y>21</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>763</x>
+     <y>25</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>pushButton_4</sender>
+   <signal>clicked()</signal>
+   <receiver>MWaypointsView</receiver>
+   <slot>deleteSelectedWaypoint()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>1155</x>
+     <y>486</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>708</x>
+     <y>488</y>
+    </hint>
+   </hints>
+  </connection>
+ </connections>
+ <slots>
+  <slot>addNewWaypoint()</slot>
+  <slot>saveTrack()</slot>
+  <slot>saveAsTrack()</slot>
+  <slot>openTrack()</slot>
+  <slot>deleteSelectedWaypoint()</slot>
+ </slots>
+</ui>

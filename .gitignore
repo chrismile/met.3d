@@ -1,0 +1,13 @@
+*.o
+Debug
+Release
+*.moc
+moc_*
+ui_*
+qrc_*
+*.user
+.gitignore~
+Makefile
+met3D
+config/*.cfg
+config/*.actor.conf

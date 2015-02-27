@@ -1,0 +1,24 @@
+INCLUDEPATH += \
+    src/ \
+# Path to the system freetype and gdal installation. Should work as is
+# under OpenSuSE.
+    /usr/include/freetype2 \
+    /usr/include/gdal \
+# Path to the manually installed NetCDF-C++ interface.
+    /home/local/sw/unidata/include \
+# Path to the manually installed QCustomPlot library.
+    /home/local/sw/qt/include \
+# Path to the manually installed glfx library.
+    /home/local/sw/gl/include
+
+# LIBS for openSuSE 12.3
+LIBS += \
+# Path to the manually installed NetCDF-C++ interface.
+    -L/home/local/sw/unidata/lib64 -lnetcdf_c++4 \
+    -lnetcdf -lhdf5_hl -lhdf5 -lz -lcurl \
+    -lgsl -lgslcblas -lfreetype -lgdal -lGLU \
+    -llog4cplus -lGLEW -lgrib_api \
+# Path to the manually installed QCustomPlot library.
+    -L/home/local/sw/gl/lib -lglfx \
+# Path to the manually installed glfx library.
+    -L/home/local/sw/qt/lib64/ -l$$QCPLIB

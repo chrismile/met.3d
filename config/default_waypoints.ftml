@@ -1,0 +1,12 @@
+<!DOCTYPE FlightTrack>
+<FlightTrack>
+  <Name>New Flight Track</Name>
+  <ListOfWaypoints>
+    <Waypoint lon="-50" flightlevel="0" location="" lat="45">
+      <Comments></Comments>
+    </Waypoint>
+    <Waypoint lon="30" flightlevel="0" location="" lat="45">
+      <Comments></Comments>
+    </Waypoint>
+  </ListOfWaypoints>
+</FlightTrack>

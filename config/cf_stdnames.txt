@@ -1,0 +1,167 @@
+################ Temperature ##################
+
+standard_name air_temperature
+variable_name Temperature 
+variable_name Temperature_isobaric
+variable_name Temperature_hybrid
+
+standard_name surface_temperature
+variable_name N2_metre_temperature 
+variable_name 2_metre_temperature_surface
+
+standard_name air_potential_temperature
+variable_name Potential_temperature_potential_vorticity_surface
+
+################## Humidity ###################
+
+standard_name specific_humidity
+variable_name Specific_humidity
+variable_name Specific_humidity_isobaric
+variable_name Specific_humidity_hybrid
+
+#################### Wind #####################
+
+standard_name eastward_wind
+variable_name U-component_of_wind 
+variable_name u-component_of_wind_hybrid
+variable_name U_velocity_isobaric
+
+standard_name northward_wind
+variable_name V-component_of_wind
+variable_name v-component_of_wind_hybrid
+variable_name V_velocity_isobaric
+
+standard_name divergence_of_wind
+variable_name Divergence_isobaric
+
+standard_name surface_eastward_wind 
+variable_name 10_metre_U_wind_component_surface
+
+standard_name surface_northward_wind 
+variable_name 10_metre_V_wind_component_surface
+
+############## Vertical Velocity ##############
+
+standard_name omega
+variable_name Vertical_velocity_pressure
+variable_name Vertical_velocity_isobaric
+variable_name Vertical_velocity_pressure_hybrid
+
+################# Potential ################### 
+
+standard_name geopotential_height
+variable_name Geopotential 
+variable_name Geopotential_isobaric
+variable_name Geopotential_height_hybrid
+variable_name Geopotential_potential_vorticity_surface
+
+standard_name surface_geopotential
+variable_name Geopotential_surface
+
+standard_name air_potential_temperature
+variable_name Potential_temperature 
+
+standard_name ertel_potential_vorticity
+variable_name Potential_vorticity_isobaric
+
+################# Pressure ################### 
+
+
+standard_name air_pressure
+variable_name Pressure 
+variable_name Pressure_potential_vorticity_surface
+
+standard_name surface_air_pressure
+variable_name Surface_pressure_surface
+
+standard_name air_pressure_at_sea_level
+variable_name Mean_sea_level_pressure_surface
+
+
+standard_name cloud_area_fraction_in_atmosphere_layer
+variable_name UnknownParameter_D0_C6_32
+variable_name Fraction_of_cloud_cover_hybrid
+
+standard_name specific_cloud_ice_water_content
+variable_name Specific_cloud_ice_water_content_hybrid 
+
+standard_name specific_cloud_liquid_water_content
+variable_name Specific_cloud_liquid_water_content_hybrid 
+
+standard_name high_cloud_area_fraction
+variable_name High_cloud_cover_surface
+
+standard_name medium_cloud_area_fraction
+variable_name Medium_cloud_cover_surface
+
+standard_name low_cloud_area_fraction
+variable_name Low_cloud_cover_surface
+
+standard_name sea_ice_area_fraction
+variable_name Sea-ice_cover_surface
+
+
+standard_name mass_fraction_of_ozone_in_air
+variable_name Ozone_mass_mixing_ratio_isobaric
+
+
+standard_name surface_dew_point_temperature
+variable_name 2_metre_dewpoint_temperature_surface
+
+standard_name atmosphere_boundary_layer_thickness
+variable_name Boundary_layer_height_surface
+
+############## surface vars ??? ##############
+
+standard_name wind_speed_of_gust
+variable_name 10_metre_wind_gust_surface
+variable_name 10_metre_wind_gust_surface_1_Hour_2
+variable_name 10_metre_wind_gust_surface_Mixed_intervals_2
+variable_name 10_metre_wind_gust_surface_6_Hour_2
+
+standard_name atmosphere_specific_convective_available_potential_energy
+variable_name specific_convective_available_potential_energy
+variable_name Convective_available_potential_energy_surface
+
+standard_name lwe_thickness_of_convective_precipitation_amount
+variable_name Convective_precipitation_surface
+
+standard_name sea_surface_temperature
+variable_name Sea_surface_temperature_surface
+
+standard_name thickness_of_snowfall_amount
+variable_name Snowfall_surface
+
+standard_name surface_downward_sensible_heat_flux
+variable_name Surface_sensible_heat_flux_surface
+
+standard_name sea_surface_skin_temperature
+variable_name Skin_temperature_surface
+
+standard_name sea_surface_temperature
+variable_name Sea_surface_temperature_surface
+
+standard_name lwe_thickness_of_stratiform_precipitation_amount
+variable_name Stratiform_precipitation_Large-scale_precipitation_surface
+
+standard_name lwe_thickness_of_water_evaporation_amount
+variable_name Evaporation_surface
+
+standard_name surface_albedo_assuming_deep_snow
+variable_name Snow_albedo_surface
+
+standard_name thickness_of_snowfall_amount
+variable_name Snow_depth_surface
+
+standard_name surface_albedo
+variable_name Albedo_surface
+
+
+############## trajectory vars ###############
+
+
+standard_name probability_of_wcb_occurrence
+variable_name probability_of_wcb_occurrence
+variable_name vertically_integrated_probability_of_wcb_occurrence
+
+

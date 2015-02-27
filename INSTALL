@@ -1,0 +1,286 @@
+Met.3D Installation Guidelines.
+===============================
+
+This document provides installation guidelines for installing Met.3D on
+OpenSuSE 12.X/13.X systems. Met.3D requires a number of libraries to be
+installed and a few external data packages to be downloaded. Most of these
+packages can be installed via YaST, however, a few have to be downloaded and
+compiled manually.
+
+System requirements: You need an OpenGL 4.3 capable graphics card and an
+appropriate Linux driver to run Met.3D. The driver will most likely be a
+proprietary driver (Nvidia or AMD); open-source drivers for Linux currently do
+not provide the required capabilities. Before you continue with the
+installation, make sure that graphics card and driver are installed. If
+everything is installed correctly, the "glxinfo" command should output
+something similar to (the important thing is the OpenGL version > 4.3):
+
+glxinfo | grep OpenGL
+
+OpenGL vendor string: NVIDIA Corporation
+OpenGL renderer string: GeForce GTX 560 Ti/PCIe/SSE2
+OpenGL version string: 4.4.0 NVIDIA 340.65
+OpenGL shading language version string: 4.40 NVIDIA via Cg compiler
+
+
+================================================================================
+A) Install the following packages via YaST (or your favourite rpm manager):
+================================================================================
+
+For OpenSuSE 12.3, these repositories are required (similar for other
+OpenSuSE versions):
+- http://download.opensuse.org/repositories/Application:/Geo/openSUSE_12.3/
+- http://download.opensuse.org/repositories/home:/SStepke/openSUSE_12.3/
+
+Packages that need to be installed via YaST (or the system's repository 
+manager):
+
+- libqt4 and libqt4-devel
+- liblog4cplus and log4cplus-devel
+- gdal, libgdal and libgdal-devel
+- netcdf, netcdf-devel
+- hdf5, libhdf5 and hdf5-devel
+- glew and glew-devel
+- libfreetype and freetype-devel
+- grib_api and grib_api-devel
+- libGLU
+- gsl and gsl_devel
+
+- ... and I might have forgotten some. Please tell me!
+
+
+================================================================================
+B) Install the following libraries from their sources:
+================================================================================
+
+1) glfx
+=======
+
+Get the glfx sources from: https://code.google.com/p/glfx/
+
+mkdir glfx-build
+cd glfx-build
+cmake -DCMAKE_INSTALL_PREFIX:PATH=/your/target/dir ../glfx/CMakeLists.txt
+make
+make install
+
+Add /your/target/dir to the "met3D_inclib.pri.user" configuration (see below).
+
+
+2) qcustomplot
+==============
+
+Get the qcustomplot sources from: http://www.qcustomplot.com/
+You will need the archives QCustomPlot.tar.gz and QCustomPlot-sharedlib.tar.gz.
+
+Extract the QCustomPlot.tar.gz archive (the /qcustomplot directory)
+and put the contents of QCustomPlot-sharedlib.tar.gz *inside* the
+/qcustomplot directory. Go to 
+
+qcustomplot/qcustomplot-sharedlib/sharedlib-compilation
+
+and run:
+
+qmake
+make
+
+Next, copy the resulting libraries and the qcustomplot.h header to directories
+where Met.3D can find them (i.e. put the path in the "met3D_inclib.pri.user"
+configuration). These files are required:
+
+./include:
+qcustomplot.h
+
+./lib64:
+libqcustomplotd.so -> libqcustomplotd.so.1.2.1*
+libqcustomplotd.so.1 -> libqcustomplotd.so.1.2.1*
+libqcustomplotd.so.1.2 -> libqcustomplotd.so.1.2.1*
+libqcustomplotd.so.1.2.1*
+libqcustomplot.so -> libqcustomplot.so.1.2.1*
+libqcustomplot.so.1 -> libqcustomplot.so.1.2.1*
+libqcustomplot.so.1.2 -> libqcustomplot.so.1.2.1*
+libqcustomplot.so.1.2.1*
+
+
+3) netcdf-cxx4
+==============
+
+Get the sources of the CURRENT (not the old!) NetCDF C++ interface from
+http://www.unidata.ucar.edu/downloads/netcdf/index.jsp
+(choose the latest stable distribution). The C++ library requires the regular
+C library to be installed (see rpm packages above).
+
+./configure --prefix=/your/target/dir
+make
+make check
+make install
+
+Add /your/target/dir to the "met3D_inclib.pri.user" configuration (see below).
+
+
+================================================================================
+C) Download the following source and data packages:
+================================================================================
+
+I recommend to place the following packages along with the Met.3D sources into
+a specific directory structure.
+
+Create a base directory "met.3d-base" and a subdirectory "third-party":
+
+met.3d-base/
+    third-party/
+
+Change into "third-party" to execute the following commands.
+
+
+1) qtpropertybrowser
+====================
+
+Met.3D requires the qtpropertybrowser framework from the "qt-solutions"
+repository. The qtpropertybrowser sources are directly compiled into the
+Met.3D executable and hence do not have to be build beforehand. They can
+be downloaded with git:
+
+[in met.3d-base/third-party]
+git clone https://gitorious.org/qt-solutions/qt-solutions.git
+
+
+2) Fonts
+========
+
+Met.3D requires a TrueType font file. I recommend the "FreeSans" font from
+the GNU FreeFont package. It can be downloaded from
+http://ftp.gnu.org/gnu/freefont/. At the time of writing, the most recent
+version is 20120503:
+
+[in met.3d-base/third-party]
+wget http://ftp.gnu.org/gnu/freefont/freefont-ttf-20120503.zip
+unzip freefont-ttf-20120503.zip
+
+
+3) Vector and raster map, coastline and country borderline data
+===============================================================
+
+Met.3D requires a base map image in GeoTIFF format, as well as coastline and
+country borderline vector data in shapefile format. I recommend to use the free
+data from www.naturalearthdata.com. The medium resolution files (50m) work
+fine (they require roughly 300 MB of disk space).
+
+For coastline data, I use the "Coastline" dataset
+(http://www.naturalearthdata.com/downloads/50m-physical-vectors/):
+
+[in met.3d-base/third-party]
+mkdir naturalearth
+cd naturalearth
+wget http://www.naturalearthdata.com/http//www.naturalearthdata.com/download/50m/physical/ne_50m_coastline.zip
+unzip ne_50m_coastline.zip
+
+For country boundaries, I use the "Admin 0 – Boundary Lines" dataset
+(http://www.naturalearthdata.com/downloads/50m-cultural-vectors/):
+
+[in met.3d-base/third-party/naturalearth]
+wget http://www.naturalearthdata.com/http//www.naturalearthdata.com/download/50m/cultural/ne_50m_admin_0_boundary_lines_land.zip
+unzip ne_50m_admin_0_boundary_lines_land.zip
+
+For the raster basemap, I use the "Cross Blended Hypso with Shaded Relief and
+Water" dataset
+(http://www.naturalearthdata.com/downloads/50m-raster-data/50m-cross-blend-hypso/):
+
+[in met.3d-base/third-party/naturalearth]
+wget http://www.naturalearthdata.com/http//www.naturalearthdata.com/download/50m/raster/HYP_50M_SR_W.zip
+unzip HYP_50M_SR_W.zip
+
+
+You should now have the following directory structure ("..." denotes other
+files):
+
+met.3d-base/
+    third-party/
+        qt-solutions/
+            qtpropertybrowser/
+                *
+            ...
+        freefont-20120503/
+            FreeSans.ttf
+            ...
+        naturalearth/
+            HYP_50M_SR_W/
+                HYP_50M_SR_W.tif
+                ...
+            ne_50m_coastline.shp
+            ne_50m_admin_0_boundary_lines_land.shp
+            ...
+
+
+================================================================================
+D) Checkout Met.3D from the GIT repo.
+================================================================================
+
+The latest version of Met.3D can be checked out from
+
+               https://bitbucket.org/wxmetvis/met.3d/
+
+Place the repository into the "met.3d-base" base directory:
+
+[in met.3d-base]
+git clone https://bitbucket.org/wxmetvis/met.3d.git
+
+
+================================================================================
+E) Configure Met.3D.
+================================================================================
+
+Modify the software configuration to match your system.
+
+- In met.3d-base/met.3d/, copy the file "met3D_inclib.pri.template" to
+"met3D_inclib.pri.user" and modify the contained paths according to your
+system.
+
+- In met.3d-base/met.3d/config/, copy the files "default_frontend.cfg.template"
+and "default_pipeline.cfg.template" to local configuration files, e.g.
+"frontend.cfg" and "pipeline.cfg" (these filenames are used in the following
+but you can choose other names as well). Modify the paths in "pipeline.cfg" to
+match the paths at which the forecast data is stored on your system. Modify
+"frontend.cfg" to specify the configuration of Met.3D after start-up. If you
+have followed the suggested directory structure, you should not need to modify
+"frontend.cfg".
+
+
+================================================================================
+F) Compile Met.3D.
+================================================================================
+
+Met.3D uses the Qt qmake build system. You can either build the tool from the
+command line or from within QtCreator. From the command line follow the
+following steps:
+
+In met.3d-base/, create a subdirectory "build" into which the executable can
+be built:
+
+[in met.3d-base]
+mkdir build
+
+Change into "build/" and run (the "-j 12" option for make starts 12 parallel
+compilation threads, modify this number to match the number of CPU cores in
+your system)
+
+[in met.3d-base/build]
+qmake ../met.3d/met3D.pro
+make -j 12
+
+Compilation may take a few minutes. If no errors are reported, an executable
+named "met3D" should be created.
+
+To start the Met.3D, change back to "met.3d-base/met.3d/" (Met.3D currently
+needs to be executed in the root repository directory (the one that contains
+this file)) and type
+
+[in met.3d-base/met.3d]
+../build/met3D --pipeline=config/pipeline.cfg --frontend=config/frontend.cfg
+
+Note: Depending on the amount of available forecast data, the software
+may take a while to start. Also, on first startup the compilation of the
+OpenGL shader programs may take a while.
+
+On first start-up, you should only see an empty window. Please follow the user
+guide to learn how to create visualizations.

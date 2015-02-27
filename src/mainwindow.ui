@@ -1,0 +1,229 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MainWindow</class>
+ <widget class="QMainWindow" name="MainWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>800</width>
+    <height>600</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>MainWindow</string>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <layout class="QVBoxLayout" name="verticalLayout">
+    <item>
+     <widget class="QFrame" name="centralframe">
+      <property name="sizePolicy">
+       <sizepolicy hsizetype="Preferred" vsizetype="MinimumExpanding">
+        <horstretch>0</horstretch>
+        <verstretch>0</verstretch>
+       </sizepolicy>
+      </property>
+      <property name="frameShape">
+       <enum>QFrame::NoFrame</enum>
+      </property>
+      <property name="frameShadow">
+       <enum>QFrame::Raised</enum>
+      </property>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QMenuBar" name="menubar">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>800</width>
+     <height>20</height>
+    </rect>
+   </property>
+   <widget class="QMenu" name="menuFile">
+    <property name="title">
+     <string>&amp;File</string>
+    </property>
+    <addaction name="actionExit"/>
+   </widget>
+   <widget class="QMenu" name="menu_View">
+    <property name="title">
+     <string>&amp;View</string>
+    </property>
+    <widget class="QMenu" name="menu_Layout">
+     <property name="title">
+      <string>&amp;Layout</string>
+     </property>
+     <addaction name="actionLayoutSingleView"/>
+     <addaction name="actionLayoutDualView"/>
+     <addaction name="actionLayoutDualViewVertical"/>
+     <addaction name="actionLayoutOneLargeTwoSmallViews"/>
+     <addaction name="actionLayoutOneLargeThreeSmallViews"/>
+     <addaction name="actionLayoutQuadView"/>
+    </widget>
+    <widget class="QMenu" name="menuCurrent_Camera">
+     <property name="title">
+      <string>Current &amp;Camera</string>
+     </property>
+     <addaction name="actionCameraNorthUp"/>
+     <addaction name="actionCameraTopView"/>
+     <addaction name="actionRememberCurrentCamera"/>
+     <addaction name="actionRestoreRememberedCamera"/>
+     <addaction name="actionSaveCameraToFile"/>
+     <addaction name="actionRestoreCameraFromFile"/>
+    </widget>
+    <addaction name="actionFullScreen"/>
+    <addaction name="actionWaypoints"/>
+    <addaction name="actionSceneManagement"/>
+    <addaction name="separator"/>
+    <addaction name="menuCurrent_Camera"/>
+    <addaction name="menu_Layout"/>
+   </widget>
+   <addaction name="menuFile"/>
+   <addaction name="menu_View"/>
+  </widget>
+  <action name="actionExit">
+   <property name="text">
+    <string>E&amp;xit</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+X</string>
+   </property>
+  </action>
+  <action name="actionCameraTopView">
+   <property name="text">
+    <string>&amp;Top View</string>
+   </property>
+   <property name="shortcut">
+    <string>Alt+T</string>
+   </property>
+  </action>
+  <action name="actionCameraNorthUp">
+   <property name="text">
+    <string>&amp;North Up</string>
+   </property>
+   <property name="shortcut">
+    <string>Alt+N</string>
+   </property>
+  </action>
+  <action name="actionLayoutSingleView">
+   <property name="text">
+    <string>&amp;1 Single View</string>
+   </property>
+   <property name="shortcut">
+    <string>Alt+1</string>
+   </property>
+  </action>
+  <action name="actionLayoutDualView">
+   <property name="text">
+    <string>&amp;2 Dual View</string>
+   </property>
+   <property name="shortcut">
+    <string>Alt+2</string>
+   </property>
+  </action>
+  <action name="actionLayoutOneLargeTwoSmallViews">
+   <property name="text">
+    <string>&amp;4 One Large, Two Small Views</string>
+   </property>
+   <property name="shortcut">
+    <string>Alt+4</string>
+   </property>
+  </action>
+  <action name="actionLayoutQuadView">
+   <property name="text">
+    <string>&amp;6 Quad View</string>
+   </property>
+   <property name="shortcut">
+    <string>Alt+6</string>
+   </property>
+  </action>
+  <action name="actionLayoutOneLargeThreeSmallViews">
+   <property name="text">
+    <string>&amp;5 One Large, Three Small Views</string>
+   </property>
+   <property name="shortcut">
+    <string>Alt+5</string>
+   </property>
+  </action>
+  <action name="actionSceneManagement">
+   <property name="text">
+    <string>Scene Management</string>
+   </property>
+   <property name="shortcut">
+    <string>F4</string>
+   </property>
+  </action>
+  <action name="actionLayoutDualViewVertical">
+   <property name="text">
+    <string>&amp;3 Dual View, Vertical</string>
+   </property>
+   <property name="shortcut">
+    <string>Alt+3</string>
+   </property>
+  </action>
+  <action name="actionWaypoints">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>&amp;Waypoints</string>
+   </property>
+   <property name="shortcut">
+    <string>F2</string>
+   </property>
+  </action>
+  <action name="actionRememberCurrentCamera">
+   <property name="text">
+    <string>&amp;Remember Current Camera</string>
+   </property>
+  </action>
+  <action name="actionRestoreRememberedCamera">
+   <property name="text">
+    <string>Restore Remembered &amp;Camera</string>
+   </property>
+  </action>
+  <action name="actionSaveCameraToFile">
+   <property name="text">
+    <string>&amp;Save Camera To File</string>
+   </property>
+  </action>
+  <action name="actionRestoreCameraFromFile">
+   <property name="text">
+    <string>Restore Camera From &amp;File</string>
+   </property>
+  </action>
+  <action name="actionFullScreen">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>&amp;Full Screen</string>
+   </property>
+   <property name="shortcut">
+    <string>F11</string>
+   </property>
+  </action>
+ </widget>
+ <resources/>
+ <connections>
+  <connection>
+   <sender>actionExit</sender>
+   <signal>activated()</signal>
+   <receiver>MainWindow</receiver>
+   <slot>close()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>-1</x>
+     <y>-1</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>399</x>
+     <y>299</y>
+    </hint>
+   </hints>
+  </connection>
+ </connections>
+</ui>
