@@ -37,6 +37,7 @@
 // local application imports
 #include "gxfw/mactor.h"
 #include "gxfw/gl/shadereffect.h"
+#include "gxfw/gl/texture.h"
 
 
 class MGLResourcesManager;
@@ -90,7 +91,8 @@ private:
 
     std::shared_ptr<GL::MShaderEffect> shaderProgram;
 
-    GLuint textureObjectName;
+    //GLuint textureObjectName;
+    GL::MTexture* texture;
     int textureUnit;
 
     uint numVertices;

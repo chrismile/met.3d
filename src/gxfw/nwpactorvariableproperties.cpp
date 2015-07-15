@@ -143,8 +143,9 @@ MVerticalRegridProperties::MVerticalRegridProperties(
     regridModeNames << "no regrid"
                     << "to hybrid/mean psfc"
                     << "to hybrid/min psfc"
-                    << "to hybrid/const 1023.25 hPa"
-                    << "to pressure levels";
+                    << "to hybrid/const 1013.25 hPa"
+                    << "to pressure levels/ECMWF standard"
+                    << "to pressure levels/const 1013.25 hPa";
     regridModeProperty = a->addProperty(ENUM_PROPERTY, "regrid mode",
                                         groupProperty);
     properties->mEnum()->setEnumNames(regridModeProperty, regridModeNames);
@@ -186,6 +187,9 @@ bool MVerticalRegridProperties::onQtPropertyChanged(
             break;
         case 4: // PL grid
             regridMode = "PL/10/50/100/200/250/300/400/500/700/850/925/1000";
+            break;
+        case 5: // PL grid, const sfc pressure
+            regridMode = "PL/CONST_STANDARD_PSFC";
             break;
         }
 

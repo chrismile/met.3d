@@ -174,8 +174,8 @@ MStructuredGrid* MVerticalRegridder::produceData(MDataRequest request)
 
                 for (unsigned int k = 0; k < result->nlevs; k++)
                 {
-                    float targetPressure_hPa =
-                            result->ak_hPa[k] + result->bk[k] * targetSurfacePressure_hPa;
+                    float targetPressure_hPa = result->ak_hPa[k]
+                            + result->bk[k] * targetSurfacePressure_hPa;
 
                     float targetValue = inputGrid->interpolateGridColumnToPressure(
                                 j, i, targetPressure_hPa);
@@ -192,7 +192,16 @@ MStructuredGrid* MVerticalRegridder::produceData(MDataRequest request)
         // Pressure level grid has been requested.
         // =======================================
 
+        // Standard behaviour: Use list of pressure levels passed as
+        // arguments to PL in "params".
         unsigned int numLevels = params.size() - 1;
+
+        // Alternative: Use the hybrid levels of the input grid, but with
+        // a constant surface pressure (so that they can be interpreted as
+        // pressure levels).
+        if (params[1] == "CONST_STANDARD_PSFC") numLevels = inputGrid->nlevs;
+
+        // Initialise result grid.
         MRegularLonLatStructuredPressureGrid *result =
                 new MRegularLonLatStructuredPressureGrid(numLevels,
                                                          inputGrid->nlats,
@@ -203,8 +212,22 @@ MStructuredGrid* MVerticalRegridder::produceData(MDataRequest request)
             result->lons[i] = inputGrid->lons[i];
         for (unsigned int j = 0; j < inputGrid->nlats; j++)
             result->lats[j] = inputGrid->lats[j];
-        for (unsigned int k = 0; k < numLevels; k++)
-            result->levels[k] = params[k+1].toFloat();
+
+        // Vertical levels are either computed from the hybrid coefficients
+        // of the input grid or taken from the input argument list.
+        if (params[1] == "CONST_STANDARD_PSFC")
+        {
+            for (unsigned int k = 0; k < numLevels; k++)
+            {
+                result->levels[k] = inputGrid->ak_hPa[k]
+                        + inputGrid->bk[k] * 1013.25;
+            }
+        }
+        else
+        {
+            for (unsigned int k = 0; k < numLevels; k++)
+                result->levels[k] = params[k+1].toFloat();
+        }
 
         // CPU-based regridding: Loop over all grid columns.
         // =================================================

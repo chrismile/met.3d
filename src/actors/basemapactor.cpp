@@ -53,6 +53,7 @@ namespace Met3D
 
 MBaseMapActor::MBaseMapActor()
     : MActor(),
+      texture(nullptr),
       numVertices(4),
       bbox(QRectF(-90., 0., 180., 90.)),
       colourSaturation(0.3)
@@ -162,17 +163,8 @@ void MBaseMapActor::initializeActorResources()
 
     MGLResourcesManager* glRM = MGLResourcesManager::getInstance();
 
-    // Load texture data if the returned texture object is new
-    // (generateTexture() returns true).
-    if (glRM->generateTexture("map_texture_" + QString::number(myID),
-                              &textureObjectName))
-    {
-        LOG4CPLUS_DEBUG(mlog, "loading texture data to texture object "
-                        << textureObjectName << flush);
-
-        QString filename = properties->mString()->value(filenameProperty);
-        loadMap(filename.toStdString());
-    }
+    QString filename = properties->mString()->value(filenameProperty);
+    loadMap(filename.toStdString());
 
     // Load shader program if the returned program is new.
     bool loadShaders = false;
@@ -229,8 +221,7 @@ void MBaseMapActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
                 "mvpMatrix", *(sceneView->getModelViewProjectionMatrix()));
 
     // Bind texture and use correct texture unit in shader.
-    glActiveTexture(GL_TEXTURE0 + textureUnit);
-    glBindTexture(GL_TEXTURE_2D, textureObjectName);
+    texture->bindToTextureUnit(textureUnit);
     shaderProgram->setUniformValue("mapTexture", textureUnit);
 
     QVector4D bboxVec4(bbox.x(), bbox.y(),
@@ -414,30 +405,45 @@ void MBaseMapActor::loadMap(std::string filename)
     // at the end close the tiff file
     GDALClose(tiffData);
 
-    // Texture object name has been created in MGLResourcesManager::
-    // generateTexture().
-    //if (textureObjectName) { glDeleteTextures(1, &textureObjectName); }
+    MGLResourcesManager* glRM = MGLResourcesManager::getInstance();
 
-    glActiveTexture(GL_TEXTURE0 + textureUnit); CHECK_GL_ERROR;
-    glBindTexture(GL_TEXTURE_2D, textureObjectName); CHECK_GL_ERROR;
+    if (texture == nullptr)
+    {
+        QString textureID = QString("baseMap_#%1").arg(getID());
+        texture = new GL::MTexture(textureID, GL_TEXTURE_2D, GL_RGB8,
+                                   longitudeDim, latitudeDim);
 
-    // Set texture parameters: wrap mode and filtering (RTVG p. 64).
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        if (!glRM->tryStoreGPUItem(texture))
+        {
+            delete texture;
+            texture = nullptr;
+        }
+    }
 
-    // DEBUG
-    //std::cout << longitudeDim * latitudeDim * colorDim << std::endl;
-    //GLint size;
-    //glGetIntegerv(GL_MAX_TEXTURE_SIZE,&size);
-    //std::cout << size << std::endl << flush;
+    if (texture)
+    {
+        texture->updateSize(longitudeDim, latitudeDim);
 
-    // Upload data array to GPU.
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB,
-                 longitudeDim, latitudeDim,
-                 0, GL_RGB, GL_UNSIGNED_BYTE, &tiffImg[0]); CHECK_GL_ERROR;
+        glRM->makeCurrent();
+        texture->bindToLastTextureUnit();
 
+        // Set texture parameters: wrap mode and filtering (RTVG p. 64).
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+
+        // DEBUG
+        //std::cout << longitudeDim * latitudeDim * colorDim << std::endl;
+        //GLint size;
+        //glGetIntegerv(GL_MAX_TEXTURE_SIZE,&size);
+        //std::cout << size << std::endl << flush;
+
+        // Upload data array to GPU.
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB,
+                     longitudeDim, latitudeDim,
+                     0, GL_RGB, GL_UNSIGNED_BYTE, &tiffImg[0]); CHECK_GL_ERROR;
+    }
 }
 
 } // namespace Met3D
