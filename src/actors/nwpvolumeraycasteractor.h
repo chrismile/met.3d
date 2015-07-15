@@ -45,6 +45,7 @@
 #include "gxfw/nwpmultivaractor.h"
 #include "gxfw/nwpactorvariable.h"
 #include "gxfw/gl/shadereffect.h"
+#include "gxfw/gl/shaderstoragebufferobject.h"
 #include "actors/transferfunction1d.h"
 #include "actors/graticuleactor.h"
 
@@ -276,7 +277,6 @@ private:
         std::shared_ptr<GL::MShaderEffect> shadowImageRenderShader;
 
         // shader to obtain init points for the normal curves
-//TODO: replace shader by compute shader
         std::shared_ptr<GL::MShaderEffect> normalCurveInitPointsShader;
         // shader to compute line segments of each normal curve
         std::shared_ptr<GL::MShaderEffect> normalCurveLineComputeShader;
@@ -297,22 +297,21 @@ private:
 
         // ground image vertex buffer
         GL::MVertexBuffer* vboShadowImage;
-        // normal curve init points vertex buffer
-        GL::MVertexBuffer* vboInitPoints;
 
         // normal curve vertices stored in a ssbo buffer to allow OpenGL to
         // read and write from/to that buffer - like UAVs in Direct3D 11
-        GLuint             ssboNormalCurves;
+        GL::MShaderStorageBufferObject* ssboInitPoints;
+        GL::MShaderStorageBufferObject* ssboNormalCurves;
 
         // Textures.
         // =========
 
         // shadow image texture2D
-        GL::MTexture *tex2DShadowImage;
+        GL::MTexture* tex2DShadowImage;
         GLint         texUnitShadowImage;
 
         // contains depth data (useful for normal curves)
-        GLuint        tex2DDepthBuffer;
+        GL::MTexture*  tex2DDepthBuffer;
         GLint         texUnitDepthBuffer;
 
         // Subroutines.
@@ -560,7 +559,7 @@ private:
     };
 
     // initial seed points for the normal curves
-    std::unordered_map<uint32_t, QVector3D>     normalCurveInitPoints;
+    GLuint                                      numNormalCurveInitPoints;
     // normal curve lines
     std::vector<NormalCurveLineSegment>         normalCurves;
 };

@@ -56,16 +56,23 @@ const int SHADOWS_VOLUME_AND_RAY = 2;
  ***                             UNIFORMS
  *****************************************************************************/
 
-// SSBOs
+// Normal curve vertex element.
 struct NormalCurveVertex
 {
     vec3 position;
     float value;
 };
 
-layout (std430, binding=0) buffer LineBuffer
+// Shader buffer storage object of the found init points.
+layout (std430, binding=0) buffer InitPointBuffer
 {
-    NormalCurveVertex vertices[];
+    NormalCurveVertex initPoints[];
+};
+
+// Shader buffer storage object of computed normal curve vertices.
+layout (std430, binding=1) buffer NormalCurveLineBuffer
+{
+    NormalCurveVertex lines[];
 };
 
 // matrices
@@ -77,7 +84,6 @@ uniform sampler1D hybridCoefficients; // SIGMA_HYBRID_PRESSURE
 uniform sampler1D pressureTable; // FOR PRESSURE_LEVELS only
 uniform sampler2D pressureTexCoordTable2D; // HYBRID_SIGMA
 uniform sampler1D transferFunction;
-
 uniform sampler1D lonLatLevAxes;
 
 uniform bool    isoEnables[MAX_ISOSURFACES];
@@ -95,7 +101,7 @@ uniform vec3    volumeTopNWCrnr;
 // scalars
 // =======
 
-uniform float   integrationStepSize; // integration step size
+uniform float   integrationStepSize; // Integration step size
 uniform int     maxNumLineSegments; // maximal number of line segments
 uniform int     maxNumLines; // maximal number of lines
 uniform uint    bisectionSteps;
@@ -141,7 +147,7 @@ uniform float   isoValueBorder;
  ***                              UTILS
  *****************************************************************************/
 
-// Classical 4-steps Runge-Kutta method
+// Classical 4-steps Runge-Kutta method.
 vec3 RK4Integration(in vec3 position, in float stepSize, in vec3 h_gradient)
 {
     vec3 sample0, sample1, sample2, sample3;
@@ -154,7 +160,7 @@ vec3 RK4Integration(in vec3 position, in float stepSize, in vec3 h_gradient)
 }
 
 
-// 3-steps Runge-Kutta method
+// 3-steps Runge-Kutta method.
 vec3 RK3Integration(in vec3 position, in float stepSize, in vec3 h_gradient)
 {
     vec3 sample0, sample1, sample2;
@@ -166,7 +172,8 @@ vec3 RK3Integration(in vec3 position, in float stepSize, in vec3 h_gradient)
     return stepSize / 6.0 * (sample0 + 4 * sample1 + sample2);
 }
 
-
+// Correct the position of any detected iso-surface by using the
+// bisection algorithm.
 void bisectionCorrection(inout vec3 position,
                          in vec3 prevPosition,
                          inout float scalar,
@@ -176,153 +183,160 @@ void bisectionCorrection(inout vec3 position,
     vec3 centerPosition;
     const uint NUM_BISECTION_STEPS = 5;
     float scalarCenter = scalar;
-    float prevscalar = scalar;
+    float prevScalar = scalar;
 
     for (int i = 0; i < NUM_BISECTION_STEPS; ++i)
     {
         centerPosition = (position + prevPosition) / 2.0;
         scalarCenter = sampleDataAtPos(centerPosition);
 
-        bool condition = scalarCenter <= threshold;
-        if (inverted)
-            condition = scalarCenter >= threshold;
+        bool condition = (inverted) ? (scalarCenter <= threshold) : (scalarCenter >= threshold);
 
         if (condition)
         {
             position = centerPosition;
             scalar = scalarCenter;
-        }
-        else
-        {
+        } else {
             prevPosition = centerPosition;
-            prevscalar = scalarCenter;
+            prevScalar = scalarCenter;
         }
     }
 }
 
-
+// Function that uses the user-determined threshold to check if the normal curve
+// computation has to be aborted or should be carried on.
 bool checkThreshold(int steps, float curveLength, float scalar, in vec3 position)
 {
-    if (position.x > dataExtent.dataSECrnr.x) return false;
-    if (position.x < dataExtent.dataNWCrnr.x) return false;
-    if (position.y < dataExtent.dataSECrnr.y) return false;
-    if (position.y > dataExtent.dataNWCrnr.y) return false;
+    // Do not sample position outside the data volume.
+    if (position.x > dataExtent.dataSECrnr.x) { return false; }
+    if (position.x < dataExtent.dataNWCrnr.x) { return false; }
+    if (position.y < dataExtent.dataSECrnr.y) { return false; }
+    if (position.y > dataExtent.dataNWCrnr.y) { return false; }
 
-    if (abortCriterion == 0)
+    if (abortCriterion == 0) // Number of steps.
     {
         return steps < maxNumSteps;
     }
-    else if (abortCriterion == 1)
+    else if (abortCriterion == 1) // Curve length.
     {
         return curveLength <= maxCurveLength;
     }
-    else if (abortCriterion == 2)
+    else if (abortCriterion == 2) // Iso-Value.
     {
         return scalar >= isoValueBorder;
     }
-    else if (abortCriterion == 3)
+    else if (abortCriterion == 3) // Second iso-value.
     {
         return scalar >= isoValueBorderOuter;
     }
-    else if (abortCriterion == 4)
+    else if (abortCriterion == 4) // First iso-value.
     {
         return scalar <= isoValueBorderInner;
     }  
 }
 
-
+// Determines the color of one normal curve by using the curve length,
+// the number of line segments (steps) or simply the scalar value.
 float determineColorValue(int steps, float curveLength, float scalar)
 {
-    if (colorMode == 0)
+    if (colorMode == 0) // Number of steps.
     {
         return 1.0 - min(1.0, max(0.0, float(steps) / maxNumSteps));
     }
-    else if (colorMode == 1)
+    else if (colorMode == 1) // Curve length.
     {
         return min(1.0f, max(0.0, curveLength / maxCurveLength));
     }
-    else
+    else // Scalar value.
     {
         return scalar;
     }
 }
 
-
-void computeLine(uint index, int direction)
+// Determine the threshold that has to be used to perform the
+// bisection correction and thus to find the exact iso-surface position.
+float determineThreshold()
 {
+    if (abortCriterion == 2) { return isoValueBorder; }
+    else if (abortCriterion == 3) { return isoValueBorderOuter; }
+    else if (abortCriterion == 4) { return isoValueBorderInner; }
+    else return 0;
+}
+
+
+void computeLine(uint initPointIndex, int direction)
+{
+    // Compute index in normal curve line buffer.
+    uint index = initPointIndex * (maxNumLineSegments + 2);
+
+    // Initialize gradient step size.
     vec3 h_gradient = initGradientSamplingStep(dataExtent);
 
-    // attributes per line
+    // Initialize attributes per normal curve line.
     int numLineSegments = 0;
     float lineLength = 0;
 
-    vec3 currentPos = vertices[index].position;
+    // Determine the entry position of the normal curve
+    vec3 currentPos = initPoints[initPointIndex].position;
     vec3 prevPos = currentPos;
     vec3 gradient = vec3(0,0,0);
     vec3 prevGradient = vec3(0,0,0);
 
-    float scalar = sampleDataAtPos(currentPos);
-    vertices[index].value = scalar;
+    float scalar = initPoints[initPointIndex].value;
 
+    // Initialize first entry of line buffer
+    lines[index].position = currentPos;
+    lines[index].value = scalar;
+
+    // Threshold to conduct bisection correction.
+    const float threshold = determineThreshold();
+    // Determine if we have to invert the scalar condition
+    // depending on how we integrate in the data volume
+    const bool inverted = (direction == 1) ? false : true;
+
+    // Start integrating process and computation of normal curve.
     int i = 1;
-
     for (; i <= maxNumLineSegments; ++i)
     {
-        if (!checkThreshold(numLineSegments, lineLength, scalar, currentPos))
-        {
-            float threshold = 0;
-            bool inverted = false;
-            if (abortCriterion >= 2)
-            {
-                if(abortCriterion == 2)
-                {
-                    threshold = isoValueBorder;
-                }
-                else if (abortCriterion == 3)
-                {
-                    threshold = isoValueBorderOuter;
-                }
-                else
-                {
-                    threshold = isoValueBorderInner;
-                    inverted = true;
-                }
-
-                vec3 prevCurPos = currentPos - gradient * direction;
-                vec3 oldCurPos = currentPos;
-                bisectionCorrection(currentPos, prevCurPos, scalar, threshold, inverted);
-
-                lineLength -= length(oldCurPos - currentPos);
-
-                vertices[index + i - 1].position = currentPos;
-                vertices[index + i - 1].value = scalar;
-            }
-            break;
-        }
-
+        // Determine the gradient by Runge-Kutta.
         gradient = RK4Integration(currentPos, integrationStepSize, h_gradient);
         currentPos += gradient * direction;
+        // Compute the new line length.
         lineLength += length(gradient);
         numLineSegments++;
         scalar = sampleDataAtPos(currentPos);
 
-        vertices[index + i].position = currentPos;
-        vertices[index + i].value = scalar;
+        // Update the line buffer.
+        lines[index + i].position = currentPos;
+        lines[index + i].value = scalar;
+
+        // If we exceeded a certain threshold then correct the last position and
+        // update the scalar value.
+        if (!checkThreshold(numLineSegments, lineLength, scalar, currentPos))
+        {
+            if (abortCriterion >= 2)
+            {
+                vec3 oldCurPos = currentPos;
+                bisectionCorrection(currentPos, prevPos, scalar, threshold, inverted);
+
+                lineLength -= length(oldCurPos - currentPos);
+
+                lines[index + i].position = currentPos;
+                lines[index + i].value = scalar;
+            }
+
+            break;
+        }
 
         prevPos = currentPos;
         prevGradient = gradient;
     }
 
+    // Determine the color of all line segments.
     for (int j = 0; j <= i; j++)
     {
-        vertices[index + j].value = determineColorValue(
-                numLineSegments, lineLength, vertices[index + j].value);
-    }
-
-    for (; i <= maxNumLineSegments + 1; ++i)
-    {
-        vertices[index + i].position = vec3(-1, -1, -1);
-        vertices[index + i].value = -1;
+        lines[index + j].value = determineColorValue(
+                numLineSegments, lineLength, lines[index + j].value);
     }
 }
 
@@ -331,16 +345,27 @@ void computeLine(uint index, int direction)
  ***                           COMPUTE SHADER
  *****************************************************************************/
 
-shader CSmain()
+// Shader that integrates only in one certain direction
+shader CSsingleIntegration()
 {
-    uint lineIndex = gl_GlobalInvocationID.x;
+    uint initPointIndex = gl_GlobalInvocationID.x;
 
-    if (lineIndex >= maxNumLines)
+    if (initPointIndex >= maxNumLines)
         return;
 
-    uint index = lineIndex * (maxNumLineSegments + 2);
+    computeLine(initPointIndex, integrationMode);
+}
 
-    computeLine(index + indexOffset, integrationMode);
+// Shader that integrates in both directions.
+shader CSdoubleIntegration()
+{
+    uint initPointIndex = gl_GlobalInvocationID.x * 2;
+
+    if (initPointIndex >= maxNumLines)
+        return;
+
+    computeLine(initPointIndex, 1);
+    computeLine(initPointIndex + 1, -1);
 }
 
 
@@ -348,7 +373,12 @@ shader CSmain()
  ***                             PROGRAMS
  *****************************************************************************/
 
-program Standard
+program SingleIntegration
 {
-    cs(430)=CSmain() : in(local_size_x = 128);
+    cs(430)=CSsingleIntegration() : in(local_size_x = 128);
+};
+
+program DoubleIntegration
+{
+    cs(430)=CSdoubleIntegration() : in(local_size_x = 128);
 };

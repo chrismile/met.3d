@@ -117,7 +117,8 @@ HEADERS += \
     src/qt_extensions/qtpropertymanager_extensions.h \
     src/system/frontendconfiguration.h \
     src/system/pipelineconfiguration.h \
-    src/data/probabltrajectoriessource.h
+    src/data/probabltrajectoriessource.h \
+    src/gxfw/gl/shaderstoragebufferobject.h
 
 SOURCES += \
     src/main.cpp \
@@ -202,7 +203,8 @@ SOURCES += \
     src/qt_extensions/qtpropertymanager_extensions.cpp \
     src/system/frontendconfiguration.cpp \
     src/system/pipelineconfiguration.cpp \
-    src/data/probabltrajectoriessource.cpp
+    src/data/probabltrajectoriessource.cpp \
+    src/gxfw/gl/shaderstoragebufferobject.cpp
 
 FORMS += \
     src/mainwindow.ui \
@@ -253,10 +255,10 @@ OTHER_FILES += \
     src/glsl/volume_compute_normalcurves.fx.glsl \
     src/glsl/volume_image.fx.glsl \
     src/glsl/volume_normalcurves_geometry.fx.glsl \
-    src/glsl/volume_normalcurves_initpoints.fx.glsl \
     src/glsl/volume_raycaster.fx.glsl \
     src/glsl/hsec_marching_squares.fx.glsl \
-    src/glsl/vsec_marching_squares.fx.glsl
+    src/glsl/vsec_marching_squares.fx.glsl \
+    src/glsl/volume_normalcurves_initpoints.fx.glsl
 
 
 DEFINES += \

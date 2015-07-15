@@ -240,6 +240,8 @@ void MTypedVertexBuffer<Data,Type,Num>::reallocate(
                      upBufSize,
                      data,
                      GL_DYNAMIC_DRAW); CHECK_GL_ERROR;
+
+        if (glRM->isManagedGPUItem(this)) glRM->updateGPUItemSize(this);
     }
 
     // If a valid GL context has been specifed, make this current.

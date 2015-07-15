@@ -220,6 +220,7 @@ unsigned int MTexture::formatSizeInBytes(GLint internalFormat)
     case GL_RGBA8I:
     case GL_RGBA8UI:
     case GL_ALPHA32F_ARB:
+    case GL_DEPTH_COMPONENT32:
         return 4;
 
     case GL_RGB16:

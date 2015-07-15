@@ -59,7 +59,7 @@ public:
       */
     unsigned int approxSizeInBytes();
 
-    unsigned int getGPUMemorySize_kb();
+    unsigned int getGPUMemorySize_kb() override;
 
     void bindToTextureUnit(GLuint unit);
 

@@ -54,13 +54,6 @@ const int SHADOWS_VOLUME_AND_RAY = 2;
  ***                             INTERFACES
  *****************************************************************************/
 
-interface VStoFS
-{
-    smooth vec3 worldSpaceCoordinate;
-    smooth vec2 screenCoords;
-};
-
-
 /*****************************************************************************
  ***                             UNIFORMS
  *****************************************************************************/
@@ -75,9 +68,12 @@ uniform sampler1D hybridCoefficients; // HYBRID_SIGMA
 // contains surface pressure at grid point (i, j)
 uniform sampler2D surfacePressure; // HYBRID_SIGMA
 uniform sampler2D pressureTexCoordTable2D; // HYBRID_SIGMA
-uniform sampler2D disturbTex;
+uniform sampler2D distortTex;
 uniform sampler3D dataVolume;
 uniform sampler1D lonLatLevAxes;
+// Denotes an imaginary grid along the bounding box, indicating if there has
+// been found an init point at a certain grid cell. Can also be used as voxelized model.
+layout(r32i) uniform iimage3D ghostGrid;
 
 uniform bool    isoEnables[MAX_ISOSURFACES];
 uniform float   isoValues[MAX_ISOSURFACES];
@@ -98,22 +94,42 @@ uniform vec3    volumeTopNWCrnr;
 // =======
 uniform float   stepSize;
 uniform float   isoValue;
-uniform float   isoValueOuter;
 
 uniform uint     bisectionSteps;
 
 /*** ECMWF-specific ***/
 //   ==============   //
 uniform vec2    pToWorldZParams;
-uniform bool    spatialCDFVisEnabled;
 uniform float   numPressureLevels;
 
 /*** Normal Curve-specific ***/
 //   =====================   //
-uniform vec3    lightDirection;
-uniform float   boxDistance;
-uniform vec3    gridSpacing; // to disturb ray position
+uniform vec3    castingDirection; // The direction the rays are casted along.
+uniform float   maxRayLength; // Maximal length of the ray from the origin.
+uniform vec3    initWorldPos; // Initial world position of the ray.
+uniform vec3    deltaGridX; // Distance between two rays in x-direction.
+uniform vec3    deltaGridY; // Distance between two rays in y-direction.
+uniform ivec2   maxNumRays; // Maximum number of rays in x/y-dimension.
+uniform bool    doubleIntegration; // Indicates if double integration is activated.
 
+uniform vec3    bboxMin; // Minimal bounding box boundaries.
+uniform vec3    bboxMax; // Maximal bounding box boundaries.
+
+// Atomic counter counting the number of init points.
+layout(binding=0, offset=0) uniform atomic_uint counter;
+
+// Normal curve vertex element.
+struct NormalCurveVertex
+{
+    vec3 position;
+    float value;
+};
+
+// Shader buffer storage object of the found init points.
+layout (std430, binding=0) buffer InitPointBuffer
+{
+    NormalCurveVertex initPoints[];
+};
 
 /*****************************************************************************
  ***                             INCLUDES
@@ -134,25 +150,11 @@ uniform vec3    gridSpacing; // to disturb ray position
 
 
 /*****************************************************************************
- ***                           VERTEX SHADER
+ ***                          COMPUTE SHADER
  *****************************************************************************/
 
-shader VSmain(in vec2 vertex0 : 0, in vec3 border0 : 1,
-              out VStoFS Output)
-{
-    // pass vertex unhandled through vertex shader
-    //world_position = vec3(vertex + 1 / 2.0,0);
-    Output.worldSpaceCoordinate = border0;
-    // ndc coordinates.xy | -1 = near plane | 1 = point
-    gl_Position = vec4(vertex0,-1,1);
-    Output.screenCoords = vertex0 * 0.5 + 0.5;
-}
-
-
-/*****************************************************************************
- ***                          FRAGMENT SHADER
- *****************************************************************************/
-
+// Correct the position of any detected iso-surface by using the
+// bisection algorithm.
 void bisectionCorrection(inout vec3 rayPosition, inout float lambda,
                          in vec3 prevRayPosition, in float prevLambda,
                          in bool inverted)
@@ -171,24 +173,20 @@ void bisectionCorrection(inout vec3 rayPosition, inout float lambda,
 
         scalar = sampleDataAtPos(rayCenterPosition);
 
-        bool condition = false;
-
-        if (inverted)
-        {
-            condition = scalar <= isoValue;
-        }
-        else
-        {
-            condition = scalar >= isoValue;
-        }
+        // Condition test depends on from which direction the ray was shot.
+        // This could also be implemented via crossing levels.
+        bool condition = (inverted) ? scalar <= isoValue : scalar >= isoValue;
 
         if (condition)
         {
+            // If central position is located after the iso-surface, then
+            // set the ray position to the center of the interval.
             rayPosition = rayCenterPosition;
             lambda = centerLambda;
         }
         else
         {
+            // Otherwise, set the previous ray position to the center.
             prevRayPosition = rayCenterPosition;
             prevLambda = centerLambda;
         }
@@ -196,55 +194,36 @@ void bisectionCorrection(inout vec3 rayPosition, inout float lambda,
 }
 
 
-shader FSmain(in VStoFS Input,
-              out vec4 fragColor : 0,
-              out vec4 fragColor2 : 1,
-              out vec4 fragColor3 : 2,
-              out vec4 fragColor4 : 3,
-              out vec4 fragColor5 : 4,
-              out vec4 fragColor6 : 5,
-              out vec4 fragColor7 : 6,
-              out vec4 fragColor8 : 7)
+shader CSmain()
 {
-    // temporary color outputs;
-    vec4 initPoints[8] = vec4[8](vec4(0.0), vec4(0.0),
-                                 vec4(0.0), vec4(0.0),
-                                 vec4(0.0), vec4(0.0),
-                                 vec4(0.0), vec4(0.0));
+    // Determine the indices of the ray grid.
+    const uint indexX = gl_GlobalInvocationID.x;
+    const uint indexY = gl_GlobalInvocationID.y;
 
-    //initGlobalDataExtentVars();
+    // Make sure that there are no rays outside the defined ray grid.
+    // So, the indices must not exceed the maximum number of rays.
+    if (indexX >= maxNumRays.x || indexY >= maxNumRays.y) { return; }
 
-    int currentCrossingLevel = 0;
-    bool invertCondition = false;
+    // Compute the texture coordinates of the distortion texture in range [0;1].
+    const vec2 distortTexCoords = vec2(indexX / float(maxNumRays.x - 1),
+                                       indexY / float(maxNumRays.y - 1));
 
-    vec2 lambdaMinMax = vec2(0,0);
+    // Obtain the random values in x/y direction.
+    const vec2 distortVec = textureLod(distortTex, distortTexCoords, 0).rg;
+    // Compute world position by using the current indices and grid cell distances.
+    vec3 worldPos = initWorldPos + indexX * deltaGridX + indexY * deltaGridY;
+    // Distort the original world position.
+    worldPos += deltaGridX * distortVec.x + deltaGridY * distortVec.y;
 
-    vec2 disturb = textureLod(disturbTex, Input.screenCoords, 0).rg;
-
-    vec3 right, up;
-
-    if (lightDirection.x != 0)
-    {
-        right = vec3(0, gridSpacing.y, 0);
-        up = vec3(0,0,gridSpacing.z);
-    }
-    else if (lightDirection.y != 0)
-    {
-        right = vec3(gridSpacing.x,0,0);
-        up = vec3(0,0,gridSpacing.z);
-    }
-    else
-    {
-        right = vec3(gridSpacing.x,0,0);
-        up = vec3(0,gridSpacing.y,0);
-    }
-
+    // Create the corresponding ray.
     Ray ray;
-    ray.origin = Input.worldSpaceCoordinate + (right * disturb.x + up * disturb.y);
-    ray.direction = lightDirection;
+    ray.origin = worldPos;
+    ray.direction = normalize(castingDirection);
 
-    lambdaMinMax.x = 0.0;
-    lambdaMinMax.y = boxDistance;
+    // Define the maximum of detectable iso-surfaces along the ray.
+    const uint MAX_CROSSINGS = 8;
+    uint numCurrentCrossings = 0;
+    const vec2 lambdaMinMax = vec2(0, maxRayLength);
 
     float lambda = lambdaMinMax.x;
     vec3 rayPosition = ray.origin + lambdaMinMax.x * ray.direction;
@@ -252,23 +231,68 @@ shader FSmain(in VStoFS Input,
     vec3 prevRayPosition = rayPosition;
     float prevLambda = lambda;
 
-    while (lambda < lambdaMinMax.y)
+    bool invertCondition = false;
+    bool condition = false;
+
+    // Traverse the grid across the ray and detect any intersection points.
+    while (lambda < lambdaMinMax.y && numCurrentCrossings < MAX_CROSSINGS)
     {
         float scalar = sampleDataAtPos(rayPosition);
 
-        bool condition = false;
-        if (invertCondition)
-            condition = scalar <= isoValue;
-        else
-            condition = scalar >= isoValue;
+        // Check depends on if the ray position is inside/outside the iso-surface.
+        if (invertCondition) { condition = scalar <= isoValue; }
+        else { condition = scalar >= isoValue; }
 
+        // If test passes then one intersection point is detected.
         if (condition)
         {
+            numCurrentCrossings++;
+
+            // Search for an exact intersection point along the surface.
             bisectionCorrection(rayPosition, lambda, prevRayPosition, prevLambda, invertCondition);
 
-            initPoints[currentCrossingLevel] = vec4(rayPosition, 1);
+            scalar = sampleDataAtPos(rayPosition);
 
-            if (++currentCrossingLevel >= 8) { break; }
+            // Use the ghost grid to check if there has been detected an intersection point
+            // at the current position belonging to a cell of the ghost grid.
+            // If the index is 1, then we've already found an intersection point and do not update
+            // the init points buffer. Otherwise, increment the counter and add the current position
+            // and scalar value.
+            const ivec3 ghostGridSize = imageSize(ghostGrid) - ivec3(1,1,1);
+
+            const vec3 boxExtent = abs(bboxMax - bboxMin);
+            const vec3 ghostGridNormTexCoords = abs(rayPosition - bboxMin) / boxExtent;
+
+            // Calculate the indices within the ghost grid
+            ivec3 ghostGridTexCoords = ivec3(0,0,0);
+            ghostGridTexCoords.x = int(ghostGridNormTexCoords.x * ghostGridSize.x);
+            ghostGridTexCoords.y = int(ghostGridNormTexCoords.y * ghostGridSize.y);
+            ghostGridTexCoords.z = int(ghostGridNormTexCoords.z * ghostGridSize.z);
+
+            // Obtain the old value and only exchange the current value with 1
+            // if the value was zero before.
+            int ghostCount = imageAtomicCompSwap(ghostGrid, ghostGridTexCoords, 0, 1);
+
+            // If there is no currently detected init point at the grid cell, add the current position
+            // to the init points and set the cell as marked.
+            if (ghostCount == 0)
+            {
+                // Increment the init point counter by one.
+                uint index = atomicCounterIncrement(counter);
+
+                // Write to the shader buffer.
+                initPoints[index].position = rayPosition;
+                initPoints[index].value = scalar;
+
+                // If we are in double integration mode, add another entry to the list.
+                if (doubleIntegration)
+                {
+                    index = atomicCounterIncrement(counter);
+
+                    initPoints[index].position = rayPosition;
+                    initPoints[index].value = scalar;
+                }
+            }
 
             invertCondition = !invertCondition;
         }
@@ -279,15 +303,6 @@ shader FSmain(in VStoFS Input,
         lambda += stepSize;
         rayPosition += rayPosIncrement;
     }
-
-    fragColor = initPoints[0];
-    fragColor2 = initPoints[1];
-    fragColor3 = initPoints[2];
-    fragColor4 = initPoints[3];
-    fragColor5 = initPoints[4];
-    fragColor6 = initPoints[5];
-    fragColor7 = initPoints[6];
-    fragColor8 = initPoints[7];
 }
 
 
@@ -297,6 +312,5 @@ shader FSmain(in VStoFS Input,
 
 program Standard
 {
-    vs(420)=VSmain();
-    fs(420)=FSmain();
+    cs(430)=CSmain()  : in(local_size_x = 64, local_size_y = 2, local_size_z = 1);
 };

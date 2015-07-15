@@ -63,8 +63,7 @@ MNWPVolumeRaycasterActor::MNWPVolumeRaycasterActor()
       shadingVariableIndex(0),
       shadingVar(nullptr),
       gl(), // initialize gl objects
-      normalCurveNumVertices(0),
-      normalCurveInitPoints()
+      normalCurveNumVertices(0)
 {
     // Enable picking for the scene view's analysis mode. See
     // triggerAnalysisOfObjectAtPos().
@@ -123,12 +122,12 @@ MNWPVolumeRaycasterActor::OpenGL::OpenGL()
       vboPositionCross(nullptr),
       vboShadowImageRender(nullptr),
       vboShadowImage(nullptr),
-      vboInitPoints(nullptr),
-      ssboNormalCurves(0),
+      ssboInitPoints(nullptr),
+      ssboNormalCurves(nullptr),
 
       tex2DShadowImage(nullptr),
       texUnitShadowImage(-1),
-      tex2DDepthBuffer(0),
+      tex2DDepthBuffer(nullptr),
       texUnitDepthBuffer(-1)
 {
 }
@@ -398,10 +397,10 @@ MNWPVolumeRaycasterActor::NormalCurveSettings::NormalCurveSettings(
       stepSize(0.1),
       integrationDir(IntegrationDir::Forwards),
       numLineSegments(100),
-      initPointResX(0.5),
-      initPointResY(0.5),
-      initPointResZ(0.5),
-      initPointVariance(0.45),
+      initPointResX(1.75),
+      initPointResY(1.75),
+      initPointResZ(1.0),
+      initPointVariance(0.3),
       numSteps(1),
       curveLength(1),
       isoValueBorder(75)
@@ -409,7 +408,7 @@ MNWPVolumeRaycasterActor::NormalCurveSettings::NormalCurveSettings(
     MActor *a = hostActor;
     MQtProperties *properties = a->getQtProperties();
 
-    groupProp = a->addProperty(GROUP_PROPERTY, "normal curve settings");
+    groupProp = a->addProperty(GROUP_PROPERTY, "normal curves");
 
     normalCurvesEnabledProp = a->addProperty(BOOL_PROPERTY, "enabled", groupProp);
     properties->mBool()->setValue(normalCurvesEnabledProp, normalCurvesEnabled);
@@ -457,16 +456,16 @@ MNWPVolumeRaycasterActor::NormalCurveSettings::NormalCurveSettings(
     properties->setInt(numLineSegmentsProp, numLineSegments, 1, 500);
 
     seedPointResXProp = a->addProperty(
-                DOUBLE_PROPERTY, "seed points resolution X", groupProp);
-    properties->setDouble(seedPointResXProp, initPointResX, 0.25, 4, 3, 0.25);
+                DOUBLE_PROPERTY, "seed spacing lon", groupProp);
+    properties->setDouble(seedPointResXProp, initPointResX, 0.1, 10, 3, 0.1);
 
     seedPointResYProp = a->addProperty(
-                DOUBLE_PROPERTY, "seed points resolution Y", groupProp);
-    properties->setDouble(seedPointResYProp, initPointResY, 0.25, 4, 3, 0.25);
+                DOUBLE_PROPERTY, "seed spacing lat", groupProp);
+    properties->setDouble(seedPointResYProp, initPointResY, 0.1, 10, 3, 0.1);
 
     seedPointResZProp = a->addProperty(
-                DOUBLE_PROPERTY, "seed points resolution Z", groupProp);
-    properties->setDouble(seedPointResZProp, initPointResZ, 0.25, 4, 3, 0.25);
+                DOUBLE_PROPERTY, "seed spacing Z", groupProp);
+    properties->setDouble(seedPointResZProp, initPointResZ, 0.1, 10, 3, 0.1);
 
     seedPointVarianceProp = a->addProperty(
                 DOUBLE_PROPERTY, "seed points variance", groupProp);
@@ -489,7 +488,11 @@ MNWPVolumeRaycasterActor::~MNWPVolumeRaycasterActor()
 {
     MGLResourcesManager* glRM = MGLResourcesManager::getInstance();
     if (gl.tex2DShadowImage) glRM->releaseGPUItem(gl.tex2DShadowImage);
-
+    if (gl.tex2DDepthBuffer) glRM->releaseGPUItem(gl.tex2DDepthBuffer);
+    if (gl.vboShadowImageRender) glRM->releaseGPUItem(gl.vboShadowImageRender);
+    if (gl.vboBoundingBox) glRM->releaseGPUItem(gl.vboBoundingBox);
+    if (gl.ssboInitPoints != nullptr) glRM->releaseGPUItem(gl.ssboInitPoints);
+    if (gl.ssboNormalCurves != nullptr) glRM->releaseGPUItem(gl.ssboNormalCurves);
     if (gl.texUnitShadowImage >=0) releaseTextureUnit(gl.texUnitShadowImage);
     if (gl.texUnitDepthBuffer >=0) releaseTextureUnit(gl.texUnitDepthBuffer);
 
@@ -1234,7 +1237,8 @@ void MNWPVolumeRaycasterActor::onQtPropertyChanged(QtProperty* property)
              property == normalCurveSettings->seedPointResXProp ||
              property == normalCurveSettings->seedPointResYProp ||
              property == normalCurveSettings->seedPointResZProp ||
-             property == normalCurveSettings->seedPointVarianceProp)
+             property == normalCurveSettings->seedPointVarianceProp ||
+             property == normalCurveSettings->integrationDirProp)
     {
         normalCurveSettings->surface =
                 static_cast<NormalCurveSettings::Surface>(
@@ -1247,6 +1251,9 @@ void MNWPVolumeRaycasterActor::onQtPropertyChanged(QtProperty* property)
                 ->value(normalCurveSettings->seedPointResZProp);
         normalCurveSettings->initPointVariance = properties->mDouble()
                 ->value(normalCurveSettings->seedPointVarianceProp);
+        normalCurveSettings->integrationDir =
+                static_cast<NormalCurveSettings::IntegrationDir>(
+                    properties->mEnum()->value(normalCurveSettings->integrationDirProp));
 
         if (normalCurveSettings->normalCurvesEnabled)
         {
@@ -1271,7 +1278,6 @@ void MNWPVolumeRaycasterActor::onQtPropertyChanged(QtProperty* property)
     else if (property == normalCurveSettings->thresholdProp ||
              property == normalCurveSettings->colourProp ||
              property == normalCurveSettings->stepSizeProp ||
-             property == normalCurveSettings->integrationDirProp ||
              property == normalCurveSettings->numStepsProp ||
              property == normalCurveSettings->curveLengthProp ||
              property == normalCurveSettings->isoValueBorderProp)
@@ -1284,9 +1290,6 @@ void MNWPVolumeRaycasterActor::onQtPropertyChanged(QtProperty* property)
                     properties->mEnum()->value(normalCurveSettings->colourProp));
         normalCurveSettings->stepSize = properties->mDouble()->value(
                     normalCurveSettings->stepSizeProp);
-        normalCurveSettings->integrationDir =
-                static_cast<NormalCurveSettings::IntegrationDir>(
-                    properties->mEnum()->value(normalCurveSettings->integrationDirProp));
         normalCurveSettings->numSteps = properties->mInt()->value(
                     normalCurveSettings->numStepsProp);
         normalCurveSettings->curveLength = properties->mDouble()->value(
@@ -1511,6 +1514,11 @@ void MNWPVolumeRaycasterActor::renderToCurrentContext(
         }
     }
 
+    // Render depth of normal curve segments to depth buffer -- needs to be
+    // called before createShadowImage() as the latter requires the depth
+    // buffer in the shader.
+    renderToDepthTexture(sceneView);
+
     if (rayCasterSettings->shadowMode == RenderMode::ShadowMap)
     {
         if (updateNextRenderFrame[UpdateShadowImage])
@@ -1530,9 +1538,6 @@ void MNWPVolumeRaycasterActor::renderToCurrentContext(
     {
         renderNormalCurves(sceneView, false);
     }
-
-    // render depth of curve segments to depth buffer
-    renderToDepthTexture(sceneView);
 
     // Raycaster.
     // ==========
@@ -1797,28 +1802,33 @@ void MNWPVolumeRaycasterActor::generateVolumeBoxGeometry()
                 ? bbSettings->pBot_hPa : bbSettings->pTop_hPa;
     }
 
-    const QString vboID = QString("vbo_bbox_actor#%1").arg(myID);
-    GL::MVertexBuffer* vbo = static_cast<GL::MVertexBuffer*>(glRM->getGPUItem(vboID));
-
-    if (vbo)
+    if (gl.vboBoundingBox)
     {
-        gl.vboBoundingBox = vbo;
-        GL::MFloat3VertexBuffer* buf = dynamic_cast<GL::MFloat3VertexBuffer*>(vbo);
+        GL::MFloat3VertexBuffer* buf = dynamic_cast<GL::MFloat3VertexBuffer*>(
+                    gl.vboBoundingBox);
         buf->update(vertexData, numVertices);
     }
     else
     {
-        GL::MFloat3VertexBuffer* buf = nullptr;
-        buf = new GL::MFloat3VertexBuffer(vboID, numVertices);
+        const QString vboID = QString("vbo_bbox_actor#%1").arg(myID);
+
+        GL::MFloat3VertexBuffer* buf =
+                new GL::MFloat3VertexBuffer(vboID, numVertices);
+
         if (glRM->tryStoreGPUItem(buf))
         {
             buf->upload(vertexData, numVertices);
+            gl.vboBoundingBox = static_cast<GL::MVertexBuffer*>(
+                        glRM->getGPUItem(vboID));
         }
         else
         {
+            LOG4CPLUS_WARN(mlog, "WARNING: cannot store buffer for volume"
+                           " bbox in GPU memory.");
             delete buf;
+            return;
         }
-        gl.vboBoundingBox = static_cast<GL::MVertexBuffer*>(glRM->getGPUItem(vboID));
+
     }
 
     glGenBuffers(1, &gl.iboBoundingBox); CHECK_GL_ERROR;
@@ -2099,16 +2109,15 @@ void MNWPVolumeRaycasterActor::setRayCasterShaderVars(
 {
     setCommonShaderVars(shader, sceneView);
 
-    // set depth texture for opacity mapping
-    // =====================================
 
-    glActiveTexture(GL_TEXTURE0 + gl.texUnitDepthBuffer);
-    glBindTexture(GL_TEXTURE_2D, gl.tex2DDepthBuffer);
+    // 1) Bind the depth buffer texture to the current program.
+    if (gl.tex2DDepthBuffer)
+    {
+        gl.tex2DDepthBuffer->bindToTextureUnit(gl.texUnitDepthBuffer);
+        shader->setUniformValue("depthTex", gl.texUnitDepthBuffer);
+    }
 
-    shader->setUniformValue("depthTex", gl.texUnitDepthBuffer);
-
-    // set lighting params variables
-    // =============================
+    // 2) Set lighting params variables.
 
     shader->setUniformValue("lightingMode", lightingSettings->lightingMode); CHECK_GL_ERROR;
     shader->setUniformValue("ambientCoeff", lightingSettings->ambient); CHECK_GL_ERROR;
@@ -2117,8 +2126,7 @@ void MNWPVolumeRaycasterActor::setRayCasterShaderVars(
     shader->setUniformValue("shininessCoeff", lightingSettings->shininess); CHECK_GL_ERROR;
     shader->setUniformValue("shadowColor", lightingSettings->shadowColor); CHECK_GL_ERROR;
 
-    // set raycaster shader variables
-    // ==============================
+    // 3) Set raycaster shader variables.
 
     // enhance performance when user is interacting with scene
     if (sceneView->userIsInteractingWithScene() || sceneView->userIsScrollingWithMouse())
@@ -2147,8 +2155,7 @@ void MNWPVolumeRaycasterActor::setRayCasterShaderVars(
     shader->setUniformValue(
                 "numIsoValues", rayCasterSettings->numEnabledIsoValues); CHECK_GL_ERROR;
 
-    // set shadow variables
-    // ====================
+    // 4) Set shadow setting variables.
 
     if (rayCasterSettings->shadowMode == RenderMode::ShadowMap)
     {
@@ -2191,9 +2198,7 @@ void MNWPVolumeRaycasterActor::setNormalCurveShaderVars(
                 "normalized", GLboolean(
                     normalCurveSettings->colour != NormalCurveSettings::ColorIsoValue));
 
-    glActiveTexture(GL_TEXTURE0 + gl.texUnitDepthBuffer);
-    glBindTexture(GL_TEXTURE_2D, gl.tex2DDepthBuffer);
-
+    gl.tex2DDepthBuffer->bindToTextureUnit(gl.texUnitDepthBuffer);
     shader->setUniformValue("depthTex", gl.texUnitDepthBuffer);
 }
 
@@ -2296,36 +2301,38 @@ void MNWPVolumeRaycasterActor::createShadowImage(
         bbSettings->urcrnLon, bbSettings->urcrnLat, zMax,
     };
 
-    const QString vboID = QString("vbo_shadowimage_actor_#%1").arg(myID);
-    GL::MVertexBuffer* vbo = static_cast<GL::MVertexBuffer*>(
-                                        glRM->getGPUItem(vboID));
 
     const GLint numVertices = 20;
 
-    if (vbo)
+    if (gl.vboShadowImage)
     {
-        gl.vboShadowImage = vbo;
-        GL::MFloatVertexBuffer* buf = dynamic_cast<GL::MFloatVertexBuffer*>(vbo);
+        GL::MFloatVertexBuffer* buf = dynamic_cast<GL::MFloatVertexBuffer*>(
+                    gl.vboShadowImage);
         buf->update(vertexData, numVertices, 0, 0, sceneView);
     }
     else
     {
-        // update buffer instead of deleting and creating a new one
-        GL::MFloatVertexBuffer* newVB = nullptr;
-        newVB = new GL::MFloatVertexBuffer(vboID, numVertices);
+        const QString vboID = QString("vbo_shadowimage_actor_#%1").arg(myID);
+
+        GL::MFloatVertexBuffer* newVB =
+                new GL::MFloatVertexBuffer(vboID, numVertices);
+
         if (glRM->tryStoreGPUItem(newVB))
         {
             newVB->upload(vertexData, numVertices, sceneView);
+            gl.vboShadowImage = static_cast<GL::MVertexBuffer*>(
+                        glRM->getGPUItem(vboID));
         }
         else
         {
+            LOG4CPLUS_WARN(mlog, "WARNING: cannot store buffer for shadow"
+                           " image bbox in GPU memory.");
             delete newVB;
+            return;
         }
-        gl.vboShadowImage = static_cast<GL::MVertexBuffer*>(glRM->getGPUItem(vboID));
     }
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);  CHECK_GL_ERROR;
-
 
     float ratio = lonDist / latDist;
 
@@ -2335,9 +2342,6 @@ void MNWPVolumeRaycasterActor::createShadowImage(
     GLuint tempFBO = 0;
     glGenFramebuffers(1, &tempFBO);
     glBindFramebuffer(GL_FRAMEBUFFER, tempFBO);
-
-    QString shadowImageTextureID = QString("shadow_image_2D_actor_#%1").arg(myID);
-//    gl.tex2DShadowImage = dynamic_cast<GL::Texture*>(glRM->getGPUItem(getID()));
 
     GLint oldResX = 0;
     GLint oldResY = 0;
@@ -2350,16 +2354,33 @@ void MNWPVolumeRaycasterActor::createShadowImage(
         glBindTexture(GL_TEXTURE_2D, 0);
     }
 
-    // Create new framebuffer texture if either none had been created so far,
-    // or if the resolution has changed.
+    // Create new framebuffer texture if none exists, or update its size if
+    // the resolution has changed.
     if (!gl.tex2DShadowImage || oldResX != resX || oldResY != resY)
     {
         if (!gl.tex2DShadowImage)
         {
+            const QString shadowImageTextureID =
+                    QString("shadow_image_2D_actor_#%1").arg(myID);
+
             gl.tex2DShadowImage = new GL::MTexture(shadowImageTextureID,
-                                                  GL_TEXTURE_2D, GL_RGBA32F,
-                                                  resX, resY);
-            glRM->tryStoreGPUItem(gl.tex2DShadowImage);
+                                                   GL_TEXTURE_2D, GL_RGBA32F,
+                                                   resX, resY);
+
+            if (glRM->tryStoreGPUItem(gl.tex2DShadowImage))
+            {
+                gl.tex2DShadowImage = dynamic_cast<GL::MTexture*>(
+                            glRM->getGPUItem(shadowImageTextureID));
+
+            }
+            else
+            {
+                LOG4CPLUS_WARN(mlog, "WARNING: cannot store texture for shadow"
+                               " image in GPU memory.");
+                delete gl.tex2DShadowImage;
+                gl.tex2DShadowImage = nullptr;
+                return;
+            }
         }
         else
         {
@@ -2403,14 +2424,14 @@ void MNWPVolumeRaycasterActor::createShadowImage(
 
     // bind vertex attributes
     gl.vboShadowImage->attachToVertexAttribute(SHADER_VERTEX_ATTRIBUTE,
-                                                     2, false,
-                                                     5 * sizeof(float),
-                                                     (const GLvoid*)(0 * sizeof(float)));
+                                               2, false,
+                                               5 * sizeof(float),
+                                               (const GLvoid*)(0 * sizeof(float)));
 
     gl.vboShadowImage->attachToVertexAttribute(SHADER_BORDER_ATTRIBUTE,
-                                                     3, false,
-                                                     5 * sizeof(float),
-                                                     (const GLvoid*)(2 * sizeof(float)));
+                                               3, false,
+                                               5 * sizeof(float),
+                                               (const GLvoid*)(2 * sizeof(float)));
 
     // select the mode, polygons have to be drawn. Here back faces and their surfaces are filled
     glPolygonMode(GL_FRONT_AND_BACK,GL_FILL); CHECK_GL_ERROR;
@@ -2432,7 +2453,7 @@ void MNWPVolumeRaycasterActor::createShadowImage(
     pEffect->bindProgram("Shadow");
     setRayCasterShaderVars(pEffect, sceneView);
     pEffect->setUniformValue("shadowMode", GLint(RenderMode::ShadowMap));
-    pEffect->setUniformValue("stepSize", GLfloat(0.5));
+    pEffect->setUniformValue("stepSize", rayCasterSettings->stepSize);
 
     // set indices of subroutines
  //   pEffect->printSubroutineInformation(GL_FRAGMENT_SHADER);
@@ -2503,33 +2524,37 @@ void MNWPVolumeRaycasterActor::renderShadows(
     };
 
     MGLResourcesManager* glRM = MGLResourcesManager::getInstance();
-
-    const QString vboID = QString("vbo_shadowrender_actor#%1").arg(myID);
-    GL::MVertexBuffer* vbo = static_cast<GL::MVertexBuffer*>(
-                                        glRM->getGPUItem(vboID));
-
     const GLint numVertices = 20;
 
-    if (vbo)
+    // Check buffer for shadow map bounding box.
+    if (gl.vboShadowImageRender)
     {
-        gl.vboShadowImageRender = vbo;
-        GL::MFloatVertexBuffer* buf = dynamic_cast<GL::MFloatVertexBuffer*>(vbo);
+        // Update buffer.
+        GL::MFloatVertexBuffer* buf = dynamic_cast<GL::MFloatVertexBuffer*>(
+                    gl.vboShadowImageRender);
         buf->update(vertexData, numVertices, 0,  0, sceneView);
     }
     else
     {
-        // update buffer instead of deleting and creating a new one
-        GL::MFloatVertexBuffer* newVB = nullptr;
-        newVB = new GL::MFloatVertexBuffer(vboID, numVertices);
+        // Create new buffer.
+        const QString vboID = QString("vbo_shadowmap_bbox_actor#%1").arg(myID);
+
+        GL::MFloatVertexBuffer* newVB =
+                new GL::MFloatVertexBuffer(vboID, numVertices);
+
         if (glRM->tryStoreGPUItem(newVB))
         {
             newVB->upload(vertexData, numVertices, sceneView);
+            gl.vboShadowImageRender = static_cast<GL::MVertexBuffer*>(
+                        glRM->getGPUItem(vboID));
         }
         else
         {
+            LOG4CPLUS_WARN(mlog, "WARNING: cannot store buffer for shadow"
+                           " image bbox in GPU memory.");
             delete newVB;
+            return;
         }
-        gl.vboShadowImageRender = static_cast<GL::MVertexBuffer*>(glRM->getGPUItem(vboID));
     }
 
     glBindBuffer(GL_ARRAY_BUFFER, 0); CHECK_GL_ERROR;
@@ -2564,395 +2589,321 @@ void MNWPVolumeRaycasterActor::renderShadows(
 void MNWPVolumeRaycasterActor::computeNormalCurveInitialPoints(
         MSceneViewGLWidget* sceneView)
 {
-    updateNextRenderFrame.reset(ComputeNCInitPoints);
-
-    float boxMinZ = sceneView->worldZfromPressure(bbSettings->pBot_hPa);
-    float boxMaxZ = sceneView->worldZfromPressure(bbSettings->pTop_hPa);
-
-    float gridSpace = (var->grid->lons[1] - var->grid->lons[0]);
-
-    float boxSpaceLon = std::abs(bbSettings->urcrnLon - bbSettings->llcrnLon);
-    float boxSpaceLat = std::abs(bbSettings->urcrnLat - bbSettings->llcrnLat);
-    float boxSpaceP = std::abs(boxMaxZ - boxMinZ);
-
-    QVector3D castDirection[] =
-    {
-        QVector3D(0, 0,-1),
-        QVector3D(0, 1, 0),
-        QVector3D(1, 0, 0)
-    };
-
-    float castRayLength[] =
-    {
-        boxSpaceP, boxSpaceLat, boxSpaceLon
-    };
-
-    struct ImageRes
-    {
-        int width, height;
-    };
-
-    // adjust grid in every direction (voxels are equidistant in every direction)
-    uint16_t numLons = boxSpaceLon / gridSpace;
-    uint16_t numLats = boxSpaceLat / gridSpace;
-    uint16_t numPLs = boxSpaceP / gridSpace;
-
-    int resLons = 1 << static_cast<int>(std::ceil(
-                    log2(static_cast<int>((numLons * normalCurveSettings->initPointResX )))));
-    int resLats = 1 << static_cast<int>(std::ceil(
-                    log2(static_cast<int>((numLats * normalCurveSettings->initPointResY )))));
-    int resPLs =  1 << static_cast<int>(std::ceil(
-                    log2(static_cast<int>((numPLs  * normalCurveSettings->initPointResZ )))));
-
-    // actual space between two grids in a certain dimension (according to viewport resolution)
-    QVector3D gridSpacing(boxSpaceLon / resLons ,
-                          boxSpaceLat / resLats ,
-                          boxSpaceP / resPLs );
-
-    ImageRes castImageRes[] =
-    {
-        { resLons, resLats },
-        { resLons, resPLs },
-        { resLats, resPLs  }
-    };
-
-    // temporary FBO to render
-    GLuint tempFBO = 0;
-    glGenFramebuffers(1, &tempFBO);
-
-    float vertexData[] =
-    {
-        // top view
-        -1,-1,
-        bbSettings->llcrnLon, bbSettings->llcrnLat, boxMaxZ,
-        -1, 1,
-        bbSettings->llcrnLon, bbSettings->urcrnLat, boxMaxZ,
-         1,-1,
-        bbSettings->urcrnLon, bbSettings->llcrnLat, boxMaxZ,
-         1, 1,
-        bbSettings->urcrnLon, bbSettings->urcrnLat, boxMaxZ,
-
-        // front view
-        -1,-1,
-        bbSettings->llcrnLon, bbSettings->llcrnLat, boxMinZ,
-        -1, 1,
-        bbSettings->llcrnLon, bbSettings->llcrnLat, boxMaxZ,
-         1,-1,
-        bbSettings->urcrnLon, bbSettings->llcrnLat, boxMinZ,
-         1, 1,
-        bbSettings->urcrnLon, bbSettings->llcrnLat, boxMaxZ,
-
-        // left view
-        -1,-1,
-        bbSettings->llcrnLon, bbSettings->urcrnLat, boxMinZ,
-        -1, 1,
-        bbSettings->llcrnLon, bbSettings->urcrnLat, boxMaxZ,
-         1,-1,
-        bbSettings->llcrnLon, bbSettings->llcrnLat, boxMinZ,
-         1, 1,
-        bbSettings->llcrnLon, bbSettings->llcrnLat, boxMaxZ
-    };
-
     MGLResourcesManager* glRM = MGLResourcesManager::getInstance();
 
-    const QString vboID = QString("vbo_ncinitpoints_actor#%1").arg(myID);
-    GL::MVertexBuffer* vbo = static_cast<GL::MVertexBuffer*>(
-                                            glRM->getGPUItem(vboID));
+    numNormalCurveInitPoints = 0;
+    updateNextRenderFrame.reset(ComputeNCInitPoints);
 
-    const GLint numVertices = 20 * 3;
+    // Compute minimum and maximum z-values of the data.
+    const float dataMinZ = sceneView->worldZfromPressure(bbSettings->pBot_hPa);
+    const float dataMaxZ = sceneView->worldZfromPressure(bbSettings->pTop_hPa);
 
-    if (vbo)
+    // Determine seed points grid spacing.
+    const float gridSpaceLon = normalCurveSettings->initPointResX;
+    const float gridSpaceLat = normalCurveSettings->initPointResY;
+    const float gridSpaceHeight = normalCurveSettings->initPointResZ;
+
+    // Compute data extent in lon, lat and height domain.
+    const float dataExtentLon = std::abs(bbSettings->urcrnLon - bbSettings->llcrnLon);
+    const float dataExtentLat = std::abs(bbSettings->urcrnLat - bbSettings->llcrnLat);
+    const float dataExtentHeight = std::abs(dataMaxZ - dataMinZ);
+
+    // Compute the number of rays to be shot through the scene in X/Y/Z parallel
+    // direction. Used for number of threads started on GPU (see below).
+    const uint16_t numRaysLon = dataExtentLon / gridSpaceLon + 1;
+    const uint16_t numRaysLat = dataExtentLat / gridSpaceLat + 1;
+    const uint16_t numRaysHeight = dataExtentHeight / gridSpaceHeight + 1;
+
+    const uint32_t numRays = numRaysLon * numRaysLat
+                             + numRaysLon * numRaysHeight
+                             + numRaysLat * numRaysHeight;
+
+    // Make resource manager to the current context.
+    glRM->makeCurrent();
+
+    // Create a 3D texture storing the ghost grid over the domain (to avoid
+    // multiple curves seeded close to each other).
+    QString ghostTexID = QString("normalcurves_ghost_grid_#%1").arg(myID);
+
+    GL::MTexture* ghostGridTex3D = nullptr;
+    ghostGridTex3D = static_cast<GL::MTexture*>(glRM->getGPUItem(ghostTexID));
+
+    if (ghostGridTex3D == nullptr)
     {
-        gl.vboInitPoints = vbo;
-        GL::MFloatVertexBuffer* buf = dynamic_cast<GL::MFloatVertexBuffer*>(vbo);
-        buf->update(vertexData, numVertices, 0, 0, sceneView);
+        ghostGridTex3D = new GL::MTexture(ghostTexID, GL_TEXTURE_3D, GL_R32UI,
+                                          numRaysLon, numRaysLat, numRaysHeight);
+
+        if (!glRM->tryStoreGPUItem(ghostGridTex3D))
+        {
+            LOG4CPLUS_WARN(mlog, "WARNING: cannot store texture for normal curves"
+                           " ghost grid in GPU memory, skipping normal curves"
+                           " computation.");
+            delete ghostGridTex3D;
+            return;
+        }
     }
     else
     {
-        // update buffer instead of deleting and creating a new one
-        GL::MFloatVertexBuffer* newVB = nullptr;
-        newVB = new GL::MFloatVertexBuffer(vboID, numVertices);
-        if (glRM->tryStoreGPUItem(newVB))
+        ghostGridTex3D->updateSize(numRaysLon, numRaysLat, numRaysHeight);
+    }
+
+    // Initialise ghost grid with zeros.
+    ghostGridTex3D->bindToLastTextureUnit(); CHECK_GL_ERROR;
+    QVector<GLint> nullData(numRaysLon * numRaysLat * numRaysHeight, 0);
+
+    glTexImage3D(GL_TEXTURE_3D, 0, GL_R32I, numRaysLon, numRaysLat, numRaysHeight, 0,
+                 GL_RED_INTEGER, GL_INT, nullData.data()); CHECK_GL_ERROR;
+
+    const GLint ghostGridImageUnit = assignImageUnit();
+
+    glBindTexture(GL_TEXTURE_3D, 0); CHECK_GL_ERROR;
+
+    const GLuint MAX_ESTIMATE_CROSSINGS = 2;
+    const int MAX_INITPOINTS = numRays * MAX_ESTIMATE_CROSSINGS;
+
+    // Create a shader storage buffer containing all possible init points.
+    QVector<QVector4D> initData(MAX_INITPOINTS, QVector4D(-1,-1,-1,-1));
+
+    if (gl.ssboInitPoints == nullptr)
+    {
+        const QString ssboInitPointsID =
+                QString("normalcurves_ssbo_init_points_#%1").arg(myID);
+        gl.ssboInitPoints = new GL::MShaderStorageBufferObject(
+                    ssboInitPointsID, sizeof(QVector4D), MAX_INITPOINTS);
+
+        if (glRM->tryStoreGPUItem(gl.ssboInitPoints))
         {
-            newVB->upload(vertexData, numVertices, sceneView);
+            // Obtain reference to SSBO item.
+            gl.ssboInitPoints = static_cast<GL::MShaderStorageBufferObject*>(
+                        glRM->getGPUItem(ssboInitPointsID));
         }
         else
         {
-            delete newVB;
+            LOG4CPLUS_WARN(mlog, "WARNING: cannot store buffer for normal curves"
+                           " init points in GPU memory, skipping normal curves"
+                           " computation.");
+            delete gl.ssboInitPoints;
+            gl.ssboInitPoints = nullptr;
+            return;
         }
-        gl.vboInitPoints = static_cast<GL::MVertexBuffer*>(glRM->getGPUItem(vboID));
+    }
+    else
+    {
+        gl.ssboInitPoints->updateSize(MAX_INITPOINTS);
     }
 
-    glBindBuffer(GL_ARRAY_BUFFER, 0);  CHECK_GL_ERROR;
+    gl.ssboInitPoints->upload(initData.data(), GL_DYNAMIC_COPY);
 
-    normalCurveInitPoints.clear();
-    normalCurveInitPoints.reserve(  resLons * resLats
-                                  + resPLs  * resLons
-                                  + resLats * resPLs);
+    // Create an atomic counter to control the writes to the SSBO.
+    GLuint atomicCounter = 0;
+    GLuint atomicBuffer = 0;
+    glGenBuffers(1, &atomicBuffer); CHECK_GL_ERROR;
+    glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, atomicBuffer); CHECK_GL_ERROR;
+    glBufferData(GL_ATOMIC_COUNTER_BUFFER, sizeof(GLuint), &atomicCounter,
+                 GL_DYNAMIC_DRAW); CHECK_GL_ERROR;
+    glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, 0); CHECK_GL_ERROR;
 
-    GLuint disturbSeedTex[3] = { 0 };
-    glGenTextures(3, disturbSeedTex);
+    // Bind the compute shader and set required shader variables.
+    gl.normalCurveInitPointsShader->bind();
+    setCommonShaderVars(gl.normalCurveInitPointsShader, sceneView);
+
+    gl.normalCurveInitPointsShader->setUniformSubroutineByName(
+                GL_COMPUTE_SHADER, gl.normalInitSubroutines[var->grid->getLevelType()]);
+
+    // Bind the atomic counter to the binding index 0.
+    glBindBufferBase(GL_ATOMIC_COUNTER_BUFFER, 0, atomicBuffer);
+    // Bind the SSBO to the binding index 0.
+    gl.ssboInitPoints->bindToIndex(0);
+
+    if (normalCurveSettings->surface == NormalCurveSettings::Outer)
+    {
+        gl.normalCurveInitPointsShader->setUniformValue(
+                    "isoValue", rayCasterSettings->isoValueSetList[1].isoValue);
+    }
+    else
+    {
+        gl.normalCurveInitPointsShader->setUniformValue(
+                    "isoValue", rayCasterSettings->isoValueSetList[0].isoValue);
+    }
+
+    gl.normalCurveInitPointsShader->setUniformValue(
+                "stepSize", rayCasterSettings->stepSize);
+    gl.normalCurveInitPointsShader->setUniformValue(
+                "bisectionSteps", rayCasterSettings->bisectionSteps);
+
+    const QVector3D initWorldPos(bbSettings->llcrnLon, bbSettings->llcrnLat, dataMinZ);
+    gl.normalCurveInitPointsShader->setUniformValue(
+                "initWorldPos", initWorldPos);
+    gl.normalCurveInitPointsShader->setUniformValue(
+                "bboxMin", QVector3D(bbSettings->llcrnLon,
+                                     bbSettings->llcrnLat,
+                                     dataMinZ));
+    gl.normalCurveInitPointsShader->setUniformValue(
+                "bboxMax", QVector3D(bbSettings->urcrnLon,
+                                     bbSettings->urcrnLat,
+                                     dataMaxZ));
+
+    // Set direction specific shader vars.
+
+    // Different ray-casting directions.
+    const QVector3D castDirection[] = {
+        QVector3D(0, 0, 1), QVector3D(0, 1, 0), QVector3D(1, 0, 0) };
+
+    // Maximum length of each ray.
+    float maxRayLength[] = { dataExtentHeight, dataExtentLat, dataExtentLon };
+
+    const QVector3D deltaGridX[] = { QVector3D(gridSpaceLon,0,0),
+                                     QVector3D(gridSpaceLon,0,0),
+                                     QVector3D(0,gridSpaceLat,0) };
+
+    const QVector3D deltaGridY[] = { QVector3D(0,gridSpaceLat,0),
+                                     QVector3D(0,0,gridSpaceHeight),
+                                     QVector3D(0,0,gridSpaceHeight) };
+
+    const GLuint dispatchXLonLat = numRaysLon / 64 + 1;
+    const GLuint dispatchXLatHeight = numRaysLat / 64 + 1;
+    const GLuint dispatchYLonLat = numRaysLat / 2 + 1;
+    const GLuint dispatchYLonHeight = numRaysHeight / 2 + 1;
+
+    const QPoint dispatches[] = { QPoint(dispatchXLonLat, dispatchYLonLat),
+                                  QPoint(dispatchXLonLat, dispatchYLonHeight),
+                                  QPoint(dispatchXLatHeight, dispatchYLonHeight) };
+
+    const QPoint maxNumRays[] = { QPoint(numRaysLon, numRaysLat),
+                                  QPoint(numRaysLon, numRaysHeight),
+                                  QPoint(numRaysLat, numRaysHeight) };
+
+    // Maximum extent of all 3D dimensions.
+    const GLuint maxRes = std::max(numRaysLon, std::max(numRaysLat, numRaysHeight));
+
+    // Create a texture to distort the start position of the rays.
+    const QString distortTexID =
+            QString("normalcurves_displacement_texture_#%1").arg(myID);
+    GL::MTexture* distortTex2D = static_cast<GL::MTexture*>(
+                glRM->getGPUItem(distortTexID));
+
+    if (distortTex2D == nullptr)
+    {
+        distortTex2D = new GL::MTexture(distortTexID, GL_TEXTURE_2D, GL_RG32F,
+                                        maxRes, maxRes);
+
+        if (!glRM->tryStoreGPUItem(distortTex2D))
+        {
+            LOG4CPLUS_WARN(mlog, "WARNING: cannot store texture for normal curves"
+                           " displacement grid in GPU memory, skipping normal curves"
+                           " computation.");
+            delete distortTex2D;
+            return;
+        }
+    }
+    else
+    {
+        distortTex2D->updateSize(maxRes, maxRes);
+    }
 
     std::default_random_engine engine;
     std::uniform_real_distribution<float> distribution(
-                -normalCurveSettings->initPointVariance,
-                normalCurveSettings->initPointVariance);
+                    -normalCurveSettings->initPointVariance,
+                     normalCurveSettings->initPointVariance);
 
-    GLuint textureUnit = assignTextureUnit();
+    // Compute random distortion values.
+    QVector<float> texels(maxRes * maxRes * 2);
+    for (int i = 0; i < texels.size(); ++i) { texels[i] = distribution(engine); }
+
+    // Set data of distort texture.
+    const GLuint distortTexUnit = assignTextureUnit();
+
+    distortTex2D->bindToTextureUnit(distortTexUnit);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RG32F, maxRes, maxRes, 0, GL_RG, GL_FLOAT,
+                 texels.data());
+    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST); CHECK_GL_ERROR;
+    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST); CHECK_GL_ERROR;
+    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP); CHECK_GL_ERROR;
+    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP); CHECK_GL_ERROR;
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    // Bind to texture unit.
+    distortTex2D->bindToTextureUnit(distortTexUnit);
+    gl.normalCurveInitPointsShader->setUniformValue("distortTex", distortTexUnit);
+    gl.normalCurveInitPointsShader->setUniformValue("doubleIntegration",
+                    (normalCurveSettings->integrationDir == NormalCurveSettings::Both));
+
+    // Bind ghost grid as image3D to the shader.
+    gl.normalCurveInitPointsShader->setUniformValue(
+                "ghostGrid", ghostGridImageUnit); CHECK_GL_ERROR;
+
+    glBindImageTexture(ghostGridImageUnit, // image unit
+                       ghostGridTex3D->getTextureObject(), // texture object
+                       0,                        // level
+                       GL_TRUE,                  // layered
+                       0,                        // layer
+                       GL_READ_WRITE,            // shader access
+                       GL_R32I); CHECK_GL_ERROR; // format
+
+    // For each plane cast rays along a regular grid and search for intersection points
+    // We compute the intersection points on GPU using Compute Shader (we do not need the rasterizer here).
     for (int i = 0; i < 3; ++i)
     {
-        std::vector<float> pixels;
-        pixels.reserve(castImageRes[i].width * castImageRes[i].height * 2);
+        gl.normalCurveInitPointsShader->setUniformValue(
+                    "castingDirection", castDirection[i]); CHECK_GL_ERROR;
+        gl.normalCurveInitPointsShader->setUniformValue(
+                    "maxRayLength", GLfloat(maxRayLength[i])); CHECK_GL_ERROR;
 
-        for(GLuint i = 0; i < pixels.capacity(); ++i)
-        {
-            pixels.push_back(distribution(engine));
-        }
+        gl.normalCurveInitPointsShader->setUniformValue(
+                    "deltaGridX", deltaGridX[i]); CHECK_GL_ERROR;
+        gl.normalCurveInitPointsShader->setUniformValue(
+                    "deltaGridY", deltaGridY[i]); CHECK_GL_ERROR;
 
-        glActiveTexture(GL_TEXTURE0 + textureUnit);
-        glBindTexture(GL_TEXTURE_2D, disturbSeedTex[i]);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RG32F, castImageRes[i].width, castImageRes[i].height, 0, GL_RG, GL_FLOAT, pixels.data());
-        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST); CHECK_GL_ERROR;
-        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST); CHECK_GL_ERROR;
-        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP); CHECK_GL_ERROR;
-        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP); CHECK_GL_ERROR;
-        glBindTexture(GL_TEXTURE_2D, 0);
+        gl.normalCurveInitPointsShader->setUniformValue(
+                    "maxNumRays", maxNumRays[i]); CHECK_GL_ERROR;
+
+        glDispatchCompute(GLint(dispatches[i].x()), GLint(dispatches[i].y()), 1);
+        glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
     }
 
-    int ghostGridRes[3] = {resLons ,resLats, resPLs};
+    // DEBUGGING
+//    glBindBuffer(GL_SHADER_STORAGE_BUFFER, gl.ssboNormalCurves);
+//    QVector<NormalCurveLineSegment> lines(200);//numRays * (normalCurveSettings->numLineSegments + 2));
 
-    // start point of the ghost grid
-    QVector3D ghostGridPoint(bbSettings->llcrnLon,
-                             bbSettings->urcrnLat,
-                             boxMaxZ);
+//    GLint bufMask = GL_MAP_READ_BIT;
+//    NormalCurveLineSegment* vertices = (NormalCurveLineSegment*) glMapBufferRange(GL_SHADER_STORAGE_BUFFER, 0,
+//                numRays * (normalCurveSettings->numLineSegments + 2) * sizeof(NormalCurveLineSegment), bufMask); CHECK_GL_ERROR;
 
-    // ghost grid containing information, if a certain grid box contains any init point
-    std::vector<bool> ghostGrid(ghostGridRes[0] * ghostGridRes[1] * ghostGridRes[2]);
-    std::fill(ghostGrid.begin(), ghostGrid.end(), false);
+//    for(int i = 0; i < 200; ++i)
+//    {
+//        lines[i] = vertices[i];
+//    }
 
-    // DEBUG
-    /*uint32_t numInitPoints = 0;
-    uint32_t numAcceptedPoints = 0;
-    uint32_t numRejectedPoints = 0;
-    uint32_t numUpdatedPoints = 0;*/
-    // DEBUG
+//    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
-    for (int i = 0; i < 3; ++i)
-    {
-        glBindFramebuffer(GL_FRAMEBUFFER, tempFBO);
+    // Obtain the number of detected init points from the atomic counter.
+    GLuint counter = 0;
+    glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, atomicBuffer);
+    glGetBufferSubData(GL_ATOMIC_COUNTER_BUFFER, 0, sizeof(GLuint), &counter);
+    //std::cout << "numInitPoints: " << counter << std::endl << std::flush;
 
-        const int NUM_FBO_TEXS = 4;
+    numNormalCurveInitPoints = counter;
 
-        GLuint tempFBOTex[NUM_FBO_TEXS];
+    // Release temporary resources and texture/image units.
+    glDeleteBuffers(1, &atomicBuffer);
 
-        glGenTextures(NUM_FBO_TEXS, tempFBOTex);
+    glRM->releaseGPUItem(distortTexID);
+    releaseTextureUnit(distortTexUnit);
 
-        for (int j = 0; j < NUM_FBO_TEXS; ++j)
-        {
-            glActiveTexture(GL_TEXTURE0 + textureUnit);
-            glBindTexture(GL_TEXTURE_2D, tempFBOTex[j]); CHECK_GL_ERROR;
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F,
-                         castImageRes[i].width, castImageRes[i].height,
-                         0, GL_RGBA, GL_FLOAT, NULL); CHECK_GL_ERROR;
-            glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST); CHECK_GL_ERROR;
-            glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST); CHECK_GL_ERROR;
+    glRM->releaseGPUItem(ghostTexID);
+    releaseImageUnit(ghostGridImageUnit);
 
-            glFramebufferTexture2D( GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + j, GL_TEXTURE_2D, tempFBOTex[j], 0);
-            glBindTexture(GL_TEXTURE_2D, 0); CHECK_GL_ERROR;
-        }
-
-        GLenum DrawBuffers[NUM_FBO_TEXS];
-        for (int k = 0; k < NUM_FBO_TEXS; ++k)
-        {
-            DrawBuffers[k] = GL_COLOR_ATTACHMENT0 + k;
-        }
-
-        glDrawBuffers(NUM_FBO_TEXS, DrawBuffers); CHECK_GL_ERROR;
-
-        glViewport(0, 0, castImageRes[i].width, castImageRes[i].height);
-
-        if (renderMode == RenderMode::Original)
-        {
-            gl.normalCurveInitPointsShader->bind();
-            setRayCasterShaderVars(gl.normalCurveInitPointsShader, sceneView);
-        }
-
-        //gl.normalCurveInitPointsShader->printSubroutineInformation(GL_FRAGMENT_SHADER);
-        gl.normalCurveInitPointsShader->setUniformSubroutineByName(GL_FRAGMENT_SHADER,
-                                                                   gl.normalInitSubroutines[var->grid->getLevelType()]);
-
-        gl.normalCurveInitPointsShader->setUniformValue("lightDirection", castDirection[i]); CHECK_GL_ERROR;
-        gl.normalCurveInitPointsShader->setUniformValue("boxDistance", GLfloat(castRayLength[i])); CHECK_GL_ERROR;
-        gl.normalCurveInitPointsShader->setUniformValue("stepSize", rayCasterSettings->stepSize); CHECK_GL_ERROR;
-        gl.normalCurveInitPointsShader->setUniformValue("bisectionSteps", rayCasterSettings->bisectionSteps); CHECK_GL_ERROR;
-        gl.normalCurveInitPointsShader->setUniformValue("gridSpacing", gridSpacing); CHECK_GL_ERROR;
-
-        if (normalCurveSettings->surface == NormalCurveSettings::Outer)
-        {
-            gl.normalCurveInitPointsShader->setUniformValue("isoValue", rayCasterSettings->isoValueSetList[1].isoValue);
-        }
-        else
-        {
-            gl.normalCurveInitPointsShader->setUniformValue("isoValue", rayCasterSettings->isoValueSetList[0].isoValue);
-        }
-
-        glActiveTexture(GL_TEXTURE0 + textureUnit);
-        glBindTexture(GL_TEXTURE_2D, disturbSeedTex[i]);
-        gl.normalCurveInitPointsShader->setUniformValue("disturbTex", textureUnit);
-
-        // render scene from pixel grid through box
-
-        // clear current backbuffer
-        glClearColor(0,0,0,0);
-        glClear(GL_COLOR_BUFFER_BIT);
-
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0); CHECK_GL_ERROR;
-
-        gl.vboInitPoints->attachToVertexAttribute(SHADER_VERTEX_ATTRIBUTE,
-                                                         2, false,
-                                                         5 * sizeof(float),
-                                                         (const GLvoid*)(0 * sizeof(float)));
-
-        gl.vboInitPoints->attachToVertexAttribute(SHADER_BORDER_ATTRIBUTE,
-                                                         3, false,
-                                                         5 * sizeof(float),
-                                                         (const GLvoid*)(2 * sizeof(float)));
-
-        glPolygonMode(GL_FRONT_AND_BACK,GL_FILL); CHECK_GL_ERROR;
-        glDrawArrays(GL_TRIANGLE_STRIP, i * 4, 4); CHECK_GL_ERROR;
-
-        // obtain texture data and write it back to memory
-        std::vector<std::vector<float> > texDatas(NUM_FBO_TEXS);
-
-        for (int k = 0; k < NUM_FBO_TEXS; ++k)
-        {
-            texDatas[k].resize(4 * castImageRes[i].width *  castImageRes[i].height);
-            glBindTexture(GL_TEXTURE_2D, tempFBOTex[k]);
-            glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_FLOAT, &texDatas[k][0]); CHECK_GL_ERROR;
-            glBindTexture(GL_TEXTURE_2D, 0); CHECK_GL_ERROR;
-        }
-
-        /*// print images
-        for (int j = 0; j < NUM_FBO_TEXS; ++j)
-        {
-            QImage img(castImageRes[i].width, castImageRes[i].height, QImage::Format_ARGB32_Premultiplied);
-
-            for (int y = 0; y < img.height(); ++y)
-            {
-                for (int x = 0; x < img.width(); ++x)
-                {
-                    int r = static_cast<unsigned char>(texDatas[j][(x + y * castImageRes[i].width) * 4 + 0] * 255);
-                    int g = static_cast<unsigned char>(texDatas[j][(x + y * castImageRes[i].width) * 4 + 1] * 255);
-                    int b = static_cast<unsigned char>(texDatas[j][(x + y * castImageRes[i].width) * 4 + 2] * 255);
-                    int a = static_cast<unsigned char>(texDatas[j][(x + y * castImageRes[i].width) * 4 + 3] * 255);
-
-                    img.setPixel(x,y,QColor(r,g,b,a).rgba());
-                }
-            }
-
-            img.save(QString("raycaster_image_") + QString("%1_%2.png").arg(i).arg(j));
-
-        }*/
-
-        for (int y = 0; y < castImageRes[i].height; y++)
-        {
-            for (int x = 0; x < castImageRes[i].width; ++x)
-            {
-                for (int k = 0; k < NUM_FBO_TEXS; ++k)
-                {
-                    float alpha = texDatas[k][(x + y * castImageRes[i].width) * 4 + 3];
-
-                    if (alpha)
-                    {
-                        //numInitPoints++;
-
-                        float red = texDatas[k][(x + y * castImageRes[i].width) * 4 + 0];
-                        float green = texDatas[k][(x + y * castImageRes[i].width) * 4 + 1];
-                        float blue = texDatas[k][(x + y * castImageRes[i].width) * 4 + 2];
-
-                        QVector3D pos(red,green,blue);
-
-                        GLuint stride = ghostGridRes[0];
-                        GLuint slice = ghostGridRes[1] * stride;
-
-                        uint32_t idX = static_cast<uint32_t>(std::abs(pos.x() - ghostGridPoint.x()) / gridSpacing.x());
-                        uint32_t idY = static_cast<uint32_t>(std::abs(pos.y() - ghostGridPoint.y()) / gridSpacing.y());
-                        uint32_t idZ = static_cast<uint32_t>(std::abs(pos.z() - ghostGridPoint.z()) / gridSpacing.z());
-                        uint32_t id = idX + idY * stride + idZ * slice;
-
-                        bool entry = ghostGrid[id];
-
-                        if (!entry)
-                        {
-                            normalCurveInitPoints.emplace(id, pos);
-                            //numAcceptedPoints++;
-                            ghostGrid[id] = true;
-                        }
-                        else
-                        {
-                            const auto it = normalCurveInitPoints.find(id);
-
-                            if (it == normalCurveInitPoints.end())
-                                continue;
-
-                            QVector3D prevPos = it->second;
-
-                            const QVector3D gridCenter(ghostGridPoint.x() + gridSpacing.x() * idX,
-                                                       ghostGridPoint.y() - gridSpacing.y() * idY,
-                                                       ghostGridPoint.z() - gridSpacing.z() * idZ);
-
-                            QVector3D prevDist = prevPos - gridCenter;
-                            QVector3D dist = pos - gridCenter;
-
-                            it->second = prevDist.length() > dist.length() ? pos : prevPos;
-
-                            //numUpdatedPoints += prevDist.length() > dist.length() ? 1 : 0;
-                            //numRejectedPoints++;
-                        }
-                    }
-                    else
-                    {
-                        break;
-                    }
-                }
-            }
-        }
-
-        glDeleteTextures(NUM_FBO_TEXS, tempFBOTex);
-
-    }
-
-    // DEBUG:
-    /*std::cout << "NumInitPoints: " << numInitPoints << "\n" << std::flush;
-    std::cout << "NumAcceptedPoints: " << numAcceptedPoints << "\n" << std::flush;
-    std::cout << "NumRejectedPoints: " << numRejectedPoints << "\n" << std::flush;
-    std::cout << "NumUpdatedPoints: " << numUpdatedPoints << "\n" << std::flush;*/
-
-    glBindBuffer(GL_ARRAY_BUFFER, 0);  CHECK_GL_ERROR;
-
-    glDeleteTextures(3, disturbSeedTex); CHECK_GL_ERROR;
-
-    glDeleteFramebuffers(1, &tempFBO); CHECK_GL_ERROR;
-    glBindFramebuffer(GL_FRAMEBUFFER, 0); CHECK_GL_ERROR;
-
-    glViewport(0,0,sceneView->getViewPortWidth(),sceneView->getViewPortHeight());
-
-    glBindBuffer(GL_ARRAY_BUFFER, 0);  CHECK_GL_ERROR;
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0); CHECK_GL_ERROR;
-    glDisable(GL_CULL_FACE);
-    glDisable(GL_POLYGON_OFFSET_FILL);
-
-    releaseTextureUnit(textureUnit);
+    // Set sceneView to the current context again.
+    sceneView->makeCurrent();
 }
 
 
 void MNWPVolumeRaycasterActor::setNormalCurveComputeShaderVars(
         std::shared_ptr<GL::MShaderEffect>& shader, MSceneViewGLWidget* sceneView)
 {
-
     setCommonShaderVars(shader, sceneView);
 
-    // set subroutine indices
+    // Set subroutine indices.
     //pEffect->printSubroutineInformation(GL_COMPUTE_SHADER);
 
     shader->setUniformSubroutineByName(
@@ -2963,7 +2914,7 @@ void MNWPVolumeRaycasterActor::setNormalCurveComputeShaderVars(
     shader->setUniformValue(
                 "integrationStepSize", normalCurveSettings->stepSize); CHECK_GL_ERROR;
     shader->setUniformValue(
-                "maxNumLines", GLint(normalCurveInitPoints.size())); CHECK_GL_ERROR;
+                "maxNumLines", GLint(numNormalCurveInitPoints)); CHECK_GL_ERROR;
     shader->setUniformValue(
                 "maxNumLineSegments", GLint(normalCurveSettings->numLineSegments)); CHECK_GL_ERROR;
     shader->setUniformValue(
@@ -2988,8 +2939,7 @@ void MNWPVolumeRaycasterActor::setNormalCurveComputeShaderVars(
 }
 
 
-void MNWPVolumeRaycasterActor::computeNormalCurves(
-        MSceneViewGLWidget* sceneView)
+void MNWPVolumeRaycasterActor::computeNormalCurves(MSceneViewGLWidget* sceneView)
 {
     updateNextRenderFrame.reset(RecomputeNCLines);
 
@@ -2998,120 +2948,109 @@ void MNWPVolumeRaycasterActor::computeNormalCurves(
         computeNormalCurveInitialPoints(sceneView);
     }
 
-    normalCurveNumVertices = (normalCurveSettings->numLineSegments + 2) * normalCurveInitPoints.size();
-
-    normalCurveNumVertices = (normalCurveSettings->integrationDir == NormalCurveSettings::Both)
-                                ? 2 * normalCurveNumVertices : normalCurveNumVertices;
-
-    if (normalCurveNumVertices == 0)
+    if (numNormalCurveInitPoints == 0)
     {
         LOG4CPLUS_ERROR(mlog, "Warning: could not find any normal curve init "
                         "points");
         return;
     }
 
-    if (!gl.ssboNormalCurves)
+    MGLResourcesManager* glRM = MGLResourcesManager::getInstance();
+    glRM->makeCurrent();
+
+    normalCurveNumVertices = (normalCurveSettings->numLineSegments + 2)
+                             * numNormalCurveInitPoints;
+
+    // Create the normal curve line buffer for every init point.
+    if (gl.ssboNormalCurves == nullptr)
     {
-        glDeleteBuffers(1, &gl.ssboNormalCurves); CHECK_GL_ERROR;
-    }
+        const QString ssboNCCurvesID =
+                QString("normalcurves_ssbo_lines_#%1").arg(myID);
 
-    glGenBuffers(1, &gl.ssboNormalCurves); CHECK_GL_ERROR;
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, gl.ssboNormalCurves); CHECK_GL_ERROR;
-    // STATIC = data is modified once | COPY = read data from GL and use as source for rendering
-    glBufferData(GL_SHADER_STORAGE_BUFFER, normalCurveNumVertices * sizeof(NormalCurveLineSegment), NULL, GL_STATIC_COPY); CHECK_GL_ERROR;
+        gl.ssboNormalCurves = new GL::MShaderStorageBufferObject(
+                    ssboNCCurvesID, sizeof(NormalCurveLineSegment),
+                    normalCurveNumVertices);
 
-    GLint bufMask = GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT; CHECK_GL_ERROR;
-    NormalCurveLineSegment* vertices = (NormalCurveLineSegment*)
-            glMapBufferRange(GL_SHADER_STORAGE_BUFFER, 0, normalCurveNumVertices * sizeof(NormalCurveLineSegment), bufMask); CHECK_GL_ERROR;
-
-    auto it = normalCurveInitPoints.cbegin();
-    QVector3D currStartPos;
-
-    for (GLuint i = 0; i < normalCurveNumVertices; ++i)
-    {
-        //GLuint index = i % normalCurveInitPoints.size();
-        // fill start vertices of lines
-        if(i % (normalCurveSettings->numLineSegments + 2) == 0)
+        if (glRM->tryStoreGPUItem(gl.ssboNormalCurves))
         {
-            if (it == normalCurveInitPoints.end())
-            {
-                it = normalCurveInitPoints.cbegin();
-            }
-
-            const QVector3D& pos = it->second;
-
-            vertices[i].x = pos.x();
-            vertices[i].y = pos.y();
-            vertices[i].z = pos.z();
-            vertices[i].value = 0;
-            currStartPos = it->second;
-            it++;
+            gl.ssboNormalCurves = static_cast<GL::MShaderStorageBufferObject*>(
+                        glRM->getGPUItem(ssboNCCurvesID));
         }
         else
         {
-            // reset other vertices to the dummy element
-            vertices[i].x = -1;
-            vertices[i].y = -1;
-            vertices[i].z = -1;
-            vertices[i].value = -1;
+            LOG4CPLUS_WARN(mlog, "WARNING: cannot store buffer for normal curves"
+                           " in GPU memory, skipping normal curves computation.");
+            delete gl.ssboNormalCurves;
+            gl.ssboNormalCurves = nullptr;
+            return;
         }
     }
+    else
+    {
+        gl.ssboNormalCurves->updateSize(normalCurveNumVertices);
+    }
 
-    glUnmapBuffer(GL_SHADER_STORAGE_BUFFER); CHECK_GL_ERROR;
+    QVector<QVector4D> initData(normalCurveNumVertices, QVector4D(-1,-1,-1,-1));
 
-    // bind compute shader and shader storage buffer object and compute lines
-    gl.normalCurveLineComputeShader->bind();
+    gl.ssboNormalCurves->upload(initData.data(), GL_DYNAMIC_COPY);
+
+    // Bind compute shader and shader storage buffer object and compute lines.
+    if (normalCurveSettings->integrationDir == NormalCurveSettings::Both)
+    {
+        gl.normalCurveLineComputeShader->bindProgram("DoubleIntegration");
+    } else {
+        gl.normalCurveLineComputeShader->bindProgram("SingleIntegration");
+    }
+
     setNormalCurveComputeShaderVars(gl.normalCurveLineComputeShader, sceneView);
 
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, gl.ssboNormalCurves);
+    // Bind the ssbo's to the corresponding binding indices.
+    gl.ssboInitPoints->bindToIndex(0);
+    gl.ssboNormalCurves->bindToIndex(1);
 
-    int dispatchX = normalCurveInitPoints.size() / 128 + 1;
+    int dispatchX = numNormalCurveInitPoints / 128 + 1;
 
     switch(normalCurveSettings->integrationDir)
     {
     case NormalCurveSettings::Backwards:
         gl.normalCurveLineComputeShader->setUniformValue("integrationMode", int(-1)); CHECK_GL_ERROR;
-        gl.normalCurveLineComputeShader->setUniformValue("indexOffset", int(0)); CHECK_GL_ERROR;
         glDispatchCompute(dispatchX, 1, 1);
         glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
         break;
 
     case NormalCurveSettings::Forwards:
         gl.normalCurveLineComputeShader->setUniformValue("integrationMode", int(1)); CHECK_GL_ERROR;
-        gl.normalCurveLineComputeShader->setUniformValue("indexOffset", int(0)); CHECK_GL_ERROR;
         glDispatchCompute(dispatchX, 1, 1);
         glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
         break;
 
     case NormalCurveSettings::Both:
     default:
-        gl.normalCurveLineComputeShader->setUniformValue("integrationMode", int(-1)); CHECK_GL_ERROR;
-        gl.normalCurveLineComputeShader->setUniformValue("indexOffset", int(0)); CHECK_GL_ERROR;
-        glDispatchCompute(dispatchX, 1, 1);
+        glDispatchCompute(dispatchX / 2 + 1, 1, 1);
         glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
-
-        gl.normalCurveLineComputeShader->setUniformValue("integrationMode", int(1)); CHECK_GL_ERROR;
-        gl.normalCurveLineComputeShader->setUniformValue("indexOffset", int(normalCurveNumVertices / 2)); CHECK_GL_ERROR;
-        glDispatchCompute(dispatchX, 1, 1);
-        glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
-
         break;
 
     }
 
     // DEBUG
-    /*std::vector<NormalCurveLineSegment> lines(numVertices);
+//    glBindBuffer(GL_SHADER_STORAGE_BUFFER, gl.ssboNormalCurves); CHECK_GL_ERROR;
 
-    bufMask = GL_MAP_READ_BIT;
-    vertices = (NormalCurveLineSegment*) glMapBufferRange(GL_SHADER_STORAGE_BUFFER, 0,
-                  numVertices * sizeof(NormalCurveLineSegment), bufMask); CHECK_GL_ERROR;
+//    QVector<NormalCurveLineSegment> lines(200);
 
-    for (GLuint i = 0; i < numVertices; ++i)
-    {
-        lines[i] = vertices[i];
-    }*/
+//    GLint bufMask = GL_MAP_READ_BIT;
+//    NormalCurveLineSegment* vertices = (NormalCurveLineSegment*) glMapBufferRange(GL_SHADER_STORAGE_BUFFER, 0,
+//                  normalCurveNumVertices * sizeof(NormalCurveLineSegment), bufMask); CHECK_GL_ERROR;
 
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+//    for (GLuint i = 0; i < 200; ++i)
+//    {
+//        lines[i] = vertices[i];
+//    }
+
+//    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+
+    // Set sceneView to the current OpenGL context, again.
+    sceneView->makeCurrent();
+
 }
 
 
@@ -3136,12 +3075,12 @@ void MNWPVolumeRaycasterActor::renderNormalCurves(
         break;
     }
 
-    setNormalCurveShaderVars(gl.normalCurveGeometryEffect, sceneView);
-    gl.normalCurveGeometryEffect->setUniformValue("toDepth", GLboolean(toDepth));
-    gl.normalCurveGeometryEffect->setUniformValue("shadowColor", lightingSettings->shadowColor);
+    setNormalCurveShaderVars(gl.normalCurveGeometryEffect, sceneView); CHECK_GL_ERROR;
+    gl.normalCurveGeometryEffect->setUniformValue("toDepth", GLboolean(toDepth)); CHECK_GL_ERROR;
+    gl.normalCurveGeometryEffect->setUniformValue("shadowColor", lightingSettings->shadowColor); CHECK_GL_ERROR;
 
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-    glBindBuffer(GL_ARRAY_BUFFER, gl.ssboNormalCurves); CHECK_GL_ERROR;
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0); CHECK_GL_ERROR;
+    glBindBuffer(GL_ARRAY_BUFFER, gl.ssboNormalCurves->getBufferObject()); CHECK_GL_ERROR;
 
     glVertexAttribPointer(
                 SHADER_VERTEX_ATTRIBUTE,
@@ -3161,26 +3100,33 @@ void MNWPVolumeRaycasterActor::renderNormalCurves(
     glEnableVertexAttribArray(SHADER_VALUE_ATTRIBUTE);
 
     glPolygonMode(GL_FRONT_AND_BACK,GL_FILL); CHECK_GL_ERROR;
-    glDrawArrays(GL_LINE_STRIP_ADJACENCY, 0, normalCurveNumVertices);
+    glDrawArrays(GL_LINE_STRIP_ADJACENCY, 0, normalCurveNumVertices); CHECK_GL_ERROR;
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);  CHECK_GL_ERROR;
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0); CHECK_GL_ERROR;
-    glDisable(GL_CULL_FACE);
-    glDisable(GL_POLYGON_OFFSET_FILL);
+    glDisable(GL_CULL_FACE); CHECK_GL_ERROR;
+    glDisable(GL_POLYGON_OFFSET_FILL); CHECK_GL_ERROR;
 }
 
 
 void MNWPVolumeRaycasterActor::renderToDepthTexture(
         MSceneViewGLWidget* sceneView)
 {
+    MGLResourcesManager* glRM = MGLResourcesManager::getInstance();
+    //glRM->makeCurrent();
+
+    // Create temporary depth and frame buffer. The depth buffer is rendered
+    // to the depth texture represented as FramebufferTexture2D
+    // and not to the default OpenGL depth buffer.
+    // This is guaranteed by the GL_DEPTH_COMPONENT and GL_DEPTH_ATTACHMENT flag.
     GLuint tempFBO = 0;
     GLuint tempDBO = 0;
 
     glGenFramebuffers(1, &tempFBO); CHECK_GL_ERROR;
     glBindFramebuffer(GL_FRAMEBUFFER, tempFBO);CHECK_GL_ERROR;
 
-    GLint width = sceneView->getViewPortWidth();
-    GLint height = sceneView->getViewPortHeight();
+    const GLint width = sceneView->getViewPortWidth();
+    const GLint height = sceneView->getViewPortHeight();
 
     glGenRenderbuffers(1, &tempDBO); CHECK_GL_ERROR;
     glBindRenderbuffer(GL_RENDERBUFFER, tempDBO); CHECK_GL_ERROR;
@@ -3190,50 +3136,57 @@ void MNWPVolumeRaycasterActor::renderToDepthTexture(
     GLint oldWidth = 0;
     GLint oldHeight = 0;
 
-    if (gl.tex2DDepthBuffer)
+    if (gl.tex2DDepthBuffer == nullptr)
     {
-        glActiveTexture(GL_TEXTURE0 + gl.texUnitDepthBuffer);
-        glBindTexture(GL_TEXTURE_2D, gl.tex2DDepthBuffer);
-        glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &oldWidth);
-        glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &oldHeight);
-        glBindTexture(GL_TEXTURE_2D, 0); CHECK_GL_ERROR;
+        const QString depthTexID = QString("depth_buffer_tex_#%1").arg(myID);
+
+        gl.tex2DDepthBuffer = new GL::MTexture(depthTexID, GL_TEXTURE_2D,
+                                               GL_DEPTH_COMPONENT32, width, height);
+
+        if (glRM->tryStoreGPUItem(gl.tex2DDepthBuffer))
+        {
+            gl.tex2DDepthBuffer = static_cast<GL::MTexture*>(
+                        glRM->getGPUItem(depthTexID));
+        }
+        else
+        {
+            LOG4CPLUS_WARN(mlog, "WARNING: cannot store texture for depth map"
+                           " in GPU memory.");
+            delete gl.tex2DDepthBuffer;
+            gl.tex2DDepthBuffer = nullptr;
+            return;
+        }
     }
 
-    if (!gl.tex2DDepthBuffer || width != oldWidth || height != oldHeight)
+    gl.tex2DDepthBuffer->bindToTextureUnit(gl.texUnitDepthBuffer);
+    glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &oldWidth);
+    glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &oldHeight);
+
+    if (width != oldWidth || height != oldHeight)
     {
-        if (gl.tex2DDepthBuffer)
-        {
-            glDeleteTextures(1, &gl.tex2DDepthBuffer);
-        }
-        glGenTextures(1, &gl.tex2DDepthBuffer);
-        glActiveTexture(GL_TEXTURE0 + gl.texUnitDepthBuffer);
-        glBindTexture(GL_TEXTURE_2D, gl.tex2DDepthBuffer);
+        gl.tex2DDepthBuffer->updateSize(width, height);
 
         glTexImage2D(GL_TEXTURE_2D, 0,
                      GL_DEPTH_COMPONENT32, width, height,
                      0, GL_DEPTH_COMPONENT,
                      GL_FLOAT, nullptr); CHECK_GL_ERROR;
-        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST); CHECK_GL_ERROR;
-        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST); CHECK_GL_ERROR;
-
-        glFramebufferTexture2D( GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D,
-                                gl.tex2DDepthBuffer, 0); CHECK_GL_ERROR;
     }
     else
     {
-        glActiveTexture(GL_TEXTURE0 + gl.texUnitDepthBuffer);
-        glBindTexture(GL_TEXTURE_2D, gl.tex2DDepthBuffer);
-
-        std::vector<float> texData(width * height);
-        std::fill(texData.begin(), texData.end(), 1);
+        QVector<float> texData(width * height, 1);
         glTexSubImage2D(GL_TEXTURE_2D, 0,
                         0, 0, width, height,
                         GL_DEPTH_COMPONENT,
                         GL_FLOAT, texData.data() );
-
-        glFramebufferTexture2D( GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D,
-                                gl.tex2DDepthBuffer, 0); CHECK_GL_ERROR;
     }
+
+    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST); CHECK_GL_ERROR;
+    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST); CHECK_GL_ERROR;
+
+    glFramebufferTexture2D( GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D,
+                            gl.tex2DDepthBuffer->getTextureObject(), 0); CHECK_GL_ERROR;
+
+    glBindTexture(GL_TEXTURE_2D, 0); CHECK_GL_ERROR;
 
     glClear(GL_DEPTH_BUFFER_BIT); CHECK_GL_ERROR;
     glClear(GL_COLOR_BUFFER_BIT); CHECK_GL_ERROR;
@@ -3241,6 +3194,9 @@ void MNWPVolumeRaycasterActor::renderToDepthTexture(
     glDisable(GL_LIGHTING); CHECK_GL_ERROR;
     glDisable(GL_CULL_FACE); CHECK_GL_ERROR;
     glPolygonMode(GL_FRONT_AND_BACK,GL_FILL); CHECK_GL_ERROR;
+
+    glBindTexture(GL_TEXTURE_2D, 0);
+    //sceneView->makeCurrent();
 
     if (normalCurveSettings->normalCurvesEnabled)
     {
@@ -3281,6 +3237,8 @@ void MNWPVolumeRaycasterActor::renderToDepthTexture(
 
     glDeleteRenderbuffers(1, &tempDBO);
     glDeleteFramebuffers(1, &tempFBO);
+
+    //sceneView->makeCurrent();
 }
 
 } // namespace Met3D
