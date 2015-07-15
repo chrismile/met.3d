@@ -965,7 +965,7 @@ void MTextManager::generateTextureAtlas(QString fontFile, int size)
             continue;
         }
         textureAtlasWidth += g->bitmap.width + pad;
-        textureAtlasHeight = max(textureAtlasHeight, g->bitmap.rows);
+        textureAtlasHeight = max(int(textureAtlasHeight), int(g->bitmap.rows));
     }
 
     LOG4CPLUS_DEBUG_FMT(mlog, "\ttexture atlas: width %i, height %i",
