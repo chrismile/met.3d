@@ -63,8 +63,12 @@ MNWPHorizontalSectionActor::MNWPHorizontalSectionActor()
       windBarbsSettings(),
       renderShadowQuad(true),
       shadowColor(QColor(60,60,60,70)),
-      shadowHeight(0.01f)
+      shadowHeight(0.01f),
+      vbMouseHandlePoints(nullptr),
+      selectedMouseHandle(-1)
 {
+    enablePicking(true);
+
     // Create and initialise QtProperties for the GUI.
     // ===============================================
     beginInitialiseQtProperties();
@@ -114,6 +118,7 @@ MNWPHorizontalSectionActor::MNWPHorizontalSectionActor()
     actorPropertiesSupGroup->addSubProperty(graticuleActor->getPropertyGroup());
 
     endInitialiseQtProperties();
+
 }
 
 
@@ -132,6 +137,7 @@ MNWPHorizontalSectionActor::WindBarbsSettings::WindBarbsSettings(
       uComponentVarIndex(0),
       vComponentVarIndex(0)
 {
+
     MActor *a = hostActor;
     MQtProperties *properties = a->getQtProperties();
 
@@ -182,12 +188,15 @@ MNWPHorizontalSectionActor::~MNWPHorizontalSectionActor()
     // "graticuleActor" is deleted by the resourcesManager.
 
     delete windBarbsSettings;
+    if (vbMouseHandlePoints) delete vbMouseHandlePoints;
 }
 
 
 /******************************************************************************
 ***                            PUBLIC METHODS                               ***
 *******************************************************************************/
+
+#define SHADER_VERTEX_ATTRIBUTE 0
 
 void MNWPHorizontalSectionActor::reloadShaderEffects()
 {
@@ -205,6 +214,8 @@ void MNWPHorizontalSectionActor::reloadShaderEffects()
                 "src/glsl/hsec_windbarbs.fx.glsl");
     glShadowQuad->compileFromFile(
                 "src/glsl/hsec_shadow.fx.glsl");
+    positionSpheresShader->compileFromFile(
+                "src/glsl/trajectory_positions.fx.glsl");
 
     crossSectionGridsNeedUpdate = true;
 }
@@ -312,6 +323,92 @@ void MNWPHorizontalSectionActor::loadConfiguration(QSettings *settings)
     settings->endGroup(); // MNWPHorizontalSectionActor
 }
 
+int MNWPHorizontalSectionActor::checkIntersectionWithHandle(
+        MSceneViewGLWidget *sceneView,
+        float clipX, float clipY,
+        float clipRadius)
+{
+
+    // See notes 22-23Feb2012 and 21Nov2012.
+
+    if (mouseHandlePoints.size() == 0) {
+        updateMouseHandlePositions();
+    }
+
+    float clipRadiusSq = clipRadius*clipRadius;
+
+    selectedMouseHandle = -1;
+
+    // Loop over all cornerpoints and check whether the mouse cursor is inside
+    // a circle with radius "clipRadius" around the waypoint (in clip space).
+    for (int i = 0; i < mouseHandlePoints.size(); i++)
+    {
+        // Transform the corner point coordinate to clip space.
+        QVector3D pClip = sceneView->lonLatPToClipSpace(mouseHandlePoints.at(i));
+
+        float dx = pClip.x() - clipX;
+        float dy = pClip.y() - clipY;
+
+        // Compute the distance between point and mouse in clip space. If it
+        // is less than clipRadius return one.
+        if ( (dx*dx + dy*dy) < clipRadiusSq )
+        {
+            selectedMouseHandle = i;
+            break;
+        }
+    }
+
+
+    return selectedMouseHandle;
+}
+
+
+void MNWPHorizontalSectionActor::dragEvent(MSceneViewGLWidget *sceneView,
+                                    int handleID, float clipX, float clipY)
+{
+    // http://stackoverflow.com/questions/2093096/implementing-ray-picking
+
+    if (mouseHandlePoints.size() == 0) return;
+
+    // Select an arbitrary z-value to construct a point in clip space that,
+    // transformed to world space, lies on the ray passing through the camera
+    // and the location on the worldZ==0 plane "picked" by the mouse.
+    // (See notes 22-23Feb2012).
+    QVector3D mousePosClipSpace = QVector3D(clipX, clipY, 0.);
+
+    // The point p at which the ray intersects the worldZ==0 plane is found by
+    // computing the value d in p=d*l+l0, where l0 is a point on the ray and l
+    // is a vector in the direction of the ray. d can be found with
+    //        (p0 - l0) * n
+    //   d = ----------------
+    //            l * n
+    // where p0 is a point on the worldZ==0 plane and n is the normal vector
+    // of the plane.
+    //       http://en.wikipedia.org/wiki/Line-plane_intersection
+
+    // To compute l0, the MVP matrix has to be inverted.
+    QMatrix4x4 *mvpMatrix = sceneView->getModelViewProjectionMatrix();
+    QVector3D l0 = mvpMatrix->inverted() * mousePosClipSpace;
+
+    // Compute l as the vector from l0 to the camera origin.
+    QVector3D cameraPosWorldSpace = sceneView->getCamera()->getOrigin();
+    QVector3D l = (l0 - cameraPosWorldSpace);
+
+    // The planes origin is the selected mouse handle
+    QVector3D p0 = mouseHandlePoints.at(selectedMouseHandle);
+    // The normal vector is a vector to the camera without
+    // a value in the z-direction -> it is located on the surface of the basemap
+    QVector3D n = sceneView->getCamera()->getOrigin() - p0;
+    n.setZ(0);
+    // Compute the mouse position in world space.
+    float d = QVector3D::dotProduct(p0 - l0, n) / QVector3D::dotProduct(l, n);
+    QVector3D mousePosWorldSpace = l0 + d * l;
+
+    properties->mDDouble()->setValue(slicePosProperty,
+                            sceneView->pressureFromWorldZ(mousePosWorldSpace.z()));
+    emitActorChangedSignal();
+}
+
 
 const QList<MVerticalLevelType> MNWPHorizontalSectionActor::supportedLevelTypes()
 {
@@ -359,6 +456,7 @@ void MNWPHorizontalSectionActor::onQtPropertyChanged(QtProperty *property)
         if (suppressActorUpdates()) return;
 
         updateDescriptionLabel();
+        updateMouseHandlePositions();
         emitActorChangedSignal();
     }
 
@@ -381,6 +479,7 @@ void MNWPHorizontalSectionActor::onQtPropertyChanged(QtProperty *property)
         // The bbox position has changed. In the next render cycle, update the
         // render region, download target grid from GPU and update contours.
         computeRenderRegionParameters();
+        updateMouseHandlePositions();
         crossSectionGridsNeedUpdate = true;
         emitActorChangedSignal();
     }
@@ -496,6 +595,8 @@ void MNWPHorizontalSectionActor::initializeActorResources()
                                                 glWindBarbsShader);
     loadShaders |= glRM->generateEffectProgram("hsec_shadow",
                                                 glShadowQuad);
+    loadShaders |= glRM->generateEffectProgram("vsec_positionsphere",
+                                                positionSpheresShader);
 
     if (loadShaders) reloadShaderEffects();
 
@@ -636,6 +737,56 @@ void MNWPHorizontalSectionActor::renderToCurrentContext(MSceneViewGLWidget *scen
         renderWindBarbs(sceneView);
     }
 
+    if (sceneView->interactionModeEnabled() &&
+            (vbMouseHandlePoints != nullptr))
+    {
+        positionSpheresShader->bindProgram("Normal");
+
+        positionSpheresShader->setUniformValue(
+                    "mvpMatrix",
+                    *(sceneView->getModelViewProjectionMatrix()));
+        positionSpheresShader->setUniformValue(
+                    "pToWorldZParams",
+                    sceneView->pressureToWorldZParameters());
+        positionSpheresShader->setUniformValue(
+                    "lightDirection",
+                    sceneView->getLightDirection());
+        positionSpheresShader->setUniformValue(
+                    "cameraPosition",
+                    sceneView->getCamera()->getOrigin());
+        positionSpheresShader->setUniformValue(
+                    "cameraUpDir",
+                    sceneView->getCamera()->getYAxis());
+        positionSpheresShader->setUniformValue(
+                    "radius",
+                    GLfloat(1.0));
+        positionSpheresShader->setUniformValue(
+                    "scaleRadius",
+                    GLboolean(true));
+
+        positionSpheresShader->setUniformValue(
+                    "useTransferFunction", GLboolean(false));
+        positionSpheresShader->setUniformValue(
+                    "constColour", QColor(Qt::white));
+
+        vbMouseHandlePoints->attachToVertexAttribute(SHADER_VERTEX_ATTRIBUTE);
+
+        if (selectedMouseHandle >= 0)
+        {
+            positionSpheresShader->setUniformValue(
+                        "constColour", QColor(Qt::red));
+        }
+
+        glPolygonMode(GL_FRONT_AND_BACK,
+                      renderAsWireFrame ? GL_LINE : GL_FILL); CHECK_GL_ERROR;
+        glLineWidth(1); CHECK_GL_ERROR;
+
+        glDrawArrays(GL_POINTS, 0, 4); CHECK_GL_ERROR;
+
+        // Unbind VBO.
+        glBindBuffer(GL_ARRAY_BUFFER, 0); CHECK_GL_ERROR;
+    }
+
     if (actorNeedsRedraw) emitActorChangedSignal();
 }
 
@@ -700,6 +851,33 @@ void MNWPHorizontalSectionActor::updateDescriptionLabel(bool deleteOldLabel)
                       labelsize, labelColour, MTextManager::BASELINELEFT,
                       labelbbox, labelBBoxColour, 0.3)
                   );
+}
+
+void MNWPHorizontalSectionActor::updateMouseHandlePositions(){
+    mouseHandlePoints.clear();
+    mouseHandlePoints.append(
+            QVector3D(horizontalBBox.x(),
+                      horizontalBBox.y(),
+                      slicePosition_hPa));
+    mouseHandlePoints.append(
+            QVector3D(horizontalBBox.right(),
+                      horizontalBBox.y(),
+                      slicePosition_hPa));
+    mouseHandlePoints.append(
+            QVector3D(horizontalBBox.right(),
+                      horizontalBBox.y() + horizontalBBox.height(),
+                      slicePosition_hPa));
+    mouseHandlePoints.append(
+            QVector3D(horizontalBBox.x(),
+                      horizontalBBox.y() + horizontalBBox.height(),
+                      slicePosition_hPa));
+
+    // Send vertices of drag handle positions to video memory.
+    if (vbMouseHandlePoints) delete vbMouseHandlePoints;
+    vbMouseHandlePoints = new GL::MVector3DVertexBuffer(
+                QString("vbmhpos_%1").arg(myID),
+                mouseHandlePoints.size());
+    vbMouseHandlePoints->upload(mouseHandlePoints);
 }
 
 

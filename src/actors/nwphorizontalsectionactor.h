@@ -38,6 +38,7 @@
 #include "gxfw/nwpmultivaractor.h"
 #include "gxfw/nwpactorvariable.h"
 #include "gxfw/gl/shadereffect.h"
+#include "gxfw/gl/typedvertexbuffer.h"
 #include "actors/transferfunction1d.h"
 #include "actors/graticuleactor.h"
 
@@ -57,6 +58,42 @@ public:
     ~MNWPHorizontalSectionActor();
 
     void reloadShaderEffects();
+
+    /**
+      Implements MActor::checkIntersectionWithHandle().
+
+      Checks is the mouse position in clip space @p clipX and @p clipY
+      "touches" one of the waypoints or midpoints of this cross-section
+      (midpoints are located between two waypoints; if a midpoint is moved the
+      entire segment is moved). If a way- or midpoint is matched, its index is
+      returned.
+
+      Approach: Simply test each way-/midpoint. Loops over all way-/midpoints.
+      The world coordinates of the waypoint are transformed to clip space using
+      the scene view's MVP matrix and assuming the point to be located on the
+      worldZ == 0 plane. If the distance between the waypoint's clip
+      coordinates and the mouse position is smaller than @p clipRadius, the
+      waypoint is considered to be matched. (@p clipRadius is typically on the
+      order of a few pixels; set in the scene view.)
+      */
+    virtual int checkIntersectionWithHandle(MSceneViewGLWidget *sceneView,
+                                  float clipX, float clipY, float clipRadius);
+
+    /**
+      Implements MActor::dragEvent().
+
+      Drags the way-/midpoint at index @p handleID to the position on the
+      worldZ == 0 plane that the mouse cursor points at, updates the vertical
+      section path and triggers a redraw of the scene.
+
+      The mouse position in world space is found by computing the intersection
+      point of the ray (camera origin - mouse position) with the worldZ == 0
+      plane. The section path is updated by calling @ref
+      generatePathFromWaypoints(). Expensive, because the scene view's MVP
+      matrix is inverted and the vertical section's path is interpolated.
+      */
+    virtual void dragEvent(MSceneViewGLWidget *sceneView,
+                           int handleID, float clipX, float clipY);
 
     /**
       Set the pressure at which the section is rendered.
@@ -141,18 +178,26 @@ private:
     void renderContourLabels(MSceneViewGLWidget *sceneView,
                              MNWP2DHorizontalActorVariable* var);
 
+    void updateMouseHandlePositions();
+
     std::shared_ptr<GL::MShaderEffect> glVerticalInterpolationEffect;
     std::shared_ptr<GL::MShaderEffect> glFilledContoursShader;
     std::shared_ptr<GL::MShaderEffect> glPseudoColourShader;
     std::shared_ptr<GL::MShaderEffect> glMarchingSquaresShader;
     std::shared_ptr<GL::MShaderEffect> glWindBarbsShader;
     std::shared_ptr<GL::MShaderEffect> glShadowQuad;
+    std::shared_ptr<GL::MShaderEffect> positionSpheresShader;
 
     QtProperty *slicePosProperty;
     double      slicePosition_hPa;
 
     bool crossSectionGridsNeedUpdate;
     bool updateRenderRegion;
+
+    /** Mouse handles */
+    QVector<QVector3D> mouseHandlePoints;
+    GL::MVector3DVertexBuffer *vbMouseHandlePoints;
+    int selectedMouseHandle;
 
     /** Horizontal bounding box in which section is drawn */
     QtProperty *boundingBoxProperty;
