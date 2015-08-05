@@ -470,6 +470,7 @@ private:
         GlyphType           glyph;
         Threshold           threshold;
         CurveColor          colour;
+        GLfloat             tubeSize;
         Surface             surface;
 
         GLfloat             stepSize;
@@ -491,6 +492,7 @@ private:
         QtProperty*         glyphProp;
         QtProperty*         thresholdProp;
         QtProperty*         colourProp;
+        QtProperty*         tubeSizeProp;
         QtProperty*         surfaceProp;
         QtProperty*         groupProp;
 

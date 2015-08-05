@@ -433,6 +433,9 @@ MNWPVolumeRaycasterActor::NormalCurveSettings::NormalCurveSettings(
     properties->mEnum()->setEnumNames(colourProp, modesLst);
     properties->mEnum()->setValue(colourProp, static_cast<int>(colour));
 
+    tubeSizeProp = a->addProperty(DOUBLE_PROPERTY, "tubes size", groupProp);
+    properties->setDouble(tubeSizeProp, 0.03, 3, 0.001);
+
     modesLst.clear();
     modesLst << "inner" << "outer";
     surfaceProp = a->addProperty(ENUM_PROPERTY, "start isosurface", groupProp);
@@ -789,10 +792,17 @@ void MNWPVolumeRaycasterActor::loadConfiguration(QSettings *settings)
             NormalCurveSettings::CurveColor(settings->value("colour").toInt());
     properties->mEnum()->setValue(normalCurveSettings->colourProp,
                                   normalCurveSettings->colour);
+
+    normalCurveSettings->tubeSize = settings->value("tubesSize").toFloat();
+    properties->mDouble()->setValue(normalCurveSettings->tubeSizeProp,
+                                  normalCurveSettings->tubeSize);
+
     normalCurveSettings->surface =
             NormalCurveSettings::Surface(settings->value("surfaceStart").toInt());
     properties->mEnum()->setValue(normalCurveSettings->surfaceProp,
                                   normalCurveSettings->surface);
+
+
     normalCurveSettings->integrationDir =
             NormalCurveSettings::IntegrationDir(settings->value("integrationDir").toInt());
     properties->mEnum()->setValue(normalCurveSettings->integrationDirProp,
@@ -1234,6 +1244,7 @@ void MNWPVolumeRaycasterActor::onQtPropertyChanged(QtProperty* property)
     }
 
     else if (property == normalCurveSettings->surfaceProp ||
+             property == normalCurveSettings->tubeSizeProp ||
              property == normalCurveSettings->seedPointResXProp ||
              property == normalCurveSettings->seedPointResYProp ||
              property == normalCurveSettings->seedPointResZProp ||
@@ -1251,6 +1262,8 @@ void MNWPVolumeRaycasterActor::onQtPropertyChanged(QtProperty* property)
                 ->value(normalCurveSettings->seedPointResZProp);
         normalCurveSettings->initPointVariance = properties->mDouble()
                 ->value(normalCurveSettings->seedPointVarianceProp);
+        normalCurveSettings->tubeSize = properties->mDouble()
+                ->value(normalCurveSettings->tubeSizeProp);
         normalCurveSettings->integrationDir =
                 static_cast<NormalCurveSettings::IntegrationDir>(
                     properties->mEnum()->value(normalCurveSettings->integrationDirProp));
@@ -2197,6 +2210,8 @@ void MNWPVolumeRaycasterActor::setNormalCurveShaderVars(
     shader->setUniformValue(
                 "normalized", GLboolean(
                     normalCurveSettings->colour != NormalCurveSettings::ColorIsoValue));
+
+    shader->setUniformValue("tube_size", normalCurveSettings->tubeSize); CHECK_GL_ERROR;
 
     gl.tex2DDepthBuffer->bindToTextureUnit(gl.texUnitDepthBuffer);
     shader->setUniformValue("depthTex", gl.texUnitDepthBuffer);
