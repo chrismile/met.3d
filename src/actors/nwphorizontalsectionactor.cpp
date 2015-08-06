@@ -873,10 +873,11 @@ void MNWPHorizontalSectionActor::updateMouseHandlePositions(){
                       slicePosition_hPa));
 
     // Send vertices of drag handle positions to video memory.
-    if (vbMouseHandlePoints) delete vbMouseHandlePoints;
-    vbMouseHandlePoints = new GL::MVector3DVertexBuffer(
-                QString("vbmhpos_%1").arg(myID),
-                mouseHandlePoints.size());
+    if (!vbMouseHandlePoints) {
+        vbMouseHandlePoints = new GL::MVector3DVertexBuffer(
+                    QString("vbmhpos_%1").arg(myID),
+                    mouseHandlePoints.size());
+    }
     vbMouseHandlePoints->upload(mouseHandlePoints);
 }
 
