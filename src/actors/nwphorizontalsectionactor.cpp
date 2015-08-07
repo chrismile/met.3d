@@ -64,6 +64,7 @@ MNWPHorizontalSectionActor::MNWPHorizontalSectionActor()
       renderShadowQuad(true),
       shadowColor(QColor(60,60,60,70)),
       shadowHeight(0.01f),
+      slicePositionGranularity(5.0),
       vbMouseHandlePoints(nullptr),
       selectedMouseHandle(-1)
 {
@@ -79,6 +80,11 @@ MNWPHorizontalSectionActor::MNWPHorizontalSectionActor()
                                    actorPropertiesSupGroup);
     properties->setDDouble(slicePosProperty, slicePosition_hPa, 10., 1050.,
                            2, 5., " hPa");
+
+    slicePosGranularityProperty = addProperty(DOUBLE_PROPERTY, "slice position granularity",
+                                   actorPropertiesSupGroup);
+    properties->setDouble(slicePosGranularityProperty,
+                          slicePositionGranularity,1.0,50.0, 0, 5.);
 
     QStringList differenceModeNames;
     differenceModeNames << "off" << "absolute" << "relative";
@@ -404,8 +410,10 @@ void MNWPHorizontalSectionActor::dragEvent(MSceneViewGLWidget *sceneView,
     float d = QVector3D::dotProduct(p0 - l0, n) / QVector3D::dotProduct(l, n);
     QVector3D mousePosWorldSpace = l0 + d * l;
 
+    int pressZ = sceneView->pressureFromWorldZ(mousePosWorldSpace.z());
+    pressZ = pressZ - fmod(pressZ,slicePositionGranularity);
     properties->mDDouble()->setValue(slicePosProperty,
-                            sceneView->pressureFromWorldZ(mousePosWorldSpace.z()));
+                            pressZ);
     emitActorChangedSignal();
 }
 
@@ -442,7 +450,11 @@ void MNWPHorizontalSectionActor::onQtPropertyChanged(QtProperty *property)
 {
     // Parent signal processing.
     MNWPMultiVarActor::onQtPropertyChanged(property);
-
+    if (property == slicePosGranularityProperty)
+    {
+        slicePositionGranularity =
+                properties->mDouble()->value(slicePosGranularityProperty);
+    }
     if (property == slicePosProperty)
     {
         // The slice position has been changed.

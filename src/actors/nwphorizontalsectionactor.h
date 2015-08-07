@@ -191,6 +191,9 @@ private:
     QtProperty *slicePosProperty;
     double      slicePosition_hPa;
 
+    QtProperty *slicePosGranularityProperty;
+    double      slicePositionGranularity;
+
     bool crossSectionGridsNeedUpdate;
     bool updateRenderRegion;
 
