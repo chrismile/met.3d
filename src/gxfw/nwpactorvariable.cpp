@@ -601,7 +601,11 @@ void MNWPActorVariable::saveConfiguration(QSettings *settings)
     QString tfName = tfNames.at(tfIndex);
     settings->setValue("transferFunction", tfName);
 
-    settings->setValue("synchronizationID", synchronizationControl->getID());
+    if(synchronizationControl != nullptr){
+        settings->setValue("synchronizationID", synchronizationControl->getID());
+    } else {
+        settings->setValue("synchronizationID", "");
+    }
 }
 
 
