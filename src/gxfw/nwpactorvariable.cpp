@@ -601,6 +601,12 @@ void MNWPActorVariable::saveConfiguration(QSettings *settings)
     QString tfName = tfNames.at(tfIndex);
     settings->setValue("transferFunction", tfName);
 
+    QStringList emNames =
+            properties->mEnum()->enumNames(ensembleModeProperty);
+    int modeIndex = properties->mEnum()->value(ensembleModeProperty);
+    QString emName = emNames.at(modeIndex);
+    settings->setValue("ensembleMode", emName);
+
     if(synchronizationControl != nullptr){
         settings->setValue("synchronizationID", synchronizationControl->getID());
     } else {
@@ -633,6 +639,18 @@ void MNWPActorVariable::loadConfiguration(QSettings *settings)
         msgBox.exec();
     }
 
+    QString emName = settings->value("ensembleMode").toString();
+    if ( !setEnsembelMode(emName) )
+    {
+        QMessageBox msgBox;
+        msgBox.setIcon(QMessageBox::Warning);
+        msgBox.setText(QString("Variable '%1':\n"
+                               "Ensemble Mode '%2' does not exist.\n"
+                               "Setting ensemble Mode to 'Member'.")
+                       .arg(variableName).arg(emName));
+        msgBox.exec();
+    }
+
     QString syncID = settings->value("synchronizationID").toString();
     if ( !syncID.isEmpty() )
     {
@@ -656,6 +674,24 @@ void MNWPActorVariable::loadConfiguration(QSettings *settings)
     }
 }
 
+bool MNWPActorVariable::setEnsembelMode(QString emName)
+{
+    MQtProperties *properties = actor->getQtProperties();
+    QStringList emNames = properties->mEnum()->enumNames(
+                ensembleModeProperty);
+    int emIndex = emNames.indexOf(emName);
+
+    if (emIndex >= 0)
+    {
+        properties->mEnum()->setValue(ensembleModeProperty, emIndex);
+        return true;
+    }
+
+    // Set transfer function property to "None".
+    properties->mEnum()->setValue(ensembleModeProperty, 0);
+
+    return false; // the given tf name could not be found
+}
 
 bool MNWPActorVariable::setTransferFunction(QString tfName)
 {
