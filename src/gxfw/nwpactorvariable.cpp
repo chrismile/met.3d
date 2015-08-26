@@ -607,9 +607,13 @@ void MNWPActorVariable::saveConfiguration(QSettings *settings)
     QString emName = emNames.at(modeIndex);
     settings->setValue("ensembleMode", emName);
 
-    if(synchronizationControl != nullptr){
+    // The variable doesn't need to be synchronized
+    if(synchronizationControl != nullptr)
+    {
         settings->setValue("synchronizationID", synchronizationControl->getID());
-    } else {
+    }
+    else
+    {
         settings->setValue("synchronizationID", "");
     }
 }

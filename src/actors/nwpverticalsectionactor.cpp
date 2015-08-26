@@ -138,7 +138,9 @@ void MNWPVerticalSectionActor::saveConfiguration(QSettings *settings)
 
     settings->beginGroup(MNWPVerticalSectionActor::getSettingsID());
 
-    if(waypointsModel != nullptr){
+    // Just save waypoints if they exist
+    if(waypointsModel != nullptr)
+    {
         settings->setValue("waypointsModelID", waypointsModel->getID());
     }
 
