@@ -142,7 +142,7 @@ Met.3D executable and hence do not have to be build beforehand. They can
 be downloaded with git:
 
 [in met.3d-base/third-party]
-git clone https://gitorious.org/qt-solutions/qt-solutions.git
+git clone https://github.com/qtproject/qt-solutions.git
 
 
 2) Fonts
