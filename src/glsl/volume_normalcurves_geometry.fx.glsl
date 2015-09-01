@@ -53,7 +53,7 @@ interface GStoFS
  ***                             UNIFORMS
  *****************************************************************************/
 
-uniform float tube_size;
+uniform float tubeRadius;
 
 /*****************************************************************************
  ***                           VERTEX SHADER
@@ -151,10 +151,10 @@ shader GSBox(in VStoGS Input[], out GStoFS Output)
     else
         magnifier = 3.0;
 
-    vec3 prev_ray_pos_ll = prev_ray_position + tube_size * magnifier * (-normal - binormal);
-    vec3 prev_ray_pos_ul = prev_ray_position + tube_size * magnifier * (-normal + binormal);
-    vec3 prev_ray_pos_lr = prev_ray_position + tube_size * magnifier * ( normal - binormal);
-    vec3 prev_ray_pos_ur = prev_ray_position + tube_size * magnifier * ( normal + binormal);
+    vec3 prev_ray_pos_ll = prev_ray_position + tubeRadius * magnifier * (-normal - binormal);
+    vec3 prev_ray_pos_ul = prev_ray_position + tubeRadius * magnifier * (-normal + binormal);
+    vec3 prev_ray_pos_lr = prev_ray_position + tubeRadius * magnifier * ( normal - binormal);
+    vec3 prev_ray_pos_ur = prev_ray_position + tubeRadius * magnifier * ( normal + binormal);
 
     Output.normalPS = gradient;
 
@@ -172,15 +172,15 @@ shader GSBox(in VStoGS Input[], out GStoFS Output)
     EmitVertex();
     EndPrimitive();
 
-    prev_ray_pos_ll = prev_ray_position + tube_size * (-normal - binormal);
-    prev_ray_pos_ul = prev_ray_position + tube_size * (-normal + binormal);
-    prev_ray_pos_lr = prev_ray_position + tube_size * ( normal - binormal);
-    prev_ray_pos_ur = prev_ray_position + tube_size * ( normal + binormal);
+    prev_ray_pos_ll = prev_ray_position + tubeRadius * (-normal - binormal);
+    prev_ray_pos_ul = prev_ray_position + tubeRadius * (-normal + binormal);
+    prev_ray_pos_lr = prev_ray_position + tubeRadius * ( normal - binormal);
+    prev_ray_pos_ur = prev_ray_position + tubeRadius * ( normal + binormal);
 
-    vec3 ray_pos_ll = ray_position + tube_size * (-normal - binormal);
-    vec3 ray_pos_ul = ray_position + tube_size * (-normal + binormal);
-    vec3 ray_pos_lr = ray_position + tube_size * ( normal - binormal);
-    vec3 ray_pos_ur = ray_position + tube_size * ( normal + binormal);
+    vec3 ray_pos_ll = ray_position + tubeRadius * (-normal - binormal);
+    vec3 ray_pos_ul = ray_position + tubeRadius * (-normal + binormal);
+    vec3 ray_pos_lr = ray_position + tubeRadius * ( normal - binormal);
+    vec3 ray_pos_ur = ray_position + tubeRadius * ( normal + binormal);
 
     Output.normalPS = -normal - binormal;
     Output.valuePS = prev_value;
@@ -300,8 +300,8 @@ shader GSTube(in VStoGS Input[], out GStoFS Output)
     for (int t = 0; t <= tube_segments; t++)
     {
         float angle = radians(angle_t * t);
-        float cosi = cos(angle) * tube_size;
-        float sini = sin(angle) * tube_size;
+        float cosi = cos(angle) * tubeRadius;
+        float sini = sin(angle) * tubeRadius;
 
         vec3 prev_world_pos = pos1 + cosi * normalPrev + sini * binormalPrev;
         vec3 next_world_pos = pos2 + cosi * normalNext + sini * binormalNext;
@@ -339,14 +339,14 @@ shader GSTube(in VStoGS Input[], out GStoFS Output)
         for (int t = 0; t < tube_segments; ++t)
         {
             float angle = radians(angle_t * t);
-            float cosi = cos(angle) * tube_size;
-            float sini = sin(angle) * tube_size;
+            float cosi = cos(angle) * tubeRadius;
+            float sini = sin(angle) * tubeRadius;
 
             vec3 next_world_pos_0 = pos2 + cosi * normalNext + sini * binormalNext;
 
             angle = radians(angle_t * (t + 1));
-            cosi = cos(angle) * tube_size;
-            sini = sin(angle) * tube_size;
+            cosi = cos(angle) * tubeRadius;
+            sini = sin(angle) * tubeRadius;
 
             vec3 next_world_pos_1 = pos2 + cosi * normalNext + sini * binormalNext;
 
@@ -431,19 +431,19 @@ shader GSTubeShadow(in VStoGS Input[], out GStoFS Output)
     Output.normalPS = normalize(vec3(0,0,0));
 
     // and calculate the boundaries of the projected quad in x/y plane
-    Output.worldPos = pos1 - normalPrev * tube_size;
+    Output.worldPos = pos1 - normalPrev * tubeRadius;
     gl_Position = mvpMatrix * vec4(Output.worldPos, 1);
     EmitVertex();
 
-    Output.worldPos = pos1 + normalPrev * tube_size;
+    Output.worldPos = pos1 + normalPrev * tubeRadius;
     gl_Position = mvpMatrix * vec4(Output.worldPos, 1);
     EmitVertex();
 
-    Output.worldPos = pos2 - normalNext * tube_size;
+    Output.worldPos = pos2 - normalNext * tubeRadius;
     gl_Position = mvpMatrix * vec4(Output.worldPos, 1);
     EmitVertex();
 
-    Output.worldPos = pos2 + normalNext * tube_size;
+    Output.worldPos = pos2 + normalNext * tubeRadius;
     gl_Position = mvpMatrix * vec4(Output.worldPos, 1);
     EmitVertex();
 

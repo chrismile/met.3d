@@ -393,6 +393,7 @@ MNWPVolumeRaycasterActor::NormalCurveSettings::NormalCurveSettings(
       glyph(GlyphType::Tube),
       threshold(Threshold::IsoValueInner),
       colour(CurveColor::ColorIsoValue),
+      tubeRadius(0.05),
       surface(Surface::Outer),
       stepSize(0.1),
       integrationDir(IntegrationDir::Forwards),
@@ -433,8 +434,8 @@ MNWPVolumeRaycasterActor::NormalCurveSettings::NormalCurveSettings(
     properties->mEnum()->setEnumNames(colourProp, modesLst);
     properties->mEnum()->setValue(colourProp, static_cast<int>(colour));
 
-    tubeSizeProp = a->addProperty(DOUBLE_PROPERTY, "tubes size", groupProp);
-    properties->setDouble(tubeSizeProp, 0.03, 3, 0.001);
+    tubeRadiusProp = a->addProperty(DOUBLE_PROPERTY, "curve radius", groupProp);
+    properties->setDouble(tubeRadiusProp, tubeRadius, 0.01, 0.5, 2, 0.01);
 
     modesLst.clear();
     modesLst << "inner" << "outer";
@@ -621,6 +622,7 @@ void MNWPVolumeRaycasterActor::saveConfiguration(QSettings *settings)
     settings->setValue("glyphType", static_cast<int>(normalCurveSettings->glyph));
     settings->setValue("threshold", static_cast<int>(normalCurveSettings->threshold));
     settings->setValue("colour", static_cast<int>(normalCurveSettings->colour));
+    settings->setValue("tubeRadius", normalCurveSettings->tubeRadius);
     settings->setValue("surfaceStart", static_cast<int>(normalCurveSettings->surface));
     settings->setValue("stepSize", normalCurveSettings->stepSize);
     settings->setValue("integrationDir", static_cast<int>(normalCurveSettings->integrationDir));
@@ -793,9 +795,9 @@ void MNWPVolumeRaycasterActor::loadConfiguration(QSettings *settings)
     properties->mEnum()->setValue(normalCurveSettings->colourProp,
                                   normalCurveSettings->colour);
 
-    normalCurveSettings->tubeSize = settings->value("tubesSize").toFloat();
-    properties->mDouble()->setValue(normalCurveSettings->tubeSizeProp,
-                                  normalCurveSettings->tubeSize);
+    normalCurveSettings->tubeRadius = settings->value("tubeRadius").toFloat();
+    properties->mDouble()->setValue(normalCurveSettings->tubeRadiusProp,
+                                  normalCurveSettings->tubeRadius);
 
     normalCurveSettings->surface =
             NormalCurveSettings::Surface(settings->value("surfaceStart").toInt());
@@ -1244,7 +1246,7 @@ void MNWPVolumeRaycasterActor::onQtPropertyChanged(QtProperty* property)
     }
 
     else if (property == normalCurveSettings->surfaceProp ||
-             property == normalCurveSettings->tubeSizeProp ||
+             property == normalCurveSettings->tubeRadiusProp ||
              property == normalCurveSettings->seedPointResXProp ||
              property == normalCurveSettings->seedPointResYProp ||
              property == normalCurveSettings->seedPointResZProp ||
@@ -1262,8 +1264,8 @@ void MNWPVolumeRaycasterActor::onQtPropertyChanged(QtProperty* property)
                 ->value(normalCurveSettings->seedPointResZProp);
         normalCurveSettings->initPointVariance = properties->mDouble()
                 ->value(normalCurveSettings->seedPointVarianceProp);
-        normalCurveSettings->tubeSize = properties->mDouble()
-                ->value(normalCurveSettings->tubeSizeProp);
+        normalCurveSettings->tubeRadius = properties->mDouble()
+                ->value(normalCurveSettings->tubeRadiusProp);
         normalCurveSettings->integrationDir =
                 static_cast<NormalCurveSettings::IntegrationDir>(
                     properties->mEnum()->value(normalCurveSettings->integrationDirProp));
@@ -2211,7 +2213,7 @@ void MNWPVolumeRaycasterActor::setNormalCurveShaderVars(
                 "normalized", GLboolean(
                     normalCurveSettings->colour != NormalCurveSettings::ColorIsoValue));
 
-    shader->setUniformValue("tube_size", normalCurveSettings->tubeSize); CHECK_GL_ERROR;
+    shader->setUniformValue("tubeRadius", normalCurveSettings->tubeRadius); CHECK_GL_ERROR;
 
     gl.tex2DDepthBuffer->bindToTextureUnit(gl.texUnitDepthBuffer);
     shader->setUniformValue("depthTex", gl.texUnitDepthBuffer);
