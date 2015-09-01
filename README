@@ -10,15 +10,14 @@ not restricted to this application. Besides being used as a visualization tool,
 Met.3D is intended to serve as a framework to implement and evaluate new 3D and
 ensemble visualization techniques for the atmospheric sciences.
 
-The Met.3D reference publication is currently under review for "Geoscientific
-Model Development" and available online from Geoscientific Model Development
-Discussions:
+The Met.3D reference publication has been published in "Geoscientific
+Model Development" and is available online:
 
-   M. Rautenhaus, M. Kern, A. Schäfler, and R. Westermann,
-   "3D visualization of ensemble weather forecasts -- Part 1: The
-   visualization tool Met.3D (version 1.0)", Geosci. Model Devel.
-   Discuss., 8, 2101-2160, doi:10.5194/gmdd-8-2101-2015, 2015.
-   Available at: http://www.geosci-model-dev-discuss.net/8/2101/2015/gmdd-8-2101-2015.html
+   Rautenhaus, M., Kern, M., Schäfler, A., and Westermann, R.:
+   "Three-dimensional visualization of ensemble weather forecasts -- Part 1:
+   The visualization tool Met.3D (version 1.0)", Geosci. Model Dev., 8,
+   2329-2353, doi:10.5194/gmd-8-2329-2015, 2015.
+   Available at: http://www.geosci-model-dev.net/8/2329/2015/gmd-8-2329-2015.html
 
 Met.3D is developed at the Computer Graphics & Visualization Group, Technische
 Universitaet Muenchen, Garching, Germany. We hope you find the tool useful for
@@ -65,15 +64,15 @@ In addition to the reference publication, a second paper available online from
 Geoscientific Model Development Discussions describes the specific application
 case of forecasting warm conveyor belt situations with Met.3D:
 
-   M. Rautenhaus, C. M. Grams, A. Schäfler, and R. Westermann,
-   "3D visualization of ensemble weather forecasts -- Part 2: Forecasting
-   warm conveyor belt situations for aircraft-based field campaigns",
-   Geosci. Model Devel. Discuss., 8, 2161-2212, doi:10.5194/gmdd-8-2161-2015, 2015.
-   Available at: http://www.geosci-model-dev-discuss.net/8/2161/2015/gmdd-8-2161-2015.html
+   Rautenhaus, M., Grams, C. M., Schäfler, A., and Westermann, R.:
+   "Three-dimensional visualization of ensemble weather forecasts --Part 2:
+   Forecasting warm conveyor belt situations for aircraft-based field campaigns",
+   Geosci. Model Dev., 8, 2355-2377, doi:10.5194/gmd-8-2355-2015, 2015.
+   Available at: http://www.geosci-model-dev.net/8/2355/2015/gmd-8-2355-2015.html
 
 A high-level description of the project can be found in the ECMWF Newsletter:
 
-   M. Rautenhaus, C. M. Grams, A. Schäfler, and R. Westermann,
+   Rautenhaus, M., Grams, C. M., Schäfler, A., and Westermann, R.:
    "GPU based interactive 3D visualization of ECMWF ensemble forecasts",
    ECMWF Newsletter, vol. 138 (Winter 2014), pp. 34-38, 2014.
    Available at: http://old.ecmwf.int/publications/newsletters/pdf/138.pdf
