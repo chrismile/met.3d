@@ -63,37 +63,22 @@ public:
       Implements MActor::checkIntersectionWithHandle().
 
       Checks is the mouse position in clip space @p clipX and @p clipY
-      "touches" one of the waypoints or midpoints of this cross-section
-      (midpoints are located between two waypoints; if a midpoint is moved the
-      entire segment is moved). If a way- or midpoint is matched, its index is
-      returned.
-
-      Approach: Simply test each way-/midpoint. Loops over all way-/midpoints.
-      The world coordinates of the waypoint are transformed to clip space using
-      the scene view's MVP matrix and assuming the point to be located on the
-      worldZ == 0 plane. If the distance between the waypoint's clip
-      coordinates and the mouse position is smaller than @p clipRadius, the
-      waypoint is considered to be matched. (@p clipRadius is typically on the
-      order of a few pixels; set in the scene view.)
+      "touches" one of the four corner points of this cross-section. If a
+      corner point is matched, its index is returned.
       */
-    virtual int checkIntersectionWithHandle(MSceneViewGLWidget *sceneView,
-                                  float clipX, float clipY, float clipRadius);
+    int checkIntersectionWithHandle(MSceneViewGLWidget *sceneView,
+                                    float clipX, float clipY,
+                                    float clipRadius) override;
 
     /**
       Implements MActor::dragEvent().
 
-      Drags the way-/midpoint at index @p handleID to the position on the
-      worldZ == 0 plane that the mouse cursor points at, updates the vertical
-      section path and triggers a redraw of the scene.
-
-      The mouse position in world space is found by computing the intersection
-      point of the ray (camera origin - mouse position) with the worldZ == 0
-      plane. The section path is updated by calling @ref
-      generatePathFromWaypoints(). Expensive, because the scene view's MVP
-      matrix is inverted and the vertical section's path is interpolated.
+      Drags the corner point at index @p handleID to the vertical position that
+      the mouse cursor points at on a plane perpendicular to the x/y plane,
+      updates the vertical slice position and triggers a redraw of the scene.
       */
-    virtual void dragEvent(MSceneViewGLWidget *sceneView,
-                           int handleID, float clipX, float clipY);
+    void dragEvent(MSceneViewGLWidget *sceneView,
+                   int handleID, float clipX, float clipY) override;
 
     /**
       Set the pressure at which the section is rendered.
@@ -192,7 +177,7 @@ private:
     double      slicePosition_hPa;
 
     QtProperty *slicePosGranularityProperty;
-    double      slicePositionGranularity;
+    double      slicePositionGranularity_hPa;
 
     bool crossSectionGridsNeedUpdate;
     bool updateRenderRegion;

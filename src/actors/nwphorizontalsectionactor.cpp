@@ -56,17 +56,17 @@ namespace Met3D
 MNWPHorizontalSectionActor::MNWPHorizontalSectionActor()
     : MNWPMultiVarActor(),
       slicePosition_hPa(250.),
+      slicePositionGranularity_hPa(5.0),
       updateRenderRegion(false),
+      vbMouseHandlePoints(nullptr),
+      selectedMouseHandle(-1),
       horizontalBBox(QRectF(-60., 30., 100., 40.)),
       differenceMode(0),
       windBarbsVertexBuffer(nullptr),
       windBarbsSettings(),
       renderShadowQuad(true),
       shadowColor(QColor(60,60,60,70)),
-      shadowHeight(0.01f),
-      slicePositionGranularity(5.0),
-      vbMouseHandlePoints(nullptr),
-      selectedMouseHandle(-1)
+      shadowHeight(0.01f)
 {
     enablePicking(true);
 
@@ -79,12 +79,13 @@ MNWPHorizontalSectionActor::MNWPHorizontalSectionActor()
     slicePosProperty = addProperty(DECORATEDDOUBLE_PROPERTY, "slice position",
                                    actorPropertiesSupGroup);
     properties->setDDouble(slicePosProperty, slicePosition_hPa, 10., 1050.,
-                           2, 5., " hPa");
+                           2, slicePositionGranularity_hPa, " hPa");
 
-    slicePosGranularityProperty = addProperty(DOUBLE_PROPERTY, "slice position granularity",
-                                   actorPropertiesSupGroup);
-    properties->setDouble(slicePosGranularityProperty,
-                          slicePositionGranularity,1.0,50.0, 0, 5.);
+    slicePosGranularityProperty = addProperty(DECORATEDDOUBLE_PROPERTY,
+                                              "slice position granularity",
+                                              actorPropertiesSupGroup);
+    properties->setDDouble(slicePosGranularityProperty,
+                           slicePositionGranularity_hPa, 1., 50., 0, 1., " hPa");
 
     QStringList differenceModeNames;
     differenceModeNames << "off" << "absolute" << "relative";
@@ -124,7 +125,6 @@ MNWPHorizontalSectionActor::MNWPHorizontalSectionActor()
     actorPropertiesSupGroup->addSubProperty(graticuleActor->getPropertyGroup());
 
     endInitialiseQtProperties();
-
 }
 
 
@@ -329,24 +329,21 @@ void MNWPHorizontalSectionActor::loadConfiguration(QSettings *settings)
     settings->endGroup(); // MNWPHorizontalSectionActor
 }
 
+
 int MNWPHorizontalSectionActor::checkIntersectionWithHandle(
         MSceneViewGLWidget *sceneView,
         float clipX, float clipY,
         float clipRadius)
 {
-
-    // See notes 22-23Feb2012 and 21Nov2012.
-
-    if (mouseHandlePoints.size() == 0) {
-        updateMouseHandlePositions();
-    }
+    // First call? Generate positions of corner points.
+    if (mouseHandlePoints.size() == 0) updateMouseHandlePositions();
 
     float clipRadiusSq = clipRadius*clipRadius;
 
     selectedMouseHandle = -1;
 
-    // Loop over all cornerpoints and check whether the mouse cursor is inside
-    // a circle with radius "clipRadius" around the waypoint (in clip space).
+    // Loop over all corner points and check whether the mouse cursor is inside
+    // a circle with radius "clipRadius" around the corner point (in clip space).
     for (int i = 0; i < mouseHandlePoints.size(); i++)
     {
         // Transform the corner point coordinate to clip space.
@@ -364,13 +361,13 @@ int MNWPHorizontalSectionActor::checkIntersectionWithHandle(
         }
     }
 
-
     return selectedMouseHandle;
 }
 
 
-void MNWPHorizontalSectionActor::dragEvent(MSceneViewGLWidget *sceneView,
-                                    int handleID, float clipX, float clipY)
+void MNWPHorizontalSectionActor::dragEvent(
+        MSceneViewGLWidget *sceneView,
+        int handleID, float clipX, float clipY)
 {
     // http://stackoverflow.com/questions/2093096/implementing-ray-picking
 
@@ -400,21 +397,24 @@ void MNWPHorizontalSectionActor::dragEvent(MSceneViewGLWidget *sceneView,
     QVector3D cameraPosWorldSpace = sceneView->getCamera()->getOrigin();
     QVector3D l = (l0 - cameraPosWorldSpace);
 
-    // The planes origin is the selected mouse handle
-    QVector3D p0 = mouseHandlePoints.at(selectedMouseHandle);
-    // The normal vector is a vector to the camera without
-    // a value in the z-direction -> it is located on the surface of the basemap
+    // The plane's origin is the selected mouse handle.
+    QVector3D p0 = mouseHandlePoints.at(handleID);
+    // The normal vector is taken as the vector to the camera with a zero value
+    // in the worldZ-direction -> a vector in the x/y plane.
     QVector3D n = sceneView->getCamera()->getOrigin() - p0;
     n.setZ(0);
+
     // Compute the mouse position in world space.
     float d = QVector3D::dotProduct(p0 - l0, n) / QVector3D::dotProduct(l, n);
     QVector3D mousePosWorldSpace = l0 + d * l;
 
-    int pressZ = sceneView->pressureFromWorldZ(mousePosWorldSpace.z());
-    pressZ = pressZ - fmod(pressZ,slicePositionGranularity);
-    properties->mDDouble()->setValue(slicePosProperty,
-                            pressZ);
-    emitActorChangedSignal();
+    // Transform world space Z to pressure (hPa) and round off to match
+    // granularity requested by used.
+    double p_hPa = sceneView->pressureFromWorldZ(mousePosWorldSpace.z());
+    p_hPa = p_hPa - fmod(p_hPa, slicePositionGranularity_hPa);
+
+    // Set slice position to new pressure elevation.
+    setSlicePosition(p_hPa);
 }
 
 
@@ -450,11 +450,7 @@ void MNWPHorizontalSectionActor::onQtPropertyChanged(QtProperty *property)
 {
     // Parent signal processing.
     MNWPMultiVarActor::onQtPropertyChanged(property);
-    if (property == slicePosGranularityProperty)
-    {
-        slicePositionGranularity =
-                properties->mDouble()->value(slicePosGranularityProperty);
-    }
+
     if (property == slicePosProperty)
     {
         // The slice position has been changed.
@@ -470,6 +466,15 @@ void MNWPHorizontalSectionActor::onQtPropertyChanged(QtProperty *property)
         updateDescriptionLabel();
         updateMouseHandlePositions();
         emitActorChangedSignal();
+    }
+
+    else if (property == slicePosGranularityProperty)
+    {
+        slicePositionGranularity_hPa =
+                properties->mDDouble()->value(slicePosGranularityProperty);
+
+        properties->mDDouble()->setSingleStep(slicePosProperty,
+                                              slicePositionGranularity_hPa);
     }
 
     else if ( (property == labelSizeProperty)
@@ -749,6 +754,8 @@ void MNWPHorizontalSectionActor::renderToCurrentContext(MSceneViewGLWidget *scen
         renderWindBarbs(sceneView);
     }
 
+    // Render HANDLES in interaction mode.
+    // ===================================
     if (sceneView->interactionModeEnabled() &&
             (vbMouseHandlePoints != nullptr))
     {
@@ -771,7 +778,7 @@ void MNWPHorizontalSectionActor::renderToCurrentContext(MSceneViewGLWidget *scen
                     sceneView->getCamera()->getYAxis());
         positionSpheresShader->setUniformValue(
                     "radius",
-                    GLfloat(1.0));
+                    GLfloat(0.5));
         positionSpheresShader->setUniformValue(
                     "scaleRadius",
                     GLboolean(true));
@@ -865,8 +872,11 @@ void MNWPHorizontalSectionActor::updateDescriptionLabel(bool deleteOldLabel)
                   );
 }
 
-void MNWPHorizontalSectionActor::updateMouseHandlePositions(){
+
+void MNWPHorizontalSectionActor::updateMouseHandlePositions()
+{
     mouseHandlePoints.clear();
+
     mouseHandlePoints.append(
             QVector3D(horizontalBBox.x(),
                       horizontalBBox.y(),
@@ -885,7 +895,8 @@ void MNWPHorizontalSectionActor::updateMouseHandlePositions(){
                       slicePosition_hPa));
 
     // Send vertices of drag handle positions to video memory.
-    if (!vbMouseHandlePoints) {
+    if (!vbMouseHandlePoints)
+    {
         vbMouseHandlePoints = new GL::MVector3DVertexBuffer(
                     QString("vbmhpos_%1").arg(myID),
                     mouseHandlePoints.size());
