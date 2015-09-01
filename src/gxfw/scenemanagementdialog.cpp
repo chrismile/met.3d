@@ -441,6 +441,15 @@ void MSceneManagementDialog::createActorFromFile()
 
 void MSceneManagementDialog::deleteActor()
 {
+    // Is an actor selected?
+    if(!ui->actorPoolListWidget->currentItem())
+    {
+        QMessageBox msgBox;
+        msgBox.setText("Please select the actor you wish to delete.");
+        msgBox.exec();
+        return;
+    }
+
     MGLResourcesManager* glRM = MGLResourcesManager::getInstance();
 
     const QString actorName = ui->actorPoolListWidget->currentItem()->text();
