@@ -25,6 +25,8 @@
 **
 ******************************************************************************/
 
+
+
 /*****************************************************************************
  ***                             INTERFACES
  *****************************************************************************/
@@ -47,6 +49,11 @@ interface GStoFS
     smooth float valuePS;
 };
 
+/*****************************************************************************
+ ***                             UNIFORMS
+ *****************************************************************************/
+
+uniform float tubeRadius;
 
 /*****************************************************************************
  ***                           VERTEX SHADER
@@ -119,8 +126,6 @@ shader GSBox(in VStoGS Input[], out GStoFS Output)
     if (Input[1].value == -1 || Input[2].value == -1)
         return;
 
-    float tube_size = 0.03;
-
     vec3 start_position = vec3(-1,-1,-1);
     if (Input[0].value == -1)
         start_position = Input[1].worldSpaceCoordinate;
@@ -146,10 +151,10 @@ shader GSBox(in VStoGS Input[], out GStoFS Output)
     else
         magnifier = 3.0;
 
-    vec3 prev_ray_pos_ll = prev_ray_position + tube_size * magnifier * (-normal - binormal);
-    vec3 prev_ray_pos_ul = prev_ray_position + tube_size * magnifier * (-normal + binormal);
-    vec3 prev_ray_pos_lr = prev_ray_position + tube_size * magnifier * ( normal - binormal);
-    vec3 prev_ray_pos_ur = prev_ray_position + tube_size * magnifier * ( normal + binormal);
+    vec3 prev_ray_pos_ll = prev_ray_position + tubeRadius * magnifier * (-normal - binormal);
+    vec3 prev_ray_pos_ul = prev_ray_position + tubeRadius * magnifier * (-normal + binormal);
+    vec3 prev_ray_pos_lr = prev_ray_position + tubeRadius * magnifier * ( normal - binormal);
+    vec3 prev_ray_pos_ur = prev_ray_position + tubeRadius * magnifier * ( normal + binormal);
 
     Output.normalPS = gradient;
 
@@ -167,15 +172,15 @@ shader GSBox(in VStoGS Input[], out GStoFS Output)
     EmitVertex();
     EndPrimitive();
 
-    prev_ray_pos_ll = prev_ray_position + tube_size * (-normal - binormal);
-    prev_ray_pos_ul = prev_ray_position + tube_size * (-normal + binormal);
-    prev_ray_pos_lr = prev_ray_position + tube_size * ( normal - binormal);
-    prev_ray_pos_ur = prev_ray_position + tube_size * ( normal + binormal);
+    prev_ray_pos_ll = prev_ray_position + tubeRadius * (-normal - binormal);
+    prev_ray_pos_ul = prev_ray_position + tubeRadius * (-normal + binormal);
+    prev_ray_pos_lr = prev_ray_position + tubeRadius * ( normal - binormal);
+    prev_ray_pos_ur = prev_ray_position + tubeRadius * ( normal + binormal);
 
-    vec3 ray_pos_ll = ray_position + tube_size * (-normal - binormal);
-    vec3 ray_pos_ul = ray_position + tube_size * (-normal + binormal);
-    vec3 ray_pos_lr = ray_position + tube_size * ( normal - binormal);
-    vec3 ray_pos_ur = ray_position + tube_size * ( normal + binormal);
+    vec3 ray_pos_ll = ray_position + tubeRadius * (-normal - binormal);
+    vec3 ray_pos_ul = ray_position + tubeRadius * (-normal + binormal);
+    vec3 ray_pos_lr = ray_position + tubeRadius * ( normal - binormal);
+    vec3 ray_pos_ur = ray_position + tubeRadius * ( normal + binormal);
 
     Output.normalPS = -normal - binormal;
     Output.valuePS = prev_value;
@@ -238,7 +243,6 @@ uniform sampler2D depthTex;
 
 shader GSTube(in VStoGS Input[], out GStoFS Output)
 {
-    float tubeSize = 0.05;
 
     Output.valuePS = 0;
 
@@ -296,8 +300,8 @@ shader GSTube(in VStoGS Input[], out GStoFS Output)
     for (int t = 0; t <= tube_segments; t++)
     {
         float angle = radians(angle_t * t);
-        float cosi = cos(angle) * tubeSize;
-        float sini = sin(angle) * tubeSize;
+        float cosi = cos(angle) * tubeRadius;
+        float sini = sin(angle) * tubeRadius;
 
         vec3 prev_world_pos = pos1 + cosi * normalPrev + sini * binormalPrev;
         vec3 next_world_pos = pos2 + cosi * normalNext + sini * binormalNext;
@@ -335,14 +339,14 @@ shader GSTube(in VStoGS Input[], out GStoFS Output)
         for (int t = 0; t < tube_segments; ++t)
         {
             float angle = radians(angle_t * t);
-            float cosi = cos(angle) * tubeSize;
-            float sini = sin(angle) * tubeSize;
+            float cosi = cos(angle) * tubeRadius;
+            float sini = sin(angle) * tubeRadius;
 
             vec3 next_world_pos_0 = pos2 + cosi * normalNext + sini * binormalNext;
 
             angle = radians(angle_t * (t + 1));
-            cosi = cos(angle) * tubeSize;
-            sini = sin(angle) * tubeSize;
+            cosi = cos(angle) * tubeRadius;
+            sini = sin(angle) * tubeRadius;
 
             vec3 next_world_pos_1 = pos2 + cosi * normalNext + sini * binormalNext;
 
@@ -370,8 +374,6 @@ shader GSTube(in VStoGS Input[], out GStoFS Output)
 
 shader GSTubeShadow(in VStoGS Input[], out GStoFS Output)
 {
-    // set size of tubes to 0.05 in world space
-    float tubeSize = 0.05;
     // set value of all to zero
     Output.valuePS = 0;
 
@@ -429,19 +431,19 @@ shader GSTubeShadow(in VStoGS Input[], out GStoFS Output)
     Output.normalPS = normalize(vec3(0,0,0));
 
     // and calculate the boundaries of the projected quad in x/y plane
-    Output.worldPos = pos1 - normalPrev * tubeSize;
+    Output.worldPos = pos1 - normalPrev * tubeRadius;
     gl_Position = mvpMatrix * vec4(Output.worldPos, 1);
     EmitVertex();
 
-    Output.worldPos = pos1 + normalPrev * tubeSize;
+    Output.worldPos = pos1 + normalPrev * tubeRadius;
     gl_Position = mvpMatrix * vec4(Output.worldPos, 1);
     EmitVertex();
 
-    Output.worldPos = pos2 - normalNext * tubeSize;
+    Output.worldPos = pos2 - normalNext * tubeRadius;
     gl_Position = mvpMatrix * vec4(Output.worldPos, 1);
     EmitVertex();
 
-    Output.worldPos = pos2 + normalNext * tubeSize;
+    Output.worldPos = pos2 + normalNext * tubeRadius;
     gl_Position = mvpMatrix * vec4(Output.worldPos, 1);
     EmitVertex();
 
