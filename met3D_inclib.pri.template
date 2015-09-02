@@ -18,7 +18,7 @@ LIBS += \
     -lnetcdf -lhdf5_hl -lhdf5 -lz -lcurl \
     -lgsl -lgslcblas -lfreetype -lgdal -lGLU \
     -llog4cplus -lGLEW -lgrib_api \
-# Path to the manually installed QCustomPlot library.
-    -L/home/local/sw/gl/lib -lglfx \
 # Path to the manually installed glfx library.
+    -L/home/local/sw/gl/lib -lglfx \
+# Path to the manually installed QCustomPlot library.
     -L/home/local/sw/qt/lib64/ -l$$QCPLIB

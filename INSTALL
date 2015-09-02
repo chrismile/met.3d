@@ -58,9 +58,8 @@ B) Install the following libraries from their sources:
 
 Get the glfx sources from: https://code.google.com/p/glfx/
 
-mkdir glfx-build
-cd glfx-build
-cmake -DCMAKE_INSTALL_PREFIX:PATH=/your/target/dir ../glfx/CMakeLists.txt
+cd glfx
+cmake -DCMAKE_INSTALL_PREFIX:PATH=/your/target/dir CMakeLists.txt
 make
 make install
 
