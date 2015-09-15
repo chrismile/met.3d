@@ -47,6 +47,8 @@ MActorCreationDialog::MActorCreationDialog(QWidget *parent) :
     ui(new Ui::MActorCreationDialog)
 {
     ui->setupUi(this);
+    connect(ui->actorTypeComboBox , SIGNAL(currentIndexChanged(int)),this,SLOT(actorTypeChanged()));
+
 }
 
 
@@ -81,6 +83,29 @@ MActor* MActorCreationDialog::createActorInstance()
     return actor;
 }
 
+void MActorCreationDialog::actorTypeChanged(){
+    MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
+    QVector<MActor*> actors = glRM->getActors();
+    int numActorsWithSameName = 0;
+    QString currentActorName = ui->actorTypeComboBox->currentText();
+    for(int i = 0 ; i < actors.size();i++)
+    {
+        if(actors.at(i)->getName().contains(currentActorName))
+        {
+            numActorsWithSameName++;
+        }
+    }
+    if(numActorsWithSameName == 0)
+    {
+        ui->nameLineEdit->setText(currentActorName);
+    }
+    else
+    {
+        ui->nameLineEdit->setText(currentActorName + " " +
+                                  QString::number(numActorsWithSameName));
+    }
+}
+
 
 /******************************************************************************
 ***                          PROTECTED METHODS                              ***
@@ -96,6 +121,8 @@ void MActorCreationDialog::showEvent(QShowEvent *event)
             MGLResourcesManager::getInstance()->getActorFactoryNames();
     for (int i = 0; i < factoryNames.size(); i++)
         ui->actorTypeComboBox->addItem(factoryNames[i]);
+
+    actorTypeChanged();
 }
 
 } // namespace Met3D

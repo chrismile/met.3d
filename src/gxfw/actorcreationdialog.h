@@ -70,7 +70,8 @@ public:
      */
     QString getActorName() const;
 
-
+public slots:
+    void actorTypeChanged();
 protected:
     /**
       Fills the GUI with the available actor factories.
