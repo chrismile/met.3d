@@ -873,6 +873,9 @@ void MTextManager::renderLabelList(MSceneViewGLWidget *sceneView,
         glDrawArrays(GL_TRIANGLES, 0, 6 * label->numCharacters);
     }
 
+    glDisableVertexAttribArray(SHADER_VERTEX_ATTRIBUTE);
+    glDisableVertexAttribArray(SHADER_TEXTURE_ATTRIBUTE);
+
     glBindBuffer(GL_ARRAY_BUFFER, 0); CHECK_GL_ERROR;
 }
 
