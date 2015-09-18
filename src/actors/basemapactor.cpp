@@ -214,32 +214,36 @@ void MBaseMapActor::onQtPropertyChanged(QtProperty* property)
 
 void MBaseMapActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
 {
-    // Bind shader program.
-    shaderProgram->bind();
+    if (texture != nullptr)
+    {
+        // Bind shader program.
+        shaderProgram->bind();
 
-    shaderProgram->setUniformValue(
-                "mvpMatrix", *(sceneView->getModelViewProjectionMatrix()));
+        shaderProgram->setUniformValue(
+                    "mvpMatrix", *(sceneView->getModelViewProjectionMatrix()));
 
-    // Bind texture and use correct texture unit in shader.
-    texture->bindToTextureUnit(textureUnit);
-    shaderProgram->setUniformValue("mapTexture", textureUnit);
+        // Bind texture and use correct texture unit in shader.
+        texture->bindToTextureUnit(textureUnit);
+        shaderProgram->setUniformValue("mapTexture", textureUnit);
 
-    QVector4D bboxVec4(bbox.x(), bbox.y(),
-                       bbox.width() + bbox.x(), bbox.height() + bbox.y());
-    QVector4D dataVec4(llcrnrlon, llcrnrlat, urcrnrlon, urcrnrlat);
+        QVector4D bboxVec4(bbox.x(), bbox.y(),
+                           bbox.width() + bbox.x(), bbox.height() + bbox.y());
+        QVector4D dataVec4(llcrnrlon, llcrnrlat, urcrnrlon, urcrnrlat);
 
-    shaderProgram->setUniformValue("cornersBox", bboxVec4);
+        shaderProgram->setUniformValue("cornersBox", bboxVec4);
 
-    shaderProgram->setUniformValue("cornersData", dataVec4);
+        shaderProgram->setUniformValue("cornersData", dataVec4);
 
-    shaderProgram->setUniformValue("colourIntensity", colourSaturation);
+        shaderProgram->setUniformValue("colourIntensity", colourSaturation);
 
-    // Draw map.
-    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4); CHECK_GL_ERROR;
+        // Draw map.
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4); CHECK_GL_ERROR;
 
-    // Unbind VBO.
-    glBindBuffer(GL_ARRAY_BUFFER, 0); CHECK_GL_ERROR;
+        // Unbind VBO.
+        glBindBuffer(GL_ARRAY_BUFFER, 0); CHECK_GL_ERROR;
+    }
+
 }
 
 
