@@ -76,6 +76,8 @@ MMainWindow::MMainWindow(QStringList commandLineArguments, QWidget *parent)
                 commandLineArguments);
     QDockWidget* systemDock = new QDockWidget("System", this);
     systemDock->setAllowedAreas(Qt::AllDockWidgetAreas);
+    systemDock->setFeatures(QDockWidget::DockWidgetMovable
+                            | QDockWidget::DockWidgetFloatable);
     systemDock->setWidget(systemManagerAndControl);
 
     // Global dock widget settings -- tabs shall appear on the "west" side of
@@ -258,6 +260,9 @@ void MMainWindow::dockSyncControl(MSyncControl *syncControl)
     // Create a synchronisation control as dock widget.
     QDockWidget* syncDock = new QDockWidget(syncControl->getID(), this);
     syncDock->setAllowedAreas(Qt::AllDockWidgetAreas);
+    // Remove "x" corner button so the user cannot close the dock widget.
+    syncDock->setFeatures(QDockWidget::DockWidgetMovable
+                          | QDockWidget::DockWidgetFloatable);
     syncDock->setWidget(syncControl);
     addDockWidget(Qt::LeftDockWidgetArea, syncDock);
 }
@@ -267,6 +272,9 @@ void MMainWindow::dockSceneControl(MSceneControl *control)
 {
     QDockWidget* dock = new QDockWidget(control->getName(), this);
     dock->setAllowedAreas(Qt::AllDockWidgetAreas);
+    // Remove "x" corner button so the user cannot close the dock widget.
+    dock->setFeatures(QDockWidget::DockWidgetMovable
+                      | QDockWidget::DockWidgetFloatable);
     dock->setWidget(control);
     addDockWidget(Qt::LeftDockWidgetArea, dock);
     dockWidgets.append(dock);
@@ -301,6 +309,10 @@ void MMainWindow::dockWaypointsModel(MWaypointsTableModel *waypointsModel)
     waypointsTableDock = new QDockWidget("Waypoints", this);
     waypointsTableDock->setAllowedAreas(Qt::BottomDockWidgetArea);
     waypointsTableDock->setWidget(waypointsTableView);
+    // Remove "x" corner button so the user can only hide the dock widget
+    // via the corresponding menu button.
+    waypointsTableDock->setFeatures(QDockWidget::DockWidgetMovable
+                                    | QDockWidget::DockWidgetFloatable);
     waypointsTableDock->setVisible(false);
     addDockWidget(Qt::BottomDockWidgetArea, waypointsTableDock);
 }
