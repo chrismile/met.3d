@@ -596,12 +596,14 @@ void MNWPActorVariable::saveConfiguration(QSettings *settings)
     settings->setValue("variableName", variableName);
 
     MQtProperties *properties = actor->getQtProperties();
-    int tfIndex = properties->mEnum()->value(transferFunctionProperty);
-    QStringList tfNames = properties->mEnum()->enumNames(transferFunctionProperty);
-    QString tfName = tfNames.at(tfIndex);
+    QString tfName = properties->getEnumItem(transferFunctionProperty);
     settings->setValue("transferFunction", tfName);
+    QString emName = properties->getEnumItem(ensembleModeProperty);
+    settings->setValue("ensembleMode", emName);
 
-    settings->setValue("synchronizationID", synchronizationControl->getID());
+    settings->setValue("synchronizationID",
+                       (synchronizationControl != nullptr) ?
+                           synchronizationControl->getID() : "");
 }
 
 
@@ -629,6 +631,18 @@ void MNWPActorVariable::loadConfiguration(QSettings *settings)
         msgBox.exec();
     }
 
+    QString emName = settings->value("ensembleMode").toString();
+    if ( !setEnsembleMode(emName) )
+    {
+        QMessageBox msgBox;
+        msgBox.setIcon(QMessageBox::Warning);
+        msgBox.setText(QString("Variable '%1':\n"
+                               "Ensemble Mode '%2' does not exist.\n"
+                               "Setting ensemble Mode to 'Member'.")
+                       .arg(variableName).arg(emName));
+        msgBox.exec();
+    }
+
     QString syncID = settings->value("synchronizationID").toString();
     if ( !syncID.isEmpty() )
     {
@@ -650,6 +664,26 @@ void MNWPActorVariable::loadConfiguration(QSettings *settings)
             synchronizeWith(nullptr);
         }
     }
+}
+
+
+bool MNWPActorVariable::setEnsembleMode(QString emName)
+{
+    MQtProperties *properties = actor->getQtProperties();
+    QStringList emNames = properties->mEnum()->enumNames(
+                ensembleModeProperty);
+    int emIndex = emNames.indexOf(emName);
+
+    if (emIndex >= 0)
+    {
+        properties->mEnum()->setValue(ensembleModeProperty, emIndex);
+        return true;
+    }
+
+    // Set ensemble mode property to "None".
+    properties->mEnum()->setValue(ensembleModeProperty, 0);
+
+    return false; // the given ensemble mode name could not be found
 }
 
 

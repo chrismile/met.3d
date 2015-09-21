@@ -138,7 +138,11 @@ void MNWPVerticalSectionActor::saveConfiguration(QSettings *settings)
 
     settings->beginGroup(MNWPVerticalSectionActor::getSettingsID());
 
-    settings->setValue("waypointsModelID", waypointsModel->getID());
+    if (waypointsModel != nullptr)
+    {
+        settings->setValue("waypointsModelID", waypointsModel->getID());
+    }
+
     settings->setValue("p_top_hPa", p_top_hPa);
     settings->setValue("p_bot_hPa", p_bot_hPa);
     settings->setValue("opacity", opacity);

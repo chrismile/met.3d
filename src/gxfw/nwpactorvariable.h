@@ -109,6 +109,8 @@ public:
 
     virtual void loadConfiguration(QSettings *settings);
 
+    bool setEnsembleMode(QString emName);
+
     bool setTransferFunction(QString tfName);
 
     /**
