@@ -70,6 +70,14 @@ public:
      */
     QString getActorName() const;
 
+public slots:
+    /**
+      Called when the user changes the type of the actor to be created.
+      Updates a counter corresponding to the current actor that is used
+      to add a number to the name of the new actor (e.g. Graticule, Graticule 1,
+      Graticule 2, etc.).
+     */
+    void actorTypeChanged();
 
 protected:
     /**

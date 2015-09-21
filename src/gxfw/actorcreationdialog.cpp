@@ -47,6 +47,12 @@ MActorCreationDialog::MActorCreationDialog(QWidget *parent) :
     ui(new Ui::MActorCreationDialog)
 {
     ui->setupUi(this);
+
+    // Update actor-wise counter when the user changes the type of the
+    // actor to be created.
+    connect(ui->actorTypeComboBox, SIGNAL(currentIndexChanged(int)),
+            this, SLOT(actorTypeChanged()));
+
 }
 
 
@@ -82,6 +88,31 @@ MActor* MActorCreationDialog::createActorInstance()
 }
 
 
+void MActorCreationDialog::actorTypeChanged()
+{
+    MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
+    QVector<MActor*> actors = glRM->getActors();
+
+    // Get the current (i.e. default) name for the new actor and find the
+    // number of existing actors that already carry this name.
+    QString currentActorName = ui->actorTypeComboBox->currentText();
+    int numActorsWithSameName = 0;
+
+    for (int i = 0; i < actors.size(); i++)
+    {
+        if (actors.at(i)->getName().contains(currentActorName))
+            numActorsWithSameName++;
+    }
+
+    // If the proposed actor name already exists, add a number.
+    if (numActorsWithSameName == 0)
+        ui->nameLineEdit->setText(currentActorName);
+    else
+        ui->nameLineEdit->setText(QString("%1 %2").arg(currentActorName)
+                                  .arg(numActorsWithSameName));
+}
+
+
 /******************************************************************************
 ***                          PROTECTED METHODS                              ***
 *******************************************************************************/
@@ -96,6 +127,8 @@ void MActorCreationDialog::showEvent(QShowEvent *event)
             MGLResourcesManager::getInstance()->getActorFactoryNames();
     for (int i = 0; i < factoryNames.size(); i++)
         ui->actorTypeComboBox->addItem(factoryNames[i]);
+
+    actorTypeChanged();
 }
 
 } // namespace Met3D
