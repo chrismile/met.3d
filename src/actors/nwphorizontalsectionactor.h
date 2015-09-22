@@ -53,6 +53,8 @@ namespace Met3D
   */
 class MNWPHorizontalSectionActor : public MNWPMultiVarActor
 {
+    Q_OBJECT
+
 public:
     MNWPHorizontalSectionActor();
     ~MNWPHorizontalSectionActor();
@@ -81,11 +83,6 @@ public:
                    int handleID, float clipX, float clipY) override;
 
     /**
-      Set the pressure at which the section is rendered.
-      */
-    void setSlicePosition(double pressure);
-
-    /**
       Set the horizontal bounding box for the region (lonEast, latSouth, width,
       height).
       */
@@ -109,10 +106,25 @@ public:
     MNWPActorVariable *createActorVariable(
             const MSelectableDataSource& dataSource) override;
 
+    bool isConnectedTo(MActor *actor) override;
+
+public slots:
+    /**
+      Set the pressure at which the section is rendered.
+      */
+    void setSlicePosition(double pressure_hPa);
+
+signals:
+    void slicePositionChanged(double pressure_hPa);
+
 protected:
     void initializeActorResources();
 
-    void onQtPropertyChanged(QtProperty *property);
+    void onQtPropertyChanged(QtProperty *property) override;
+
+    void onOtherActorCreated(MActor *actor) override;
+
+    void onOtherActorDeleted(MActor *actor) override;
 
     void renderToCurrentContext(MSceneViewGLWidget *sceneView);
 
@@ -178,6 +190,9 @@ private:
 
     QtProperty *slicePosGranularityProperty;
     double      slicePositionGranularity_hPa;
+
+    QtProperty *synchronizeSlicePosWithOtherActorProperty;
+    MNWPHorizontalSectionActor *slicePosSynchronizationActor;
 
     bool crossSectionGridsNeedUpdate;
     bool updateRenderRegion;

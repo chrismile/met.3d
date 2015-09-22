@@ -879,6 +879,9 @@ void MNWPActorVariable::onActorCreated(MActor *actor)
     // available transfer functions.
     if (MTransferFunction1D *tf = dynamic_cast<MTransferFunction1D*>(actor))
     {
+        // Don't render while the properties are being updated.
+        this->actor->enableEmissionOfActorChangedSignal(false);
+
         MQtProperties *properties = actor->getQtProperties();
         int index = properties->mEnum()->value(transferFunctionProperty);
         QStringList availableTFs = properties->mEnum()->enumNames(
@@ -886,6 +889,8 @@ void MNWPActorVariable::onActorCreated(MActor *actor)
         availableTFs << tf->transferFunctionName();
         properties->mEnum()->setEnumNames(transferFunctionProperty, availableTFs);
         properties->mEnum()->setValue(transferFunctionProperty, index);
+
+        this->actor->enableEmissionOfActorChangedSignal(true);
     }
 }
 
@@ -896,6 +901,8 @@ void MNWPActorVariable::onActorDeleted(MActor *actor)
     // available transfer functions.
     if (MTransferFunction1D *tf = dynamic_cast<MTransferFunction1D*>(actor))
     {
+        this->actor->enableEmissionOfActorChangedSignal(false);
+
         MQtProperties *properties = actor->getQtProperties();
         int index = properties->mEnum()->value(transferFunctionProperty);
         QStringList availableTFs = properties->mEnum()->enumNames(
@@ -908,6 +915,8 @@ void MNWPActorVariable::onActorDeleted(MActor *actor)
         availableTFs.removeOne(tf->getName());
         properties->mEnum()->setEnumNames(transferFunctionProperty, availableTFs);
         properties->mEnum()->setValue(transferFunctionProperty, index);
+
+        this->actor->enableEmissionOfActorChangedSignal(true);
     }
 }
 

@@ -208,10 +208,12 @@ void MGLResourcesManager::registerActor(MActor *actor)
                     << ") with graphics resources manager");
     actorPool.append(actor);
 
+    emit actorCreated(actor);
+
+    connect(this, SIGNAL(actorCreated(MActor*)),
+            actor, SLOT(actOnOtherActorCreated(MActor*)));
     connect(this, SIGNAL(actorDeleted(MActor*)),
             actor, SLOT(actOnOtherActorDeleted(MActor*)));
-
-    emit actorCreated(actor);
 }
 
 
@@ -401,12 +403,13 @@ void MGLResourcesManager::deleteActor(const QString name)
             actorPool.remove(i);
 
             // Disconnect actor from signals.
+            disconnect(this, SIGNAL(actorCreated(MActor*)),
+                       actor, SLOT(actOnOtherActorCreated(MActor*)));
             disconnect(this, SIGNAL(actorDeleted(MActor*)),
                        actor, SLOT(actOnOtherActorDeleted(MActor*)));
 
             // Notify other actors that this actor will be deleted.
             emit actorDeleted(actor);
-
 
             delete actor;
             break;
@@ -417,25 +420,7 @@ void MGLResourcesManager::deleteActor(const QString name)
 
 void MGLResourcesManager::deleteActor(MActor* actor)
 {
-    LOG4CPLUS_DEBUG(mlog, "deleting OpenGL actor ''"
-                    << actor->getName().toStdString()
-                    << "'' from actor pool" << flush);
-
-    for (int i = 0; i < actorPool.size(); ++i)
-    {
-        if (actorPool.at(i) == actor)
-        {
-            actorPool.remove(i);
-
-            disconnect(this, SIGNAL(actorDeleted(MActor*)),
-                       actor, SLOT(actOnOtherActorDeleted(MActor*)));
-
-            emit actorDeleted(actor);
-
-            delete actor;
-            break;
-        }
-    }
+    deleteActor(actor->getName());
 }
 
 

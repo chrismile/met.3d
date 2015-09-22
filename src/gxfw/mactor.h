@@ -331,6 +331,13 @@ public slots:
 
     /**
       Called when another actor (not this one) in the global actor pool is
+      created. Calls @ref onOtherActorCreated(), in which derived classes can
+      handle actor deletion events.
+     */
+    void actOnOtherActorCreated(MActor *actor);
+
+    /**
+      Called when another actor (not this one) in the global actor pool is
       deleted. Allows this actor to take actions if any connection exists
       between this actor and the deleted actor. Calls @ref onOtherActorDeleted(),
       in which derived classes can handle actor deletion events.
@@ -365,6 +372,13 @@ protected:
      */
     virtual void onQtPropertyChanged(QtProperty *property)
     { Q_UNUSED(property); }
+
+    /**
+      Implement this function in derived classes to handle actor creation
+      events. @see actOnOtherActorCreated().
+     */
+    virtual void onOtherActorCreated(MActor *actor)
+    { Q_UNUSED(actor); }
 
     /**
       Implement this function in derived classes to handle actor deletion

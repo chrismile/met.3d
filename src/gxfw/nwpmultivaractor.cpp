@@ -343,6 +343,8 @@ void MNWPMultiVarActor::broadcastPropertyChangedEvent(
 
 bool MNWPMultiVarActor::isConnectedTo(MActor *actor)
 {
+    if (MActor::isConnectedTo(actor)) return true;
+
     // This actor is connected to the argument actor if the actor is the
     // transfer function of any variable.
     foreach (MNWPActorVariable* var, variables)

@@ -57,6 +57,7 @@ MNWPHorizontalSectionActor::MNWPHorizontalSectionActor()
     : MNWPMultiVarActor(),
       slicePosition_hPa(250.),
       slicePositionGranularity_hPa(5.0),
+      slicePosSynchronizationActor(nullptr),
       updateRenderRegion(false),
       vbMouseHandlePoints(nullptr),
       selectedMouseHandle(-1),
@@ -86,6 +87,25 @@ MNWPHorizontalSectionActor::MNWPHorizontalSectionActor()
                                               actorPropertiesSupGroup);
     properties->setDDouble(slicePosGranularityProperty,
                            slicePositionGranularity_hPa, 1., 50., 0, 1., " hPa");
+
+    // Scan currently available actors for further hsec actors. Add hsecs to
+    // the combo box of the synchronizeSlicePosWithOtherActorProperty.
+    QStringList hsecActorNames;
+    hsecActorNames << "None";
+    MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
+    foreach (MActor *ma, glRM->getActors())
+    {
+        if (MNWPHorizontalSectionActor *hsec =
+                dynamic_cast<MNWPHorizontalSectionActor*>(ma))
+        {
+            hsecActorNames << hsec->getName();
+        }
+    }
+    synchronizeSlicePosWithOtherActorProperty = addProperty(
+                ENUM_PROPERTY, "sync slice position with",
+                actorPropertiesSupGroup);
+    properties->mEnum()->setEnumNames(
+                synchronizeSlicePosWithOtherActorProperty, hsecActorNames);
 
     QStringList differenceModeNames;
     differenceModeNames << "off" << "absolute" << "relative";
@@ -236,12 +256,6 @@ void MNWPHorizontalSectionActor::setBBox(QRectF bbox)
 void MNWPHorizontalSectionActor::setSurfaceShadowEnabled(bool enable)
 {
     properties->mBool()->setValue(shadowEnabledProp, enable);
-}
-
-
-void MNWPHorizontalSectionActor::setSlicePosition(double pressure)
-{
-    properties->mDDouble()->setValue(slicePosProperty, pressure);
 }
 
 
@@ -442,9 +456,93 @@ MNWPActorVariable* MNWPHorizontalSectionActor::createActorVariable(
 }
 
 
+bool MNWPHorizontalSectionActor::isConnectedTo(MActor *actor)
+{
+    if (MNWPMultiVarActor::isConnectedTo(actor)) return true;
+    if (slicePosSynchronizationActor == actor) return true;
+
+    return false;
+}
+
+
 /******************************************************************************
 ***                             PUBLIC SLOTS                                ***
 *******************************************************************************/
+
+void MNWPHorizontalSectionActor::setSlicePosition(double pressure_hPa)
+{
+    properties->mDDouble()->setValue(slicePosProperty, pressure_hPa);
+
+    emit slicePositionChanged(pressure_hPa);
+}
+
+
+/******************************************************************************
+***                          PROTECTED METHODS                              ***
+*******************************************************************************/
+
+void MNWPHorizontalSectionActor::initializeActorResources()
+{
+    MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
+
+    windBarbsSettings->varNameList.clear();
+
+    // Parent initialisation.
+    MNWPMultiVarActor::initializeActorResources();
+
+    for (int vi = 0; vi < variables.size(); vi++)
+    {
+        MNWPActorVariable* var = variables.at(vi);
+
+        windBarbsSettings->varNameList << var->variableName;
+    }
+
+    properties->mEnum()->setEnumNames(windBarbsSettings->uComponentVarProperty,
+                                      windBarbsSettings->varNameList);
+    properties->mEnum()->setEnumNames(windBarbsSettings->vComponentVarProperty,
+                                      windBarbsSettings->varNameList);
+    properties->mEnum()->setValue(windBarbsSettings->uComponentVarProperty,
+                                  windBarbsSettings->uComponentVarIndex);
+    properties->mEnum()->setValue(windBarbsSettings->vComponentVarProperty,
+                                  windBarbsSettings->vComponentVarIndex);
+
+    // Set this status variable to download the target grid to CPU memory in
+    // the first render cycle.
+    crossSectionGridsNeedUpdate = true;
+
+    // Compute the grid indices that correspond to the current bounding box
+    // (the bounding box can have different extents than the data grid) during
+    // the first render cycle.
+    updateRenderRegion = true;
+
+    // Load shader for filled contours and marching squares line contours.
+    bool loadShaders = false;
+
+    loadShaders |= glRM->generateEffectProgram("hsec_marchingsquares",
+                                                glMarchingSquaresShader);
+    loadShaders |= glRM->generateEffectProgram("hsec_filledcountours",
+                                                glFilledContoursShader);
+    loadShaders |= glRM->generateEffectProgram("hsec_interpolation",
+                                                glVerticalInterpolationEffect);
+    loadShaders |= glRM->generateEffectProgram("hsec_pseudocolor",
+                                                glPseudoColourShader);
+    loadShaders |= glRM->generateEffectProgram("hsec_windbarbs",
+                                                glWindBarbsShader);
+    loadShaders |= glRM->generateEffectProgram("hsec_shadow",
+                                                glShadowQuad);
+    loadShaders |= glRM->generateEffectProgram("vsec_positionsphere",
+                                                positionSpheresShader);
+
+    if (loadShaders) reloadShaderEffects();
+
+    // Explicitly initialize the graticule actor here. This is needed to get a
+    // valid reference to its "labels" list in the first
+    // "computeRenderRegionParameters()" call. If the graticule actor is not
+    // initialized here, no labels will be displayed until the next bbox
+    // change.
+    graticuleActor->initialize();
+}
+
 
 void MNWPHorizontalSectionActor::onQtPropertyChanged(QtProperty *property)
 {
@@ -475,6 +573,28 @@ void MNWPHorizontalSectionActor::onQtPropertyChanged(QtProperty *property)
 
         properties->mDDouble()->setSingleStep(slicePosProperty,
                                               slicePositionGranularity_hPa);
+    }
+
+    else if (property == synchronizeSlicePosWithOtherActorProperty)
+    {
+        QString hsecName = properties->getEnumItem(
+                    synchronizeSlicePosWithOtherActorProperty);
+
+        // Disconnect from previous synchronization actor.
+        if (slicePosSynchronizationActor != nullptr)
+            disconnect(slicePosSynchronizationActor,
+                       SIGNAL(slicePositionChanged(double)),
+                       this, SLOT(setSlicePosition(double)));
+
+        // Get pointer to new synchronization actor and connect to signal.
+        MGLResourcesManager* glRM = MGLResourcesManager::getInstance();
+        slicePosSynchronizationActor = dynamic_cast<MNWPHorizontalSectionActor*>(
+                    glRM->getActorByName(hsecName));
+
+        if (slicePosSynchronizationActor != nullptr)
+            connect(slicePosSynchronizationActor,
+                    SIGNAL(slicePositionChanged(double)),
+                    this, SLOT(setSlicePosition(double)));
     }
 
     else if ( (property == labelSizeProperty)
@@ -559,70 +679,65 @@ void MNWPHorizontalSectionActor::onQtPropertyChanged(QtProperty *property)
 }
 
 
-/******************************************************************************
-***                          PROTECTED METHODS                              ***
-*******************************************************************************/
-
-void MNWPHorizontalSectionActor::initializeActorResources()
+void MNWPHorizontalSectionActor::onOtherActorCreated(MActor *actor)
 {
-    MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
-
-    windBarbsSettings->varNameList.clear();
-
-    // Parent initialisation.
-    MNWPMultiVarActor::initializeActorResources();
-
-    for (int vi = 0; vi < variables.size(); vi++)
+    // If the new actor is a horizontal section, add it to the list of
+    // available sync actors.
+    if (MNWPHorizontalSectionActor *hsec =
+            dynamic_cast<MNWPHorizontalSectionActor*>(actor))
     {
-        MNWPActorVariable* var = variables.at(vi);
+        // Don't render while the properties are being updated.
+        enableEmissionOfActorChangedSignal(false);
 
-        windBarbsSettings->varNameList << var->variableName;
+        MQtProperties *properties = actor->getQtProperties();
+        int index = properties->mEnum()->value(
+                    synchronizeSlicePosWithOtherActorProperty);
+
+        QStringList availableHSecs = properties->mEnum()->enumNames(
+                    synchronizeSlicePosWithOtherActorProperty);
+        availableHSecs << hsec->getName();
+        properties->mEnum()->setEnumNames(
+                    synchronizeSlicePosWithOtherActorProperty, availableHSecs);
+
+        properties->mEnum()->setValue(
+                    synchronizeSlicePosWithOtherActorProperty, index);
+
+        enableEmissionOfActorChangedSignal(true);
     }
+}
 
-    properties->mEnum()->setEnumNames(windBarbsSettings->uComponentVarProperty,
-                                      windBarbsSettings->varNameList);
-    properties->mEnum()->setEnumNames(windBarbsSettings->vComponentVarProperty,
-                                      windBarbsSettings->varNameList);
-    properties->mEnum()->setValue(windBarbsSettings->uComponentVarProperty,
-                                  windBarbsSettings->uComponentVarIndex);
-    properties->mEnum()->setValue(windBarbsSettings->vComponentVarProperty,
-                                  windBarbsSettings->vComponentVarIndex);
 
-    // Set this status variable to download the target grid to CPU memory in
-    // the first render cycle.
-    crossSectionGridsNeedUpdate = true;
+void MNWPHorizontalSectionActor::onOtherActorDeleted(MActor *actor)
+{
+    if (MNWPHorizontalSectionActor *hsec =
+            dynamic_cast<MNWPHorizontalSectionActor*>(actor))
+    {
+        // Don't render while the properties are being updated.
+        enableEmissionOfActorChangedSignal(false);
 
-    // Compute the grid indices that correspond to the current bounding box
-    // (the bounding box can have different extents than the data grid) during
-    // the first render cycle.
-    updateRenderRegion = true;
+        MQtProperties *properties = actor->getQtProperties();
 
-    // Load shader for filled contours and marching squares line contours.
-    bool loadShaders = false;
+        // Remember the name of the currently sync'ed HSec.
+        QString syncHSec = properties->getEnumItem(
+                    synchronizeSlicePosWithOtherActorProperty);
 
-    loadShaders |= glRM->generateEffectProgram("hsec_marchingsquares",
-                                                glMarchingSquaresShader);
-    loadShaders |= glRM->generateEffectProgram("hsec_filledcountours",
-                                                glFilledContoursShader);
-    loadShaders |= glRM->generateEffectProgram("hsec_interpolation",
-                                                glVerticalInterpolationEffect);
-    loadShaders |= glRM->generateEffectProgram("hsec_pseudocolor",
-                                                glPseudoColourShader);
-    loadShaders |= glRM->generateEffectProgram("hsec_windbarbs",
-                                                glWindBarbsShader);
-    loadShaders |= glRM->generateEffectProgram("hsec_shadow",
-                                                glShadowQuad);
-    loadShaders |= glRM->generateEffectProgram("vsec_positionsphere",
-                                                positionSpheresShader);
+        // If this actor is currently sync'ed with the one to be deleted
+        // reset sync.
+        if (hsec->getName() == syncHSec) syncHSec = "None";
 
-    if (loadShaders) reloadShaderEffects();
+        // Remove actor name from list.
+        QStringList availableHSecs = properties->mEnum()->enumNames(
+                    synchronizeSlicePosWithOtherActorProperty);
+        availableHSecs.removeOne(hsec->getName());
+        properties->mEnum()->setEnumNames(
+                    synchronizeSlicePosWithOtherActorProperty, availableHSecs);
 
-    // Explicitly initialize the graticule actor here. This is needed to get a
-    // valid reference to its "labels" list in the first
-    // "computeRenderRegionParameters()" call. If the graticule actor is not
-    // initialized here, no labels will be displayed until the next bbox
-    // change.
-    graticuleActor->initialize();
+        // Restore currently selected sync actor.
+        properties->setEnumItem(
+                    synchronizeSlicePosWithOtherActorProperty, syncHSec);
+
+        enableEmissionOfActorChangedSignal(true);
+    }
 }
 
 
