@@ -545,6 +545,12 @@ void MActor::actOnQtPropertyChanged(QtProperty *property)
 }
 
 
+void MActor::actOnOtherActorDeleted(MActor *actor)
+{
+    onOtherActorDeleted(actor);
+}
+
+
 /******************************************************************************
 ***                          PROTECTED METHODS                              ***
 *******************************************************************************/

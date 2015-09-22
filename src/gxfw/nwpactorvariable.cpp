@@ -153,9 +153,10 @@ MNWPActorVariable::MNWPActorVariable(MNWPMultiVarActor *actor)
                                               varRenderingPropertyGroup);
     properties->mEnum()->setEnumNames(transferFunctionProperty, availableTFs);
 
-    // Observe the creation of the new actors -- if these are transfer
+    // Observe the creation/deletion of other actors -- if these are transfer
     // functions, add to the list displayed in the transfer function property.
     connect(glRM, SIGNAL(actorCreated(MActor*)), SLOT(onActorCreated(MActor*)));
+    connect(glRM, SIGNAL(actorDeleted(MActor*)), SLOT(onActorDeleted(MActor*)));
 
     actor->endInitialiseQtProperties();
 }
@@ -165,6 +166,13 @@ MNWPActorVariable::~MNWPActorVariable()
 {
     // Release data fields.
     releaseDataItems();
+
+    // Disconnect signals.
+    MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
+    disconnect(glRM, SIGNAL(actorCreated(MActor*)),
+               this, SLOT(onActorCreated(MActor*)));
+    disconnect(glRM, SIGNAL(actorDeleted(MActor*)),
+               this, SLOT(onActorDeleted(MActor*)));
 
     // Delete synchronization links (don't update the already deleted GUI
     // properties anymore...).
@@ -876,6 +884,28 @@ void MNWPActorVariable::onActorCreated(MActor *actor)
         QStringList availableTFs = properties->mEnum()->enumNames(
                     transferFunctionProperty);
         availableTFs << tf->transferFunctionName();
+        properties->mEnum()->setEnumNames(transferFunctionProperty, availableTFs);
+        properties->mEnum()->setValue(transferFunctionProperty, index);
+    }
+}
+
+
+void MNWPActorVariable::onActorDeleted(MActor *actor)
+{
+    // If the deleted actor is a transfer function, remove it from the list of
+    // available transfer functions.
+    if (MTransferFunction1D *tf = dynamic_cast<MTransferFunction1D*>(actor))
+    {
+        MQtProperties *properties = actor->getQtProperties();
+        int index = properties->mEnum()->value(transferFunctionProperty);
+        QStringList availableTFs = properties->mEnum()->enumNames(
+                    transferFunctionProperty);
+
+        // If the deleted transfer function is currently connected to this
+        // variable, set current transfer function to "None" (index 0).
+        if(availableTFs.at(index) == tf->getName()) index = 0;
+
+        availableTFs.removeOne(tf->getName());
         properties->mEnum()->setEnumNames(transferFunctionProperty, availableTFs);
         properties->mEnum()->setValue(transferFunctionProperty, index);
     }

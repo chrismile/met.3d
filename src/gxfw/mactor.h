@@ -314,7 +314,20 @@ public:
     bool getActorIsUserDeletable() { return actorIsUserDeletable; }
 
 public slots:
+    /**
+      Handles change events of the properties in the property browser. Calls
+      @ref onQtPropertyChanged(), in which derived classes can handle
+      property change events.
+     */
     void actOnQtPropertyChanged(QtProperty *property);
+
+    /**
+      Called when another actor (not this one) in the global actor pool is
+      deleted. Allows this actor to take actions if any connection exists
+      between this actor and the deleted actor. Calls @ref onOtherActorDeleted(),
+      in which derived classes can handle actor deletion events.
+     */
+    void actOnOtherActorDeleted(MActor *actor);
 
 signals:
     /**
@@ -339,9 +352,18 @@ protected:
     virtual void initializeActorResources() = 0;
 
     /**
+      Implement this function in derived classes to handle property change
+      events. @see actOnQtPropertyChanged().
      */
     virtual void onQtPropertyChanged(QtProperty *property)
     { Q_UNUSED(property); }
+
+    /**
+      Implement this function in derived classes to handle actor deletion
+      events. @see actOnOtherActorDeleted().
+     */
+    virtual void onOtherActorDeleted(MActor *actor)
+    { Q_UNUSED(actor); }
 
     // Define friends for suppressActorUpdates().
     friend class MVerticalRegridProperties;

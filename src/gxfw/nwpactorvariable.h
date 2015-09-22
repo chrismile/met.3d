@@ -222,6 +222,14 @@ public slots:
      */
     void onActorCreated(MActor *actor);
 
+    /**
+     Connects to the MGLResourcesManager::actorDeleted() signal. If the deleted
+     actor is a transfer function, update the list of transfer functions
+     displayed by the transferFunctionProperty, possibly disconnect from the
+     transfer function.
+     */
+    void onActorDeleted(MActor *actor);
+
     void asynchronousDataAvailable(MDataRequest request);
 
 protected:
