@@ -116,7 +116,7 @@ MStructuredGrid* MProbDFTrajectoriesSource::produceData(
     MStructuredGrid *result = nullptr;
 
     // Gridding helper.
-    int nlon; int nlat; int nlev;
+    int nlon = 0; int nlat = 0; int nlev = 0;
     gsl_interp_accel *lonAccel = gsl_interp_accel_alloc();
     gsl_interp_accel *latAccel = gsl_interp_accel_alloc();
     gsl_interp_accel *levAccel = gsl_interp_accel_alloc();

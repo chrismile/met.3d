@@ -822,7 +822,7 @@ MStructuredGrid *MClimateForecastReader::readGrid(
 
 
     // Return value.
-    MStructuredGrid *grid;
+    MStructuredGrid *grid = nullptr;
 
     // Initialize the grid dependent on the vertical level type.
     if (levelType == SURFACE_2D)

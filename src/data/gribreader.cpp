@@ -292,7 +292,7 @@ MStructuredGrid *MGribReader::readGrid(
 
 
     // Return value.
-    MStructuredGrid *grid;
+    MStructuredGrid *grid = nullptr;
 
     if (levelType == SURFACE_2D)
     {

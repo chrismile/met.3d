@@ -604,7 +604,7 @@ void MShaderEffect
         idata[i] = static_cast<GLint>(data[i]);
     }
 
-    GLenum type;
+    GLenum type = 0;
     switch(tupleSize)
     {
     case 1:  type = GL_BOOL; break;
@@ -645,7 +645,7 @@ void MShaderEffect
 
     std::shared_ptr<Uniform>& uniform = getUniform(name);
 
-    GLenum type;
+    GLenum type = 0;
     switch(tupleSize)
     {
     case 1:  type = GL_INT; break;
@@ -686,7 +686,7 @@ void MShaderEffect
 
     std::shared_ptr<Uniform>& uniform = getUniform(name);
 
-    GLenum type;
+    GLenum type = 0;
     switch(tupleSize)
     {
     case 1:  type = GL_UNSIGNED_INT; break;
@@ -727,7 +727,7 @@ void MShaderEffect
 
     std::shared_ptr<Uniform>& uniform = getUniform(name);
 
-    GLenum type;
+    GLenum type = 0;
     switch(tupleSize)
     {
     case 1:  type = GL_FLOAT; break;
@@ -768,7 +768,7 @@ void MShaderEffect
 
     std::shared_ptr<Uniform>& uniform = getUniform(name);
 
-    GLenum type;
+    GLenum type = 0;
     switch(tupleSize)
     {
     case 1:  type = GL_DOUBLE; break;
