@@ -637,6 +637,17 @@ QList<MAbstractActorFactory*> MGLResourcesManager::getActorFactories()
 }
 
 
+QList<MActor*> MGLResourcesManager::getActorsConnectedTo(MActor *actor)
+{
+    QList<MActor*> connectedActors;
+
+    foreach (MActor* a, actorPool)
+        if (a->isConnectedTo(actor)) connectedActors << a;
+
+    return connectedActors;
+}
+
+
 void MGLResourcesManager::gpuMemoryInfo_kb(uint& total, uint& available)
 {
     // Get CPU memory usage via NVIDIA extension.

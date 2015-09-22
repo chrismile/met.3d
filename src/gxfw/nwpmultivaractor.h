@@ -140,6 +140,8 @@ public:
     void broadcastPropertyChangedEvent(
             MPropertyType::ChangeNotification ptype, void *value);
 
+    bool isConnectedTo(MActor *actor) override;
+
 protected:
     friend class MNWPActorVariable;
 

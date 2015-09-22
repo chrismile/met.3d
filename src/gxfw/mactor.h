@@ -313,6 +313,14 @@ public:
 
     bool getActorIsUserDeletable() { return actorIsUserDeletable; }
 
+    /**
+      Returns @p true if this actor is in some way connected to the argument
+      @p actor.
+
+      @note Override this method if your derived class.
+     */
+    virtual bool isConnectedTo(MActor *actor) { Q_UNUSED(actor); return false; }
+
 public slots:
     /**
       Handles change events of the properties in the property browser. Calls

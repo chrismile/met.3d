@@ -277,6 +277,11 @@ public:
 
     QList<MAbstractActorFactory*> getActorFactories();
 
+    /**
+      Returns a list of actors connected to the argument @p actor.
+     */
+    QList<MActor*> getActorsConnectedTo(MActor *actor);
+
 public slots:
     /**
       Updates the property labels that display the current memory usage. The

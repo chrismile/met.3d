@@ -464,14 +464,27 @@ void MSceneManagementDialog::deleteActor()
         return;
     }
 
-    // ask if user really wants to delete the actor
+    // Check if the user really wants to delete the actor.
+    QString msg = "Do you really want to remove actor ''" + actorName + "''?";
+
+    // If the actor to be deleted is connected to other actors (e.g. transfer
+    // functions), print a warning.
+    QList<MActor*> connectedActors = glRM->getActorsConnectedTo(actor);
+    if ( !connectedActors.empty() )
+    {
+        msg += "\n\n\rWARNING: ''" + actorName
+                + "'' is connected to the following actors:\n\n\r";
+
+        foreach (MActor* a, connectedActors) msg += a->getName() + "\n\r";
+    }
+
     QMessageBox yesNoBox;
     yesNoBox.setWindowTitle("Delete actor");
-    yesNoBox.setText("Do you really want to remove actor ''" + actorName + "''?");
+    yesNoBox.setText(msg);
     yesNoBox.setStandardButtons(QMessageBox::Yes | QMessageBox::No);
     yesNoBox.setDefaultButton(QMessageBox::No);
 
-    if (yesNoBox.exec() != QMessageBox::Yes) { return; }
+    if (yesNoBox.exec() != QMessageBox::Yes) return;
 
     QList<MSceneControl*> actorScenes = actor->getScenes();
 
