@@ -83,6 +83,8 @@ public:
 
     const QStringList& getApplicationCommandLineArguments() const;
 
+    const QDir& getMet3DHomeDir() const;
+
     /**
       Returns a pointer to the group property manager responsible for @ref
       QtProperty instances in the system property tree.
@@ -166,6 +168,7 @@ private:
     Ui::MSystemControl *ui;
 
     QStringList commandLineArguments;
+    QDir met3DHomeDir;
 
     QtTreePropertyBrowser *systemPropertiesBrowser;
 

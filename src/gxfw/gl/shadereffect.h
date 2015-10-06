@@ -68,6 +68,14 @@ public:
 
     bool compileFromFile(const QString _filename);
 
+    /**
+      Compile GLSL shader sources from glfx formatted file located relative
+      to Met.3D home directory.
+
+      @see MSystemManagerAndControl::getMet3DHomeDir()
+     */
+    bool compileFromFile_Met3DHome(const QString _filename);
+
     bool compileFromMemory(const char* src);
 
     /**

@@ -83,7 +83,7 @@ MNWPSurfaceTopographyActor::~MNWPSurfaceTopographyActor()
 void MNWPSurfaceTopographyActor::reloadShaderEffects()
 {
     LOG4CPLUS_DEBUG(mlog, "loading shader programs" << flush);
-    shaderProgram->compileFromFile("src/glsl/surface_topography.fx.glsl");
+    shaderProgram->compileFromFile_Met3DHome("src/glsl/surface_topography.fx.glsl");
 }
 
 

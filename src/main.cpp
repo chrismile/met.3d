@@ -41,10 +41,21 @@ int main(int argc, char *argv[])
     QApplication app(argc, argv);
     QStringList commandLineArguments = app.arguments();
 
+    // Check if the MET3D_HOME environment variable is set, get its value
+    // to find the LOG4CPLUS config file.
+    const QProcessEnvironment& env = QProcessEnvironment::systemEnvironment();
+    if ( !env.contains("MET3D_HOME") )
+    {
+        std::cerr << "ERROR: Environment variable MET3D_HOME has not been set.\n";
+        return 1;
+    }
+    QDir met3Dhome = QDir(env.value("MET3D_HOME"));
+
     // Initialise the log4cplus logging mechanism.
     // See http://log4cplus.sourceforge.net/index.html.
     log4cplus::PropertyConfigurator::doConfigure(
-                LOG4CPLUS_TEXT("config/log4cplus.properties"));
+                LOG4CPLUS_TEXT(met3Dhome.absoluteFilePath(
+                                   "config/log4cplus.properties").toStdString()));
 
     LOG4CPLUS_INFO(mlog, "===================================================="
                    "============================");

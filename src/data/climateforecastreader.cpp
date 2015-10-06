@@ -59,9 +59,11 @@ MClimateForecastReader::MClimateForecastReader(QString identifier)
     : MWeatherPredictionReader(identifier),
       useFilenameAndDomainInfo(false)
 {
-    // Mapping "variable name to CF standard name", specific to ECMWF forecasts
-    // converted to NetCDF with netcdf-java.
-    parseCfStandardNameFile("config/cf_stdnames.txt");
+    // Read mapping "variable name to CF standard name", specific to ECMWF
+    // forecasts converted to NetCDF with netcdf-java.
+    MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
+    parseCfStandardNameFile(sysMC->getMet3DHomeDir().absoluteFilePath(
+                                "config/cf_stdnames.dat"));
 
     domain = "";
     fileFilter = "*";

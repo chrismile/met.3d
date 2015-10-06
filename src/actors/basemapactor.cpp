@@ -103,7 +103,7 @@ MBaseMapActor::~MBaseMapActor()
 void MBaseMapActor::reloadShaderEffects()
 {
     LOG4CPLUS_DEBUG(mlog, "loading shader programs\n" << flush);
-    shaderProgram->compileFromFile("src/glsl/basemap.fx.glsl");
+    shaderProgram->compileFromFile_Met3DHome("src/glsl/basemap.fx.glsl");
 }
 
 

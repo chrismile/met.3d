@@ -32,6 +32,7 @@
 #include <log4cplus/loggingmacros.h>
 
 // local application imports
+#include "gxfw/msystemcontrol.h"
 #include "util/mutil.h"
 
 
@@ -110,6 +111,14 @@ bool MShaderEffect::compileFromFile(const QString _filename)
 bool MShaderEffect::compileFromFile(const char* _filename)
 {
     return compileFromFile(QString(_filename));
+}
+
+
+bool MShaderEffect::compileFromFile_Met3DHome(const QString _filename)
+{
+    Met3D::MSystemManagerAndControl *sysMC =
+            Met3D::MSystemManagerAndControl::getInstance();
+    return compileFromFile(sysMC->getMet3DHomeDir().absoluteFilePath(_filename));
 }
 
 

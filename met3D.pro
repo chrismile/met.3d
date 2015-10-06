@@ -258,7 +258,9 @@ OTHER_FILES += \
     src/glsl/volume_raycaster.fx.glsl \
     src/glsl/hsec_marching_squares.fx.glsl \
     src/glsl/vsec_marching_squares.fx.glsl \
-    src/glsl/volume_normalcurves_initpoints.fx.glsl
+    src/glsl/volume_normalcurves_initpoints.fx.glsl \
+    config/cf_stdnames.dat \
+    config/log4cplus.properties
 
 
 DEFINES += \

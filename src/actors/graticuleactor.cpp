@@ -128,7 +128,7 @@ void MGraticuleActor::loadConfiguration(QSettings *settings)
 void MGraticuleActor::reloadShaderEffects()
 {
     LOG4CPLUS_DEBUG(mlog, "loading shader programs" << flush);
-    shaderProgram->compileFromFile("src/glsl/simple_coloured_geometry.fx.glsl");
+    shaderProgram->compileFromFile_Met3DHome("src/glsl/simple_coloured_geometry.fx.glsl");
 }
 
 

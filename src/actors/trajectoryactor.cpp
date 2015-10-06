@@ -168,10 +168,10 @@ MTrajectoryActor::~MTrajectoryActor()
 void MTrajectoryActor::reloadShaderEffects()
 {
     LOG4CPLUS_DEBUG(mlog, "loading shader programs" << flush);
-    tubeShader->compileFromFile("src/glsl/trajectory_tubes.fx.glsl");
-    tubeShadowShader->compileFromFile("src/glsl/trajectory_tubes_shadow.fx.glsl");
-    positionSphereShader->compileFromFile("src/glsl/trajectory_positions.fx.glsl");
-    positionSphereShadowShader->compileFromFile("src/glsl/trajectory_positions_shadow.fx.glsl");
+    tubeShader->compileFromFile_Met3DHome("src/glsl/trajectory_tubes.fx.glsl");
+    tubeShadowShader->compileFromFile_Met3DHome("src/glsl/trajectory_tubes_shadow.fx.glsl");
+    positionSphereShader->compileFromFile_Met3DHome("src/glsl/trajectory_positions.fx.glsl");
+    positionSphereShadowShader->compileFromFile_Met3DHome("src/glsl/trajectory_positions_shadow.fx.glsl");
 }
 
 

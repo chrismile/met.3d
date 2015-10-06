@@ -57,6 +57,7 @@ MSystemManagerAndControl::MSystemManagerAndControl(QWidget *parent) :
     mainWindow(nullptr),
     naturalEarthDataLoader(nullptr)
 {
+    LOG4CPLUS_DEBUG(mlog, "Initialising system manager...");
     ui->setupUi(this);
 
     groupPropertyManager           = new QtGroupPropertyManager(this);
@@ -99,6 +100,13 @@ MSystemManagerAndControl::MSystemManagerAndControl(QWidget *parent) :
     // Insert a dummy "None" entry into the list of waypoints models.
     waypointsTableModelPool.insert("None", nullptr);
     syncControlPool.insert("None", nullptr);
+
+    // Determine the Met.3D home directory (the base directory to find
+    // shader files and data files that do not change).
+    met3DHomeDir = QDir(QProcessEnvironment::systemEnvironment().value(
+                            "MET3D_HOME"));
+    LOG4CPLUS_DEBUG(mlog, "  > MET3D_HOME set to "
+                    << met3DHomeDir.absolutePath().toStdString());
 }
 
 
@@ -183,6 +191,12 @@ void MSystemManagerAndControl::storeApplicationCommandLineArguments(
 const QStringList &MSystemManagerAndControl::getApplicationCommandLineArguments() const
 {
     return commandLineArguments;
+}
+
+
+const QDir& MSystemManagerAndControl::getMet3DHomeDir() const
+{
+    return met3DHomeDir;
 }
 
 

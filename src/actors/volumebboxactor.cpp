@@ -103,7 +103,7 @@ MVolumeBoundingBoxActor::~MVolumeBoundingBoxActor()
 void MVolumeBoundingBoxActor::reloadShaderEffects()
 {
     LOG4CPLUS_DEBUG(mlog, "loading shader programs\n" << flush);
-    geometryEffect->compileFromFile("src/glsl/simple_coloured_geometry.fx.glsl");
+    geometryEffect->compileFromFile_Met3DHome("src/glsl/simple_coloured_geometry.fx.glsl");
 }
 
 

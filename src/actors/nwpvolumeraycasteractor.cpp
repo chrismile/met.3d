@@ -520,21 +520,21 @@ void MNWPVolumeRaycasterActor::reloadShaderEffects()
 {
     LOG4CPLUS_DEBUG(mlog, "loading shader programs" << flush);
 
-    gl.boundingBoxShader->compileFromFile(
+    gl.boundingBoxShader->compileFromFile_Met3DHome(
                 "src/glsl/simple_coloured_geometry.fx.glsl");
-    gl.rayCasterEffect->compileFromFile(
+    gl.rayCasterEffect->compileFromFile_Met3DHome(
                 "src/glsl/volume_raycaster.fx.glsl");
-    gl.shadowImageRenderShader->compileFromFile(
+    gl.shadowImageRenderShader->compileFromFile_Met3DHome(
                 "src/glsl/volume_image.fx.glsl");
 
-    gl.normalCurveGeometryEffect->compileFromFile(
+    gl.normalCurveGeometryEffect->compileFromFile_Met3DHome(
                 "src/glsl/volume_normalcurves_geometry.fx.glsl");
-    gl.normalCurveInitPointsShader->compileFromFile(
+    gl.normalCurveInitPointsShader->compileFromFile_Met3DHome(
                 "src/glsl/volume_normalcurves_initpoints.fx.glsl");
-    gl.normalCurveLineComputeShader->compileFromFile(
+    gl.normalCurveLineComputeShader->compileFromFile_Met3DHome(
                 "src/glsl/volume_compute_normalcurves.fx.glsl");
 
-    gl.bitfieldRayCasterEffect->compileFromFile(
+    gl.bitfieldRayCasterEffect->compileFromFile_Met3DHome(
                 "src/glsl/volume_bitfield_raycaster.fx.glsl");
 
     initializeRenderInformation();

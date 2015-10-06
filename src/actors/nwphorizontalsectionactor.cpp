@@ -228,19 +228,19 @@ void MNWPHorizontalSectionActor::reloadShaderEffects()
 {
     LOG4CPLUS_DEBUG(mlog, "loading shader programs" << flush);
 
-    glVerticalInterpolationEffect->compileFromFile(
+    glVerticalInterpolationEffect->compileFromFile_Met3DHome(
                 "src/glsl/hsec_verticalinterpolation.fx.glsl");
-    glFilledContoursShader->compileFromFile(
+    glFilledContoursShader->compileFromFile_Met3DHome(
                 "src/glsl/hsec_filledcontours.fx.glsl");
-    glPseudoColourShader->compileFromFile(
+    glPseudoColourShader->compileFromFile_Met3DHome(
                 "src/glsl/hsec_pseudocolour.fx.glsl");
-    glMarchingSquaresShader->compileFromFile(
+    glMarchingSquaresShader->compileFromFile_Met3DHome(
                 "src/glsl/hsec_marching_squares.fx.glsl");
-    glWindBarbsShader->compileFromFile(
+    glWindBarbsShader->compileFromFile_Met3DHome(
                 "src/glsl/hsec_windbarbs.fx.glsl");
-    glShadowQuad->compileFromFile(
+    glShadowQuad->compileFromFile_Met3DHome(
                 "src/glsl/hsec_shadow.fx.glsl");
-    positionSpheresShader->compileFromFile(
+    positionSpheresShader->compileFromFile_Met3DHome(
                 "src/glsl/trajectory_positions.fx.glsl");
 
     crossSectionGridsNeedUpdate = true;

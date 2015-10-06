@@ -114,8 +114,8 @@ void MTextManager::initializePerGLContextResources(MSceneViewGLWidget *sceneView
 void MTextManager::reloadShaderEffects()
 {
     LOG4CPLUS_DEBUG(mlog, "loading shader programs" << flush);
-    bboxEffect->compileFromFile("src/glsl/simple_coloured_geometry.fx.glsl");
-    textEffect->compileFromFile("src/glsl/text.fx.glsl");
+    bboxEffect->compileFromFile_Met3DHome("src/glsl/simple_coloured_geometry.fx.glsl");
+    textEffect->compileFromFile_Met3DHome("src/glsl/text.fx.glsl");
 }
 
 
