@@ -67,3 +67,32 @@ void checkOpenGLError(const char* file, int line)
         }
     }
 }
+
+
+QString expandEnvironmentVariables(QString path)
+{
+    QRegExp regExpEnvVar("\\$([A-Za-z0-9_]+)");
+
+    int i;
+    while ((i = regExpEnvVar.indexIn(path)) != -1)
+    {
+        QString envVar = regExpEnvVar.cap(1);
+        QString expansion = QProcessEnvironment::systemEnvironment().value(
+                    envVar);
+
+        if (expansion.isEmpty())
+        {
+            LOG4CPLUS_ERROR(mlog, "ERROR: Environment variable "
+                            << envVar.toStdString()
+                            << " has not been defined. Cannot expand variable.");
+            break;
+        }
+        else
+        {
+            path.remove(i, regExpEnvVar.matchedLength());
+            path.insert(i, expansion);
+        }
+    }
+
+    return path;
+}

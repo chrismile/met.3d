@@ -129,7 +129,15 @@ void MFrontendConfiguration::initializeFrontendFromConfigFile(
     // ==========================
     config.beginGroup("Text");
 
-    QString fontfile = config.value("fontfile").toString();
+    QString fontfile = expandEnvironmentVariables(config.value("fontfile")
+                                                  .toString());
+    if ( !QFile::exists(fontfile) )
+    {
+        QString msg = QString("ERROR: cannot find font file %1").arg(fontfile);
+        LOG4CPLUS_ERROR(mlog, msg.toStdString());
+        throw MInitialisationError(msg.toStdString(), __FILE__, __LINE__);
+    }
+
     int fontsize = config.value("fontsize").toInt();
     glRM->getTextManager()->setFont(fontfile, fontsize);
 
@@ -140,8 +148,9 @@ void MFrontendConfiguration::initializeFrontendFromConfigFile(
     // =======================================================
     config.beginGroup("CoastCountryLines");
 
-    QString coastfile = config.value("coastfile").toString();
-    QString countryfile = config.value("countryfile").toString();
+    QString coastfile = expandEnvironmentVariables(config.value("coastfile")
+                                                   .toString());
+    QString countryfile = expandEnvironmentVariables(config.value("countryfile").toString());
     sysMC->getNaturalEarthDataLoader()->setDataSources(coastfile, countryfile);
 
     config.endGroup();
@@ -231,7 +240,8 @@ void MFrontendConfiguration::initializeFrontendFromConfigFile(
 
         // Read settings from file.
         QString name = config.value("name").toString();
-        QString datafile = config.value("datafile").toString();
+        QString datafile = expandEnvironmentVariables(config.value("datafile")
+                                                      .toString());
 
         LOG4CPLUS_DEBUG(mlog, "initializing waypoints model #" << i << ": ");
         LOG4CPLUS_DEBUG(mlog, "  name = " << name.toStdString());
@@ -267,7 +277,8 @@ void MFrontendConfiguration::initializeFrontendFromConfigFile(
         // Read settings from file.
         QString type = config.value("type").toString();
         QString dataSourceID = config.value("dataSource").toString();
-        QString datafile = config.value("datafile").toString();
+        QString datafile = expandEnvironmentVariables(config.value("datafile")
+                                                      .toString());
         QString bboxStr = config.value("bbox").toString();
         QString scenesStr = config.value("scenes").toString();
         QString levelTypeStr = config.value("levelType").toString();
@@ -348,7 +359,8 @@ void MFrontendConfiguration::initializeFrontendFromConfigFile(
         config.setArrayIndex(i);
 
         // Read settings from file.
-        QString configfile = config.value("config").toString();
+        QString configfile = expandEnvironmentVariables(config.value("config")
+                                                        .toString());
         QString scenesStr = config.value("scenes").toString();
 
         LOG4CPLUS_DEBUG(mlog, "initializing actor #" << i << ": ");
@@ -367,6 +379,12 @@ void MFrontendConfiguration::initializeFrontendFromConfigFile(
              || scenes.empty() )
         {
             LOG4CPLUS_WARN(mlog, "invalid parameters encountered; skipping.");
+            continue;
+        }
+
+        if ( !QFile::exists(configfile) )
+        {
+            LOG4CPLUS_WARN(mlog, "cannot find actor configuration file; skipping.");
             continue;
         }
 

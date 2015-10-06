@@ -29,9 +29,11 @@
 #include <iostream>
 
 // related third party imports
+#include <log4cplus/loggingmacros.h>
 
 // local application imports
 #include "util/mutil.h"
+#include "util/mexception.h"
 
 using namespace std;
 
@@ -407,6 +409,14 @@ QString MWaypointsTableModel::getFileName() const
 
 void MWaypointsTableModel::loadFromFile(QString fn)
 {
+    // Check if file exists.
+    if ( !QFile::exists(fn) )
+    {
+        QString msg = QString("ERROR: cannot open waypoints file %1").arg(fn);
+        LOG4CPLUS_ERROR(mlog, msg.toStdString());
+        throw MInitialisationError(msg.toStdString(), __FILE__, __LINE__);
+    }
+
     fileName = fn;
 
     // Read the XML document from the file "fn".
