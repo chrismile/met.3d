@@ -2,7 +2,7 @@ Met.3D Installation Guidelines.
 ===============================
 
 This document provides installation guidelines for installing Met.3D on
-OpenSuSE 12.X/13.X systems. Met.3D requires a number of libraries to be
+OpenSuSE 13.X systems. Met.3D requires a number of libraries to be
 installed and a few external data packages to be downloaded. Most of these
 packages can be installed via YaST, however, a few have to be downloaded and
 compiled manually.
@@ -27,10 +27,10 @@ OpenGL shading language version string: 4.40 NVIDIA via Cg compiler
 A) Install the following packages via YaST (or your favourite rpm manager):
 ================================================================================
 
-For OpenSuSE 12.3, these repositories are required (similar for other
+For OpenSuSE 13.X, these repositories are required (similar for other
 OpenSuSE versions):
-- http://download.opensuse.org/repositories/Application:/Geo/openSUSE_12.3/
-- http://download.opensuse.org/repositories/home:/SStepke/openSUSE_12.3/
+- http://download.opensuse.org/repositories/Application:/Geo/openSUSE_13.X/
+- http://download.opensuse.org/repositories/home:/SStepke/openSUSE_13.X/
 
 Packages that need to be installed via YaST (or the system's repository 
 manager):
@@ -212,7 +212,7 @@ met.3d-base/
 
 
 ================================================================================
-D) Checkout Met.3D from the GIT repo.
+D) Checkout Met.3D from the GIT repository.
 ================================================================================
 
 The latest version of Met.3D can be checked out from
@@ -236,13 +236,17 @@ Modify the software configuration to match your system.
 system.
 
 - In met.3d-base/met.3d/config/, copy the files "default_frontend.cfg.template"
-and "default_pipeline.cfg.template" to local configuration files, e.g.
-"frontend.cfg" and "pipeline.cfg" (these filenames are used in the following
-but you can choose other names as well). Modify the paths in "pipeline.cfg" to
-match the paths at which the forecast data is stored on your system. Modify
-"frontend.cfg" to specify the configuration of Met.3D after start-up. If you
-have followed the suggested directory structure, you should not need to modify
-"frontend.cfg".
+and "default_pipeline.cfg.template" to local configuration files, e.g. to
+"met.3d-base/config/frontend.cfg" and "met.3d-base/config/pipeline.cfg" (these
+filenames are used in the following but you can choose other names as well).
+Modify the paths in "pipeline.cfg" to match the paths at which the forecast
+data is stored on your system. Modify "frontend.cfg" to specify the
+configuration of Met.3D after start-up. If you have followed the suggested
+directory structure, you should not need to modify "frontend.cfg" for first
+experiments with Met.3D. Note that you can use environement variables in the
+paths defined in the configuration files. In the example installation described
+in this document, two envrionment variables (MET3D_HOME and MET3D_BASE) are
+used (see below).
 
 
 ================================================================================
@@ -270,12 +274,29 @@ make -j 12
 Compilation may take a few minutes. If no errors are reported, an executable
 named "met3D" should be created.
 
-To start the Met.3D, change back to "met.3d-base/met.3d/" (Met.3D currently
-needs to be executed in the root repository directory (the one that contains
-this file)) and type
 
-[in met.3d-base/met.3d]
-../build/met3D --pipeline=config/pipeline.cfg --frontend=config/frontend.cfg
+================================================================================
+G) Start Met.3D.
+================================================================================
+
+Before Met.3D is started, the environment variable MET3D_HOME needs to be set
+to the Met.3D source directory (alternatively, at least the subdirectories
+/src/glsl and /config need to be accessible):
+
+export MET3D_HOME=/your/path/to/met.3d-base/met.3d
+
+For the example configuration described in this document, an additional
+environment variable MET3D_BASE is used to refer to the paths with third-party
+data in the configuration files (see default_frontend.cfg.template; feel free
+to change this is you like):
+
+export MET3D_BASE=/your/path/to/met.3d-base
+
+To start Met.3D, type (change the paths to the configuration files if they
+are stored in a different location):
+
+[e.g. in met.3d-base/build]
+./met3D --pipeline=$MET3D_HOME/config/pipeline.cfg --frontend=$MET3D_HOME/config/frontend.cfg
 
 Note: Depending on the amount of available forecast data, the software
 may take a while to start. Also, on first startup the compilation of the
