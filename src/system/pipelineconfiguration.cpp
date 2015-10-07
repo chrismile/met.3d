@@ -180,7 +180,7 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
         // Read settings from file.
         QString name = config.value("name").toString();
         bool isEnsemble = config.value("ensemble").toBool();
-        QString path = config.value("path").toString();
+        QString path = expandEnvironmentVariables(config.value("path").toString());
         QString domainID = config.value("domainID").toString();
         QString schedulerID = config.value("schedulerID").toString();
         QString memoryManagerID = config.value("memoryManagerID").toString();
@@ -238,7 +238,7 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
         // Read settings from file.
         QString name = config.value("name").toString();
         bool isEnsemble = config.value("ensemble").toBool();
-        QString path = config.value("path").toString();
+        QString path = expandEnvironmentVariables(config.value("path").toString());
         bool ablTrajectories = config.value("ABLTrajectories").toBool();
         QString schedulerID = config.value("schedulerID").toString();
         QString memoryManagerID = config.value("memoryManagerID").toString();

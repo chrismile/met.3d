@@ -286,9 +286,9 @@ to the Met.3D source directory (alternatively, at least the subdirectories
 export MET3D_HOME=/your/path/to/met.3d-base/met.3d
 
 For the example configuration described in this document, an additional
-environment variable MET3D_BASE is used to refer to the paths with third-party
-data in the configuration files (see default_frontend.cfg.template; feel free
-to change this is you like):
+environment variable MET3D_BASE is used in the configuration files to refer to
+the paths with third-party data (see default_frontend.cfg.template; feel free
+to change this if you like):
 
 export MET3D_BASE=/your/path/to/met.3d-base
 
