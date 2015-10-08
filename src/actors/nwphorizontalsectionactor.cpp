@@ -437,7 +437,8 @@ const QList<MVerticalLevelType> MNWPHorizontalSectionActor::supportedLevelTypes(
     return (QList<MVerticalLevelType>()
             << HYBRID_SIGMA_PRESSURE_3D
             << PRESSURE_LEVELS_3D
-            << LOG_PRESSURE_LEVELS_3D);
+            << LOG_PRESSURE_LEVELS_3D
+            << SURFACE_2D);
 }
 
 
