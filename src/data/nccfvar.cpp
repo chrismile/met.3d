@@ -357,26 +357,47 @@ QList<QDateTime> NcCFVar::getTimeValues()
     // particular necessary to get the correct time for day or year units (e.g.
     // in EMAC and ECHAM datasets).
     QList<QDateTime> convertedTimeValues;
-    int secs = 0;
     for (unsigned int i = 0; i < size; i++)
     {
         if (timeUnit == "second")
-            secs = int(round(timeValues[i]));
+        {
+            int secs = int(round(timeValues[i]));
+            convertedTimeValues.append(baseTime.addSecs(secs));
+        }
         else if (timeUnit == "minute")
-            secs = int(round(timeValues[i] * 60.));
+        {
+            // Break into days and seconds to prevent overflows.
+            int days = int(timeValues[i] / 1440.);
+            int secs = round(fmod(timeValues[i], 1440.) * 60.);
+            QDateTime t = baseTime.addDays(days);
+            convertedTimeValues.append(t.addSecs(secs));
+        }
         else if (timeUnit == "hour")
-            secs = int(round(timeValues[i] * 3600.));
+        {
+            int days = int(timeValues[i] / 24.);
+            int secs = round(fmod(timeValues[i], 24.) * 3600.);
+            QDateTime t = baseTime.addDays(days);
+            convertedTimeValues.append(t.addSecs(secs));
+        }
         else if (timeUnit == "day")
-            secs = int(round(timeValues[i] * 86400.));
+        {
+            int days = int(timeValues[i]);
+            int secs = round(fmod(timeValues[i], 1.) * 86400.);
+            QDateTime t = baseTime.addDays(days);
+            convertedTimeValues.append(t.addSecs(secs));
+        }
         else if (timeUnit == "year")
-            secs = int(round(timeValues[i] * 304560000.));
+        {
+            int years = int(timeValues[i]);
+            int secs = round(fmod(timeValues[i], 1.) * 304560000.);
+            QDateTime t = baseTime.addYears(years);
+            convertedTimeValues.append(t.addSecs(secs));
+        }
         else
             throw NcException(
                     "NcException",
                     "cannot identify time unit "+timeUnit.toStdString(),
                     __FILE__, __LINE__);
-
-        convertedTimeValues.append(baseTime.addSecs(secs));
     }
 
     delete[] timeValues;
