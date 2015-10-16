@@ -210,21 +210,91 @@ void MStructuredGrid::maskRectangularRegion(unsigned int i0,
                                             unsigned int nj,
                                             unsigned int nk)
 {
-//TODO: Can this be done without looping through the ENTIRE field??
+    // Account for grids potentially being cyclic in longitude.
+    i0 = i0 % nlons;
+    unsigned int i1 = (i0 + ni) % nlons;
 
-    unsigned int njni   = nlats * nlons;
-
-    unsigned int i1 = i0 + ni;
     unsigned int j1 = j0 + nj;
     unsigned int k1 = k0 + nk;
 
-    for (unsigned int k = 0; k < nlevs; k++)
-        for (unsigned int j = 0; j < nlats; j++)
-            for (unsigned int i = 0; i < nlons; i++)
-                if (    ((i < i0) || (i > i1)) ||
-                        ((j < j0) || (j > j1)) ||
-                        ((k < k0) || (k > k1))    )
-                    data[INDEX3zyx_2(k, j, i, njni, nlons)] = M_MISSING_VALUE;
+    if (i0 <= i1)
+    {
+        // Mask everything from 0..i0 and from i1..nlons.
+        for (unsigned int k = 0; k < nlevs; k++)
+            for (unsigned int j = 0; j < nlats; j++)
+            {
+                for (unsigned int i = 0; i < i0; i++)
+                    data[INDEX3zyx_2(k, j, i, nlatsnlons, nlons)] = M_MISSING_VALUE;
+                for (unsigned int i = i1+1; i < nlons; i++)
+                    data[INDEX3zyx_2(k, j, i, nlatsnlons, nlons)] = M_MISSING_VALUE;
+            }
+
+
+        for (unsigned int k = 0; k < nlevs; k++)
+            for (unsigned int i = i0; i <= i1; i++)
+            {
+                for (unsigned int j = 0; j < j0; j++)
+                    data[INDEX3zyx_2(k, j, i, nlatsnlons, nlons)] = M_MISSING_VALUE;
+                for (unsigned int j = j1+1; j < nlats; j++)
+                    data[INDEX3zyx_2(k, j, i, nlatsnlons, nlons)] = M_MISSING_VALUE;
+            }
+
+
+        for (unsigned int j = j0; j <= j1; j++)
+            for (unsigned int i = i0; i <= i1; i++)
+            {
+                for (unsigned int k = 0; k < k0; k++)
+                    data[INDEX3zyx_2(k, j, i, nlatsnlons, nlons)] = M_MISSING_VALUE;
+                for (unsigned int k = k1+1; k < nlevs; k++)
+                    data[INDEX3zyx_2(k, j, i, nlatsnlons, nlons)] = M_MISSING_VALUE;
+            }
+    }
+    else
+    {
+        // Mask everything from i1..i0.
+        for (unsigned int k = 0; k < nlevs; k++)
+            for (unsigned int j = 0; j < nlats; j++)
+            {
+                for (unsigned int i = i1+1; i < i0; i++)
+                    data[INDEX3zyx_2(k, j, i, nlatsnlons, nlons)] = M_MISSING_VALUE;
+            }
+
+        for (unsigned int k = 0; k < nlevs; k++)
+        {
+            for (unsigned int i = 0; i < i1; i++)
+            {
+                for (unsigned int j = 0; j < j0; j++)
+                    data[INDEX3zyx_2(k, j, i, nlatsnlons, nlons)] = M_MISSING_VALUE;
+                for (unsigned int j = j1+1; j < nlats; j++)
+                    data[INDEX3zyx_2(k, j, i, nlatsnlons, nlons)] = M_MISSING_VALUE;
+            }
+            for (unsigned int i = i0+1; i < nlons; i++)
+            {
+                for (unsigned int j = 0; j < j0; j++)
+                    data[INDEX3zyx_2(k, j, i, nlatsnlons, nlons)] = M_MISSING_VALUE;
+                for (unsigned int j = j1+1; j < nlats; j++)
+                    data[INDEX3zyx_2(k, j, i, nlatsnlons, nlons)] = M_MISSING_VALUE;
+            }
+        }
+
+        for (unsigned int j = j0; j <= j1; j++)
+        {
+            for (unsigned int i = 0; i < i1; i++)
+            {
+                for (unsigned int k = 0; k < k0; k++)
+                    data[INDEX3zyx_2(k, j, i, nlatsnlons, nlons)] = M_MISSING_VALUE;
+                for (unsigned int k = k1+1; k < nlevs; k++)
+                    data[INDEX3zyx_2(k, j, i, nlatsnlons, nlons)] = M_MISSING_VALUE;
+            }
+            for (unsigned int i = i0+1; i < nlons; i++)
+            {
+                for (unsigned int k = 0; k < k0; k++)
+                    data[INDEX3zyx_2(k, j, i, nlatsnlons, nlons)] = M_MISSING_VALUE;
+                for (unsigned int k = k1+1; k < nlevs; k++)
+                    data[INDEX3zyx_2(k, j, i, nlatsnlons, nlons)] = M_MISSING_VALUE;
+            }
+        }
+    }
 }
 
 
