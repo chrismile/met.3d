@@ -54,6 +54,9 @@ struct MVariableDataSharedPerFile
     QList<QDateTime> timeCoordValues;
     QList<unsigned int> availableMembers;
 
+    bool scaleAndOffsetProvided;
+    double scale_factor, add_offset;
+
     bool reverseLatitudes;
 };
 

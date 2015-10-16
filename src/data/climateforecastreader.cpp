@@ -659,6 +659,24 @@ MStructuredGrid *MClimateForecastReader::readGrid(
                         << "' (" << shared->timeVar.getDim(0).getSize()
                         << " elements).");
 
+        // Query scale and offset, if provided.
+        try { shared->cfVar.getAtt("scale_factor").getValues(&(shared->scale_factor)); }
+        catch (NcException) { shared->scale_factor = 1.; }
+        try { shared->cfVar.getAtt("add_offset").getValues(&(shared->add_offset)); }
+        catch (NcException) { shared->add_offset = 0.; }
+
+        // Have scale and offset been provided? If not, they are not applied.
+        shared->scaleAndOffsetProvided =
+                (shared->scale_factor != 1.) && (shared->add_offset != 0.);
+
+        if (shared->scaleAndOffsetProvided)
+        {
+            LOG4CPLUS_DEBUG(mlog, "\tScale and offset have been provided:"
+                            << " scale = " << shared->scale_factor
+                            << " offset = " << shared->add_offset
+                            << ".");
+        }
+
         // Read grid type dependent coordinate data.
         if (levelType == SURFACE_2D)
         {
@@ -1115,6 +1133,14 @@ MStructuredGrid *MClimateForecastReader::readGrid(
         break;
 
     } // switch
+
+    // Apply offset and scale, if provided.
+    if (shared->scaleAndOffsetProvided)
+    {
+        for (unsigned int i = 0; i < grid->nvalues; i++)
+            grid->setValue(i, grid->getValue(i)
+                           * shared->scale_factor + shared->add_offset);
+    }
 
 #ifdef MSTOPWATCH_ENABLED
     stopwatch.split();
