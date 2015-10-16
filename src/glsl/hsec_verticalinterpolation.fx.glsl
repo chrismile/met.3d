@@ -66,8 +66,8 @@ shader VSmain()
 {
     // Compute grid indices (i, j) of the this vertex from vertex and instance
     // ID (notes 09Feb2012).
-    int i = int(gl_VertexID / 2);
-    int j = bool(gl_VertexID & 1) ? (gl_InstanceID + 1) : gl_InstanceID;
+    int i = gl_VertexID;
+    int j = gl_InstanceID;
 
     // Subregion shift?
     int numLons = textureSize(dataField, 0).x;
@@ -276,8 +276,8 @@ shader VSmainDiff()
 {
     // Compute grid indices (i, j) of the this vertex from vertex and instance
     // ID (see notes 09Feb2012).
-    int i = int(gl_VertexID / 2);
-    int j = bool(gl_VertexID & 1) ? (gl_InstanceID + 1) : gl_InstanceID;
+    int i = gl_VertexID;
+    int j = gl_InstanceID;
 
     int numLons = textureSize(dataField1, 0).x;
     if (levelType1 == SURFACE_2D) numLons = textureSize(dataField2D1, 0).x;

@@ -1181,7 +1181,7 @@ void MNWPHorizontalSectionActor::renderVerticalInterpolation(
                 "jOffset", GLint(var->j0)); CHECK_GL_ERROR;
 
     glDrawArraysInstanced(GL_POINTS,
-                          0, var->nlons * 2, var->nlats - 1); CHECK_GL_ERROR;
+                          0, var->nlons, var->nlats); CHECK_GL_ERROR;
 }
 
 
@@ -1324,7 +1324,7 @@ void MNWPHorizontalSectionActor::renderVerticalInterpolationDifference(
     glVerticalInterpolationEffect->setUniformValue("mode", differenceMode);
 
     glDrawArraysInstanced(GL_POINTS,
-                          0, var->nlons * 2, var->nlats - 1); CHECK_GL_ERROR;
+                          0, var->nlons, var->nlats); CHECK_GL_ERROR;
 }
 
 
@@ -1475,6 +1475,8 @@ void MNWPHorizontalSectionActor::renderLineCountours(
                 "iOffset", GLint(var->i0)); CHECK_GL_ERROR;
     glMarchingSquaresShader->setUniformValue(
                 "jOffset", GLint(var->j0)); CHECK_GL_ERROR;
+    glMarchingSquaresShader->setUniformValue(
+                "bboxLons", QVector2D(llcrnrlon, urcrnrlon)); CHECK_GL_ERROR;
 
     glMarchingSquaresShader->setUniformValue(
                 "worldZ", GLfloat(sceneView->worldZfromPressure(slicePosition_hPa)));

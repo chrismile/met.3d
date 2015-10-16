@@ -47,6 +47,7 @@ uniform int       latOffset;      // index at which lat data starts
 uniform int       iOffset;        // grid index offsets if only a subregion
 uniform int       jOffset;        //   of the grid shall be rendered
 uniform float     isoValue;       // iso value of the contour line
+uniform vec2      bboxLons;       // western and eastern lon of the bbox
 
 /**
   Emit a vertex between the two edge points p1 and p2 of the currently
@@ -78,12 +79,16 @@ shader GSmain()
 {
     // Based on code from this (http://www.twodee.org/blog/?p=805) website.
 
+    int numLons = latOffset;
+
     // gl_Position.xy encodes the i and j grid indices of the upper left corner
     // of the grid cell processed by this shader instance.
     ivec2 ul = ivec2(gl_in[0].gl_Position.xy) + ivec2(iOffset, jOffset);
+    ul.x = ul.x % numLons;
     ivec2 ur = ul + ivec2(1, 0);
+    ur.x = ur.x % numLons;
     ivec2 ll = ul + ivec2(0, 1);
-    ivec2 lr = ul + ivec2(1, 1);
+    ivec2 lr = ur + ivec2(0, 1);
 
     // Load the scalar values at the four corner points of the grid cell.
     float ul_intensity = imageLoad(sectionGrid, ul).r;
@@ -95,11 +100,36 @@ shader GSmain()
     vec2 ul_worldposition = vec2(texelFetch(latLonAxesData, ul.x, 0).a,
                                  texelFetch(latLonAxesData, ul.y + latOffset, 0).a);
     vec2 ur_worldposition = vec2(texelFetch(latLonAxesData, ur.x, 0).a,
-                                 texelFetch(latLonAxesData, ur.y + latOffset, 0).a);
-    vec2 ll_worldposition = vec2(texelFetch(latLonAxesData, ll.x, 0).a,
+                                 ul_worldposition.y);
+    vec2 ll_worldposition = vec2(ul_worldposition.x,
                                  texelFetch(latLonAxesData, ll.y + latOffset, 0).a);
-    vec2 lr_worldposition = vec2(texelFetch(latLonAxesData, lr.x, 0).a,
-                                 texelFetch(latLonAxesData, lr.y + latOffset, 0).a);
+    vec2 lr_worldposition = vec2(ur_worldposition.x,
+                                 ll_worldposition.y);
+
+    // Check if the longitude fetched from the grid axis is within the
+    // requested bounding box. If not, shift (see notes 17Apr2012).
+    float bboxWestLon = bboxLons.x;
+    float bboxEastLon = bboxLons.y;
+    if (ul_worldposition.x > bboxEastLon)
+    {
+        ul_worldposition.x += int((bboxWestLon - ul_worldposition.x) / 360.) * 360.;
+        ll_worldposition.x = ul_worldposition.x;
+    }
+    else if (ul_worldposition.x < bboxWestLon)
+    {
+        ul_worldposition.x += int((bboxEastLon - ul_worldposition.x) / 360.) * 360.;
+        ll_worldposition.x = ul_worldposition.x;
+    }
+    if (ur_worldposition.x > bboxEastLon)
+    {
+        ur_worldposition.x += int((bboxWestLon - ur_worldposition.x) / 360.) * 360.;
+        lr_worldposition.x = ur_worldposition.x;
+    }
+    else if (ur_worldposition.x < bboxWestLon)
+    {
+        ur_worldposition.x += int((bboxEastLon - ur_worldposition.x) / 360.) * 360.;
+        lr_worldposition.x = ur_worldposition.x;
+    }
 
     // Determine the marching squares case we are handling..
     int bitfield = 0;

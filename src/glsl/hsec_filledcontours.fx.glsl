@@ -83,7 +83,7 @@ shader VSmain(out VStoFS output)
     float bboxWestLon = bboxLons.x;
     float bboxEastLon = bboxLons.y;
     if (lon > bboxEastLon) lon += int((bboxWestLon - lon) / 360.) * 360.;
-    if (lon < bboxWestLon) lon += int((bboxEastLon - lon) / 360.) * 360.;
+    else if (lon < bboxWestLon) lon += int((bboxEastLon - lon) / 360.) * 360.;
 
     vec3 vertexPosition = vec3(lon, lat, worldZ);
 
