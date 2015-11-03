@@ -198,8 +198,11 @@ private:
     QVector<QVector4D> path;
 
     // This integer stores the ID of a waypoint to be highlighted. If the value
-    // is -1, no waypoint will be highlighted.
+    // is -1, no waypoint will be highlighted. modifyWaypoint_worldZ stores the
+    // worldZ coordinate of the selected waypoint, so that bot/top handles
+    // can be distinguished.
     int modifyWaypoint;
+    double modifyWaypoint_worldZ;
 
     GL::MTexture *textureVerticalSectionPath;
     int          textureUnitVerticalSectionPath;

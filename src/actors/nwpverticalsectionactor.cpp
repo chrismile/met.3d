@@ -54,6 +54,7 @@ MNWPVerticalSectionActor::MNWPVerticalSectionActor()
     : MNWPMultiVarActor(),
       waypointsModel(nullptr),
       modifyWaypoint(-1),
+      modifyWaypoint_worldZ(0.),
       textureVerticalSectionPath(nullptr),
       textureUnitVerticalSectionPath(-1),
       texturePressureLevels(nullptr),
@@ -201,26 +202,39 @@ int MNWPVerticalSectionActor::checkIntersectionWithHandle(
     {
         // Transform the waypoint coordinates to clip space. As only lat/lon
         // of the waypoint is stored, assume a worldZ = 0.
-        QVector3D p = QVector3D(
-                    waypointsModel->positionLonLatIncludingMidpoints(i), 0);
+        QVector3D wpPositionBottom = QVector3D(
+                    waypointsModel->positionLonLatIncludingMidpoints(i),
+                    sceneView->worldZfromPressure(p_bot_hPa));
+        QVector3D wpPositionTop = QVector3D(
+                    waypointsModel->positionLonLatIncludingMidpoints(i),
+                    sceneView->worldZfromPressure(p_top_hPa));
+
         QMatrix4x4 *mvpMatrix = sceneView->getModelViewProjectionMatrix();
-        QVector3D pClip = *(mvpMatrix) * p;
 
-        // cout << "\tWP " << i << ": (" << pClip.x() << ", " << pClip.y()
-        //      << ", " << pClip.z() << ")\n" << flush;
+        QVector3D posClipBot = *(mvpMatrix) * wpPositionBottom;
+        QVector3D posClipTop = *(mvpMatrix) * wpPositionTop;
 
-        float dx = pClip.x() - clipX;
-        float dy = pClip.y() - clipY;
+        float dxBot = posClipBot.x() - clipX;
+        float dyBot = posClipBot.y() - clipY;
+        float dxTop = posClipTop.x() - clipX;
+        float dyTop = posClipTop.y() - clipY;
 
         // Compute the distance between point and mouse in clip space. If it
         // is less than clipRadius, store this waypoint as the "matched" one
         // and return from this function.
-        if ( (dx*dx + dy*dy) < clipRadiusSq )
+        if ( (dxBot*dxBot + dyBot*dyBot) < clipRadiusSq )
         {
-            // cout << "Match with WP" << i << "\n" << flush;
             modifyWaypoint = i;
+            modifyWaypoint_worldZ = sceneView->worldZfromPressure(p_bot_hPa);
             break;
         }
+        else if ( (dxTop*dxTop + dyTop*dyTop) < clipRadiusSq )
+        {
+            modifyWaypoint = i;
+            modifyWaypoint_worldZ = sceneView->worldZfromPressure(p_top_hPa);
+            break;
+        }
+
     } // for (waypoints)
 
     return modifyWaypoint;
@@ -238,7 +252,7 @@ void MNWPVerticalSectionActor::dragEvent(MSceneViewGLWidget *sceneView,
     // transformed to world space, lies on the ray passing through the camera
     // and the location on the worldZ==0 plane "picked" by the mouse.
     // (See notes 22-23Feb2012).
-    QVector3D mousePosClipSpace = QVector3D(clipX, clipY, 0.);
+    QVector3D mousePosClipSpace = QVector3D(clipX, clipY, modifyWaypoint_worldZ);
 
     // The point p at which the ray intersects the worldZ==0 plane is found by
     // computing the value d in p=d*l+l0, where l0 is a point on the ray and l
@@ -261,7 +275,8 @@ void MNWPVerticalSectionActor::dragEvent(MSceneViewGLWidget *sceneView,
     // The plane's normal vector simply points upward, the origin in world
     // space is lcoated on the plane.
     QVector3D n = QVector3D(0, 0, 1);
-    QVector3D p0 = QVector3D(0, 0, 0);
+    QVector3D p0 = waypointsModel->positionLonLatIncludingMidpoints(handleID)
+            + QVector3D(0, 0, modifyWaypoint_worldZ);
 
     // Compute the mouse position in world space.
     float d = QVector3D::dotProduct(p0 - l0, n) / QVector3D::dotProduct(l, n);
