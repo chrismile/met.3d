@@ -135,13 +135,16 @@ MMainWindow::MMainWindow(QStringList commandLineArguments, QWidget *parent)
     MApplicationConfigurationManager appConfig;
     appConfig.loadConfiguration();
 
-    // Assign scenes to scene views.
+    // Initial assignment of scenes to scene views.
     //==========================================================================
 
-    sceneViewGLWidgets[0]->setScene(glResourcesManager->getScenes()[0]);
-    sceneViewGLWidgets[1]->setScene(glResourcesManager->getScenes()[1]);
-    sceneViewGLWidgets[2]->setScene(glResourcesManager->getScenes()[2]);
-    sceneViewGLWidgets[3]->setScene(glResourcesManager->getScenes()[3]);
+    int numScenes = glResourcesManager->getScenes().size();
+    for (int i = 0; i < MET3D_MAX_SCENEVIEWS; i++)
+    {
+        sceneViewGLWidgets[i]->setScene(
+                    glResourcesManager->getScenes()[min(i, numScenes-1)]);
+    }
+
 
     // Show the control widget of the first scene and add the system control
     // dock below.
@@ -149,9 +152,8 @@ MMainWindow::MMainWindow(QStringList commandLineArguments, QWidget *parent)
 
     // Uncomment this loop if the system control should be tabified with the
     // scene controls.
-    for (int i = 0; i < dockWidgets.size()-1; i++)
-        if (!dockWidgets[i]->isFloating())
-            tabifyDockWidget(dockWidgets[i], systemDock);
+    foreach (QDockWidget *dockWidget, dockWidgets)
+        if (!dockWidget->isFloating()) tabifyDockWidget(dockWidget, systemDock);
 
     dockWidgets[0]->raise();
 
