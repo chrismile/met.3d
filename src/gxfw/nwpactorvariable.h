@@ -283,10 +283,13 @@ protected:
 
     /* Ensemble management. */
     QtProperty *ensembleModeProperty;
-    QtProperty *ensembleMemberProperty;
+    QtProperty *ensembleSingleMemberProperty;
+    QtProperty *ensembleMultiMemberSelectionProperty;
+    QtProperty *ensembleMultiMemberProperty;
     QtProperty *ensembleThresholdProperty;
     QString     ensembleFilterOperation;
     int         numEnsembleMembers;
+    QSet<unsigned int> selectedEnsembleMembers;
 
     /** If true, load the grid's "flag" data field to the GPU, if available. */
     bool useFlagsIfAvailable;

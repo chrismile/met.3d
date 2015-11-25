@@ -42,6 +42,7 @@
 #include "gxfw/mscenecontrol.h"
 #include "gxfw/selectdatasourcedialog.h"
 #include "gxfw/nwpmultivaractor.h"
+#include "gxfw/memberselectiondialog.h"
 
 using namespace std;
 
@@ -121,13 +122,19 @@ MNWPActorVariable::MNWPActorVariable(MNWPMultiVarActor *actor)
     QStringList ensembleModeNames;
     ensembleModeNames << "member" << "mean" << "standard deviation"
                       << "p(> threshold)" << "p(< threshold)"
-                      << "min" << "max" << "max-min";
+                      << "min" << "max" << "max-min" << "multiple members";
     ensembleModeProperty = a->addProperty(ENUM_PROPERTY, "ensemble mode",
                                           varPropertyGroup);
     properties->mEnum()->setEnumNames(ensembleModeProperty, ensembleModeNames);
 
-    ensembleMemberProperty = a->addProperty(INT_PROPERTY, "ensemble member",
+    ensembleSingleMemberProperty = a->addProperty(INT_PROPERTY, "ensemble member",
                                             varPropertyGroup);
+
+    ensembleMultiMemberSelectionProperty = a->addProperty(
+                CLICK_PROPERTY, "select members", varPropertyGroup);
+    ensembleMultiMemberProperty = a->addProperty(
+                STRING_PROPERTY, "ensemble members", varPropertyGroup);
+    ensembleMultiMemberProperty->setEnabled(false);
 
     ensembleThresholdProperty = a->addProperty(DOUBLE_PROPERTY,
                                                "ensemble threshold",
@@ -566,14 +573,29 @@ bool MNWPActorVariable::onQtPropertyChanged(QtProperty *property)
         return false;
     }
 
-    else if (property == ensembleMemberProperty)
+    else if (property == ensembleSingleMemberProperty)
     {
-        if ( ensembleMemberProperty->isEnabled() )
+        if ( ensembleSingleMemberProperty->isEnabled() )
         {
             if (actor->suppressActorUpdates()) return false;
 
             asynchronousDataRequest();
             return false;
+        }
+    }
+
+    else if (property == ensembleMultiMemberSelectionProperty)
+    {
+        if (actor->suppressActorUpdates()) return false;
+
+        MMemberSelectionDialog dlg;
+        dlg.setAvailableEnsembleMembers(dataSource->availableEnsembleMembers(
+                                            levelType, variableName).toSet());
+        dlg.setSelectedMembers(selectedEnsembleMembers);
+
+        if ( dlg.exec() == QDialog::Accepted )
+        {
+            selectedEnsembleMembers = dlg.getSelectedMembers();
         }
     }
 
@@ -743,7 +765,7 @@ void MNWPActorVariable::useFlags(bool b)
 
 int MNWPActorVariable::getEnsembleMember()
 {
-    return actor->getQtProperties()->mInt()->value(ensembleMemberProperty);
+    return actor->getQtProperties()->mInt()->value(ensembleSingleMemberProperty);
 }
 
 
@@ -814,7 +836,7 @@ bool MNWPActorVariable::setEnsembleMember(int member)
         // restored.
 
         ensembleModeProperty->setEnabled(false);
-        ensembleMemberProperty->setEnabled(false);
+        ensembleSingleMemberProperty->setEnabled(false);
         ensembleThresholdProperty->setEnabled(false);
 #ifdef DIRECT_SYNCHRONIZATION
         if (ensembleFilterOperation == "MEAN")
@@ -858,8 +880,8 @@ bool MNWPActorVariable::setEnsembleMember(int member)
         }
 
         static_cast<QtIntPropertyManager*>
-                (ensembleMemberProperty->propertyManager())
-                ->setValue(ensembleMemberProperty, member);
+                (ensembleSingleMemberProperty->propertyManager())
+                ->setValue(ensembleSingleMemberProperty, member);
 
 #ifdef DIRECT_SYNCHRONIZATION
         // Does a new data request need to be emitted?
@@ -1133,19 +1155,24 @@ void MNWPActorVariable::initEnsembleProperties()
     numEnsembleMembers =
             dataSource->availableEnsembleMembers(levelType, variableName).size();
 
+    // Initially all ensemble members are selected to be used for ensemble
+    // operations.
+    selectedEnsembleMembers = dataSource->availableEnsembleMembers(
+                levelType, variableName).toSet();
+
     if ( numEnsembleMembers > 0 )
     {
         ensembleModeProperty->setEnabled(true);
-        ensembleMemberProperty->setEnabled(true);
+        ensembleSingleMemberProperty->setEnabled(true);
         ensembleThresholdProperty->setEnabled(false);
         MQtProperties *properties = actor->getQtProperties();
-        properties->mInt()->setMinimum(ensembleMemberProperty, 0);
-        properties->mInt()->setMaximum(ensembleMemberProperty, numEnsembleMembers-1);
+        properties->mInt()->setMinimum(ensembleSingleMemberProperty, 0);
+        properties->mInt()->setMaximum(ensembleSingleMemberProperty, numEnsembleMembers-1);
     }
     else
     {
         ensembleModeProperty->setEnabled(false);
-        ensembleMemberProperty->setEnabled(false);
+        ensembleSingleMemberProperty->setEnabled(false);
         ensembleThresholdProperty->setEnabled(false);
         ensembleFilterOperation = "";
     }
@@ -1159,60 +1186,77 @@ void MNWPActorVariable::updateEnsembleProperties()
     MQtProperties *properties = actor->getQtProperties();
     int mode = properties->mEnum()->value(ensembleModeProperty);
 
+    actor->enableActorUpdates(false);
+
     switch ( mode )
     {
     case (0):
-        // ensemble member
-        ensembleMemberProperty->setEnabled(true);
+        // single ensemble member
+        ensembleSingleMemberProperty->setEnabled(true);
         ensembleThresholdProperty->setEnabled(false);
+        ensembleMultiMemberSelectionProperty->setEnabled(false);
         ensembleFilterOperation = "";
         break;
     case (1):
         // mean
-        ensembleMemberProperty->setEnabled(false);
+        ensembleSingleMemberProperty->setEnabled(false);
         ensembleThresholdProperty->setEnabled(false);
+        ensembleMultiMemberSelectionProperty->setEnabled(true);
         ensembleFilterOperation = "MEAN";
         break;
     case (2):
         // stddev
-        ensembleMemberProperty->setEnabled(false);
+        ensembleSingleMemberProperty->setEnabled(false);
         ensembleThresholdProperty->setEnabled(false);
+        ensembleMultiMemberSelectionProperty->setEnabled(true);
         ensembleFilterOperation = "STDDEV";
         break;
     case (3):
         // > threshold
-        ensembleMemberProperty->setEnabled(false);
+        ensembleSingleMemberProperty->setEnabled(false);
         ensembleThresholdProperty->setEnabled(true);
+        ensembleMultiMemberSelectionProperty->setEnabled(true);
         ensembleFilterOperation = QString("P>%1").arg(
                     properties->mDouble()->value(ensembleThresholdProperty));
         break;
     case (4):
         // < threshold
-        ensembleMemberProperty->setEnabled(false);
+        ensembleSingleMemberProperty->setEnabled(false);
         ensembleThresholdProperty->setEnabled(true);
+        ensembleMultiMemberSelectionProperty->setEnabled(true);
         ensembleFilterOperation = QString("P<%1").arg(
                     properties->mDouble()->value(ensembleThresholdProperty));
         break;
     case (5):
         // min
-        ensembleMemberProperty->setEnabled(false);
+        ensembleSingleMemberProperty->setEnabled(false);
         ensembleThresholdProperty->setEnabled(false);
+        ensembleMultiMemberSelectionProperty->setEnabled(true);
         ensembleFilterOperation = "MIN";
         break;
     case (6):
         // max
-        ensembleMemberProperty->setEnabled(false);
+        ensembleSingleMemberProperty->setEnabled(false);
         ensembleThresholdProperty->setEnabled(false);
+        ensembleMultiMemberSelectionProperty->setEnabled(true);
         ensembleFilterOperation = "MAX";
         break;
     case (7):
         // max-min
-        ensembleMemberProperty->setEnabled(false);
+        ensembleSingleMemberProperty->setEnabled(false);
         ensembleThresholdProperty->setEnabled(false);
+        ensembleMultiMemberSelectionProperty->setEnabled(true);
         ensembleFilterOperation = "MAX-MIN";
         break;
+    case (8):
+        // multiple members
+        ensembleSingleMemberProperty->setEnabled(false);
+        ensembleThresholdProperty->setEnabled(false);
+        ensembleMultiMemberSelectionProperty->setEnabled(true);
+        ensembleFilterOperation = "MULTIPLE";
     }
 
+    actor->enableActorUpdates(true);
 }
 
 
