@@ -41,7 +41,7 @@ interface VStoFS
 shader VSmain(in vec3 vertexCoord : 0, in vec3 texCoordIn : 1, out VStoFS Output)
 {
     gl_Position = vec4(vertexCoord, 1);
-    Output.texCoord = texCoordIn;
+    Output.texCoord = texCoordIn.r;
 }
 
 
