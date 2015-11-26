@@ -261,8 +261,8 @@ MStructuredGrid* MProbDFTrajectoriesSource::produceData(
             result->setToZero();
             result->enableFlags(); // allocate flags bitfield
 
-            for (int i = 0; i < trajectorySource->availableEnsembleMembers().size(); i++)
-                result->setAvailableMember(trajectorySource->availableEnsembleMembers()[i]);
+            foreach (unsigned int m, trajectorySource->availableEnsembleMembers())
+                result->setAvailableMember(m);
 
             // Compute gridding nodes (the midpoints between the grid point
             // coordinates); used for the gsl_interp routine below.
@@ -447,7 +447,7 @@ QStringList MProbDFTrajectoriesSource::availableVariables(
 }
 
 
-QList<unsigned int> MProbDFTrajectoriesSource::availableEnsembleMembers(
+QSet<unsigned int> MProbDFTrajectoriesSource::availableEnsembleMembers(
         MVerticalLevelType levelType, const QString& variableName)
 {
     Q_UNUSED(variableName);
@@ -457,7 +457,7 @@ QList<unsigned int> MProbDFTrajectoriesSource::availableEnsembleMembers(
             || (levelType == PRESSURE_LEVELS_3D))
         return trajectorySource->availableEnsembleMembers();
     else
-        return QList<unsigned int>();
+        return QSet<unsigned int>();
 }
 
 

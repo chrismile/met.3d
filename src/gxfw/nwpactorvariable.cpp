@@ -590,7 +590,7 @@ bool MNWPActorVariable::onQtPropertyChanged(QtProperty *property)
 
         MMemberSelectionDialog dlg;
         dlg.setAvailableEnsembleMembers(dataSource->availableEnsembleMembers(
-                                            levelType, variableName).toSet());
+                                            levelType, variableName));
         dlg.setSelectedMembers(selectedEnsembleMembers);
 
         if ( dlg.exec() == QDialog::Accepted )
@@ -1158,7 +1158,7 @@ void MNWPActorVariable::initEnsembleProperties()
     // Initially all ensemble members are selected to be used for ensemble
     // operations.
     selectedEnsembleMembers = dataSource->availableEnsembleMembers(
-                levelType, variableName).toSet();
+                levelType, variableName);
 
     if ( numEnsembleMembers > 0 )
     {

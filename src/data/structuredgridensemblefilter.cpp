@@ -508,7 +508,7 @@ QStringList MStructuredGridEnsembleFilter::availableVariables(
 }
 
 
-QList<unsigned int> MStructuredGridEnsembleFilter::availableEnsembleMembers(
+QSet<unsigned int> MStructuredGridEnsembleFilter::availableEnsembleMembers(
         MVerticalLevelType levelType, const QString& variableName)
 {
     assert(inputSource != nullptr);

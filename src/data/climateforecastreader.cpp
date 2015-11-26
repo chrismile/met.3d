@@ -103,7 +103,7 @@ QStringList MClimateForecastReader::availableVariables(
 }
 
 
-QList<unsigned int> MClimateForecastReader::availableEnsembleMembers(
+QSet<unsigned int> MClimateForecastReader::availableEnsembleMembers(
         MVerticalLevelType levelType,
         const QString&     variableName)
 {
@@ -116,11 +116,11 @@ QList<unsigned int> MClimateForecastReader::availableEnsembleMembers(
 
     if (availableDataFields[levelType].keys().contains(variableName))
     {
-        return availableDataFields[levelType][variableName]->availableMembers.toList();
+        return availableDataFields[levelType][variableName]->availableMembers;
     }
     else if (availableDataFieldsByStdName[levelType].keys().contains(variableName))
     {
-        return availableDataFieldsByStdName[levelType][variableName]->availableMembers.toList();
+        return availableDataFieldsByStdName[levelType][variableName]->availableMembers;
     }
     else
     {
@@ -912,8 +912,8 @@ MStructuredGrid *MClimateForecastReader::readGrid(
 
     // Store metadata in grid object.
     grid->setMetaData(initTime, validTime, variableName, ensembleMember);
-    for (int i = 0; i < shared->availableMembers.size(); i++)
-        grid->setAvailableMember(shared->availableMembers[i]);
+    foreach (unsigned int m, shared->availableMembers)
+        grid->setAvailableMember(m);
 
     // Load the data field.
     switch (levelType)

@@ -89,7 +89,7 @@ QStringList MGribReader::availableVariables(
 }
 
 
-QList<unsigned int> MGribReader::availableEnsembleMembers(
+QSet<unsigned int> MGribReader::availableEnsembleMembers(
         MVerticalLevelType levelType,
         const QString&     variableName)
 {
@@ -103,7 +103,7 @@ QList<unsigned int> MGribReader::availableEnsembleMembers(
         throw MBadDataFieldRequest(
                 "unkown variable requested: " + variableName.toStdString(),
                 __FILE__, __LINE__);
-    return availableDataFields[levelType][variableName]->availableMembers.toList();
+    return availableDataFields[levelType][variableName]->availableMembers;
 }
 
 

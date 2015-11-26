@@ -150,8 +150,8 @@ public:
 
     QStringList availableVariables(MVerticalLevelType levelType);
 
-    QList<unsigned int> availableEnsembleMembers(MVerticalLevelType levelType,
-                                                 const QString&     variableName);
+    QSet<unsigned int> availableEnsembleMembers(MVerticalLevelType levelType,
+                                                const QString&     variableName);
 
     QList<QDateTime> availableInitTimes(MVerticalLevelType levelType,
                                         const QString&     variableName);

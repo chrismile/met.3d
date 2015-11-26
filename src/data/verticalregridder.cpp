@@ -306,7 +306,7 @@ QStringList MVerticalRegridder::availableVariables(
 }
 
 
-QList<unsigned int> MVerticalRegridder::availableEnsembleMembers(
+QSet<unsigned int> MVerticalRegridder::availableEnsembleMembers(
         MVerticalLevelType levelType, const QString& variableName)
 {
     assert(inputSource != nullptr);

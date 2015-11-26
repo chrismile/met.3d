@@ -129,7 +129,7 @@ public:
     QList<QDateTime> validTimeOverlap(const QDateTime& initTime,
                                       const QDateTime& validTime);
 
-    QList<unsigned int> availableEnsembleMembers();
+    QSet<unsigned int> availableEnsembleMembers();
 
     /**
       Reads a data item from disk.

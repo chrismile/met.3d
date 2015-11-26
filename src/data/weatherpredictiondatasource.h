@@ -67,10 +67,11 @@ public:
             MVerticalLevelType levelType) = 0;
 
     /**
-      If the variable is part of an ensemble forecast, returns the number of
-      members in the ensemble. Otherwise returns 0.
+      If the variable is part of an ensemble forecast, returns the IDs of the
+      available members in the ensemble. Otherwise returns a set with a single
+      member "0".
       */
-    virtual QList<unsigned int> availableEnsembleMembers(
+    virtual QSet<unsigned int> availableEnsembleMembers(
             MVerticalLevelType levelType,
             const QString&     variableName) = 0;
 

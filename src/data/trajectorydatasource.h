@@ -78,7 +78,7 @@ public:
     /**
       Returns the available ensemble members.
       */
-    virtual QList<unsigned int> availableEnsembleMembers() = 0;
+    virtual QSet<unsigned int> availableEnsembleMembers() = 0;
 
 protected:
 

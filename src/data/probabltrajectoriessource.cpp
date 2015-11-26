@@ -299,8 +299,8 @@ MStructuredGrid* MProbABLTrajectoriesSource::produceData(
             result->setToZero();
             result->enableFlags(); // allocate flags bitfield
 
-            for (int i = 0; i < trajectorySource->availableEnsembleMembers().size(); i++)
-                result->setAvailableMember(trajectorySource->availableEnsembleMembers()[i]);
+            foreach (unsigned int m, trajectorySource->availableEnsembleMembers())
+                result->setAvailableMember(m);
         } // initialize grids
 
         memberGrid->setToZero();
@@ -551,7 +551,7 @@ QStringList MProbABLTrajectoriesSource::availableVariables(
 }
 
 
-QList<unsigned int> MProbABLTrajectoriesSource::availableEnsembleMembers(
+QSet<unsigned int> MProbABLTrajectoriesSource::availableEnsembleMembers(
         MVerticalLevelType levelType, const QString& variableName)
 {
     Q_UNUSED(variableName);
@@ -561,7 +561,7 @@ QList<unsigned int> MProbABLTrajectoriesSource::availableEnsembleMembers(
             || (levelType == PRESSURE_LEVELS_3D))
         return trajectorySource->availableEnsembleMembers();
     else
-        return QList<unsigned int>();
+        return QSet<unsigned int>();
 }
 
 
