@@ -638,11 +638,8 @@ void MGribReader::scanDataRoot()
                 }
 
                 long ensMember = gmiInfo.ensMember;
-                if (acceptedForecastType == ENSEMBLE_FORECAST)
-                {
-                    vinfo->availableMembers.insert(ensMember);
-                    vinfo->availableMembers_bitfield |= (Q_UINT64_C(1) << ensMember);
-                }
+                vinfo->availableMembers.insert(ensMember);
+                vinfo->availableMembers_bitfield |= (Q_UINT64_C(1) << ensMember);
 
                 // Get time values of this message.
                 QDateTime initTime = gmiInfo.initTime;
@@ -943,14 +940,16 @@ void MGribReader::scanDataRoot()
                                     vinfo->standardname, vinfo);
                 }
 
+                // Determine ensemble member of this data field. Deterministic
+                // and analysis datafields are stored as member "0".
                 long ensMember = 0;
                 if (acceptedForecastType == ENSEMBLE_FORECAST)
                 {
                     ensMember = getGribLongKey(gribHandle, "perturbationNumber");
                     // LOG4CPLUS_DEBUG(mlog, "perturbationNumber: " << ensMember);
-                    vinfo->availableMembers.insert(ensMember);
-                    vinfo->availableMembers_bitfield |= (Q_UINT64_C(1) << ensMember);
                 }
+                vinfo->availableMembers.insert(ensMember);
+                vinfo->availableMembers_bitfield |= (Q_UINT64_C(1) << ensMember);
                 gmiInfo.ensMember = ensMember;
 
                 // Get time values of this variable.

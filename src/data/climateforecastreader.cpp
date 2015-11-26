@@ -490,22 +490,20 @@ void MClimateForecastReader::scanDataRoot()
                             vinfo->surfacePressureName = psName;
                         }
 
-                        try
-                        {
-                            // Check if the variable has an ensemble dimension.
-                            NcVar ensVar = currCFVar.getEnsembleVar();
-                            // If yes, get the number of available ensemble members.
-                            vinfo->numEnsembleMembers = ensVar.getDim(0).getSize();
-                            for (int m = 0; m < vinfo->numEnsembleMembers; m++)
-                                vinfo->availableMembers.insert(m);
 
-                        }
-                        catch (NcException)
+                        // Check if the variable has an ensemble dimension.
+                        if (currCFVar.hasEnsembleDimension())
                         {
-                            // No ensemble dimension could be found.
-                            vinfo->numEnsembleMembers = 0;
+                            // If yes, get the available ensemble members.
+                            vinfo->availableMembers =
+                                    currCFVar.getEnsembleMembers();
                         }
-
+                        else
+                        {
+                            // No ensemble dimension could be found. List the
+                            // available data field as the "0" member.
+                            vinfo->availableMembers.insert(0);
+                        }
                     }
 
                     for (int j = 0; j < currTimeCoordValues.size(); j++)

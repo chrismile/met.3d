@@ -825,7 +825,7 @@ bool MNWPActorVariable::setEnsembleMember(int member)
 {
     // Only accept set-member-operation if the connected data source provides
     // ensemble data.
-    if ( numEnsembleMembers == 0 ) return false;
+    if ( numEnsembleMembers <= 1 ) return false;
 
     // Ensemble mean: member == -1.
     if (member < 0)
@@ -1160,7 +1160,7 @@ void MNWPActorVariable::initEnsembleProperties()
     selectedEnsembleMembers = dataSource->availableEnsembleMembers(
                 levelType, variableName);
 
-    if ( numEnsembleMembers > 0 )
+    if ( numEnsembleMembers > 1 )
     {
         ensembleModeProperty->setEnabled(true);
         ensembleSingleMemberProperty->setEnabled(true);
@@ -1174,6 +1174,7 @@ void MNWPActorVariable::initEnsembleProperties()
         ensembleModeProperty->setEnabled(false);
         ensembleSingleMemberProperty->setEnabled(false);
         ensembleThresholdProperty->setEnabled(false);
+        ensembleMultiMemberSelectionProperty->setEnabled(false);
         ensembleFilterOperation = "";
     }
 }
@@ -1181,7 +1182,7 @@ void MNWPActorVariable::initEnsembleProperties()
 
 void MNWPActorVariable::updateEnsembleProperties()
 {
-    if ( numEnsembleMembers == 0 ) return;
+    if ( numEnsembleMembers <= 1 ) return;
 
     MQtProperties *properties = actor->getQtProperties();
     int mode = properties->mEnum()->value(ensembleModeProperty);
