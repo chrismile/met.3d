@@ -62,6 +62,11 @@ public:
 
     QSet<unsigned int> getSelectedMembers();
 
+public slots:
+    void selectAllMembers();
+
+    void selectNoMembers();
+
 private:
     Ui::MMemberSelectionDialog *ui;
 };

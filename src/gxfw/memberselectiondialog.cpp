@@ -53,6 +53,17 @@ MMemberSelectionDialog::MMemberSelectionDialog(QWidget *parent) :
     ui->setupUi(this);
     ui->availableMembers->setSelectionMode(QAbstractItemView::MultiSelection);
     ui->availableMembers->setSelectionBehavior(QAbstractItemView::SelectRows);
+
+    connect(ui->selectAllButton, SIGNAL(clicked()),
+            this, SLOT(selectAllMembers()));
+    connect(ui->selectNoneButton, SIGNAL(clicked()),
+            this, SLOT(selectNoMembers()));
+}
+
+
+MMemberSelectionDialog::~MMemberSelectionDialog()
+{
+    delete ui;
 }
 
 
@@ -97,9 +108,20 @@ QSet<unsigned int> MMemberSelectionDialog::getSelectedMembers()
 }
 
 
-MMemberSelectionDialog::~MMemberSelectionDialog()
+/******************************************************************************
+***                             PUBLIC SLOTS                                ***
+*******************************************************************************/
+
+void MMemberSelectionDialog::selectAllMembers()
 {
-    delete ui;
+    ui->availableMembers->selectAll();
 }
+
+
+void MMemberSelectionDialog::selectNoMembers()
+{
+    ui->availableMembers->clearSelection();
+}
+
 
 } // namespace Met3D

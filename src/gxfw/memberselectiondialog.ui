@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>291</width>
-    <height>518</height>
+    <width>328</width>
+    <height>628</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -19,9 +19,27 @@
      <property name="title">
       <string>Available ensemble members:</string>
      </property>
-     <layout class="QHBoxLayout" name="horizontalLayout">
+     <layout class="QVBoxLayout" name="verticalLayout_2">
       <item>
        <widget class="QListWidget" name="availableMembers"/>
+      </item>
+      <item>
+       <layout class="QHBoxLayout" name="horizontalLayout">
+        <item>
+         <widget class="QPushButton" name="selectAllButton">
+          <property name="text">
+           <string>select all</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="selectNoneButton">
+          <property name="text">
+           <string>select none</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
       </item>
      </layout>
     </widget>

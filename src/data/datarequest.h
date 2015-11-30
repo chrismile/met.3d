@@ -87,6 +87,8 @@ public:
 
     void insert(const QString &key, const QVector3D &value);
 
+    static QString uintSetToString(const QSet<unsigned int> &value);
+
     void insert(const QString &key, const QSet<unsigned int> &value);
 
     QStringList keys() const;

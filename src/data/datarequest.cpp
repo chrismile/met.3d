@@ -164,9 +164,9 @@ void MDataRequestHelper::insert(const QString &key, const QVector3D &value)
 }
 
 
-void MDataRequestHelper::insert(const QString &key, const QSet<unsigned int> &value)
+QString MDataRequestHelper::uintSetToString(const QSet<unsigned int> &value)
 {
-    modified = true;
+    QString s;
 
     if (value.count() > 0)
     {
@@ -179,10 +179,21 @@ void MDataRequestHelper::insert(const QString &key, const QSet<unsigned int> &va
 //TODO (mr, 26Nov2015) -- convert the list of members to a more compact form,
 //                        e.g. 0/5:10/20:22/25 for 0/5/6/7/8/9/10/20/21/22/25.
 
-        QString s;
         foreach (unsigned int i, list) s += QString("%1/").arg(i);
         s = s.left(s.length() - 1); // remove last "/"
-        requestMap.insert(key, s);
+    }
+
+    return s;
+}
+
+
+void MDataRequestHelper::insert(const QString &key, const QSet<unsigned int> &value)
+{
+    modified = true;
+
+    if (value.count() > 0)
+    {
+        requestMap.insert(key, uintSetToString(value));
     }
 }
 

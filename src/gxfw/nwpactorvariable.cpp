@@ -119,22 +119,22 @@ MNWPActorVariable::MNWPActorVariable(MNWPMultiVarActor *actor)
     validTimeProperty = a->addProperty(ENUM_PROPERTY, "valid",
                                        varPropertyGroup);
 
+    ensembleMultiMemberSelectionProperty = a->addProperty(
+                CLICK_PROPERTY, "select members", varPropertyGroup);
+    ensembleMultiMemberProperty = a->addProperty(
+                STRING_PROPERTY, "selected members", varPropertyGroup);
+    ensembleMultiMemberProperty->setEnabled(false);
+
     QStringList ensembleModeNames;
     ensembleModeNames << "member" << "mean" << "standard deviation"
                       << "p(> threshold)" << "p(< threshold)"
-                      << "min" << "max" << "max-min" << "multiple members";
+                      << "min" << "max" << "max-min";
     ensembleModeProperty = a->addProperty(ENUM_PROPERTY, "ensemble mode",
                                           varPropertyGroup);
     properties->mEnum()->setEnumNames(ensembleModeProperty, ensembleModeNames);
 
     ensembleSingleMemberProperty = a->addProperty(INT_PROPERTY, "ensemble member",
-                                            varPropertyGroup);
-
-    ensembleMultiMemberSelectionProperty = a->addProperty(
-                CLICK_PROPERTY, "select members", varPropertyGroup);
-    ensembleMultiMemberProperty = a->addProperty(
-                STRING_PROPERTY, "ensemble members", varPropertyGroup);
-    ensembleMultiMemberProperty->setEnabled(false);
+                                                  varPropertyGroup);
 
     ensembleThresholdProperty = a->addProperty(DOUBLE_PROPERTY,
                                                "ensemble threshold",
@@ -595,7 +595,12 @@ bool MNWPActorVariable::onQtPropertyChanged(QtProperty *property)
 
         if ( dlg.exec() == QDialog::Accepted )
         {
+            // Get set of selected members from dialog and update
+            // ensembleMultiMemberProperty to display set to user.
             selectedEnsembleMembers = dlg.getSelectedMembers();
+            QString s = MDataRequestHelper::uintSetToString(selectedEnsembleMembers);
+            properties->mString()->setValue(ensembleMultiMemberProperty, s);
+            ensembleMultiMemberProperty->setToolTip(s);
         }
     }
 
@@ -1151,6 +1156,8 @@ void MNWPActorVariable::updateValidTimeProperty()
 
 void MNWPActorVariable::initEnsembleProperties()
 {
+    MQtProperties *properties = actor->getQtProperties();
+
     // Get the number of ensemble members.
     numEnsembleMembers =
             dataSource->availableEnsembleMembers(levelType, variableName).size();
@@ -1159,13 +1166,15 @@ void MNWPActorVariable::initEnsembleProperties()
     // operations.
     selectedEnsembleMembers = dataSource->availableEnsembleMembers(
                 levelType, variableName);
+    QString s = MDataRequestHelper::uintSetToString(selectedEnsembleMembers);
+    properties->mString()->setValue(ensembleMultiMemberProperty, s);
+    ensembleMultiMemberProperty->setToolTip(s);
 
     if ( numEnsembleMembers > 1 )
     {
         ensembleModeProperty->setEnabled(true);
         ensembleSingleMemberProperty->setEnabled(true);
         ensembleThresholdProperty->setEnabled(false);
-        MQtProperties *properties = actor->getQtProperties();
         properties->mInt()->setMinimum(ensembleSingleMemberProperty, 0);
         properties->mInt()->setMaximum(ensembleSingleMemberProperty, numEnsembleMembers-1);
     }
