@@ -82,7 +82,7 @@ public:
 
       @see MSyncControl
      */
-    void synchronizeWith(MSyncControl *sync, bool updateGUIProperty=true);
+    void synchronizeWith(MSyncControl *sync, bool updateGUIProperties=true);
 
     bool synchronizationEvent(MSynchronizationType syncType, QVariant data);
 
@@ -93,6 +93,9 @@ public:
       when the variable's actor is added to a new scene).
      */
     void updateSyncPropertyColourHints(MSceneControl *scene = nullptr);
+
+    void setPropertyColour(QtProperty *property, const QColor& colour,
+                           bool resetColour, MSceneControl *scene = nullptr);
 
     /**
       Updates the current data field.
@@ -192,7 +195,6 @@ public:
     /* Synchronization (Pointer to the MSyncControl with which time/ensemble is
        synchronised and corresponding property). */
     MSyncControl *synchronizationControl;
-    QtProperty   *synchronizationProperty;
 
     /* Button to remove this variable from its actor. Signal is handled by
        MNWPMultiVarActor and derived classes. */
@@ -255,9 +257,18 @@ protected:
      */
     void updateValidTimeProperty();
 
+    void updateTimeProperties();
+
     void initEnsembleProperties();
 
     void updateEnsembleProperties();
+
+    /**
+      Updates the list of available members in @p ensembleSingleMemberProperty.
+      Returns @p true if the displayed member has changed (because the
+      previously displayed member is not available anymore).
+     */
+    bool updateEnsembleSingleMemberProperty();
 
     /**
       This function is called whenever a new data field has been made current.
@@ -275,6 +286,16 @@ protected:
     /** Actor that this instance belongs to. */
     MNWPMultiVarActor *actor;
 
+    /* Synchronization properties */
+    QtProperty *synchronizationPropertyGroup;
+    QtProperty *synchronizationProperty;
+    bool        synchronizeInitTime;
+    QtProperty *synchronizeInitTimeProperty;
+    bool        synchronizeValidTime;
+    QtProperty *synchronizeValidTimeProperty;
+    bool        synchronizeEnsemble;
+    QtProperty *synchronizeEnsembleProperty;
+
     /* Time management. */
     QList<QDateTime> availableValidTimes;
     QList<QDateTime> availableInitTimes;
@@ -290,6 +311,8 @@ protected:
     QString     ensembleFilterOperation;
     int         numEnsembleMembers;
     QSet<unsigned int> selectedEnsembleMembers;
+    QList<unsigned int> selectedEnsembleMembersAsSortedList;
+    int         ensembleMemberLoadedFromConfiguration;
 
     /** If true, load the grid's "flag" data field to the GPU, if available. */
     bool useFlagsIfAvailable;
@@ -301,6 +324,7 @@ protected:
     virtual bool changeVariable();
 
     QtProperty *datasourceNameProperty;
+    QtProperty *changeVariablePropertyGroup;
     QtProperty *changeVariableProperty;
 
     QtProperty *transferFunctionProperty;
@@ -340,6 +364,13 @@ private:
     bool internalSetDateTime(const QList<QDateTime>& availableTimes,
                              const QDateTime& datetime,
                              QtProperty* timeProperty);
+
+
+    template<typename T> bool setEnumPropertyClosest(
+            const QList<T>& availableValues,
+            const T& value,
+            QtProperty* property,
+            bool setSyncColour=true);
 
     bool setTransferFunctionFromProperty();
 

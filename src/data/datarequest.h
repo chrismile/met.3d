@@ -109,6 +109,8 @@ public:
 
     QVector3D vec3Value(const QString &key) const;
 
+    static QSet<unsigned int> uintSetFromString(const QString &s);
+
     QSet<unsigned int> uintSetValue(const QString &key) const;
 
 private:

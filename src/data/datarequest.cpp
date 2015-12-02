@@ -267,9 +267,8 @@ QVector3D MDataRequestHelper::vec3Value(const QString &key) const
 }
 
 
-QSet<unsigned int> MDataRequestHelper::uintSetValue(const QString &key) const
+QSet<unsigned int> MDataRequestHelper::uintSetFromString(const QString &s)
 {
-    QString s = value(key);
     QSet<unsigned int> set;
     QStringList sl = s.split("/");
 
@@ -281,6 +280,13 @@ QSet<unsigned int> MDataRequestHelper::uintSetValue(const QString &key) const
     }
 
     return set;
+}
+
+
+QSet<unsigned int> MDataRequestHelper::uintSetValue(const QString &key) const
+{
+    QString s = value(key);
+    return uintSetFromString(s);
 }
 
 

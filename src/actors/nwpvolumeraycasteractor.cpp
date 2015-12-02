@@ -1331,8 +1331,8 @@ void MNWPVolumeRaycasterActor::onQtPropertyChanged(QtProperty* property)
         {
         case RenderMode::Original:
             var->ensembleSingleMemberProperty->setEnabled(true);
-            var->setEnsembleMember(properties->mInt()->value(
-                                       var->ensembleSingleMemberProperty));
+            var->setEnsembleMember(properties->getEnumItem(
+                                       var->ensembleSingleMemberProperty).toInt());
 
             updateNextRenderFrame.set(UpdateShadowImage);
 
@@ -1345,8 +1345,8 @@ void MNWPVolumeRaycasterActor::onQtPropertyChanged(QtProperty* property)
             normalCurveSettings->groupProp->setEnabled(false);
 
             var->ensembleSingleMemberProperty->setEnabled(true);
-            var->setEnsembleMember(properties->mInt()->value(
-                                       var->ensembleSingleMemberProperty));
+            var->setEnsembleMember(properties->getEnumItem(
+                                       var->ensembleSingleMemberProperty).toInt());
 
             updateNextRenderFrame.set(UpdateShadowImage);
 
