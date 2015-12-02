@@ -318,6 +318,10 @@ MStructuredGrid *MGribReader::readGrid(
         {
             // Read data values into grid object.
 
+            // Set the missing value number.
+            GRIB_CHECK(grib_set_double(gribHandle, "missingValue",
+                                       M_MISSING_VALUE), 0);
+
             // Get the size of the values array
             size_t nGribValues = 0;
             GRIB_CHECK(grib_get_size(gribHandle, "values", &nGribValues), 0);
@@ -376,6 +380,10 @@ MStructuredGrid *MGribReader::readGrid(
             if (gribHandle != NULL)
             {
                 // Read data values into grid object.
+
+                // Set the missing value number.
+                GRIB_CHECK(grib_set_double(gribHandle, "missingValue",
+                                           M_MISSING_VALUE), 0);
 
                 // Get the size of the values array
                 size_t nGribValues = 0;
@@ -456,6 +464,10 @@ MStructuredGrid *MGribReader::readGrid(
             if (gribHandle != NULL)
             {
                 // Read data values into grid object.
+
+                // Set the missing value number.
+                GRIB_CHECK(grib_set_double(gribHandle, "missingValue",
+                                           M_MISSING_VALUE), 0);
 
                 // Get the size of the values array
                 size_t nGribValues = 0;
