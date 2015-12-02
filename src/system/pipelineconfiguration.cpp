@@ -316,7 +316,7 @@ void MPipelineConfiguration::initializeNWPDeterministicPipeline(
     else if (dataFormat == ECMWF_GRIB)
     {
         MGribReader *gribReaderDET =
-                new MGribReader(dataSourceId, DETERMINISTIC_FORECAST);
+                new MGribReader(dataSourceId);
         gribReaderDET->setMemoryManager(memoryManager);
         gribReaderDET->setScheduler(scheduler);
         gribReaderDET->setDataRoot(fileDir);
@@ -382,7 +382,7 @@ void MPipelineConfiguration::initializeNWPEnsemblePipeline(
     else if (dataFormat == ECMWF_GRIB)
     {
         MGribReader *gribReaderENS =
-                new MGribReader(dataSourceId, ENSEMBLE_FORECAST);
+                new MGribReader(dataSourceId);
         gribReaderENS->setMemoryManager(memoryManager);
         gribReaderENS->setScheduler(scheduler);
         gribReaderENS->setDataRoot(fileDir);

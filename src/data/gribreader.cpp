@@ -48,10 +48,8 @@ namespace Met3D
 ***                     CONSTRUCTOR / DESTRUCTOR                            ***
 *******************************************************************************/
 
-MGribReader::MGribReader(QString identifier,
-                         MECMWFForecastType acceptedForecastType)
-    : MWeatherPredictionReader(identifier),
-      acceptedForecastType(acceptedForecastType)
+MGribReader::MGribReader(QString identifier)
+    : MWeatherPredictionReader(identifier)
 {
 }
 
@@ -559,9 +557,7 @@ void MGribReader::scanDataRoot()
         // =================================================================
 
         QString filePath = dataRoot.filePath(availableFiles[i]);
-        QString fileIndexPath = QString("%1.%2_met3d_grib_index")
-                .arg(filePath).arg(
-                    acceptedForecastType == DETERMINISTIC_FORECAST ? "DET": "ENS");
+        QString fileIndexPath = QString("%1.met3d_grib_index").arg(filePath);
 
         // If the grib index exists, read it. Otherwise, create it and store it.
         if (QFile::exists(fileIndexPath))
@@ -574,16 +570,16 @@ void MGribReader::scanDataRoot()
             indexFile.open(QIODevice::ReadOnly);
             QDataStream indexDataStream(&indexFile);
 
-            // Read index file header (only version number "1" supported for
+            // Read index file header (only version number "2" supported for
             // now; this may be changed in the future when the index format
             // changes).
             qint32 indexVersion;
             indexDataStream >> indexVersion;
-            if (indexVersion != 1)
+            if (indexVersion != 2)
             {
                 LOG4CPLUS_ERROR(mlog, "ERROR: grib index has version "
                                 << indexVersion << "; this version of Met.3D "
-                                "only supports version 1. Skipping file -- "
+                                "only supports version 2. Skipping file -- "
                                 "remove the index file if you want the grib "
                                 "file to be considered.");
                 continue;
@@ -615,6 +611,7 @@ void MGribReader::scanDataRoot()
                     vinfo->longname = gmiInfo.longname;
                     vinfo->standardname = gmiInfo.standardname;
                     vinfo->units = gmiInfo.units;
+                    vinfo->fcType = gmiInfo.fcType;
 
                     vinfo->nlons = gmiInfo.nlons;
                     vinfo->nlats = gmiInfo.nlats;
@@ -706,9 +703,9 @@ void MGribReader::scanDataRoot()
             QFile indexFile(fileIndexPath);
             indexFile.open(QIODevice::WriteOnly);
             QDataStream indexDataStream(&indexFile);
-            // Write index file header (version number "1" for now; this may
+            // Write index file header (version number "2" for now; this may
             // be changed in the future when the index format changes).
-            indexDataStream << (qint32)1;
+            indexDataStream << (qint32)2;
             indexDataStream.setVersion(QDataStream::Qt_4_8);
 
             // Loop over grib messages contained in the file.
@@ -729,27 +726,14 @@ void MGribReader::scanDataRoot()
 
                 MGribMessageIndexInfo gmiInfo;
 
-                // A gribReader instance can only handle either deterministic
-                // or ensemble forecast fields (set in the constructor). Check
-                // if this message has the correct type.
+                // Determine type of data fields (analysis, deterministic,
+                // ensemble). Append type to variable name so variables with
+                // the same name but different types can be distinguished).
                 QString dataType = getGribStringKey(gribHandle, "ls.dataType");
                 // LOG4CPLUS_DEBUG(mlog, "ls.dataType: " << dataType.toStdString());
-                if (acceptedForecastType == DETERMINISTIC_FORECAST)
-                {
-                    if (dataType != "fc")
-                    {
-                        LOG4CPLUS_WARN(mlog, "no deterministic data field; skipping.");
-                        continue;
-                    }
-                }
-                else
-                {
-                    if ( !((dataType == "pf") || (dataType == "cf")) )
-                    {
-                        LOG4CPLUS_WARN(mlog, "no ensemble data field; skipping.");
-                        continue;
-                    }
-                }
+                // Perturbed (pf) and control (cf) forecasts are combined into
+                // "ensemble" (ens) forecasts.
+                if ( (dataType == "pf") || (dataType == "cf") ) dataType = "ens";
 
                 // Currently Met.3D can only handle data fields on a regular
                 // lat/lon grid in the horizontal.
@@ -789,7 +773,7 @@ void MGribReader::scanDataRoot()
                 // Determine the variable name.
                 QString shortName = getGribStringKey(gribHandle, "parameter.shortName");
                 // LOG4CPLUS_DEBUG(mlog, "parameter.shortName: " << shortName.toStdString());
-                QString varName = shortName;
+                QString varName = QString("%1 (%2)").arg(shortName).arg(dataType);
 
                 // Create a new MVariableInfo struct and store availabe
                 // variable information in this field.
@@ -828,30 +812,6 @@ void MGribReader::scanDataRoot()
                     // message of the current variable (when a new vinfo is
                     // created). This saves a huge amount of data in the index!
                     gmiInfo.variablename = vinfo->variablename;
-//                    gmiInfo.longname = vinfo->longname;
-//                    gmiInfo.standardname = vinfo->standardname;
-//                    gmiInfo.units = vinfo->units;
-
-//                    gmiInfo.nlons = vinfo->nlons;
-//                    gmiInfo.nlats = vinfo->nlats;
-//                    gmiInfo.lon0 = vinfo->lon0;
-//                    gmiInfo.lat0 = vinfo->lat0;
-//                    gmiInfo.lon1 = vinfo->lon1;
-//                    gmiInfo.lat1 = vinfo->lat1;
-//                    gmiInfo.dlon = vinfo->dlon;
-//                    gmiInfo.dlat = vinfo->dlat;
-
-//                    gmiInfo.lons = vinfo->lons;
-//                    gmiInfo.lats = vinfo->lats;
-
-//                    if (levelType == HYBRID_SIGMA_PRESSURE_3D)
-//                    {
-//                        gmiInfo.surfacePressureName = vinfo->surfacePressureName;
-//                        gmiInfo.aki_hPa = vinfo->aki_hPa;
-//                        gmiInfo.bki = vinfo->bki;
-//                        gmiInfo.ak_hPa = vinfo->ak_hPa;
-//                        gmiInfo.bk = vinfo->bk;
-//                    }
                     // end copy
                 }
                 else
@@ -864,6 +824,11 @@ void MGribReader::scanDataRoot()
                     vinfo->standardname = gmiInfo.standardname = "";
                     vinfo->units = gmiInfo.units =
                             getGribStringKey(gribHandle, "parameter.units");
+
+                    if (dataType == "an") vinfo->fcType = ANALYSIS;
+                    else if (dataType == "fc") vinfo->fcType = DETERMINISTIC_FORECAST;
+                    else if (dataType == "ens") vinfo->fcType = ENSEMBLE_FORECAST;
+                    else vinfo->fcType = INVALID_TYPE;
 
                     vinfo->nlons = gmiInfo.nlons = getGribLongKey(
                                 gribHandle, "Ni");
@@ -899,7 +864,8 @@ void MGribReader::scanDataRoot()
                     {
 //TODO (mr, 29Sep2014): how to find sp name? There might be either sp or lnsp...
                         vinfo->surfacePressureName =
-                                gmiInfo.surfacePressureName = "sp";
+                                gmiInfo.surfacePressureName =
+                                QString("%1 (%2)").arg("sp").arg(dataType);
 
                         // Read hybrid level coefficients.
                         double *akbk = new double[300];
@@ -955,7 +921,7 @@ void MGribReader::scanDataRoot()
                 // Determine ensemble member of this data field. Deterministic
                 // and analysis datafields are stored as member "0".
                 long ensMember = 0;
-                if (acceptedForecastType == ENSEMBLE_FORECAST)
+                if (vinfo->fcType == ENSEMBLE_FORECAST)
                 {
                     ensMember = getGribLongKey(gribHandle, "perturbationNumber");
                     // LOG4CPLUS_DEBUG(mlog, "perturbationNumber: " << ensMember);
@@ -1079,7 +1045,7 @@ void MGribReader::scanDataRoot()
         }
     }
 
-    debugPrintLevelTypeMap(availableDataFields);
+    // debugPrintLevelTypeMap(availableDataFields);
 
 #ifdef ENABLE_MET3D_STOPWATCH
     stopwatch.split();
@@ -1374,6 +1340,22 @@ bool MGribReader::checkIndexForVariable(MGribVariableInfo *vinfo)
 }
 
 
+QString MGribReader::forecastTypeToString(MECMWFForecastType type)
+{
+    switch (type)
+    {
+    case ANALYSIS:
+        return QString("ANA");
+    case DETERMINISTIC_FORECAST:
+        return QString("DET");
+    case ENSEMBLE_FORECAST:
+        return QString("ENS");
+    default:
+        return QString("---");
+    }
+}
+
+
 template<typename T> QString MGribReader::keyListToString(QList<T> keyList)
 {
     QString str = QString("%1 item(s): ").arg(keyList.size());
@@ -1394,6 +1376,7 @@ void MGribMessageIndexInfo::writeToDataStream(QDataStream *dataStream)
     (*dataStream) << longname;
     (*dataStream) << standardname;
     (*dataStream) << units;
+    (*dataStream) << (quint32)fcType;
     (*dataStream) << surfacePressureName;
     (*dataStream) << nlons;
     (*dataStream) << nlats;
@@ -1441,6 +1424,7 @@ void MGribMessageIndexInfo::readFromDataStream(QDataStream *dataStream)
     (*dataStream) >> longname;
     (*dataStream) >> standardname;
     (*dataStream) >> units;
+    quint32 fcT; (*dataStream) >> fcT; fcType = MECMWFForecastType(fcT);
     (*dataStream) >> surfacePressureName;
     (*dataStream) >> nlons;
     (*dataStream) >> nlats;
