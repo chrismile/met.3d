@@ -139,6 +139,8 @@ public:
     QtTreePropertyBrowser* getActorPropertyBrowser()
     { return actorPropertiesBrowser; }
 
+    void collapsePropertySubTree(QtProperty *property);
+
     void collapseActorPropertyTree(MActor *actor);
 
 public slots:
