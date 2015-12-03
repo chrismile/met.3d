@@ -84,11 +84,8 @@ MStructuredGrid* MStructuredGridEnsembleFilter::produceData(MDataRequest request
     }
 
     // Parse request.
-    QString memberRange = rh.value("MEMBER_RANGE");
+    QSet<unsigned int> selectedMembers = rh.uintSetValue("SELECTED_MEMBERS");
     QString operation = rh.value("ENS_OPERATION");
-    QStringList member = memberRange.split("/");
-    int memberFrom = member[0].toInt();
-    int memberTo = member[1].toInt();
 
     rh.removeAll(locallyRequiredKeys());
 
@@ -127,7 +124,7 @@ MStructuredGrid* MStructuredGridEnsembleFilter::produceData(MDataRequest request
         MStructuredGrid *stddev = nullptr;
 
         k = 0; // number of ensemble members
-        for (int m = memberFrom; m <= memberTo; m++)
+        foreach (unsigned int m, selectedMembers)
         {
             rh.insert("MEMBER", m);
 
@@ -137,8 +134,8 @@ MStructuredGrid* MStructuredGridEnsembleFilter::produceData(MDataRequest request
             if (k == 1)
             {
                 // First iteration, k = 1.
-                mean   = createAndInitializeResultGrid(memberGrid, memberRange);
-                stddev = createAndInitializeResultGrid(memberGrid, memberRange);
+                mean   = createAndInitializeResultGrid(memberGrid, selectedMembers);
+                stddev = createAndInitializeResultGrid(memberGrid, selectedMembers);
 
                 validMembersCounter = new MLonLatHybridSigmaPressureGrid(
                             memberGrid->nlevs, memberGrid->nlats,
@@ -243,7 +240,7 @@ MStructuredGrid* MStructuredGridEnsembleFilter::produceData(MDataRequest request
         MStructuredGrid *maxGrid = nullptr;
         MStructuredGrid *dmaxminGrid = nullptr;
 
-        for (int m = memberFrom; m <= memberTo; m++)
+        foreach (unsigned int m, selectedMembers)
         {
             rh.insert("MEMBER", m);
 
@@ -252,13 +249,13 @@ MStructuredGrid* MStructuredGridEnsembleFilter::produceData(MDataRequest request
             if (minGrid == nullptr)
             {
                 // First iteration.
-                minGrid = createAndInitializeResultGrid(memberGrid, memberRange);
+                minGrid = createAndInitializeResultGrid(memberGrid, selectedMembers);
                 minGrid->enableFlags(); // allocate flags bitfield
                 minGrid->setToValue(M_MISSING_VALUE);
-                maxGrid = createAndInitializeResultGrid(memberGrid, memberRange);
+                maxGrid = createAndInitializeResultGrid(memberGrid, selectedMembers);
                 maxGrid->enableFlags();
                 maxGrid->setToValue(M_MISSING_VALUE);
-                dmaxminGrid = createAndInitializeResultGrid(memberGrid, memberRange);
+                dmaxminGrid = createAndInitializeResultGrid(memberGrid, selectedMembers);
                 dmaxminGrid->enableFlags();
                 dmaxminGrid->setToValue(M_MISSING_VALUE);
             }
@@ -371,7 +368,7 @@ MStructuredGrid* MStructuredGridEnsembleFilter::produceData(MDataRequest request
 
         k = 0;
         if (op == ">")
-            for (int m = memberFrom; m <= memberTo; m++)
+            foreach (unsigned int m, selectedMembers)
             {
                 rh.insert("MEMBER", m);
 
@@ -381,7 +378,7 @@ MStructuredGrid* MStructuredGridEnsembleFilter::produceData(MDataRequest request
                 if (result == nullptr)
                 {
                     // First iteration.
-                    result = createAndInitializeResultGrid(memberGrid, memberRange);
+                    result = createAndInitializeResultGrid(memberGrid, selectedMembers);
                     result->enableFlags(); // allocate flags bitfield
                     result->setToZero();
                     validMembersCounter = new MLonLatHybridSigmaPressureGrid(
@@ -411,7 +408,7 @@ MStructuredGrid* MStructuredGridEnsembleFilter::produceData(MDataRequest request
             }
 
         else if (op == "<")
-            for (int m = memberFrom; m <= memberTo; m++)
+            foreach (unsigned int m, selectedMembers)
             {
                 rh.insert("MEMBER", m);
 
@@ -421,7 +418,7 @@ MStructuredGrid* MStructuredGridEnsembleFilter::produceData(MDataRequest request
                 if (result == nullptr)
                 {
                     // First iteration.
-                    result = createAndInitializeResultGrid(memberGrid, memberRange);
+                    result = createAndInitializeResultGrid(memberGrid, selectedMembers);
                     result->enableFlags(); // allocate flags bitfield
                     result->setToZero();
                     validMembersCounter = new MLonLatHybridSigmaPressureGrid(
@@ -477,13 +474,10 @@ MTask* MStructuredGridEnsembleFilter::createTaskGraph(MDataRequest request)
     MTask *task = new MTask(request, this);
 
     MDataRequestHelper rh(request);
-    QStringList member = rh.value("MEMBER_RANGE").split("/");
-    int memberFrom = member[0].toInt();
-    int memberTo = member[1].toInt();
-
+    QSet<unsigned int> selectedMembers = rh.uintSetValue("SELECTED_MEMBERS");
     rh.removeAll(locallyRequiredKeys());
 
-    for (int m = memberFrom; m <= memberTo; m++)
+    foreach (unsigned int m, selectedMembers)
     {
         rh.insert("MEMBER", m);
         task->addParent(inputSource->getTaskGraph(rh.request()));
@@ -540,12 +534,13 @@ QList<QDateTime> MStructuredGridEnsembleFilter::availableValidTimes(
 
 const QStringList MStructuredGridEnsembleFilter::locallyRequiredKeys()
 {
-    return (QStringList() << "ENS_OPERATION" << "MEMBER_RANGE");
+    return (QStringList() << "ENS_OPERATION" << "SELECTED_MEMBERS");
 }
 
 
 MStructuredGrid *MStructuredGridEnsembleFilter::createAndInitializeResultGrid(
-        MStructuredGrid *firstMemberGrid, QString memberRange)
+        MStructuredGrid *firstMemberGrid,
+        const QSet<unsigned int> &selectedMembers)
 {
     MStructuredGrid *result = nullptr;
 
@@ -626,10 +621,10 @@ MStructuredGrid *MStructuredGridEnsembleFilter::createAndInitializeResultGrid(
 //      memory manager. A possible solution might be to give MAbstractDataItem a
 //      "getMemoryManager()" method and use that mem.mgr. here.
         MDataRequest psfcRequest;
-        if (!memberRange.isEmpty() && rh_psfc.contains("MEMBER"))
+        if (!selectedMembers.isEmpty() && rh_psfc.contains("MEMBER"))
         {
             rh_psfc.remove("MEMBER");
-            rh_psfc.insert("MEMBER_RANGE", memberRange);
+            rh_psfc.insert("SELECTED_MEMBERS", selectedMembers);
 //TODO: Is it correct to reference all ensemble filter results to the mean
 //      surface pressure field?
             rh_psfc.insert("ENS_OPERATION", "MEAN");

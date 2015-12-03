@@ -76,7 +76,8 @@ protected:
     MWeatherPredictionDataSource* inputSource;
 
     MStructuredGrid* createAndInitializeResultGrid(
-            MStructuredGrid *firstMemberGrid, QString memberRange=QString());
+            MStructuredGrid *firstMemberGrid,
+            const QSet<unsigned int> &selectedMembers=QSet<unsigned int>());
 
 };
 

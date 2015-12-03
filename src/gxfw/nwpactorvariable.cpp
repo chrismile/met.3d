@@ -83,7 +83,6 @@ MNWPActorVariable::MNWPActorVariable(MNWPMultiVarActor *actor)
       synchronizeValidTime(true),
       synchronizeEnsemble(true),
       ensembleFilterOperation(""),
-      numEnsembleMembers(0),
       ensembleMemberLoadedFromConfiguration(-1),
       useFlagsIfAvailable(false),
       gridTopologyMayHaveChanged(true),
@@ -605,7 +604,7 @@ void MNWPActorVariable::asynchronousDataRequest(bool synchronizationRequest)
     else
     {
         rh.insert("ENS_OPERATION", ensembleFilterOperation);
-        rh.insert("MEMBER_RANGE", QString("0/%1").arg(numEnsembleMembers-1));
+        rh.insert("SELECTED_MEMBERS", selectedEnsembleMembers);
     }
 
     // Add request keys from the property subgroups.
@@ -775,11 +774,20 @@ bool MNWPActorVariable::onQtPropertyChanged(QtProperty *property)
         {
             // Get set of selected members from dialog and update
             // ensembleMultiMemberProperty to display set to user.
-            // Request a new data field if the currently selected member has
-            // changed (because the previously selected one is not available
-            // anymore).
             selectedEnsembleMembers = dlg.getSelectedMembers();
-            if (updateEnsembleSingleMemberProperty()) asynchronousDataRequest();
+
+            // Update the current data field if either the currently selected
+            // member has changed (because the previously selected one is not
+            // available anymore) or the ensemble more is set to mean, std.dev,
+            // etc (in this case the computed field needs to be recomputed
+            // based on the new member set).
+
+            // Selected member has changed?
+            bool updateDataField = updateEnsembleSingleMemberProperty();
+            // ..or ens mode is != member.
+            updateDataField |= !ensembleFilterOperation.isEmpty();
+
+            if (updateDataField) asynchronousDataRequest();
         }
     }
 
@@ -1059,10 +1067,6 @@ bool MNWPActorVariable::setInitDateTime(const QDateTime& datetime)
 
 bool MNWPActorVariable::setEnsembleMember(int member)
 {
-    // Only accept set-member-operation if the connected data source provides
-    // ensemble data.
-    if ( numEnsembleMembers <= 1 ) return false;
-
     // Ensemble mean: member == -1.
     // ============================
     if (member < 0)
@@ -1384,10 +1388,6 @@ void MNWPActorVariable::updateTimeProperties()
 
 void MNWPActorVariable::initEnsembleProperties()
 {
-    // Get the number of ensemble members.
-    numEnsembleMembers = dataSource->availableEnsembleMembers(
-                levelType, variableName).size();
-
     // Initially all ensemble members are selected to be used for ensemble
     // operations. Exception: loadConfiguration() has loaded a set of
     // selected members from the configuration file. In this case, test
@@ -1405,27 +1405,11 @@ void MNWPActorVariable::initEnsembleProperties()
 
     }
     updateEnsembleSingleMemberProperty();
-
-    if ( numEnsembleMembers > 1 )
-    {
-        ensembleModeProperty->setEnabled(true);
-        ensembleSingleMemberProperty->setEnabled(true);
-        ensembleThresholdProperty->setEnabled(false);
-    }
-    else
-    {
-        ensembleModeProperty->setEnabled(false);
-        ensembleSingleMemberProperty->setEnabled(false);
-        ensembleThresholdProperty->setEnabled(false);
-        ensembleFilterOperation = "";
-    }
 }
 
 
 void MNWPActorVariable::updateEnsembleProperties()
 {
-    if ( numEnsembleMembers <= 1 ) return;
-
     MQtProperties *properties = actor->getQtProperties();
     int mode = properties->mEnum()->value(ensembleModeProperty);
 

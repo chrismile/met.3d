@@ -186,7 +186,7 @@ bool MVerticalRegridProperties::onQtPropertyChanged(
             regridMode = "ML/CONST_STANDARD_PSFC";
             break;
         case 4: // PL grid
-            regridMode = "PL/10/50/100/200/250/300/400/500/700/850/925/1000";
+            regridMode = "PL/HPA/10/50/100/200/250/300/400/500/700/850/925/1000";
             break;
         case 5: // PL grid, const sfc pressure
             regridMode = "PL/CONST_STANDARD_PSFC";
@@ -215,11 +215,13 @@ void MVerticalRegridProperties::addToRequest(MDataRequestHelper *rh)
     if (regridMode != "")
     {
         if (regridMode == "ML/MEAN")
-            rh->insert("REGRID", QString("ML/MEAN/0/%1").arg(
-                          actorVariable->numEnsembleMembers-1));
+            rh->insert("REGRID", QString("ML/MEAN/%1").arg(
+                           MDataRequestHelper::uintSetToString(
+                               actorVariable->selectedEnsembleMembers)));
         else if (regridMode == "ML/MIN")
-            rh->insert("REGRID", QString("ML/MIN/0/%1").arg(
-                          actorVariable->numEnsembleMembers-1));
+            rh->insert("REGRID", QString("ML/MIN/%1").arg(
+                           MDataRequestHelper::uintSetToString(
+                               actorVariable->selectedEnsembleMembers)));
         else
             rh->insert("REGRID", regridMode);
     }

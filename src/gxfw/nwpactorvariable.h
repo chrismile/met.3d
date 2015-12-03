@@ -309,7 +309,6 @@ protected:
     QtProperty *ensembleMultiMemberProperty;
     QtProperty *ensembleThresholdProperty;
     QString     ensembleFilterOperation;
-    int         numEnsembleMembers;
     QSet<unsigned int> selectedEnsembleMembers;
     QList<unsigned int> selectedEnsembleMembersAsSortedList;
     int         ensembleMemberLoadedFromConfiguration;
