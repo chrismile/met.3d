@@ -772,22 +772,37 @@ bool MNWPActorVariable::onQtPropertyChanged(QtProperty *property)
 
         if ( dlg.exec() == QDialog::Accepted )
         {
-            // Get set of selected members from dialog and update
-            // ensembleMultiMemberProperty to display set to user.
-            selectedEnsembleMembers = dlg.getSelectedMembers();
+            // Get set of selected members from dialog, update
+            // ensembleMultiMemberProperty to display set to user and, if
+            // necessary, request new data field.
+            QSet<unsigned int> selMembers = dlg.getSelectedMembers();
+            if ( !selMembers.isEmpty() )
+            {
+                selectedEnsembleMembers = selMembers;
 
-            // Update the current data field if either the currently selected
-            // member has changed (because the previously selected one is not
-            // available anymore) or the ensemble more is set to mean, std.dev,
-            // etc (in this case the computed field needs to be recomputed
-            // based on the new member set).
+                // Update the current data field if either the currently
+                // selected member has changed (because the previously selected
+                // one is not available anymore) or the ensemble more is set to
+                // mean, std.dev, etc (in this case the computed field needs to
+                // be recomputed based on the new member set).
 
-            // Selected member has changed?
-            bool updateDataField = updateEnsembleSingleMemberProperty();
-            // ..or ens mode is != member.
-            updateDataField |= !ensembleFilterOperation.isEmpty();
+                // Selected member has changed?
+                bool updateDataField = updateEnsembleSingleMemberProperty();
+                // ..or ens mode is != member.
+                updateDataField |= !ensembleFilterOperation.isEmpty();
 
-            if (updateDataField) asynchronousDataRequest();
+                if (updateDataField) asynchronousDataRequest();
+                return false;
+            }
+            else
+            {
+                // The user has selected an emtpy set of members. Display a
+                // warning and do NOT accept the empty set.
+                QMessageBox msgBox;
+                msgBox.setIcon(QMessageBox::Warning);
+                msgBox.setText("You need to select at least one member.");
+                msgBox.exec();
+            }
         }
     }
 
