@@ -229,16 +229,16 @@ double gcQuadrilateralArea(const double lon1, const double lat1,
 }
 
 
-double pressure2metre(double p_Pa)
+double pressure2metre_standardICAO(double p_Pa)
 {
     // g and R are used by all equations below.
-    double g = 9.80665;
-    double R = 287.058;
+    double g = MetConstants::GRAVITY_ACCELERATION;
+    double R = MetConstants::GAS_CONSTANT_DRY_AIR;
 
     double z = 0.;
     if (p_Pa < 1011.)
     {
-        // Pressure to flight level conversion not implemented for z > 32km
+        // Pressure to metre conversion not implemented for z > 32km
         // (p ~ 10.11 hPa).
         return M_MISSING_VALUE;
     }
@@ -282,6 +282,61 @@ double pressure2metre(double p_Pa)
     }
 
     return z;
+}
+
+
+double metre2pressure_standardICAO(double z_m)
+{
+    // g and R are used by all equations below.
+    double g = MetConstants::GRAVITY_ACCELERATION;
+    double R = MetConstants::GAS_CONSTANT_DRY_AIR;
+
+    if (z_m <= 11000.)
+    {
+        // ICAO standard atmosphere between 0 and 11 km: T(z=0km) = 15 degC,
+        // p(z=0km) = 1013.25 hPa. Temperature gradient is 6.5 K/km.
+        double z0 = 0.;
+        double T0 = 288.15;
+        double gamma = 6.5e-3;
+        double p0 = 101325.;
+
+        // Hydrostatic equation with linear temperature gradient.
+        double p = p0 * pow((T0-gamma*z_m) / (T0-gamma*z0), g/(gamma*R));
+        return p;
+    }
+
+    else if (z_m <= 20000.)
+    {
+        // ICAO standard atmosphere between 11 and 20 km: T(z=11km) = -56.5
+        // degC, p(z=11km) = 226.32 hPa. Temperature is constant at -56.5 degC.
+        double z0 = 11000.;
+        double p0 = 22632.;
+        double T = 216.65;
+
+        // Hydrostatic equation with constant temperature profile.
+        double p = p0 * exp(-g * (z_m-z0) / (R*T));
+        return p;
+    }
+
+    else if (z_m <= 32000.)
+    {
+        // ICAO standard atmosphere between 20 and 32 km: T(z=20km) = -56.5
+        // degC, p(z=20km) = 54.75 hPa. Temperature gradient is -1.0 K/km.
+        double z0 = 20000.;
+        double T0 = 216.65;
+        double gamma = -1.0e-3;
+        double p0 = 5475.006582501095;
+
+        // Hydrostatic equation with linear temperature gradient.
+        double p = p0 * pow((T0-gamma*z_m) / (T0-gamma*z0), g/(gamma*R));
+        return p;
+    }
+
+    else
+    {
+        // Metre to pressure conversion not implemented for z > 32km.
+        return M_MISSING_VALUE;
+    }
 }
 
 
@@ -339,7 +394,7 @@ double metre2flightlevel(double z_m)
 double columnAirmass(double pbot_Pa, double ptop_Pa, double area_m2)
 {
     // Gravity acceleration (m/s2).
-    double g = 9.80665;
+    double g = MetConstants::GRAVITY_ACCELERATION;
 
     // m*g = dp*A --> m = dp/g * A
     double mass_kg = abs(pbot_Pa - ptop_Pa) / g * area_m2;
@@ -350,7 +405,7 @@ double columnAirmass(double pbot_Pa, double ptop_Pa, double area_m2)
 double boxVolume_dry(double p_Pa, double mass_kg, double temp_K)
 {
     // Gas constant for dry air.
-    double R_dry = 287.058;
+    double R_dry = MetConstants::GAS_CONSTANT_DRY_AIR;
 
     // Ideal gas law, pV = mRT.
     double vol = mass_kg * R_dry * temp_K / p_Pa;
@@ -367,13 +422,13 @@ double boxVolume_dry(double northWestLon, double northWestLat,
                                           southEastLon, southEastLat,
                                           northWestLon, northWestLat,
                                           southEastLon, northWestLat,
-                                          M_EARTH_RADIUS_km);
+                                          MetConstants::EARTH_RADIUS_km);
 
     double area_m2 = area_km2 * 1.E6;
     double mass_kg = columnAirmass(pbot_Pa, ptop_Pa, area_m2);
 
     if (temp_K == M_MISSING_VALUE)
-        temp_K  = isaTemperature(pressure2metre(pmid_Pa));
+        temp_K  = isaTemperature(pressure2metre_standardICAO(pmid_Pa));
 
     return boxVolume_dry(pmid_Pa, mass_kg, temp_K);
 }

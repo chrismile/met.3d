@@ -41,7 +41,21 @@ namespace Met3D
 ***                               CONSTANTS                                 ***
 *******************************************************************************/
 
-const double M_EARTH_RADIUS_km = 6371.; // km
+// Definition of atmospheric science constants. Reference: e.g. Wallace and
+// Hobbs (2006), pp. 467ff.
+namespace MetConstants
+{
+// Universal constants
+
+// Air
+const double GAS_CONSTANT_DRY_AIR = 287.058; // J K^-1 kg^-1
+
+// Water substance
+
+// Earth and sun
+const double GRAVITY_ACCELERATION = 9.80665; // m s^-2
+const double EARTH_RADIUS_km = 6371.; // km
+}
 
 
 /******************************************************************************
@@ -153,9 +167,23 @@ double gcQuadrilateralArea(const double lon1, const double lat1,
 
     @param p_Pa pressure (Pa)
     @return geometric elevation in m
-    """
  */
-double pressure2metre(double p_Pa);
+double pressure2metre_standardICAO(double p_Pa);
+
+
+/**
+    Conversion of geometric height (given in m) to pressure (Pa) with
+    hydrostatic equation, according to the profile of the ICAO standard
+    atmosphere.
+
+    Reference:
+        For example, H. Kraus, Die Atmosphaere der Erde, Springer, 2001,
+        470pp., Sections II.1.4. and II.6.1.2.
+
+    @param z_m elevation in m
+    @return pressure in Pa
+ */
+double metre2pressure_standardICAO(double z_m);
 
 
 /**
