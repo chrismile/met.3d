@@ -41,7 +41,7 @@
 #include "gxfw/mglresourcesmanager.h"
 #include "data/waypoints/waypointstablemodel.h"
 
-#include "data/ecmwfcfreader.h"
+#include "data/climateforecastreader.h"
 #include "data/gribreader.h"
 #include "data/verticalregridder.h"
 #include "data/structuredgridensemblefilter.h"
@@ -301,16 +301,16 @@ void MPipelineConfiguration::initializeNWPDeterministicPipeline(
                 new MClimateForecastReader(dataSourceId);
         cfReaderDET->setMemoryManager(memoryManager);
         cfReaderDET->setScheduler(scheduler);
-        cfReaderDET->setDataRoot(fileDir);
+        cfReaderDET->setDataRoot(fileDir, "*");
         nwpReaderDET = cfReaderDET;
     }
     else if (dataFormat == ECMWF_CF_NETCDF)
     {
-        MECMWFClimateForecastReader *ecmwfReaderDET =
-                new MECMWFClimateForecastReader(dataSourceId);
+        MClimateForecastReader *ecmwfReaderDET =
+                new MClimateForecastReader(dataSourceId);
         ecmwfReaderDET->setMemoryManager(memoryManager);
         ecmwfReaderDET->setScheduler(scheduler);
-        ecmwfReaderDET->setDataRoot(fileDir, domain);
+        ecmwfReaderDET->setDataRoot(fileDir, QString("*%1*").arg(domain));
         nwpReaderDET = ecmwfReaderDET;
     }
     else if (dataFormat == ECMWF_GRIB)
@@ -319,7 +319,7 @@ void MPipelineConfiguration::initializeNWPDeterministicPipeline(
                 new MGribReader(dataSourceId);
         gribReaderDET->setMemoryManager(memoryManager);
         gribReaderDET->setScheduler(scheduler);
-        gribReaderDET->setDataRoot(fileDir);
+        gribReaderDET->setDataRoot(fileDir, "*");
         nwpReaderDET = gribReaderDET;
     }
 
@@ -367,16 +367,16 @@ void MPipelineConfiguration::initializeNWPEnsemblePipeline(
                 new MClimateForecastReader(dataSourceId);
         cfReaderENS->setMemoryManager(memoryManager);
         cfReaderENS->setScheduler(scheduler);
-        cfReaderENS->setDataRoot(fileDir);
+        cfReaderENS->setDataRoot(fileDir, "*");
         nwpReaderENS = cfReaderENS;
     }
     else if (dataFormat == ECMWF_CF_NETCDF)
     {
-        MECMWFEnsembleClimateForecastReader *ecmwfReaderENS =
-                new MECMWFEnsembleClimateForecastReader(dataSourceId);
+        MClimateForecastReader *ecmwfReaderENS =
+                new MClimateForecastReader(dataSourceId);
         ecmwfReaderENS->setMemoryManager(memoryManager);
         ecmwfReaderENS->setScheduler(scheduler);
-        ecmwfReaderENS->setDataRoot(fileDir, domain);
+        ecmwfReaderENS->setDataRoot(fileDir, QString("*%1*").arg(domain));
         nwpReaderENS = ecmwfReaderENS;
     }
     else if (dataFormat == ECMWF_GRIB)
@@ -385,7 +385,7 @@ void MPipelineConfiguration::initializeNWPEnsemblePipeline(
                 new MGribReader(dataSourceId);
         gribReaderENS->setMemoryManager(memoryManager);
         gribReaderENS->setScheduler(scheduler);
-        gribReaderENS->setDataRoot(fileDir);
+        gribReaderENS->setDataRoot(fileDir, "*");
         nwpReaderENS = gribReaderENS;
     }
     sysMC->registerDataSource(dataSourceId, nwpReaderENS);
@@ -454,7 +454,7 @@ void MPipelineConfiguration::initializeLagrantoEnsemblePipeline(
             new MTrajectoryReader(dataSourceId);
     trajectoryReader->setMemoryManager(memoryManager);
     trajectoryReader->setScheduler(scheduler);
-    trajectoryReader->setDataRoot(fileDir);
+    trajectoryReader->setDataRoot(fileDir, "*");
     sysMC->registerDataSource(dataSourceId + QString(" Reader"),
                               trajectoryReader);
 

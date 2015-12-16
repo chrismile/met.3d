@@ -77,7 +77,6 @@ HEADERS += \
     src/data/trajectoryselectionsource.h \
     src/gxfw/gl/abstractgpudataitem.h \
     src/data/probdftrajectoriessource.h \
-    src/data/ecmwfcfreader.h \
     src/data/climateforecastreader.h \
     src/data/weatherpredictionreader.h \
     src/gxfw/nwpmultivaractor.h \
@@ -162,7 +161,6 @@ SOURCES += \
     src/data/trajectoryselectionsource.cpp \
     src/gxfw/gl/abstractgpudataitem.cpp \
     src/data/probdftrajectoriessource.cpp \
-    src/data/ecmwfcfreader.cpp \
     src/data/climateforecastreader.cpp \
     src/data/weatherpredictionreader.cpp \
     src/gxfw/nwpmultivaractor.cpp \

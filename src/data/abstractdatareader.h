@@ -57,7 +57,7 @@ public:
       data loader's dataset are located. @p path is scanned and the available
       variables can afterwards be accessed through ..
       */
-    void setDataRoot(QString path);
+    void setDataRoot(QString path, QString fFilter);
 
 protected:
     /**
@@ -69,6 +69,7 @@ protected:
 
     QString identifier;
     QDir dataRoot;
+    QString fileFilter;
 
     /** Global NetCDF access mutex, as the NetCDF (C++) library is not
         thread-safe (notes Feb2015). This mutex must be used to protect
