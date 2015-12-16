@@ -52,7 +52,7 @@ struct MVariableDataSharedPerFile
 
     QVector<double> levels, lats, lons, ak, bk;
     QList<QDateTime> timeCoordValues;
-    QList<unsigned int> availableMembers;
+    QSet<unsigned int> availableMembers;
 
     bool scaleAndOffsetProvided;
     double scale_factor, add_offset;
@@ -102,8 +102,8 @@ public:
 
     QStringList availableVariables(MVerticalLevelType levelType);
 
-    QList<unsigned int> availableEnsembleMembers(MVerticalLevelType levelType,
-                                                 const QString&     variableName);
+    QSet<unsigned int> availableEnsembleMembers(MVerticalLevelType levelType,
+                                                const QString&     variableName);
 
     QList<QDateTime> availableInitTimes(MVerticalLevelType levelType,
                                         const QString&     variableName);
@@ -152,21 +152,6 @@ protected:
                           const QDateTime&   initTime,
                           const QDateTime&   validTime);
 
-    // Set this variable to true in derived classes to use information parsed
-    // from forecast filenames via parseForecastFileName().
-    bool useFilenameAndDomainInfo;
-    // Set this string in derived classes to only use forecast files whose
-    // domain as obtained by parseForecastFileName() matches this string.
-    QString domain;
-    // Set this string in derived classes to only use filenames that correspond
-    // to the filter.
-    QString fileFilter;
-
-    virtual bool parseForecastFileName(QString   filename,
-                                       QDateTime *initTime,
-                                       QString   *domain,
-                                       QString   *levelType);
-
     // Maps NetCDF variable names to standard names.
     QMap<QString, QString> variableToStandardNameMap;
 
@@ -176,7 +161,6 @@ protected:
       an attribute in the NetCDF file.
      */
     bool parseCfStandardNameFile(const QString& filename);
-
 };
 
 

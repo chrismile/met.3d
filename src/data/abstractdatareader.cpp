@@ -57,9 +57,10 @@ MAbstractDataReader::~MAbstractDataReader()
 ***                            PUBLIC METHODS                               ***
 *******************************************************************************/
 
-void MAbstractDataReader::setDataRoot(QString path)
+void MAbstractDataReader::setDataRoot(QString path, QString fFilter)
 {
     dataRoot = QDir(path);
+    fileFilter = fFilter;
     scanDataRoot();
 }
 

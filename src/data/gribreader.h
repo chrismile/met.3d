@@ -42,8 +42,10 @@ namespace Met3D
 
 enum MECMWFForecastType
 {
-    DETERMINISTIC_FORECAST = 0,
-    ENSEMBLE_FORECAST      = 1
+    INVALID_TYPE           = 0,
+    ANALYSIS               = 1,
+    DETERMINISTIC_FORECAST = 2,
+    ENSEMBLE_FORECAST      = 3
 };
 
 
@@ -74,6 +76,7 @@ struct MGribVariableInfo
     QString longname;            // CF-conventions
     QString standardname;        // CF-conventions
     QString units;               // CF-conventions
+    MECMWFForecastType fcType;   // forecast type of this variable
     QString surfacePressureName; // for variables on hybrid model levels
                                  // the name of the var containing the
                                  // corresponding sfc pressure field
@@ -111,6 +114,7 @@ struct MGribMessageIndexInfo
     QString longname;            // CF-conventions
     QString standardname;        // CF-conventions
     QString units;               // CF-conventions
+    MECMWFForecastType fcType;   // forecast type of this variable
     QString surfacePressureName; // for variables on hybrid model levels
                                  // the name of the var containing the
                                  // corresponding sfc pressure field
@@ -134,7 +138,7 @@ struct MGribMessageIndexInfo
 
 /**
   @brief Reader for ECMWF Grib files that are retrieved from the ECMWF MARS
-  system for input into the DLR Mission Support System.
+  system (e.g. from Metview or for input into the DLR Mission Support System).
 
   The grib files currently (still) need to follow a specific formatting.
 
@@ -143,15 +147,15 @@ struct MGribMessageIndexInfo
 class MGribReader : public MWeatherPredictionReader
 {
 public:
-    MGribReader(QString identifier, MECMWFForecastType acceptedForecastType);
+    MGribReader(QString identifier);
     ~MGribReader();
 
     QList<MVerticalLevelType> availableLevelTypes();
 
     QStringList availableVariables(MVerticalLevelType levelType);
 
-    QList<unsigned int> availableEnsembleMembers(MVerticalLevelType levelType,
-                                                 const QString&     variableName);
+    QSet<unsigned int> availableEnsembleMembers(MVerticalLevelType levelType,
+                                                const QString&     variableName);
 
     QList<QDateTime> availableInitTimes(MVerticalLevelType levelType,
                                         const QString&     variableName);
@@ -201,7 +205,8 @@ protected:
 
     bool checkIndexForVariable(MGribVariableInfo* vinfo);
 
-    MECMWFForecastType acceptedForecastType;
+    QString forecastTypeToString(MECMWFForecastType type);
+
     MGribLevelTypeMap availableDataFields;
     MGribLevelTypeMap availableDataFieldsByStdName;
     QReadWriteLock availableItemsLock;

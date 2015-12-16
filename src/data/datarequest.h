@@ -87,6 +87,10 @@ public:
 
     void insert(const QString &key, const QVector3D &value);
 
+    static QString uintSetToString(const QSet<unsigned int> &value);
+
+    void insert(const QString &key, const QSet<unsigned int> &value);
+
     QStringList keys() const;
 
     const QMap<QString, QString>& map() const;
@@ -104,6 +108,10 @@ public:
     QString value(const QString &key) const;
 
     QVector3D vec3Value(const QString &key) const;
+
+    static QSet<unsigned int> uintSetFromString(const QString &s);
+
+    QSet<unsigned int> uintSetValue(const QString &key) const;
 
 private:
     /** Map that stores all key/value pairs of the request. QMap is used as

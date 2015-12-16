@@ -164,6 +164,40 @@ void MDataRequestHelper::insert(const QString &key, const QVector3D &value)
 }
 
 
+QString MDataRequestHelper::uintSetToString(const QSet<unsigned int> &value)
+{
+    QString s;
+
+    if (value.count() > 0)
+    {
+        // QSet items are unsorted. In the request, they need to be sorted to
+        // ensure that there are no requests that reference the same members
+        // but in a different order (the memory manager can't distinguish).
+        QList<unsigned int> list = value.toList();
+        qSort(list);
+
+//TODO (mr, 26Nov2015) -- convert the list of members to a more compact form,
+//                        e.g. 0/5:10/20:22/25 for 0/5/6/7/8/9/10/20/21/22/25.
+
+        foreach (unsigned int i, list) s += QString("%1/").arg(i);
+        s = s.left(s.length() - 1); // remove last "/"
+    }
+
+    return s;
+}
+
+
+void MDataRequestHelper::insert(const QString &key, const QSet<unsigned int> &value)
+{
+    modified = true;
+
+    if (value.count() > 0)
+    {
+        requestMap.insert(key, uintSetToString(value));
+    }
+}
+
+
 QStringList MDataRequestHelper::keys() const
 {
     return requestMap.keys();
@@ -230,6 +264,29 @@ QVector3D MDataRequestHelper::vec3Value(const QString &key) const
     QStringList sl = s.split("/");
     if (sl.size() < 3) return QVector3D();
     return QVector3D(sl[0].toFloat(), sl[1].toFloat(), sl[2].toFloat());
+}
+
+
+QSet<unsigned int> MDataRequestHelper::uintSetFromString(const QString &s)
+{
+    QSet<unsigned int> set;
+    QStringList sl = s.split("/");
+
+    foreach (QString slItem, sl)
+    {
+        bool ok = false;
+        unsigned int i = slItem.toUInt(&ok);
+        if (ok) set.insert(i);
+    }
+
+    return set;
+}
+
+
+QSet<unsigned int> MDataRequestHelper::uintSetValue(const QString &key) const
+{
+    QString s = value(key);
+    return uintSetFromString(s);
 }
 
 

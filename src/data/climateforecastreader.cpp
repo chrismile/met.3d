@@ -56,17 +56,13 @@ namespace Met3D
 *******************************************************************************/
 
 MClimateForecastReader::MClimateForecastReader(QString identifier)
-    : MWeatherPredictionReader(identifier),
-      useFilenameAndDomainInfo(false)
+    : MWeatherPredictionReader(identifier)
 {
     // Read mapping "variable name to CF standard name", specific to ECMWF
     // forecasts converted to NetCDF with netcdf-java.
     MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
     parseCfStandardNameFile(sysMC->getMet3DHomeDir().absoluteFilePath(
                                 "config/cf_stdnames.dat"));
-
-    domain = "";
-    fileFilter = "*";
 }
 
 
@@ -103,7 +99,7 @@ QStringList MClimateForecastReader::availableVariables(
 }
 
 
-QList<unsigned int> MClimateForecastReader::availableEnsembleMembers(
+QSet<unsigned int> MClimateForecastReader::availableEnsembleMembers(
         MVerticalLevelType levelType,
         const QString&     variableName)
 {
@@ -116,11 +112,11 @@ QList<unsigned int> MClimateForecastReader::availableEnsembleMembers(
 
     if (availableDataFields[levelType].keys().contains(variableName))
     {
-        return availableDataFields[levelType][variableName]->availableMembers.toList();
+        return availableDataFields[levelType][variableName]->availableMembers;
     }
     else if (availableDataFieldsByStdName[levelType].keys().contains(variableName))
     {
-        return availableDataFieldsByStdName[levelType][variableName]->availableMembers.toList();
+        return availableDataFieldsByStdName[levelType][variableName]->availableMembers;
     }
     else
     {
@@ -318,203 +314,162 @@ void MClimateForecastReader::scanDataRoot()
                     << dataRoot.absolutePath().toStdString() << " "
                     << "for files with NetCDF-CF forecast data.");
     LOG4CPLUS_DEBUG(mlog, "Using file filter: " << fileFilter.toStdString());
-
-    if ( !domain.isEmpty() )
-    {
-        LOG4CPLUS_DEBUG(mlog, "Available files with forecast data for domain "
-                        << domain.toStdString() << ":");
-    }
-    else
-    {
-        LOG4CPLUS_DEBUG(mlog, "Available files with forecast data:");
-    }
+    LOG4CPLUS_DEBUG(mlog, "Available files with forecast data:");
 
     // Get a list of all files in the directory that match the wildcard name
-    // filter "*_ecmwf_forecast.*.<domain>.*.nc".
+    // filter given in "fileFilter".
     QStringList availableFiles = dataRoot.entryList(
                 QStringList(fileFilter), QDir::Files);
 
-    // For each file, apply the regular expression filter
-    // (parseForecastFileName) to extract initialisation time and level type
-    // from the filename, then open the file and extract information about the
-    // contained variables and forecast valid times.
-    for (int i = 0; i < availableFiles.size(); i++)
+    // For each file, open the file and extract information about the contained
+    // variables and forecast valid times.
+    foreach (QString fileName, availableFiles)
     {
         LOG4CPLUS_DEBUG(mlog, "\tParsing file "
-                        << availableFiles[i].toStdString() << " .." << flush);
+                        << fileName.toStdString() << " .." << flush);
 
-        QDateTime initTime;
-        QString filedomain;
-        QString fileLevelType;
+        // NetCDF library is not thread-safe (at least the regular C/C++
+        // interface is not; hence all NetCDF calls need to be serialized
+        // globally in Met.3D! (notes Feb2015).
+        QMutexLocker ncAccessMutexLocker(&staticNetCDFAccessMutex);
 
-        if ( parseForecastFileName(availableFiles[i], &initTime, &filedomain,
-                                   &fileLevelType) )
+        // Open the file.
+        NcFile *ncFile;
+        try
         {
-            // Check if the domain of the file matches the requested domain, if
-            // not skip this file.
-            if (useFilenameAndDomainInfo)
+            ncFile = new NcFile(dataRoot.filePath(fileName).toStdString(),
+                                NcFile::read);
+        }
+        catch (NcException& e)
+        {
+            LOG4CPLUS_ERROR(mlog, "ERROR: cannot open the file \""
+                            << fileName.toStdString()
+                            << "\".." << flush);
+            continue;
+        }
+
+        // Loop over all variables: Obtain available time values for each
+        // variable and insert the fields into "availableDataFields".
+        multimap<string, NcVar> ncVariables = ncFile->getVars();
+        for (multimap<string, NcVar>::iterator var=ncVariables.begin();
+             var != ncVariables.end(); var++)
+        {
+            QString varName = QString::fromStdString(var->first);
+
+            if ( NcCFVar::isCFDataVariable(
+                     ncFile->getVar(varName.toStdString()), NcCFVar::LAT_LON) )
             {
-                if (filedomain != domain)
+                // Get the NcVar object belonging to the variable and wrap
+                // it in a NcCFVar object.
+                NcCFVar currCFVar(ncFile->getVar(varName.toStdString()));
+
+                // Read the variable's long_name, standard_name and units
+                // attributes, if present. If they are not present, leave the
+                // corresponding variables empty.
+                string longname = "";
+                string standardname = "";
+                string units = "";
+                try { currCFVar.getAtt("long_name").getValues(longname); }
+                catch (NcException) {}
+                try { currCFVar.getAtt("standard_name").getValues(standardname); }
+                catch (NcException) {}
+                try { currCFVar.getAtt("units").getValues(units); }
+                catch (NcException) {}
+
+                // If no standard name is provided in the file, check if we
+                // can reconstruct the standard name from the
+                // "variableToStandardNameMap" table.
+                if (standardname == "")
                 {
-                    LOG4CPLUS_WARN(mlog, "\tWARNING: File domain differs from "
-                                   "requested domain, skipping.");
-                    continue;
-                }
-            }
-
-            // NetCDF library is not thread-safe (at least the regular C/C++
-            // interface is not; hence all NetCDF calls need to be serialized
-            // globally in Met.3D! (notes Feb2015).
-            QMutexLocker ncAccessMutexLocker(&staticNetCDFAccessMutex);
-
-            // Open the file.
-            NcFile *ncFile;
-            try
-            {
-                ncFile = new NcFile(dataRoot.filePath(
-                                        availableFiles[i]).toStdString(),
-                                    NcFile::read);
-            }
-            catch (NcException& e)
-            {
-                LOG4CPLUS_ERROR(mlog, "ERROR: cannot open the file \""
-                                << availableFiles[i].toStdString()
-                                << "\".." << flush);
-                continue;
-            }
-
-            // Loop over all variables: Obtain available time values for each
-            // variable and insert the fields into "availableDataFields".
-            multimap<string, NcVar> ncVariables = ncFile->getVars();
-            for (multimap<string, NcVar>::iterator var=ncVariables.begin();
-                 var != ncVariables.end(); var++)
-            {
-                QString varName = QString::fromStdString(var->first);
-
-                if (NcCFVar::isCFDataVariable(
-                            ncFile->getVar(varName.toStdString()),
-                            NcCFVar::LAT_LON))
-                {
-                    // Get the NcVar object belonging to the variable and wrap
-                    // it in a NcCFVar object.
-                    NcCFVar currCFVar(ncFile->getVar(varName.toStdString()));
-
-                    // Read the variable's long_name, standard_name and units
-                    // attributes, if present. If they are not present, leave the
-                    // corresponding variables empty.
-                    string longname = "";
-                    string standardname = "";
-                    string units = "";
-                    try { currCFVar.getAtt("long_name").getValues(longname); }
-                    catch (NcException) {}
-                    try { currCFVar.getAtt("standard_name").getValues(standardname); }
-                    catch (NcException) {}
-                    try { currCFVar.getAtt("units").getValues(units); }
-                    catch (NcException) {}
-
-                    // If no standard name is provided in the file, check if we
-                    // can reconstruct the standard name from the
-                    // "variableToStandardNameMap" table.
-                    if (standardname == "")
+                    if (variableToStandardNameMap.contains(varName))
                     {
-                        if (variableToStandardNameMap.contains(varName))
-                        {
-                            standardname = variableToStandardNameMap[
-                                    varName].toStdString();
-                        }
-                        else
-                        {
-                            LOG4CPLUS_WARN(mlog,
-                                           "WARNING: no standard name and no mapping "
-                                           "from variable name to standard name "
-                                           "defined for <"
-                                           << varName.toStdString() << ">.");
-                        }
-                    }
-
-                    // Get time values of this variable.
-                    QList<QDateTime> currTimeCoordValues =
-                            currCFVar.getTimeValues();
-
-                    if (!useFilenameAndDomainInfo)
-                    {
-                        // If the init time from the file name is not used,
-                        // try to get the init time from the CF variable.
-                        initTime = currCFVar.getBaseTime();
-                    }
-
-                    // Determin the type of the vertical level of the variable.
-                    MVerticalLevelType levelType;
-                    switch (currCFVar.getGridType())
-                    {
-                    case NcCFVar::LAT_LON:
-                        levelType = SURFACE_2D;
-                        break;
-                    case NcCFVar::LAT_LON_P:
-                        levelType = PRESSURE_LEVELS_3D;
-                        break;
-                    case NcCFVar::LAT_LON_HYBRID:
-                        levelType = HYBRID_SIGMA_PRESSURE_3D;
-                        break;
-                    case NcCFVar::LAT_LON_PVU:
-                        levelType = POTENTIAL_VORTICITY_2D;
-                        break;
-                    default:
-                        // If neither of the above choices could be matched,
-                        // discard this variable and continue.
-                        continue;
-                        break;
-                    }
-
-                    // Create a new MVariableInfo struct and store availabe
-                    // variable information in this field.
-                    MVariableInfo* vinfo;
-                    if (availableDataFields[levelType].contains(varName))
-                    {
-                        vinfo = availableDataFields[levelType].value(varName);
+                        standardname = variableToStandardNameMap[
+                                varName].toStdString();
                     }
                     else
                     {
-                        vinfo = new MVariableInfo;
-                        vinfo->longname        = QString::fromStdString(longname);
-                        vinfo->standardname    = QString::fromStdString(standardname);
-                        vinfo->units           = QString::fromStdString(units);
-                        vinfo->variablename    = varName;
+                        LOG4CPLUS_WARN(mlog,
+                                       "WARNING: no standard name and no mapping "
+                                       "from variable name to standard name "
+                                       "defined for <"
+                                       << varName.toStdString() << ">.");
+                    }
+                }
 
-                        if (levelType == HYBRID_SIGMA_PRESSURE_3D)
-                        {
-                            NcVar vertVar, apVar, bVar;
-                            QString psName;
-                            vertVar = currCFVar.getVerticalCoordinateHybridSigmaPressure(
-                                        &apVar, &bVar, &psName);
-                            vinfo->surfacePressureName = psName;
-                        }
+                // Get time values of this variable.
+                QList<QDateTime> currTimeCoordValues = currCFVar.getTimeValues();
 
-                        try
-                        {
-                            // Check if the variable has an ensemble dimension.
-                            NcVar ensVar = currCFVar.getEnsembleVar();
-                            // If yes, get the number of available ensemble members.
-                            vinfo->numEnsembleMembers = ensVar.getDim(0).getSize();
-                            for (int m = 0; m < vinfo->numEnsembleMembers; m++)
-                                vinfo->availableMembers.insert(m);
+                // Determine init time from the CF variable.
+                QDateTime initTime = currCFVar.getBaseTime();
 
-                        }
-                        catch (NcException)
-                        {
-                            // No ensemble dimension could be found.
-                            vinfo->numEnsembleMembers = 0;
-                        }
+                // Determin the type of the vertical level of the variable.
+                MVerticalLevelType levelType;
+                switch (currCFVar.getGridType())
+                {
+                case NcCFVar::LAT_LON:
+                    levelType = SURFACE_2D;
+                    break;
+                case NcCFVar::LAT_LON_P:
+                    levelType = PRESSURE_LEVELS_3D;
+                    break;
+                case NcCFVar::LAT_LON_HYBRID:
+                    levelType = HYBRID_SIGMA_PRESSURE_3D;
+                    break;
+                case NcCFVar::LAT_LON_PVU:
+                    levelType = POTENTIAL_VORTICITY_2D;
+                    break;
+                default:
+                    // If neither of the above choices could be matched,
+                    // discard this variable and continue.
+                    continue;
+                    break;
+                }
 
+                // Create a new MVariableInfo struct and store availabe
+                // variable information in this field.
+                MVariableInfo* vinfo;
+                if (availableDataFields[levelType].contains(varName))
+                {
+                    vinfo = availableDataFields[levelType].value(varName);
+                }
+                else
+                {
+                    vinfo = new MVariableInfo;
+                    vinfo->longname        = QString::fromStdString(longname);
+                    vinfo->standardname    = QString::fromStdString(standardname);
+                    vinfo->units           = QString::fromStdString(units);
+                    vinfo->variablename    = varName;
+
+                    if (levelType == HYBRID_SIGMA_PRESSURE_3D)
+                    {
+                        NcVar vertVar, apVar, bVar;
+                        QString psName;
+                        vertVar = currCFVar.getVerticalCoordinateHybridSigmaPressure(
+                                    &apVar, &bVar, &psName);
+                        vinfo->surfacePressureName = psName;
                     }
 
-                    for (int j = 0; j < currTimeCoordValues.size(); j++)
-                    {
-                        QDateTime validTime = currTimeCoordValues.at(j); // in UTC!
 
-                        MDatafieldInfo info;
-                        info.filename = availableFiles[i];
-                        vinfo->timeMap[initTime][validTime] = info;
+                    // Check if the variable has an ensemble dimension.
+                    if (currCFVar.hasEnsembleDimension())
+                    {
+                        // If yes, get the available ensemble members.
+                        vinfo->availableMembers =
+                                currCFVar.getEnsembleMembers();
+                    }
+                    else
+                    {
+                        // No ensemble dimension could be found. List the
+                        // available data field as the "0" member.
+                        vinfo->availableMembers.insert(0);
+                    }
+                }
+
+                foreach (QDateTime validTime, currTimeCoordValues) // in UTC!
+                {
+                    MDatafieldInfo info;
+                    info.filename = fileName;
+                    vinfo->timeMap[initTime][validTime] = info;
 
 //                        cout << "\t"  << filedomain.toStdString()
 //                             << "  "  << varName.toStdString()
@@ -528,24 +483,23 @@ void MClimateForecastReader::scanDataRoot()
 //                                            : "")
 //                             << "\n";
 
-                    } // for (valid times)
+                } // for (valid times)
 
 
-                    // Insert the new MVariableInfo struct into the variable name
-                    // map..
-                    availableDataFields[levelType].insert(
-                                vinfo->variablename, vinfo);
-                    // ..and, if a CF standard name is available, into the std
-                    // name map.
-                    if (standardname != "")
-                        availableDataFieldsByStdName[levelType].insert(
-                                    vinfo->standardname, vinfo);
+                // Insert the new MVariableInfo struct into the variable name
+                // map..
+                availableDataFields[levelType].insert(
+                            vinfo->variablename, vinfo);
+                // ..and, if a CF standard name is available, into the std
+                // name map.
+                if (standardname != "")
+                    availableDataFieldsByStdName[levelType].insert(
+                                vinfo->standardname, vinfo);
 
-                } // if (is CF variable)
-            } // for (variables)
+            } // if (is CF variable)
+        } // for (variables)
 
-            delete ncFile;
-        }
+        delete ncFile;
     } // for (files)
 }
 
@@ -912,8 +866,8 @@ MStructuredGrid *MClimateForecastReader::readGrid(
 
     // Store metadata in grid object.
     grid->setMetaData(initTime, validTime, variableName, ensembleMember);
-    for (int i = 0; i < shared->availableMembers.size(); i++)
-        grid->setAvailableMember(shared->availableMembers[i]);
+    foreach (unsigned int m, shared->availableMembers)
+        grid->setAvailableMember(m);
 
     // Load the data field.
     switch (levelType)
@@ -1191,21 +1145,6 @@ QString MClimateForecastReader::dataFieldFile(
     }
 
     return dataRoot.filePath(filename);
-}
-
-
-bool MClimateForecastReader::parseForecastFileName(
-        QString filename,
-        QDateTime *initTime,
-        QString *domain,
-        QString *levelType)
-{
-    Q_UNUSED(filename);
-    Q_UNUSED(initTime);
-    Q_UNUSED(domain);
-    Q_UNUSED(levelType);
-
-    return true;
 }
 
 

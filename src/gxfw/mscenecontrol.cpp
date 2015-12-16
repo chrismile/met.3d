@@ -307,21 +307,27 @@ MQtProperties *MSceneControl::getQtProperties()
 }
 
 
+void MSceneControl::collapsePropertySubTree(QtProperty *property)
+{
+    foreach (QtBrowserItem *item, actorPropertiesBrowser->items(property))
+    {
+        // Collapse the item..
+        actorPropertiesBrowser->setExpanded(item, false);
+        // ..and collapse its child items.
+        QList<QtBrowserItem*> childrenItems = item->children();
+        while (!childrenItems.isEmpty())
+        {
+            QtBrowserItem* child = childrenItems.takeFirst();
+            actorPropertiesBrowser->setExpanded(child, false);
+            childrenItems.append(child->children());
+        }
+    }
+}
+
+
 void MSceneControl::collapseActorPropertyTree(MActor *actor)
 {
-    // Add the item's properties to the property browser.
-    QtBrowserItem *item = actorPropertiesBrowser
-            ->topLevelItem(actor->getPropertyGroup());
-    // Collapse the new item..
-    actorPropertiesBrowser->setExpanded(item, false);
-    // ..and collapse its children items.
-    QList<QtBrowserItem*> childrenItems = item->children();
-    while (!childrenItems.isEmpty())
-    {
-        QtBrowserItem* child = childrenItems.takeFirst();
-        actorPropertiesBrowser->setExpanded(child, false);
-        childrenItems.append(child->children());
-    }
+    collapsePropertySubTree(actor->getPropertyGroup());
 }
 
 

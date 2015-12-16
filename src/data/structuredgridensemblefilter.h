@@ -59,8 +59,8 @@ public:
 
     QStringList availableVariables(MVerticalLevelType levelType);
 
-    QList<unsigned int> availableEnsembleMembers(MVerticalLevelType levelType,
-                                                 const QString& variableName);
+    QSet<unsigned int> availableEnsembleMembers(MVerticalLevelType levelType,
+                                                const QString& variableName);
 
     QList<QDateTime> availableInitTimes(MVerticalLevelType levelType,
                                         const QString& variableName);
@@ -76,7 +76,8 @@ protected:
     MWeatherPredictionDataSource* inputSource;
 
     MStructuredGrid* createAndInitializeResultGrid(
-            MStructuredGrid *firstMemberGrid, QString memberRange=QString());
+            MStructuredGrid *firstMemberGrid,
+            const QSet<unsigned int> &selectedMembers=QSet<unsigned int>());
 
 };
 

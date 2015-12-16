@@ -115,7 +115,7 @@ QStringList MThermodynamicsDataSource::availableVariables(
 }
 
 
-QList<unsigned int> MThermodynamicsDataSource::availableEnsembleMembers(
+QSet<unsigned int> MThermodynamicsDataSource::availableEnsembleMembers(
         MVerticalLevelType levelType, const QString& variableName)
 {
     assert(inputSource != nullptr);

@@ -75,7 +75,9 @@ MStructuredGrid* MVerticalRegridder::produceData(MDataRequest request)
 
     // Parse request.
     QString regridMode = rh.value("REGRID");
-    QStringList params = regridMode.split("/");
+    QString levelType = regridMode.section("/", 0, 0);
+    QString gridDef = regridMode.section("/", 1, 1);
+    QString regridArgs = regridMode.section("/", 2);
     rh.removeAll(locallyRequiredKeys());
 
     MLonLatHybridSigmaPressureGrid *inputGrid =
@@ -86,7 +88,7 @@ MStructuredGrid* MVerticalRegridder::produceData(MDataRequest request)
 
     MStructuredGrid *regriddedField = nullptr;
 
-    if (params[0] == "ML")
+    if (levelType == "ML")
     {
         // Hybrid sigma pressure grid has been requested.
         // ==============================================
@@ -109,7 +111,7 @@ MStructuredGrid* MVerticalRegridder::produceData(MDataRequest request)
         }
 
         // ..and take care of the surface grid.
-        if (params[1] == "CONST_STANDARD_PSFC")
+        if (gridDef == "CONST_STANDARD_PSFC")
         {
             MDataRequestHelper rh_psfc;
             rh_psfc.insert("LEVELTYPE", SURFACE_2D);
@@ -148,15 +150,14 @@ MStructuredGrid* MVerticalRegridder::produceData(MDataRequest request)
                         memoryManager->getData(this, psfcRequest) );
         }
 
-        else if ((params[1] == "MEAN") || (params[1] == "MIN"))
+        else if ((gridDef == "MEAN") || (gridDef == "MIN"))
         {
             rh.insert("VARIABLE", rh.value("VARIABLE") + "/PSFC");
-            rh.insert("ENS_OPERATION", params[1]);
+            rh.insert("ENS_OPERATION", gridDef);
 
-            int memberFrom = params[2].toInt();
-            int memberTo   = params[3].toInt();
-            rh.insert("MEMBER_RANGE",
-                      QString("%1/%2").arg(memberFrom).arg(memberTo));
+            // ( see createTaskGraph() ).
+            QString selectedMembersString = regridArgs;
+            rh.insert("SELECTED_MEMBERS", selectedMembersString);
 
             result->surfacePressure =
                     dynamic_cast<MRegularLonLatGrid*>(
@@ -187,19 +188,28 @@ MStructuredGrid* MVerticalRegridder::produceData(MDataRequest request)
         regriddedField = result;
     } // hybrid sigma pressure grid requested
 
-    else if (params[0] == "PL")
+    else if (levelType == "PL")
     {
         // Pressure level grid has been requested.
         // =======================================
 
-        // Standard behaviour: Use list of pressure levels passed as
-        // arguments to PL in "params".
-        unsigned int numLevels = params.size() - 1;
+        unsigned int numLevels = 0;
+        QStringList pressureLevelStrings;
 
-        // Alternative: Use the hybrid levels of the input grid, but with
-        // a constant surface pressure (so that they can be interpreted as
-        // pressure levels).
-        if (params[1] == "CONST_STANDARD_PSFC") numLevels = inputGrid->nlevs;
+        if (gridDef == "HPA")
+        {
+            // List of pressure levels is explicitly specified as arguments
+            // in "params[2:]".
+            pressureLevelStrings = regridArgs.split("/");
+            numLevels = pressureLevelStrings.size();
+        }
+        else
+        {
+            // Alternative: Use the hybrid levels of the input grid, but with
+            // a constant surface pressure (so that they can be interpreted as
+            // pressure levels).
+            if (gridDef == "CONST_STANDARD_PSFC") numLevels = inputGrid->nlevs;
+        }
 
         // Initialise result grid.
         MRegularLonLatStructuredPressureGrid *result =
@@ -215,7 +225,7 @@ MStructuredGrid* MVerticalRegridder::produceData(MDataRequest request)
 
         // Vertical levels are either computed from the hybrid coefficients
         // of the input grid or taken from the input argument list.
-        if (params[1] == "CONST_STANDARD_PSFC")
+        if (gridDef == "CONST_STANDARD_PSFC")
         {
             for (unsigned int k = 0; k < numLevels; k++)
             {
@@ -226,7 +236,7 @@ MStructuredGrid* MVerticalRegridder::produceData(MDataRequest request)
         else
         {
             for (unsigned int k = 0; k < numLevels; k++)
-                result->levels[k] = params[k+1].toFloat();
+                result->levels[k] = pressureLevelStrings[k].toFloat();
         }
 
         // CPU-based regridding: Loop over all grid columns.
@@ -273,16 +283,19 @@ MTask* MVerticalRegridder::createTaskGraph(MDataRequest request)
 
     // Depending on the regridding mode, surface pressure fields may have to
     // be requested.
-    QStringList params = regridMode.split("/");
-    if ((params[0] == "ML") && ((params[1] == "MEAN") || (params[1] == "MIN")))
+    QString levelType = regridMode.section("/", 0, 0);
+    QString gridDef = regridMode.section("/", 1, 1);
+    if ((levelType == "ML") && ((gridDef == "MEAN") || (gridDef == "MIN")))
     {
         rh.insert("VARIABLE", rh.value("VARIABLE") + "/PSFC");
-        rh.insert("ENS_OPERATION", params[1]);
+        rh.insert("ENS_OPERATION", gridDef);
 
-        int memberFrom = params[2].toInt();
-        int memberTo   = params[3].toInt();
-        rh.insert("MEMBER_RANGE",
-                  QString("%1/%2").arg(memberFrom).arg(memberTo));
+        // If a model level data field defined by ensemble mean or min surface
+        // pressure is requested, the members to be used to compute mean or min
+        // are appended at the end of the "REGRID" parameter. Simply copy the
+        // remainder of this parameter string here to "SELECTED_MEMBERS".
+        QString selectedMembersString = regridMode.section("/", 2);
+        rh.insert("SELECTED_MEMBERS", selectedMembersString);
 
         task->addParent(inputSource->getTaskGraph(rh.request()));
     }
@@ -306,7 +319,7 @@ QStringList MVerticalRegridder::availableVariables(
 }
 
 
-QList<unsigned int> MVerticalRegridder::availableEnsembleMembers(
+QSet<unsigned int> MVerticalRegridder::availableEnsembleMembers(
         MVerticalLevelType levelType, const QString& variableName)
 {
     assert(inputSource != nullptr);

@@ -111,10 +111,10 @@ QList<QDateTime> MTrajectoryReader::validTimeOverlap(
 }
 
 
-QList<unsigned int> MTrajectoryReader::availableEnsembleMembers()
+QSet<unsigned int> MTrajectoryReader::availableEnsembleMembers()
 {
     QReadLocker availableItemsReadLocker(&availableItemsLock);
-    return availableMembers.toList();
+    return availableMembers;
 }
 
 

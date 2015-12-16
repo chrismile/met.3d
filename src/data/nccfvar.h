@@ -117,11 +117,22 @@ public:
     NcVar getVerticalCoordinatePotVort();
 
     /**
+      Returns TRUE if this CF variable has an ensemble dimension.
+     */
+    bool hasEnsembleDimension();
+
+    /**
       If the CF variable represented by this object has an ensemble dimension,
       getEnsembleVar() returns the corresponding coordinate variable. If no
       ensemble dimension exists, an @ref NcException is thrown.
       */
     NcVar getEnsembleVar();
+
+    /**
+      Returns a set of available ensemble members, if an ensemble dimension
+      is available for this variable.
+     */
+    QSet<unsigned int> getEnsembleMembers();
 
     /**
       Returns TRUE if this CF variable has a time dimension.

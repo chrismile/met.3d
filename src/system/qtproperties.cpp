@@ -226,6 +226,7 @@ bool MQtProperties::setEnumItem(QtProperty *prop, QString entry)
 QString MQtProperties::getEnumItem(QtProperty *prop)
 {
     int index = mEnum()->value(prop);
+    if (index < 0) return QString();
     return mEnum()->enumNames(prop)[index];
 }
 

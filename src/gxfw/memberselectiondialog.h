@@ -5,6 +5,7 @@
 **  prediction data.
 **
 **  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015 Christoph Heidelmann
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -23,61 +24,53 @@
 **  along with Met.3D.  If not, see <http://www.gnu.org/licenses/>.
 **
 *******************************************************************************/
-#ifndef ABSTRACTDATAREADER_H
-#define ABSTRACTDATAREADER_H
+#ifndef MEMBERSELECTIONDIALOG_H
+#define MEMBERSELECTIONDIALOG_H
 
 // standard library imports
 
 // related third party imports
-#include <QtCore>
+#include <QDialog>
 
 // local application imports
 
 
+namespace Ui {
+class MMemberSelectionDialog;
+}
+
 namespace Met3D
 {
 
-/**
-  @brief MAbstractDataReader is the base class for all data reader
-  implementations.
-  */
-class MAbstractDataReader
+class MMemberSelectionDialog : public QDialog
 {
+    Q_OBJECT
+
 public:
-    MAbstractDataReader(QString identifier);
-    virtual ~MAbstractDataReader();
+    explicit MMemberSelectionDialog(QWidget *parent = 0);
+    ~MMemberSelectionDialog();
 
     /**
-      Returns the identifier string of this data loader.
-      */
-    QString getIdentifier() { return identifier; }
-
-    /**
-      Sets @p path to be the root directory in which the data files for this
-      data loader's dataset are located. @p path is scanned and the available
-      variables can afterwards be accessed through ..
-      */
-    void setDataRoot(QString path, QString fFilter);
-
-protected:
-    /**
-     Scans the data root directory to determine which data is available. This
-     method is called from @ref setDataRoot() and needs to be implemented in
-     derived classes.
+      Set the list of available members that are displayed to the user.
      */
-    virtual void scanDataRoot() = 0;
+    void setAvailableEnsembleMembers(QSet<unsigned int> members);
 
-    QString identifier;
-    QDir dataRoot;
-    QString fileFilter;
+    /**
+      Pre-select a set of members.
+     */
+    void setSelectedMembers(QSet<unsigned int> members);
 
-    /** Global NetCDF access mutex, as the NetCDF (C++) library is not
-        thread-safe (notes Feb2015). This mutex must be used to protect
-        ALL access to NetCDF files in Met.3D! */
-    static QMutex staticNetCDFAccessMutex;
+    QSet<unsigned int> getSelectedMembers();
+
+public slots:
+    void selectAllMembers();
+
+    void selectNoMembers();
+
+private:
+    Ui::MMemberSelectionDialog *ui;
 };
-
 
 } // namespace Met3D
 
-#endif // ABSTRACTDATAREADER_H
+#endif // MEMBERSELECTIONDIALOG_H

@@ -71,10 +71,10 @@ struct MVariableInfo
     QString      surfacePressureName; // for variables on hybrid model levels
                                       // the name of the var containing the
                                       // corresponding sfc pressure field
-    int          numEnsembleMembers;  // If > 0, this variable is part of an
-                                      // ensemble prediction -- it then contains
-                                      // the number of members in the ensemble
-    QSet<unsigned int> availableMembers;
+    QSet<unsigned int> availableMembers; // list of available ensemble members;
+                                         // if the variable is not part of a
+                                         // multimember ensemble, the list will
+                                         // contain a single "0" member
 };
 
 typedef QMap<QString, MVariableInfo*> MVariableNameMap;

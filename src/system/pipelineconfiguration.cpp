@@ -41,7 +41,7 @@
 #include "gxfw/mglresourcesmanager.h"
 #include "data/waypoints/waypointstablemodel.h"
 
-#include "data/ecmwfcfreader.h"
+#include "data/climateforecastreader.h"
 #include "data/gribreader.h"
 #include "data/verticalregridder.h"
 #include "data/structuredgridensemblefilter.h"
@@ -179,33 +179,46 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
 
         // Read settings from file.
         QString name = config.value("name").toString();
-        bool isEnsemble = config.value("ensemble").toBool();
         QString path = expandEnvironmentVariables(config.value("path").toString());
         QString domainID = config.value("domainID").toString();
+        QString fileFilter = config.value("fileFilter").toString();
         QString schedulerID = config.value("schedulerID").toString();
         QString memoryManagerID = config.value("memoryManagerID").toString();
         QString fileFormatStr = config.value("fileFormat").toString();
-        bool enableRegridding = config.value("enableRegridding").toBool();
+        bool enableRegridding = config.value("enableRegridding", false).toBool();
+        bool enableProbRegionFilter = config.value("enableProbabilityRegionFilter",
+                                                   false).toBool();
+
+//TODO (mr, 16Dec2015) -- compatibility code; remove in Met.3D version 2.0
+        // If no fileFilter is specified but a domainID is specified use
+        // "*domainID*" as fileFilter. If neither is specified, use "*".
+        if (fileFilter.isEmpty())
+        {
+            if (domainID.isEmpty()) fileFilter = "*";
+            else fileFilter = QString("*%1*").arg(domainID);
+        }
 
         LOG4CPLUS_DEBUG(mlog, "initializing NWP pipeline #" << i << ": ");
         LOG4CPLUS_DEBUG(mlog, "  name = " << name.toStdString());
-        LOG4CPLUS_DEBUG(mlog, "  " << (isEnsemble ? "ensemble" : "deterministic"));
         LOG4CPLUS_DEBUG(mlog, "  path = " << path.toStdString());
-        LOG4CPLUS_DEBUG(mlog, "  domainID = " << domainID.toStdString());
+        LOG4CPLUS_DEBUG(mlog, "  fileFilter = " << fileFilter.toStdString());
         LOG4CPLUS_DEBUG(mlog, "  schedulerID = " << schedulerID.toStdString());
         LOG4CPLUS_DEBUG(mlog, "  memoryManagerID=" << memoryManagerID.toStdString());
         LOG4CPLUS_DEBUG(mlog, "  fileFormat=" << fileFormatStr.toStdString());
-        LOG4CPLUS_DEBUG(mlog, "  regridding=" << (enableRegridding ? "enabled" : "disabled"));
+        LOG4CPLUS_DEBUG(mlog, "  regridding="
+                        << (enableRegridding ? "enabled" : "disabled"));
+        LOG4CPLUS_DEBUG(mlog, "  probability region="
+                        << (enableProbRegionFilter ? "enabled" : "disabled"));
 
         MNWPReaderFileFormat fileFormat = INVALID_FORMAT;
         if (fileFormatStr == "CF_NETCDF") fileFormat = CF_NETCDF;
-        else if (fileFormatStr == "ECMWF_CF_NETCDF") fileFormat = ECMWF_CF_NETCDF;
+//TODO (mr, 16Dec2015) -- compatibility code; remove in Met.3D version 2.0
+        else if (fileFormatStr == "ECMWF_CF_NETCDF") fileFormat = CF_NETCDF;
         else if (fileFormatStr == "ECMWF_GRIB") fileFormat = ECMWF_GRIB;
 
         // Check parameter validity.
         if ( name.isEmpty()
              || path.isEmpty()
-             || (fileFormat != CF_NETCDF && domainID.isEmpty())
              || schedulerID.isEmpty()
              || memoryManagerID.isEmpty()
              || (fileFormat == INVALID_FORMAT) )
@@ -215,14 +228,10 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
         }
 
         // Create new pipeline.
-        if (isEnsemble)
-            initializeNWPEnsemblePipeline(
-                        name, path, domainID, schedulerID,
-                        memoryManagerID, fileFormat, enableRegridding);
-        else
-            initializeNWPDeterministicPipeline(
-                        name, path, domainID, schedulerID,
-                        memoryManagerID, fileFormat, enableRegridding);
+        initializeNWPPipeline(
+                    name, path, fileFilter, schedulerID,
+                    memoryManagerID, fileFormat, enableRegridding,
+                    enableProbRegionFilter);
     }
 
     config.endArray();
@@ -277,118 +286,39 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
 }
 
 
-void MPipelineConfiguration::initializeNWPDeterministicPipeline(
+void MPipelineConfiguration::initializeNWPPipeline(
         QString name,
         QString fileDir,
-        QString domain,
+        QString fileFilter,
         QString schedulerID,
         QString memoryManagerID,
         MNWPReaderFileFormat dataFormat,
-        bool enableRegridding)
+        bool enableRegridding,
+        bool enableProbabiltyRegionFilter)
 {
     MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
     MAbstractScheduler* scheduler = sysMC->getScheduler(schedulerID);
     MAbstractMemoryManager* memoryManager = sysMC->getMemoryManager(memoryManagerID);
 
     const QString dataSourceId = name;
-    LOG4CPLUS_DEBUG(mlog, "Initializing deterministic pipeline ''"
-                    << dataSourceId.toStdString() << "'' ...");
-
-    MWeatherPredictionReader *nwpReaderDET = nullptr;
-    if (dataFormat == CF_NETCDF)
-    {
-        MClimateForecastReader *cfReaderDET =
-                new MClimateForecastReader(dataSourceId);
-        cfReaderDET->setMemoryManager(memoryManager);
-        cfReaderDET->setScheduler(scheduler);
-        cfReaderDET->setDataRoot(fileDir);
-        nwpReaderDET = cfReaderDET;
-    }
-    else if (dataFormat == ECMWF_CF_NETCDF)
-    {
-        MECMWFClimateForecastReader *ecmwfReaderDET =
-                new MECMWFClimateForecastReader(dataSourceId);
-        ecmwfReaderDET->setMemoryManager(memoryManager);
-        ecmwfReaderDET->setScheduler(scheduler);
-        ecmwfReaderDET->setDataRoot(fileDir, domain);
-        nwpReaderDET = ecmwfReaderDET;
-    }
-    else if (dataFormat == ECMWF_GRIB)
-    {
-        MGribReader *gribReaderDET =
-                new MGribReader(dataSourceId, DETERMINISTIC_FORECAST);
-        gribReaderDET->setMemoryManager(memoryManager);
-        gribReaderDET->setScheduler(scheduler);
-        gribReaderDET->setDataRoot(fileDir);
-        nwpReaderDET = gribReaderDET;
-    }
-
-    if (!enableRegridding)
-    {
-        sysMC->registerDataSource(dataSourceId, nwpReaderDET);
-    }
-    else
-    {
-        MVerticalRegridder *regridderDET =
-                new MVerticalRegridder();
-        regridderDET->setMemoryManager(memoryManager);
-        regridderDET->setScheduler(scheduler);
-        regridderDET->setInputSource(nwpReaderDET);
-
-        sysMC->registerDataSource(dataSourceId, regridderDET);
-    }
-
-    LOG4CPLUS_DEBUG(mlog, "Pipeline ''" << dataSourceId.toStdString()
-                    << "'' has been initialized.");
-}
-
-
-void MPipelineConfiguration::initializeNWPEnsemblePipeline(
-        QString name,
-        QString fileDir,
-        QString domain,
-        QString schedulerID,
-        QString memoryManagerID,
-        MNWPReaderFileFormat dataFormat,
-        bool enableRegridding)
-{
-    MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
-    MAbstractScheduler* scheduler = sysMC->getScheduler(schedulerID);
-    MAbstractMemoryManager* memoryManager = sysMC->getMemoryManager(memoryManagerID);
-
-    const QString dataSourceId = name;
-    LOG4CPLUS_DEBUG(mlog, "Initializing ensemble pipeline ''"
+    LOG4CPLUS_DEBUG(mlog, "Initializing NWP pipeline ''"
                     << dataSourceId.toStdString() << "'' ...");
 
     MWeatherPredictionReader *nwpReaderENS = nullptr;
     if (dataFormat == CF_NETCDF)
     {
-        MClimateForecastReader *cfReaderENS =
-                new MClimateForecastReader(dataSourceId);
-        cfReaderENS->setMemoryManager(memoryManager);
-        cfReaderENS->setScheduler(scheduler);
-        cfReaderENS->setDataRoot(fileDir);
-        nwpReaderENS = cfReaderENS;
-    }
-    else if (dataFormat == ECMWF_CF_NETCDF)
-    {
-        MECMWFEnsembleClimateForecastReader *ecmwfReaderENS =
-                new MECMWFEnsembleClimateForecastReader(dataSourceId);
-        ecmwfReaderENS->setMemoryManager(memoryManager);
-        ecmwfReaderENS->setScheduler(scheduler);
-        ecmwfReaderENS->setDataRoot(fileDir, domain);
-        nwpReaderENS = ecmwfReaderENS;
+        nwpReaderENS = new MClimateForecastReader(dataSourceId);
     }
     else if (dataFormat == ECMWF_GRIB)
     {
-        MGribReader *gribReaderENS =
-                new MGribReader(dataSourceId, ENSEMBLE_FORECAST);
-        gribReaderENS->setMemoryManager(memoryManager);
-        gribReaderENS->setScheduler(scheduler);
-        gribReaderENS->setDataRoot(fileDir);
-        nwpReaderENS = gribReaderENS;
+        nwpReaderENS = new MGribReader(dataSourceId);
     }
-    sysMC->registerDataSource(dataSourceId, nwpReaderENS);
+    nwpReaderENS->setMemoryManager(memoryManager);
+    nwpReaderENS->setScheduler(scheduler);
+    nwpReaderENS->setDataRoot(fileDir, fileFilter);
+
+    // (Should the "raw" data reader be selectable as a data source?)
+    // sysMC->registerDataSource(dataSourceId, nwpReaderENS);
 
     MStructuredGridEnsembleFilter *ensFilter =
             new MStructuredGridEnsembleFilter();
@@ -419,14 +349,17 @@ void MPipelineConfiguration::initializeNWPEnsemblePipeline(
     sysMC->registerDataSource(dataSourceId + QString(" ENSFilter"),
                               ensFilter);
 
-    MProbabilityRegionDetectorFilter *probRegDetectorNWP =
-            new MProbabilityRegionDetectorFilter();
-    probRegDetectorNWP->setMemoryManager(memoryManager);
-    probRegDetectorNWP->setScheduler(scheduler);
-    probRegDetectorNWP->setInputSource(ensFilter);
+    if (enableProbabiltyRegionFilter)
+    {
+        MProbabilityRegionDetectorFilter *probRegDetectorNWP =
+                new MProbabilityRegionDetectorFilter();
+        probRegDetectorNWP->setMemoryManager(memoryManager);
+        probRegDetectorNWP->setScheduler(scheduler);
+        probRegDetectorNWP->setInputSource(ensFilter);
 
-    sysMC->registerDataSource(dataSourceId + QString(" ProbReg"),
-                              probRegDetectorNWP);
+        sysMC->registerDataSource(dataSourceId + QString(" ProbReg"),
+                                  probRegDetectorNWP);
+    }
 
     LOG4CPLUS_DEBUG(mlog, "Pipeline ''" << dataSourceId.toStdString()
                     << "'' has been initialized.");
@@ -454,7 +387,7 @@ void MPipelineConfiguration::initializeLagrantoEnsemblePipeline(
             new MTrajectoryReader(dataSourceId);
     trajectoryReader->setMemoryManager(memoryManager);
     trajectoryReader->setScheduler(scheduler);
-    trajectoryReader->setDataRoot(fileDir);
+    trajectoryReader->setDataRoot(fileDir, "*");
     sysMC->registerDataSource(dataSourceId + QString(" Reader"),
                               trajectoryReader);
 
@@ -544,23 +477,25 @@ void MPipelineConfiguration::initializeDevelopmentDataPipeline()
     sysMC->registerMemoryManager("Analysis",
                new MLRUMemoryManager("Analysis", 10.*1024.));
 
-    initializeNWPDeterministicPipeline(
+    initializeNWPPipeline(
                 "ECMWF DET EUR_LL015",
                 "/home/local/data/mss/grid/ecmwf/netcdf",
-                "EUR_LL015",
+                "*ecmwf_forecast*EUR_LL015*.nc",
                 "SingleThread",
                 "NWP",
-                ECMWF_CF_NETCDF,
-                false);
+                CF_NETCDF,
+                false,
+                true);
 
-    initializeNWPEnsemblePipeline(
+    initializeNWPPipeline(
                 "ECMWF ENS EUR_LL10",
                 "/home/local/data/mss/grid/ecmwf/netcdf",
-                "EUR_LL10",
+                "*ecmwf_ensemble_forecast*EUR_LL10*.nc",
                 "SingleThread",
                 "NWP",
-                ECMWF_CF_NETCDF,
-                false);
+                CF_NETCDF,
+                false,
+                true);
 
     sysMC->registerMemoryManager("Trajectories DF-T psfc_1000hPa_L62",
                new MLRUMemoryManager("Trajectories DF-T psfc_1000hPa_L62",

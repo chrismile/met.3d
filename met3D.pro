@@ -77,7 +77,6 @@ HEADERS += \
     src/data/trajectoryselectionsource.h \
     src/gxfw/gl/abstractgpudataitem.h \
     src/data/probdftrajectoriessource.h \
-    src/data/ecmwfcfreader.h \
     src/data/climateforecastreader.h \
     src/data/weatherpredictionreader.h \
     src/gxfw/nwpmultivaractor.h \
@@ -118,7 +117,8 @@ HEADERS += \
     src/system/frontendconfiguration.h \
     src/system/pipelineconfiguration.h \
     src/data/probabltrajectoriessource.h \
-    src/gxfw/gl/shaderstoragebufferobject.h
+    src/gxfw/gl/shaderstoragebufferobject.h \
+    src/gxfw/memberselectiondialog.h
 
 SOURCES += \
     src/main.cpp \
@@ -161,7 +161,6 @@ SOURCES += \
     src/data/trajectoryselectionsource.cpp \
     src/gxfw/gl/abstractgpudataitem.cpp \
     src/data/probdftrajectoriessource.cpp \
-    src/data/ecmwfcfreader.cpp \
     src/data/climateforecastreader.cpp \
     src/data/weatherpredictionreader.cpp \
     src/gxfw/nwpmultivaractor.cpp \
@@ -204,7 +203,8 @@ SOURCES += \
     src/system/frontendconfiguration.cpp \
     src/system/pipelineconfiguration.cpp \
     src/data/probabltrajectoriessource.cpp \
-    src/gxfw/gl/shaderstoragebufferobject.cpp
+    src/gxfw/gl/shaderstoragebufferobject.cpp \
+    src/gxfw/memberselectiondialog.cpp
 
 FORMS += \
     src/mainwindow.ui \
@@ -214,7 +214,8 @@ FORMS += \
     src/gxfw/selectdatasourcedialog.ui \
     src/gxfw/actorcreationdialog.ui \
     src/gxfw/scenemanagementdialog.ui \
-    src/gxfw/synccontrol.ui
+    src/gxfw/synccontrol.ui \
+    src/gxfw/memberselectiondialog.ui
 
 OTHER_FILES += \
     data/log4cplus.properties \

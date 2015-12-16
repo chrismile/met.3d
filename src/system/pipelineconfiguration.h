@@ -41,9 +41,9 @@ namespace Met3D
 
 /**
   @brief MPipelineConfiguration initializes the Met.3D data pipeline. A number
-  of predefined pipelines are available (currently for ECMWF deterministic and
-  ensemble data, and for LAGRANTO trajectory data. Pipeline parameters are read
-  from a configuration file.
+  of predefined pipelines are available (currently for NetCDF-CF and GRIB data,
+  and for LAGRANTO trajectory data. Pipeline parameters are read from a
+  configuration file.
   */
 class MPipelineConfiguration : public MAbstractApplicationConfiguration
 {
@@ -57,8 +57,7 @@ protected:
     {
         INVALID_FORMAT  = 0,
         CF_NETCDF       = 1,
-        ECMWF_CF_NETCDF = 2,
-        ECMWF_GRIB      = 3
+        ECMWF_GRIB      = 2
     };
 
     /**
@@ -71,29 +70,20 @@ protected:
       Loads a pipeline configuration from file. Can only read parameters
       for the predefined pipelines.
 
-      @see initializeECMWFDeterministicPipeline()
-      @see initializeECMWFEnsemblePipeline()
+      @see initializeNWPPipeline()
       @see initializeLagrantoEnsemblePipeline()
      */
     void initializeDataPipelineFromConfigFile(QString filename);
 
-    void initializeNWPDeterministicPipeline(
+    void initializeNWPPipeline(
             QString name,
             QString fileDir,
-            QString domain,
+            QString fileFilter,
             QString schedulerID,
             QString memoryManagerID,
             MNWPReaderFileFormat dataFormat,
-            bool enableRegridding);
-
-    void initializeNWPEnsemblePipeline(
-            QString name,
-            QString fileDir,
-            QString domain,
-            QString schedulerID,
-            QString memoryManagerID,
-            MNWPReaderFileFormat dataFormat,
-            bool enableRegridding);
+            bool enableRegridding,
+            bool enableProbabiltyRegionFilter);
 
     void initializeLagrantoEnsemblePipeline(
             QString name,

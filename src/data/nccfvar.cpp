@@ -246,6 +246,20 @@ NcVar NcCFVar::getVerticalCoordinatePotVort()
 }
 
 
+bool NcCFVar::hasEnsembleDimension()
+{
+    try
+    {
+        NcVar dummy = getEnsembleVar();
+        return true;
+    }
+    catch (NcException)
+    {
+        return false;
+    }
+}
+
+
 NcVar NcCFVar::getEnsembleVar()
 {
     // NOTE: The ensemble dimension currently (01Oct2012) doesn't seem to be
@@ -275,6 +289,23 @@ NcVar NcCFVar::getEnsembleVar()
     throw NcException("NcException", "cannot identify ensemble variable",
                       __FILE__, __LINE__);
 
+}
+
+
+QSet<unsigned int> NcCFVar::getEnsembleMembers()
+{
+    NcVar ensVar = getEnsembleVar();
+
+    // Load ensemble data.
+    unsigned int numMembers = ensVar.getDim(0).getSize();
+    int *ensValues = new int[numMembers];
+    ensVar.getVar(ensValues);
+
+    QSet<unsigned int> members;
+    for (unsigned int i = 0; i < numMembers; i++) members.insert(ensValues[i]);
+    delete[] ensValues;
+
+    return members;
 }
 
 

@@ -42,6 +42,7 @@
 #include "gxfw/mscenecontrol.h"
 #include "gxfw/selectdatasourcedialog.h"
 #include "gxfw/nwpmultivaractor.h"
+#include "gxfw/memberselectiondialog.h"
 
 using namespace std;
 
@@ -78,8 +79,11 @@ MNWPActorVariable::MNWPActorVariable(MNWPMultiVarActor *actor)
       textureUnitTransferFunction(-1),
       synchronizationControl(nullptr),
       actor(actor),
+      synchronizeInitTime(true),
+      synchronizeValidTime(true),
+      synchronizeEnsemble(true),
       ensembleFilterOperation(""),
-      numEnsembleMembers(0),
+      ensembleMemberLoadedFromConfiguration(-1),
       useFlagsIfAvailable(false),
       gridTopologyMayHaveChanged(true),
       requestPropertiesFactory(new MRequestPropertiesFactory(this)),
@@ -94,44 +98,67 @@ MNWPActorVariable::MNWPActorVariable(MNWPMultiVarActor *actor)
 
     varPropertyGroup = a->addProperty(GROUP_PROPERTY, variableName);
 
-    datasourceNameProperty = a->addProperty(STRING_PROPERTY, "data source",
-                                            varPropertyGroup);
+    datasourceNameProperty = a->addProperty(
+                STRING_PROPERTY, "data source", varPropertyGroup);
     datasourceNameProperty->setEnabled(false);
 
-    changeVariableProperty = a->addProperty(CLICK_PROPERTY, "change variable",
-                                            varPropertyGroup);
+    changeVariablePropertyGroup = a->addProperty(
+                GROUP_PROPERTY, "change/remove", varPropertyGroup);
 
-    removeVariableProperty = a->addProperty(CLICK_PROPERTY, "remove",
-                                            varPropertyGroup);
+    changeVariableProperty = a->addProperty(
+                CLICK_PROPERTY, "change variable", changeVariablePropertyGroup);
+
+    removeVariableProperty = a->addProperty(
+                CLICK_PROPERTY, "remove", changeVariablePropertyGroup);
 
     // Property: Synchronize time and ensemble with an MSyncControl instance?
+    synchronizationPropertyGroup = a->addProperty(
+                GROUP_PROPERTY, "synchronization", varPropertyGroup);
+
     MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
-    synchronizationProperty = a->addProperty(ENUM_PROPERTY, "synchronization",
-                                             varPropertyGroup);
-    properties->mEnum()->setEnumNames(synchronizationProperty,
-                                      sysMC->getSyncControlIdentifiers());
+    synchronizationProperty = a->addProperty(
+                ENUM_PROPERTY, "synchronize with", synchronizationPropertyGroup);
+    properties->mEnum()->setEnumNames(
+                synchronizationProperty, sysMC->getSyncControlIdentifiers());
+
+    synchronizeInitTimeProperty = a->addProperty(
+                BOOL_PROPERTY, "sync init time", synchronizationPropertyGroup);
+    properties->mBool()->setValue(synchronizeInitTimeProperty, synchronizeInitTime);
+    synchronizeValidTimeProperty = a->addProperty(
+                BOOL_PROPERTY, "sync valid time", synchronizationPropertyGroup);
+    properties->mBool()->setValue(synchronizeValidTimeProperty, synchronizeValidTime);
+    synchronizeEnsembleProperty = a->addProperty(
+                BOOL_PROPERTY, "sync ensemble", synchronizationPropertyGroup);
+    properties->mBool()->setValue(synchronizeEnsembleProperty, synchronizeEnsemble);
 
     // Properties for init and valid time.
-    initTimeProperty = a->addProperty(ENUM_PROPERTY, "initialisation",
-                                      varPropertyGroup);
+    initTimeProperty = a->addProperty(
+                ENUM_PROPERTY, "initialisation", varPropertyGroup);
+    validTimeProperty = a->addProperty(
+                ENUM_PROPERTY, "valid", varPropertyGroup);
 
-    validTimeProperty = a->addProperty(ENUM_PROPERTY, "valid",
-                                       varPropertyGroup);
+    // Properties for ensemble control.
+    ensembleMultiMemberSelectionProperty = a->addProperty(
+                CLICK_PROPERTY, "select members", varPropertyGroup);
+    ensembleMultiMemberSelectionProperty->setToolTip(
+                "select which ensemble members this variable should utilize");
+    ensembleMultiMemberProperty = a->addProperty(
+                STRING_PROPERTY, "utilized members", varPropertyGroup);
+    ensembleMultiMemberProperty->setEnabled(false);
 
     QStringList ensembleModeNames;
     ensembleModeNames << "member" << "mean" << "standard deviation"
                       << "p(> threshold)" << "p(< threshold)"
                       << "min" << "max" << "max-min";
-    ensembleModeProperty = a->addProperty(ENUM_PROPERTY, "ensemble mode",
-                                          varPropertyGroup);
+    ensembleModeProperty = a->addProperty(
+                ENUM_PROPERTY, "ensemble mode", varPropertyGroup);
     properties->mEnum()->setEnumNames(ensembleModeProperty, ensembleModeNames);
 
-    ensembleMemberProperty = a->addProperty(INT_PROPERTY, "ensemble member",
-                                            varPropertyGroup);
+    ensembleSingleMemberProperty = a->addProperty(
+                ENUM_PROPERTY, "ensemble member", varPropertyGroup);
 
-    ensembleThresholdProperty = a->addProperty(DOUBLE_PROPERTY,
-                                               "ensemble threshold",
-                                               varPropertyGroup);
+    ensembleThresholdProperty = a->addProperty(
+                DOUBLE_PROPERTY, "ensemble threshold", varPropertyGroup);
     properties->setDouble(ensembleThresholdProperty, 0., 6, 0.1);
 
     // Rendering properties.
@@ -208,6 +235,8 @@ MNWPActorVariable::~MNWPActorVariable()
 
 void MNWPActorVariable::initialize()
 {
+    actor->enableActorUpdates(false);
+
     QString groupName = QString("%1 (%2)").arg(variableName).arg(
                 MStructuredGrid::verticalLevelTypeToString(levelType));
     varPropertyGroup->setPropertyName(groupName);
@@ -282,13 +311,29 @@ void MNWPActorVariable::initialize()
     initEnsembleProperties();
 
     // Get values from sync control, if connected to one.
-    if (synchronizationControl != nullptr)
+    if (synchronizationControl == nullptr)
     {
-        setInitDateTime(synchronizationControl->initDateTime());
-        updateValidTimeProperty();
-        setValidDateTime(synchronizationControl->validDateTime());
-        setEnsembleMember(synchronizationControl->ensembleMember());
+        synchronizeInitTimeProperty->setEnabled(false);
+        synchronizeInitTime = false;
+        synchronizeValidTimeProperty->setEnabled(false);
+        synchronizeValidTime = false;
+        synchronizeEnsembleProperty->setEnabled(false);
+        synchronizeEnsemble = false;
     }
+    else
+    {
+        if (synchronizeInitTime)
+            setInitDateTime(synchronizationControl->initDateTime());
+        updateValidTimeProperty();
+        if (synchronizeValidTime)
+            setValidDateTime(synchronizationControl->validDateTime());
+        if (synchronizeEnsemble)
+            setEnsembleMember(synchronizationControl->ensembleMember());
+    }
+
+    updateTimeProperties();
+    updateEnsembleProperties();
+    updateSyncPropertyColourHints();
 
     setTransferFunctionFromProperty();
 
@@ -301,14 +346,19 @@ void MNWPActorVariable::initialize()
 
     // Load data field.
     asynchronousDataRequest();
+
+    actor->enableActorUpdates(true);
 }
 
 
 void MNWPActorVariable::synchronizeWith(
-        MSyncControl *sync, bool updateGUIProperty)
+        MSyncControl *sync, bool updateGUIProperties)
 
 {
     if (synchronizationControl == sync) return;
+
+    // Reset connection to current synchronization control.
+    // ====================================================
 
     // If the variable is currently connected to a sync control, reset the
     // background colours of the valid and init time properties (they have
@@ -316,11 +366,8 @@ void MNWPActorVariable::synchronizeWith(
     // see setValidDateTime()) and disconnect the signals.
     if (synchronizationControl != nullptr)
     {
-        for (int i = 0; i < actor->getScenes().size(); i++)
-        {
-            actor->getScenes().at(i)->variableDeletesSynchronizationWith(
-                        synchronizationControl);
-        }
+        foreach (MSceneControl* scene, actor->getScenes())
+            scene->variableDeletesSynchronizationWith(synchronizationControl);
 
 #ifdef DIRECT_SYNCHRONIZATION
         synchronizationControl->deregisterSynchronizedClass(this);
@@ -336,27 +383,34 @@ void MNWPActorVariable::synchronizeWith(
 
     synchronizationControl = sync;
 
-    // Update GUI property.
-    if (updateGUIProperty) // true by default
+    // Update "synchronizationProperty".
+    // =================================
+    if (updateGUIProperties)
     {
         MQtProperties *properties = actor->getQtProperties();
         QString displayedSyncID = properties->getEnumItem(synchronizationProperty);
         QString newSyncID = (sync == nullptr) ? "None" : synchronizationControl->getID();
         if (displayedSyncID != newSyncID)
+        {
+            actor->enableActorUpdates(false);
             properties->setEnumItem(synchronizationProperty, newSyncID);
+            actor->enableActorUpdates(true);
+        }
     }
 
-    // Connect to new sync control and try to switch to its current times.
+    // Connect to new sync control and synchronize.
+    // ============================================
     if (sync != nullptr)
     {
         // Tell the actor's scenes that this variable synchronized with this
         // sync control.
-        for (int i = 0; i < actor->getScenes().size(); i++)
-            actor->getScenes().at(i)->variableSynchronizesWith(sync);
+        foreach (MSceneControl* scene, actor->getScenes())
+            scene->variableSynchronizesWith(sync);
 
 #ifdef DIRECT_SYNCHRONIZATION
         synchronizationControl->registerSynchronizedClass(this);
 #else
+//TODO (mr, 01Dec2015) -- add checks for synchronizeInitTime etc..
         connect(sync, SIGNAL(initDateTimeChanged(QDateTime)),
                 this, SLOT(setInitDateTime(QDateTime)));
         connect(sync, SIGNAL(validDateTimeChanged(QDateTime)),
@@ -364,17 +418,56 @@ void MNWPActorVariable::synchronizeWith(
         connect(sync, SIGNAL(ensembleMemberChanged(int)),
                 this, SLOT(setEnsembleMember(int)));
 #endif
-        setInitDateTime(sync->initDateTime());
-        setValidDateTime(sync->validDateTime());
-        setEnsembleMember(sync->ensembleMember());
+        if (updateGUIProperties)
+        {
+            actor->enableActorUpdates(false);
+            MQtProperties *properties = actor->getQtProperties();
+            synchronizeInitTimeProperty->setEnabled(true);
+            synchronizeInitTime = properties->mBool()->value(
+                        synchronizeInitTimeProperty);
+            synchronizeValidTimeProperty->setEnabled(true);
+            synchronizeValidTime = properties->mBool()->value(
+                        synchronizeValidTimeProperty);
+            synchronizeEnsembleProperty->setEnabled(true);
+            synchronizeEnsemble = properties->mBool()->value(
+                        synchronizeEnsembleProperty);
+            actor->enableActorUpdates(true);
+        }
+
+        if (synchronizeInitTime) setInitDateTime(sync->initDateTime());
+        if (synchronizeValidTime) setValidDateTime(sync->validDateTime());
+        if (synchronizeEnsemble) setEnsembleMember(sync->ensembleMember());
     }
     else
     {
-        for (int i = 0; i < actor->getScenes().size(); i++)
+        // No synchronization. Reset property colours and disable sync
+        // checkboxes.
+        foreach (MSceneControl* scene, actor->getScenes())
         {
-            actor->getScenes().at(i)->resetPropertyColour(initTimeProperty);
-            actor->getScenes().at(i)->resetPropertyColour(validTimeProperty);
+            scene->resetPropertyColour(initTimeProperty);
+            scene->resetPropertyColour(validTimeProperty);
+            scene->resetPropertyColour(ensembleSingleMemberProperty);
         }
+
+        if (updateGUIProperties)
+        {
+            actor->enableActorUpdates(false);
+            synchronizeInitTimeProperty->setEnabled(false);
+            synchronizeInitTime = false;
+            synchronizeValidTimeProperty->setEnabled(false);
+            synchronizeValidTime = false;
+            synchronizeEnsembleProperty->setEnabled(false);
+            synchronizeEnsemble = false;
+            actor->enableActorUpdates(true);
+        }
+    }
+
+    // Update "synchronize xyz" GUI properties.
+    // ========================================
+    if (updateGUIProperties && actor->isInitialized())
+    {
+        updateTimeProperties();
+        updateEnsembleProperties();
     }
 }
 
@@ -386,6 +479,7 @@ bool MNWPActorVariable::synchronizationEvent(
     {
     case SYNC_INIT_TIME:
     {
+        if (!synchronizeInitTime) return false;
         actor->enableActorUpdates(false);
         bool newInitTimeSet = setInitDateTime(data.toDateTime());
         actor->enableActorUpdates(true);
@@ -394,15 +488,16 @@ bool MNWPActorVariable::synchronizationEvent(
     }
     case SYNC_VALID_TIME:
     {
+        if (!synchronizeValidTime) return false;
         actor->enableActorUpdates(false);
         bool newValidTimeSet = setValidDateTime(data.toDateTime());
         actor->enableActorUpdates(true);
         if (newValidTimeSet) asynchronousDataRequest(true);
         return newValidTimeSet;
-        break;
     }
     case SYNC_ENSEMBLE_MEMBER:
     {
+        if (!synchronizeEnsemble) return false;
         actor->enableActorUpdates(false);
         bool newEnsembleMemberSet = setEnsembleMember(data.toInt());
         actor->enableActorUpdates(true);
@@ -419,39 +514,68 @@ bool MNWPActorVariable::synchronizationEvent(
 
 void MNWPActorVariable::updateSyncPropertyColourHints(MSceneControl *scene)
 {
-    if (synchronizationControl == nullptr) return;
-
-    // ( Also see internalSetDateTime() ).
-
-    // Init time.
-    // ==========
-    bool match = (getPropertyTime(initTimeProperty)
-                  == synchronizationControl->initDateTime());
-    QColor colour = match ? QColor(0, 255, 0) : QColor(255, 0, 0);
-
-    if (scene == nullptr)
-        // Set colour for all scenes in which the actor appears.
-        for (int i = 0; i < actor->getScenes().size(); i++)
-            actor->getScenes().at(i)->setPropertyColour(
-                        initTimeProperty, colour);
+    if (synchronizationControl == nullptr)
+    {
+        // No synchronization -- reset all property colours.
+        setPropertyColour(initTimeProperty, QColor(), true, scene);
+        setPropertyColour(validTimeProperty, QColor(), true, scene);
+        setPropertyColour(ensembleSingleMemberProperty, QColor(), true, scene);
+    }
     else
-        // Set colour only for the specifed scene.
-        scene->setPropertyColour(initTimeProperty, colour);
+    {
+        // ( Also see internalSetDateTime() ).
 
-    // Valid time.
-    // ===========
-    match = (getPropertyTime(validTimeProperty)
-             == synchronizationControl->validDateTime());
-    colour = match ? QColor(0, 255, 0) : QColor(255, 0, 0);
+        // Init time.
+        // ==========
+        bool match = (getPropertyTime(initTimeProperty)
+                      == synchronizationControl->initDateTime());
+        QColor colour = match ? QColor(0, 255, 0) : QColor(255, 0, 0);
+        setPropertyColour(initTimeProperty, colour,
+                          !synchronizeInitTime, scene);
 
-    if (scene == nullptr)
-        // Set colour for all scenes in which the actor appears.
-        for (int i = 0; i < actor->getScenes().size(); i++)
-            actor->getScenes().at(i)->setPropertyColour(
-                        validTimeProperty, colour);
+        // Valid time.
+        // ===========
+        match = (getPropertyTime(validTimeProperty)
+                 == synchronizationControl->validDateTime());
+        colour = match ? QColor(0, 255, 0) : QColor(255, 0, 0);
+        setPropertyColour(validTimeProperty, colour,
+                          !synchronizeValidTime, scene);
+
+        // Ensemble.
+        // =========
+        match = (getEnsembleMember()
+                 == synchronizationControl->ensembleMember());
+        colour = match ? QColor(0, 255, 0) : QColor(255, 0, 0);
+        setPropertyColour(ensembleSingleMemberProperty, colour,
+                          !synchronizeEnsemble, scene);
+    }
+}
+
+
+void MNWPActorVariable::setPropertyColour(
+        QtProperty* property, const QColor &colour, bool resetColour,
+        MSceneControl *scene)
+{
+    if (resetColour)
+    {
+        if (scene == nullptr)
+            // Reset colour for all scenes in which the actor appears.
+            foreach (MSceneControl* sc, actor->getScenes())
+                sc->resetPropertyColour(property);
+        else
+            // Reset colour only for the specifed scene.
+            scene->resetPropertyColour(property);
+    }
     else
-        // Set colour only for the specifed scene.
-        scene->setPropertyColour(validTimeProperty, colour);
+    {
+        if (scene == nullptr)
+            // Set colour for all scenes in which the actor appears.
+            foreach (MSceneControl* sc, actor->getScenes())
+                sc->setPropertyColour(property, colour);
+        else
+            // Set colour only for the specifed scene.
+            scene->setPropertyColour(property, colour);
+    }
 }
 
 
@@ -480,7 +604,7 @@ void MNWPActorVariable::asynchronousDataRequest(bool synchronizationRequest)
     else
     {
         rh.insert("ENS_OPERATION", ensembleFilterOperation);
-        rh.insert("MEMBER_RANGE", QString("0/%1").arg(numEnsembleMembers-1));
+        rh.insert("SELECTED_MEMBERS", selectedEnsembleMembers);
     }
 
     // Add request keys from the property subgroups.
@@ -527,9 +651,69 @@ bool MNWPActorVariable::onQtPropertyChanged(QtProperty *property)
     // Connect to the time signals of the selected scene.
     else if (property == synchronizationProperty)
     {
+        if (actor->suppressActorUpdates()) return false;
+
         MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
         QString syncID = properties->getEnumItem(synchronizationProperty);
-        synchronizeWith(sysMC->getSyncControl(syncID), false);
+        synchronizeWith(sysMC->getSyncControl(syncID));
+
+        return false;
+    }
+
+    else if (property == synchronizeInitTimeProperty)
+    {
+        synchronizeInitTime = properties->mBool()->value(
+                    synchronizeInitTimeProperty);
+        updateTimeProperties();
+
+        if (actor->suppressActorUpdates()) return false;
+
+        if (synchronizeInitTime)
+        {
+            if (setInitDateTime(synchronizationControl->initDateTime()))
+            {
+                asynchronousDataRequest();
+            }
+        }
+
+        return false;
+    }
+
+    else if (property == synchronizeValidTimeProperty)
+    {
+        synchronizeValidTime = properties->mBool()->value(
+                    synchronizeValidTimeProperty);
+        updateTimeProperties();
+
+        if (actor->suppressActorUpdates()) return false;
+
+        if (synchronizeValidTime)
+        {
+            if (setValidDateTime(synchronizationControl->validDateTime()))
+            {
+                asynchronousDataRequest();
+            }
+        }
+
+        return false;
+    }
+
+    else if (property == synchronizeEnsembleProperty)
+    {
+        synchronizeEnsemble = properties->mBool()->value(
+                    synchronizeEnsembleProperty);
+        updateEnsembleProperties();
+        updateSyncPropertyColourHints();
+
+        if (actor->suppressActorUpdates()) return false;
+
+        if (synchronizeEnsemble)
+        {
+            if (setEnsembleMember(synchronizationControl->ensembleMember()))
+            {
+                asynchronousDataRequest();
+            }
+        }
 
         return false;
     }
@@ -566,14 +750,59 @@ bool MNWPActorVariable::onQtPropertyChanged(QtProperty *property)
         return false;
     }
 
-    else if (property == ensembleMemberProperty)
+    else if (property == ensembleSingleMemberProperty)
     {
-        if ( ensembleMemberProperty->isEnabled() )
-        {
-            if (actor->suppressActorUpdates()) return false;
+        if (actor->suppressActorUpdates()) return false;
 
+        if ( ensembleSingleMemberProperty->isEnabled() )
+        {
             asynchronousDataRequest();
             return false;
+        }
+    }
+
+    else if (property == ensembleMultiMemberSelectionProperty)
+    {
+        if (actor->suppressActorUpdates()) return false;
+
+        MMemberSelectionDialog dlg;
+        dlg.setAvailableEnsembleMembers(dataSource->availableEnsembleMembers(
+                                            levelType, variableName));
+        dlg.setSelectedMembers(selectedEnsembleMembers);
+
+        if ( dlg.exec() == QDialog::Accepted )
+        {
+            // Get set of selected members from dialog, update
+            // ensembleMultiMemberProperty to display set to user and, if
+            // necessary, request new data field.
+            QSet<unsigned int> selMembers = dlg.getSelectedMembers();
+            if ( !selMembers.isEmpty() )
+            {
+                selectedEnsembleMembers = selMembers;
+
+                // Update the current data field if either the currently
+                // selected member has changed (because the previously selected
+                // one is not available anymore) or the ensemble more is set to
+                // mean, std.dev, etc (in this case the computed field needs to
+                // be recomputed based on the new member set).
+
+                // Selected member has changed?
+                bool updateDataField = updateEnsembleSingleMemberProperty();
+                // ..or ens mode is != member.
+                updateDataField |= !ensembleFilterOperation.isEmpty();
+
+                if (updateDataField) asynchronousDataRequest();
+                return false;
+            }
+            else
+            {
+                // The user has selected an emtpy set of members. Display a
+                // warning and do NOT accept the empty set.
+                QMessageBox msgBox;
+                msgBox.setIcon(QMessageBox::Warning);
+                msgBox.setText("You need to select at least one member.");
+                msgBox.exec();
+            }
         }
     }
 
@@ -604,14 +833,32 @@ void MNWPActorVariable::saveConfiguration(QSettings *settings)
     settings->setValue("variableName", variableName);
 
     MQtProperties *properties = actor->getQtProperties();
-    QString tfName = properties->getEnumItem(transferFunctionProperty);
-    settings->setValue("transferFunction", tfName);
-    QString emName = properties->getEnumItem(ensembleModeProperty);
-    settings->setValue("ensembleMode", emName);
 
+    // Save synchronization properties.
     settings->setValue("synchronizationID",
                        (synchronizationControl != nullptr) ?
                            synchronizationControl->getID() : "");
+    settings->setValue("synchronizeInitTime",
+                       properties->mBool()->value(synchronizeInitTimeProperty));
+    settings->setValue("synchronizeValidTime",
+                       properties->mBool()->value(synchronizeValidTimeProperty));
+    settings->setValue("synchronizeEnsemble",
+                       properties->mBool()->value(synchronizeEnsembleProperty));
+
+    // Save ensemble mode properties.
+    settings->setValue("ensembleUtilizedMembers",
+                       MDataRequestHelper::uintSetToString(
+                           selectedEnsembleMembers));
+    settings->setValue("ensembleMode",
+                       properties->getEnumItem(ensembleModeProperty));
+    settings->setValue("ensembleSingleMember",
+                       properties->getEnumItem(ensembleSingleMemberProperty));
+    settings->setValue("ensembleThreshold",
+                       properties->mDouble()->value(ensembleThresholdProperty));
+
+    // Save rendering properties.
+    settings->setValue("transferFunction",
+                       properties->getEnumItem(transferFunctionProperty));
 }
 
 
@@ -623,21 +870,22 @@ void MNWPActorVariable::loadConfiguration(QSettings *settings)
     // available and the user is asked for an alternative source. The
     // remaining configuration should nevertheless be loaded.
 
-//    dataSourceID = settings->value("dataLoaderID").toString();
-//    levelType    = MVerticalLevelType(settings->value("levelType").toInt());
-//    variableName = settings->value("variableName").toString();
+    MQtProperties *properties = actor->getQtProperties();
 
-    QString tfName = settings->value("transferFunction").toString();
-    if ( !setTransferFunction(tfName) )
-    {
-        QMessageBox msgBox;
-        msgBox.setIcon(QMessageBox::Warning);
-        msgBox.setText(QString("Variable '%1':\n"
-                               "Transfer function '%2' does not exist.\n"
-                               "Setting transfer function to 'None'.")
-                       .arg(variableName).arg(tfName));
-        msgBox.exec();
-    }
+    // Load ensemble mode properties.
+    // ==============================
+    selectedEnsembleMembers = MDataRequestHelper::uintSetFromString(
+                settings->value("ensembleUtilizedMembers").toString());
+
+    // At this time, the variables hasn't been initialized yet .. store the
+    // loaded ensemble member temporarily; updateEnsembleSingleMemberProperty()
+    // will make use of this variable.
+    ensembleMemberLoadedFromConfiguration =
+            settings->value("ensembleSingleMember", -1).toInt();
+
+    properties->mDouble()->setValue(
+                ensembleThresholdProperty,
+                settings->value("ensembleThreshold", 0.).toDouble());
 
     QString emName = settings->value("ensembleMode").toString();
     if ( !setEnsembleMode(emName) )
@@ -645,11 +893,24 @@ void MNWPActorVariable::loadConfiguration(QSettings *settings)
         QMessageBox msgBox;
         msgBox.setIcon(QMessageBox::Warning);
         msgBox.setText(QString("Variable '%1':\n"
-                               "Ensemble Mode '%2' does not exist.\n"
-                               "Setting ensemble Mode to 'Member'.")
+                               "Ensemble mode '%2' does not exist.\n"
+                               "Setting ensemble mode to 'member'.")
                        .arg(variableName).arg(emName));
         msgBox.exec();
     }
+
+    // Load synchronization properties (AFTER the ensemble mode properties
+    // have been loaded; sync may overwrite some settings).
+    // ===================================================================
+    properties->mBool()->setValue(
+                synchronizeInitTimeProperty,
+                settings->value("synchronizeInitTime", true).toBool());
+    properties->mBool()->setValue(
+                synchronizeValidTimeProperty,
+                settings->value("synchronizeValidTime", true).toBool());
+    properties->mBool()->setValue(
+                synchronizeEnsembleProperty,
+                settings->value("synchronizeEnsemble", true).toBool());
 
     QString syncID = settings->value("synchronizationID").toString();
     if ( !syncID.isEmpty() )
@@ -671,6 +932,20 @@ void MNWPActorVariable::loadConfiguration(QSettings *settings)
 
             synchronizeWith(nullptr);
         }
+    }
+
+    // Load rendering properties.
+    // ==========================
+    QString tfName = settings->value("transferFunction").toString();
+    if ( !setTransferFunction(tfName) )
+    {
+        QMessageBox msgBox;
+        msgBox.setIcon(QMessageBox::Warning);
+        msgBox.setText(QString("Variable '%1':\n"
+                               "Transfer function '%2' does not exist.\n"
+                               "Setting transfer function to 'None'.")
+                       .arg(variableName).arg(tfName));
+        msgBox.exec();
     }
 }
 
@@ -743,7 +1018,13 @@ void MNWPActorVariable::useFlags(bool b)
 
 int MNWPActorVariable::getEnsembleMember()
 {
-    return actor->getQtProperties()->mInt()->value(ensembleMemberProperty);
+    QString memberString = actor->getQtProperties()->getEnumItem(
+                ensembleSingleMemberProperty);
+
+    bool ok = true;
+    int member = memberString.toInt(&ok);
+
+    if (ok) return member; else return -99999;
 }
 
 
@@ -801,21 +1082,11 @@ bool MNWPActorVariable::setInitDateTime(const QDateTime& datetime)
 
 bool MNWPActorVariable::setEnsembleMember(int member)
 {
-    // Only accept set-member-operation if the connected data source provides
-    // ensemble data.
-    if ( numEnsembleMembers == 0 ) return false;
-
     // Ensemble mean: member == -1.
+    // ============================
     if (member < 0)
     {
-        // Disable all ensemble properties. Set ensemble filter operation to
-        // MEAN. The corresponding mode property is NOT set: When the sync
-        // mean is disabled afterwards, the variable's ensemble settings are
-        // restored.
-
-        ensembleModeProperty->setEnabled(false);
-        ensembleMemberProperty->setEnabled(false);
-        ensembleThresholdProperty->setEnabled(false);
+        // Set ensemble filter operation to MEAN.
 #ifdef DIRECT_SYNCHRONIZATION
         if (ensembleFilterOperation == "MEAN")
         {
@@ -825,7 +1096,7 @@ bool MNWPActorVariable::setEnsembleMember(int member)
         }
         else
         {
-            ensembleFilterOperation = "MEAN";
+            setEnsembleMode("mean");
             return true;
         }
 #else
@@ -835,6 +1106,7 @@ bool MNWPActorVariable::setEnsembleMember(int member)
     }
 
     // Change to the specified member.
+    // ===============================
     else
     {
         // Change member via ensemble member property.
@@ -844,22 +1116,11 @@ bool MNWPActorVariable::setEnsembleMember(int member)
         int prevEnsembleMember = getEnsembleMember();
 #endif
 
-        // If the variable's ensemble mode property was disabled by a previous
-        // syny request for the ensemble mean, enable it. Also enable the other
-        // ensemble properties according to the current mode settings.
-        // NOTE: If the variable's mode settings was not set to "member"
-        // before it won't be set to member now -- the member sync will not
-        // be considered.
-        if ( !ensembleModeProperty->isEnabled() )
-        {
-            ensembleModeProperty->setEnabled(true);
-            // updateEnsembleProperties() will update ensembleFilterOperation
-            updateEnsembleProperties();
-        }
+        if (ensembleFilterOperation != "MEMBER") setEnsembleMode("member");
 
-        static_cast<QtIntPropertyManager*>
-                (ensembleMemberProperty->propertyManager())
-                ->setValue(ensembleMemberProperty, member);
+        setEnumPropertyClosest<unsigned int>(
+                    selectedEnsembleMembersAsSortedList, (unsigned int)member,
+                    ensembleSingleMemberProperty);
 
 #ifdef DIRECT_SYNCHRONIZATION
         // Does a new data request need to be emitted?
@@ -1127,92 +1388,167 @@ void MNWPActorVariable::updateValidTimeProperty()
 }
 
 
+void MNWPActorVariable::updateTimeProperties()
+{
+    actor->enableActorUpdates(false);
+
+    initTimeProperty->setEnabled(!synchronizeInitTime);
+    validTimeProperty->setEnabled(!synchronizeValidTime);
+
+    updateSyncPropertyColourHints();
+
+    actor->enableActorUpdates(true);
+}
+
+
 void MNWPActorVariable::initEnsembleProperties()
 {
-    // Get the number of ensemble members.
-    numEnsembleMembers =
-            dataSource->availableEnsembleMembers(levelType, variableName).size();
-
-    if ( numEnsembleMembers > 0 )
+    // Initially all ensemble members are selected to be used for ensemble
+    // operations. Exception: loadConfiguration() has loaded a set of
+    // selected members from the configuration file. In this case, test
+    // whether all those members are actually available.
+    if (selectedEnsembleMembers.empty())
     {
-        ensembleModeProperty->setEnabled(true);
-        ensembleMemberProperty->setEnabled(true);
-        ensembleThresholdProperty->setEnabled(false);
-        MQtProperties *properties = actor->getQtProperties();
-        properties->mInt()->setMinimum(ensembleMemberProperty, 0);
-        properties->mInt()->setMaximum(ensembleMemberProperty, numEnsembleMembers-1);
+        selectedEnsembleMembers = dataSource->availableEnsembleMembers(
+                    levelType, variableName);
     }
     else
     {
-        ensembleModeProperty->setEnabled(false);
-        ensembleMemberProperty->setEnabled(false);
-        ensembleThresholdProperty->setEnabled(false);
-        ensembleFilterOperation = "";
+        selectedEnsembleMembers = selectedEnsembleMembers.intersect(
+                    dataSource->availableEnsembleMembers(
+                        levelType, variableName));
+
     }
+    updateEnsembleSingleMemberProperty();
 }
 
 
 void MNWPActorVariable::updateEnsembleProperties()
 {
-    if ( numEnsembleMembers == 0 ) return;
-
     MQtProperties *properties = actor->getQtProperties();
     int mode = properties->mEnum()->value(ensembleModeProperty);
+
+    actor->enableActorUpdates(false);
+
+    // Ensemble properties are only enabled if not synchronized.
+    ensembleModeProperty->setEnabled(!synchronizeEnsemble);
 
     switch ( mode )
     {
     case (0):
-        // ensemble member
-        ensembleMemberProperty->setEnabled(true);
+        // single ensemble member
+        ensembleSingleMemberProperty->setEnabled(true);
         ensembleThresholdProperty->setEnabled(false);
         ensembleFilterOperation = "";
         break;
     case (1):
         // mean
-        ensembleMemberProperty->setEnabled(false);
+        ensembleSingleMemberProperty->setEnabled(false);
         ensembleThresholdProperty->setEnabled(false);
         ensembleFilterOperation = "MEAN";
         break;
     case (2):
         // stddev
-        ensembleMemberProperty->setEnabled(false);
+        ensembleSingleMemberProperty->setEnabled(false);
         ensembleThresholdProperty->setEnabled(false);
         ensembleFilterOperation = "STDDEV";
         break;
     case (3):
         // > threshold
-        ensembleMemberProperty->setEnabled(false);
+        ensembleSingleMemberProperty->setEnabled(false);
         ensembleThresholdProperty->setEnabled(true);
         ensembleFilterOperation = QString("P>%1").arg(
                     properties->mDouble()->value(ensembleThresholdProperty));
         break;
     case (4):
         // < threshold
-        ensembleMemberProperty->setEnabled(false);
+        ensembleSingleMemberProperty->setEnabled(false);
         ensembleThresholdProperty->setEnabled(true);
         ensembleFilterOperation = QString("P<%1").arg(
                     properties->mDouble()->value(ensembleThresholdProperty));
         break;
     case (5):
         // min
-        ensembleMemberProperty->setEnabled(false);
+        ensembleSingleMemberProperty->setEnabled(false);
         ensembleThresholdProperty->setEnabled(false);
         ensembleFilterOperation = "MIN";
         break;
     case (6):
         // max
-        ensembleMemberProperty->setEnabled(false);
+        ensembleSingleMemberProperty->setEnabled(false);
         ensembleThresholdProperty->setEnabled(false);
         ensembleFilterOperation = "MAX";
         break;
     case (7):
         // max-min
-        ensembleMemberProperty->setEnabled(false);
+        ensembleSingleMemberProperty->setEnabled(false);
         ensembleThresholdProperty->setEnabled(false);
         ensembleFilterOperation = "MAX-MIN";
         break;
+    case (8):
+        // multiple members
+        ensembleSingleMemberProperty->setEnabled(false);
+        ensembleThresholdProperty->setEnabled(false);
+        ensembleFilterOperation = "MULTIPLE";
     }
 
+    // If the ensemble is synchronized, disable all properties (they are set
+    // via the synchronization control).
+    if (synchronizeEnsemble)
+    {
+        ensembleSingleMemberProperty->setEnabled(false);
+        ensembleThresholdProperty->setEnabled(false);
+    }
+
+    actor->enableActorUpdates(true);
+}
+
+
+bool MNWPActorVariable::updateEnsembleSingleMemberProperty()
+{
+    MQtProperties *properties = actor->getQtProperties();
+
+    // Remember currently set ensemble member in order to restore it below
+    // (if getEnsembleMember() returns a value < 0 the list is currently
+    // empty; however, since the ensemble members are represented by
+    // unsigned ints below we cast this case to 0).
+    int prevEnsembleMember = max(0, getEnsembleMember());
+
+    if (ensembleMemberLoadedFromConfiguration > 0)
+    {
+        // If an ensemble member has been loaded from a config file, try
+        // to restore this member.
+        prevEnsembleMember = ensembleMemberLoadedFromConfiguration;
+        ensembleMemberLoadedFromConfiguration = -1;
+    }
+
+    // Update ensembleMultiMemberProperty to display the currently selected
+    // list of ensemble members.
+    QString s = MDataRequestHelper::uintSetToString(selectedEnsembleMembers);
+    properties->mString()->setValue(ensembleMultiMemberProperty, s);
+    ensembleMultiMemberProperty->setToolTip(s);
+
+    // Update ensembleSingleMemberProperty so that the user can choose only
+    // from the list of selected members. (Requires first sorting the set of
+    // members as a list, which can then be converted  to a string list).
+    selectedEnsembleMembersAsSortedList = selectedEnsembleMembers.toList();
+    qSort(selectedEnsembleMembersAsSortedList);
+
+    QStringList selectedMembersAsStringList;
+    foreach (unsigned int member, selectedEnsembleMembersAsSortedList)
+        selectedMembersAsStringList << QString("%1").arg(member);
+
+    actor->enableActorUpdates(false);
+    properties->mEnum()->setEnumNames(
+                ensembleSingleMemberProperty, selectedMembersAsStringList);
+    setEnumPropertyClosest<unsigned int>(
+                selectedEnsembleMembersAsSortedList,
+                (unsigned int)prevEnsembleMember,
+                ensembleSingleMemberProperty, synchronizeEnsemble);
+    actor->enableActorUpdates(true);
+
+    bool displayedMemberHasChanged = (getEnsembleMember() != prevEnsembleMember);
+    return displayedMemberHasChanged;
 }
 
 
@@ -1281,6 +1617,80 @@ bool MNWPActorVariable::internalSetDateTime(
             // Set the new valid time.
             static_cast<QtEnumPropertyManager*> (timeProperty->propertyManager())
                     ->setValue(timeProperty, i);
+            // A new index was set. Return true.
+            return true;
+        }
+    }
+
+    return false;
+}
+
+
+template<typename T> bool MNWPActorVariable::setEnumPropertyClosest(
+        const QList<T>& availableValues, const T& value,
+        QtProperty *property, bool setSyncColour)
+{
+    // Find the value closest to "value" in the list of available values.
+    int i = -1; // use of "++i" below
+    bool exactMatch = false;
+    while (i < availableValues.size()-1)
+    {
+        // Loop as long as "value" is larger that the currently inspected
+        // element (use "++i" to have the same i available for the remaining
+        // statements in this block).
+        if (value > availableValues.at(++i)) continue;
+
+        // We'll only get here if "value" <= availableValues.at(i). If we
+        // have an exact match, break the loop. This is our value.
+        if (availableValues.at(i) == value)
+        {
+            exactMatch = true;
+            break;
+        }
+
+        // If "value" cannot be exactly matched it lies between indices i-1
+        // and i in availableValues. Determine which is closer.
+        if (i == 0) break; // if there's no i-1 we're done
+
+//        LOG4CPLUS_DEBUG(mlog, value << " " << availableValues.at(i-1) << " "
+//                        << availableValues.at(i) << " "
+//                        << abs(value - availableValues.at(i-1)) << " "
+//                        << abs(availableValues.at(i) - value) << " ");
+
+        if ( abs(value - availableValues.at(i-1))
+             <= abs(availableValues.at(i) - value) ) i--;
+        // "i" now contains the index of the closest available value.
+        break;
+    }
+
+    if (i > -1)
+    {
+        // ( Also see updateSyncPropertyColourHints() ).
+
+        // Update background colour of the property in the connected
+        // scene's property browser: green if "value" is an
+        // exact match with one of the available values, red otherwise.
+        if (setSyncColour)
+        {
+            QColor colour = exactMatch ? QColor(0, 255, 0) : QColor(255, 0, 0);
+            foreach (MSceneControl* scene, actor->getScenes())
+                scene->setPropertyColour(property, colour);
+        }
+
+        // Get the currently selected index.
+        int currentIndex = static_cast<QtEnumPropertyManager*> (
+                    property->propertyManager())->value(property);
+
+        if (i == currentIndex)
+        {
+            // Index i is already the current one. Nothing needs to be done.
+            return false;
+        }
+        else
+        {
+            // Set the new value.
+            static_cast<QtEnumPropertyManager*> (property->propertyManager())
+                    ->setValue(property, i);
             // A new index was set. Return true.
             return true;
         }

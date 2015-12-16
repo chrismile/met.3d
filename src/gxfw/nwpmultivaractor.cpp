@@ -152,23 +152,9 @@ MNWPActorVariable* MNWPMultiVarActor::addActorVariable(
     // Add variable property group to this actor's properties.
     variablePropertiesGroup->addSubProperty(var->varPropertyGroup);
 
-    // collapse browser items of variables
-    for (int i = 0; i < scenes.size(); ++i)
-    {
-        MSceneControl* scene = scenes.at(i);
-        QtTreePropertyBrowser* propBrowser = scene->getActorPropertyBrowser();
-
-        for (int j = 0; j < variables.size(); j++)
-        {
-            QtBrowserItem* item = propBrowser->items(
-                        variables.at(j)->varPropertyGroup).at(0);
-            propBrowser->setExpanded(item, false);
-        }
-    }
-
+    // Initialize variable.
     if (isInitialized())
     {
-        // initialize variable
         LOG4CPLUS_DEBUG(mlog, "Initializing variable:");
         var->initialize();
     }
@@ -181,6 +167,10 @@ MNWPActorVariable* MNWPMultiVarActor::addActorVariable(
 
     // Tell derived classes that this variable has been added.
     onAddActorVariable(var);
+
+    // Collapse browser items of variable.
+    foreach (MSceneControl *scene, scenes)
+        scene->collapsePropertySubTree(var->varPropertyGroup);
 
     enableEmissionOfActorChangedSignal(true);
 
