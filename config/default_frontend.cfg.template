@@ -5,7 +5,7 @@
 size=1
 
 1\name=Synchronization
-1\initialiseFromDatasource=ECMWF ENS EUR_LL10
+1\initialiseFromDatasource=ECMWF ENS EUR_LL10 ENSFilter
 1\initialiseFromLeveltype=HYBRID_SIGMA_PRESSURE_3D
 1\initialiseFromVariable=eastward_wind
 
