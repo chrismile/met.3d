@@ -125,12 +125,6 @@ uniform vec4    isoColors[MAX_ISOSURFACES];
 uniform int     isoColorModes[MAX_ISOSURFACES];
 uniform int     numIsoValues;
 
-/*** ECMWF-specific ***/
-//   ==============   //
-// 0 = PRESSURE_LEVEL
-// 1 = HYBRID_SIGMA
-// 2 = LOG_PRESSURE_LEVEL
-
 uniform vec2    pToWorldZParams;
 uniform bool    spatialCDFVisEnabled;
 uniform float   numPressureLevels;
@@ -157,8 +151,6 @@ uniform vec4    shadowColor;
 #include "volume_hybrid_utils.glsl"
 // include pressure levels volume sampling methods
 #include "volume_pressure_utils.glsl"
-// include log pressure levels volume sampling methods
-#include "volume_logpressure_utils.glsl"
 // defines subroutines and auxiliary ray-casting functions
 #include "volume_sample_utils.glsl"
 // shading variable sampling methods

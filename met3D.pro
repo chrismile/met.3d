@@ -241,7 +241,6 @@ OTHER_FILES += \
     met3D_inclib.pri.template \
     src/glsl/basemap.fx.glsl \
     src/glsl/volume_pressure_utils.glsl \
-    src/glsl/volume_logpressure_utils.glsl \
     src/glsl/volume_hybrid_utils.glsl \
     src/glsl/volume_global_structs_utils.glsl \
     src/glsl/volume_defines.glsl \

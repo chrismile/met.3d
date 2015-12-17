@@ -83,12 +83,6 @@ float sampleHybridLevel(in vec3 pos)
 #endif
 
 
-subroutine(sampleDataAtPosType)
-float sampleLogPressureLevel(in vec3 pos)
-{
-    return sampleLogPressureLevelVolumeAtPos(dataVolume, dataExtent, pos);
-}
-
 #ifdef ENABLE_HYBRID_NEIGHBOURHOOD_ACCELERATION
 
 subroutine(sampleDataAtPosAccelType)
@@ -115,13 +109,6 @@ float sampleHybridLevelAccel(in vec3 pos, inout HybridSigmaAccel hca, bool initA
                                         pos, hca);
 }
 #endif
-
-
-subroutine(sampleDataAtPosAccelType)sampleHybridSigmaVolumeSingleBitAtPos
-float sampleLogPressureLevelAccel(in vec3 pos, inout HybridSigmaAccel hca, bool initAccel)
-{
-    return sampleLogPressureLevelVolumeAtPos(dataVolume, dataExtent, pos);
-}
 
 #endif // ENABLE_HYBRID_NEIGHBOURHOOD_ACCELERATION
 
@@ -248,38 +235,6 @@ vec3 hybridLevelGradient(in vec3 pos, in vec3 h)
     float z1 = sampleDataAtPos(pos_top);
     float z2 = sampleDataAtPos(pos_bot);
     hz = pos_top.z - pos_bot.z;
-
-    gradient = vec3((x1 - x2) / abs(hx), (y1 - y2) / abs(hy), (z1 - z2) / abs(hz));
-
-    return normalize(gradient);
-}
-
-
-subroutine(computeGradientType)
-vec3 logPressureLevelGradient(in vec3 pos, in vec3 h)
-{
-    vec3 gradient;
-
-    // The easiest case: No orography can be crossed in the horizontal,
-    // the vertical level distance is the same at all positions.
-
-    vec3 pos_east = vec3(max(pos.x + h.x, dataExtent.dataSECrnr.x), pos.yz);
-    vec3 pos_west = vec3(min(pos.x - h.x, dataExtent.dataNWCrnr.x), pos.yz);
-    float x1 = sampleLogPressureLevelVolumeAtPos(dataVolume, dataExtent, pos_east);
-    float x2 = sampleLogPressureLevelVolumeAtPos(dataVolume, dataExtent, pos_west);
-    float hx = pos_east.x - pos_west.x;
-
-    vec3 pos_north = vec3(pos.x, min(pos.y + h.y, dataExtent.dataNWCrnr.y), pos.z);
-    vec3 pos_south = vec3(pos.x, max(pos.y - h.y, dataExtent.dataSECrnr.y), pos.z);
-    float y1 = sampleLogPressureLevelVolumeAtPos(dataVolume, dataExtent, pos_north);
-    float y2 = sampleLogPressureLevelVolumeAtPos(dataVolume, dataExtent, pos_south);
-    float hy = pos_north.y - pos_south.y;
-
-    vec3 pos_top = vec3(pos.xy, min(pos.z + h.z, dataExtent.dataNWCrnr.z));
-    vec3 pos_bot = vec3(pos.xy, max(pos.z - h.z, dataExtent.dataSECrnr.z));
-    float z1 = sampleLogPressureLevelVolumeAtPos(dataVolume, dataExtent, pos_top);
-    float z2 = sampleLogPressureLevelVolumeAtPos(dataVolume, dataExtent, pos_bot);
-    float hz = pos_top.z - pos_bot.z;
 
     gradient = vec3((x1 - x2) / abs(hx), (y1 - y2) / abs(hy), (z1 - z2) / abs(hz));
 
@@ -448,38 +403,10 @@ void computeDepthFromWorld(in vec3 rayPosition)
     gl_FragDepth = clipSpacePos.z * 0.5 + 0.5;
 }
 
+
 vec3 initGradientSamplingStep(in DataVolumeExtent dve)
 {
-    // mk(04Nov2014): dve.deltaLnP is only used for computation in logPressure
-    //                grid...
+    // dve.deltaLnP is not used... (instead computed in gradient methods).
     return vec3(dve.deltaLatLon, dve.deltaLatLon, dve.deltaLnP);
-
-    /*
-    //vec3 h = vec3(0., 0., 0.);
-
-    // case PRESSURE_LEVEL_3D
-    if (dve.levelType == 0)
-    {
-//TODO: vertical h is an approximation and only correct for grids regular in p
-        h = vec3(dve.deltaLatLon, dve.deltaLatLon, dve.deltaLnP);
-    }
-    // case HYBRID_SIGMA_PRESSURE_3D
-    else if (dve.levelType == 1)
-    {
-        // Determine average worldZ-interval between model levels.
-//TODO: NOTE that this is a simple average that does not account for the
-// vertical stretching of the levels. We simply use the distance between the
-// lower and upper data volume boundaries and divide it by the number of
-// vertical levels.
-        h = vec3(dve.deltaLatLon, dve.deltaLatLon, dve.deltaLnP);
-    }
-    // case LOG_PRESSURE_LEVEL_3D
-    else
-    {
-        // correct vertical h
-        h = vec3(dve.deltaLatLon, dve.deltaLatLon, dve.deltaLnP);
-    }
-
-    return h;*/
 }
 

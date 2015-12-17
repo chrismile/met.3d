@@ -49,11 +49,6 @@ float sampleShadingDataAtPos(in vec3 pos)
                                             surfacePressureShV, hybridCoefficientsShV,
                                             pos, hcaDummy);
     }
-    // case LOG_PRESSURE_LEVEL_3D
-     else
-    {
-        return sampleLogPressureLevelVolumeAtPos(dataVolumeShV, dataExtentShV, pos);
-    }
 
     return 0;
 }
@@ -75,12 +70,6 @@ float sampleShadingDataAtPos_maxNeighbour(in vec3 pos)
                                         dataVolumeShV, dataExtentShV,
                                         surfacePressureShV, hybridCoefficientsShV,
                                         pos);
-    }
-    // case LOG_PRESSURE_LEVEL_3D
-    else
-    {
-        return sampleLogPressureLevelVolumeAtPos_maxNeighbour(
-                                         dataVolumeShV, dataExtentShV, pos);
     }
 
     return 0;

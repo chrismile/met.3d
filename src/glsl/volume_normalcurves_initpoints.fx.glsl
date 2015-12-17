@@ -143,8 +143,6 @@ layout (std430, binding=0) buffer InitPointBuffer
 #include "volume_hybrid_utils.glsl"
 // include pressure levels volume sampling methods
 #include "volume_pressure_utils.glsl"
-// include log pressure levels volume sampling methods
-#include "volume_logpressure_utils.glsl"
 // defines subroutines and auxiliary ray-casting functions
 #include "volume_sample_utils.glsl"
 

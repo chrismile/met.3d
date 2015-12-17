@@ -32,6 +32,10 @@ const float M_MISSING_VALUE = -999.E9;
 //   ===================   //
 struct DataVolumeExtent
 {
+    /*** ECMWF-specific ***/
+    //   ==============   //
+    // 0 = PRESSURE_LEVEL
+    // 1 = HYBRID_SIGMA
     int levelType; // vertical level type of volume data
     float deltaLatLon; // space between two grid cells in lat/lon in world space
 
