@@ -1082,18 +1082,11 @@ void MNWPVolumeRaycasterActor::initializeRenderInformation()
 
     gl.rayCasterSubroutines[PRESSURE_LEVELS_3D]
             << "samplePressureLevel"
-            << "samplePressureLevelAccel"
             << "pressureLevelGradient";
 
     gl.rayCasterSubroutines[HYBRID_SIGMA_PRESSURE_3D]
             << "sampleHybridLevel"
-            << "sampleHybridLevelAccel"
             << "hybridLevelGradient";
-
-//    gl.rayCasterSubroutines[LOG_PRESSURE_LEVELS_3D]
-//            << "sampleLogPressureLevel"
-//            << "sampleLogPressureLevelAccel"
-//            << "logPressureLevelGradient";
 
     gl.bitfieldRayCasterSubroutines[PRESSURE_LEVELS_3D]
             << "samplePressureLevelVolumeBitfield"
@@ -1105,10 +1098,6 @@ void MNWPVolumeRaycasterActor::initializeRenderInformation()
             << "sampleHybridVolumeAllBits"
             << "hybridLevelGradientBitfield";
 
-//    gl.bitfieldRayCasterSubroutines[LOG_PRESSURE_LEVELS_3D]
-//            << "sampleLogPressureLevel"
-//            << "sampleLogPressureLevelAccel";
-
     gl.normalCompSubroutines[PRESSURE_LEVELS_3D]
             << "samplePressureLevel"
             << "pressureLevelGradient";
@@ -1117,18 +1106,11 @@ void MNWPVolumeRaycasterActor::initializeRenderInformation()
             << "sampleHybridLevel"
             << "hybridLevelGradient";
 
-//    gl.normalCompSubroutines[LOG_PRESSURE_LEVELS_3D]
-//            << "sampleLogPressureLevel"
-//            << "logPressureLevelGradient";
-
     gl.normalInitSubroutines[PRESSURE_LEVELS_3D]
             << "samplePressureLevel";
 
     gl.normalInitSubroutines[HYBRID_SIGMA_PRESSURE_3D]
             << "sampleHybridLevel";
-
-//    gl.normalInitSubroutines[LOG_PRESSURE_LEVELS_3D]
-//            << "sampleLogPressureLevel";
 
     // Re-compute normal curves and shadow image on next frame.
     updateNextRenderFrame.set(ComputeNCInitPoints);

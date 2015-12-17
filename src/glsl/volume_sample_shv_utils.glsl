@@ -44,10 +44,9 @@ float sampleShadingDataAtPos(in vec3 pos)
     // case HYBRID_SIGMA_PRESSURE_3D
     else if (dataExtentShV.levelType == 1)
     {
-        HybridSigmaAccel hcaDummy; // not required here
         return sampleHybridSigmaVolumeAtPos(dataVolumeShV, dataExtentShV,
                                             surfacePressureShV, hybridCoefficientsShV,
-                                            pos, hcaDummy);
+                                            pos);
     }
 
     return 0;

@@ -71,21 +71,4 @@ struct Ray
 };
 
 
-struct GridColumnAccel
-{
-    int   i, j;
-    int   k[2];
-    float ln_p[2];
-    float s[2];
-    float psfc_hPa;
-    bool  horizontallyMoved;
-};
-
-
-struct HybridSigmaAccel
-{
-    GridColumnAccel c00, c01, c10, c11;
-};
-
-
 bool shadowRay;

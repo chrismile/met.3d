@@ -204,9 +204,6 @@ bool traverseSectionOfDataVolume(
         inout vec4 rayColor, inout vec3 rayPosition,
         inout int crossingLevelFront, inout int crossingLevelBack,
         inout bool firstCrossing, inout bool lastCrossing,
-#ifdef ENABLE_HYBRID_NEIGHBOURHOOD_ACCELERATION
-        inout HybridSigmaAccel hybridRayAccel,
-#endif        
         inout vec3 crossingPosition)
 {
     // Main ray caster loop. Advance the current position along the ray
@@ -214,11 +211,7 @@ bool traverseSectionOfDataVolume(
     // and testing for isosurface crossing.
     while (lambda < lambdaExit)
     {
-#ifdef ENABLE_HYBRID_NEIGHBOURHOOD_ACCELERATION    
-        float scalar = sampleDataAtPosAccel(rayPosition, hybridRayAccel, false);
-#else
         float scalar = sampleDataAtPos(rayPosition);
-#endif
 
         if (scalar != M_MISSING_VALUE)
         {
@@ -308,12 +301,7 @@ void raycaster(in vec3 h_gradient, in Ray ray, in vec2 lambdaNearFar,
     vec3 prevRayPosition = rayPosition;
     float prevLambda = lambda;
 
-#ifdef ENABLE_HYBRID_NEIGHBOURHOOD_ACCELERATION
-    HybridSigmaAccel hybridRayAccel;
-    float scalar = sampleDataAtPosAccel(rayPosition, hybridRayAccel, true);
-#else
     float scalar = sampleDataAtPos(rayPosition);
-#endif
 
     int crossingLevelBack, crossingLevelFront;
     crossingLevelBack = crossingLevelFront = computeCrossingLevel(scalar);
@@ -339,9 +327,6 @@ void raycaster(in vec3 h_gradient, in Ray ray, in vec2 lambdaNearFar,
         rayColor, rayPosition,
         crossingLevelFront, crossingLevelBack,
         firstCrossing, lastCrossing,
-#ifdef ENABLE_HYBRID_NEIGHBOURHOOD_ACCELERATION
-        hybridRayAccel,
-#endif        
         crossingPosition);
 
     // =================================================
@@ -493,9 +478,6 @@ void raycaster(in vec3 h_gradient, in Ray ray, in vec2 lambdaNearFar,
                     rayColor, rayPosition,
                     crossingLevelFront, crossingLevelBack,
                     firstCrossing, lastCrossing,
-#ifdef ENABLE_HYBRID_NEIGHBOURHOOD_ACCELERATION
-                    hybridRayAccel,
-#endif        
                     crossingPosition);
 
             // Has the ray been terminated in the brick? Then also terminate the

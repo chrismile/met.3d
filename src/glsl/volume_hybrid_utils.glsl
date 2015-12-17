@@ -38,8 +38,7 @@
 float sampleHybridSigmaColumnAtP(in sampler3D sampler, in DataVolumeExtent dve,
                                  in sampler2D sfcSampler,
                                  in sampler1D hybCoeffSampler,
-                                 in int i, in int j, in float p,
-                                 out GridColumnAccel gca)
+                                 in int i, in int j, in float p)
 {
     int kL = 0;
     int kU = dve.nLev - 1;
@@ -80,14 +79,6 @@ float sampleHybridSigmaColumnAtP(in sampler3D sampler, in DataVolumeExtent dve,
     float scalarU = texelFetch(sampler, ivec3(i, j, kU), 0).a;
     float scalarL = texelFetch(sampler, ivec3(i, j, kL), 0).a;
 
-    // Store auxiliary variables in acceleration structure.
-    gca.i = i; gca.j = j;
-    gca.k[0] = kU; gca.k[1] = kL;
-    gca.ln_p[0] = lnPU; gca.ln_p[1] = lnPL;
-    gca.s[0] = scalarU; gca.s[1] = scalarL;
-    gca.psfc_hPa = psfc;
-    gca.horizontallyMoved = false;
-
 //TODO: Why is this not working with computeGradient()? (mr, 03Aug2014)
 //     if ((mixK < 0.) || (mixK > 1.)) return M_MISSING_VALUE;
     return mix(scalarL, scalarU, mixK);
@@ -99,8 +90,7 @@ float sampleHybridSigmaVolumeAtPos(in sampler3D sampler,
                                    in DataVolumeExtent dve,
                                    in sampler2D sfcSampler,
                                    in sampler1D hybCoeffSampler,
-                                   in vec3 pos,
-                                   out HybridSigmaAccel hsa)
+                                   in vec3 pos)
 {
     float mixI = mod(pos.x - dve.dataNWCrnr.x, 360.) / dve.deltaLatLon;
     float mixJ = (dve.dataNWCrnr.y - pos.y) / dve.deltaLatLon;
@@ -115,181 +105,20 @@ float sampleHybridSigmaVolumeAtPos(in sampler3D sampler,
     int j1 = j+1;
 
     float scalar_i0j0 = sampleHybridSigmaColumnAtP(sampler, dve, sfcSampler,
-                                                   hybCoeffSampler, i , j , p,
-                                                   hsa.c00);
+                                                   hybCoeffSampler, i , j , p);
     float scalar_i1j0 = sampleHybridSigmaColumnAtP(sampler, dve, sfcSampler,
-                                                   hybCoeffSampler, i1, j , p,
-                                                   hsa.c10);
+                                                   hybCoeffSampler, i1, j , p);
     float scalar_i0j1 = sampleHybridSigmaColumnAtP(sampler, dve, sfcSampler,
-                                                   hybCoeffSampler, i , j1, p,
-                                                   hsa.c01);
+                                                   hybCoeffSampler, i , j1, p);
     float scalar_i1j1 = sampleHybridSigmaColumnAtP(sampler, dve, sfcSampler,
-                                                   hybCoeffSampler, i1, j1, p,
-                                                   hsa.c11);
+                                                   hybCoeffSampler, i1, j1, p);
 
-    // Check for missing values. Due to consistency of the acceleration
-    // structures, this is done after all four columns have been retrieved.
+    // Check for missing values.
 //TODO: Why is this not working with computeGradient()? (mr, 03Aug2014)
 //     if (scalar_i0j0 == M_MISSING_VALUE) return M_MISSING_VALUE;
 //     if (scalar_i1j0 == M_MISSING_VALUE) return M_MISSING_VALUE;
 //     if (scalar_i0j1 == M_MISSING_VALUE) return M_MISSING_VALUE;
 //     if (scalar_i1j1 == M_MISSING_VALUE) return M_MISSING_VALUE;
-
-    // Interpolate horizontally.
-    mixJ = fract(mixJ);
-    float scalar_i0 = mix(scalar_i0j0, scalar_i0j1, mixJ);
-    float scalar_i1 = mix(scalar_i1j0, scalar_i1j1, mixJ);
-
-    mixI = fract(mixI);
-    float scalar = mix(scalar_i0, scalar_i1, mixI);
-
-    return scalar;
-}
-
-
-float updateHybridSigmaColumnAtP(in sampler3D sampler, in DataVolumeExtent dve,
-                                 in sampler2D sfcSampler,
-                                 in sampler1D hybCoeffSampler,
-                                 in float ln_p,
-                                 in bool clampToCellBoundary,
-                                 inout GridColumnAccel gca)
-{
-    if (gca.horizontallyMoved)
-    {
-        // Fetch the surface pressure at (i, j). It is used to compute the
-        // pressure at the model levels via p = ak + bk * psfgca.
-        gca.psfc_hPa = texelFetch(sfcSampler, ivec2(gca.i, gca.j), 0).a / 100.;
-
-        // Get ln(pressure) and scalar values at the current levels.
-        for (int i = 0; i < 2; i++)
-        {
-            float ak = texelFetch(hybCoeffSampler, gca.k[i], 0).a;
-            float bk = texelFetch(hybCoeffSampler, gca.k[i] + dve.nLev, 0).a;
-            gca.ln_p[i] = log(ak + bk * gca.psfc_hPa);
-            gca.s[i] = texelFetch(sampler, ivec3(gca.i, gca.j, gca.k[i]), 0).a;
-        }
-
-        gca.horizontallyMoved = false;
-    }
-
-    // if target pressure < column upper pressure: move upward
-    while ((ln_p < gca.ln_p[1]) && (gca.k[1] > 0))
-    {
-        // move upward by one cell
-        gca.k[0]--; gca.k[1]--;
-
-        // lower pressure and scaler = former upper pressure and scalar
-        gca.ln_p[0] = gca.ln_p[1];
-        gca.s[0] = gca.s[1];
-
-        // retrieve next upper pressure and scalar
-        float ak = texelFetch(hybCoeffSampler, gca.k[1], 0).a;
-        float bk = texelFetch(hybCoeffSampler, gca.k[1] + dve.nLev, 0).a;
-        gca.ln_p[1] = log(ak + bk * gca.psfc_hPa);
-        gca.s[1] = texelFetch(sampler, ivec3(gca.i, gca.j, gca.k[1]), 0).a;
-    }
-
-    // if target pressure > column lower pressure: move downward
-    while ((ln_p > gca.ln_p[0]) && (gca.k[0] < dve.nLev-1))
-    {
-        // move downward by one cell
-        gca.k[0]++; gca.k[1]++;
-
-        gca.ln_p[1] = gca.ln_p[0];
-        gca.s[1] = gca.s[0];
-
-        float ak = texelFetch(hybCoeffSampler, gca.k[0], 0).a;
-        float bk = texelFetch(hybCoeffSampler, gca.k[0] + dve.nLev, 0).a;
-        gca.ln_p[0] = log(ak + bk * gca.psfc_hPa);
-        gca.s[0] = texelFetch(sampler, ivec3(gca.i, gca.j, gca.k[0]), 0).a;
-    }
-
-    // Linearly interpolate in ln(p) between the scalar values at levels
-    // k[0] and k[1].
-    float mixK = (gca.ln_p[0] - ln_p) / (gca.ln_p[0] - gca.ln_p[1]);
-
-    if (clampToCellBoundary)
-        mixK = clamp(mixK, 0., 1.);
-    else
-        if ((mixK < 0.) || (mixK > 1.)) return M_MISSING_VALUE;
-    return mix(gca.s[0], gca.s[1], mixK);
-}
-
-
-float sampleHybridSigmaVolumeAtPos_accel(in sampler3D sampler,
-                                         in DataVolumeExtent dve,
-                                         in sampler2D sfcSampler,
-                                         in sampler1D hybCoeffSampler,
-                                         in vec3 pos,
-                                         in bool clampToCellBoundary,
-                                         inout HybridSigmaAccel hsa)
-{
-    float mixI = mod(pos.x - dve.dataNWCrnr.x, 360.) / dve.deltaLatLon;
-    float mixJ = (dve.dataNWCrnr.y - pos.y) / dve.deltaLatLon;
-    int pos_i = int(mixI);
-    int pos_j = int(mixJ);
-
-    // Compute pressure from world z coordinate.
-    float ln_p = pos.z / pToWorldZParams.y + pToWorldZParams.x;
-
-    //IMPORTANT: It is assumed that the horizontal step size is max. 1 cell
-    // (i.e. we shift by max. one grid cell in any horizontal direction).
-    if (pos_i > hsa.c00.i)
-    {
-        hsa.c00 = hsa.c10;
-        int i_new = (hsa.c10.i + 1) % dve.nLon;
-        hsa.c10.i = i_new;
-        hsa.c10.horizontallyMoved = true;
-        hsa.c01 = hsa.c11;
-        hsa.c11.i = i_new;
-        hsa.c11.horizontallyMoved = true;
-    }
-    else if (pos_i < hsa.c00.i)
-    {
-        hsa.c10 = hsa.c00;
-        int i_new = (hsa.c10.i - 1) % dve.nLon;
-        hsa.c00.i = i_new;
-        hsa.c00.horizontallyMoved = true;
-        hsa.c11 = hsa.c01;
-        hsa.c01.i = i_new;
-        hsa.c01.horizontallyMoved = true;
-    }
-
-    if (pos_j > hsa.c00.j)
-    {
-        hsa.c00 = hsa.c01;
-        hsa.c01.j++;
-        hsa.c01.horizontallyMoved = true;
-        hsa.c10 = hsa.c11;
-        hsa.c11.j++;
-        hsa.c11.horizontallyMoved = true;
-    }
-    else if (pos_j < hsa.c00.j)
-    {
-        hsa.c01 = hsa.c00;
-        hsa.c00.j--;
-        hsa.c00.horizontallyMoved = true;
-        hsa.c11 = hsa.c10;
-        hsa.c10.j--;
-        hsa.c10.horizontallyMoved = true;
-    }
-
-    // for all four columns update k,lnp,s and get scalar values
-    float scalar_i0j0 = updateHybridSigmaColumnAtP(
-            sampler, dve, sfcSampler, hybCoeffSampler, ln_p, clampToCellBoundary, hsa.c00);
-    float scalar_i1j0 = updateHybridSigmaColumnAtP(
-            sampler, dve, sfcSampler, hybCoeffSampler, ln_p, clampToCellBoundary, hsa.c10);
-    float scalar_i0j1 = updateHybridSigmaColumnAtP(
-            sampler, dve, sfcSampler, hybCoeffSampler, ln_p, clampToCellBoundary, hsa.c01);
-    float scalar_i1j1 = updateHybridSigmaColumnAtP(
-            sampler, dve, sfcSampler, hybCoeffSampler, ln_p, clampToCellBoundary, hsa.c11);
-
-    // Check for missing values. Due to consistency of the acceleration
-    // structures, this is done after all four columns have been retrieved.
-    if (scalar_i0j0 == M_MISSING_VALUE) return M_MISSING_VALUE;
-    if (scalar_i1j0 == M_MISSING_VALUE) return M_MISSING_VALUE;
-    if (scalar_i0j1 == M_MISSING_VALUE) return M_MISSING_VALUE;
-    if (scalar_i1j1 == M_MISSING_VALUE) return M_MISSING_VALUE;
 
     // Interpolate horizontally.
     mixJ = fract(mixJ);

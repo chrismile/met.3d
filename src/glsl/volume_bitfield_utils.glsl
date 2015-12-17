@@ -563,21 +563,6 @@ vec3 hybridLevelGradientBitfield(vec3 pos, vec3 h, uint bit)
 {
     vec3 gradient;
 
-    //! Does this structure enhance the performance for bitfields?
-    HybridSigmaAccel hca;
-
-    // 1. Sample data field at pos to determine grid column and levels.
-//FIXME: The sampling at "pos" is unneeded. However, replacing this by the
-//       sampling call for pos_east below breaks something. Fix this!
-//       Some more things could be sped up as well... (mr, 04Aug2014)
-    float v = sampleHybridSigmaVolumeAtPos(dataVolume, dataExtent,
-                                           surfacePressure, hybridCoefficients,
-                                           pos, hca);
-
-    float hz1 = (hca.c00.ln_p[0] - pToWorldZParams.x) * pToWorldZParams.y;
-    float hz2 = (hca.c00.ln_p[1] - pToWorldZParams.x) * pToWorldZParams.y;
-    float hz = abs(hz1 - hz2);
-
     // 2. Sample with horizontal displacement, using clampToDataBoundary.
     vec3 pos_east = vec3(min(pos.x + h.x, dataExtent.dataSECrnr.x), pos.yz);
     vec3 pos_west = vec3(max(pos.x - h.x, dataExtent.dataNWCrnr.x), pos.yz);
@@ -610,6 +595,9 @@ vec3 hybridLevelGradientBitfield(vec3 pos, vec3 h, uint bit)
     float zbot, ztop;
     getHybridSigmaBotTopLevelAtPos(dataExtent, surfacePressure,
                                    hybridCoefficients, pos, zbot, ztop);
+
+    float hz = getHybridApproxWorldZLevelDistanceAtPos(dataExtent, surfacePressure,
+                                                       hybridCoefficients, pos);
 
     vec3 pos_top = vec3(pos.xy, min(pos.z + hz, ztop));
     vec3 pos_bot = vec3(pos.xy, max(pos.z - hz, zbot));

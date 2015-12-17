@@ -35,18 +35,10 @@ uniform DataVolumeExtent dataExtent;
 
 // sample any data type at world position
 subroutine float sampleDataAtPosType(vec3 pos);
-#ifdef ENABLE_HYBRID_NEIGHBOURHOOD_ACCELERATION
-subroutine float sampleDataAtPosAccelType(vec3 pos, inout HybridSigmaAccel hca,
-                                          bool initAccel);
-#endif
 subroutine vec3 computeGradientType(vec3 pos, in vec3 h);
-
 
 // define subroutine uniform names
 subroutine uniform sampleDataAtPosType      sampleDataAtPos;
-#ifdef ENABLE_HYBRID_NEIGHBOURHOOD_ACCELERATION
-subroutine uniform sampleDataAtPosAccelType sampleDataAtPosAccel;
-#endif
 subroutine uniform computeGradientType      computeGradient;
 
 
@@ -75,42 +67,11 @@ float sampleHybridLevel(in vec3 pos)
 subroutine(sampleDataAtPosType)
 float sampleHybridLevel(in vec3 pos)
 {
-    HybridSigmaAccel hcaDummy; // not required here
     return sampleHybridSigmaVolumeAtPos(dataVolume, dataExtent,
                                         surfacePressure, hybridCoefficients,
-                                        pos, hcaDummy);
+                                        pos);
 }
 #endif
-
-
-#ifdef ENABLE_HYBRID_NEIGHBOURHOOD_ACCELERATION
-
-subroutine(sampleDataAtPosAccelType)
-float samplePressureLevelAccel(in vec3 pos, inout HybridSigmaAccel hca, bool initAccel)
-{
-    return samplePressureLevelVolumeAtPos(dataVolume, dataExtent,
-                                          pressureTable, pos);
-}
-
-#ifdef ENABLE_HYBRID_PRESSURETEXCOORDTABLE
-subroutine(sampleDataAtPosAccelType)
-float sampleHybridLevelAccel(in vec3 pos, inout HybridSigmaAccel hca, bool initAccel)
-{
-    return sampleHybridSigmaVolumeAtPos_LUT(dataVolume, dataExtent,
-                                            surfacePressure, hybridCoefficients,
-                                            pressureTexCoordTable2D, pos);
-}
-#else
-subroutine(sampleDataAtPosAccelType)
-float sampleHybridLevelAccel(in vec3 pos, inout HybridSigmaAccel hca, bool initAccel)
-{
-    return sampleHybridSigmaVolumeAtPos(dataVolume, dataExtent,
-                                        surfacePressure, hybridCoefficients,
-                                        pos, hca);
-}
-#endif
-
-#endif // ENABLE_HYBRID_NEIGHBOURHOOD_ACCELERATION
 
 
 /******************************************************************************
