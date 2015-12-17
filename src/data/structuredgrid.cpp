@@ -444,6 +444,29 @@ QVector3D MStructuredGrid::getSouthEastBottomDataVolumeCorner_lonlatp()
 }
 
 
+bool MStructuredGrid::gridIsCyclicInLongitude()
+{
+    double deltaLon = lons[1] - lons[0];
+    double lon_west = MMOD(lons[0], 360.);
+    double lon_east = MMOD(lons[nlons-1] + deltaLon, 360.);
+
+//WORKAROUND -- Usage of M_LONLAT_RESOLUTION defined in mutil.h
+    // NOTE (mr, Dec2013): Workaround to fix a float accuracy problem
+    // occuring with some NetCDF data files converted from GRIB with
+    // netcdf-java): For example, such longitude arrays can occur:
+    // -18, -17, -16, -15, -14, -13, -12, -11, -10, -9.000004, -8.000004,
+    // The latter should be equal to -9.0, -8.0 etc. The inaccuracy causes
+    // wrong indices below, hence we compare to this absolute epsilon to
+    // determine equality of two float values.
+    // THIS WORKAROUND NEEDS TO BE REMOVED WHEN HIGHER RESOLUTIONS THAN 0.00001
+    // ARE HANDLED BY MET.3D.
+    // Cf. http://randomascii.wordpress.com/2012/02/25/comparing-floating-point-numbers-2012-edition/
+    // for potentially better solutions.
+
+    return ( fabs(lon_west - lon_east) < M_LONLAT_RESOLUTION );
+}
+
+
 void MStructuredGrid::setTextureParameters(GLint  internalFormat,
                                            GLenum format,
                                            GLint  wrap,

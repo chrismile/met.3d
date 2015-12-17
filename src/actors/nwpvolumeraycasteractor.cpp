@@ -2062,6 +2062,9 @@ void MNWPVolumeRaycasterActor::setVarSpecificShaderVars(
     shader->setUniformValue(structName + ".eastWestExtent", eastWestExtent); CHECK_GL_ERROR;
     shader->setUniformValue(structName + ".northernBoundary", northernBoundary); CHECK_GL_ERROR;
     shader->setUniformValue(structName + ".northSouthExtent", northSouthExtent); CHECK_GL_ERROR;
+    shader->setUniformValue(
+                structName + ".gridIsCyclicInLongitude",
+                var->grid->gridIsCyclicInLongitude()); CHECK_GL_ERROR;
     shader->setUniformValue(structName + ".nLon", nLon); CHECK_GL_ERROR;
     shader->setUniformValue(structName + ".nLat", nLat); CHECK_GL_ERROR;
     shader->setUniformValue(structName + ".nLev", nLev); CHECK_GL_ERROR;

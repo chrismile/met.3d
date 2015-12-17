@@ -221,8 +221,19 @@ vec3 hybridLevelGradient(in vec3 pos, in vec3 h)
     float hz = abs(hz1 - hz2);
 
     // 2. Sample with horizontal displacement, using clampToDataBoundary.
-    vec3 pos_east = vec3(min(pos.x + h.x, dataExtent.dataSECrnr.x), pos.yz);
-    vec3 pos_west = vec3(max(pos.x - h.x, dataExtent.dataNWCrnr.x), pos.yz);
+    vec3 pos_east;
+    vec3 pos_west;
+    if (dataExtent.gridIsCyclicInLongitude)
+    {
+        pos_east = vec3(pos.x + h.x, pos.yz);
+        pos_west = vec3(pos.x - h.x, pos.yz);
+    }
+    else
+    {
+        // Non-cyclic grids: clamp to data boundary.
+        pos_east = vec3(min(pos.x + h.x, dataExtent.dataSECrnr.x), pos.yz);
+        pos_west = vec3(max(pos.x - h.x, dataExtent.dataNWCrnr.x), pos.yz);
+    }
 
     float x1 = sampleHybridSigmaVolumeAtPos_accel(dataVolume, dataExtent,
                                                   surfacePressure, hybridCoefficients,

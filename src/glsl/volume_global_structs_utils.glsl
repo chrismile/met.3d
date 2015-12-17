@@ -46,6 +46,7 @@ struct DataVolumeExtent
     float eastWestExtent; // lon extent
     float northernBoundary; // northern lat boundary (+ deltaLatLon / 2)
     float northSouthExtent; // lat extent
+    bool  gridIsCyclicInLongitude;
 
     int   nLon; // dimension of lons
     int   nLat; // dimension of lats

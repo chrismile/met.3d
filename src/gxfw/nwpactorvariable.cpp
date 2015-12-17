@@ -2199,10 +2199,7 @@ void MNWP2DHorizontalActorVariable::computeRenderRegionParameters(
     // -- Repeating parts of a grid, e.g. the grid is defined from 0 to 360,
     //    we want to render from -180 to 300.
 
-    double deltaLon = grid->lons[1] - grid->lons[0];
-    double lon_west = MMOD(grid->lons[0], 360.);
-    double lon_east = MMOD(grid->lons[grid->nlons-1] + deltaLon, 360.);
-    bool gridIsCyclic = ( fabs(lon_west - lon_east) < M_LONLAT_RESOLUTION);
+    bool gridIsCyclic = grid->gridIsCyclicInLongitude();
 
     double shiftLon = grid->lons[0];
     if (!gridIsCyclic) shiftLon = min(shiftLon, llcrnrlon);

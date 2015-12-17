@@ -301,6 +301,8 @@ public:
 
     virtual float getBottomDataVolumePressure() { return 0.; }
 
+    bool gridIsCyclicInLongitude();
+
     /**
       Allows a number of texture parameters to be modified. Call this function
       before you call @ref getTexture().

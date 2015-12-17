@@ -111,6 +111,7 @@ float sampleHybridSigmaVolumeAtPos(in sampler3D sampler,
     float p = exp(pos.z / pToWorldZParams.y + pToWorldZParams.x);
 
     int i1 = i+1;
+    if (dve.gridIsCyclicInLongitude) i1 %= dve.nLon;
     int j1 = j+1;
 
     float scalar_i0j0 = sampleHybridSigmaColumnAtP(sampler, dve, sfcSampler,
@@ -351,6 +352,7 @@ float sampleHybridSigmaVolumeAtPos_maxNeighbour(
     float p = exp(pos.z / pToWorldZParams.y + pToWorldZParams.x);
 
     int i1 = i+1;
+    if (dve.gridIsCyclicInLongitude) i1 %= dve.nLon;
     int j1 = j+1;
 
     float scalar_i0j0 = sampleHybridSigmaColumnAtP_maxNeighbour(sampler, dve, sfcSampler,
@@ -385,6 +387,7 @@ void getHybridSigmaBotTopLevelAtPos(in DataVolumeExtent dve,
     int i = int(mixI);
     int j = int(mixJ);
     int i1 = i+1;
+    if (dve.gridIsCyclicInLongitude) i1 %= dve.nLon;
     int j1 = j+1;
 
     // Hybrid coefficients of highest and lowest level.
@@ -529,6 +532,7 @@ float sampleHybridSigmaVolumeAtPos_LUT(in sampler3D sampler,
     int i = int(mixI);
     int j = int(mixJ);
     int i1 = i+1;
+    if (dve.gridIsCyclicInLongitude) i1 %= dve.nLon;
     int j1 = j+1;
 
     // Compute pressure from world z coordinate.
