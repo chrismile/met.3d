@@ -428,6 +428,57 @@ void getHybridSigmaBotTopLevelAtPos(in DataVolumeExtent dve,
 }
 
 
+// Determine the distance (in worldZ coordinates) between the two hybrid levels
+// that enclose the sample point at position "pos". The grid column at i,j
+// coordinates (west/north corner of the horizontal grid box) is used.
+float getHybridApproxWorldZLevelDistanceAtPos(in DataVolumeExtent dve,
+                                              in sampler2D sfcSampler,
+                                              in sampler1D hybCoeffSampler,
+                                              in vec3 pos)
+{
+    float mixI = mod(pos.x - dve.dataNWCrnr.x, 360.) / dve.deltaLatLon;
+    float mixJ = (dve.dataNWCrnr.y - pos.y) / dve.deltaLatLon;
+    int i = int(mixI);
+    int j = int(mixJ);
+
+    // Compute pressure from world z coordinate.
+    float p = exp(pos.z / pToWorldZParams.y + pToWorldZParams.x);
+
+    int kL = 0;
+    int kU = dve.nLev - 1;
+
+    // pressure in Pa converted to hPa
+    float psfc = texelFetch(sfcSampler, ivec2(i,j), 0).a / 100.0;
+
+    // Binary search to find model levels kL, kU that enclose pressure level p.
+    while (abs(kU - kL) > 1)
+    {
+        int kMid = (kL + kU) / 2;
+
+        float a = texelFetch(hybCoeffSampler, kMid, 0).a;
+        float b = texelFetch(hybCoeffSampler, kMid + dve.nLev, 0).a;
+        float pMid = a + b * psfc;
+
+        if (p >= pMid) kL = kMid; else kU = kMid;
+    }
+
+    float aU = texelFetch(hybCoeffSampler, kU, 0).a;
+    float bU = texelFetch(hybCoeffSampler, kU + dve.nLev, 0).a;
+
+    float aL = texelFetch(hybCoeffSampler, kL, 0).a;
+    float bL = texelFetch(hybCoeffSampler, kL + dve.nLev, 0).a;
+
+    float pU = aU + bU * psfc;
+    float pL = aL + bL * psfc;
+
+    float hzU = (log(pU) - pToWorldZParams.x) * pToWorldZParams.y;
+    float hzL = (log(pL) - pToWorldZParams.x) * pToWorldZParams.y;
+    float hz = abs(hzU - hzL);
+
+    return hz;
+}
+
+
 #ifdef ENABLE_HYBRID_PRESSURETEXCOORDTABLE
 
 float sampleHybridSigmaColumnAtP_LUT(in sampler3D sampler, in DataVolumeExtent dve,
