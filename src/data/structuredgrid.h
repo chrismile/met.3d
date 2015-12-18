@@ -239,17 +239,21 @@ public:
             unsigned int k, unsigned int j, unsigned int i)
     { Q_UNUSED(k); Q_UNUSED(j); Q_UNUSED(i); return M_MISSING_VALUE; }
 
+    inline float getDeltaLon() { return fabs(lons[1]-lons[0]); }
+
+    inline float getDeltaLat() { return fabs(lats[1]-lats[0]); }
+
     inline float getWestInterfaceLon(unsigned int i)
-    { return lons[i] - abs(lons[1]-lons[0])/2.; }
+    { return lons[i] - getDeltaLon()/2.; }
 
     inline float getEastInterfaceLon(unsigned int i)
-    { return lons[i] + abs(lons[1]-lons[0])/2.; }
+    { return lons[i] + getDeltaLon()/2.; }
 
     inline float getNorthInterfaceLat(unsigned int j)
-    { return lats[j] + abs(lats[1]-lats[0])/2.; }
+    { return lats[j] + getDeltaLat()/2.; }
 
     inline float getSouthInterfaceLat(unsigned int j)
-    { return lats[j] - abs(lats[1]-lats[0])/2.; }
+    { return lats[j] - getDeltaLat()/2.; }
 
     /**
       Sample the data grid at lon, lat and p, using trilinear interpolation.

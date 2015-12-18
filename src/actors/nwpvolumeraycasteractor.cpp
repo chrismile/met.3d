@@ -2023,7 +2023,7 @@ void MNWPVolumeRaycasterActor::setVarSpecificShaderVars(
 
     // Precompute data extent variables and store in uniform struct.
     // =============================================================
-    const GLfloat deltaLatLon = GLfloat(fabs(var->grid->getLons()[1] - var->grid->getLons()[0]));
+    const GLfloat deltaLatLon = GLfloat(var->grid->getDeltaLat());
     const GLfloat westernBoundary = dataNWCrnr.x() - deltaLatLon / 2.0f;
     const GLfloat eastWestExtent = dataSECrnr.x() - dataNWCrnr.x() + deltaLatLon;
     const GLfloat northernBoundary = dataNWCrnr.y() + deltaLatLon / 2.0f;

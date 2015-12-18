@@ -337,15 +337,25 @@ void raycaster(in vec3 h_gradient, in Ray ray, in vec2 lambdaNearFar,
     // that potentially contain an isosurface.
     // ===================================================================
 
-    // Grid spacing of the acceleration structure.
-    vec3 deltaAccel = vec3(
-            abs(dataExtent.dataSECrnr.x - dataExtent.dataNWCrnr.x) /
-                float(textureSize(minMaxAccel3D, 0).x),
-            abs(dataExtent.dataSECrnr.y - dataExtent.dataNWCrnr.y) /
-                float(textureSize(minMaxAccel3D, 0).y),
-            abs(dataExtent.dataSECrnr.z - dataExtent.dataNWCrnr.z) /
-                float(textureSize(minMaxAccel3D, 0).z));
+    // Grid spacing of the acceleration structure. 
 
+    ivec3 nMinMaxAccel3D = ivec3(textureSize(minMaxAccel3D, 0).x,
+                                 textureSize(minMaxAccel3D, 0).y,
+                                 textureSize(minMaxAccel3D, 0).z);
+    
+    // Special case: If the grid is cyclic in longitude, shift the eastern 
+    // longitude one grid spacing east (e.g. make 359. 360.).
+    float dataSECrnr_x = dataExtent.dataSECrnr.x;
+    if (dataExtent.gridIsCyclicInLongitude) dataSECrnr_x += dataExtent.deltaLatLon;
+
+    vec3 deltaAccel = vec3(
+            abs(dataSECrnr_x - dataExtent.dataNWCrnr.x) /
+                float(nMinMaxAccel3D.x),
+            abs(dataExtent.dataSECrnr.y - dataExtent.dataNWCrnr.y) /
+                float(nMinMaxAccel3D.y),
+            abs(dataExtent.dataSECrnr.z - dataExtent.dataNWCrnr.z) /
+                float(nMinMaxAccel3D.z));
+                
     // Indices of the position of ray entry into the acceleration structure
     // (the min/max map covers the same world space as the data volume).
     // "iaccel" is updated during the traversal to keep track of the current
@@ -416,7 +426,11 @@ void raycaster(in vec3 h_gradient, in Ray ray, in vec2 lambdaNearFar,
         // DEBUG -- Uncomment to visualise the boundary artefacts described
         // in the TODO (mr, 17Nov2014) in the fragment shader.
         //rayColor = vec4(brickMinMax.g / 30., 0., 0., 1.); break;
-    
+        
+        // DEBUG -- Uncomment to see whether we're getting the right entry
+        // brick.
+        //rayColor = vec4(iaccel.z / 32., iaccel.y / 32., iaccel.x / 32., 1.); break;
+        
         // Determine which axis-perpendicular plane is crossed next. This 
         // corresponds to the currently smallest "lambdaExit".
         if (lambdaExitAccel.x < lambdaExitAccel.y)
@@ -434,7 +448,11 @@ void raycaster(in vec3 h_gradient, in Ray ray, in vec2 lambdaNearFar,
                 // Update lambdaExitAccel.x and iaccel.x to represent the exit
                 // position and index of the next brick.
                 lambdaExitAccel.x += deltaLambdaAccel.x;
-                iaccel.x += iincr.x;                    
+                iaccel.x += iincr.x;
+                
+                // If the grid is cyclic in longitude, map iaccel.x range to
+                // (0 .. nMinMaxAccel3D.x - 1).
+                if (dataExtent.gridIsCyclicInLongitude) iaccel.x %= nMinMaxAccel3D.x;
             }
         
             else // z < x < y => z is smallest

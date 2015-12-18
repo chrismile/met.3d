@@ -858,6 +858,12 @@ GL::MTexture *MStructuredGrid::getMinMaxAccelTexture3D(
         // Get data volume corners in lon/lat/pressure space.
         QVector3D nwtDataCrnr = getNorthWestTopDataVolumeCorner_lonlatp();
         QVector3D sebDataCrnr = getSouthEastBottomDataVolumeCorner_lonlatp();
+        // If the grid is cyclic fill the "cycle gap", e.g. between 359. and
+        // 360. -- The eastern longitude of the data grid would be 359., but
+        // the region we want to use to create the acceleration strucutre would
+        // be 0..360.
+        if (gridIsCyclicInLongitude())
+            sebDataCrnr.setX(sebDataCrnr.x() + getDeltaLat());
 
         // Convert pressure to ln(pressure) to divide vertically in ln(p).
         nwtDataCrnr.setZ(log(nwtDataCrnr.z()));
@@ -874,10 +880,16 @@ GL::MTexture *MStructuredGrid::getMinMaxAccelTexture3D(
             float lonEast = nwtDataCrnr.x() + (iAcc + 1) * deltaAccLon;
 
             // Find horizontal indices iWest, iEast that enclose brick.
-            float mixI = MMOD(lonWest - lons[0], 360.) / fabs(lons[1]-lons[0]);
+            float mixI = (lonWest - lons[0]) / getDeltaLon();
             int iWest = int(mixI);
-            mixI = MMOD(lonEast - lons[0], 360.) / fabs(lons[1]-lons[0]);
-            int iEast = std::min(int(mixI) + 1, int(nlons - 1));
+            mixI = (lonEast - lons[0]) / getDeltaLon();
+            int iEast = int(mixI) + 1;
+            if ( !gridIsCyclicInLongitude() )
+            {
+                // If the grid is NOT cyclic in longitude, crop iEast to the
+                // range (0 .. nlons-1).
+                iEast = std::min(iEast, int(nlons - 1));
+            }
 
             for (int jAcc = 0; jAcc < nAccLon; jAcc++)
             {
@@ -886,9 +898,9 @@ GL::MTexture *MStructuredGrid::getMinMaxAccelTexture3D(
                 float latSouth = nwtDataCrnr.y() + (jAcc + 1) * deltaAccLat;
 
                 // Find horizontal indices jNorth, jSouth that enclose brick.
-                float mixJ = (lats[0] - latNorth) / fabs(lats[1]-lats[0]);
+                float mixJ = (lats[0] - latNorth) / getDeltaLat();
                 int jNorth = int(mixJ);
-                mixJ = (lats[0] - latSouth) / fabs(lats[1]-lats[0]);
+                mixJ = (lats[0] - latSouth) / getDeltaLat();
                 int jSouth = std::min(int(mixJ) + 1, int(nlats - 1));
 
                 for (int kAcc = 0; kAcc < nAccLon; kAcc++)
@@ -905,19 +917,23 @@ GL::MTexture *MStructuredGrid::getMinMaxAccelTexture3D(
                     for (int i = iWest; i <= iEast; i++)
                         for (int j = jNorth; j <= jSouth; j++)
                         {
+                            // For grids cyclic in longitude, i may be > nlons.
+                            // Map to range 0..nlons-1.
+                            int imod = i % nlons;
+
                             // For some level types (e.g. hybrid terrain following),
                             // the current grid column i,j might be above the
                             // current brick. Skip these cases.
-                            if (pTop > getPressure(nlevs-1, j, i)) continue;
+                            if (pTop > getPressure(nlevs-1, j, imod)) continue;
 
                             // Determine min/max k with findLevel().
-                            int kTop = findLevel(j, i, pTop);
-                            int kBot = std::min(findLevel(j, i, pBot) + 1,
+                            int kTop = findLevel(j, imod, pTop);
+                            int kBot = std::min(findLevel(j, imod, pBot) + 1,
                                                 int(nlevs - 1));
 
                             for (int k = kTop; k <= kBot; k++)
                             {
-                                float val = data[INDEX3zyx_2(k, j, i,
+                                float val = data[INDEX3zyx_2(k, j, imod,
                                                              nlatsnlons, nlons)];
                                 if (val < min) min = val;
                                 if (val > max) max = val;
@@ -941,10 +957,10 @@ GL::MTexture *MStructuredGrid::getMinMaxAccelTexture3D(
 //                for (int iAcc = 0; iAcc < nAccLon; iAcc++)
 //                {
 //                    accLevel += QString("%1(%2) / ")
-//                            .arg(minMaxAccelGrid[INDEX4zyxc(kAcc, jAcc, iAcc, 0,
-//                                                            nAccLat, nAccLon, 2)])
-//                            .arg(minMaxAccelGrid[INDEX4zyxc(kAcc, jAcc, iAcc, 1,
-//                                                            nAccLat, nAccLon, 2)]);
+//                            .arg(minMaxAccel->data[INDEX4zyxc(kAcc, jAcc, iAcc, 0,
+//                                                              nAccLat, nAccLon, 2)])
+//                            .arg(minMaxAccel->data[INDEX4zyxc(kAcc, jAcc, iAcc, 1,
+//                                                              nAccLat, nAccLon, 2)]);
 //                }
 //                accLevel += "\n";
 //            }
