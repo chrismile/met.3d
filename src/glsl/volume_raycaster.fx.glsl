@@ -355,12 +355,28 @@ void raycaster(in vec3 h_gradient, in Ray ray, in vec2 lambdaNearFar,
                 float(nMinMaxAccel3D.y),
             abs(dataExtent.dataSECrnr.z - dataExtent.dataNWCrnr.z) /
                 float(nMinMaxAccel3D.z));
-                
+
+    // In longitude, the world space coordinate system can be shifted by
+    // multiples of 360 degrees with respect to the data coordinate system
+    // (e.g. if the data volume is defined from -60..60 degrees it may be
+    // rendered in the range 300..420 degrees; or cyclic global grids may
+    // be repeated at the boundaries).
+    // To compute the correct entry indices into the acceleration structure,
+    // find closest (shifted) dataNWCrnr.x WEST of rayPosition.x by shifting by
+    // multiples of 360. degrees longitude.
+    // Example: if dataNWCrnr.x == -60. and rayPosition.x == 320., then
+    // dataNWCrnr.x is shifted to 300. If rayPosition.x == -70., then
+    // dataNWCrnr.x is shifted to -420.
+    float distanceRayPosDataNW_x = rayPosition.x - dataExtent.dataNWCrnr.x;
+    int numShift360degrees = int(distanceRayPosDataNW_x / 360.);
+    if (rayPosition.x < dataExtent.dataNWCrnr.x) numShift360degrees -= 1;
+    float dataNWCrnr_x = dataExtent.dataNWCrnr.x + numShift360degrees * 360.;
+
     // Indices of the position of ray entry into the acceleration structure
     // (the min/max map covers the same world space as the data volume).
     // "iaccel" is updated during the traversal to keep track of the current
     // brick.
-    float mixI = mod(rayPosition.x - dataExtent.dataNWCrnr.x, 360.) / deltaAccel.x;
+    float mixI = (rayPosition.x - dataNWCrnr_x) / deltaAccel.x;
     float mixJ = (dataExtent.dataNWCrnr.y - rayPosition.y) / deltaAccel.y;
     float mixK = (dataExtent.dataNWCrnr.z - rayPosition.z) / deltaAccel.z;
     ivec3 iaccel = ivec3(int(mixI), int(mixJ), int(mixK)); 
@@ -370,7 +386,7 @@ void raycaster(in vec3 h_gradient, in Ray ray, in vec2 lambdaNearFar,
     // coordinates that do not form a point; they are stored in a vector for
     // convenience).
     vec3 posExit = vec3(
-            dataExtent.dataNWCrnr.x 
+            dataNWCrnr_x
             + (iaccel.x + (ray.direction.x >= 0.0 ? 1 : 0)) * deltaAccel.x,
             dataExtent.dataNWCrnr.y
             - (iaccel.y + (ray.direction.y >= 0.0 ? 0 : 1)) * deltaAccel.y,
@@ -491,7 +507,7 @@ void raycaster(in vec3 h_gradient, in Ray ray, in vec2 lambdaNearFar,
             // The brick is to be traversed, invoke traversal.
             bool fullTraversal = traverseSectionOfDataVolume(
                     h_gradient, depthGlobal, rayPosIncrement,
-                    lambdaBrickExit,
+                    min(lambdaBrickExit, lambdaNearFar.y), // don't overshoot!
                     lambda, prevRayPosition, prevLambda,
                     rayColor, rayPosition,
                     crossingLevelFront, crossingLevelBack,
