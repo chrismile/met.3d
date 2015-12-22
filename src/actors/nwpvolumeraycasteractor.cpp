@@ -898,14 +898,14 @@ bool MNWPVolumeRaycasterActor::triggerAnalysisOfObjectAtPos(
 
     // Compute the intersection points of the ray with the volume bounding
     // box. If the ray does not intersect with the box discard this fragment.
-    QVector3D volumeTopNWCrnr(bbSettings->urcrnLon, bbSettings->urcrnLat,
+    QVector3D volumeTopNECrnr(bbSettings->urcrnLon, bbSettings->urcrnLat,
                               sceneView->worldZfromPressure(bbSettings->pTop_hPa));
-    QVector3D volumeBottomSECrnr(bbSettings->llcrnLon, bbSettings->llcrnLat,
+    QVector3D volumeBottomSWCrnr(bbSettings->llcrnLon, bbSettings->llcrnLat,
                                  sceneView->worldZfromPressure(bbSettings->pBot_hPa));
     QVector2D lambdaNearFar;
 
     bool rayIntersectsRenderVolume = rayBoxIntersection(
-                rayOrigin, rayDirection, volumeBottomSECrnr, volumeTopNWCrnr,
+                rayOrigin, rayDirection, volumeBottomSWCrnr, volumeTopNECrnr,
                 &lambdaNearFar);
     if (!rayIntersectsRenderVolume)
     {
@@ -2079,12 +2079,12 @@ void MNWPVolumeRaycasterActor::setCommonShaderVars(
 
     shader->setUniformValue(
                 "volumeBottomSECrnr",
-                QVector3D(bbSettings->llcrnLon,
+                QVector3D(bbSettings->urcrnLon, // upper-right == north-east
                           bbSettings->llcrnLat,
                           sceneView->worldZfromPressure(bbSettings->pBot_hPa))); CHECK_GL_ERROR;
     shader->setUniformValue(
                 "volumeTopNWCrnr",
-                QVector3D(bbSettings->urcrnLon,
+                QVector3D(bbSettings->llcrnLon, // lower-left == south-west
                           bbSettings->urcrnLat,
                           sceneView->worldZfromPressure(bbSettings->pTop_hPa))); CHECK_GL_ERROR;
 

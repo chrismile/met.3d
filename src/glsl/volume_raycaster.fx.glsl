@@ -561,10 +561,26 @@ shader FSmain(in VStoFS Input, out vec4 fragColor : 0)
         ray.origin = cameraPosition;
         ray.direction = normalize(Input.worldSpaceCoordinate - cameraPosition);
 
+        // Compute the minimum bounding box of the region that is to be
+        // rendered. For latitude and worldZ (both cannot be cyclic), compute
+        // the inner coordinates of user-specified bounding box and data
+        // volume bounding box. Longitude is a special case (can be cyclic)
+        // and needs to be treated below. The user-specified bounding box
+        // value is kept here.
+        vec3 renderRegionBottomSWCrnr = vec3(
+                volumeTopNWCrnr.x,
+                max(volumeBottomSECrnr.y, dataExtent.dataSECrnr.y),
+                max(volumeBottomSECrnr.z, dataExtent.dataSECrnr.z));
+
+        vec3 renderRegionTopNECrnr = vec3(
+                volumeBottomSECrnr.x,
+                min(volumeTopNWCrnr.y, dataExtent.dataNWCrnr.y),
+                min(volumeTopNWCrnr.z, dataExtent.dataNWCrnr.z));
+
         // Compute the intersection points of the ray with the volume bounding
         // box. If the ray does not intersect with the box discard this fragment.
         bool rayIntersectsRenderVolume = rayBoxIntersection(
-                ray, volumeBottomSECrnr, volumeTopNWCrnr, lambdaNearFar);
+                ray, renderRegionBottomSWCrnr, renderRegionTopNECrnr, lambdaNearFar);
         if (!rayIntersectsRenderVolume) discard;
 
         // If the value for lambdaNear is < 0 the camera is located inside the
