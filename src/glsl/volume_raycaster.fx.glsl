@@ -50,6 +50,8 @@ const int SHADOWS_OFF = 0;
 const int SHADOWS_MAP = 1;
 const int SHADOWS_VOLUME_AND_RAY = 2;
 
+// Workaround; see usage below.
+const float LAMBDA_OFFSET = 0.001;
 
 /*****************************************************************************
  ***                             INTERFACES
@@ -505,7 +507,7 @@ void raycaster(in vec3 h_gradient, in Ray ray, in vec2 lambdaNearFar,
         if (doBrickTraversal)
         {
             // The brick is to be traversed, invoke traversal.
-            bool fullTraversal = traverseSectionOfDataVolume(
+            bool brickHasBeenFullyTraversed = traverseSectionOfDataVolume(
                     h_gradient, depthGlobal, rayPosIncrement,
                     min(lambdaBrickExit, lambdaNearFar.y), // don't overshoot!
                     lambda, prevRayPosition, prevLambda,
@@ -516,7 +518,7 @@ void raycaster(in vec3 h_gradient, in Ray ray, in vec2 lambdaNearFar,
 
             // Has the ray been terminated in the brick? Then also terminate the
             // min/max map traversal.
-            if (!fullTraversal) break;
+            if (!brickHasBeenFullyTraversed) break;
         }
         else
         {
@@ -525,6 +527,68 @@ void raycaster(in vec3 h_gradient, in Ray ray, in vec2 lambdaNearFar,
             prevLambda  = lambda - stepSize;
             rayPosition = ray.origin + lambda * ray.direction;;
             prevRayPosition = rayPosition - rayPosIncrement;
+        }
+
+        // Special case for non-cyclic grids. If parts of a non-cyclic data
+        // volume are repeated (e.g. a volume defined in the range -60..40 deg
+        // in longitude is rendered from 0..360 deg) and the samping position
+        // has left valid data space, skip the empty space and re-enter the
+        // data volume where its next recurrence starts. The case is simply
+        // detected by testing whether iaccel.x still referes to valid brick
+        // indidces.
+        if ( (iaccel.x < 0) || (iaccel.x >= nMinMaxAccel3D.x) )
+        {
+            // Skip empty space and compute the lambda of the position where
+            // the ray enters the next recurrence of the data volume.
+            if (iaccel.x >= nMinMaxAccel3D.x)
+            {
+                // ray.direction.x >= 0.0: move eastward.
+                dataNWCrnr_x += 360.;
+                lambda = abs((dataNWCrnr_x - ray.origin.x) * rayDirInv.x);
+            }
+            else
+            {
+                // ray.direction.x < 0.0: move westward.
+                dataNWCrnr_x -= 360.;
+                float widthOfDataVolume = dataExtent.dataSECrnr.x - dataExtent.dataNWCrnr.x;
+                lambda = abs((dataNWCrnr_x + widthOfDataVolume - ray.origin.x) * rayDirInv.x);
+            }
+
+//TODO -- avoid noise -- see other usage of LAMBDA_OFFSET below.
+            lambda += LAMBDA_OFFSET;
+
+            // Compute the new "rayPosition" from lambda.
+            prevLambda  = lambda - stepSize;
+            rayPosition = ray.origin + lambda * ray.direction;;
+            prevRayPosition = rayPosition - rayPosIncrement;
+
+            // Reset the current crossinglevel (otherwise isosurfaces that
+            // should be open can be closed, e.g. if the last scalar value
+            // before the empty-space-skip is below the isovalue and the first
+            // scalar after re-entering the data volume is above...).
+            float scalar = sampleDataAtPos(rayPosition);
+            crossingLevelBack = crossingLevelFront = computeCrossingLevel(scalar);
+
+            // Repeat statements from the initialization above: compute
+            // iaccel, posExit and lambdaExitAccel at the new "rayPosition".
+            float mixI = (rayPosition.x - dataNWCrnr_x) / deltaAccel.x;
+            float mixJ = (dataExtent.dataNWCrnr.y - rayPosition.y) / deltaAccel.y;
+            float mixK = (dataExtent.dataNWCrnr.z - rayPosition.z) / deltaAccel.z;
+            iaccel = ivec3(int(mixI), int(mixJ), int(mixK));
+
+            posExit = vec3(
+                    dataNWCrnr_x
+                    + (iaccel.x + (ray.direction.x >= 0.0 ? 1 : 0)) * deltaAccel.x,
+                    dataExtent.dataNWCrnr.y
+                    - (iaccel.y + (ray.direction.y >= 0.0 ? 0 : 1)) * deltaAccel.y,
+                    dataExtent.dataNWCrnr.z
+                    - (iaccel.z + (ray.direction.z >= 0.0 ? 0 : 1)) * deltaAccel.z);
+
+            lambdaExitAccel = vec3(
+                    (posExit.x - ray.origin.x) * rayDirInv.x,
+                    (posExit.y - ray.origin.y) * rayDirInv.y,
+                    (posExit.z - ray.origin.z) * rayDirInv.z);
+            lambdaExitAccel = abs(lambdaExitAccel);
         }
     }
     
@@ -650,7 +714,7 @@ shader FSmain(in VStoFS Input, out vec4 fragColor : 0)
 //      lambda_near to be located slightly before the box. I move the ray
 //      a bit foward here, but that is not a clean solution. INVESTIGATE THE
 //      ISSUE!
-        lambdaNearFar.x += 0.001;
+        lambdaNearFar.x += LAMBDA_OFFSET;
        
         //shadowRay = false;
     }
