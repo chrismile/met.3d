@@ -561,12 +561,13 @@ shader FSmain(in VStoFS Input, out vec4 fragColor : 0)
         ray.origin = cameraPosition;
         ray.direction = normalize(Input.worldSpaceCoordinate - cameraPosition);
 
-        // Compute the minimum bounding box of the region that is to be
-        // rendered. For latitude and worldZ (both cannot be cyclic), compute
+        // Compute the bottom south-west corner and the top north-east corner
+        // of the minimum bounding box of the region that is to be
+        // rendered. For latitude and worldZ (both cannot be cyclic), use
         // the inner coordinates of user-specified bounding box and data
         // volume bounding box. Longitude is a special case (can be cyclic)
-        // and needs to be treated below. The user-specified bounding box
-        // value is kept here.
+        // and is treated below (here, longitude values of the user-specified
+        // bounding box are kept).
         vec3 renderRegionBottomSWCrnr = vec3(
                 volumeTopNWCrnr.x,
                 max(volumeBottomSECrnr.y, dataExtent.dataSECrnr.y),
@@ -577,8 +578,8 @@ shader FSmain(in VStoFS Input, out vec4 fragColor : 0)
                 min(volumeTopNWCrnr.y, dataExtent.dataNWCrnr.y),
                 min(volumeTopNWCrnr.z, dataExtent.dataNWCrnr.z));
 
-        // Compute the intersection points of the ray with the volume bounding
-        // box. If the ray does not intersect with the box discard this fragment.
+        // Compute the intersection points of the ray with this bounding box.
+        // If the ray does not intersect with the box discard this fragment.
         bool rayIntersectsRenderVolume = rayBoxIntersection(
                 ray, renderRegionBottomSWCrnr, renderRegionTopNECrnr, lambdaNearFar);
         if (!rayIntersectsRenderVolume) discard;
@@ -587,6 +588,61 @@ shader FSmain(in VStoFS Input, out vec4 fragColor : 0)
         // bounding box. It makes no sense to start the ray traversal behind the
         // camera, hence move lambdaNear to 0 to start in front of the camera.
         lambdaNearFar.x = max(lambdaNearFar.x, 0.01);
+
+        // Treatment of longitude: The bounding box above uses the user-specified
+        // east/west boundaries. In the longitude dimension, parts of the data
+        // grid can be repeated in the display or shifted in location (example:
+        // data is defined in the range -60..+40 degrees but displayed in the
+        // range 0..360 degrees => the part from -60..0 needs to be displayed
+        // at 300..360).
+        // To avoid sampling at locations where no data values are defined,
+        // the longitude boundaries of the bounding box need to be adjusted
+        // (example continued: the ray intersects with the bounding box at
+        // 270 deg, looking EASTward (ray.direction.x > 0). No data is defined
+        // at 270 deg. The next cyclic entry position into the data volume
+        // (-60 deg + N * 360 deg) in eastward direction is at 300 deg. Hence,
+        // move the western boundary of the bounding box from 0 deg (the user
+        // specified value) to 300 deg. (If the camera is looking WESTward,
+        // the next EASTERN boundary is at 40 deg).
+
+        // Compute the next shifted western boundary of the data volume
+        // (dataNWCrnr_x) WEST of the computed intersection (entry) point
+        // (given by lambdaNearFar.x).
+        vec3 rayEntryIntoBBox = ray.origin + lambdaNearFar.x * ray.direction;
+        float distanceRayEntryLonToDataWestLon = rayEntryIntoBBox.x - dataExtent.dataNWCrnr.x;
+        int numShift360degrees = int(distanceRayEntryLonToDataWestLon / 360.);
+        if (rayEntryIntoBBox.x < dataExtent.dataNWCrnr.x) numShift360degrees -= 1;
+        float dataNWCrnr_x = dataExtent.dataNWCrnr.x + numShift360degrees * 360.;
+
+        // Determine whether the current entry position is located inside or
+        // outside of the data volume (inside = distance of entry to next
+        // western data boundary needs to be smaller than width of data volume).
+        distanceRayEntryLonToDataWestLon = rayEntryIntoBBox.x - dataNWCrnr_x;
+        float widthOfDataVolume = dataExtent.dataSECrnr.x - dataExtent.dataNWCrnr.x;
+
+        if (distanceRayEntryLonToDataWestLon > widthOfDataVolume)
+        {
+            // Ray entry position is outside of data volume.
+
+            if (ray.direction.x > 0)
+            {
+                // Camera is looking EAST: modify western boundary of bbox.
+                renderRegionBottomSWCrnr.x = max(
+                        volumeTopNWCrnr.x, dataNWCrnr_x + 360.);
+            }
+            else
+            {
+                // Camera is looking WEST: modify eastern boundary of bbox.
+                renderRegionTopNECrnr.x = min(
+                        volumeBottomSECrnr.x, dataNWCrnr_x + widthOfDataVolume);
+            }
+
+            // Again compute intersection points of ray and modified bounding
+            // box.
+            bool rayIntersectsRenderVolume = rayBoxIntersection(
+                ray, renderRegionBottomSWCrnr, renderRegionTopNECrnr, lambdaNearFar);
+            if (!rayIntersectsRenderVolume) discard;
+        }
 
 //TODO (mr, 17Nov2014): The sampling at the position computed from 
 //      lambdaNearFar.x often fails, resulting in artefacts at the data volume
