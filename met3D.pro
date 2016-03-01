@@ -274,7 +274,8 @@ DEFINES += \
 #     CONTINUOUS_GL_UPDATE \
 #     DEBUG \
 #     DEBUG_OUTPUT_MULTITHREAD_SCHEDULER \
-#     DEBUG_OUTPUT_MEMORYMANAGER
+#     DEBUG_OUTPUT_MEMORYMANAGER \
+#     NETCDF_CF_TEST_ATTRIBUTES
 
 # Link with debug version of qcustomplot if compiling in debug mode,
 # else with release library:

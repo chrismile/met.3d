@@ -506,6 +506,7 @@ bool NcCFVar::isCFDataVariable(const NcVar& var, NcVariableGridType type)
     if ((var.getDimCount() == 1) && (var.getName() == var.getDim(0).getName()))
         return false;
 
+#ifdef NETCDF_CF_TEST_ATTRIBUTES
     // Second test: The variable has to contain the "units" attribute and
     // either the "long_name" or "standard_name" attribute.
     bool units=false, name=false;
@@ -514,6 +515,7 @@ bool NcCFVar::isCFDataVariable(const NcVar& var, NcVariableGridType type)
     if (attributeList.find("long_name") != attributeList.end()) name = true;
     if (attributeList.find("standard_name") != attributeList.end()) name = true;
     if (!(units && name)) return false;
+#endif
 
     // Third test: Are all coordinates for the requested variable type present?
     NcCFVar cfvar(var);
