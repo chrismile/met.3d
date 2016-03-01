@@ -58,6 +58,7 @@ struct MVariableDataSharedPerFile
     double scale_factor, add_offset;
 
     bool reverseLatitudes;
+    bool reverseLevels;
 };
 
 typedef QHash<QString, MVariableDataSharedPerFile> MSharedDataVariableNameMap;

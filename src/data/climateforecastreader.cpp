@@ -748,6 +748,32 @@ MStructuredGrid *MClimateForecastReader::readGrid(
             shared->levels.resize(shared->vertVar.getDim(0).getSize());
             shared->vertVar.getVar(shared->levels.data());
 
+            // Determine whether the grid's vertical levels must be reversed.
+            string verticalDirection = "";
+            try { shared->vertVar.getAtt("positive").getValues(verticalDirection); }
+            catch (NcException) {}
+
+            if (verticalDirection == "up")
+            {
+                LOG4CPLUS_DEBUG(mlog, "\tReversing levels.");
+                shared->reverseLevels = true;
+                QVector<double> tmpLevs(shared->levels);
+                int size = shared->levels.size();
+                for (int i = 0; i < size; i++) shared->levels[i] = tmpLevs[size-1-i];
+            }
+            else if (verticalDirection == "down")
+            {
+                shared->reverseLevels = false;
+            }
+            else
+            {
+                throw NcException(
+                        "NcException",
+                        "invalid vertical direction ('positive' attribute must"
+                        " be one of 'up' or 'down')",
+                        __FILE__, __LINE__);
+            }
+
             if (levelType == PRESSURE_LEVELS_3D)
             {
                 // If vertical levels are specified in Pa, convert to hPa.
@@ -891,24 +917,49 @@ MStructuredGrid *MClimateForecastReader::readGrid(
                 count[2] = shared->lats.size();
                 count[3] = shared->lons.size();
 
-                if (shared->reverseLatitudes)
+                if (shared->reverseLatitudes || shared->reverseLevels)
                 {
                     LOG4CPLUS_WARN(mlog, "WARNING: data field needs to be "
-                                   "reversed w.r.t. latitude. Performance may "
-                                   "suffer.");
+                                   "reversed w.r.t. latitude or levels. "
+                                   "Performance may suffer.");
                     float *tmpData = new float[grid->nvalues];
                     QMutexLocker ncAccessMutexLocker(&staticNetCDFAccessMutex);
                     shared->cfVar.getVar(start, count, tmpData);
                     ncAccessMutexLocker.unlock();
 
-                    for (uint k = 0; k < grid->nlevs; k++)
-                        for (uint j = 0; j < grid->nlats; j++)
-                            for (uint i = 0; i < grid->nlons; i++)
-                            {
-                                grid->setValue(k, j, i, tmpData[INDEX3zyx_2(
-                                            k, grid->nlats-1-j, i,
-                                            grid->nlatsnlons, grid->nlons)]);
-                            }
+                    if (shared->reverseLatitudes && shared->reverseLevels)
+                    {
+                        for (uint k = 0; k < grid->nlevs; k++)
+                            for (uint j = 0; j < grid->nlats; j++)
+                                for (uint i = 0; i < grid->nlons; i++)
+                                {
+                                    grid->setValue(k, j, i, tmpData[INDEX3zyx_2(
+                                                grid->nlevs-1-k, grid->nlats-1-j, i,
+                                                grid->nlatsnlons, grid->nlons)]);
+                                }
+                    }
+                    else if (shared->reverseLatitudes)
+                    {
+                        for (uint k = 0; k < grid->nlevs; k++)
+                            for (uint j = 0; j < grid->nlats; j++)
+                                for (uint i = 0; i < grid->nlons; i++)
+                                {
+                                    grid->setValue(k, j, i, tmpData[INDEX3zyx_2(
+                                                k, grid->nlats-1-j, i,
+                                                grid->nlatsnlons, grid->nlons)]);
+                                }
+                    }
+                    else if (shared->reverseLevels)
+                    {
+                        for (uint k = 0; k < grid->nlevs; k++)
+                            for (uint j = 0; j < grid->nlats; j++)
+                                for (uint i = 0; i < grid->nlons; i++)
+                                {
+                                    grid->setValue(k, j, i, tmpData[INDEX3zyx_2(
+                                                grid->nlevs-1-k, j, i,
+                                                grid->nlatsnlons, grid->nlons)]);
+                                }
+                    }
 
                     delete[] tmpData;
                 }
@@ -942,24 +993,49 @@ MStructuredGrid *MClimateForecastReader::readGrid(
                 count[3] = shared->lats.size();
                 count[4] = shared->lons.size();
 
-                if (shared->reverseLatitudes)
+                if (shared->reverseLatitudes || shared->reverseLevels)
                 {
                     LOG4CPLUS_WARN(mlog, "WARNING: data field needs to be "
-                                   "reversed w.r.t. latitude. Performance may "
-                                   "suffer.");
+                                   "reversed w.r.t. latitude or levels. "
+                                   "Performance may suffer.");
                     float *tmpData = new float[grid->nvalues];
                     QMutexLocker ncAccessMutexLocker(&staticNetCDFAccessMutex);
                     shared->cfVar.getVar(start, count, tmpData);
                     ncAccessMutexLocker.unlock();
 
-                    for (uint k = 0; k < grid->nlevs; k++)
-                        for (uint j = 0; j < grid->nlats; j++)
-                            for (uint i = 0; i < grid->nlons; i++)
-                            {
-                                grid->setValue(k, j, i, tmpData[INDEX3zyx_2(
-                                            k, grid->nlats-1-j, i,
-                                            grid->nlatsnlons, grid->nlons)]);
-                            }
+                    if (shared->reverseLatitudes && shared->reverseLevels)
+                    {
+                        for (uint k = 0; k < grid->nlevs; k++)
+                            for (uint j = 0; j < grid->nlats; j++)
+                                for (uint i = 0; i < grid->nlons; i++)
+                                {
+                                    grid->setValue(k, j, i, tmpData[INDEX3zyx_2(
+                                                grid->nlevs-1-k, grid->nlats-1-j, i,
+                                                grid->nlatsnlons, grid->nlons)]);
+                                }
+                    }
+                    else if (shared->reverseLatitudes)
+                    {
+                        for (uint k = 0; k < grid->nlevs; k++)
+                            for (uint j = 0; j < grid->nlats; j++)
+                                for (uint i = 0; i < grid->nlons; i++)
+                                {
+                                    grid->setValue(k, j, i, tmpData[INDEX3zyx_2(
+                                                k, grid->nlats-1-j, i,
+                                                grid->nlatsnlons, grid->nlons)]);
+                                }
+                    }
+                    else if (shared->reverseLevels)
+                    {
+                        for (uint k = 0; k < grid->nlevs; k++)
+                            for (uint j = 0; j < grid->nlats; j++)
+                                for (uint i = 0; i < grid->nlons; i++)
+                                {
+                                    grid->setValue(k, j, i, tmpData[INDEX3zyx_2(
+                                                grid->nlevs-1-k, j, i,
+                                                grid->nlatsnlons, grid->nlons)]);
+                                }
+                    }
 
                     delete[] tmpData;
                 }
