@@ -62,7 +62,7 @@ public:
                           bool append=true);
 
 private:
-    QVector<OGRDataSource*> ogrDataSource;
+    QVector<GDALDataset*> gdalDataSet;
 
 };
 

@@ -49,14 +49,13 @@ namespace Met3D
 
 MNaturalEarthDataLoader::MNaturalEarthDataLoader()
 {
-    OGRRegisterAll();
+    GDALAllRegister();
 }
 
 
 MNaturalEarthDataLoader::~MNaturalEarthDataLoader()
 {
-    for (int i = 0; i < ogrDataSource.size(); i++)
-        OGRDataSource::DestroyDataSource(ogrDataSource[i]);
+    for (int i = 0; i < gdalDataSet.size(); i++) GDALClose(gdalDataSet[i]);
 }
 
 
@@ -68,17 +67,16 @@ void MNaturalEarthDataLoader::setDataSources(
         QString coastlinesfile, QString borderlinesfile)
 {
     // Remove existing datasources.
-    for (int i = 0; i < ogrDataSource.size(); i++)
-        OGRDataSource::DestroyDataSource(ogrDataSource[i]);
+    for (int i = 0; i < gdalDataSet.size(); i++) GDALClose(gdalDataSet[i]);
 
     // We currently have 2 data sources.
-    ogrDataSource.resize(2);
+    gdalDataSet.resize(2);
 
     // Open the coastlines shapefile.
-    ogrDataSource[COASTLINES] = OGRSFDriverRegistrar::Open(
+    gdalDataSet[COASTLINES] = (GDALDataset*) GDALOpenEx(
                 coastlinesfile.toStdString().c_str(),
-                FALSE);
-    if (ogrDataSource[COASTLINES] == NULL)
+                GDAL_OF_VECTOR, NULL, NULL, NULL);
+    if (gdalDataSet[COASTLINES] == NULL)
     {
         QString msg = QString("ERROR: cannot open coastlines file %1")
                 .arg(coastlinesfile);
@@ -86,10 +84,10 @@ void MNaturalEarthDataLoader::setDataSources(
         throw MInitialisationError(msg.toStdString(), __FILE__, __LINE__);
     }
 
-    ogrDataSource[BORDERLINES] = OGRSFDriverRegistrar::Open(
+    gdalDataSet[BORDERLINES] = (GDALDataset*) GDALOpenEx(
                 borderlinesfile.toStdString().c_str(),
-                FALSE);
-    if (ogrDataSource[BORDERLINES] == NULL)
+                GDAL_OF_VECTOR, NULL, NULL, NULL);
+    if (gdalDataSet[BORDERLINES] == NULL)
     {
         QString msg = QString("ERROR: cannot open borderlines file %1")
                 .arg(borderlinesfile);
@@ -106,7 +104,7 @@ void MNaturalEarthDataLoader::loadLineGeometry(GeometryType        type,
                                                QVector<int>       *count,
                                                bool                append)
 {
-    if (ogrDataSource.size() < 2)
+    if (gdalDataSet.size() < 2)
     {
         QString msg = QString("ERROR: NaturalEarthDataLoader not yet "
                               "initilised.");
@@ -127,7 +125,7 @@ void MNaturalEarthDataLoader::loadLineGeometry(GeometryType        type,
     // NaturalEarth shapefiles only contain one layer. (Do shapefiles in
     // general contain only one layer?)
     OGRLayer *layer;
-    layer = ogrDataSource[type]->GetLayer(0);
+    layer = gdalDataSet[type]->GetLayer(0);
 
     // Create a bounding box geometry: NOTE that this needs to be polygon -- if
     // a line string or ring is used, the Intersection() method used below will
