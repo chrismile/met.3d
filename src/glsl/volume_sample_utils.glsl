@@ -91,11 +91,8 @@ float sampleHybridLevel(in vec3 pos)
   according to the vertical level distance (which will or can vary with height).
  */
 
-subroutine(computeGradientType)
-vec3 pressureLevelGradient(in vec3 pos, in vec3 h)
+vec3 gradientAtPos(in vec3 pos, in vec3 h, float ztop, float zbot)
 {
-//TODO (mr, 04Mar2016): gradient methods for pressure levels and hybrid levels
-//                      are largely similar. Merge both into one method.
     vec3 gradient;
 
     // 1. Sample with horizontal displacement. Check if the grid is cyclic in
@@ -128,7 +125,23 @@ vec3 pressureLevelGradient(in vec3 pos, in vec3 h)
     // 2. Sample with vertical displacement, considering data volume
     // boundaries.
 
-// =========== This section differs from hybrid gradient ======    
+    vec3 pos_top = vec3(pos.xy, min(pos.z + h.z, ztop));
+    vec3 pos_bot = vec3(pos.xy, max(pos.z - h.z, zbot));
+    float z1 = sampleDataAtPos(pos_top);
+    float z2 = sampleDataAtPos(pos_bot);
+    float hz = pos_top.z - pos_bot.z;
+
+    // 3. Compute gradient.
+    
+    gradient = vec3((x1 - x2) / abs(hx), (y1 - y2) / abs(hy), (z1 - z2) / abs(hz));
+
+    return normalize(gradient);
+}
+ 
+ 
+subroutine(computeGradientType)
+vec3 pressureLevelGradient(in vec3 pos, in vec3 h)
+{
     // Find the pressue levels enclosing pos.z to estimate hz for the
     // vertical difference.
 
@@ -152,75 +165,29 @@ vec3 pressureLevelGradient(in vec3 pos, in vec3 h)
 
     float hz1 = (lnPk - pToWorldZParams.x) * pToWorldZParams.y;
     float hz2 = (lnPk1 - pToWorldZParams.x) * pToWorldZParams.y;
-    float hz = abs(hz1 - hz2);
+    vec3 h_ = vec3(h.x, h.y, abs(hz1 - hz2));
 
     float ztop = dataExtent.dataNWCrnr.z;
     float zbot = dataExtent.dataSECrnr.z;
-// =========== END ======
-    
-    vec3 pos_top = vec3(pos.xy, min(pos.z + hz, ztop));
-    vec3 pos_bot = vec3(pos.xy, max(pos.z - hz, zbot));
-    float z1 = sampleDataAtPos(pos_top);
-    float z2 = sampleDataAtPos(pos_bot);
-    hz = pos_top.z - pos_bot.z;
-    
-    gradient = vec3((x1 - x2) / abs(hx), (y1 - y2) / abs(hy), (z1 - z2) / abs(hz));
 
-    return normalize(gradient);
+    return gradientAtPos(pos, h_, ztop, zbot);
 }
 
 
 subroutine(computeGradientType)
 vec3 hybridLevelGradient(in vec3 pos, in vec3 h)
 {
-    vec3 gradient;
-
-    // 1. Sample with horizontal displacement. Check if the grid is cyclic in
-    // longitude.
-
-    vec3 pos_east;
-    vec3 pos_west;
-    if (dataExtent.gridIsCyclicInLongitude)
-    {
-        pos_east = vec3(pos.x + h.x, pos.yz);
-        pos_west = vec3(pos.x - h.x, pos.yz);
-    }
-    else
-    {
-        // Non-cyclic grids: clamp to data boundary.
-        pos_east = vec3(min(pos.x + h.x, dataExtent.dataSECrnr.x), pos.yz);
-        pos_west = vec3(max(pos.x - h.x, dataExtent.dataNWCrnr.x), pos.yz);
-    }
-
-    float x1 = sampleDataAtPos(pos_east);
-    float x2 = sampleDataAtPos(pos_west);
-    float hx = pos_east.x - pos_west.x;
-
-    vec3 pos_north = vec3(pos.x, min(pos.y + h.y, dataExtent.dataNWCrnr.y), pos.z);
-    vec3 pos_south = vec3(pos.x, max(pos.y - h.y, dataExtent.dataSECrnr.y), pos.z);
-    float y1 = sampleDataAtPos(pos_north);
-    float y2 = sampleDataAtPos(pos_south);
-    float hy = pos_north.y - pos_south.y;
-
-    // 2. Sample with vertical displacement, considering data volume
-    // boundaries.
-
+    // Determine the approximate distance between the model levels above and
+    // below the current position ("hz").
     float zbot, ztop;
     getHybridSigmaBotTopLevelAtPos(dataExtent, surfacePressure,
                                    hybridCoefficients, pos, zbot, ztop);
 
     float hz = getHybridApproxWorldZLevelDistanceAtPos(dataExtent, surfacePressure,
                                                        hybridCoefficients, pos);
-
-    vec3 pos_top = vec3(pos.xy, min(pos.z + hz, ztop));
-    vec3 pos_bot = vec3(pos.xy, max(pos.z - hz, zbot));
-    float z1 = sampleDataAtPos(pos_top);
-    float z2 = sampleDataAtPos(pos_bot);
-    hz = pos_top.z - pos_bot.z;
-
-    gradient = vec3((x1 - x2) / abs(hx), (y1 - y2) / abs(hy), (z1 - z2) / abs(hz));
-
-    return normalize(gradient);
+    vec3 h_ = vec3(h.x, h.y, hz);
+                                                       
+    return gradientAtPos(pos, h_, ztop, zbot);
 }
 
 
