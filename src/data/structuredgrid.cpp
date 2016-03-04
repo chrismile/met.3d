@@ -319,6 +319,7 @@ float MStructuredGrid::interpolateValue(float lon, float lat, float p_hPa)
     int j = int(mixJ);
 
     int i1 = i+1;
+    if (gridIsCyclicInLongitude()) i1 %= nlons;
     int j1 = j+1;
 
     if ((i < 0) || (j < 0) || (i1 >= int(nlons)) || (j1 >= int(nlats)))
@@ -359,14 +360,18 @@ bool MStructuredGrid::findTopGridIndices(
     int i = int(mixI);
     int j = int(mixJ);
 
-    nw->i = i;   nw->j = j;   nw->k = findLevel(nw->j, nw->i, p_hPa);
-    ne->i = i+1; ne->j = j;   ne->k = findLevel(ne->j, ne->i, p_hPa);
-    sw->i = i;   sw->j = j+1; sw->k = findLevel(sw->j, sw->i, p_hPa);
-    se->i = i+1; se->j = j+1; se->k = findLevel(se->j, se->i, p_hPa);
+    int i1 = i+1;
+    if (gridIsCyclicInLongitude()) i1 %= nlons;
+    int j1 = j+1;
+
+    nw->i = i;  nw->j = j;  nw->k = findLevel(nw->j, nw->i, p_hPa);
+    ne->i = i1; ne->j = j;  ne->k = findLevel(ne->j, ne->i, p_hPa);
+    sw->i = i;  sw->j = j1; sw->k = findLevel(sw->j, sw->i, p_hPa);
+    se->i = i1; se->j = j1; se->k = findLevel(se->j, se->i, p_hPa);
 
     // Check if indices are inside the grid domain.
-    if ((i < 0) || (i+1 >= int(nlons))) return false;
-    if ((j < 0) || (j+1 >= int(nlats))) return false;
+    if ((i < 0) || (i1 >= int(nlons))) return false;
+    if ((j < 0) || (j1 >= int(nlats))) return false;
     if ((nw->k < 0) || (nw->k+1 >= int(nlevs))) return false;
     if ((ne->k < 0) || (ne->k+1 >= int(nlevs))) return false;
     if ((sw->k < 0) || (sw->k+1 >= int(nlevs))) return false;
@@ -501,7 +506,11 @@ GL::MTexture* MStructuredGrid::getTexture(QGLWidget *currentGLContext,
         t->bindToLastTextureUnit();
 
         // Set texture parameters: wrap mode and filtering (RTVG p. 64).
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, textureWrap);
+        // If the grid is cyclic in longitude, use "GL_REPEAT" so that
+        // "texture()" works correctly in the samplers (where used, e.g.
+        // for pressure level data).
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S,
+                        gridIsCyclicInLongitude() ? GL_REPEAT : textureWrap);
         glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, textureWrap);
         glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, textureWrap);
         glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, textureMinMaxFilter);
@@ -711,7 +720,7 @@ void MStructuredGrid::enableFlags(unsigned char numBits)
     // (http://www.boost.org/doc/libs/1_55_0/libs/multiprecision/doc/html/boost_multiprecision/intro.html),
     // or with boost::dynamic_bitset (http://www.boost.org/doc/libs/1_36_0/libs/dynamic_bitset/dynamic_bitset.html).
     if (numBits != 64) throw MValueError(
-                "MStructuredGrid currently only support 64bit flags.",
+                "MStructuredGrid currently only supports 64bit flags.",
                 __FILE__, __LINE__);
 
     if (flags == nullptr)
@@ -745,7 +754,7 @@ GL::MTexture *MStructuredGrid::getFlagsTexture(QGLWidget *currentGLContext)
 
     // No texture with this item's data exists. Create a new one.
     t = new GL::MTexture(flagsID, GL_TEXTURE_3D, GL_RG32UI,
-                        nlons, nlats, nlevs);
+                         nlons, nlats, nlevs);
 
     if ( glRM->tryStoreGPUItem(t) )
     {

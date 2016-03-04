@@ -92,8 +92,8 @@ float sampleHybridSigmaVolumeAtPos(in sampler3D sampler,
                                    in sampler1D hybCoeffSampler,
                                    in vec3 pos)
 {
-    float mixI = mod(pos.x - dve.dataNWCrnr.x, 360.) / dve.deltaLatLon;
-    float mixJ = (dve.dataNWCrnr.y - pos.y) / dve.deltaLatLon;
+    float mixI = mod(pos.x - dve.dataNWCrnr.x, 360.) / dve.deltaLon;
+    float mixJ = (dve.dataNWCrnr.y - pos.y) / dve.deltaLat;
     int i = int(mixI);
     int j = int(mixJ);
 
@@ -172,8 +172,8 @@ float sampleHybridSigmaVolumeAtPos_maxNeighbour(
                                    in sampler1D hybCoeffSampler,
                                    in vec3 pos)
 {
-    float mixI = mod(pos.x - dve.dataNWCrnr.x, 360.) / dve.deltaLatLon;
-    float mixJ = (dve.dataNWCrnr.y - pos.y) / dve.deltaLatLon;
+    float mixI = mod(pos.x - dve.dataNWCrnr.x, 360.) / dve.deltaLon;
+    float mixJ = (dve.dataNWCrnr.y - pos.y) / dve.deltaLat;
     int i = int(mixI);
     int j = int(mixJ);
 
@@ -211,8 +211,8 @@ void getHybridSigmaBotTopLevelAtPos(in DataVolumeExtent dve,
                                     in vec3 pos,
                                     out float zbot, out float ztop)
 {
-    float mixI = mod(pos.x - dve.dataNWCrnr.x, 360.) / dve.deltaLatLon;
-    float mixJ = (dve.dataNWCrnr.y - pos.y) / dve.deltaLatLon;
+    float mixI = mod(pos.x - dve.dataNWCrnr.x, 360.) / dve.deltaLon;
+    float mixJ = (dve.dataNWCrnr.y - pos.y) / dve.deltaLat;
     int i = int(mixI);
     int j = int(mixJ);
     int i1 = i+1;
@@ -265,8 +265,8 @@ float getHybridApproxWorldZLevelDistanceAtPos(in DataVolumeExtent dve,
                                               in sampler1D hybCoeffSampler,
                                               in vec3 pos)
 {
-    float mixI = mod(pos.x - dve.dataNWCrnr.x, 360.) / dve.deltaLatLon;
-    float mixJ = (dve.dataNWCrnr.y - pos.y) / dve.deltaLatLon;
+    float mixI = mod(pos.x - dve.dataNWCrnr.x, 360.) / dve.deltaLon;
+    float mixJ = (dve.dataNWCrnr.y - pos.y) / dve.deltaLat;
     int i = int(mixI);
     int j = int(mixJ);
 
@@ -407,8 +407,8 @@ float sampleHybridSigmaVolumeAtPos_LUT(in sampler3D sampler,
                                        in sampler2D presTexCoordSampler,
                                        in vec3 pos)
 {
-    float mixI = mod(pos.x - dve.dataNWCrnr.x, 360.) / dve.deltaLatLon;
-    float mixJ = (dve.dataNWCrnr.y - pos.y) / dve.deltaLatLon;
+    float mixI = mod(pos.x - dve.dataNWCrnr.x, 360.) / dve.deltaLon;
+    float mixJ = (dve.dataNWCrnr.y - pos.y) / dve.deltaLat;
     int i = int(mixI);
     int j = int(mixJ);
     int i1 = i+1;

@@ -37,7 +37,8 @@ struct DataVolumeExtent
     // 0 = PRESSURE_LEVEL
     // 1 = HYBRID_SIGMA
     int levelType; // vertical level type of volume data
-    float deltaLatLon; // space between two grid cells in lat/lon in world space
+    float deltaLon; // space between two grid cells in lon in world space
+    float deltaLat; // space between two grid cells in lat in world space
 
     vec3 dataSECrnr; // data boundaries in SE
     vec3 dataNWCrnr; // data boundaries in NW
@@ -46,9 +47,9 @@ struct DataVolumeExtent
     float tfMaximum; // minimum of variable's transfer function
 
     // auxiliary variables
-    float westernBoundary; // western lon boundary (- deltaLatLon / 2)
+    float westernBoundary; // western lon boundary (- deltaLon / 2)
     float eastWestExtent; // lon extent
-    float northernBoundary; // northern lat boundary (+ deltaLatLon / 2)
+    float northernBoundary; // northern lat boundary (+ deltaLat / 2)
     float northSouthExtent; // lat extent
     bool  gridIsCyclicInLongitude;
 
@@ -56,7 +57,7 @@ struct DataVolumeExtent
     int   nLat; // dimension of lats
     int   nLev; // dimension of levels
     float deltaLnP; // average delta between levels in world space
-    float upperBoundary; // upper level boundary (+ deltaLatLon / 2)
+    float upperBoundary; // upper level boundary (+ deltaLnP / 2)
     float verticalExtent; // extent in level direction
     float upperPTableBoundary; // upper table boundary in world space
     float vertPTableExtent; // pressure table extent in level direction

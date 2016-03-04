@@ -65,16 +65,19 @@ float samplePressureLevelVolumeAtPos(in sampler3D sampler,
 }
 
 
-// manual interpolation of ln(p) grids -- for debugging purposes
+// manual interpolation of pressure level grids -- for debugging purposes
 float s2amplePressureLevelVolumeAtPos(in sampler3D sampler,
                                       in DataVolumeExtent dve,
                                       in sampler1D pTableSampler,
                                       in vec3 pos)
 {
-    float mixI = mod(pos.x - dve.dataNWCrnr.x, 360.) / dve.deltaLatLon;
-    float mixJ = (dve.dataNWCrnr.y - pos.y) / dve.deltaLatLon;
+    float mixI = mod(pos.x - dve.dataNWCrnr.x, 360.) / dve.deltaLon;
+    float mixJ = (dve.dataNWCrnr.y - pos.y) / dve.deltaLat;
     int i = int(mixI);
     int j = int(mixJ);
+    int i1 = i+1;
+    if (dve.gridIsCyclicInLongitude) i1 %= dve.nLon;
+    int j1 = j+1;
 
     // Compute pressure from world z coordinate.
     float p = exp(pos.z / pToWorldZParams.y + pToWorldZParams.x);
@@ -101,16 +104,16 @@ float s2amplePressureLevelVolumeAtPos(in sampler3D sampler,
     // How to handle positions outside the vertical bounds?
     // if ((mixK < 0.) || (mixK > 1.)) return 0.;
     mixK = clamp(mixK, 0., 1.);
-
+   
     // Fetch the scalar values at the eight grid points surrounding pos.
-    float scalar_i0j0k0 = texelFetch(sampler, ivec3(i  , j  , k  ), 0).a;
-    float scalar_i0j0k1 = texelFetch(sampler, ivec3(i  , j  , k+1), 0).a;
-    float scalar_i0j1k0 = texelFetch(sampler, ivec3(i  , j+1, k  ), 0).a;
-    float scalar_i0j1k1 = texelFetch(sampler, ivec3(i  , j+1, k+1), 0).a;
-    float scalar_i1j0k0 = texelFetch(sampler, ivec3(i+1, j  , k  ), 0).a;
-    float scalar_i1j0k1 = texelFetch(sampler, ivec3(i+1, j  , k+1), 0).a;
-    float scalar_i1j1k0 = texelFetch(sampler, ivec3(i+1, j+1, k  ), 0).a;
-    float scalar_i1j1k1 = texelFetch(sampler, ivec3(i+1, j+1, k+1), 0).a;
+    float scalar_i0j0k0 = texelFetch(sampler, ivec3(i , j , k  ), 0).a;
+    float scalar_i0j0k1 = texelFetch(sampler, ivec3(i , j , k+1), 0).a;
+    float scalar_i0j1k0 = texelFetch(sampler, ivec3(i , j1, k  ), 0).a;
+    float scalar_i0j1k1 = texelFetch(sampler, ivec3(i , j1, k+1), 0).a;
+    float scalar_i1j0k0 = texelFetch(sampler, ivec3(i1, j , k  ), 0).a;
+    float scalar_i1j0k1 = texelFetch(sampler, ivec3(i1, j , k+1), 0).a;
+    float scalar_i1j1k0 = texelFetch(sampler, ivec3(i1, j1, k  ), 0).a;
+    float scalar_i1j1k1 = texelFetch(sampler, ivec3(i1, j1, k+1), 0).a;
 
     // Interpolate vertically ...
     float scalar_i0j0 = mix(scalar_i0j0k0, scalar_i0j0k1, mixK);
@@ -134,10 +137,13 @@ float samplePressureLevelVolumeAtPos_maxNeighbour(in sampler3D sampler,
                                                   in DataVolumeExtent dve,
                                                   in vec3 pos)
 {
-    float mixI = mod(pos.x - dve.dataNWCrnr.x, 360.) / dve.deltaLatLon;
-    float mixJ = (dve.dataNWCrnr.y - pos.y) / dve.deltaLatLon;
+    float mixI = mod(pos.x - dve.dataNWCrnr.x, 360.) / dve.deltaLon;
+    float mixJ = (dve.dataNWCrnr.y - pos.y) / dve.deltaLat;
     int i = int(mixI);
     int j = int(mixJ);
+    int i1 = i+1;
+    if (dve.gridIsCyclicInLongitude) i1 %= dve.nLon;
+    int j1 = j+1;
 
     // Compute pressure from world z coordinate.
     float p = exp(pos.z / pToWorldZParams.y + pToWorldZParams.x);
@@ -155,14 +161,14 @@ float samplePressureLevelVolumeAtPos_maxNeighbour(in sampler3D sampler,
     }
 
     // Fetch the scalar values at the eight grid points surrounding pos.
-    float scalar_i0j0k0 = texelFetch(sampler, ivec3(i  , j  , k  ), 0).a;
-    float scalar_i0j0k1 = texelFetch(sampler, ivec3(i  , j  , k+1), 0).a;
-    float scalar_i0j1k0 = texelFetch(sampler, ivec3(i  , j+1, k  ), 0).a;
-    float scalar_i0j1k1 = texelFetch(sampler, ivec3(i  , j+1, k+1), 0).a;
-    float scalar_i1j0k0 = texelFetch(sampler, ivec3(i+1, j  , k  ), 0).a;
-    float scalar_i1j0k1 = texelFetch(sampler, ivec3(i+1, j  , k+1), 0).a;
-    float scalar_i1j1k0 = texelFetch(sampler, ivec3(i+1, j+1, k  ), 0).a;
-    float scalar_i1j1k1 = texelFetch(sampler, ivec3(i+1, j+1, k+1), 0).a;
+    float scalar_i0j0k0 = texelFetch(sampler, ivec3(i , j , k  ), 0).a;
+    float scalar_i0j0k1 = texelFetch(sampler, ivec3(i , j , k+1), 0).a;
+    float scalar_i0j1k0 = texelFetch(sampler, ivec3(i , j1, k  ), 0).a;
+    float scalar_i0j1k1 = texelFetch(sampler, ivec3(i , j1, k+1), 0).a;
+    float scalar_i1j0k0 = texelFetch(sampler, ivec3(i1, j , k  ), 0).a;
+    float scalar_i1j0k1 = texelFetch(sampler, ivec3(i1, j , k+1), 0).a;
+    float scalar_i1j1k0 = texelFetch(sampler, ivec3(i1, j1, k  ), 0).a;
+    float scalar_i1j1k1 = texelFetch(sampler, ivec3(i1, j1, k+1), 0).a;
 
     float scalar_i0j0 = max(scalar_i0j0k0, scalar_i0j0k1);
     float scalar_i0j1 = max(scalar_i0j1k0, scalar_i0j1k1);

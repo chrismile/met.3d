@@ -368,6 +368,6 @@ void computeDepthFromWorld(in vec3 rayPosition)
 vec3 initGradientSamplingStep(in DataVolumeExtent dve)
 {
     // dve.deltaLnP is not used... (instead computed in gradient methods).
-    return vec3(dve.deltaLatLon, dve.deltaLatLon, dve.deltaLnP);
+    return vec3(dve.deltaLon, dve.deltaLat, dve.deltaLnP);
 }
 

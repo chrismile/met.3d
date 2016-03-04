@@ -2023,11 +2023,10 @@ void MNWPVolumeRaycasterActor::setVarSpecificShaderVars(
 
     // Precompute data extent variables and store in uniform struct.
     // =============================================================
-    const GLfloat deltaLatLon = GLfloat(var->grid->getDeltaLat());
-    const GLfloat westernBoundary = dataNWCrnr.x() - deltaLatLon / 2.0f;
-    const GLfloat eastWestExtent = dataSECrnr.x() - dataNWCrnr.x() + deltaLatLon;
-    const GLfloat northernBoundary = dataNWCrnr.y() + deltaLatLon / 2.0f;
-    const GLfloat northSouthExtent = dataNWCrnr.y() - dataSECrnr.y() + deltaLatLon;
+    const GLfloat westernBoundary = dataNWCrnr.x() - var->grid->getDeltaLon() / 2.0f;
+    const GLfloat eastWestExtent = dataSECrnr.x() - dataNWCrnr.x() + var->grid->getDeltaLon();
+    const GLfloat northernBoundary = dataNWCrnr.y() + var->grid->getDeltaLat() / 2.0f;
+    const GLfloat northSouthExtent = dataNWCrnr.y() - dataSECrnr.y() + var->grid->getDeltaLat();
 
     const GLint nLon = var->grid->nlons;
     const GLint nLat = var->grid->nlats;
@@ -2037,7 +2036,8 @@ void MNWPVolumeRaycasterActor::setVarSpecificShaderVars(
     const GLfloat verticalExtent = abs(dataNWCrnr.z() - dataSECrnr.z()) + deltaLnP;
 
     // Assume that lat/lon spacing is the same.
-    shader->setUniformValue(structName + ".deltaLatLon", deltaLatLon); CHECK_GL_ERROR;
+    shader->setUniformValue(structName + ".deltaLat", var->grid->getDeltaLat()); CHECK_GL_ERROR;
+    shader->setUniformValue(structName + ".deltaLon", var->grid->getDeltaLon()); CHECK_GL_ERROR;
     shader->setUniformValue(structName + ".dataSECrnr", dataSECrnr); CHECK_GL_ERROR;
     shader->setUniformValue(structName + ".dataNWCrnr", dataNWCrnr); CHECK_GL_ERROR;
     shader->setUniformValue(structName + ".westernBoundary", westernBoundary); CHECK_GL_ERROR;

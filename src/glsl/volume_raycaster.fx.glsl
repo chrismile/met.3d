@@ -348,7 +348,7 @@ void raycaster(in vec3 h_gradient, in Ray ray, in vec2 lambdaNearFar,
     // Special case: If the grid is cyclic in longitude, shift the eastern 
     // longitude one grid spacing east (e.g. make 359. 360.).
     float dataSECrnr_x = dataExtent.dataSECrnr.x;
-    if (dataExtent.gridIsCyclicInLongitude) dataSECrnr_x += dataExtent.deltaLatLon;
+    if (dataExtent.gridIsCyclicInLongitude) dataSECrnr_x += dataExtent.deltaLon;
 
     vec3 deltaAccel = vec3(
             abs(dataSECrnr_x - dataExtent.dataNWCrnr.x) /
@@ -683,6 +683,9 @@ shader FSmain(in VStoFS Input, out vec4 fragColor : 0)
         // western data boundary needs to be smaller than width of data volume).
         distanceRayEntryLonToDataWestLon = rayEntryIntoBBox.x - dataNWCrnr_x;
         float widthOfDataVolume = dataExtent.dataSECrnr.x - dataExtent.dataNWCrnr.x;
+        // If the grid is cyclic in longitude, add one grid width to avoid
+        // a gap at the data volume boundary.
+        if (dataExtent.gridIsCyclicInLongitude) widthOfDataVolume += dataExtent.deltaLon;
 
         if (distanceRayEntryLonToDataWestLon > widthOfDataVolume)
         {
