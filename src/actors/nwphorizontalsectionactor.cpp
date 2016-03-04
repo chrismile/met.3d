@@ -1568,20 +1568,18 @@ void MNWPHorizontalSectionActor::renderWindBarbs(MSceneViewGLWidget *sceneView)
         return;
     }
 
-    const GLfloat deltaLatLon = windU->grid->lons[1] - windU->grid->lons[0];
-
     // collect infos of data
-    const int widthX = std::floor(std::abs(urcrnrlon - llcrnrlon) / deltaLatLon);
-    const int widthY = std::floor(std::abs(urcrnrlat - llcrnrlat) / deltaLatLon);
+    const int widthX = std::floor(std::abs(urcrnrlon - llcrnrlon) / windU->grid->getDeltaLon());
+    const int widthY = std::floor(std::abs(urcrnrlat - llcrnrlat) / windU->grid->getDeltaLat());
 
     const int resLon = windU->grid->nlons;
     const int resLat = windU->grid->nlats;
 
     // compute current boundary indices in grid
-    int minX = static_cast<int>((llcrnrlon - windU->grid->lons[0]) / deltaLatLon) % 360;
+    int minX = static_cast<int>((llcrnrlon - windU->grid->lons[0]) / windU->grid->getDeltaLon()) % 360;
     int maxX = minX + widthX;
 
-    int minY = static_cast<int>((windU->grid->lats[0] - urcrnrlat) / deltaLatLon);
+    int minY = static_cast<int>((windU->grid->lats[0] - urcrnrlat) / windU->grid->getDeltaLat());
     int maxY = minY + widthY;
 
     minX = min(max(0, minX), resLon - 1);
@@ -1654,7 +1652,9 @@ void MNWPHorizontalSectionActor::renderWindBarbs(MSceneViewGLWidget *sceneView)
     }
 
     glWindBarbsShader->setUniformValue(
-                "deltaLatLon", deltaLatLon); CHECK_GL_ERROR;
+                "deltaLon", windU->grid->getDeltaLon()); CHECK_GL_ERROR;
+    glWindBarbsShader->setUniformValue(
+                "deltaLat", windU->grid->getDeltaLat()); CHECK_GL_ERROR;
 
     glWindBarbsShader->setUniformValue(
                 "pToWorldZParams",
@@ -1742,7 +1742,7 @@ void MNWPHorizontalSectionActor::renderWindBarbs(MSceneViewGLWidget *sceneView)
         windBarbsSettings->oldScale = scale;
     }
 
-    const float deltaGlyph = deltaLatLon * scale;
+    const float deltaGlyph = windU->grid->getDeltaLon() * scale;
 
     const int width = maxX - minX + 1;
     const int height = maxY - minY + 1;

@@ -76,7 +76,8 @@ uniform sampler1D   hybridCoefficientsU; // hybrid sigma pressure coefficients
 uniform sampler2D   surfacePressureV;    // surface pressure field in Pa
 uniform sampler1D   hybridCoefficientsV; // hybrid sigma pressure coefficients
 
-uniform float       deltaLatLon;
+uniform float       deltaLon;
+uniform float       deltaLat;
 
 uniform vec2        dataSECrnr;
 uniform vec2        dataNWCrnr;
@@ -112,8 +113,8 @@ float computeKnots(in float velMeterPerSecond)
 // compute indices (i,j) and fractions wrt hybrid sigma pressure volume data
 void computeIndices(in vec2 pos, out int i, out int j)
 {
-    float Lon = mod(pos.x - dataNWCrnr.x, 360.) / deltaLatLon;
-    float Lat = (dataNWCrnr.y - pos.y) / deltaLatLon;
+    float Lon = mod(pos.x - dataNWCrnr.x, 360.) / deltaLon;
+    float Lat = (dataNWCrnr.y - pos.y) / deltaLat;
 
     i = int(Lon);
     j = int(Lat);
