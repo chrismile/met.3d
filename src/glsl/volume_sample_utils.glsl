@@ -94,25 +94,43 @@ float sampleHybridLevel(in vec3 pos)
 subroutine(computeGradientType)
 vec3 pressureLevelGradient(in vec3 pos, in vec3 h)
 {
+//TODO (mr, 04Mar2016): gradient methods for pressure levels and hybrid levels
+//                      are largely similar. Merge both into one method.
     vec3 gradient;
 
-    vec3 pos_east = vec3(min(pos.x + h.x, dataExtent.dataSECrnr.x), pos.yz);
-    vec3 pos_west = vec3(max(pos.x - h.x, dataExtent.dataNWCrnr.x), pos.yz);
+    // 1. Sample with horizontal displacement. Check if the grid is cyclic in
+    // longitude.
 
-    float x1 = samplePressureLevelVolumeAtPos(dataVolume, dataExtent, pressureTable, pos_east);
-    float x2 = samplePressureLevelVolumeAtPos(dataVolume, dataExtent, pressureTable, pos_west);
+    vec3 pos_east;
+    vec3 pos_west;
+    if (dataExtent.gridIsCyclicInLongitude)
+    {
+        pos_east = vec3(pos.x + h.x, pos.yz);
+        pos_west = vec3(pos.x - h.x, pos.yz);
+    }
+    else
+    {
+        // Non-cyclic grids: clamp to data boundary.
+        pos_east = vec3(min(pos.x + h.x, dataExtent.dataSECrnr.x), pos.yz);
+        pos_west = vec3(max(pos.x - h.x, dataExtent.dataNWCrnr.x), pos.yz);
+    }
+
+    float x1 = sampleDataAtPos(pos_east);
+    float x2 = sampleDataAtPos(pos_west);
     float hx = pos_east.x - pos_west.x;
 
     vec3 pos_north = vec3(pos.x, min(pos.y + h.y, dataExtent.dataNWCrnr.y), pos.z);
     vec3 pos_south = vec3(pos.x, max(pos.y - h.y, dataExtent.dataSECrnr.y), pos.z);
-
-    float y1 = samplePressureLevelVolumeAtPos(dataVolume, dataExtent, pressureTable, pos_north);
-    float y2 = samplePressureLevelVolumeAtPos(dataVolume, dataExtent, pressureTable, pos_south);
+    float y1 = sampleDataAtPos(pos_north);
+    float y2 = sampleDataAtPos(pos_south);
     float hy = pos_north.y - pos_south.y;
 
+    // 2. Sample with vertical displacement, considering data volume
+    // boundaries.
+
+// =========== This section differs from hybrid gradient ======    
     // Find the pressue levels enclosing pos.z to estimate hz for the
     // vertical difference.
-    // ==============================================================
 
     // Compute pressure from world z coordinate.
     float p = exp(pos.z / pToWorldZParams.y + pToWorldZParams.x);
@@ -136,13 +154,16 @@ vec3 pressureLevelGradient(in vec3 pos, in vec3 h)
     float hz2 = (lnPk1 - pToWorldZParams.x) * pToWorldZParams.y;
     float hz = abs(hz1 - hz2);
 
-    vec3 pos_top = vec3(pos.xy, min(pos.z + hz, dataExtent.dataNWCrnr.z));
-    vec3 pos_bot = vec3(pos.xy, max(pos.z - hz, dataExtent.dataSECrnr.z));
-
-    float z1 = samplePressureLevelVolumeAtPos(dataVolume, dataExtent, pressureTable, pos_top);
-    float z2 = samplePressureLevelVolumeAtPos(dataVolume, dataExtent, pressureTable, pos_bot);
+    float ztop = dataExtent.dataNWCrnr.z;
+    float zbot = dataExtent.dataSECrnr.z;
+// =========== END ======
+    
+    vec3 pos_top = vec3(pos.xy, min(pos.z + hz, ztop));
+    vec3 pos_bot = vec3(pos.xy, max(pos.z - hz, zbot));
+    float z1 = sampleDataAtPos(pos_top);
+    float z2 = sampleDataAtPos(pos_bot);
     hz = pos_top.z - pos_bot.z;
-
+    
     gradient = vec3((x1 - x2) / abs(hx), (y1 - y2) / abs(hy), (z1 - z2) / abs(hz));
 
     return normalize(gradient);
