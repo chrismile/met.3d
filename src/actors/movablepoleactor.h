@@ -69,11 +69,15 @@ public:
 
     void addPole(QPointF pos);
 
+    void removeAllPoles();
+
     QString getSettingsID() override { return "PressurePoleActor"; }
 
     void saveConfiguration(QSettings *settings);
 
     void loadConfiguration(QSettings *settings);
+
+    const QVector<QVector3D>& getPoleVertices();
 
 protected:
     void initializeActorResources();

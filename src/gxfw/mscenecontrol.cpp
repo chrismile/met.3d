@@ -325,6 +325,13 @@ void MSceneControl::collapsePropertySubTree(QtProperty *property)
 }
 
 
+void MSceneControl::setSingleInteractionActor(MActor *actor)
+{
+    foreach (MSceneViewGLWidget* view, registeredSceneViews)
+        view->setSingleInteractionActor(actor);
+}
+
+
 void MSceneControl::collapseActorPropertyTree(MActor *actor)
 {
     collapsePropertySubTree(actor->getPropertyGroup());

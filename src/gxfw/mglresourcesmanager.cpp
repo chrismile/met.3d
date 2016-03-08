@@ -68,7 +68,13 @@ MGLResourcesManager::MGLResourcesManager(const QGLFormat &format,
                                          QWidget *parent,
                                          QGLWidget *shareWidget)
     : QGLWidget(format, parent, shareWidget),
-      videoMemoryUsage_kb(0)
+      globalMouseButtonRotate(Qt::LeftButton),
+      globalMouseButtonPan(Qt::RightButton),
+      globalMouseButtonZoom(Qt::MiddleButton),
+      isReverseCameraZoom(false),
+      videoMemoryUsage_kb(0),
+      selectSceneCentreActor(nullptr),
+      selectSceneCentreText(nullptr)
 {
     // Get the system control instance.
     systemControl = MSystemManagerAndControl::getInstance();
@@ -705,6 +711,41 @@ void MGLResourcesManager::initializeTextManager()
 MTextManager* MGLResourcesManager::getTextManager()
 {
     return textManager;
+}
+
+
+MLabel* MGLResourcesManager::getSceneRotationCentreSelectionLabel()
+{
+    // Initialize an MLabel for the interactive camera selection.
+    if (selectSceneCentreText == nullptr)
+    {
+        MTextManager* tm = getTextManager();
+        selectSceneCentreText = tm->addText(
+                    "Drag the pole to the rotation centre you would like to "
+                    "use, then hit enter.",
+                     MTextManager::CLIPSPACE,-0.5,0.9,0,16,
+                     QColor(0,0,0),MTextManager::BASELINELEFT,true);
+    }
+
+    return selectSceneCentreText;
+}
+
+
+MMovablePoleActor* MGLResourcesManager::getSceneRotationCentreSelectionPoleActor()
+{
+    // Initialize an MMovablePoleActor for the interactive camera selection.
+    if (selectSceneCentreActor == nullptr)
+    {
+        MAbstractActorFactory *factory = getActorFactory("Movable poles");
+        selectSceneCentreActor =
+                dynamic_cast<MMovablePoleActor*>(factory->create());
+        selectSceneCentreActor->setName("SelectSceneRotationCentreActor");
+        selectSceneCentreActor->setEnabled(true);
+        selectSceneCentreActor->initialize();
+        registerActor(selectSceneCentreActor);
+        selectSceneCentreActor->addPole(QPointF(0,0));
+    }
+    return selectSceneCentreActor;
 }
 
 

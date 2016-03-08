@@ -258,6 +258,21 @@ void MMovablePoleActor::dragEvent(MSceneViewGLWidget *sceneView,
 }
 
 
+void MMovablePoleActor::removeAllPoles()
+{
+    foreach (PoleSettings pole, poleProperties)
+        actorPropertiesSupGroup->removeSubProperty(pole.groupProperty);
+
+    poleProperties.clear();
+
+    if (isInitialized())
+    {
+        generateGeometry();
+        emitActorChangedSignal();
+    }
+}
+
+
 void MMovablePoleActor::addPole(QPointF pos)
 {
     PoleSettings poleSettings(this);
@@ -346,6 +361,11 @@ void MMovablePoleActor::loadConfiguration(QSettings *settings)
     if (isInitialized()) generateGeometry();
 }
 
+
+const QVector<QVector3D>& MMovablePoleActor::getPoleVertices()
+{
+    return poleVertices;
+}
 
 
 /******************************************************************************

@@ -46,6 +46,7 @@
 #include "gxfw/msystemcontrol.h"
 #include "gxfw/gl/abstractgpudataitem.h"
 #include "data/datarequest.h"
+#include "actors/movablepoleactor.h"
 
 
 namespace Met3D
@@ -282,6 +283,53 @@ public:
      */
     QList<MActor*> getActorsConnectedTo(MActor *actor);
 
+    /**
+     Returns an @ref MLabel displaying user intructions for interactively
+     selecting a new rotation centre in "MOVE_SCENE" camera mode.
+     */
+    MLabel* getSceneRotationCentreSelectionLabel();
+
+    /**
+     Returns an @ref MMovablePoleActor that is used for interactively
+     selecting a new rotation centre in "MOVE_SCENE" camera mode.
+     */
+    MMovablePoleActor* getSceneRotationCentreSelectionPoleActor();
+
+//TODO (mr, 08Mar2016): move the following settings to the scene views.
+    /**
+     Configure which mouse button rotates the camera/scene.
+
+     @see MSceneViewGLWidget::SceneNavigationMode
+     */
+    void setGlobalMouseButtonRotate(Qt::MouseButton mouseButton)
+    { globalMouseButtonRotate = mouseButton; }
+
+    /**
+     Configure which mouse button pan the camera/scene.
+
+     @see MSceneViewGLWidget::SceneNavigationMode
+     */
+    void setGlobalMouseButtonPan(Qt::MouseButton mouseButton)
+    { globalMouseButtonPan = mouseButton; }
+
+    /**
+     Configure which mouse button zooms the camera/scene.
+
+     @see MSceneViewGLWidget::SceneNavigationMode
+     */
+    void setGlobalMouseButtonZoom(Qt::MouseButton mouseButton)
+    { globalMouseButtonZoom = mouseButton; }
+
+    /**
+     Configure whether zoom direction should be reversed. Default direction is
+     "mouse wheel forward = zoom IN" in MOVE_CAMERA mode and "mouse wheel
+     forward = zoom OUT" in ROTATE_SCENE mode.
+
+     @see MSceneViewGLWidget::SceneNavigationMode
+     */
+    void reverseDefaultZoomDirection(bool reverse)
+    { isReverseCameraZoom = reverse; }
+
 public slots:
     /**
       Updates the property labels that display the current memory usage. The
@@ -305,10 +353,19 @@ signals:
     void actorDeleted(MActor* actor);
 
 protected:
+    friend class MSceneViewGLWidget;
+
     /**
       Initialize the OpenGL resources. Called once on program start.
      */
     void initializeGL();
+
+    /** Scene navigation: mappings from mouse buttons to rotate, move, zoom. */
+//TODO (mr, 08Mar2016): move these settings to the scene views.
+    Qt::MouseButton globalMouseButtonRotate;
+    Qt::MouseButton globalMouseButtonPan;
+    Qt::MouseButton globalMouseButtonZoom;
+    bool isReverseCameraZoom;
 
 private:
     /**
@@ -369,6 +426,11 @@ private:
     QtProperty *met3DVideoMemoryProperty;
     QtProperty *totalSystemMemoryProperty;
     QtProperty *dumpMemoryContentProperty;
+
+    /** GUI elements for interactive selection of a scene centre used for
+    scene rotation (@see MSceneViewGLWidget::SceneNavigationMode). */
+    MMovablePoleActor *selectSceneCentreActor;
+    MLabel *selectSceneCentreText;
 };
 
 } // namespace Met3D

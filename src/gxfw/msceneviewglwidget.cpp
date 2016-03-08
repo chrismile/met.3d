@@ -40,6 +40,7 @@
 #include "util/mutil.h"
 #include "gxfw/mtypes.h"
 #include "gxfw/textmanager.h"
+#include "mainwindow.h"
 
 using namespace std;
 
@@ -59,12 +60,17 @@ MSceneViewGLWidget::MSceneViewGLWidget()
     : QGLWidget(MGLResourcesManager::getInstance()->format(), 0,
                 MGLResourcesManager::getInstance()),
       scene(nullptr),
+      lastPoint(QVector3D(0,0,0)),
+      sceneNavigationMode(MOVE_CAMERA),
+      sceneRotationCentre(QVector3D(0,0,1020)),
       freezeMode(0),
       measureFPS(false),
       measureFPSFrameCount(0),
       sceneNameLabel(nullptr),
-      visualisationParameterChange(false),
-      cameraSyncronizedWith(nullptr)
+      visualizationParameterChange(false),
+      cameraSyncronizedWith(nullptr),
+      singleInteractionActor(nullptr),
+      enablePropertyEvents(true)
 {
     viewIsInitialised = false;
     focusShader = nullptr;
@@ -81,7 +87,7 @@ MSceneViewGLWidget::MSceneViewGLWidget()
     ztop    = 36.;
     slopePtoZ = (ztop - zbot) / (log(ptop) - log(pbot));
 
-    interactionMode      = false;
+    actorInteractionMode      = false;
     analysisMode         = false;
     userIsInteracting    = false;
     userIsScrolling      = false;
@@ -97,6 +103,7 @@ MSceneViewGLWidget::MSceneViewGLWidget()
     camera.moveForward(-160.);
     camera.moveUp(-30.);
     camera.moveRight(-20);
+    worldRotationMatrix.setToIdentity();
 
     lightDirection = TOP;
     sceneNorthWestRotationMatrix.rotate(45, 1, 0, 0);
@@ -140,6 +147,41 @@ MSceneViewGLWidget::MSceneViewGLWidget()
             ->addProperty("interaction");
     propertyGroup->addSubProperty(interactionGroupProperty);
 
+    sceneNavigationModeProperty = systemControl->getEnumPropertyManager()
+            ->addProperty("scene navigation");
+    systemControl->getEnumPropertyManager()->setEnumNames(
+                sceneNavigationModeProperty, {"move camera", "rotate scene"});
+    interactionGroupProperty->addSubProperty(sceneNavigationModeProperty);
+
+    sceneRotationCenterProperty = systemControl->getGroupPropertyManager()
+            ->addProperty("scene rotation centre");
+    sceneRotationCenterProperty->setEnabled(false);
+
+    QtExtensions::QtDecoratedDoublePropertyManager *doublePropertyManager =
+            MSystemManagerAndControl::getInstance()->getDecoratedDoublePropertyManager();
+    sceneRotationCentreLonProperty = doublePropertyManager->addProperty("longitude");
+    sceneRotationCenterProperty->addSubProperty(sceneRotationCentreLonProperty);
+    sceneRotationCentreLatProperty = doublePropertyManager->addProperty("latitude");
+    sceneRotationCenterProperty->addSubProperty(sceneRotationCentreLatProperty);
+    sceneRotationCentreElevationProperty = doublePropertyManager->addProperty("elevation");
+
+    doublePropertyManager->setSuffix(sceneRotationCentreLonProperty,
+                                     QString::fromUtf8("\u00B0"));
+    doublePropertyManager->setSuffix(sceneRotationCentreLatProperty,
+                                     QString::fromUtf8("\u00B0"));
+    doublePropertyManager->setSuffix(sceneRotationCentreElevationProperty, " hPa");
+    doublePropertyManager->setValue(sceneRotationCentreElevationProperty, 1020);
+    doublePropertyManager->setMinimum(sceneRotationCentreElevationProperty, 20);
+    doublePropertyManager->setMaximum(sceneRotationCentreElevationProperty, 1020);
+
+    sceneRotationCenterProperty->addSubProperty(sceneRotationCentreElevationProperty);
+    interactionGroupProperty->addSubProperty(sceneRotationCenterProperty);
+
+    selectSceneRotationCentreProperty  = systemControl->getClickPropertyManager()
+            ->addProperty("interactively select rotation centre");
+    sceneRotationCenterProperty->addSubProperty(selectSceneRotationCentreProperty);
+    selectSceneRotationCentreProperty->setEnabled(false);
+
     QList<MSceneViewGLWidget*> otherViews = systemControl->getRegisteredViews();
     QStringList otherViewLabels;
     otherViewLabels << "None";
@@ -155,9 +197,9 @@ MSceneViewGLWidget::MSceneViewGLWidget()
 
     // Register modify mode property.
     interactionModeProperty = systemControl->getBoolPropertyManager()
-            ->addProperty("interaction mode");
+            ->addProperty("actor interaction mode");
     systemControl->getBoolPropertyManager()
-            ->setValue(interactionModeProperty, interactionMode);
+            ->setValue(interactionModeProperty, actorInteractionMode);
     interactionGroupProperty->addSubProperty(interactionModeProperty);
 
     analysisModeProperty = systemControl->getBoolPropertyManager()
@@ -428,7 +470,7 @@ void MSceneViewGLWidget::setInteractionMode(bool enabled)
 void MSceneViewGLWidget::setAnalysisMode(bool enabled)
 {
     // Interaction mode cannot be active at the same time.
-    if (enabled && interactionMode)
+    if (enabled && actorInteractionMode)
         MSystemManagerAndControl::getInstance()->getBoolPropertyManager()
                 ->setValue(interactionModeProperty, false);
 
@@ -515,16 +557,19 @@ void MSceneViewGLWidget::executeCameraAction(int action,
 
 void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
 {
+
+    if (!enablePropertyEvents) return;
+
     if (property == interactionModeProperty)
     {
-        // Toggle interaction mode.
-        interactionMode = MSystemManagerAndControl::getInstance()->getBoolPropertyManager()
-                ->value(interactionModeProperty);
+        // Toggle actor interaction mode.
+        actorInteractionMode = MSystemManagerAndControl::getInstance()
+                ->getBoolPropertyManager()->value(interactionModeProperty);
 
-        // In interaction mode, mouse tracking is enabled to have
+        // In actor interaction mode, mouse tracking is enabled to have
         // mouseMoveEvent() executed on every mouse move, not only when a
         // button is pressed.
-        setMouseTracking(interactionMode);
+        setMouseTracking(actorInteractionMode);
         updateSceneLabel();
 #ifndef CONTINUOUS_GL_UPDATE
         updateGL();
@@ -611,7 +656,7 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
                 ->value(verticalScalingProperty);
         slopePtoZ = (ztop - zbot) / (log(ptop) - log(pbot));
         // This will be set to false at the end of the next render cycle.
-        visualisationParameterChange = true;
+        visualizationParameterChange = true;
 
 #ifndef CONTINUOUS_GL_UPDATE
         if (viewIsInitialised) updateGL();
@@ -640,6 +685,61 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
 #ifndef CONTINUOUS_GL_UPDATE
         if (viewIsInitialised) updateGL();
 #endif
+    }
+
+    else if (property == sceneNavigationModeProperty)
+    {
+        sceneNavigationMode = (SceneNavigationMode)MSystemManagerAndControl::getInstance()
+                ->getEnumPropertyManager()->value(sceneNavigationModeProperty);
+
+        enablePropertyEvents = false;
+        if (sceneNavigationMode == MOVE_CAMERA)
+        {
+            sceneRotationCenterProperty->setEnabled(false);
+            selectSceneRotationCentreProperty->setEnabled(false);
+        }
+        else
+        {
+            sceneRotationCenterProperty->setEnabled(true);
+            selectSceneRotationCentreProperty->setEnabled(true);
+        }
+        enablePropertyEvents = true;
+    }
+
+    else if (property == sceneRotationCentreElevationProperty ||
+             property == sceneRotationCentreLatProperty       ||
+             property == sceneRotationCentreLonProperty)
+    {
+        QtExtensions::QtDecoratedDoublePropertyManager *doublePropertyManager =
+                MSystemManagerAndControl::getInstance()->getDecoratedDoublePropertyManager();
+        double p   = doublePropertyManager->value(sceneRotationCentreElevationProperty);
+        double lon = doublePropertyManager->value(sceneRotationCentreLonProperty);
+        double lat = doublePropertyManager->value(sceneRotationCentreLatProperty);
+        sceneRotationCentre = QVector3D(lon, lat, p);
+    }
+
+    else if ( property == selectSceneRotationCentreProperty &&
+              selectSceneRotationCentreProperty->isEnabled() )
+    {
+
+        selectSceneRotationCentreProperty->setEnabled(false);
+        MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
+        MLabel *pickText  = glRM->getSceneRotationCentreSelectionLabel();
+        MMovablePoleActor *pickActor = glRM->getSceneRotationCentreSelectionPoleActor();
+
+        pickActor->removeAllPoles();
+        pickActor->addPole(sceneRotationCentre.toPointF());
+
+        sceneNavigationMode = MOVE_CAMERA;
+
+        scene->addActor(pickActor);
+        scene->setSingleInteractionActor(pickActor);
+
+        foreach (MSceneViewGLWidget *sceneView, scene->getRegisteredSceneViews())
+        {
+            sceneView->staticLabels.append(pickText);
+            sceneView->updateSceneLabel();
+        }
     }
 
 #ifndef CONTINUOUS_GL_UPDATE
@@ -830,11 +930,13 @@ void MSceneViewGLWidget::paintGL()
         frameCount++;
     }
 
+    MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
     // Compute model-view-projection matrix.
     // Specify a perspective projection. NOTE: Near and far clipping planes are
     // positive (not zero or negative) values that represent distances in front
     // of the eye. See
     // http://www.opengl.org/resources/faq/technical/depthbuffer.htm
+
     QVector3D co = camera.getOrigin();
     modelViewProjectionMatrix.setToIdentity();
     modelViewProjectionMatrix.perspective(
@@ -844,24 +946,55 @@ void MSceneViewGLWidget::paintGL()
                 500.);
     modelViewProjectionMatrix *= camera.getViewMatrix();
 
+    if (sceneNavigationMode == ROTATE_SCENE)
+    {
+        worldPositionMatrix.setToIdentity();
+        QVector3D focus = sceneRotationCentre;
+        double z = worldZfromPressure(focus.z());
+
+        // Translate world to focus centre.
+        worldPositionMatrix.translate(focus.x(),focus.y(),z);
+        modelViewProjectionMatrix *= worldPositionMatrix;
+        // Rotate.
+        modelViewProjectionMatrix *= worldRotationMatrix;
+        // Translate world back to origin.
+        worldPositionMatrix.setToIdentity();
+        worldPositionMatrix.translate(-focus.x(),-focus.y(),-z);
+        modelViewProjectionMatrix *= worldPositionMatrix;
+    }
+
+
     QList<MLabel*> labelList;
     labelList.append(staticLabels);
 
     if (scene)
     {
+        bool _interactionMode = actorInteractionMode;
         // Get a reference to the scene's render queue and render the actors.
         // Collect the actor's labels -- they are rendered in the next step.
-        const QVector<MActor*>& renderQueue = scene->getRenderQueue();
-        for (int i = 0; i < renderQueue.size(); i++)
+        foreach (MActor* actor, scene->getRenderQueue())
         {
-            renderQueue[i]->render(this);
-            labelList.append(renderQueue[i]->getLabelsToRender());
+            if (singleInteractionActor != nullptr &&
+                    singleInteractionActor->getName() == actor->getName())
+            {
+                actorInteractionMode = true;
+            }
+
+            actor->render(this);
+            labelList.append(actor->getLabelsToRender());
+
+            if (singleInteractionActor != nullptr &&
+                    singleInteractionActor->getName() == actor->getName())
+            {
+                actorInteractionMode = false;
+            }
         }
+
+        actorInteractionMode = _interactionMode;
 
         // Render text labels.
         if (!renderLabelsWithDepthTest) glDisable(GL_DEPTH_TEST);
-        MGLResourcesManager::getInstance()
-                ->getTextManager()->renderLabelList(this, labelList);
+        glRM->getTextManager()->renderLabelList(this, labelList);
         if (!renderLabelsWithDepthTest) glEnable(GL_DEPTH_TEST);
     }
 
@@ -880,7 +1013,7 @@ void MSceneViewGLWidget::paintGL()
 
     // All actors have been rendered; they won't query this variable until the
     // next render cylce.
-    visualisationParameterChange = false;
+    visualizationParameterChange = false;
 
     // This update is triggered by a click on "measureFPSProperty". The scene
     // is updated for 30 seconds for fps measurements.
@@ -918,6 +1051,14 @@ void MSceneViewGLWidget::resizeGL(int width, int height)
     // viewport was resized, set timer and variable
     resizeTimer.restart();
     viewportResized = true;
+    QVector3D co = camera.getOrigin();
+    modelViewProjectionMatrix.setToIdentity();
+    modelViewProjectionMatrix.perspective(
+                45.,
+                double(viewPortWidth)/double(viewPortHeight),
+                co.z()/10.,
+                500.);
+    modelViewProjectionMatrix *= camera.getViewMatrix();
 }
 
 
@@ -937,6 +1078,12 @@ bool MSceneViewGLWidget::isViewPortResized()
 void MSceneViewGLWidget::mousePressEvent(QMouseEvent *event)
 {
     lastPos = event->pos();
+    float clipX = -1. + 2.*(float(event->x()) / float(viewPortWidth));
+    float clipY =  1. - 2.*(float(event->y()) / float(viewPortHeight));
+    lastPoint = QVector3D(clipX,clipY,0);
+    float length = sqrt(lastPoint.x() * lastPoint.x() + lastPoint.y() * lastPoint.y());
+    length = (length < 1.0) ? length : 1.0;
+    lastPoint.setZ(cos((M_PI/2.0) * length));
     userIsInteracting = true;
 }
 
@@ -953,7 +1100,7 @@ void MSceneViewGLWidget::mouseMoveEvent(QMouseEvent *event)
     // mouse is moved on the OpenGL canvas. If mouse tracking is disabled,
     // mouseMoveEvent() is only called when a button has been pressed.
 
-    if (interactionMode)
+    if (actorInteractionMode)
     {
         // No scene registered? Return.
         if (!scene) return;
@@ -981,21 +1128,26 @@ void MSceneViewGLWidget::mouseMoveEvent(QMouseEvent *event)
 
             // Loop over all actors in the scene and let them check whether
             // the mouse cursor coincides with one of their handles.
-            const QVector<MActor*>& actors = scene->getRenderQueue();
-            for (int i = 0; i < actors.size(); i++)
+            foreach (MActor* actor, scene->getRenderQueue())
+            {
                 // Only check actors that are pickable.
-                if (actors[i]->isPickable())
+                if (actor->isPickable())
                 {
-                    pickedActor.handleID = actors[i]->checkIntersectionWithHandle(
-                                this, clipX, clipY, 10. / float(viewPortWidth));
-                    // If the test returned a valid handle ID, store the actor
-                    // and its handle as the currently picked actor.
-                    if (pickedActor.handleID >= 0)
+                    if (singleInteractionActor == nullptr ||
+                           singleInteractionActor->getName() == actor->getName())
                     {
-                        pickedActor.actor = actors[i];
-                        break;
+                        pickedActor.handleID = actor->checkIntersectionWithHandle(
+                                    this, clipX, clipY, 10. / float(viewPortWidth));
+                        // If the test returned a valid handle ID, store the actor
+                        // and its handle as the currently picked actor.
+                        if (pickedActor.handleID >= 0)
+                        {
+                            pickedActor.actor = actor;
+                            break;
+                        }
                     }
                 }
+            }
 
             // Redraw (the actors might draw any highlighted handles).
 #ifndef CONTINUOUS_GL_UPDATE
@@ -1015,6 +1167,8 @@ void MSceneViewGLWidget::mouseMoveEvent(QMouseEvent *event)
     // C) CAMERA MOVEMENTS.
     // ========================================================================
 
+    MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
+
     int dx = event->x() - lastPos.x();
     int dy = event->y() - lastPos.y();
 
@@ -1022,23 +1176,61 @@ void MSceneViewGLWidget::mouseMoveEvent(QMouseEvent *event)
     if (event->modifiers() == Qt::ShiftModifier)
         factor = 10.;
 
-    if (event->buttons() & Qt::LeftButton)
+    if (event->buttons() & glRM->globalMouseButtonRotate)
     {
-        // The left mouse button rotates the camera, the camera position
-        // remains unchanged.
-        // dx maps to a rotation around the world space z-axis
-        camera.rotateWorldSpace(-dx/10., 0, 0, 1);
-        // dy maps to a rotation around the camera x-axis
-        camera.rotate(-dy/10., 1, 0, 0);
+        if (sceneNavigationMode == MOVE_CAMERA)
+        {
+            // The left mouse button rotates the camera, the camera position
+            // remains unchanged.
+            // dx maps to a rotation around the world space z-axis
+            camera.rotateWorldSpace(-dx/10., 0, 0, 1);
+            // dy maps to a rotation around the camera x-axis
+            camera.rotate(-dy/10., 1, 0, 0);
+        }
+        else // sceneNavigationMode == ROTATE_SCENE
+        {
+            // Rotation is implemented with a rotation matrix and is combined
+            // with a translation in "paintGL()". The calculation uses an
+            // arcball rotation; see:
+            // https://en.wikibooks.org/wiki/OpenGL_Programming/Modern_OpenGL_Tutorial_Arcball
+            float clipX = -1. + 2.*(float(event->x()) / float(viewPortWidth));
+            float clipY =  1. - 2.*(float(event->y()) / float(viewPortHeight));
+            QVector3D curPoint = QVector3D(clipX, clipY,0);
+            float length = sqrt(curPoint.x() * curPoint.x() +
+                                curPoint.y() * curPoint.y());
+            length = (length < 1.0) ? length : 1.0;
+            curPoint.setZ(cos((M_PI/2.0) * length));
+            QVector3D difPosition = (lastPoint - curPoint);
+            float angle = difPosition.length() * 45.0;
+            // The rotation vector is also rotated by the worldMatrix
+            // to perform the rotation regarding the actual world rotation.
+            QVector3D rotAxis = worldRotationMatrix.inverted() *
+                    QVector3D::crossProduct(lastPoint, curPoint);
+            worldRotationMatrix.rotate(angle,rotAxis);
+            lastPoint = curPoint;
+        }
     }
-    else if (event->buttons() & Qt::RightButton)
+    else if (event->buttons() & glRM->globalMouseButtonPan)
     {
         // The right mouse button moves the camera around in the scene.
         camera.moveUp(-dy/10./factor, 1.);
         camera.moveRight(dx/10./factor);
     }
+    else if (event->buttons() & glRM->globalMouseButtonZoom)
+    {
+        // "Pure" mouse wheel: zoom (move camera forward/backward)
+        float factor = -1.;
+        if (event->modifiers() == Qt::ShiftModifier)
+            factor = -0.1;
+
+        if (sceneNavigationMode == ROTATE_SCENE) factor = -factor;
+        if (glRM->isReverseCameraZoom) factor = -factor;
+
+        camera.moveForward(dy * factor);
+    }
 
     lastPos = event->pos();
+
     updateCameraPositionDisplay();
     updateSynchronizedCameras();
 
@@ -1090,9 +1282,11 @@ void MSceneViewGLWidget::mouseReleaseEvent(QMouseEvent *event)
 
 void MSceneViewGLWidget::wheelEvent(QWheelEvent *event)
 {
-    if (interactionMode || analysisMode) return;
-    if (freezeMode) return;
+    MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
 
+    if (actorInteractionMode || analysisMode) return;
+    if (freezeMode) return;
+    if (glRM->globalMouseButtonZoom != Qt::MiddleButton) return;
     if (event->modifiers() == Qt::ControlModifier)
     {
         // Ctrl + mouse wheel: -- none --
@@ -1114,8 +1308,11 @@ void MSceneViewGLWidget::wheelEvent(QWheelEvent *event)
 
         // "Pure" mouse wheel: zoom (move camera forward/backward)
         float factor = 10.;
-        if (event->modifiers() == Qt::ShiftModifier)
-            factor = 1.;
+        if (event->modifiers() == Qt::ShiftModifier) factor = 1.;
+
+        if (sceneNavigationMode == ROTATE_SCENE) factor = -factor;
+        if (glRM->isReverseCameraZoom) factor = -factor;
+
         if (event->delta() > 0)
         {
             camera.moveForward(0.5 * factor);
@@ -1153,9 +1350,43 @@ bool MSceneViewGLWidget::userIsScrollingWithMouse()
 
 void MSceneViewGLWidget::keyPressEvent(QKeyEvent *event)
 {
+    // Special case: The user interactively selects a new scene rotation
+    // centre (see "selectSceneRotationCentreProperty"). The selection is
+    // finished upon hitting the "ENTER" key.
+    if (singleInteractionActor != nullptr)
+    {
+        if (event->key() == Qt::Key_Enter || event->key() == Qt::Key_Return)
+        {
+            MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
+            MMovablePoleActor *pickActor =
+                    glRM->getSceneRotationCentreSelectionPoleActor();
+            MLabel *pickText = glRM->getSceneRotationCentreSelectionLabel();
+            QVector3D rotationCenter = pickActor->getPoleVertices().at(0);
+
+            sceneRotationCentre.setX(rotationCenter.x());
+            sceneRotationCentre.setY(rotationCenter.y());
+
+            setSceneRotationCentre(sceneRotationCentre);
+
+            scene->setSingleInteractionActor(nullptr);
+            scene->removeActorByName(pickActor->getName());
+            foreach (MSceneViewGLWidget *sceneView, scene->getRegisteredSceneViews())
+            {
+                sceneView->staticLabels.removeOne(pickText);
+                sceneView->updateSceneLabel();
+            }
+
+            worldRotationMatrix.setToIdentity();
+            sceneNavigationMode = ROTATE_SCENE;
+            enablePropertyEvents = false;
+            selectSceneRotationCentreProperty->setEnabled(true);
+            enablePropertyEvents = true;
+        }
+    }
+
     if (freezeMode) return;
 
-    switch(event->key())
+    switch (event->key())
     {
     case Qt::Key_L:
         // Shader reload.
@@ -1166,7 +1397,7 @@ void MSceneViewGLWidget::keyPressEvent(QKeyEvent *event)
         break;
     case Qt::Key_I:
         // Toggle interaction mode.
-        setInteractionMode(!interactionMode);
+        setInteractionMode(!actorInteractionMode);
         break;
     case Qt::Key_A:
         // Toggle analysis mode.
@@ -1210,7 +1441,7 @@ void MSceneViewGLWidget::updateSceneLabel()
     // Create a new scene description label (view number and scene name in
     // lower left corner of the view).
     QString label = QString("view %1 (%2)").arg(myID+1).arg(scene->getName());
-    if (interactionMode) label += " - interaction mode";
+    if (actorInteractionMode) label += " - actor interaction mode";
     if (analysisMode) label += " - analysis mode";
 
     sceneNameLabel = MGLResourcesManager::getInstance()->getTextManager()->addText(
@@ -1228,6 +1459,44 @@ void MSceneViewGLWidget::updateCameraPositionDisplay()
                 cameraPositionProperty,
                 QString("%1/%2/%3").arg(co.x(), 0, 'f', 1)
                 .arg(co.y(), 0, 'f', 1).arg(co.z(), 0, 'f', 1));
+}
+
+
+void MSceneViewGLWidget::setSingleInteractionActor(MActor *actor)
+{
+    singleInteractionActor = actor;
+    if (singleInteractionActor != nullptr)
+    {
+        setInteractionMode(true);
+    }
+    else
+    {
+        setInteractionMode(false);
+    }
+}
+
+
+void MSceneViewGLWidget::setSceneNavigationMode(SceneNavigationMode mode)
+{
+    sceneNavigationMode = mode;
+    MSystemManagerAndControl::getInstance()->getEnumPropertyManager()->setValue(
+                sceneNavigationModeProperty, (int) mode);
+}
+
+
+void MSceneViewGLWidget::setSceneRotationCentre(QVector3D centre)
+{
+    sceneRotationCentre = centre;
+    QtExtensions::QtDecoratedDoublePropertyManager *doublePropertyManager =
+            MSystemManagerAndControl::getInstance()->getDecoratedDoublePropertyManager();
+    enablePropertyEvents = false;
+    doublePropertyManager->setValue(
+                sceneRotationCentreLonProperty, centre.x());
+    doublePropertyManager->setValue(
+                sceneRotationCentreLatProperty, centre.y());
+    doublePropertyManager->setValue(
+                sceneRotationCentreElevationProperty, centre.z());
+    enablePropertyEvents = true;
 }
 
 

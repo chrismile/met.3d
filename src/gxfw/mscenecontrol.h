@@ -143,6 +143,13 @@ public:
 
     void collapseActorPropertyTree(MActor *actor);
 
+    /**
+      If the scene view is in "actor interaction mode": make @p actor the only
+      actor in the scene with which the user can interact. (Used, e.g., to
+      display a pole to select a scene rotation centre).
+     */
+    void setSingleInteractionActor(MActor *actor);
+
 public slots:
     /**
       This slot collects the @ref MActor::actorChanged() signals of all

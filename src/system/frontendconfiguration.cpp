@@ -196,8 +196,90 @@ void MFrontendConfiguration::initializeFrontendFromConfigFile(
     config.endArray();
 
 
+    // Configure scene navigation.
+    // ===========================
+
+    config.beginGroup("SceneNavigation");
+
+    QString mouseButtonRotate = config.value("mouseButtonRotate").toString();
+    QString mouseButtonPan = config.value("mouseButtonPan").toString();
+    QString mouseButtonZoom = config.value("mouseButtonZoom").toString();
+    bool reverseDefaultZoomDirection = config.value(
+                "reverseDefaultZoomDirection").toBool();
+
+    if (mouseButtonRotate == "left")
+        glRM->setGlobalMouseButtonRotate(Qt::LeftButton);
+    else if (mouseButtonRotate == "middle")
+        glRM->setGlobalMouseButtonRotate(Qt::MiddleButton);
+    else if (mouseButtonRotate == "right")
+        glRM->setGlobalMouseButtonRotate(Qt::RightButton);
+
+    if (mouseButtonPan == "left")
+        glRM->setGlobalMouseButtonPan(Qt::LeftButton);
+    else if (mouseButtonPan == "middle")
+        glRM->setGlobalMouseButtonPan(Qt::MiddleButton);
+    else if (mouseButtonPan == "right")
+        glRM->setGlobalMouseButtonPan(Qt::RightButton);
+
+    if (mouseButtonZoom == "left")
+        glRM->setGlobalMouseButtonZoom(Qt::LeftButton);
+    else if (mouseButtonZoom == "middle")
+        glRM->setGlobalMouseButtonZoom(Qt::MiddleButton);
+    else if (mouseButtonZoom == "right")
+        glRM->setGlobalMouseButtonZoom(Qt::RightButton);
+
+    glRM->reverseDefaultZoomDirection(reverseDefaultZoomDirection);
+
+    config.endGroup();
+
+
+    // Configure scene views.
+    // ======================
+
+    size = config.beginReadArray("SceneViews");
+
+    for (int i = 0; i < min(size, MET3D_MAX_SCENEVIEWS); i++)
+    {
+        config.setArrayIndex(i);
+
+        // Read scene navigation mode.
+        QString sceneNavigationMode = config.value("sceneNavigation").toString();
+
+        // Default setting is MOVE_CAMERA.
+        MSceneViewGLWidget::SceneNavigationMode navMode =
+                (sceneNavigationMode == "ROTATE_SCENE") ?
+                    MSceneViewGLWidget::ROTATE_SCENE :
+                    MSceneViewGLWidget::MOVE_CAMERA;
+
+        // Get pointer to MSceneViewGLWidget with index i.
+        MSceneViewGLWidget* glWidget =
+                sysMC->getMainWindow()->getGLWidgets().at(i);
+        glWidget->setSceneNavigationMode(navMode);
+
+        QStringList rotationCentreStrL =
+                config.value("sceneRotationCentre",
+                             QString("0./45./1050.")).toString().split("/");
+        QVector3D rotationCentre = QVector3D(
+                    rotationCentreStrL.at(0).toDouble(),
+                    rotationCentreStrL.at(1).toDouble(),
+                    rotationCentreStrL.at(2).toDouble());
+        glWidget->setSceneRotationCentre(rotationCentre);
+
+        LOG4CPLUS_DEBUG(mlog, "initializing view #" << i << ": ");
+        LOG4CPLUS_DEBUG(mlog, "  navigation mode = "
+                        << ((navMode == MSceneViewGLWidget::MOVE_CAMERA) ?
+                            "MOVE_CAMERA" : "ROTATE_SCENE"));
+        LOG4CPLUS_DEBUG(mlog, "  rotation centre = "
+                        << "latitude: " << rotationCentre.x() << " deg, "
+                        << "longitude: " << rotationCentre.y() << " deg, "
+                        << "pressure: " << rotationCentre.z() << " hPa");
+    }
+
+    config.endArray();
+
+
     // Create scene controls.
-    //==========================================================================
+    // ======================
 
     size = config.beginReadArray("Scenes");
 
@@ -230,7 +312,7 @@ void MFrontendConfiguration::initializeFrontendFromConfigFile(
 
 
     // Waypoints model.
-    // =========================================================================
+    // ================
 
     size = config.beginReadArray("WaypointsModel");
 
@@ -266,7 +348,7 @@ void MFrontendConfiguration::initializeFrontendFromConfigFile(
 
 
     // Add predefined actors to the scenes.
-    //==========================================================================
+    // ====================================
 
     size = config.beginReadArray("PredefinedActors");
 
@@ -350,7 +432,7 @@ void MFrontendConfiguration::initializeFrontendFromConfigFile(
 
 
     // Add actors from config files to the scenes.
-    //==========================================================================
+    // ===========================================
 
     size = config.beginReadArray("Actors");
 

@@ -10,6 +10,41 @@ size=1
 1\initialiseFromVariable=eastward_wind
 
 
+# Configure scene navigation.
+# =============================================================================
+
+[SceneNavigation]
+# Configure which mouse buttons are used to rotate and pan a view. Possible
+# buttons are "left", "middle", "right".
+mouseButtonRotate=left
+mouseButtonPan=right
+
+# Configure which mouse button is used to zoom. If set to "middle", the
+# mouse wheel is used to zoom; otherwise the specified button + move up/down
+# is used. Default zoom direction is "mouse wheel forward = zoom IN" in
+# MOVE_CAMERA mode and "mouse wheel forward = zoom OUT" in ROTATE_SCENE mode
+# (see section "SceneViews" below); reverse this setting by setting
+# "reverseDefaultZoomDirection" to "true".
+mouseButtonZoom=middle
+reverseDefaultZoomDirection=false
+
+
+# Configure scene views.
+# =============================================================================
+
+[SceneViews]
+size=4
+
+# Set "sceneNavigation" to one of MOVE_CAMERA or ROTATE_SCENE. If ROTATE_SCENE
+# is selected, specify a "sceneRotationCentre" (lon/lat/pressure).
+1\sceneNavigation=MOVE_CAMERA
+#1\sceneNavigation=ROTATE_SCENE
+#1\sceneRotationCentre=0./45./500.
+2\sceneNavigation=MOVE_CAMERA
+3\sceneNavigation=MOVE_CAMERA
+4\sceneNavigation=MOVE_CAMERA
+
+
 # Define scenes.
 # =============================================================================
 

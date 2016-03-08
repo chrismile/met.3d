@@ -737,10 +737,14 @@ void MSceneManagementDialog::showEvent(QShowEvent *event)
     }
 
     // Create actor view list from actor pool.
-    const QVector<MActor*>& actorPool = glRM->getActors();
-    for (int i = 0; i < actorPool.size(); i++)
+    foreach (MActor* actor, glRM->getActors())
     {
-        QString actorName = actorPool.at(i)->getName();
+        QString actorName = actor->getName();
+
+        // Skip special actors.
+        // See: MGLResourcesManager::getSceneRotationCentreSelectionPoleActor()
+        if (actorName == "SelectSceneRotationCentreActor") continue;
+
         new QListWidgetItem(actorName, ui->actorPoolListWidget);
     }
 

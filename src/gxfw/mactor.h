@@ -317,7 +317,7 @@ public:
       Returns @p true if this actor is in some way connected to the argument
       @p actor.
 
-      @note Override this method if your derived class.
+      @note Override this method in your derived class.
      */
     virtual bool isConnectedTo(MActor *actor) { Q_UNUSED(actor); return false; }
 

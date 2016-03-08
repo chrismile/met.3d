@@ -78,6 +78,11 @@ public:
         RestoreFromFile = 5
     };
 
+    enum SceneNavigationMode {
+        MOVE_CAMERA  = 0,
+        ROTATE_SCENE = 1
+    };
+
     enum LightDirection {
         WORLD_NORTHWEST = 0,
         SCENE_NORTHWEST = 1,
@@ -147,7 +152,7 @@ public:
       changed.
       */
     bool visualisationParametersHaveChanged()
-    { return visualisationParameterChange; }
+    { return visualizationParameterChange; }
 
     /**
       Returns the scene's light direction. (Use this in actors that use
@@ -181,7 +186,7 @@ public:
 
     void setFreeze(bool enabled);
 
-    bool interactionModeEnabled() { return interactionMode; }
+    bool interactionModeEnabled() { return actorInteractionMode; }
 
     bool analysisModeEnabled() { return analysisMode; }
 
@@ -202,6 +207,17 @@ public:
       control's property browser.
       */
     void updateCameraPositionDisplay();
+
+    /**
+      If the scene view is in "actor interaction mode": make @p actor the only
+      actor in the scene with which the user can interact. (Used, e.g., to
+      display a pole to select a scene rotation centre).
+     */
+    void setSingleInteractionActor(MActor *actor);
+
+    void setSceneNavigationMode(SceneNavigationMode mode);
+
+    void setSceneRotationCentre(QVector3D centre);
 
 signals:
     /**
@@ -266,7 +282,10 @@ protected:
 
     void updateSynchronizedCameras();
 
+    QList<MLabel*> staticLabels;
+
 protected slots:
+
     /**
       Checks every 100 milliseconds if the user is scrolling with the mouse.
      */
@@ -281,13 +300,18 @@ private:
     // Stores the position of the mourse cursor, used in the mouse??Event()
     // methods.
     QPoint lastPos;
+    QVector3D lastPoint;
 
     MCamera camera;
     QMatrix4x4 modelViewProjectionMatrix;
+    QMatrix4x4 worldRotationMatrix;
+    QMatrix4x4 worldPositionMatrix;
+    SceneNavigationMode sceneNavigationMode;
+    QVector3D sceneRotationCentre;
 
     // Status variables.
     bool renderLabelsWithDepthTest;
-    bool interactionMode;
+    bool actorInteractionMode;
     bool analysisMode;
     int freezeMode;
     bool viewIsInitialised;
@@ -335,9 +359,15 @@ private:
     unsigned int myID;
 
     QtProperty *propertyGroup;
-    QtProperty *cameraPositionProperty;
 
+    QtProperty *cameraPositionProperty;
     QtProperty *interactionGroupProperty;
+    QtProperty *sceneNavigationModeProperty;
+    QtProperty *sceneRotationCenterProperty;
+    QtProperty *sceneRotationCentreLatProperty;
+    QtProperty *sceneRotationCentreLonProperty;
+    QtProperty *sceneRotationCentreElevationProperty;
+    QtProperty *selectSceneRotationCentreProperty;
     QtProperty *syncCameraWithViewProperty;
     QtProperty *interactionModeProperty;
     QtProperty *analysisModeProperty;
@@ -354,14 +384,21 @@ private:
     QtProperty *measureFPSProperty;
 
     /** List of static labels to display in this view. */
-    QList<MLabel*> staticLabels;
     MLabel* sceneNameLabel;
 
-    bool visualisationParameterChange;
+    bool visualizationParameterChange;
 
     QSet<MSceneViewGLWidget*> syncCameras;
     MSceneViewGLWidget* cameraSyncronizedWith;
     MCamera rememberCamera;
+
+    MActor *singleInteractionActor;
+
+    /**
+     * When this variable is set to false the qt property changed events will be
+     * ignored for the instance of the scene.
+     */
+    bool enablePropertyEvents;
 };
 
 } // namespace Met3D
