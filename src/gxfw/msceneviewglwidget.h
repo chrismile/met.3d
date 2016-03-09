@@ -291,6 +291,8 @@ protected slots:
      */
     void checkUserScrolling();
 
+    void autorotateCamera();
+
 private:
     MSceneControl *scene;
 
@@ -308,10 +310,14 @@ private:
     QMatrix4x4 worldPositionMatrix;
     SceneNavigationMode sceneNavigationMode;
     QVector3D sceneRotationCentre;
+    QTimer *cameraAutorotateTimer;
+    QVector3D cameraAutorotateAxis;
+    float cameraAutorotateAngle;
 
     // Status variables.
     bool renderLabelsWithDepthTest;
     bool actorInteractionMode;
+    bool cameraAutorotateMode;
     bool analysisMode;
     int freezeMode;
     bool viewIsInitialised;
@@ -371,6 +377,7 @@ private:
     QtProperty *syncCameraWithViewProperty;
     QtProperty *interactionModeProperty;
     QtProperty *analysisModeProperty;
+    QtProperty *cameraAutorotateModeProperty;
 
     QtProperty *renderingGroupProperty;
     QtProperty *multisamplingProperty;
