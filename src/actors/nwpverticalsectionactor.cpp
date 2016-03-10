@@ -84,11 +84,11 @@ MNWPVerticalSectionActor::MNWPVerticalSectionActor()
 
     upperLimitProperty = addProperty(DECORATEDDOUBLE_PROPERTY, "top pressure",
                                      actorPropertiesSupGroup);
-    properties->setDDouble(upperLimitProperty, p_top_hPa, 20, 1050, 2, 5., " hPa");
+    properties->setDDouble(upperLimitProperty, p_top_hPa, 0.01, 1050, 2, 5., " hPa");
 
     lowerLimitProperty = addProperty(DECORATEDDOUBLE_PROPERTY, "bottom pressure",
                                      actorPropertiesSupGroup);
-    properties->setDDouble(lowerLimitProperty, p_bot_hPa, 20, 1050, 2, 5., " hPa");
+    properties->setDDouble(lowerLimitProperty, p_bot_hPa, 0.01, 1050, 2, 5., " hPa");
 
     opacityProperty = addProperty(DECORATEDDOUBLE_PROPERTY, "opacity",
                                   actorPropertiesSupGroup);

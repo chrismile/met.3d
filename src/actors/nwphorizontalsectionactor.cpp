@@ -79,14 +79,14 @@ MNWPHorizontalSectionActor::MNWPHorizontalSectionActor()
 
     slicePosProperty = addProperty(DECORATEDDOUBLE_PROPERTY, "slice position",
                                    actorPropertiesSupGroup);
-    properties->setDDouble(slicePosProperty, slicePosition_hPa, 10., 1050.,
+    properties->setDDouble(slicePosProperty, slicePosition_hPa, 0.01, 1050.,
                            2, slicePositionGranularity_hPa, " hPa");
 
     slicePosGranularityProperty = addProperty(DECORATEDDOUBLE_PROPERTY,
                                               "slice position granularity",
                                               actorPropertiesSupGroup);
     properties->setDDouble(slicePosGranularityProperty,
-                           slicePositionGranularity_hPa, 1., 50., 0, 1., " hPa");
+                           slicePositionGranularity_hPa, 0.01, 50., 2, 1., " hPa");
 
     // Scan currently available actors for further hsec actors. Add hsecs to
     // the combo box of the synchronizeSlicePosWithOtherActorProperty.

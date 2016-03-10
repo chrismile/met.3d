@@ -67,13 +67,13 @@ MVolumeBoundingBoxActor::MVolumeBoundingBoxActor()
                                          "bottom pressure",
                                          actorPropertiesSupGroup);
     properties->setDDouble(bottomPressureProperty, 1045.,
-                           1050., 20., 1, 10., " hPa");
+                           1050., 0.01, 1, 10., " hPa");
 
     topPressureProperty = addProperty(DECORATEDDOUBLE_PROPERTY,
                                       "top pressure",
                                       actorPropertiesSupGroup);
     properties->setDDouble(topPressureProperty, 20.,
-                           1050., 20., 1, 10., " hPa");
+                           1050., 0.01, 1, 10., " hPa");
 
     tickLengthProperty = addProperty(DECORATEDDOUBLE_PROPERTY,
                                      "tick length",

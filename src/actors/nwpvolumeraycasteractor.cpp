@@ -147,10 +147,10 @@ MNWPVolumeRaycasterActor::BoundingBoxSettings::BoundingBoxSettings(
     properties->setRectF(boxCornersProp, QRectF(-60., 30., 100., 40.), 2);
 
     pBotProp = a->addProperty(DOUBLE_PROPERTY, "bottom pressure", groupProp);
-    properties->setDouble(pBotProp, pBot_hPa, 1050., 20., 1, 5.);
+    properties->setDouble(pBotProp, pBot_hPa, 1050., 0.01, 2, 5.);
 
     pTopProp = a->addProperty(DOUBLE_PROPERTY, "top pressure", groupProp);
-    properties->setDouble(pTopProp, pTop_hPa, 1050., 20., 1, 5.);
+    properties->setDouble(pTopProp, pTop_hPa, 1050., 0.01, 2, 5.);
 }
 
 
