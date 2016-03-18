@@ -63,6 +63,7 @@ MSceneViewGLWidget::MSceneViewGLWidget()
       lastPoint(QVector3D(0,0,0)),
       sceneNavigationMode(MOVE_CAMERA),
       sceneRotationCentre(QVector3D(0,0,1020)),
+      cameraAutorotationMode(false),
       freezeMode(0),
       measureFPS(false),
       measureFPSFrameCount(0),
@@ -70,8 +71,7 @@ MSceneViewGLWidget::MSceneViewGLWidget()
       visualizationParameterChange(false),
       cameraSyncronizedWith(nullptr),
       singleInteractionActor(nullptr),
-      enablePropertyEvents(true),
-      cameraAutorotateMode(false)
+      enablePropertyEvents(true)
 {
     viewIsInitialised = false;
     focusShader = nullptr;
@@ -183,10 +183,10 @@ MSceneViewGLWidget::MSceneViewGLWidget()
     sceneRotationCenterProperty->addSubProperty(selectSceneRotationCentreProperty);
     selectSceneRotationCentreProperty->setEnabled(false);
 
-    cameraAutorotateModeProperty = systemControl->getBoolPropertyManager()
-            ->addProperty("camera autorotation mode");
-    cameraAutorotateModeProperty->setEnabled(false);
-    interactionGroupProperty->addSubProperty(cameraAutorotateModeProperty);
+    cameraAutoRotationModeProperty = systemControl->getBoolPropertyManager()
+            ->addProperty("auto-rotate camera");
+    cameraAutoRotationModeProperty->setEnabled(false);
+    interactionGroupProperty->addSubProperty(cameraAutoRotationModeProperty);
 
     QList<MSceneViewGLWidget*> otherViews = systemControl->getRegisteredViews();
     QStringList otherViewLabels;
@@ -287,9 +287,11 @@ MSceneViewGLWidget::MSceneViewGLWidget()
             SIGNAL(propertyChanged(QtProperty*)),
             SLOT(onPropertyChanged(QtProperty*)));
 
-    cameraAutorotateTimer = new QTimer();
-    cameraAutorotateTimer->setInterval(20);
-    connect(cameraAutorotateTimer, SIGNAL(timeout()), this, SLOT(autorotateCamera()));
+    // Set up a timer for camera auto-rotation.
+    cameraAutoRotationTimer = new QTimer();
+    cameraAutoRotationTimer->setInterval(20);
+    connect(cameraAutoRotationTimer, SIGNAL(timeout()),
+            this, SLOT(autoRotateCamera()));
 }
 
 
@@ -486,6 +488,16 @@ void MSceneViewGLWidget::setAnalysisMode(bool enabled)
 
     MSystemManagerAndControl::getInstance()->getBoolPropertyManager()
             ->setValue(analysisModeProperty, enabled);
+}
+
+
+void MSceneViewGLWidget::setAutoRotationMode(bool enabled)
+{
+    // Auto-rotation can only be set in ROTATE_SCENE mode.
+    if (sceneNavigationMode != ROTATE_SCENE) return;
+
+    MSystemManagerAndControl::getInstance()->getBoolPropertyManager()
+            ->setValue(cameraAutoRotationModeProperty, enabled);
 }
 
 
@@ -699,6 +711,9 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
 
     else if (property == sceneNavigationModeProperty)
     {
+        // Disable auto-rotation when scene navigation is changed.
+        setAutoRotationMode(false);
+
         sceneNavigationMode = (SceneNavigationMode)MSystemManagerAndControl::getInstance()
                 ->getEnumPropertyManager()->value(sceneNavigationModeProperty);
 
@@ -707,13 +722,13 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
         {
             sceneRotationCenterProperty->setEnabled(false);
             selectSceneRotationCentreProperty->setEnabled(false);
-            cameraAutorotateModeProperty->setEnabled(false);
+            cameraAutoRotationModeProperty->setEnabled(false);
         }
         else
         {
             sceneRotationCenterProperty->setEnabled(true);
             selectSceneRotationCentreProperty->setEnabled(true);
-            cameraAutorotateModeProperty->setEnabled(true);
+            cameraAutoRotationModeProperty->setEnabled(true);
         }
         enablePropertyEvents = true;
         updateSceneLabel();
@@ -755,15 +770,17 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
         }
     }
 
-    else if (property == cameraAutorotateModeProperty)
+    else if (property == cameraAutoRotationModeProperty)
     {
-        cameraAutorotateMode = (SceneNavigationMode)MSystemManagerAndControl::getInstance()
-                ->getBoolPropertyManager()->value(cameraAutorotateModeProperty);
-        if (!cameraAutorotateMode)
-        {
-            cameraAutorotateTimer->stop();
-        }
+        cameraAutorotationMode = MSystemManagerAndControl::getInstance()
+                ->getBoolPropertyManager()->value(cameraAutoRotationModeProperty);
+
+        if (!cameraAutorotationMode) cameraAutoRotationTimer->stop();
+
         updateSceneLabel();
+#ifndef CONTINUOUS_GL_UPDATE
+        updateGL();
+#endif
     }
 
 #ifndef CONTINUOUS_GL_UPDATE
@@ -1197,8 +1214,7 @@ void MSceneViewGLWidget::mouseMoveEvent(QMouseEvent *event)
     int dy = event->y() - lastPos.y();
 
     float factor = 1.;
-    if (event->modifiers() == Qt::ShiftModifier)
-        factor = 10.;
+    if (event->modifiers() == Qt::ShiftModifier) factor = 10.;
 
     if (event->buttons() & glRM->globalMouseButtonRotate)
     {
@@ -1226,25 +1242,29 @@ void MSceneViewGLWidget::mouseMoveEvent(QMouseEvent *event)
             curPoint.setZ(cos((M_PI/2.0) * length));
             QVector3D difPosition = (lastPoint - curPoint);
             float angle = difPosition.length() * 45.0;
+
             // The rotation vector is also rotated by the worldMatrix
             // to perform the rotation regarding the actual world rotation.
             QVector3D rotAxis = worldRotationMatrix.inverted() *
                     QVector3D::crossProduct(lastPoint, curPoint);
             worldRotationMatrix.rotate(angle,rotAxis);
             lastPoint = curPoint;
-            if (cameraAutorotateMode)
+
+            if (cameraAutorotationMode)
             {
-                cameraAutorotateAxis = rotAxis;
-                cameraAutorotateAngle = angle / 10.;
+                cameraAutoRotationAxis = rotAxis;
+                cameraAutoRotationAngle = angle / 10.;
             }
         }
     }
+
     else if (event->buttons() & glRM->globalMouseButtonPan)
     {
         // The right mouse button moves the camera around in the scene.
         camera.moveUp(-dy/10./factor, 1.);
         camera.moveRight(dx/10./factor);
     }
+
     else if (event->buttons() & glRM->globalMouseButtonZoom)
     {
         // "Pure" mouse wheel: zoom (move camera forward/backward)
@@ -1305,10 +1325,15 @@ void MSceneViewGLWidget::mouseReleaseEvent(QMouseEvent *event)
 
     MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
 
+    // AUTO-ROTATION MODE.
+    // ===================
+
+    // If we are in auto-rotation mode, start the auto-rotation timer to
+    // rotate the scene around its rotation centre.
     if (event->button() == glRM->globalMouseButtonRotate &&
-        cameraAutorotateMode && sceneNavigationMode == ROTATE_SCENE)
+        cameraAutorotationMode && sceneNavigationMode == ROTATE_SCENE)
     {
-      cameraAutorotateTimer->start();
+      cameraAutoRotationTimer->start();
     }
 
 #ifndef CONTINUOUS_GL_UPDATE
@@ -1379,10 +1404,12 @@ void MSceneViewGLWidget::checkUserScrolling()
 }
 
 
-void MSceneViewGLWidget::autorotateCamera()
+void MSceneViewGLWidget::autoRotateCamera()
 {
-    worldRotationMatrix.rotate(cameraAutorotateAngle, cameraAutorotateAxis);
+    worldRotationMatrix.rotate(cameraAutoRotationAngle, cameraAutoRotationAxis);
+#ifndef CONTINUOUS_GL_UPDATE
     updateGL();
+#endif
 }
 
 
@@ -1448,9 +1475,9 @@ void MSceneViewGLWidget::keyPressEvent(QKeyEvent *event)
         setAnalysisMode(!analysisMode);
         break;
     case Qt::Key_R:
-        cameraAutorotateMode = !cameraAutorotateMode;
-        MSystemManagerAndControl::getInstance()->getBoolPropertyManager()
-                ->setValue(cameraAutorotateModeProperty, cameraAutorotateMode);
+        // Toggle auto-rotation mode.
+        setAutoRotationMode(!cameraAutorotationMode);
+        break;
     default:
         // If we do not act upon the key, pass event to base class
         // implementation.
@@ -1491,8 +1518,8 @@ void MSceneViewGLWidget::updateSceneLabel()
     QString label = QString("view %1 (%2)").arg(myID+1).arg(scene->getName());
     if (actorInteractionMode) label += " - actor interaction mode";
     if (analysisMode) label += " - analysis mode";
-    if (cameraAutorotateMode && sceneNavigationMode == ROTATE_SCENE)
-        label += " (autorotate camera)";
+    if (cameraAutorotationMode) label += " - auto-rotate camera";
+
     sceneNameLabel = MGLResourcesManager::getInstance()->getTextManager()->addText(
                 label, MTextManager::CLIPSPACE, -0.99, -0.99, -0.99, 20,
                 QColor(0, 0, 255, 150));
