@@ -216,10 +216,17 @@ void MGLResourcesManager::registerActor(MActor *actor)
 
     emit actorCreated(actor);
 
+    // Listen to actorHasChangedItsName() signals of this actor.
+    connect(actor, SIGNAL(actorNameChanged(MActor*, QString)),
+            this, SLOT(actorHasChangedItsName(MActor*, QString)));
+
+    // Notify the actor when other actors change.
     connect(this, SIGNAL(actorCreated(MActor*)),
             actor, SLOT(actOnOtherActorCreated(MActor*)));
     connect(this, SIGNAL(actorDeleted(MActor*)),
             actor, SLOT(actOnOtherActorDeleted(MActor*)));
+    connect(this, SIGNAL(actorRenamed(MActor*, QString)),
+            actor, SLOT(actOnOtherActorRenamed(MActor*, QString)));
 }
 
 
@@ -409,10 +416,15 @@ void MGLResourcesManager::deleteActor(const QString name)
             actorPool.remove(i);
 
             // Disconnect actor from signals.
+            disconnect(actor, SIGNAL(actorNameChanged(MActor*, QString)),
+                       this, SLOT(actorHasChangedItsName(MActor*, QString)));
+
             disconnect(this, SIGNAL(actorCreated(MActor*)),
                        actor, SLOT(actOnOtherActorCreated(MActor*)));
             disconnect(this, SIGNAL(actorDeleted(MActor*)),
                        actor, SLOT(actOnOtherActorDeleted(MActor*)));
+            disconnect(this, SIGNAL(actorRenamed(MActor*, QString)),
+                       actor, SLOT(actOnOtherActorRenamed(MActor*, QString)));
 
             // Notify other actors that this actor will be deleted.
             emit actorDeleted(actor);
@@ -807,6 +819,13 @@ void MGLResourcesManager::dumpMemoryContent(QtProperty *property)
     s += "\n\n===========================\n";
 
     LOG4CPLUS_INFO(mlog, s.toStdString());
+}
+
+
+void MGLResourcesManager::actorHasChangedItsName(MActor *actor, QString oldName)
+{
+    // Simply pass on the received signal to all registered actors.
+    emit actorRenamed(actor, oldName);
 }
 
 

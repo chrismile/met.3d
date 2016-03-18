@@ -232,6 +232,13 @@ public slots:
      */
     void onActorDeleted(MActor *actor);
 
+    /**
+     Connects to the MGLResourcesManager::actorRenamed() signal. If the renamed
+     actor is a transfer function, it is renamed in the list of transfer
+     functions displayed by the transferFunctionProperty.
+     */
+    void onActorRenamed(MActor *actor, QString oldName);
+
     void asynchronousDataAvailable(MDataRequest request);
 
 protected:

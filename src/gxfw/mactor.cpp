@@ -201,8 +201,11 @@ unsigned int MActor::getID()
 
 void MActor::setName(const QString name)
 {
+    QString oldName = actorName;
     actorName = name;
     propertyGroup->setPropertyName(actorName);
+
+    emit actorNameChanged(this, oldName);
 }
 
 
@@ -554,6 +557,12 @@ void MActor::actOnOtherActorCreated(MActor *actor)
 void MActor::actOnOtherActorDeleted(MActor *actor)
 {
     onOtherActorDeleted(actor);
+}
+
+
+void MActor::actOnOtherActorRenamed(MActor *actor, QString oldName)
+{
+    onOtherActorRenamed(actor, oldName);
 }
 
 

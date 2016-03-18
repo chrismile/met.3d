@@ -330,19 +330,26 @@ public slots:
     void actOnQtPropertyChanged(QtProperty *property);
 
     /**
-      Called when another actor (not this one) in the global actor pool is
+      Called when another actor (not this one) in the global actor pool has been
       created. Calls @ref onOtherActorCreated(), in which derived classes can
       handle actor deletion events.
      */
     void actOnOtherActorCreated(MActor *actor);
 
     /**
-      Called when another actor (not this one) in the global actor pool is
+      Called when another actor (not this one) in the global actor pool has been
       deleted. Allows this actor to take actions if any connection exists
       between this actor and the deleted actor. Calls @ref onOtherActorDeleted(),
       in which derived classes can handle actor deletion events.
      */
     void actOnOtherActorDeleted(MActor *actor);
+
+    /**
+      Called when another actor (not this one) in the global actor pool has been
+      renamed. Calls @ref onOtherActorRenamed(), in which derived classes can
+      handle actor renaming events.
+     */
+    void actOnOtherActorRenamed(MActor *actor, QString oldName);
 
 signals:
     /**
@@ -353,6 +360,11 @@ signals:
       @note Never emit directly, always use @ref signalActorChanged()!
       */
     void actorChanged();
+
+    /**
+      Emitted when the name of the actor has been changed via @ref setName().
+     */
+    void actorNameChanged(MActor *actor, QString oldName);
 
 protected:
     /**
@@ -386,6 +398,13 @@ protected:
      */
     virtual void onOtherActorDeleted(MActor *actor)
     { Q_UNUSED(actor); }
+
+    /**
+      Implement this function in derived classes to handle actor renaming
+      events. @see actOnOtherActorRenamed().
+     */
+    virtual void onOtherActorRenamed(MActor *actor, QString oldName)
+    { Q_UNUSED(actor); Q_UNUSED(oldName); }
 
     // Define friends for suppressActorUpdates().
     friend class MVerticalRegridProperties;

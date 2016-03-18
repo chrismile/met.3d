@@ -339,6 +339,11 @@ public slots:
 
     void dumpMemoryContent(QtProperty *property);
 
+    /**
+      Called when a registered actor has changed its name.
+      */
+    void actorHasChangedItsName(MActor *actor, QString oldName);
+
 signals:
     /**
      This signal is emitted when a new actor has been created and added to the
@@ -351,6 +356,11 @@ signals:
      actor pool.
      */
     void actorDeleted(MActor* actor);
+
+    /**
+     This signal is emitted when an actor has been renamed.
+     */
+    void actorRenamed(MActor* actor, QString oldName);
 
 protected:
     friend class MSceneViewGLWidget;

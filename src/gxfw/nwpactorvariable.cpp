@@ -184,6 +184,8 @@ MNWPActorVariable::MNWPActorVariable(MNWPMultiVarActor *actor)
     // functions, add to the list displayed in the transfer function property.
     connect(glRM, SIGNAL(actorCreated(MActor*)), SLOT(onActorCreated(MActor*)));
     connect(glRM, SIGNAL(actorDeleted(MActor*)), SLOT(onActorDeleted(MActor*)));
+    connect(glRM, SIGNAL(actorRenamed(MActor*, QString)),
+            SLOT(onActorRenamed(MActor*, QString)));
 
     actor->endInitialiseQtProperties();
 }
@@ -200,6 +202,8 @@ MNWPActorVariable::~MNWPActorVariable()
                this, SLOT(onActorCreated(MActor*)));
     disconnect(glRM, SIGNAL(actorDeleted(MActor*)),
                this, SLOT(onActorDeleted(MActor*)));
+    disconnect(glRM, SIGNAL(actorRenamed(MActor*, QString)),
+               this, SLOT(onActorRenamed(MActor*, QString)));
 
     // Delete synchronization links (don't update the already deleted GUI
     // properties anymore...).
@@ -1171,9 +1175,34 @@ void MNWPActorVariable::onActorDeleted(MActor *actor)
 
         // If the deleted transfer function is currently connected to this
         // variable, set current transfer function to "None" (index 0).
-        if(availableTFs.at(index) == tf->getName()) index = 0;
+        if (availableTFs.at(index) == tf->getName()) index = 0;
 
         availableTFs.removeOne(tf->getName());
+        properties->mEnum()->setEnumNames(transferFunctionProperty, availableTFs);
+        properties->mEnum()->setValue(transferFunctionProperty, index);
+
+        this->actor->enableEmissionOfActorChangedSignal(true);
+    }
+}
+
+
+void MNWPActorVariable::onActorRenamed(MActor *actor, QString oldName)
+{
+    // If the new actor is a transfer function, add it to the list of
+    // available transfer functions.
+    if (MTransferFunction1D *tf = dynamic_cast<MTransferFunction1D*>(actor))
+    {
+        // Don't render while the properties are being updated.
+        this->actor->enableEmissionOfActorChangedSignal(false);
+
+        MQtProperties *properties = this->actor->getQtProperties();
+        int index = properties->mEnum()->value(transferFunctionProperty);
+        QStringList availableTFs = properties->mEnum()->enumNames(
+                    transferFunctionProperty);
+
+        // Replace affected entry.
+        availableTFs[availableTFs.indexOf(oldName)] = tf->getName();
+
         properties->mEnum()->setEnumNames(transferFunctionProperty, availableTFs);
         properties->mEnum()->setValue(transferFunctionProperty, index);
 
