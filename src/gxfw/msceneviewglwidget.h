@@ -184,6 +184,8 @@ public:
 
     void setAnalysisMode(bool enabled);
 
+    void setAutoRotationMode(bool enabled);
+
     void setFreeze(bool enabled);
 
     bool interactionModeEnabled() { return actorInteractionMode; }
@@ -291,6 +293,12 @@ protected slots:
      */
     void checkUserScrolling();
 
+    /**
+     Called by the auto-rotation timer to rotate the camera in auto-rotation
+     mode.
+     */
+    void autoRotateCamera();
+
 private:
     MSceneControl *scene;
 
@@ -308,10 +316,14 @@ private:
     QMatrix4x4 worldPositionMatrix;
     SceneNavigationMode sceneNavigationMode;
     QVector3D sceneRotationCentre;
+    QTimer *cameraAutoRotationTimer;
+    QVector3D cameraAutoRotationAxis;
+    float cameraAutoRotationAngle;
 
     // Status variables.
     bool renderLabelsWithDepthTest;
     bool actorInteractionMode;
+    bool cameraAutorotationMode;
     bool analysisMode;
     int freezeMode;
     bool viewIsInitialised;
@@ -371,6 +383,7 @@ private:
     QtProperty *syncCameraWithViewProperty;
     QtProperty *interactionModeProperty;
     QtProperty *analysisModeProperty;
+    QtProperty *cameraAutoRotationModeProperty;
 
     QtProperty *renderingGroupProperty;
     QtProperty *multisamplingProperty;
