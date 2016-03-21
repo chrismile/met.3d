@@ -470,57 +470,6 @@ void MTextManager::renderText(
         x += ci->advanceX * scaleX;
     }
 
-    if (bbox)
-    {
-        // If enabled, draw a bounding box around the character.
-
-        // Convert bboxPad from pixel units to clip space [-1..1].
-        float xScaledBBoxPad = bboxPad * 2. / sceneView->getViewPortWidth();
-        float yScaledBBoxPad = bboxPad * 2. / sceneView->getViewPortHeight();
-
-        float cbbox[12] = {
-            // lower left (lower left x, y of first triangle from ctriangles).
-            ctriangles[0  ] - xScaledBBoxPad,
-            minYOfBBox      - yScaledBBoxPad,
-            z,
-            // upper left
-            ctriangles[0  ] - xScaledBBoxPad,
-            maxYOfBBox      + yScaledBBoxPad,
-            z,
-            // lower right
-            ctriangles[n-5] + xScaledBBoxPad,
-            minYOfBBox      - yScaledBBoxPad,
-            z,
-            // upper right (upper right x, y of the last triangle).
-            ctriangles[n-5] + xScaledBBoxPad,
-            maxYOfBBox      + yScaledBBoxPad,
-            z
-        };
-
-        bboxEffect->bindProgram("Simple");
-        bboxEffect->setUniformValue("colour", bboxColour);
-
-        glBindBuffer(GL_ARRAY_BUFFER, directRenderingBBoxVBO);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(cbbox), cbbox, GL_DYNAMIC_DRAW);
-
-        glVertexAttribPointer(SHADER_VERTEX_ATTRIBUTE, 3, GL_FLOAT,
-                              GL_FALSE, 0, (const GLvoid *)0);
-        glEnableVertexAttribArray(SHADER_VERTEX_ATTRIBUTE);
-
-        // Make sure the bounding box doesn't obscure the characters.
-        glPolygonOffset(.01f, 1.0f);
-        glEnable(GL_POLYGON_OFFSET_FILL);
-
-        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-        glDisable(GL_POLYGON_OFFSET_FILL);
-    }
-
-    // Pass colour variable to shader, upload vertex attributes to VBO and
-    // render the text string.
-    textEffect->bindProgram("Text");
-    textEffect->setUniformValue("colour", colour);
-
     QVector2D offset = QVector2D(0, 0); // (anchor == BASELINELEFT)
     if (anchor == BASELINERIGHT)
         offset = QVector2D(ctriangles[0]-ctriangles[n-5], 0);
@@ -547,6 +496,56 @@ void MTextManager::renderText(
         offset = QVector2D((ctriangles[0]-ctriangles[n-5])/2.,
                            y-minYOfBBox - (maxYOfBBox-minYOfBBox)/2.);
 
+    if (bbox)
+    {
+        // If enabled, draw a bounding box around the character.
+
+        // Convert bboxPad from pixel units to clip space [-1..1].
+        float xScaledBBoxPad = bboxPad * 2. / sceneView->getViewPortWidth();
+        float yScaledBBoxPad = bboxPad * 2. / sceneView->getViewPortHeight();
+
+        float cbbox[12] = {
+            // lower left (lower left x, y of first triangle from ctriangles).
+            ctriangles[0  ] - xScaledBBoxPad + float(offset.x()),
+            minYOfBBox      - yScaledBBoxPad + float(offset.y()),
+            z,
+            // upper left
+            ctriangles[0  ] - xScaledBBoxPad + float(offset.x()),
+            maxYOfBBox      + yScaledBBoxPad + float(offset.y()),
+            z,
+            // lower right
+            ctriangles[n-5] + xScaledBBoxPad + float(offset.x()),
+            minYOfBBox      - yScaledBBoxPad + float(offset.y()),
+            z,
+            // upper right (upper right x, y of the last triangle).
+            ctriangles[n-5] + xScaledBBoxPad + float(offset.x()),
+            maxYOfBBox      + yScaledBBoxPad + float(offset.y()),
+            z
+        };
+
+        bboxEffect->bindProgram("Simple");
+        bboxEffect->setUniformValue("colour", bboxColour);
+
+        glBindBuffer(GL_ARRAY_BUFFER, directRenderingBBoxVBO);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(cbbox), cbbox, GL_DYNAMIC_DRAW);
+
+        glVertexAttribPointer(SHADER_VERTEX_ATTRIBUTE, 3, GL_FLOAT,
+                              GL_FALSE, 0, (const GLvoid *)0);
+        glEnableVertexAttribArray(SHADER_VERTEX_ATTRIBUTE);
+
+        // Make sure the bounding box doesn't obscure the characters.
+        glPolygonOffset(.01f, 1.0f);
+        glEnable(GL_POLYGON_OFFSET_FILL);
+
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+        glDisable(GL_POLYGON_OFFSET_FILL);
+    }
+
+    // Pass colour variable to shader, upload vertex attributes to VBO and
+    // render the text string.
+    textEffect->bindProgram("Text");
+    textEffect->setUniformValue("colour", colour);
     textEffect->setUniformValue("offset", offset);
 
     glActiveTexture(GL_TEXTURE0 + textureUnit);
