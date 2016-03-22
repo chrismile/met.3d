@@ -529,6 +529,7 @@ void MFrontendConfiguration::initializeSynchronization(
                         initializeFromVariable,
                         initialInitTime)[0];
             syncControl->setValidDateTime(initialValidTime);
+            syncControl->copyValidTimeToTimeAnimationFromTo();
         }
         catch (MBadDataFieldRequest)
         {

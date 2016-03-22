@@ -54,6 +54,26 @@ enum MSynchronizationType
 
 
 /**
+ @brief MLabelledWidgetAction provides custom entries (=actions) for QMenus.
+ A widget that should be displayed can be specified, as well as text that
+ appears before and after the widget.
+ */
+class MLabelledWidgetAction : public QWidgetAction
+{
+    Q_OBJECT
+
+public:
+    MLabelledWidgetAction(const QString& labelFront, const QString& labelBack,
+                          QWidget* customWidget, QWidget *parent = nullptr);
+
+    QWidget* getCustomWidget() { return customWidget; }
+
+private:
+    QWidget *customWidget;
+};
+
+
+/**
  @brief MSyncControl provides time and ensemble settings with which individual
  actors can synchronize. The functionality has been separated from
  @ref MSceneControl to allow for comprehensive synchronization possibilities.
@@ -84,6 +104,8 @@ public:
 
     void setInitDateTime(const QDateTime &dateTime);
 
+    void copyValidTimeToTimeAnimationFromTo();
+
     /**
      Returns the current ensemble member. If the ensemble mode is set to
      "mean", returns -1.
@@ -110,9 +132,20 @@ public slots:
     void timeBackward();
 
     /**
-      Starts an animation over time.
+      Advance time (forward or backward, depending on settings) in animation
+      mode (called by the animation timer).
+      */
+    void timeAnimationAdvanceTimeStep();
+
+    /**
+      Starts animation over time.
       */
     void startTimeAnimation();
+
+    /**
+      Stops animation over time.
+      */
+    void stopTimeAnimation();
 
 signals:
     /**
@@ -170,13 +203,25 @@ private:
     void processSynchronizationEvent(MSynchronizationType syncType,
                                      QVariant syncVariant);
 
+    /**
+      Enables/disables the GUI elements that control time. (Used to disable
+      time control during time animation).
+     */
+    void setTimeSynchronizationGUIEnabled(bool enabled);
+
     Ui::MSyncControl *ui;
 
     // Maps index of ui->timeStepComboBox to seconds (see constructor and
     // applyTimeStep()).
     int *timeStepIndexToSeconds;
 
-    // Timer to control animations.
+    // Properties to control time animations.
+    QMenu *timeAnimationDropdownMenu;
+    QSpinBox *timeAnimationTimeStepSpinBox;
+    QDateTimeEdit *timeAnimationFrom;
+    QDateTimeEdit *timeAnimationTo;
+    QAction *timeAnimationLoopTimeAction;
+    QAction *timeAnimationReverseTimeDirectionAction;
     QTimer *animationTimer;
 
     QString syncID;

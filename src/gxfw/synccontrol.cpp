@@ -46,6 +46,31 @@ namespace Met3D
 ***                     CONSTRUCTOR / DESTRUCTOR                            ***
 *******************************************************************************/
 
+MLabelledWidgetAction::MLabelledWidgetAction(
+        const QString &labelFront, const QString &labelBack,
+        QWidget *customWidget, QWidget *parent)
+    : QWidgetAction(parent)
+{
+    QWidget* widget = new QWidget(parent);
+    QHBoxLayout* layout = new QHBoxLayout();
+
+    QLabel *label1 = new QLabel(labelFront, parent);
+    layout->addWidget(label1);
+
+    this->customWidget = customWidget;
+    layout->addWidget(customWidget);
+
+    if ( !labelBack.isEmpty() )
+    {
+        QLabel *label2 = new QLabel(labelBack, parent);
+        layout->addWidget(label2);
+    }
+
+    widget->setLayout(layout);
+    setDefaultWidget(widget);
+}
+
+
 MSyncControl::MSyncControl(QString id, QWidget *parent) :
     QWidget(parent),
     ui(new Ui::MSyncControl),
@@ -73,32 +98,79 @@ MSyncControl::MSyncControl(QString id, QWidget *parent) :
     setValidDateTime(QDateTime(QDateTime::currentDateTimeUtc().date()));
     updateTimeDifference();
 
-    connect(ui->timeForwardButton, SIGNAL(clicked()), SLOT(timeForward()));
-    connect(ui->timeBackwardButton, SIGNAL(clicked()), SLOT(timeBackward()));
-    connect(ui->animationPlayButton, SIGNAL(clicked()), SLOT(startTimeAnimation()));
-
-    connect(ui->validTimeEdit,
-            SIGNAL(dateTimeChanged(QDateTime)),
+    connect(ui->validTimeEdit, SIGNAL(dateTimeChanged(QDateTime)),
             SLOT(onValidDateTimeChange(QDateTime)));
-    connect(ui->initTimeEdit,
-            SIGNAL(dateTimeChanged(QDateTime)),
+    connect(ui->initTimeEdit, SIGNAL(dateTimeChanged(QDateTime)),
             SLOT(onInitDateTimeChange(QDateTime)));
+    connect(ui->timeForwardButton, SIGNAL(clicked()),
+            SLOT(timeForward()));
+    connect(ui->timeBackwardButton, SIGNAL(clicked()),
+            SLOT(timeBackward()));
 
+    // Initialise a drop down menu that provides time animation settings.
+    timeAnimationDropdownMenu = new QMenu(this);
+
+    timeAnimationTimeStepSpinBox = new QSpinBox(this);
+    timeAnimationTimeStepSpinBox->setMinimum(10);
+    timeAnimationTimeStepSpinBox->setMaximum(10000);
+    timeAnimationTimeStepSpinBox->setValue(1000);
+    MLabelledWidgetAction *timeStepSpinBoxAction = new MLabelledWidgetAction(
+                "animation time step:", "ms", timeAnimationTimeStepSpinBox, this);
+    timeAnimationDropdownMenu->addAction(timeStepSpinBoxAction);
+
+    timeAnimationDropdownMenu->addSeparator();
+
+    timeAnimationFrom = new QDateTimeEdit(this);
+    timeAnimationFrom->setDisplayFormat("ddd yyyy-MM-dd hh:mm UTC");
+    timeAnimationFrom->setTimeSpec(Qt::UTC);
+    MLabelledWidgetAction *animateFromTimeAction =
+            new MLabelledWidgetAction("from", "", timeAnimationFrom, this);
+    timeAnimationDropdownMenu->addAction(animateFromTimeAction);
+
+    timeAnimationTo = new QDateTimeEdit(this);
+    timeAnimationTo->setDisplayFormat("ddd yyyy-MM-dd hh:mm UTC");
+    timeAnimationTo->setTimeSpec(Qt::UTC);
+    MLabelledWidgetAction *animateToTimeAction =
+            new MLabelledWidgetAction("to", "", timeAnimationTo, this);
+    timeAnimationDropdownMenu->addAction(animateToTimeAction);
+
+    timeAnimationDropdownMenu->addSeparator();
+
+    timeAnimationLoopTimeAction = new QAction(this);
+    timeAnimationLoopTimeAction->setCheckable(true);
+    timeAnimationLoopTimeAction->setText("Loop");
+    timeAnimationDropdownMenu->addAction(timeAnimationLoopTimeAction);
+
+    timeAnimationReverseTimeDirectionAction = new QAction(this);
+    timeAnimationReverseTimeDirectionAction->setCheckable(true);
+    timeAnimationReverseTimeDirectionAction->setText("Reverse time direction");
+    timeAnimationDropdownMenu->addAction(timeAnimationReverseTimeDirectionAction);
+
+    ui->animationPlayButton->setMenu(timeAnimationDropdownMenu);
+
+    connect(ui->animationPlayButton, SIGNAL(clicked()),
+            SLOT(startTimeAnimation()));
+    connect(ui->animationStopButton, SIGNAL(clicked()),
+            SLOT(stopTimeAnimation()));
+
+    // Initialise a timer to control the animation.
     animationTimer = new QTimer(this);
-    connect(animationTimer, SIGNAL(timeout()), SLOT(timeForward()));
+    connect(animationTimer, SIGNAL(timeout()),
+            SLOT(timeAnimationAdvanceTimeStep()));
 
 
     // Ensemble control elements.
     // =========================================================================
 
-//TODO: Remove hardcoded limits!
-    ui->ensembeMemberSpinBox->setMinimum(0);
-    ui->ensembeMemberSpinBox->setMaximum(50);
+//TODO (mr, 22Mar2016): Remove hardcoded limits -- MSynchronizedObject needs
+//                      to provide limits of valid/init time and ens members.
+    ui->ensembleMemberSpinBox->setMinimum(0);
+    ui->ensembleMemberSpinBox->setMaximum(50);
 
     connect(ui->showMeanCheckBox,
             SIGNAL(stateChanged(int)),
             SLOT(onEnsembleModeChange(int)));
-    connect(ui->ensembeMemberSpinBox,
+    connect(ui->ensembleMemberSpinBox,
             SIGNAL(valueChanged(int)),
             SLOT(onEnsembleModeChange(int)));
 }
@@ -139,12 +211,21 @@ void MSyncControl::setInitDateTime(const QDateTime &dateTime)
 }
 
 
+void MSyncControl::copyValidTimeToTimeAnimationFromTo()
+{
+//TODO (mr, 22Mar2016): Update from data sources -- MSynchronizedObject needs
+//                      to provide limits of valid/init time and ens members.
+    timeAnimationFrom->setDateTime(ui->validTimeEdit->dateTime());
+    timeAnimationTo->setDateTime(ui->validTimeEdit->dateTime());
+}
+
+
 int MSyncControl::ensembleMember() const
 {
     if (ui->showMeanCheckBox->isChecked())
         return -1;
     else
-        return ui->ensembeMemberSpinBox->value();
+        return ui->ensembleMemberSpinBox->value();
 }
 
 
@@ -179,13 +260,27 @@ void MSyncControl::synchronizationCompleted(MSynchronizedObject *object)
         // Enable GUI for next event.
         ui->syncFrame->setEnabled(true);
 
+        // In animation mode force an immediate repaint of the valid and init
+        // time displays (otherwise they may not update during animation).
+        if (animationTimer->isActive())
+        {
+            ui->validTimeEdit->repaint();
+            ui->initTimeEdit->repaint();
+        }
+
         // Last active QWdiget looses focus through disabling of sync frame
         // -- give it back.
         if (lastFocusWidget) lastFocusWidget->setFocus();
         // For some reason this doesn't always work for the ensemble memnber
         // spinbox.
         if (currentSyncType == SYNC_ENSEMBLE_MEMBER)
-            ui->ensembeMemberSpinBox->setFocus();
+        {
+            ui->ensembleMemberSpinBox->setFocus();
+            // Also, force repaint of ensemble memnber spinbox; it doesn't
+            // always update in time (e.g., when the user holds an up/down
+            // key to animate over the ensemble members).
+            ui->ensembleMemberSpinBox->repaint();
+        }
 
         currentSyncType = SYNC_UNKNOWN;
 
@@ -205,11 +300,35 @@ void MSyncControl::timeForward()
     {
         // Index 0 of stepChooseVTITComboBox means that the valid time should
         // be modified by the time navigation buttons.
+
+        if ( animationTimer->isActive() )
+            if (ui->validTimeEdit->dateTime() >= timeAnimationTo->dateTime() )
+            {
+                if ( timeAnimationLoopTimeAction->isChecked() )
+                    ui->validTimeEdit->setDateTime(timeAnimationFrom->dateTime());
+                else
+                    stopTimeAnimation();
+
+                return;
+            }
+
         applyTimeStep(ui->validTimeEdit, 1);
     }
     else
     {
         // Modify initialisation time.
+
+        if ( animationTimer->isActive() )
+            if (ui->initTimeEdit->dateTime() >= timeAnimationTo->dateTime() )
+            {
+                if ( timeAnimationLoopTimeAction->isChecked() )
+                    ui->initTimeEdit->setDateTime(timeAnimationFrom->dateTime());
+                else
+                    stopTimeAnimation();
+
+                return;
+            }
+
         applyTimeStep(ui->initTimeEdit, 1);
     }
 }
@@ -221,22 +340,82 @@ void MSyncControl::timeBackward()
     {
         // Index 0 of stepChooseVTITComboBox means that the valid time should
         // be modified by the time navigation buttons.
+
+        if ( animationTimer->isActive() )
+            if (ui->validTimeEdit->dateTime() <= timeAnimationFrom->dateTime() )
+            {
+                if ( timeAnimationLoopTimeAction->isChecked() )
+                    ui->validTimeEdit->setDateTime(timeAnimationTo->dateTime());
+                else
+                    stopTimeAnimation();
+
+                return;
+            }
+
         applyTimeStep(ui->validTimeEdit, -1);
     }
     else
     {
         // Modify initialisation time.
+
+        if ( animationTimer->isActive() )
+            if (ui->initTimeEdit->dateTime() <= timeAnimationFrom->dateTime() )
+            {
+                if ( timeAnimationLoopTimeAction->isChecked() )
+                    ui->initTimeEdit->setDateTime(timeAnimationTo->dateTime());
+                else
+                    stopTimeAnimation();
+
+                return;
+            }
+
         applyTimeStep(ui->initTimeEdit, -1);
     }
+}
+
+
+void MSyncControl::timeAnimationAdvanceTimeStep()
+{
+#ifdef DIRECT_SYNCHRONIZATION
+    // Don't apply the time change if the previous request hasn't been
+    // completed.
+    if (synchronizationInProgress) return;
+#endif
+
+    if ( timeAnimationReverseTimeDirectionAction->isChecked() )
+        timeBackward();
+    else
+        timeForward();
 }
 
 
 void MSyncControl::startTimeAnimation()
 {
     if (ui->animationPlayButton->isChecked())
-        animationTimer->start(1000);
-    else
-        animationTimer->stop();
+    {
+        // Disable time control GUI elements; enable STOP button.
+        ui->animationPlayButton->setEnabled(false);
+        ui->animationStopButton->setEnabled(true);
+        timeAnimationDropdownMenu->setEnabled(false);
+        setTimeSynchronizationGUIEnabled(false);
+
+        // Start the animation timer.
+        animationTimer->start(timeAnimationTimeStepSpinBox->value());
+    }
+}
+
+
+void MSyncControl::stopTimeAnimation()
+{
+    // Stop the animation timer.
+    animationTimer->stop();
+
+    // Enable time control GUI elements; disable STOP button.
+    ui->animationPlayButton->setEnabled(true);
+    ui->animationPlayButton->setChecked(false);
+    timeAnimationDropdownMenu->setEnabled(true);
+    setTimeSynchronizationGUIEnabled(true);
+    ui->animationStopButton->setEnabled(false);
 }
 
 
@@ -280,6 +459,7 @@ void MSyncControl::onInitDateTimeChange(const QDateTime &datetime)
     emit initDateTimeChanged(datetime);
     emit endSynchronization();
 #endif
+
 }
 
 
@@ -297,15 +477,15 @@ void MSyncControl::onEnsembleModeChange(const int foo)
     if (ui->showMeanCheckBox->isChecked())
     {
         // Ensemble mean.
-        ui->ensembeMemberSpinBox->setEnabled(false);
+        ui->ensembleMemberSpinBox->setEnabled(false);
         ui->ensembleMemberLabel->setEnabled(false);
     }
     else
     {
         // Change to specified ensemble member.
-        ui->ensembeMemberSpinBox->setEnabled(true);
+        ui->ensembleMemberSpinBox->setEnabled(true);
         ui->ensembleMemberLabel->setEnabled(true);
-        member = ui->ensembeMemberSpinBox->value();
+        member = ui->ensembleMemberSpinBox->value();
     }
 
 #ifdef DIRECT_SYNCHRONIZATION
@@ -373,11 +553,13 @@ void MSyncControl::endSceneSynchronization()
 void MSyncControl::processSynchronizationEvent(MSynchronizationType syncType,
                                                QVariant syncVariant)
 {
-    // Begin synchronization: disable sync GUI, tell scenes that sync
-    // begins (so they can block redraws).
+    // Begin synchronization: disable sync GUI (unless the event is caused by
+    // the animationTimer; in this case the GUI remains active so the user can
+    // stop the animation), tell scenes that sync begins (so they can block
+    // redraws).
     lastFocusWidget = QApplication::focusWidget();
     currentSyncType = syncType;
-    ui->syncFrame->setEnabled(false);
+    if ( !animationTimer->isActive() ) ui->syncFrame->setEnabled(false);
     beginSceneSynchronization();
 
     if ( (syncType == SYNC_VALID_TIME) || (syncType == SYNC_INIT_TIME) )
@@ -409,5 +591,15 @@ void MSyncControl::processSynchronizationEvent(MSynchronizationType syncType,
     if (pendingSynchronizations.empty()) synchronizationCompleted(nullptr);
 }
 
+
+void MSyncControl::setTimeSynchronizationGUIEnabled(bool enabled)
+{
+    ui->initTimeEdit->setEnabled(enabled);
+    ui->validTimeEdit->setEnabled(enabled);
+    ui->timeBackwardButton->setEnabled(enabled);
+    ui->timeForwardButton->setEnabled(enabled);
+    ui->timeStepComboBox->setEnabled(enabled);
+    ui->stepChooseVTITComboBox->setEnabled(enabled);
+}
 
 } // namespace Met3D

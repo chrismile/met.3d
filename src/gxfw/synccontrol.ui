@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>399</width>
-    <height>185</height>
+    <width>520</width>
+    <height>226</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -132,7 +132,7 @@
           </property>
           <property name="dateTime">
            <datetime>
-            <hour>16</hour>
+            <hour>6</hour>
             <minute>0</minute>
             <second>0</second>
             <year>2011</year>
@@ -149,7 +149,7 @@
           </property>
           <property name="minimumDateTime">
            <datetime>
-            <hour>12</hour>
+            <hour>7</hour>
             <minute>0</minute>
             <second>0</second>
             <year>1999</year>
@@ -166,7 +166,7 @@
           </property>
           <property name="minimumTime">
            <time>
-            <hour>12</hour>
+            <hour>7</hour>
             <minute>0</minute>
             <second>0</second>
            </time>
@@ -314,7 +314,7 @@
           </property>
           <property name="dateTime">
            <datetime>
-            <hour>16</hour>
+            <hour>6</hour>
             <minute>0</minute>
             <second>0</second>
             <year>2011</year>
@@ -331,7 +331,7 @@
           </property>
           <property name="minimumDateTime">
            <datetime>
-            <hour>11</hour>
+            <hour>6</hour>
             <minute>0</minute>
             <second>0</second>
             <year>1999</year>
@@ -348,7 +348,7 @@
           </property>
           <property name="minimumTime">
            <time>
-            <hour>11</hour>
+            <hour>6</hour>
             <minute>0</minute>
             <second>0</second>
            </time>
@@ -392,22 +392,6 @@
          </widget>
         </item>
         <item>
-         <spacer name="horizontalSpacer_3">
-          <property name="orientation">
-           <enum>Qt::Horizontal</enum>
-          </property>
-          <property name="sizeType">
-           <enum>QSizePolicy::Minimum</enum>
-          </property>
-          <property name="sizeHint" stdset="0">
-           <size>
-            <width>20</width>
-            <height>20</height>
-           </size>
-          </property>
-         </spacer>
-        </item>
-        <item>
          <widget class="QToolButton" name="timeBackwardButton">
           <property name="toolTip">
            <string>decrement time</string>
@@ -435,7 +419,7 @@
         <item>
          <widget class="QComboBox" name="timeStepComboBox">
           <property name="toolTip">
-           <string>time step for changing the valid time</string>
+           <string>time step for changing the valid/init time</string>
           </property>
           <item>
            <property name="text">
@@ -517,11 +501,27 @@
           <property name="checkable">
            <bool>true</bool>
           </property>
+          <property name="popupMode">
+           <enum>QToolButton::MenuButtonPopup</enum>
+          </property>
           <property name="toolButtonStyle">
            <enum>Qt::ToolButtonTextBesideIcon</enum>
           </property>
+          <property name="autoRaise">
+           <bool>false</bool>
+          </property>
           <property name="arrowType">
-           <enum>Qt::RightArrow</enum>
+           <enum>Qt::NoArrow</enum>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QToolButton" name="animationStopButton">
+          <property name="text">
+           <string>stop</string>
+          </property>
+          <property name="arrowType">
+           <enum>Qt::NoArrow</enum>
           </property>
          </widget>
         </item>
@@ -559,7 +559,7 @@
          </widget>
         </item>
         <item>
-         <widget class="QSpinBox" name="ensembeMemberSpinBox">
+         <widget class="QSpinBox" name="ensembleMemberSpinBox">
           <property name="sizePolicy">
            <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
             <horstretch>0</horstretch>
