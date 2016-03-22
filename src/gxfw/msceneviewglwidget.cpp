@@ -1042,7 +1042,7 @@ void MSceneViewGLWidget::paintGL()
     modelViewProjectionMatrix.perspective(
                 45.,
                 double(viewPortWidth)/double(viewPortHeight),
-                co.z()/10.,
+                abs(co.z())/10.,
                 500.);
     modelViewProjectionMatrix *= camera.getViewMatrix();
 
