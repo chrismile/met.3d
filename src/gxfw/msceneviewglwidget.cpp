@@ -62,6 +62,7 @@ MSceneViewGLWidget::MSceneViewGLWidget()
       scene(nullptr),
       lastPoint(QVector3D(0,0,0)),
       sceneNavigationMode(MOVE_CAMERA),
+      sceneNavigationMode_NoActorInteraction(MOVE_CAMERA),
       sceneRotationCentre(QVector3D(0,0,1020)),
       cameraAutorotationMode(false),
       freezeMode(0),
@@ -104,7 +105,7 @@ MSceneViewGLWidget::MSceneViewGLWidget()
     camera.moveForward(-160.);
     camera.moveUp(-30.);
     camera.moveRight(-20);
-    worldRotationMatrix.setToIdentity();
+    sceneRotationMatrix.setToIdentity();
 
     lightDirection = TOP;
     sceneNorthWestRotationMatrix.rotate(45, 1, 0, 0);
@@ -588,6 +589,30 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
         actorInteractionMode = MSystemManagerAndControl::getInstance()
                 ->getBoolPropertyManager()->value(interactionModeProperty);
 
+        if ( actorInteractionMode )
+        {
+            // "actorInteractionMode" was switched from "false" to "true". Save
+            // the current scene navigation mode and switch to MOVE_CAMERA.
+            sceneNavigationMode_NoActorInteraction = sceneNavigationMode;
+
+            if (sceneNavigationMode == ROTATE_SCENE)
+            {
+                sceneNavigationMode = MOVE_CAMERA;
+                sceneNavigationModeProperty->setEnabled(false);
+                selectSceneRotationCentreProperty->setEnabled(false);
+                sceneRotationCenterProperty->setEnabled(false);
+            }
+        }
+        else
+        {
+            // "actorInteractionMode" was switched from "true" to "false".
+            // Restore scene navigation mode.
+            sceneNavigationMode = sceneNavigationMode_NoActorInteraction;
+            sceneNavigationModeProperty->setEnabled(true);
+            MSystemManagerAndControl::getInstance()->getEnumPropertyManager()
+                    ->setValue(sceneNavigationModeProperty, sceneNavigationMode);
+        }
+
         // In actor interaction mode, mouse tracking is enabled to have
         // mouseMoveEvent() executed on every mouse move, not only when a
         // button is pressed.
@@ -971,13 +996,47 @@ void MSceneViewGLWidget::paintGL()
         frameCount++;
     }
 
-    MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
+
+    // In ROTATE_SCENE mode, rotate the camera around the current scene centre.
+    // Compute the new camera position.
+    if (sceneNavigationMode == ROTATE_SCENE)
+    {
+        // Compute worldZ coordinate from sceneRotationCentre pressure
+        // coordinate.
+        double z = worldZfromPressure(sceneRotationCentre.z());
+
+        // Compute a matrix to translate the camera position in world space to
+        // the sceneRotationCentre.
+        QMatrix4x4 updateCameraMatrix;
+        updateCameraMatrix.setToIdentity();
+        updateCameraMatrix.translate(
+                    sceneRotationCentre.x(), sceneRotationCentre.y(), z);
+
+        // Rotate the camera around the current centre by the rotation defined
+        // by the sceneRotationMatrix.
+        updateCameraMatrix *= sceneRotationMatrix;
+
+        // Translate the camera position back to its origin.
+        updateCameraMatrix.translate(
+                    -sceneRotationCentre.x(), -sceneRotationCentre.y(), -z);
+
+        updateCameraMatrix = updateCameraMatrix.inverted();
+        sceneRotationMatrix = sceneRotationMatrix.inverted();
+
+        // Update camera position.
+        camera.setOrigin(updateCameraMatrix * camera.getOrigin());
+        camera.setYAxis(sceneRotationMatrix * camera.getYAxis());
+        camera.setZAxis(sceneRotationMatrix * camera.getZAxis());
+
+        // Reset current rotation.
+        sceneRotationMatrix.setToIdentity();
+    }
+
     // Compute model-view-projection matrix.
     // Specify a perspective projection. NOTE: Near and far clipping planes are
     // positive (not zero or negative) values that represent distances in front
     // of the eye. See
     // http://www.opengl.org/resources/faq/technical/depthbuffer.htm
-
     QVector3D co = camera.getOrigin();
     modelViewProjectionMatrix.setToIdentity();
     modelViewProjectionMatrix.perspective(
@@ -986,24 +1045,6 @@ void MSceneViewGLWidget::paintGL()
                 co.z()/10.,
                 500.);
     modelViewProjectionMatrix *= camera.getViewMatrix();
-
-    if (sceneNavigationMode == ROTATE_SCENE)
-    {
-        worldPositionMatrix.setToIdentity();
-        QVector3D focus = sceneRotationCentre;
-        double z = worldZfromPressure(focus.z());
-
-        // Translate world to focus centre.
-        worldPositionMatrix.translate(focus.x(),focus.y(),z);
-        modelViewProjectionMatrix *= worldPositionMatrix;
-        // Rotate.
-        modelViewProjectionMatrix *= worldRotationMatrix;
-        // Translate world back to origin.
-        worldPositionMatrix.setToIdentity();
-        worldPositionMatrix.translate(-focus.x(),-focus.y(),-z);
-        modelViewProjectionMatrix *= worldPositionMatrix;
-    }
-
 
     QList<MLabel*> labelList;
     labelList.append(staticLabels);
@@ -1035,7 +1076,8 @@ void MSceneViewGLWidget::paintGL()
 
         // Render text labels.
         if (!renderLabelsWithDepthTest) glDisable(GL_DEPTH_TEST);
-        glRM->getTextManager()->renderLabelList(this, labelList);
+        MGLResourcesManager::getInstance()->getTextManager()
+                ->renderLabelList(this, labelList);
         if (!renderLabelsWithDepthTest) glEnable(GL_DEPTH_TEST);
     }
 
@@ -1229,6 +1271,7 @@ void MSceneViewGLWidget::mouseMoveEvent(QMouseEvent *event)
         }
         else // sceneNavigationMode == ROTATE_SCENE
         {
+            sceneRotationMatrix.setToIdentity();
             // Rotation is implemented with a rotation matrix and is combined
             // with a translation in "paintGL()". The calculation uses an
             // arcball rotation; see:
@@ -1245,9 +1288,8 @@ void MSceneViewGLWidget::mouseMoveEvent(QMouseEvent *event)
 
             // The rotation vector is also rotated by the worldMatrix
             // to perform the rotation regarding the actual world rotation.
-            QVector3D rotAxis = worldRotationMatrix.inverted() *
-                    QVector3D::crossProduct(lastPoint, curPoint);
-            worldRotationMatrix.rotate(angle,rotAxis);
+            QVector3D rotAxis = QVector3D::crossProduct(lastPoint, curPoint);
+            sceneRotationMatrix.rotate(angle,rotAxis);
             lastPoint = curPoint;
 
             if (cameraAutorotationMode)
@@ -1334,6 +1376,7 @@ void MSceneViewGLWidget::mouseReleaseEvent(QMouseEvent *event)
         cameraAutorotationMode && sceneNavigationMode == ROTATE_SCENE)
     {
       cameraAutoRotationTimer->start();
+      userIsInteracting = true;
     }
 
 #ifndef CONTINUOUS_GL_UPDATE
@@ -1406,7 +1449,7 @@ void MSceneViewGLWidget::checkUserScrolling()
 
 void MSceneViewGLWidget::autoRotateCamera()
 {
-    worldRotationMatrix.rotate(cameraAutoRotationAngle, cameraAutoRotationAxis);
+    sceneRotationMatrix.rotate(cameraAutoRotationAngle, cameraAutoRotationAxis);
 #ifndef CONTINUOUS_GL_UPDATE
     updateGL();
 #endif
@@ -1447,8 +1490,9 @@ void MSceneViewGLWidget::keyPressEvent(QKeyEvent *event)
                 sceneView->updateSceneLabel();
             }
 
-            worldRotationMatrix.setToIdentity();
             sceneNavigationMode = ROTATE_SCENE;
+            MSystemManagerAndControl::getInstance()->getEnumPropertyManager()->setValue(
+                        sceneNavigationModeProperty, sceneNavigationMode);
             enablePropertyEvents = false;
             selectSceneRotationCentreProperty->setEnabled(true);
             enablePropertyEvents = true;
