@@ -72,10 +72,11 @@ public:
     enum CameraActions {
         NorthUp = 0,
         TopView = 1,
-        RememberCurrentView = 2,
-        RestoreRememberedView = 3,
-        SaveViewToFile = 4,
-        RestoreFromFile = 5
+        Upright = 2,
+        RememberCurrentView = 3,
+        RestoreRememberedView = 4,
+        SaveViewToFile = 5,
+        RestoreFromFile = 6
     };
 
     enum SceneNavigationMode {

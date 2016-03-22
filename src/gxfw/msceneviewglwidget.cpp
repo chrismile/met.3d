@@ -548,6 +548,10 @@ void MSceneViewGLWidget::executeCameraAction(int action,
         camera.setYAxis(QVector3D(0, 1., 0));
         camera.setZAxis(QVector3D(0, 0, -1.));
         break;
+    case Upright:
+        camera.setYAxis(QVector3D(0, 0, 1.));
+        camera.setZAxis(
+                    QVector3D::crossProduct(QVector3D(0, 0, 1.), camera.getXAxis()));
     case RememberCurrentView:
         rememberCamera = camera;
         break;

@@ -175,6 +175,8 @@ MMainWindow::MMainWindow(QStringList commandLineArguments, QWidget *parent)
                                    MSceneViewGLWidget::NorthUp);
     signalMapperCamera->setMapping(ui->actionCameraTopView,
                                    MSceneViewGLWidget::TopView);
+    signalMapperCamera->setMapping(ui->actionUprightCamera,
+                                   MSceneViewGLWidget::Upright);
     signalMapperCamera->setMapping(ui->actionRememberCurrentCamera,
                                    MSceneViewGLWidget::RememberCurrentView);
     signalMapperCamera->setMapping(ui->actionRestoreRememberedCamera,
@@ -187,6 +189,8 @@ MMainWindow::MMainWindow(QStringList commandLineArguments, QWidget *parent)
     connect(ui->actionCameraNorthUp, SIGNAL(triggered()),
             signalMapperCamera, SLOT(map()));
     connect(ui->actionCameraTopView, SIGNAL(triggered()),
+            signalMapperCamera, SLOT(map()));
+    connect(ui->actionUprightCamera, SIGNAL(triggered()),
             signalMapperCamera, SLOT(map()));
     connect(ui->actionRememberCurrentCamera, SIGNAL(triggered()),
             signalMapperCamera, SLOT(map()));

@@ -39,7 +39,7 @@
      <x>0</x>
      <y>0</y>
      <width>800</width>
-     <height>20</height>
+     <height>25</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -69,6 +69,7 @@
      </property>
      <addaction name="actionCameraNorthUp"/>
      <addaction name="actionCameraTopView"/>
+     <addaction name="actionUprightCamera"/>
      <addaction name="actionRememberCurrentCamera"/>
      <addaction name="actionRestoreRememberedCamera"/>
      <addaction name="actionSaveCameraToFile"/>
@@ -204,6 +205,14 @@
    </property>
    <property name="shortcut">
     <string>F11</string>
+   </property>
+  </action>
+  <action name="actionUprightCamera">
+   <property name="text">
+    <string>&amp;Upright Camera</string>
+   </property>
+   <property name="shortcut">
+    <string>Alt+U</string>
    </property>
   </action>
  </widget>
