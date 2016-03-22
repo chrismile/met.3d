@@ -79,7 +79,7 @@ int main(int argc, char *argv[])
 
     // Create the application window and run the application.
     QString applicationTitle = QString(
-                "Met.3D  (built %1)").arg(__DATE__);
+                "Met.3D 1.0.1 (built %1)").arg(__DATE__);
 
     Met3D::MMainWindow win(commandLineArguments);
     win.setWindowTitle(applicationTitle);
