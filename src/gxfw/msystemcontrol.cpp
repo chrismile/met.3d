@@ -316,6 +316,12 @@ MAbstractMemoryManager* MSystemManagerAndControl::getMemoryManager(
 }
 
 
+QStringList MSystemManagerAndControl::getMemoryManagerIdentifiers() const
+{
+    return memoryManagerPool.keys();
+}
+
+
 MAbstractDataSource* MSystemManagerAndControl::getDataSource(
         const QString& id) const
 {

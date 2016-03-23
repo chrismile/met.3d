@@ -36,6 +36,7 @@
 #include "gxfw/msystemcontrol.h"
 #include "ui_scenemanagementdialog.h"
 #include "system/applicationconfiguration.h"
+#include "system/pipelineconfiguration.h"
 
 using namespace std;
 
@@ -163,6 +164,8 @@ MMainWindow::MMainWindow(QStringList commandLineArguments, QWidget *parent)
             this, SLOT(showWaypointsTable(bool)));
     connect(ui->actionSceneManagement, SIGNAL(triggered()),
             this, SLOT(sceneManagement()));
+    connect(ui->actionAddDataset, SIGNAL(triggered()),
+            this, SLOT(addDataset()));
 
     // Signal mapper to map all layout related menu actions to a single
     // slot (setSceneViewLayout()).
@@ -473,6 +476,32 @@ void MMainWindow::sceneManagement()
     if ( sceneManagementDialog->exec() == QDialog::Accepted )
     {
         LOG4CPLUS_DEBUG(mlog, "updating scene management" << flush);
+    }
+}
+
+
+void MMainWindow::addDataset()
+{
+    MAddDatasetDialog addDatasetDialog;
+
+    if ( addDatasetDialog.exec() == QDialog::Accepted )
+    {
+        MNWPPipelineConfigurationInfo pipelineConfig =
+                addDatasetDialog.getNWPPipelineConfigurationInfo();
+
+        LOG4CPLUS_DEBUG(mlog, "adding new dataset: "
+                        << pipelineConfig.name.toStdString());
+
+        MPipelineConfiguration newPipelineConfig;
+        newPipelineConfig.initializeNWPPipeline(
+                pipelineConfig.name,
+                pipelineConfig.fileDir,
+                pipelineConfig.fileFilter,
+                pipelineConfig.schedulerID,
+                pipelineConfig.memoryManagerID,
+                (MPipelineConfiguration::MNWPReaderFileFormat)pipelineConfig.dataFormat,
+                pipelineConfig.enableRegridding,
+                pipelineConfig.enableProbabiltyRegionFilter);
     }
 }
 

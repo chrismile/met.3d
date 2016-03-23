@@ -38,6 +38,7 @@
 #include "gxfw/msceneviewglwidget.h"
 #include "gxfw/mscenecontrol.h"
 #include "gxfw/scenemanagementdialog.h"
+#include "gxfw/adddatasetdialog.h"
 #include "gxfw/synccontrol.h"
 #include "data/waypoints/waypointstableview.h"
 
@@ -86,6 +87,8 @@ public slots:
     void setSceneViewLayout(int layout);
 
     void sceneManagement();
+
+    void addDataset();
 
 private:
     Ui::MainWindow *ui;

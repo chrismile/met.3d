@@ -397,10 +397,34 @@ void MClimateForecastReader::scanDataRoot()
                 }
 
                 // Get time values of this variable.
-                QList<QDateTime> currTimeCoordValues = currCFVar.getTimeValues();
+                QList<QDateTime> currTimeCoordValues;
+                try
+                {
+                    currTimeCoordValues = currCFVar.getTimeValues();
+                }
+                catch (NcException)
+                {
+                    LOG4CPLUS_WARN(mlog, "WARNING: unable to identify valid "
+                                         "time values for variable <"
+                                   << varName.toStdString()
+                                   << "> -- skipping variable.");
+                    continue;
+                }
 
                 // Determine init time from the CF variable.
-                QDateTime initTime = currCFVar.getBaseTime();
+                QDateTime initTime;
+                try
+                {
+                    initTime = currCFVar.getBaseTime();
+                }
+                catch (NcException)
+                {
+                    LOG4CPLUS_WARN(mlog, "WARNING: unable to identify "
+                                         "init/base time for variable <"
+                                   << varName.toStdString()
+                                   << ">  -- skipping variable.");
+                    continue;
+                }
 
                 // Determin the type of the vertical level of the variable.
                 MVerticalLevelType levelType;

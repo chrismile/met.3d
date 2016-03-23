@@ -125,6 +125,8 @@ public:
 
     MAbstractMemoryManager* getMemoryManager(const QString& id) const;
 
+    QStringList getMemoryManagerIdentifiers() const;
+
     void registerDataSource(const QString& id,
                             MAbstractDataSource* dataSource);
 

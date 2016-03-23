@@ -118,7 +118,8 @@ HEADERS += \
     src/system/pipelineconfiguration.h \
     src/data/probabltrajectoriessource.h \
     src/gxfw/gl/shaderstoragebufferobject.h \
-    src/gxfw/memberselectiondialog.h
+    src/gxfw/memberselectiondialog.h \
+    src/gxfw/adddatasetdialog.h
 
 SOURCES += \
     src/main.cpp \
@@ -204,7 +205,8 @@ SOURCES += \
     src/system/pipelineconfiguration.cpp \
     src/data/probabltrajectoriessource.cpp \
     src/gxfw/gl/shaderstoragebufferobject.cpp \
-    src/gxfw/memberselectiondialog.cpp
+    src/gxfw/memberselectiondialog.cpp \
+    src/gxfw/adddatasetdialog.cpp
 
 FORMS += \
     src/mainwindow.ui \
@@ -215,7 +217,8 @@ FORMS += \
     src/gxfw/actorcreationdialog.ui \
     src/gxfw/scenemanagementdialog.ui \
     src/gxfw/synccontrol.ui \
-    src/gxfw/memberselectiondialog.ui
+    src/gxfw/memberselectiondialog.ui \
+    src/gxfw/adddatasetdialog.ui
 
 OTHER_FILES += \
     data/log4cplus.properties \

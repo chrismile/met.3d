@@ -34,6 +34,7 @@
 // local application imports
 #include "system/applicationconfiguration.h"
 #include "data/structuredgrid.h"
+#include "mainwindow.h"
 
 
 namespace Met3D
@@ -53,6 +54,10 @@ public:
     void configure();
 
 protected:
+    // Friend class MMainWindow so that its method addDataset() can call
+    // initializeNWPPipeline() from this class.
+    friend class MMainWindow;
+
     enum MNWPReaderFileFormat
     {
         INVALID_FORMAT  = 0,
