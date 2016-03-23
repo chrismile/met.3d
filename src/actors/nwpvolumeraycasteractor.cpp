@@ -2580,8 +2580,12 @@ void MNWPVolumeRaycasterActor::renderShadows(
                                                          5 * sizeof(float),
                                                          (const GLvoid*)(3 * sizeof(float)));
 
-        glPolygonMode(GL_FRONT_AND_BACK,GL_FILL); CHECK_GL_ERROR;
-        glDrawArrays(GL_TRIANGLE_STRIP,0,4); CHECK_GL_ERROR;
+        glAlphaFunc(GL_GREATER, 0.01);
+        glEnable(GL_ALPHA_TEST);
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL); CHECK_GL_ERROR;
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4); CHECK_GL_ERROR;
+//TODO (ch, 23Mar2016) -- is this correct and safe?
+        glDisable(GL_ALPHA_TEST);
     }
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
