@@ -833,8 +833,11 @@ MStructuredGrid *MClimateForecastReader::readGrid(
         try
         {
             shared->ensembleVar = shared->cfVar.getEnsembleVar();
-            LOG4CPLUS_DEBUG(mlog, "\tEnsemble forecast contains "
-                            << shared->ensembleVar.getDim(0).getSize() << " members.");
+            LOG4CPLUS_DEBUG(mlog, "\tEnsemble variable is '"
+                            << shared->ensembleVar.getName()
+                            << "'; ensemble forecast contains "
+                            << shared->ensembleVar.getDim(0).getSize()
+                            << " members.");
             shared->availableMembers = availableEnsembleMembers(
                         levelType, variableName);
         }

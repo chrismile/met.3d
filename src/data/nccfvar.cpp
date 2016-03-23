@@ -272,9 +272,8 @@ NcVar NcCFVar::getEnsembleVar()
     for (int i = 0; i < getDimCount(); i++)
     {
         NcVar var = getParentGroup().getVar(getDim(i).getName());
-        // Match name ...
-        if (var.getName() == "ens0") return var;
-        // ... or standard name.
+
+        // Try to match an attribute ...
         try
         {
             string attribute;
@@ -283,12 +282,21 @@ NcVar NcCFVar::getEnsembleVar()
             if (attribute == "ensemble_member_id") return var;
         }
         catch (NcException) {}
+
+        try
+        {
+            // _CoordinateAxisType is used by netcdf-java.
+            string attribute;
+            var.getAtt("_CoordinateAxisType").getValues(attribute);
+            fixZeroTermination(&attribute);
+            if (attribute == "Ensemble") return var;
+        }
+        catch (NcException) {}
     }
 
     // If we get here no variable has been identified. Throw an exception.
     throw NcException("NcException", "cannot identify ensemble variable",
                       __FILE__, __LINE__);
-
 }
 
 
