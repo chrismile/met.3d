@@ -539,31 +539,34 @@ void MGribReader::scanDataRoot()
     LOG4CPLUS_DEBUG(mlog, "Scanning directory "
                     << dataRoot.absolutePath().toStdString() << " "
                     << "for grib files with forecast data.");
+    LOG4CPLUS_DEBUG(mlog, "Using file filter: " << fileFilter.toStdString());
     LOG4CPLUS_DEBUG(mlog, "Available files:" << flush);
 
-    // Get a list of all files in the directory.
-    QStringList availableFiles = dataRoot.entryList(QDir::Files);
+    // Get a list of all files in the directory that match the wildcard name
+    // filter given in "fileFilter".
+    QStringList availableFiles = dataRoot.entryList(
+                QStringList(fileFilter), QDir::Files);
 
     // Scan all grib files contained in the directory.
-    for (int i = 0; i < availableFiles.size(); i++)
+    foreach (QString gribFileName, availableFiles)
     {
         // (Skip index files.)
-        if (availableFiles[i].endsWith("met3d_grib_index")) continue;
+        if (gribFileName.endsWith("met3d_grib_index")) continue;
 
         LOG4CPLUS_DEBUG(mlog, "Scanning file "
-                        << availableFiles[i].toStdString() << " .." << flush);
+                        << gribFileName.toStdString() << " .." << flush);
 
         // First, read or create the grib index for fast access to messages.
         // =================================================================
 
-        QString filePath = dataRoot.filePath(availableFiles[i]);
+        QString filePath = dataRoot.filePath(gribFileName);
         QString fileIndexPath = QString("%1.met3d_grib_index").arg(filePath);
 
         // If the grib index exists, read it. Otherwise, create it and store it.
         if (QFile::exists(fileIndexPath))
         {
             LOG4CPLUS_DEBUG(mlog, "Reading grib index for file "
-                            << availableFiles[i].toStdString() << " ..");
+                            << gribFileName.toStdString() << " ..");
 
             // Open index file.
             QFile indexFile(fileIndexPath);
@@ -659,7 +662,7 @@ void MGribReader::scanDataRoot()
                 if (vinfo->timeMap[initTime][validTime].contains(ensMember))
                 {
                     info = &(vinfo->timeMap[initTime][validTime][ensMember]);
-                    if (info->filename != availableFiles[i])
+                    if (info->filename != gribFileName)
                     {
                         LOG4CPLUS_ERROR(mlog, "found levels of the same "
                                         "3D data field in different files"
@@ -670,7 +673,7 @@ void MGribReader::scanDataRoot()
                 else
                 {
                     info = &(vinfo->timeMap[initTime][validTime][ensMember]);
-                    info->filename = availableFiles[i];
+                    info->filename = gribFileName;
                 }
 
                 // Get vertical level.
@@ -961,7 +964,7 @@ void MGribReader::scanDataRoot()
                 if (vinfo->timeMap[initTime][validTime].contains(ensMember))
                 {
                     info = &(vinfo->timeMap[initTime][validTime][ensMember]);
-                    if (info->filename != availableFiles[i])
+                    if (info->filename != gribFileName)
                     {
                         LOG4CPLUS_ERROR(mlog, "found levels of the same "
                                         "3D data field in different files"
@@ -972,7 +975,7 @@ void MGribReader::scanDataRoot()
                 else
                 {
                     info = &(vinfo->timeMap[initTime][validTime][ensMember]);
-                    info->filename = availableFiles[i];
+                    info->filename = gribFileName;
                 }
 
                 // Get vertical level.
