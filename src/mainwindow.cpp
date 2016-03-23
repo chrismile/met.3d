@@ -125,9 +125,6 @@ MMainWindow::MMainWindow(QStringList commandLineArguments, QWidget *parent)
 
     // Initial layout settings.
     setSceneViewLayout(1);
-    sceneViewGLWidgets[2]->executeCameraAction(MSceneViewGLWidget::TopView,
-                                               false);
-    sceneViewGLWidgets[2]->setVerticalScaling(1.);
 
     // Init application system resources.
     // =========================================================================
@@ -166,44 +163,6 @@ MMainWindow::MMainWindow(QStringList commandLineArguments, QWidget *parent)
             this, SLOT(showWaypointsTable(bool)));
     connect(ui->actionSceneManagement, SIGNAL(triggered()),
             this, SLOT(sceneManagement()));
-
-    // Signal mapper to map all camera related menu actions to a single
-    // slot within MSceneViewGLWidget. See QSignalMapper documentation
-    // for further details.
-    signalMapperCamera = new QSignalMapper(this);
-    signalMapperCamera->setMapping(ui->actionCameraNorthUp,
-                                   MSceneViewGLWidget::NorthUp);
-    signalMapperCamera->setMapping(ui->actionCameraTopView,
-                                   MSceneViewGLWidget::TopView);
-    signalMapperCamera->setMapping(ui->actionUprightCamera,
-                                   MSceneViewGLWidget::Upright);
-    signalMapperCamera->setMapping(ui->actionRememberCurrentCamera,
-                                   MSceneViewGLWidget::RememberCurrentView);
-    signalMapperCamera->setMapping(ui->actionRestoreRememberedCamera,
-                                   MSceneViewGLWidget::RestoreRememberedView);
-    signalMapperCamera->setMapping(ui->actionSaveCameraToFile,
-                                   MSceneViewGLWidget::SaveViewToFile);
-    signalMapperCamera->setMapping(ui->actionRestoreCameraFromFile,
-                                   MSceneViewGLWidget::RestoreFromFile);
-
-    connect(ui->actionCameraNorthUp, SIGNAL(triggered()),
-            signalMapperCamera, SLOT(map()));
-    connect(ui->actionCameraTopView, SIGNAL(triggered()),
-            signalMapperCamera, SLOT(map()));
-    connect(ui->actionUprightCamera, SIGNAL(triggered()),
-            signalMapperCamera, SLOT(map()));
-    connect(ui->actionRememberCurrentCamera, SIGNAL(triggered()),
-            signalMapperCamera, SLOT(map()));
-    connect(ui->actionRestoreRememberedCamera, SIGNAL(triggered()),
-            signalMapperCamera, SLOT(map()));
-    connect(ui->actionSaveCameraToFile, SIGNAL(triggered()),
-            signalMapperCamera, SLOT(map()));
-    connect(ui->actionRestoreCameraFromFile, SIGNAL(triggered()),
-            signalMapperCamera, SLOT(map()));
-
-    for (int i = 0; i < sceneViewGLWidgets.size(); i++)
-        connect(signalMapperCamera, SIGNAL(mapped(int)),
-                sceneViewGLWidgets[i], SLOT(executeCameraAction(int)));
 
     // Signal mapper to map all layout related menu actions to a single
     // slot (setSceneViewLayout()).

@@ -70,13 +70,11 @@ class MSceneViewGLWidget : public QGLWidget
 
 public:
     enum CameraActions {
-        NorthUp = 0,
-        TopView = 1,
-        Upright = 2,
-        RememberCurrentView = 3,
-        RestoreRememberedView = 4,
-        SaveViewToFile = 5,
-        RestoreFromFile = 6
+        CAMERA_NORTHUP = 0,
+        CAMERA_UPRIGHT = 1,
+        CAMERA_TOPVIEW = 2,
+        CAMERA_SAVETOFILE = 3,
+        CAMERA_LOADFROMFILE = 4
     };
 
     enum SceneNavigationMode {
@@ -374,6 +372,13 @@ private:
     QtProperty *propertyGroup;
 
     QtProperty *cameraPositionProperty;
+    QtProperty *cameraGroupProperty;
+    QtProperty *cameraSetNorthUpProperty;
+    QtProperty *cameraSetUprightProperty;
+    QtProperty *cameraSetTopViewProperty;
+    QtProperty *cameraSaveToFileProperty;
+    QtProperty *cameraLoadFromFileProperty;
+
     QtProperty *interactionGroupProperty;
     QtProperty *sceneNavigationModeProperty;
     QtProperty *sceneRotationCenterProperty;
@@ -382,7 +387,7 @@ private:
     QtProperty *sceneRotationCentreElevationProperty;
     QtProperty *selectSceneRotationCentreProperty;
     QtProperty *syncCameraWithViewProperty;
-    QtProperty *interactionModeProperty;
+    QtProperty *actorInteractionProperty;
     QtProperty *analysisModeProperty;
     QtProperty *cameraAutoRotationModeProperty;
 
@@ -404,7 +409,6 @@ private:
 
     QSet<MSceneViewGLWidget*> syncCameras;
     MSceneViewGLWidget* cameraSyncronizedWith;
-    MCamera rememberCamera;
 
     MActor *singleInteractionActor;
 

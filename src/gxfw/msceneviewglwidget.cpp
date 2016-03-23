@@ -145,6 +145,32 @@ MSceneViewGLWidget::MSceneViewGLWidget()
             ->addProperty("camera position");
     propertyGroup->addSubProperty(cameraPositionProperty);
 
+    // Camera group.
+    cameraGroupProperty = systemControl->getGroupPropertyManager()
+            ->addProperty("modify camera");
+    propertyGroup->addSubProperty(cameraGroupProperty);
+
+    cameraLoadFromFileProperty = systemControl->getClickPropertyManager()
+            ->addProperty("load");
+    cameraGroupProperty->addSubProperty(cameraLoadFromFileProperty);
+
+    cameraSaveToFileProperty = systemControl->getClickPropertyManager()
+            ->addProperty("save");
+    cameraGroupProperty->addSubProperty(cameraSaveToFileProperty);
+
+    cameraSetNorthUpProperty = systemControl->getClickPropertyManager()
+            ->addProperty("set north up");
+    cameraGroupProperty->addSubProperty(cameraSetNorthUpProperty);
+
+    cameraSetUprightProperty = systemControl->getClickPropertyManager()
+            ->addProperty("set upright");
+    cameraGroupProperty->addSubProperty(cameraSetUprightProperty);
+
+    cameraSetTopViewProperty = systemControl->getClickPropertyManager()
+            ->addProperty("set top view");
+    cameraGroupProperty->addSubProperty(cameraSetTopViewProperty);
+
+    // Interaction group.
     interactionGroupProperty = systemControl->getGroupPropertyManager()
             ->addProperty("interaction");
     propertyGroup->addSubProperty(interactionGroupProperty);
@@ -203,11 +229,11 @@ MSceneViewGLWidget::MSceneViewGLWidget()
     interactionGroupProperty->addSubProperty(syncCameraWithViewProperty);
 
     // Register modify mode property.
-    interactionModeProperty = systemControl->getBoolPropertyManager()
+    actorInteractionProperty = systemControl->getBoolPropertyManager()
             ->addProperty("actor interaction mode");
     systemControl->getBoolPropertyManager()
-            ->setValue(interactionModeProperty, actorInteractionMode);
-    interactionGroupProperty->addSubProperty(interactionModeProperty);
+            ->setValue(actorInteractionProperty, actorInteractionMode);
+    interactionGroupProperty->addSubProperty(actorInteractionProperty);
 
     analysisModeProperty = systemControl->getBoolPropertyManager()
             ->addProperty("analysis mode");
@@ -215,25 +241,23 @@ MSceneViewGLWidget::MSceneViewGLWidget()
             ->setValue(analysisModeProperty, analysisMode);
     interactionGroupProperty->addSubProperty(analysisModeProperty);
 
+    // Rendering group.
     renderingGroupProperty = systemControl->getGroupPropertyManager()
             ->addProperty("rendering");
     propertyGroup->addSubProperty(renderingGroupProperty);
 
-    // Register multisampling property.
     multisamplingProperty = systemControl->getBoolPropertyManager()
             ->addProperty("multisampling");
     systemControl->getBoolPropertyManager()
             ->setValue(multisamplingProperty, true);
     renderingGroupProperty->addSubProperty(multisamplingProperty);
 
-    // Register antialiasing property.
     antialiasingProperty = systemControl->getBoolPropertyManager()
             ->addProperty("antialiasing");
     systemControl->getBoolPropertyManager()
             ->setValue(antialiasingProperty, false);
     renderingGroupProperty->addSubProperty(antialiasingProperty);
 
-    // Register label depth test property.
     renderLabelsWithDepthTest = true;
     labelDepthTestProperty = systemControl->getBoolPropertyManager()
             ->addProperty("depth test for labels");
@@ -241,7 +265,6 @@ MSceneViewGLWidget::MSceneViewGLWidget()
             ->setValue(labelDepthTestProperty, renderLabelsWithDepthTest);
     renderingGroupProperty->addSubProperty(labelDepthTestProperty);
 
-    // Lighting direction.
     QStringList lightingOptions;
     lightingOptions << "World North-West"
                     << "Scene North-West"
@@ -255,7 +278,6 @@ MSceneViewGLWidget::MSceneViewGLWidget()
             ->setValue(lightingProperty, lightDirection);
     renderingGroupProperty->addSubProperty(lightingProperty);
 
-    // Vertical exaggeration.
     verticalScalingProperty = systemControl->getDecoratedDoublePropertyManager()
             ->addProperty("vertical scaling");
     systemControl->getDecoratedDoublePropertyManager()
@@ -476,7 +498,7 @@ void MSceneViewGLWidget::setInteractionMode(bool enabled)
                 ->setValue(analysisModeProperty, false);
 
     MSystemManagerAndControl::getInstance()->getBoolPropertyManager()
-            ->setValue(interactionModeProperty, enabled);
+            ->setValue(actorInteractionProperty, enabled);
 }
 
 
@@ -485,7 +507,7 @@ void MSceneViewGLWidget::setAnalysisMode(bool enabled)
     // Interaction mode cannot be active at the same time.
     if (enabled && actorInteractionMode)
         MSystemManagerAndControl::getInstance()->getBoolPropertyManager()
-                ->setValue(interactionModeProperty, false);
+                ->setValue(actorInteractionProperty, false);
 
     MSystemManagerAndControl::getInstance()->getBoolPropertyManager()
             ->setValue(analysisModeProperty, enabled);
@@ -533,39 +555,36 @@ void MSceneViewGLWidget::executeCameraAction(int action,
     // Get current camera axes.
     QVector3D yAxis = camera.getYAxis();
     QVector3D zAxis = camera.getZAxis();
+    QVector3D origin = camera.getOrigin();
 
     // Modify axes.
     switch (action)
     {
-    case NorthUp:
+    case CAMERA_NORTHUP:
         yAxis.setX(0);
         zAxis.setX(0);
         camera.setYAxis(yAxis);
         camera.setZAxis(zAxis);
         break;
-    case TopView:
-        camera.setOrigin(QVector3D(0, 45., 120.));
+    case CAMERA_TOPVIEW:
+        origin.setZ(250.);
+        camera.setOrigin(origin);
         camera.setYAxis(QVector3D(0, 1., 0));
         camera.setZAxis(QVector3D(0, 0, -1.));
         break;
-    case Upright:
+    case CAMERA_UPRIGHT:
         camera.setYAxis(QVector3D(0, 0, 1.));
-        camera.setZAxis(
-                    QVector3D::crossProduct(QVector3D(0, 0, 1.), camera.getXAxis()));
-    case RememberCurrentView:
-        rememberCamera = camera;
+        camera.setZAxis(QVector3D::crossProduct(
+                            QVector3D(0, 0, 1.), camera.getXAxis()));
         break;
-    case RestoreRememberedView:
-        camera = rememberCamera;
-        break;
-    case SaveViewToFile:
+    case CAMERA_SAVETOFILE:
         camera.saveToFile(QFileDialog::getSaveFileName(
                               MGLResourcesManager::getInstance(),
                               "Save current camera",
                               "data/camera",
                               "Camera configuration files (*.camera.conf)"));
         break;
-    case RestoreFromFile:
+    case CAMERA_LOADFROMFILE:
         camera.loadFromFile(QFileDialog::getOpenFileName(
                                 MGLResourcesManager::getInstance(),
                                 "Open camera",
@@ -587,11 +606,11 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
 
     if (!enablePropertyEvents) return;
 
-    if (property == interactionModeProperty)
+    if (property == actorInteractionProperty)
     {
         // Toggle actor interaction mode.
         actorInteractionMode = MSystemManagerAndControl::getInstance()
-                ->getBoolPropertyManager()->value(interactionModeProperty);
+                ->getBoolPropertyManager()->value(actorInteractionProperty);
 
         if ( actorInteractionMode )
         {
@@ -812,6 +831,31 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
 #endif
     }
 
+    else if (property == cameraSetNorthUpProperty)
+    {
+        executeCameraAction(CAMERA_NORTHUP, false);
+    }
+
+    else if (property == cameraSetUprightProperty)
+    {
+        executeCameraAction(CAMERA_UPRIGHT, false);
+    }
+
+    else if (property == cameraSetTopViewProperty)
+    {
+        executeCameraAction(CAMERA_TOPVIEW, false);
+    }
+
+    else if (property == cameraSaveToFileProperty)
+    {
+        executeCameraAction(CAMERA_SAVETOFILE, false);
+    }
+
+    else if (property == cameraLoadFromFileProperty)
+    {
+        executeCameraAction(CAMERA_LOADFROMFILE, false);
+    }
+
 #ifndef CONTINUOUS_GL_UPDATE
     else if (property == measureFPSProperty)
     {
@@ -825,7 +869,6 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
         updateGL();
     }
 #endif
-
 }
 
 
@@ -1525,6 +1568,15 @@ void MSceneViewGLWidget::keyPressEvent(QKeyEvent *event)
     case Qt::Key_R:
         // Toggle auto-rotation mode.
         setAutoRotationMode(!cameraAutorotationMode);
+        break;
+    case Qt::Key_N:
+        if (event->modifiers() & Qt::AltModifier) executeCameraAction(CAMERA_NORTHUP);
+        break;
+    case Qt::Key_U:
+        if (event->modifiers() & Qt::AltModifier) executeCameraAction(CAMERA_UPRIGHT);
+        break;
+    case Qt::Key_T:
+        if (event->modifiers() & Qt::AltModifier) executeCameraAction(CAMERA_TOPVIEW);
         break;
     default:
         // If we do not act upon the key, pass event to base class

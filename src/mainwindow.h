@@ -105,7 +105,6 @@ private:
     /** List of all dock widgets */
     QList<QDockWidget*> dockWidgets;
 
-    QSignalMapper *signalMapperCamera;
     QSignalMapper *signalMapperLayout;
 
     MWaypointsView *waypointsTableView;
