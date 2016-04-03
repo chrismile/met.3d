@@ -52,7 +52,10 @@ MGraticuleActor::MGraticuleActor()
       graticuleVertexBuffer(nullptr),
       numVerticesGraticule(0),
       coastlineVertexBuffer(nullptr),
-      graticuleColour(QColor(Qt::black))
+      graticuleColour(QColor(Qt::black)),
+      drawGraticule(true),
+      drawCoastLines(true),
+      drawBorderLines(true)
 {
     naturalEarthDataLoader = MSystemManagerAndControl::getInstance()
             ->getNaturalEarthDataLoader();
@@ -74,6 +77,18 @@ MGraticuleActor::MGraticuleActor()
     colourProperty = addProperty(COLOR_PROPERTY, "colour",
                                  actorPropertiesSupGroup);
     properties->mColor()->setValue(colourProperty, graticuleColour);
+
+    drawGraticuleProperty = addProperty(BOOL_PROPERTY, "draw graticule",
+                                        actorPropertiesSupGroup);
+    properties->mBool()->setValue(drawGraticuleProperty, drawGraticule);
+
+    drawCoastLinesProperty = addProperty(BOOL_PROPERTY, "draw coast lines",
+                                         actorPropertiesSupGroup);
+    properties->mBool()->setValue(drawCoastLinesProperty, drawCoastLines);
+
+    drawBorderLinesProperty = addProperty(BOOL_PROPERTY, "draw border lines",
+                                          actorPropertiesSupGroup);
+    properties->mBool()->setValue(drawBorderLinesProperty, drawGraticule);
 
     // Default vertical position is at 1050 hPa.
     setVerticalPosition(1049.);
@@ -98,6 +113,9 @@ void MGraticuleActor::saveConfiguration(QSettings *settings)
     settings->setValue("bbox", properties->mRectF()->value(cornersProperty));
     settings->setValue("spacing", properties->mPointF()->value(spacingProperty));
     settings->setValue("colour", graticuleColour);
+    settings->setValue("drawGraticule", drawGraticule);
+    settings->setValue("drawCoastLines", drawCoastLines);
+    settings->setValue("drawBorderLines", drawBorderLines);
     settings->setValue("verticalPosition", verticalPosition_hPa);
 
     settings->endGroup();
@@ -116,6 +134,15 @@ void MGraticuleActor::loadConfiguration(QSettings *settings)
 
     QColor color = settings->value("colour").value<QColor>();
     properties->mColor()->setValue(colourProperty, color);
+
+    drawGraticule = settings->value("drawGraticule", true).toBool();
+    properties->mBool()->setValue(drawGraticuleProperty, drawGraticule);
+
+    drawCoastLines = settings->value("drawCoastLines", true).toBool();
+    properties->mBool()->setValue(drawCoastLinesProperty, drawCoastLines);
+
+    drawBorderLines = settings->value("drawBorderLines", true).toBool();
+    properties->mBool()->setValue(drawBorderLinesProperty, drawBorderLines);
 
     verticalPosition_hPa = settings->value("verticalPosition").toFloat();
 
@@ -175,12 +202,12 @@ void MGraticuleActor::initializeActorResources()
 void MGraticuleActor::onQtPropertyChanged(QtProperty *property)
 {
     // Recompute the geometry when bounding box or spacing have been changed.
-    if ((property == cornersProperty)
-            || (property == spacingProperty)
-            || (property == labelSizeProperty)
-            || (property == labelColourProperty)
-            || (property == labelBBoxProperty)
-            || (property == labelBBoxColourProperty) )
+    if ( (property == cornersProperty)
+         || (property == spacingProperty)
+         || (property == labelSizeProperty)
+         || (property == labelColourProperty)
+         || (property == labelBBoxProperty)
+         || (property == labelBBoxColourProperty) )
     {
         if (suppressActorUpdates()) return;
         generateGeometry();
@@ -190,6 +217,16 @@ void MGraticuleActor::onQtPropertyChanged(QtProperty *property)
     else if (property == colourProperty)
     {
         graticuleColour = properties->mColor()->value(colourProperty);
+        emitActorChangedSignal();
+    }
+
+    else if ( (property == drawGraticuleProperty)
+              || (property == drawCoastLinesProperty)
+              || (property == drawBorderLinesProperty) )
+    {
+        drawGraticule = properties->mBool()->value(drawGraticuleProperty);
+        drawCoastLines = properties->mBool()->value(drawCoastLinesProperty);
+        drawBorderLines = properties->mBool()->value(drawBorderLinesProperty);
         emitActorChangedSignal();
     }
 }
@@ -206,37 +243,46 @@ void MGraticuleActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
     float worldZ = sceneView->worldZfromPressure(verticalPosition_hPa);
     shaderProgram->setUniformValue("worldZ", worldZ);
 
-    // Draw graticule.
-    graticuleVertexBuffer->attachToVertexAttribute(SHADER_VERTEX_ATTRIBUTE);
+    if (drawGraticule)
+    {
+        // Draw graticule.
+        graticuleVertexBuffer->attachToVertexAttribute(SHADER_VERTEX_ATTRIBUTE);
 
-    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); CHECK_GL_ERROR;
-    glLineWidth(1); CHECK_GL_ERROR;
+        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); CHECK_GL_ERROR;
+        glLineWidth(1); CHECK_GL_ERROR;
 
-    glDrawArrays(GL_LINES, 0, numVerticesGraticule); CHECK_GL_ERROR;
+        glDrawArrays(GL_LINES, 0, numVerticesGraticule); CHECK_GL_ERROR;
+    }
 
-    // Draw coastlines.
-    coastlineVertexBuffer->attachToVertexAttribute(SHADER_VERTEX_ATTRIBUTE);
-    CHECK_GL_ERROR;
+    if (drawCoastLines)
+    {
+        // Draw coastlines.
+        coastlineVertexBuffer->attachToVertexAttribute(SHADER_VERTEX_ATTRIBUTE);
+        CHECK_GL_ERROR;
 
-    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); CHECK_GL_ERROR;
-    glLineWidth(2); CHECK_GL_ERROR;
+        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); CHECK_GL_ERROR;
+        glLineWidth(2); CHECK_GL_ERROR;
 
-    glMultiDrawArrays(GL_LINE_STRIP,
-                      coastlineStartIndices.constData(),
-                      coastlineVertexCount.constData(),
-                      coastlineStartIndices.size()); CHECK_GL_ERROR;
+        glMultiDrawArrays(GL_LINE_STRIP,
+                          coastlineStartIndices.constData(),
+                          coastlineVertexCount.constData(),
+                          coastlineStartIndices.size()); CHECK_GL_ERROR;
+    }
 
-    // Draw borderlines.
-    borderlineVertexBuffer->attachToVertexAttribute(SHADER_VERTEX_ATTRIBUTE);
-    CHECK_GL_ERROR;
+    if (drawBorderLines)
+    {
+        // Draw borderlines.
+        borderlineVertexBuffer->attachToVertexAttribute(SHADER_VERTEX_ATTRIBUTE);
+        CHECK_GL_ERROR;
 
-    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); CHECK_GL_ERROR;
-    glLineWidth(1); CHECK_GL_ERROR;
+        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); CHECK_GL_ERROR;
+        glLineWidth(1); CHECK_GL_ERROR;
 
-    glMultiDrawArrays(GL_LINE_STRIP,
-                      borderlineStartIndices.constData(),
-                      borderlineVertexCount.constData(),
-                      borderlineStartIndices.size()); CHECK_GL_ERROR;
+        glMultiDrawArrays(GL_LINE_STRIP,
+                          borderlineStartIndices.constData(),
+                          borderlineVertexCount.constData(),
+                          borderlineStartIndices.size()); CHECK_GL_ERROR;
+    }
 
     glBindBuffer(GL_ARRAY_BUFFER, 0); CHECK_GL_ERROR;
 }

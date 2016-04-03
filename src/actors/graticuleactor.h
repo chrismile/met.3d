@@ -122,6 +122,14 @@ private:
     QtProperty *spacingProperty;
     QtProperty *colourProperty;
     QColor graticuleColour;
+
+    bool drawGraticule;
+    QtProperty *drawGraticuleProperty;
+    bool drawCoastLines;
+    QtProperty *drawCoastLinesProperty;
+    bool drawBorderLines;
+    QtProperty *drawBorderLinesProperty;
+
     float verticalPosition_hPa;
 };
 
