@@ -215,6 +215,8 @@ MNWPVolumeRaycasterActor::IsoValueSettings::IsoValueSettings(
         const uint8_t index,
         bool _enabled,
         float _isoValue,
+        int decimals,
+        double singleStep,
         QColor _isoColor,
         IsoValueSettings::ColorType _colorType)
     : enabled(_enabled),
@@ -234,7 +236,13 @@ MNWPVolumeRaycasterActor::IsoValueSettings::IsoValueSettings(
     properties->mBool()->setValue(enabledProp, enabled);
 
     isoValueProp = a->addProperty(DOUBLE_PROPERTY, "isovalue", groupProp);
-    properties->setDouble(isoValueProp, isoValue, 6, 0.01);
+    properties->setDouble(isoValueProp, isoValue, decimals, singleStep);
+
+    isoValueDecimalsProperty = a->addProperty(INT_PROPERTY, "isovalue decimals", groupProp);
+    properties->setInt(isoValueDecimalsProperty, decimals, 0, 10, 1);
+
+    isoValueSingleStepProperty = a->addProperty(DOUBLE_PROPERTY, "animation step", groupProp);
+    properties->setDouble(isoValueSingleStepProperty, singleStep, decimals, singleStep);
 
     QStringList modesLst;
     modesLst.clear();
@@ -292,7 +300,7 @@ MNWPVolumeRaycasterActor::RayCasterSettings::RayCasterSettings(
 
     // Default isosurface settings: A single isosurface at isovalue 0, colour
     // white.
-    addIsoValue(true, false, 0, QColor(255,255,255,255));
+    addIsoValue(true, false, 0, 1, 0.1, QColor(255,255,255,255));
 
     // Sort isovalues to ensure correct visualization via crossing levels.
     sortIsoValues();
@@ -340,11 +348,12 @@ MNWPVolumeRaycasterActor::RayCasterSettings::RayCasterSettings(
 
 void MNWPVolumeRaycasterActor::RayCasterSettings::addIsoValue(
         const bool enabled, const bool hidden,
-        const float isoValue, const QColor color,
+        const float isoValue, const int decimals,
+        const double singleStep, const QColor color,
         const IsoValueSettings::ColorType colorType)
 {
     IsoValueSettings isoSettings(hostActor, isoValueSetList.size(), enabled, isoValue,
-                                 color, colorType);
+                                 decimals, singleStep, color, colorType);
     isoValueSetList.push_back(isoSettings);
     isoEnabled.push_back(isoSettings.enabled);
     isoValues.push_back(isoSettings.isoValue);
@@ -624,6 +633,12 @@ void MNWPVolumeRaycasterActor::saveConfiguration(QSettings *settings)
 
         settings->setValue("enabled", setting.enabled);
         settings->setValue("isoValue", setting.isoValue);
+        settings->setValue(
+                    "isoValueDecimals",
+                    properties->mInt()->value(setting.isoValueDecimalsProperty));
+        settings->setValue(
+                    "isoValueSingleStep",
+                    properties->mDouble()->value(setting.isoValueSingleStepProperty));
         settings->setValue("colourMode", setting.isoColourType);
         settings->setValue("colour", setting.isoColour);
 
@@ -753,8 +768,12 @@ void MNWPVolumeRaycasterActor::loadConfiguration(QSettings *settings)
                     settings->value("colourMode").toInt());
         QColor isoColor = settings->value("colour").value<QColor>();
 
+        int decimals = settings->value("isoValueDecimals", 6).toInt();
+        double singleStep = settings->value("isoValueSingleStep", 0.01).toFloat();
+
         rayCasterSettings->addIsoValue(enabled, false,
-                                       isoValue, isoColor, isoColorType);
+                                       isoValue, decimals, singleStep,
+                                       isoColor, isoColorType);
 
         settings->endGroup();
     }
@@ -1626,6 +1645,16 @@ void MNWPVolumeRaycasterActor::onQtPropertyChanged(QtProperty* property)
                 emitActorChangedSignal();
 
                 return;
+            }
+            else if ( property == it->isoValueDecimalsProperty
+                      || property == it->isoValueSingleStepProperty)
+            {
+                int decimals = properties->mInt()->value(it->isoValueDecimalsProperty);
+                properties->mDouble()->setDecimals(it->isoValueProp, decimals);
+                properties->mDouble()->setDecimals(it->isoValueSingleStepProperty, decimals);
+
+                double singleStep = properties->mDouble()->value(it->isoValueSingleStepProperty);
+                properties->mDouble()->setSingleStep(it->isoValueProp, singleStep);
             }
         } // isovalues
 

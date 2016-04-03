@@ -386,6 +386,8 @@ private:
                          const uint8_t index,
                          bool _enabled = true,
                          float _isoValue = 0.5,
+                         int decimals = 1,
+                         double singleStep = 0.1,
                          QColor _color = QColor(255,0,0,255),
                          ColorType _colorType = ColorType::ConstColor);
 
@@ -397,6 +399,8 @@ private:
         QtProperty *groupProp;
         QtProperty *enabledProp;
         QtProperty *isoValueProp;
+        QtProperty *isoValueDecimalsProperty;
+        QtProperty *isoValueSingleStepProperty;
         QtProperty *isoColourProp;
         QtProperty *isoColourTypeProp;
         QtProperty *isoValueRemoveProp;
@@ -415,6 +419,8 @@ private:
                 const bool enabled = true,
                 const bool hidden = false,
                 const float isoValue = 0.5,
+                const int decimals = 1,
+                const double singleStep = 0.1,
                 const QColor color = QColor(255,0,0,255),
                 const IsoValueSettings::ColorType colorType
                 = IsoValueSettings::ColorType::ConstColor);
