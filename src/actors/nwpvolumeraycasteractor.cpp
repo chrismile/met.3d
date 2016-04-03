@@ -77,16 +77,20 @@ MNWPVolumeRaycasterActor::MNWPVolumeRaycasterActor()
 
     QStringList modesLst;
     modesLst << "standard" << "bitfield";
-    renderModeProp = addProperty(ENUM_PROPERTY, "render mode",
-                                 actorPropertiesSupGroup);
+    renderModeProp = addProperty(
+                ENUM_PROPERTY, "render mode", actorPropertiesSupGroup);
     properties->mEnum()->setEnumNames(renderModeProp, modesLst);
     properties->mEnum()->setValue(renderModeProp, static_cast<int>(renderMode));
 
-    variableIndexProp = addProperty(ENUM_PROPERTY, "observed variable",
-                                    actorPropertiesSupGroup);
+    variableIndexProp = addProperty(
+                ENUM_PROPERTY, "observed variable", actorPropertiesSupGroup);
 
-    shadingVariableIndexProp = addProperty(ENUM_PROPERTY, "shading variable",
-                                           actorPropertiesSupGroup);
+    shadingVariableIndexProp = addProperty(
+                ENUM_PROPERTY, "shading variable", actorPropertiesSupGroup);
+
+    // Raycaster.
+    rayCasterSettings = new RayCasterSettings(this);
+    actorPropertiesSupGroup->addSubProperty(rayCasterSettings->groupProp);
 
     // Bounding box.
     bbSettings = new BoundingBoxSettings(this);
@@ -96,13 +100,28 @@ MNWPVolumeRaycasterActor::MNWPVolumeRaycasterActor()
     lightingSettings = new LightingSettings(this);
     actorPropertiesSupGroup->addSubProperty(lightingSettings->groupProp);
 
-    // Raycaster.
-    rayCasterSettings = new RayCasterSettings(this);
-    actorPropertiesSupGroup->addSubProperty(rayCasterSettings->groupProp);
-
     // Normal curves.
     normalCurveSettings = new NormalCurveSettings(this);
     actorPropertiesSupGroup->addSubProperty(normalCurveSettings->groupProp);
+
+    // Set isovalue IDs for normal curves... this works because normal
+    // curve properties have been initialized before the constructor is called.
+    // NOTE: At least one isovalue needs to be defined!
+    QStringList names;
+    for (uint i = 0; i < rayCasterSettings->isoValueSetList.size(); i++)
+        names << rayCasterSettings->isoValueSetList.at(i).groupProp->propertyName();
+    properties->mEnum()->setEnumNames(
+                normalCurveSettings->startIsoSurfaceProp, names);
+    properties->mEnum()->setEnumNames(
+                normalCurveSettings->stopIsoSurfaceProp, names);
+
+    properties->mEnum()->setValue(normalCurveSettings->startIsoSurfaceProp, 0);
+    properties->mEnum()->setValue(normalCurveSettings->stopIsoSurfaceProp, 0);
+
+    normalCurveSettings->startIsoValue =
+            rayCasterSettings->isoValueSetList.at(0).isoValue;
+    normalCurveSettings->stopIsoValue =
+            rayCasterSettings->isoValueSetList.at(0).isoValue;
 
     endInitialiseQtProperties();
 }
@@ -208,7 +227,7 @@ MNWPVolumeRaycasterActor::IsoValueSettings::IsoValueSettings(
 
     a->beginInitialiseQtProperties();
 
-    QString propTitle = QString("isovalue #%1").arg(index);
+    QString propTitle = QString("isovalue #%1").arg(index  + 1);
     groupProp = a->addProperty(GROUP_PROPERTY, propTitle);
 
     enabledProp = a->addProperty(BOOL_PROPERTY, "enabled", groupProp);
@@ -231,6 +250,8 @@ MNWPVolumeRaycasterActor::IsoValueSettings::IsoValueSettings(
     isoColourProp = a->addProperty(COLOR_PROPERTY, "constant colour", groupProp);
     properties->mColor()->setValue(isoColourProp, isoColour);
 
+    isoValueRemoveProp = a->addProperty(CLICK_PROPERTY, "remove", groupProp);
+
     a->endInitialiseQtProperties();
 }
 
@@ -240,8 +261,6 @@ const int MAX_ISOSURFACES = 10;
 MNWPVolumeRaycasterActor::RayCasterSettings::RayCasterSettings(
         MNWPVolumeRaycasterActor *hostActor)
     : hostActor(hostActor),
-      numIsoValues(2),
-      numEnabledIsoValues(0),
       isoValueSetList(),
       isoEnabled(),
       isoValues(),
@@ -257,52 +276,54 @@ MNWPVolumeRaycasterActor::RayCasterSettings::RayCasterSettings(
     MActor *a = hostActor;
     MQtProperties *properties = a->getQtProperties();
 
-    groupProp = a->addProperty(GROUP_PROPERTY, "raycaster");
+    groupProp = a->addProperty(
+                GROUP_PROPERTY, "isosurface raycaster");
 
-    numIsoValuesProp = a->addProperty(INT_PROPERTY, "num isovalues", groupProp);
-    properties->setInt(numIsoValuesProp, numIsoValues, 1, MAX_ISOSURFACES, 1);
+    isoValuesProp = a->addProperty(
+                GROUP_PROPERTY, "isovalues", groupProp);
 
-    isoValuesProp = a->addProperty(GROUP_PROPERTY, "isovalues", groupProp);
+    addIsoValueProp = a->addProperty(
+                CLICK_PROPERTY, "add isovalue", isoValuesProp);
 
     isoEnabled.reserve(MAX_ISOSURFACES);
     isoValues.reserve(MAX_ISOSURFACES);
     isoColors.reserve(MAX_ISOSURFACES);
     isoColorTypes.reserve(MAX_ISOSURFACES);
 
-    // Default isosurface settings.
-    addIsoValue(1, true, false, 60);
-    addIsoValue(2, true, false, 45, QColor(255,255,255,150));
-
-    // Already create properties for remaining MAX_ISOSURFACES isovalue
-    // settings (dynamic creation of new properties very expensive!).
-    for (int i = numIsoValues; i < int(MAX_ISOSURFACES); ++i)
-    {
-        addIsoValue(i + 1, false, true);
-    }
+    // Default isosurface settings: A single isosurface at isovalue 0, colour
+    // white.
+    addIsoValue(true, false, 0, QColor(255,255,255,255));
 
     // Sort isovalues to ensure correct visualization via crossing levels.
     sortIsoValues();
 
-    stepSizeProp = a->addProperty(DOUBLE_PROPERTY, "step size", groupProp);
+    groupRaycasterSettings = a->addProperty(
+                GROUP_PROPERTY, "sampling step size", groupProp);
+
+    stepSizeProp = a->addProperty(
+                DOUBLE_PROPERTY, "step size", groupRaycasterSettings);
     properties->setDouble(stepSizeProp, stepSize, 0.001, 10.0, 3, 0.01);
 
     interactionStepSizeProp = a->addProperty(
-                DOUBLE_PROPERTY, "interaction step size", groupProp);
+                DOUBLE_PROPERTY, "interaction step size", groupRaycasterSettings);
     properties->setDouble(interactionStepSizeProp, interactionStepSize,
                           0.001, 10.0, 3, 0.1);
 
-    bisectionStepsProp = a->addProperty
-            (INT_PROPERTY, "bisection steps", groupProp);
+    bisectionStepsProp = a->addProperty(
+                INT_PROPERTY, "bisection steps", groupRaycasterSettings);
     properties->setInt(bisectionStepsProp, bisectionSteps, 0, 20);
 
     interactionBisectionStepsProp = a->addProperty(
-                INT_PROPERTY, "interaction bisection steps", groupProp);
+                INT_PROPERTY, "interaction bisection steps", groupRaycasterSettings);
     properties->setInt(interactionBisectionStepsProp,
                        interactionBisectionSteps, 0, 20);
 
-    QStringList shadowModesList;
+    groupShadowSettings = a->addProperty(
+                GROUP_PROPERTY, "shadow", groupProp);
+
+    QStringList shadowModesList;    
     shadowModesList << "off" << "shadow map" << "shadow ray";
-    shadowModeProp = a->addProperty(ENUM_PROPERTY, "shadows", groupProp);
+    shadowModeProp = a->addProperty(ENUM_PROPERTY, "shadows", groupShadowSettings);
     properties->mEnum()->setEnumNames(shadowModeProp, shadowModesList);
     properties->mEnum()->setValue(shadowModeProp, static_cast<int>(shadowMode));
 
@@ -310,7 +331,7 @@ MNWPVolumeRaycasterActor::RayCasterSettings::RayCasterSettings(
     modesLst << "very low (0.5K)" << "low (1K)" << "normal (2K)" << "high (4K)"
              << "very high (8K)" << "maximum (16K)";
     shadowsResolutionProp = a->addProperty(
-                ENUM_PROPERTY, "shadow map resolution", groupProp);
+                ENUM_PROPERTY, "shadow map resolution", groupShadowSettings);
     properties->mEnum()->setEnumNames(shadowsResolutionProp, modesLst);
     properties->mEnum()->setValue(shadowsResolutionProp,
                                   static_cast<int>(shadowsResolution));
@@ -318,11 +339,11 @@ MNWPVolumeRaycasterActor::RayCasterSettings::RayCasterSettings(
 
 
 void MNWPVolumeRaycasterActor::RayCasterSettings::addIsoValue(
-        const int index, const bool enabled, const bool hidden,
+        const bool enabled, const bool hidden,
         const float isoValue, const QColor color,
         const IsoValueSettings::ColorType colorType)
 {
-    IsoValueSettings isoSettings(hostActor, index, enabled, isoValue,
+    IsoValueSettings isoSettings(hostActor, isoValueSetList.size(), enabled, isoValue,
                                  color, colorType);
     isoValueSetList.push_back(isoSettings);
     isoEnabled.push_back(isoSettings.enabled);
@@ -335,22 +356,19 @@ void MNWPVolumeRaycasterActor::RayCasterSettings::addIsoValue(
     isoColorTypes.push_back(static_cast<GLint>(isoSettings.isoColourType));
     if (!hidden)
     {
-        isoValuesProp->addSubProperty(isoValueSetList[index - 1].groupProp);
+        isoValuesProp->addSubProperty(isoValueSetList.back().groupProp);
     }
 }
 
 
 void MNWPVolumeRaycasterActor::RayCasterSettings::sortIsoValues()
 {
-    numEnabledIsoValues = 0;
-
-    for (int i = 0; i < int(MAX_ISOSURFACES); ++i)
+    for (uint i = 0; i < isoValueSetList.size(); ++i)
     {
         isoEnabled[i] = static_cast<int>(isoValueSetList[i].enabled);
         if (isoValueSetList[i].enabled)
         {
             isoValues[i] = isoValueSetList[i].isoValue;
-            numEnabledIsoValues++;
         }
         else
         {
@@ -363,7 +381,7 @@ void MNWPVolumeRaycasterActor::RayCasterSettings::sortIsoValues()
         isoColorTypes[i] = static_cast<GLint>(isoValueSetList[i].isoColourType);
     }
 
-    for (int i = 1; i < int(MAX_ISOSURFACES); ++i)
+    for (uint i = 1; i < isoValueSetList.size(); ++i)
     {
         bool currEnabled = isoEnabled[i];
         GLfloat currIsoValue = isoValues[i];
@@ -391,100 +409,102 @@ MNWPVolumeRaycasterActor::NormalCurveSettings::NormalCurveSettings(
         MNWPVolumeRaycasterActor *hostActor)
     : normalCurvesEnabled(false),
       glyph(GlyphType::Tube),
-      threshold(Threshold::IsoValueInner),
+      threshold(Threshold::Steps),
       colour(CurveColor::ColorIsoValue),
       tubeRadius(0.05),
-      surface(Surface::Outer),
       stepSize(0.1),
-      integrationDir(IntegrationDir::Forwards),
-      numLineSegments(100),
+      numLineSegments(20),
+      integrationDir(IntegrationDir::Backwards),
+      startIsoValue(0),
+      stopIsoValue(0),
       initPointResX(1.75),
       initPointResY(1.75),
       initPointResZ(1.0),
-      initPointVariance(0.3),
-      numSteps(1),
-      curveLength(1),
-      isoValueBorder(75)
+      initPointVariance(0.3)
 {
     MActor *a = hostActor;
     MQtProperties *properties = a->getQtProperties();
 
     groupProp = a->addProperty(GROUP_PROPERTY, "normal curves");
 
-    normalCurvesEnabledProp = a->addProperty(BOOL_PROPERTY, "enabled", groupProp);
+    normalCurvesEnabledProp = a->addProperty(
+                BOOL_PROPERTY, "enabled", groupProp);
     properties->mBool()->setValue(normalCurvesEnabledProp, normalCurvesEnabled);
 
     QStringList modesLst;
-    modesLst << "lines" << "boxes + slices" << "tubes";
-    glyphProp = a->addProperty(ENUM_PROPERTY, "glyph type", groupProp);
-    properties->mEnum()->setEnumNames(glyphProp, modesLst);
-    properties->mEnum()->setValue(glyphProp, static_cast<int>(glyph));
 
     modesLst.clear();
-    modesLst << "number of steps" << "curve length"
-             << "isovalue border" << "isovalue outer" << "isovalue inner";
-    thresholdProp = a->addProperty(ENUM_PROPERTY, "stop criterion", groupProp);
+    modesLst << "number of line segments" << "stop at isosurface";
+    thresholdProp = a->addProperty(
+                ENUM_PROPERTY, "curve length limited by", groupProp);
     properties->mEnum()->setEnumNames(thresholdProp, modesLst);
     properties->mEnum()->setValue(thresholdProp, static_cast<int>(threshold));
 
-    modesLst.clear();
-    modesLst << "ratio steps/max steps" << "ratio curve length/max length"
-             << "transfer function (observed variable)";
-    colourProp = a->addProperty(ENUM_PROPERTY, "curve colour", groupProp);
-    properties->mEnum()->setEnumNames(colourProp, modesLst);
-    properties->mEnum()->setValue(colourProp, static_cast<int>(colour));
+    startIsoSurfaceProp = a->addProperty(
+                ENUM_PROPERTY, "curves start at", groupProp);
 
-    tubeRadiusProp = a->addProperty(DOUBLE_PROPERTY, "curve radius", groupProp);
-    properties->setDouble(tubeRadiusProp, tubeRadius, 0.01, 0.5, 2, 0.01);
+    stopIsoSurfaceProp = a->addProperty(
+                ENUM_PROPERTY, "curves stop at", groupProp);
+    stopIsoSurfaceProp->setEnabled(false);
 
     modesLst.clear();
-    modesLst << "inner" << "outer";
-    surfaceProp = a->addProperty(ENUM_PROPERTY, "start isosurface", groupProp);
-    properties->mEnum()->setEnumNames(surfaceProp, modesLst);
-    properties->mEnum()->setValue(surfaceProp, static_cast<int>(surface));
-
-
-    modesLst.clear();
-    modesLst << "backwards" << "forwards" << "both";
+    modesLst << "high to low values" << "low to high values" << "both";
     integrationDirProp = a->addProperty(
                 ENUM_PROPERTY, "integration direction", groupProp);
     properties->mEnum()->setEnumNames(integrationDirProp, modesLst);
     properties->mEnum()->setValue(integrationDirProp,
                                   static_cast<int>(integrationDir));
 
-    stepSizeProp = a->addProperty(DOUBLE_PROPERTY, "curve stepsize", groupProp);
-    properties->setDouble(stepSizeProp, stepSize, 0.001, 100, 3, 0.001);
-
     numLineSegmentsProp = a->addProperty(
                 INT_PROPERTY, "max number line segments", groupProp);
-    properties->setInt(numLineSegmentsProp, numLineSegments, 1, 500);
+    properties->setInt(numLineSegmentsProp, numLineSegments, 1, 9999);
+
+    stepSizeProp = a->addProperty(
+                DOUBLE_PROPERTY, "length of single line segment", groupProp);
+    properties->setDouble(stepSizeProp, stepSize, 0.001, 100, 3, 0.001);
+
+    groupRenderingSettingsProp = a->addProperty(
+                GROUP_PROPERTY, "rendering", groupProp);
+
+    modesLst.clear();
+    modesLst << "lines" << "boxes + slices" << "tubes";
+    glyphProp = a->addProperty(ENUM_PROPERTY, "glyph type", groupRenderingSettingsProp);
+    properties->mEnum()->setEnumNames(glyphProp, modesLst);
+    properties->mEnum()->setValue(glyphProp, static_cast<int>(glyph));
+
+    modesLst.clear();
+//TODO (mr, 03Apr2016) -- first two colour modes are broken; I've disabled them
+// for now (hence the "-2" below).
+//    modesLst << "ratio steps/max steps" << "ratio curve length/max length"
+//             << "transfer function (observed variable)";
+    modesLst << "transfer function (observed variable)";
+    colourProp = a->addProperty(
+                ENUM_PROPERTY, "curve colour", groupRenderingSettingsProp);
+    properties->mEnum()->setEnumNames(colourProp, modesLst);
+    properties->mEnum()->setValue(colourProp, static_cast<int>(colour) - 2);
+
+    tubeRadiusProp = a->addProperty(
+                DOUBLE_PROPERTY, "curve radius", groupRenderingSettingsProp);
+    properties->setDouble(tubeRadiusProp, tubeRadius, 0.01, 0.5, 2, 0.01);
+
+    groupSeedSettingsProp = a->addProperty(
+                GROUP_PROPERTY, "seed points", groupProp);
 
     seedPointResXProp = a->addProperty(
-                DOUBLE_PROPERTY, "seed spacing lon", groupProp);
+                DOUBLE_PROPERTY, "seed spacing lon", groupSeedSettingsProp);
     properties->setDouble(seedPointResXProp, initPointResX, 0.1, 10, 3, 0.1);
 
     seedPointResYProp = a->addProperty(
-                DOUBLE_PROPERTY, "seed spacing lat", groupProp);
+                DOUBLE_PROPERTY, "seed spacing lat", groupSeedSettingsProp);
     properties->setDouble(seedPointResYProp, initPointResY, 0.1, 10, 3, 0.1);
 
     seedPointResZProp = a->addProperty(
-                DOUBLE_PROPERTY, "seed spacing Z", groupProp);
+                DOUBLE_PROPERTY, "seed spacing Z", groupSeedSettingsProp);
     properties->setDouble(seedPointResZProp, initPointResZ, 0.1, 10, 3, 0.1);
 
     seedPointVarianceProp = a->addProperty(
-                DOUBLE_PROPERTY, "seed points variance", groupProp);
+                DOUBLE_PROPERTY, "seed points variance", groupSeedSettingsProp);
     properties->setDouble(seedPointVarianceProp, initPointVariance, 0, 2, 3, 0.01);
-
-    numStepsProp = a->addProperty(INT_PROPERTY, "max number steps", groupProp);
-    properties->setInt(numStepsProp, numSteps, 1, 200);
-
-    curveLengthProp = a->addProperty(
-                DOUBLE_PROPERTY, "max curve length", groupProp);
-    properties->setDouble(curveLengthProp, curveLength, 0.001, 100, 3, 0.001);
-
-    isoValueBorderProp = a->addProperty(
-                DOUBLE_PROPERTY, "isovalue border", groupProp);
-    properties->setDouble(isoValueBorderProp, isoValueBorder, -400, 400, 2, 0.1);
 }
 
 
@@ -584,7 +604,7 @@ void MNWPVolumeRaycasterActor::saveConfiguration(QSettings *settings)
     // ==================
     settings->beginGroup("Raycaster");
 
-    settings->setValue("numIsoValues", rayCasterSettings->numIsoValues);
+    settings->setValue("numIsoValues", uint(rayCasterSettings->isoValueSetList.size()));
     settings->setValue("stepSize", rayCasterSettings->stepSize);
     settings->setValue("interactionStepSize", rayCasterSettings->interactionStepSize);
     settings->setValue("bisectionSteps", rayCasterSettings->bisectionSteps);
@@ -596,7 +616,7 @@ void MNWPVolumeRaycasterActor::saveConfiguration(QSettings *settings)
 
     settings->beginGroup("IsoValues");
 
-    for (unsigned int i = 0; i < rayCasterSettings->numIsoValues; ++i)
+    for (unsigned int i = 0; i < rayCasterSettings->isoValueSetList.size(); ++i)
     {
         IsoValueSettings& setting =  rayCasterSettings->isoValueSetList.at(i);
 
@@ -623,7 +643,6 @@ void MNWPVolumeRaycasterActor::saveConfiguration(QSettings *settings)
     settings->setValue("threshold", static_cast<int>(normalCurveSettings->threshold));
     settings->setValue("colour", static_cast<int>(normalCurveSettings->colour));
     settings->setValue("tubeRadius", normalCurveSettings->tubeRadius);
-    settings->setValue("surfaceStart", static_cast<int>(normalCurveSettings->surface));
     settings->setValue("stepSize", normalCurveSettings->stepSize);
     settings->setValue("integrationDir", static_cast<int>(normalCurveSettings->integrationDir));
     settings->setValue("numLineSegments", normalCurveSettings->numLineSegments);
@@ -632,8 +651,10 @@ void MNWPVolumeRaycasterActor::saveConfiguration(QSettings *settings)
     settings->setValue("initPointResZ", normalCurveSettings->initPointResZ);
     settings->setValue("initPointVariance", normalCurveSettings->initPointVariance);
     settings->setValue("numSteps", normalCurveSettings->numSteps);
-    settings->setValue("curveLength", normalCurveSettings->curveLength);
-    settings->setValue("isoValueBorder", normalCurveSettings->isoValueBorder);
+    settings->setValue("startIsoSurfaceEnum",
+                       properties->mEnum()->value(normalCurveSettings->startIsoSurfaceProp));
+    settings->setValue("stopIsoSurfaceEnum",
+                       properties->mEnum()->value(normalCurveSettings->stopIsoSurfaceProp));
 
     settings->endGroup(); // normal curves
 
@@ -705,15 +726,12 @@ void MNWPVolumeRaycasterActor::loadConfiguration(QSettings *settings)
     // raycaster settings
     // ==================
     settings->beginGroup("Raycaster");
-
-    rayCasterSettings->numIsoValues = settings->value("numIsoValues").toUInt();
-    properties->mInt()->setValue(rayCasterSettings->numIsoValuesProp,
-                                            rayCasterSettings->numIsoValues);
+    uint numIsoValues = settings->value("numIsoValues").toUInt();
 
     settings->beginGroup("IsoValues");
 
     // Remove current isovalue properties.
-    for (int i = 0; i < MAX_ISOSURFACES; ++i)
+    for (uint i = 0; i < rayCasterSettings->isoValueSetList.size(); ++i)
     {
         IsoValueSettings& setting = rayCasterSettings->isoValueSetList.at(i);
         rayCasterSettings->isoValuesProp->removeSubProperty(setting.groupProp);
@@ -725,7 +743,7 @@ void MNWPVolumeRaycasterActor::loadConfiguration(QSettings *settings)
     rayCasterSettings->isoColorTypes.clear();
 
     // Load new isovalue properties from file.
-    for (uint i = 0; i < rayCasterSettings->numIsoValues; ++i)
+    for (uint i = 0; i < numIsoValues; i++)
     {
         settings->beginGroup(QString("isoValue%1").arg(i));
 
@@ -735,18 +753,22 @@ void MNWPVolumeRaycasterActor::loadConfiguration(QSettings *settings)
                     settings->value("colourMode").toInt());
         QColor isoColor = settings->value("colour").value<QColor>();
 
-        rayCasterSettings->addIsoValue(i + 1, enabled, false,
+        rayCasterSettings->addIsoValue(enabled, false,
                                        isoValue, isoColor, isoColorType);
 
         settings->endGroup();
     }
 
-    for (int i = rayCasterSettings->numIsoValues; i < MAX_ISOSURFACES; ++i)
-    {
-        rayCasterSettings->addIsoValue(i + 1, false, true);
-    }
-
     rayCasterSettings->sortIsoValues();
+
+    // Update normal curves properties that link to isovalues.
+    QStringList names;
+    for (uint i = 0; i < rayCasterSettings->isoValueSetList.size(); i++)
+        names << rayCasterSettings->isoValueSetList.at(i).groupProp->propertyName();
+    properties->mEnum()->setEnumNames(
+                normalCurveSettings->startIsoSurfaceProp, names);
+    properties->mEnum()->setEnumNames(
+                normalCurveSettings->stopIsoSurfaceProp, names);
 
     settings->endGroup(); // isoValueSettings
 
@@ -799,11 +821,6 @@ void MNWPVolumeRaycasterActor::loadConfiguration(QSettings *settings)
     properties->mDouble()->setValue(normalCurveSettings->tubeRadiusProp,
                                   normalCurveSettings->tubeRadius);
 
-    normalCurveSettings->surface =
-            NormalCurveSettings::Surface(settings->value("surfaceStart").toInt());
-    properties->mEnum()->setValue(normalCurveSettings->surfaceProp,
-                                  normalCurveSettings->surface);
-
 
     normalCurveSettings->integrationDir =
             NormalCurveSettings::IntegrationDir(settings->value("integrationDir").toInt());
@@ -834,18 +851,17 @@ void MNWPVolumeRaycasterActor::loadConfiguration(QSettings *settings)
             settings->value("initPointVariance").toFloat();
     properties->mDouble()->setValue(normalCurveSettings->seedPointVarianceProp,
                                     normalCurveSettings->initPointVariance);
-    normalCurveSettings->numSteps =
-            settings->value("numSteps").toUInt();
-    properties->mInt()->setValue(normalCurveSettings->numStepsProp,
-                                 normalCurveSettings->numSteps);
-    normalCurveSettings->curveLength =
-            settings->value("curveLength").toFloat();
-    properties->mDouble()->setValue(normalCurveSettings->curveLengthProp,
-                                    normalCurveSettings->curveLength);
-    normalCurveSettings->isoValueBorder =
-            settings->value("isoValueBorder").toFloat();
-    properties->mDouble()->setValue(normalCurveSettings->isoValueBorderProp,
-                                    normalCurveSettings->isoValueBorder);
+
+    properties->mEnum()->setValue(normalCurveSettings->startIsoSurfaceProp,
+                                  settings->value("startIsoSurfaceEnum").toInt());
+    normalCurveSettings->startIsoValue =
+            rayCasterSettings->isoValueSetList.at(
+                settings->value("startIsoSurfaceEnum").toInt()).isoValue;
+    properties->mEnum()->setValue(normalCurveSettings->stopIsoSurfaceProp,
+                                  settings->value("stopIsoSurfaceEnum").toInt());
+    normalCurveSettings->stopIsoValue =
+            rayCasterSettings->isoValueSetList.at(
+                settings->value("stopIsoSurfaceEnum").toInt()).isoValue;
 
     settings->endGroup();
 
@@ -1227,17 +1243,71 @@ void MNWPVolumeRaycasterActor::onQtPropertyChanged(QtProperty* property)
         emitActorChangedSignal();
     }
 
-    else if (property == normalCurveSettings->surfaceProp ||
-             property == normalCurveSettings->tubeRadiusProp ||
+    else if (property == normalCurveSettings->startIsoSurfaceProp ||
+             property == normalCurveSettings->stopIsoSurfaceProp)
+    {
+        uint startIndex = properties->mEnum()->value(
+                    normalCurveSettings->startIsoSurfaceProp);
+        uint stopIndex = properties->mEnum()->value(
+                    normalCurveSettings->stopIsoSurfaceProp);
+        if (startIndex < rayCasterSettings->isoValueSetList.size())
+        {
+            normalCurveSettings->startIsoValue =
+                    rayCasterSettings->isoValueSetList.at(startIndex).isoValue;
+        }
+        else
+        {
+            normalCurveSettings->startIsoValue =
+                    rayCasterSettings->isoValueSetList.at(0).isoValue;
+        }
+
+        if (stopIndex < rayCasterSettings->isoValueSetList.size())
+        {
+            normalCurveSettings->stopIsoValue =
+                    rayCasterSettings->isoValueSetList.at(stopIndex).isoValue;
+        }
+        else
+        {
+            normalCurveSettings->stopIsoValue =
+                    rayCasterSettings->isoValueSetList.at(0).isoValue;
+        }
+
+        if (normalCurveSettings->threshold == NormalCurveSettings::Threshold::Steps)
+        {
+            normalCurveSettings->integrationDir =
+                            static_cast<NormalCurveSettings::IntegrationDir>(
+                                properties->mEnum()->value(normalCurveSettings->integrationDirProp));
+        }
+        else
+        {
+            if (normalCurveSettings->startIsoValue > normalCurveSettings->stopIsoValue)
+            {
+                normalCurveSettings->integrationDir = NormalCurveSettings::Backwards;
+            }
+            else
+            {
+                normalCurveSettings->integrationDir = NormalCurveSettings::Forwards;
+            }
+        }
+
+        if (normalCurveSettings->normalCurvesEnabled)
+        {
+            updateNextRenderFrame.set(ComputeNCInitPoints);
+            updateNextRenderFrame.set(RecomputeNCLines);
+        }
+
+        updateNextRenderFrame.set(UpdateShadowImage);
+
+        emitActorChangedSignal();
+    }
+
+    else if (property == normalCurveSettings->tubeRadiusProp ||
              property == normalCurveSettings->seedPointResXProp ||
              property == normalCurveSettings->seedPointResYProp ||
              property == normalCurveSettings->seedPointResZProp ||
              property == normalCurveSettings->seedPointVarianceProp ||
              property == normalCurveSettings->integrationDirProp)
     {
-        normalCurveSettings->surface =
-                static_cast<NormalCurveSettings::Surface>(
-                    properties->mEnum()->value(normalCurveSettings->surfaceProp));
         normalCurveSettings->initPointResX = properties->mDouble()
                 ->value(normalCurveSettings->seedPointResXProp);
         normalCurveSettings->initPointResY = properties->mDouble()
@@ -1248,9 +1318,24 @@ void MNWPVolumeRaycasterActor::onQtPropertyChanged(QtProperty* property)
                 ->value(normalCurveSettings->seedPointVarianceProp);
         normalCurveSettings->tubeRadius = properties->mDouble()
                 ->value(normalCurveSettings->tubeRadiusProp);
-        normalCurveSettings->integrationDir =
-                static_cast<NormalCurveSettings::IntegrationDir>(
-                    properties->mEnum()->value(normalCurveSettings->integrationDirProp));
+
+        if (normalCurveSettings->threshold == NormalCurveSettings::Threshold::Steps)
+        {
+            normalCurveSettings->integrationDir =
+                            static_cast<NormalCurveSettings::IntegrationDir>(
+                                properties->mEnum()->value(normalCurveSettings->integrationDirProp));
+        }
+        else
+        {
+            if (normalCurveSettings->startIsoValue >= normalCurveSettings->stopIsoValue)
+            {
+                normalCurveSettings->integrationDir = NormalCurveSettings::Backwards;
+            }
+            else
+            {
+                normalCurveSettings->integrationDir = NormalCurveSettings::Forwards;
+            }
+        }
 
         if (normalCurveSettings->normalCurvesEnabled)
         {
@@ -1273,27 +1358,39 @@ void MNWPVolumeRaycasterActor::onQtPropertyChanged(QtProperty* property)
     }
 
     else if (property == normalCurveSettings->thresholdProp ||
-             property == normalCurveSettings->colourProp ||
-             property == normalCurveSettings->stepSizeProp ||
-             property == normalCurveSettings->numStepsProp ||
-             property == normalCurveSettings->curveLengthProp ||
-             property == normalCurveSettings->isoValueBorderProp)
+             property == normalCurveSettings->colourProp    ||
+             property == normalCurveSettings->stepSizeProp)
     {
         normalCurveSettings->threshold =
                 static_cast<NormalCurveSettings::Threshold>(
                     properties->mEnum()->value(normalCurveSettings->thresholdProp));
+
+        if (normalCurveSettings->threshold == NormalCurveSettings::Threshold::Steps)
+        {
+            normalCurveSettings->integrationDirProp->setEnabled(true);
+            normalCurveSettings->numLineSegmentsProp->setEnabled(true);
+            normalCurveSettings->stopIsoSurfaceProp->setEnabled(false);
+            normalCurveSettings->numLineSegments = properties->mInt()->value(
+                        normalCurveSettings->numLineSegmentsProp);
+        }
+        else
+        {
+            normalCurveSettings->integrationDirProp->setEnabled(false);
+            normalCurveSettings->numLineSegmentsProp->setEnabled(false);
+            normalCurveSettings->stopIsoSurfaceProp->setEnabled(true);
+//TODO (mr, 03Apr2016) -- this shouldn't be hard-coded!
+            normalCurveSettings->numLineSegments = 500;
+        }
+
+//TODO (mr, 03Apr2016) -- disabled first two colour modes; hence the "+2". See
+// normal curve properties constructor.
         normalCurveSettings->colour =
                 static_cast<NormalCurveSettings::CurveColor>(
-                    properties->mEnum()->value(normalCurveSettings->colourProp));
+                    properties->mEnum()->value(normalCurveSettings->colourProp) + 2);
         normalCurveSettings->stepSize = properties->mDouble()->value(
                     normalCurveSettings->stepSizeProp);
-        normalCurveSettings->numSteps = properties->mInt()->value(
-                    normalCurveSettings->numStepsProp);
-        normalCurveSettings->curveLength = properties->mDouble()->value(
-                    normalCurveSettings->curveLengthProp);
-        normalCurveSettings->isoValueBorder = properties->mDouble()->value(
-                    normalCurveSettings->isoValueBorderProp);
 
+        updateNextRenderFrame.set(ComputeNCInitPoints);
         updateNextRenderFrame.set(RecomputeNCLines);
 
         emitActorChangedSignal();
@@ -1388,31 +1485,31 @@ void MNWPVolumeRaycasterActor::onQtPropertyChanged(QtProperty* property)
         emitActorChangedSignal();
     }
 
-    else if (property == rayCasterSettings->numIsoValuesProp)
+    else if (property == rayCasterSettings->addIsoValueProp)
     {
-        GLuint oldNumIsoValues = rayCasterSettings->numIsoValues;
-        rayCasterSettings->numIsoValues = properties->mInt()
-                ->value(rayCasterSettings->numIsoValuesProp);
-
-        // remove all not required isovalues
-        for (int i = 0; i < int(oldNumIsoValues - rayCasterSettings->numIsoValues); ++i)
+        if (rayCasterSettings->isoValueSetList.size() < MAX_ISOSURFACES)
         {
-            IsoValueSettings& currIsoValueSettings =
-                    rayCasterSettings->isoValueSetList[oldNumIsoValues - 1 - i];
+            enableEmissionOfActorChangedSignal(false);
+            rayCasterSettings->addIsoValue();
 
-            currIsoValueSettings.enabled = false;
-            properties->mBool()->setValue(
-                    currIsoValueSettings.enabledProp, false);
+            // Update normal curve properties that link to isovalues.
+            int startIsoIndex =
+                    properties->mEnum()->value(normalCurveSettings->startIsoSurfaceProp);
+            int stopIsoIndex =
+                    properties->mEnum()->value(normalCurveSettings->stopIsoSurfaceProp);
 
-            rayCasterSettings->isoValuesProp->removeSubProperty(
-                        rayCasterSettings->isoValueSetList[oldNumIsoValues - 1 - i].groupProp);
-        }
+            QStringList names;
+            for (uint i = 0; i < rayCasterSettings->isoValueSetList.size(); i++)
+            {
+                names << rayCasterSettings->isoValueSetList.at(i).groupProp->propertyName();
+            }
 
-        // add new isovalues
-        for(int i = 0; i < int(rayCasterSettings->numIsoValues - oldNumIsoValues); ++i)
-        {
-            rayCasterSettings->isoValuesProp->addSubProperty(
-                        rayCasterSettings->isoValueSetList[oldNumIsoValues + i].groupProp);
+            properties->mEnum()->setEnumNames(normalCurveSettings->startIsoSurfaceProp, names);
+            properties->mEnum()->setEnumNames(normalCurveSettings->stopIsoSurfaceProp, names);
+            properties->mEnum()->setValue(normalCurveSettings->startIsoSurfaceProp, startIsoIndex);
+            properties->mEnum()->setValue(normalCurveSettings->stopIsoSurfaceProp, stopIsoIndex);
+
+            enableEmissionOfActorChangedSignal(true);
         }
 
         return;
@@ -1420,15 +1517,79 @@ void MNWPVolumeRaycasterActor::onQtPropertyChanged(QtProperty* property)
 
     else
     {
+        int counter = 0;
+        int removedIsoValueIndex = -1;
         for (auto it = rayCasterSettings->isoValueSetList.begin();
              it != rayCasterSettings->isoValueSetList.end(); ++it)
         {
-            if ( property == it->enabledProp ||
+            if (removedIsoValueIndex >= 0)
+            {
+                enableEmissionOfActorChangedSignal(false);
+                QString oldDisplayText = it->groupProp->propertyName();
+                int hashStringPosition = oldDisplayText.indexOf("#");
+                QString oldTextFront   = oldDisplayText.mid(0, hashStringPosition + 1);
+                it->groupProp->setPropertyName(
+                            oldTextFront + QString::number(counter++));
+                enableEmissionOfActorChangedSignal(true);
+                continue;
+            }
+
+            if (property == it->isoValueRemoveProp)
+            {
+
+                if (rayCasterSettings->isoValueSetList.size() == 1) break;
+                properties->mBool()->setValue(it->enabledProp, false);
+                rayCasterSettings->isoValuesProp->removeSubProperty(
+                          it->groupProp);
+                rayCasterSettings->isoValueSetList.erase(it);
+                QString oldDisplayText  = it->groupProp->propertyName();
+                int hashStringPosition  = oldDisplayText.indexOf("#");
+                int oldIndex            =
+                      oldDisplayText.mid(hashStringPosition + 1).toInt();
+                removedIsoValueIndex    = oldIndex;
+                counter                 = oldIndex - 1;
+                enableEmissionOfActorChangedSignal(false);
+                if (it != rayCasterSettings->isoValueSetList.begin())
+                {
+                    --it;
+                }
+                else
+                {
+                    auto begin =
+                          rayCasterSettings->isoValueSetList.begin();
+                    QString oldDisplayText  = begin->groupProp->propertyName();
+                    int hashStringPosition  = oldDisplayText.indexOf("#");
+                    QString oldTextFront    =
+                          oldDisplayText.mid(0, hashStringPosition + 1);
+                    int oldIndex            =
+                          oldDisplayText.mid(hashStringPosition + 1).toInt();
+                    counter = oldIndex;
+                    begin->groupProp->setPropertyName(
+                              oldTextFront + QString::number(oldIndex - 1));
+                }
+                enableEmissionOfActorChangedSignal(true);
+            }
+
+            else if ( property == it->enabledProp ||
                  property == it->isoValueProp )
             {
                 it->enabled = properties->mBool()->value(it->enabledProp);
                 it->isoValue = properties->mDouble()->value(it->isoValueProp);
+                int startIsoIndex = properties->mEnum()->value(
+                            normalCurveSettings->startIsoSurfaceProp);
+                int stopIsoIndex = properties->mEnum()->value(
+                            normalCurveSettings->stopIsoSurfaceProp);
+                if (("isovalue #") + QString::number(startIsoIndex + 1) ==
+                        it->groupProp->propertyName())
+                {
+                    normalCurveSettings->startIsoValue = it->isoValue;
+                }
 
+                if (("isovalue #") + QString::number(stopIsoIndex + 1) ==
+                        it->groupProp->propertyName())
+                {
+                    normalCurveSettings->stopIsoValue = it->isoValue;
+                }
                 if (normalCurveSettings->normalCurvesEnabled)
                 {
                     updateNextRenderFrame.set(ComputeNCInitPoints);
@@ -1467,6 +1628,63 @@ void MNWPVolumeRaycasterActor::onQtPropertyChanged(QtProperty* property)
                 return;
             }
         } // isovalues
+
+        if (removedIsoValueIndex >= 0)
+        {
+            int startIsoIndex =
+                    properties->mEnum()->value(
+                        normalCurveSettings->startIsoSurfaceProp);
+            int stopIsoIndex =
+                    properties->mEnum()->value(
+                        normalCurveSettings->stopIsoSurfaceProp);
+
+            QStringList names;
+            for (uint i = 0; i < rayCasterSettings->isoValueSetList.size(); i++)
+            {
+                names << rayCasterSettings->isoValueSetList.at(i).groupProp->propertyName();
+            }
+            properties->mEnum()->setEnumNames(
+                        normalCurveSettings->startIsoSurfaceProp, names);
+            properties->mEnum()->setEnumNames(
+                        normalCurveSettings->stopIsoSurfaceProp, names);
+            properties->mEnum()->setValue(
+                        normalCurveSettings->startIsoSurfaceProp, startIsoIndex);
+            properties->mEnum()->setValue(
+                        normalCurveSettings->stopIsoSurfaceProp, stopIsoIndex);
+
+            if (startIsoIndex == removedIsoValueIndex)
+            {
+                properties->mEnum()->setValue(
+                            normalCurveSettings->startIsoSurfaceProp, 0);
+            }
+            else if (startIsoIndex > removedIsoValueIndex)
+            {
+                properties->mEnum()->setValue(
+                            normalCurveSettings->startIsoSurfaceProp, startIsoIndex - 1);
+            }
+            else
+            {
+                properties->mEnum()->setValue(
+                            normalCurveSettings->startIsoSurfaceProp, startIsoIndex);
+            }
+
+            if (stopIsoIndex == removedIsoValueIndex)
+            {
+                properties->mEnum()->setValue(
+                            normalCurveSettings->stopIsoSurfaceProp, 0);
+            }
+            else if (stopIsoIndex > removedIsoValueIndex)
+            {
+                properties->mEnum()->setValue(
+                            normalCurveSettings->stopIsoSurfaceProp, stopIsoIndex - 1);
+            }
+            else
+            {
+                properties->mEnum()->setValue(
+                            normalCurveSettings->stopIsoSurfaceProp, stopIsoIndex);
+            }
+            emitActorChangedSignal();
+        }
     }
 }
 
@@ -1629,7 +1847,7 @@ int MNWPVolumeRaycasterActor::computeCrossingLevel(float scalar)
     int level = 0;
 
 //TODO (mr, 17Nov2014) -- replace by numEnabledIsoValues?
-    for (unsigned int i = 0; i < rayCasterSettings->numIsoValues; i++)
+    for (unsigned int i = 0; i < rayCasterSettings->isoValueSetList.size(); i++)
     {
         if (rayCasterSettings->isoEnabled[i])
             level += int(scalar >= rayCasterSettings->isoValues[i]);
@@ -2153,7 +2371,7 @@ void MNWPVolumeRaycasterActor::setRayCasterShaderVars(
     shader->setUniformValueArray(
                 "isoColorModes", &rayCasterSettings->isoColorTypes[0], MAX_ISOSURFACES); CHECK_GL_ERROR;
     shader->setUniformValue(
-                "numIsoValues", rayCasterSettings->numEnabledIsoValues); CHECK_GL_ERROR;
+                "numIsoValues", GLint(rayCasterSettings->isoValueSetList.size())); CHECK_GL_ERROR;
 
     // 4) Set shadow setting variables.
 
@@ -2235,10 +2453,11 @@ void MNWPVolumeRaycasterActor::renderPositionCross(
     glDrawArrays(GL_LINES, 0, 6); CHECK_GL_ERROR;
 }
 
-
 void MNWPVolumeRaycasterActor::renderRayCaster(
         std::shared_ptr<GL::MShaderEffect>& effect, MSceneViewGLWidget* sceneView)
 {
+    if (rayCasterSettings->isoValueSetList.size() == 0) return;
+
     effect->bindProgram("Volume");
 
     setRayCasterShaderVars(effect, sceneView); CHECK_GL_ERROR;
@@ -2721,16 +2940,8 @@ void MNWPVolumeRaycasterActor::computeNormalCurveInitialPoints(
     // Bind the SSBO to the binding index 0.
     gl.ssboInitPoints->bindToIndex(0);
 
-    if (normalCurveSettings->surface == NormalCurveSettings::Outer)
-    {
-        gl.normalCurveInitPointsShader->setUniformValue(
-                    "isoValue", rayCasterSettings->isoValueSetList[1].isoValue);
-    }
-    else
-    {
-        gl.normalCurveInitPointsShader->setUniformValue(
-                    "isoValue", rayCasterSettings->isoValueSetList[0].isoValue);
-    }
+    gl.normalCurveInitPointsShader->setUniformValue(
+                    "isoValue", normalCurveSettings->startIsoValue);
 
     gl.normalCurveInitPointsShader->setUniformValue(
                 "stepSize", rayCasterSettings->stepSize);
@@ -2926,27 +3137,20 @@ void MNWPVolumeRaycasterActor::setNormalCurveComputeShaderVars(
     shader->setUniformValue(
                 "bisectionSteps", GLint(5)); CHECK_GL_ERROR;
 
+    shader->setUniformValue(
+                "isoValueStop", normalCurveSettings->stopIsoValue); CHECK_GL_ERROR;
 
     shader->setUniformValue(
                 "colorMode", int(normalCurveSettings->colour)); CHECK_GL_ERROR;
     shader->setUniformValue(
                 "abortCriterion", int(normalCurveSettings->threshold)); CHECK_GL_ERROR;
-
-    shader->setUniformValue(
-                "maxNumSteps", GLint(normalCurveSettings->numSteps)); CHECK_GL_ERROR;
-    shader->setUniformValue(
-                "maxCurveLength", GLfloat(normalCurveSettings->curveLength)); CHECK_GL_ERROR;
-    shader->setUniformValue(
-                "isoValueBorderInner", rayCasterSettings->isoValueSetList[0].isoValue); CHECK_GL_ERROR;
-    shader->setUniformValue(
-                "isoValueBorderOuter", rayCasterSettings->isoValueSetList[1].isoValue); CHECK_GL_ERROR;
-    shader->setUniformValue(
-                "isoValueBorder", normalCurveSettings->isoValueBorder); CHECK_GL_ERROR;
 }
 
 
 void MNWPVolumeRaycasterActor::computeNormalCurves(MSceneViewGLWidget* sceneView)
 {
+    if (rayCasterSettings->isoValueSetList.size() == 0) return;
+
     updateNextRenderFrame.reset(RecomputeNCLines);
 
     if (updateNextRenderFrame[ComputeNCInitPoints])
@@ -3018,13 +3222,13 @@ void MNWPVolumeRaycasterActor::computeNormalCurves(MSceneViewGLWidget* sceneView
 
     switch(normalCurveSettings->integrationDir)
     {
-    case NormalCurveSettings::Backwards:
+    case NormalCurveSettings::IntegrationDir::Backwards:
         gl.normalCurveLineComputeShader->setUniformValue("integrationMode", int(-1)); CHECK_GL_ERROR;
         glDispatchCompute(dispatchX, 1, 1);
         glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
         break;
 
-    case NormalCurveSettings::Forwards:
+    case NormalCurveSettings::IntegrationDir::Forwards:
         gl.normalCurveLineComputeShader->setUniformValue("integrationMode", int(1)); CHECK_GL_ERROR;
         glDispatchCompute(dispatchX, 1, 1);
         glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
@@ -3063,7 +3267,8 @@ void MNWPVolumeRaycasterActor::computeNormalCurves(MSceneViewGLWidget* sceneView
 void MNWPVolumeRaycasterActor::renderNormalCurves(
         MSceneViewGLWidget* sceneView, bool toDepth, bool shadow)
 {
-    if (normalCurveNumVertices == 0)
+    if (normalCurveNumVertices                    == 0 ||
+        rayCasterSettings->isoValueSetList.size() == 0)
     {
         return;
     }

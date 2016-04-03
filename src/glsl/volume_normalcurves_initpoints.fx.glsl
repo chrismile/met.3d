@@ -275,6 +275,12 @@ shader CSmain()
             // to the init points and set the cell as marked.
             if (ghostCount == 0)
             {
+                if(rayPosition.z <= bboxMin.z) return;
+                if(rayPosition.y >= bboxMax.y) return;
+                if(rayPosition.y <= bboxMin.y) return;
+                if(rayPosition.x >= bboxMax.x) return;
+                if(rayPosition.x <= bboxMin.x) return;
+
                 // Increment the init point counter by one.
                 uint index = atomicCounterIncrement(counter);
 

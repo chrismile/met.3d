@@ -119,10 +119,7 @@ uniform vec2    pToWorldZParams;
 // Normal Curve specific
 // =====================
 
-uniform int     maxNumSteps;
-uniform float   isoValueBorderInner;
-uniform float   isoValueBorderOuter;
-uniform float   isoValueBorder;
+uniform float   isoValueStop;
 
 
 /*****************************************************************************
@@ -203,7 +200,7 @@ void bisectionCorrection(inout vec3 position,
 
 // Function that uses the user-determined threshold to check if the normal curve
 // computation has to be aborted or should be carried on.
-bool checkThreshold(int steps, float curveLength, float scalar, in vec3 position)
+bool checkThreshold(float scalar, in vec3 position)
 {
     // Do not sample position outside the data volume.
     if (position.x > dataExtent.dataSECrnr.x) { return false; }
@@ -211,27 +208,22 @@ bool checkThreshold(int steps, float curveLength, float scalar, in vec3 position
     if (position.y < dataExtent.dataSECrnr.y) { return false; }
     if (position.y > dataExtent.dataNWCrnr.y) { return false; }
 
-    if (abortCriterion == 0) // Number of steps.
+    if (abortCriterion == 1) // Iso-Value.
     {
-        return steps < maxNumSteps;
+        if (integrationMode == -1) // backwards
+        {
+            return scalar >= isoValueStop;
+        }
+        else // forwards
+        {
+            return scalar <= isoValueStop;
+        }
     }
-    else if (abortCriterion == 1) // Curve length.
-    {
-        return curveLength <= maxCurveLength;
-    }
-    else if (abortCriterion == 2) // Iso-Value.
-    {
-        return scalar >= isoValueBorder;
-    }
-    else if (abortCriterion == 3) // Second iso-value.
-    {
-        return scalar >= isoValueBorderOuter;
-    }
-    else if (abortCriterion == 4) // First iso-value.
-    {
-        return scalar <= isoValueBorderInner;
-    }  
+
+    return true;
+
 }
+
 
 // Determines the color of one normal curve by using the curve length,
 // the number of line segments (steps) or simply the scalar value.
@@ -239,7 +231,7 @@ float determineColorValue(int steps, float curveLength, float scalar)
 {
     if (colorMode == 0) // Number of steps.
     {
-        return 1.0 - min(1.0, max(0.0, float(steps) / maxNumSteps));
+        return 1.0 - min(1.0, max(0.0, float(steps) / maxNumLineSegments));
     }
     else if (colorMode == 1) // Curve length.
     {
@@ -249,16 +241,6 @@ float determineColorValue(int steps, float curveLength, float scalar)
     {
         return scalar;
     }
-}
-
-// Determine the threshold that has to be used to perform the
-// bisection correction and thus to find the exact iso-surface position.
-float determineThreshold()
-{
-    if (abortCriterion == 2) { return isoValueBorder; }
-    else if (abortCriterion == 3) { return isoValueBorderOuter; }
-    else if (abortCriterion == 4) { return isoValueBorderInner; }
-    else return 0;
 }
 
 
@@ -287,7 +269,6 @@ void computeLine(uint initPointIndex, int direction)
     lines[index].value = scalar;
 
     // Threshold to conduct bisection correction.
-    const float threshold = determineThreshold();
     // Determine if we have to invert the scalar condition
     // depending on how we integrate in the data volume
     const bool inverted = (direction == 1) ? false : true;
@@ -308,22 +289,20 @@ void computeLine(uint initPointIndex, int direction)
         lines[index + i].position = currentPos;
         lines[index + i].value = scalar;
 
-        // If we exceeded a certain threshold then correct the last position and
-        // update the scalar value.
-        if (!checkThreshold(numLineSegments, lineLength, scalar, currentPos))
+        if (!checkThreshold(scalar, currentPos))
         {
-            if (abortCriterion >= 2)
-            {
-                vec3 oldCurPos = currentPos;
-                bisectionCorrection(currentPos, prevPos, scalar, threshold, inverted);
+           if (abortCriterion == 1)
+           {
+               vec3 oldCurPos = currentPos;
+               bisectionCorrection(currentPos, prevPos, scalar, isoValueStop, inverted);
 
-                lineLength -= length(oldCurPos - currentPos);
+               lineLength -= length(oldCurPos - currentPos);
 
-                lines[index + i].position = currentPos;
-                lines[index + i].value = scalar;
-            }
+               lines[index + i].position = currentPos;
+               lines[index + i].value = scalar;
+           }
 
-            break;
+           break;
         }
 
         prevPos = currentPos;

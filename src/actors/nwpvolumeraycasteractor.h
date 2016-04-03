@@ -399,6 +399,7 @@ private:
         QtProperty *isoValueProp;
         QtProperty *isoColourProp;
         QtProperty *isoColourTypeProp;
+        QtProperty *isoValueRemoveProp;
     };
 
     /**
@@ -411,7 +412,6 @@ private:
         void sortIsoValues();
 
         void addIsoValue(
-                const int index,
                 const bool enabled = true,
                 const bool hidden = false,
                 const float isoValue = 0.5,
@@ -420,8 +420,6 @@ private:
                 = IsoValueSettings::ColorType::ConstColor);
 
         MNWPVolumeRaycasterActor      *hostActor;
-        GLuint                         numIsoValues;
-        GLuint                         numEnabledIsoValues;
         // iso value settings from GUI
         std::vector<IsoValueSettings>  isoValueSetList;
         // list need to be sorted so that crossing levels work correct
@@ -440,9 +438,11 @@ private:
 
         // properties
         QtProperty*                    groupProp;
+        QtProperty*                    groupRaycasterSettings;
+        QtProperty*                    groupShadowSettings;
 
-        QtProperty*                    numIsoValuesProp;
         QtProperty*                    isoValuesProp;
+        QtProperty*                    addIsoValueProp;
 
         QtProperty*                    stepSizeProp;
         QtProperty*                    interactionStepSizeProp;
@@ -460,10 +460,10 @@ private:
         NormalCurveSettings(MNWPVolumeRaycasterActor *hostActor);
 
         enum GlyphType { Line = 0, Box, Tube };
-        enum Threshold { Steps = 0, Curve, IsoValueBorder, IsoValueOuter, IsoValueInner };
+        enum Threshold { Steps = 0, StopIsoValue = 1 };
         enum CurveColor { ColorSteps = 0, ColorCurve, ColorIsoValue };
         enum Surface { Inner = 0, Outer };
-        enum IntegrationDir { Backwards = 0, Forwards, Both };
+        enum IntegrationDir { Backwards = 0, Forwards = 1, Both = 2};
 
         GLboolean           normalCurvesEnabled;
 
@@ -471,11 +471,13 @@ private:
         Threshold           threshold;
         CurveColor          colour;
         GLfloat             tubeRadius;
-        Surface             surface;
 
         GLfloat             stepSize;
+        GLint               numLineSegments;
         IntegrationDir      integrationDir;
-        GLuint              numLineSegments;
+
+        GLfloat             startIsoValue;
+        GLfloat             stopIsoValue;
 
         GLfloat             initPointResX;
         GLfloat             initPointResY;
@@ -484,21 +486,25 @@ private:
         GLfloat             initPointVariance;
 
         GLuint              numSteps;
-        GLfloat             curveLength;
-        GLfloat             isoValueBorder;
+
+        QtProperty*         groupProp;
 
         QtProperty*         normalCurvesEnabledProp;
 
+        QtProperty*         groupRenderingSettingsProp;
         QtProperty*         glyphProp;
-        QtProperty*         thresholdProp;
-        QtProperty*         colourProp;
         QtProperty*         tubeRadiusProp;
-        QtProperty*         surfaceProp;
-        QtProperty*         groupProp;
+        QtProperty*         colourProp;
+
+        QtProperty*         thresholdProp;
+        QtProperty*         startIsoSurfaceProp;
+        QtProperty*         stopIsoSurfaceProp;
 
         QtProperty*         stepSizeProp;
         QtProperty*         integrationDirProp;
         QtProperty*         numLineSegmentsProp;
+
+        QtProperty*         groupSeedSettingsProp;
 
         QtProperty*         seedPointResXProp;
         QtProperty*         seedPointResYProp;
@@ -506,9 +512,6 @@ private:
 
         QtProperty*         seedPointVarianceProp;
 
-        QtProperty*         numStepsProp;
-        QtProperty*         curveLengthProp;
-        QtProperty*         isoValueBorderProp;
     };
 
     enum NextRenderFrameUpdateRequests
