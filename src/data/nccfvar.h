@@ -132,7 +132,8 @@ public:
       Returns a set of available ensemble members, if an ensemble dimension
       is available for this variable.
      */
-    QSet<unsigned int> getEnsembleMembers();
+    QSet<unsigned int> getEnsembleMembers(
+            QHash<unsigned int, unsigned int> *memberToFileIndexMap = nullptr);
 
     /**
       Returns TRUE if this CF variable has a time dimension.

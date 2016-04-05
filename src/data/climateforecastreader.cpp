@@ -838,8 +838,8 @@ MStructuredGrid *MClimateForecastReader::readGrid(
                             << "'; ensemble forecast contains "
                             << shared->ensembleVar.getDim(0).getSize()
                             << " members.");
-            shared->availableMembers = availableEnsembleMembers(
-                        levelType, variableName);
+            shared->availableMembers = shared->cfVar.getEnsembleMembers(
+                        &(shared->memberToFileIndexMap));
         }
         catch (NcException)
         {
@@ -1013,7 +1013,7 @@ MStructuredGrid *MClimateForecastReader::readGrid(
                 // Load from a 5D NetCDF variable (ens, time, vertical, lat, lon).
                 vector<size_t> start(5); start.assign(5,0);
                 start[0] = timeIndex;
-                start[1] = ensembleMember;
+                start[1] = shared->memberToFileIndexMap.value(ensembleMember);
                 vector<size_t> count(5); count.assign(5,1);
                 count[1] = 1;
                 count[2] = shared->levels.size();
@@ -1140,7 +1140,7 @@ MStructuredGrid *MClimateForecastReader::readGrid(
                 // Load from a 3D NetCDF variable (time, lat, lon).
                 vector<size_t> start(4); start.assign(4,0);
                 start[0] = timeIndex;
-                start[1] = ensembleMember;
+                start[1] = shared->memberToFileIndexMap.value(ensembleMember);
                 vector<size_t> count(4); count.assign(4,1);
                 count[1] = 1;
                 count[2] = shared->lats.size();

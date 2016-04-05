@@ -53,6 +53,7 @@ struct MVariableDataSharedPerFile
     QVector<double> levels, lats, lons, ak, bk;
     QList<QDateTime> timeCoordValues;
     QSet<unsigned int> availableMembers;
+    QHash<unsigned int, unsigned int> memberToFileIndexMap;
 
     bool scaleAndOffsetProvided;
     double scale_factor, add_offset;

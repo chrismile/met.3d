@@ -292,6 +292,8 @@ NcVar NcCFVar::getEnsembleVar()
             if (attribute == "Ensemble") return var;
         }
         catch (NcException) {}
+
+        if (var.getName() == "ens0") return var;
     }
 
     // If we get here no variable has been identified. Throw an exception.
@@ -300,7 +302,8 @@ NcVar NcCFVar::getEnsembleVar()
 }
 
 
-QSet<unsigned int> NcCFVar::getEnsembleMembers()
+QSet<unsigned int> NcCFVar::getEnsembleMembers(
+        QHash<unsigned int, unsigned int> *memberToFileIndexMap)
 {
     NcVar ensVar = getEnsembleVar();
 
@@ -310,7 +313,12 @@ QSet<unsigned int> NcCFVar::getEnsembleMembers()
     ensVar.getVar(ensValues);
 
     QSet<unsigned int> members;
-    for (unsigned int i = 0; i < numMembers; i++) members.insert(ensValues[i]);
+    for (unsigned int i = 0; i < numMembers; i++)
+    {
+        members.insert(ensValues[i]);
+        if (memberToFileIndexMap != nullptr)
+            memberToFileIndexMap->insert(ensValues[i], i);
+    }
     delete[] ensValues;
 
     return members;
