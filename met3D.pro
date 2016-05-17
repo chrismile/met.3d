@@ -86,7 +86,6 @@ HEADERS += \
     src/data/verticalregridder.h \
     src/data/thinouttrajectoryfilter.h \
     src/data/probabilityregiondetector.h \
-    src/data/thermodatasource.h \
     src/gxfw/nwpactorvariableproperties.h \
     src/data/valueextractionanalysis.h \
     src/data/abstractanalysis.h \
@@ -119,7 +118,8 @@ HEADERS += \
     src/data/probabltrajectoriessource.h \
     src/gxfw/gl/shaderstoragebufferobject.h \
     src/gxfw/memberselectiondialog.h \
-    src/gxfw/adddatasetdialog.h
+    src/gxfw/adddatasetdialog.h \
+    src/data/derivedmetvarsdatasource.h
 
 SOURCES += \
     src/main.cpp \
@@ -171,7 +171,6 @@ SOURCES += \
     src/data/verticalregridder.cpp \
     src/data/thinouttrajectoryfilter.cpp \
     src/data/probabilityregiondetector.cpp \
-    src/data/thermodatasource.cpp \
     src/gxfw/nwpactorvariableproperties.cpp \
     src/data/valueextractionanalysis.cpp \
     src/data/abstractanalysis.cpp \
@@ -206,7 +205,8 @@ SOURCES += \
     src/data/probabltrajectoriessource.cpp \
     src/gxfw/gl/shaderstoragebufferobject.cpp \
     src/gxfw/memberselectiondialog.cpp \
-    src/gxfw/adddatasetdialog.cpp
+    src/gxfw/adddatasetdialog.cpp \
+    src/data/derivedmetvarsdatasource.cpp
 
 FORMS += \
     src/mainwindow.ui \
