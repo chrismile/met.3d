@@ -1,6 +1,14 @@
 Met.3D -- 3D visualization of numerical ensemble weather prediction data
 ========================================================================
 
+*********************************************************************
+NEWS (July 2016): The Met.3D documentation is now available online at
+
+                      http://met3d.readthedocs.org/
+
+Please refer to this website for the latest documentation version.
+*********************************************************************
+
 Met.3D is an open-source visualization tool for interactive, three-dimensional
 visualization of numerical ensemble weather predictions and similar numerical
 atmospheric model datasets. The tool is implemented in C++ and OpenGL-4 and
@@ -57,8 +65,10 @@ consumer (i.e. gaming) model works fine. Met.3D's current features include:
 Documentation:
 ==============
 
-User guide: A short (and evolving) user guide (pdf) can be downloaded from the
-"Downloads" section of the Met.3D Bitbucket repository.
+User guide: A short (and evolving) user guide (pdf) is available online at
+
+                      http://met3d.readthedocs.org/
+
 
 In addition to the reference publication, a second paper available online from
 Geoscientific Model Development describes the specific application case of
@@ -82,4 +92,5 @@ Installation and configuration
 ==============================
 
 Installation and configuration notes can be found in the file "INSTALL" located
-in the same directory as this file.
+in the same directory as this file, and online in the user documentation at
+http://met3d.readthedocs.org/.
