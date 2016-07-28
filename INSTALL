@@ -1,6 +1,10 @@
 Met.3D Installation Guidelines.
 ===============================
 
+** NOTE: This file may be slightly out of date. Please refer to the online
+         documentation at http://met3d.readthedocs.org/ for the latest
+         installation guidelines.
+
 This document provides installation guidelines for installing Met.3D on
 OpenSuSE 13.X systems. Met.3D requires a number of libraries to be
 installed and a few external data packages to be downloaded. Most of these
