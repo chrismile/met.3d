@@ -249,7 +249,7 @@ private:
     struct RenderMode
     {
         RenderMode() {}
-        enum Type { Original = 0, Bitfield };
+        enum Type { Original = 0, Bitfield, DVR };
         enum ColorType { IsoColor = 0, TransferFunction };
         enum Resolution { VeryLowRes = 0, LowRes, NormalRes,
                           HighRes, VeryHighRes, UltraRes };
