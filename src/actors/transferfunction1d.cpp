@@ -50,6 +50,7 @@ MTransferFunction1D::MTransferFunction1D()
     : MTransferFunction(),
       tfTexture(nullptr),
       vertexBuffer(nullptr),
+      enableAlpha(true),
       minimumValue(203.15),
       maximumValue(303.15)
 {
@@ -117,12 +118,20 @@ MTransferFunction1D::MTransferFunction1D()
                                    actorPropertiesSupGroup);
     properties->setRectF(positionProperty, QRectF(0.9, 0.9, 0.05, 0.5), 2);
 
+    enableAlphaInTFProperty = addProperty(BOOL_PROPERTY, "display opacity",
+                                          actorPropertiesSupGroup);
+    properties->mBool()->setValue(enableAlphaInTFProperty, enableAlpha);
+
+    reverseTFRangeProperty = addProperty(BOOL_PROPERTY, "reverse range",
+                                        actorPropertiesSupGroup);
+    properties->mBool()->setValue(reverseTFRangeProperty, false);
+
     // Properties related to type of colourmap.
     // ========================================
 
     colourmapTypeProperty = addProperty(ENUM_PROPERTY, "colourmap type",
                                         actorPropertiesSupGroup);
-    QStringList cmapTypes = QStringList() << "predefined" << "HCL";
+    QStringList cmapTypes = QStringList() << "predefined" << "HCL" << "HSV";
     properties->mEnum()->setEnumNames(colourmapTypeProperty, cmapTypes);
 
     // Predefined ...
@@ -136,10 +145,6 @@ MTransferFunction1D::MTransferFunction1D()
     predefColourmapProperty = addProperty(ENUM_PROPERTY, "colour map",
                                           predefCMapPropertiesSubGroup);
     properties->mEnum()->setEnumNames(predefColourmapProperty, availableColourmaps);
-
-    predefReverseProperty = addProperty(BOOL_PROPERTY, "reverse",
-                                        predefCMapPropertiesSubGroup);
-    properties->mBool()->setValue(predefReverseProperty, false);
 
     predefLightnessAdjustProperty = addProperty(INT_PROPERTY, "lightness",
                                                 predefCMapPropertiesSubGroup);
@@ -206,11 +211,22 @@ MTransferFunction1D::MTransferFunction1D()
                                         hclCMapPropertiesSubGroup);
     properties->setDouble(hclPowerAlphaProperty, 1., 0., 100., 3., 0.01);
 
-    hclReverseProperty = addProperty(BOOL_PROPERTY, "reverse",
-                                     hclCMapPropertiesSubGroup);
-    properties->mBool()->setValue(hclReverseProperty, false);
-
     updateHCLProperties();
+
+
+    // HSV ...
+
+    hsvCMapPropertiesSubGroup = addProperty(GROUP_PROPERTY, "HSV",
+                                            actorPropertiesSupGroup);
+    hsvCMapPropertiesSubGroup->setEnabled(false);
+
+    hsvLoadFromVaporXMLProperty = addProperty(CLICK_PROPERTY, "load from Vapor XML file",
+                                              hsvCMapPropertiesSubGroup);
+
+    hsvVaporXMLFilenameProperty = addProperty(STRING_PROPERTY, "Vapor XML file",
+                                              hsvCMapPropertiesSubGroup);
+    properties->mString()->setValue(hsvVaporXMLFilenameProperty, "");
+    hsvVaporXMLFilenameProperty->setEnabled(false);
 
     endInitialiseQtProperties();
 }
@@ -246,11 +262,12 @@ void MTransferFunction1D::selectPredefinedColourmap(
 
         properties->mEnum()->setValue(colourmapTypeProperty, int(PREDEFINED));
         properties->mEnum()->setValue(predefColourmapProperty, index);
-        properties->mBool()->setValue(predefReverseProperty, reversed);
+        properties->mBool()->setValue(reverseTFRangeProperty, reversed);
         properties->mInt()->setValue(predefSaturationAdjustProperty, saturation);
         properties->mInt()->setValue(predefLightnessAdjustProperty, lightness);
         predefCMapPropertiesSubGroup->setEnabled(true);
         hclCMapPropertiesSubGroup->setEnabled(false);
+        hsvCMapPropertiesSubGroup->setEnabled(false);
 
         enableActorUpdates(true);
 
@@ -285,10 +302,39 @@ void MTransferFunction1D::selectHCLColourmap(
     properties->mDouble()->setValue(hclAlpha1Property, alpha1);
     properties->mDouble()->setValue(hclAlpha2Property, alpha2);
     properties->mDouble()->setValue(hclPowerAlphaProperty, poweralpha);
-    properties->mBool()->setValue(hclReverseProperty, reversed);
+    properties->mBool()->setValue(reverseTFRangeProperty, reversed);
 
     predefCMapPropertiesSubGroup->setEnabled(false);
     hclCMapPropertiesSubGroup->setEnabled(true);
+    hsvCMapPropertiesSubGroup->setEnabled(false);
+
+    enableActorUpdates(true);
+
+    if (isInitialized())
+    {
+        generateTransferTexture();
+        generateColourBarGeometry();
+        emitActorChangedSignal();
+    }
+}
+
+
+void MTransferFunction1D::selectHSVColourmap(
+        QString vaporXMLFile, bool reversed)
+{
+    enableActorUpdates(false);
+
+    properties->mEnum()->setValue(colourmapTypeProperty, int(HSV));
+
+    hsvVaporXMLFilename = vaporXMLFile;
+    properties->mString()->setValue(
+                hsvVaporXMLFilenameProperty, hsvVaporXMLFilename);
+
+    properties->mBool()->setValue(reverseTFRangeProperty, reversed);
+
+    predefCMapPropertiesSubGroup->setEnabled(false);
+    hclCMapPropertiesSubGroup->setEnabled(false);
+    hsvCMapPropertiesSubGroup->setEnabled(true);
 
     enableActorUpdates(true);
 
@@ -385,6 +431,10 @@ void MTransferFunction1D::saveConfiguration(QSettings *settings)
     MColourmapType cmaptype = MColourmapType(
                 properties->mEnum()->value(colourmapTypeProperty));
     settings->setValue("colourMapType", int(cmaptype));
+    settings->setValue("displayOpacity",
+                       properties->mBool()->value(enableAlphaInTFProperty));
+    settings->setValue("reverseColourMap",
+                       properties->mBool()->value(reverseTFRangeProperty));
 
     switch (cmaptype)
     {
@@ -394,8 +444,6 @@ void MTransferFunction1D::saveConfiguration(QSettings *settings)
         QString colourmapName = properties->mEnum()->enumNames(
                     predefColourmapProperty)[colourmapIndex];
         settings->setValue("predefinedColourMap", colourmapName);
-        settings->setValue("reverseColourMap",
-                           properties->mBool()->value(predefReverseProperty));
         settings->setValue("lightnessAdjust",
                            properties->mInt()->value(predefLightnessAdjustProperty));
         settings->setValue("saturationAdjust",
@@ -429,8 +477,11 @@ void MTransferFunction1D::saveConfiguration(QSettings *settings)
                            properties->mDouble()->value(hclAlpha2Property));
         settings->setValue("poweralpha",
                            properties->mDouble()->value(hclPowerAlphaProperty));
-        settings->setValue("reverseColourMap",
-                           properties->mBool()->value(hclReverseProperty));
+        break;
+    }
+    case HSV:
+    {
+        settings->setValue("vaporXMLFile", hsvVaporXMLFilename);
         break;
     }
     }
@@ -502,6 +553,12 @@ void MTransferFunction1D::loadConfiguration(QSettings *settings)
                            settings->value("reverseColourMap").toBool());
         break;
     }
+    case HSV:
+    {
+        selectHSVColourmap(settings->value("vaporXMLFile").toString(),
+                           settings->value("reverseColourMap").toBool());
+        break;
+    }
     }
 
     settings->endGroup();
@@ -562,7 +619,7 @@ void MTransferFunction1D::onQtPropertyChanged(QtProperty *property)
          (property == labelBBoxColourProperty) ||
          (property == scaleFactorProperty)     ||
          (property == predefColourmapProperty) ||
-         (property == predefReverseProperty)   ||
+         (property == reverseTFRangeProperty)  ||
          (property == predefLightnessAdjustProperty)  ||
          (property == predefSaturationAdjustProperty) ||
          (property == hclHue1Property)         ||
@@ -575,8 +632,7 @@ void MTransferFunction1D::onQtPropertyChanged(QtProperty *property)
          (property == hclPower2Property)       ||
          (property == hclAlpha1Property)       ||
          (property == hclAlpha2Property)       ||
-         (property == hclPowerAlphaProperty)   ||
-         (property == hclReverseProperty)         )
+         (property == hclPowerAlphaProperty)      )
     {
         if (suppressActorUpdates()) return;
 
@@ -595,10 +651,28 @@ void MTransferFunction1D::onQtPropertyChanged(QtProperty *property)
         case PREDEFINED:
             predefCMapPropertiesSubGroup->setEnabled(true);
             hclCMapPropertiesSubGroup->setEnabled(false);
+            hsvCMapPropertiesSubGroup->setEnabled(false);
             break;
         case HCL:
             predefCMapPropertiesSubGroup->setEnabled(false);
             hclCMapPropertiesSubGroup->setEnabled(true);
+            hsvCMapPropertiesSubGroup->setEnabled(false);
+            break;
+        case HSV:
+            predefCMapPropertiesSubGroup->setEnabled(false);
+            hclCMapPropertiesSubGroup->setEnabled(false);
+            hsvCMapPropertiesSubGroup->setEnabled(true);
+
+            if (hsvVaporXMLFilename.isEmpty())
+            {
+                hsvVaporXMLFilename = QFileDialog::getOpenFileName(
+                            MGLResourcesManager::getInstance(),
+                            "Load Vapor transfer function",
+                            "/",
+                            "Vapor transfer function XML (*.vtf)");
+                updateHSVProperties();
+            }
+
             break;
         }
 
@@ -636,6 +710,35 @@ void MTransferFunction1D::onQtPropertyChanged(QtProperty *property)
         generateColourBarGeometry();
         emitActorChangedSignal();
     }
+
+    else if (property == hsvLoadFromVaporXMLProperty)
+    {
+        QString filename = QFileDialog::getOpenFileName(
+                    MGLResourcesManager::getInstance(),
+                    "Load Vapor transfer function",
+                    "/",
+                    "Vapor transfer function XML (*.vtf)");
+
+        if (filename.isEmpty()) return;
+
+        hsvVaporXMLFilename = filename;
+        LOG4CPLUS_DEBUG(mlog, "Loading Vapor transfer function from "
+                        << hsvVaporXMLFilename.toStdString());
+        updateHSVProperties();
+
+        if (suppressActorUpdates()) return;
+
+        generateTransferTexture();
+        generateColourBarGeometry();
+        emitActorChangedSignal();
+    }
+
+    else if (property == enableAlphaInTFProperty)
+    {
+        enableAlpha = properties->mBool()->value(enableAlphaInTFProperty);
+
+        emitActorChangedSignal();
+    }
 }
 
 
@@ -650,6 +753,7 @@ void MTransferFunction1D::renderToCurrentContext(MSceneViewGLWidget *sceneView)
     // afterwards is rendered correctly.
     colourbarShader->bind();
     colourbarShader->setUniformValue("transferTexture", textureUnit);
+    colourbarShader->setUniformValue("enableAlpha", GLboolean(enableAlpha));
 
     vertexBuffer->attachToVertexAttribute(SHADER_VERTEX_ATTRIBUTE, 3, false,
                                           4 * sizeof(float), 0 * sizeof(float));
@@ -708,7 +812,7 @@ void MTransferFunction1D::generateTransferTexture()
 
     MColourmap *cmap = nullptr;
     bool deleteColourMap = false;
-    bool reverse = false;
+    bool reverse = properties->mBool()->value(reverseTFRangeProperty);
 
     int lightnessAdjust = 0;
     int saturationAdjust = 0;
@@ -721,7 +825,6 @@ void MTransferFunction1D::generateTransferTexture()
         int colourmapIndex = properties->mEnum()->value(predefColourmapProperty);
         QString colourmapName = properties->mEnum()->enumNames(
                     predefColourmapProperty)[colourmapIndex];
-        reverse = properties->mBool()->value(predefReverseProperty);
         cmap = colourmapPool.colourmap(colourmapName);
         lightnessAdjust = properties->mInt()->value(predefLightnessAdjustProperty);
         saturationAdjust = properties->mInt()->value(predefSaturationAdjustProperty);
@@ -762,7 +865,6 @@ void MTransferFunction1D::generateTransferTexture()
         float alpha1 = properties->mDouble()->value(hclAlpha1Property);
         float alpha2 = properties->mDouble()->value(hclAlpha2Property);
         float poweralpha = properties->mDouble()->value(hclPowerAlphaProperty);
-        reverse = properties->mBool()->value(hclReverseProperty);
         deleteColourMap = true;
 
         // Get type of HCL map and instantiate corresponding class.
@@ -807,9 +909,36 @@ void MTransferFunction1D::generateTransferTexture()
 
         break;
     }
+    case HSV:
+    {
+        // Instantiate HSV colourmap class with filename pointing to an
+        // XML file containing a Vapor transfer function.
+        try
+        {
+            cmap = new MHSVColourmap(hsvVaporXMLFilename);
+        }
+        catch (MInitialisationError)
+        {
+            break;
+        }
+
+        // Fill the texture with the chosen colourmap.
+        int n = 0;
+        for (int i = 0; i < numSteps; i++)
+        {
+            float  scalar = float(i) / float(numSteps-1);
+            QColor rgba   = cmap->scalarToColour(reverse ? 1.-scalar : scalar);
+            textureImage[n++] = (unsigned char)(rgba.redF() * 255);
+            textureImage[n++] = (unsigned char)(rgba.greenF() * 255);
+            textureImage[n++] = (unsigned char)(rgba.blueF() * 255);
+            textureImage[n++] = (unsigned char)(rgba.alphaF() * 255);
+        }
+
+        break;
+    }
     }
 
-    if (deleteColourMap) delete cmap;
+    if (deleteColourMap && (cmap != nullptr)) delete cmap;
 
     // Upload the texture to GPU memory:
     if (tfTexture == nullptr)
@@ -1064,6 +1193,13 @@ void MTransferFunction1D::updateHCLProperties()
         hclPowerAlphaProperty->setEnabled(true);
         break;
     }
+}
+
+
+void MTransferFunction1D::updateHSVProperties()
+{
+    properties->mString()->setValue(
+                hsvVaporXMLFilenameProperty, hsvVaporXMLFilename);
 }
 
 } // namespace Met3D

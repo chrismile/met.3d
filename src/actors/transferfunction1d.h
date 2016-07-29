@@ -107,6 +107,8 @@ public:
             float alpha1, float alpha2, float poweralpha,
             bool reversed=false);
 
+    void selectHSVColourmap(QString vaporXMLFile, bool reversed=false);
+
     void setMinimumValue(float value);
 
     void setMaximumValue(float value);
@@ -154,6 +156,8 @@ private:
 
     void updateHCLProperties();
 
+    void updateHSVProperties();
+
     std::shared_ptr<GL::MShaderEffect> colourbarShader;
     std::shared_ptr<GL::MShaderEffect> simpleGeometryShader;
 
@@ -167,6 +171,9 @@ private:
 
     // General properties.
     QtProperty *positionProperty;
+    bool        enableAlpha;
+    QtProperty *enableAlphaInTFProperty;
+    QtProperty *reverseTFRangeProperty;
 
     // Properties related to ticks and labels.
     QtProperty *maxNumTicksProperty;
@@ -186,12 +193,11 @@ private:
     QtProperty *numStepsProperty;
 
     // Type of colourmap.
-    enum MColourmapType { PREDEFINED = 0, HCL = 1 };
+    enum MColourmapType { PREDEFINED = 0, HCL = 1, HSV = 2 };
     QtProperty *colourmapTypeProperty;
 
     QtProperty *predefCMapPropertiesSubGroup;
     QtProperty *predefColourmapProperty;
-    QtProperty *predefReverseProperty;
     QtProperty *predefLightnessAdjustProperty;
     QtProperty *predefSaturationAdjustProperty;
 
@@ -210,6 +216,10 @@ private:
     QtProperty *hclPowerAlphaProperty;
     QtProperty *hclReverseProperty;
 
+    QtProperty *hsvCMapPropertiesSubGroup;
+    QtProperty *hsvLoadFromVaporXMLProperty;
+    QString     hsvVaporXMLFilename;
+    QtProperty *hsvVaporXMLFilenameProperty;
 };
 
 
