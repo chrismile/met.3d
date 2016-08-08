@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>520</width>
-    <height>226</height>
+    <width>562</width>
+    <height>306</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -132,7 +132,7 @@
           </property>
           <property name="dateTime">
            <datetime>
-            <hour>6</hour>
+            <hour>13</hour>
             <minute>0</minute>
             <second>0</second>
             <year>2011</year>
@@ -147,35 +147,11 @@
             <day>6</day>
            </date>
           </property>
-          <property name="minimumDateTime">
-           <datetime>
-            <hour>7</hour>
-            <minute>0</minute>
-            <second>0</second>
-            <year>1999</year>
-            <month>12</month>
-            <day>31</day>
-           </datetime>
-          </property>
-          <property name="minimumDate">
-           <date>
-            <year>1999</year>
-            <month>12</month>
-            <day>31</day>
-           </date>
-          </property>
-          <property name="minimumTime">
-           <time>
-            <hour>7</hour>
-            <minute>0</minute>
-            <second>0</second>
-           </time>
-          </property>
           <property name="displayFormat">
            <string>ddd yyyy-MM-dd hh:mm UTC</string>
           </property>
           <property name="calendarPopup">
-           <bool>false</bool>
+           <bool>true</bool>
           </property>
           <property name="timeSpec">
            <enum>Qt::UTC</enum>
@@ -314,7 +290,7 @@
           </property>
           <property name="dateTime">
            <datetime>
-            <hour>6</hour>
+            <hour>13</hour>
             <minute>0</minute>
             <second>0</second>
             <year>2011</year>
@@ -331,33 +307,19 @@
           </property>
           <property name="minimumDateTime">
            <datetime>
-            <hour>6</hour>
+            <hour>0</hour>
             <minute>0</minute>
             <second>0</second>
-            <year>1999</year>
-            <month>12</month>
-            <day>31</day>
+            <year>1752</year>
+            <month>9</month>
+            <day>14</day>
            </datetime>
-          </property>
-          <property name="minimumDate">
-           <date>
-            <year>1999</year>
-            <month>12</month>
-            <day>31</day>
-           </date>
-          </property>
-          <property name="minimumTime">
-           <time>
-            <hour>6</hour>
-            <minute>0</minute>
-            <second>0</second>
-           </time>
           </property>
           <property name="displayFormat">
            <string>ddd yyyy-MM-dd hh:mm UTC</string>
           </property>
           <property name="calendarPopup">
-           <bool>false</bool>
+           <bool>true</bool>
           </property>
           <property name="timeSpec">
            <enum>Qt::UTC</enum>
