@@ -66,6 +66,7 @@ MSceneViewGLWidget::MSceneViewGLWidget()
       sceneRotationCentre(QVector3D(0,0,1020)),
       cameraAutorotationMode(false),
       freezeMode(0),
+      sceneNavigationSensitivity(1.),
       measureFPS(false),
       measureFPSFrameCount(0),
       sceneNameLabel(nullptr),
@@ -209,6 +210,16 @@ MSceneViewGLWidget::MSceneViewGLWidget()
             ->addProperty("interactively select rotation centre");
     sceneRotationCenterProperty->addSubProperty(selectSceneRotationCentreProperty);
     selectSceneRotationCentreProperty->setEnabled(false);
+
+    sceneNavigationSensitivityProperty = systemControl->getDecoratedDoublePropertyManager()
+            ->addProperty("navigation sensitivity");
+    systemControl->getDecoratedDoublePropertyManager()
+            ->setValue(sceneNavigationSensitivityProperty, sceneNavigationSensitivity);
+    systemControl->getDecoratedDoublePropertyManager()
+            ->setMinimum(sceneNavigationSensitivityProperty, 1.);
+    systemControl->getDecoratedDoublePropertyManager()
+            ->setMaximum(sceneNavigationSensitivityProperty, 100.);
+    interactionGroupProperty->addSubProperty(sceneNavigationSensitivityProperty);
 
     cameraAutoRotationModeProperty = systemControl->getBoolPropertyManager()
             ->addProperty("auto-rotate camera");
@@ -856,6 +867,12 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
         executeCameraAction(CAMERA_LOADFROMFILE, false);
     }
 
+    else if (property == sceneNavigationSensitivityProperty)
+    {
+        sceneNavigationSensitivity = MSystemManagerAndControl::getInstance()
+                ->getDecoratedDoublePropertyManager()->value(sceneNavigationSensitivityProperty);
+    }
+
 #ifndef CONTINUOUS_GL_UPDATE
     else if (property == measureFPSProperty)
     {
@@ -1302,8 +1319,8 @@ void MSceneViewGLWidget::mouseMoveEvent(QMouseEvent *event)
     int dx = event->x() - lastPos.x();
     int dy = event->y() - lastPos.y();
 
-    float factor = 1.;
-    if (event->modifiers() == Qt::ShiftModifier) factor = 10.;
+    float sensitivity = sceneNavigationSensitivity;
+    if (event->modifiers() == Qt::ShiftModifier) sensitivity *= 10.;
 
     if (event->buttons() & glRM->globalMouseButtonRotate)
     {
@@ -1312,9 +1329,9 @@ void MSceneViewGLWidget::mouseMoveEvent(QMouseEvent *event)
             // The left mouse button rotates the camera, the camera position
             // remains unchanged.
             // dx maps to a rotation around the world space z-axis
-            camera.rotateWorldSpace(-dx/10., 0, 0, 1);
+            camera.rotateWorldSpace(-dx/10./sensitivity, 0, 0, 1);
             // dy maps to a rotation around the camera x-axis
-            camera.rotate(-dy/10., 1, 0, 0);
+            camera.rotate(-dy/10./sensitivity, 1, 0, 0);
         }
         else // sceneNavigationMode == ROTATE_SCENE
         {
@@ -1350,21 +1367,19 @@ void MSceneViewGLWidget::mouseMoveEvent(QMouseEvent *event)
     else if (event->buttons() & glRM->globalMouseButtonPan)
     {
         // The right mouse button moves the camera around in the scene.
-        camera.moveUp(-dy/10./factor, 1.);
-        camera.moveRight(dx/10./factor);
+        camera.moveUp(-dy/10./sensitivity, 1.);
+        camera.moveRight(dx/10./sensitivity);
     }
 
     else if (event->buttons() & glRM->globalMouseButtonZoom)
     {
         // "Pure" mouse wheel: zoom (move camera forward/backward)
-        float factor = -1.;
-        if (event->modifiers() == Qt::ShiftModifier)
-            factor = -0.1;
+        float zoomFactor = -1./sensitivity;
 
-        if (sceneNavigationMode == ROTATE_SCENE) factor = -factor;
-        if (glRM->isReverseCameraZoom) factor = -factor;
+        if (sceneNavigationMode == ROTATE_SCENE) zoomFactor = -zoomFactor;
+        if (glRM->isReverseCameraZoom) zoomFactor = -zoomFactor;
 
-        camera.moveForward(dy * factor);
+        camera.moveForward(dy * zoomFactor);
     }
 
     lastPos = event->pos();
@@ -1459,19 +1474,19 @@ void MSceneViewGLWidget::wheelEvent(QWheelEvent *event)
         scrollTimer.restart();
 
         // "Pure" mouse wheel: zoom (move camera forward/backward)
-        float factor = 10.;
-        if (event->modifiers() == Qt::ShiftModifier) factor = 1.;
+        float zoomFactor = 10./sceneNavigationSensitivity;
+        if (event->modifiers() == Qt::ShiftModifier) zoomFactor /= 10.;
 
-        if (sceneNavigationMode == ROTATE_SCENE) factor = -factor;
-        if (glRM->isReverseCameraZoom) factor = -factor;
+        if (sceneNavigationMode == ROTATE_SCENE) zoomFactor = -zoomFactor;
+        if (glRM->isReverseCameraZoom) zoomFactor = -zoomFactor;
 
         if (event->delta() > 0)
         {
-            camera.moveForward(0.5 * factor);
+            camera.moveForward(0.5 * zoomFactor);
         }
         else
         {
-            camera.moveForward(-0.5 * factor);
+            camera.moveForward(-0.5 * zoomFactor);
         }
         updateCameraPositionDisplay();
         updateSynchronizedCameras();
