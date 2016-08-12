@@ -66,6 +66,7 @@ MNWPVerticalSectionActor::MNWPVerticalSectionActor()
       p_top_hPa(100.),
       p_bot_hPa(1050.),
       opacity(1.),
+      interpolationNodeSpacing(0.15),
       updatePath(false)
 {
     enablePicking(true);
@@ -93,6 +94,13 @@ MNWPVerticalSectionActor::MNWPVerticalSectionActor()
     opacityProperty = addProperty(DECORATEDDOUBLE_PROPERTY, "opacity",
                                   actorPropertiesSupGroup);
     properties->setDDouble(opacityProperty, opacity, 0, 1, 2, 0.05, " (0-1)");
+
+    interpolationNodeSpacingProperty = addProperty(
+                DECORATEDDOUBLE_PROPERTY, "interpolation node spacing",
+                actorPropertiesSupGroup);
+    properties->setDDouble(
+                interpolationNodeSpacingProperty, interpolationNodeSpacing,
+                0.000001, 180, 6, 0.05, " (degrees)");
 
     endInitialiseQtProperties();
 }
@@ -147,6 +155,7 @@ void MNWPVerticalSectionActor::saveConfiguration(QSettings *settings)
     settings->setValue("p_top_hPa", p_top_hPa);
     settings->setValue("p_bot_hPa", p_bot_hPa);
     settings->setValue("opacity", opacity);
+    settings->setValue("interpolationNodeSpacing", interpolationNodeSpacing);
 
     settings->endGroup();
 }
@@ -162,12 +171,18 @@ void MNWPVerticalSectionActor::loadConfiguration(QSettings *settings)
     setWaypointsModel(MSystemManagerAndControl::getInstance()
                       ->getWaypointsModel(wpID));
 
-    properties->mDDouble()->setValue(upperLimitProperty,
-                                     settings->value("p_top_hPa").toFloat());
-    properties->mDDouble()->setValue(lowerLimitProperty,
-                                     settings->value("p_bot_hPa").toFloat());
-    properties->mDDouble()->setValue(opacityProperty,
-                                     settings->value("opacity").toFloat());
+    properties->mDDouble()->setValue(
+                upperLimitProperty,
+                settings->value("p_top_hPa").toFloat());
+    properties->mDDouble()->setValue(
+                lowerLimitProperty,
+                settings->value("p_bot_hPa").toFloat());
+    properties->mDDouble()->setValue(
+                opacityProperty,
+                settings->value("opacity").toFloat());
+    properties->mDDouble()->setValue(
+                interpolationNodeSpacingProperty,
+                settings->value("interpolationNodeSpacing").toFloat());
 
     settings->endGroup();
 }
@@ -425,6 +440,19 @@ void MNWPVerticalSectionActor::onQtPropertyChanged(QtProperty *property)
 
         emitActorChangedSignal();
     }
+
+    else if (property == interpolationNodeSpacingProperty)
+    {
+        interpolationNodeSpacing = properties->mDDouble()->value(
+                    interpolationNodeSpacingProperty);
+
+        targetGridToBeUpdated = true;
+
+        if (suppressActorUpdates()) return;
+
+        updatePath = true;
+        emitActorChangedSignal();
+    }
 }
 
 
@@ -466,7 +494,7 @@ void MNWPVerticalSectionActor::generatePathFromWaypoints(
     path.clear();
 
     // Approximate spacing between points along the cross section path.
-    float deltaS = .15; // 0.15
+    float deltaS = interpolationNodeSpacing;
 
     // Determine model grid spacing and the upper left corner coordinates
     // of the model grid; used to locate the grid cells of the points along

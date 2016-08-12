@@ -223,6 +223,9 @@ private:
     float opacity;
     QtProperty *opacityProperty;
 
+    float interpolationNodeSpacing;
+    QtProperty *interpolationNodeSpacingProperty;
+
     bool updatePath;
 };
 
