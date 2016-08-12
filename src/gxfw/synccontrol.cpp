@@ -258,7 +258,7 @@ void MSyncControl::synchronizationCompleted(MSynchronizedObject *object)
     if (pendingSynchronizations.empty() && earlyCompletedSynchronizations.empty())
     {
         // Enable GUI for next event.
-        ui->syncFrame->setEnabled(true);
+        setSynchronizationGUIEnabled(true);
 
         // In animation mode force an immediate repaint of the valid and init
         // time displays (otherwise they may not update during animation).
@@ -559,7 +559,7 @@ void MSyncControl::processSynchronizationEvent(MSynchronizationType syncType,
     // redraws).
     lastFocusWidget = QApplication::focusWidget();
     currentSyncType = syncType;
-    if ( !animationTimer->isActive() ) ui->syncFrame->setEnabled(false);
+    if ( !animationTimer->isActive() ) setSynchronizationGUIEnabled(false);
     beginSceneSynchronization();
 
     if ( (syncType == SYNC_VALID_TIME) || (syncType == SYNC_INIT_TIME) )
@@ -600,6 +600,14 @@ void MSyncControl::setTimeSynchronizationGUIEnabled(bool enabled)
     ui->timeForwardButton->setEnabled(enabled);
     ui->timeStepComboBox->setEnabled(enabled);
     ui->stepChooseVTITComboBox->setEnabled(enabled);
+}
+
+
+void MSyncControl::setSynchronizationGUIEnabled(bool enabled)
+{
+    ui->syncFrame->setEnabled(enabled);
+    ui->timeBackwardButton->blockSignals(!enabled);
+    ui->timeForwardButton->blockSignals(!enabled);
 }
 
 } // namespace Met3D
