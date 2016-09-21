@@ -61,6 +61,7 @@ MTrajectoryActor::MTrajectoryActor()
       renderMode(TRAJECTORY_TUBES),
       syncWithValidTime(true),
       synchronizationControl(nullptr),
+      bbox(QRectF(-90., 0., 180., 90.)),
       textureUnitTransferFunction(-1),
       tubeRadius(0.1),
       sphereRadius(0.2),
@@ -128,6 +129,10 @@ MTrajectoryActor::MTrajectoryActor()
                                     actorPropertiesSupGroup);
     properties->setDDouble(deltaTimeProperty, 48, 1, 48, 0, 1, " hrs");
 
+    bboxProperty = addProperty(RECTF_PROPERTY, "bounding box",
+                               actorPropertiesSupGroup);
+    properties->setRectF(bboxProperty, bbox, 2);
+
     // Render mode and parameters.
     tubeRadiusProperty = addProperty(DECORATEDDOUBLE_PROPERTY, "tube radius",
                                      actorPropertiesSupGroup);
@@ -189,6 +194,8 @@ void MTrajectoryActor::saveConfiguration(QSettings *settings)
     settings->setValue("deltaTime",
                        properties->mDDouble()->value(deltaTimeProperty));
 
+    settings->setValue("boundingBox", bbox);
+
     settings->setValue("tubeRadius", tubeRadius);
     settings->setValue("sphereRadius", sphereRadius);
     settings->setValue("shadowEnabled", shadowEnabled);
@@ -217,6 +224,9 @@ void MTrajectoryActor::loadConfiguration(QSettings *settings)
     properties->mDDouble()->setValue(
                 deltaTimeProperty,
                 settings->value("deltaTime").toFloat());
+
+    bbox = settings->value("boundingBox").toRectF();
+    properties->mRectF()->setValue(bboxProperty, bbox);
 
     properties->mDDouble()->setValue(
                 tubeRadiusProperty,
@@ -847,6 +857,13 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
 
         setValidDateTime(synchronizationControl->validDateTime());
     }
+
+    else if (property == bboxProperty)
+    {
+        bbox = properties->mRectF()->value(bboxProperty);
+        if (suppressActorUpdates()) return;
+        asynchronousSelectionRequest();
+    }
 }
 
 
@@ -1222,9 +1239,16 @@ void MTrajectoryActor::asynchronousDataRequest(bool synchronizationRequest)
         // Request is e.g. 500/48 for 500 hPa in 48 hours.
         rh.insert("FILTER_PRESSURE_TIME",
                   QString("%1/%2").arg(deltaPressure_hPa).arg(deltaTime_hrs));
+        // Request bounding box filtering.
+        rh.insert("FILTER_BBOX", QString("%1/%2/%3/%4")
+                  .arg(bbox.x()).arg(bbox.y())
+                  .arg(bbox.width() + bbox.x()).arg(bbox.height() + bbox.y()));
     }
     else
+    {
         rh.insert("FILTER_PRESSURE_TIME", "ALL");
+        rh.insert("FILTER_BBOX", "ALL");
+    }
 
     if ((renderMode == SINGLETIME_POSITIONS)
             || (renderMode == TUBES_AND_SINGLETIME)
@@ -1314,9 +1338,16 @@ void MTrajectoryActor::asynchronousSelectionRequest()
         // Request is e.g. 500/48 for 500 hPa in 48 hours.
         rh.insert("FILTER_PRESSURE_TIME",
                   QString("%1/%2").arg(deltaPressure_hPa).arg(deltaTime_hrs));
+        // Request bounding box filtering.
+        rh.insert("FILTER_BBOX", QString("%1/%2/%3/%4")
+                  .arg(bbox.x()).arg(bbox.y())
+                  .arg(bbox.width() + bbox.x()).arg(bbox.height() + bbox.y()));
     }
     else
+    {
         rh.insert("FILTER_PRESSURE_TIME", "ALL");
+        rh.insert("FILTER_BBOX", "ALL");
+    }
 
     if ((renderMode == SINGLETIME_POSITIONS)
             || (renderMode == TUBES_AND_SINGLETIME)

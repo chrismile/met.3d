@@ -119,7 +119,8 @@ HEADERS += \
     src/gxfw/gl/shaderstoragebufferobject.h \
     src/gxfw/memberselectiondialog.h \
     src/gxfw/adddatasetdialog.h \
-    src/data/derivedmetvarsdatasource.h
+    src/data/derivedmetvarsdatasource.h \
+    src/data/bboxtrajectoryfilter.h
 
 SOURCES += \
     src/main.cpp \
@@ -206,7 +207,8 @@ SOURCES += \
     src/gxfw/gl/shaderstoragebufferobject.cpp \
     src/gxfw/memberselectiondialog.cpp \
     src/gxfw/adddatasetdialog.cpp \
-    src/data/derivedmetvarsdatasource.cpp
+    src/data/derivedmetvarsdatasource.cpp \
+    src/data/bboxtrajectoryfilter.cpp
 
 FORMS += \
     src/mainwindow.ui \
