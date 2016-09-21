@@ -1283,12 +1283,14 @@ void MFrontendConfiguration::initializeDefaultActors_Trajectories(
     MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
 
     MTransferFunction1D *transferFunctionPressure = new MTransferFunction1D();
-    transferFunctionPressure->setName("Trajectory pressure");
+    transferFunctionPressure->setName("Colourbar pressure (trajectories predef)");
     transferFunctionPressure->setValueDecimals(0);
-    transferFunctionPressure->selectPredefinedColourmap("gist_rainbow");
-    transferFunctionPressure->setMinimumValue(50.);
-    transferFunctionPressure->setMaximumValue(1000.);
-    transferFunctionPressure->setNumTicks(11);
+    transferFunctionPressure->selectHCLColourmap(
+                MTransferFunction1D::QUALITATIVE,
+                0., 360., 50., 50., 70., 70., 1., 1., 1., 1., 1., true);
+    transferFunctionPressure->setMinimumValue(1000.);
+    transferFunctionPressure->setMaximumValue(100.);
+    transferFunctionPressure->setNumTicks(10);
     transferFunctionPressure->setSteps(250);
     transferFunctionPressure->setPosition(QRectF(0.9, -0.45, 0.05, 0.5));
     transferFunctionPressure->setEnabled(true);

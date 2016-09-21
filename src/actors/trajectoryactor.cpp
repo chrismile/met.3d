@@ -988,7 +988,7 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
             }
             else
                 tubeShadowShader->setUniformValue(
-                            "constColour", QColor(100, 100, 100, 155));
+                            "constColour", QColor(20, 20, 20, 155));
 
             glMultiDrawArrays(GL_LINE_STRIP_ADJACENCY,
                               trajectorySelection->getStartIndices(),
@@ -1120,7 +1120,7 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
             }
             else
                 positionSphereShadowShader->setUniformValue(
-                            "constColour", QColor(100, 100, 100, 155)); CHECK_GL_ERROR;
+                            "constColour", QColor(20, 20, 20, 155)); CHECK_GL_ERROR;
 
             if (renderMode == ALL_POSITION_SPHERES)
                 glMultiDrawArrays(GL_POINTS,
