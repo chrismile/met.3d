@@ -285,7 +285,7 @@ MSceneViewGLWidget::MSceneViewGLWidget()
     systemControl->getDecoratedDoublePropertyManager()
             ->setMinimum(verticalScalingProperty, 1.);
     systemControl->getDecoratedDoublePropertyManager()
-            ->setMaximum(verticalScalingProperty, 100.);
+            ->setMaximum(verticalScalingProperty, 999.);
     renderingGroupProperty->addSubProperty(verticalScalingProperty);
 
 #ifndef CONTINUOUS_GL_UPDATE
