@@ -220,7 +220,10 @@ private:
     QSpinBox *timeAnimationTimeStepSpinBox;
     QDateTimeEdit *timeAnimationFrom;
     QDateTimeEdit *timeAnimationTo;
+    QActionGroup *timeAnimationLoopGroup;
+    QAction *timeAnimationSinglePassAction;
     QAction *timeAnimationLoopTimeAction;
+    QAction *timeAnimationBackForthTimeAction;
     QAction *timeAnimationReverseTimeDirectionAction;
     QTimer *animationTimer;
 

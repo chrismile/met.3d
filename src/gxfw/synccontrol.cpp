@@ -136,10 +136,27 @@ MSyncControl::MSyncControl(QString id, QWidget *parent) :
 
     timeAnimationDropdownMenu->addSeparator();
 
+    timeAnimationSinglePassAction = new QAction(this);
+    timeAnimationSinglePassAction->setCheckable(true);
+    timeAnimationSinglePassAction->setChecked(true);
+    timeAnimationSinglePassAction->setText("Single pass");
+    timeAnimationDropdownMenu->addAction(timeAnimationSinglePassAction);
+
     timeAnimationLoopTimeAction = new QAction(this);
     timeAnimationLoopTimeAction->setCheckable(true);
     timeAnimationLoopTimeAction->setText("Loop");
     timeAnimationDropdownMenu->addAction(timeAnimationLoopTimeAction);
+
+    timeAnimationBackForthTimeAction = new QAction(this);
+    timeAnimationBackForthTimeAction->setCheckable(true);
+    timeAnimationBackForthTimeAction->setText("Back and forth");
+    timeAnimationDropdownMenu->addAction(timeAnimationBackForthTimeAction);
+
+    timeAnimationLoopGroup = new QActionGroup(this);
+    timeAnimationLoopGroup->setExclusive(true);
+    timeAnimationLoopGroup->addAction(timeAnimationSinglePassAction);
+    timeAnimationLoopGroup->addAction(timeAnimationLoopTimeAction);
+    timeAnimationLoopGroup->addAction(timeAnimationBackForthTimeAction);
 
     timeAnimationReverseTimeDirectionAction = new QAction(this);
     timeAnimationReverseTimeDirectionAction->setCheckable(true);
@@ -306,6 +323,8 @@ void MSyncControl::timeForward()
             {
                 if ( timeAnimationLoopTimeAction->isChecked() )
                     ui->validTimeEdit->setDateTime(timeAnimationFrom->dateTime());
+                else if ( timeAnimationBackForthTimeAction->isChecked() )
+                    timeAnimationReverseTimeDirectionAction->toggle();
                 else
                     stopTimeAnimation();
 
@@ -323,6 +342,8 @@ void MSyncControl::timeForward()
             {
                 if ( timeAnimationLoopTimeAction->isChecked() )
                     ui->initTimeEdit->setDateTime(timeAnimationFrom->dateTime());
+                else if ( timeAnimationBackForthTimeAction->isChecked() )
+                    timeAnimationReverseTimeDirectionAction->toggle();
                 else
                     stopTimeAnimation();
 
@@ -346,6 +367,8 @@ void MSyncControl::timeBackward()
             {
                 if ( timeAnimationLoopTimeAction->isChecked() )
                     ui->validTimeEdit->setDateTime(timeAnimationTo->dateTime());
+                else if ( timeAnimationBackForthTimeAction->isChecked() )
+                    timeAnimationReverseTimeDirectionAction->toggle();
                 else
                     stopTimeAnimation();
 
@@ -363,6 +386,8 @@ void MSyncControl::timeBackward()
             {
                 if ( timeAnimationLoopTimeAction->isChecked() )
                     ui->initTimeEdit->setDateTime(timeAnimationTo->dateTime());
+                else if ( timeAnimationBackForthTimeAction->isChecked() )
+                    timeAnimationReverseTimeDirectionAction->toggle();
                 else
                     stopTimeAnimation();
 
