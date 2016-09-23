@@ -469,18 +469,18 @@ void MPipelineConfiguration::initializeLagrantoEnsemblePipeline(
     dpdtFilter->setInputSelectionSource(thinoutFilter);
     dpdtFilter->setDeltaPressureSource(dpSource);
 
-    MBoundingBoxTrajectoryFilter *bboxFilter =
-            new MBoundingBoxTrajectoryFilter();
-    bboxFilter->setMemoryManager(memoryManager);
-    bboxFilter->setScheduler(scheduler);
-    bboxFilter->setInputSelectionSource(dpdtFilter);
-    bboxFilter->setTrajectorySource(trajectoryReader);
+//    MBoundingBoxTrajectoryFilter *bboxFilter =
+//            new MBoundingBoxTrajectoryFilter();
+//    bboxFilter->setMemoryManager(memoryManager);
+//    bboxFilter->setScheduler(scheduler);
+//    bboxFilter->setInputSelectionSource(dpdtFilter);
+//    bboxFilter->setTrajectorySource(trajectoryReader);
 
     MSingleTimeTrajectoryFilter *timestepFilter =
             new MSingleTimeTrajectoryFilter();
     timestepFilter->setMemoryManager(memoryManager);
     timestepFilter->setScheduler(scheduler);
-    timestepFilter->setInputSelectionSource(bboxFilter);
+    timestepFilter->setInputSelectionSource(dpdtFilter);
     sysMC->registerDataSource(dataSourceId + QString(" timestepFilter"),
                               timestepFilter);
 
