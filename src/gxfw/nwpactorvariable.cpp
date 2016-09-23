@@ -863,6 +863,10 @@ void MNWPActorVariable::saveConfiguration(QSettings *settings)
     // Save rendering properties.
     settings->setValue("transferFunction",
                        properties->getEnumItem(transferFunctionProperty));
+
+    // Save properties of connected request property subgroups.
+    foreach (MRequestProperties* props, propertiesList)
+        props->saveConfiguration(settings);
 }
 
 
@@ -951,6 +955,10 @@ void MNWPActorVariable::loadConfiguration(QSettings *settings)
                        .arg(variableName).arg(tfName));
         msgBox.exec();
     }
+
+    // Load properties of connected request property subgroups.
+    foreach (MRequestProperties* props, propertiesList)
+        props->loadConfiguration(settings);
 }
 
 

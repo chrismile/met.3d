@@ -84,6 +84,9 @@ public:
             MPropertyType::ChangeNotification ptype, void *value)
     { Q_UNUSED(ptype); Q_UNUSED(value); }
 
+    virtual void saveConfiguration(QSettings *settings) { Q_UNUSED(settings); }
+
+    virtual void loadConfiguration(QSettings *settings) { Q_UNUSED(settings); }
 
 protected:
     MNWPActorVariable *actorVariable;
@@ -134,6 +137,10 @@ public:
     void actorPropertyChangeEvent(
             MPropertyType::ChangeNotification ptype, void *value);
 
+    void saveConfiguration(QSettings *settings);
+
+    void loadConfiguration(QSettings *settings);
+
 protected:
     QtProperty *regridModeProperty;
     QString     regridMode;
@@ -154,6 +161,10 @@ public:
                              bool *redrawWithoutDataRequest);
     void addToRequest(MDataRequestHelper *rh);
 
+    void saveConfiguration(QSettings *settings);
+
+    void loadConfiguration(QSettings *settings);
+
 protected:
     QtProperty *enableFilterProperty;
     QtProperty *tryPrecomputedFilterProperty;
@@ -173,6 +184,10 @@ public:
     bool onQtPropertyChanged(QtProperty *property,
                              bool *redrawWithoutDataRequest);
     void addToRequest(MDataRequestHelper *rh);
+
+    void saveConfiguration(QSettings *settings);
+
+    void loadConfiguration(QSettings *settings);
 
 protected:
     QtProperty *applySettingsProperty;
@@ -204,6 +219,10 @@ public:
                              bool *redrawWithoutDataRequest);
     void addToRequest(MDataRequestHelper *rh);
 
+    void saveConfiguration(QSettings *settings);
+
+    void loadConfiguration(QSettings *settings);
+
 protected:
     QtProperty *applySettingsProperty;
 
@@ -227,6 +246,10 @@ public:
 
     void actorPropertyChangeEvent(
             MPropertyType::ChangeNotification ptype, void *value);
+
+    void saveConfiguration(QSettings *settings);
+
+    void loadConfiguration(QSettings *settings);
 
 protected:
     QtProperty *probabilityRegionIsovalueProperty;
