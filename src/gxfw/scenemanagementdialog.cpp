@@ -410,14 +410,22 @@ void MSceneManagementDialog::createActorFromFile()
             if (!actor) return;
 
             QString actorName = actor->getName();
-            bool ok = true;
-            while (!ok || actorName.isEmpty() || glRM->getActorByName(actorName))
+            bool ok = false;
+            while (actorName.isEmpty() || glRM->getActorByName(actorName))
             {
                 actorName = QInputDialog::getText(
                             this, "Change actor name",
                             "The given actor name already exists, please enter a new one:",
                             QLineEdit::Normal,
                             actorName, &ok);
+
+                if (!ok)
+                {
+                    // The user has pressed the "Cancel" button.
+                    delete actor;
+                    return;
+                }
+
                 actor->setName(actorName);
             }
 
