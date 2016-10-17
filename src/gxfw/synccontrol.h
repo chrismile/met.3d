@@ -209,6 +209,8 @@ private:
      */
     void setTimeSynchronizationGUIEnabled(bool enabled);
 
+    void setSynchronizationGUIEnabled(bool enabled);
+
     Ui::MSyncControl *ui;
 
     // Maps index of ui->timeStepComboBox to seconds (see constructor and

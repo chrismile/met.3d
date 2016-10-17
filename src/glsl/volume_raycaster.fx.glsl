@@ -50,6 +50,9 @@ const int SHADOWS_OFF = 0;
 const int SHADOWS_MAP = 1;
 const int SHADOWS_VOLUME_AND_RAY = 2;
 
+const int RENDER_ISOSURFACES = 0;
+const int RENDER_DVR = 2;
+
 // Workaround; see usage below.
 const float LAMBDA_OFFSET = 0.001;
 
@@ -141,6 +144,10 @@ uniform float   specularCoeff;
 uniform float   shininessCoeff;
 uniform int     shadowMode;
 uniform vec4    shadowColor;
+
+// Mode
+// ====
+uniform uint    renderingMode;
 
 
 /*****************************************************************************
@@ -289,6 +296,71 @@ bool traverseSectionOfDataVolume(
 }
 
 
+bool traverseSectionOfDataVolume_DVR(
+        in vec3 h_gradient, in float depthGlobal, in vec3 rayPosIncrement,
+        in float lambdaExit,
+        inout float lambda, inout vec3 prevRayPosition, inout float prevLambda,
+        inout vec4 rayColor, inout vec3 rayPosition,
+        inout int crossingLevelFront, inout int crossingLevelBack,
+        inout bool firstCrossing, inout bool lastCrossing,
+        inout vec3 crossingPosition)
+{
+    // Pre-multiply colour by alpha.
+    rayColor.rgb = rayColor.rgb * rayColor.a;
+
+    // Main ray caster loop. Advance the current position along the ray
+    // direction through the volume, fetching scalar values from texture memory
+    // and testing for isosurface crossing.
+    bool fullTraversal = true;
+    while (lambda < lambdaExit)
+    {
+        float scalar = sampleDataAtPos(rayPosition);
+
+        if (scalar != M_MISSING_VALUE)
+        {
+            // Fetch segment blend colour from transfer function.
+            float t = (scalar - dataExtent.tfMinimum)
+                        / (dataExtent.tfMaximum - dataExtent.tfMinimum);
+            vec4 blendColor = texture(transferFunction, t).rgba;
+            
+            // If we're in shadow mode we're only using the alpha value of
+            // the transfer function.
+            if (shadowRay) blendColor.rgb = shadowColor.rgb;
+
+            // Opacity correction.
+            // Reference: Engel et al. (Real-time volume graphics, 2006), Eq. 1.17
+            float stepSizeRatio = stepSize / 1.; // reference step size is 1.
+            blendColor.a = 1. - pow(1. - blendColor.a, stepSizeRatio);
+            // Alternative from TUM.3D practical course IVDA, WS2016/16 slide 14:
+            //blendColor.a = 1. - exp(-1. * blendColor.a * stepSize);
+
+            // Front to back alpha blending.
+            blendColor.rgb *= blendColor.a;
+            rayColor.rgb += (1. - rayColor.a) * blendColor.rgb;
+            rayColor.a += (1. - rayColor.a) * blendColor.a;
+        }
+        
+        prevLambda  = lambda;
+        prevRayPosition = rayPosition;
+
+        lambda += stepSize;
+        rayPosition += rayPosIncrement;
+        
+        // Terminate ray if alpha is saturated.
+        if (rayColor.a > 0.99)
+        {
+            fullTraversal = false;
+            break;
+        }
+    } // raycaster loop
+
+    // Restore ray colour from alpha-multiplied value.
+    rayColor.rgb = rayColor.rgb / rayColor.a;
+    
+    return fullTraversal;
+}
+
+
 /**
   Set up variables required for raycasting and invoke volume traversal loop.
  */
@@ -322,15 +394,29 @@ void raycaster(in vec3 h_gradient, in Ray ray, in vec2 lambdaNearFar,
     // Traverse entire data volume with fixed step size.
     // =================================================
     
-    traverseSectionOfDataVolume(
-        h_gradient, depthGlobal, rayPosIncrement,
-        lambdaNearFar.y,
-        lambda, prevRayPosition, prevLambda,
-        rayColor, rayPosition,
-        crossingLevelFront, crossingLevelBack,
-        firstCrossing, lastCrossing,
-        crossingPosition);
-
+    if (renderingMode == RENDER_ISOSURFACES)
+    {
+        traverseSectionOfDataVolume(
+            h_gradient, depthGlobal, rayPosIncrement,
+            lambdaNearFar.y,
+            lambda, prevRayPosition, prevLambda,
+            rayColor, rayPosition,
+            crossingLevelFront, crossingLevelBack,
+            firstCrossing, lastCrossing,
+            crossingPosition);
+    }
+    else if (renderingMode == RENDER_DVR)
+    {
+        traverseSectionOfDataVolume_DVR(
+            h_gradient, depthGlobal, rayPosIncrement,
+            lambdaNearFar.y,
+            lambda, prevRayPosition, prevLambda,
+            rayColor, rayPosition,
+            crossingLevelFront, crossingLevelBack,
+            firstCrossing, lastCrossing,
+            crossingPosition);
+    }
+        
     // =================================================
         
 #else
@@ -507,14 +593,29 @@ void raycaster(in vec3 h_gradient, in Ray ray, in vec2 lambdaNearFar,
         if (doBrickTraversal)
         {
             // The brick is to be traversed, invoke traversal.
-            bool brickHasBeenFullyTraversed = traverseSectionOfDataVolume(
-                    h_gradient, depthGlobal, rayPosIncrement,
-                    min(lambdaBrickExit, lambdaNearFar.y), // don't overshoot!
-                    lambda, prevRayPosition, prevLambda,
-                    rayColor, rayPosition,
-                    crossingLevelFront, crossingLevelBack,
-                    firstCrossing, lastCrossing,
-                    crossingPosition);
+            bool brickHasBeenFullyTraversed = false;
+            if (renderingMode == RENDER_ISOSURFACES)
+            {
+                brickHasBeenFullyTraversed = traverseSectionOfDataVolume(
+                        h_gradient, depthGlobal, rayPosIncrement,
+                        min(lambdaBrickExit, lambdaNearFar.y), // don't overshoot!
+                        lambda, prevRayPosition, prevLambda,
+                        rayColor, rayPosition,
+                        crossingLevelFront, crossingLevelBack,
+                        firstCrossing, lastCrossing,
+                        crossingPosition);
+            }
+            else if (renderingMode == RENDER_DVR)
+            {
+                brickHasBeenFullyTraversed = traverseSectionOfDataVolume_DVR(
+                        h_gradient, depthGlobal, rayPosIncrement,
+                        min(lambdaBrickExit, lambdaNearFar.y), // don't overshoot!
+                        lambda, prevRayPosition, prevLambda,
+                        rayColor, rayPosition,
+                        crossingLevelFront, crossingLevelBack,
+                        firstCrossing, lastCrossing,
+                        crossingPosition);
+            }
 
             // Has the ray been terminated in the brick? Then also terminate the
             // min/max map traversal.

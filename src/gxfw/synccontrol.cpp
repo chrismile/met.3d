@@ -85,13 +85,13 @@ MSyncControl::MSyncControl(QString id, QWidget *parent) :
     // =========================================================================
 
     // Time steps for navigating valid/init time in seconds (5min, 10min, ..).
-    const int numTimeSteps = 9;
-    int timeStepsSeconds[numTimeSteps] = {300, 600, 900, 1800, 3600, 10800,
+    const int numTimeSteps = 10;
+    int timeStepsSeconds[numTimeSteps] = {60, 300, 600, 900, 1800, 3600, 10800,
                                           21600, 43200, 86400};
     timeStepIndexToSeconds = new int[numTimeSteps];
     for (int i = 0; i < numTimeSteps; i++)
         timeStepIndexToSeconds[i] = timeStepsSeconds[i];
-    ui->timeStepComboBox->setCurrentIndex(6); // pre-select 6hrs
+    ui->timeStepComboBox->setCurrentIndex(7); // pre-select 6hrs
 
     // Initialise with 00 UTC of current date.
     setInitDateTime(QDateTime(QDateTime::currentDateTimeUtc().date()));
@@ -275,7 +275,7 @@ void MSyncControl::synchronizationCompleted(MSynchronizedObject *object)
     if (pendingSynchronizations.empty() && earlyCompletedSynchronizations.empty())
     {
         // Enable GUI for next event.
-        ui->syncFrame->setEnabled(true);
+        setSynchronizationGUIEnabled(true);
 
         // In animation mode force an immediate repaint of the valid and init
         // time displays (otherwise they may not update during animation).
@@ -584,7 +584,7 @@ void MSyncControl::processSynchronizationEvent(MSynchronizationType syncType,
     // redraws).
     lastFocusWidget = QApplication::focusWidget();
     currentSyncType = syncType;
-    if ( !animationTimer->isActive() ) ui->syncFrame->setEnabled(false);
+    if ( !animationTimer->isActive() ) setSynchronizationGUIEnabled(false);
     beginSceneSynchronization();
 
     if ( (syncType == SYNC_VALID_TIME) || (syncType == SYNC_INIT_TIME) )
@@ -625,6 +625,14 @@ void MSyncControl::setTimeSynchronizationGUIEnabled(bool enabled)
     ui->timeForwardButton->setEnabled(enabled);
     ui->timeStepComboBox->setEnabled(enabled);
     ui->stepChooseVTITComboBox->setEnabled(enabled);
+}
+
+
+void MSyncControl::setSynchronizationGUIEnabled(bool enabled)
+{
+    ui->syncFrame->setEnabled(enabled);
+    ui->timeBackwardButton->blockSignals(!enabled);
+    ui->timeForwardButton->blockSignals(!enabled);
 }
 
 } // namespace Met3D

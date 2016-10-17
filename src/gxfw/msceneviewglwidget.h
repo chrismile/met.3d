@@ -386,6 +386,8 @@ private:
     QtProperty *sceneRotationCentreLonProperty;
     QtProperty *sceneRotationCentreElevationProperty;
     QtProperty *selectSceneRotationCentreProperty;
+    float       sceneNavigationSensitivity;
+    QtProperty *sceneNavigationSensitivityProperty;
     QtProperty *syncCameraWithViewProperty;
     QtProperty *actorInteractionProperty;
     QtProperty *analysisModeProperty;
