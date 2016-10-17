@@ -4,7 +4,7 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015-2016 Marc Rautenhaus
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -133,6 +133,12 @@ MMainWindow::MMainWindow(QStringList commandLineArguments, QWidget *parent)
     MApplicationConfigurationManager appConfig;
     appConfig.loadConfiguration();
 
+    // Set window icon.
+    QString iconPath = systemManagerAndControl->getMet3DHomeDir(
+                ).absoluteFilePath("config/met3d_icon.png");
+    setWindowIcon(QIcon(iconPath));
+
+
     // Initial assignment of scenes to scene views.
     //==========================================================================
 
@@ -192,6 +198,15 @@ MMainWindow::MMainWindow(QStringList commandLineArguments, QWidget *parent)
 
     connect(signalMapperLayout, SIGNAL(mapped(int)),
             this, SLOT(setSceneViewLayout(int)));
+
+    connect(ui->actionOnlineManual, SIGNAL(triggered()),
+            this, SLOT(openOnlineManual()));
+    connect(ui->actionReportABug, SIGNAL(triggered()),
+            this, SLOT(openOnlineIssueTracker()));
+    connect(ui->actionAboutQt, SIGNAL(triggered()),
+            this, SLOT(showAboutQtDialog()));
+    connect(ui->actionAboutMet3D, SIGNAL(triggered()),
+            this, SLOT(showAboutDialog()));
 }
 
 
@@ -503,6 +518,54 @@ void MMainWindow::addDataset()
                 pipelineConfig.enableRegridding,
                 pipelineConfig.enableProbabiltyRegionFilter);
     }
+}
+
+
+void MMainWindow::openOnlineManual()
+{
+    QDesktopServices::openUrl(QUrl("https://met3d.readthedocs.org"));
+}
+
+
+void MMainWindow::openOnlineIssueTracker()
+{
+    QDesktopServices::openUrl(QUrl("https://gitlab.com/wxmetvis/met.3d/issues"));
+}
+
+
+void MMainWindow::showAboutQtDialog()
+{
+    QMessageBox::aboutQt(this);
+}
+
+
+void MMainWindow::showAboutDialog()
+{
+    QString aboutString = QString(
+            "<b>About Met.3D</b><br><br>"
+            "This is Met.3D version %1, %2.<br><br>"
+            "Met.3D is an open-source software for interactive visualization "
+            "of 3D spatial fields from meteorological numerical simulations "
+            "and observations. "
+            "In particular, Met.3D features functionality for visualization of "
+            "ensemble numerical weather prediction data. Please refer to the "
+            "<a href='https://met3d.readthedocs.io/en/latest/about.html'>online "
+            "manual</a> for further details.<br><br>"
+            "Met.3D is free software under the GNU General Public License.<br>"
+            "It is distributed in the hope that it will be useful, but WITHOUT "
+            "ANY WARRANTY; without even the implied warranty of MERCHANTABILITY "
+            "or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public "
+            "License for more details.<br><br>"
+            "Copyright 2015-2016 Met.3D authors:<br>"
+            "Marc Rautenhaus(1), Michael Kern(1), Christoph Heidelmann(1), "
+            "Bianca Tost(1), Alexander Kumpf(1), Fabian Sch&ouml;ttl(1).<br><br>"
+            "(1) <a href='https://wwwcg.in.tum.de/'>Computer Graphics and "
+            "Visualization Group</a>, "
+            "Technical University of Munich, Garching, Germany<br><br>"
+            "See Met.3D source files for license details.<br>"
+                ).arg(met3dVersionString).arg(met3dBuildDate);
+
+    QMessageBox::about(this, "About Met.3D", aboutString);
 }
 
 
