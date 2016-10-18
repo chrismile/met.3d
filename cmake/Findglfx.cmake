@@ -1,4 +1,3 @@
-
 # Locate glfx library
 # This module defines
 #  GLFX_FOUND, if false, do not try to link to NETCDF_CPP4
@@ -6,19 +5,20 @@
 #  GLFX_INCLUDE_DIR
 
 find_path(GLFX_INCLUDE_DIR
-  NAMES glfx.h
-  HINTS
-  $ENV{GLFX_DIR}
-  PATH_SUFFIXES include/GL
-  PATHS
-  ~/Library/Frameworks
-  /Library/Frameworks
-  /usr/local
-  /usr
-  /sw # Fink
-  /opt/local # DarwinPorts
-  /opt/csw # Blastwave
-  /opt
+    NAMES GL/glfx.h
+    HINTS
+    $ENV{GLFX_DIR}
+    PATH_SUFFIXES include
+    PATHS
+    ~/Library/Frameworks
+    /Library/Frameworks
+    /usr/local
+    /usr
+    /sw # Fink
+    /opt/local # DarwinPorts
+    /opt/csw # Blastwave
+    /opt
+    /home/local/sw/gl
 )
 
 find_library(GLFX_LIBRARIES
@@ -35,6 +35,7 @@ find_library(GLFX_LIBRARIES
     /opt/local
     /opt/csw
     /opt
+    /home/local/sw/gl
 )
 
 INCLUDE(FindPackageHandleStandardArgs)
@@ -43,4 +44,3 @@ INCLUDE(FindPackageHandleStandardArgs)
 FIND_PACKAGE_HANDLE_STANDARD_ARGS(glfx DEFAULT_MSG GLFX_LIBRARIES GLFX_INCLUDE_DIR)
 
 MARK_AS_ADVANCED(GLFX_INCLUDE_DIR GLFX_LIBRARIES)
-

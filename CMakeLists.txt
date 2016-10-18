@@ -33,7 +33,7 @@ cmake_minimum_required(VERSION 3.5.1)
 set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 
 ##############################################################################
-# 				Project Description
+#                         Project Description                                #
 ##############################################################################
 
 # Set project name
@@ -54,28 +54,29 @@ add_definitions(-DENABLE_MET3D_STOPWATCH
 option(USE_CLANG "Build application with clang" OFF)
 
 if (WIN32)
-	# TODO: support for windows
-	set(EXECUTABLE_OUTPUT_PATH ${CMAKE_CURRENT_SOURCE_DIR}/build/win32 CACHE PATH "Build directory" FORCE)
+    # TODO: support for windows
+    set(EXECUTABLE_OUTPUT_PATH ${CMAKE_CURRENT_SOURCE_DIR}/build/win32 CACHE PATH "Build directory" FORCE)
 endif (WIN32)
 
 if (UNIX)
-	set(EXECUTABLE_OUTPUT_PATH ${CMAKE_CURRENT_SOURCE_DIR}/build/unix CACHE PATH "Build directory" FORCE)
-	set(RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/build/unix)
-	#set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/build/unix")
+    set(EXECUTABLE_OUTPUT_PATH ${CMAKE_CURRENT_SOURCE_DIR}/build/unix CACHE PATH "Build directory" FORCE)
+    set(RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/build/unix)
+    #set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/build/unix")
 endif(UNIX)
 
 
 # Set flags if we use GNUCC
-if      ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall -pedantic")
 # Or CLANG
 # TODO: clang command arguments slightly differ from GNUCC
-elseif  ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" OR USE_CLANG)
+elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" OR USE_CLANG)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall -pedantic")
 endif ()
 
+
 ##############################################################################
-# 			Create Configure File
+#                      Create Configure File                                 #
 ##############################################################################
 
 # configure a header file to pass some CMake settings to the source code
@@ -86,72 +87,73 @@ endif ()
 # add the binary tree to the include directory paths
 #include_directories("${PROJECT_BINARY_DIR}")
 
+
 ##############################################################################
-# 			Required QT4 Libraries
+#                      Required Qt4 Libraries                                #
 ##############################################################################
 
+# Automatically build Qt moc files.
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 cmake_policy(SET CMP0020 NEW)
 
-#if (UNIX)
-	#find_package(Qt5Core REQUIRED)
-	#find_package(Qt5Xml REQUIRED)
-	#find_package(Qt5XmlPatterns REQUIRED)
-	#find_package(Qt5Widgets REQUIRED)
-    find_package(Qt4 4.8 REQUIRED QTCORE QTGUI QTOPENGL QTXML QTNETWORK)
-    #find_package(Qt4 COMPONENTS QTCORE QTGUI QTOPENGL QTXML QTNETWORK)
+find_package(Qt4 4.8 REQUIRED QTCORE QTGUI QTOPENGL QTXML QTNETWORK)
+# Future: Change to Qt5.
+#find_package(Qt5Core REQUIRED)
+#find_package(Qt5Xml REQUIRED)
+#find_package(Qt5XmlPatterns REQUIRED)
+#find_package(Qt5Widgets REQUIRED)
 
-#endif (UNIX)
-
+# Import Qt headers.
 INCLUDE(${QT_USE_FILE})
 
+# Build QtDesigner forms.
 set(MET3D_UIS
-        src/mainwindow.ui
-        src/data/waypoints/waypointstableview.ui
-        src/gxfw/actorcreationdialog.ui
-        src/gxfw/adddatasetdialog.ui
-        src/gxfw/memberselectiondialog.ui
-        src/gxfw/mscenecontrol.ui
-        src/gxfw/msystemcontrol.ui
-        src/gxfw/scenemanagementdialog.ui
-        src/gxfw/selectdatasourcedialog.ui
-        src/gxfw/synccontrol.ui
+    src/mainwindow.ui
+    src/data/waypoints/waypointstableview.ui
+    src/gxfw/actorcreationdialog.ui
+    src/gxfw/adddatasetdialog.ui
+    src/gxfw/memberselectiondialog.ui
+    src/gxfw/mscenecontrol.ui
+    src/gxfw/msystemcontrol.ui
+    src/gxfw/scenemanagementdialog.ui
+    src/gxfw/selectdatasourcedialog.ui
+    src/gxfw/synccontrol.ui
     )
 
 set (MET3D_RCS
-        ../third-party/qt-solutions/qtpropertybrowser/src/qtpropertybrowser.qrc)
+    ../third-party/qt-solutions/qtpropertybrowser/src/qtpropertybrowser.qrc)
 
 qt4_wrap_ui(MET3D_UIS_H ${MET3D_UIS})
 qt4_add_resources(MET3D_RC_SRCS ${MET3D_RCS})
-#qt4_use_modules(OpenGL Xml XmlPatterns)
+# Future: Change to Qt5.
+#qt5_use_modules(OpenGL Xml XmlPatterns)
+
 
 ##############################################################################
-# 			Required Third-Party Libraries
+#                  Required Third-Party Libraries                            #
 ##############################################################################
 
-#find_package()
+# For all libraries that do not have "Find..."-scripts provided in 
+# /usr/share/cmake/Modules, corresponding scripts need to be provided in
+# cmake/...
 
 # Freetype
 find_package(Freetype REQUIRED)
 include_directories(${FREETYPE_INCLUDE_DIRS})
 
-# Eigen3
-#find_package(Eigen3 REQUIRED)
-#include_directories(${EIGEN3_INCLUDE_DIR})
-
 # OpenGL packages
 find_package(OpenGL REQUIRED)
 find_package(GLU REQUIRED)
 find_package(GLEW REQUIRED)
-# TODO: glew is not support with OpenGL widget which is deprecated anyway
+# TODO: glew is not supported with OpenGL widget (which is deprecated anyway)
 include_directories(${GLEW_INCLUDE_DIRS})
 
 # Log4cplus
 find_package(log4cplus REQUIRED)
 include_directories(${LOG4CPLUS_INCLUDE_DIR})
 
-# Gdal
+# GDAL
 find_package(GDAL REQUIRED)
 include_directories(${GDAL_INCLUDE_DIR})
 
@@ -160,7 +162,7 @@ find_package(GSL REQUIRED)
 include_directories(${GSL_INCLUDE_DIRS})
 
 # Grib-API
-find_package(GRIB_API REQUIRED)
+find_package(grib_api REQUIRED)
 include_directories(${GRIB_API_INCLUDE_DIR})
 
 # Netcdf
@@ -175,8 +177,13 @@ include_directories(${QCUSTOMPLOT_INCLUDE_DIR})
 find_package(glfx REQUIRED)
 include_directories(${GLFX_INCLUDE_DIR})
 
+# Eigen3
+#find_package(Eigen3 REQUIRED)
+#include_directories(${EIGEN3_INCLUDE_DIR})
+
+
 ##############################################################################
-# 			Conifigure Other Projects
+#                      Configure Other Projects                              #
 ##############################################################################
 
 # add QtProperty Browser
@@ -188,10 +195,10 @@ include_directories(${GLFX_INCLUDE_DIR})
 
 
 ##############################################################################
-# 			Conifigure Met.3D Project
+#                     Configure Met.3D Project                               #
 ##############################################################################
 
-# source files
+# Source files.
 file (GLOB_RECURSE  Met3D_Header    src/*.h)
 file (GLOB_RECURSE  Met3D_Source    src/*.cpp)
 file (GLOB_RECURSE  Met3D_Source_C  src/*.c)
@@ -212,66 +219,66 @@ file (GLOB          Met3D_Configs   config/*)
 
 # NOTE: we could also use file (GLOB_RECURSE Met3D_Source src/*)
 
-# third-party souce files
+# Third-party souce files.
 file (GLOB QT_PROPERTYBROWSER_Source ../third-party/qt-solutions/qtpropertybrowser/src/*)
 
-# set filters
+# Set filters.
 if (WIN32)
     source_group(Met3D FILES ${Met3D_Source_Files} ${})
     source_group(Met3D\\Actors FILES ${Met3D_Actors_Source_Files})
 endif (WIN32)
 
-# set include directories
+# Set include directories.
 include_directories(${CMAKE_CURRENT_BINARY_DIR} # since QT files will be located here
-                        ${PROJECT_SOURCE_DIR}/src
-                    	${PROJECT_SOURCE_DIR}/../third-party/qt-solutions/qtpropertybrowser/src
-)
+                    ${PROJECT_SOURCE_DIR}/src
+                    ${PROJECT_SOURCE_DIR}/../third-party/qt-solutions/qtpropertybrowser/src
+                    )
 
 # set custom targets to display files not included in the executable build process
 add_custom_target(shaders SOURCES ${Met3D_Shaders})
 add_custom_target(configs SOURCES ${Met3D_Configs})
 
-# Tell cmake to create Met.3D executable
+# Tell cmake to create Met.3D executable.
 add_executable(Met3D # executable name
-                ${Met3D_Source} # cpp source files
-                ${Met3D_Header} # h header files
-                ${Met3D_Source_C} # c source files
+               ${Met3D_Source} # cpp source files
+               ${Met3D_Header} # h header files
+               ${Met3D_Source_C} # c source files
+               
+               #${Met3D_Actors_Source}
+               #${Met3D_Data_Source}
+               #${Met3D_Data_Waypoints_Source}
+               #${Met3D_GXFW_Source}
+               #${Met3D_GXFW_GL_Source}
+               #${Met3D_QTExtensions_Source}
+               #${Met3D_System_Source}
+               #${Met3D_Util_Source}
+               #${Met3D_Cluster_Source}
+               
+               ${QT_PROPERTYBROWSER_Source}
+               ${MET3D_UIS_H} # add qt uis to the executable
+               ${MET3D_RC_SRCS}
+  )
 
-                #${Met3D_Actors_Source}
-                #${Met3D_Data_Source}
-                #${Met3D_Data_Waypoints_Source}
-                #${Met3D_GXFW_Source}
-                #${Met3D_GXFW_GL_Source}
-                #${Met3D_QTExtensions_Source}
-                #${Met3D_System_Source}
-                #${Met3D_Util_Source}
-                #${Met3D_Cluster_Source}
-
-                ${QT_PROPERTYBROWSER_Source}
-                ${MET3D_UIS_H} # add qt uis to the executable
-                ${MET3D_RC_SRCS}
-)
-
-# Link Qt4 and other libraries to executable
+# Link Qt4 and other libraries to executable.
 target_link_libraries(Met3D
-                       Qt4::QtCore
-                       Qt4::QtGui
-                       Qt4::QtOpenGL
-                       Qt4::QtXml
-                       Qt4::QtNetwork
-                       ${FREETYPE_LIBRARIES}
-                       #${EIGEN3_LIBRARIES}
-                       ${OPENGL_gl_LIBRARY}
-                       ${OPENGL_glu_LIBRARY}
-                       ${GLEW_LIBRARIES}
-                       ${LOG4CPLUS_LIBRARIES}
-                       ${GDAL_LIBRARY}
-                       ${GSL_LIBRARIES}
-		       ${GRIB_API_LIBRARIES}
-                       ${NETCDF_CPP4_LIBRARIES}
-                       ${QCUSTOMPLOT_LIBRARY}
-                       ${GLFX_LIBRARIES}
-)
+                      Qt4::QtCore
+                      Qt4::QtGui
+                      Qt4::QtOpenGL
+                      Qt4::QtXml
+                      Qt4::QtNetwork
+                      ${FREETYPE_LIBRARIES}
+                      ${OPENGL_gl_LIBRARY}
+                      ${OPENGL_glu_LIBRARY}
+                      ${GLEW_LIBRARIES}
+                      ${LOG4CPLUS_LIBRARIES}
+                      ${GDAL_LIBRARY}
+                      ${GSL_LIBRARIES}
+                      ${GRIB_API_LIBRARIES}
+                      ${NETCDF_CPP4_LIBRARIES}
+                      ${QCUSTOMPLOT_LIBRARY}
+                      ${GLFX_LIBRARIES}
+                      #${EIGEN3_LIBRARIES}
+  )
 
 # Set command line arguments TODO does not work!
 #set_target_properties(Met3D PROPERTIES COMMAND_LINE_ARGUMENTS "--pipeline=config/pipeline.cfg --frontend=config/frontend.cfg")
@@ -280,7 +287,9 @@ target_link_libraries(Met3D
 set(ENV{MET3D_HOME} "${PROJECT_SOURCE_DIR}")
 set(ENV{MET3D_BASE} "${PROJECT_SOURCE_DIR}/../")
 
+
 ##############################################################################
 #                           Custom Commands
 ##############################################################################
 
+# ...

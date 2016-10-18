@@ -1,4 +1,3 @@
-
 # Locate netcdf_c++4 library
 # This module defines
 #  NETCDF_CPP4_FOUND, if false, do not try to link to NETCDF_CPP4
@@ -6,19 +5,20 @@
 #  NETCDF_CPP4_INCLUDE_DIR
 
 find_path(NETCDF_CPP4_INCLUDE_DIR
-  NAMES netcdf
-  HINTS
-  $ENV{NETCDF_CPP4_DIR}
-  PATH_SUFFIXES include
-  PATHS
-  ~/Library/Frameworks
-  /Library/Frameworks
-  /usr/local
-  /usr
-  /sw # Fink
-  /opt/local # DarwinPorts
-  /opt/csw # Blastwave
-  /opt
+    NAMES netcdf
+    HINTS
+    $ENV{NETCDF_CPP4_DIR}
+    PATH_SUFFIXES include
+    PATHS
+    ~/Library/Frameworks
+    /Library/Frameworks
+    /usr/local
+    /usr
+    /sw # Fink
+    /opt/local # DarwinPorts
+    /opt/csw # Blastwave
+    /opt
+    /home/local/sw/unidata
 )
 
 # we always require the c-library of netcdf
@@ -36,22 +36,24 @@ find_library(NETCDF_C_LIBRARY
     /opt/local
     /opt/csw
     /opt
+    /home/local/sw/unidata
 )
 
 find_library(NETCDF_CPP4_LIBRARY
-  NAMES netcdf_c++4 NETCDF_C++4
-  HINTS
-  $ENV{NETCDF_CPP4_DIR}
-  PATH_SUFFIXES lib64 lib
-  PATHS
-  ~/Library/Frameworks
-  /Library/Frameworks
-  /usr/local
-  /usr
-  /sw
-  /opt/local
-  /opt/csw
-  /opt
+    NAMES netcdf_c++4 NETCDF_C++4
+    HINTS
+    $ENV{NETCDF_CPP4_DIR}
+    PATH_SUFFIXES lib64 lib
+    PATHS
+    ~/Library/Frameworks
+    /Library/Frameworks
+    /usr/local
+    /usr
+    /sw
+    /opt/local
+    /opt/csw
+    /opt
+    /home/local/sw/unidata
 )
 
 IF(NETCDF_C_LIBRARY AND NETCDF_CPP4_LIBRARY)
