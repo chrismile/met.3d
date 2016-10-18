@@ -549,23 +549,40 @@ void MNWPVolumeRaycasterActor::reloadShaderEffects()
 {
     LOG4CPLUS_DEBUG(mlog, "loading shader programs" << flush);
 
-    gl.boundingBoxShader->compileFromFile_Met3DHome(
-                "src/glsl/simple_coloured_geometry.fx.glsl");
-    gl.rayCasterEffect->compileFromFile_Met3DHome(
-                "src/glsl/volume_raycaster.fx.glsl");
-    gl.shadowImageRenderShader->compileFromFile_Met3DHome(
-                "src/glsl/volume_image.fx.glsl");
+    QProgressDialog *progressDialog = this->setupLoadingShaderProgressDialog(7);
 
-    gl.normalCurveGeometryEffect->compileFromFile_Met3DHome(
-                "src/glsl/volume_normalcurves_geometry.fx.glsl");
-    gl.normalCurveInitPointsShader->compileFromFile_Met3DHome(
-                "src/glsl/volume_normalcurves_initpoints.fx.glsl");
-    gl.normalCurveLineComputeShader->compileFromFile_Met3DHome(
-                "src/glsl/volume_compute_normalcurves.fx.glsl");
+    compileFromFileWithProgressDialog(
+                gl.boundingBoxShader,
+                "src/glsl/simple_coloured_geometry.fx.glsl",
+                progressDialog);
+    compileFromFileWithProgressDialog(
+                gl.rayCasterEffect,
+                "src/glsl/volume_raycaster.fx.glsl",
+                progressDialog);
+    compileFromFileWithProgressDialog(
+                gl.shadowImageRenderShader,
+                "src/glsl/volume_image.fx.glsl",
+                progressDialog);
 
-    gl.bitfieldRayCasterEffect->compileFromFile_Met3DHome(
-                "src/glsl/volume_bitfield_raycaster.fx.glsl");
+    compileFromFileWithProgressDialog(
+                gl.normalCurveGeometryEffect,
+                "src/glsl/volume_normalcurves_geometry.fx.glsl",
+                progressDialog);
+    compileFromFileWithProgressDialog(
+                gl.normalCurveInitPointsShader,
+                "src/glsl/volume_normalcurves_initpoints.fx.glsl",
+                progressDialog);
+    compileFromFileWithProgressDialog(
+                gl.normalCurveLineComputeShader,
+                "src/glsl/volume_compute_normalcurves.fx.glsl",
+                progressDialog);
 
+    compileFromFileWithProgressDialog(
+                gl.bitfieldRayCasterEffect,
+                "src/glsl/volume_bitfield_raycaster.fx.glsl",
+                progressDialog);
+
+    delete progressDialog;
     initializeRenderInformation();
 }
 

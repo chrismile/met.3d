@@ -31,9 +31,11 @@
 // related third party imports
 #include <QtCore>
 #include <QtProperty>
+#include <memory>
 
 // local application imports
 #include "gxfw/mtypes.h"
+#include "gxfw/gl/shadereffect.h"
 #include "gxfw/gl/vertexbuffer.h"
 #include "system/qtproperties.h"
 
@@ -385,6 +387,7 @@ protected:
     virtual void onQtPropertyChanged(QtProperty *property)
     { Q_UNUSED(property); }
 
+
     /**
       Implement this function in derived classes to handle actor creation
       events. @see actOnOtherActorCreated().
@@ -436,6 +439,21 @@ protected:
     virtual void renderToCurrentContext(MSceneViewGLWidget *sceneView) = 0;
 
     void enablePicking(bool p) { actorIsPickable = p; }
+
+    /**
+      Sets the shader loading progress dialog up. Resets
+      @ref shaderLoadingProgress to @p 0.
+      */
+    QProgressDialog *setupLoadingShaderProgressDialog(int numberOfShaders);
+
+    /**
+      Loads shader from filename and updates the shader loading progress dialog.
+      Uses @ref shaderLoadingProgress to store number of already loaded shaders.
+      */
+    void compileFromFileWithProgressDialog(
+            std::shared_ptr<GL::MShaderEffect> shader,
+            const QString filename,
+            QProgressDialog *progressDialog);
 
     /**
       Emit the @ref actorChanged() signal, but only if the signal is enabled,
@@ -505,6 +523,9 @@ protected:
     QtProperty *labelBBoxColourProperty;
 
     bool actorIsPickable;
+
+    /** Counter to monitor the progress of shader loading process. */
+    int  shaderLoadingProgress;
 
     /** List of scenes to which this actor has been added. */
     QList<MSceneControl*> scenes;

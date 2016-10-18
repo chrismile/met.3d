@@ -168,10 +168,27 @@ MTrajectoryActor::~MTrajectoryActor()
 void MTrajectoryActor::reloadShaderEffects()
 {
     LOG4CPLUS_DEBUG(mlog, "loading shader programs" << flush);
-    tubeShader->compileFromFile_Met3DHome("src/glsl/trajectory_tubes.fx.glsl");
-    tubeShadowShader->compileFromFile_Met3DHome("src/glsl/trajectory_tubes_shadow.fx.glsl");
-    positionSphereShader->compileFromFile_Met3DHome("src/glsl/trajectory_positions.fx.glsl");
-    positionSphereShadowShader->compileFromFile_Met3DHome("src/glsl/trajectory_positions_shadow.fx.glsl");
+
+    QProgressDialog *progressDialog = this->setupLoadingShaderProgressDialog(4);
+
+    compileFromFileWithProgressDialog(
+                tubeShader,
+                "src/glsl/trajectory_tubes.fx.glsl",
+                progressDialog);
+    compileFromFileWithProgressDialog(
+                tubeShadowShader,
+                "src/glsl/trajectory_tubes_shadow.fx.glsl",
+                progressDialog);
+    compileFromFileWithProgressDialog(
+                positionSphereShader,
+                "src/glsl/trajectory_positions.fx.glsl",
+                progressDialog);
+    compileFromFileWithProgressDialog(
+                positionSphereShadowShader,
+                "src/glsl/trajectory_positions_shadow.fx.glsl",
+                progressDialog);
+
+    delete progressDialog;
 }
 
 

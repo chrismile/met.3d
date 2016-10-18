@@ -120,16 +120,30 @@ void MNWPVerticalSectionActor::reloadShaderEffects()
 {
     LOG4CPLUS_DEBUG(mlog, "loading shader programs" << flush);
 
-    sectionGridShader->compileFromFile_Met3DHome(
-                "src/glsl/vsec_interpolation_filledcontours.fx.glsl");
-    marchingSquaresShader->compileFromFile_Met3DHome(
-                "src/glsl/vsec_marching_squares.fx.glsl");
-    pressureLinesShader->compileFromFile_Met3DHome(
-                "src/glsl/vsec_pressureisolines.fx.glsl");
-    simpleGeometryShader->compileFromFile_Met3DHome(
-                "src/glsl/simple_coloured_geometry.fx.glsl");
-    positionSpheresShader->compileFromFile_Met3DHome(
-                "src/glsl/trajectory_positions.fx.glsl");
+    QProgressDialog *progressDialog = this->setupLoadingShaderProgressDialog(5);
+
+    compileFromFileWithProgressDialog(
+                sectionGridShader,
+                "src/glsl/vsec_interpolation_filledcontours.fx.glsl",
+                progressDialog);
+    compileFromFileWithProgressDialog(
+                marchingSquaresShader,
+                "src/glsl/vsec_marching_squares.fx.glsl",
+                progressDialog);
+    compileFromFileWithProgressDialog(
+                pressureLinesShader,
+                "src/glsl/vsec_pressureisolines.fx.glsl",
+                progressDialog);
+    compileFromFileWithProgressDialog(
+                simpleGeometryShader,
+                "src/glsl/simple_coloured_geometry.fx.glsl",
+                progressDialog);
+    compileFromFileWithProgressDialog(
+                positionSpheresShader,
+                "src/glsl/trajectory_positions.fx.glsl",
+                progressDialog);
+
+    delete progressDialog;
 }
 
 

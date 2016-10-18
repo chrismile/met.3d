@@ -121,8 +121,19 @@ MMovablePoleActor::PoleSettings::PoleSettings(MActor *actor)
 void MMovablePoleActor::reloadShaderEffects()
 {
     LOG4CPLUS_DEBUG(mlog, "loading shader programs" << flush);
-    simpleGeometryEffect->compileFromFile_Met3DHome("src/glsl/simple_coloured_geometry.fx.glsl");
-    positionSpheresShader->compileFromFile_Met3DHome("src/glsl/trajectory_positions.fx.glsl");
+
+    QProgressDialog *progressDialog = this->setupLoadingShaderProgressDialog(2);
+
+    compileFromFileWithProgressDialog(
+                simpleGeometryEffect,
+                "src/glsl/simple_coloured_geometry.fx.glsl",
+                progressDialog);
+    compileFromFileWithProgressDialog(
+                positionSpheresShader,
+                "src/glsl/trajectory_positions.fx.glsl",
+                progressDialog);
+
+    delete progressDialog;
 }
 
 
