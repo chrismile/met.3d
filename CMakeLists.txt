@@ -92,8 +92,14 @@ endif ()
 #                      Required Qt4 Libraries                                #
 ##############################################################################
 
-# Automatically build Qt moc files.
-set(CMAKE_AUTOMOC ON)
+# does not work with cmake command in terminal
+#set_property(GLOBAL PROPERTY USE_FOLDERS ON)
+#set_property(GLOBAL PROPERTY AUTOGEN_TARGETS_FOLDER ${CMAKE_CURRENT_SOURCE_DIR}/automoc)
+
+# Automatically build Qt moc files, wrap UIs and add RCC resource files
+set(CMAKE_AUTOMOC ON) # instead of using the macro QT4_WRAP_CPP
+#set(CMAKE_AUTOUIC ON) # instead of using the macro QT4_WRAP_UI, still buggy
+#set(CMAKE_AUTORCC ON) # instead of using the macro QT4_ADD_RESOURCES
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 cmake_policy(SET CMP0020 NEW)
 
@@ -108,21 +114,24 @@ find_package(Qt4 4.8 REQUIRED QTCORE QTGUI QTOPENGL QTXML QTNETWORK)
 INCLUDE(${QT_USE_FILE})
 
 # Build QtDesigner forms.
-set(MET3D_UIS
-    src/mainwindow.ui
-    src/data/waypoints/waypointstableview.ui
-    src/gxfw/actorcreationdialog.ui
-    src/gxfw/adddatasetdialog.ui
-    src/gxfw/memberselectiondialog.ui
-    src/gxfw/mscenecontrol.ui
-    src/gxfw/msystemcontrol.ui
-    src/gxfw/scenemanagementdialog.ui
-    src/gxfw/selectdatasourcedialog.ui
-    src/gxfw/synccontrol.ui
-    )
+#set(MET3D_UIS
+#    src/mainwindow.ui
+#    src/data/waypoints/waypointstableview.ui
+#    src/gxfw/actorcreationdialog.ui
+#    src/gxfw/adddatasetdialog.ui
+#    src/gxfw/memberselectiondialog.ui
+#    src/gxfw/mscenecontrol.ui
+#    src/gxfw/msystemcontrol.ui
+#    src/gxfw/scenemanagementdialog.ui
+#    src/gxfw/selectdatasourcedialog.ui
+#    src/gxfw/synccontrol.ui
+#    )
 
-set (MET3D_RCS
-    ../third-party/qt-solutions/qtpropertybrowser/src/qtpropertybrowser.qrc)
+#set (MET3D_RCS
+#    ../third-party/qt-solutions/qtpropertybrowser/src/qtpropertybrowser.qrc)
+
+file (GLOB_RECURSE  MET3D_UIS 	src/*.ui)
+file (GLOB_RECURSE  MET3D_RCS   ../*.qrc)
 
 qt4_wrap_ui(MET3D_UIS_H ${MET3D_UIS})
 qt4_add_resources(MET3D_RC_SRCS ${MET3D_RCS})
@@ -205,6 +214,8 @@ file (GLOB_RECURSE  Met3D_Source_C  src/*.c)
 file (GLOB          Met3D_Shaders   src/glsl/*)
 file (GLOB          Met3D_Configs   config/*)
 
+#source_group(automocs FILES ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}_automoc.cpp)
+
 #file (GLOB Met3D_Source_Files	src/main.cpp src/mainwindow.cpp src/mainwindow.h)
 #file (GLOB Met3D_Actors_Source_Files src/actors/*)
 #file (GLOB Met3D_Data_Source src/data/*)
@@ -237,6 +248,7 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR} # since QT files will be located
 # set custom targets to display files not included in the executable build process
 add_custom_target(shaders SOURCES ${Met3D_Shaders})
 add_custom_target(configs SOURCES ${Met3D_Configs})
+add_custom_target(uis SOURCES     ${Met3D_UIS})
 
 # Tell cmake to create Met.3D executable.
 add_executable(Met3D # executable name
