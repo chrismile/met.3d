@@ -35,6 +35,7 @@
 #include <QtGui>
 #include <QtOpenGL>
 #include <log4cplus/loggingmacros.h>
+#include <QFileInfo>
 
 // local application imports
 #include "util/mutil.h"
@@ -175,6 +176,10 @@ MSceneViewGLWidget::MSceneViewGLWidget()
     interactionGroupProperty = systemControl->getGroupPropertyManager()
             ->addProperty("interaction");
     propertyGroup->addSubProperty(interactionGroupProperty);
+
+    sceneSaveToImageProperty = systemControl->getClickPropertyManager()
+            ->addProperty("save to image file");
+    interactionGroupProperty->addSubProperty(sceneSaveToImageProperty);
 
     sceneNavigationModeProperty = systemControl->getEnumPropertyManager()
             ->addProperty("scene navigation");
@@ -766,6 +771,11 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
 #ifndef CONTINUOUS_GL_UPDATE
         if (viewIsInitialised) updateGL();
 #endif
+    }
+
+    else if (property == sceneSaveToImageProperty)
+    {
+        takeScreenshot();
     }
 
     else if (property == sceneNavigationModeProperty)
@@ -1593,6 +1603,10 @@ void MSceneViewGLWidget::keyPressEvent(QKeyEvent *event)
     case Qt::Key_T:
         if (event->modifiers() & Qt::AltModifier) executeCameraAction(CAMERA_TOPVIEW);
         break;
+    case Qt::Key_S:
+        takeScreenshot();
+        break;
+        // if (event->modifiers() & Qt::AltModifier) executeCameraAction(CAMERA_TOPVIEW);
     default:
         // If we do not act upon the key, pass event to base class
         // implementation.
@@ -1695,6 +1709,96 @@ void MSceneViewGLWidget::setSceneRotationCentre(QVector3D centre)
 ***                           PRIVATE METHODS                               ***
 *******************************************************************************/
 
-// -- None --
+void MSceneViewGLWidget::takeScreenshot()
+{
+    // Take Screenshot of current scene.
+    QImage screenshot = this->grabFrameBuffer();
+    // Chop red frame.
+    screenshot = screenshot.copy(1, 1, screenshot.width() - 2,
+                                 screenshot.height() - 2);
+
+    // Filter containing all imagefile-extensions Qt is able to write (Oct2016).
+    // All extensions are: .png .jpg .jpeg .bmp .ppm .tiff .xbm .xpm .
+    QString filter = QString("png (*.png);;jpg (*.jpg);;jpeg (*.jpeg);;")
+            + QString("bmp (*.bmp);;ppm (*.ppm);;tiff (*.tiff);;")
+            + QString("xbm (*.xbm);;xpm (*.xpm)");
+    // Filterlist contains all imagefile-extensions as a regular expression.
+    QRegExp filterlist(".*\\.((png)|(jpe?g)|(bmp)|(ppm)|(tiff)|(x(b|p)m))");
+
+    QString filetype;
+    // Variable filename stores filename and path but for some operating systems
+    // not the selected extension.
+    QString filename = QFileDialog::getSaveFileName(
+                MGLResourcesManager::getInstance(),
+                "Save screenshot",
+                "../screenshots",
+                filter,
+                &filetype);
+    if (!filename.isEmpty())
+    {
+        // Check if filename doesn't end with an image file extension Qt can
+        // write.
+        // Repeat the test since the user could have changed the name in the
+        // second FileDialog.
+        while (!filterlist.exactMatch(filename))
+        {
+            // Extract selection file-extension from selected filter element.
+            // Length of extension name can vary thus cant chop fixed number of
+            // letters. 5 = number of letters occuring in every scheme besides
+            // the file-extension.
+            filetype.chop(((filetype.length() - 5) / 2) + 5);
+            filetype = QString("." + filetype);
+            // Append the selected file extension
+            filename += filetype;
+// NOTE (bt, 17Oct2016): Can be removed if Qt-bug is fixed.
+            // Need to check if file already exists since QFileDialog
+            // doesn't provide this functionality under Linux compared to
+            // https://bugreports.qt.io/browse/QTBUG-11352 .
+            QFileInfo checkFile(filename);
+            if (checkFile.exists())
+            {
+// TODO (bt, 17Oct2016) Use operating system dependend filename splitting.
+                QMessageBox::StandardButton reply = QMessageBox::question(
+                                        MGLResourcesManager::getInstance(),
+                                        "Save screenshot",
+                                        filename.split("/").last()
+                                        + " already exits.\n"
+                                        + "Do you want to replace it?",
+                                        QMessageBox::Yes|QMessageBox::No,
+                                        QMessageBox::No);
+                if (reply == QMessageBox::No)
+                {
+                    // Reopen FileDialog if file already exists and the user
+                    // chooses not to overwrite it or closes the question box.
+                    filename = QFileDialog::getSaveFileName(
+                                    MGLResourcesManager::getInstance(),
+                                    "Save screenshot",
+                                    filename,
+                                    filter,
+                                    &filetype);
+                    // Quit if user closes file dialog.
+                    if(filename.isEmpty()) return;
+                }
+            }
+        }
+        if (screenshot.save(filename))
+        {
+            QString str = "Saved screenshot of current view to " + filename
+                    + "\n";
+            LOG4CPLUS_INFO(mlog, str.toStdString());
+        }
+        else
+        {
+            QMessageBox::critical(MGLResourcesManager::getInstance(),
+                                 "Error",
+                                 "Could not save " + filename,
+                                 QMessageBox::Ok,
+                                 QMessageBox::NoButton);
+            QString str = "Could not save " + filename + "\n";
+            LOG4CPLUS_ERROR(mlog, str.toStdString());
+        }
+    }
+
+}
 
 } // namespace Met3D
