@@ -549,23 +549,33 @@ void MNWPVolumeRaycasterActor::reloadShaderEffects()
 {
     LOG4CPLUS_DEBUG(mlog, "loading shader programs" << flush);
 
-    gl.boundingBoxShader->compileFromFile_Met3DHome(
+    beginCompileShaders(7);
+
+    compileShadersFromFileWithProgressDialog(
+                gl.boundingBoxShader,
                 "src/glsl/simple_coloured_geometry.fx.glsl");
-    gl.rayCasterEffect->compileFromFile_Met3DHome(
+    compileShadersFromFileWithProgressDialog(
+                gl.rayCasterEffect,
                 "src/glsl/volume_raycaster.fx.glsl");
-    gl.shadowImageRenderShader->compileFromFile_Met3DHome(
+    compileShadersFromFileWithProgressDialog(
+                gl.shadowImageRenderShader,
                 "src/glsl/volume_image.fx.glsl");
 
-    gl.normalCurveGeometryEffect->compileFromFile_Met3DHome(
+    compileShadersFromFileWithProgressDialog(
+                gl.normalCurveGeometryEffect,
                 "src/glsl/volume_normalcurves_geometry.fx.glsl");
-    gl.normalCurveInitPointsShader->compileFromFile_Met3DHome(
+    compileShadersFromFileWithProgressDialog(
+                gl.normalCurveInitPointsShader,
                 "src/glsl/volume_normalcurves_initpoints.fx.glsl");
-    gl.normalCurveLineComputeShader->compileFromFile_Met3DHome(
+    compileShadersFromFileWithProgressDialog(
+                gl.normalCurveLineComputeShader,
                 "src/glsl/volume_compute_normalcurves.fx.glsl");
 
-    gl.bitfieldRayCasterEffect->compileFromFile_Met3DHome(
+    compileShadersFromFileWithProgressDialog(
+                gl.bitfieldRayCasterEffect,
                 "src/glsl/volume_bitfield_raycaster.fx.glsl");
 
+    endCompileShaders();
     initializeRenderInformation();
 }
 

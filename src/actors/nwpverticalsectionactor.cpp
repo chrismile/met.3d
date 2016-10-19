@@ -128,16 +128,25 @@ void MNWPVerticalSectionActor::reloadShaderEffects()
 {
     LOG4CPLUS_DEBUG(mlog, "loading shader programs" << flush);
 
-    sectionGridShader->compileFromFile_Met3DHome(
+    beginCompileShaders(5);
+
+    compileShadersFromFileWithProgressDialog(
+                sectionGridShader,
                 "src/glsl/vsec_interpolation_filledcontours.fx.glsl");
-    marchingSquaresShader->compileFromFile_Met3DHome(
+    compileShadersFromFileWithProgressDialog(
+                marchingSquaresShader,
                 "src/glsl/vsec_marching_squares.fx.glsl");
-    pressureLinesShader->compileFromFile_Met3DHome(
+    compileShadersFromFileWithProgressDialog(
+                pressureLinesShader,
                 "src/glsl/vsec_pressureisolines.fx.glsl");
-    simpleGeometryShader->compileFromFile_Met3DHome(
+    compileShadersFromFileWithProgressDialog(
+                simpleGeometryShader,
                 "src/glsl/simple_coloured_geometry.fx.glsl");
-    positionSpheresShader->compileFromFile_Met3DHome(
+    compileShadersFromFileWithProgressDialog(
+                positionSpheresShader,
                 "src/glsl/trajectory_positions.fx.glsl");
+
+    endCompileShaders();
 }
 
 

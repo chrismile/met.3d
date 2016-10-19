@@ -242,10 +242,17 @@ MTransferFunction1D::MTransferFunction1D()
 void MTransferFunction1D::reloadShaderEffects()
 {
     LOG4CPLUS_DEBUG(mlog, "loading shader programs" << flush);
-    simpleGeometryShader->compileFromFile_Met3DHome(
+
+    beginCompileShaders(2);
+
+    compileShadersFromFileWithProgressDialog(
+                simpleGeometryShader,
                 "src/glsl/simple_coloured_geometry.fx.glsl");
-    colourbarShader->compileFromFile_Met3DHome(
+    compileShadersFromFileWithProgressDialog(
+                colourbarShader,
                 "src/glsl/colourbar.fx.glsl");
+
+    endCompileShaders();
 }
 
 
