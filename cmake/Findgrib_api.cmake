@@ -1,44 +1,58 @@
-# Locate grib_api library
-# This module defines
-#  GRIB_API_FOUND, if false, do not try to link to Log4cplus
-#  GRIB_API_LIBRARIES
-#  GRIB_API_INCLUDE_DIR
+####################################################################################################
+#  This file is a find module script for CMake to locate all required headers and
+#  static libraries and to correctly setup Met.3D on every system
+#
+#  Package: grib_api
+#       - grib_api_FOUND        - System has found the package
+#       - grib_api_INCLUDE_DIR  - Package include directory
+#       - grib_api_LIBRARIES    - Package static libraries
+#
+#  Copyright 2016 Marc Rautenhaus
+#  Copyright 2016 Michael Kern
+#
+####################################################################################################
 
-FIND_PATH(GRIB_API_INCLUDE_DIR 
-    NAMES grib_api.h
-    HINTS
-    $ENV{GRIB_API_DIR}
-    PATH_SUFFIXES include
-    PATHS
-    ~/Library/Frameworks
-    /Library/Frameworks
-    /usr/local
-    /usr
-    /sw # Fink
-    /opt/local # DarwinPorts
-    /opt/csw # Blastwave
-    /opt
-)
+# Include common settings such as common include/library directories
+include("cmake/common_settings.cmake")
 
-FIND_LIBRARY(GRIB_API_LIBRARIES
-    NAMES GRIB_API grib_api
-    HINTS
-    $ENV{GRIB_API_DIR}
-    PATH_SUFFIXES lib64 lib
-    PATHS
-    ~/Library/Frameworks
-    /Library/Frameworks
-    /usr/local
-    /usr
-    /sw
-    /opt/local
-    /opt/csw
-    /opt
-)
+# Set the name of the package
+set (PKG_NAME grib_api)
 
-INCLUDE(FindPackageHandleStandardArgs)
-# handle the QUIETLY and REQUIRED arguments and set GRIB_API_FOUND to TRUE if 
+# If the system is unix, try to use the pkg_config for a custom library
+if (UNIX)
+    use_pkg_config(${PKG_NAME})
+endif (UNIX)
+
+find_path(${PKG_NAME}_INCLUDE_DIR
+        NAMES # Name of all header files
+            grib_api.h
+        HINTS # Hints to the directory where the package is currently installed in
+            $ENV{${PKG_NAME}_DIR}
+            ${PKG_INCLUDE_DIRS}
+        PATH_SUFFIXES # Subfolders in the install directory
+            include
+        PATHS # The directories where cmake should look for the files by default if HINTS does not work
+            ${COMMON_INSTALL_DIRS}
+        )
+
+find_library(${PKG_NAME}_LIBRARIES
+        NAMES
+            grib_api GRIB_API
+        HINTS
+            $ENV{${PKG_NAME}_DIR}
+            ${PKG_LIBRARY_DIRS}
+        PATH_SUFFIXES
+            lib64
+            lib
+        PATHS
+            ${COMMON_INSTALL_DIRS}
+        )
+
+
+include(FindPackageHandleStandardArgs)
+# handle the QUIETLY and REQUIRED arguments and set ${PGK_NAME}_FOUND to TRUE if
 # all listed variables are TRUE
-FIND_PACKAGE_HANDLE_STANDARD_ARGS(grib_api DEFAULT_MSG GRIB_API_LIBRARIES GRIB_API_INCLUDE_DIR)
+find_package_handle_standard_args(${PKG_NAME} REQUIRED_VARS ${PKG_NAME}_LIBRARIES ${PKG_NAME}_INCLUDE_DIR)
+# Marks cmake cached variables as advanced
+mark_as_advanced(${PKG_NAME}_INCLUDE_DIR ${PKG_NAME}_LIBRARIES)
 
-MARK_AS_ADVANCED(GRIB_API_INCLUDE_DIR GRIB_API_LIBRARIES)

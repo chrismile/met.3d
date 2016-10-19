@@ -2,10 +2,10 @@
 #  This file is a find module script for CMake to locate all required headers and
 #  static libraries and to correctly setup Met.3D on every system
 #
-#  Package: qcustomplot
-#       - qcustomplot_FOUND        - System has found the package
-#       - qcustomplot_INCLUDE_DIR  - Package include directory
-#       - qcustomplot_LIBRARIES    - Package static libraries
+#  Package: netcdf_cpp4
+#       - netcdf_cxx4_FOUND        - System has found the package
+#       - netcdf_cxx4_INCLUDE_DIR  - Package include directory
+#       - netcdf_cxx4_LIBRARIES    - Package static libraries
 #
 #  Copyright 2016 Marc Rautenhaus
 #  Copyright 2016 Michael Kern
@@ -16,7 +16,7 @@
 include("cmake/common_settings.cmake")
 
 # Set the name of the package
-set (PKG_NAME qcustomplot)
+set (PKG_NAME netcdf_cxx4)
 
 # If the system is unix, try to use the pkg_config for a custom library
 if (UNIX)
@@ -25,7 +25,7 @@ endif (UNIX)
 
 find_path(${PKG_NAME}_INCLUDE_DIR
         NAMES # Name of all header files
-            qcustomplot.h
+            netcdf.h
         HINTS # Hints to the directory where the package is currently installed in
             $ENV{${PKG_NAME}_DIR}
             ${PKG_INCLUDE_DIRS}
@@ -35,9 +35,10 @@ find_path(${PKG_NAME}_INCLUDE_DIR
             ${COMMON_INSTALL_DIRS}
         )
 
-find_library(${PKG_NAME}_LIBRARY_DEBUG
+# We also require the c library of this package
+find_library(${PKG_NAME}_C_LIBRARY
         NAMES
-            qcustomplotd
+            netcdf NETCDF
         HINTS
             $ENV{${PKG_NAME}_DIR}
             ${PKG_LIBRARY_DIRS}
@@ -48,9 +49,9 @@ find_library(${PKG_NAME}_LIBRARY_DEBUG
             ${COMMON_INSTALL_DIRS}
         )
 
-find_library(${PKG_NAME}_LIBRARY_RELEASE
+find_library(${PKG_NAME}_LIBRARY
         NAMES
-            qcustomplot
+            netcdf_c++4 NETCDF_C++4
         HINTS
             $ENV{${PKG_NAME}_DIR}
             ${PKG_LIBRARY_DIRS}
@@ -61,11 +62,9 @@ find_library(${PKG_NAME}_LIBRARY_RELEASE
             ${COMMON_INSTALL_DIRS}
         )
 
-if (${PKG_NAME}_LIBRARY_DEBUG AND ${PKG_NAME}_LIBRARY_RELEASE)
-    # use different libraries for different configurations
-    set (${PKG_NAME}_LIBRARIES
-            optimized ${${PKG_NAME}_LIBRARY_RELEASE}
-            debug ${${PKG_NAME}_LIBRARY_DEBUG})
+
+if (${PKG_NAME}_C_LIBRARY AND ${PKG_NAME}_LIBRARY)
+    set(${PKG_NAME}_LIBRARIES ${${PKG_NAME}_C_LIBRARY} ${${PKG_NAME}_LIBRARY})
 endif ()
 
 include(FindPackageHandleStandardArgs)

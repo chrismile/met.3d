@@ -160,7 +160,7 @@ include_directories(${GLEW_INCLUDE_DIRS})
 
 # Log4cplus
 find_package(log4cplus REQUIRED)
-include_directories(${LOG4CPLUS_INCLUDE_DIR})
+include_directories(${log4cplus_INCLUDE_DIR})
 
 # GDAL
 find_package(GDAL REQUIRED)
@@ -172,19 +172,19 @@ include_directories(${GSL_INCLUDE_DIRS})
 
 # Grib-API
 find_package(grib_api REQUIRED)
-include_directories(${GRIB_API_INCLUDE_DIR})
+include_directories(${grib_api_INCLUDE_DIR})
 
 # Netcdf
-find_package(netcdf_cpp4 REQUIRED)
-include_directories(${NETCDF_CPP4_INCLUDE_DIR})
+find_package(netcdf_cxx4 REQUIRED)
+include_directories(${netcdf_cxx4_INCLUDE_DIR})
 
 # QCustomPlot
 find_package(qcustomplot REQUIRED)
-include_directories(${QCUSTOMPLOT_INCLUDE_DIR})
+include_directories(${qcustomplot_INCLUDE_DIR})
 
 # GLFX
 find_package(glfx REQUIRED)
-include_directories(${GLFX_INCLUDE_DIR})
+include_directories(${glfx_INCLUDE_DIR})
 
 # Eigen3
 #find_package(Eigen3 REQUIRED)
@@ -252,44 +252,44 @@ add_custom_target(uis SOURCES     ${Met3D_UIS})
 
 # Tell cmake to create Met.3D executable.
 add_executable(Met3D # executable name
-               ${Met3D_Source} # cpp source files
-               ${Met3D_Header} # h header files
-               ${Met3D_Source_C} # c source files
+                ${Met3D_Source} # cpp source files
+                ${Met3D_Header} # h header files
+                ${Met3D_Source_C} # c source files
                
-               #${Met3D_Actors_Source}
-               #${Met3D_Data_Source}
-               #${Met3D_Data_Waypoints_Source}
-               #${Met3D_GXFW_Source}
-               #${Met3D_GXFW_GL_Source}
-               #${Met3D_QTExtensions_Source}
-               #${Met3D_System_Source}
-               #${Met3D_Util_Source}
-               #${Met3D_Cluster_Source}
+                #${Met3D_Actors_Source}
+                #${Met3D_Data_Source}
+                #${Met3D_Data_Waypoints_Source}
+                #${Met3D_GXFW_Source}
+                #${Met3D_GXFW_GL_Source}
+                #${Met3D_QTExtensions_Source}
+                #${Met3D_System_Source}
+                #${Met3D_Util_Source}
+                #${Met3D_Cluster_Source}
                
-               ${QT_PROPERTYBROWSER_Source}
-               ${MET3D_UIS_H} # add qt uis to the executable
-               ${MET3D_RC_SRCS}
+                ${QT_PROPERTYBROWSER_Source}
+                ${MET3D_UIS_H} # add qt uis to the executable
+                ${MET3D_RC_SRCS}
   )
 
 # Link Qt4 and other libraries to executable.
 target_link_libraries(Met3D
-                      Qt4::QtCore
-                      Qt4::QtGui
-                      Qt4::QtOpenGL
-                      Qt4::QtXml
-                      Qt4::QtNetwork
-                      ${FREETYPE_LIBRARIES}
-                      ${OPENGL_gl_LIBRARY}
-                      ${OPENGL_glu_LIBRARY}
-                      ${GLEW_LIBRARIES}
-                      ${LOG4CPLUS_LIBRARIES}
-                      ${GDAL_LIBRARY}
-                      ${GSL_LIBRARIES}
-                      ${GRIB_API_LIBRARIES}
-                      ${NETCDF_CPP4_LIBRARIES}
-                      ${QCUSTOMPLOT_LIBRARY}
-                      ${GLFX_LIBRARIES}
-                      #${EIGEN3_LIBRARIES}
+                        Qt4::QtCore
+                        Qt4::QtGui
+                        Qt4::QtOpenGL
+                        Qt4::QtXml
+                        Qt4::QtNetwork
+                        ${FREETYPE_LIBRARIES}
+                        ${OPENGL_gl_LIBRARY}
+                        ${OPENGL_glu_LIBRARY}
+                        ${GLEW_LIBRARIES}
+                        ${GDAL_LIBRARY}
+                        ${GSL_LIBRARIES}
+                        ${log4cplus_LIBRARIES}
+                        ${grib_api_LIBRARIES}
+                        ${netcdf_cxx4_LIBRARIES}
+                        ${qcustomplot_LIBRARIES}
+                        ${glfx_LIBRARIES}
+                        #${EIGEN3_LIBRARIES}
   )
 
 # Set command line arguments TODO does not work!
