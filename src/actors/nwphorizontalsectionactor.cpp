@@ -228,38 +228,31 @@ void MNWPHorizontalSectionActor::reloadShaderEffects()
 {
     LOG4CPLUS_DEBUG(mlog, "loading shader programs" << flush);
 
-    QProgressDialog *progressDialog = this->setupLoadingShaderProgressDialog(7);
+    beginCompileShaders(7);
 
-    compileFromFileWithProgressDialog(
+    compileShadersFromFileWithProgressDialog(
                 glVerticalInterpolationEffect,
-                "src/glsl/hsec_verticalinterpolation.fx.glsl",
-                progressDialog);
-    compileFromFileWithProgressDialog(
+                "src/glsl/hsec_verticalinterpolation.fx.glsl");
+    compileShadersFromFileWithProgressDialog(
                 glFilledContoursShader,
-                "src/glsl/hsec_filledcontours.fx.glsl",
-                progressDialog);
-    compileFromFileWithProgressDialog(
+                "src/glsl/hsec_filledcontours.fx.glsl");
+    compileShadersFromFileWithProgressDialog(
                 glPseudoColourShader,
-                "src/glsl/hsec_pseudocolour.fx.glsl",
-                progressDialog);
-    compileFromFileWithProgressDialog(
+                "src/glsl/hsec_pseudocolour.fx.glsl");
+    compileShadersFromFileWithProgressDialog(
                 glMarchingSquaresShader,
-                "src/glsl/hsec_marching_squares.fx.glsl",
-                progressDialog);
-    compileFromFileWithProgressDialog(
+                "src/glsl/hsec_marching_squares.fx.glsl");
+    compileShadersFromFileWithProgressDialog(
                 glWindBarbsShader,
-                "src/glsl/hsec_windbarbs.fx.glsl",
-                progressDialog);
-    compileFromFileWithProgressDialog(
+                "src/glsl/hsec_windbarbs.fx.glsl");
+    compileShadersFromFileWithProgressDialog(
                 glShadowQuad,
-                "src/glsl/hsec_shadow.fx.glsl",
-                progressDialog);
-    compileFromFileWithProgressDialog(
+                "src/glsl/hsec_shadow.fx.glsl");
+    compileShadersFromFileWithProgressDialog(
                 positionSpheresShader,
-                "src/glsl/trajectory_positions.fx.glsl",
-                progressDialog);
+                "src/glsl/trajectory_positions.fx.glsl");
 
-    delete progressDialog;
+    endCompileShaders();
 
     crossSectionGridsNeedUpdate = true;
 }

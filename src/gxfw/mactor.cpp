@@ -56,6 +56,8 @@ MActor::MActor(QObject *parent)
       labelsAreEnabled(true),
       renderAsWireFrame(false),
       actorIsPickable(false), // by default actors are not pickable
+      shaderCompilationProgressDialog(nullptr),
+      shaderCompilationProgress(0),
       actorName("Default actor"),
       addPropertiesCounter(0),
       actorIsInitialized(false),
@@ -145,6 +147,7 @@ MActor::MActor(QObject *parent)
 
 MActor::~MActor()
 {
+    delete shaderCompilationProgressDialog;
 }
 
 
@@ -585,34 +588,47 @@ void MActor::enableEmissionOfActorChangedSignal(bool enabled)
 }
 
 
-QProgressDialog *MActor::setupLoadingShaderProgressDialog(int numberOfShaders)
+void MActor::beginCompileShaders(int numberOfShaders)
 {
-    QProgressDialog *progressDialog = new QProgressDialog(
-                "Loading Shaders...", "",
-                0, numberOfShaders,
-                QApplication::activeModalWidget());
-    shaderLoadingProgress = 0;
-    // Hide cancel button.
-    progressDialog->setCancelButton(0);
-    // Hide close, resize and minimize buttons.
-    progressDialog->setWindowFlags(Qt::Dialog | Qt::CustomizeWindowHint);
-    // Block access to active widget while progress dialog is active.
-    progressDialog->setWindowModality(Qt::WindowModal);
-    // Always show progress dialog right away.
-    progressDialog->setMinimumDuration(0);
-    progressDialog->show();
+    if (shaderCompilationProgressDialog == nullptr)
+    {
+        shaderCompilationProgressDialog = new QProgressDialog(
+                    "Compiling OpenGL GLSL shaders...", "",
+                    0, numberOfShaders,
+                    QApplication::activeModalWidget());
+        // Hide cancel button.
+        shaderCompilationProgressDialog->setCancelButton(0);
+        // Hide close, resize and minimize buttons.
+        shaderCompilationProgressDialog->setWindowFlags(
+                    Qt::Dialog | Qt::CustomizeWindowHint);
+        // Block access to active widget while progress dialog is active.
+        shaderCompilationProgressDialog->setWindowModality(Qt::WindowModal);
+        shaderCompilationProgressDialog->setMinimumDuration(0);
+    }
 
-    return progressDialog;
+    // Set progress to 0%.
+    shaderCompilationProgress = 0;
+    shaderCompilationProgressDialog->setValue(0);
+
+    // Always show progress dialog right away.
+    shaderCompilationProgressDialog->show();
+    shaderCompilationProgressDialog->repaint();
 }
 
 
-void MActor::compileFromFileWithProgressDialog(
+void MActor::endCompileShaders()
+{
+    shaderCompilationProgressDialog->hide();
+}
+
+
+void MActor::compileShadersFromFileWithProgressDialog(
         std::shared_ptr<GL::MShaderEffect> shader,
-        const QString filename,
-        QProgressDialog *progressDialog)
+        const QString filename)
 {
     shader->compileFromFile_Met3DHome(filename);
-    progressDialog->setValue(++shaderLoadingProgress);
+    shaderCompilationProgressDialog->setValue(++shaderCompilationProgress);
+    shaderCompilationProgressDialog->repaint();
 }
 
 

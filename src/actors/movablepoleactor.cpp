@@ -122,18 +122,16 @@ void MMovablePoleActor::reloadShaderEffects()
 {
     LOG4CPLUS_DEBUG(mlog, "loading shader programs" << flush);
 
-    QProgressDialog *progressDialog = this->setupLoadingShaderProgressDialog(2);
+    beginCompileShaders(2);
 
-    compileFromFileWithProgressDialog(
+    compileShadersFromFileWithProgressDialog(
                 simpleGeometryEffect,
-                "src/glsl/simple_coloured_geometry.fx.glsl",
-                progressDialog);
-    compileFromFileWithProgressDialog(
+                "src/glsl/simple_coloured_geometry.fx.glsl");
+    compileShadersFromFileWithProgressDialog(
                 positionSpheresShader,
-                "src/glsl/trajectory_positions.fx.glsl",
-                progressDialog);
+                "src/glsl/trajectory_positions.fx.glsl");
 
-    delete progressDialog;
+    endCompileShaders();
 }
 
 

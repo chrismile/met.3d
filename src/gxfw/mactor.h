@@ -108,7 +108,8 @@ public:
     bool isInitialized();
 
     /**
-      Recompiles the actor's GLSL shaders.
+      Recompiles the actor's GLSL shaders. Needs to call
+      @ref beginCompileShaders() and @ref endCompileShaders().
       */
     virtual void reloadShaderEffects() = 0;
 
@@ -441,19 +442,29 @@ protected:
     void enablePicking(bool p) { actorIsPickable = p; }
 
     /**
-      Sets the shader loading progress dialog up. Resets
-      @ref shaderLoadingProgress to @p 0.
+      This method needs to be called at the beginning of each actor's
+      @ref reloadShaderEffects() method, indicating the number of shaders
+      that will be compiled. It needs to be followed by a call to
+      @ref endCompileShaders() after all shaders have been compiled.
+
+      The method sets up the "compile shaders" progress dialog. It resets
+      @ref shaderCompilationProgress to @p 0.
       */
-    QProgressDialog *setupLoadingShaderProgressDialog(int numberOfShaders);
+    void beginCompileShaders(int numberOfShaders);
 
     /**
-      Loads shader from filename and updates the shader loading progress dialog.
-      Uses @ref shaderLoadingProgress to store number of already loaded shaders.
+      See @ref beginCompileShaders().
+     */
+    void endCompileShaders();
+
+    /**
+      Compiles a GLSL shader from @p filename and updates the "compile shaders"
+      progress dialog. Uses @ref shaderCompilationProgress to update number of
+      already compiled shaders.
       */
-    void compileFromFileWithProgressDialog(
+    void compileShadersFromFileWithProgressDialog(
             std::shared_ptr<GL::MShaderEffect> shader,
-            const QString filename,
-            QProgressDialog *progressDialog);
+            const QString filename);
 
     /**
       Emit the @ref actorChanged() signal, but only if the signal is enabled,
@@ -525,7 +536,8 @@ protected:
     bool actorIsPickable;
 
     /** Counter to monitor the progress of shader loading process. */
-    int  shaderLoadingProgress;
+    QProgressDialog *shaderCompilationProgressDialog;
+    int  shaderCompilationProgress;
 
     /** List of scenes to which this actor has been added. */
     QList<MSceneControl*> scenes;
