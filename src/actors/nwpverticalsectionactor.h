@@ -157,6 +157,12 @@ protected:
     void dataFieldChangedEvent();
 
     /**
+      Parses the string @p pressureLevelStr for pressure level definitions.
+      @see MNWP2DSectionActorVariable::parseContourLevelString().
+     */
+    bool parseIsoPressureLevelString(QString pressureLevelStr);
+
+    /**
      Computes a list of pressure levels at which iso-pressure lines are plotted
      along the vertical section. The pressure levels are uploaded to a texture
      buffer.
@@ -219,6 +225,8 @@ private:
     QtProperty *upperLimitProperty;
     QtProperty *lowerLimitProperty;
     QVector<float> pressureLineLevels;
+    QVector<float> selectedPressureLineLevels;
+    QtProperty *pressureLineLevelsProperty;
 
     float opacity;
     QtProperty *opacityProperty;

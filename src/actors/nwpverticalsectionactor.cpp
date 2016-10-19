@@ -85,11 +85,25 @@ MNWPVerticalSectionActor::MNWPVerticalSectionActor()
 
     upperLimitProperty = addProperty(DECORATEDDOUBLE_PROPERTY, "top pressure",
                                      actorPropertiesSupGroup);
-    properties->setDDouble(upperLimitProperty, p_top_hPa, 0.01, 1050, 2, 5., " hPa");
+    properties->setDDouble(upperLimitProperty, p_top_hPa, 0.01, 1050, 2, 5.,
+                           " hPa");
 
     lowerLimitProperty = addProperty(DECORATEDDOUBLE_PROPERTY, "bottom pressure",
                                      actorPropertiesSupGroup);
-    properties->setDDouble(lowerLimitProperty, p_bot_hPa, 0.01, 1050, 2, 5., " hPa");
+    properties->setDDouble(lowerLimitProperty, p_bot_hPa, 0.01, 1050, 2, 5.,
+                           " hPa");
+
+
+
+    QString defaultPressureLineLevel = QString("1000.,900.,800.,700.,600.,500.")
+                                       + QString(",400.,300.,200.,100.,90.,80.")
+                                       + QString(",70.,60.,50.,40.,30.,20.");
+
+    pressureLineLevelsProperty = addProperty(STRING_PROPERTY, "pressure levels",
+                                                actorPropertiesSupGroup);
+    properties->mString()->setValue(pressureLineLevelsProperty,
+                                    defaultPressureLineLevel);
+    parseIsoPressureLevelString(defaultPressureLineLevel);
 
     opacityProperty = addProperty(DECORATEDDOUBLE_PROPERTY, "opacity",
                                   actorPropertiesSupGroup);
@@ -154,6 +168,8 @@ void MNWPVerticalSectionActor::saveConfiguration(QSettings *settings)
 
     settings->setValue("p_top_hPa", p_top_hPa);
     settings->setValue("p_bot_hPa", p_bot_hPa);
+    settings->setValue("pressureLevels",
+                       properties->mString()->value(pressureLineLevelsProperty));
     settings->setValue("opacity", opacity);
     settings->setValue("interpolationNodeSpacing", interpolationNodeSpacing);
 
@@ -177,6 +193,9 @@ void MNWPVerticalSectionActor::loadConfiguration(QSettings *settings)
     properties->mDDouble()->setValue(
                 lowerLimitProperty,
                 settings->value("p_bot_hPa").toFloat());
+    const QString pressureLevels = settings->value("pressureLevels").toString();
+    properties->mString()->setValue(pressureLineLevelsProperty,
+                                    pressureLevels);
     properties->mDDouble()->setValue(
                 opacityProperty,
                 settings->value("opacity").toFloat());
@@ -407,8 +426,22 @@ void MNWPVerticalSectionActor::onQtPropertyChanged(QtProperty *property)
 
         if (suppressActorUpdates()) return;
 
+        // Adapt iso pressure lines set to new boundaries.
         generateIsoPressureLines();
         updatePath = true;
+        emitActorChangedSignal();
+    }
+
+    else if (property == pressureLineLevelsProperty)
+    {
+        QString pressureLevelStr = properties->mString()->value(
+                    pressureLineLevelsProperty);
+        parseIsoPressureLevelString(pressureLevelStr);
+
+        if (suppressActorUpdates()) return;
+
+        generateIsoPressureLines();
+        generateLabels();
         emitActorChangedSignal();
     }
 
@@ -1136,22 +1169,90 @@ void MNWPVerticalSectionActor::dataFieldChangedEvent()
 }
 
 
-void MNWPVerticalSectionActor::generateIsoPressureLines()
+bool MNWPVerticalSectionActor::parseIsoPressureLevelString(QString pressureLevelStr)
 {
-    // Compute pressure values at which lines shall be drawn.
-    float possiblePressureLevels[18] = {1000., 900., 800., 700., 600.,
-                                        500., 400., 300., 200., 100.,
-                                        90., 80., 70., 60., 50.,
-                                        40., 30., 20.};
+    // Clear the current list of pressure line levels; if pLevelStr does not
+    // match any accepted format no pressure lines are drawn.
+    selectedPressureLineLevels.clear();
 
-    pressureLineLevels.clear();
-    for (int i = 0; i < 18; i++)
+    // Empty strings, i.e. no pressure lines, are accepted.
+    if (pressureLevelStr.isEmpty()) return true;
+
+    // Match strings of format "[0,100,10]" or "[0.5,10,0.5]".
+    QRegExp rxRange("^\\[([\\-|\\+]*\\d+\\.*\\d*),([\\-|\\+]*\\d+\\.*\\d*),"
+                    "([\\-|\\+]*\\d+\\.*\\d*)\\]$");
+    // Match strings of format "1,2,3,4,5" or "0,0.5,1,1.5,5,10" (number of
+    // values is arbitrary).
+    QRegExp rxList("^([\\-|\\+]*\\d+\\.*\\d*,*)+$");
+
+    if (rxRange.exactMatch(pressureLevelStr))
     {
-        if ((possiblePressureLevels[i] <= p_bot_hPa)
-                && (possiblePressureLevels[i] >= p_top_hPa))
-            pressureLineLevels.append(possiblePressureLevels[i]);
+        QStringList rangeValues = rxRange.capturedTexts();
+
+        bool ok;
+        double from = rangeValues.value(1).toDouble(&ok);
+        double to   = rangeValues.value(2).toDouble(&ok);
+        double step = rangeValues.value(3).toDouble(&ok);
+
+        if (step > 0)
+        {
+            for (double d = from; d <= to; d += step)
+            {
+                selectedPressureLineLevels << d;
+            }
+        }
+        else if (step < 0)
+        {
+            for (double d = from; d >= to; d += step)
+            {
+                selectedPressureLineLevels << d;
+            }
+        }
+
+        return true;
+    }
+    else if (rxList.exactMatch(pressureLevelStr))
+    {
+        QStringList listValues = pressureLevelStr.split(",");
+
+        bool ok;
+        for (int i = 0; i < listValues.size(); i++)
+        {
+            selectedPressureLineLevels << listValues.value(i).toDouble(&ok);
+        }
+
+        return true;
     }
 
+    // No RegExp could be matched.
+    return false;
+}
+
+
+void MNWPVerticalSectionActor::generateIsoPressureLines()
+{
+//    // Compute pressure values at which lines shall be drawn.
+//    float possiblePressureLevels[18] = {1000., 900., 800., 700., 600.,
+//                                        500., 400., 300., 200., 100.,
+//                                        90., 80., 70., 60., 50.,
+//                                        40., 30., 20.};
+
+//    pressureLineLevels.clear();
+//    for (int i = 0; i < 18; i++)
+//    {
+//        if ((possiblePressureLevels[i] <= p_bot_hPa)
+//                && (possiblePressureLevels[i] >= p_top_hPa))
+//            pressureLineLevels.append(possiblePressureLevels[i]);
+//    }
+
+
+    pressureLineLevels.clear();
+    for (int i = 0; i < selectedPressureLineLevels.size(); i++)
+    {
+        if ((selectedPressureLineLevels[i] <= p_bot_hPa)
+                && (selectedPressureLineLevels[i] >= p_top_hPa))
+            pressureLineLevels.append(selectedPressureLineLevels[i]);
+    }
 
     if (texturePressureLevels) delete texturePressureLevels;
 
