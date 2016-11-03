@@ -152,6 +152,23 @@ public:
 
     MNaturalEarthDataLoader* getNaturalEarthDataLoader();
 
+    /**
+      Returns true after @ref MGLResourcesManager::initializeGL() has been executed
+      and the application is entirely initialized (i.e. all config files
+      have been loaded and GL resources have been initialized).
+     */
+    bool applicationIsInitialized() { return met3dAppIsInitialized; }
+
+protected:
+    friend class MGLResourcesManager;
+
+    /**
+      This method is only called once by @ref MGLResourcesManager::initializeGL().
+      All other methods can query whether the application has already been
+      entirely initialized by calling @ref applicationIsInitialized().
+     */
+    void setApplicationIsInitialized();
+
 private:
     /**
      Constructor is private, as it should only be called from getInstance().
@@ -168,6 +185,8 @@ private:
     static MSystemManagerAndControl* instance;
 
     Ui::MSystemControl *ui;
+
+    bool met3dAppIsInitialized;
 
     QStringList commandLineArguments;
     QDir met3DHomeDir;

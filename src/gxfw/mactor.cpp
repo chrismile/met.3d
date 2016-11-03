@@ -33,6 +33,8 @@
 
 // local application imports
 #include "gxfw/mglresourcesmanager.h"
+#include "gxfw/msystemcontrol.h"
+#include "mainwindow.h"
 #include "gxfw/mscenecontrol.h"
 #include "util/mutil.h"
 #include "gxfw/gl/typedvertexbuffer.h"
@@ -594,21 +596,26 @@ void MActor::beginCompileShaders(int numberOfShaders)
     {
         shaderCompilationProgressDialog = new QProgressDialog(
                     "Compiling OpenGL GLSL shaders...", "",
-                    0, numberOfShaders,
-                    QApplication::activeModalWidget());
+                    0, numberOfShaders);
         // Hide cancel button.
         shaderCompilationProgressDialog->setCancelButton(0);
         // Hide close, resize and minimize buttons.
         shaderCompilationProgressDialog->setWindowFlags(
                     Qt::Dialog | Qt::CustomizeWindowHint);
-        // Block access to active widget while progress dialog is active.
-        shaderCompilationProgressDialog->setWindowModality(Qt::WindowModal);
         shaderCompilationProgressDialog->setMinimumDuration(0);
     }
 
     // Set progress to 0%.
     shaderCompilationProgress = 0;
     shaderCompilationProgressDialog->setValue(0);
+
+    // Block access to active widget while progress dialog is active.
+    // NOTE: This only works if the main window has already been shown; hence
+    // only after the application has been fully initialized.
+    if (MSystemManagerAndControl::getInstance()->applicationIsInitialized())
+    {
+        shaderCompilationProgressDialog->setWindowModality(Qt::ApplicationModal);
+    }
 
     // Always show progress dialog right away.
     shaderCompilationProgressDialog->show();
