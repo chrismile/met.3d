@@ -315,232 +315,17 @@ shader VSmain(in vec2 worldXY, out vec3 worldPos)
  ***                          GEOMETRY SHADER
  *****************************************************************************/
 
-// filled triangle
-void createPennantTri(  in vec3 dir,
-                        in vec3 normal,
-                        in vec3 pos,
-                        in float adaptedLineWidth,
-                        in float largeWidth,
-                        in float peakOffset,
-                        in float offset,
-                        in float posOffset)
-{
-    vec3 pos0, pos1, pos2;
-
-    //float scaleFactor = adaptedLineWidth / lineWidth;
-    pos += normal * adaptedLineWidth / 2.0;
-
-    pos0 = pos - posOffset / 2.0 * dir;
-    pos1 = pos0 - dir * posOffset / 2.0 + dir * peakOffset + normal * largeWidth;
-    pos2 = pos0 - dir * posOffset / 2.0 + dir * (offset + peakOffset);
-
-    gl_Position = mvpMatrix * vec4(pos0, 1);
-    EmitVertex();
-    gl_Position = mvpMatrix * vec4(pos1, 1);
-    EmitVertex();
-    gl_Position = mvpMatrix * vec4(pos2, 1);
-    EmitVertex();
-    EndPrimitive();
-}
-
-
-// two circles with 128 vertices
-void createCalmWindTri( in vec3 pos,
-                        in float adaptedLineWidth,
-                        in float smallRadius,
-                        in float largeRadius)
-{
-    const int tubeSegments = 16;
-    const float angleStep = 360.0 / float(tubeSegments);
-    const vec3 normal = vec3(1,0,0);
-    const vec3 binormal = vec3(0,1,0);
-
-    vec3 prevPos0, prevPos1;
-    vec3 currPos0, currPos1;
-    for (int i = 0; i <= tubeSegments; ++i)
-    {
-        float angle = radians(angleStep * i);
-        float cosi = cos(angle) * smallRadius;
-        float sini = sin(angle) * smallRadius;
-        float sinig = sin(angle) * (smallRadius - adaptedLineWidth);
-        float cosig = cos(angle) * (smallRadius - adaptedLineWidth);
-
-        if (i == 0)
-        {
-            prevPos0 = pos + normal * cosi + binormal * sini;
-            prevPos1 = pos + normal * cosig + binormal * sinig;
-            continue;
-        }
-
-        currPos0 = pos + normal * cosi + binormal * sini;
-        currPos1 = pos + normal * cosig + binormal * sinig;
-
-        gl_Position = mvpMatrix * vec4(prevPos0, 1);
-        EmitVertex();
-        gl_Position = mvpMatrix * vec4(currPos0, 1);
-        EmitVertex();
-        gl_Position = mvpMatrix * vec4(prevPos1, 1);
-        EmitVertex();
-        gl_Position = mvpMatrix * vec4(currPos1, 1);
-        EmitVertex();
-        EndPrimitive();
-
-        prevPos0 = currPos0;
-        prevPos1 = currPos1;
-    }
-
-    for (int i = 0; i <= tubeSegments; ++i)
-    {
-        float angle = radians(angleStep * i);
-        float cosi = cos(angle) * largeRadius;
-        float sini = sin(angle) * largeRadius;
-        float sinig = sin(angle) * (largeRadius - adaptedLineWidth);
-        float cosig = cos(angle) * (largeRadius - adaptedLineWidth);
-
-        if (i == 0)
-        {
-            prevPos0 = pos + normal * cosi + binormal * sini;
-            prevPos1 = pos + normal * cosig + binormal * sinig;
-            continue;
-        }
-
-        currPos0 = pos + normal * cosi + binormal * sini;
-        currPos1 = pos + normal * cosig + binormal * sinig;
-
-        gl_Position = mvpMatrix * vec4(prevPos0, 1);
-        EmitVertex();
-        gl_Position = mvpMatrix * vec4(currPos0, 1);
-        EmitVertex();
-        gl_Position = mvpMatrix * vec4(prevPos1, 1);
-        EmitVertex();
-        gl_Position = mvpMatrix * vec4(currPos1, 1);
-        EmitVertex();
-        EndPrimitive();
-
-        prevPos0 = currPos0;
-        prevPos1 = currPos1;
-    }
-}
-
-
-void createHalfFlagTri( in vec3 dir,
-                        in vec3 normal,
-                        in vec3 pos,
-                        in float adaptedLineWidth,
-                        in float smallWidth,
-                        in float offset,
-                        in float posOffset)
-{
-    vec3 pos0, pos1, pos2, pos3;
-
-    pos += normal * adaptedLineWidth / 2.0;
-
-    // left bottom
-    pos0 = pos - dir * adaptedLineWidth / 2.0;
-    // left top
-    pos1 = pos0 - dir * offset + normal * smallWidth;
-    // right bottom
-    pos2 = pos + dir * adaptedLineWidth / 2.0;
-    // right top
-    pos3 = pos2 - dir * offset + normal * smallWidth;
-
-    gl_Position = mvpMatrix * vec4(pos0, 1);
-    EmitVertex();
-    gl_Position = mvpMatrix * vec4(pos1, 1);
-    EmitVertex();
-    gl_Position = mvpMatrix * vec4(pos2, 1);
-    EmitVertex();
-    gl_Position = mvpMatrix * vec4(pos3, 1);
-    EmitVertex();
-    EndPrimitive();
-}
-
-
-void createFullFlagTri( in vec3 dir,
-                        in vec3 normal,
-                        in vec3 pos,
-                        in float adaptedLineWidth,
-                        in float largeWidth,
-                        in float offset,
-                        in float posOffset)
-{
-    vec3 pos0, pos1, pos2, pos3;
-
-    pos += normal * adaptedLineWidth / 2.0;
-
-    // left bottom
-    pos0 = pos - dir * adaptedLineWidth / 2.0;
-    // left top
-    pos1 = pos0 - dir * offset + normal * largeWidth;
-    // right bottom
-    pos2 = pos + dir * adaptedLineWidth / 2.0;
-    // right top
-    pos3 = pos2 - dir * offset + normal * largeWidth;
-
-    gl_Position = mvpMatrix * vec4(pos0, 1);
-    EmitVertex();
-    gl_Position = mvpMatrix * vec4(pos1, 1);
-    EmitVertex();
-    gl_Position = mvpMatrix * vec4(pos2, 1);
-    EmitVertex();
-    gl_Position = mvpMatrix * vec4(pos3, 1);
-    EmitVertex();
-    EndPrimitive();
-}
-
-
-// describes a rectangle bar
-void createBaseTri( in vec3 dir,
-                    in vec3 normal,
-                    in vec3 pos,
-                    in float adaptedLineWidth,
-                    in float barbLength)
-{
-    vec3 pos0, pos1, pos2, pos3;
-
-#ifdef PIVOT_TIP
-    // left bottom
-    pos0 = pos - dir * barbLength - normal * adaptedLineWidth / 2.0;
-    // left top
-    pos1 = pos                    - normal * adaptedLineWidth / 2.0;
-    // right bottom
-    pos2 = pos - dir * barbLength + normal * adaptedLineWidth / 2.0;
-    // right top
-    pos3 = pos                    + normal * adaptedLineWidth / 2.0;
-#else
-    // left bottom
-    pos0 = pos - dir * barbLength / 2.0 - normal * adaptedLineWidth / 2.0;
-    // left top
-    pos1 = pos + dir * barbLength / 2.0 - normal * adaptedLineWidth / 2.0;
-    // right bottom
-    pos2 = pos - dir * barbLength / 2.0 + normal * adaptedLineWidth / 2.0;
-    // right top
-    pos3 = pos + dir * barbLength / 2.0 + normal * adaptedLineWidth / 2.0;
-#endif
-
-    gl_Position = mvpMatrix * vec4(pos0, 1);
-    EmitVertex();
-    gl_Position = mvpMatrix * vec4(pos1, 1);
-    EmitVertex();
-    gl_Position = mvpMatrix * vec4(pos2, 1);
-    EmitVertex();
-    gl_Position = mvpMatrix * vec4(pos3, 1);
-    EmitVertex();
-    EndPrimitive();
-
-}
-
 
 shader GSmain(in vec3 worldPos[], out GStoFS Output)
 {
     Output.color = glyphColor;
 
     // current world position
-    const vec3 pos = worldPos[0];
+    vec3 posWorld = worldPos[0];
 
     // sample both wind textures, obtain wind speed in u and v direction
-    float windU = sampleDataAtPos(pos, dataUComp, surfacePressureU, hybridCoefficientsU);
-    float windV = sampleDataAtPos(pos, dataVComp, surfacePressureV, hybridCoefficientsV);
+    float windU = sampleDataAtPos(posWorld, dataUComp, surfacePressureU, hybridCoefficientsU);
+    float windV = sampleDataAtPos(posWorld, dataVComp, surfacePressureV, hybridCoefficientsV);
 
     // if no data is available, do not draw any glyphs
     if (windU == MISSING_VALUE || windV == MISSING_VALUE)
@@ -552,11 +337,11 @@ shader GSmain(in vec3 worldPos[], out GStoFS Output)
     vec3 windDir = vec3(windU, windV, 0);
 
     // normalized wind direction
-    const vec3 dir = normalize(windDir);
-    const vec3 normal = normalize( vec3( -dir.y, dir.x, 0));
+    vec3 dir = normalize(windDir);
+    vec3 normal = normalize( vec3( -dir.y, dir.x, 0));
 
     // wind velocity in m/s
-    const float velocity = length(windDir);
+    float velocity = length(windDir);
     // wind velocity in kt
     float knots = computeKnots(velocity);
 
@@ -568,51 +353,109 @@ shader GSmain(in vec3 worldPos[], out GStoFS Output)
     //const float scaleDistFactor = camDist * 0.6;
 
     // compute useful glyph parameters
-    const float deltaGrid = (deltaGridX + deltaGridY) / 2.0f;
+    float deltaGrid = (deltaGridX + deltaGridY) / 2.0f;
 
     // adapt line width of glyph elements
-    const float adaptedLineWidth = deltaGrid * lineWidth;
+    float adaptedLineWidth = deltaGrid * lineWidth;
     // compute barb length
-    const float barbLength = 0.75 * deltaGrid;
+    float barbLength = 0.75 * deltaGrid;
     // compute small radius of calm wind
-    const float smallRadius = 0.15 * deltaGrid;
+    float smallRadius = 0.15 * deltaGrid;
     // compute large radius of calm wind
-    const float largeRadius = 0.3 * deltaGrid;
+    float largeRadius = 0.3 * deltaGrid;
 
     // set posOffset
-    const float posOffset = barbLength / numFlags;
+    float posOffset = barbLength / numFlags;
 
     // set pennant triangle offset
-    const float pennantPeakOffset = 0.3 * posOffset;
+    float pennantPeakOffset = 0.3 * posOffset;
     // set offset of flags and pennant
-    const float pennantOffset = 2 * 0.95 * posOffset;
+    float pennantOffset = 2 * 0.95 * posOffset;
     // set flag offset
-    const float flagOffset = pennantOffset;
+    float flagOffset = pennantOffset;
 
     // compute width of small flag
-    const float smallWidth = 0.2 * 0.6 * deltaGrid;
+    float smallWidth = 0.2 * 0.6 * deltaGrid;
     // compute width of large flag
-    const float largeWidth = 0.2 * deltaGrid;
+    float largeWidth = 0.2 * deltaGrid;
 
     // distance between elements
     //const float pennantDist = (offset  + pennantOffset);
     //const float flagDist = offset * 1    * scaleDistFactor;
 
+    // ------------------------------------------------------------------------------------
+    // Create the base line of the wind barb glyph
+
+    //! NOTE (Kern, 2016-11-03): Using EmitVertex() and EndPrimitve() in local functions
+    // is not possible after NVidia driver 340 since the latest driver do not allow
+    // to use stage-specific functions in all shaders. GLFX always includes
+    // local functions into all shader stage programs (VS/FS) which leads to
+    // compilation errors for all stages except the geometry shader.
+
     if (knots >= 5.0)
     {
-        createBaseTri(dir, normal, pos,
-                        adaptedLineWidth, barbLength);
+        vec3 pos0, pos1, pos2, pos3;
+        vec3 pos = posWorld;
 
-#ifdef PIVOT_TIP                        
-        vec3 elemPos = pos - dir * barbLength + dir * (posOffset / 2.0);
+        #ifdef PIVOT_TIP
+            // left bottom
+            pos0 = pos - dir * barbLength - normal * adaptedLineWidth / 2.0;
+            // left top
+            pos1 = pos                    - normal * adaptedLineWidth / 2.0;
+            // right bottom
+            pos2 = pos - dir * barbLength + normal * adaptedLineWidth / 2.0;
+            // right top
+            pos3 = pos                    + normal * adaptedLineWidth / 2.0;
+        #else
+            // left bottom
+            pos0 = pos - dir * barbLength / 2.0 - normal * adaptedLineWidth / 2.0;
+            // left top
+            pos1 = pos + dir * barbLength / 2.0 - normal * adaptedLineWidth / 2.0;
+            // right bottom
+            pos2 = pos - dir * barbLength / 2.0 + normal * adaptedLineWidth / 2.0;
+            // right top
+            pos3 = pos + dir * barbLength / 2.0 + normal * adaptedLineWidth / 2.0;
+        #endif
+
+            gl_Position = mvpMatrix * vec4(pos0, 1);
+            EmitVertex();
+            gl_Position = mvpMatrix * vec4(pos1, 1);
+            EmitVertex();
+            gl_Position = mvpMatrix * vec4(pos2, 1);
+            EmitVertex();
+            gl_Position = mvpMatrix * vec4(pos3, 1);
+            EmitVertex();
+            EndPrimitive();
+
+#ifdef PIVOT_TIP
+        vec3 elemPos = posWorld - dir * barbLength + dir * (posOffset / 2.0);
 #else
-        vec3 elemPos = pos - dir * (barbLength / 2.0 * 0.9) + dir * (posOffset / 2.0);
+        vec3 elemPos = posWorld - dir * (barbLength / 2.0 * 0.9) + dir * (posOffset / 2.0);
 #endif
+
+        // ------------------------------------------------------------------------------------
+        // Create the pennants at the current wind barb position
 
         for(int i = 0; i < floor(knots / 50); ++i)
         {
-            createPennantTri(dir, normal, elemPos,
-                            adaptedLineWidth, largeWidth, pennantPeakOffset, pennantOffset, posOffset);
+            vec3 pos0, pos1, pos2;
+            vec3 pos = elemPos;
+
+            //float scaleFactor = adaptedLineWidth / lineWidth;
+            pos += normal * adaptedLineWidth / 2.0;
+
+            pos0 = pos - posOffset / 2.0 * dir;
+            pos1 = pos0 - dir * posOffset / 2.0 + dir * pennantPeakOffset + normal * largeWidth;
+            pos2 = pos0 - dir * posOffset / 2.0 + dir * (pennantOffset + pennantPeakOffset);
+
+            gl_Position = mvpMatrix * vec4(pos0, 1);
+            EmitVertex();
+            gl_Position = mvpMatrix * vec4(pos1, 1);
+            EmitVertex();
+            gl_Position = mvpMatrix * vec4(pos2, 1);
+            EmitVertex();
+            EndPrimitive();
+
             elemPos += 2 * posOffset * dir;
         }
 
@@ -620,19 +463,70 @@ shader GSmain(in vec3 worldPos[], out GStoFS Output)
 
         //elemPos += flagDist * 0.001 * dir;
 
+        // ------------------------------------------------------------------------------------
+        // Create the full flag triangle at the current wind barb position
+
         for(int j = 0; j < floor(knots / 10); ++j)
         {
-            createFullFlagTri(dir, normal, elemPos,
-                                adaptedLineWidth, largeWidth, flagOffset, posOffset);
+            vec3 pos0, pos1, pos2, pos3;
+            vec3 pos = elemPos;
+
+            pos += normal * adaptedLineWidth / 2.0;
+
+            // left bottom
+            pos0 = pos - dir * adaptedLineWidth / 2.0;
+            // left top
+            pos1 = pos0 - dir * flagOffset + normal * largeWidth;
+            // right bottom
+            pos2 = pos + dir * adaptedLineWidth / 2.0;
+            // right top
+            pos3 = pos2 - dir * flagOffset + normal * largeWidth;
+
+            gl_Position = mvpMatrix * vec4(pos0, 1);
+            EmitVertex();
+            gl_Position = mvpMatrix * vec4(pos1, 1);
+            EmitVertex();
+            gl_Position = mvpMatrix * vec4(pos2, 1);
+            EmitVertex();
+            gl_Position = mvpMatrix * vec4(pos3, 1);
+            EmitVertex();
+            EndPrimitive();
+
+
             elemPos += posOffset * dir;
         }
 
         knots = mod(knots,10);
 
+        // ------------------------------------------------------------------------------------
+        // Create the half flag triangle at the current wind barb position
+
         for(int k = 0; k < floor(knots / 5); ++k)
         {
-            createHalfFlagTri(dir, normal, elemPos,
-                                adaptedLineWidth, smallWidth, flagOffset * 0.6, posOffset);
+            vec3 pos0, pos1, pos2, pos3;
+            vec3 pos = elemPos;
+
+            pos += normal * adaptedLineWidth / 2.0;
+
+            // left bottom
+            pos0 = pos - dir * adaptedLineWidth / 2.0;
+            // left top
+            pos1 = pos0 - dir * flagOffset * 0.6 + normal * smallWidth;
+            // right bottom
+            pos2 = pos + dir * adaptedLineWidth / 2.0;
+            // right top
+            pos3 = pos2 - dir * flagOffset * 0.6 + normal * smallWidth;
+
+            gl_Position = mvpMatrix * vec4(pos0, 1);
+            EmitVertex();
+            gl_Position = mvpMatrix * vec4(pos1, 1);
+            EmitVertex();
+            gl_Position = mvpMatrix * vec4(pos2, 1);
+            EmitVertex();
+            gl_Position = mvpMatrix * vec4(pos3, 1);
+            EmitVertex();
+            EndPrimitive();
+
             elemPos += posOffset * dir;
         }
 
@@ -640,13 +534,89 @@ shader GSmain(in vec3 worldPos[], out GStoFS Output)
    }
    else
    {
-        if (showCalmGlyph)
+        // ------------------------------------------------------------------------------------
+	// Create the glyph for calm wind with 2 circles consiting of 128 vertices each
+        
+	if (showCalmGlyph)
         {
-            createCalmWindTri(pos, adaptedLineWidth, smallRadius, largeRadius);
+
+            vec3 pos = posWorld;
+
+            const int tubeSegments = 16;
+            const float angleStep = 360.0 / float(tubeSegments);
+            const vec3 normal = vec3(1,0,0);
+            const vec3 binormal = vec3(0,1,0);
+
+            vec3 prevPos0, prevPos1;
+            vec3 currPos0, currPos1;
+            for (int i = 0; i <= tubeSegments; ++i)
+            {
+                float angle = radians(angleStep * i);
+                float cosi = cos(angle) * smallRadius;
+                float sini = sin(angle) * smallRadius;
+                float sinig = sin(angle) * (smallRadius - adaptedLineWidth);
+                float cosig = cos(angle) * (smallRadius - adaptedLineWidth);
+
+                if (i == 0)
+                {
+                    prevPos0 = pos + normal * cosi + binormal * sini;
+                    prevPos1 = pos + normal * cosig + binormal * sinig;
+                    continue;
+                }
+
+                currPos0 = pos + normal * cosi + binormal * sini;
+                currPos1 = pos + normal * cosig + binormal * sinig;
+
+                gl_Position = mvpMatrix * vec4(prevPos0, 1);
+                EmitVertex();
+                gl_Position = mvpMatrix * vec4(currPos0, 1);
+                EmitVertex();
+                gl_Position = mvpMatrix * vec4(prevPos1, 1);
+                EmitVertex();
+                gl_Position = mvpMatrix * vec4(currPos1, 1);
+                EmitVertex();
+                EndPrimitive();
+
+                prevPos0 = currPos0;
+                prevPos1 = currPos1;
+            }
+
+            for (int i = 0; i <= tubeSegments; ++i)
+            {
+                float angle = radians(angleStep * i);
+                float cosi = cos(angle) * largeRadius;
+                float sini = sin(angle) * largeRadius;
+                float sinig = sin(angle) * (largeRadius - adaptedLineWidth);
+                float cosig = cos(angle) * (largeRadius - adaptedLineWidth);
+
+                if (i == 0)
+                {
+                    prevPos0 = pos + normal * cosi + binormal * sini;
+                    prevPos1 = pos + normal * cosig + binormal * sinig;
+                    continue;
+                }
+
+                currPos0 = pos + normal * cosi + binormal * sini;
+                currPos1 = pos + normal * cosig + binormal * sinig;
+
+                gl_Position = mvpMatrix * vec4(prevPos0, 1);
+                EmitVertex();
+                gl_Position = mvpMatrix * vec4(currPos0, 1);
+                EmitVertex();
+                gl_Position = mvpMatrix * vec4(prevPos1, 1);
+                EmitVertex();
+                gl_Position = mvpMatrix * vec4(currPos1, 1);
+                EmitVertex();
+                EndPrimitive();
+
+                prevPos0 = currPos0;
+                prevPos1 = currPos1;
+            }
         }
+
+        // ------------------------------------------------------------------------------------
    }
 }
-
 
 /*****************************************************************************
  ***                          FRAGMENT SHADER
@@ -664,7 +634,7 @@ shader FSmain(in GStoFS Input, out vec4 fragColor)
 
 program Standard
 {
-    vs(420)=VSmain();
-    gs(420)=GSmain() : in(points), out(triangle_strip, max_vertices = 128);
-    fs(420)=FSmain();
+    vs(330)=VSmain();
+    gs(330)=GSmain() : in(points), out(triangle_strip, max_vertices = 128);
+    fs(330)=FSmain();
 };
