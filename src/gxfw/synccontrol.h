@@ -138,12 +138,12 @@ public slots:
     void timeAnimationAdvanceTimeStep();
 
     /**
-      Starts animation over time.
+      Start animation over time.
       */
     void startTimeAnimation();
 
     /**
-      Stops animation over time.
+      Stop animation over time.
       */
     void stopTimeAnimation();
 
@@ -181,6 +181,26 @@ protected slots:
     void onInitDateTimeChange(const QDateTime &datetime);
 
     void onEnsembleModeChange(const int foo);
+
+    /**
+      Copy initial time to @ref timeAnimationFrom.
+      */
+    void copyInitToFrom();
+
+    /**
+      Copy valid time to @ref timeAnimationFrom.
+      */
+    void copyValidToFrom();
+
+    /**
+      Copy inital time to @ref timeAnimationTo.
+      */
+    void copyInitToTo();
+
+    /**
+      Copy valid time to @ref timeAnimationTo.
+      */
+    void copyValidToTo();
 
 private:
     /**
@@ -220,8 +240,16 @@ private:
     // Properties to control time animations.
     QMenu *timeAnimationDropdownMenu;
     QSpinBox *timeAnimationTimeStepSpinBox;
+    QWidget *timeAnimationFromWidget;
+    QWidget *timeAnimationToWidget;
+    QHBoxLayout *timeAnimationFromLayout;
+    QHBoxLayout *timeAnimationToLayout;
     QDateTimeEdit *timeAnimationFrom;
     QDateTimeEdit *timeAnimationTo;
+    QPushButton *copyInitTimeToAnimationFromButton;
+    QPushButton *copyValidTimeToAnimationFromButton;
+    QPushButton *copyInitTimeToAnimationToButton;
+    QPushButton *copyValidTimeToAnimationToButton;
     QActionGroup *timeAnimationLoopGroup;
     QAction *timeAnimationSinglePassAction;
     QAction *timeAnimationLoopTimeAction;
