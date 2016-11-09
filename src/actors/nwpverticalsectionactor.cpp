@@ -191,7 +191,7 @@ void MNWPVerticalSectionActor::loadConfiguration(QSettings *settings)
                 settings->value("opacity").toFloat());
     properties->mDDouble()->setValue(
                 interpolationNodeSpacingProperty,
-                settings->value("interpolationNodeSpacing").toFloat());
+                settings->value("interpolationNodeSpacing", 0.15).toFloat());
 
     settings->endGroup();
 }
