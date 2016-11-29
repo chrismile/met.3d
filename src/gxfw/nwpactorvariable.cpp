@@ -2073,6 +2073,19 @@ void MNWP2DSectionActorVariable::loadConfiguration(QSettings *settings)
 
     properties->mColor()->setValue(renderSettings.thickContourColourProperty,
                                    settings->value("thickContourColour").value<QColor>());
+
+
+// TODO (bt, 29NOV2016): Connect these variables to their ContourLevels
+// variable they belong to, so one can update these in parseContourLevelString()
+    // Update [thin/thick]Contours[Start/Stop]Index to avoid contours not being
+    // displayed if one loads config with given contour levels but with a render
+    // mode selected not displaying the contours. If one selects a render mode
+    // for contour lines without changing the contour levels meanwhile, the
+    // contours won't be displayed unless one changes the levels.
+    thinContoursStartIndex  = 0;
+    thinContoursStopIndex   = thinContourLevels.size();
+    thickContoursStartIndex = 0;
+    thickContoursStopIndex  = thickContourLevels.size();
 }
 
 
