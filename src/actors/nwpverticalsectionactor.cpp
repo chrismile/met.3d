@@ -981,7 +981,7 @@ void MNWPVerticalSectionActor::renderToCurrentContext(MSceneViewGLWidget *sceneV
 
             // Loop over all iso values for which thin contour lines should be
             // rendered -- one render pass per isovalue.
-            glLineWidth(1); CHECK_GL_ERROR;
+            glLineWidth(var->thinContourThickness); CHECK_GL_ERROR;
 
 //TODO put this somewhere else (mr, 28Jan2013)
             var->thinContoursStartIndex  = 0;
@@ -1003,7 +1003,7 @@ void MNWPVerticalSectionActor::renderToCurrentContext(MSceneViewGLWidget *sceneV
             }
 
             // The same for the thick iso lines.
-            glLineWidth(2); CHECK_GL_ERROR;
+            glLineWidth(var->thickContourThickness); CHECK_GL_ERROR;
             marchingSquaresShader->setUniformValue(
                         "colour", var->thickContourColour);  CHECK_GL_ERROR;
             for (int i = var->thickContoursStartIndex;

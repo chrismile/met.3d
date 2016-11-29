@@ -1509,7 +1509,7 @@ void MNWPHorizontalSectionActor::renderLineCountours(
 
     // Loop over all iso values for which thin contour lines should be
     // rendered -- one render pass per isovalue.
-    glLineWidth(1); CHECK_GL_ERROR;
+    glLineWidth(var->thinContourThickness); CHECK_GL_ERROR;
     glMarchingSquaresShader->setUniformValue(
                 "colour", var->thinContourColour);
     for (int i = var->thinContoursStartIndex;
@@ -1525,6 +1525,7 @@ void MNWPHorizontalSectionActor::renderLineCountours(
 
     // The same for the thick iso lines.
     glLineWidth(2); CHECK_GL_ERROR;
+    glLineWidth(var->thickContourThickness); CHECK_GL_ERROR;
     glMarchingSquaresShader->setUniformValue(
                 "colour", var->thickContourColour);
     for (int i = var->thickContoursStartIndex;
