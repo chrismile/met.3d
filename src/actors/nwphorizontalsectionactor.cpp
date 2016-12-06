@@ -1524,7 +1524,6 @@ void MNWPHorizontalSectionActor::renderLineCountours(
     }
 
     // The same for the thick iso lines.
-    glLineWidth(2); CHECK_GL_ERROR;
     glLineWidth(var->thickContourThickness); CHECK_GL_ERROR;
     glMarchingSquaresShader->setUniformValue(
                 "colour", var->thickContourColour);
