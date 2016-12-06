@@ -120,7 +120,8 @@ HEADERS += \
     src/gxfw/memberselectiondialog.h \
     src/gxfw/adddatasetdialog.h \
     src/data/derivedmetvarsdatasource.h \
-    src/data/bboxtrajectoryfilter.h
+    src/data/bboxtrajectoryfilter.h \
+    src/gxfw/mresizewindowdialog.h
 
 SOURCES += \
     src/main.cpp \
@@ -208,7 +209,8 @@ SOURCES += \
     src/gxfw/memberselectiondialog.cpp \
     src/gxfw/adddatasetdialog.cpp \
     src/data/derivedmetvarsdatasource.cpp \
-    src/data/bboxtrajectoryfilter.cpp
+    src/data/bboxtrajectoryfilter.cpp \
+    src/gxfw/mresizewindowdialog.cpp
 
 FORMS += \
     src/mainwindow.ui \
@@ -220,7 +222,8 @@ FORMS += \
     src/gxfw/scenemanagementdialog.ui \
     src/gxfw/synccontrol.ui \
     src/gxfw/memberselectiondialog.ui \
-    src/gxfw/adddatasetdialog.ui
+    src/gxfw/adddatasetdialog.ui \
+    src/gxfw/resizewindowdialog.ui
 
 OTHER_FILES += \
     data/log4cplus.properties \

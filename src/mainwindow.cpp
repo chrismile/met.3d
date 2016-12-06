@@ -50,7 +50,8 @@ namespace Met3D
 MMainWindow::MMainWindow(QStringList commandLineArguments, QWidget *parent)
     : QMainWindow(parent),
       ui(new Ui::MainWindow),
-      sceneManagementDialog(new MSceneManagementDialog)
+      sceneManagementDialog(new MSceneManagementDialog),
+      resizeWindowDialog(new MResizeWindowDialog)
 {
     // Qt Designer specific initialization.
     ui->setupUi(this);
@@ -172,6 +173,8 @@ MMainWindow::MMainWindow(QStringList commandLineArguments, QWidget *parent)
             this, SLOT(sceneManagement()));
     connect(ui->actionAddDataset, SIGNAL(triggered()),
             this, SLOT(addDataset()));
+    connect(ui->actionResizeWindow, SIGNAL(triggered()),
+            this, SLOT(resizeWindow()));
 
     // Signal mapper to map all layout related menu actions to a single
     // slot (setSceneViewLayout()).
@@ -215,6 +218,7 @@ MMainWindow::~MMainWindow()
     LOG4CPLUS_DEBUG(mlog, "Freeing application resources.." << flush);
 
     delete sceneManagementDialog;
+    delete resizeWindowDialog;
 
     for (int i = 0; i < sceneViewGLWidgets.size(); i++)
         delete sceneViewGLWidgets[i];
@@ -566,6 +570,21 @@ void MMainWindow::showAboutDialog()
                 ).arg(met3dVersionString).arg(met3dBuildDate);
 
     QMessageBox::about(this, "About Met.3D", aboutString);
+}
+
+
+void MMainWindow::resizeWindow()
+{
+    // Initialise input boxes and ratio with current window size
+    resizeWindowDialog->setup(this->width(),this->height());
+
+    if (resizeWindowDialog->exec() == QDialog::Rejected) return;
+
+    int newWidth = resizeWindowDialog->getWidth();
+    int newHeight = resizeWindowDialog->getHeight();
+    // TODO (bt, 25Oct2016) At the moment only resize in one monitor possible
+    this->resize(newWidth, newHeight);
+
 }
 
 
