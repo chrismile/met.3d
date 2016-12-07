@@ -35,6 +35,7 @@
 #include <QtGui>
 #include <QtOpenGL>
 #include <log4cplus/loggingmacros.h>
+#include <QFileInfo>
 
 // local application imports
 #include "util/mutil.h"
@@ -66,6 +67,7 @@ MSceneViewGLWidget::MSceneViewGLWidget()
       sceneRotationCentre(QVector3D(0,0,1020)),
       cameraAutorotationMode(false),
       freezeMode(0),
+      sceneNavigationSensitivity(1.),
       measureFPS(false),
       measureFPSFrameCount(0),
       sceneNameLabel(nullptr),
@@ -175,6 +177,10 @@ MSceneViewGLWidget::MSceneViewGLWidget()
             ->addProperty("interaction");
     propertyGroup->addSubProperty(interactionGroupProperty);
 
+    sceneSaveToImageProperty = systemControl->getClickPropertyManager()
+            ->addProperty("save to image file");
+    interactionGroupProperty->addSubProperty(sceneSaveToImageProperty);
+
     sceneNavigationModeProperty = systemControl->getEnumPropertyManager()
             ->addProperty("scene navigation");
     systemControl->getEnumPropertyManager()->setEnumNames(
@@ -209,6 +215,16 @@ MSceneViewGLWidget::MSceneViewGLWidget()
             ->addProperty("interactively select rotation centre");
     sceneRotationCenterProperty->addSubProperty(selectSceneRotationCentreProperty);
     selectSceneRotationCentreProperty->setEnabled(false);
+
+    sceneNavigationSensitivityProperty = systemControl->getDecoratedDoublePropertyManager()
+            ->addProperty("navigation sensitivity");
+    systemControl->getDecoratedDoublePropertyManager()
+            ->setValue(sceneNavigationSensitivityProperty, sceneNavigationSensitivity);
+    systemControl->getDecoratedDoublePropertyManager()
+            ->setMinimum(sceneNavigationSensitivityProperty, 1.);
+    systemControl->getDecoratedDoublePropertyManager()
+            ->setMaximum(sceneNavigationSensitivityProperty, 100.);
+    interactionGroupProperty->addSubProperty(sceneNavigationSensitivityProperty);
 
     cameraAutoRotationModeProperty = systemControl->getBoolPropertyManager()
             ->addProperty("auto-rotate camera");
@@ -285,7 +301,7 @@ MSceneViewGLWidget::MSceneViewGLWidget()
     systemControl->getDecoratedDoublePropertyManager()
             ->setMinimum(verticalScalingProperty, 1.);
     systemControl->getDecoratedDoublePropertyManager()
-            ->setMaximum(verticalScalingProperty, 100.);
+            ->setMaximum(verticalScalingProperty, 999.);
     renderingGroupProperty->addSubProperty(verticalScalingProperty);
 
 #ifndef CONTINUOUS_GL_UPDATE
@@ -757,6 +773,11 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
 #endif
     }
 
+    else if (property == sceneSaveToImageProperty)
+    {
+        takeScreenshot();
+    }
+
     else if (property == sceneNavigationModeProperty)
     {
         // Disable auto-rotation when scene navigation is changed.
@@ -854,6 +875,12 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
     else if (property == cameraLoadFromFileProperty)
     {
         executeCameraAction(CAMERA_LOADFROMFILE, false);
+    }
+
+    else if (property == sceneNavigationSensitivityProperty)
+    {
+        sceneNavigationSensitivity = MSystemManagerAndControl::getInstance()
+                ->getDecoratedDoublePropertyManager()->value(sceneNavigationSensitivityProperty);
     }
 
 #ifndef CONTINUOUS_GL_UPDATE
@@ -1302,8 +1329,8 @@ void MSceneViewGLWidget::mouseMoveEvent(QMouseEvent *event)
     int dx = event->x() - lastPos.x();
     int dy = event->y() - lastPos.y();
 
-    float factor = 1.;
-    if (event->modifiers() == Qt::ShiftModifier) factor = 10.;
+    float sensitivity = sceneNavigationSensitivity;
+    if (event->modifiers() == Qt::ShiftModifier) sensitivity *= 10.;
 
     if (event->buttons() & glRM->globalMouseButtonRotate)
     {
@@ -1312,9 +1339,9 @@ void MSceneViewGLWidget::mouseMoveEvent(QMouseEvent *event)
             // The left mouse button rotates the camera, the camera position
             // remains unchanged.
             // dx maps to a rotation around the world space z-axis
-            camera.rotateWorldSpace(-dx/10., 0, 0, 1);
+            camera.rotateWorldSpace(-dx/10./sensitivity, 0, 0, 1);
             // dy maps to a rotation around the camera x-axis
-            camera.rotate(-dy/10., 1, 0, 0);
+            camera.rotate(-dy/10./sensitivity, 1, 0, 0);
         }
         else // sceneNavigationMode == ROTATE_SCENE
         {
@@ -1350,21 +1377,19 @@ void MSceneViewGLWidget::mouseMoveEvent(QMouseEvent *event)
     else if (event->buttons() & glRM->globalMouseButtonPan)
     {
         // The right mouse button moves the camera around in the scene.
-        camera.moveUp(-dy/10./factor, 1.);
-        camera.moveRight(dx/10./factor);
+        camera.moveUp(-dy/10./sensitivity, 1.);
+        camera.moveRight(dx/10./sensitivity);
     }
 
     else if (event->buttons() & glRM->globalMouseButtonZoom)
     {
         // "Pure" mouse wheel: zoom (move camera forward/backward)
-        float factor = -1.;
-        if (event->modifiers() == Qt::ShiftModifier)
-            factor = -0.1;
+        float zoomFactor = -1./sensitivity;
 
-        if (sceneNavigationMode == ROTATE_SCENE) factor = -factor;
-        if (glRM->isReverseCameraZoom) factor = -factor;
+        if (sceneNavigationMode == ROTATE_SCENE) zoomFactor = -zoomFactor;
+        if (glRM->isReverseCameraZoom) zoomFactor = -zoomFactor;
 
-        camera.moveForward(dy * factor);
+        camera.moveForward(dy * zoomFactor);
     }
 
     lastPos = event->pos();
@@ -1459,19 +1484,19 @@ void MSceneViewGLWidget::wheelEvent(QWheelEvent *event)
         scrollTimer.restart();
 
         // "Pure" mouse wheel: zoom (move camera forward/backward)
-        float factor = 10.;
-        if (event->modifiers() == Qt::ShiftModifier) factor = 1.;
+        float zoomFactor = 10./sceneNavigationSensitivity;
+        if (event->modifiers() == Qt::ShiftModifier) zoomFactor /= 10.;
 
-        if (sceneNavigationMode == ROTATE_SCENE) factor = -factor;
-        if (glRM->isReverseCameraZoom) factor = -factor;
+        if (sceneNavigationMode == ROTATE_SCENE) zoomFactor = -zoomFactor;
+        if (glRM->isReverseCameraZoom) zoomFactor = -zoomFactor;
 
         if (event->delta() > 0)
         {
-            camera.moveForward(0.5 * factor);
+            camera.moveForward(0.5 * zoomFactor);
         }
         else
         {
-            camera.moveForward(-0.5 * factor);
+            camera.moveForward(-0.5 * zoomFactor);
         }
         updateCameraPositionDisplay();
         updateSynchronizedCameras();
@@ -1578,6 +1603,10 @@ void MSceneViewGLWidget::keyPressEvent(QKeyEvent *event)
     case Qt::Key_T:
         if (event->modifiers() & Qt::AltModifier) executeCameraAction(CAMERA_TOPVIEW);
         break;
+    case Qt::Key_S:
+        takeScreenshot();
+        break;
+        // if (event->modifiers() & Qt::AltModifier) executeCameraAction(CAMERA_TOPVIEW);
     default:
         // If we do not act upon the key, pass event to base class
         // implementation.
@@ -1680,6 +1709,96 @@ void MSceneViewGLWidget::setSceneRotationCentre(QVector3D centre)
 ***                           PRIVATE METHODS                               ***
 *******************************************************************************/
 
-// -- None --
+void MSceneViewGLWidget::takeScreenshot()
+{
+    // Take Screenshot of current scene.
+    QImage screenshot = this->grabFrameBuffer();
+    // Chop red frame.
+    screenshot = screenshot.copy(1, 1, screenshot.width() - 2,
+                                 screenshot.height() - 2);
+
+    // Filter containing all imagefile-extensions Qt is able to write (Oct2016).
+    // All extensions are: .png .jpg .jpeg .bmp .ppm .tiff .xbm .xpm .
+    QString filter = QString("png (*.png);;jpg (*.jpg);;jpeg (*.jpeg);;")
+            + QString("bmp (*.bmp);;ppm (*.ppm);;tiff (*.tiff);;")
+            + QString("xbm (*.xbm);;xpm (*.xpm)");
+    // Filterlist contains all imagefile-extensions as a regular expression.
+    QRegExp filterlist(".*\\.((png)|(jpe?g)|(bmp)|(ppm)|(tiff)|(x(b|p)m))");
+
+    QString filetype;
+    // Variable filename stores filename and path but for some operating systems
+    // not the selected extension.
+    QString filename = QFileDialog::getSaveFileName(
+                MGLResourcesManager::getInstance(),
+                "Save screenshot",
+                "../screenshots",
+                filter,
+                &filetype);
+    if (!filename.isEmpty())
+    {
+        // Check if filename doesn't end with an image file extension Qt can
+        // write.
+        // Repeat the test since the user could have changed the name in the
+        // second FileDialog.
+        while (!filterlist.exactMatch(filename))
+        {
+            // Extract selection file-extension from selected filter element.
+            // Length of extension name can vary thus cant chop fixed number of
+            // letters. 5 = number of letters occuring in every scheme besides
+            // the file-extension.
+            filetype.chop(((filetype.length() - 5) / 2) + 5);
+            filetype = QString("." + filetype);
+            // Append the selected file extension
+            filename += filetype;
+// NOTE (bt, 17Oct2016): Can be removed if Qt-bug is fixed.
+            // Need to check if file already exists since QFileDialog
+            // doesn't provide this functionality under Linux compared to
+            // https://bugreports.qt.io/browse/QTBUG-11352 .
+            QFileInfo checkFile(filename);
+            if (checkFile.exists())
+            {
+// TODO (bt, 17Oct2016) Use operating system dependend filename splitting.
+                QMessageBox::StandardButton reply = QMessageBox::question(
+                                        MGLResourcesManager::getInstance(),
+                                        "Save screenshot",
+                                        filename.split("/").last()
+                                        + " already exits.\n"
+                                        + "Do you want to replace it?",
+                                        QMessageBox::Yes|QMessageBox::No,
+                                        QMessageBox::No);
+                if (reply == QMessageBox::No)
+                {
+                    // Reopen FileDialog if file already exists and the user
+                    // chooses not to overwrite it or closes the question box.
+                    filename = QFileDialog::getSaveFileName(
+                                    MGLResourcesManager::getInstance(),
+                                    "Save screenshot",
+                                    filename,
+                                    filter,
+                                    &filetype);
+                    // Quit if user closes file dialog.
+                    if(filename.isEmpty()) return;
+                }
+            }
+        }
+        if (screenshot.save(filename))
+        {
+            QString str = "Saved screenshot of current view to " + filename
+                    + "\n";
+            LOG4CPLUS_INFO(mlog, str.toStdString());
+        }
+        else
+        {
+            QMessageBox::critical(MGLResourcesManager::getInstance(),
+                                 "Error",
+                                 "Could not save " + filename,
+                                 QMessageBox::Ok,
+                                 QMessageBox::NoButton);
+            QString str = "Could not save " + filename + "\n";
+            LOG4CPLUS_ERROR(mlog, str.toStdString());
+        }
+    }
+
+}
 
 } // namespace Met3D

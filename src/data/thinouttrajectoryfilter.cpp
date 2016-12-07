@@ -93,28 +93,44 @@ MTrajectorySelection* MThinOutTrajectoryFilter::produceData(
     int nlev = startGrid->getNumLevels();
     int nlevnlon = nlev * nlon;
 
-    // Index for selected trajectories.
-    int j = 0;
-
-    // Dimension order: lat/lon/lev (cf. notes mr, 10Feb2014).
-    for (int ilat = 0; ilat < nlat; ilat += thinoutLat)
+    // Check for correct dimensions of the start grid.
+    int startGridPoints = nlevnlon*nlat;
+    if (startGridPoints == input->getNumTrajectories())
     {
-        int itrajlat = nlevnlon * ilat;
-        for (int ilon = 0; ilon < nlon; ilon += thinoutLon)
+        // Index for selected trajectories.
+        int j = 0;
+
+        // Dimension order: lat/lon/lev (cf. notes mr, 10Feb2014).
+        for (int ilat = 0; ilat < nlat; ilat += thinoutLat)
         {
-            int itrajlon = itrajlat + nlev * ilon;
-            for (int ilev = 0; ilev < nlev; ilev += thinoutLev)
+            int itrajlat = nlevnlon * ilat;
+            for (int ilon = 0; ilon < nlon; ilon += thinoutLon)
             {
-                int i = itrajlon + ilev;
-                filterResult->setStartIndex(j, input->getStartIndices()[i]);
-                filterResult->setIndexCount(j, input->getIndexCount()[i]);
-                j++;
+                int itrajlon = itrajlat + nlev * ilon;
+                for (int ilev = 0; ilev < nlev; ilev += thinoutLev)
+                {
+                    int i = itrajlon + ilev;
+                    filterResult->setStartIndex(j, input->getStartIndices()[i]);
+                    filterResult->setIndexCount(j, input->getIndexCount()[i]);
+                    j++;
+                }
             }
         }
-    }
 
-    filterResult->setStartGridStride(QVector3D(thinoutLon, thinoutLat, thinoutLev));
-    filterResult->decreaseNumSelectedTrajectories(j);
+        filterResult->setStartGridStride(
+                    QVector3D(thinoutLon, thinoutLat, thinoutLev));
+        filterResult->decreaseNumSelectedTrajectories(j);
+    }
+    else
+    {
+        LOG4CPLUS_ERROR(mlog, "ERROR: Trajectory start grid dimensions ("
+                        << startGridPoints << ") don't match "
+                        << "number of available trajectories ("
+                        << input->getNumTrajectories() << "). Returning "
+                        <<"empty filter result.");
+
+        filterResult->decreaseNumSelectedTrajectories(0);
+    }
 
     // Debug output.
     // input->dumpStartVerticesToLog(300, filterResult);

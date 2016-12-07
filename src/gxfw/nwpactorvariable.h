@@ -422,6 +422,9 @@ public:
     int thickContoursStartIndex;
     int thickContoursStopIndex;
 
+    double thinContourThickness;
+    double thickContourThickness;
+
     struct RenderMode
     {
         RenderMode() {}
@@ -464,8 +467,10 @@ protected:
         QtProperty *groupProperty;
         QtProperty *renderModeProperty;
         QtProperty *thinContourLevelsProperty;
+        QtProperty *thinContourThicknessProperty;
         QtProperty *thinContourColourProperty;
         QtProperty *thickContourLevelsProperty;
+        QtProperty *thickContourThicknessProperty;
         QtProperty *thickContourColourProperty;
     };
 

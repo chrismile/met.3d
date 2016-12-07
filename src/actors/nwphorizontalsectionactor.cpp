@@ -228,20 +228,31 @@ void MNWPHorizontalSectionActor::reloadShaderEffects()
 {
     LOG4CPLUS_DEBUG(mlog, "loading shader programs" << flush);
 
-    glVerticalInterpolationEffect->compileFromFile_Met3DHome(
+    beginCompileShaders(7);
+
+    compileShadersFromFileWithProgressDialog(
+                glVerticalInterpolationEffect,
                 "src/glsl/hsec_verticalinterpolation.fx.glsl");
-    glFilledContoursShader->compileFromFile_Met3DHome(
+    compileShadersFromFileWithProgressDialog(
+                glFilledContoursShader,
                 "src/glsl/hsec_filledcontours.fx.glsl");
-    glPseudoColourShader->compileFromFile_Met3DHome(
+    compileShadersFromFileWithProgressDialog(
+                glPseudoColourShader,
                 "src/glsl/hsec_pseudocolour.fx.glsl");
-    glMarchingSquaresShader->compileFromFile_Met3DHome(
+    compileShadersFromFileWithProgressDialog(
+                glMarchingSquaresShader,
                 "src/glsl/hsec_marching_squares.fx.glsl");
-    glWindBarbsShader->compileFromFile_Met3DHome(
+    compileShadersFromFileWithProgressDialog(
+                glWindBarbsShader,
                 "src/glsl/hsec_windbarbs.fx.glsl");
-    glShadowQuad->compileFromFile_Met3DHome(
+    compileShadersFromFileWithProgressDialog(
+                glShadowQuad,
                 "src/glsl/hsec_shadow.fx.glsl");
-    positionSpheresShader->compileFromFile_Met3DHome(
+    compileShadersFromFileWithProgressDialog(
+                positionSpheresShader,
                 "src/glsl/trajectory_positions.fx.glsl");
+
+    endCompileShaders();
 
     crossSectionGridsNeedUpdate = true;
 }
@@ -1498,7 +1509,7 @@ void MNWPHorizontalSectionActor::renderLineCountours(
 
     // Loop over all iso values for which thin contour lines should be
     // rendered -- one render pass per isovalue.
-    glLineWidth(1); CHECK_GL_ERROR;
+    glLineWidth(var->thinContourThickness); CHECK_GL_ERROR;
     glMarchingSquaresShader->setUniformValue(
                 "colour", var->thinContourColour);
     for (int i = var->thinContoursStartIndex;
@@ -1513,7 +1524,7 @@ void MNWPHorizontalSectionActor::renderLineCountours(
     }
 
     // The same for the thick iso lines.
-    glLineWidth(2); CHECK_GL_ERROR;
+    glLineWidth(var->thickContourThickness); CHECK_GL_ERROR;
     glMarchingSquaresShader->setUniformValue(
                 "colour", var->thickContourColour);
     for (int i = var->thickContoursStartIndex;

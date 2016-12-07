@@ -863,6 +863,10 @@ void MNWPActorVariable::saveConfiguration(QSettings *settings)
     // Save rendering properties.
     settings->setValue("transferFunction",
                        properties->getEnumItem(transferFunctionProperty));
+
+    // Save properties of connected request property subgroups.
+    foreach (MRequestProperties* props, propertiesList)
+        props->saveConfiguration(settings);
 }
 
 
@@ -951,6 +955,10 @@ void MNWPActorVariable::loadConfiguration(QSettings *settings)
                        .arg(variableName).arg(tfName));
         msgBox.exec();
     }
+
+    // Load properties of connected request property subgroups.
+    foreach (MRequestProperties* props, propertiesList)
+        props->loadConfiguration(settings);
 }
 
 
@@ -1819,7 +1827,13 @@ MNWP2DSectionActorVariable::MNWP2DSectionActorVariable(
       targetGrid2D(nullptr),
       textureTargetGrid(nullptr),
       textureUnitTargetGrid(-1),
-      imageUnitTargetGrid(-1)
+      imageUnitTargetGrid(-1),
+      thinContoursStartIndex(0),
+      thinContoursStopIndex(0),
+      thickContoursStartIndex(0),
+      thickContoursStopIndex(0),
+      thinContourThickness(1.2),
+      thickContourThickness(2.)
 {
     assert(actor != nullptr);
     MNWPMultiVarActor *a = actor;
@@ -1851,6 +1865,12 @@ MNWP2DSectionActorVariable::MNWP2DSectionActorVariable(
                 STRING_PROPERTY, "thin contour levels",
                 renderSettings.groupProperty);
 
+    renderSettings.thinContourThicknessProperty = a->addProperty(
+                DOUBLE_PROPERTY, "thin contour thickness",
+                renderSettings.groupProperty);
+    properties->setDouble(renderSettings.thinContourThicknessProperty,
+                          thinContourThickness, 0.1, 10.0, 2, 0.1);
+
     renderSettings.thinContourColourProperty = a->addProperty(
                 COLOR_PROPERTY, "thin contour colour",
                 renderSettings.groupProperty);
@@ -1858,6 +1878,12 @@ MNWP2DSectionActorVariable::MNWP2DSectionActorVariable(
     renderSettings.thickContourLevelsProperty = a->addProperty(
                 STRING_PROPERTY, "thick contour levels",
                 renderSettings.groupProperty);
+
+    renderSettings.thickContourThicknessProperty = a->addProperty(
+                DOUBLE_PROPERTY, "thick contour thickness",
+                renderSettings.groupProperty);
+    properties->setDouble(renderSettings.thickContourThicknessProperty,
+                          thinContourThickness, 0.1, 10.0, 2, 0.1);
 
     renderSettings.thickContourColourProperty = a->addProperty(
                 COLOR_PROPERTY, "thick contour colour",
@@ -1938,6 +1964,13 @@ bool MNWP2DSectionActorVariable::onQtPropertyChanged(QtProperty *property)
         return true; // redraw actor
     }
 
+    else if (property == renderSettings.thinContourThicknessProperty)
+    {
+        thinContourThickness = properties->mDouble()->value(
+                    renderSettings.thinContourThicknessProperty);
+        return true; // redraw actor
+    }
+
     else if (property == renderSettings.thinContourLevelsProperty)
     {
         QString cLevelStr = properties->mString()->value(
@@ -1955,6 +1988,13 @@ bool MNWP2DSectionActorVariable::onQtPropertyChanged(QtProperty *property)
         thickContourColour = properties->mColor()->value(
                     renderSettings.thickContourColourProperty);
         return true;
+    }
+
+    else if (property == renderSettings.thickContourThicknessProperty)
+    {
+        thickContourThickness = properties->mDouble()->value(
+                    renderSettings.thickContourThicknessProperty);
+        return true; // redraw actor
     }
 
     else if (property == renderSettings.thickContourLevelsProperty)
@@ -1990,10 +2030,12 @@ void MNWP2DSectionActorVariable::saveConfiguration(QSettings *settings)
     settings->setValue("renderMode", static_cast<int>(renderSettings.renderMode));
 
     settings->setValue("thinContourColour", thinContourColour);
+    settings->setValue("thinContourThickness", thinContourThickness);
     settings->setValue("thinContourLevels", properties->mString()->value(
                            renderSettings.thinContourLevelsProperty));
 
     settings->setValue("thickContourColour", thickContourColour);
+    settings->setValue("thickContourThickness", thickContourThickness);
     settings->setValue("thickContourLevels", properties->mString()->value(
                            renderSettings.thickContourLevelsProperty));
 }
@@ -2013,6 +2055,10 @@ void MNWP2DSectionActorVariable::loadConfiguration(QSettings *settings)
     properties->mString()->setValue(renderSettings.thinContourLevelsProperty,
                                     thinContourLevs);
 
+    properties->mDouble()->setValue(renderSettings.thinContourThicknessProperty,
+                                     settings->value("thinContourThickness",
+                                                     1.2).toDouble());
+
     properties->mColor()->setValue(renderSettings.thinContourColourProperty,
                                    settings->value("thinContourColour").value<QColor>());
 
@@ -2021,8 +2067,25 @@ void MNWP2DSectionActorVariable::loadConfiguration(QSettings *settings)
     properties->mString()->setValue(renderSettings.thickContourLevelsProperty,
                                     thickContourLevs);
 
+    properties->mDouble()->setValue(renderSettings.thickContourThicknessProperty,
+                                     settings->value("thickContourThickness",
+                                                     2.).toDouble());
+
     properties->mColor()->setValue(renderSettings.thickContourColourProperty,
                                    settings->value("thickContourColour").value<QColor>());
+
+
+// TODO (bt, 29NOV2016): Connect these variables to their ContourLevels
+// variable they belong to, so one can update these in parseContourLevelString()
+    // Update [thin/thick]Contours[Start/Stop]Index to avoid contours not being
+    // displayed if one loads config with given contour levels but with a render
+    // mode selected not displaying the contours. If one selects a render mode
+    // for contour lines without changing the contour levels meanwhile, the
+    // contours won't be displayed unless one changes the levels.
+    thinContoursStartIndex  = 0;
+    thinContoursStopIndex   = thinContourLevels.size();
+    thickContoursStartIndex = 0;
+    thickContoursStopIndex  = thickContourLevels.size();
 }
 
 

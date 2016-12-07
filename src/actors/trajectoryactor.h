@@ -250,6 +250,10 @@ private:
                                        // criterion
     QtProperty *deltaTimeProperty;
 
+    // Bounding box.
+    QRectF      bbox;
+    QtProperty* bboxProperty;
+
     /** GLSL shader objects. */
     std::shared_ptr<GL::MShaderEffect> tubeShader;
     std::shared_ptr<GL::MShaderEffect> tubeShadowShader;

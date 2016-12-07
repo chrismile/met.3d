@@ -50,10 +50,12 @@ shader VSmain(in vec3 vertexCoord : 0, in vec3 texCoordIn : 1, out VStoFS Output
  *****************************************************************************/
 
 uniform sampler1D transferTexture;
+uniform bool enableAlpha;
 
 shader FSmain(in VStoFS Input, out vec4 fragColour)
 {
     fragColour = texture(transferTexture, Input.texCoord);
+    if (!enableAlpha) fragColour.a = 1.0;
 }
 
 

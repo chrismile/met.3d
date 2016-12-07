@@ -29,6 +29,8 @@
 #include <iostream>
 
 // related third party imports
+#include <QtGui>
+#include <QFileInfo>
 #include <log4cplus/loggingmacros.h>
 
 // local application imports

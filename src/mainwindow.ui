@@ -56,7 +56,7 @@
     </property>
     <widget class="QMenu" name="menu_Layout">
      <property name="title">
-      <string>Window &amp;Layout</string>
+      <string>View &amp;Layout</string>
      </property>
      <addaction name="actionLayoutSingleView"/>
      <addaction name="actionLayoutDualView"/>
@@ -69,11 +69,24 @@
     <addaction name="separator"/>
     <addaction name="actionWaypoints"/>
     <addaction name="separator"/>
+    <addaction name="actionResizeWindow"/>
     <addaction name="actionFullScreen"/>
     <addaction name="menu_Layout"/>
    </widget>
+   <widget class="QMenu" name="menu_Help">
+    <property name="title">
+     <string>&amp;Help</string>
+    </property>
+    <addaction name="actionOnlineManual"/>
+    <addaction name="separator"/>
+    <addaction name="actionReportABug"/>
+    <addaction name="separator"/>
+    <addaction name="actionAboutQt"/>
+    <addaction name="actionAboutMet3D"/>
+   </widget>
    <addaction name="menuFile"/>
    <addaction name="menu_View"/>
+   <addaction name="menu_Help"/>
   </widget>
   <action name="actionExit">
    <property name="text">
@@ -125,7 +138,7 @@
   </action>
   <action name="actionSceneManagement">
    <property name="text">
-    <string>Scene Management</string>
+    <string>&amp;Scene Management</string>
    </property>
    <property name="shortcut">
     <string>F4</string>
@@ -164,6 +177,40 @@
   <action name="actionAddDataset">
    <property name="text">
     <string>&amp;Add Dataset</string>
+   </property>
+  </action>
+  <action name="actionOnlineManual">
+   <property name="text">
+    <string>Online &amp;Manual</string>
+   </property>
+   <property name="toolTip">
+    <string>Open the online manual in a web browser</string>
+   </property>
+  </action>
+  <action name="actionReportABug">
+   <property name="text">
+    <string>Report a &amp;Bug</string>
+   </property>
+   <property name="toolTip">
+    <string>Report a bug in the online issue tracker</string>
+   </property>
+  </action>
+  <action name="actionAboutMet3D">
+   <property name="text">
+    <string>&amp;About Met.3D</string>
+   </property>
+  </action>
+  <action name="actionAboutQt">
+   <property name="text">
+    <string>About &amp;Qt</string>
+   </property>
+  </action>
+  <action name="actionResizeWindow">
+   <property name="text">
+    <string>Resize Window</string>
+   </property>
+   <property name="shortcut">
+    <string>F5</string>
    </property>
   </action>
  </widget>

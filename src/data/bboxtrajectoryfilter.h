@@ -23,8 +23,8 @@
 **  along with Met.3D.  If not, see <http://www.gnu.org/licenses/>.
 **
 *******************************************************************************/
-#ifndef THERMODATASOURCE_H
-#define THERMODATASOURCE_H
+#ifndef BBOXTRAJECTORYFILTER_H
+#define BBOXTRAJECTORYFILTER_H
 
 // standard library imports
 
@@ -32,55 +32,32 @@
 #include <QtCore>
 
 // local application imports
-#include "weatherpredictiondatasource.h"
-#include "structuredgrid.h"
+#include "trajectoryfilter.h"
+#include "floatpertrajectorysource.h"
+#include "trajectories.h"
 #include "datarequest.h"
+
 
 namespace Met3D
 {
 
 /**
-  @brief MThermodynamicsDataSource derives thermodynamic variables from basic
-  forecast parameters.
-
-  @note Not functional yet. Please help with the implementation.
-
-  @todo Computations need to be implemented. :-)
+  @brief Selects trajectories accoring to a specified bounding box.
   */
-class MThermodynamicsDataSource
-        : public MWeatherPredictionDataSource
+class MBoundingBoxTrajectoryFilter : public MTrajectoryFilter
 {
 public:
-    MThermodynamicsDataSource();
+    void setTrajectorySource(MTrajectoryDataSource* s);
 
-    MStructuredGrid* produceData(MDataRequest request);
+    MTrajectorySelection* produceData(MDataRequest request);
 
     MTask* createTaskGraph(MDataRequest request);
 
-    void setInputSource(MWeatherPredictionDataSource* s);
-
-    QList<MVerticalLevelType> availableLevelTypes();
-
-    QStringList availableVariables(MVerticalLevelType levelType);
-
-    QSet<unsigned int> availableEnsembleMembers(MVerticalLevelType levelType,
-                                                const QString& variableName);
-
-    QList<QDateTime> availableInitTimes(MVerticalLevelType levelType,
-                                        const QString& variableName);
-
-    QList<QDateTime> availableValidTimes(MVerticalLevelType levelType,
-                                         const QString& variableName,
-                                         const QDateTime& initTime);
-
-
 protected:
     const QStringList locallyRequiredKeys();
-
-    MWeatherPredictionDataSource* inputSource;
 
 };
 
 } // namespace Met3D
 
-#endif // THERMODATASOURCE_H
+#endif // BBOXTRAJECTORYFILTER_H

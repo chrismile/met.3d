@@ -71,6 +71,8 @@ private slots:
 
     void saveTrack();
 
+    void checkExistanceAndSave(QString filename);
+
     void saveAsTrack();
 
     void openTrack();

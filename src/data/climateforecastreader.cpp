@@ -773,11 +773,9 @@ MStructuredGrid *MClimateForecastReader::readGrid(
             shared->vertVar.getVar(shared->levels.data());
 
             // Determine whether the grid's vertical levels must be reversed.
-            string verticalDirection = "";
-            try { shared->vertVar.getAtt("positive").getValues(verticalDirection); }
-            catch (NcException) {}
-
-            if (verticalDirection == "up")
+            double lev_bot = shared->levels[0];
+            double lev_top = shared->levels[shared->levels.size()-1];
+            if (lev_bot > lev_top)
             {
                 LOG4CPLUS_DEBUG(mlog, "\tReversing levels.");
                 shared->reverseLevels = true;
@@ -785,17 +783,9 @@ MStructuredGrid *MClimateForecastReader::readGrid(
                 int size = shared->levels.size();
                 for (int i = 0; i < size; i++) shared->levels[i] = tmpLevs[size-1-i];
             }
-            else if (verticalDirection == "down")
-            {
-                shared->reverseLevels = false;
-            }
             else
             {
-                throw NcException(
-                        "NcException",
-                        "invalid vertical direction ('positive' attribute must"
-                        " be one of 'up' or 'down')",
-                        __FILE__, __LINE__);
+                shared->reverseLevels = false;
             }
 
             if (levelType == PRESSURE_LEVELS_3D)

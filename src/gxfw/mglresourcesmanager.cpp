@@ -951,6 +951,9 @@ void MGLResourcesManager::initializeGL()
 
     LOG4CPLUS_DEBUG(mlog, "GL resources manager initialisation done\n*****\n"
                     << flush);
+
+    // Inform the system manager that the application has been initialized.
+    systemControl->setApplicationIsInitialized();
 }
 
 } // namespace Met3D

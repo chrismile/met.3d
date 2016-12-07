@@ -246,6 +246,20 @@ void MVerticalRegridProperties::actorPropertyChangeEvent(
 }
 
 
+void MVerticalRegridProperties::saveConfiguration(QSettings *settings)
+{
+//TODO: implement.
+    Q_UNUSED(settings);
+}
+
+
+void MVerticalRegridProperties::loadConfiguration(QSettings *settings)
+{
+//TODO: implement.
+    Q_UNUSED(settings);
+}
+
+
 /******************************************************************************
 ***                     MTrajectoryFilterProperties                         ***
 *******************************************************************************/
@@ -346,6 +360,50 @@ void MTrajectoryFilterProperties::addToRequest(MDataRequestHelper *rh)
 }
 
 
+void MTrajectoryFilterProperties::saveConfiguration(QSettings *settings)
+{
+    MQtProperties *properties = actorVariable->getActor()->getQtProperties();
+
+    settings->setValue("filteringEnabled",
+                       properties->mBool()->value(enableFilterProperty));
+
+    settings->setValue("deltaPressure_hPa",
+                       properties->mDDouble()->value(deltaPressureProperty));
+    settings->setValue("deltaTime_hrs",
+                       properties->mDDouble()->value(deltaTimeProperty));
+
+    settings->setValue("tryPrecomputedFiltering",
+                       properties->mBool()->value(tryPrecomputedFilterProperty));
+    settings->setValue("usedMembers",
+                       properties->mInt()->value(filterUsedMembersProperty));
+}
+
+
+void MTrajectoryFilterProperties::loadConfiguration(QSettings *settings)
+{
+    MQtProperties *properties = actorVariable->getActor()->getQtProperties();
+
+    properties->mBool()->setValue(
+                enableFilterProperty,
+                settings->value("filteringEnabled", true).toBool());
+
+    properties->mDouble()->setValue(
+                deltaPressureProperty,
+                settings->value("deltaPressure_hPa", 500.).toDouble());
+    properties->mDouble()->setValue(
+                deltaTimeProperty,
+                settings->value("deltaTime_hrs", 48.).toDouble());
+
+    properties->mBool()->setValue(
+                tryPrecomputedFilterProperty,
+                settings->value("tryPrecomputedFiltering", true).toBool());
+
+    properties->mInt()->setValue(
+                filterUsedMembersProperty,
+                settings->value("usedMembers", 51).toInt());
+}
+
+
 /******************************************************************************
 ***                    MTrajectoryGriddingProperties                        ***
 *******************************************************************************/
@@ -374,7 +432,7 @@ MTrajectoryGriddingProperties::MTrajectoryGriddingProperties(
     westernLonProperty = a->addProperty(
                 DECORATEDDOUBLE_PROPERTY, "western lon", groupProperty);
     properties->setDDouble(
-                westernLonProperty, -60., -360, 360, 2, 1., " degrees");
+                westernLonProperty, -100., -360, 360, 2, 1., " degrees");
 
     deltaLonProperty = a->addProperty(
                 DECORATEDDOUBLE_PROPERTY, "delta lon", groupProperty);
@@ -384,11 +442,11 @@ MTrajectoryGriddingProperties::MTrajectoryGriddingProperties(
     numLonProperty = a->addProperty(
                 INT_PROPERTY, "num. longitudes", groupProperty);
     properties->mInt()->setMinimum(numLonProperty, 1);
-    properties->mInt()->setValue(numLonProperty, 101);
+    properties->mInt()->setValue(numLonProperty, 131);
 
     northerLatProperty = a->addProperty(
                 DECORATEDDOUBLE_PROPERTY, "norther lat", groupProperty);
-    properties->setDDouble(northerLatProperty, 70., -90, 90, 2, 1, " degrees");
+    properties->setDDouble(northerLatProperty, 85., -90, 90, 2, 1, " degrees");
 
     deltaLatProperty = a->addProperty(
                 DECORATEDDOUBLE_PROPERTY, "delta lon", groupProperty);
@@ -397,7 +455,7 @@ MTrajectoryGriddingProperties::MTrajectoryGriddingProperties(
     numLatProperty = a->addProperty(
                 INT_PROPERTY, "num. latitudes", groupProperty);
     properties->mInt()->setMinimum(numLatProperty, 1);
-    properties->mInt()->setValue(numLatProperty, 41);
+    properties->mInt()->setValue(numLatProperty, 66);
 
     QStringList gridType; gridType << "regular";
     verticalGridTypeProperty = a->addProperty(
@@ -465,6 +523,76 @@ void MTrajectoryGriddingProperties::addToRequest(MDataRequestHelper *rh)
                .arg(westernlon).arg(dlon).arg(nlon).arg(northernlat)
                .arg(dlat).arg(nlat).arg(pbot).arg(ptop).arg(np)
                .arg(scaleParcelThickness ? "1" : "0"));
+}
+
+
+void MTrajectoryGriddingProperties::saveConfiguration(QSettings *settings)
+{
+    MQtProperties *properties = actorVariable->getActor()->getQtProperties();
+
+    settings->setValue("scaleParcelThickness",
+                       properties->mBool()->value(scaleParcelThicknessProperty));
+
+    settings->setValue("westernlon",
+                       properties->mDDouble()->value(westernLonProperty));
+    settings->setValue("dlon",
+                       properties->mDDouble()->value(deltaLonProperty));
+    settings->setValue("nlon",
+                       properties->mInt()->value(numLonProperty));
+
+    settings->setValue("northernlat",
+                       properties->mDDouble()->value(northerLatProperty));
+    settings->setValue("dlat",
+                       properties->mDDouble()->value(deltaLatProperty));
+    settings->setValue("nlat",
+                       properties->mInt()->value(numLatProperty));
+
+    settings->setValue("pbot",
+                       properties->mDDouble()->value(bottomPressureProperty));
+    settings->setValue("ptop",
+                       properties->mDDouble()->value(topPressureProperty));
+    settings->setValue("np",
+                       properties->mInt()->value(numPressureProperty));
+}
+
+
+void MTrajectoryGriddingProperties::loadConfiguration(QSettings *settings)
+{
+    MQtProperties *properties = actorVariable->getActor()->getQtProperties();
+
+    properties->mBool()->setValue(
+                scaleParcelThicknessProperty,
+                settings->value("scaleParcelThickness", true).toBool());
+
+    properties->mDouble()->setValue(
+                westernLonProperty,
+                settings->value("westernlon", -90.).toDouble());
+    properties->mDouble()->setValue(
+                deltaLonProperty,
+                settings->value("dlon", 1.).toDouble());
+    properties->mInt()->setValue(
+                numLonProperty,
+                settings->value("nlon", 180).toInt());
+
+    properties->mDouble()->setValue(
+                northerLatProperty,
+                settings->value("northernlat", -90.).toDouble());
+    properties->mDouble()->setValue(
+                deltaLatProperty,
+                settings->value("dlat", 1.).toDouble());
+    properties->mInt()->setValue(
+                numLatProperty,
+                settings->value("nlat", 180).toInt());
+
+    properties->mDouble()->setValue(
+                bottomPressureProperty,
+                settings->value("pbot", 1000.).toDouble());
+    properties->mDouble()->setValue(
+                topPressureProperty,
+                settings->value("ptop", 100.).toDouble());
+    properties->mInt()->setValue(
+                numPressureProperty,
+                settings->value("np", 20).toInt());
 }
 
 
@@ -545,6 +673,42 @@ void MTrajectoryThinOutProperties::addToRequest(MDataRequestHelper *rh)
 }
 
 
+void MTrajectoryThinOutProperties::saveConfiguration(QSettings *settings)
+{
+    MQtProperties *properties = actorVariable->getActor()->getQtProperties();
+
+    settings->setValue("enableThinOut",
+                       properties->mBool()->value(enableThinOutProperty));
+
+    settings->setValue("strideLon",
+                       properties->mInt()->value(strideLonProperty));
+    settings->setValue("strideLat",
+                       properties->mInt()->value(strideLatProperty));
+    settings->setValue("strideLev",
+                       properties->mInt()->value(strideLevProperty));
+}
+
+
+void MTrajectoryThinOutProperties::loadConfiguration(QSettings *settings)
+{
+    MQtProperties *properties = actorVariable->getActor()->getQtProperties();
+
+    properties->mBool()->setValue(
+                enableThinOutProperty,
+                settings->value("enableThinOut", true).toBool());
+
+    properties->mInt()->setValue(
+                strideLonProperty,
+                settings->value("strideLon", 1).toInt());
+    properties->mInt()->setValue(
+                strideLatProperty,
+                settings->value("strideLat", 1).toInt());
+    properties->mInt()->setValue(
+                strideLevProperty,
+                settings->value("strideLev", 1).toInt());
+}
+
+
 /******************************************************************************
 ***                     MProbabilityRegionProperties                        ***
 *******************************************************************************/
@@ -611,6 +775,25 @@ void MProbabilityRegionProperties::actorPropertyChangeEvent(
         float v = *(static_cast<float*>(value));
         properties->mDDouble()->setValue(probabilityRegionIsovalueProperty, v);
     }
+}
+
+
+void MProbabilityRegionProperties::saveConfiguration(QSettings *settings)
+{
+    MQtProperties *properties = actorVariable->getActor()->getQtProperties();
+
+    settings->setValue("probabilityRegionDetectionIsovalue",
+                       properties->mDDouble()->value(probabilityRegionIsovalueProperty));
+}
+
+
+void MProbabilityRegionProperties::loadConfiguration(QSettings *settings)
+{
+    MQtProperties *properties = actorVariable->getActor()->getQtProperties();
+
+    properties->mDouble()->setValue(
+                probabilityRegionIsovalueProperty,
+                settings->value("probabilityRegionDetectionIsovalue", 0.).toDouble());
 }
 
 

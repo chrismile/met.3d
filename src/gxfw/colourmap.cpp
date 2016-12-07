@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2016 Marc Rautenhaus
+**  Copyright 2016 Theresa Diefenbach
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -29,9 +30,13 @@
 #include <iostream>
 
 // related third party imports
+#include <QtXml>
+#include <QFile>
+#include <log4cplus/loggingmacros.h>
 
 // local application imports
 #include "util/mutil.h"
+#include "util/mexception.h"
 
 using namespace std;
 
@@ -41,7 +46,7 @@ using namespace std;
 *******************************************************************************/
 
 // The following code has been taken from colorspace.c, part of the
-// R "colorspace" package by Ross Ihaka.
+// R "colorspace" package by Ross Ihaka. Parts of the code have been modified.
 // NOTE: colorspace.c contains further colorspace transformations that might
 // become useful for Met.3D.
 // =================================================================
@@ -218,6 +223,43 @@ static void polarLUV_to_LUV(double l, double c, double h,
     *V = c * sin(h);
 }
 
+
+/* ----- RGB <-> HSV ----- */
+
+#define RETURN_RGB(red,green,blue) *r=red;*g=green;*b=blue;break;
+
+//NOTE: Parts of this function have been modified in order to use it with
+//      Vapor-imported transfer functions!
+static void HSV_to_RGB(double h, double s, double v,
+                       double *r, double *g, double *b)
+{
+    double m, n, f;
+    int i;
+    if (h == NA_REAL) {
+        *r = v; *g = v; *b = v;
+    }
+    else {
+        if (h < 0) h = 0;
+        h = h * 6;		/* convert to [0, 6] , in Vapor h is in the interval from [-1 ; 1] */
+        i = floor(h);
+        f = h - i;
+        if(!(i & 1))	/* if i is even */
+            f = 1 - f;
+        m = v * (1 - s);
+        n = v * (1 - s * f);   
+        switch (i) {
+            case 6:
+            case 0: RETURN_RGB(v, n, m);
+            case 1: RETURN_RGB(n, v, m);
+            case 2: RETURN_RGB(m, v, n);
+            case 3: RETURN_RGB(m, n, v);
+            case 4: RETURN_RGB(n, m, v);
+            case 5: RETURN_RGB(v, m, n);
+        }
+   }
+}
+
+
 // END code form the R "colorspace" package.
 // =================================================================
 
@@ -269,7 +311,7 @@ MLinearSegmentedColourmap::MLinearSegmentedColourmap(
         const MColourmapInterpolationNodes& interpolationNodes)
     : MColourmap()
 {
-    // For each colour compontent:
+    // For each colour component:
     for (int c = RED; c <= ALPHA; c++)
     {
         // Initialize a GSL interpolation object for the colour component.
@@ -294,6 +336,49 @@ MLinearSegmentedColourmap::~MLinearSegmentedColourmap()
 {
     // For each colour compontent:
     for (int c = RED; c <= ALPHA; c++)
+    {
+        // Free interpolation object ..
+        gsl_interp_free(interp[c]);
+        gsl_interp_accel_free(interpAcc[c]);
+        // .. and memory.
+        delete[] scalars[c];
+        delete[] colourValues[c];
+    }
+}
+
+
+MHSVColourmap::MHSVColourmap(QString& vaporFileName)
+    :MColourmap()
+{
+    readFromVaporFile(vaporFileName);
+
+    // For each colour component:
+    for (int c = HUE; c <= ALPHA; c++)
+    {
+        // Initialize a GSL interpolation object for the colour component.
+        int numNodes = vaporNodes[c].size();
+        interpAcc[c] = gsl_interp_accel_alloc();
+        interp[c]    = gsl_interp_alloc(gsl_interp_linear, numNodes);
+        // Copy scalar (t) and colour intensity data to double arrays, as these
+        // are required by gsl_interp_init().
+        scalars[c] = new double[numNodes];
+        colourValues[c] = new double[numNodes];
+        for (int i = 0; i < numNodes; i++) {
+            scalars[c][i] = vaporNodes[c][i].scalar;
+            colourValues[c][i] = vaporNodes[c][i].intensity;
+        }
+        // Pass interpolation nodes to GSL.
+        scalars[c][numNodes-1] = 1. ;
+
+        gsl_interp_init(interp[c], scalars[c], colourValues[c], numNodes);
+    }
+}
+
+
+MHSVColourmap::~MHSVColourmap()
+{
+    // For each colour component:
+    for (int c = HUE; c <= ALPHA; c++)
     {
         // Free interpolation object ..
         gsl_interp_free(interp[c]);
@@ -438,10 +523,157 @@ QColor MLinearSegmentedColourmap::scalarToColour(double scalar)
 }
 
 
+QColor MHSVColourmap::scalarToColour(double scalar)
+{
+    double H, S, V, alpha, R, G, B;
+
+    H = gsl_interp_eval(interp[HUE], scalars[HUE],
+                                colourValues[HUE], scalar, interpAcc[HUE]);
+    S = gsl_interp_eval(interp[SATURATION], scalars[SATURATION],
+                                colourValues[SATURATION], scalar, interpAcc[SATURATION]);
+    V = gsl_interp_eval(interp[VALUE], scalars[VALUE],
+                                colourValues[VALUE], scalar, interpAcc[VALUE]);
+    alpha = gsl_interp_eval(interp[ALPHA], scalars[ALPHA],
+                                colourValues[ALPHA], scalar, interpAcc[ALPHA]);
+
+    HSV_to_RGB(H, S, V, &R, &G, &B);
+    return QColor(int(R*255.), int(G*255.), int(B*255.), int(alpha*255.));
+}
+
+
+void MHSVColourmap::readFromVaporFile(QString fileName)
+{
+    QDomDocument vaporTF;
+    QFile file(fileName);
+
+    MColourNode firstNode;
+    firstNode.scalar = 7.; //Random Value to initialize
+    firstNode.intensity = 7.; //Random Value to initialize
+
+    for (int p = 0; p <= 3; p++) vaporNodes[p].push_back(firstNode);
+
+    LOG4CPLUS_TRACE(mlog, "Size of vaporNodes beginning " << vaporNodes[0].size());
+
+    if (!file.open(QIODevice::ReadOnly))
+    {
+        file.close();
+
+        QString msg = QString("ERROR: cannot open Vapor transfer function file %1")
+                .arg(fileName);
+        LOG4CPLUS_ERROR(mlog, msg.toStdString());
+        throw MInitialisationError(msg.toStdString(), __FILE__, __LINE__);
+    }
+
+    vaporTF.setContent(&file);
+
+    file.close();
+
+    // Get OpacityMapControlPoints
+
+    QDomElement transferFunction = vaporTF.documentElement();
+
+    // Find Out where OpacityMap starts,
+    // since default transferfunctions in vapor have other format than 'self-made' ones
+
+    QDomElement opacityMap = transferFunction.firstChild().toElement();
+
+    while(opacityMap.tagName() != "OpacityMap")
+    {
+        opacityMap = opacityMap.nextSibling().toElement();
+    }
+
+    QDomElement opacityMapControlPoint = opacityMap.firstChild().toElement();
+
+    // Loop while there is an OpacityMapControlPoint
+    int i = 0 ;
+
+    while ( !opacityMapControlPoint.isNull() )
+    {
+        // Check if the child tag name is COMPONENT
+        if (opacityMapControlPoint.tagName()=="OpacityMapControlPoint")
+        {
+            QString opacity, valueStr;
+            double alpha, value;
+            opacity = opacityMapControlPoint.attribute("Opacity","NaN");
+            valueStr = opacityMapControlPoint.attribute("Value","NaN");
+            alpha = opacity.toDouble();
+            value = valueStr.toDouble();
+
+            MColourNode newNode;
+            newNode.scalar = value;
+            newNode.intensity = alpha;
+
+            vaporNodes[ALPHA].push_back(newNode);
+
+            //std::cout << "Opacity  = " << VaporNodes[4][i].intensity  << "    \t Value  = " << value << std::endl;
+            i += 1;
+            opacityMapControlPoint = opacityMapControlPoint.nextSibling().toElement();
+        }
+    }
+
+    vaporNodes[ALPHA].erase(vaporNodes[ALPHA].begin());
+    i = 0;
+
+    QDomElement colorMap = opacityMap.nextSibling().toElement();
+    QDomElement colorMapControlPoint = colorMap.firstChild().toElement();
+
+    while ( !colorMapControlPoint.isNull() )
+    {
+        // Check if the child tag name is COMPONENT
+        if (colorMapControlPoint.tagName() == "ColorMapControlPoint")
+        {
+            QString HSV, Value ;
+            QStringList HSVlist ;
+            double  h,s,v, value;
+            HSV = colorMapControlPoint.attribute("HSV", "NaN");
+            HSVlist = HSV.split(" ");
+            h = HSVlist[0].toDouble();
+            s = HSVlist[1].toDouble();
+            v = HSVlist[2].toDouble();
+
+            Value = colorMapControlPoint.attribute("Value", "NaN");
+            value = Value.toDouble();
+
+            MColourNode newNode;
+            newNode.scalar = value;
+
+            newNode.intensity = h;
+            vaporNodes[HUE].push_back(newNode);
+
+            newNode.intensity = s;
+            vaporNodes[SATURATION].push_back(newNode);
+
+            newNode.intensity = v;
+            vaporNodes[VALUE].push_back(newNode);
+
+            /*
+            vaporNodes[0][i].intensity = h;
+            vaporNodes[1][i].scalar = value;
+            vaporNodes[1][i].intensity = s;
+            vaporNodes[2][i].scalar = value;
+            vaporNodes[2][i].intensity = v;
+            **/
+
+            //for (unsigned int c = 0; c <= 3; c++) std::cout << vaporNodes[c][i].scalar <<std::endl;
+            //std::cout << vaporNodes[0][i].scalar <<std::endl;
+            //std::cout << vaporNodes[1][i].scalar <<std::endl;
+            //std::cout << vaporNodes[2][i].scalar <<std::endl;
+            //std::cout << vaporNodes[3][i].scalar <<std::endl;
+        }
+        colorMapControlPoint = colorMapControlPoint.nextSibling().toElement();
+        i += 1;
+    }
+
+    for(unsigned int c=HUE; c<=VALUE; c++)
+    {
+        vaporNodes[c].erase(vaporNodes[c].begin());
+    }
+}
+
+
 /******************************************************************************
 ***                            PUBLIC METHODS                               ***
 *******************************************************************************/
-
 
 void MColourmapPool::initializePredefinedColourmaps()
 {
@@ -999,6 +1231,81 @@ void MColourmapPool::initializePredefinedColourmaps()
                      {1., 1.0}}
     };
     addColourmap("pv_eth", new MLinearSegmentedColourmap(pv_eth_data));
+
+#define SCALE_PVU_TO_01_b(x) ((x+6.)/12.)
+    MColourmapInterpolationNodes pv_error_data = {
+        /* red */   {{SCALE_PVU_TO_01_b(-6.), 175./255.},
+                     {SCALE_PVU_TO_01_b(-5.-S), 175./255.},
+                     {SCALE_PVU_TO_01_b(-5.), 135./255.},
+                     {SCALE_PVU_TO_01_b(-4.-S), 135./255.},
+                     {SCALE_PVU_TO_01_b(-4.), 70./255.},
+                     {SCALE_PVU_TO_01_b(-3.-S), 70./255.},
+                     {SCALE_PVU_TO_01_b(-3), 100./255.},
+                     {SCALE_PVU_TO_01_b(-2.-S), 100./255.},
+                     {SCALE_PVU_TO_01_b(-2.), 204./255.},
+                     {SCALE_PVU_TO_01_b(-1.-S), 204./255.},
+                     {SCALE_PVU_TO_01_b(-1.), 255./255.},
+                     {SCALE_PVU_TO_01_b(1.-S), 255./255.},
+                     {SCALE_PVU_TO_01_b(1.), 255./255.},
+                     {SCALE_PVU_TO_01_b(2.-S), 255./255.},
+                     {SCALE_PVU_TO_01_b(2.), 255./255.},
+                     {SCALE_PVU_TO_01_b(3.-S), 255./255.},
+                     {SCALE_PVU_TO_01_b(3.), 205./255.},
+                     {SCALE_PVU_TO_01_b(4.-S), 205./255.},
+                     {SCALE_PVU_TO_01_b(4.), 238./255.},
+                     {SCALE_PVU_TO_01_b(5.-S), 238./255.},
+                     {SCALE_PVU_TO_01_b(5.), 255./255.},
+                     {SCALE_PVU_TO_01_b(6.), 255./255.}},
+
+        /* green */ {{SCALE_PVU_TO_01_b(-6.), 238./255.},
+                     {SCALE_PVU_TO_01_b(-5.-S), 238./255.},
+                     {SCALE_PVU_TO_01_b(-5.), 206./255.},
+                     {SCALE_PVU_TO_01_b(-4.-S), 206./255.},
+                     {SCALE_PVU_TO_01_b(-4.), 130./255.},
+                     {SCALE_PVU_TO_01_b(-3.-S), 130./255.},
+                     {SCALE_PVU_TO_01_b(-3), 100./255.},
+                     {SCALE_PVU_TO_01_b(-2.-S), 100./255.},
+                     {SCALE_PVU_TO_01_b(-2.), 204./255.},
+                     {SCALE_PVU_TO_01_b(-1.-S), 204./255.},
+                     {SCALE_PVU_TO_01_b(-1.), 255./255.},
+                     {SCALE_PVU_TO_01_b(1.-S), 255./255.},
+                     {SCALE_PVU_TO_01_b(1.), 204./255.},
+                     {SCALE_PVU_TO_01_b(2.-S), 204./255.},
+                     {SCALE_PVU_TO_01_b(2.), 81./255.},
+                     {SCALE_PVU_TO_01_b(3.-S), 81./255.},
+                     {SCALE_PVU_TO_01_b(3.), 55./255.},
+                     {SCALE_PVU_TO_01_b(4.-S), 55./255.},
+                     {SCALE_PVU_TO_01_b(4.), 118./255.},
+                     {SCALE_PVU_TO_01_b(5.-S), 118./255.},
+                     {SCALE_PVU_TO_01_b(5.), 165./255.},
+                     {SCALE_PVU_TO_01_b(6.), 165./255.}},
+
+        /* blue */  {{SCALE_PVU_TO_01_b(-6.), 238./255.},
+                     {SCALE_PVU_TO_01_b(-5.-S), 238./255.},
+                     {SCALE_PVU_TO_01_b(-5.), 235./255.},
+                     {SCALE_PVU_TO_01_b(-4.-S), 235./255.},
+                     {SCALE_PVU_TO_01_b(-4.), 180./255.},
+                     {SCALE_PVU_TO_01_b(-3.-S), 180./255.},
+                     {SCALE_PVU_TO_01_b(-3), 255./255.},
+                     {SCALE_PVU_TO_01_b(-2.-S), 255./255.},
+                     {SCALE_PVU_TO_01_b(-2.), 255./255.},
+                     {SCALE_PVU_TO_01_b(-1.-S), 255./255.},
+                     {SCALE_PVU_TO_01_b(-1.), 255./255.},
+                     {SCALE_PVU_TO_01_b(1.-S), 255./255.},
+                     {SCALE_PVU_TO_01_b(1.), 204./255.},
+                     {SCALE_PVU_TO_01_b(2.-S), 204./255.},
+                     {SCALE_PVU_TO_01_b(2.), 81./255.},
+                     {SCALE_PVU_TO_01_b(3.-S), 81./255.},
+                     {SCALE_PVU_TO_01_b(3.), 0./255.},
+                     {SCALE_PVU_TO_01_b(4.-S), 0./255.},
+                     {SCALE_PVU_TO_01_b(4.), 0./255.},
+                     {SCALE_PVU_TO_01_b(5.-S), 0./255.},
+                     {SCALE_PVU_TO_01_b(5.), 0./255.},
+                     {SCALE_PVU_TO_01_b(6.), 0./255.}},
+        /* alpha */ {{0., 1.0},
+                     {1., 1.0}}
+    };
+    addColourmap("pv_error", new MLinearSegmentedColourmap(pv_error_data));
 }
 
 } // namespace Met3D

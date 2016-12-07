@@ -46,6 +46,7 @@
 #include "data/verticalregridder.h"
 #include "data/structuredgridensemblefilter.h"
 #include "data/probabilityregiondetector.h"
+#include "data/derivedmetvarsdatasource.h"
 
 #include "data/trajectoryreader.h"
 #include "data/trajectorynormalssource.h"
@@ -56,6 +57,7 @@
 #include "data/probabltrajectoriessource.h"
 #include "data/singletimetrajectoryfilter.h"
 #include "data/pressuretimetrajectoryfilter.h"
+#include "data/bboxtrajectoryfilter.h"
 
 
 namespace Met3D
@@ -304,6 +306,9 @@ void MPipelineConfiguration::initializeNWPPipeline(
     LOG4CPLUS_DEBUG(mlog, "Initializing NWP pipeline ''"
                     << dataSourceId.toStdString() << "'' ...");
 
+    // Pipeline for data fields that are stored on disk.
+    // =================================================
+
     MWeatherPredictionReader *nwpReaderENS = nullptr;
     if (dataFormat == CF_NETCDF)
     {
@@ -361,6 +366,60 @@ void MPipelineConfiguration::initializeNWPPipeline(
                                   probRegDetectorNWP);
     }
 
+    // Pipeline for derived variables (derivedMetVarsSource connects to
+    // the reader and computes derived data fields. The rest of the pipeline
+    // is the same as above).
+    // =====================================================================
+
+    const QString dataSourceIdDerived = dataSourceId + " derived";
+
+    MDerivedMetVarsDataSource *derivedMetVarsSource =
+            new MDerivedMetVarsDataSource();
+    derivedMetVarsSource->setMemoryManager(memoryManager);
+    derivedMetVarsSource->setScheduler(scheduler);
+    derivedMetVarsSource->setInputSource(nwpReaderENS);
+
+    MStructuredGridEnsembleFilter *ensFilterDerived =
+            new MStructuredGridEnsembleFilter();
+    ensFilterDerived->setMemoryManager(memoryManager);
+    ensFilterDerived->setScheduler(scheduler);
+
+    if (!enableRegridding)
+    {
+        ensFilterDerived->setInputSource(derivedMetVarsSource);
+    }
+    else
+    {
+        MStructuredGridEnsembleFilter *ensFilter1Derived =
+                new MStructuredGridEnsembleFilter();
+        ensFilter1Derived->setMemoryManager(memoryManager);
+        ensFilter1Derived->setScheduler(scheduler);
+        ensFilter1Derived->setInputSource(derivedMetVarsSource);
+
+        MVerticalRegridder *regridderEPSDerived =
+                new MVerticalRegridder();
+        regridderEPSDerived->setMemoryManager(memoryManager);
+        regridderEPSDerived->setScheduler(scheduler);
+        regridderEPSDerived->setInputSource(ensFilter1Derived);
+
+        ensFilterDerived->setInputSource(regridderEPSDerived);
+    }
+
+    sysMC->registerDataSource(dataSourceIdDerived + QString(" ENSFilter"),
+                              ensFilterDerived);
+
+    if (enableProbabiltyRegionFilter)
+    {
+        MProbabilityRegionDetectorFilter *probRegDetectorNWPDerived =
+                new MProbabilityRegionDetectorFilter();
+        probRegDetectorNWPDerived->setMemoryManager(memoryManager);
+        probRegDetectorNWPDerived->setScheduler(scheduler);
+        probRegDetectorNWPDerived->setInputSource(ensFilterDerived);
+
+        sysMC->registerDataSource(dataSourceIdDerived + QString(" ProbReg"),
+                                  probRegDetectorNWPDerived);
+    }
+
     LOG4CPLUS_DEBUG(mlog, "Pipeline ''" << dataSourceId.toStdString()
                     << "'' has been initialized.");
 }
@@ -410,11 +469,19 @@ void MPipelineConfiguration::initializeLagrantoEnsemblePipeline(
     dpdtFilter->setInputSelectionSource(thinoutFilter);
     dpdtFilter->setDeltaPressureSource(dpSource);
 
+    MBoundingBoxTrajectoryFilter *bboxFilter =
+            new MBoundingBoxTrajectoryFilter();
+    bboxFilter->setMemoryManager(memoryManager);
+    bboxFilter->setScheduler(scheduler);
+    bboxFilter->setInputSelectionSource(dpdtFilter);
+    bboxFilter->setTrajectorySource(trajectoryReader);
+
     MSingleTimeTrajectoryFilter *timestepFilter =
             new MSingleTimeTrajectoryFilter();
     timestepFilter->setMemoryManager(memoryManager);
     timestepFilter->setScheduler(scheduler);
     timestepFilter->setInputSelectionSource(dpdtFilter);
+//    timestepFilter->setInputSelectionSource(bboxFilter);
     sysMC->registerDataSource(dataSourceId + QString(" timestepFilter"),
                               timestepFilter);
 

@@ -85,13 +85,13 @@ MSyncControl::MSyncControl(QString id, QWidget *parent) :
     // =========================================================================
 
     // Time steps for navigating valid/init time in seconds (5min, 10min, ..).
-    const int numTimeSteps = 9;
-    int timeStepsSeconds[numTimeSteps] = {300, 600, 900, 1800, 3600, 10800,
+    const int numTimeSteps = 10;
+    int timeStepsSeconds[numTimeSteps] = {60, 300, 600, 900, 1800, 3600, 10800,
                                           21600, 43200, 86400};
     timeStepIndexToSeconds = new int[numTimeSteps];
     for (int i = 0; i < numTimeSteps; i++)
         timeStepIndexToSeconds[i] = timeStepsSeconds[i];
-    ui->timeStepComboBox->setCurrentIndex(6); // pre-select 6hrs
+    ui->timeStepComboBox->setCurrentIndex(7); // pre-select 6hrs
 
     // Initialise with 00 UTC of current date.
     setInitDateTime(QDateTime(QDateTime::currentDateTimeUtc().date()));
@@ -108,6 +108,7 @@ MSyncControl::MSyncControl(QString id, QWidget *parent) :
             SLOT(timeBackward()));
 
     // Initialise a drop down menu that provides time animation settings.
+    // ==================================================================
     timeAnimationDropdownMenu = new QMenu(this);
 
     timeAnimationTimeStepSpinBox = new QSpinBox(this);
@@ -120,26 +121,98 @@ MSyncControl::MSyncControl(QString id, QWidget *parent) :
 
     timeAnimationDropdownMenu->addSeparator();
 
-    timeAnimationFrom = new QDateTimeEdit(this);
+    // "from" entry of drop down menu.
+    // -------------------------------
+
+    // Width for all "copy IT/VT to from/to" buttons.
+    int widthOfCopyButtons = 30;
+
+    timeAnimationFromWidget = new QWidget(this);
+
+    timeAnimationFrom = new QDateTimeEdit(timeAnimationFromWidget);
     timeAnimationFrom->setDisplayFormat("ddd yyyy-MM-dd hh:mm UTC");
     timeAnimationFrom->setTimeSpec(Qt::UTC);
+    copyInitTimeToAnimationFromButton = new QPushButton("IT", timeAnimationFromWidget);
+    copyInitTimeToAnimationFromButton->setMinimumWidth(widthOfCopyButtons);
+    copyInitTimeToAnimationFromButton->setMaximumWidth(widthOfCopyButtons);
+    copyInitTimeToAnimationFromButton->setToolTip("set \"from\" to init time");
+    copyValidTimeToAnimationFromButton = new QPushButton("VT", timeAnimationFromWidget);
+    copyValidTimeToAnimationFromButton->setMinimumWidth(widthOfCopyButtons);
+    copyValidTimeToAnimationFromButton->setMaximumWidth(widthOfCopyButtons);
+    copyValidTimeToAnimationFromButton->setToolTip("set \"from\" to valid time");
+
+    timeAnimationFromLayout = new QHBoxLayout();
+    timeAnimationFromLayout->addWidget(timeAnimationFrom);
+    timeAnimationFromLayout->addWidget(copyInitTimeToAnimationFromButton);
+    timeAnimationFromLayout->addWidget(copyValidTimeToAnimationFromButton);
+
+    timeAnimationFromWidget->setLayout(timeAnimationFromLayout);
+
     MLabelledWidgetAction *animateFromTimeAction =
-            new MLabelledWidgetAction("from", "", timeAnimationFrom, this);
+            new MLabelledWidgetAction("from", "", timeAnimationFromWidget, this);
     timeAnimationDropdownMenu->addAction(animateFromTimeAction);
 
-    timeAnimationTo = new QDateTimeEdit(this);
+    connect(copyInitTimeToAnimationFromButton, SIGNAL(clicked()),
+            SLOT(copyInitToFrom()));
+    connect(copyValidTimeToAnimationFromButton, SIGNAL(clicked()),
+            SLOT(copyValidToFrom()));
+
+    // "to" entry of drop down menu.
+    // -----------------------------
+
+    timeAnimationToWidget = new QWidget(this);
+
+    timeAnimationTo = new QDateTimeEdit(timeAnimationToWidget);
     timeAnimationTo->setDisplayFormat("ddd yyyy-MM-dd hh:mm UTC");
     timeAnimationTo->setTimeSpec(Qt::UTC);
+    copyInitTimeToAnimationToButton = new QPushButton("IT", timeAnimationToWidget);
+    copyInitTimeToAnimationToButton->setMinimumWidth(widthOfCopyButtons);
+    copyInitTimeToAnimationToButton->setMaximumWidth(widthOfCopyButtons);
+    copyInitTimeToAnimationToButton->setToolTip("set \"to\" to init time");
+    copyValidTimeToAnimationToButton = new QPushButton("VT", timeAnimationToWidget);
+    copyValidTimeToAnimationToButton->setMinimumWidth(widthOfCopyButtons);
+    copyValidTimeToAnimationToButton->setMaximumWidth(widthOfCopyButtons);
+    copyValidTimeToAnimationToButton->setToolTip("set \"to\" to valid time");
+
+    timeAnimationToLayout = new QHBoxLayout();
+    timeAnimationToLayout->addWidget(timeAnimationTo);
+    timeAnimationToLayout->addWidget(copyInitTimeToAnimationToButton);
+    timeAnimationToLayout->addWidget(copyValidTimeToAnimationToButton);
+    timeAnimationToWidget->setLayout(timeAnimationToLayout);
+
     MLabelledWidgetAction *animateToTimeAction =
-            new MLabelledWidgetAction("to", "", timeAnimationTo, this);
+            new MLabelledWidgetAction("to", "", timeAnimationToWidget, this);
     timeAnimationDropdownMenu->addAction(animateToTimeAction);
 
+    connect(copyInitTimeToAnimationToButton, SIGNAL(clicked()),
+            SLOT(copyInitToTo()));
+    connect(copyValidTimeToAnimationToButton, SIGNAL(clicked()),
+            SLOT(copyValidToTo()));
+
+
     timeAnimationDropdownMenu->addSeparator();
+
+    timeAnimationSinglePassAction = new QAction(this);
+    timeAnimationSinglePassAction->setCheckable(true);
+    timeAnimationSinglePassAction->setChecked(true);
+    timeAnimationSinglePassAction->setText("Single pass");
+    timeAnimationDropdownMenu->addAction(timeAnimationSinglePassAction);
 
     timeAnimationLoopTimeAction = new QAction(this);
     timeAnimationLoopTimeAction->setCheckable(true);
     timeAnimationLoopTimeAction->setText("Loop");
     timeAnimationDropdownMenu->addAction(timeAnimationLoopTimeAction);
+
+    timeAnimationBackForthTimeAction = new QAction(this);
+    timeAnimationBackForthTimeAction->setCheckable(true);
+    timeAnimationBackForthTimeAction->setText("Back and forth");
+    timeAnimationDropdownMenu->addAction(timeAnimationBackForthTimeAction);
+
+    timeAnimationLoopGroup = new QActionGroup(this);
+    timeAnimationLoopGroup->setExclusive(true);
+    timeAnimationLoopGroup->addAction(timeAnimationSinglePassAction);
+    timeAnimationLoopGroup->addAction(timeAnimationLoopTimeAction);
+    timeAnimationLoopGroup->addAction(timeAnimationBackForthTimeAction);
 
     timeAnimationReverseTimeDirectionAction = new QAction(this);
     timeAnimationReverseTimeDirectionAction->setCheckable(true);
@@ -258,7 +331,7 @@ void MSyncControl::synchronizationCompleted(MSynchronizedObject *object)
     if (pendingSynchronizations.empty() && earlyCompletedSynchronizations.empty())
     {
         // Enable GUI for next event.
-        ui->syncFrame->setEnabled(true);
+        setSynchronizationGUIEnabled(true);
 
         // In animation mode force an immediate repaint of the valid and init
         // time displays (otherwise they may not update during animation).
@@ -306,6 +379,8 @@ void MSyncControl::timeForward()
             {
                 if ( timeAnimationLoopTimeAction->isChecked() )
                     ui->validTimeEdit->setDateTime(timeAnimationFrom->dateTime());
+                else if ( timeAnimationBackForthTimeAction->isChecked() )
+                    timeAnimationReverseTimeDirectionAction->toggle();
                 else
                     stopTimeAnimation();
 
@@ -323,6 +398,8 @@ void MSyncControl::timeForward()
             {
                 if ( timeAnimationLoopTimeAction->isChecked() )
                     ui->initTimeEdit->setDateTime(timeAnimationFrom->dateTime());
+                else if ( timeAnimationBackForthTimeAction->isChecked() )
+                    timeAnimationReverseTimeDirectionAction->toggle();
                 else
                     stopTimeAnimation();
 
@@ -346,6 +423,8 @@ void MSyncControl::timeBackward()
             {
                 if ( timeAnimationLoopTimeAction->isChecked() )
                     ui->validTimeEdit->setDateTime(timeAnimationTo->dateTime());
+                else if ( timeAnimationBackForthTimeAction->isChecked() )
+                    timeAnimationReverseTimeDirectionAction->toggle();
                 else
                     stopTimeAnimation();
 
@@ -363,6 +442,8 @@ void MSyncControl::timeBackward()
             {
                 if ( timeAnimationLoopTimeAction->isChecked() )
                     ui->initTimeEdit->setDateTime(timeAnimationTo->dateTime());
+                else if ( timeAnimationBackForthTimeAction->isChecked() )
+                    timeAnimationReverseTimeDirectionAction->toggle();
                 else
                     stopTimeAnimation();
 
@@ -497,6 +578,30 @@ void MSyncControl::onEnsembleModeChange(const int foo)
 }
 
 
+void MSyncControl::copyInitToFrom()
+{
+    timeAnimationFrom->setDateTime(initDateTime());
+}
+
+
+void MSyncControl::copyValidToFrom()
+{
+    timeAnimationFrom->setDateTime(validDateTime());
+}
+
+
+void MSyncControl::copyInitToTo()
+{
+    timeAnimationTo->setDateTime(initDateTime());
+}
+
+
+void MSyncControl::copyValidToTo()
+{
+    timeAnimationTo->setDateTime(validDateTime());
+}
+
+
 /******************************************************************************
 ***                           PRIVATE METHODS                               ***
 *******************************************************************************/
@@ -559,7 +664,7 @@ void MSyncControl::processSynchronizationEvent(MSynchronizationType syncType,
     // redraws).
     lastFocusWidget = QApplication::focusWidget();
     currentSyncType = syncType;
-    if ( !animationTimer->isActive() ) ui->syncFrame->setEnabled(false);
+    if ( !animationTimer->isActive() ) setSynchronizationGUIEnabled(false);
     beginSceneSynchronization();
 
     if ( (syncType == SYNC_VALID_TIME) || (syncType == SYNC_INIT_TIME) )
@@ -600,6 +705,14 @@ void MSyncControl::setTimeSynchronizationGUIEnabled(bool enabled)
     ui->timeForwardButton->setEnabled(enabled);
     ui->timeStepComboBox->setEnabled(enabled);
     ui->stepChooseVTITComboBox->setEnabled(enabled);
+}
+
+
+void MSyncControl::setSynchronizationGUIEnabled(bool enabled)
+{
+    ui->syncFrame->setEnabled(enabled);
+    ui->timeBackwardButton->blockSignals(!enabled);
+    ui->timeForwardButton->blockSignals(!enabled);
 }
 
 } // namespace Met3D

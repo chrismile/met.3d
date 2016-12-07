@@ -76,7 +76,7 @@ MNWPVolumeRaycasterActor::MNWPVolumeRaycasterActor()
     setName("Volume raycaster");
 
     QStringList modesLst;
-    modesLst << "standard" << "bitfield";
+    modesLst << "standard" << "bitfield" << "DVR";
     renderModeProp = addProperty(
                 ENUM_PROPERTY, "render mode", actorPropertiesSupGroup);
     properties->mEnum()->setEnumNames(renderModeProp, modesLst);
@@ -549,23 +549,33 @@ void MNWPVolumeRaycasterActor::reloadShaderEffects()
 {
     LOG4CPLUS_DEBUG(mlog, "loading shader programs" << flush);
 
-    gl.boundingBoxShader->compileFromFile_Met3DHome(
+    beginCompileShaders(7);
+
+    compileShadersFromFileWithProgressDialog(
+                gl.boundingBoxShader,
                 "src/glsl/simple_coloured_geometry.fx.glsl");
-    gl.rayCasterEffect->compileFromFile_Met3DHome(
+    compileShadersFromFileWithProgressDialog(
+                gl.rayCasterEffect,
                 "src/glsl/volume_raycaster.fx.glsl");
-    gl.shadowImageRenderShader->compileFromFile_Met3DHome(
+    compileShadersFromFileWithProgressDialog(
+                gl.shadowImageRenderShader,
                 "src/glsl/volume_image.fx.glsl");
 
-    gl.normalCurveGeometryEffect->compileFromFile_Met3DHome(
+    compileShadersFromFileWithProgressDialog(
+                gl.normalCurveGeometryEffect,
                 "src/glsl/volume_normalcurves_geometry.fx.glsl");
-    gl.normalCurveInitPointsShader->compileFromFile_Met3DHome(
+    compileShadersFromFileWithProgressDialog(
+                gl.normalCurveInitPointsShader,
                 "src/glsl/volume_normalcurves_initpoints.fx.glsl");
-    gl.normalCurveLineComputeShader->compileFromFile_Met3DHome(
+    compileShadersFromFileWithProgressDialog(
+                gl.normalCurveLineComputeShader,
                 "src/glsl/volume_compute_normalcurves.fx.glsl");
 
-    gl.bitfieldRayCasterEffect->compileFromFile_Met3DHome(
+    compileShadersFromFileWithProgressDialog(
+                gl.bitfieldRayCasterEffect,
                 "src/glsl/volume_bitfield_raycaster.fx.glsl");
 
+    endCompileShaders();
     initializeRenderInformation();
 }
 
@@ -904,6 +914,8 @@ void MNWPVolumeRaycasterActor::loadConfiguration(QSettings *settings)
         var->useFlags(false); break;
     case RenderMode::Bitfield:
         var->useFlags(true); break;
+    case RenderMode::DVR:
+        var->useFlags(false); break;
     }
 }
 
@@ -1428,6 +1440,7 @@ void MNWPVolumeRaycasterActor::onQtPropertyChanged(QtProperty* property)
         switch (renderMode)
         {
         case RenderMode::Original:
+        case RenderMode::DVR:
             var->ensembleSingleMemberProperty->setEnabled(true);
             var->setEnsembleMember(properties->getEnumItem(
                                        var->ensembleSingleMemberProperty).toInt());
@@ -1439,7 +1452,6 @@ void MNWPVolumeRaycasterActor::onQtPropertyChanged(QtProperty* property)
             break;
 
         case RenderMode::Bitfield:
-
             normalCurveSettings->groupProp->setEnabled(false);
 
             var->ensembleSingleMemberProperty->setEnabled(true);
@@ -1789,6 +1801,7 @@ void MNWPVolumeRaycasterActor::renderToCurrentContext(
     switch(renderMode)
     {
     case RenderMode::Original:
+    case RenderMode::DVR:
         renderRayCaster(gl.rayCasterEffect, sceneView);
         break;
 
@@ -2402,6 +2415,9 @@ void MNWPVolumeRaycasterActor::setRayCasterShaderVars(
     shader->setUniformValue(
                 "numIsoValues", GLint(rayCasterSettings->isoValueSetList.size())); CHECK_GL_ERROR;
 
+    shader->setUniformValue(
+                "renderingMode", GLint(renderMode)); CHECK_GL_ERROR;
+
     // 4) Set shadow setting variables.
 
     if (rayCasterSettings->shadowMode == RenderMode::ShadowMap)
@@ -2495,17 +2511,18 @@ void MNWPVolumeRaycasterActor::renderRayCaster(
 
     switch(renderMode)
     {
-        case RenderMode::Original:
-            // set subroutine indices
-            effect->setUniformSubroutineByName(
-                        GL_FRAGMENT_SHADER,
-                        gl.rayCasterSubroutines[var->grid->getLevelType()]);
-            break;
-        case RenderMode::Bitfield:
-            effect->setUniformSubroutineByName(
-                        GL_FRAGMENT_SHADER,
-                        gl.bitfieldRayCasterSubroutines[var->grid->getLevelType()]);
-            break;
+    case RenderMode::Original:
+    case RenderMode::DVR:
+        // set subroutine indices
+        effect->setUniformSubroutineByName(
+                    GL_FRAGMENT_SHADER,
+                    gl.rayCasterSubroutines[var->grid->getLevelType()]);
+        break;
+    case RenderMode::Bitfield:
+        effect->setUniformSubroutineByName(
+                    GL_FRAGMENT_SHADER,
+                    gl.bitfieldRayCasterSubroutines[var->grid->getLevelType()]);
+        break;
     }
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, gl.iboBoundingBox); CHECK_GL_ERROR;
@@ -2693,6 +2710,7 @@ void MNWPVolumeRaycasterActor::createShadowImage(
     switch(renderMode)
     {
     case RenderMode::Original:
+    case RenderMode::DVR:
         pEffect = gl.rayCasterEffect;
         break;
     case RenderMode::Bitfield:
@@ -2710,15 +2728,16 @@ void MNWPVolumeRaycasterActor::createShadowImage(
 
     switch(renderMode)
     {
-        case RenderMode::Original:
-            // set subroutine indices
-            pEffect->setUniformSubroutineByName(GL_FRAGMENT_SHADER,
-                                                gl.rayCasterSubroutines[var->grid->getLevelType()]);
-            break;
-        case RenderMode::Bitfield:
-            pEffect->setUniformSubroutineByName(GL_FRAGMENT_SHADER,
-                                        gl.bitfieldRayCasterSubroutines[var->grid->getLevelType()]);
-            break;
+    case RenderMode::Original:
+    case RenderMode::DVR:
+        // set subroutine indices
+        pEffect->setUniformSubroutineByName(GL_FRAGMENT_SHADER,
+                                            gl.rayCasterSubroutines[var->grid->getLevelType()]);
+        break;
+    case RenderMode::Bitfield:
+        pEffect->setUniformSubroutineByName(GL_FRAGMENT_SHADER,
+                                            gl.bitfieldRayCasterSubroutines[var->grid->getLevelType()]);
+        break;
     }
 
     glDrawArrays(GL_TRIANGLE_STRIP,0,4); CHECK_GL_ERROR;

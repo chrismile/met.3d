@@ -299,6 +299,12 @@ protected slots:
     void autoRotateCamera();
 
 private:
+
+    /**
+     * Handels taking and saving a screenshot of the scene.
+     */
+    void takeScreenshot();
+
     MSceneControl *scene;
 
     // Background colour.
@@ -380,12 +386,15 @@ private:
     QtProperty *cameraLoadFromFileProperty;
 
     QtProperty *interactionGroupProperty;
+    QtProperty *sceneSaveToImageProperty;
     QtProperty *sceneNavigationModeProperty;
     QtProperty *sceneRotationCenterProperty;
     QtProperty *sceneRotationCentreLatProperty;
     QtProperty *sceneRotationCentreLonProperty;
     QtProperty *sceneRotationCentreElevationProperty;
     QtProperty *selectSceneRotationCentreProperty;
+    float       sceneNavigationSensitivity;
+    QtProperty *sceneNavigationSensitivityProperty;
     QtProperty *syncCameraWithViewProperty;
     QtProperty *actorInteractionProperty;
     QtProperty *analysisModeProperty;

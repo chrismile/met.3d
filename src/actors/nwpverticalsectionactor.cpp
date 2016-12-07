@@ -66,6 +66,7 @@ MNWPVerticalSectionActor::MNWPVerticalSectionActor()
       p_top_hPa(100.),
       p_bot_hPa(1050.),
       opacity(1.),
+      interpolationNodeSpacing(0.15),
       updatePath(false)
 {
     enablePicking(true);
@@ -94,6 +95,13 @@ MNWPVerticalSectionActor::MNWPVerticalSectionActor()
                                   actorPropertiesSupGroup);
     properties->setDDouble(opacityProperty, opacity, 0, 1, 2, 0.05, " (0-1)");
 
+    interpolationNodeSpacingProperty = addProperty(
+                DECORATEDDOUBLE_PROPERTY, "interpolation node spacing",
+                actorPropertiesSupGroup);
+    properties->setDDouble(
+                interpolationNodeSpacingProperty, interpolationNodeSpacing,
+                0.000001, 180, 6, 0.05, " (degrees)");
+
     endInitialiseQtProperties();
 }
 
@@ -120,16 +128,25 @@ void MNWPVerticalSectionActor::reloadShaderEffects()
 {
     LOG4CPLUS_DEBUG(mlog, "loading shader programs" << flush);
 
-    sectionGridShader->compileFromFile_Met3DHome(
+    beginCompileShaders(5);
+
+    compileShadersFromFileWithProgressDialog(
+                sectionGridShader,
                 "src/glsl/vsec_interpolation_filledcontours.fx.glsl");
-    marchingSquaresShader->compileFromFile_Met3DHome(
+    compileShadersFromFileWithProgressDialog(
+                marchingSquaresShader,
                 "src/glsl/vsec_marching_squares.fx.glsl");
-    pressureLinesShader->compileFromFile_Met3DHome(
+    compileShadersFromFileWithProgressDialog(
+                pressureLinesShader,
                 "src/glsl/vsec_pressureisolines.fx.glsl");
-    simpleGeometryShader->compileFromFile_Met3DHome(
+    compileShadersFromFileWithProgressDialog(
+                simpleGeometryShader,
                 "src/glsl/simple_coloured_geometry.fx.glsl");
-    positionSpheresShader->compileFromFile_Met3DHome(
+    compileShadersFromFileWithProgressDialog(
+                positionSpheresShader,
                 "src/glsl/trajectory_positions.fx.glsl");
+
+    endCompileShaders();
 }
 
 
@@ -147,6 +164,7 @@ void MNWPVerticalSectionActor::saveConfiguration(QSettings *settings)
     settings->setValue("p_top_hPa", p_top_hPa);
     settings->setValue("p_bot_hPa", p_bot_hPa);
     settings->setValue("opacity", opacity);
+    settings->setValue("interpolationNodeSpacing", interpolationNodeSpacing);
 
     settings->endGroup();
 }
@@ -162,12 +180,18 @@ void MNWPVerticalSectionActor::loadConfiguration(QSettings *settings)
     setWaypointsModel(MSystemManagerAndControl::getInstance()
                       ->getWaypointsModel(wpID));
 
-    properties->mDDouble()->setValue(upperLimitProperty,
-                                     settings->value("p_top_hPa").toFloat());
-    properties->mDDouble()->setValue(lowerLimitProperty,
-                                     settings->value("p_bot_hPa").toFloat());
-    properties->mDDouble()->setValue(opacityProperty,
-                                     settings->value("opacity").toFloat());
+    properties->mDDouble()->setValue(
+                upperLimitProperty,
+                settings->value("p_top_hPa").toFloat());
+    properties->mDDouble()->setValue(
+                lowerLimitProperty,
+                settings->value("p_bot_hPa").toFloat());
+    properties->mDDouble()->setValue(
+                opacityProperty,
+                settings->value("opacity").toFloat());
+    properties->mDDouble()->setValue(
+                interpolationNodeSpacingProperty,
+                settings->value("interpolationNodeSpacing", 0.15).toFloat());
 
     settings->endGroup();
 }
@@ -425,6 +449,19 @@ void MNWPVerticalSectionActor::onQtPropertyChanged(QtProperty *property)
 
         emitActorChangedSignal();
     }
+
+    else if (property == interpolationNodeSpacingProperty)
+    {
+        interpolationNodeSpacing = properties->mDDouble()->value(
+                    interpolationNodeSpacingProperty);
+
+        targetGridToBeUpdated = true;
+
+        if (suppressActorUpdates()) return;
+
+        updatePath = true;
+        emitActorChangedSignal();
+    }
 }
 
 
@@ -466,7 +503,7 @@ void MNWPVerticalSectionActor::generatePathFromWaypoints(
     path.clear();
 
     // Approximate spacing between points along the cross section path.
-    float deltaS = .15; // 0.15
+    float deltaS = interpolationNodeSpacing;
 
     // Determine model grid spacing and the upper left corner coordinates
     // of the model grid; used to locate the grid cells of the points along
@@ -944,7 +981,7 @@ void MNWPVerticalSectionActor::renderToCurrentContext(MSceneViewGLWidget *sceneV
 
             // Loop over all iso values for which thin contour lines should be
             // rendered -- one render pass per isovalue.
-            glLineWidth(1); CHECK_GL_ERROR;
+            glLineWidth(var->thinContourThickness); CHECK_GL_ERROR;
 
 //TODO put this somewhere else (mr, 28Jan2013)
             var->thinContoursStartIndex  = 0;
@@ -966,7 +1003,7 @@ void MNWPVerticalSectionActor::renderToCurrentContext(MSceneViewGLWidget *sceneV
             }
 
             // The same for the thick iso lines.
-            glLineWidth(2); CHECK_GL_ERROR;
+            glLineWidth(var->thickContourThickness); CHECK_GL_ERROR;
             marchingSquaresShader->setUniformValue(
                         "colour", var->thickContourColour);  CHECK_GL_ERROR;
             for (int i = var->thickContoursStartIndex;

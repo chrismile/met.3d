@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2016 Marc Rautenhaus
+**  Copyright 2016 Theresa Diefenbach
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -28,6 +29,8 @@
 
 // standard library imports
 #include <vector>
+
+
 
 // related third party imports
 #include <QtGui>
@@ -181,7 +184,38 @@ public:
       */
     QColor scalarToColour(double scalar);
 
-private:
+protected:
+    gsl_interp       *interp[4];
+    gsl_interp_accel *interpAcc[4];
+    double *scalars[4];
+    double *colourValues[4];
+};
+
+
+/** 
+  @brief MHSVColourmap implements an HSV based colourmap. The code ports parts
+  of the R "colorspace" package by Ross Ihaka.
+
+  Colourmap definitions are read from Vapor-exported transfer functions.
+ */
+class MHSVColourmap : public MColourmap
+{
+public:
+    enum ColourIndex { HUE = 0, SATURATION = 1, VALUE = 2, ALPHA = 3 };
+
+    MHSVColourmap(QString& vaporFileName);
+
+    /**
+      Frees the GSL interpolation objects.
+      */
+    ~MHSVColourmap();
+
+    QColor scalarToColour(double scalar);
+
+    void readFromVaporFile(QString fileName);
+
+protected:
+    MColourmapInterpolationNodes vaporNodes;
     gsl_interp       *interp[4];
     gsl_interp_accel *interpAcc[4];
     double *scalars[4];
