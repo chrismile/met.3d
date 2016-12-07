@@ -42,7 +42,6 @@ project(Met.3D)
 set(Met3D_VERSION_MAJOR 1)
 set(Met3D_VERSION_MINOR 0)
 
-
 # Add global defines
 add_definitions(-DENABLE_MET3D_STOPWATCH
                 -DENABLE_HYBRID_PRESSURETEXCOORDTABLE
@@ -92,7 +91,10 @@ endif ()
 #                      Required Qt4 Libraries                                #
 ##############################################################################
 
-# does not work with cmake command in terminal
+# TODO! does not work with cmake command in terminal
+# Automocs are generated and stored in the directory from where the user
+# has called the make command by default
+
 #set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 #set_property(GLOBAL PROPERTY AUTOGEN_TARGETS_FOLDER ${CMAKE_CURRENT_SOURCE_DIR}/automoc)
 
@@ -113,27 +115,14 @@ find_package(Qt4 4.8 REQUIRED QTCORE QTGUI QTOPENGL QTXML QTNETWORK)
 # Import Qt headers.
 INCLUDE(${QT_USE_FILE})
 
-# Build QtDesigner forms.
-#set(MET3D_UIS
-#    src/mainwindow.ui
-#    src/data/waypoints/waypointstableview.ui
-#    src/gxfw/actorcreationdialog.ui
-#    src/gxfw/adddatasetdialog.ui
-#    src/gxfw/memberselectiondialog.ui
-#    src/gxfw/mscenecontrol.ui
-#    src/gxfw/msystemcontrol.ui
-#    src/gxfw/scenemanagementdialog.ui
-#    src/gxfw/selectdatasourcedialog.ui
-#    src/gxfw/synccontrol.ui
-#    )
-
-#set (MET3D_RCS
-#    ../third-party/qt-solutions/qtpropertybrowser/src/qtpropertybrowser.qrc)
-
+# Qt4 forms / designer forms
 file (GLOB_RECURSE  MET3D_UIS 	src/*.ui)
+# Qt4 resources
 file (GLOB_RECURSE  MET3D_RCS   ../*.qrc)
 
+# Build cpp and header from UI forms
 qt4_wrap_ui(MET3D_UIS_H ${MET3D_UIS})
+# Add QT resources
 qt4_add_resources(MET3D_RC_SRCS ${MET3D_RCS})
 # Future: Change to Qt5.
 #qt5_use_modules(OpenGL Xml XmlPatterns)
