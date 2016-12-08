@@ -79,7 +79,8 @@ public:
 
     enum SceneNavigationMode {
         MOVE_CAMERA  = 0,
-        ROTATE_SCENE = 1
+        ROTATE_SCENE = 1,
+        TOPVIEW_2D   = 2
     };
 
     enum LightDirection {
@@ -194,6 +195,8 @@ public:
     bool userIsInteractingWithScene() { return userIsInteracting; }
 
     bool userIsScrollingWithMouse();
+
+    bool orthographicModeEnabled() { return sceneNavigationMode == TOPVIEW_2D; }
 
     bool isViewPortResized();
 

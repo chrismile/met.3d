@@ -148,6 +148,7 @@ uniform vec4    shadowColor;
 // Mode
 // ====
 uniform uint    renderingMode;
+uniform bool    isOrthographic;
 
 
 /*****************************************************************************
@@ -286,7 +287,7 @@ bool traverseSectionOfDataVolume(
                     return false;
             }
         }
-        
+
         // Terminate ray if alpha is saturated.
         if (rayColor.a > 0.99) return false;
     } // raycaster loop
@@ -707,6 +708,23 @@ shader FSmain(in VStoFS Input, out vec4 fragColor : 0)
     Ray ray;
     vec2 lambdaNearFar = vec2(0., 0.);
 
+    // Compute the bottom south-west corner and the top north-east corner
+    // of the minimum bounding box of the region that is to be
+    // rendered. For latitude and worldZ (both cannot be cyclic), use
+    // the inner coordinates of user-specified bounding box and data
+    // volume bounding box. Longitude is a special case (can be cyclic)
+    // and is treated below (here, longitude values of the user-specified
+    // bounding box are kept).
+    vec3 renderRegionBottomSWCrnr = vec3(
+            volumeTopNWCrnr.x,
+            max(volumeBottomSECrnr.y, dataExtent.dataSECrnr.y),
+            max(volumeBottomSECrnr.z, dataExtent.dataSECrnr.z));
+
+    vec3 renderRegionTopNECrnr = vec3(
+            volumeBottomSECrnr.x,
+            min(volumeTopNWCrnr.y, dataExtent.dataNWCrnr.y),
+            min(volumeTopNWCrnr.z, dataExtent.dataNWCrnr.z));
+
     if (shadowMode == SHADOWS_MAP)
     {
         // Render a shadow image of the scene: The ray is parallel to the
@@ -719,6 +737,16 @@ shader FSmain(in VStoFS Input, out vec4 fragColor : 0)
 
         shadowRay = true;
     }
+    else if (isOrthographic)
+    {
+        ray.origin = Input.worldSpaceCoordinate;
+        // Set ray position to the top of the render bounding box
+        ray.origin.z = renderRegionTopNECrnr.z;
+        ray.direction = vec3(0, 0, -1.);
+
+        lambdaNearFar.x = 0;
+        lambdaNearFar.y = volumeTopNWCrnr.z - volumeBottomSECrnr.z;
+    }
     else
     {
         // Volume rendering mode: The ray direction is determined by the camera
@@ -726,28 +754,14 @@ shader FSmain(in VStoFS Input, out vec4 fragColor : 0)
         ray.origin = cameraPosition;
         ray.direction = normalize(Input.worldSpaceCoordinate - cameraPosition);
 
-        // Compute the bottom south-west corner and the top north-east corner
-        // of the minimum bounding box of the region that is to be
-        // rendered. For latitude and worldZ (both cannot be cyclic), use
-        // the inner coordinates of user-specified bounding box and data
-        // volume bounding box. Longitude is a special case (can be cyclic)
-        // and is treated below (here, longitude values of the user-specified
-        // bounding box are kept).
-        vec3 renderRegionBottomSWCrnr = vec3(
-                volumeTopNWCrnr.x,
-                max(volumeBottomSECrnr.y, dataExtent.dataSECrnr.y),
-                max(volumeBottomSECrnr.z, dataExtent.dataSECrnr.z));
-
-        vec3 renderRegionTopNECrnr = vec3(
-                volumeBottomSECrnr.x,
-                min(volumeTopNWCrnr.y, dataExtent.dataNWCrnr.y),
-                min(volumeTopNWCrnr.z, dataExtent.dataNWCrnr.z));
-
         // Compute the intersection points of the ray with this bounding box.
         // If the ray does not intersect with the box discard this fragment.
         bool rayIntersectsRenderVolume = rayBoxIntersection(
                 ray, renderRegionBottomSWCrnr, renderRegionTopNECrnr, lambdaNearFar);
-        if (!rayIntersectsRenderVolume) discard;
+        if (!rayIntersectsRenderVolume)
+        {
+            discard;
+        }
 
         // If the value for lambdaNear is < 0 the camera is located inside the
         // bounding box. It makes no sense to start the ray traversal behind the

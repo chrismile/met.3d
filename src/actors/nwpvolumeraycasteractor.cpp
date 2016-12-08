@@ -2348,6 +2348,9 @@ void MNWPVolumeRaycasterActor::setCommonShaderVars(
                           bbSettings->urcrnLat,
                           sceneView->worldZfromPressure(bbSettings->pTop_hPa))); CHECK_GL_ERROR;
 
+    shader->setUniformValue("isOrthographic", sceneView->orthographicModeEnabled());
+    CHECK_GL_ERROR;
+
     setVarSpecificShaderVars(shader, sceneView, var, "dataExtent",
                              "dataVolume","transferFunction",
                              "pressureTable", "surfacePressure",

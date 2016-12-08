@@ -184,7 +184,8 @@ MSceneViewGLWidget::MSceneViewGLWidget()
     sceneNavigationModeProperty = systemControl->getEnumPropertyManager()
             ->addProperty("scene navigation");
     systemControl->getEnumPropertyManager()->setEnumNames(
-                sceneNavigationModeProperty, {"move camera", "rotate scene"});
+                sceneNavigationModeProperty, {"move camera", "rotate scene",
+                                              "2D top view"});
     interactionGroupProperty->addSubProperty(sceneNavigationModeProperty);
 
     sceneRotationCenterProperty = systemControl->getGroupPropertyManager()
@@ -793,14 +794,26 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
             selectSceneRotationCentreProperty->setEnabled(false);
             cameraAutoRotationModeProperty->setEnabled(false);
         }
-        else
+        else if (sceneNavigationMode == ROTATE_SCENE)
         {
             sceneRotationCenterProperty->setEnabled(true);
             selectSceneRotationCentreProperty->setEnabled(true);
             cameraAutoRotationModeProperty->setEnabled(true);
         }
+        else if (sceneNavigationMode == TOPVIEW_2D)
+        {
+            // !TODO: disable camera zooming
+
+            QVector3D eyePos = QVector3D(-10, 50, 100);//camera.getOrigin();
+
+            camera.setOrigin(eyePos);
+            camera.setZAxis(QVector3D(0, 0, -1));
+            camera.setYAxis(QVector3D(0, 1, 0));
+        }
+
         enablePropertyEvents = true;
         updateSceneLabel();
+        updateGL();
     }
 
     else if (property == sceneRotationCentreElevationProperty ||
@@ -1113,11 +1126,26 @@ void MSceneViewGLWidget::paintGL()
     // http://www.opengl.org/resources/faq/technical/depthbuffer.htm
     QVector3D co = camera.getOrigin();
     modelViewProjectionMatrix.setToIdentity();
-    modelViewProjectionMatrix.perspective(
-                45.,
-                double(viewPortWidth)/double(viewPortHeight),
-                abs(co.z())/10.,
-                500.);
+    const double ratio = static_cast<double>(viewPortWidth) / viewPortHeight;
+
+    if (sceneNavigationMode == TOPVIEW_2D)
+    {
+        const float zBack = co.z();
+        float dyHalf = std::tan(M_PI / 8.0) * zBack;
+        float dxHalf = ratio * dyHalf;
+
+        float minX = - dxHalf;
+        float maxX = + dxHalf;
+        float minY = - dyHalf;
+        float maxY = + dyHalf;
+
+        modelViewProjectionMatrix.ortho(minX, maxX, minY, maxY, 0., 500.);
+    }
+    else
+    {
+        modelViewProjectionMatrix.perspective(45., ratio, abs(co.z())/10., 500.);
+    }
+
     modelViewProjectionMatrix *= camera.getViewMatrix();
 
     QList<MLabel*> labelList;
@@ -1210,11 +1238,30 @@ void MSceneViewGLWidget::resizeGL(int width, int height)
     viewportResized = true;
     QVector3D co = camera.getOrigin();
     modelViewProjectionMatrix.setToIdentity();
-    modelViewProjectionMatrix.perspective(
+    const double ratio = static_cast<double>(viewPortWidth) / viewPortHeight;
+
+    if (sceneNavigationMode == TOPVIEW_2D)
+    {
+        const float zBack = co.z();
+        float dyHalf = std::tan(M_PI / 8.0) * zBack;
+        float dxHalf = ratio * dyHalf;
+
+        float minX = - dxHalf;
+        float maxX = + dxHalf;
+        float minY = - dyHalf;
+        float maxY = + dyHalf;
+
+        modelViewProjectionMatrix.ortho(minX, maxX, minY, maxY, 0., 500.);
+    }
+    else
+    {
+        modelViewProjectionMatrix.perspective(
                 45.,
-                double(viewPortWidth)/double(viewPortHeight),
+                ratio,
                 co.z()/10.,
                 500.);
+    }
+
     modelViewProjectionMatrix *= camera.getViewMatrix();
 }
 
@@ -1343,7 +1390,7 @@ void MSceneViewGLWidget::mouseMoveEvent(QMouseEvent *event)
             // dy maps to a rotation around the camera x-axis
             camera.rotate(-dy/10./sensitivity, 1, 0, 0);
         }
-        else // sceneNavigationMode == ROTATE_SCENE
+        else if (sceneNavigationMode == ROTATE_SCENE)
         {
             sceneRotationMatrix.setToIdentity();
             // Rotation is implemented with a rotation matrix and is combined
