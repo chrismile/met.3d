@@ -259,27 +259,25 @@ MStructuredGrid* MStructuredGridEnsembleFilter::produceData(MDataRequest request
                 dmaxminGrid->enableFlags();
                 dmaxminGrid->setToValue(M_MISSING_VALUE);
             }
-            else
-            {
-                for (unsigned int v = 0; v < memberGrid->nvalues; v++)
-                    if (memberGrid->data[v] != M_MISSING_VALUE)
+
+            for (unsigned int v = 0; v < memberGrid->nvalues; v++)
+                if (memberGrid->data[v] != M_MISSING_VALUE)
+                {
+                    if ((minGrid->data[v] == M_MISSING_VALUE)
+                            || (memberGrid->data[v] < minGrid->data[v]))
                     {
-                        if ((minGrid->data[v] == M_MISSING_VALUE)
-                                || (memberGrid->data[v] < minGrid->data[v]))
-                        {
-                            minGrid->data[v] = memberGrid->data[v];
-                            minGrid->clearFlags(v);
-                            minGrid->setFlag(v, m);
-                        }
-                        if ((maxGrid->data[v] == M_MISSING_VALUE)
-                                || (memberGrid->data[v] > maxGrid->data[v]))
-                        {
-                            maxGrid->data[v] = memberGrid->data[v];
-                            maxGrid->clearFlags(v);
-                            maxGrid->setFlag(v, m);
-                        }
+                        minGrid->data[v] = memberGrid->data[v];
+                        minGrid->clearFlags(v);
+                        minGrid->setFlag(v, m);
                     }
-            }
+                    if ((maxGrid->data[v] == M_MISSING_VALUE)
+                            || (memberGrid->data[v] > maxGrid->data[v]))
+                    {
+                        maxGrid->data[v] = memberGrid->data[v];
+                        maxGrid->clearFlags(v);
+                        maxGrid->setFlag(v, m);
+                    }
+                }
 
             // Store that member m contributed to the result.
             minGrid->setContributingMember(m);
@@ -386,19 +384,17 @@ MStructuredGrid* MStructuredGridEnsembleFilter::produceData(MDataRequest request
                                 memberGrid->nlons);
                     validMembersCounter->setToZero();
                 }
-                else
-                {
-                    for (unsigned int v = 0; v < result->nvalues; v++)
-                        if (memberGrid->data[v] != M_MISSING_VALUE)
+
+                for (unsigned int v = 0; v < result->nvalues; v++)
+                    if (memberGrid->data[v] != M_MISSING_VALUE)
+                    {
+                        validMembersCounter->data[v] += 1;
+                        if (memberGrid->data[v] > threshold)
                         {
-                            validMembersCounter->data[v] += 1;
-                            if (memberGrid->data[v] > threshold)
-                            {
-                                result->data[v] += 1;
-                                result->setFlag(v, m);
-                            }
+                            result->data[v] += 1;
+                            result->setFlag(v, m);
                         }
-                }
+                    }
 
                 // Store that member m contributed to the result.
                 result->setContributingMember(m);
@@ -426,19 +422,17 @@ MStructuredGrid* MStructuredGridEnsembleFilter::produceData(MDataRequest request
                                 memberGrid->nlons);
                     validMembersCounter->setToZero();
                 }
-                else
-                {
-                    for (unsigned int v = 0; v < result->nvalues; v++)
-                        if (memberGrid->data[v] != M_MISSING_VALUE)
+
+                for (unsigned int v = 0; v < result->nvalues; v++)
+                    if (memberGrid->data[v] != M_MISSING_VALUE)
+                    {
+                        validMembersCounter->data[v] += 1;
+                        if (memberGrid->data[v] < threshold)
                         {
-                            validMembersCounter->data[v] += 1;
-                            if (memberGrid->data[v] < threshold)
-                            {
-                                result->data[v] += 1;
-                                result->setFlag(v, m);
-                            }
+                            result->data[v] += 1;
+                            result->setFlag(v, m);
                         }
-                }
+                    }
 
                 // Store that member m contributed to the result.
                 result->setContributingMember(m);
