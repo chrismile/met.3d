@@ -2027,7 +2027,8 @@ void MNWP2DSectionActorVariable::saveConfiguration(QSettings *settings)
 
     MQtProperties *properties = actor->getQtProperties();
 
-    settings->setValue("renderMode", static_cast<int>(renderSettings.renderMode));
+    settings->setValue("renderMode",
+                       renderModeToString(renderSettings.renderMode));
 
     settings->setValue("thinContourColour", thinContourColour);
     settings->setValue("thinContourThickness", thinContourThickness);
@@ -2047,8 +2048,25 @@ void MNWP2DSectionActorVariable::loadConfiguration(QSettings *settings)
 
     MQtProperties *properties = actor->getQtProperties();
 
+    QString renderModeName =
+            settings->value("renderMode", "disabled").toString();
+    RenderMode::Type renderMode = stringToRenderMode(renderModeName);
+
+    // Print message if render mode name is no defined and set render mode to
+    // disabled.
+    if (renderMode == RenderMode::Invalid)
+    {
+        QMessageBox msgBox;
+        msgBox.setIcon(QMessageBox::Warning);
+        msgBox.setText(QString("Could not find render mode %1.\n"
+                       "Setting render mode to 'disabled'.").arg(renderModeName));
+        msgBox.exec();
+
+        renderMode = stringToRenderMode(QString("disabled"));
+    }
+
     properties->mEnum()->setValue(renderSettings.renderModeProperty,
-                                  settings->value("renderMode").toInt());
+                                  renderMode);
 
     const QString thinContourLevs = settings->value("thinContourLevels").toString();
     //parseContourLevelString(thinContourLevs, &thinContourLevels);
@@ -2102,6 +2120,63 @@ void MNWP2DSectionActorVariable::setThickContourLevelsFromString(
 {
     actor->getQtProperties()->mString()->setValue(
             renderSettings.thickContourLevelsProperty, cLevelStr);
+}
+
+
+QString MNWP2DSectionActorVariable::renderModeToString(
+        RenderMode::Type renderMode)
+{
+    switch (renderMode)
+    {
+    case RenderMode::Disabled:
+        return QString("disabled");
+    case RenderMode::FilledContours:
+        return QString("filled contours");
+    case RenderMode::PseudoColour:
+        return QString("pseudo colour");
+    case RenderMode::LineContours:
+        return QString("line contours");
+    case RenderMode::FilledAndLineContours:
+        return QString("filled and line contours");
+    case RenderMode::PseudoColourAndLineContours:
+        return QString("pcolour and line contours");
+    default:
+        return QString("");
+    }
+}
+
+
+MNWP2DSectionActorVariable::RenderMode::Type
+MNWP2DSectionActorVariable::stringToRenderMode(QString renderModeName)
+{
+    if (renderModeName == QString("disabled"))
+    {
+        return RenderMode::Disabled;
+    }
+    else if (renderModeName == QString("filled contours"))
+    {
+        return RenderMode::FilledContours;
+    }
+    else if (renderModeName == QString("pseudo colour"))
+    {
+        return RenderMode::PseudoColour;
+    }
+    else if (renderModeName == QString("line contours"))
+    {
+        return RenderMode::LineContours;
+    }
+    else if (renderModeName == QString("filled and line contours"))
+    {
+        return RenderMode::FilledAndLineContours;
+    }
+    else if (renderModeName == QString("pcolour and line contours"))
+    {
+        return RenderMode::PseudoColourAndLineContours;
+    }
+    else
+    {
+        return RenderMode::Invalid;
+    }
 }
 
 
