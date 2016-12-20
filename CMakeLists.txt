@@ -40,7 +40,7 @@ set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 project(Met.3D)
 # Set version number 
 set(Met3D_VERSION_MAJOR 1)
-set(Met3D_VERSION_MINOR 0)
+set(Met3D_VERSION_MINOR 1)
 
 # Add global defines
 add_definitions(-DENABLE_MET3D_STOPWATCH
@@ -205,19 +205,8 @@ file (GLOB          Met3D_Configs   config/*)
 
 #source_group(automocs FILES ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}_automoc.cpp)
 
-#file (GLOB Met3D_Source_Files	src/main.cpp src/mainwindow.cpp src/mainwindow.h)
-#file (GLOB Met3D_Actors_Source_Files src/actors/*)
-#file (GLOB Met3D_Data_Source src/data/*)
-#file (GLOB Met3D_Data_Waypoints_Source src/data/waypoints/*)
-#file (GLOB Met3D_GLSL_Source src/glsl/*)
-#file (GLOB Met3D_GXFW_Source src/gxfw/*)
-#file (GLOB Met3D_GXFW_GL_Source src/gxfw/gl/*)
-#file (GLOB Met3D_Cluster_Source src/cluster/*)
-#file (GLOB Met3D_QTExtensions_Source src/qt_extensions/*)
-#file (GLOB Met3D_System_Source src/system/*)cmake set arguments for run
-#file (GLOB Met3D_Util_Source src/util/*)
-
-# NOTE: we could also use file (GLOB_RECURSE Met3D_Source src/*)
+# NOTE: we could also use file (GLOB_RECURSE Met3D_Source src/*) but we still
+# want to keep control over what has to be included in the project
 
 # Third-party souce files.
 file (GLOB QT_PROPERTYBROWSER_Source ../third-party/qt-solutions/qtpropertybrowser/src/*)
@@ -244,16 +233,6 @@ add_executable(Met3D # executable name
                 ${Met3D_Source} # cpp source files
                 ${Met3D_Header} # h header files
                 ${Met3D_Source_C} # c source files
-               
-                #${Met3D_Actors_Source}
-                #${Met3D_Data_Source}
-                #${Met3D_Data_Waypoints_Source}
-                #${Met3D_GXFW_Source}
-                #${Met3D_GXFW_GL_Source}
-                #${Met3D_QTExtensions_Source}
-                #${Met3D_System_Source}
-                #${Met3D_Util_Source}
-                #${Met3D_Cluster_Source}
                
                 ${QT_PROPERTYBROWSER_Source}
                 ${MET3D_UIS_H} # add qt uis to the executable
