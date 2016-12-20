@@ -40,6 +40,7 @@
 #include "data/structuredgrid.h"
 #include "data/weatherpredictiondatasource.h"
 #include "actors/transferfunction1d.h"
+#include "actors/spatial1dtransferfunction.h"
 #include "util/mstopwatch.h"
 
 #define MSTOPWATCH_ENABLED
@@ -334,6 +335,7 @@ protected:
     QtProperty *changeVariableProperty;
 
     QtProperty *transferFunctionProperty;
+    QtProperty *spatialTransferFunctionProperty;
 
     /** Data request information. */
     QSet<MDataRequest> pendingRequests; // to quickly decide whether to accept a request
@@ -435,7 +437,13 @@ public:
             PseudoColour = 2,
             LineContours = 3,
             FilledAndLineContours = 4,
-            PseudoColourAndLineContours = 5
+            PseudoColourAndLineContours = 5,
+            TexturedContours = 6,
+            FilledAndTexturedContours = 7,
+            LineAndTexturedContours = 8,
+            PseudoColourAndTexturedContours = 9,
+            FilledAndLineAndTexturedContours = 10,
+            PseudoColourAndLineAndTexturedContours = 11
         };
     };
 
@@ -494,6 +502,8 @@ public:
 
     ~MNWP2DHorizontalActorVariable();
 
+    void initialize() override;
+
     bool onQtPropertyChanged(QtProperty *property) override;
 
     void saveConfiguration(QSettings *settings) override;
@@ -519,6 +529,12 @@ public:
      */
     QList<MLabel*> getContourLabels(bool noOverlapping = false,
                                     MSceneViewGLWidget* sceneView = nullptr);
+
+    bool setSpatialTransferFunction(QString stfName);
+
+    /* SpatialTransferFunction attached to this variable. */
+    MSpatial1DTransferFunction *spatialTransferFunction;
+    int                         textureUnitSpatialTransferFunction;
 
 protected:
     friend class MNWPHorizontalSectionActor;
@@ -577,6 +593,10 @@ protected:
                                   const int lat, const int lon,
                                   const int deltaLat, const int deltaLon,
                                   const float isoValue);
+
+private:
+
+    bool setSpatialTransferFunctionFromProperty();
 };
 
 

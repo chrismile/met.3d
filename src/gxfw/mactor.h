@@ -491,6 +491,7 @@ protected:
 
     // Define friends for request/release texture and image units.
     friend class MNWP2DSectionActorVariable;
+    friend class MNWP2DHorizontalActorVariable;
     friend class MNWP3DVolumeActorVariable;
 
     GLint assignTextureUnit();

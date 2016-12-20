@@ -237,6 +237,9 @@ void MNWPHorizontalSectionActor::reloadShaderEffects()
                 glFilledContoursShader,
                 "src/glsl/hsec_filledcontours.fx.glsl");
     compileShadersFromFileWithProgressDialog(
+                glTexturedContoursShader,
+                "src/glsl/hsec_texturedcontours.fx.glsl");
+    compileShadersFromFileWithProgressDialog(
                 glPseudoColourShader,
                 "src/glsl/hsec_pseudocolour.fx.glsl");
     compileShadersFromFileWithProgressDialog(
@@ -534,6 +537,8 @@ void MNWPHorizontalSectionActor::initializeActorResources()
                                                 glMarchingSquaresShader);
     loadShaders |= glRM->generateEffectProgram("hsec_filledcountours",
                                                 glFilledContoursShader);
+    loadShaders |= glRM->generateEffectProgram("hsec_texturedcountours",
+                                                glTexturedContoursShader);
     loadShaders |= glRM->generateEffectProgram("hsec_interpolation",
                                                 glVerticalInterpolationEffect);
     loadShaders |= glRM->generateEffectProgram("hsec_pseudocolor",
@@ -839,6 +844,40 @@ void MNWPHorizontalSectionActor::renderToCurrentContext(MSceneViewGLWidget *scen
 
         case MNWP2DHorizontalActorVariable::RenderMode::PseudoColourAndLineContours:
             renderPseudoColour(sceneView, var);
+            renderLineCountours(sceneView, var);
+            renderContourLabels(sceneView, var);
+            break;
+
+        case MNWP2DHorizontalActorVariable::RenderMode::TexturedContours:
+            renderTexturedContours(sceneView, var);
+            break;
+
+        case MNWP2DHorizontalActorVariable::RenderMode::FilledAndTexturedContours:
+            renderFilledContours(sceneView, var);
+            renderTexturedContours(sceneView, var);
+            break;
+
+        case MNWP2DHorizontalActorVariable::RenderMode::LineAndTexturedContours:
+            renderTexturedContours(sceneView, var);
+            renderLineCountours(sceneView, var);
+            renderContourLabels(sceneView, var);
+            break;
+
+        case MNWP2DHorizontalActorVariable::RenderMode::PseudoColourAndTexturedContours:
+            renderPseudoColour(sceneView, var);
+            renderTexturedContours(sceneView, var);
+            break;
+
+        case MNWP2DHorizontalActorVariable::RenderMode::FilledAndLineAndTexturedContours:
+            renderFilledContours(sceneView, var);
+            renderTexturedContours(sceneView, var);
+            renderLineCountours(sceneView, var);
+            renderContourLabels(sceneView, var);
+            break;
+
+        case MNWP2DHorizontalActorVariable::RenderMode::PseudoColourAndLineAndTexturedContours:
+            renderPseudoColour(sceneView, var);
+            renderTexturedContours(sceneView, var);
             renderLineCountours(sceneView, var);
             renderContourLabels(sceneView, var);
             break;
@@ -1549,6 +1588,111 @@ void MNWPHorizontalSectionActor::renderLineCountours(
 //                                  0,
 //                                  nlons - 1,
 //                                  nlats - 1); CHECK_GL_ERROR;
+}
+
+
+void MNWPHorizontalSectionActor::renderTexturedContours(
+        MSceneViewGLWidget *sceneView, MNWP2DHorizontalActorVariable *var)
+{
+    // Abort rendering if transfer function is not defined.
+    if (var->spatialTransferFunction == nullptr) return;
+    if (var->spatialTransferFunction->getTexture() == nullptr) return;
+
+//    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LEQUAL);
+
+    glTexturedContoursShader->bind();
+
+    // Model-view-projection matrix from the current scene view.
+    glTexturedContoursShader->setUniformValue(
+                "mvpMatrix", *(sceneView->getModelViewProjectionMatrix())); CHECK_GL_ERROR;
+
+    // Texture bindings for Lat/Lon axes (1D textures).
+    var->textureLonLatLevAxes->bindToTextureUnit(var->textureUnitLonLatLevAxes); CHECK_GL_ERROR;
+    glTexturedContoursShader->setUniformValue(
+                "latLonAxesData", var->textureUnitLonLatLevAxes); CHECK_GL_ERROR;
+    glTexturedContoursShader->setUniformValue(
+                "latOffset", var->grid->nlons); CHECK_GL_ERROR;
+
+    glTexturedContoursShader->setUniformValue(
+                "scalarMinimum",
+                var->spatialTransferFunction->getMinimumValue()); CHECK_GL_ERROR;
+    glTexturedContoursShader->setUniformValue(
+                "scalarMaximum",
+                var->spatialTransferFunction->getMaximumValue()); CHECK_GL_ERROR;
+
+    var->spatialTransferFunction->getTexture()->bindToTextureUnit(
+                var->textureUnitSpatialTransferFunction);
+    glTexturedContoursShader->setUniformValue(
+                "transferFunction",
+                var->textureUnitSpatialTransferFunction); CHECK_GL_ERROR;
+
+    glTexturedContoursShader->setUniformValue(
+                "distInterp",
+                GLfloat(var->spatialTransferFunction->getInterpolationRange()));
+
+    glTexturedContoursShader->setUniformValue(
+                "clampMaximum",
+                GLboolean(var->spatialTransferFunction->getClampMaximum()));
+
+    glTexturedContoursShader->setUniformValue(
+                "numLevels",
+                GLint(var->spatialTransferFunction->getNumLevels())); CHECK_GL_ERROR;
+
+    glTexturedContoursShader->setUniformValue(
+                "scaleWidth",
+                GLfloat(var->spatialTransferFunction->getTextureScale()));
+
+    glTexturedContoursShader->setUniformValue(
+                "aspectRatio",
+                GLfloat(var->spatialTransferFunction->getTextureAspectRatio()));
+
+    glTexturedContoursShader->setUniformValue(
+                "worldZ", GLfloat(sceneView->worldZfromPressure(slicePosition_hPa))); CHECK_GL_ERROR;
+
+    glBindImageTexture(var->imageUnitTargetGrid, // image unit
+                       var->textureTargetGrid->getTextureObject(),
+                                                 // texture object
+                       0,                        // level
+                       GL_FALSE,                 // layered
+                       0,                        // layer
+                       GL_READ_WRITE,            // shader access
+                       // GL_WRITE_ONLY,         // shader access
+                       GL_R32F); CHECK_GL_ERROR; // format
+    // TODO:
+//    glBindImageTexture(var->imageUnitTargetGrid, // image unit
+//                       var->textureTargetGrid->getTextureObject(),
+//                                                 // texture object
+//                       0,                        // level
+//                       GL_FALSE,                 // layered
+//                       0,                        // layer
+//                       GL_READ_WRITE,            // shader access
+//                       // GL_WRITE_ONLY,         // shader access
+//                       GL_RG32F); CHECK_GL_ERROR; // format
+
+    glTexturedContoursShader->setUniformValue(
+                "crossSectionGrid", GLint(var->imageUnitTargetGrid)); CHECK_GL_ERROR;
+
+    // Grid offsets to render only the requested subregion.
+    glTexturedContoursShader->setUniformValue(
+                "iOffset", GLint(var->i0)); CHECK_GL_ERROR;
+    glTexturedContoursShader->setUniformValue(
+                "jOffset", GLint(var->j0)); CHECK_GL_ERROR;
+    glTexturedContoursShader->setUniformValue(
+                "bboxLons", QVector2D(llcrnrlon, urcrnrlon)); CHECK_GL_ERROR;
+
+    // Use instanced rendering to avoid geometry upload (see notes 09Feb2012).
+    glPolygonOffset(.8f, 1.0f); CHECK_GL_ERROR;
+
+    glEnable(GL_POLYGON_OFFSET_FILL); CHECK_GL_ERROR;
+    glPolygonMode(GL_FRONT_AND_BACK,
+                  renderAsWireFrame ? GL_LINE : GL_FILL); CHECK_GL_ERROR;
+    glDrawArraysInstanced(GL_TRIANGLE_STRIP,
+                          0, var->nlons * 2, var->nlats - 1); CHECK_GL_ERROR;
+
+    glDisable(GL_POLYGON_OFFSET_FILL);
+
+//    glEnable(GL_DEPTH_TEST);
 }
 
 

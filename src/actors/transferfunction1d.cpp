@@ -402,6 +402,8 @@ void MTransferFunction1D::setNumLabels(int num)
 
 void MTransferFunction1D::saveConfiguration(QSettings *settings)
 {
+    MTransferFunction::saveConfiguration(settings);
+
     settings->beginGroup(MTransferFunction1D::getSettingsID());
 
     // Properties related to labelling the colour bar.
