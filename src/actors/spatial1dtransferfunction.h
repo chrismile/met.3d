@@ -60,7 +60,7 @@ public:
 
     void loadConfiguration(QSettings *settings);
 
-    QString getSettingsID() override { return "Spatial1DTransferFunction"; }
+    QString getSettingsID() override { return "TransferFunction1DSpatialTexture"; }
 
     /**
       Returns the texture that represents the spatial transfer function texture.

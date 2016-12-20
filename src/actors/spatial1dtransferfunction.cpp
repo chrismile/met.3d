@@ -53,10 +53,11 @@ MSpatial1DTransferFunction::MSpatial1DTransferFunction()
     : MTransferFunction(),
       tfTexture(nullptr),
       numLevels(2),
-      minimumValue(203.15),
-      maximumValue(303.15),
+      minimumValue(0.0),
+      maximumValue(100.0),
       clampMaximum(true),
       interpolationRange(1.0),
+      textureScale(1.0),
       currentTextureWidth(0),
       currentTextureHeight(0)
 {
@@ -67,7 +68,7 @@ MSpatial1DTransferFunction::MSpatial1DTransferFunction()
     // ===============================================
     beginInitialiseQtProperties();
 
-    setName("Spatial 1D transfer function");
+    setName("Transfer function scalar to texture");
 
     // Properties related to labelling the colour bar.
     // ===============================================
