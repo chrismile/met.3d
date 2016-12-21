@@ -58,7 +58,7 @@ MTransferFunction1D::MTransferFunction1D()
     // ===============================================
     beginInitialiseQtProperties();
 
-    setName("1D transfer function (colour map)");
+    setName("Transfer function scalar to colour (colour map)");
 
     // Properties related to labelling the colour bar.
     // ===============================================
@@ -402,6 +402,8 @@ void MTransferFunction1D::setNumLabels(int num)
 
 void MTransferFunction1D::saveConfiguration(QSettings *settings)
 {
+    MTransferFunction::saveConfiguration(settings);
+
     settings->beginGroup(MTransferFunction1D::getSettingsID());
 
     // Properties related to labelling the colour bar.

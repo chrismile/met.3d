@@ -1165,6 +1165,27 @@ void MNWPActorVariable::onActorCreated(MActor *actor)
 
         this->actor->enableEmissionOfActorChangedSignal(true);
     }
+
+    if (MSpatial1DTransferFunction *stf =
+            dynamic_cast<MSpatial1DTransferFunction*>(actor))
+    {
+        if (dynamic_cast<MNWP2DHorizontalActorVariable*>(this))
+        {
+            // Don't render while the properties are being updated.
+            this->actor->enableEmissionOfActorChangedSignal(false);
+
+            MQtProperties *properties = actor->getQtProperties();
+            int index = properties->mEnum()->value(spatialTransferFunctionProperty);
+            QStringList availableSTFs = properties->mEnum()->enumNames(
+                        spatialTransferFunctionProperty);
+            availableSTFs << stf->transferFunctionName();
+            properties->mEnum()->setEnumNames(spatialTransferFunctionProperty,
+                                              availableSTFs);
+            properties->mEnum()->setValue(spatialTransferFunctionProperty, index);
+
+            this->actor->enableEmissionOfActorChangedSignal(true);
+        }
+    }
 }
 
 
@@ -1191,13 +1212,43 @@ void MNWPActorVariable::onActorDeleted(MActor *actor)
 
         this->actor->enableEmissionOfActorChangedSignal(true);
     }
+
+    // If the deleted actor is a spatial transfer function, remove it from the
+    // list of available spatial transfer functions.
+    if (MSpatial1DTransferFunction *stf =
+            dynamic_cast<MSpatial1DTransferFunction*>(actor))
+    {
+        if (dynamic_cast<MNWP2DHorizontalActorVariable*>(this))
+        {
+            this->actor->enableEmissionOfActorChangedSignal(false);
+
+            MQtProperties *properties = actor->getQtProperties();
+            int index =
+                    properties->mEnum()->value(spatialTransferFunctionProperty);
+
+            QStringList availableSTFs = properties->mEnum()->enumNames(
+                        spatialTransferFunctionProperty);
+
+            // If the deleted transfer function is currently connected to this
+            // variable, set current transfer function to "None" (index 0).
+            if (availableSTFs.at(index) == stf->getName()) index = 0;
+
+            availableSTFs.removeOne(stf->getName());
+            properties->mEnum()->setEnumNames(spatialTransferFunctionProperty,
+                                              availableSTFs);
+            properties->mEnum()->setValue(spatialTransferFunctionProperty,
+                                          index);
+
+            this->actor->enableEmissionOfActorChangedSignal(true);
+        }
+    }
 }
 
 
 void MNWPActorVariable::onActorRenamed(MActor *actor, QString oldName)
 {
-    // If the new actor is a transfer function, add it to the list of
-    // available transfer functions.
+    // If the renamed actor is a transfer function, change its name in the list
+    // of available transfer functions.
     if (MTransferFunction1D *tf = dynamic_cast<MTransferFunction1D*>(actor))
     {
         // Don't render while the properties are being updated.
@@ -1215,6 +1266,32 @@ void MNWPActorVariable::onActorRenamed(MActor *actor, QString oldName)
         properties->mEnum()->setValue(transferFunctionProperty, index);
 
         this->actor->enableEmissionOfActorChangedSignal(true);
+    }
+
+    // If the renamed actor is a spatial transfer function, change its name in
+    // the list of available spatial transfer functions.
+    if (MTransferFunction1D *tf = dynamic_cast<MTransferFunction1D*>(actor))
+    {
+        if (dynamic_cast<MNWP2DHorizontalActorVariable*>(this))
+        {
+            // Don't render while the properties are being updated.
+            this->actor->enableEmissionOfActorChangedSignal(false);
+
+            MQtProperties *properties = this->actor->getQtProperties();
+            int index =
+                    properties->mEnum()->value(spatialTransferFunctionProperty);
+            QStringList availableSTFs = properties->mEnum()->enumNames(
+                        spatialTransferFunctionProperty);
+
+            // Replace affected entry.
+            availableSTFs[availableSTFs.indexOf(oldName)] = tf->getName();
+
+            properties->mEnum()->setEnumNames(spatialTransferFunctionProperty,
+                                              availableSTFs);
+            properties->mEnum()->setValue(spatialTransferFunctionProperty, index);
+
+            this->actor->enableEmissionOfActorChangedSignal(true);
+        }
     }
 }
 
@@ -2257,6 +2334,8 @@ bool MNWP2DSectionActorVariable::parseContourLevelString(
 MNWP2DHorizontalActorVariable::MNWP2DHorizontalActorVariable(
         MNWPMultiVarActor *actor)
     : MNWP2DSectionActorVariable(actor),
+      spatialTransferFunction(nullptr),
+      textureUnitSpatialTransferFunction(-1),
       llcrnrlon(0),
       llcrnrlat(0),
       urcrnrlon(0),
@@ -2266,11 +2345,64 @@ MNWP2DHorizontalActorVariable::MNWP2DHorizontalActorVariable(
 {
     assert(actor != nullptr);
     MNWPMultiVarActor *a = actor;
+    MQtProperties *properties = actor->getQtProperties();
 
     a->beginInitialiseQtProperties();
 
     QtProperty* renderGroup = getPropertyGroup("rendering");
     assert(renderGroup != nullptr);
+    // Remove properties to place spatial transfer function selection propery
+    // above them.
+    renderGroup->removeSubProperty(renderSettings.renderModeProperty);
+    renderGroup->removeSubProperty(renderSettings.thinContourLevelsProperty);
+    renderGroup->removeSubProperty(renderSettings.thinContourThicknessProperty);
+    renderGroup->removeSubProperty(renderSettings.thinContourColourProperty);
+    renderGroup->removeSubProperty(renderSettings.thickContourLevelsProperty);
+    renderGroup->removeSubProperty(renderSettings.thickContourThicknessProperty);
+    renderGroup->removeSubProperty(renderSettings.thickContourColourProperty);
+
+    QStringList renderModeNames =
+            properties->getEnumItems(renderSettings.renderModeProperty);
+    renderModeNames << "textured contours"
+                    << "filled and textured contours"
+                    << "line and textured contours"
+                    << "pseudo colour and textured contours"
+                    << "filled, line and textured contours"
+                    << "pseudo colour and line and textured contours";
+    properties->mEnum()->setEnumNames(renderSettings.renderModeProperty,
+                                      renderModeNames);
+
+    // Scan currently available actors for spatial transfer functions. Add STFs
+    // to the list displayed in the combo box of the
+    // spatialTransferFunctionProperty.
+    QStringList availableSTFs;
+    availableSTFs << "None";
+    MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
+    foreach (MActor *mactor, glRM->getActors())
+    {
+        if (MSpatial1DTransferFunction *stf =
+                dynamic_cast<MSpatial1DTransferFunction*>(mactor))
+        {
+            availableSTFs << stf->transferFunctionName();
+        }
+    }
+
+    spatialTransferFunctionProperty = a->addProperty(ENUM_PROPERTY,
+                                                     "spatial transfer function",
+                                                     renderGroup);
+    properties->mEnum()->setEnumNames(spatialTransferFunctionProperty,
+                                      availableSTFs);
+
+    // Re-add properties after spatial transfer function selection property.
+    renderGroup->addSubProperty(renderSettings.renderModeProperty);
+    renderGroup->addSubProperty(renderSettings.thinContourLevelsProperty);
+    renderGroup->addSubProperty(renderSettings.thinContourThicknessProperty);
+    renderGroup->addSubProperty(renderSettings.thinContourColourProperty);
+    renderGroup->addSubProperty(renderSettings.thickContourLevelsProperty);
+    renderGroup->addSubProperty(renderSettings.thickContourThicknessProperty);
+    renderGroup->addSubProperty(renderSettings.thickContourColourProperty);
+
+
 
     contourLabelsEnabledProperty = a->addProperty(
                 BOOL_PROPERTY, "(thin) contour labels",
@@ -2286,7 +2418,8 @@ MNWP2DHorizontalActorVariable::MNWP2DHorizontalActorVariable(
 
 MNWP2DHorizontalActorVariable::~MNWP2DHorizontalActorVariable()
 {
-    // Do nothing
+    if (textureUnitSpatialTransferFunction >=0)
+        actor->releaseTextureUnit(textureUnitSpatialTransferFunction);
 }
 
 
@@ -2294,9 +2427,28 @@ MNWP2DHorizontalActorVariable::~MNWP2DHorizontalActorVariable()
 ***                            PUBLIC METHODS                               ***
 *******************************************************************************/
 
+void MNWP2DHorizontalActorVariable::initialize()
+{
+    MNWP2DSectionActorVariable::initialize();
+
+    if (textureUnitSpatialTransferFunction >=0)
+        actor->releaseTextureUnit(textureUnitSpatialTransferFunction);
+
+    textureUnitSpatialTransferFunction = actor->assignTextureUnit();
+
+    setSpatialTransferFunctionFromProperty();
+}
+
+
 void MNWP2DHorizontalActorVariable::saveConfiguration(QSettings *settings)
 {
     MNWP2DSectionActorVariable::saveConfiguration(settings);
+
+    MQtProperties *properties = actor->getQtProperties();
+
+    // Save rendering properties.
+    settings->setValue("spatialTransferFunction",
+                       properties->getEnumItem(spatialTransferFunctionProperty));
 
     settings->setValue("contourLabelsEnabled", contourLabelsEnabled);
     settings->setValue("contourLabelSuffix", contourLabelSuffix);
@@ -2308,6 +2460,20 @@ void MNWP2DHorizontalActorVariable::loadConfiguration(QSettings *settings)
     MNWP2DSectionActorVariable::loadConfiguration(settings);
 
     MQtProperties *properties = actor->getQtProperties();
+
+    // Load rendering properties.
+    // ==========================
+    QString stfName = settings->value("spatialTransferFunction", "None").toString();
+    if ( !setSpatialTransferFunction(stfName) )
+    {
+        QMessageBox msgBox;
+        msgBox.setIcon(QMessageBox::Warning);
+        msgBox.setText(QString("Variable '%1':\n"
+                               "Spatial transfer function '%2' does not exist.\n"
+                               "Setting spatial transfer function to 'None'.")
+                       .arg(variableName).arg(stfName));
+        msgBox.exec();
+    }
 
     contourLabelsEnabled = settings->value("contourLabelsEnabled").toBool();
     properties->mBool()->setValue(contourLabelsEnabledProperty,
@@ -2334,6 +2500,7 @@ bool MNWP2DHorizontalActorVariable::onQtPropertyChanged(QtProperty *property)
 
         return true;
     }
+
     else if (property == contourLabelSuffixProperty)
     {
         contourLabelSuffix = properties->mString()->value(
@@ -2342,6 +2509,11 @@ bool MNWP2DHorizontalActorVariable::onQtPropertyChanged(QtProperty *property)
         updateContourLabels();
 
         return true;
+    }
+
+    else if (property == spatialTransferFunctionProperty)
+    {
+        return setSpatialTransferFunctionFromProperty();
     }
 
     return false;
@@ -2562,6 +2734,26 @@ QList<MLabel*> MNWP2DHorizontalActorVariable::getContourLabels(
 }
 
 
+bool MNWP2DHorizontalActorVariable::setSpatialTransferFunction(QString stfName)
+{
+    MQtProperties *properties = actor->getQtProperties();
+    QStringList stfNames = properties->mEnum()->enumNames(
+                spatialTransferFunctionProperty);
+    int stfIndex = stfNames.indexOf(stfName);
+
+    if (stfIndex >= 0)
+    {
+        properties->mEnum()->setValue(spatialTransferFunctionProperty, stfIndex);
+        return true;
+    }
+
+    // Set transfer function property to "None".
+    properties->mEnum()->setValue(spatialTransferFunctionProperty, 0);
+
+    return false; // the given tf name could not be found
+}
+
+
 /******************************************************************************
 ***                          PROTECTED METHODS                              ***
 *******************************************************************************/
@@ -2718,6 +2910,58 @@ void MNWP2DHorizontalActorVariable::addNewContourLabel(
                     16, thinContourColour, MTextManager::BASELINECENTRE,
                     true, QColor(255, 255, 255, 200), 0.3)
                 );
+}
+
+
+/******************************************************************************
+***                            PRIVATE METHODS                              ***
+*******************************************************************************/
+
+bool MNWP2DHorizontalActorVariable::setSpatialTransferFunctionFromProperty()
+{
+    MQtProperties *properties = actor->getQtProperties();
+    MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
+
+    QString stfName = properties->getEnumItem(spatialTransferFunctionProperty);
+
+    if (stfName == "None")
+    {
+        spatialTransferFunction = nullptr;
+
+        // Update enum items: Scan currently available actors for transfer
+        // functions. Add TFs to the list displayed in the combo box of the
+        // transferFunctionProperty.
+        QStringList availableSTFs;
+        availableSTFs << "None";
+        foreach (MActor *mactor, glRM->getActors())
+        {
+            if (MSpatial1DTransferFunction *stf =
+                    dynamic_cast<MSpatial1DTransferFunction*>(mactor))
+            {
+                availableSTFs << stf->transferFunctionName();
+            }
+        }
+        properties->mEnum()->setEnumNames(spatialTransferFunctionProperty,
+                                          availableSTFs);
+
+        return true;
+    }
+
+    // Find the selected transfer function in the list of actors from the
+    // resources manager. Not very efficient, but works well enough for the
+    // small number of actors at the moment..
+    foreach (MActor *mactor, glRM->getActors())
+    {
+        if (MSpatial1DTransferFunction *stf =
+                dynamic_cast<MSpatial1DTransferFunction*>(mactor))
+            if (stf->transferFunctionName() == stfName)
+            {
+                spatialTransferFunction = stf;
+                return true;
+            }
+    }
+
+    return false;
 }
 
 

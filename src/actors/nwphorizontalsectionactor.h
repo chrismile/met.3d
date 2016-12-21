@@ -168,6 +168,9 @@ private:
     void renderLineCountours(MSceneViewGLWidget *sceneView,
                              MNWP2DHorizontalActorVariable* var);
 
+    void renderTexturedContours(MSceneViewGLWidget *sceneView,
+                             MNWP2DHorizontalActorVariable* var);
+
     void renderWindBarbs(MSceneViewGLWidget *sceneView);
 
     void renderShadow(MSceneViewGLWidget* sceneView);
@@ -179,6 +182,7 @@ private:
 
     std::shared_ptr<GL::MShaderEffect> glVerticalInterpolationEffect;
     std::shared_ptr<GL::MShaderEffect> glFilledContoursShader;
+    std::shared_ptr<GL::MShaderEffect> glTexturedContoursShader;
     std::shared_ptr<GL::MShaderEffect> glPseudoColourShader;
     std::shared_ptr<GL::MShaderEffect> glMarchingSquaresShader;
     std::shared_ptr<GL::MShaderEffect> glWindBarbsShader;
