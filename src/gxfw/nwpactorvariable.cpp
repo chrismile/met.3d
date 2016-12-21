@@ -2135,8 +2135,9 @@ void MNWP2DSectionActorVariable::loadConfiguration(QSettings *settings)
     {
         QMessageBox msgBox;
         msgBox.setIcon(QMessageBox::Warning);
-        msgBox.setText(QString("Could not find render mode %1.\n"
-                       "Setting render mode to 'disabled'.").arg(renderModeName));
+        msgBox.setText(QString("Error reading configuration file: "
+                               "Could not find render mode %1.\n"
+                               "Setting render mode to 'disabled'.").arg(renderModeName));
         msgBox.exec();
 
         renderMode = stringToRenderMode(QString("disabled"));
@@ -2238,32 +2239,43 @@ QString MNWP2DSectionActorVariable::renderModeToString(
 MNWP2DSectionActorVariable::RenderMode::Type
 MNWP2DSectionActorVariable::stringToRenderMode(QString renderModeName)
 {
-    if (renderModeName == QString("disabled"))
+    // NOTE: Render mode identification was changed in Met.3D version 1.1. For
+    // compatibility with version 1.0, the old numeric identifiers are
+    // considered here as well.
+    if (renderModeName == QString("disabled")
+            || renderModeName == QString("0")) // compatibility with Met.3D 1.0
     {
         return RenderMode::Disabled;
     }
-    else if (renderModeName == QString("filled contours"))
+    else if (renderModeName == QString("filled contours")
+             || renderModeName == QString("1"))
     {
         return RenderMode::FilledContours;
     }
-    else if (renderModeName == QString("pseudo colour"))
+    else if (renderModeName == QString("pseudo colour")
+             || renderModeName == QString("2"))
     {
         return RenderMode::PseudoColour;
     }
-    else if (renderModeName == QString("line contours"))
+    else if (renderModeName == QString("line contours")
+             || renderModeName == QString("3"))
     {
         return RenderMode::LineContours;
     }
-    else if (renderModeName == QString("filled and line contours"))
+    else if (renderModeName == QString("filled and line contours")
+             || renderModeName == QString("4"))
     {
         return RenderMode::FilledAndLineContours;
     }
-    else if (renderModeName == QString("pcolour and line contours"))
+    else if (renderModeName == QString("pcolour and line contours")
+             || renderModeName == QString("5"))
     {
         return RenderMode::PseudoColourAndLineContours;
     }
     // Avoid accepting render modes in vertical section which only exist in
     // horizontal sections.
+//TODO (mr, 21Dec2016) -- this method should be made virtual and the following
+//     code be put into the derived method
     else if (dynamic_cast<MNWP2DHorizontalActorVariable*>(this))
     {
         if (renderModeName == QString("textured contours"))
