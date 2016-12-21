@@ -2217,6 +2217,18 @@ QString MNWP2DSectionActorVariable::renderModeToString(
         return QString("filled and line contours");
     case RenderMode::PseudoColourAndLineContours:
         return QString("pcolour and line contours");
+    case RenderMode::TexturedContours:
+        return QString("textured contours");
+    case RenderMode::FilledAndTexturedContours:
+        return QString("filled and textured contours");
+    case RenderMode::LineAndTexturedContours:
+        return QString("line and textured contours");
+    case RenderMode::PseudoColourAndTexturedContours:
+        return QString("pcolour and textured contours");
+    case RenderMode::FilledAndLineAndTexturedContours:
+        return QString("filled, line and textured contours");
+    case RenderMode::PseudoColourAndLineAndTexturedContours:
+        return QString("pcolour and line and textured contours");
     default:
         return QString("");
     }
@@ -2249,6 +2261,40 @@ MNWP2DSectionActorVariable::stringToRenderMode(QString renderModeName)
     else if (renderModeName == QString("pcolour and line contours"))
     {
         return RenderMode::PseudoColourAndLineContours;
+    }
+    // Avoid accepting render modes in vertical section which only exist in
+    // horizontal sections.
+    else if (dynamic_cast<MNWP2DHorizontalActorVariable*>(this))
+    {
+        if (renderModeName == QString("textured contours"))
+        {
+            return RenderMode::TexturedContours;
+        }
+        else if (renderModeName == QString("filled and textured contours"))
+        {
+            return RenderMode::FilledAndTexturedContours;
+        }
+        else if (renderModeName == QString("line and textured contours"))
+        {
+            return RenderMode::LineAndTexturedContours;
+        }
+        else if (renderModeName == QString("pcolour and textured contours"))
+        {
+            return RenderMode::PseudoColourAndTexturedContours;
+        }
+        else if (renderModeName == QString("filled, line and textured contours"))
+        {
+            return RenderMode::FilledAndLineAndTexturedContours;
+        }
+        else if (renderModeName == QString("pcolour and line and textured contours"))
+        {
+            return RenderMode::PseudoColourAndLineAndTexturedContours;
+        }
+        else
+        {
+            return RenderMode::Invalid;
+        }
+
     }
     else
     {
@@ -2366,9 +2412,9 @@ MNWP2DHorizontalActorVariable::MNWP2DHorizontalActorVariable(
     renderModeNames << "textured contours"
                     << "filled and textured contours"
                     << "line and textured contours"
-                    << "pseudo colour and textured contours"
+                    << "pcolour and textured contours"
                     << "filled, line and textured contours"
-                    << "pseudo colour and line and textured contours";
+                    << "pcolour and line and textured contours";
     properties->mEnum()->setEnumNames(renderSettings.renderModeProperty,
                                       renderModeNames);
 
