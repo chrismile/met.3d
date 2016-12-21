@@ -432,6 +432,7 @@ public:
         RenderMode() {}
         enum Type
         {
+            Invalid = -1,
             Disabled = 0,
             FilledContours = 1,
             PseudoColour = 2,
@@ -448,6 +449,13 @@ public:
     };
 
     void setRenderMode(RenderMode::Type mode);
+
+    /** Returns the name of the given render mode as QString. */
+    QString renderModeToString(RenderMode::Type renderMode);
+
+    /** Returns enum associated with the given name. Returns Invalid if no mode
+        exists with the given name. */
+    RenderMode::Type stringToRenderMode(QString renderModeName);
 
 protected:
     /**
