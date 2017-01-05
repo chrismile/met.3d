@@ -1270,7 +1270,8 @@ void MNWPActorVariable::onActorRenamed(MActor *actor, QString oldName)
 
     // If the renamed actor is a spatial transfer function, change its name in
     // the list of available spatial transfer functions.
-    if (MTransferFunction1D *tf = dynamic_cast<MTransferFunction1D*>(actor))
+    if (MSpatial1DTransferFunction *stf =
+            dynamic_cast<MSpatial1DTransferFunction*>(actor))
     {
         if (dynamic_cast<MNWP2DHorizontalActorVariable*>(this))
         {
@@ -1284,7 +1285,7 @@ void MNWPActorVariable::onActorRenamed(MActor *actor, QString oldName)
                         spatialTransferFunctionProperty);
 
             // Replace affected entry.
-            availableSTFs[availableSTFs.indexOf(oldName)] = tf->getName();
+            availableSTFs[availableSTFs.indexOf(oldName)] = stf->getName();
 
             properties->mEnum()->setEnumNames(spatialTransferFunctionProperty,
                                               availableSTFs);
