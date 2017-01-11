@@ -2136,7 +2136,7 @@ void MNWP2DSectionActorVariable::loadConfiguration(QSettings *settings)
         QMessageBox msgBox;
         msgBox.setIcon(QMessageBox::Warning);
         msgBox.setText(QString("Error reading configuration file: "
-                               "Could not find render mode %1.\n"
+                               "Could not find render mode '%1'.\n"
                                "Setting render mode to 'disabled'.").arg(renderModeName));
         msgBox.exec();
 
@@ -2271,42 +2271,6 @@ MNWP2DSectionActorVariable::stringToRenderMode(QString renderModeName)
              || renderModeName == QString("5"))
     {
         return RenderMode::PseudoColourAndLineContours;
-    }
-    // Avoid accepting render modes in vertical section which only exist in
-    // horizontal sections.
-//TODO (mr, 21Dec2016) -- this method should be made virtual and the following
-//     code be put into the derived method
-    else if (dynamic_cast<MNWP2DHorizontalActorVariable*>(this))
-    {
-        if (renderModeName == QString("textured contours"))
-        {
-            return RenderMode::TexturedContours;
-        }
-        else if (renderModeName == QString("filled and textured contours"))
-        {
-            return RenderMode::FilledAndTexturedContours;
-        }
-        else if (renderModeName == QString("line and textured contours"))
-        {
-            return RenderMode::LineAndTexturedContours;
-        }
-        else if (renderModeName == QString("pcolour and textured contours"))
-        {
-            return RenderMode::PseudoColourAndTexturedContours;
-        }
-        else if (renderModeName == QString("filled, line and textured contours"))
-        {
-            return RenderMode::FilledAndLineAndTexturedContours;
-        }
-        else if (renderModeName == QString("pcolour and line and textured contours"))
-        {
-            return RenderMode::PseudoColourAndLineAndTexturedContours;
-        }
-        else
-        {
-            return RenderMode::Invalid;
-        }
-
     }
     else
     {
@@ -2789,6 +2753,52 @@ QList<MLabel*> MNWP2DHorizontalActorVariable::getContourLabels(
     }
 
     return renderList;
+}
+
+
+MNWP2DSectionActorVariable::RenderMode::Type
+MNWP2DHorizontalActorVariable::stringToRenderMode(QString renderModeName)
+{
+    RenderMode::Type renderMode;
+
+    renderMode = MNWP2DSectionActorVariable::stringToRenderMode(renderModeName);
+
+    // Check if string matched 2D section render mode.
+    if (renderMode != RenderMode::Invalid)
+    {
+        return renderMode;
+    }
+
+    // Check if string matches horizontal section render mode and return invalid
+    // if not.
+    if (renderModeName == QString("textured contours"))
+    {
+        return RenderMode::TexturedContours;
+    }
+    else if (renderModeName == QString("filled and textured contours"))
+    {
+        return RenderMode::FilledAndTexturedContours;
+    }
+    else if (renderModeName == QString("line and textured contours"))
+    {
+        return RenderMode::LineAndTexturedContours;
+    }
+    else if (renderModeName == QString("pcolour and textured contours"))
+    {
+        return RenderMode::PseudoColourAndTexturedContours;
+    }
+    else if (renderModeName == QString("filled, line and textured contours"))
+    {
+        return RenderMode::FilledAndLineAndTexturedContours;
+    }
+    else if (renderModeName == QString("pcolour and line and textured contours"))
+    {
+        return RenderMode::PseudoColourAndLineAndTexturedContours;
+    }
+    else
+    {
+        return RenderMode::Invalid;
+    }
 }
 
 
