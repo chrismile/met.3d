@@ -71,6 +71,11 @@ uniform vec2      bboxLons;          // western and eastern lon of the bbox
 uniform float     scalarMinimum;    // min/max data values to scale to 0..1
 uniform float     scalarMaximum;
 
+uniform int alphaBlendingMode;
+uniform bool invertAlpha;
+uniform bool useConstantColour;
+uniform vec4 constantColour;
+
 shader VSmain(out VStoFS output)
 {
     // Compute grid indices (i, j) of the this vertex from vertex and instance
@@ -114,7 +119,7 @@ shader VSmain(out VStoFS output)
  ***                          FRAGMENT SHADER
  *****************************************************************************/
 
-uniform sampler3D transferFunction; // 2D transfer function with levels in 3rd
+uniform sampler2DArray transferFunction; // 2D transfer function with levels in 3rd
                                     // dimension
 
 uniform float distInterp;           // Range in scalar values used for interpolation.
@@ -125,6 +130,8 @@ uniform int numLevels;              // Amount of textures loaded.
 
 uniform float     scaleWidth;       // Scale in longitudes to scale texture with.
 uniform float     aspectRatio;      // Aspect ratio of given textures.
+
+uniform float height;               // Height of horizontal cross-section.
 
 shader FSmain(in VStoFS input, out vec4 fragColour)
 {
@@ -138,28 +145,32 @@ shader FSmain(in VStoFS input, out vec4 fragColour)
         discard;
     }
 
-    // Adapt to change scale of texture.
+    // Scale of texture with respect to one grid cell.
     vec2 scale = vec2(scaleWidth, scaleWidth * aspectRatio);
 
-    // Scalar value in range mapped to [0, max-min].
+    // Scalar value mapped to range: [0, max-min].
     float scalar = input.scalar - scalarMinimum;
 
+    // Flip y direction to obtain right orientation of texture.
+    vec2 pos = vec2(input.pos.x, height - input.pos.y);
+
     float scalarRange = scalarMaximum - scalarMinimum;
+    // Distribute texture levels equidistantly over scalar range.
     float dist = scalarRange / float(numLevels);
+    // Compute texture level from scalar value.
     float level = floor(scalar / dist);
-    // Texture level in 3d texture coordinates. (With first level at
-    // 1/(2*numLevels))
-    float levelCoord = (((min(level, float(numLevels - 1.0f))
-                          * 2.0f) + 1.0f) / float(2.0f * numLevels));
 
-    // todo Why is flip necessary?
-    // Texture coordinates with respect to scale. Flip y-direction since
-    // otherwise texture "stands on its head".
-    vec3 texCoords =
-            vec3(vec2(0.0f, 1.0f) + vec2(1.f, -1.f) * fract(input.pos / scale),
-                 levelCoord);
+    // Level in texture coordinates. (Clamp to highest level.)
+    float levelCoord = min(level, float(numLevels - 1.0f));
 
-    vec3 colour = textureLod(transferFunction, texCoords, 0.0f).rgb;
+    // Texture coordinates with respect to scale.
+    vec3 texCoords = vec3(pos / scale, levelCoord);
+
+    // Fetch lod and use it manually since otherwise interpolation between two
+    // texture levels won't work correctly.
+    float mipmapLevel = textureQueryLod(transferFunction, texCoords.xy).x;
+
+    vec4 colour = textureLod(transferFunction, texCoords, mipmapLevel);
 
     // Interpolation range in scalar value.
     float interpRange = (distInterp / 2.0f);
@@ -168,46 +179,113 @@ shader FSmain(in VStoFS input, out vec4 fragColour)
     // Scalar value distance to next level.
     float fraction2 = (ceil(scalar / dist) * dist) - scalar;
 
-    // Interpolation to lower level. (No interpolation for lowest level or
-    // clamped region!)
+    // Interpolation to previous level.
     if (interpRange > fraction && level < float(numLevels))
     {
-        levelCoord = (((floor(scalar / dist) - 1.f) * 2.0f) + 1.0f)
-                / float(2.0f * numLevels);
-        float interpolation = (fraction / (2.0f * interpRange)) + 0.5f;
+        // Indicator whether to blend to the previous level.
+        float indicator = float(level != 0.0f);
 
-        texCoords = vec3(vec2(0.0f, 1.0f) + vec2(1.f, -1.f)
-                         * fract(input.pos / scale), levelCoord);
+        levelCoord = floor(scalar / dist) - 1.f;
+        // Since we interpolate at borders to both sides, our interpolation
+        // range is [1.f, 0.5f] for one side. But for the lowest level we want
+        // the texture to fade out completely therefore the interpolation range
+        // is [1.f, 0.f].
+        float interpolation = (fraction / (pow(2.0f, indicator) * interpRange))
+                + 0.5f * indicator;
 
-        // Blend to previous level.If no previous level exists blend to white.
+        texCoords = vec3(pos / scale, levelCoord);
+
+        // Blend to previous level. If no previous level exists blend to
+        // transparent version of the lowest level.
         colour = (interpolation * colour)
                 + ((1.f - interpolation)
-                   * max(textureLod(transferFunction, texCoords, 0.0f).rgb,
-                         float(level == 0.0f))
+                   * vec4(textureLod(transferFunction, texCoords, mipmapLevel).rgb,
+                          // Use alpha value of texture to blend to previous
+                          // level, otherwise use 0.0f.
+                          indicator
+                          * textureLod(transferFunction, texCoords, mipmapLevel).a)
                    );
     }
-    // Interpolation to upper level. (No interpolation for highest level!)
+    // Interpolation to higher level. (No interpolation for clamped region.)
     else if (fraction2 < interpRange && level < float(numLevels))
     {
-        levelCoord =
-                ((min(ceil(scalar / dist), numLevels - 1.0f) * 2.0f) + 1.0f) / float(2.0f * numLevels);
-        float interpolation = (fraction2 / (2.0f * interpRange)) + 0.5f;
+        // Indicator whether to blend to the next level.
+        float indicator = float(level != float(numLevels - 1) || clampMaximum);
 
-        texCoords = vec3(vec2(0.0f, 1.0f) + vec2(1.f, -1.f)
-                         * fract(input.pos / scale), levelCoord);
+        levelCoord = min(ceil(scalar / dist), numLevels - 1.0f);
+        // Since we interpolate at borders between texture levels to both sides,
+        // our interpolation range is [1.f, 0.5f] for one side. But for the
+        // highest level we want the texture to fade out completely (if we do
+        // not use clamp) therefore the interpolation range is [1.f, 0.f].
+        float interpolation = (fraction2 / (pow(2.0f, indicator) * interpRange))
+                + 0.5f * indicator;
 
-        // Blend to next level. If no next level exists blend to white exept the
-        // user wants to clamp the maximum value.
+        texCoords = vec3(pos / scale, levelCoord);
+
+        // Blend to next level. If no next level exists blend to transparent
+        // version of the highest level exept the user wants to clamp the maximum
+        // value.
         colour = (interpolation * colour)
                 + ((1.f - interpolation)
-                   * max(textureLod(transferFunction, texCoords, 0.0f).rgb,
-                         float(level == float(numLevels - 1) && !clampMaximum))
+                   * vec4(textureLod(transferFunction, texCoords, mipmapLevel).rgb,
+                          // Use alpha value of texture to blend to next level,
+                          // otherwise use 0.0f.
+                          indicator
+                          * textureLod(transferFunction, texCoords, mipmapLevel).a)
                    );
     }
 
-    colour = min(vec3(.5f), colour);
+    // Needs to match alphaBlendingMode enum in spatial1dtransferfunction.h.
+    switch (alphaBlendingMode)
+    {
+    case 0: // Use alpha channel.
+    {
+        colour = colour;
+        break;
+    }
+    case 1: // Use red channel.
+    {
+        colour = colour.rgbr;
+        break;
+    }
+    case 2: // Use green channel.
+    {
+        colour = colour.rgbg;
+        break;
+    }
+    case 3: // Use blue channel.
+    {
+        colour = colour.rgbb;
+        break;
+    }
+    case 4: // Use rgb average.
+    {
+        float alpha = (colour.r + colour.g + colour.b) / 3.0f;
+        colour = vec4(colour.rgb, alpha);
+        break;
+    }
+    case 5: // Use no alpha blending.
+    {
+        colour = vec4(colour.rgb, 1.0f);
+        break;
+    }
+    default: // Invalid mode.
+    {
+        discard;
+    }
+    }
 
-    fragColour = vec4(colour, 1.0f - 2.0f * colour.r);
+    if (invertAlpha)
+    {
+        colour.a = 1.0f - colour.a;
+    }
+
+    if (useConstantColour)
+    {
+        colour = vec4(constantColour.rgb, colour.a);
+    }
+
+    fragColour = colour;
 }
 
 

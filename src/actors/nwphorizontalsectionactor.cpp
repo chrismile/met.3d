@@ -43,6 +43,7 @@
 #include "gxfw/selectdatasourcedialog.h"
 #include "gxfw/gl/typedvertexbuffer.h"
 #include "data/structuredgrid.h"
+#include "actors/spatial1dtransferfunction.h"
 
 using namespace std;
 
@@ -1648,7 +1649,24 @@ void MNWPHorizontalSectionActor::renderTexturedContours(
                 GLfloat(var->spatialTransferFunction->getTextureAspectRatio()));
 
     glTexturedContoursShader->setUniformValue(
-                "worldZ", GLfloat(sceneView->worldZfromPressure(slicePosition_hPa))); CHECK_GL_ERROR;
+                "worldZ", GLfloat(sceneView->worldZfromPressure(
+                                      slicePosition_hPa))); CHECK_GL_ERROR;
+
+    glTexturedContoursShader->setUniformValue("alphaBlendingMode",
+                                     GLenum(var->spatialTransferFunction
+                                           ->getAlphaBlendingMode()));
+    glTexturedContoursShader->setUniformValue("invertAlpha",
+                                     GLboolean(var->spatialTransferFunction
+                                               ->getInvertAlpha()));
+    glTexturedContoursShader->setUniformValue("useConstantColour",
+                                     GLboolean(var->spatialTransferFunction
+                                               ->getUseConstantColour()));
+    glTexturedContoursShader->setUniformValue("constantColour",
+                                     var->spatialTransferFunction
+                                     ->getConstantColour());
+
+    glTexturedContoursShader->setUniformValue(
+                "height", GLfloat(horizontalBBox.height())); CHECK_GL_ERROR;
 
     glBindImageTexture(var->imageUnitTargetGrid, // image unit
                        var->textureTargetGrid->getTextureObject(),
@@ -1657,7 +1675,6 @@ void MNWPHorizontalSectionActor::renderTexturedContours(
                        GL_FALSE,                 // layered
                        0,                        // layer
                        GL_READ_WRITE,            // shader access
-                       // GL_WRITE_ONLY,         // shader access
                        GL_R32F); CHECK_GL_ERROR; // format
     // TODO:
 //    glBindImageTexture(var->imageUnitTargetGrid, // image unit

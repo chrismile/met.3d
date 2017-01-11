@@ -47,7 +47,30 @@ class MSceneViewGLWidget;
 namespace Met3D
 {
 
+/**
+  @brief MSpatial1DTransferFunction represents a texturebar, providing both a
+  2D-texture that can be used as a lookup table by actors to map scalar values
+  to colours, and the geometric representation of the texturebar to be
+  drawn into the scene.
 
+  The user can control the mapping scalar value to colour value as well as
+  geometric properties of the rendered texturebar (position, size, labelling).
+
+  To allow the user more flexibility in the use of the texture, it is possible
+  to choose either to use the texture as it is or to use one or more of its
+  channels as an alpha map and set the colour to a constant value. Since the
+  user might use a black and white texture with black representing the structure
+  and white the transparent part, it is possible to invert the alpha value used.
+
+  To simplify loading textures and since GL_TEXTURE_2D_ARRAY only allows
+  textures of the same size, it is only allow to load a set of textures with
+  all having the same size. In a different approach one could implement to ask
+  the user to scale the textures to the same size if loaded with different
+  sizes, but this could lead to unexpected behaviour and confusion.
+
+  To achieve the best result it is advised to use a set of textures in which the
+  sparser textures are part of the denser textures.
+  */
 class MSpatial1DTransferFunction : public MTransferFunction
 {
 public:
@@ -85,6 +108,12 @@ public:
 
     float getInterpolationRange() { return interpolationRange; }
 
+    bool getInvertAlpha() { return invertAlpha; }
+
+    bool getUseConstantColour() { return useConstantColour; }
+
+    QColor getConstantColour() { return constantColour; }
+
     float getTextureScale() { return (float)textureScale; }
 
     float getTextureAspectRatio()
@@ -97,6 +126,16 @@ public:
     void setValueDecimals(int decimals);
 
     void setPosition(QRectF position);
+
+    enum AlphaBlendingMode {
+        AlphaChannel = 0,
+        RedChannel,
+        GreenChannel,
+        BlueChannel,
+        RGBAverage,
+        None
+    };
+    AlphaBlendingMode getAlphaBlendingMode() { return alphaBlendingMode; }
 
     QString transferFunctionName();
 
@@ -154,6 +193,8 @@ private:
     QtProperty          *pathToLoadedImagesProperty;
     QVector<QString>     pathsToLoadedImages;
     QString              imagePathsString;
+    QtProperty          *useMirroredRepeatProperty;
+    bool                 useMirroredRepeat;
 
 
     // Properties related to value range.
@@ -166,7 +207,19 @@ private:
     QtProperty *clampMaximumProperty;
     bool        clampMaximum;
     QtProperty *interpolationRangeProperty;
-    double      interpolationRange; // Defines scalar range of interpolated texture.
+    // Defines scalar range of interpolated texture.
+    double      interpolationRange;
+
+    // Properties related to alpha blending.
+    QtProperty *alphaBlendingPropertiesSubGroup;
+    QtProperty *alphaBlendingModeProperty;
+    QtProperty *invertAlphaProperty;
+    QtProperty *useConstantColourProperty;
+    QtProperty *constantColourProperty;
+    AlphaBlendingMode alphaBlendingMode;
+    bool invertAlpha;
+    bool useConstantColour;
+    QColor constantColour;
 
     // Properties related to texture scale.
     QtProperty *textureScalePropertiesSubGroup;
