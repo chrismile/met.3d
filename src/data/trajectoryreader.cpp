@@ -594,7 +594,7 @@ void MTrajectoryReader::checkFileOpen(QString filename)
                 else if (units != "hPa")
                     // .. and if they're in completely different units, raise an
                     // exception.
-                    throw NcException(
+                    throw MNcException(
                             "NcException",
                             "invalid units for ak coefficients (must be Pa or hPa)",
                             __FILE__, __LINE__);
@@ -615,7 +615,7 @@ void MTrajectoryReader::checkFileOpen(QString filename)
                 }
                 else if (units != "Pa")
                 {
-                    throw NcException(
+                    throw MNcException(
                                 "NcException", "invalid units for "
                                 "ensemble_minimum_of_surface_pressure (must "
                                 "be Pa or hPa)", __FILE__, __LINE__);

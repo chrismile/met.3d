@@ -696,7 +696,7 @@ MStructuredGrid *MClimateForecastReader::readGrid(
                 {
                     // .. and if they're in completely different units, raise an
                     // exception.
-                    throw NcException(
+                    throw MNcException(
                             "NcException",
                             "invalid units for ak coefficients (must be Pa or hPa)",
                             __FILE__, __LINE__);
@@ -804,7 +804,7 @@ MStructuredGrid *MClimateForecastReader::readGrid(
                 }
                 else if (units != "hPa")
                 {
-                    throw NcException(
+                    throw MNcException(
                             "NcException",
                             "invalid units for pressure levels (must be Pa or hPa)",
                             __FILE__, __LINE__);
