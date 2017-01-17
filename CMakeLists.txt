@@ -170,6 +170,8 @@ include_directories(${netcdf_cxx4_INCLUDE_DIR})
 # QCustomPlot
 find_package(qcustomplot REQUIRED)
 include_directories(${qcustomplot_INCLUDE_DIR})
+# Add major version as preprocessor definition.
+add_definitions(-DQCPLOT_MAJOR_VERSION=${qcustomplot_MAJOR_VERSION})
 
 # GLFX
 find_package(glfx REQUIRED)
