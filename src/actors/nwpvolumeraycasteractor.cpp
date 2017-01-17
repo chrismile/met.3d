@@ -903,19 +903,22 @@ void MNWPVolumeRaycasterActor::loadConfiguration(QSettings *settings)
 
     if (isInitialized()) generateVolumeBoxGeometry();
 
-    var = static_cast<MNWP3DVolumeActorVariable*>(
-                variables.at(variableIndex));
-    shadingVar = static_cast<MNWP3DVolumeActorVariable*>(
-                variables.at(shadingVariableIndex));
-
-    switch(renderMode)
+    if (!variables.empty())
     {
-    case RenderMode::Original:
-        var->useFlags(false); break;
-    case RenderMode::Bitfield:
-        var->useFlags(true); break;
-    case RenderMode::DVR:
-        var->useFlags(false); break;
+        var = static_cast<MNWP3DVolumeActorVariable*>(
+                    variables.at(variableIndex));
+        shadingVar = static_cast<MNWP3DVolumeActorVariable*>(
+                    variables.at(shadingVariableIndex));
+
+        switch(renderMode)
+        {
+        case RenderMode::Original:
+            var->useFlags(false); break;
+        case RenderMode::Bitfield:
+            var->useFlags(true); break;
+        case RenderMode::DVR:
+            var->useFlags(false); break;
+        }
     }
 }
 
