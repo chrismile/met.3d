@@ -142,16 +142,25 @@ void MNWPVerticalSectionActor::reloadShaderEffects()
 {
     LOG4CPLUS_DEBUG(mlog, "loading shader programs" << flush);
 
-    sectionGridShader->compileFromFile_Met3DHome(
+    beginCompileShaders(5);
+
+    compileShadersFromFileWithProgressDialog(
+                sectionGridShader,
                 "src/glsl/vsec_interpolation_filledcontours.fx.glsl");
-    marchingSquaresShader->compileFromFile_Met3DHome(
+    compileShadersFromFileWithProgressDialog(
+                marchingSquaresShader,
                 "src/glsl/vsec_marching_squares.fx.glsl");
-    pressureLinesShader->compileFromFile_Met3DHome(
+    compileShadersFromFileWithProgressDialog(
+                pressureLinesShader,
                 "src/glsl/vsec_pressureisolines.fx.glsl");
-    simpleGeometryShader->compileFromFile_Met3DHome(
+    compileShadersFromFileWithProgressDialog(
+                simpleGeometryShader,
                 "src/glsl/simple_coloured_geometry.fx.glsl");
-    positionSpheresShader->compileFromFile_Met3DHome(
+    compileShadersFromFileWithProgressDialog(
+                positionSpheresShader,
                 "src/glsl/trajectory_positions.fx.glsl");
+
+    endCompileShaders();
 }
 
 
@@ -201,7 +210,7 @@ void MNWPVerticalSectionActor::loadConfiguration(QSettings *settings)
                 settings->value("opacity").toFloat());
     properties->mDDouble()->setValue(
                 interpolationNodeSpacingProperty,
-                settings->value("interpolationNodeSpacing").toFloat());
+                settings->value("interpolationNodeSpacing", 0.15).toFloat());
 
     settings->endGroup();
 }
@@ -1005,7 +1014,7 @@ void MNWPVerticalSectionActor::renderToCurrentContext(MSceneViewGLWidget *sceneV
 
             // Loop over all iso values for which thin contour lines should be
             // rendered -- one render pass per isovalue.
-            glLineWidth(1); CHECK_GL_ERROR;
+            glLineWidth(var->thinContourThickness); CHECK_GL_ERROR;
 
 //TODO put this somewhere else (mr, 28Jan2013)
             var->thinContoursStartIndex  = 0;
@@ -1027,7 +1036,7 @@ void MNWPVerticalSectionActor::renderToCurrentContext(MSceneViewGLWidget *sceneV
             }
 
             // The same for the thick iso lines.
-            glLineWidth(2); CHECK_GL_ERROR;
+            glLineWidth(var->thickContourThickness); CHECK_GL_ERROR;
             marchingSquaresShader->setUniformValue(
                         "colour", var->thickContourColour);  CHECK_GL_ERROR;
             for (int i = var->thickContoursStartIndex;

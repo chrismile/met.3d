@@ -58,7 +58,7 @@ MTransferFunction1D::MTransferFunction1D()
     // ===============================================
     beginInitialiseQtProperties();
 
-    setName("1D transfer function (colour map)");
+    setName("Transfer function scalar to colour (colour map)");
 
     // Properties related to labelling the colour bar.
     // ===============================================
@@ -242,10 +242,17 @@ MTransferFunction1D::MTransferFunction1D()
 void MTransferFunction1D::reloadShaderEffects()
 {
     LOG4CPLUS_DEBUG(mlog, "loading shader programs" << flush);
-    simpleGeometryShader->compileFromFile_Met3DHome(
+
+    beginCompileShaders(2);
+
+    compileShadersFromFileWithProgressDialog(
+                simpleGeometryShader,
                 "src/glsl/simple_coloured_geometry.fx.glsl");
-    colourbarShader->compileFromFile_Met3DHome(
+    compileShadersFromFileWithProgressDialog(
+                colourbarShader,
                 "src/glsl/colourbar.fx.glsl");
+
+    endCompileShaders();
 }
 
 
@@ -395,6 +402,8 @@ void MTransferFunction1D::setNumLabels(int num)
 
 void MTransferFunction1D::saveConfiguration(QSettings *settings)
 {
+    MTransferFunction::saveConfiguration(settings);
+
     settings->beginGroup(MTransferFunction1D::getSettingsID());
 
     // Properties related to labelling the colour bar.

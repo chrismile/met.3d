@@ -120,7 +120,9 @@ HEADERS += \
     src/gxfw/memberselectiondialog.h \
     src/gxfw/adddatasetdialog.h \
     src/data/derivedmetvarsdatasource.h \
-    src/data/bboxtrajectoryfilter.h
+    src/data/bboxtrajectoryfilter.h \
+    src/gxfw/mresizewindowdialog.h \
+    src/actors/spatial1dtransferfunction.h
 
 SOURCES += \
     src/main.cpp \
@@ -208,7 +210,9 @@ SOURCES += \
     src/gxfw/memberselectiondialog.cpp \
     src/gxfw/adddatasetdialog.cpp \
     src/data/derivedmetvarsdatasource.cpp \
-    src/data/bboxtrajectoryfilter.cpp
+    src/data/bboxtrajectoryfilter.cpp \
+    src/gxfw/mresizewindowdialog.cpp \
+    src/actors/spatial1dtransferfunction.cpp
 
 FORMS += \
     src/mainwindow.ui \
@@ -220,7 +224,8 @@ FORMS += \
     src/gxfw/scenemanagementdialog.ui \
     src/gxfw/synccontrol.ui \
     src/gxfw/memberselectiondialog.ui \
-    src/gxfw/adddatasetdialog.ui
+    src/gxfw/adddatasetdialog.ui \
+    src/gxfw/resizewindowdialog.ui
 
 OTHER_FILES += \
     data/log4cplus.properties \
@@ -264,6 +269,7 @@ OTHER_FILES += \
     src/glsl/hsec_marching_squares.fx.glsl \
     src/glsl/vsec_marching_squares.fx.glsl \
     src/glsl/volume_normalcurves_initpoints.fx.glsl \
+    src/glsl/hsec_texturedcontours.fx.glsl \
     config/cf_stdnames.dat \
     config/log4cplus.properties
 

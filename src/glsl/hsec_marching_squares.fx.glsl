@@ -63,8 +63,10 @@ void emit(vec2 p1_worldposition, vec2 p2_worldposition,
   float fraction = (isoValue - p1_intensity) / (p2_intensity - p1_intensity);
   vec2 vertex_worldposition = mix(p1_worldposition, p2_worldposition, fraction);
   gl_Position = mvpMatrix * vec4(vertex_worldposition, worldZ, 1.0);
-  EmitVertex();
+//FIX (06Dec2016, mr) -- emit vertex has been moved out of the function
+//                       in order to run with newer Nvidia drivers -- check this
 }
+
 
 // we do not need any input, we use gl_in instead:
 /*
@@ -151,46 +153,62 @@ shader GSmain()
     else if (bitfield == 1)
     {
         emit(ll_worldposition, ul_worldposition, ll_intensity, ul_intensity, isoValue);
+        EmitVertex();
         emit(ll_worldposition, lr_worldposition, ll_intensity, lr_intensity, isoValue);
+        EmitVertex();
         EndPrimitive();
     }
     else if (bitfield == 2)
     {
         emit(ll_worldposition, lr_worldposition, ll_intensity, lr_intensity, isoValue);
+        EmitVertex();
         emit(lr_worldposition, ur_worldposition, lr_intensity, ur_intensity, isoValue);
+        EmitVertex();
         EndPrimitive();
     }
     else if (bitfield == 3)
     {
         emit(ll_worldposition, ul_worldposition, ll_intensity, ul_intensity, isoValue);
+        EmitVertex();
         emit(lr_worldposition, ur_worldposition, lr_intensity, ur_intensity, isoValue);
+        EmitVertex();
         EndPrimitive();
     }
     else if (bitfield == 4)
     {
         emit(ll_worldposition, ul_worldposition, ll_intensity, ul_intensity, isoValue);
+        EmitVertex();
         emit(ul_worldposition, ur_worldposition, ul_intensity, ur_intensity, isoValue);
+        EmitVertex();
         EndPrimitive();
     }
     else if (bitfield == 5)
     {
         emit(ll_worldposition, lr_worldposition, ll_intensity, lr_intensity, isoValue);
+        EmitVertex();
         emit(ul_worldposition, ur_worldposition, ul_intensity, ur_intensity, isoValue);
+        EmitVertex();
         EndPrimitive();
     }
     else if (bitfield == 6)
     {
         emit(ll_worldposition, ul_worldposition, ll_intensity, ul_intensity, isoValue);
+        EmitVertex();
         emit(ll_worldposition, lr_worldposition, ll_intensity, lr_intensity, isoValue);
+        EmitVertex();
         EndPrimitive();
         emit(ul_worldposition, ur_worldposition, ul_intensity, ur_intensity, isoValue);
+        EmitVertex();
         emit(lr_worldposition, ur_worldposition, lr_intensity, ur_intensity, isoValue);
+        EmitVertex();
         EndPrimitive();
     }
     else if (bitfield == 7)
     {
         emit(ul_worldposition, ur_worldposition, ul_intensity, ur_intensity, isoValue);
+        EmitVertex();
         emit(lr_worldposition, ur_worldposition, lr_intensity, ur_intensity, isoValue);
+        EmitVertex();
         EndPrimitive();
     }
 }

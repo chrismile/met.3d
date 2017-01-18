@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015-2016 Marc Rautenhaus
+**  Copyright 2016 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -86,9 +87,13 @@ void MWaypointsView::deleteSelectedWaypoint()
 void MWaypointsView::saveTrack()
 {
     if (this->waypointsModel->getFileName().length() == 0)
+    {
         saveAsTrack();
+    }
     else
-        this->waypointsModel->saveToFile(this->waypointsModel->getFileName());
+    {
+        checkExistanceAndSave(this->waypointsModel->getFileName());
+    }
 }
 
 
@@ -97,7 +102,85 @@ void MWaypointsView::saveAsTrack()
     QString fileName = QFileDialog::getSaveFileName(
                 this, "Save Flight Track", "", "Flight Track XML (*.ftml)");
     if (fileName.length() > 0)
-        this->waypointsModel->saveToFile(fileName);
+        checkExistanceAndSave(fileName);//this->waypointsModel->saveToFile(fileName);
+}
+
+
+void MWaypointsView::checkExistanceAndSave(QString filename)
+{
+    // Check whether the filename already exists.
+    QRegExp filterlist(".*\\.(ftml)");
+    if (!filename.isEmpty())
+    {
+        QString filetype = QString(".ftml");
+        QFileInfo checkFile(filename);
+
+        if (checkFile.exists())
+        {
+// TODO (bt, 17Oct2016) Use operating system dependend filename splitting.
+            QMessageBox::StandardButton reply = QMessageBox::question(
+                        this,
+                        "Save Flight Track",
+                        filename.split("/").last()
+                        + " already exits.\n"
+                        + "Do you want to replace it?",
+                        QMessageBox::Yes|QMessageBox::No,
+                        QMessageBox::No);
+
+            if (reply == QMessageBox::No)
+            {
+                // Re-open FileDialog if file already exists and the user
+                // chooses not to overwrite it or closes the question box.
+                filename = QFileDialog::getSaveFileName(
+                            this, "Save Flight Track", filename,
+                            "Flight Track XML (*.ftml)");
+
+                // Quit if user closes file dialog.
+                if(filename.isEmpty()) return;
+            }
+        }
+
+        // Check if filename doesn't end with .ftml
+        // Repeat the test since the user could have changed the name in the
+        // second FileDialog.
+        while (!filterlist.exactMatch(filename))
+        {
+            // Append the selected file extension
+            filename += filetype;
+// NOTE (bt, 17Oct2016): Can be removed if Qt-bug is fixed.
+            // Need to check if file already exists since QFileDialog
+            // doesn't provide this functionality under Linux compared to
+            // https://bugreports.qt.io/browse/QTBUG-11352 .
+            QFileInfo checkFile(filename);
+            if (checkFile.exists())
+            {
+// TODO (bt, 17Oct2016) Use operating system dependend filename splitting.
+                QMessageBox::StandardButton reply = QMessageBox::question(
+                            this,
+                            "Save Flight Track",
+                            filename.split("/").last()
+                            + " already exits.\n"
+                            + "Do you want to replace it?",
+                            QMessageBox::Yes|QMessageBox::No,
+                            QMessageBox::No);
+
+                if (reply == QMessageBox::No)
+                {
+                    // Re-open FileDialog if file already exists and the user
+                    // chooses not to overwrite it or closes the question box.
+                    filename = QFileDialog::getSaveFileName(
+                                this, "Save Flight Track", filename,
+                                "Flight Track XML (*.ftml)");
+                    // Quit if user closes file dialog.
+                    if(filename.isEmpty()) return;
+                }
+            }
+        }
+
+        this->waypointsModel->saveToFile(filename);
+    }
+
+    return;
 }
 
 

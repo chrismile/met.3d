@@ -56,7 +56,7 @@
     </property>
     <widget class="QMenu" name="menu_Layout">
      <property name="title">
-      <string>Window &amp;Layout</string>
+      <string>View &amp;Layout</string>
      </property>
      <addaction name="actionLayoutSingleView"/>
      <addaction name="actionLayoutDualView"/>
@@ -69,6 +69,7 @@
     <addaction name="separator"/>
     <addaction name="actionWaypoints"/>
     <addaction name="separator"/>
+    <addaction name="actionResizeWindow"/>
     <addaction name="actionFullScreen"/>
     <addaction name="menu_Layout"/>
    </widget>
@@ -137,7 +138,7 @@
   </action>
   <action name="actionSceneManagement">
    <property name="text">
-    <string>Scene Management</string>
+    <string>&amp;Scene Management</string>
    </property>
    <property name="shortcut">
     <string>F4</string>
@@ -202,6 +203,14 @@
   <action name="actionAboutQt">
    <property name="text">
     <string>About &amp;Qt</string>
+   </property>
+  </action>
+  <action name="actionResizeWindow">
+   <property name="text">
+    <string>Resize Window</string>
+   </property>
+   <property name="shortcut">
+    <string>F5</string>
    </property>
   </action>
  </widget>

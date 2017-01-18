@@ -54,6 +54,7 @@ MSystemManagerAndControl* MSystemManagerAndControl::instance = 0;
 MSystemManagerAndControl::MSystemManagerAndControl(QWidget *parent) :
     QWidget(parent),
     ui(new Ui::MSystemControl),
+    met3dAppIsInitialized(false),
     mainWindow(nullptr),
     naturalEarthDataLoader(nullptr)
 {
@@ -396,6 +397,16 @@ MNaturalEarthDataLoader *MSystemManagerAndControl::getNaturalEarthDataLoader()
     if (naturalEarthDataLoader == nullptr)
         naturalEarthDataLoader = new MNaturalEarthDataLoader();
     return naturalEarthDataLoader;
+}
+
+
+/******************************************************************************
+***                          PROTECTED METHODS                              ***
+*******************************************************************************/
+
+void MSystemManagerAndControl::setApplicationIsInitialized()
+{
+    met3dAppIsInitialized = true;
 }
 
 

@@ -41,6 +41,7 @@
 #include "gxfw/adddatasetdialog.h"
 #include "gxfw/synccontrol.h"
 #include "data/waypoints/waypointstableview.h"
+#include "gxfw/mresizewindowdialog.h"
 
 
 namespace Ui {
@@ -98,6 +99,8 @@ public slots:
 
     void showAboutDialog();
 
+    void resizeWindow();
+
 private:
     Ui::MainWindow *ui;
     QSplitter *mainSplitter;
@@ -112,6 +115,7 @@ private:
     QVector<MSceneViewGLWidget*> sceneViewGLWidgets;
     MSystemManagerAndControl *systemManagerAndControl;
     MSceneManagementDialog *sceneManagementDialog;
+    MResizeWindowDialog *resizeWindowDialog;
 
     /** List of all dock widgets */
     QList<QDockWidget*> dockWidgets;

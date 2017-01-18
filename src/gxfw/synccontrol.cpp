@@ -108,6 +108,7 @@ MSyncControl::MSyncControl(QString id, QWidget *parent) :
             SLOT(timeBackward()));
 
     // Initialise a drop down menu that provides time animation settings.
+    // ==================================================================
     timeAnimationDropdownMenu = new QMenu(this);
 
     timeAnimationTimeStepSpinBox = new QSpinBox(this);
@@ -120,19 +121,74 @@ MSyncControl::MSyncControl(QString id, QWidget *parent) :
 
     timeAnimationDropdownMenu->addSeparator();
 
-    timeAnimationFrom = new QDateTimeEdit(this);
+    // "from" entry of drop down menu.
+    // -------------------------------
+
+    // Width for all "copy IT/VT to from/to" buttons.
+    int widthOfCopyButtons = 30;
+
+    timeAnimationFromWidget = new QWidget(this);
+
+    timeAnimationFrom = new QDateTimeEdit(timeAnimationFromWidget);
     timeAnimationFrom->setDisplayFormat("ddd yyyy-MM-dd hh:mm UTC");
     timeAnimationFrom->setTimeSpec(Qt::UTC);
+    copyInitTimeToAnimationFromButton = new QPushButton("IT", timeAnimationFromWidget);
+    copyInitTimeToAnimationFromButton->setMinimumWidth(widthOfCopyButtons);
+    copyInitTimeToAnimationFromButton->setMaximumWidth(widthOfCopyButtons);
+    copyInitTimeToAnimationFromButton->setToolTip("set \"from\" to init time");
+    copyValidTimeToAnimationFromButton = new QPushButton("VT", timeAnimationFromWidget);
+    copyValidTimeToAnimationFromButton->setMinimumWidth(widthOfCopyButtons);
+    copyValidTimeToAnimationFromButton->setMaximumWidth(widthOfCopyButtons);
+    copyValidTimeToAnimationFromButton->setToolTip("set \"from\" to valid time");
+
+    timeAnimationFromLayout = new QHBoxLayout();
+    timeAnimationFromLayout->addWidget(timeAnimationFrom);
+    timeAnimationFromLayout->addWidget(copyInitTimeToAnimationFromButton);
+    timeAnimationFromLayout->addWidget(copyValidTimeToAnimationFromButton);
+
+    timeAnimationFromWidget->setLayout(timeAnimationFromLayout);
+
     MLabelledWidgetAction *animateFromTimeAction =
-            new MLabelledWidgetAction("from", "", timeAnimationFrom, this);
+            new MLabelledWidgetAction("from", "", timeAnimationFromWidget, this);
     timeAnimationDropdownMenu->addAction(animateFromTimeAction);
 
-    timeAnimationTo = new QDateTimeEdit(this);
+    connect(copyInitTimeToAnimationFromButton, SIGNAL(clicked()),
+            SLOT(copyInitToFrom()));
+    connect(copyValidTimeToAnimationFromButton, SIGNAL(clicked()),
+            SLOT(copyValidToFrom()));
+
+    // "to" entry of drop down menu.
+    // -----------------------------
+
+    timeAnimationToWidget = new QWidget(this);
+
+    timeAnimationTo = new QDateTimeEdit(timeAnimationToWidget);
     timeAnimationTo->setDisplayFormat("ddd yyyy-MM-dd hh:mm UTC");
     timeAnimationTo->setTimeSpec(Qt::UTC);
+    copyInitTimeToAnimationToButton = new QPushButton("IT", timeAnimationToWidget);
+    copyInitTimeToAnimationToButton->setMinimumWidth(widthOfCopyButtons);
+    copyInitTimeToAnimationToButton->setMaximumWidth(widthOfCopyButtons);
+    copyInitTimeToAnimationToButton->setToolTip("set \"to\" to init time");
+    copyValidTimeToAnimationToButton = new QPushButton("VT", timeAnimationToWidget);
+    copyValidTimeToAnimationToButton->setMinimumWidth(widthOfCopyButtons);
+    copyValidTimeToAnimationToButton->setMaximumWidth(widthOfCopyButtons);
+    copyValidTimeToAnimationToButton->setToolTip("set \"to\" to valid time");
+
+    timeAnimationToLayout = new QHBoxLayout();
+    timeAnimationToLayout->addWidget(timeAnimationTo);
+    timeAnimationToLayout->addWidget(copyInitTimeToAnimationToButton);
+    timeAnimationToLayout->addWidget(copyValidTimeToAnimationToButton);
+    timeAnimationToWidget->setLayout(timeAnimationToLayout);
+
     MLabelledWidgetAction *animateToTimeAction =
-            new MLabelledWidgetAction("to", "", timeAnimationTo, this);
+            new MLabelledWidgetAction("to", "", timeAnimationToWidget, this);
     timeAnimationDropdownMenu->addAction(animateToTimeAction);
+
+    connect(copyInitTimeToAnimationToButton, SIGNAL(clicked()),
+            SLOT(copyInitToTo()));
+    connect(copyValidTimeToAnimationToButton, SIGNAL(clicked()),
+            SLOT(copyValidToTo()));
+
 
     timeAnimationDropdownMenu->addSeparator();
 
@@ -519,6 +575,30 @@ void MSyncControl::onEnsembleModeChange(const int foo)
     emit ensembleMemberChanged(member);
     emit endSynchronization();
 #endif
+}
+
+
+void MSyncControl::copyInitToFrom()
+{
+    timeAnimationFrom->setDateTime(initDateTime());
+}
+
+
+void MSyncControl::copyValidToFrom()
+{
+    timeAnimationFrom->setDateTime(validDateTime());
+}
+
+
+void MSyncControl::copyInitToTo()
+{
+    timeAnimationTo->setDateTime(initDateTime());
+}
+
+
+void MSyncControl::copyValidToTo()
+{
+    timeAnimationTo->setDateTime(validDateTime());
 }
 
 

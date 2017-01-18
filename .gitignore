@@ -11,3 +11,10 @@ Makefile
 met3D
 config/*.cfg
 config/*.actor.conf
+CMakeCache.txt
+CMakeFiles
+Met.3D.cbp
+Met3D_automoc.cpp
+cmake_install.cmake
+__
+build

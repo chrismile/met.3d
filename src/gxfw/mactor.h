@@ -31,9 +31,11 @@
 // related third party imports
 #include <QtCore>
 #include <QtProperty>
+#include <memory>
 
 // local application imports
 #include "gxfw/mtypes.h"
+#include "gxfw/gl/shadereffect.h"
 #include "gxfw/gl/vertexbuffer.h"
 #include "system/qtproperties.h"
 
@@ -106,7 +108,8 @@ public:
     bool isInitialized();
 
     /**
-      Recompiles the actor's GLSL shaders.
+      Recompiles the actor's GLSL shaders. Needs to call
+      @ref beginCompileShaders() and @ref endCompileShaders().
       */
     virtual void reloadShaderEffects() = 0;
 
@@ -385,6 +388,7 @@ protected:
     virtual void onQtPropertyChanged(QtProperty *property)
     { Q_UNUSED(property); }
 
+
     /**
       Implement this function in derived classes to handle actor creation
       events. @see actOnOtherActorCreated().
@@ -438,6 +442,31 @@ protected:
     void enablePicking(bool p) { actorIsPickable = p; }
 
     /**
+      This method needs to be called at the beginning of each actor's
+      @ref reloadShaderEffects() method, indicating the number of shaders
+      that will be compiled. It needs to be followed by a call to
+      @ref endCompileShaders() after all shaders have been compiled.
+
+      The method sets up the "compile shaders" progress dialog. It resets
+      @ref shaderCompilationProgress to @p 0.
+      */
+    void beginCompileShaders(int numberOfShaders);
+
+    /**
+      See @ref beginCompileShaders().
+     */
+    void endCompileShaders();
+
+    /**
+      Compiles a GLSL shader from @p filename and updates the "compile shaders"
+      progress dialog. Uses @ref shaderCompilationProgress to update number of
+      already compiled shaders.
+      */
+    void compileShadersFromFileWithProgressDialog(
+            std::shared_ptr<GL::MShaderEffect> shader,
+            const QString filename);
+
+    /**
       Emit the @ref actorChanged() signal, but only if the signal is enabled,
       the actor is enabled and the actor is initialized.
 
@@ -462,6 +491,7 @@ protected:
 
     // Define friends for request/release texture and image units.
     friend class MNWP2DSectionActorVariable;
+    friend class MNWP2DHorizontalActorVariable;
     friend class MNWP3DVolumeActorVariable;
 
     GLint assignTextureUnit();
@@ -505,6 +535,10 @@ protected:
     QtProperty *labelBBoxColourProperty;
 
     bool actorIsPickable;
+
+    /** Counter to monitor the progress of shader loading process. */
+    QProgressDialog *shaderCompilationProgressDialog;
+    int  shaderCompilationProgress;
 
     /** List of scenes to which this actor has been added. */
     QList<MSceneControl*> scenes;

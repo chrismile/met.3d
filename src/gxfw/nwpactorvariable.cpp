@@ -1165,6 +1165,27 @@ void MNWPActorVariable::onActorCreated(MActor *actor)
 
         this->actor->enableEmissionOfActorChangedSignal(true);
     }
+
+    if (MSpatial1DTransferFunction *stf =
+            dynamic_cast<MSpatial1DTransferFunction*>(actor))
+    {
+        if (dynamic_cast<MNWP2DHorizontalActorVariable*>(this))
+        {
+            // Don't render while the properties are being updated.
+            this->actor->enableEmissionOfActorChangedSignal(false);
+
+            MQtProperties *properties = actor->getQtProperties();
+            int index = properties->mEnum()->value(spatialTransferFunctionProperty);
+            QStringList availableSTFs = properties->mEnum()->enumNames(
+                        spatialTransferFunctionProperty);
+            availableSTFs << stf->transferFunctionName();
+            properties->mEnum()->setEnumNames(spatialTransferFunctionProperty,
+                                              availableSTFs);
+            properties->mEnum()->setValue(spatialTransferFunctionProperty, index);
+
+            this->actor->enableEmissionOfActorChangedSignal(true);
+        }
+    }
 }
 
 
@@ -1191,13 +1212,43 @@ void MNWPActorVariable::onActorDeleted(MActor *actor)
 
         this->actor->enableEmissionOfActorChangedSignal(true);
     }
+
+    // If the deleted actor is a spatial transfer function, remove it from the
+    // list of available spatial transfer functions.
+    if (MSpatial1DTransferFunction *stf =
+            dynamic_cast<MSpatial1DTransferFunction*>(actor))
+    {
+        if (dynamic_cast<MNWP2DHorizontalActorVariable*>(this))
+        {
+            this->actor->enableEmissionOfActorChangedSignal(false);
+
+            MQtProperties *properties = actor->getQtProperties();
+            int index =
+                    properties->mEnum()->value(spatialTransferFunctionProperty);
+
+            QStringList availableSTFs = properties->mEnum()->enumNames(
+                        spatialTransferFunctionProperty);
+
+            // If the deleted transfer function is currently connected to this
+            // variable, set current transfer function to "None" (index 0).
+            if (availableSTFs.at(index) == stf->getName()) index = 0;
+
+            availableSTFs.removeOne(stf->getName());
+            properties->mEnum()->setEnumNames(spatialTransferFunctionProperty,
+                                              availableSTFs);
+            properties->mEnum()->setValue(spatialTransferFunctionProperty,
+                                          index);
+
+            this->actor->enableEmissionOfActorChangedSignal(true);
+        }
+    }
 }
 
 
 void MNWPActorVariable::onActorRenamed(MActor *actor, QString oldName)
 {
-    // If the new actor is a transfer function, add it to the list of
-    // available transfer functions.
+    // If the renamed actor is a transfer function, change its name in the list
+    // of available transfer functions.
     if (MTransferFunction1D *tf = dynamic_cast<MTransferFunction1D*>(actor))
     {
         // Don't render while the properties are being updated.
@@ -1215,6 +1266,33 @@ void MNWPActorVariable::onActorRenamed(MActor *actor, QString oldName)
         properties->mEnum()->setValue(transferFunctionProperty, index);
 
         this->actor->enableEmissionOfActorChangedSignal(true);
+    }
+
+    // If the renamed actor is a spatial transfer function, change its name in
+    // the list of available spatial transfer functions.
+    if (MSpatial1DTransferFunction *stf =
+            dynamic_cast<MSpatial1DTransferFunction*>(actor))
+    {
+        if (dynamic_cast<MNWP2DHorizontalActorVariable*>(this))
+        {
+            // Don't render while the properties are being updated.
+            this->actor->enableEmissionOfActorChangedSignal(false);
+
+            MQtProperties *properties = this->actor->getQtProperties();
+            int index =
+                    properties->mEnum()->value(spatialTransferFunctionProperty);
+            QStringList availableSTFs = properties->mEnum()->enumNames(
+                        spatialTransferFunctionProperty);
+
+            // Replace affected entry.
+            availableSTFs[availableSTFs.indexOf(oldName)] = stf->getName();
+
+            properties->mEnum()->setEnumNames(spatialTransferFunctionProperty,
+                                              availableSTFs);
+            properties->mEnum()->setValue(spatialTransferFunctionProperty, index);
+
+            this->actor->enableEmissionOfActorChangedSignal(true);
+        }
     }
 }
 
@@ -1827,7 +1905,13 @@ MNWP2DSectionActorVariable::MNWP2DSectionActorVariable(
       targetGrid2D(nullptr),
       textureTargetGrid(nullptr),
       textureUnitTargetGrid(-1),
-      imageUnitTargetGrid(-1)
+      imageUnitTargetGrid(-1),
+      thinContoursStartIndex(0),
+      thinContoursStopIndex(0),
+      thickContoursStartIndex(0),
+      thickContoursStopIndex(0),
+      thinContourThickness(1.2),
+      thickContourThickness(2.)
 {
     assert(actor != nullptr);
     MNWPMultiVarActor *a = actor;
@@ -1859,6 +1943,12 @@ MNWP2DSectionActorVariable::MNWP2DSectionActorVariable(
                 STRING_PROPERTY, "thin contour levels",
                 renderSettings.groupProperty);
 
+    renderSettings.thinContourThicknessProperty = a->addProperty(
+                DOUBLE_PROPERTY, "thin contour thickness",
+                renderSettings.groupProperty);
+    properties->setDouble(renderSettings.thinContourThicknessProperty,
+                          thinContourThickness, 0.1, 10.0, 2, 0.1);
+
     renderSettings.thinContourColourProperty = a->addProperty(
                 COLOR_PROPERTY, "thin contour colour",
                 renderSettings.groupProperty);
@@ -1866,6 +1956,12 @@ MNWP2DSectionActorVariable::MNWP2DSectionActorVariable(
     renderSettings.thickContourLevelsProperty = a->addProperty(
                 STRING_PROPERTY, "thick contour levels",
                 renderSettings.groupProperty);
+
+    renderSettings.thickContourThicknessProperty = a->addProperty(
+                DOUBLE_PROPERTY, "thick contour thickness",
+                renderSettings.groupProperty);
+    properties->setDouble(renderSettings.thickContourThicknessProperty,
+                          thinContourThickness, 0.1, 10.0, 2, 0.1);
 
     renderSettings.thickContourColourProperty = a->addProperty(
                 COLOR_PROPERTY, "thick contour colour",
@@ -1946,6 +2042,13 @@ bool MNWP2DSectionActorVariable::onQtPropertyChanged(QtProperty *property)
         return true; // redraw actor
     }
 
+    else if (property == renderSettings.thinContourThicknessProperty)
+    {
+        thinContourThickness = properties->mDouble()->value(
+                    renderSettings.thinContourThicknessProperty);
+        return true; // redraw actor
+    }
+
     else if (property == renderSettings.thinContourLevelsProperty)
     {
         QString cLevelStr = properties->mString()->value(
@@ -1963,6 +2066,13 @@ bool MNWP2DSectionActorVariable::onQtPropertyChanged(QtProperty *property)
         thickContourColour = properties->mColor()->value(
                     renderSettings.thickContourColourProperty);
         return true;
+    }
+
+    else if (property == renderSettings.thickContourThicknessProperty)
+    {
+        thickContourThickness = properties->mDouble()->value(
+                    renderSettings.thickContourThicknessProperty);
+        return true; // redraw actor
     }
 
     else if (property == renderSettings.thickContourLevelsProperty)
@@ -1995,13 +2105,16 @@ void MNWP2DSectionActorVariable::saveConfiguration(QSettings *settings)
 
     MQtProperties *properties = actor->getQtProperties();
 
-    settings->setValue("renderMode", static_cast<int>(renderSettings.renderMode));
+    settings->setValue("renderMode",
+                       renderModeToString(renderSettings.renderMode));
 
     settings->setValue("thinContourColour", thinContourColour);
+    settings->setValue("thinContourThickness", thinContourThickness);
     settings->setValue("thinContourLevels", properties->mString()->value(
                            renderSettings.thinContourLevelsProperty));
 
     settings->setValue("thickContourColour", thickContourColour);
+    settings->setValue("thickContourThickness", thickContourThickness);
     settings->setValue("thickContourLevels", properties->mString()->value(
                            renderSettings.thickContourLevelsProperty));
 }
@@ -2013,13 +2126,35 @@ void MNWP2DSectionActorVariable::loadConfiguration(QSettings *settings)
 
     MQtProperties *properties = actor->getQtProperties();
 
+    QString renderModeName =
+            settings->value("renderMode", "disabled").toString();
+    RenderMode::Type renderMode = stringToRenderMode(renderModeName);
+
+    // Print message if render mode name is no defined and set render mode to
+    // disabled.
+    if (renderMode == RenderMode::Invalid)
+    {
+        QMessageBox msgBox;
+        msgBox.setIcon(QMessageBox::Warning);
+        msgBox.setText(QString("Error reading configuration file: "
+                               "Could not find render mode %1.\n"
+                               "Setting render mode to 'disabled'.").arg(renderModeName));
+        msgBox.exec();
+
+        renderMode = stringToRenderMode(QString("disabled"));
+    }
+
     properties->mEnum()->setValue(renderSettings.renderModeProperty,
-                                  settings->value("renderMode").toInt());
+                                  renderMode);
 
     const QString thinContourLevs = settings->value("thinContourLevels").toString();
     //parseContourLevelString(thinContourLevs, &thinContourLevels);
     properties->mString()->setValue(renderSettings.thinContourLevelsProperty,
                                     thinContourLevs);
+
+    properties->mDouble()->setValue(renderSettings.thinContourThicknessProperty,
+                                     settings->value("thinContourThickness",
+                                                     1.2).toDouble());
 
     properties->mColor()->setValue(renderSettings.thinContourColourProperty,
                                    settings->value("thinContourColour").value<QColor>());
@@ -2029,8 +2164,25 @@ void MNWP2DSectionActorVariable::loadConfiguration(QSettings *settings)
     properties->mString()->setValue(renderSettings.thickContourLevelsProperty,
                                     thickContourLevs);
 
+    properties->mDouble()->setValue(renderSettings.thickContourThicknessProperty,
+                                     settings->value("thickContourThickness",
+                                                     2.).toDouble());
+
     properties->mColor()->setValue(renderSettings.thickContourColourProperty,
                                    settings->value("thickContourColour").value<QColor>());
+
+
+// TODO (bt, 29NOV2016): Connect these variables to their ContourLevels
+// variable they belong to, so one can update these in parseContourLevelString()
+    // Update [thin/thick]Contours[Start/Stop]Index to avoid contours not being
+    // displayed if one loads config with given contour levels but with a render
+    // mode selected not displaying the contours. If one selects a render mode
+    // for contour lines without changing the contour levels meanwhile, the
+    // contours won't be displayed unless one changes the levels.
+    thinContoursStartIndex  = 0;
+    thinContoursStopIndex   = thinContourLevels.size();
+    thickContoursStartIndex = 0;
+    thickContoursStopIndex  = thickContourLevels.size();
 }
 
 
@@ -2047,6 +2199,120 @@ void MNWP2DSectionActorVariable::setThickContourLevelsFromString(
 {
     actor->getQtProperties()->mString()->setValue(
             renderSettings.thickContourLevelsProperty, cLevelStr);
+}
+
+
+QString MNWP2DSectionActorVariable::renderModeToString(
+        RenderMode::Type renderMode)
+{
+    switch (renderMode)
+    {
+    case RenderMode::Disabled:
+        return QString("disabled");
+    case RenderMode::FilledContours:
+        return QString("filled contours");
+    case RenderMode::PseudoColour:
+        return QString("pseudo colour");
+    case RenderMode::LineContours:
+        return QString("line contours");
+    case RenderMode::FilledAndLineContours:
+        return QString("filled and line contours");
+    case RenderMode::PseudoColourAndLineContours:
+        return QString("pcolour and line contours");
+    case RenderMode::TexturedContours:
+        return QString("textured contours");
+    case RenderMode::FilledAndTexturedContours:
+        return QString("filled and textured contours");
+    case RenderMode::LineAndTexturedContours:
+        return QString("line and textured contours");
+    case RenderMode::PseudoColourAndTexturedContours:
+        return QString("pcolour and textured contours");
+    case RenderMode::FilledAndLineAndTexturedContours:
+        return QString("filled, line and textured contours");
+    case RenderMode::PseudoColourAndLineAndTexturedContours:
+        return QString("pcolour and line and textured contours");
+    default:
+        return QString("");
+    }
+}
+
+
+MNWP2DSectionActorVariable::RenderMode::Type
+MNWP2DSectionActorVariable::stringToRenderMode(QString renderModeName)
+{
+    // NOTE: Render mode identification was changed in Met.3D version 1.1. For
+    // compatibility with version 1.0, the old numeric identifiers are
+    // considered here as well.
+    if (renderModeName == QString("disabled")
+            || renderModeName == QString("0")) // compatibility with Met.3D 1.0
+    {
+        return RenderMode::Disabled;
+    }
+    else if (renderModeName == QString("filled contours")
+             || renderModeName == QString("1"))
+    {
+        return RenderMode::FilledContours;
+    }
+    else if (renderModeName == QString("pseudo colour")
+             || renderModeName == QString("2"))
+    {
+        return RenderMode::PseudoColour;
+    }
+    else if (renderModeName == QString("line contours")
+             || renderModeName == QString("3"))
+    {
+        return RenderMode::LineContours;
+    }
+    else if (renderModeName == QString("filled and line contours")
+             || renderModeName == QString("4"))
+    {
+        return RenderMode::FilledAndLineContours;
+    }
+    else if (renderModeName == QString("pcolour and line contours")
+             || renderModeName == QString("5"))
+    {
+        return RenderMode::PseudoColourAndLineContours;
+    }
+    // Avoid accepting render modes in vertical section which only exist in
+    // horizontal sections.
+//TODO (mr, 21Dec2016) -- this method should be made virtual and the following
+//     code be put into the derived method
+    else if (dynamic_cast<MNWP2DHorizontalActorVariable*>(this))
+    {
+        if (renderModeName == QString("textured contours"))
+        {
+            return RenderMode::TexturedContours;
+        }
+        else if (renderModeName == QString("filled and textured contours"))
+        {
+            return RenderMode::FilledAndTexturedContours;
+        }
+        else if (renderModeName == QString("line and textured contours"))
+        {
+            return RenderMode::LineAndTexturedContours;
+        }
+        else if (renderModeName == QString("pcolour and textured contours"))
+        {
+            return RenderMode::PseudoColourAndTexturedContours;
+        }
+        else if (renderModeName == QString("filled, line and textured contours"))
+        {
+            return RenderMode::FilledAndLineAndTexturedContours;
+        }
+        else if (renderModeName == QString("pcolour and line and textured contours"))
+        {
+            return RenderMode::PseudoColourAndLineAndTexturedContours;
+        }
+        else
+        {
+            return RenderMode::Invalid;
+        }
+
+    }
+    else
+    {
+        return RenderMode::Invalid;
+    }
 }
 
 
@@ -2127,6 +2393,8 @@ bool MNWP2DSectionActorVariable::parseContourLevelString(
 MNWP2DHorizontalActorVariable::MNWP2DHorizontalActorVariable(
         MNWPMultiVarActor *actor)
     : MNWP2DSectionActorVariable(actor),
+      spatialTransferFunction(nullptr),
+      textureUnitSpatialTransferFunction(-1),
       llcrnrlon(0),
       llcrnrlat(0),
       urcrnrlon(0),
@@ -2136,11 +2404,64 @@ MNWP2DHorizontalActorVariable::MNWP2DHorizontalActorVariable(
 {
     assert(actor != nullptr);
     MNWPMultiVarActor *a = actor;
+    MQtProperties *properties = actor->getQtProperties();
 
     a->beginInitialiseQtProperties();
 
     QtProperty* renderGroup = getPropertyGroup("rendering");
     assert(renderGroup != nullptr);
+    // Remove properties to place spatial transfer function selection propery
+    // above them.
+    renderGroup->removeSubProperty(renderSettings.renderModeProperty);
+    renderGroup->removeSubProperty(renderSettings.thinContourLevelsProperty);
+    renderGroup->removeSubProperty(renderSettings.thinContourThicknessProperty);
+    renderGroup->removeSubProperty(renderSettings.thinContourColourProperty);
+    renderGroup->removeSubProperty(renderSettings.thickContourLevelsProperty);
+    renderGroup->removeSubProperty(renderSettings.thickContourThicknessProperty);
+    renderGroup->removeSubProperty(renderSettings.thickContourColourProperty);
+
+    QStringList renderModeNames =
+            properties->getEnumItems(renderSettings.renderModeProperty);
+    renderModeNames << "textured contours"
+                    << "filled and textured contours"
+                    << "line and textured contours"
+                    << "pcolour and textured contours"
+                    << "filled, line and textured contours"
+                    << "pcolour and line and textured contours";
+    properties->mEnum()->setEnumNames(renderSettings.renderModeProperty,
+                                      renderModeNames);
+
+    // Scan currently available actors for spatial transfer functions. Add STFs
+    // to the list displayed in the combo box of the
+    // spatialTransferFunctionProperty.
+    QStringList availableSTFs;
+    availableSTFs << "None";
+    MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
+    foreach (MActor *mactor, glRM->getActors())
+    {
+        if (MSpatial1DTransferFunction *stf =
+                dynamic_cast<MSpatial1DTransferFunction*>(mactor))
+        {
+            availableSTFs << stf->transferFunctionName();
+        }
+    }
+
+    spatialTransferFunctionProperty = a->addProperty(ENUM_PROPERTY,
+                                                     "spatial transfer function",
+                                                     renderGroup);
+    properties->mEnum()->setEnumNames(spatialTransferFunctionProperty,
+                                      availableSTFs);
+
+    // Re-add properties after spatial transfer function selection property.
+    renderGroup->addSubProperty(renderSettings.renderModeProperty);
+    renderGroup->addSubProperty(renderSettings.thinContourLevelsProperty);
+    renderGroup->addSubProperty(renderSettings.thinContourThicknessProperty);
+    renderGroup->addSubProperty(renderSettings.thinContourColourProperty);
+    renderGroup->addSubProperty(renderSettings.thickContourLevelsProperty);
+    renderGroup->addSubProperty(renderSettings.thickContourThicknessProperty);
+    renderGroup->addSubProperty(renderSettings.thickContourColourProperty);
+
+
 
     contourLabelsEnabledProperty = a->addProperty(
                 BOOL_PROPERTY, "(thin) contour labels",
@@ -2156,7 +2477,8 @@ MNWP2DHorizontalActorVariable::MNWP2DHorizontalActorVariable(
 
 MNWP2DHorizontalActorVariable::~MNWP2DHorizontalActorVariable()
 {
-    // Do nothing
+    if (textureUnitSpatialTransferFunction >=0)
+        actor->releaseTextureUnit(textureUnitSpatialTransferFunction);
 }
 
 
@@ -2164,9 +2486,28 @@ MNWP2DHorizontalActorVariable::~MNWP2DHorizontalActorVariable()
 ***                            PUBLIC METHODS                               ***
 *******************************************************************************/
 
+void MNWP2DHorizontalActorVariable::initialize()
+{
+    MNWP2DSectionActorVariable::initialize();
+
+    if (textureUnitSpatialTransferFunction >=0)
+        actor->releaseTextureUnit(textureUnitSpatialTransferFunction);
+
+    textureUnitSpatialTransferFunction = actor->assignTextureUnit();
+
+    setSpatialTransferFunctionFromProperty();
+}
+
+
 void MNWP2DHorizontalActorVariable::saveConfiguration(QSettings *settings)
 {
     MNWP2DSectionActorVariable::saveConfiguration(settings);
+
+    MQtProperties *properties = actor->getQtProperties();
+
+    // Save rendering properties.
+    settings->setValue("spatialTransferFunction",
+                       properties->getEnumItem(spatialTransferFunctionProperty));
 
     settings->setValue("contourLabelsEnabled", contourLabelsEnabled);
     settings->setValue("contourLabelSuffix", contourLabelSuffix);
@@ -2178,6 +2519,20 @@ void MNWP2DHorizontalActorVariable::loadConfiguration(QSettings *settings)
     MNWP2DSectionActorVariable::loadConfiguration(settings);
 
     MQtProperties *properties = actor->getQtProperties();
+
+    // Load rendering properties.
+    // ==========================
+    QString stfName = settings->value("spatialTransferFunction", "None").toString();
+    if ( !setSpatialTransferFunction(stfName) )
+    {
+        QMessageBox msgBox;
+        msgBox.setIcon(QMessageBox::Warning);
+        msgBox.setText(QString("Variable '%1':\n"
+                               "Spatial transfer function '%2' does not exist.\n"
+                               "Setting spatial transfer function to 'None'.")
+                       .arg(variableName).arg(stfName));
+        msgBox.exec();
+    }
 
     contourLabelsEnabled = settings->value("contourLabelsEnabled").toBool();
     properties->mBool()->setValue(contourLabelsEnabledProperty,
@@ -2204,6 +2559,7 @@ bool MNWP2DHorizontalActorVariable::onQtPropertyChanged(QtProperty *property)
 
         return true;
     }
+
     else if (property == contourLabelSuffixProperty)
     {
         contourLabelSuffix = properties->mString()->value(
@@ -2212,6 +2568,11 @@ bool MNWP2DHorizontalActorVariable::onQtPropertyChanged(QtProperty *property)
         updateContourLabels();
 
         return true;
+    }
+
+    else if (property == spatialTransferFunctionProperty)
+    {
+        return setSpatialTransferFunctionFromProperty();
     }
 
     return false;
@@ -2432,6 +2793,26 @@ QList<MLabel*> MNWP2DHorizontalActorVariable::getContourLabels(
 }
 
 
+bool MNWP2DHorizontalActorVariable::setSpatialTransferFunction(QString stfName)
+{
+    MQtProperties *properties = actor->getQtProperties();
+    QStringList stfNames = properties->mEnum()->enumNames(
+                spatialTransferFunctionProperty);
+    int stfIndex = stfNames.indexOf(stfName);
+
+    if (stfIndex >= 0)
+    {
+        properties->mEnum()->setValue(spatialTransferFunctionProperty, stfIndex);
+        return true;
+    }
+
+    // Set transfer function property to "None".
+    properties->mEnum()->setValue(spatialTransferFunctionProperty, 0);
+
+    return false; // the given tf name could not be found
+}
+
+
 /******************************************************************************
 ***                          PROTECTED METHODS                              ***
 *******************************************************************************/
@@ -2588,6 +2969,58 @@ void MNWP2DHorizontalActorVariable::addNewContourLabel(
                     16, thinContourColour, MTextManager::BASELINECENTRE,
                     true, QColor(255, 255, 255, 200), 0.3)
                 );
+}
+
+
+/******************************************************************************
+***                            PRIVATE METHODS                              ***
+*******************************************************************************/
+
+bool MNWP2DHorizontalActorVariable::setSpatialTransferFunctionFromProperty()
+{
+    MQtProperties *properties = actor->getQtProperties();
+    MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
+
+    QString stfName = properties->getEnumItem(spatialTransferFunctionProperty);
+
+    if (stfName == "None")
+    {
+        spatialTransferFunction = nullptr;
+
+        // Update enum items: Scan currently available actors for transfer
+        // functions. Add TFs to the list displayed in the combo box of the
+        // transferFunctionProperty.
+        QStringList availableSTFs;
+        availableSTFs << "None";
+        foreach (MActor *mactor, glRM->getActors())
+        {
+            if (MSpatial1DTransferFunction *stf =
+                    dynamic_cast<MSpatial1DTransferFunction*>(mactor))
+            {
+                availableSTFs << stf->transferFunctionName();
+            }
+        }
+        properties->mEnum()->setEnumNames(spatialTransferFunctionProperty,
+                                          availableSTFs);
+
+        return true;
+    }
+
+    // Find the selected transfer function in the list of actors from the
+    // resources manager. Not very efficient, but works well enough for the
+    // small number of actors at the moment..
+    foreach (MActor *mactor, glRM->getActors())
+    {
+        if (MSpatial1DTransferFunction *stf =
+                dynamic_cast<MSpatial1DTransferFunction*>(mactor))
+            if (stf->transferFunctionName() == stfName)
+            {
+                spatialTransferFunction = stf;
+                return true;
+            }
+    }
+
+    return false;
 }
 
 
