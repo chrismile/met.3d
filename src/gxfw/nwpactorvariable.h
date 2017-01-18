@@ -451,11 +451,11 @@ public:
     void setRenderMode(RenderMode::Type mode);
 
     /** Returns the name of the given render mode as QString. */
-    QString renderModeToString(RenderMode::Type renderMode);
+    QString renderModeToString(RenderMode::Type renderMode);    
 
     /** Returns enum associated with the given name. Returns Invalid if no mode
         exists with the given name. */
-    RenderMode::Type stringToRenderMode(QString renderModeName);
+    virtual RenderMode::Type stringToRenderMode(QString renderModeName);
 
 protected:
     /**
@@ -537,6 +537,8 @@ public:
      */
     QList<MLabel*> getContourLabels(bool noOverlapping = false,
                                     MSceneViewGLWidget* sceneView = nullptr);
+
+    RenderMode::Type stringToRenderMode(QString renderModeName) override;
 
     bool setSpatialTransferFunction(QString stfName);
 

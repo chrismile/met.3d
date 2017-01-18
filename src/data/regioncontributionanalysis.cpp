@@ -580,13 +580,19 @@ void MRegionContributionAnalysisControl::plotHistogram(
         // Crate bars that represent the features' size.
         QCPBars *bars = new QCPBars(plot->xAxis, plot->yAxis);
         featureBars.append(bars);
+// addPlottable method was removed from qcustomplot library with version 2.0.0.
+#if QCPLOT_MAJOR_VERSION <= 1
         plot->addPlottable(bars);
+#endif
 
         // Create bars that represent those parts of the features that
         // overlap with the probability region.
         QCPBars *overlapBars = new QCPBars(plot->xAxis, plot->yAxis);
         featureOverlapBars.append(overlapBars);
+// addPlottable method was removed from qcustomplot library with version 2.0.0.
+#if QCPLOT_MAJOR_VERSION <= 1
         plot->addPlottable(overlapBars);
+#endif
 
         // Set the colour of the bars; overlapping bars are rendered with
         // full opacity; for the full feature size alpha is set to 120.

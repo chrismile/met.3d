@@ -42,6 +42,31 @@ namespace netCDF
 {
 
 /**
+  Inline function defined depending on the version of NetCDF library since the
+  signatur of @ref NcException() changed from version 4.2 to 4.3.
+*/
+#if NetCDFCXX4_VERSION_MAJOR >= 4 && NetCDFCXX4_VERSION_MINOR >= 3
+// Newer version of netCDF
+inline netCDF::exceptions::NcException MNcException(
+        const std::string& exceptionName, const std::string& complaint,
+        const char* fileName, int lineNumber)
+{
+    Q_UNUSED(exceptionName);
+    return netCDF::exceptions::NcException(complaint.c_str(), fileName,
+                                           lineNumber);
+}
+#else
+// Older version of netCDF
+inline netCDF::exceptions::NcException MNcException(
+        const std::string& exceptionName, const std::string& complaint,
+        const char* fileName, int lineNumber)
+{
+    return netCDF::exceptions::NcException(exceptionName, complaint, fileName,
+                                           lineNumber);
+}
+#endif
+
+/**
   @brief NcCFVar represents a NetCDF variable compliant with the CF-conventions
   (http://cf-pcmdi.llnl.gov/).
 

@@ -167,9 +167,15 @@ include_directories(${grib_api_INCLUDE_DIR})
 find_package(netcdf_cxx4 REQUIRED)
 include_directories(${netcdf_cxx4_INCLUDE_DIR})
 
+# Add global defines for netcdf cxx4 library version checking.
+add_definitions(-DNetCDFCXX4_VERSION_MAJOR=${netcdf_cxx4_VERSION_MAJOR}
+                -DNetCDFCXX4_VERSION_MINOR=${netcdf_cxx4_VERSION_MINOR})
+
 # QCustomPlot
 find_package(qcustomplot REQUIRED)
 include_directories(${qcustomplot_INCLUDE_DIR})
+# Add major version as preprocessor definition.
+add_definitions(-DQCPLOT_MAJOR_VERSION=${qcustomplot_MAJOR_VERSION})
 
 # GLFX
 find_package(glfx REQUIRED)
