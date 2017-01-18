@@ -62,6 +62,18 @@ find_library(${PKG_NAME}_LIBRARY
             ${COMMON_INSTALL_DIRS}
         )
 
+find_file(${PKG_NAME}_PC_FILE
+        NAMES
+            netcdf-cxx4.pc
+        HINTS
+            $ENV{${PKG_NAME}_DIR}
+            ${PKG_LIBRARY_DIRS}
+        PATH_SUFFIXES
+            lib/pkgconfig
+        PATHS
+            ${COMMON_INSTALL_DIRS}
+        )
+
 
 if (${PKG_NAME}_C_LIBRARY AND ${PKG_NAME}_LIBRARY)
     set(${PKG_NAME}_LIBRARIES ${${PKG_NAME}_C_LIBRARY} ${${PKG_NAME}_LIBRARY})
@@ -71,5 +83,14 @@ include(FindPackageHandleStandardArgs)
 # handle the QUIETLY and REQUIRED arguments and set ${PGK_NAME}_FOUND to TRUE if
 # all listed variables are TRUE
 find_package_handle_standard_args(${PKG_NAME} REQUIRED_VARS ${PKG_NAME}_LIBRARIES ${PKG_NAME}_INCLUDE_DIR)
+
+# Parse .pc file to get used version of netcdf.
+pkg_check_modules(${PKG_NAME} REQUIRED ${${PKG_NAME}_PC_FILE})
+# Extract major and minor version from version string.
+string(REPLACE "." ";" ${PKG_NAME}_VERSION ${${PKG_NAME}_VERSION})
+list(GET ${PKG_NAME}_VERSION 0 ${PKG_NAME}_VERSION_MAJOR)
+list(GET ${PKG_NAME}_VERSION 1 ${PKG_NAME}_VERSION_MINOR)
+list(GET ${PKG_NAME}_VERSION 2 ${PKG_NAME}_VERSION_PATCH)
+
 # Marks cmake cached variables as advanced
 mark_as_advanced(${PKG_NAME}_INCLUDE_DIR ${PKG_NAME}_LIBRARIES)

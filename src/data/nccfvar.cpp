@@ -160,7 +160,7 @@ NcVar NcCFVar::getCFCoordinateVar(const vector<string>& units,
     }
 
     // If we get here no variable has been identified. Throw an exception.
-    throw NcException("NcException", "CF coordinate variable '" + standardname
+    throw MNcException("NcException", "CF coordinate variable '" + standardname
                       + "' not found", __FILE__, __LINE__);
 }
 
@@ -297,7 +297,7 @@ NcVar NcCFVar::getEnsembleVar()
     }
 
     // If we get here no variable has been identified. Throw an exception.
-    throw NcException("NcException", "cannot identify ensemble variable",
+    throw MNcException("NcException", "cannot identify ensemble variable",
                       __FILE__, __LINE__);
 }
 
@@ -375,7 +375,7 @@ NcVar NcCFVar::getTimeVar()
     }
 
     // If we get here no variable has been identified. Throw an exception.
-    throw NcException("NcException", "cannot identify time variable",
+    throw MNcException("NcException", "cannot identify time variable",
                       __FILE__, __LINE__);
 }
 
@@ -441,7 +441,7 @@ QList<QDateTime> NcCFVar::getTimeValues()
             convertedTimeValues.append(t.addSecs(secs));
         }
         else
-            throw NcException(
+            throw MNcException(
                     "NcException",
                     "cannot identify time unit "+timeUnit.toStdString(),
                     __FILE__, __LINE__);
@@ -494,7 +494,7 @@ QDateTime NcCFVar::getTimeFromAttribute(QString attributeName)
     if (success) return time;
 
     // We can't interpret this time string.
-    throw NcException(
+    throw MNcException(
                 "NcException",
                 "cannot identify time attribute "+att,
                 __FILE__, __LINE__);
