@@ -72,5 +72,26 @@ include(FindPackageHandleStandardArgs)
 # handle the QUIETLY and REQUIRED arguments and set ${PGK_NAME}_FOUND to TRUE if
 # all listed variables are TRUE
 find_package_handle_standard_args(${PKG_NAME} REQUIRED_VARS ${PKG_NAME}_LIBRARIES ${PKG_NAME}_INCLUDE_DIR)
+
+# Extract version number of QCustomPlot library from header-file:
+# Get content of header-file.
+file(STRINGS "${qcustomplot_INCLUDE_DIR}/qcustomplot.h" ${PKG_NAME}_VERSION
+     NEWLINE_CONSUME)
+# Extract version from content by matching string: "Version: major.minor.patch".
+string(REGEX MATCH "Version: [0-9][.][0-9][.][0-9]"
+       ${PKG_NAME}_VERSION ${${PKG_NAME}_VERSION})
+# Extract version from matched string by using the white space to create list and
+# choosing the secong argument of the list.
+string(REPLACE " " ";" ${PKG_NAME}_VERSION ${${PKG_NAME}_VERSION})
+list(GET ${PKG_NAME}_VERSION 1 ${PKG_NAME}_VERSION)
+# Split version into major, minor and patch part.
+string(REPLACE "." ";" ${PKG_NAME}_VERSION ${${PKG_NAME}_VERSION})
+# Set major version.
+list(GET ${PKG_NAME}_VERSION 0 ${PKG_NAME}_MAJOR_VERSION)
+# Set minor version.
+list(GET ${PKG_NAME}_VERSION 1 ${PKG_NAME}_MINOR_VERSION)
+# Set patch version.
+list(GET ${PKG_NAME}_VERSION 2 ${PKG_NAME}_PATCH_VERSION)
+
 # Marks cmake cached variables as advanced
 mark_as_advanced(${PKG_NAME}_INCLUDE_DIR ${PKG_NAME}_LIBRARIES)
