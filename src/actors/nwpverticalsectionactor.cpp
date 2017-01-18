@@ -52,6 +52,7 @@ namespace Met3D
 
 MNWPVerticalSectionActor::MNWPVerticalSectionActor()
     : MNWPMultiVarActor(),
+      labelDistance(1),
       waypointsModel(nullptr),
       modifyWaypoint(-1),
       modifyWaypoint_worldZ(0.),
@@ -77,6 +78,12 @@ MNWPVerticalSectionActor::MNWPVerticalSectionActor()
 
     setName("Vertical cross-section");
 
+    labelDistanceProperty = addProperty(INT_PROPERTY, "distance (in tick marks)",
+                                         labelPropertiesSupGroup);
+    properties->mInt()->setValue(labelDistanceProperty, labelDistance);
+    properties->mInt()->setMinimum(labelDistanceProperty, 0);
+    labelDistanceProperty->setToolTip("Depends on order in pressure levels list.");
+
     waypointsModelProperty = addProperty(ENUM_PROPERTY, "waypoints model",
                                          actorPropertiesSupGroup);
     properties->mEnum()->setEnumNames(waypointsModelProperty,
@@ -92,8 +99,6 @@ MNWPVerticalSectionActor::MNWPVerticalSectionActor()
                                      actorPropertiesSupGroup);
     properties->setDDouble(lowerLimitProperty, p_bot_hPa, 0.01, 1050, 2, 5.,
                            " hPa");
-
-
 
     QString defaultPressureLineLevel = QString("1000.,900.,800.,700.,600.,500.")
                                        + QString(",400.,300.,200.,100.,90.,80.")
@@ -170,6 +175,8 @@ void MNWPVerticalSectionActor::saveConfiguration(QSettings *settings)
 
     settings->beginGroup(MNWPVerticalSectionActor::getSettingsID());
 
+    settings->setValue("labelDistance", labelDistance);
+
     if (waypointsModel != nullptr)
     {
         settings->setValue("waypointsModelID", waypointsModel->getID());
@@ -192,6 +199,9 @@ void MNWPVerticalSectionActor::loadConfiguration(QSettings *settings)
 
     settings->beginGroup(MNWPVerticalSectionActor::getSettingsID());
 
+    labelDistance = settings->value("labelDistance", 1).toInt();
+    properties->mInt()->setValue(labelDistanceProperty, labelDistance);
+
     QString wpID = settings->value("waypointsModelID").toString();
     setWaypointsModel(MSystemManagerAndControl::getInstance()
                       ->getWaypointsModel(wpID));
@@ -202,7 +212,13 @@ void MNWPVerticalSectionActor::loadConfiguration(QSettings *settings)
     properties->mDDouble()->setValue(
                 lowerLimitProperty,
                 settings->value("p_bot_hPa").toFloat());
-    const QString pressureLevels = settings->value("pressureLevels").toString();
+
+    QString defaultPressureLineLevel = QString("1000.,900.,800.,700.,600.,500.")
+                                       + QString(",400.,300.,200.,100.,90.,80.")
+                                       + QString(",70.,60.,50.,40.,30.,20.");
+    const QString pressureLevels =
+            settings->value("pressureLevels",
+                            defaultPressureLineLevel).toString();
     properties->mString()->setValue(pressureLineLevelsProperty,
                                     pressureLevels);
     properties->mDDouble()->setValue(
@@ -438,6 +454,16 @@ void MNWPVerticalSectionActor::onQtPropertyChanged(QtProperty *property)
         // Adapt iso pressure lines set to new boundaries.
         generateIsoPressureLines();
         updatePath = true;
+        emitActorChangedSignal();
+    }
+
+    else if (property == labelDistanceProperty)
+    {
+        labelDistance = properties->mInt()->value(labelDistanceProperty);
+
+        if (suppressActorUpdates()) return;
+
+        generateLabels();
         emitActorChangedSignal();
     }
 
@@ -1240,21 +1266,6 @@ bool MNWPVerticalSectionActor::parseIsoPressureLevelString(QString pressureLevel
 
 void MNWPVerticalSectionActor::generateIsoPressureLines()
 {
-//    // Compute pressure values at which lines shall be drawn.
-//    float possiblePressureLevels[18] = {1000., 900., 800., 700., 600.,
-//                                        500., 400., 300., 200., 100.,
-//                                        90., 80., 70., 60., 50.,
-//                                        40., 30., 20.};
-
-//    pressureLineLevels.clear();
-//    for (int i = 0; i < 18; i++)
-//    {
-//        if ((possiblePressureLevels[i] <= p_bot_hPa)
-//                && (possiblePressureLevels[i] >= p_top_hPa))
-//            pressureLineLevels.append(possiblePressureLevels[i]);
-//    }
-
-
     pressureLineLevels.clear();
     for (int i = 0; i < selectedPressureLineLevels.size(); i++)
     {
@@ -1332,9 +1343,9 @@ void MNWPVerticalSectionActor::generateLabels()
     int drawLabel = 0;
     for (int i = 0; i < pressureLineLevels.size(); i++)
     {
-        // Label only every 3rd tick mark.
+        // Label only every (labelDistance + 1)-th tick mark.
         if (drawLabel++ < 0) continue;
-        if (drawLabel == 1) drawLabel = -1;
+        if (drawLabel == 1) drawLabel = -labelDistance;
 
         for (int j = 0; j < labelPoints.size(); j++)
         {

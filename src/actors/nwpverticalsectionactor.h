@@ -199,6 +199,9 @@ private:
       */
     bool targetGridToBeUpdated;
 
+    QtProperty *labelDistanceProperty;
+    int labelDistance;
+
     QtProperty *waypointsModelProperty;
     MWaypointsTableModel *waypointsModel;
     QVector<QVector4D> path;
