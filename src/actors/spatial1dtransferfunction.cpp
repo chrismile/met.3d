@@ -53,10 +53,15 @@ MSpatial1DTransferFunction::MSpatial1DTransferFunction()
     : MTransferFunction(),
       tfTexture(nullptr),
       numLevels(2),
+      useMirroredRepeat(false),
       minimumValue(0.0),
       maximumValue(100.0),
       clampMaximum(true),
       interpolationRange(1.0),
+      alphaBlendingMode(AlphaBlendingMode::AlphaChannel),
+      invertAlpha(false),
+      useConstantColour(false),
+      constantColour(QColor(0, 0, 0, 255)),
       textureScale(1.0),
       currentTextureWidth(0),
       currentTextureHeight(0)
@@ -104,6 +109,10 @@ MSpatial1DTransferFunction::MSpatial1DTransferFunction()
     properties->mString()->setValue(pathToLoadedImagesProperty, pathsToLoadedImages.at(0));
     pathToLoadedImagesProperty->setEnabled(false);
 
+    useMirroredRepeatProperty = addProperty(BOOL_PROPERTY, "use mirrored repeat",
+                                   levelsPropertiesSubGroup);
+    properties->mBool()->setValue(useMirroredRepeatProperty, useMirroredRepeat);
+
     // Properties related to data range.
     // =================================
 
@@ -125,15 +134,43 @@ MSpatial1DTransferFunction::MSpatial1DTransferFunction()
     properties->setDouble(maximumValueProperty, maximumValue,
                           decimals, pow(10., -decimals));
 
-
     clampMaximumProperty = addProperty(BOOL_PROPERTY, "clamp maximum",
-                                   rangePropertiesSubGroup);
+                                       rangePropertiesSubGroup);
     properties->mBool()->setValue(clampMaximumProperty, clampMaximum);
 
     interpolationRangeProperty = addProperty(DOUBLE_PROPERTY, "interpolation range",
                                        rangePropertiesSubGroup);
     properties->setDouble(interpolationRangeProperty, interpolationRange,
                           0.0, DBL_MAX, decimals, pow(10., -decimals));
+
+    // Properties related to alpha blending.
+    // =====================================
+
+    alphaBlendingPropertiesSubGroup = addProperty(GROUP_PROPERTY,
+                                                  "alpha blending",
+                                                  actorPropertiesSupGroup);
+
+    alphaBlendingModeProperty = addProperty(ENUM_PROPERTY, "mode",
+                                            alphaBlendingPropertiesSubGroup);
+    QStringList alphaModeNames = QStringList();
+    alphaModeNames << "use alpha channel" << "use red channel"
+                   << "use green channel" << "use blue channel"
+                   << "use rgb average" << "use none";
+    properties->mEnum()->setEnumNames(alphaBlendingModeProperty, alphaModeNames);
+    properties->mEnum()->setValue(alphaBlendingModeProperty, alphaBlendingMode);
+
+    invertAlphaProperty = addProperty(BOOL_PROPERTY, "invert alpha",
+                                           alphaBlendingPropertiesSubGroup);
+    properties->mBool()->setValue(invertAlphaProperty, invertAlpha);
+
+    useConstantColourProperty = addProperty(BOOL_PROPERTY, "use constant colour",
+                                           alphaBlendingPropertiesSubGroup);
+    properties->mBool()->setValue(useConstantColourProperty, useConstantColour);
+
+    constantColourProperty = addProperty(COLOR_PROPERTY, "constant colour",
+                                        alphaBlendingPropertiesSubGroup);
+    properties->mColor()->setValue(constantColourProperty, constantColour);
+
 
     // General properties.
     // ===================
@@ -223,6 +260,17 @@ void MSpatial1DTransferFunction::saveConfiguration(QSettings *settings)
     settings->setValue("interpolationRange",
                        properties->mDouble()->value(interpolationRangeProperty));
 
+    // Properties related to alpha blending.
+    // =====================================
+    settings->setValue("alphaBlendingMode",
+                       properties->mEnum()->value(alphaBlendingModeProperty));
+    settings->setValue("invertAlpha",
+                       properties->mBool()->value(invertAlphaProperty));
+    settings->setValue("useConstantColour",
+                       properties->mBool()->value(useConstantColourProperty));
+    settings->setValue("constantColour",
+                       properties->mColor()->value(constantColourProperty));
+
     // General properties.
     // ===================
     settings->setValue("position",
@@ -231,6 +279,8 @@ void MSpatial1DTransferFunction::saveConfiguration(QSettings *settings)
     // Properties related to type of texture.
     // ======================================
     settings->setValue("pathsToLoadedImages", imagePathsString);
+    settings->setValue("useMirroredRepeat",
+                       properties->mBool()->value(useMirroredRepeatProperty));
 
     // Properties related to texture scale.
     // ====================================
@@ -275,6 +325,20 @@ void MSpatial1DTransferFunction::loadConfiguration(QSettings *settings)
                 interpolationRangeProperty,
                 settings->value("interpolationRange", 1.0).toDouble());
 
+    // Properties related to alpha blending.
+    // =====================================
+    properties->mEnum()->setValue(alphaBlendingModeProperty,
+                                 settings->value("alphaBlendingMode", 0).toInt());
+    properties->mBool()->setValue(invertAlphaProperty,
+                                 settings->value("invertAlpha", false).toBool());
+    properties->mBool()->setValue(useConstantColourProperty,
+                                 settings->value("useConstantColour",
+                                                 false).toBool());
+    properties->mColor()->setValue(constantColourProperty,
+                                 settings->value("constantColour",
+                                                 QColor(0, 0, 0, 255))
+                                   .value<QColor>());
+
     // General properties.
     // ===================
     setPosition(settings->value("position", QRectF(0.9, 0.9, 0.05, 0.5)).toRectF());
@@ -284,12 +348,11 @@ void MSpatial1DTransferFunction::loadConfiguration(QSettings *settings)
     QStringList paths = ((settings->value("pathsToLoadedImages", "").toString())
                          .split("; ", QString::SkipEmptyParts));
 
-    foreach (QString path, paths)
-    {
-        std::cout << path.toStdString() << std::endl;
-    }
-
     loadImagesFromPaths(paths);
+
+    properties->mBool()->setValue(
+                useMirroredRepeatProperty,
+                settings->value("useMirroredRepeat", false).toBool());
 
     // Properties related to texture scale.
     // ====================================
@@ -312,6 +375,7 @@ void MSpatial1DTransferFunction::loadConfiguration(QSettings *settings)
         loadedImages.clear();
         generateTextureBarGeometry();
     }
+
 }
 
 
@@ -429,6 +493,10 @@ void MSpatial1DTransferFunction::onQtPropertyChanged(QtProperty *property)
                 listWidget->setDragEnabled(true);
                 listWidget->setDropIndicatorShown(true);
                 listWidget->setDragDropMode(QAbstractItemView::InternalMove);
+                QPushButton *okButton = new QPushButton(nullptr);
+                okButton->setText("OK");
+                connect(okButton, SIGNAL(clicked()), &dialog, SLOT(accept()));
+                layout->addWidget(okButton);
 
                 dialog.exec();
                 // Clear fileNames to store file names in user set order.
@@ -459,6 +527,49 @@ void MSpatial1DTransferFunction::onQtPropertyChanged(QtProperty *property)
                 return;
             }
         }
+    }
+
+    else if (property == useMirroredRepeatProperty)
+    {
+        useMirroredRepeat =
+                properties->mBool()->value(useMirroredRepeatProperty);
+
+        if (tfTexture != nullptr)
+        {
+            MGLResourcesManager* glRM = MGLResourcesManager::getInstance();
+            glRM->makeCurrent();
+            tfTexture->bindToTextureUnit(0);
+
+            if (useMirroredRepeat)
+            {
+                glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S,
+                                GL_MIRRORED_REPEAT); CHECK_GL_ERROR;
+                glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T,
+                                GL_MIRRORED_REPEAT); CHECK_GL_ERROR;
+                glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_R,
+                                GL_MIRRORED_REPEAT); CHECK_GL_ERROR;
+            }
+            else
+            {
+                glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S,
+                                GL_REPEAT); CHECK_GL_ERROR;
+                glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T,
+                                GL_REPEAT); CHECK_GL_ERROR;
+                glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_R,
+                                GL_REPEAT); CHECK_GL_ERROR;
+            }
+            // Need to set these parameters as well, otherwise they are set back
+            // to their default values.
+            glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER,
+                            GL_LINEAR); CHECK_GL_ERROR;
+            glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER,
+                            GL_LINEAR_MIPMAP_LINEAR); CHECK_GL_ERROR;
+
+        }
+
+        if (suppressActorUpdates()) return;
+
+        emitActorChangedSignal();
     }
 
     else if (property == clampMaximumProperty)
@@ -494,6 +605,63 @@ void MSpatial1DTransferFunction::onQtPropertyChanged(QtProperty *property)
     {
         interpolationRange =
                 properties->mDouble()->value(interpolationRangeProperty);
+
+        if (suppressActorUpdates()) return;
+
+        emitActorChangedSignal();
+    }
+
+    else if (property == alphaBlendingModeProperty)
+    {
+        alphaBlendingMode =
+                AlphaBlendingMode(
+                    properties->mEnum()->value(alphaBlendingModeProperty));
+
+        // Only invert alpha if alphaBlendingMode is not "none".
+        // Therefore disable invertAlpha-Property and set invertAlpha to false.
+        if (alphaBlendingMode == AlphaBlendingMode::None)
+        {
+            enableActorUpdates(false);
+            invertAlphaProperty->setEnabled(false);
+            properties->mBool()->setValue(invertAlphaProperty, false);
+            enableActorUpdates(true);
+        }
+        else
+        {
+            enableActorUpdates(false);
+            invertAlphaProperty->setEnabled(true);
+            enableActorUpdates(true);
+        }
+
+        if (suppressActorUpdates()) return;
+
+        emitActorChangedSignal();
+    }
+
+    else if (property == invertAlphaProperty)
+    {
+        invertAlpha = properties->mBool()->value(invertAlphaProperty);
+
+        if (suppressActorUpdates()) return;
+
+        emitActorChangedSignal();
+    }
+
+    else if (property == useConstantColourProperty)
+    {
+        useConstantColour = properties->mBool()->value(useConstantColourProperty);
+
+        if (suppressActorUpdates()) return;
+
+        emitActorChangedSignal();
+    }
+
+    else if (property == constantColourProperty)
+    {
+        constantColour = properties->mColor()->value(constantColourProperty);
+
+        if (suppressActorUpdates() || !useConstantColour) return;
+
         emitActorChangedSignal();
     }
 
@@ -528,6 +696,9 @@ void MSpatial1DTransferFunction::renderToCurrentContext(
         int viewPortWidth = sceneView->getViewPortWidth();
         int viewPortHeight = sceneView->getViewPortHeight();
 
+        glAlphaFunc(GL_GREATER, 0.1);
+        glEnable(GL_ALPHA_TEST);
+
         QRectF positionRect = properties->mRectF()->value(positionProperty);
         float barWidth     = positionRect.width();
         float barHeight    = positionRect.height();
@@ -560,6 +731,14 @@ void MSpatial1DTransferFunction::renderToCurrentContext(
 
         colourbarShader->setUniformValue("numLevels",
                                          GLint(numLevels));
+
+        colourbarShader->setUniformValue("alphaBlendingMode",
+                                         GLenum(alphaBlendingMode));
+        colourbarShader->setUniformValue("invertAlpha",
+                                         GLboolean(invertAlpha));
+        colourbarShader->setUniformValue("useConstantColour",
+                                         GLboolean(useConstantColour));
+        colourbarShader->setUniformValue("constantColour", constantColour);
 
         colourbarShader->setUniformValue("spatialTransferTexture", textureUnit);CHECK_GL_ERROR;
 
@@ -614,9 +793,8 @@ void MSpatial1DTransferFunction::generateTransferTexture(int level, bool recreat
         {
             // No texture exists. Create a new one and register with memory manager.
             QString textureID = QString("spatialTransferFunction_#%1").arg(getID());
-//            tfTexture = new GL::MTexture(textureID, GL_TEXTURE_2D, GL_RGBA32F,
-//                                          loadedImage.width(), loadedImage.height());
-            tfTexture = new GL::MTexture(textureID, GL_TEXTURE_3D, GL_RGBA32F,
+            tfTexture = new GL::MTexture(textureID, GL_TEXTURE_2D_ARRAY,
+                                         GL_RGBA32F,
                                          currentTextureWidth,
                                          currentTextureHeight,
                                          numLevels);
@@ -627,16 +805,34 @@ void MSpatial1DTransferFunction::generateTransferTexture(int level, bool recreat
                 tfTexture = nullptr;
             }
 
-            glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_REPEAT); CHECK_GL_ERROR;
-            glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_REPEAT); CHECK_GL_ERROR;
-            glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_REPEAT); CHECK_GL_ERROR;
-            glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR); CHECK_GL_ERROR;
-            glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST); CHECK_GL_ERROR;
+
+            if (useMirroredRepeat)
+            {
+                glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S,
+                                GL_MIRRORED_REPEAT); CHECK_GL_ERROR;
+                glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T,
+                                GL_MIRRORED_REPEAT); CHECK_GL_ERROR;
+                glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_R,
+                                GL_MIRRORED_REPEAT); CHECK_GL_ERROR;
+            }
+            else
+            {
+                glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S,
+                                GL_REPEAT); CHECK_GL_ERROR;
+                glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T,
+                                GL_REPEAT); CHECK_GL_ERROR;
+                glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_R,
+                                GL_REPEAT); CHECK_GL_ERROR;
+            }
+            glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER,
+                            GL_LINEAR); CHECK_GL_ERROR;
+            glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER,
+                            GL_LINEAR_MIPMAP_LINEAR); CHECK_GL_ERROR;
 
             glRM->makeCurrent();
             tfTexture->bindToTextureUnit(0);
 
-            glTexImage3D(GL_TEXTURE_3D,            // target
+            glTexImage3D(GL_TEXTURE_2D_ARRAY,            // target
                          0,                         // level of detail
                          GL_RGBA32F,                // internal format
                          currentTextureWidth,       // width
@@ -655,13 +851,31 @@ void MSpatial1DTransferFunction::generateTransferTexture(int level, bool recreat
             glRM->makeCurrent();
             tfTexture->bindToTextureUnit(0);
 
-            glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_REPEAT); CHECK_GL_ERROR;
-            glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_REPEAT); CHECK_GL_ERROR;
-            glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_REPEAT); CHECK_GL_ERROR;
-            glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR); CHECK_GL_ERROR;
-            glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST); CHECK_GL_ERROR;
+            if (useMirroredRepeat)
+            {
+                glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S,
+                                GL_MIRRORED_REPEAT); CHECK_GL_ERROR;
+                glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T,
+                                GL_MIRRORED_REPEAT); CHECK_GL_ERROR;
+                glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_R,
+                                GL_MIRRORED_REPEAT); CHECK_GL_ERROR;
+            }
+            else
+            {
+                glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S,
+                                GL_REPEAT); CHECK_GL_ERROR;
+                glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T,
+                                GL_REPEAT); CHECK_GL_ERROR;
+                glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_R,
+                                GL_REPEAT); CHECK_GL_ERROR;
+            }
+            glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER,
+                            GL_LINEAR); CHECK_GL_ERROR;
+            glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER,
+                            GL_LINEAR_MIPMAP_LINEAR); CHECK_GL_ERROR;
 
-            glTexImage3D(GL_TEXTURE_3D,            // target
+
+            glTexImage3D(GL_TEXTURE_2D_ARRAY,            // target
                          0,                         // level of detail
                          GL_RGBA32F,                // internal format
                          currentTextureWidth,       // width
@@ -682,28 +896,8 @@ void MSpatial1DTransferFunction::generateTransferTexture(int level, bool recreat
             glRM->makeCurrent();
             tfTexture->bindToTextureUnit(0);
 
-            // Set texture parameters: wrap mode and filtering.
-//            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
-//            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
-//            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-//            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-//            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_LINEAR);
-//            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR); CHECK_GL_ERROR;
-//            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST); CHECK_GL_ERROR;
-
-//            // Upload data array to GPU.
-//            glTexImage2D(GL_TEXTURE_2D,            // target
-//                         0,                         // level of detail
-//                         GL_RGBA32F,                // internal format
-//                         loadedImage.width(),       // width
-//                         loadedImage.height(),      // height
-//                         0,                         // border
-//                         GL_RGBA,                   // format
-//                         GL_UNSIGNED_BYTE,          // data type of the pixel data
-//                         loadedImage.bits()); CHECK_GL_ERROR;
-
             // Upload data array to GPU.
-            glTexSubImage3D(GL_TEXTURE_3D,             // target
+            glTexSubImage3D(GL_TEXTURE_2D_ARRAY,             // target
                             0,                         // level of detail
                             0,                         // xoffset
                             0,                         // yoffset
@@ -716,7 +910,7 @@ void MSpatial1DTransferFunction::generateTransferTexture(int level, bool recreat
                             loadedImages.at(level).bits()); CHECK_GL_ERROR;
 
 //             glGenerateTextureMipmap(tfTexture->getTextureObject());
-            glGenerateMipmap(GL_TEXTURE_3D);
+            glGenerateMipmap(GL_TEXTURE_2D_ARRAY);
         }
     }
 }

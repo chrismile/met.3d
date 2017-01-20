@@ -64,7 +64,7 @@ shader FSmain(in VStoFS Input, out vec4 fragColour)
 }
 
 
-uniform sampler3D spatialTransferTexture;
+uniform sampler2DArray spatialTransferTexture;
 
 uniform float distInterp; // user
 
@@ -82,6 +82,11 @@ uniform int textureHeight;
 uniform float barWidthF;
 uniform float barHeightF;
 
+uniform int alphaBlendingMode;
+uniform bool invertAlpha;
+uniform bool useConstantColour;
+uniform vec4 constantColour;
+
 shader FSspatialTF(in VStoFS Input, out vec4 fragColour)
 {
     // Float versions of the given sizes.
@@ -91,7 +96,7 @@ shader FSspatialTF(in VStoFS Input, out vec4 fragColour)
     float textureWidthF = float(textureWidth);
     float textureHeightF = float(textureHeight);
 
-    // Adapt to change scale of texture in colour bar.
+    // Scale of texture in colour bar.
     vec2 scale = vec2((textureWidthF / viewPortWidthF) * (2.0f / barWidthF),
                       (textureHeightF / viewPortHeightF) * (2.0f / barHeightF));
 
@@ -99,14 +104,12 @@ shader FSspatialTF(in VStoFS Input, out vec4 fragColour)
 
     vec2 pos = Input.texCoords;
 
-    // Get level position in 3D texture. Doesn't start with first image at 0.0f,
-    // but at 1/(2*numLevels).
-    float level =
-            ((floor(pos.y / dist) * 2.0f) + 1.0f) / float(2.0f * numLevels);
+    // Get level position in 3D texture.
+    float level = floor(pos.y / dist);
 
-    vec3 texCoords = vec3(fract(pos / scale), level);
+    vec3 texCoords = vec3(pos / scale, level);
 
-    vec3 colour = textureLod(spatialTransferTexture, texCoords, 0.0f).rgb;
+    vec4 colour = textureLod(spatialTransferTexture, texCoords, 0.0f);
 
     // Interpolation range in texture coordinates.
     float interpRange = (distInterp / 2.0f) / (maximumValue - minimumValue);
@@ -115,34 +118,84 @@ shader FSspatialTF(in VStoFS Input, out vec4 fragColour)
     // Scalar value distance to next level in texture coordinates.
     float fraction2 = (ceil(pos.y / dist) * dist) - pos.y;
 
-    // Interpolation to lower level. (No interpolation for lowest level!)
+    // Interpolation to previous level. (No interpolation for lowest level!)
     if (interpRange > fraction && floor(pos.y / dist) > 0.0f)
     {
-        level = (((floor(pos.y / dist) - 1.f) * 2.0f) + 1.0f)
-                / float(2.0f * numLevels);
+        level = floor(pos.y / dist) - 1.0f;
         float interpolation = fraction / (2.0f * interpRange) + 0.5f;
 
-        texCoords = vec3(fract(pos / scale), level);
+        texCoords = vec3(pos / scale, level);
 
         colour = (interpolation * colour)
                 + ((1.f - interpolation)
-                   * textureLod(spatialTransferTexture, texCoords, 0.0f).rgb);
+                   * textureLod(spatialTransferTexture, texCoords, 0.0f));
     }
-    // Interpolation to upper level. (No interpolation for highest level!)
+    // Interpolation to next level. (No interpolation for highest level!)
     else if (fraction2 < interpRange
              && floor(pos.y / dist) < float(numLevels - 1))
     {
-        level = ((ceil(pos.y / dist) * 2.0f) + 1.0f) / float(2.0f * numLevels);
+        level = ceil(pos.y / dist);
         float interpolation = fraction2 / (2.0f * interpRange) + 0.5f;
 
-        texCoords = vec3(fract(pos / scale), level);
+        texCoords = vec3(pos / scale, level);
 
         colour = (interpolation * colour)
                 + ((1.f - interpolation)
-                   * textureLod(spatialTransferTexture, texCoords, 0.0f).rgb);
+                   * textureLod(spatialTransferTexture, texCoords, 0.0f));
     }
 
-    fragColour = vec4(colour, 1.0f);
+    // Needs to match alphaBlendingMode enum in spatial1dtransferfunction.h.
+    switch (alphaBlendingMode)
+    {
+    case 0: // Use alpha channel.
+    {
+        colour = colour;
+        break;
+    }
+    case 1: // Use red channel.
+    {
+        colour = colour.rgbr;
+        break;
+    }
+    case 2: // Use green channel.
+    {
+        colour = colour.rgbg;
+        break;
+    }
+    case 3: // Use blue channel.
+    {
+        colour = colour.rgbb;
+        break;
+    }
+    case 4: // Use rgb average.
+    {
+        float alpha = (colour.r + colour.g + colour.b) / 3.0f;
+        colour = vec4(colour.rgb, alpha);
+        break;
+    }
+    case 5: // Use no alpha blending.
+    {
+        colour = vec4(colour.rgb, 1.0f);
+        break;
+    }
+    default: // Invalid mode.
+    {
+        discard;
+    }
+    }
+
+    if (invertAlpha)
+    {
+        colour.a = 1.0f - colour.a;
+    }
+
+    if (useConstantColour)
+    {
+        colour = vec4(constantColour.rgb, colour.a);
+    }
+
+    fragColour = colour;
+
 }
 
 /*****************************************************************************
