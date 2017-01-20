@@ -1298,7 +1298,7 @@ void MNWPActorVariable::onActorRenamed(MActor *actor, QString oldName)
 
 
 void MNWPActorVariable::asynchronousDataAvailable(MDataRequest request)
-{  
+{
     // Decide in O(1) based on the QSet whether to accept the incoming request.
     if (!pendingRequests.contains(request)) return;
     pendingRequests.remove(request);

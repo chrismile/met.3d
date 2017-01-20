@@ -35,12 +35,16 @@
 #include "gxfw/mglresourcesmanager.h"
 #include "gxfw/gl/typedvertexbuffer.h"
 #include "util/mutil.h"
+#include "transferfunctioneditor/transferfunctioneditor.h"
+#include "mainwindow.h"
 
 using namespace std;
 
 
 namespace Met3D
 {
+
+using namespace TFEditor;
 
 /******************************************************************************
 ***                     CONSTRUCTOR / DESTRUCTOR                            ***
@@ -50,6 +54,7 @@ MTransferFunction1D::MTransferFunction1D()
     : MTransferFunction(),
       tfTexture(nullptr),
       vertexBuffer(nullptr),
+      editor(nullptr),
       enableAlpha(true),
       minimumValue(203.15),
       maximumValue(303.15)
@@ -131,7 +136,10 @@ MTransferFunction1D::MTransferFunction1D()
 
     colourmapTypeProperty = addProperty(ENUM_PROPERTY, "colourmap type",
                                         actorPropertiesSupGroup);
-    QStringList cmapTypes = QStringList() << "predefined" << "HCL" << "HSV";
+
+    QStringList cmapTypes = QStringList() << "predefined" << "HCL" << "HSV"
+                                          << "Editor";
+
     properties->mEnum()->setEnumNames(colourmapTypeProperty, cmapTypes);
 
     // Predefined ...
@@ -213,7 +221,6 @@ MTransferFunction1D::MTransferFunction1D()
 
     updateHCLProperties();
 
-
     // HSV ...
 
     hsvCMapPropertiesSubGroup = addProperty(GROUP_PROPERTY, "HSV",
@@ -228,7 +235,34 @@ MTransferFunction1D::MTransferFunction1D()
     properties->mString()->setValue(hsvVaporXMLFilenameProperty, "");
     hsvVaporXMLFilenameProperty->setEnabled(false);
 
+    // Editor
+    editorPropertiesSubGroup = addProperty(GROUP_PROPERTY, "Editor",
+                                            actorPropertiesSupGroup);
+    editorPropertiesSubGroup->setEnabled(false);
+
+    editorClickProperty = addProperty(CLICK_PROPERTY, "open",
+                                      editorPropertiesSubGroup);
+
+
     endInitialiseQtProperties();
+
+    MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
+    // Assign main window as parent so editor gets closed automatically if the
+    // user closes the main window.
+    editor = new MTransferFunctionEditor(sysMC->getMainWindow());
+    editor->resize(700, 200);
+
+    connect(editor, SIGNAL(transferFunctionChanged()),
+            this, SLOT(onEditorTransferFunctionChanged()));
+}
+
+MTransferFunction1D::~MTransferFunction1D()
+{
+    if (editor)
+    {
+        delete editor;
+    }
+    editor = nullptr;
 }
 
 
@@ -275,6 +309,7 @@ void MTransferFunction1D::selectPredefinedColourmap(
         predefCMapPropertiesSubGroup->setEnabled(true);
         hclCMapPropertiesSubGroup->setEnabled(false);
         hsvCMapPropertiesSubGroup->setEnabled(false);
+        editorPropertiesSubGroup->setEnabled(false);
 
         enableActorUpdates(true);
 
@@ -314,6 +349,7 @@ void MTransferFunction1D::selectHCLColourmap(
     predefCMapPropertiesSubGroup->setEnabled(false);
     hclCMapPropertiesSubGroup->setEnabled(true);
     hsvCMapPropertiesSubGroup->setEnabled(false);
+    editorPropertiesSubGroup->setEnabled(false);
 
     enableActorUpdates(true);
 
@@ -342,6 +378,7 @@ void MTransferFunction1D::selectHSVColourmap(
     predefCMapPropertiesSubGroup->setEnabled(false);
     hclCMapPropertiesSubGroup->setEnabled(false);
     hsvCMapPropertiesSubGroup->setEnabled(true);
+    editorPropertiesSubGroup->setEnabled(false);
 
     enableActorUpdates(true);
 
@@ -353,12 +390,23 @@ void MTransferFunction1D::selectHSVColourmap(
     }
 }
 
+void MTransferFunction1D::selectEditor()
+{
+    enableActorUpdates(false);
+
+    properties->mEnum()->setValue(colourmapTypeProperty, int(EDITOR));
+    predefCMapPropertiesSubGroup->setEnabled(false);
+    hclCMapPropertiesSubGroup->setEnabled(false);
+    hsvCMapPropertiesSubGroup->setEnabled(false);
+    editorPropertiesSubGroup->setEnabled(true);
+
+    enableActorUpdates(true);
+}
 
 void MTransferFunction1D::setMinimumValue(float value)
 {
     properties->mDouble()->setValue(minimumValueProperty, value);
 }
-
 
 void MTransferFunction1D::setMaximumValue(float value)
 {
@@ -493,6 +541,37 @@ void MTransferFunction1D::saveConfiguration(QSettings *settings)
         settings->setValue("vaporXMLFile", hsvVaporXMLFilename);
         break;
     }
+    case EDITOR:
+    {
+        const auto colourNodes = editor->getTransferFunction()->getColourNodes();
+        const auto alphaNodes = editor->getTransferFunction()->getAlphaNodes();
+
+        settings->beginWriteArray("colourNode");
+        for (int i= 0; i < colourNodes->getNumNodes(); i++)
+        {
+            settings->setArrayIndex(i);
+            settings->setValue("pos", colourNodes->xAt(i));
+
+            MColorXYZ64 colour = colourNodes->colourAt(i);
+            QByteArray array((char*)&colour, sizeof(MColorXYZ64));
+            settings->setValue("colour", array);
+        }
+        settings->endArray();
+
+        settings->beginWriteArray("alphaNode");
+        for (int i= 0; i < alphaNodes->getNumNodes(); i++)
+        {
+            settings->setArrayIndex(i);
+            settings->setValue("pos", alphaNodes->xAt(i));
+            settings->setValue("alpha", alphaNodes->yAt(i));
+        }
+        settings->endArray();
+
+        int type = (int)editor->getType();
+        settings->setValue("interpolationType", type);
+
+        break;
+    }
     }
 
     settings->endGroup();
@@ -568,6 +647,45 @@ void MTransferFunction1D::loadConfiguration(QSettings *settings)
                            settings->value("reverseColourMap").toBool());
         break;
     }
+    case EDITOR:
+    {
+        auto colourNodes = editor->getTransferFunction()->getColourNodes();
+        auto alphaNodes = editor->getTransferFunction()->getAlphaNodes();
+
+        colourNodes->clear();
+        alphaNodes->clear();
+
+        int numColourNodes = settings->beginReadArray("colourNode");
+        for (int i=0; i < numColourNodes; i++)
+        {
+            settings->setArrayIndex(i);
+            float pos = settings->value("pos", 0).toFloat();
+
+            QByteArray array = settings->value("colour", QByteArray()).toByteArray();
+            MColorXYZ64 colour;
+            if (array.size() == sizeof(MColorXYZ64))
+                memcpy(&colour, array.data(), sizeof(MColorXYZ64));
+            colourNodes->push_back(pos, colour);
+        }
+        settings->endArray();
+
+        int numAlphaPoints = settings->beginReadArray("alphaNode");
+        for (int i= 0; i < numAlphaPoints; i++)
+        {
+            settings->setArrayIndex(i);
+            float pos = settings->value("pos", 0).toFloat();
+            float alpha = settings->value("alpha", Qt::black).toFloat();
+
+            alphaNodes->push_back(pos, alpha);
+        }
+        settings->endArray();
+        int type = settings->value("interpolationType", 0).toInt();
+        editor->setType((InterpolationType)type);
+
+        editor->resetUI();
+        selectEditor();
+        break;
+    }
     }
 
     settings->endGroup();
@@ -607,7 +725,6 @@ void MTransferFunction1D::initializeActorResources()
                                                simpleGeometryShader);
 
     if (loadShaders) reloadShaderEffects();
-
     generateColourBarGeometry();
 }
 
@@ -661,16 +778,19 @@ void MTransferFunction1D::onQtPropertyChanged(QtProperty *property)
             predefCMapPropertiesSubGroup->setEnabled(true);
             hclCMapPropertiesSubGroup->setEnabled(false);
             hsvCMapPropertiesSubGroup->setEnabled(false);
+            editorPropertiesSubGroup->setEnabled(false);
             break;
         case HCL:
             predefCMapPropertiesSubGroup->setEnabled(false);
             hclCMapPropertiesSubGroup->setEnabled(true);
             hsvCMapPropertiesSubGroup->setEnabled(false);
+            editorPropertiesSubGroup->setEnabled(false);
             break;
         case HSV:
             predefCMapPropertiesSubGroup->setEnabled(false);
             hclCMapPropertiesSubGroup->setEnabled(false);
             hsvCMapPropertiesSubGroup->setEnabled(true);
+            editorPropertiesSubGroup->setEnabled(false);
 
             if (hsvVaporXMLFilename.isEmpty())
             {
@@ -681,7 +801,12 @@ void MTransferFunction1D::onQtPropertyChanged(QtProperty *property)
                             "Vapor transfer function XML (*.vtf)");
                 updateHSVProperties();
             }
-
+            break;
+        case EDITOR:
+            predefCMapPropertiesSubGroup->setEnabled(false);
+            hclCMapPropertiesSubGroup->setEnabled(false);
+            hsvCMapPropertiesSubGroup->setEnabled(false);
+            editorPropertiesSubGroup->setEnabled(true);
             break;
         }
 
@@ -719,7 +844,6 @@ void MTransferFunction1D::onQtPropertyChanged(QtProperty *property)
         generateColourBarGeometry();
         emitActorChangedSignal();
     }
-
     else if (property == hsvLoadFromVaporXMLProperty)
     {
         QString filename = QFileDialog::getOpenFileName(
@@ -747,6 +871,10 @@ void MTransferFunction1D::onQtPropertyChanged(QtProperty *property)
         enableAlpha = properties->mBool()->value(enableAlphaInTFProperty);
 
         emitActorChangedSignal();
+    }
+    else if (property == editorClickProperty)
+    {
+        editor->show();
     }
 }
 
@@ -945,6 +1073,20 @@ void MTransferFunction1D::generateTransferTexture()
 
         break;
     }
+    case EDITOR:
+    {
+        editor->updateNumSteps(numSteps);
+        const auto& tex = *editor->getTransferFunction()->getSampledBuffer();
+
+        for (int i = 0; i < numSteps; i++)
+        {
+            textureImage[i * 4 + 0] = (unsigned char)qRed(tex[i]);
+            textureImage[i * 4 + 1] = (unsigned char)qGreen(tex[i]);
+            textureImage[i * 4 + 2] = (unsigned char)qBlue(tex[i]);
+            textureImage[i * 4 + 3] = (unsigned char)qAlpha(tex[i]);
+        }
+        break;
+    }
     }
 
     if (deleteColourMap && (cmap != nullptr)) delete cmap;
@@ -1126,7 +1268,8 @@ void MTransferFunction1D::generateColourBarGeometry()
     float scaleFactor = properties->mDouble()->value(scaleFactorProperty);
 
     // Register the labels with the text manager.
-    for (uint i = 0; i < numTicks; i += tickStep) {
+    for (uint i = 0; i < numTicks; i += tickStep)
+    {
         float value = maximumValue - double(i) / double(numTicks-1)
                 * (maximumValue - minimumValue);
         labels.append(tm->addText(
@@ -1140,6 +1283,9 @@ void MTransferFunction1D::generateColourBarGeometry()
                           labelbbox, labelBBoxColour)
                       );
     }
+
+    editor->setRange(minimumValue, maximumValue, scaleFactor,
+                     maxNumTicks, maxNumLabels, numSteps, decimals);
 }
 
 
@@ -1204,11 +1350,16 @@ void MTransferFunction1D::updateHCLProperties()
     }
 }
 
-
 void MTransferFunction1D::updateHSVProperties()
 {
     properties->mString()->setValue(
                 hsvVaporXMLFilenameProperty, hsvVaporXMLFilename);
+}
+
+void MTransferFunction1D::onEditorTransferFunctionChanged()
+{
+    generateTransferTexture();
+    emit actorChanged();
 }
 
 } // namespace Met3D
