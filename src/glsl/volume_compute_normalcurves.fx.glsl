@@ -202,11 +202,15 @@ void bisectionCorrection(inout vec3 position,
 // computation has to be aborted or should be carried on.
 bool checkThreshold(float scalar, in vec3 position)
 {
-    // Do not sample position outside the data volume.
-    if (position.x > dataExtent.dataSECrnr.x) { return false; }
-    if (position.x < dataExtent.dataNWCrnr.x) { return false; }
-    if (position.y < dataExtent.dataSECrnr.y) { return false; }
-    if (position.y > dataExtent.dataNWCrnr.y) { return false; }
+    // Do not sample position outside the data volume. (If volume is cyclic in
+    // longitude, one cannot sample outside the data volume in x-direction.)
+    if (!dataExtent.gridIsCyclicInLongitude)
+    {
+        if (position.x > dataExtent.dataSECrnr.x) { return false; }
+        if (position.x < dataExtent.dataNWCrnr.x) { return false; }
+    }
+        if (position.y < dataExtent.dataSECrnr.y) { return false; }
+        if (position.y > dataExtent.dataNWCrnr.y) { return false; }
 
     if (abortCriterion == 1) // Iso-Value.
     {
