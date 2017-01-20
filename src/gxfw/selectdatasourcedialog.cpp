@@ -49,7 +49,8 @@ namespace Met3D
 
 MSelectDataSourceDialog::MSelectDataSourceDialog(QWidget *parent)
     : QDialog(parent),
-      ui(new Ui::MSelectDataSourceDialog)
+      ui(new Ui::MSelectDataSourceDialog),
+      variableAvailable(false)
 {
     ui->setupUi(this);
 
@@ -65,7 +66,8 @@ MSelectDataSourceDialog::MSelectDataSourceDialog(QWidget *parent)
 MSelectDataSourceDialog::MSelectDataSourceDialog(
         const QList<MVerticalLevelType>& supportList, QWidget *parent)
     : QDialog(parent),
-      ui(new Ui::MSelectDataSourceDialog)
+      ui(new Ui::MSelectDataSourceDialog),
+      variableAvailable(false)
 {
     ui->setupUi(this);
     createDataSourceEntries(supportList);
@@ -85,6 +87,7 @@ MSelectDataSourceDialog::~MSelectDataSourceDialog()
 MSelectableDataSource MSelectDataSourceDialog::getSelectedDataSource()
 {
     int row = ui->dataFieldTable->currentRow();
+
     return getDataSourceFromRow(row);
 }
 
@@ -108,6 +111,30 @@ QList<MSelectableDataSource> MSelectDataSourceDialog::getSelectedDataSources()
 
 
 /******************************************************************************
+***                             PUBLIC SLOTS                                ***
+*******************************************************************************/
+
+
+int MSelectDataSourceDialog::exec()
+{
+    // Test if variables to select are available. If not inform user and return
+    // QDialog::Rejected without executing the dialog.
+    if (variableAvailable)
+    {
+        return QDialog::exec();
+    }
+    else
+    {
+        QMessageBox msgBox;
+        msgBox.setIcon(QMessageBox::Warning);
+        msgBox.setText("No variables available to select!");
+        msgBox.exec();
+        return QDialog::Rejected;
+    }
+}
+
+
+/******************************************************************************
 ***                            PRIVATE METHODS                              ***
 *******************************************************************************/
 
@@ -124,6 +151,8 @@ void MSelectDataSourceDialog::createDataSourceEntries(
 
     // Loop over all data loaders registered with the resource manager.
     MSystemManagerAndControl* sysMC = MSystemManagerAndControl::getInstance();
+
+    variableAvailable = false;
 
     QStringList dataSources = sysMC->getDataSourceIdentifiers();
     for (int idl = 0; idl < dataSources.size(); idl++)
@@ -148,6 +177,7 @@ void MSelectDataSourceDialog::createDataSourceEntries(
 
             // .. and all variables for the current level type ..
             QStringList variables = source->availableVariables(lvl);
+            variableAvailable = variableAvailable || !variables.empty();
             for (int ivar = 0; ivar < variables.size(); ivar++)
             {
                 QString var = variables.at(ivar);

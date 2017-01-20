@@ -76,12 +76,21 @@ public:
 
     QList<MSelectableDataSource> getSelectedDataSources();
 
+public Q_SLOTS:
+    /**
+      Reimplemented exec() to avoid execusion of dialog if no variables to
+      select are available.
+      */
+    int exec();
+
 private:
     Ui::MSelectDataSourceDialog *ui;
 
     void createDataSourceEntries(QList<MVerticalLevelType> supportedTypes);
 
     MSelectableDataSource getDataSourceFromRow(int row);
+
+    bool variableAvailable;
 };
 
 } // namespace Met3D
