@@ -355,8 +355,12 @@ bool traverseSectionOfDataVolume_DVR(
         }
     } // raycaster loop
 
-    // Restore ray colour from alpha-multiplied value.
-    rayColor.rgb = rayColor.rgb / rayColor.a;
+    // Avoid divison by 0.
+    if (rayColor.a != 0.f)
+    {
+        // Restore ray colour from alpha-multiplied value.
+        rayColor.rgb = rayColor.rgb / rayColor.a;
+    }
     
     return fullTraversal;
 }
@@ -425,6 +429,23 @@ void raycaster(in vec3 h_gradient, in Ray ray, in vec2 lambdaNearFar,
     // Step through acceleration structure and only traverse volume bricks
     // that potentially contain an isosurface.
     // ===================================================================
+
+    // Don't use empty space skipping for DVR-mode if neither the minimum value
+    // nor the maximum value have an alpha equal to 0 (This means, no space to
+    // skip).
+    if (renderingMode == RENDER_DVR && texture(transferFunction, 0.).a > 0.
+            && texture(transferFunction, 1.).a > 0.)
+    {
+        traverseSectionOfDataVolume_DVR(
+                    h_gradient, depthGlobal, rayPosIncrement,
+                    lambdaNearFar.y,
+                    lambda, prevRayPosition, prevLambda,
+                    rayColor, rayPosition,
+                    crossingLevelFront, crossingLevelBack,
+                    firstCrossing, lastCrossing,
+                    crossingPosition);
+        return;
+    }
 
     // Grid spacing of the acceleration structure. 
 
@@ -506,10 +527,57 @@ void raycaster(in vec3 h_gradient, in Ray ray, in vec2 lambdaNearFar,
     // The min/max isovalues of the isosurfaces that are rendered in this
     // render pass.
     vec2 isoMinMax = vec2(isoValues[0], isoValues[0]);
-    for (int i = 1; i < numIsoValues; i++)
+    if (renderingMode == RENDER_ISOSURFACES)
     {
-        if (isoValues[i] < isoMinMax.x) isoMinMax.x = isoValues[i];
-        if (isoValues[i] > isoMinMax.y) isoMinMax.y = isoValues[i];
+        for (int i = 1; i < numIsoValues; i++)
+        {
+            if (isoValues[i] < isoMinMax.x) isoMinMax.x = isoValues[i];
+            if (isoValues[i] > isoMinMax.y) isoMinMax.y = isoValues[i];
+        }
+    }
+    // For DVR use the minimum and maximum value of the transfer function.
+    else if (renderingMode == RENDER_DVR)
+    {
+        // Set isoMin to -infinity. (No skip if not changed.)
+        isoMinMax.x = -1.0 / 0.0;
+        // Set isoMax to infinity. (No skip if not changed.)
+        isoMinMax.y = 1.0 / 0.0;
+
+        // Since the user is free to set the maximum value of the transfer
+        // function to a value smaller than the minimum value of the transfer
+        // function, both cases have to be considered.
+        if (dataExtent.tfMinimum < dataExtent.tfMaximum)
+        {
+            // Only skip isovalues smaller minimum isovalue of transfer function
+            // if alpha of minimum equals 0.
+            if (texture(transferFunction, 0.).a == 0.)
+            {
+                isoMinMax.x = dataExtent.tfMinimum;
+            }
+            // Only skip isovalues greater maximum isovalue of transfer function
+            // if alpha of maximum equals 0.
+            if (texture(transferFunction, 1.).a == 0.)
+            {
+                isoMinMax.y = dataExtent.tfMaximum;
+            }
+
+        }
+        else
+        {
+            // Only skip isovalues greater maximum isovalue of transfer function
+            // if alpha of maximum equals 0. (In this case tfMinimum stores max)
+            if (texture(transferFunction, 0.).a == 0.)
+            {
+                isoMinMax.y = dataExtent.tfMinimum;
+            }
+            // Only skip isovalues smaller minimum isovalue of transfer function
+            // if alpha of minimum equals 0. (In this case tfMaximum stores min)
+            if (texture(transferFunction, 1.).a == 0.)
+            {
+                isoMinMax.x = dataExtent.tfMaximum;
+            }
+
+        }
     }
 
     // Loop that traverses the min/max structure. "Empty" (with respect to the
@@ -522,7 +590,7 @@ void raycaster(in vec3 h_gradient, in Ray ray, in vec2 lambdaNearFar,
         // Get min/max scalar values contained in the current brick. Check
         // if an isosurface can be contained.
         vec2 brickMinMax = texelFetch(minMaxAccel3D, iaccel, 0).rg;
-        bool doBrickTraversal = (! ((brickMinMax.y < isoMinMax.x) 
+        bool doBrickTraversal = (! ((brickMinMax.y < isoMinMax.x)
                                         || (brickMinMax.x > isoMinMax.y)));
         //doBrickTraversal = false;
 
