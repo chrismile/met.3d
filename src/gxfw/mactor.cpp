@@ -288,6 +288,11 @@ void MActor::saveConfigurationToFile(QString filename)
 
     QSettings* settings = new QSettings(filename, QSettings::IniFormat);
 
+    settings->beginGroup("FileFormat");
+    // Save version id of Met.3D.
+    settings->setValue("met3dVersion", met3dVersionString);
+    settings->endGroup();
+
     // Save basic MActor settings.
     settings->beginGroup(MActor::getSettingsID());
 
