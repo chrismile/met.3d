@@ -553,7 +553,8 @@ void MSyncControl::selectDataSources()
 {
     // Ask the user for data sources to which times and ensemble members the
     // sync control should be restricted to.
-    MSelectDataSourceDialog dialog(this);
+    MSelectDataSourceDialog dialog(MSelectDataSourceDialogType::SYNC_CONTROL,
+                                   this);
     if (dialog.exec() == QDialog::Rejected)
     {
         return;

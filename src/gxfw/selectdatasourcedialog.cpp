@@ -37,6 +37,9 @@
 #include "gxfw/mglresourcesmanager.h"
 #include "gxfw/msystemcontrol.h"
 #include "data/weatherpredictiondatasource.h"
+#include "data/trajectorydatasource.h"
+#include "data/trajectorynormalssource.h"
+#include "data/trajectoryfilter.h"
 
 using namespace std;
 
@@ -47,15 +50,41 @@ namespace Met3D
 ***                     CONSTRUCTOR / DESTRUCTOR                            ***
 *******************************************************************************/
 
-MSelectDataSourceDialog::MSelectDataSourceDialog(QWidget *parent)
+MSelectDataSourceDialog::MSelectDataSourceDialog(
+        MSelectDataSourceDialogType type, QWidget *parent)
     : QDialog(parent),
       ui(new Ui::MSelectDataSourceDialog),
       variableAvailable(true),
       dataSourceAvailable(false)
 {
     ui->setupUi(this);
-
-    createDataSourceEntries();
+    switch (type)
+    {
+    case MSelectDataSourceDialogType::SYNC_CONTROL:
+    {
+        ui->label->setText("Please select data sources and confirm with \"OK\"");
+        createDataSourceEntries();
+        break;
+    }
+    case MSelectDataSourceDialogType::VARIABLES:
+    {
+        ui->label->setText("Please select a variable and confirm with \"OK\"");
+        QList<MVerticalLevelType> types;
+        types << AUXILIARY_PRESSURE_3D << HYBRID_SIGMA_PRESSURE_3D
+              << LOG_PRESSURE_LEVELS_3D << PRESSURE_LEVELS_3D
+              << SURFACE_2D << POTENTIAL_VORTICITY_2D;
+        createDataSourceEntries(types);
+        break;
+    }
+    case MSelectDataSourceDialogType::TRAJECTORIES:
+    {
+        ui->label->setText("Please select a data source and confirm with \"OK\"");
+        createTrajectoryDataSourceEntries();
+        break;
+    }
+    default:
+        break;
+    }
 }
 
 
@@ -187,6 +216,31 @@ bool MSelectDataSourceDialog::checkDataSourceForData(
     } // levelTypes
 
     return false;
+}
+
+
+bool MSelectDataSourceDialog::checkForTrajectoryDataSource(QString dataSourceID)
+{
+    MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
+    if (!dynamic_cast<MTrajectoryDataSource*>(
+                sysMC->getDataSource(dataSourceID + QString(" Reader"))))
+    {
+        return false;
+    }
+
+    if (!dynamic_cast<MTrajectoryNormalsSource*>(
+                sysMC->getDataSource(dataSourceID  + QString(" Normals"))))
+    {
+        return false;
+    }
+
+    if (!dynamic_cast<MTrajectoryFilter*>(
+                sysMC->getDataSource(dataSourceID + QString(" timestepFilter"))))
+    {
+        return false;
+    }
+
+    return true;
 }
 
 
@@ -336,6 +390,47 @@ void MSelectDataSourceDialog::createDataSourceEntries()
         // Only add data source to table if it contains init times, valid times
         // and ensemble member informations.
         if (checkDataSourceForData(source))
+        {
+            // Add a row to the table..
+            int row = table->rowCount();
+            table->setRowCount(row + 1);
+            // .. and insert the element.
+            table->setItem(row, 0, new QTableWidgetItem(dataSources[idl]));
+
+            dataSourceAvailable = true;
+        }
+    } // for (data loaders)
+
+    // Resize the table's columns to fit data source names.
+    table->resizeColumnsToContents();
+    // Set table width to always fit window size.
+    table->horizontalHeader()->setStretchLastSection(true);
+    // Disable resize of column by user.
+    table->horizontalHeader()->setResizeMode(0, QHeaderView::ResizeMode::Fixed);
+    // Resize widget to fit table size.
+    this->resize(table->width(), table->height());
+}
+
+
+void MSelectDataSourceDialog::createTrajectoryDataSourceEntries()
+{
+    // Set the data field table's header.
+    QTableWidget *table = ui->dataFieldTable;
+    table->setColumnCount(1);
+    table->setHorizontalHeaderLabels(QStringList("Dataset"));
+    table->setSelectionMode(QAbstractItemView::SelectionMode::SingleSelection);
+
+    // Loop over all data loaders registered with the resource manager.
+    MSystemManagerAndControl* sysMC = MSystemManagerAndControl::getInstance();
+
+    dataSourceAvailable = false;
+
+    QStringList dataSources = sysMC->getDataSourceIdentifiers();
+    for (int idl = 0; idl < dataSources.size(); idl++)
+    {
+        QString dataSourceID = dataSources[idl];
+
+        if (checkForTrajectoryDataSource(dataSourceID))
         {
             // Add a row to the table..
             int row = table->rowCount();

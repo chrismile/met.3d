@@ -103,7 +103,7 @@ void MApplicationConfigurationManager::registerActorFactories()
     glRM->registerActorFactory(new MNWPVolumeRaycasterActorFactory());
     glRM->registerActorFactory(new MTransferFunction1DFactory());
     glRM->registerActorFactory(new MSpatial1DTransferFunctionFactory());
-//    glRM->registerActorFactory(new MTrajectoryActorFactory());
+    glRM->registerActorFactory(new MTrajectoryActorFactory());
 }
 
 

@@ -52,12 +52,18 @@ struct MSelectableDataSource
     QString            variableName;
 };
 
+enum MSelectDataSourceDialogType {
+    SYNC_CONTROL     = 0,
+    VARIABLES        = 1,
+    TRAJECTORIES     = 2
+};
+
 
 /**
   @brief MSelectDataSourceDialog implements a dialog from which the user can
   select either a data source and forecast variable to be added to an @ref
-  MNWPMultiVarActor or data sources to restrict a synchronisation control to
-  their times and ensemble members.
+  MNWPMultiVarActor, data sources to restrict a synchronisation control to
+  their times and ensemble members or a trajectory data source.
 
   Which dialog is created depends on the constructor used to construct the
   dialog.
@@ -69,10 +75,14 @@ class MSelectDataSourceDialog : public QDialog
 public:
     /**
       Constructs a new dialog. The dialog's data field table is filled with a
-      list of the data source registered with @ref MGLResourcesManager. This
-      constructor is used to call a dialog for selecting data sources.
+      list of the data source registered with @ref MGLResourcesManager.
+
+      Which dialog should be created is defined by @param type. If this
+      constructor is called to create a variable selection dialog, it uses all
+      vertical level types available.
       */
-    explicit MSelectDataSourceDialog(QWidget *parent = 0);
+    explicit MSelectDataSourceDialog(MSelectDataSourceDialogType type,
+                                     QWidget *parent = 0);
 
     /**
       Constructs a new dialog. The dialog's data field table is filled with a
@@ -103,6 +113,16 @@ public:
       */
     static bool checkDataSourceForData(MWeatherPredictionDataSource *source);
 
+    /**
+      Checks whether @param dataSourceID describes a data source for
+      trajectories by checking for the data sources needed (reader, normals,
+      timestepFilter).
+
+      checkForTrajectoryDataSource returns @return true if the check was
+      positive, @return false otherwise.
+     */
+    static bool checkForTrajectoryDataSource(QString dataSourceID);
+
 public Q_SLOTS:
     /**
       @brief Reimplemented exec() to avoid execusion of dialog if no variables
@@ -125,6 +145,11 @@ private:
       Creates table entries for data source selection dialog.
       */
     void createDataSourceEntries();
+    /**
+      Creates table entries for data source selection dialog restricted to
+      trajectory data sources.
+      */
+    void createTrajectoryDataSourceEntries();
 
     MSelectableDataSource getDataSourceFromRow(int row);
     QString getDataSourceIDFromRow(int row);
