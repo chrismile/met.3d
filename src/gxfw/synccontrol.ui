@@ -351,6 +351,11 @@
             <string>init</string>
            </property>
           </item>
+          <item>
+           <property name="text">
+            <string>init and valid</string>
+           </property>
+          </item>
          </widget>
         </item>
         <item>

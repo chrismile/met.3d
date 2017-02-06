@@ -85,7 +85,7 @@ public:
      */
     void synchronizeWith(MSyncControl *sync, bool updateGUIProperties=true);
 
-    bool synchronizationEvent(MSynchronizationType syncType, QVariant data);
+    bool synchronizationEvent(MSynchronizationType syncType, QVector<QVariant> data);
 
     /**
       Updates colour hints for synchronization (green property background

@@ -339,14 +339,14 @@ void MTrajectoryActor::synchronizeWith(MSyncControl *sync)
 
 
 bool MTrajectoryActor::synchronizationEvent(
-        MSynchronizationType syncType, QVariant data)
+        MSynchronizationType syncType, QVector<QVariant> data)
 {
     switch (syncType)
     {
     case SYNC_INIT_TIME:
     {
         enableActorUpdates(false);
-        bool newInitTimeSet = setInitDateTime(data.toDateTime());
+        bool newInitTimeSet = setInitDateTime(data.at(0).toDateTime());
         enableActorUpdates(true);
         if (newInitTimeSet) asynchronousDataRequest(true);
         return newInitTimeSet;
@@ -354,16 +354,25 @@ bool MTrajectoryActor::synchronizationEvent(
     case SYNC_VALID_TIME:
     {
         enableActorUpdates(false);
-        bool newValidTimeSet = setValidDateTime(data.toDateTime());
+        bool newValidTimeSet = setValidDateTime(data.at(0).toDateTime());
         enableActorUpdates(true);
         if (newValidTimeSet) asynchronousDataRequest(true);
         return newValidTimeSet;
         break;
     }
+    case SYNC_INIT_VALID_TIME:
+    {
+        enableActorUpdates(false);
+        bool newInitTimeSet = setInitDateTime(data.at(0).toDateTime());
+        bool newValidTimeSet = setValidDateTime(data.at(1).toDateTime());
+        enableActorUpdates(true);
+        if (newInitTimeSet || newValidTimeSet) asynchronousDataRequest(true);
+        return (newInitTimeSet || newValidTimeSet);
+    }
     case SYNC_ENSEMBLE_MEMBER:
     {
         enableActorUpdates(false);
-        bool newEnsembleMemberSet = setEnsembleMember(data.toInt());
+        bool newEnsembleMemberSet = setEnsembleMember(data.at(0).toInt());
         enableActorUpdates(true);
         if (newEnsembleMemberSet) asynchronousDataRequest(true);
         return newEnsembleMemberSet;

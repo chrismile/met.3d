@@ -81,7 +81,7 @@ public:
      */
     void synchronizeWith(MSyncControl *sync);
 
-    bool synchronizationEvent(MSynchronizationType syncType, QVariant data);
+    bool synchronizationEvent(MSynchronizationType syncType, QVector<QVariant> data);
 
     /**
      */
