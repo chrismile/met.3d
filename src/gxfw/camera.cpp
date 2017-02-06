@@ -28,6 +28,7 @@
 // standard library imports
 
 // related third party imports
+#include <QMessageBox>
 
 // local application imports
 
@@ -143,6 +144,29 @@ void MCamera::rotateWorldSpace(float angle, float x, float y, float z)
 void MCamera::saveToFile(QString filename)
 {
     if (filename.isEmpty()) return;
+
+    // Overwrite if the file exists.
+    if (QFile::exists(filename))
+    {
+        QSettings* settings = new QSettings(filename, QSettings::IniFormat);
+
+        QStringList groups = settings->childGroups();
+        // Only overwrite file if it contains already configuration for the
+        // actor to save.
+        if ( !groups.contains("MCamera") )
+        {
+            QMessageBox msg;
+            msg.setWindowTitle("Error");
+            msg.setText("The selected file doesn't contain configuration of "
+                        "MCamera !\n"
+                        "Rejected to save to file!");
+            msg.setIcon(QMessageBox::Warning);
+            msg.exec();
+            return;
+        }
+
+        QFile::remove(filename);
+    }
 
     QSettings settings(filename, QSettings::IniFormat);
 

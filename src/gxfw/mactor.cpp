@@ -284,7 +284,27 @@ void MActor::saveConfigurationToFile(QString filename)
     LOG4CPLUS_DEBUG(mlog, "Saving configuration to " << filename.toStdString());
 
     // Overwrite if the file exists.
-    if (QFile::exists(filename)) QFile::remove(filename);
+    if (QFile::exists(filename))
+    {
+        QSettings* settings = new QSettings(filename, QSettings::IniFormat);
+
+        QStringList groups = settings->childGroups();
+        // Only overwrite file if it contains already configuration for the
+        // actor to save.
+        if ( !groups.contains(getSettingsID()) )
+        {
+            QMessageBox msg;
+            msg.setWindowTitle("Error");
+            msg.setText("The selected file doesn't contain configuration of "
+                        + getSettingsID() + "!\n"
+                        "Rejected to save to file!");
+            msg.setIcon(QMessageBox::Warning);
+            msg.exec();
+            return;
+        }
+
+        QFile::remove(filename);
+    }
 
     QSettings* settings = new QSettings(filename, QSettings::IniFormat);
 
