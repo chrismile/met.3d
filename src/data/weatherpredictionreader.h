@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2015-2017 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -75,6 +76,9 @@ struct MVariableInfo
                                          // if the variable is not part of a
                                          // multimember ensemble, the list will
                                          // contain a single "0" member
+    MHorizontalGridType horizontalGridType;       // Enum representing the type of the grid.
+    float         rotatedNorthPoleLon;     // Longitude rotation for rotated grids.
+    float         rotatedNorthPoleLat;     // Latitude rotation for rotated grids.
 };
 
 typedef QMap<QString, MVariableInfo*> MVariableNameMap;
@@ -102,6 +106,21 @@ protected:
       level variable, an exception is raised.
       */
     virtual QString variableSurfacePressureName(
+            MVerticalLevelType levelType,
+            const QString&     variableName) = 0;
+    /**
+      Returns the grid data type of the variable. At the moment there is only
+      a distinction between regular and rotated longitude latitude grid.
+      */
+    virtual MHorizontalGridType variableHorizontalGridType(
+            MVerticalLevelType levelType,
+            const QString&     variableName) = 0;
+    /**
+      Returns the coordinates of the rotated north pole as vector (lon,lat) if
+      requested variable is defined on rotated lon lat grid. Otherwise it throws
+      an bad data field request exception.
+      */
+    virtual QVector2D variableRotatedNorthPoleCoordinates(
             MVerticalLevelType levelType,
             const QString&     variableName) = 0;
 

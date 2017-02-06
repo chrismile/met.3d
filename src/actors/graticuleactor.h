@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2015-2017 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -36,7 +37,7 @@
 #include <QtProperty>
 
 // local application imports
-#include "gxfw/mactor.h"
+#include "gxfw/rotatedgridsupportingactor.h"
 #include "gxfw/gl/shadereffect.h"
 #include "gxfw/gl/vertexbuffer.h"
 #include "data/naturalearthdataloader.h"
@@ -55,7 +56,7 @@ namespace Met3D
   (cannot be changed by the user; the method is to sync a graticule with
   an hsec actor).
   */
-class MGraticuleActor : public MActor
+class MGraticuleActor : public MRotatedGridSupportingActor
 {
 public:
     MGraticuleActor();
@@ -108,6 +109,9 @@ private:
     GL::MVertexBuffer* graticuleVertexBuffer;
     uint   numVerticesGraticule;
 
+    QVector<int> nLats;
+    QVector<int> nLons;
+
     MNaturalEarthDataLoader *naturalEarthDataLoader;
 
     GL::MVertexBuffer* coastlineVertexBuffer;
@@ -131,6 +135,13 @@ private:
     QtProperty *drawBorderLinesProperty;
 
     float verticalPosition_hPa;
+
+    // Inidcate whether coastlineVertexCount/borderlineVertexCount contains at
+    // least one value greater and therefore is valid to be used as count array
+    // during rendering. Using a count array filled with zeros leads to an
+    // program crash.
+    bool coastLinesCountIsValid;
+    bool borderLinesCountIsValid;
 };
 
 

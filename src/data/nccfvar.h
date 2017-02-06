@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2015-2017 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -68,7 +69,7 @@ inline netCDF::exceptions::NcException MNcException(
 
 /**
   @brief NcCFVar represents a NetCDF variable compliant with the CF-conventions
-  (http://cf-pcmdi.llnl.gov/).
+  (http://cfconventions.org/).
 
   NcCFVar inherits the NcVar class to add methods that provide CF-functionality
   (e.g. to determine the coordinate variables and to get the time values of the
@@ -80,7 +81,8 @@ public:
     /**
       Type codes for @ref isCFDataVariable() and @ref getGridType().
       */
-    enum NcVariableGridType {
+    enum NcVariableGridType
+    {
         UNDEFINED      = 0,
         // all CF variables
         ALL            = 1,
@@ -112,10 +114,28 @@ public:
     NcVar getLatitudeVar();
 
     /**
+      Returns the rotated grid latitude variable corresponding to the CF
+      variable represented by this object.
+
+      (cf. http://www.cosmo-model.org/content/model/documentation/core/cosmoDyncsNumcs.pdf ,
+       chapter 3.3)
+      */
+    NcVar getRotatedLatitudeVar();
+
+    /**
       Returns the longitude variable corresponding to the CF variable
       represented by this object.
       */
     NcVar getLongitudeVar();
+
+    /**
+      Returns the rotated grid longitude variable corresponding to the CF
+      variable represented by this object.
+
+      (cf. http://www.cosmo-model.org/content/model/documentation/core/cosmoDyncsNumcs.pdf ,
+       chapter 3.3)
+      */
+    NcVar getRotatedLongitudeVar();
 
     /**
       If the CF variable represented by this object has a pressure dimension,
@@ -181,7 +201,7 @@ public:
       for further information).
       */
     NcVar getCFCoordinateVar(const vector<string>& units,
-                             const string& standardname="",
+                             const vector<string> &standardname={""},
                              bool requirepositive=false) const;
 
     /**
@@ -211,6 +231,36 @@ public:
       one of the types defined in @ref NcVariableGridType.
       */
     static bool isCFDataVariable(const NcVar& var, NcVariableGridType type);
+
+    /**
+      Static function that checks if the specified @p var is a CF variable of
+      one of the types defined in @ref NcVariableGridType.
+
+      ( cf. http://cfconventions.org/cf-conventions/v1.6.0/cf-conventions.html#grid-mappings-and-projections )
+      */
+    static bool isCFGridMappingVariable(const NcVar& var);
+
+    /**
+      Static function that checks if the specified @p var is a CF variable
+      defined on a rotated grid with a mapping defined by one of the variables
+      with their names stored in @p gridMappingVarNames. If so,
+      @p gridMappingVarName holds the name of the corresponding grid mapping
+      variable.
+      */
+    static bool isDefinedOnRotatedGrid(const NcVar& var,
+                                       const QStringList gridMappingVarNames,
+                                       QString *gridMappingVarName);
+
+    /**
+      Static function that gets the rotated north pole coordinates for a given
+      grid mapping variable @p gridMappingVar. The results are stored in
+      @p rotatedNorthPoleLon and @p rotatedNorthPoleLat respectively.
+      The function returns true if gridMappingVar is a rotated_lon_lat variable
+      and it is able to get the coordinates.
+      */
+    static bool getRotatedNorthPoleCoordinates(const NcVar& gridMappingVar,
+                                               float *rotatedNorthPoleLon,
+                                               float *rotatedNorthPoleLat);
 
 private:
     /**

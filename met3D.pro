@@ -126,7 +126,8 @@ HEADERS += \
     src/actors/transferfunctioneditor/transferfunctioneditor.h \
     src/actors/transferfunctioneditor/colour.h \
     src/actors/transferfunctioneditor/colourpicker.h \
-    src/actors/transferfunctioneditor/editortransferfunction.h
+    src/actors/transferfunctioneditor/editortransferfunction.h \
+    src/gxfw/rotatedgridsupportingactor.h
 
 SOURCES += \
     src/main.cpp \
@@ -220,7 +221,8 @@ SOURCES += \
     src/actors/transferfunctioneditor/transferfunctioneditor.cpp \
     src/actors/transferfunctioneditor/colourpicker.cpp \
     src/actors/transferfunctioneditor/colour.cpp \
-    src/actors/transferfunctioneditor/editortransferfunction.cpp
+    src/actors/transferfunctioneditor/editortransferfunction.cpp \
+    src/gxfw/rotatedgridsupportingactor.cpp
 
 FORMS += \
     src/mainwindow.ui \

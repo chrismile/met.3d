@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2015-2017 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -48,17 +49,24 @@ namespace Met3D
 *******************************************************************************/
 
 MGraticuleActor::MGraticuleActor()
-    : MActor(),
+    : MRotatedGridSupportingActor(),
       graticuleVertexBuffer(nullptr),
       numVerticesGraticule(0),
       coastlineVertexBuffer(nullptr),
       graticuleColour(QColor(Qt::black)),
       drawGraticule(true),
       drawCoastLines(true),
-      drawBorderLines(true)
+      drawBorderLines(true),
+      coastLinesCountIsValid(false),
+      borderLinesCountIsValid(false)
 {
     naturalEarthDataLoader = MSystemManagerAndControl::getInstance()
             ->getNaturalEarthDataLoader();
+
+    nLats.clear();
+    nLats.append(0);
+    nLons.clear();
+    nLons.append(0);
 
     // Create and initialise QtProperties for the GUI.
     // ===============================================
@@ -90,6 +98,8 @@ MGraticuleActor::MGraticuleActor()
                                           actorPropertiesSupGroup);
     properties->mBool()->setValue(drawBorderLinesProperty, drawGraticule);
 
+    actorPropertiesSupGroup->addSubProperty(rotatedGridPropertiesSubGroup);
+
     // Default vertical position is at 1050 hPa.
     setVerticalPosition(1049.);
 
@@ -108,6 +118,8 @@ MGraticuleActor::~MGraticuleActor()
 
 void MGraticuleActor::saveConfiguration(QSettings *settings)
 {
+    MRotatedGridSupportingActor::saveConfiguration(settings);
+
     settings->beginGroup(MGraticuleActor::getSettingsID());
 
     settings->setValue("bbox", properties->mRectF()->value(cornersProperty));
@@ -124,6 +136,8 @@ void MGraticuleActor::saveConfiguration(QSettings *settings)
 
 void MGraticuleActor::loadConfiguration(QSettings *settings)
 {
+    MRotatedGridSupportingActor::loadConfiguration(settings);
+
     settings->beginGroup(MGraticuleActor::getSettingsID());
 
     QRectF bbox = settings->value("bbox").toRectF();
@@ -229,6 +243,35 @@ void MGraticuleActor::onQtPropertyChanged(QtProperty *property)
         drawBorderLines = properties->mBool()->value(drawBorderLinesProperty);
         emitActorChangedSignal();
     }
+
+    else if (property == enableGridRotationProperty)
+    {
+        enableGridRotation =
+                properties->mBool()->value(enableGridRotationProperty);
+        if (suppressActorUpdates()) return;
+        generateGeometry();
+        emitActorChangedSignal();
+    }
+
+    else if (property == rotateBBoxProperty)
+    {
+        rotateBBox = properties->mBool()->value(rotateBBoxProperty);
+        if (suppressActorUpdates()) return;
+        generateGeometry();
+        emitActorChangedSignal();
+    }
+
+    else if (property == rotatedNorthPoleProperty)
+    {
+        rotatedNorthPole =
+                properties->mPointF()->value(rotatedNorthPoleProperty);
+        if (suppressActorUpdates()) return;
+        if (enableGridRotation)
+        {
+            generateGeometry();
+            emitActorChangedSignal();
+        }
+    }
 }
 
 
@@ -251,37 +294,82 @@ void MGraticuleActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); CHECK_GL_ERROR;
         glLineWidth(1); CHECK_GL_ERROR;
 
-        glDrawArrays(GL_LINES, 0, numVerticesGraticule); CHECK_GL_ERROR;
+        if (enableGridRotation)
+        {
+            int startIndex = 0;
+            if (rotateBBox)
+            {
+                // Start at index 1 since at index 0 the number of longitudes
+                // is stored to draw the longitudes.
+                for (int j = 1; j < nLons.size(); j++)
+                {
+                    glDrawArrays(GL_LINE_STRIP, startIndex, nLons.at(j)); CHECK_GL_ERROR;
+                    startIndex = startIndex + nLons.at(j);
+                }
+                // Use the number of longitudes stored at index 0 to draw the
+                // longitudes.
+                for (int i = 0; i < nLons.at(0); i++)
+                {
+                    glDrawArrays(GL_LINE_STRIP, startIndex, nLats.at(0)); CHECK_GL_ERROR;
+                    startIndex = startIndex + nLats.at(0);
+                }
+            }
+            else
+            {
+                for (int i = 0; i < nLats.size(); i++)
+                {
+                    glDrawArrays(GL_LINE_STRIP, startIndex, nLats.at(i)); CHECK_GL_ERROR;
+                    startIndex = startIndex + nLats.at(i);
+                }
+                for (int i = 0; i < nLons.size(); i++)
+                {
+                    glDrawArrays(GL_LINE_STRIP, startIndex, nLons.at(i)); CHECK_GL_ERROR;
+                    startIndex = startIndex + nLons.at(i);
+                }
+            }
+        }
+        else
+        {
+            glDrawArrays(GL_LINES, 0, numVerticesGraticule); CHECK_GL_ERROR;
+        }
     }
 
     if (drawCoastLines)
     {
-        // Draw coastlines.
-        coastlineVertexBuffer->attachToVertexAttribute(SHADER_VERTEX_ATTRIBUTE);
-        CHECK_GL_ERROR;
+        if (coastLinesCountIsValid)
+        {
+            // Draw coastlines.
+            coastlineVertexBuffer->attachToVertexAttribute(
+                        SHADER_VERTEX_ATTRIBUTE);
+            CHECK_GL_ERROR;
 
-        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); CHECK_GL_ERROR;
-        glLineWidth(2); CHECK_GL_ERROR;
+            glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); CHECK_GL_ERROR;
+            glLineWidth(2); CHECK_GL_ERROR;
 
-        glMultiDrawArrays(GL_LINE_STRIP,
-                          coastlineStartIndices.constData(),
-                          coastlineVertexCount.constData(),
-                          coastlineStartIndices.size()); CHECK_GL_ERROR;
+            glMultiDrawArrays(GL_LINE_STRIP,
+                              coastlineStartIndices.constData(),
+                              coastlineVertexCount.constData(),
+                              coastlineStartIndices.size()); CHECK_GL_ERROR;
+        }
     }
 
     if (drawBorderLines)
     {
-        // Draw borderlines.
-        borderlineVertexBuffer->attachToVertexAttribute(SHADER_VERTEX_ATTRIBUTE);
-        CHECK_GL_ERROR;
+        if (borderLinesCountIsValid)
+        {
+            // Draw borderlines.
+            borderlineVertexBuffer->attachToVertexAttribute(
+                        SHADER_VERTEX_ATTRIBUTE);
+            CHECK_GL_ERROR;
 
-        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); CHECK_GL_ERROR;
-        glLineWidth(1); CHECK_GL_ERROR;
+            glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); CHECK_GL_ERROR;
+            glLineWidth(1); CHECK_GL_ERROR;
 
-        glMultiDrawArrays(GL_LINE_STRIP,
-                          borderlineStartIndices.constData(),
-                          borderlineVertexCount.constData(),
-                          borderlineStartIndices.size()); CHECK_GL_ERROR;
+            glMultiDrawArrays(GL_LINE_STRIP,
+                              borderlineStartIndices.constData(),
+                              borderlineVertexCount.constData(),
+                              borderlineStartIndices.size()); CHECK_GL_ERROR;
+        }
     }
 
     glBindBuffer(GL_ARRAY_BUFFER, 0); CHECK_GL_ERROR;
@@ -345,52 +433,416 @@ void MGraticuleActor::generateGeometry()
     // Append all graticule lines to this vector.
     QVector<QVector2D> verticesGraticule;
 
-    // Generate parallels (lines of constant latitude) and their correspondig
-    // labels. NOTE that parallels are started at the first latitude that is
-    // dividable by "deltalat". Thus, if llcrnrlat == 28.1 and deltalat == 5,
-    // parallels will be drawn at 30, 35, .. etc.
-    bool label = true;
-    float latstart = llcrnrlat - fmod(llcrnrlat, deltalat);
-    for (float lat = latstart; lat <= urcrnrlat; lat += deltalat)
+    if (!enableGridRotation)
     {
-        verticesGraticule.append(QVector2D(llcrnrlon, lat));
-        verticesGraticule.append(QVector2D(urcrnrlon, lat));
-
-        if (label)
+        // Generate parallels (lines of constant latitude) and their correspondig
+        // labels. NOTE that parallels are started at the first latitude that is
+        // dividable by "deltalat". Thus, if llcrnrlat == 28.1 and deltalat == 5,
+        // parallels will be drawn at 30, 35, .. etc.
+        bool label = true;
+        float latstart = llcrnrlat - fmod(llcrnrlat, deltalat);
+        for (float lat = latstart; lat <= urcrnrlat; lat += deltalat)
         {
-            labels.append(tm->addText(
-                              QString("%1").arg(lat),
-                              MTextManager::LONLATP,
-                              urcrnrlon, lat, verticalPosition_hPa,
-                              labelsize, labelColour, MTextManager::BASELINECENTRE,
-                              labelbbox, labelBBoxColour)
-                          );
-        }
-        label = !label; // alternate labelling of lines
-    }
+            verticesGraticule.append(QVector2D(llcrnrlon, lat));
+            verticesGraticule.append(QVector2D(urcrnrlon, lat));
 
-    // Generate meridians (lines of constant longitude) and labels. NOTE that
-    // meridians are also offset so that their position is dividable by
-    // deltalon (see above).
-    label = false;
-    float lonstart = llcrnrlon - fmod(llcrnrlon, deltalon);
-    for (float lon = lonstart; lon <= urcrnrlon; lon += deltalon)
+            if (label)
+            {
+                labels.append(tm->addText(
+                                  QString("%1").arg(lat),
+                                  MTextManager::LONLATP,
+                                  urcrnrlon, lat, verticalPosition_hPa,
+                                  labelsize, labelColour, MTextManager::BASELINECENTRE,
+                                  labelbbox, labelBBoxColour)
+                              );
+            }
+            label = !label; // alternate labelling of lines
+        }
+
+        // Generate meridians (lines of constant longitude) and labels. NOTE that
+        // meridians are also offset so that their position is dividable by
+        // deltalon (see above).
+        float lonstart = llcrnrlon - fmod(llcrnrlon, deltalon);
+        label = false;
+        for (float lon = lonstart; lon <= urcrnrlon; lon += deltalon)
+        {
+            verticesGraticule.append(QVector2D(lon, llcrnrlat));
+            verticesGraticule.append(QVector2D(lon, urcrnrlat));
+
+            if (label)
+            {
+                labels.append(tm->addText(
+                                  QString("%1").arg(lon),
+                                  MTextManager::LONLATP,
+                                  lon, llcrnrlat, verticalPosition_hPa,
+                                  labelsize, labelColour, MTextManager::BASELINECENTRE,
+                                  labelbbox, labelBBoxColour)
+                              );
+            }
+            label = !label;
+        }
+    } // if !useRotation
+    else
     {
-        verticesGraticule.append(QVector2D(lon, llcrnrlat));
-        verticesGraticule.append(QVector2D(lon, urcrnrlat));
+        OGRPoint *point = new OGRPoint();
+        nLons.clear();
+        nLats.clear();
 
-        if (label)
+        // Variables used to get rid of lines crossing the whole domain.
+        // (Conntection of the right most and the left most vertex)
+        QVector2D prevPosition(0., 0.);
+        QVector2D currPosition(0., 0.);
+        QVector2D centreLons(0., 0.);
+
+        MNaturalEarthDataLoader::getCentreLons(
+                    &centreLons, rotatedNorthPole.y(), rotatedNorthPole.x());
+
+        bool label = true;
+        // Rotate graticule and bounding box.
+        if (rotateBBox)
         {
-            labels.append(tm->addText(
-                              QString("%1").arg(lon),
-                              MTextManager::LONLATP,
-                              lon, llcrnrlat, verticalPosition_hPa,
-                              labelsize, labelColour, MTextManager::BASELINECENTRE,
-                              labelbbox, labelBBoxColour)
-                          );
-        }
-        label = !label;
-    }
+            float latstart = llcrnrlat - fmod(llcrnrlat, deltalat);
+            float lonstart = llcrnrlon - fmod(llcrnrlon, deltalon);
+
+            int numlons = floor((urcrnrlon - lonstart) / deltalon) + 1;
+            int numlats = floor((urcrnrlat - latstart) / deltalat) + 1;
+            int countLons = 0;
+            int i = 0;
+            int j = 0;
+            // Store number of longitudes at first position of nLons for later
+            // use to draw correct amout of longitudes.
+            nLons.append(numlons);
+            nLats.append(numlats);
+            int verticesCount = numlons * numlats;
+            verticesGraticule.resize(verticesCount * 2);
+            bool lonLabel = false;
+
+            for (float lat = latstart; lat <= urcrnrlat; lat += deltalat)
+            {
+                // Initialise previous longitudes with first longitude to avoid
+                // discarding it.
+                point->setX(lonstart);
+                point->setY(lat);
+                MNaturalEarthDataLoader::geographicalToRotatedCoords(
+                            point, rotatedNorthPole.y(), rotatedNorthPole.x());
+                for (float lon = lonstart; lon <= urcrnrlon; lon += deltalon)
+                {
+                    point->setX(lon);
+                    point->setY(lat);
+                    if (!MNaturalEarthDataLoader::validConnectionBetweenPositions(
+                                &prevPosition, &currPosition, point,
+                                rotatedNorthPole.y(), rotatedNorthPole.x(),
+                                &centreLons))
+                    {
+                        // Start new line.
+                        nLons.append(countLons);
+                        countLons = 0;
+                    }
+
+                    i = (lat - latstart) / deltalat;
+                    j = (lon - lonstart) / deltalon;
+                    verticesGraticule.replace(i * numlons + j, currPosition);
+                    verticesGraticule.replace(
+                                verticesCount + j * numlats + i, currPosition);
+                    countLons++;
+                    // Add longitude label.
+                    if (lat == latstart && lonLabel)
+                    {
+                        point->setX(lon);
+                        point->setY(llcrnrlat);
+                        MNaturalEarthDataLoader::geographicalToRotatedCoords(
+                                    point, rotatedNorthPole.y(),
+                                    rotatedNorthPole.x());
+                        labels.append(tm->addText(
+                                          QString("%1").arg(lon),
+                                          MTextManager::LONLATP,
+                                          point->getX(), point->getY(),
+                                          verticalPosition_hPa, labelsize,
+                                          labelColour,
+                                          MTextManager::BASELINECENTRE,
+                                          labelbbox, labelBBoxColour)
+                                      );
+                    }
+                    lonLabel = !lonLabel; // alternate labelling of lines
+                }
+
+                nLons.append(countLons);
+                countLons = 0;
+
+                if (label)
+                {
+                    point->setX(urcrnrlon);
+                    point->setY(lat);
+                    MNaturalEarthDataLoader::geographicalToRotatedCoords(
+                                point, rotatedNorthPole.y(),
+                                rotatedNorthPole.x());
+                    labels.append(tm->addText(
+                                      QString("%1").arg(lat),
+                                      MTextManager::LONLATP,
+                                      point->getX(), point->getY(),
+                                      verticalPosition_hPa, labelsize,
+                                      labelColour, MTextManager::BASELINECENTRE,
+                                      labelbbox, labelBBoxColour)
+                                  );
+                }
+                label = !label; // alternate labelling of lines
+            } // for latitudes.
+        } // if rotateBBox
+        // Rotate graticule but not bounding box (represents rotated coordinates).
+        else
+        {
+            int numVertices = 0;
+
+            float lonStart = llcrnrlon;
+            float latStart = llcrnrlat;
+
+            // Get bounding box as polygon to compute intersection with the
+            // graticule.
+            OGRPolygon *bboxPolygon =
+                    MNaturalEarthDataLoader::getBBoxPolygon(&cornerRect);
+
+            // List storing seperated ling strings.
+            QList<OGRLineString*> lineStringList;
+            OGRLineString* lineString;
+
+            // Use the whole grid to make sure to not miss some grid cells.
+            for (float lat = -90.f; lat <= 90.f; lat += deltalat)
+            {
+                numVertices = 0;
+                lineStringList.append(new OGRLineString());
+                lineString = lineStringList.at(0);
+                // Intial setting of previous (rotated) longitude;
+                point->setX(-180.);
+                point->setY(lat);
+                MNaturalEarthDataLoader::geographicalToRotatedCoords(
+                            point, rotatedNorthPole.y(), rotatedNorthPole.x());
+                float lon;
+                // Use the whole grid to make sure to not miss some grid cells.
+                for (lon = -180.f; lon <= 180.f; lon += deltalon)
+                {
+                    point->setX(lon);
+                    point->setY(lat);
+                    if (!MNaturalEarthDataLoader::validConnectionBetweenPositions(
+                                &prevPosition, &currPosition, point,
+                                rotatedNorthPole.y(), rotatedNorthPole.x(),
+                                &centreLons))
+                    {
+                        // Start new line.
+                        lineStringList.append(new OGRLineString());
+                        lineString = lineStringList.last();
+                    }
+                    lineString->addPoint(currPosition.x(), currPosition.y());
+                }
+                // Add missing connection line for spacing between first and
+                // last lon smaller than deltalon.
+                if (lon > 180.f)
+                {
+                    point->setX(-180.f);
+                    point->setY(lat);
+                    if (!MNaturalEarthDataLoader::validConnectionBetweenPositions(
+                                &prevPosition, &currPosition, point,
+                                rotatedNorthPole.y(), rotatedNorthPole.x(),
+                                &centreLons))
+                    {
+                        // Start new line.
+                        lineStringList.append(new OGRLineString());
+                        lineString = lineStringList.last();
+                    }
+                    lineString->addPoint(currPosition.x(), currPosition.y());
+                }
+
+                foreach (lineString, lineStringList)
+                {
+                    // Only use valid lines with more than one vertex.
+                    if (lineString->getNumPoints() <= 1)
+                    {
+                        numVertices = 0;
+                        delete lineString;
+                        continue;
+                    }
+
+                    // Compute intersection with bbox.
+                    OGRGeometry *iGeometry =
+                            lineString->Intersection(bboxPolygon);
+
+                    // The intersection can be either a single line string, or a
+                    // collection of line strings.
+
+                    if (iGeometry->getGeometryType() == wkbLineString)
+                    {
+                        // Get all points from the intersected line string and
+                        // append them to the "vertices" vector.
+                        OGRLineString *iLine = (OGRLineString *) iGeometry;
+                        int numLinePoints = iLine->getNumPoints();
+                        OGRRawPoint *v = new OGRRawPoint[numLinePoints];
+                        iLine->getPoints(v);
+                        for (int i = 0; i < numLinePoints; i++)
+                        {
+                            verticesGraticule.append(QVector2D(v[i].x, v[i].y));
+                            numVertices++;
+                        }
+                        if (v[numLinePoints - 1].x < v[0].x)
+                        {
+                            lonStart = v[0].x;
+                            latStart = v[0].y;
+                        }
+                        else
+                        {
+                            lonStart = v[numLinePoints - 1].x;
+                            latStart = v[numLinePoints - 1].y;
+                        }
+                        delete[] v;
+                        nLats.append(numVertices);
+                        numVertices = 0;
+                    }
+
+                    else if (iGeometry->getGeometryType() == wkbMultiLineString)
+                    {
+                        // Loop over all line strings in the collection,
+                        // appending their points to "vertices" as above.
+                        OGRGeometryCollection *geomCollection =
+                                (OGRGeometryCollection *) iGeometry;
+
+                        for (int g = 0; g < geomCollection->getNumGeometries();
+                             g++)
+                        {
+                            OGRLineString *iLine = (OGRLineString *)
+                                    geomCollection->getGeometryRef(g);
+                            int numLinePoints = iLine->getNumPoints();
+                            OGRRawPoint *v = new OGRRawPoint[numLinePoints];
+                            iLine->getPoints(v);
+                            for (int i = 0; i < numLinePoints; i++)
+                            {
+                                verticesGraticule.append(QVector2D(v[i].x,
+                                                                   v[i].y));
+                                numVertices++;
+                            }
+                            if (lonStart < v[0].x)
+                            {
+                                lonStart = v[0].x;
+                                latStart = v[0].y;
+                            }
+                            if (lonStart < v[numLinePoints - 1].x)
+                            {
+                                lonStart = v[numLinePoints - 1].x;
+                                latStart = v[numLinePoints - 1].y;
+                            }
+                            delete[] v;
+                            // Restart after each line segment to avoid
+                            // connections between line segements seperated by
+                            // intersection with bounding box.
+                            nLats.append(numVertices);
+                            numVertices = 0;
+                        }
+                    }
+                    numVertices = 0;
+                    delete lineString;
+                }
+
+                lineStringList.clear();
+
+                if (label && llcrnrlat < latStart && latStart < urcrnrlat)
+                {
+                    labels.append(tm->addText(
+                                      QString("%1").arg(lat),
+                                      MTextManager::LONLATP, lonStart, latStart,
+                                      verticalPosition_hPa, labelsize,
+                                      labelColour, MTextManager::BASELINECENTRE,
+                                      labelbbox, labelBBoxColour)
+                                  );
+                }
+                label = !label; // alternate labelling of lines
+                latStart = llcrnrlat;
+                lonStart = llcrnrlon;
+            } // for latitudes.
+
+            label = false;
+            for (float lon = -180.f; lon <= 180.f; lon += deltalon)
+            {
+                lineString = new OGRLineString();
+                // Allways use the whole grid to make sure to not miss some grid
+                // cells.
+                for (float lat = -90.f; lat <= 90.f; lat += deltalat)
+                {
+                    point->setX(lon);
+                    point->setY(lat);
+                    MNaturalEarthDataLoader::geographicalToRotatedCoords(
+                                point, rotatedNorthPole.y(),
+                                rotatedNorthPole.x());
+                    lineString->addPoint(point->getX(), point->getY());
+                }
+
+                // Compute intersection with bbox.
+                OGRGeometry *iGeometry = lineString->Intersection(bboxPolygon);
+
+                // The intersection can be either a single line string, or a
+                // collection of line strings.
+
+                if (iGeometry->getGeometryType() == wkbLineString)
+                {
+                    // Get all points from the intersected line string and
+                    // append them to the "vertices" vector.
+                    OGRLineString *iLine = (OGRLineString *) iGeometry;
+                    int numLinePoints = iLine->getNumPoints();
+                    OGRRawPoint *v = new OGRRawPoint[numLinePoints];
+                    iLine->getPoints(v);
+                    lonStart = v[0].x;
+                    latStart = v[0].y;
+                    for (int i = 0; i < numLinePoints; i++)
+                    {
+                        verticesGraticule.append(QVector2D(v[i].x, v[i].y));
+                        numVertices++;
+                    }
+                    delete[] v;
+                    nLons.append(numVertices);
+                    numVertices = 0;
+                }
+
+                else if (iGeometry->getGeometryType() == wkbMultiLineString)
+                {
+                    // Loop over all line strings in the collection, appending
+                    // their points to "vertices" as above.
+                    OGRGeometryCollection *geomCollection =
+                            (OGRGeometryCollection *) iGeometry;
+
+                    for (int g = 0; g < geomCollection->getNumGeometries(); g++)
+                    {
+                        OGRLineString *iLine = (OGRLineString *) geomCollection
+                                ->getGeometryRef(g);
+                        int numLinePoints = iLine->getNumPoints();
+                        OGRRawPoint *v = new OGRRawPoint[numLinePoints];
+                        iLine->getPoints(v);
+                        lonStart = v[0].x;
+                        latStart = v[0].y;
+                        for (int i = 0; i < numLinePoints; i++)
+                        {
+                            verticesGraticule.append(QVector2D(v[i].x, v[i].y));
+                            numVertices++;
+                        }
+                        nLons.append(numVertices);
+                        numVertices = 0;
+                        delete[] v;
+                    }
+                }
+                delete lineString;
+
+                if (label && llcrnrlon < lonStart && lonStart < urcrnrlon)
+                {
+                    labels.append(tm->addText(
+                                      QString("%1").arg(lon),
+                                      MTextManager::LONLATP, lonStart, latStart,
+                                      verticalPosition_hPa, labelsize,
+                                      labelColour, MTextManager::BASELINECENTRE,
+                                      labelbbox, labelBBoxColour)
+                                  );
+                }
+                label = !label;
+                lonStart = llcrnrlon;
+            } // for longitudes.
+        } // else rotateBBox
+        // Clean up.
+        delete point;
+    } // else !useRotation
 
     // generate data item key for every vertex buffer object wrt the actor
     const QString graticuleRequestKey = QString("graticule_vertices_actor#")
@@ -404,13 +856,41 @@ void MGraticuleActor::generateGeometry()
 
     // Load coastlines and upload the vertices to a GPU vertex buffer as well.
     QVector<QVector2D> verticesCoastlines;
-    naturalEarthDataLoader->loadLineGeometry(
-                MNaturalEarthDataLoader::COASTLINES,
-                cornerRect,
-                &verticesCoastlines,
-                &coastlineStartIndices,
-                &coastlineVertexCount,
-                false);  // clear vectors
+    if (enableGridRotation)
+    {
+        if (rotateBBox)
+        {
+            naturalEarthDataLoader->loadAndRotateLineGeometry(
+                        MNaturalEarthDataLoader::COASTLINES,
+                        cornerRect,
+                        &verticesCoastlines,
+                        &coastlineStartIndices,
+                        &coastlineVertexCount,
+                        false, rotatedNorthPole.y(),
+                        rotatedNorthPole.x());  // clear vectors
+        }
+        else
+        {
+            naturalEarthDataLoader->loadAndRotateLineGeometryUsingRotatedBBox(
+                        MNaturalEarthDataLoader::COASTLINES,
+                        cornerRect,
+                        &verticesCoastlines,
+                        &coastlineStartIndices,
+                        &coastlineVertexCount,
+                        false, rotatedNorthPole.y(),
+                        rotatedNorthPole.x());  // clear vectors
+        }
+    }
+    else
+    {
+        naturalEarthDataLoader->loadLineGeometry(
+                    MNaturalEarthDataLoader::COASTLINES,
+                    cornerRect,
+                    &verticesCoastlines,
+                    &coastlineStartIndices,
+                    &coastlineVertexCount,
+                    false);  // clear vectors
+    }
 
     const QString coastRequestKey = "graticule_coastlines_actor#"
                                     + QString::number(getID());
@@ -419,18 +899,71 @@ void MGraticuleActor::generateGeometry()
 
     // .. and borderlines.
     QVector<QVector2D> verticesBorderlines;
-    naturalEarthDataLoader->loadLineGeometry(
-                MNaturalEarthDataLoader::BORDERLINES,
-                cornerRect,
-                &verticesBorderlines,
-                &borderlineStartIndices,
-                &borderlineVertexCount,
-                false);  // clear vectors
+    if (enableGridRotation)
+    {
+        if (rotateBBox)
+        {
+        naturalEarthDataLoader->loadAndRotateLineGeometry(
+                    MNaturalEarthDataLoader::BORDERLINES,
+                    cornerRect,
+                    &verticesBorderlines,
+                    &borderlineStartIndices,
+                    &borderlineVertexCount,
+                    false, rotatedNorthPole.y(),
+                    rotatedNorthPole.x());  // clear vectors
+        }
+        else
+        {
+            naturalEarthDataLoader->loadAndRotateLineGeometryUsingRotatedBBox(
+                        MNaturalEarthDataLoader::BORDERLINES,
+                        cornerRect,
+                        &verticesBorderlines,
+                        &borderlineStartIndices,
+                        &borderlineVertexCount,
+                        false, rotatedNorthPole.y(),
+                        rotatedNorthPole.x());  // clear vectors
+        }
+    }
+    else
+    {
+        naturalEarthDataLoader->loadLineGeometry(
+                    MNaturalEarthDataLoader::BORDERLINES,
+                    cornerRect,
+                    &verticesBorderlines,
+                    &borderlineStartIndices,
+                    &borderlineVertexCount,
+                    false);  // clear vectors
+    }
+
 
     const QString borderRequestKey = "graticule_borderlines_actor#"
                                      + QString::number(getID());
     uploadVec2ToVertexBuffer(verticesBorderlines, borderRequestKey,
                              &borderlineVertexBuffer);
+
+    // Since a vertex count array filled with zeros leads to a program
+    // crash, check if the vertex counts of coast and border lines contain at
+    // least one valid values.
+
+    coastLinesCountIsValid = false;
+    foreach (int vertexCount, coastlineVertexCount)
+    {
+        if (vertexCount > 0)
+        {
+            coastLinesCountIsValid = true;
+            break;
+        }
+    }
+
+    borderLinesCountIsValid = false;
+    foreach (int vertexCount, borderlineVertexCount)
+    {
+        if (vertexCount > 0)
+        {
+            borderLinesCountIsValid = true;
+            break;
+        }
+    }
 }
 
 } // namespace Met3D

@@ -192,6 +192,8 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
         bool enableRegridding = config.value("enableRegridding", false).toBool();
         bool enableProbRegionFilter = config.value("enableProbabilityRegionFilter",
                                                    false).toBool();
+        bool treatRotatedGridAsRegularGrid =
+                config.value("treatRotatedGridAsRegularGrid", false).toBool();
 
 //TODO (mr, 16Dec2015) -- compatibility code; remove in Met.3D version 2.0
         // If no fileFilter is specified but a domainID is specified use
@@ -213,6 +215,8 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
                         << (enableRegridding ? "enabled" : "disabled"));
         LOG4CPLUS_DEBUG(mlog, "  probability region="
                         << (enableProbRegionFilter ? "enabled" : "disabled"));
+        LOG4CPLUS_DEBUG(mlog, "  treat rotated grid as regular grid="
+                        << (treatRotatedGridAsRegularGrid ? "enabled" : "disabled"));
 
         MNWPReaderFileFormat fileFormat = INVALID_FORMAT;
         if (fileFormatStr == "CF_NETCDF") fileFormat = CF_NETCDF;
@@ -235,7 +239,7 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
         initializeNWPPipeline(
                     name, path, fileFilter, schedulerID,
                     memoryManagerID, fileFormat, enableRegridding,
-                    enableProbRegionFilter);
+                    enableProbRegionFilter, treatRotatedGridAsRegularGrid);
     }
 
     config.endArray();
@@ -298,7 +302,8 @@ void MPipelineConfiguration::initializeNWPPipeline(
         QString memoryManagerID,
         MNWPReaderFileFormat dataFormat,
         bool enableRegridding,
-        bool enableProbabiltyRegionFilter)
+        bool enableProbabiltyRegionFilter,
+        bool treatRotatedGridAsRegularGrid)
 {
     MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
     MAbstractScheduler* scheduler = sysMC->getScheduler(schedulerID);
@@ -314,7 +319,8 @@ void MPipelineConfiguration::initializeNWPPipeline(
     MWeatherPredictionReader *nwpReaderENS = nullptr;
     if (dataFormat == CF_NETCDF)
     {
-        nwpReaderENS = new MClimateForecastReader(dataSourceId);
+        nwpReaderENS = new MClimateForecastReader(dataSourceId,
+                                                  treatRotatedGridAsRegularGrid);
     }
     else if (dataFormat == ECMWF_GRIB)
     {
@@ -553,7 +559,8 @@ void MPipelineConfiguration::initializeDevelopmentDataPipeline()
                 "NWP",
                 CF_NETCDF,
                 false,
-                true);
+                true,
+                false);
 
     initializeNWPPipeline(
                 "ECMWF ENS EUR_LL10",
@@ -563,7 +570,8 @@ void MPipelineConfiguration::initializeDevelopmentDataPipeline()
                 "NWP",
                 CF_NETCDF,
                 false,
-                true);
+                true,
+                false);
 
     sysMC->registerMemoryManager("Trajectories DF-T psfc_1000hPa_L62",
                new MLRUMemoryManager("Trajectories DF-T psfc_1000hPa_L62",

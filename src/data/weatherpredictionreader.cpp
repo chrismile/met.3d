@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2015-2017 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -76,6 +77,14 @@ MStructuredGrid* MWeatherPredictionReader::produceData(MDataRequest request)
 
     MStructuredGrid* result = readGrid(levtype, variable, initTime,
                                        validTime, member);
+
+    result->setHorizontalGridType(variableHorizontalGridType(levtype, variable));
+
+    if (result->getHorizontalGridType() == ROTATED_LONLAT)
+    {
+        result->setRotatedNorthPoleCoordinates(
+                    variableRotatedNorthPoleCoordinates(levtype, variable));
+    }
 
     if (levtype == HYBRID_SIGMA_PRESSURE_3D)
     {
