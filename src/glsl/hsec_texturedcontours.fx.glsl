@@ -71,11 +71,6 @@ uniform vec2      bboxLons;          // western and eastern lon of the bbox
 uniform float     scalarMinimum;    // min/max data values to scale to 0..1
 uniform float     scalarMaximum;
 
-uniform int alphaBlendingMode;
-uniform bool invertAlpha;
-uniform bool useConstantColour;
-uniform vec4 constantColour;
-
 shader VSmain(out VStoFS output)
 {
     // Compute grid indices (i, j) of the this vertex from vertex and instance
@@ -130,8 +125,16 @@ uniform int numLevels;              // Amount of textures loaded.
 
 uniform float     scaleWidth;       // Scale in longitudes to scale texture with.
 uniform float     aspectRatio;      // Aspect ratio of given textures.
+uniform float     gridAspectRatio;  // Aspect ratio of given grid.
 
 uniform float height;               // Height of horizontal cross-section.
+
+uniform int alphaBlendingMode;      // Defines which channel to use as alpha.
+uniform bool invertAlpha;           // Flag whether to invert alpha value.
+uniform bool useConstantColour;     // Flag whether to use a constant instead of
+                                    // the texture given colour.
+uniform vec4 constantColour;        // Constant colour to use instead of the
+                                    // texture given if wished by the user.
 
 shader FSmain(in VStoFS input, out vec4 fragColour)
 {
@@ -146,7 +149,7 @@ shader FSmain(in VStoFS input, out vec4 fragColour)
     }
 
     // Scale of texture with respect to one grid cell.
-    vec2 scale = vec2(scaleWidth, scaleWidth * aspectRatio);
+    vec2 scale = vec2(scaleWidth, scaleWidth * aspectRatio * gridAspectRatio);
 
     // Scalar value mapped to range: [0, max-min].
     float scalar = input.scalar - scalarMinimum;

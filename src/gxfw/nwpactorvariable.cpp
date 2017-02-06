@@ -2411,7 +2411,7 @@ MNWP2DHorizontalActorVariable::MNWP2DHorizontalActorVariable(
     }
 
     spatialTransferFunctionProperty = a->addProperty(ENUM_PROPERTY,
-                                                     "spatial transfer function",
+                                                     "textured transfer function",
                                                      renderGroup);
     properties->mEnum()->setEnumNames(spatialTransferFunctionProperty,
                                       availableSTFs);

@@ -62,6 +62,7 @@ MSpatial1DTransferFunction::MSpatial1DTransferFunction()
       invertAlpha(false),
       useConstantColour(false),
       constantColour(QColor(0, 0, 0, 255)),
+      useWhiteBgForBar(false),
       textureScale(1.0),
       currentTextureWidth(0),
       currentTextureHeight(0)
@@ -81,10 +82,12 @@ MSpatial1DTransferFunction::MSpatial1DTransferFunction()
     maxNumTicksProperty = addProperty(INT_PROPERTY, "num. ticks",
                                       labelPropertiesSupGroup);
     properties->mInt()->setValue(maxNumTicksProperty, 11);
+    properties->mInt()->setMinimum(maxNumTicksProperty, 0);
 
     maxNumLabelsProperty = addProperty(INT_PROPERTY, "num. labels",
                                        labelPropertiesSupGroup);
     properties->mInt()->setValue(maxNumLabelsProperty, 6);
+    properties->mInt()->setMinimum(maxNumLabelsProperty, 0);
 
     tickWidthProperty = addProperty(DOUBLE_PROPERTY, "tick length",
                                     labelPropertiesSupGroup);
@@ -170,6 +173,11 @@ MSpatial1DTransferFunction::MSpatial1DTransferFunction()
     constantColourProperty = addProperty(COLOR_PROPERTY, "constant colour",
                                         alphaBlendingPropertiesSubGroup);
     properties->mColor()->setValue(constantColourProperty, constantColour);
+
+    useWhiteBgForBarProperty = addProperty(BOOL_PROPERTY,
+                                           "use white background for bar",
+                                           alphaBlendingPropertiesSubGroup);
+    properties->mBool()->setValue(useWhiteBgForBarProperty, useWhiteBgForBar);
 
 
     // General properties.
@@ -665,6 +673,15 @@ void MSpatial1DTransferFunction::onQtPropertyChanged(QtProperty *property)
         emitActorChangedSignal();
     }
 
+    else if (property == useWhiteBgForBarProperty)
+    {
+        useWhiteBgForBar = properties->mBool()->value(useWhiteBgForBarProperty);
+
+        if (suppressActorUpdates()) return;
+
+        emitActorChangedSignal();
+    }
+
     else if (property == textureScaleDecimalsProperty)
     {
         int decimals = properties->mInt()->value(textureScaleDecimalsProperty);
@@ -739,6 +756,8 @@ void MSpatial1DTransferFunction::renderToCurrentContext(
         colourbarShader->setUniformValue("useConstantColour",
                                          GLboolean(useConstantColour));
         colourbarShader->setUniformValue("constantColour", constantColour);
+        colourbarShader->setUniformValue("useWhiteBgForBar",
+                                         GLboolean(useWhiteBgForBar));
 
         colourbarShader->setUniformValue("spatialTransferTexture", textureUnit);CHECK_GL_ERROR;
 

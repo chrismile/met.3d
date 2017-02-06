@@ -216,10 +216,12 @@ private:
     QtProperty *invertAlphaProperty;
     QtProperty *useConstantColourProperty;
     QtProperty *constantColourProperty;
+    QtProperty *useWhiteBgForBarProperty;
     AlphaBlendingMode alphaBlendingMode;
     bool invertAlpha;
     bool useConstantColour;
     QColor constantColour;
+    bool useWhiteBgForBar;
 
     // Properties related to texture scale.
     QtProperty *textureScalePropertiesSubGroup;

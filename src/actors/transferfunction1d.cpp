@@ -66,10 +66,12 @@ MTransferFunction1D::MTransferFunction1D()
     maxNumTicksProperty = addProperty(INT_PROPERTY, "num. ticks",
                                       labelPropertiesSupGroup);
     properties->mInt()->setValue(maxNumTicksProperty, 11);
+    properties->mInt()->setMinimum(maxNumTicksProperty, 0);
 
     maxNumLabelsProperty = addProperty(INT_PROPERTY, "num. labels",
                                        labelPropertiesSupGroup);
     properties->mInt()->setValue(maxNumLabelsProperty, 6);
+    properties->mInt()->setMinimum(maxNumLabelsProperty, 0);
 
     tickWidthProperty = addProperty(DOUBLE_PROPERTY, "tick length",
                                     labelPropertiesSupGroup);

@@ -1649,6 +1649,10 @@ void MNWPHorizontalSectionActor::renderTexturedContours(
                 GLfloat(var->spatialTransferFunction->getTextureAspectRatio()));
 
     glTexturedContoursShader->setUniformValue(
+                "gridAspectRatio",
+                GLfloat(var->grid->getDeltaLon() / var->grid->getDeltaLat()));
+
+    glTexturedContoursShader->setUniformValue(
                 "worldZ", GLfloat(sceneView->worldZfromPressure(
                                       slicePosition_hPa))); CHECK_GL_ERROR;
 
