@@ -474,7 +474,11 @@ void MSpatial1DTransferFunction::onQtPropertyChanged(QtProperty *property)
         QFileDialog dialog(nullptr);
         dialog.setFileMode(QFileDialog::ExistingFiles);
         dialog.setNameFilter(tr("Image Files (*.gif *.png *.jpg *.jpeg)"));
-        dialog.setDirectory(pathsToLoadedImages.at(0));
+        // Only set directory to stored path if there exists a path to set to.
+        if (!pathsToLoadedImages.empty())
+        {
+            dialog.setDirectory(pathsToLoadedImages.at(0));
+        }
         QStringList fileNames;
         if (dialog.exec())
         {
