@@ -30,6 +30,7 @@
 // related third party imports
 
 // local application imports
+#include "util/mutil.h"
 
 
 namespace Met3D
@@ -144,7 +145,15 @@ void MCamera::saveToFile(QString filename)
 {
     if (filename.isEmpty()) return;
 
+    // Overwrite if the file exists.
+    if (QFile::exists(filename)) QFile::remove(filename);
+
     QSettings settings(filename, QSettings::IniFormat);
+
+    settings.beginGroup("FileFormat");
+    // Save version id of Met.3D.
+    settings.setValue("met3dVersion", met3dVersionString);
+    settings.endGroup();
 
     settings.beginGroup("MCamera");
     settings.setValue("origin_lon", origin.x());
