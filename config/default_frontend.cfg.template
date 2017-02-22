@@ -5,9 +5,10 @@
 size=1
 
 1\name=Synchronization
+# Configure to which data sources should be used to restrict selectable init 
+# times, valid times and members of this sync to. For using more than one data 
+# source seperate their names with '/'.
 1\initialiseFromDatasource=ECMWF ENS EUR_LL10 ENSFilter
-1\initialiseFromLeveltype=HYBRID_SIGMA_PRESSURE_3D
-1\initialiseFromVariable=eastward_wind
 
 
 # Configure scene navigation.

@@ -43,6 +43,8 @@ class MSelectDataSourceDialog;
 namespace Met3D
 {
 
+class MWeatherPredictionDataSource;
+
 struct MSelectableDataSource
 {
     QString            dataSourceID;
@@ -53,8 +55,12 @@ struct MSelectableDataSource
 
 /**
   @brief MSelectDataSourceDialog implements a dialog from which the user can
-  select a data source and forecast variable to be added to an @ref
-  MNWPMultiVarActor.
+  select either a data source and forecast variable to be added to an @ref
+  MNWPMultiVarActor or data sources to restrict a synchronisation control to
+  their times and ensemble members.
+
+  Which dialog is created depends on the constructor used to construct the
+  dialog.
   */
 class MSelectDataSourceDialog : public QDialog
 {
@@ -63,10 +69,17 @@ class MSelectDataSourceDialog : public QDialog
 public:
     /**
       Constructs a new dialog. The dialog's data field table is filled with a
-      list of the data source registered with @ref MGLResourcesManager.
+      list of the data source registered with @ref MGLResourcesManager. This
+      constructor is used to call a dialog for selecting data sources.
       */
     explicit MSelectDataSourceDialog(QWidget *parent = 0);
 
+    /**
+      Constructs a new dialog. The dialog's data field table is filled with a
+      list of the variables of the data source registered with
+      @ref MGLResourcesManager. This constructor is used to call a dialog for
+      selecting variables.
+      */
     explicit MSelectDataSourceDialog(const QList<MVerticalLevelType>& supportedTypes,
                                      QWidget *parent = 0);
 
@@ -76,21 +89,58 @@ public:
 
     QList<MSelectableDataSource> getSelectedDataSources();
 
+    QString getSelectedDataSourceID();
+
+    QList<QString> getSelectedDataSourceIDs();
+
+    /**
+      Checks whether the @param source contains init times, valid times and
+      ensemble members informations.
+
+      Returns @return true if it contains all necessary data and @return false
+      if not.
+      Also used by @ref MSyncControl.
+      */
+    static bool checkDataSourceForData(MWeatherPredictionDataSource *source);
+
 public Q_SLOTS:
     /**
-      Reimplemented exec() to avoid execusion of dialog if no variables to
-      select are available.
+      @brief Reimplemented exec() to avoid execusion of dialog if no variables
+      or data sources respectively are available to select.
+
+      Prints warning corresponding to the selection dialog (variables or data
+      sources) executed.
       */
     int exec();
 
 private:
     Ui::MSelectDataSourceDialog *ui;
 
+    /**
+      Creates table entries for variable selection dialog restricted to
+      @param supportedTypes.
+      */
     void createDataSourceEntries(QList<MVerticalLevelType> supportedTypes);
+    /**
+      Creates table entries for data source selection dialog.
+      */
+    void createDataSourceEntries();
 
     MSelectableDataSource getDataSourceFromRow(int row);
+    QString getDataSourceIDFromRow(int row);
 
+    /**
+      Indicator variable used for variable selection dialog to decide if at
+      least one variable is available to select. It is set to true for data
+      source selection dialog.
+      */
     bool variableAvailable;
+    /**
+      Indicator variable used for  data source selection dialog to decide if at
+      least one data source is available to select. It is set to true for
+      variable selection dialog.
+      */
+    bool dataSourceAvailable;
 };
 
 } // namespace Met3D

@@ -61,11 +61,8 @@ protected:
      */
     void initializeFrontendFromConfigFile(const QString& filename);
 
-    void initializeSynchronization(
-            QString syncName,
-            QString initializeFromDataSource,
-            MVerticalLevelType initializeFromLevelType,
-            QString initializeFromVariable);
+    void initializeSynchronization(QString syncName,
+            QStringList initializeFromDataSources);
 
     void initializeDefaultActors_Basemap(
             const QString& mapfile,

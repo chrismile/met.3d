@@ -132,6 +132,39 @@ public slots:
     void timeBackward();
 
     /**
+      Opens dialog to select from which data sources to draw valid times,
+      init times and members to restrict control to.
+      */
+    void selectDataSources();
+
+    /**
+      @brief Checks @param selectedDataSources for consistency and prints error
+      messages if a given data source id has no corresponding data source or if
+      the data source does not contain any init times, valid times and ensemble
+      members.
+
+      If @selectedDataSources does not contain any, loadDataSourcesFromFrontend
+      tests all register data sources for data sources with init times, valid
+      times and ensemble members. If the method cannot find any suitable
+      data source it prints a error message and returns.
+      */
+    void restrictToDataSourcesFromFrontend(QStringList selectedDataSources);
+
+    /**
+      @brief Fetches init and valid times and members from the data sources
+      given by their IDs stored in @param selectedDataSources if present.
+
+      If @param selectedDataSources is empty, it is assumed to use all available
+      data sources. It is essential that if the data sources are given that they
+      are valid data sources containing init times, valid times and ensemble
+      members. But if loadDataSourcesTimesAndMembers uses all available data
+      sources, it checks whether they contain init times, valid times and
+      ensemble members and quits quietly if no suitable data source was found.
+     */
+    void retrictControlToDataSources(
+            QStringList selectedDataSources = QStringList());
+
+    /**
       Advance time (forward or backward, depending on settings) in animation
       mode (called by the animation timer).
       */
@@ -265,6 +298,15 @@ private:
     QSet<MSynchronizedObject*> synchronizedObjects;
     QSet<MSynchronizedObject*> pendingSynchronizations;
     QSet<MSynchronizedObject*> earlyCompletedSynchronizations;
+
+    // Properties to control configuration.
+    QMenu *configurationDropdownMenu;
+    QAction *selectDataSourcesAction;
+    QDateTime lastIinitTime;
+    QDateTime lastValidTime;
+    QList<QDateTime> availableInitTimes;
+    QList<QDateTime> availableValidTimes;
+    QSet<unsigned int> availableEnsembleMembers;
 
 #ifdef ENABLE_MET3D_STOPWATCH
     MStopwatch stopwatch;

@@ -36,6 +36,8 @@
 #include "util/mutil.h"
 #include "gxfw/msystemcontrol.h"
 #include "gxfw/msceneviewglwidget.h"
+#include "selectdatasourcedialog.h"
+#include "data/weatherpredictiondatasource.h"
 
 using namespace std;
 
@@ -79,6 +81,9 @@ MSyncControl::MSyncControl(QString id, QWidget *parent) :
     lastFocusWidget(nullptr),
     currentSyncType(SYNC_UNKNOWN)
 {
+    lastIinitTime = QDateTime();
+    lastValidTime = QDateTime();
+
     ui->setupUi(this);
 
     // Time control elements.
@@ -93,9 +98,21 @@ MSyncControl::MSyncControl(QString id, QWidget *parent) :
         timeStepIndexToSeconds[i] = timeStepsSeconds[i];
     ui->timeStepComboBox->setCurrentIndex(7); // pre-select 6hrs
 
-    // Initialise with 00 UTC of current date.
-    setInitDateTime(QDateTime(QDateTime::currentDateTimeUtc().date()));
-    setValidDateTime(QDateTime(QDateTime::currentDateTimeUtc().date()));
+    retrictControlToDataSources();
+
+    // Only initialise with initTime and validTime if they are set properly.
+    if (!lastIinitTime.isNull() && !lastValidTime.isNull())
+    {
+        // Initialise with minimum init and valid time.
+        setInitDateTime(lastIinitTime);
+        setValidDateTime(lastValidTime);
+    }
+    else
+    {
+        // Initialise with 00 UTC of current date.
+        setInitDateTime(QDateTime(QDateTime::currentDateTimeUtc().date()));
+        setValidDateTime(QDateTime(QDateTime::currentDateTimeUtc().date()));
+    }
     updateTimeDifference();
 
     connect(ui->validTimeEdit, SIGNAL(dateTimeChanged(QDateTime)),
@@ -235,17 +252,31 @@ MSyncControl::MSyncControl(QString id, QWidget *parent) :
     // Ensemble control elements.
     // =========================================================================
 
-//TODO (mr, 22Mar2016): Remove hardcoded limits -- MSynchronizedObject needs
-//                      to provide limits of valid/init time and ens members.
-    ui->ensembleMemberSpinBox->setMinimum(0);
-    ui->ensembleMemberSpinBox->setMaximum(50);
-
     connect(ui->showMeanCheckBox,
             SIGNAL(stateChanged(int)),
             SLOT(onEnsembleModeChange(int)));
-    connect(ui->ensembleMemberSpinBox,
-            SIGNAL(valueChanged(int)),
+    connect(ui->ensembleMemberComboBox,
+            SIGNAL(currentIndexChanged(int)),
             SLOT(onEnsembleModeChange(int)));
+
+
+    // Configuration control elements.
+    // =========================================================================
+
+    configurationDropdownMenu = new QMenu(this);
+
+    selectDataSourcesAction = new QAction(this);
+    selectDataSourcesAction->setText("data sources");
+    configurationDropdownMenu->addAction(selectDataSourcesAction);
+
+    ui->configurationButton->setMenu(configurationDropdownMenu);
+
+    connect(selectDataSourcesAction, SIGNAL(triggered()),
+            SLOT(selectDataSources()));
+    // Show menu also if the users clicks the button not only if only the arrow
+    // was clicked.
+    connect(ui->configurationButton, SIGNAL(clicked()),
+            ui->configurationButton, SLOT(showMenu()));
 }
 
 
@@ -298,7 +329,7 @@ int MSyncControl::ensembleMember() const
     if (ui->showMeanCheckBox->isChecked())
         return -1;
     else
-        return ui->ensembleMemberSpinBox->value();
+        return ui->ensembleMemberComboBox->currentText().toInt();
 }
 
 
@@ -344,16 +375,6 @@ void MSyncControl::synchronizationCompleted(MSynchronizedObject *object)
         // Last active QWdiget looses focus through disabling of sync frame
         // -- give it back.
         if (lastFocusWidget) lastFocusWidget->setFocus();
-        // For some reason this doesn't always work for the ensemble memnber
-        // spinbox.
-        if (currentSyncType == SYNC_ENSEMBLE_MEMBER)
-        {
-            ui->ensembleMemberSpinBox->setFocus();
-            // Also, force repaint of ensemble memnber spinbox; it doesn't
-            // always update in time (e.g., when the user holds an up/down
-            // key to animate over the ensemble members).
-            ui->ensembleMemberSpinBox->repaint();
-        }
 
         currentSyncType = SYNC_UNKNOWN;
 
@@ -455,6 +476,262 @@ void MSyncControl::timeBackward()
 }
 
 
+void MSyncControl::selectDataSources()
+{
+    // Ask the user for data sources to which times and ensemble members the
+    // sync control should be restricted to.
+    MSelectDataSourceDialog dialog(this);
+    if (dialog.exec() == QDialog::Rejected)
+    {
+        return;
+    }
+
+    QStringList selectedDataSources = dialog.getSelectedDataSourceIDs();
+
+    if (selectedDataSources.empty())
+    {
+        // The user has selected an emtpy set of data sources. Display a
+        // warning and do NOT accept the empty set.
+        QMessageBox msgBox;
+        msgBox.setIcon(QMessageBox::Warning);
+        msgBox.setText("You need to select at least one data source.");
+        msgBox.exec();
+        return;
+    }
+
+    retrictControlToDataSources(selectedDataSources);
+}
+
+
+void MSyncControl::restrictToDataSourcesFromFrontend(
+        QStringList selectedDataSources)
+{
+    QStringList suitableDataSources;
+    suitableDataSources.clear();
+
+    if (!selectedDataSources.empty())
+    {
+        MSystemManagerAndControl* sysMC = MSystemManagerAndControl::getInstance();
+
+        // Check if at least one data source is available with values to load.
+        foreach (QString dataSourceID, selectedDataSources)
+        {
+            MWeatherPredictionDataSource* source =
+                    dynamic_cast<MWeatherPredictionDataSource*>
+                    (sysMC->getDataSource(dataSourceID));
+            if (source == nullptr)
+            {
+                // The user has defined a dataSource in initialiseFromDatasource
+                // in frontend that does not exist. Print warning and continue
+                // with next data source.
+                QMessageBox msgBox;
+                msgBox.setIcon(QMessageBox::Warning);
+                msgBox.setText(dataSourceID + " does not exist!");
+                msgBox.exec();
+                continue;
+            }
+
+            // Only add data source to list of suitable data sources if it
+            // contains init times, valid times and ensemble member informations.
+            if (MSelectDataSourceDialog::checkDataSourceForData(source))
+            {
+                suitableDataSources.append(dataSourceID);
+            }
+        }
+
+        if (suitableDataSources.empty())
+        {
+            // None of the data sources defined in frontend contains init times,
+            // valid time and ensemble members.
+            QMessageBox msgBox;
+            msgBox.setIcon(QMessageBox::Warning);
+            msgBox.setText("No suitable data sources given in frontend."
+                           " Use data of all data sources given!");
+            msgBox.exec();
+
+            QStringList availableDataSources = sysMC->getDataSourceIdentifiers();
+
+            // Check for registered data source containing init times, valid
+            // times and ensemble members.
+            foreach (QString dataSourceID, availableDataSources)
+            {
+                MWeatherPredictionDataSource* source =
+                        dynamic_cast<MWeatherPredictionDataSource*>
+                        (sysMC->getDataSource(dataSourceID));
+                // Only add data source to list of suitable data sources if it
+                // contains init times, valid times and ensemble members
+                // informations.
+                if (MSelectDataSourceDialog::checkDataSourceForData(source))
+                {
+                    suitableDataSources.append(dataSourceID);
+                }
+            }
+
+            // None of the registered data sources contains times and ensemble
+            // members information. Inform user and return.
+            if (suitableDataSources.empty())
+            {
+                msgBox.setText("No suitable data sources available!");
+                msgBox.exec();
+                return;
+            }
+        }
+    }
+
+    // Use the suitable data sources set to setup the sync control.
+    retrictControlToDataSources(suitableDataSources);
+}
+
+
+void MSyncControl::retrictControlToDataSources(QStringList selectedDataSources)
+{
+
+    MSystemManagerAndControl* sysMC = MSystemManagerAndControl::getInstance();
+
+    // Use all data sources if no data sources are given.
+    if (selectedDataSources.empty())
+    {
+        QStringList availableDataSources = sysMC->getDataSourceIdentifiers();
+
+        // Check for each data sourcs if it is suitable to restrict control.
+        // Since in the list of all data sources might be data sources without
+        // time and member informations.
+        foreach (QString dataSourceID, availableDataSources)
+        {
+            MWeatherPredictionDataSource* source =
+                    dynamic_cast<MWeatherPredictionDataSource*>
+                    (sysMC->getDataSource(dataSourceID));
+            // Only add data source to list of suitable data sources if it
+            // contains init times, valid times and ensemble member
+            // informations.
+            if (MSelectDataSourceDialog::checkDataSourceForData(source))
+            {
+                selectedDataSources.append(dataSourceID);
+            }
+        }
+
+    }
+
+    // Return if no data sources are available.
+    if (selectedDataSources.empty())
+    {
+        return;
+    }
+
+    QStringList variables;
+    QList<QDateTime> currentInitTimes;
+    QList<QDateTime> currentValidTimes;
+    variables.clear();
+    currentInitTimes.clear();
+    currentValidTimes.clear();
+
+// TODO (bt, 23Feb2017): If updated to Qt 5.0 use QSets and unite instead of
+// lists and contains since for version 4.8 there is no qHash method for QDateTime
+// and thus it is not possible to use toSet on QList<QDateTime>.
+// (See: http://doc.qt.io/qt-5/qhash.html#qHashx)
+    availableInitTimes.clear();
+    availableValidTimes.clear();
+    availableEnsembleMembers.clear();
+
+    foreach (QString dataSourceID, selectedDataSources)
+    {
+        MWeatherPredictionDataSource* source =
+                dynamic_cast<MWeatherPredictionDataSource*>
+                (sysMC->getDataSource(dataSourceID));
+
+        QList<MVerticalLevelType> levelTypes = source->availableLevelTypes();
+        for (int ilvl = 0; ilvl < levelTypes.size(); ilvl++)
+        {
+            MVerticalLevelType levelType = levelTypes.at(ilvl);
+
+            QStringList variables = source->availableVariables(levelType);
+
+            for (int ivar = 0; ivar < variables.size(); ivar++)
+            {
+                QString var = variables.at(ivar);
+                currentInitTimes =
+                        source->availableInitTimes(levelType, var);
+                if (currentInitTimes.empty())
+                {
+                    continue;
+                }
+
+                for (int iInitTime = 0; iInitTime < currentInitTimes.size();
+                     iInitTime++)
+                {
+                    QDateTime initTime = currentInitTimes.at(iInitTime);
+                    if (!availableInitTimes.contains(initTime))
+                    {
+                        availableInitTimes.append(initTime);
+                    }
+                    currentValidTimes = source->availableValidTimes(levelType,
+                                                                    var,
+                                                                    initTime);
+                    if (currentValidTimes.empty())
+                    {
+                        continue;
+                    }
+
+                    for (int iValidTime = 0; iValidTime < currentValidTimes.size();
+                         iValidTime++)
+                    {
+                        QDateTime validTime = currentValidTimes[iValidTime];
+                        if (!availableValidTimes.contains(validTime))
+                        {
+                            availableValidTimes.append(validTime);
+                        }
+                    } // validTimes
+                } // initTimes
+                availableEnsembleMembers =
+                        availableEnsembleMembers.unite(
+                            source->availableEnsembleMembers(levelType, var));
+            } // variables
+        } // levelTypes
+    } // dataSources
+
+    // Search for minium and maximum date values to restrict the time edits to
+    // them respectively.
+    QDateTime minTime = availableInitTimes.first();
+    QDateTime maxTime = minTime;
+    foreach (QDateTime time, availableInitTimes)
+    {
+        minTime = min(time, minTime);
+        maxTime = max(time, maxTime);
+    }
+    ui->initTimeEdit->setDateRange(minTime.date(), maxTime.date());
+    // Set time range to full day since otherwise it is not possible to change
+    // the time properly for the first and last day of the range.
+    ui->initTimeEdit->setTimeRange(QTime(0,0,0), QTime(23,59,59));
+    lastIinitTime = minTime;
+    minTime = availableValidTimes.first();
+    maxTime = minTime;
+    foreach (QDateTime time, availableValidTimes)
+    {
+        minTime = min(time, minTime);
+        maxTime = max(time, maxTime);
+    }
+    ui->validTimeEdit->setDateRange(minTime.date(), maxTime.date());
+    // Set time range to full day since otherwise it is not possible to change
+    // the time properly for the first and last day of the range.
+    ui->validTimeEdit->setTimeRange(QTime(0,0,0), QTime(23,59,59));
+    lastValidTime = minTime;
+
+    QStringList memberList;
+    QList<unsigned int> intMemberList;
+    memberList.clear();
+    ui->ensembleMemberComboBox->clear();
+    // Get list of member to be able to sort them from smallest to greatest
+    // value.
+    intMemberList = availableEnsembleMembers.toList();
+    qSort(intMemberList);
+    foreach (unsigned int member, intMemberList)
+    {
+        memberList.append(QString("%1").arg(member));
+    }
+    ui->ensembleMemberComboBox->addItems(memberList);
+}
+
+
 void MSyncControl::timeAnimationAdvanceTimeStep()
 {
 #ifdef DIRECT_SYNCHRONIZATION
@@ -502,6 +779,24 @@ void MSyncControl::stopTimeAnimation()
 
 void MSyncControl::onValidDateTimeChange(const QDateTime &datetime)
 {
+    // Only restrict valid time to available valid if times they are set yet.
+    if (!lastValidTime.isNull() && !availableValidTimes.empty())
+    {
+        // Reseting to previous time - do nothing.
+        if (lastValidTime == datetime)
+        {
+            return;
+        }
+        // Check if selected time is part of available times. If not, reset to
+        // previous time.
+        if (!availableValidTimes.contains(datetime))
+        {
+            ui->validTimeEdit->setDateTime(lastValidTime);
+            return;
+        }
+
+        lastValidTime = datetime;
+    }
 #ifdef LOG_EVENT_TIMES
     LOG4CPLUS_DEBUG(mlog, "valid time change has been triggered at "
                     << MSystemManagerAndControl::getInstance()
@@ -530,6 +825,24 @@ void MSyncControl::onValidDateTimeChange(const QDateTime &datetime)
 
 void MSyncControl::onInitDateTimeChange(const QDateTime &datetime)
 {
+    // Only restrict init time to available init times if they are set yet.
+    if (!lastIinitTime.isNull() && !availableInitTimes.empty())
+    {
+        // Reseting to previous time - do nothing.
+        if (lastIinitTime == datetime)
+        {
+            return;
+        }
+        // Check if selected time is part of available times. If not, reset to
+        // previous time.
+        if (!availableInitTimes.contains(datetime))
+        {
+            ui->initTimeEdit->setDateTime(lastIinitTime);
+            return;
+        }
+
+        lastIinitTime = datetime;
+    }
 #ifdef DIRECT_SYNCHRONIZATION
     if (synchronizationInProgress) return;
     synchronizationInProgress = true;
@@ -558,15 +871,15 @@ void MSyncControl::onEnsembleModeChange(const int foo)
     if (ui->showMeanCheckBox->isChecked())
     {
         // Ensemble mean.
-        ui->ensembleMemberSpinBox->setEnabled(false);
+        ui->ensembleMemberComboBox->setEnabled(false);
         ui->ensembleMemberLabel->setEnabled(false);
     }
     else
     {
         // Change to specified ensemble member.
-        ui->ensembleMemberSpinBox->setEnabled(true);
+        ui->ensembleMemberComboBox->setEnabled(true);
         ui->ensembleMemberLabel->setEnabled(true);
-        member = ui->ensembleMemberSpinBox->value();
+        member = ui->ensembleMemberComboBox->currentText().toInt();
     }
 
 #ifdef DIRECT_SYNCHRONIZATION

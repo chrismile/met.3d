@@ -1819,7 +1819,7 @@ bool MNWPActorVariable::changeVariable()
 {
     // Open an MSelectDataSourceDialog and re-initialize the variable with
     // information returned from the dialog.
-    MSelectDataSourceDialog dialog;
+    MSelectDataSourceDialog dialog(actor->supportedLevelTypes());
 
     if (dialog.exec() == QDialog::Rejected) return false;
 
