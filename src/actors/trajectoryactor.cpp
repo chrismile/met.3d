@@ -129,7 +129,7 @@ MTrajectoryActor::MTrajectoryActor()
                                     actorPropertiesSupGroup);
     properties->setDDouble(deltaTimeProperty, 48, 1, 48, 0, 1, " hrs");
 
-    bboxProperty = addProperty(RECTF_PROPERTY, "bounding box",
+    bboxProperty = addProperty(RECTF_LONLAT_PROPERTY, "bounding box",
                                actorPropertiesSupGroup);
     properties->setRectF(bboxProperty, bbox, 2);
 

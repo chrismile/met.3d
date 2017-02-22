@@ -470,7 +470,10 @@ QtProperty* MActor::addProperty(
     case (ENUM_PROPERTY):
         manager = properties->mEnum();
         break;
-    case (RECTF_PROPERTY):
+    case (RECTF_LONLAT_PROPERTY):
+        manager = properties->mRectF();
+        break;
+    case (RECTF_CLIP_PROPERTY):
         manager = properties->mRectF();
         break;
     case (POINTF_PROPERTY):
@@ -505,6 +508,15 @@ QtProperty* MActor::addProperty(
     // If a property group has been specified place the new property into
     // this group.
     if (group != nullptr) group->addSubProperty(p);
+
+    // Change names of subProperties for RECTF_LONLAT_PROPERTY properties.
+    if (type == RECTF_LONLAT_PROPERTY)
+    {
+        p->subProperties().at(0)->setPropertyName("western longitude");
+        p->subProperties().at(1)->setPropertyName("southern latitude");
+        p->subProperties().at(2)->setPropertyName("east-west extend");
+        p->subProperties().at(3)->setPropertyName("north-south extend");
+    }
 
     return p;
 }

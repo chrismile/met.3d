@@ -116,7 +116,7 @@ MTransferFunction1D::MTransferFunction1D()
     // General properties.
     // ===================
 
-    positionProperty = addProperty(RECTF_PROPERTY, "position",
+    positionProperty = addProperty(RECTF_CLIP_PROPERTY, "position",
                                    actorPropertiesSupGroup);
     properties->setRectF(positionProperty, QRectF(0.9, 0.9, 0.05, 0.5), 2);
 
