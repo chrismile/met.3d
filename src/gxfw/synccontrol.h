@@ -48,8 +48,9 @@ enum MSynchronizationType
 {
     SYNC_INIT_TIME = 0,
     SYNC_VALID_TIME = 1,
-    SYNC_ENSEMBLE_MEMBER = 2,
-    SYNC_UNKNOWN = 3
+    SYNC_INIT_VALID_TIME = 2,
+    SYNC_ENSEMBLE_MEMBER = 3,
+    SYNC_UNKNOWN = 4
 };
 
 
@@ -260,6 +261,7 @@ private:
     QString syncID;
 
     bool synchronizationInProgress;
+    bool forwardBackwardButtonClicked;
     QWidget *lastFocusWidget;
     MSynchronizationType currentSyncType;
     QSet<MSynchronizedObject*> synchronizedObjects;
@@ -280,8 +282,14 @@ class MSynchronizedObject
 public:
     MSynchronizedObject() { }
 
+    /**
+       Handles synchronization event. The type of the synchronization event is
+       given by @param syncType while @param data stores the data for updating.
+       @param data is implemented as a vector to handle the simultanious
+       synchronization event of init(index 0) and valid(index 1) time.
+     */
     virtual bool synchronizationEvent(
-            MSynchronizationType syncType, QVariant data) = 0;
+            MSynchronizationType syncType, QVector<QVariant> data) = 0;
 };
 
 } // namespace Met3D

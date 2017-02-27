@@ -76,6 +76,7 @@ MSyncControl::MSyncControl(QString id, QWidget *parent) :
     ui(new Ui::MSyncControl),
     syncID(id),
     synchronizationInProgress(false),
+    forwardBackwardButtonClicked(false),
     lastFocusWidget(nullptr),
     currentSyncType(SYNC_UNKNOWN)
 {
@@ -389,7 +390,7 @@ void MSyncControl::timeForward()
 
         applyTimeStep(ui->validTimeEdit, 1);
     }
-    else
+    else if (ui->stepChooseVTITComboBox->currentIndex() == 1)
     {
         // Modify initialisation time.
 
@@ -406,6 +407,42 @@ void MSyncControl::timeForward()
                 return;
             }
 
+        applyTimeStep(ui->initTimeEdit, 1);
+    }
+    else
+    {
+        // Both valid and init time should be changed simultaniously.
+
+        if ( animationTimer->isActive() )
+        {
+            if (ui->validTimeEdit->dateTime() >= timeAnimationTo->dateTime() )
+            {
+                if ( timeAnimationLoopTimeAction->isChecked() )
+                    ui->validTimeEdit->setDateTime(timeAnimationFrom->dateTime());
+                else if ( timeAnimationBackForthTimeAction->isChecked() )
+                    timeAnimationReverseTimeDirectionAction->toggle();
+                else
+                    stopTimeAnimation();
+
+                return;
+            }
+
+            if (ui->initTimeEdit->dateTime() >= timeAnimationTo->dateTime() )
+            {
+                if ( timeAnimationLoopTimeAction->isChecked() )
+                    ui->initTimeEdit->setDateTime(timeAnimationFrom->dateTime());
+                else if ( timeAnimationBackForthTimeAction->isChecked() )
+                    timeAnimationReverseTimeDirectionAction->toggle();
+                else
+                    stopTimeAnimation();
+
+                return;
+            }
+        }
+
+        forwardBackwardButtonClicked = true;
+
+        applyTimeStep(ui->validTimeEdit, 1);
         applyTimeStep(ui->initTimeEdit, 1);
     }
 }
@@ -433,7 +470,7 @@ void MSyncControl::timeBackward()
 
         applyTimeStep(ui->validTimeEdit, -1);
     }
-    else
+    else if (ui->stepChooseVTITComboBox->currentIndex() == 1)
     {
         // Modify initialisation time.
 
@@ -450,6 +487,41 @@ void MSyncControl::timeBackward()
                 return;
             }
 
+        applyTimeStep(ui->initTimeEdit, -1);
+    }
+    else
+    {
+        // Both valid and init time should be changed simultaniously.
+
+        if ( animationTimer->isActive() )
+        {
+            if (ui->validTimeEdit->dateTime() <= timeAnimationTo->dateTime() )
+            {
+                if ( timeAnimationLoopTimeAction->isChecked() )
+                    ui->validTimeEdit->setDateTime(timeAnimationFrom->dateTime());
+                else if ( timeAnimationBackForthTimeAction->isChecked() )
+                    timeAnimationReverseTimeDirectionAction->toggle();
+                else
+                    stopTimeAnimation();
+
+                return;
+            }
+
+            if (ui->initTimeEdit->dateTime() <= timeAnimationTo->dateTime() )
+            {
+                if ( timeAnimationLoopTimeAction->isChecked() )
+                    ui->initTimeEdit->setDateTime(timeAnimationFrom->dateTime());
+                else if ( timeAnimationBackForthTimeAction->isChecked() )
+                    timeAnimationReverseTimeDirectionAction->toggle();
+                else
+                    stopTimeAnimation();
+
+                return;
+            }
+        }
+        forwardBackwardButtonClicked = true;
+
+        applyTimeStep(ui->validTimeEdit, -1);
         applyTimeStep(ui->initTimeEdit, -1);
     }
 }
@@ -517,8 +589,20 @@ void MSyncControl::onValidDateTimeChange(const QDateTime &datetime)
 //      or members. Is there a more immediate way than the current disabling
 //      to BLOCK the GUI elements?
     if (synchronizationInProgress) return;
-    synchronizationInProgress = true;
-    processSynchronizationEvent(SYNC_VALID_TIME, QVariant(datetime));
+
+    // Ignore updates on valid time if init and valid time are changed
+    // simultaniously, since synchronization of valid time is handled by process
+    // event of init time.
+    if ((ui->stepChooseVTITComboBox->currentIndex() == 2)
+            && (animationTimer->isActive() || forwardBackwardButtonClicked) )
+    {
+        return;
+    }
+    else
+    {
+        synchronizationInProgress = true;
+        processSynchronizationEvent(SYNC_VALID_TIME, QVariant(datetime));
+    }
 #else
     emit beginSynchronization();
     updateTimeDifference();
@@ -533,7 +617,21 @@ void MSyncControl::onInitDateTimeChange(const QDateTime &datetime)
 #ifdef DIRECT_SYNCHRONIZATION
     if (synchronizationInProgress) return;
     synchronizationInProgress = true;
-    processSynchronizationEvent(SYNC_INIT_TIME, QVariant(datetime));
+
+    // If init and valid time are changed simultaniously, handle synchronization
+    // of both in one event. Check for index of combo box is not enough, since
+    // the user is still able to change one time manually (without forward or
+    // backward button).
+    if ((ui->stepChooseVTITComboBox->currentIndex() == 2)
+            && (animationTimer->isActive() || forwardBackwardButtonClicked) )
+    {
+        forwardBackwardButtonClicked = false;
+        processSynchronizationEvent(SYNC_INIT_VALID_TIME, QVariant(datetime));
+    }
+    else
+    {
+        processSynchronizationEvent(SYNC_INIT_TIME, QVariant(datetime));
+    }
 #else
     emit beginSynchronization();
     updateTimeDifference();
@@ -667,16 +765,29 @@ void MSyncControl::processSynchronizationEvent(MSynchronizationType syncType,
     if ( !animationTimer->isActive() ) setSynchronizationGUIEnabled(false);
     beginSceneSynchronization();
 
-    if ( (syncType == SYNC_VALID_TIME) || (syncType == SYNC_INIT_TIME) )
+    if ( (syncType == SYNC_VALID_TIME) || (syncType == SYNC_INIT_TIME)
+         || (syncType == SYNC_INIT_VALID_TIME))
     {
         updateTimeDifference();
+    }
+
+    QVector<QVariant> syncVariantVector(0);
+
+    // Append current sync variant.
+    syncVariantVector.append(syncVariant);
+
+    // For simultanious init and valid time synchronisation append current valid
+    // time in addition.
+    if (syncType == SYNC_INIT_VALID_TIME)
+    {
+        syncVariantVector.append(QVariant(ui->validTimeEdit->dateTime()));
     }
 
     // Send sync info to each registered synchronized object. Collect those
     // objects that will process the sync request (they return true).
     foreach (MSynchronizedObject *syncObj, synchronizedObjects)
     {
-        if ( syncObj->synchronizationEvent(syncType, syncVariant) )
+        if ( syncObj->synchronizationEvent(syncType, syncVariantVector) )
         {
             pendingSynchronizations.insert(syncObj);
         }
