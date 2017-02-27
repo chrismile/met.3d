@@ -136,6 +136,11 @@ QList<QString> MSelectDataSourceDialog::getSelectedDataSourceIDs()
 bool MSelectDataSourceDialog::checkDataSourceForData(
         MWeatherPredictionDataSource *source)
 {
+    if (source == nullptr)
+    {
+        return false;
+    }
+
     QStringList variables;
     QList<QDateTime> currentInitTimes;
     QList<QDateTime> currentValidTimes;
@@ -171,10 +176,12 @@ bool MSelectDataSourceDialog::checkDataSourceForData(
                     continue;
                 }
             } // initTimes
+
             if (source->availableEnsembleMembers(levelType, var).size() == 0)
             {
                 continue;
             }
+
             return true;
         } // variables
     } // levelTypes

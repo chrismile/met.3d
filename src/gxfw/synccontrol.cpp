@@ -266,7 +266,8 @@ MSyncControl::MSyncControl(QString id, QWidget *parent) :
     configurationDropdownMenu = new QMenu(this);
 
     selectDataSourcesAction = new QAction(this);
-    selectDataSourcesAction->setText("data sources");
+    selectDataSourcesAction->setText(
+                "select data sources for allowed times and members");
     configurationDropdownMenu->addAction(selectDataSourcesAction);
 
     ui->configurationButton->setMenu(configurationDropdownMenu);

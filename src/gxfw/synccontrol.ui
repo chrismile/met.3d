@@ -132,7 +132,7 @@
           </property>
           <property name="dateTime">
            <datetime>
-            <hour>13</hour>
+            <hour>11</hour>
             <minute>0</minute>
             <second>0</second>
             <year>2011</year>
@@ -290,7 +290,7 @@
           </property>
           <property name="dateTime">
            <datetime>
-            <hour>13</hour>
+            <hour>11</hour>
             <minute>0</minute>
             <second>0</second>
             <year>2011</year>
@@ -307,12 +307,12 @@
           </property>
           <property name="minimumDateTime">
            <datetime>
-            <hour>0</hour>
+            <hour>23</hour>
             <minute>0</minute>
             <second>0</second>
             <year>1752</year>
             <month>9</month>
-            <day>14</day>
+            <day>13</day>
            </datetime>
           </property>
           <property name="displayFormat">
@@ -568,13 +568,13 @@
         <item>
          <widget class="QToolButton" name="configurationButton">
           <property name="sizePolicy">
-           <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
+           <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
             <horstretch>0</horstretch>
             <verstretch>0</verstretch>
            </sizepolicy>
           </property>
           <property name="text">
-           <string>config</string>
+           <string>cfg</string>
           </property>
           <property name="checkable">
            <bool>false</bool>
