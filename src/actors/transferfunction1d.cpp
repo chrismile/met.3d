@@ -111,7 +111,7 @@ MTransferFunction1D::MTransferFunction1D()
 
     numStepsProperty = addProperty(INT_PROPERTY, "steps",
                                    rangePropertiesSubGroup);
-    properties->setInt(numStepsProperty, 50, 0, 32768, 1);
+    properties->setInt(numStepsProperty, 50, 2, 32768, 1);
 
     // General properties.
     // ===================
@@ -1031,7 +1031,7 @@ void MTransferFunction1D::generateColourBarGeometry()
     // more than colour steps.
     int numSteps = properties->mInt()->value(numStepsProperty);
     int maxNumTicks = properties->mInt()->value(maxNumTicksProperty);
-    numTicks = min(numSteps+1, maxNumTicks);
+    numTicks = min(numSteps + 1, maxNumTicks);
 
     // This array accomodates the tickmark geometry.
     float tickmarks[6 * numTicks];
@@ -1040,13 +1040,26 @@ void MTransferFunction1D::generateColourBarGeometry()
     float tickwidth = properties->mDouble()->value(tickWidthProperty);
 
     int n = 0;
-    for (uint i = 0; i < numTicks; i++)
+    // Treat numTicks equals 1 as a special case to avoid divison by zero.
+    if (numTicks != 1)
+    {
+        for (uint i = 0; i < numTicks; i++)
+        {
+            tickmarks[n++] = ulcrnr[0];
+            tickmarks[n++] = ulcrnr[1] - i * (height / (numTicks - 1));
+            tickmarks[n++] = ulcrnr[2];
+            tickmarks[n++] = ulcrnr[0] - tickwidth;
+            tickmarks[n++] = ulcrnr[1] - i * (height / (numTicks - 1));
+            tickmarks[n++] = ulcrnr[2];
+        }
+    }
+    else
     {
         tickmarks[n++] = ulcrnr[0];
-        tickmarks[n++] = ulcrnr[1] - i * (height / (numTicks-1));
+        tickmarks[n++] = ulcrnr[1];
         tickmarks[n++] = ulcrnr[2];
         tickmarks[n++] = ulcrnr[0] - tickwidth;
-        tickmarks[n++] = ulcrnr[1] - i * (height / (numTicks-1));
+        tickmarks[n++] = ulcrnr[1];
         tickmarks[n++] = ulcrnr[2];
     }
 
@@ -1071,7 +1084,8 @@ void MTransferFunction1D::generateColourBarGeometry()
         buf->update(coordinates, 0, 0, sizeof(coordinates));
         buf->update(tickmarks, 0, sizeof(coordinates), sizeof(tickmarks));
 
-    } else
+    }
+    else
     {
         GL::MFloatVertexBuffer* newVB = nullptr;
         newVB = new GL::MFloatVertexBuffer(requestKey, 24 + numTicks * 6);
@@ -1081,7 +1095,11 @@ void MTransferFunction1D::generateColourBarGeometry()
             newVB->update(coordinates, 0, 0, sizeof(coordinates));
             newVB->update(tickmarks, 0, sizeof(coordinates), sizeof(tickmarks));
 
-        } else { delete newVB; }
+        }
+        else
+        {
+            delete newVB;
+        }
         vertexBuffer = static_cast<GL::MVertexBuffer*>(glRM->getGPUItem(requestKey));
     }
 
@@ -1100,14 +1118,23 @@ void MTransferFunction1D::generateColourBarGeometry()
     MTextManager* tm = glRM->getTextManager();
 
     // Remove all text labels of the old geometry.
-    while (!labels.isEmpty()) tm->removeText(labels.takeLast());
+    while (!labels.isEmpty())
+    {
+        tm->removeText(labels.takeLast());
+    }
+
+    // Draw no labels if either numTicks or maxNumLabels equal 0.
+    if (numTicks == 0 || maxNumLabels == 0)
+    {
+        return;
+    }
 
     // A maximum of maxNumLabels are placed. The approach taken here is to
     // compute a "tick step size" from the number of ticks drawn and the
     // maximum number of labels to be drawn. A label will then be placed
     // every tickStep-th tick. The formula tries to place a label at the
     // lower and upper end of the colourbar, if possible.
-    int tickStep = ceil(double(numTicks-1) / double(maxNumLabels-1));
+    int tickStep = ceil(double(numTicks - 1) / double(maxNumLabels - 1));
 
     // The (clip-space) distance between the ends of the tick marks and the
     // labels.
@@ -1128,15 +1155,34 @@ void MTransferFunction1D::generateColourBarGeometry()
     float scaleFactor = properties->mDouble()->value(scaleFactorProperty);
 
     // Register the labels with the text manager.
-    for (uint i = 0; i < numTicks; i += tickStep) {
-        float value = maximumValue - double(i) / double(numTicks-1)
-                * (maximumValue - minimumValue);
+    // Treat numTicks equals 1 as a special case to avoid divison by zero.
+    if (numTicks != 1)
+    {
+        for (uint i = 0; i < numTicks; i += tickStep)
+        {
+            float value = (maximumValue - double(i) / double(numTicks-1)
+                           * (maximumValue - minimumValue)) * scaleFactor;
+            labels.append(tm->addText(
+                              QString("%1").arg(value, 0, 'f', decimals),
+                              MTextManager::CLIPSPACE,
+                              tickmarks[6*i + 3] - labelSpacing,
+                              tickmarks[6*i + 4],
+                              tickmarks[6*i + 5],
+                              labelsize,
+                              labelColour, MTextManager::MIDDLERIGHT,
+                              labelbbox, labelBBoxColour)
+                          );
+        }
+    }
+    else
+    {
+        float value = maximumValue * scaleFactor;
         labels.append(tm->addText(
-                          QString("%1").arg(value*scaleFactor, 0, 'f', decimals),
+                          QString("%1").arg(value, 0, 'f', decimals),
                           MTextManager::CLIPSPACE,
-                          tickmarks[6*i + 3] - labelSpacing,
-                          tickmarks[6*i + 4],
-                          tickmarks[6*i + 5],
+                          tickmarks[3] - labelSpacing,
+                          tickmarks[4],
+                          tickmarks[5],
                           labelsize,
                           labelColour, MTextManager::MIDDLERIGHT,
                           labelbbox, labelBBoxColour)
