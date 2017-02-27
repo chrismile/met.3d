@@ -66,11 +66,11 @@ endif(UNIX)
 
 # Set flags if we use GNUCC
 if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall -pedantic")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall")
 # Or CLANG
 # TODO: clang command arguments slightly differ from GNUCC
 elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" OR USE_CLANG)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall -pedantic")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall")
 endif ()
 
 
@@ -260,7 +260,8 @@ target_link_libraries(Met3D
                         ${GSL_LIBRARIES}
                         ${log4cplus_LIBRARIES}
                         ${grib_api_LIBRARIES}
-                        ${netcdf_cxx4_LIBRARIES}
+                        ${netcdf_cxx4_LIBRARY}
+                        ${netcdf_cxx4_C_LIBRARY}
                         ${qcustomplot_LIBRARIES}
                         ${glfx_LIBRARIES}
                         #${EIGEN3_LIBRARIES}

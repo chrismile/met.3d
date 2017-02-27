@@ -25,7 +25,7 @@ endif (UNIX)
 
 find_path(${PKG_NAME}_INCLUDE_DIR
         NAMES # Name of all header files
-            netcdf.h
+            netcdf
         HINTS # Hints to the directory where the package is currently installed in
             $ENV{${PKG_NAME}_DIR}
             ${PKG_INCLUDE_DIRS}
@@ -69,20 +69,16 @@ find_file(${PKG_NAME}_PC_FILE
             $ENV{${PKG_NAME}_DIR}
             ${PKG_LIBRARY_DIRS}
         PATH_SUFFIXES
+            lib64/pkgconfig
             lib/pkgconfig
         PATHS
             ${COMMON_INSTALL_DIRS}
         )
 
-
-if (${PKG_NAME}_C_LIBRARY AND ${PKG_NAME}_LIBRARY)
-    set(${PKG_NAME}_LIBRARIES ${${PKG_NAME}_C_LIBRARY} ${${PKG_NAME}_LIBRARY})
-endif ()
-
 include(FindPackageHandleStandardArgs)
 # handle the QUIETLY and REQUIRED arguments and set ${PGK_NAME}_FOUND to TRUE if
 # all listed variables are TRUE
-find_package_handle_standard_args(${PKG_NAME} REQUIRED_VARS ${PKG_NAME}_LIBRARIES ${PKG_NAME}_INCLUDE_DIR)
+find_package_handle_standard_args(${PKG_NAME} REQUIRED_VARS ${PKG_NAME}_LIBRARY ${PKG_NAME}_C_LIBRARY ${PKG_NAME}_INCLUDE_DIR)
 
 # Parse .pc file to get used version of netcdf.
 pkg_check_modules(${PKG_NAME} REQUIRED ${${PKG_NAME}_PC_FILE})
@@ -93,4 +89,4 @@ list(GET ${PKG_NAME}_VERSION 1 ${PKG_NAME}_VERSION_MINOR)
 list(GET ${PKG_NAME}_VERSION 2 ${PKG_NAME}_VERSION_PATCH)
 
 # Marks cmake cached variables as advanced
-mark_as_advanced(${PKG_NAME}_INCLUDE_DIR ${PKG_NAME}_LIBRARIES)
+mark_as_advanced(${PKG_NAME}_INCLUDE_DIR ${PKG_NAME}_LIBRARY ${PKG_NAME}_C_LIBRARY)

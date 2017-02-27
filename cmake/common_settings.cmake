@@ -16,6 +16,7 @@ set (COMMON_INSTALL_DIRS
         /opt
         /home/local/sw/gl
         /home/local/sw/unidata
+        /home/local/sw/qt
     )
 
 if (UNIX)
