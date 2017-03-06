@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2016-2017 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -86,6 +87,8 @@ MSyncControl::MSyncControl(QString id, QWidget *parent) :
     lastInitDatetime = QDateTime();
     lastValidDatetime = QDateTime();
     selectedDataSourceActionList.clear();
+    synchronizedObjects = QSet<MSynchronizedObject*>();
+    synchronizedObjects.clear();
 
     ui->setupUi(this);    
 
@@ -93,11 +96,31 @@ MSyncControl::MSyncControl(QString id, QWidget *parent) :
     // =========================================================================
 
     configurationDropdownMenu = new QMenu(this);
+    // Load configuration.
+    loadConfigurationAction = new QAction(this);
+    loadConfigurationAction->setText(
+                "load synchronisation configuration");
+    configurationDropdownMenu->addAction(loadConfigurationAction);
+    connect(loadConfigurationAction, SIGNAL(triggered()),
+            SLOT(loadConfigurationFromFile()));
 
+    // Save configuration.
+    saveConfigurationAction = new QAction(this);
+    saveConfigurationAction->setText(
+                "save synchronisation configuration");
+    configurationDropdownMenu->addAction(saveConfigurationAction);
+    connect(saveConfigurationAction, SIGNAL(triggered()),
+            SLOT(saveConfigurationToFile()));
+
+    configurationDropdownMenu->addSeparator();
+
+    // Select data source.
     selectDataSourcesAction = new QAction(this);
     selectDataSourcesAction->setText(
                 "select data sources for allowed times and members");
     configurationDropdownMenu->addAction(selectDataSourcesAction);
+
+    // Selected data sources.
     configurationDropdownMenu->addSeparator();
     configurationDropdownMenu->addAction("Selected data sources:")
             ->setEnabled(false);
@@ -106,6 +129,7 @@ MSyncControl::MSyncControl(QString id, QWidget *parent) :
 
     connect(selectDataSourcesAction, SIGNAL(triggered()),
             SLOT(selectDataSources()));
+
     // Show menu also if the users clicks the button not only if only the arrow
     // was clicked.
     connect(ui->configurationButton, SIGNAL(clicked()),
@@ -123,7 +147,7 @@ MSyncControl::MSyncControl(QString id, QWidget *parent) :
         timeStepIndexToSeconds[i] = timeStepsSeconds[i];
     ui->timeStepComboBox->setCurrentIndex(7); // pre-select 6hrs
 
-    retrictControlToDataSources();
+    restrictControlToDataSources();
 
     // Only initialise with initTime and validTime if they are set properly.
     if (!lastInitDatetime.isNull() && !lastValidDatetime.isNull())
@@ -383,6 +407,9 @@ MSyncControl::~MSyncControl()
     selectedDataSourceActionList.clear();
     delete configurationDropdownMenu;
     delete selectDataSourcesAction;
+    // Deregister all registered synchronized object since otherwise this might
+    // lead to a system crash if the actor is deleted later.
+    disconnectSynchronizedObjects();
 }
 
 
@@ -432,6 +459,13 @@ int MSyncControl::ensembleMember() const
 }
 
 
+void MSyncControl::setEnsembleMember(const unsigned int member)
+{
+    int index = ui->ensembleMemberComboBox->findText(QString("%1").arg(member));
+    ui->ensembleMemberComboBox->setCurrentIndex(index);
+}
+
+
 void MSyncControl::registerSynchronizedClass(MSynchronizedObject *object)
 {
     if (object != nullptr) synchronizedObjects.insert(object);
@@ -440,7 +474,10 @@ void MSyncControl::registerSynchronizedClass(MSynchronizedObject *object)
 
 void MSyncControl::deregisterSynchronizedClass(MSynchronizedObject *object)
 {
-    if (synchronizedObjects.contains(object)) synchronizedObjects.remove(object);
+    if (synchronizedObjects.contains(object))
+    {
+        synchronizedObjects.remove(object);
+    }
 }
 
 
@@ -481,6 +518,16 @@ void MSyncControl::synchronizationCompleted(MSynchronizedObject *object)
         emitSaveImageSignal();
         synchronizationInProgress = false;
     }
+}
+
+
+void MSyncControl::disconnectSynchronizedObjects()
+{
+    foreach (MSynchronizedObject *synchronizedObject, synchronizedObjects)
+    {
+        synchronizedObject->synchronizeWith(nullptr);
+    }
+    synchronizedObjects.clear();
 }
 
 
@@ -671,11 +718,211 @@ void MSyncControl::selectDataSources()
         return;
     }
 
-    retrictControlToDataSources(selectedDataSources);
+    restrictControlToDataSources(selectedDataSources);
 }
 
 
-void MSyncControl::restrictToDataSourcesFromFrontend(
+void MSyncControl::saveConfigurationToFile()
+{
+    QString filename = QFileDialog::getSaveFileName(
+                MGLResourcesManager::getInstance(),
+                "Save sync control configuration",
+                "data/synchronisation.synccontrol.conf",
+                "Sync control configuration files (*.synccontrol.conf)");
+
+    if (filename.isEmpty()) return;
+
+    LOG4CPLUS_DEBUG(mlog, "Saving configuration to " << filename.toStdString());
+
+    QSettings *settings = new QSettings(filename, QSettings::IniFormat);
+
+    // Overwrite if the file exists.
+    if (QFile::exists(filename))
+    {
+        QFile::remove(filename);
+    }
+
+    settings->beginGroup("FileFormat");
+    // Save version id of Met.3D.
+    settings->setValue("met3dVersion", met3dVersionString);
+    settings->endGroup();
+
+
+    settings->beginGroup("MSyncControl");
+    saveConfiguration(settings);
+    settings->endGroup();
+
+    delete settings;
+
+    LOG4CPLUS_DEBUG(mlog, "... configuration has been saved.");
+}
+
+
+void MSyncControl::loadConfigurationFromFile()
+{
+    QString filename = QFileDialog::getOpenFileName(
+                MGLResourcesManager::getInstance(),
+                "Load sync control configuration",
+                "data/config",
+                "Sync control configuration files (*.synccontrol.conf)");
+    if (filename.isEmpty()) return;
+
+    LOG4CPLUS_DEBUG(mlog, "Loading configuration from "
+                    << filename.toStdString());
+
+    QSettings *settings = new QSettings(filename, QSettings::IniFormat);
+
+    QStringList groups = settings->childGroups();
+    if ( !groups.contains("MSyncControl") )
+    {
+        QMessageBox msg;
+        msg.setWindowTitle("Error");
+        msg.setText("The selected file does not contain configuration data "
+                    "for sync control.");
+        msg.setIcon(QMessageBox::Warning);
+        msg.exec();
+        delete settings;
+        return;
+    }
+
+    settings->beginGroup("MSyncControl");
+    loadConfiguration(settings);
+    settings->endGroup();
+
+    delete settings;
+
+    LOG4CPLUS_DEBUG(mlog, "... configuration has been loaded.");
+}
+
+
+void MSyncControl::saveConfiguration(QSettings *settings)
+{
+    settings->beginGroup("General");
+    settings->setValue("stepChooseVtIt",
+                      ui->stepChooseVTITComboBox->currentText());
+    settings->setValue("timeStep", ui->timeStepComboBox->currentText());
+    settings->setValue("showMean", ui->showMeanCheckBox->isChecked());
+    settings->setValue("dataSources", selectedDataSources);
+    settings->setValue("selectedMember",
+                       ui->ensembleMemberComboBox->currentText());
+    settings->endGroup();
+
+    settings->beginGroup("Animation");
+    settings->setValue("animationTimeStep",
+                      timeAnimationTimeStepSpinBox->value());
+    settings->setValue("fromTime",
+                      timeAnimationFrom->dateTime());
+    settings->setValue("toTime",
+                      timeAnimationTo->dateTime());
+    settings->setValue("timeAnimationLoop",
+                      timeAnimationLoopGroup->actions().indexOf(
+                          timeAnimationLoopGroup->checkedAction()));
+    settings->setValue("reverseTimeDirection",
+                      timeAnimationReverseTimeDirectionAction->isChecked());
+    settings->endGroup();
+
+    settings->beginGroup("TimeSeries");
+    settings->setValue("fileName", saveTAFileNameLineEdit->text());
+    settings->setValue("fileExtension",
+                       saveTAFileExtensionComboBox->currentText());
+    settings->setValue("sceneView", saveTASceneViewsComboBox->currentText());
+    settings->setValue("directory", saveTADirectoryLabel->toolTip());
+    settings->endGroup();
+}
+
+
+void MSyncControl::loadConfiguration(QSettings *settings)
+{
+    settings->beginGroup("General");
+    ui->stepChooseVTITComboBox->setCurrentIndex(
+                ui->stepChooseVTITComboBox->findText(
+                    settings->value("stepChooseVtIt", "valid").toString()));
+    ui->timeStepComboBox->setCurrentIndex(
+                ui->timeStepComboBox->findText(
+                    settings->value("timeStep", "6 hours").toString()));
+    ui->showMeanCheckBox->setChecked(settings->value("showMean", false).toBool());
+    selectedDataSources =
+            settings->value("dataSources", QStringList("")).toStringList();
+    restrictToDataSourcesFromSettings(selectedDataSources);
+    unsigned int selectedMember = settings->value("selectedMember", 0).toUInt();
+    if (availableEnsembleMembers.contains(selectedMember))
+    {
+        setEnsembleMember(selectedMember);
+    }
+    else
+    {
+        QMessageBox::warning(this, "Error",
+                             QString("Member '%1' is not available.\n"
+                                     "Reset to 0.").arg(selectedMember));
+    }
+
+    settings->endGroup();
+
+    settings->beginGroup("Animation");
+    timeAnimationTimeStepSpinBox->setValue(
+                settings->value("animationTimeStep", 1000).toInt());
+    timeAnimationFrom->setDateTime(settings->value("fromTime").toDateTime());
+    timeAnimationTo->setDateTime(settings->value("toTime").toDateTime());
+    timeAnimationLoopGroup->actions().at(
+                settings->value("timeAnimationLoop", 0).toInt())->setChecked(true);
+    timeAnimationReverseTimeDirectionAction->setChecked(
+                settings->value("reverseTimeDirection", false).toBool());
+    settings->endGroup();
+
+    settings->beginGroup("TimeSeries");
+
+    saveTAFileNameLineEdit->setText(
+                settings->value("fileName",
+                                "met3d-image.%it.%vt.%m").toString());
+
+    int index = saveTAFileExtensionComboBox->findText(
+            settings->value("fileExtension", ".png").toString());
+    if (index < 0)
+    {
+        QString fileExt = settings->value("fileExtension", ".png").toString();
+        QMessageBox::warning(this, this->getID(),
+                             "The file extension '" + fileExt
+                             + "' is invalid.\n"
+                               "Setting file extension to '.png'.");
+        index = saveTAFileExtensionComboBox->findText(".png");
+    }
+    saveTAFileExtensionComboBox->setCurrentIndex(index);
+
+    QString sceneView0 = saveTASceneViewsComboBox->itemText(0);
+    index = saveTASceneViewsComboBox->findText(
+                settings->value("sceneView", sceneView0).toString());
+    if (index < 0)
+    {
+        QString sceneView = settings->value("sceneView", sceneView0).toString();
+        QMessageBox::warning(this, this->getID(),
+                             "Scene view '" + sceneView
+                             + "' is invalid.\nSetting scene view to '"
+                             + sceneView0 + "'.");
+        index = 0;
+    }
+    saveTASceneViewsComboBox->setCurrentIndex(index);
+
+    QString defaultDir = MSystemManagerAndControl::getInstance()
+            ->getMet3DHomeDir().absolutePath();
+    QString dir = settings->value("directory", defaultDir).toString();
+    QFileInfo info(dir);
+    if (!(info.isDir() && info.isWritable()))
+    {
+        QMessageBox::warning(this, this->getID(),
+                             "'" + dir
+                             + "' either no directory or not writable.\n"
+                               "Setting directory to '" + defaultDir + "'.");
+        dir = defaultDir;
+    }
+    saveTADirectoryLabel->setToolTip(dir);
+    saveTADirectoryLabel->setText(dir);
+    adjustSaveTADirLabelText();
+
+    settings->endGroup();
+}
+
+
+void MSyncControl::restrictToDataSourcesFromSettings(
         QStringList selectedDataSources)
 {
     QStringList suitableDataSources;
@@ -751,11 +998,11 @@ void MSyncControl::restrictToDataSourcesFromFrontend(
     }
 
     // Use the suitable data sources set to setup the sync control.
-    retrictControlToDataSources(suitableDataSources);
+    restrictControlToDataSources(suitableDataSources);
 }
 
 
-void MSyncControl::retrictControlToDataSources(QStringList selectedDataSources)
+void MSyncControl::restrictControlToDataSources(QStringList selectedDataSources)
 {
 
     MSystemManagerAndControl* sysMC = MSystemManagerAndControl::getInstance();
@@ -810,6 +1057,15 @@ void MSyncControl::retrictControlToDataSources(QStringList selectedDataSources)
     variables.clear();
     currentInitTimes.clear();
     currentValidTimes.clear();
+    this->selectedDataSources = selectedDataSources;
+
+// TODO (bt, 23Feb2017): If updated to Qt 5.0 use QSets and unite instead of
+// lists and contains since for version 4.8 there is no qHash method for QDateTime
+// and thus it is not possible to use toSet on QList<QDateTime>.
+// (See: http://doc.qt.io/qt-5/qhash.html#qHashx)
+    availableInitDatetimes.clear();
+    availableValidDatetimes.clear();
+    availableEnsembleMembers.clear();
 
     foreach (QString dataSourceID, selectedDataSources)
     {
@@ -1284,21 +1540,21 @@ void MSyncControl::switchSelectedView(QString viewID)
 void MSyncControl::changeSaveTADirectory()
 {
     QString path = QFileDialog::getExistingDirectory(
-                this, "Select save directory", saveTADirectoryLabel->text());
+                this, "Select save directory", saveTADirectoryLabel->toolTip());
     if (path != "")
     {
-        // Only change to directory with writing access.
+        // Only change to directory to which Met.3D has write access.
         if (QFileInfo(path).isWritable())
         {
             saveTADirectoryLabel->setText(path);
-            saveTADirectoryLabel->setToolTip(saveTADirectoryLabel->text());
+            saveTADirectoryLabel->setToolTip(path);
             adjustSaveTADirLabelText();
         }
         else
         {
             QMessageBox msg;
             msg.setWindowTitle("Error");
-            msg.setText("No writing access to ''" + path + "''.");
+            msg.setText("No write access to ''" + path + "''.");
             msg.setIcon(QMessageBox::Warning);
             msg.exec();
             return;

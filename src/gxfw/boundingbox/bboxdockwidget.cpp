@@ -154,6 +154,170 @@ QString MBoundingBoxDockWidget::addBoundingBox(
 }
 
 
+void MBoundingBoxDockWidget::saveConfiguration(QSettings *settings)
+{
+    settings->beginGroup("BoundingBoxes");
+    settings->beginWriteArray("boundingBox");
+
+    for (int row = 0; row < ui->tableWidget->rowCount(); row++)
+    {
+        MBoundingBox *bBox = MSystemManagerAndControl::getInstance()
+                ->getBoundingBox(ui->tableWidget->item(row, 0)
+                                 ->data(Qt::DisplayRole).toString());
+        settings->setArrayIndex(row);
+        settings->setValue("name", bBox->getID());
+        settings->setValue("horizontal2DCoords", bBox->getHorizontal2DCoords());
+        settings->setValue("bottomPressure_hPa", bBox->getBottomPressure_hPa());
+        settings->setValue("topPressure_hPa", bBox->getTopPressure_hPa());
+    }
+
+    settings->endArray();
+    settings->endGroup();
+}
+
+
+void MBoundingBoxDockWidget::loadConfiguration(QSettings *settings)
+{
+    settings->beginGroup(getSettingsID());
+    int numBBoxes = settings->beginReadArray("boundingBox");
+
+    QStringList oldBBoxes =
+            MSystemManagerAndControl::getInstance()
+            ->getBoundingBoxesIdentifiers();
+    oldBBoxes.removeOne("None");
+
+    QStringList selectableBBoxes("None");
+
+    for (int i = 0; i < numBBoxes; i++)
+    {
+        settings->setArrayIndex(i);
+        QString name = settings->value("name", "").toString();
+        QRectF horizontal2DCoords = settings->value(
+                    "horizontal2DCoords",
+                    QRectF(-60., 30., 100., 40.)).toRectF();
+        double lon = double(horizontal2DCoords.x());
+        double lat = double(horizontal2DCoords.y());
+        double width = double(horizontal2DCoords.width());
+        double height = double(horizontal2DCoords.height());
+        double bottom = settings->value("bottomPressure_hPa", 1045.).toDouble();
+        double top = settings->value("topPressure_hPa", 20.).toDouble();
+        if (oldBBoxes.contains(name))
+        {
+            oldBBoxes.removeOne(name);
+            updateRow(name, lon, lat, width, height, bottom, top);
+        }
+        else
+        {
+            insertRow(name, lon, lat, width, height, bottom, top);
+        }
+        selectableBBoxes << name;
+    }
+    settings->endArray();
+    settings->endGroup();
+
+
+    // Return if no bounding boxes is there to be removed.
+    if (!oldBBoxes.empty())
+    {
+        QMessageBox msgBox(this);
+        msgBox.setIcon(QMessageBox::Question);
+        msgBox.setWindowTitle("Load Bounding Box Configuration");
+        msgBox.setText(QString(
+                           "Do you want to keep the existing bounding boxes and"
+                           " add the new bounding box objects contained in the"
+                           " file or remove the existing bounding boxes?"));
+        msgBox.setStandardButtons(QMessageBox::Yes | QMessageBox::No);
+        msgBox.button(QMessageBox::Yes)->setText("Keep");
+        msgBox.button(QMessageBox::No)->setText("Remove");
+        msgBox.exec();
+        if (msgBox.clickedButton() == msgBox.button(QMessageBox::No))
+        {
+            MGLResourcesManager* glRM = MGLResourcesManager::getInstance();
+            // Remove bounding boxes that aren't part of the configuration file.
+            for (int row = 0; row < ui->tableWidget->rowCount(); row++)
+            {
+                // Return if no bounding boxes is left to be removed.
+                if (oldBBoxes.empty())
+                {
+                    return;
+                }
+                QString name = getBBoxNameInRow(row);
+                if ( oldBBoxes.contains(name) )
+                {
+                    // If the bounding box to be removed is connected to one or
+                    // more actors, offer the user to select one of the
+                    // selectable bounding boxes.
+                    QList<MActor*> connectedActors =
+                            glRM->getActorsConnectedToBBox(name);
+                    if ( !connectedActors.empty() )
+                    {
+                        foreach (MActor *actor, connectedActors)
+                        {
+                            // Since 'None' is also part of the selectable
+                            // bounding boxes, we need to check if the number
+                            // of selectable bounding boxes is greater one.
+                            if (selectableBBoxes.size() > 1)
+                            {
+                                // Offer the user to select one of the
+                                // selectable bounding boxes.
+                                int answer = QMessageBox::question(
+                                            nullptr, actor->getName(),
+                                            QString(
+                                                "Connected bounding box '%1''"
+                                                " will be removed.\n"
+                                                "Do you want to select one of"
+                                                " the existing bounding boxes?\n"
+                                                "[Actor: %2]")
+                                            .arg(name).arg(actor->getName()),
+                                            QMessageBox::Yes, QMessageBox::No);
+                                if (QMessageBox::StandardButton(answer)
+                                        == QMessageBox::Yes)
+                                {
+                                    bool ok;
+                                    QString selectedName = QInputDialog::getItem(
+                                                nullptr, actor->getName(),
+                                                "Bounding Box: ",
+                                                selectableBBoxes, 0, false, &ok);
+                                    // Only set name if user didn't canceled
+                                    // selection.
+                                    if (!ok)
+                                    {
+                                        continue;
+                                    }
+                                    dynamic_cast<MBoundingBoxInterface*>(actor)
+                                            ->switchToBoundingBox(selectedName);
+                                }
+                            }
+                        }
+                    }
+                    ui->tableWidget->removeRow(row);
+                    MSystemManagerAndControl::getInstance()
+                            ->deleteBoundingBox(name);
+                    oldBBoxes.removeOne(name);
+                    // Decrement row since we deleted the current one.
+                    row--;
+                }
+            }
+        }
+    }
+}
+
+
+void MBoundingBoxDockWidget::removeAllBoundingBoxes()
+{
+    // Remove all bounding boxes.
+    for (int row = 0; row < ui->tableWidget->rowCount(); row++)
+    {
+        QString name = getBBoxNameInRow(row);
+        ui->tableWidget->removeRow(row);
+        MSystemManagerAndControl::getInstance()
+                ->deleteBoundingBox(name);
+        // Decrement row since we deleted the current row.
+        row--;
+    }
+}
+
+
 /******************************************************************************
 ***                             PUBLIC SLOTS                                ***
 *******************************************************************************/
@@ -371,7 +535,8 @@ void MBoundingBoxDockWidget::loadConfigurationFromFile(QString filename)
     }
 
     // Don't ask user whether to save configuration during program start.
-    if (MSystemManagerAndControl::getInstance()->applicationIsInitialized())
+    if (MSystemManagerAndControl::getInstance()->applicationIsInitialized()
+            && ui->tableWidget->rowCount() > 0)
     {
         QMessageBox::StandardButton reply = QMessageBox::question(
                     this,
@@ -553,155 +718,6 @@ void MBoundingBoxDockWidget::updateRow(QString name, double lon, double lat,
         bBox->emitPressureLevelChanged();
     }
 
-}
-
-
-void MBoundingBoxDockWidget::saveConfiguration(QSettings *settings)
-{
-    settings->beginGroup("BoundingBoxes");
-    settings->beginWriteArray("boundingBox");
-
-    for (int row = 0; row < ui->tableWidget->rowCount(); row++)
-    {
-        MBoundingBox *bBox = MSystemManagerAndControl::getInstance()
-                ->getBoundingBox(ui->tableWidget->item(row, 0)
-                                 ->data(Qt::DisplayRole).toString());
-        settings->setArrayIndex(row);
-        settings->setValue("name", bBox->getID());
-        settings->setValue("horizontal2DCoords", bBox->getHorizontal2DCoords());
-        settings->setValue("bottomPressure_hPa", bBox->getBottomPressure_hPa());
-        settings->setValue("topPressure_hPa", bBox->getTopPressure_hPa());
-    }
-
-    settings->endArray();
-    settings->endGroup();
-}
-
-
-void MBoundingBoxDockWidget::loadConfiguration(QSettings *settings)
-{
-    settings->beginGroup(getSettingsID());
-    int numBBoxes = settings->beginReadArray("boundingBox");
-
-    QStringList oldBBoxes =
-            MSystemManagerAndControl::getInstance()
-            ->getBoundingBoxesIdentifiers();
-    oldBBoxes.removeOne("None");
-
-    QStringList selectableBBoxes("None");
-
-    for (int i = 0; i < numBBoxes; i++)
-    {
-        settings->setArrayIndex(i);
-        QString name = settings->value("name", "").toString();
-        QRectF horizontal2DCoords = settings->value(
-                    "horizontal2DCoords",
-                    QRectF(-60., 30., 100., 40.)).toRectF();
-        double lon = double(horizontal2DCoords.x());
-        double lat = double(horizontal2DCoords.y());
-        double width = double(horizontal2DCoords.width());
-        double height = double(horizontal2DCoords.height());
-        double bottom = settings->value("bottomPressure_hPa", 1045.).toDouble();
-        double top = settings->value("topPressure_hPa", 20.).toDouble();
-        if (oldBBoxes.contains(name))
-        {
-            oldBBoxes.removeOne(name);
-            updateRow(name, lon, lat, width, height, bottom, top);
-        }
-        else
-        {
-            insertRow(name, lon, lat, width, height, bottom, top);
-        }
-        selectableBBoxes << name;
-    }
-    settings->endArray();
-    settings->endGroup();
-
-
-    // Return if no bounding boxes is there to be removed.
-    if (!oldBBoxes.empty())
-    {
-        QMessageBox msgBox(this);
-        msgBox.setIcon(QMessageBox::Question);
-        msgBox.setWindowTitle("Load Bounding Box Configuration");
-        msgBox.setText(QString(
-                           "Do you want to keep the existing bounding boxes and"
-                           " add the new bounding box objects contained in the"
-                           " file or remove the existing bounding boxes?"));
-        msgBox.setStandardButtons(QMessageBox::Yes | QMessageBox::No);
-        msgBox.button(QMessageBox::Yes)->setText("Keep");
-        msgBox.button(QMessageBox::No)->setText("Remove");
-        msgBox.exec();
-        if (msgBox.clickedButton() == msgBox.button(QMessageBox::No))
-        {
-            MGLResourcesManager* glRM = MGLResourcesManager::getInstance();
-            // Remove bounding boxes that aren't part of the configuration file.
-            for (int row = 0; row < ui->tableWidget->rowCount(); row++)
-            {
-                // Return if no bounding boxes is left to be removed.
-                if (oldBBoxes.empty())
-                {
-                    return;
-                }
-                QString name = getBBoxNameInRow(row);
-                if ( oldBBoxes.contains(name) )
-                {
-                    // If the bounding box to be removed is connected to one or
-                    // more actors, offer the user to select one of the
-                    // selectable bounding boxes.
-                    QList<MActor*> connectedActors =
-                            glRM->getActorsConnectedToBBox(name);
-                    if ( !connectedActors.empty() )
-                    {
-                        foreach (MActor *actor, connectedActors)
-                        {
-                            // Since 'None' is also part of the selectable
-                            // bounding boxes, we need to check if the number
-                            // of selectable bounding boxes is greater one.
-                            if (selectableBBoxes.size() > 1)
-                            {
-                                // Offer the user to select one of the
-                                // selectable bounding boxes.
-                                int answer = QMessageBox::question(
-                                            nullptr, actor->getName(),
-                                            QString(
-                                                "Connected bounding box '%1''"
-                                                " will be removed.\n"
-                                                "Do you want to select one of"
-                                                " the existing bounding boxes?\n"
-                                                "[Actor: %2]")
-                                            .arg(name).arg(actor->getName()),
-                                            QMessageBox::Yes, QMessageBox::No);
-                                if (QMessageBox::StandardButton(answer)
-                                        == QMessageBox::Yes)
-                                {
-                                    bool ok;
-                                    QString selectedName = QInputDialog::getItem(
-                                                nullptr, actor->getName(),
-                                                "Bounding Box: ",
-                                                selectableBBoxes, 0, false, &ok);
-                                    // Only set name if user didn't canceled
-                                    // selection.
-                                    if (!ok)
-                                    {
-                                        continue;
-                                    }
-                                    dynamic_cast<MBoundingBoxInterface*>(actor)
-                                            ->switchToBoundingBox(selectedName);
-                                }
-                            }
-                        }
-                    }
-                    ui->tableWidget->removeRow(row);
-                    MSystemManagerAndControl::getInstance()
-                            ->deleteBoundingBox(name);
-                    oldBBoxes.removeOne(name);
-                    // Decrement row since we deleted the current one.
-                    row--;
-                }
-            }
-        }
-    }
 }
 
 

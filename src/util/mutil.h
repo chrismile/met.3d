@@ -125,7 +125,7 @@ QStringList readConfigVersionID(QSettings *settings);
 /**
   Expands environment variables of format $VARIABLE in the string @p path.
   Example: If the envrionment variable "MET3D_HOME" is set to "/home/user/m3d",
-  the path "$MET_3D_HOME/config/data" would be expaned to
+  the path "$MET3D_HOME/config/data" would be expaned to
   "/home/user/m3d/config/data".
  */
 QString expandEnvironmentVariables(QString path);

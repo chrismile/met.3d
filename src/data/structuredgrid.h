@@ -5,7 +5,7 @@
 **  prediction data.
 **
 **  Copyright 2015-2017 Marc Rautenhaus
-**  Copyright 2015-2017 Bianca Tost
+**  Copyright 2017      Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -227,11 +227,11 @@ public:
     inline void setLevel(unsigned int k, double v) { levels[k] = v; }
 
     inline void setHorizontalGridType(MHorizontalGridType horizontalGridType)
-    {this->horizontalGridType = horizontalGridType;}
+    { this->horizontalGridType = horizontalGridType; }
 
     inline void setRotatedNorthPoleCoordinates(QVector2D coordinates)
-    {this->rotatedNorthPoleLon = coordinates.x();
-    this->rotatedNorthPoleLat = coordinates.y();}
+    { this->rotatedNorthPoleLon = coordinates.x();
+        this->rotatedNorthPoleLat = coordinates.y(); }
 
     inline unsigned int getNumLevels() const { return nlevs; }
     inline unsigned int getNumLats() const { return nlats; }

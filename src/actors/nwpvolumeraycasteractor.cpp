@@ -5,8 +5,8 @@
 **  prediction data.
 **
 **  Copyright 2015-2017 Marc Rautenhaus
-**  Copyright 2015-2017 Michael Kern
-**  Copyright 2015-2017 Bianca Tost
+**  Copyright 2015      Michael Kern
+**  Copyright 2016-2017 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -78,7 +78,8 @@ MNWPVolumeRaycasterActor::MNWPVolumeRaycasterActor()
     // ===============================================
     beginInitialiseQtProperties();
 
-    setName("Volume raycaster");
+    setActorType("Volume raycaster");
+    setName(getActorType());
 
     QStringList modesLst;
     modesLst << "isosurface" << "bitfield" << "DVR";
@@ -886,6 +887,12 @@ bool MNWPVolumeRaycasterActor::triggerAnalysisOfObjectAtPos(
         MSceneViewGLWidget *sceneView, float clipX, float clipY,
         float clipRadius)
 {
+    if (bBoxConnection->getBoundingBox() == nullptr)
+    {
+        LOG4CPLUS_DEBUG(mlog, "No bounding box is set.");
+        return false;
+    }
+
     Q_UNUSED(clipRadius);
     LOG4CPLUS_DEBUG(mlog, "triggering isosurface analysis.");
 

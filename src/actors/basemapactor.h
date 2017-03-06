@@ -5,8 +5,8 @@
 **  prediction data.
 **
 **  Copyright 2015-2017 Marc Rautenhaus
-**  Copyright 2015-2017 Michael Kern
-**  Copyright 2015-2017 Bianca Tost
+**  Copyright 2015      Michael Kern
+**  Copyright 2017      Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -53,7 +53,8 @@ namespace Met3D
   @brief MBaseMapActor draws a map into the scene. Map raster data is loaded
   from a GeoTiff file.
   */
-class MBaseMapActor : public MRotatedGridSupportingActor, public MBoundingBoxInterface
+class MBaseMapActor : public MRotatedGridSupportingActor,
+        public MBoundingBoxInterface
 {
 public:
     MBaseMapActor();

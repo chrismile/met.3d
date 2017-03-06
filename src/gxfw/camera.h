@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2017      Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -144,8 +145,10 @@ public:
     void rotateWorldSpace(float angle, float x, float y, float z);
 
     void saveToFile(QString filename);
-
     void loadFromFile(QString filename);
+
+    void saveConfiguration(QSettings *settings);
+    void loadConfiguration(QSettings *settings);
 
 protected:
     QVector3D origin;  // Position of the camera in world space.

@@ -89,6 +89,20 @@ public:
                            double bottomPressure_hPa = 1045.,
                            double topPressure_hPa = 20.);
 
+    void saveConfiguration(QSettings *settings);
+
+    void loadConfiguration(QSettings *settings);
+
+    /**
+      Removes all existing bounding box objects.
+
+      Called by @ref MSessionManagerDialog::loadSessionFromFile() to ensure a
+      "silent" deletion of all bounding box objects of the current session.
+      Otherwise the user would be ask whether he/she wants to keep the bounding
+      box objects of the current session if he/she e.g. switches the session.
+     */
+    void removeAllBoundingBoxes();
+
 public slots:
     void onCellChanged(int row, int col);
     void onSpinBoxUpdate(double value);
@@ -118,10 +132,6 @@ private:
 
     void updateRow(QString name, double lon, double lat, double width,
                    double height, double bottom, double top);
-
-    void saveConfiguration(QSettings *settings);
-
-    void loadConfiguration(QSettings *settings);
 
     QString getBBoxNameInRow(int row);
 

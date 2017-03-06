@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2017      Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -100,7 +101,19 @@ MGLResourcesManager::MGLResourcesManager(const QGLFormat &format,
             ->addProperty("dump memory content");
     propertyGroup->addSubProperty(dumpMemoryContentProperty);
 
+    // Place "OpenGL resources" property above all other properties of the
+    // system control.
+    QList<QtProperty*> propetiesList =
+            systemControl->getSystemPropertiesBrowser()->properties();
+    foreach (QtProperty *property, propetiesList)
+    {
+        systemControl->getSystemPropertiesBrowser()->removeProperty(property);
+    }
     systemControl->addProperty(propertyGroup);
+    foreach (QtProperty *property, propetiesList)
+    {
+        systemControl->addProperty(property);
+    }
 
     connect(systemControl->getClickPropertyManager(),
             SIGNAL(propertyChanged(QtProperty*)),
@@ -200,11 +213,13 @@ QList<MSceneControl *> &MGLResourcesManager::getScenes()
 void MGLResourcesManager::deleteScene(QString name)
 {
     for (int i = 0; i < scenePool.size(); i++)
+    {
         if (scenePool[i]->getName() == name)
         {
             MSceneControl* scene = scenePool.takeAt(i);
             delete scene;
         }
+    }
 }
 
 

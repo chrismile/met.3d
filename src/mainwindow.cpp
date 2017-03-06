@@ -5,7 +5,7 @@
 **  prediction data.
 **
 **  Copyright 2015-2017 Marc Rautenhaus
-**  Copyright 2015-2017 Bianca Tost
+**  Copyright 2016-2017 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -53,12 +53,20 @@ MMainWindow::MMainWindow(QStringList commandLineArguments, QWidget *parent)
       ui(new Ui::MainWindow),
       sceneManagementDialog(new MSceneManagementDialog),
       resizeWindowDialog(new MResizeWindowDialog),
-      sceneViewLayout(0)
+      sessionManagerDialog(new MSessionManagerDialog),
+      sceneViewLayout(1),
+      sessionSettings(nullptr),
+      systemDock(nullptr),
+      sessionAutoSaveTimer(nullptr)
 {
     // Qt Designer specific initialization.
     ui->setupUi(this);
 
     LOG4CPLUS_DEBUG(mlog, "Initialising Met.3D system ... please wait.");
+
+    // Timer used to handle automatic saving of current session.
+    sessionAutoSaveTimer = new QTimer();
+    sessionAutoSaveTimer->setInterval(30000);
 
     // OpenGL settings.
     // =========================================================================
@@ -78,7 +86,7 @@ MMainWindow::MMainWindow(QStringList commandLineArguments, QWidget *parent)
     systemManagerAndControl->setMainWindow(this);
     systemManagerAndControl->storeApplicationCommandLineArguments(
                 commandLineArguments);
-    QDockWidget* systemDock = new QDockWidget("System", this);
+    systemDock = new QDockWidget("System", this);
     systemDock->setAllowedAreas(Qt::AllDockWidgetAreas);
     systemDock->setFeatures(QDockWidget::DockWidgetMovable
                             | QDockWidget::DockWidgetFloatable);
@@ -152,28 +160,33 @@ MMainWindow::MMainWindow(QStringList commandLineArguments, QWidget *parent)
                 ).absoluteFilePath("config/met3d_icon.png");
     setWindowIcon(QIcon(iconPath));
 
-
+    if (sessionManagerDialog->getLoadSessionOnStart())
+    {
+        sessionManagerDialog->loadSessionOnStart();
+    }
+    else
+    {
     // Initial assignment of scenes to scene views.
     //==========================================================================
 
-    int numScenes = glResourcesManager->getScenes().size();
-    for (int i = 0; i < MET3D_MAX_SCENEVIEWS; i++)
-    {
-        sceneViewGLWidgets[i]->setScene(
-                    glResourcesManager->getScenes()[min(i, numScenes-1)]);
+        int numScenes = glResourcesManager->getScenes().size();
+        for (int i = 0; i < MET3D_MAX_SCENEVIEWS; i++)
+        {
+            sceneViewGLWidgets[i]->setScene(
+                        glResourcesManager->getScenes()[min(i, numScenes - 1)]);
+        }
+
     }
 
 
     // Show the control widget of the first scene and add the system control
     // dock below.
+    systemDock->setObjectName("system");
     addDockWidget(Qt::LeftDockWidgetArea, systemDock);
 
     // Uncomment this loop if the system control should be tabified with the
     // scene controls.
-    foreach (QDockWidget *dockWidget, dockWidgets)
-        if (!dockWidget->isFloating()) tabifyDockWidget(dockWidget, systemDock);
-
-    dockWidgets[0]->raise();
+    tabifyScenesAndSystem();
 
     // Connect signals and slots.
     // ========================================================================
@@ -188,6 +201,8 @@ MMainWindow::MMainWindow(QStringList commandLineArguments, QWidget *parent)
             this, SLOT(sceneManagement()));
     connect(ui->actionAddDataset, SIGNAL(triggered()),
             this, SLOT(addDataset()));
+    connect(ui->actionSessionManager, SIGNAL(triggered()),
+            this, SLOT(openSessionManager()));
     connect(ui->actionResizeWindow, SIGNAL(triggered()),
             this, SLOT(resizeWindow()));
 
@@ -225,6 +240,11 @@ MMainWindow::MMainWindow(QStringList commandLineArguments, QWidget *parent)
             this, SLOT(showAboutQtDialog()));
     connect(ui->actionAboutMet3D, SIGNAL(triggered()),
             this, SLOT(showAboutDialog()));
+
+    connect(ui->menuSessions, SIGNAL(triggered(QAction*)),
+            this, SLOT(switchSession(QAction*)));
+    connect(sessionAutoSaveTimer, SIGNAL(timeout()),
+            sessionManagerDialog, SLOT(saveSession()));
 }
 
 
@@ -245,8 +265,14 @@ MMainWindow::~MMainWindow()
     delete glResourcesManager;
     delete systemManagerAndControl;
 
-    for (int i = 0; i < dockWidgets.size(); i++)
-        delete dockWidgets[i]; // aren't these deleted via the parent mechanism?
+    for (int i = 0; i < sceneDockWidgets.size(); i++)
+    {
+        delete sceneDockWidgets[i]; // aren't these deleted via the parent mechanism?
+    }
+
+    delete systemDock;
+
+    delete sessionAutoSaveTimer;
 
     delete ui;
     LOG4CPLUS_DEBUG(mlog, "..application resources have been deleted.");
@@ -260,37 +286,44 @@ MMainWindow::~MMainWindow()
 void MMainWindow::dockSyncControl(MSyncControl *syncControl)
 {
     // Create a synchronisation control as dock widget.
-    QDockWidget* syncDock = new QDockWidget(syncControl->getID(), this);
+    QDockWidget *syncDock = new QDockWidget(syncControl->getID(), this);
     syncDock->setAllowedAreas(Qt::AllDockWidgetAreas);
     // Remove "x" corner button so the user cannot close the dock widget.
     syncDock->setFeatures(QDockWidget::DockWidgetMovable
                           | QDockWidget::DockWidgetFloatable);
     syncDock->setWidget(syncControl);
+    syncDock->setObjectName("sync_" + syncControl->getID());
     addDockWidget(Qt::LeftDockWidgetArea, syncDock);
+    syncControlDockWidgets.append(syncDock);
 }
 
 
 void MMainWindow::dockSceneControl(MSceneControl *control)
 {
-    QDockWidget* dock = new QDockWidget(control->getName(), this);
+    QDockWidget *dock = new QDockWidget(control->getName(), this);
     dock->setAllowedAreas(Qt::AllDockWidgetAreas);
     // Remove "x" corner button so the user cannot close the dock widget.
     dock->setFeatures(QDockWidget::DockWidgetMovable
                       | QDockWidget::DockWidgetFloatable);
     dock->setWidget(control);
+    dock->setObjectName("scene_" + control->getName());
     addDockWidget(Qt::LeftDockWidgetArea, dock);
-    dockWidgets.append(dock);
+    sceneDockWidgets.append(dock);
 
-    for (int i = 0; i < dockWidgets.size()-1; i++)
-        if (!dockWidgets[i]->isFloating())
-            tabifyDockWidget(dockWidgets[i], dock);
+    for (int i = 0; i < sceneDockWidgets.size() - 1; i++)
+    {
+        if (!sceneDockWidgets[i]->isFloating())
+        {
+            tabifyDockWidget(sceneDockWidgets[i], dock);
+        }
+    }
 }
 
 
 void MMainWindow::changeDockedSceneName(const QString& oldName,
                                         const QString& newName)
 {
-    for(auto& dockWidget : dockWidgets)
+    foreach (QDockWidget *dockWidget, sceneDockWidgets)
     {
         if (dockWidget->windowTitle() == oldName)
         {
@@ -316,20 +349,42 @@ void MMainWindow::dockWaypointsModel(MWaypointsTableModel *waypointsModel)
     waypointsTableDock->setFeatures(QDockWidget::DockWidgetMovable
                                     | QDockWidget::DockWidgetFloatable);
     waypointsTableDock->setVisible(false);
+    waypointsTableDock->setObjectName("waypoints");
     addDockWidget(Qt::BottomDockWidgetArea, waypointsTableDock);
 }
 
 
-void MMainWindow::removeControl(QWidget *widget)
+void MMainWindow::removeSceneControl(QWidget *widget)
 {
-    for (int i = 0; i < dockWidgets.size(); i++)
-        if (dockWidgets[i]->widget() == widget)
+    for (int i = 0; i < sceneDockWidgets.size(); i++)
+    {
+        if (sceneDockWidgets[i]->widget() == widget)
         {
-            QDockWidget *dock = dockWidgets.takeAt(i);
+            QDockWidget *dock = sceneDockWidgets.takeAt(i);
             removeDockWidget(dock);
-//TODO (mr, 20Oct2014) -- Dock widget is not deleted; deletion also deletes
-//                        scene and breaks scene removal from glRM pool
+            MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
+            QString name = static_cast<MSceneControl*>(widget)->getName();
+            glRM->deleteScene(name);
+            delete dock;
         }
+    }
+}
+
+
+void MMainWindow::removeSyncControl(MSyncControl *syncControl)
+{
+    for (int i = 0; i < syncControlDockWidgets.size(); i++)
+    {
+        if (syncControlDockWidgets[i]->widget() == syncControl)
+        {
+            QDockWidget *dock = syncControlDockWidgets.takeAt(i);
+            removeDockWidget(dock);
+            // Remove the sync control from the list of registered sync controls
+            // and delete it.
+            systemManagerAndControl->removeSyncControl(syncControl);
+            delete dock;
+        }
+    }
 }
 
 
@@ -497,9 +552,330 @@ void MMainWindow::resizeSceneView(int newWidth, int newHeight,
 }
 
 
+void MMainWindow::saveConfigurationToFile(QString filename)
+{
+    if (filename.isEmpty())
+        filename = QFileDialog::getSaveFileName(
+                    MGLResourcesManager::getInstance(),
+                    "Save window layout configuration",
+                    "data/windowLayout.winlayout.conf",
+                    "Window layout configuration files (*.winlayout.conf)");
+
+    if (filename.isEmpty()) return;
+
+    LOG4CPLUS_DEBUG(mlog, "Saving configuration to " << filename.toStdString());
+
+    QSettings *settings = new QSettings(filename, QSettings::IniFormat);
+
+    // Overwrite if the file exists.
+    if (QFile::exists(filename))
+    {
+        QStringList groups = settings->childGroups();
+        // Only overwrite file if it contains already configuration for a
+        // window layout.
+        if ( !groups.contains("MWindowLayout") )
+        {
+            QMessageBox msg;
+            msg.setWindowTitle("Error");
+            msg.setText("The selected file contains a configuration other than "
+                        "MWindowLayout.\n"
+                        "This file will NOT be overwritten -- have you selected"
+                        " the correct file?");
+            msg.setIcon(QMessageBox::Warning);
+            msg.exec();
+            delete settings;
+            return;
+        }
+        QFile::remove(filename);
+    }
+
+    settings->beginGroup("FileFormat");
+    // Save version id of Met.3D.
+    settings->setValue("met3dVersion", met3dVersionString);
+    settings->endGroup();
+
+    saveConfiguration(settings);
+
+    delete settings;
+
+    LOG4CPLUS_DEBUG(mlog, "... configuration has been saved.");
+}
+
+
+void MMainWindow::loadConfigurationFromFile(QString filename)
+{
+    if (filename.isEmpty())
+        filename = QFileDialog::getOpenFileName(
+                    MGLResourcesManager::getInstance(),
+                    "Load window layout configuration",
+                    "data/config",
+                    "Window layout configuration files (*.winlayout.conf)");
+
+    if (filename.isEmpty()) return;
+
+    LOG4CPLUS_DEBUG(mlog, "Loading configuration from "
+                    << filename.toStdString());
+
+    QSettings *settings = new QSettings(filename, QSettings::IniFormat);
+
+    loadConfiguration(settings);
+
+    delete settings;
+
+    LOG4CPLUS_DEBUG(mlog, "... configuration has been loaded.");
+}
+
+
+void MMainWindow::saveConfiguration(QSettings *settings)
+{
+    settings->beginGroup("MWindowLayout");
+    settings->setValue("isFullScreen", isFullScreen());
+    settings->setValue("isMaximized", isMaximized());
+    // Save window size.
+    settings->setValue("windowWidth", width());
+    settings->setValue("windowHeight", height());
+    // Save state of check box for showing waypoints dock widget.
+    // (Visibility and placement of dock widget is handled by "state")
+    settings->setValue("showWaypoints",
+                      waypointsTableDock->isVisible());
+    // Save state of check box for showing waypoints dock widget.
+    // (Visibility and placement of dock widget is handled by "state")
+    settings->setValue("showBoundingBoxes",
+                      boundingBoxDock->isVisible());
+    // Save scene views layout by saving the list of sizes for each splitter
+    // as a string list since it is not possible to save a int list directly.
+    settings->setValue("viewLayout", sceneViewLayout);
+    QStringList sizeList;
+    foreach (int size, mainSplitter->sizes())
+    {
+        sizeList << (QString("%1").arg(size));
+    }
+    settings->setValue("mainSplitterSizes", sizeList);
+    sizeList.clear();
+
+    foreach (int size, rightSplitter->sizes())
+    {
+        sizeList << (QString("%1").arg(size));
+    }
+    settings->setValue("rightSplitterSizes", sizeList);
+    sizeList.clear();
+
+    foreach (int size, topSplitter->sizes())
+    {
+        sizeList << (QString("%1").arg(size));
+    }
+    settings->setValue("topSplitterSizes", sizeList);
+    sizeList.clear();
+
+    foreach (int size, bottomSplitter->sizes())
+    {
+        sizeList << (QString("%1").arg(size));
+    }
+    settings->setValue("bottomSplitterSizes", sizeList);
+    settings->setValue("state", saveState());
+    settings->endGroup();
+}
+
+
+void MMainWindow::loadConfiguration(QSettings *settings)
+{
+    settings->beginGroup("MWindowLayout");
+    Qt::WindowState loadedWindowState = Qt::WindowNoState;
+    QPoint position = this->pos();
+    // First reset window state to no state since otherwise swichting
+    // from full screen to maximized does not work correctly.
+    setWindowState(loadedWindowState);
+    if (settings->value("isFullScreen", false).toBool())
+    {
+        loadedWindowState = Qt::WindowFullScreen;
+    }
+    else if (settings->value("isMaximized", false).toBool())
+    {
+        loadedWindowState = Qt::WindowMaximized;
+    }
+    setWindowState(loadedWindowState);
+    // Load window size.
+    resize(settings->value("windowWidth", 1288).toInt(),
+           settings->value("windowHeight", 610).toInt());
+    // Changing the view layout during start to other than single view results
+    // in black lines, one cannot get rid of. Therefore if loading session at
+    // the start, leave scene view layout out.
+    if (MSystemManagerAndControl::getInstance()->applicationIsInitialized())
+    {
+        // Load scene views layout by extracting the size lists of the string
+        // lists saved since it is not possible to load a int list directly.
+        setSceneViewLayout(settings->value("viewLayout", 1).toInt());
+    }
+    else
+    {
+        sceneViewLayout = settings->value("viewLayout", 1).toInt();
+    }
+    QList<int> sizeList;
+    foreach (QString size, settings->value("mainSplitterSizes",
+                                          "833, 0, 0, 0").toStringList())
+    {
+        sizeList.append(size.toInt());
+    }
+    mainSplitter->setSizes(sizeList);
+    sizeList.clear();
+    foreach (QString size, settings->value("rightSplitterSizes",
+                                          "833, 0, 0, 0").toStringList())
+    {
+        sizeList.append(size.toInt());
+    }
+    rightSplitter->setSizes(sizeList);
+    sizeList.clear();
+    foreach (QString size, settings->value("topSplitterSizes",
+                                          "833, 0, 0, 0").toStringList())
+    {
+        sizeList.append(size.toInt());
+    }
+    topSplitter->setSizes(sizeList);
+    sizeList.clear();
+    foreach (QString size, settings->value("bottomSplitterSizes",
+                                          "833, 0, 0, 0").toStringList())
+    {
+        sizeList.append(size.toInt());
+    }
+    bottomSplitter->setSizes(sizeList);
+
+    QByteArray state = settings->value("state", QByteArray()).toByteArray();
+    // Don't change state if not defined in session configuration.
+    if (!state.isEmpty())
+    {
+        restoreState(state);
+        // Restoring the state of the window also affects the position of the
+        // window thus reset the window's position to the position it was before
+        // loading the configuration.
+        if (!(loadedWindowState == Qt::WindowFullScreen
+              || loadedWindowState == Qt::WindowMaximized))
+        {
+            this->setGeometry(position.x(), position.y(),
+                              this->width(), this->height());
+        }
+    }
+    // Load state of check box for showing waypoints dock widget.
+    // (Visibility and placement of dock widget is handled by "state")
+    ui->actionWaypoints->setChecked(
+                settings->value("showWaypoints", false).toBool());
+    // Load state of check box for showing bounding boxes dock widget.
+    // (Visibility and placement of dock widget is handled by "state")
+    ui->actionBoundingBoxes->setChecked(
+                settings->value("showBoundingBoxes", false).toBool());
+}
+
+
+void MMainWindow::tabifyScenesAndSystem()
+{
+    foreach (QDockWidget *dockWidget, sceneDockWidgets)
+    {
+        if (!dockWidget->isFloating())
+        {
+            tabifyDockWidget(dockWidget, systemDock);
+        }
+    }
+    // Necessary since otherwise the first scene tab won't be on top but the
+    // system tab instead would be when loading a session.
+    QTimer *timer = new QTimer(this);
+    timer->singleShot(0, sceneDockWidgets[0], SLOT(raise()));
+    delete timer;
+}
+
+
+void MMainWindow::onSessionsListChanged(QStringList *sessionsList,
+                                        QString currentSession)
+{
+    // Clear actions.
+    foreach(QAction *action, ui->menuSessions->actions())
+    {
+        ui->menuSessions->removeAction(action);
+        delete action;
+    }
+    // Add new actions.
+    foreach(QString session, *sessionsList)
+    {
+        QAction *action = ui->menuSessions->addAction(session);
+        if (session == currentSession)
+        {
+            QFont actionFont = action->font();
+            actionFont.setBold(true);
+            actionFont.setItalic(true);
+            action->setFont(actionFont);
+        }
+    }
+}
+
+
+void MMainWindow::onSessionSwitch(QString currentSession)
+{
+    // Change font of previous currentSession back to normal and emphasise
+    // current session by italic and bold type.
+    foreach(QAction *action, ui->menuSessions->actions())
+    {
+        QFont actionFont = action->font();
+        QString session = action->text();
+        // Emphasise the entry which represents the current session.
+        if (session == currentSession)
+        {
+            actionFont.setBold(true);
+            actionFont.setItalic(true);
+        }
+        // Reset previous current session entry by reseting all entries which
+        // do not represent the current session.
+        else
+        {
+            actionFont.setBold(false);
+            actionFont.setItalic(false);
+        }
+        action->setFont(actionFont);
+    }
+}
+
+
+void MMainWindow::updateSessionTimerInterval(int interval)
+{
+    // Since auto save session interval is stored in seconds but QTimer interval
+    // uses milliseconds it is necessary to multiply autoSaveSessionIntervall
+    // by 1000.
+    sessionAutoSaveTimer->setInterval(interval * 1000);
+}
+
+
 /******************************************************************************
 ***                             PUBLIC SLOTS                                ***
 *******************************************************************************/
+
+void MMainWindow::show()
+{
+    QWidget::show();
+    // TODO (bt, 14Mar2017) Why need to set view layout after showing the window?
+    // Need to set scene view layout after show since otherwise black lines are
+    // rendered for layouts different from single view. Also need to load the
+    // sizes of the views since setting the view layout resets these settings.
+    if (sessionManagerDialog->getLoadSessionOnStart())
+    {
+        sessionManagerDialog->loadWindowLayout();
+    }
+    // Start timer only if auto save is active.
+    if (sessionManagerDialog->getAutoSaveSession())
+    {
+        sessionAutoSaveTimer->start();
+    }
+}
+
+
+void MMainWindow::closeEvent(QCloseEvent *event)
+{
+    if (sessionManagerDialog->saveSessionOnAppExit())
+    {
+        event->accept();
+    }
+    else
+    {
+        event->ignore();
+    }
+}
+
 
 void MMainWindow::setFullScreen(bool b)
 {
@@ -707,6 +1083,20 @@ void MMainWindow::addDataset()
 }
 
 
+void MMainWindow::openSessionManager()
+{
+    // Don't save session automatically while the user interacts with the
+    // session manager.
+    sessionAutoSaveTimer->stop();
+    sessionManagerDialog->exec();
+    // Start timer only if auto save is active.
+    if (sessionManagerDialog->getAutoSaveSession())
+    {
+        sessionAutoSaveTimer->start();
+    }
+}
+
+
 void MMainWindow::openOnlineManual()
 {
     QDesktopServices::openUrl(QUrl("https://met3d.readthedocs.org"));
@@ -767,6 +1157,12 @@ void MMainWindow::resizeWindow()
     // TODO (bt, 25Oct2016) At the moment only resize in one monitor possible
     this->resize(newWidth, newHeight);
 
+}
+
+
+void MMainWindow::switchSession(QAction *sessionAction)
+{
+    sessionManagerDialog->switchToSession(sessionAction->text());
 }
 
 

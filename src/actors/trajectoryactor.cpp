@@ -5,7 +5,7 @@
 **  prediction data.
 **
 **  Copyright 2015-2017 Marc Rautenhaus
-**  Copyright 2015-2017 Bianca Tost
+**  Copyright 2016-2017 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -83,7 +83,8 @@ MTrajectoryActor::MTrajectoryActor()
     // ===============================================
     beginInitialiseQtProperties();
 
-    setName("Trajectories");
+    setActorType("Trajectories");
+    setName(getActorType());
 
     // Remove labels property group since it is not used for trajectory actors
     // yet.
@@ -1266,15 +1267,17 @@ void MTrajectoryActor::onActorDeleted(MActor *actor)
     {
         enableEmissionOfActorChangedSignal(false);
 
-        int index = properties->mEnum()->value(transferFunctionProperty);
+        QString tFName = properties->getEnumItem(transferFunctionProperty);
         QStringList availableTFs = properties->mEnum()->enumNames(
                     transferFunctionProperty);
 
-        // If the deleted transfer function is currently connected to this
-        // variable, set current transfer function to "None" (index 0).
-        if (availableTFs.at(index) == tf->getName()) index = 0;
-
         availableTFs.removeOne(tf->getName());
+
+        // Get the current index of the transfer function selected. If the
+        // transfer function is the one to be deleted, the selection is set to
+        // 'None'.
+        int index = availableTFs.indexOf(tFName);
+
         properties->mEnum()->setEnumNames(transferFunctionProperty,
                                           availableTFs);
         properties->mEnum()->setValue(transferFunctionProperty, index);
@@ -1312,6 +1315,17 @@ void MTrajectoryActor::onActorRenamed(MActor *actor, QString oldName)
 void MTrajectoryActor::registerScene(MSceneControl *scene)
 {
     MActor::registerScene(scene);
+    // Only send data request if data source exists, but for each scene since
+    // they have different scene views and thus different normals.
+    if (dataSourceID != "")
+    {
+        asynchronousDataRequest();
+    }
+}
+
+
+void MTrajectoryActor::onSceneViewAdded()
+{
     // Only send data request if data source exists, but for each scene since
     // they have different scene views and thus different normals.
     if (dataSourceID != "")

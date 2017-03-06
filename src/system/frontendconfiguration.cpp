@@ -5,7 +5,7 @@
 **  prediction data.
 **
 **  Copyright 2015-2017 Marc Rautenhaus
-**  Copyright 2015-2017 Bianca Tost
+**  Copyright 2017      Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -56,6 +56,8 @@
 #include "actors/nwpsurfacetopographyactor.h"
 
 #include "data/regioncontributionanalysis.h"
+
+#include "gxfw/sessionmanagerdialog.h"
 
 
 namespace Met3D
@@ -175,41 +177,192 @@ void MFrontendConfiguration::initializeFrontendFromConfigFile(
 
     QString coastfile = expandEnvironmentVariables(config.value("coastfile")
                                                    .toString());
-    QString countryfile = expandEnvironmentVariables(config.value("countryfile").toString());
+    QString countryfile = expandEnvironmentVariables(
+                config.value("countryfile").toString());
     sysMC->getNaturalEarthDataLoader()->setDataSources(coastfile, countryfile);
 
     config.endGroup();
 
+    // Initialize session manager.
+    // ===========================
+    config.beginGroup("SessionManager");
 
-    // Initialize synchronization control(s).
-    // ======================================
-    int size = config.beginReadArray("Synchronization");
+    bool sessionWasSet = true;
 
-    for (int i = 0; i < size; i++)
+    // 1) Load path to session configurations.
+    //----------------------------------------
+
+    QString sessionDirectory =
+            expandEnvironmentVariables(
+                config.value("pathToSessionConfigurations", "").toString());
+    if (sessionDirectory != ""
+            && !(QDir().mkpath(sessionDirectory)
+                 && QFileInfo(sessionDirectory).isWritable()))
     {
-        config.setArrayIndex(i);
-
-        // Read settings from file.
-        QString name = config.value("name").toString();
-        QString dataSourceIDs = config.value("initialiseFromDatasource").toString();
-
-        LOG4CPLUS_DEBUG(mlog, "initializing synchronization control #" << i << ": ");
-        LOG4CPLUS_DEBUG(mlog, "  name = " << name.toStdString());
-        LOG4CPLUS_DEBUG(mlog, "  dataSources = " << dataSourceIDs.toStdString());
-
-        // Check parameter validity.
-        if ( name.isEmpty())
+        QMessageBox msgBox;
+        msgBox.setIcon(QMessageBox::Warning);
+        msgBox.setWindowTitle("Error");
+        msgBox.setText("No write access to '" + sessionDirectory
+                       + "'.\nTry to set '"
+                       + QDir(expandEnvironmentVariables("$MET3D_BASE"))
+                       .absoluteFilePath("sessions")
+                       +  "' as default.\nPlease change value in frontend"
+                          " configuration.");
+        msgBox.exec();
+        sessionDirectory.clear();
+    }
+    if (sessionDirectory == "")
+    {
+        sessionDirectory =
+                QDir(expandEnvironmentVariables("$MET3D_BASE"))
+                .absoluteFilePath("sessions");
+        if (!QDir().exists(sessionDirectory))
         {
-            LOG4CPLUS_WARN(mlog, "invalid parameters encountered; skipping.");
-            continue;
+            if (QDir().mkdir(sessionDirectory))
+            {
+                LOG4CPLUS_WARN(mlog, "No directory to load session files from"
+                                     " specified in frontend configuration."
+                                     " Using '" << sessionDirectory.toStdString()
+                               << "' as default.");
+                sessionWasSet = false;
+            }
+            else
+            {
+                QMessageBox msgBox;
+                msgBox.setIcon(QMessageBox::Warning);
+                msgBox.setWindowTitle("Error");
+                msgBox.setText("Could not create '" + sessionDirectory + "'.\n"
+                               + "Please select a different directory to load"
+                                 " sessions from and save sessions to.");
+                msgBox.exec();
+                sessionDirectory.clear();
+                while (sessionDirectory.isEmpty())
+                {
+                    sessionDirectory =
+                            QFileDialog::getExistingDirectory(
+                                nullptr, "Select directory to store sessions",
+                                "", QFileDialog::ShowDirsOnly
+                                | QFileDialog::DontResolveSymlinks);
+                    // Ask user again if no directory has been chosen.
+                    if (sessionDirectory.isEmpty())
+                    {
+                        QMessageBox msgBox;
+                        msgBox.setIcon(QMessageBox::Warning);
+                        msgBox.setWindowTitle("Error");
+                        msgBox.setText("Please select a directory.");
+                        msgBox.exec();
+                        continue;
+                    }
+                    if (!QFileInfo(sessionDirectory).isWritable())
+                    {
+                        QMessageBox msgBox;
+                        msgBox.setIcon(QMessageBox::Warning);
+                        msgBox.setWindowTitle("Error");
+                        msgBox.setText("No write access to this directory.\n"
+                                       "Failed to change directory.");
+                        msgBox.exec();
+                        sessionDirectory.clear();
+                    }
+                }
+            }
         }
-
-        // Create new synchronization control.
-        initializeSynchronization(
-                    name, dataSourceIDs.split("/",QString::SkipEmptyParts));
     }
 
-    config.endArray();
+    bool loadSessionOnStart = true;
+
+    // 2) Load session name.
+    //----------------------
+
+    QString sessionName =
+            config.value("loadSessionOnStart", "None").toString();
+
+    if (sessionName == "None")
+    {
+        LOG4CPLUS_DEBUG(mlog, "No session specified to be loaded at start."
+                              " Load frontend configuration instead.");
+        sessionWasSet = false;
+        loadSessionOnStart = false;
+        sessionName = "";
+    }
+    else
+    {
+        QString sessionFilename =
+            QDir(sessionDirectory).absoluteFilePath(
+                sessionName + MSessionManagerDialog::fileExtension);
+        QSettings settings(sessionFilename, QSettings::IniFormat);
+        QStringList groups = settings.childGroups();
+        // File has been removed or does not contain session configuration.
+        // Display warning and refuse to load session but only if name and
+        // directory were specified in frontend configuration.
+        if ((!QFile::exists(sessionFilename) || !groups.contains("MSession")))
+        {
+            // Show warning only if directory and filename were specified in
+            // frontend configuration.
+            if (sessionWasSet)
+            {
+                QMessageBox msg;
+                msg.setWindowTitle("Error");
+                msg.setText(QString("Unable to load session file '%1'.\n"
+                                    "Using configuration defined by the frontend"
+                                    " configuration file instead.")
+                            .arg(sessionFilename));
+                msg.setIcon(QMessageBox::Warning);
+                msg.exec();
+            }
+            loadSessionOnStart = false;
+        }
+    }
+
+    // 3) Initialise session manager.
+    //-------------------------------
+
+    sysMC->getMainWindow()->getSessionManagerDialog()->initialize(
+                sessionName, sessionDirectory,
+                config.value("autoSaveSessionIntervalInSeconds", "0").toInt(),
+                loadSessionOnStart,
+                config.value("saveSessionOnApplicationExit", false).toBool());
+
+    config.endGroup();
+    // =========================================================================
+
+    int size = 0;
+
+    if (!loadSessionOnStart)
+    {
+        // Initialize synchronization control(s).
+        // ======================================
+        size = config.beginReadArray("Synchronization");
+
+        for (int i = 0; i < size; i++)
+        {
+            config.setArrayIndex(i);
+
+            // Read settings from file.
+            QString name = config.value("name").toString();
+            QString dataSourceIDs =
+                    config.value("initialiseFromDatasource").toString();
+
+            LOG4CPLUS_DEBUG(mlog, "initializing synchronization control #"
+                            << i << ": ");
+            LOG4CPLUS_DEBUG(mlog, "  name = " << name.toStdString());
+            LOG4CPLUS_DEBUG(mlog, "  dataSources = "
+                            << dataSourceIDs.toStdString());
+
+            // Check parameter validity.
+            if ( name.isEmpty() )
+            {
+                LOG4CPLUS_WARN(mlog,
+                               "invalid parameters encountered; skipping.");
+                continue;
+            }
+
+            // Create new synchronization control.
+            initializeSynchronization(
+                        name, dataSourceIDs.split("/",QString::SkipEmptyParts));
+        }
+
+        config.endArray();
+    }
 
 
     // Configure scene navigation.
@@ -252,82 +405,87 @@ void MFrontendConfiguration::initializeFrontendFromConfigFile(
     config.endGroup();
 
 
-    // Configure scene views.
-    // ======================
-
-    size = config.beginReadArray("SceneViews");
-
-    for (int i = 0; i < min(size, MET3D_MAX_SCENEVIEWS); i++)
+    if (!loadSessionOnStart)
     {
-        config.setArrayIndex(i);
+        // Configure scene views.
+        // ======================
 
-        // Read scene navigation mode.
-        QString sceneNavigationMode = config.value("sceneNavigation").toString();
+        size = config.beginReadArray("SceneViews");
 
-        // Default setting is MOVE_CAMERA.
-        MSceneViewGLWidget::SceneNavigationMode navMode =
-                (sceneNavigationMode == "ROTATE_SCENE") ?
-                    MSceneViewGLWidget::ROTATE_SCENE :
-                    MSceneViewGLWidget::MOVE_CAMERA;
-
-        // Get pointer to MSceneViewGLWidget with index i.
-        MSceneViewGLWidget* glWidget =
-                sysMC->getMainWindow()->getGLWidgets().at(i);
-        glWidget->setSceneNavigationMode(navMode);
-
-        QStringList rotationCentreStrL =
-                config.value("sceneRotationCentre",
-                             QString("0./45./1050.")).toString().split("/");
-        QVector3D rotationCentre = QVector3D(
-                    rotationCentreStrL.at(0).toDouble(),
-                    rotationCentreStrL.at(1).toDouble(),
-                    rotationCentreStrL.at(2).toDouble());
-        glWidget->setSceneRotationCentre(rotationCentre);
-
-        LOG4CPLUS_DEBUG(mlog, "initializing view #" << i << ": ");
-        LOG4CPLUS_DEBUG(mlog, "  navigation mode = "
-                        << ((navMode == MSceneViewGLWidget::MOVE_CAMERA) ?
-                            "MOVE_CAMERA" : "ROTATE_SCENE"));
-        LOG4CPLUS_DEBUG(mlog, "  rotation centre = "
-                        << "latitude: " << rotationCentre.x() << " deg, "
-                        << "longitude: " << rotationCentre.y() << " deg, "
-                        << "pressure: " << rotationCentre.z() << " hPa");
-    }
-
-    config.endArray();
-
-
-    // Create scene controls.
-    // ======================
-
-    size = config.beginReadArray("Scenes");
-
-    for (int i = 0; i < size; i++)
-    {
-        config.setArrayIndex(i);
-
-        // Read settings from file.
-        QString name = config.value("name").toString();
-
-        LOG4CPLUS_DEBUG(mlog, "initializing scene #" << i << ": ");
-        LOG4CPLUS_DEBUG(mlog, "  name = " << name.toStdString());
-
-        // Check parameter validity.
-        if ( name.isEmpty() )
+        for (int i = 0; i < min(size, MET3D_MAX_SCENEVIEWS); i++)
         {
-            LOG4CPLUS_WARN(mlog, "invalid parameters encountered; skipping.");
-            continue;
+            config.setArrayIndex(i);
+
+            // Read scene navigation mode.
+            QString sceneNavigationMode =
+                    config.value("sceneNavigation").toString();
+
+            // Default setting is MOVE_CAMERA.
+            MSceneViewGLWidget::SceneNavigationMode navMode =
+                    (sceneNavigationMode == "ROTATE_SCENE") ?
+                        MSceneViewGLWidget::ROTATE_SCENE :
+                        MSceneViewGLWidget::MOVE_CAMERA;
+
+            // Get pointer to MSceneViewGLWidget with index i.
+            MSceneViewGLWidget* glWidget =
+                    sysMC->getMainWindow()->getGLWidgets().at(i);
+            glWidget->setSceneNavigationMode(navMode);
+
+            QStringList rotationCentreStrL =
+                    config.value("sceneRotationCentre",
+                                 QString("0./45./1050.")).toString().split("/");
+            QVector3D rotationCentre = QVector3D(
+                        rotationCentreStrL.at(0).toDouble(),
+                        rotationCentreStrL.at(1).toDouble(),
+                        rotationCentreStrL.at(2).toDouble());
+            glWidget->setSceneRotationCentre(rotationCentre);
+
+            LOG4CPLUS_DEBUG(mlog, "initializing view #" << i << ": ");
+            LOG4CPLUS_DEBUG(mlog, "  navigation mode = "
+                            << ((navMode == MSceneViewGLWidget::MOVE_CAMERA) ?
+                                    "MOVE_CAMERA" : "ROTATE_SCENE"));
+            LOG4CPLUS_DEBUG(mlog, "  rotation centre = "
+                            << "latitude: " << rotationCentre.x() << " deg, "
+                            << "longitude: " << rotationCentre.y() << " deg, "
+                            << "pressure: " << rotationCentre.z() << " hPa");
         }
 
-        // Create new scene.
-        MSceneControl *scene = new MSceneControl(name);
-        glRM->registerScene(scene);
-        sysMC->getMainWindow()->dockSceneControl(scene);
+        config.endArray();
+
+
+        // Create scene controls.
+        // ======================
+
+        size = config.beginReadArray("Scenes");
+
+        for (int i = 0; i < size; i++)
+        {
+            config.setArrayIndex(i);
+
+            // Read settings from file.
+            QString name = config.value("name").toString();
+
+            LOG4CPLUS_DEBUG(mlog, "initializing scene #" << i << ": ");
+            LOG4CPLUS_DEBUG(mlog, "  name = " << name.toStdString());
+
+            // Check parameter validity.
+            if ( name.isEmpty() )
+            {
+                LOG4CPLUS_WARN(mlog,
+                               "invalid parameters encountered; skipping.");
+                continue;
+            }
+
+            // Create new scene.
+            MSceneControl *scene = new MSceneControl(name);
+            glRM->registerScene(scene);
+            sysMC->getMainWindow()->dockSceneControl(scene);
+        }
+
+        config.endArray();
+
+        sysMC->getMainWindow()->setSceneViewLayout(1);
     }
-
-    config.endArray();
-
-    sysMC->getMainWindow()->setSceneViewLayout(1);
 
 
     // Waypoints model.
@@ -365,206 +523,215 @@ void MFrontendConfiguration::initializeFrontendFromConfigFile(
 
     config.endArray();
 
-
-    // Initialize bounding boxes.
-    // ==========================
-    config.beginGroup("BoundingBoxes");
-
-    QString bboxes = expandEnvironmentVariables(config.value("config", "")
-                                                .toString());
-
-    LOG4CPLUS_DEBUG(mlog, "initializing bounding boxes: ");
-    if (bboxes.isEmpty())
+    if (!loadSessionOnStart)
     {
-        LOG4CPLUS_WARN(mlog, "No configuration file for bounding boxes is"
-                             " specified in the frontend configuration."
-                             " Using default bounding box configuration.");
-        bboxes = expandEnvironmentVariables(
-                    "$MET3D_HOME/config/default_boundingboxes.bbox.conf");
-    }
-    LOG4CPLUS_DEBUG(mlog, "  file path = " << bboxes.toStdString());
-    sysMC->getBoundingBoxDock()->loadConfigurationFromFile(bboxes);
+        // Initialize bounding boxes.
+        // ==========================
+        config.beginGroup("BoundingBoxes");
 
-    config.endGroup();
+        QString bboxes = expandEnvironmentVariables(config.value("config", "")
+                                                    .toString());
 
-
-    // Add predefined actors to the scenes.
-    // ====================================
-
-    size = config.beginReadArray("PredefinedActors");
-
-    for (int i = 0; i < size; i++)
-    {
-        config.setArrayIndex(i);
-
-        // Read settings from file.
-        QString type = config.value("type").toString();
-        QString dataSourceID = config.value("dataSource").toString();
-        QString datafile = expandEnvironmentVariables(config.value("datafile")
-                                                      .toString());
-        QString bboxStr = config.value("bbox").toString();
-        QString scenesStr = config.value("scenes").toString();
-        QString levelTypeStr = config.value("levelType").toString();
-        QString nwpDataSourceID = config.value("NWPDataSource").toString();
-
-        LOG4CPLUS_DEBUG(mlog, "initializing predefined actor(s) #" << i << ": ");
-        LOG4CPLUS_DEBUG(mlog, "  type = " << type.toStdString());
-        LOG4CPLUS_DEBUG(mlog, "  dataSource = " << dataSourceID.toStdString());
-        LOG4CPLUS_DEBUG(mlog, "  datafile = " << datafile.toStdString());
-        LOG4CPLUS_DEBUG(mlog, "  bbox = " << bboxStr.toStdString());
-        LOG4CPLUS_DEBUG(mlog, "  scenes = " << scenesStr.toStdString());
-        LOG4CPLUS_DEBUG(mlog, "  levelType = " << levelTypeStr.toStdString());
-        LOG4CPLUS_DEBUG(mlog, "  NWPDataSource = " << nwpDataSourceID.toStdString());
-
-        QStringList bboxValues = bboxStr.split("/");
-        QRectF bbox;
-        if (bboxValues.size() == 4)
-            bbox = QRectF(bboxValues[0].toFloat(), bboxValues[1].toFloat(),
-                    bboxValues[2].toFloat(), bboxValues[3].toFloat());
-
-        QList<MSceneControl*> scenes;
-        foreach (QString sceneName, scenesStr.split("/"))
+        LOG4CPLUS_DEBUG(mlog, "initializing bounding boxes: ");
+        if (bboxes.isEmpty())
         {
-            MSceneControl* scene = glRM->getScene(sceneName);
-            if (scene != nullptr) scenes << scene;
+            LOG4CPLUS_WARN(mlog, "No configuration file for bounding boxes is"
+                                 " specified in the frontend configuration."
+                                 " Using default bounding box configuration.");
+            bboxes = expandEnvironmentVariables(
+                        "$MET3D_HOME/config/default_boundingboxes.bbox.conf");
         }
+        LOG4CPLUS_DEBUG(mlog, "  file path = " << bboxes.toStdString());
+        sysMC->getBoundingBoxDock()->loadConfigurationFromFile(bboxes);
 
-        MVerticalLevelType levelType =
-                MStructuredGrid::verticalLevelTypeFromConfigString(levelTypeStr);
+        config.endGroup();
 
-        // Check parameter validity.
-        if ( type.isEmpty()
-             || scenes.empty() )
+
+        // Add predefined actors to the scenes.
+        // ====================================
+
+        size = config.beginReadArray("PredefinedActors");
+
+        for (int i = 0; i < size; i++)
         {
-            LOG4CPLUS_WARN(mlog, "invalid parameters encountered; skipping.");
-            continue;
-        }
+            config.setArrayIndex(i);
 
-        // Create new predefined actor(s).
-        if (type == "Basemap")
-            initializeDefaultActors_Basemap(datafile, bbox, scenes);
-        else if (type == "VolumeBox")
-            initializeDefaultActors_VolumeBox(bbox, scenes);
-        else if (type == "HSec_MSLP")
-            initializeDefaultActors_MSLP(dataSourceID, bbox, scenes);
-        else if (type == "Surface")
-            initializeDefaultActors_Surface(dataSourceID, bbox, scenes);
-        else if (type == "VSec_PV")
-            initializeDefaultActors_VSec_PV(dataSourceID, scenes);
-        else if (type == "VSec_Clouds")
-            initializeDefaultActors_VSec_Clouds(dataSourceID, scenes);
-        else if (type == "HSec")
-            initializeDefaultActors_HSec(dataSourceID, bbox, scenes);
-        else if (type == "HSec_Difference")
-            initializeDefaultActors_HSec_Difference(dataSourceID, bbox, scenes);
-        else if (type == "PressurePoles")
-            initializeDefaultActors_PressurePoles(scenes);
-        else if (type == "WCB_Probability")
-            initializeDefaultActors_VolumeProbability(dataSourceID, levelType,
-                                                      nwpDataSourceID, bbox,
-                                                      scenes);
-        else if (type == "Volume")
-            initializeDefaultActors_Volume(dataSourceID, bbox, scenes);
-        else if (type == "Trajectories")
-            initializeDefaultActors_Trajectories(dataSourceID, scenes);
-    }
+            // Read settings from file.
+            QString type = config.value("type").toString();
+            QString dataSourceID = config.value("dataSource").toString();
+            QString datafile = expandEnvironmentVariables(
+                        config.value("datafile").toString());
+            QString bboxStr = config.value("bbox").toString();
+            QString scenesStr = config.value("scenes").toString();
+            QString levelTypeStr = config.value("levelType").toString();
+            QString nwpDataSourceID = config.value("NWPDataSource").toString();
 
-    config.endArray();
+            LOG4CPLUS_DEBUG(mlog, "initializing predefined actor(s) #"
+                            << i << ": ");
+            LOG4CPLUS_DEBUG(mlog, "  type = " << type.toStdString());
+            LOG4CPLUS_DEBUG(mlog, "  dataSource = "
+                            << dataSourceID.toStdString());
+            LOG4CPLUS_DEBUG(mlog, "  datafile = " << datafile.toStdString());
+            LOG4CPLUS_DEBUG(mlog, "  bbox = " << bboxStr.toStdString());
+            LOG4CPLUS_DEBUG(mlog, "  scenes = " << scenesStr.toStdString());
+            LOG4CPLUS_DEBUG(mlog, "  levelType = "
+                            << levelTypeStr.toStdString());
+            LOG4CPLUS_DEBUG(mlog, "  NWPDataSource = "
+                            << nwpDataSourceID.toStdString());
 
+            QStringList bboxValues = bboxStr.split("/");
+            QRectF bbox;
+            if (bboxValues.size() == 4)
+                bbox = QRectF(bboxValues[0].toFloat(), bboxValues[1].toFloat(),
+                        bboxValues[2].toFloat(), bboxValues[3].toFloat());
 
-    // Add actors from config files to the scenes.
-    // ===========================================
-
-    size = config.beginReadArray("Actors");
-
-    for (int i = 0; i < size; i++)
-    {
-        config.setArrayIndex(i);
-
-        // Read settings from file.
-        QString configfile = expandEnvironmentVariables(config.value("config")
-                                                        .toString());
-        QString scenesStr = config.value("scenes").toString();
-
-        LOG4CPLUS_DEBUG(mlog, "initializing actor #" << i << ": ");
-        LOG4CPLUS_DEBUG(mlog, "  config = " << configfile.toStdString());
-        LOG4CPLUS_DEBUG(mlog, "  scenes = " << scenesStr.toStdString());
-
-        QList<MSceneControl*> scenes;
-        foreach (QString sceneName, scenesStr.split("/"))
-        {
-            MSceneControl* scene = glRM->getScene(sceneName);
-            if (scene != nullptr) scenes << scene;
-        }
-
-        // Check parameter validity.
-        if ( configfile.isEmpty()
-             || scenes.empty() )
-        {
-            LOG4CPLUS_WARN(mlog, "invalid parameters encountered; skipping.");
-            continue;
-        }
-
-        if ( !QFile::exists(configfile) )
-        {
-            LOG4CPLUS_WARN(mlog, "cannot find actor configuration file; skipping.");
-            continue;
-        }
-
-        // Find actor that can be created with the specified config file and
-        // create a new instance.
-        foreach (MAbstractActorFactory* factory, glRM->getActorFactories())
-        {
-            if (factory->acceptSettings(configfile))
+            QList<MSceneControl*> scenes;
+            foreach (QString sceneName, scenesStr.split("/"))
             {
-                LOG4CPLUS_DEBUG(mlog, "  config corresponds to actor of type "
-                                << factory->getName().toStdString());
+                MSceneControl* scene = glRM->getScene(sceneName);
+                if (scene != nullptr) scenes << scene;
+            }
 
-                MActor *actor = factory->create(configfile);
-                if (!actor)
+            MVerticalLevelType levelType =
+                    MStructuredGrid::verticalLevelTypeFromConfigString(
+                        levelTypeStr);
+
+            // Check parameter validity.
+            if ( type.isEmpty()
+                 || scenes.empty() )
+            {
+                LOG4CPLUS_WARN(mlog, "invalid parameters encountered; skipping.");
+                continue;
+            }
+
+            // Create new predefined actor(s).
+            if (type == "Basemap")
+                initializeDefaultActors_Basemap(datafile, bbox, scenes);
+            else if (type == "VolumeBox")
+                initializeDefaultActors_VolumeBox(bbox, scenes);
+            else if (type == "HSec_MSLP")
+                initializeDefaultActors_MSLP(dataSourceID, bbox, scenes);
+            else if (type == "Surface")
+                initializeDefaultActors_Surface(dataSourceID, bbox, scenes);
+            else if (type == "VSec_PV")
+                initializeDefaultActors_VSec_PV(dataSourceID, scenes);
+            else if (type == "VSec_Clouds")
+                initializeDefaultActors_VSec_Clouds(dataSourceID, scenes);
+            else if (type == "HSec")
+                initializeDefaultActors_HSec(dataSourceID, bbox, scenes);
+            else if (type == "HSec_Difference")
+                initializeDefaultActors_HSec_Difference(dataSourceID, bbox,
+                                                        scenes);
+            else if (type == "PressurePoles")
+                initializeDefaultActors_PressurePoles(scenes);
+            else if (type == "WCB_Probability")
+                initializeDefaultActors_VolumeProbability(
+                            dataSourceID, levelType, nwpDataSourceID, bbox,
+                            scenes);
+            else if (type == "Volume")
+                initializeDefaultActors_Volume(dataSourceID, bbox, scenes);
+            else if (type == "Trajectories")
+                initializeDefaultActors_Trajectories(dataSourceID, scenes);
+        }
+
+        config.endArray();
+
+
+        // Add actors from config files to the scenes.
+        // ===========================================
+
+        size = config.beginReadArray("Actors");
+
+        for (int i = 0; i < size; i++)
+        {
+            config.setArrayIndex(i);
+
+            // Read settings from file.
+            QString configfile =
+                    expandEnvironmentVariables(config.value("config").toString());
+            QString scenesStr = config.value("scenes").toString();
+
+            LOG4CPLUS_DEBUG(mlog, "initializing actor #" << i << ": ");
+            LOG4CPLUS_DEBUG(mlog, "  config = " << configfile.toStdString());
+            LOG4CPLUS_DEBUG(mlog, "  scenes = " << scenesStr.toStdString());
+
+            QList<MSceneControl*> scenes;
+            foreach (QString sceneName, scenesStr.split("/"))
+            {
+                MSceneControl* scene = glRM->getScene(sceneName);
+                if (scene != nullptr) scenes << scene;
+            }
+
+            // Check parameter validity.
+            if ( configfile.isEmpty()
+                 || scenes.empty() )
+            {
+                LOG4CPLUS_WARN(mlog, "invalid parameters encountered; skipping.");
+                continue;
+            }
+
+            if ( !QFile::exists(configfile) )
+            {
+                LOG4CPLUS_WARN(mlog,
+                               "cannot find actor configuration file; skipping.");
+                continue;
+            }
+
+            // Find actor that can be created with the specified config file and
+            // create a new instance.
+            foreach (MAbstractActorFactory* factory, glRM->getActorFactories())
+            {
+                if (factory->acceptSettings(configfile))
                 {
-                    break;
-                }
+                    LOG4CPLUS_DEBUG(mlog, "  config corresponds to actor of type "
+                                    << factory->getName().toStdString());
 
-                QString actorName = actor->getName();
-                bool ok = true;
-                // Check whether name already exists.
-                while (actorName.isEmpty() || glRM->getActorByName(actorName))
-                {
-                    actorName = QInputDialog::getText(
-                                nullptr, "Change actor name",
-                                "The given actor name already exists, please "
-                                "enter a new one:",
-                                QLineEdit::Normal,
-                                actorName, &ok);
-
-                    if (!ok)
+                    MActor *actor = factory->create(configfile);
+                    if (!actor)
                     {
-                        // The user has pressed the "Cancel" button.
-                        delete actor;
                         break;
                     }
 
-                    actor->setName(actorName);
-                }
-                // The user has pressed the "Cancel" button.
-                if (!ok)
-                {
+                    QString actorName = actor->getName();
+                    bool ok = true;
+                    // Check whether name already exists.
+                    while (actorName.isEmpty() || glRM->getActorByName(actorName))
+                    {
+                        actorName = QInputDialog::getText(
+                                    nullptr, "Change actor name",
+                                    "The given actor name already exists, please "
+                                    "enter a new one:",
+                                    QLineEdit::Normal,
+                                    actorName, &ok);
+
+                        if (!ok)
+                        {
+                            // The user has pressed the "Cancel" button.
+                            delete actor;
+                            break;
+                        }
+
+                        actor->setName(actorName);
+                    }
+                    // The user has pressed the "Cancel" button.
+                    if (!ok)
+                    {
+                        break;
+                    }
+
+                    glRM->registerActor(actor);
+                    foreach (MSceneControl *scene, scenes)
+                    {
+                        scene->addActor(actor);
+                    }
+
                     break;
                 }
-
-                glRM->registerActor(actor);
-                foreach (MSceneControl *scene, scenes)
-                {
-                    scene->addActor(actor);
-                }
-
-                break;
             }
         }
-    }
 
-    config.endArray();
+        config.endArray();
+    }
 
     LOG4CPLUS_INFO(mlog, "Frontend has been configured.");
 }
@@ -576,11 +743,13 @@ void MFrontendConfiguration::initializeSynchronization(
 {
     MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
 
-    MSyncControl* syncControl = new MSyncControl(syncName, sysMC->getMainWindow());
+    MSyncControl* syncControl =
+            new MSyncControl(syncName, sysMC->getMainWindow());
     sysMC->registerSyncControl(syncControl);
     sysMC->getMainWindow()->dockSyncControl(syncControl);
 
-    syncControl->restrictToDataSourcesFromFrontend(initializeFromDataSources);
+    syncControl->restrictToDataSourcesFromSettings(
+                QStringList(initializeFromDataSources));
 }
 
 
