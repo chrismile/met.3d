@@ -31,6 +31,7 @@
 // standard library imports
 
 // related third party imports
+#include <QInputDialog>
 
 // local application imports
 #include "gxfw/mglresourcesmanager.h"

@@ -32,6 +32,7 @@
 
 // related third party imports
 #include <log4cplus/loggingmacros.h>
+#include <QMenu>
 
 // local application imports
 #include "util/mutil.h"

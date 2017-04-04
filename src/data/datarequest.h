@@ -29,8 +29,11 @@
 // standard library imports
 
 // related third party imports
-#include <QtCore>
-#include <QtGui>
+#include <QString>
+#include <QDateTime>
+#include <QVector3D>
+#include <QMap>
+#include <QSet>
 
 // local application imports
 

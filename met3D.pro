@@ -32,7 +32,7 @@ include(../third-party/qt-solutions/qtpropertybrowser/src/qtpropertybrowser.pri)
 
 CONFIG += console
 
-QT += opengl core gui network xml
+QT += opengl core gui network xml concurrent
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets printsupport
 
 HEADERS += \

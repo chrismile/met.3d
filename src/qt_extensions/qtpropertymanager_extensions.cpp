@@ -75,14 +75,14 @@
 // standard library imports
 
 // related third party imports
-#include <QtGui/QApplication>
-#include <QtGui/QPainter>
-#include <QtGui/QHBoxLayout>
-#include <QtGui/QMouseEvent>
-#include <QtGui/QCheckBox>
-#include <QtGui/QLineEdit>
-#include <QtGui/QMenu>
-#include <QtGui/QStyleOption>
+#include <QApplication>
+#include <QPainter>
+#include <QHBoxLayout>
+#include <QMouseEvent>
+#include <QCheckBox>
+#include <QLineEdit>
+#include <QMenu>
+#include <QStyleOption>
 
 // local application imports
 

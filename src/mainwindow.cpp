@@ -31,6 +31,9 @@
 #include <iostream>
 
 // related third party imports
+#include <QDockWidget>
+#include <QDesktopServices>
+
 #include <log4cplus/loggingmacros.h>
 
 // local application imports

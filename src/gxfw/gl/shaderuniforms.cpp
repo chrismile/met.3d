@@ -31,6 +31,11 @@
 // related third party imports
 #include <log4cplus/loggingmacros.h>
 #include <stdexcept>
+#include <QVector2D>
+#include <QVector3D>
+#include <QVector4D>
+#include <QColor>
+#include <QMatrix4x4>
 
 // local application imports
 #include "util/mutil.h"
@@ -447,7 +452,7 @@ void MShaderEffect
 void MShaderEffect
 ::setUniformValue(const QString name, const QMatrix4x4& matrix)
 {
-    setUniformMatrixXY(name, 1, 4, 4, GL_FLOAT_MAT4, matrix.constData());
+    setUniformMatrixXYf(name, 1, 4, 4, GL_FLOAT_MAT4, matrix.constData());
 }
 
 
@@ -458,7 +463,7 @@ void MShaderEffect
 void MShaderEffect
 ::setUniformValue(const QString name, const QMatrix3x3& matrix)
 {
-    setUniformMatrixXY(name, 1, 3, 3, GL_FLOAT_MAT3, matrix.constData());
+    setUniformMatrixXYf(name, 1, 3, 3, GL_FLOAT_MAT3, matrix.constData());
 }
 
 
@@ -469,7 +474,7 @@ void MShaderEffect
 void MShaderEffect
 ::setUniformValue(const QString name, const QMatrix2x2& matrix)
 {  
-   setUniformMatrixXY(name, 1, 2, 2, GL_FLOAT_MAT2, matrix.constData());
+   setUniformMatrixXYf(name, 1, 2, 2, GL_FLOAT_MAT2, matrix.constData());
 }
 
 
@@ -481,7 +486,7 @@ void MShaderEffect
 ::setUniformValue(const QString name, const QMatrix2x3& matrix)
 {
 
-    setUniformMatrixXY(name, 1, 2, 3, GL_FLOAT_MAT2x3, matrix.constData());
+    setUniformMatrixXYf(name, 1, 2, 3, GL_FLOAT_MAT2x3, matrix.constData());
 }
 
 
@@ -489,7 +494,7 @@ void MShaderEffect
 ::setUniformValue(const QString name, const QMatrix2x4& matrix)
 {
 
-    setUniformMatrixXY(name, 1, 2, 4, GL_FLOAT_MAT2x4, matrix.constData());
+    setUniformMatrixXYf(name, 1, 2, 4, GL_FLOAT_MAT2x4, matrix.constData());
 }
 
 
@@ -497,7 +502,7 @@ void MShaderEffect
 ::setUniformValue(const QString name, const QMatrix3x2& matrix)
 {
 
-    setUniformMatrixXY(name, 1, 3, 2, GL_FLOAT_MAT3x2, matrix.constData());
+    setUniformMatrixXYf(name, 1, 3, 2, GL_FLOAT_MAT3x2, matrix.constData());
 }
 
 
@@ -505,7 +510,7 @@ void MShaderEffect
 ::setUniformValue(const QString name, const QMatrix3x4& matrix)
 {
 
-    setUniformMatrixXY(name, 1, 3, 4, GL_FLOAT_MAT3x4, matrix.constData());
+    setUniformMatrixXYf(name, 1, 3, 4, GL_FLOAT_MAT3x4, matrix.constData());
 }
 
 
@@ -513,7 +518,7 @@ void MShaderEffect
 ::setUniformValue(const QString name, const QMatrix4x2& matrix)
 {
 
-    setUniformMatrixXY(name, 1, 4, 2, GL_FLOAT_MAT4x2, matrix.constData());
+    setUniformMatrixXYf(name, 1, 4, 2, GL_FLOAT_MAT4x2, matrix.constData());
 }
 
 
@@ -521,7 +526,7 @@ void MShaderEffect
 ::setUniformValue(const QString name, const QMatrix4x3& matrix)
 {
 
-    setUniformMatrixXY(name, 1, 4, 3, GL_FLOAT_MAT4x3, matrix.constData());
+    setUniformMatrixXYf(name, 1, 4, 3, GL_FLOAT_MAT4x3, matrix.constData());
 }
 
 
@@ -558,6 +563,19 @@ void MShaderEffect
 
 		delete[] mat;
     }
+}
+
+void MShaderEffect
+::setUniformMatrixXYf(const QString name, const int8_t count,
+                        const int8_t cols, const int8_t rows,
+                        const GLenum type, const float* data)
+{
+    if (currentProgram.second == -1) { return; }
+
+    // QMatrix must not be transposed! --> GL_FALSE
+    std::shared_ptr<Uniform>& uniform = getUniform(name);
+    const GLfloat* mat = reinterpret_cast<const GLfloat*>(data);
+    uniform->setUniform(type, mat, count, 1);
 }
 
 
@@ -796,7 +814,7 @@ void MShaderEffect
 ::setUniformValueArray(const QString name, const QMatrix4x4* data,
                        const int8_t count)
 { 
-    setUniformMatrixXY(name, count, 4, 4, GL_FLOAT_MAT4, data[0].constData());
+    setUniformMatrixXYf(name, count, 4, 4, GL_FLOAT_MAT4, data[0].constData());
 }
 
 
@@ -804,7 +822,7 @@ void MShaderEffect
 ::setUniformValueArray(const QString name, const QMatrix3x3* data,
                           const int8_t count)
 {
-    setUniformMatrixXY(name, count, 3, 3, GL_FLOAT_MAT3, data[0].constData());
+    setUniformMatrixXYf(name, count, 3, 3, GL_FLOAT_MAT3, data[0].constData());
 }
 
 
@@ -812,7 +830,7 @@ void MShaderEffect
 ::setUniformValueArray(const QString name, const QMatrix2x2* data,
                           const int8_t count)
 {
-    setUniformMatrixXY(name, count, 2, 2, GL_FLOAT_MAT2, data[0].constData());
+    setUniformMatrixXYf(name, count, 2, 2, GL_FLOAT_MAT2, data[0].constData());
 }
 
 
@@ -824,7 +842,7 @@ void MShaderEffect
 ::setUniformValueArray(const QString name, const QMatrix2x3* data,
                        const int8_t count)
 {
-    setUniformMatrixXY(name, count, 2, 3, GL_FLOAT_MAT2x3, data[0].constData());
+    setUniformMatrixXYf(name, count, 2, 3, GL_FLOAT_MAT2x3, data[0].constData());
 }
 
 
@@ -832,7 +850,7 @@ void MShaderEffect
 ::setUniformValueArray(const QString name, const QMatrix2x4* data,
                        const int8_t count)
 {
-    setUniformMatrixXY(name, count, 2, 4, GL_FLOAT_MAT2x4, data[0].constData());
+    setUniformMatrixXYf(name, count, 2, 4, GL_FLOAT_MAT2x4, data[0].constData());
 }
 
 
@@ -840,7 +858,7 @@ void MShaderEffect
 ::setUniformValueArray(const QString name, const QMatrix3x2* data,
                           const int8_t count)
 {
-    setUniformMatrixXY(name, count, 3, 2, GL_FLOAT_MAT3x2, data[0].constData());
+    setUniformMatrixXYf(name, count, 3, 2, GL_FLOAT_MAT3x2, data[0].constData());
 }
 
 
@@ -849,7 +867,7 @@ void MShaderEffect
                           const int8_t count)
 {
 
-    setUniformMatrixXY(name, count, 3, 4, GL_FLOAT_MAT3x4, data[0].constData());
+    setUniformMatrixXYf(name, count, 3, 4, GL_FLOAT_MAT3x4, data[0].constData());
 }
 
 
@@ -857,7 +875,7 @@ void MShaderEffect
 ::setUniformValueArray(const QString name, const QMatrix4x2* data,
                           const int8_t count)
 {
-    setUniformMatrixXY(name, count, 4, 2, GL_FLOAT_MAT4x2, data[0].constData());
+    setUniformMatrixXYf(name, count, 4, 2, GL_FLOAT_MAT4x2, data[0].constData());
 }
 
 
@@ -865,7 +883,7 @@ void MShaderEffect
 ::setUniformValueArray(const QString name, const QMatrix4x3* data,
                           const int8_t count)
 {
-    setUniformMatrixXY(name, count, 4, 3, GL_FLOAT_MAT4x3, data[0].constData());
+    setUniformMatrixXYf(name, count, 4, 3, GL_FLOAT_MAT4x3, data[0].constData());
 }
 
 

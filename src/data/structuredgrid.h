@@ -31,8 +31,6 @@
 
 // related third party imports
 #include "GL/glew.h"
-#include <QtCore>
-#include <QtGui>
 #include <QGLWidget>
 
 // local application imports

@@ -925,7 +925,8 @@ bool MNWPVolumeRaycasterActor::triggerAnalysisOfObjectAtPos(
     // If the value for lambdaNear is < 0 the camera is located inside the
     // bounding box. It makes no sense to start the ray traversal behind the
     // camera, hence move lambdaNear to 0 to start in front of the camera.
-    lambdaNearFar.setX(max(lambdaNearFar.x(), 0.01));
+    if(lambdaNearFar.x() < 0.01)
+        lambdaNearFar.setX(0.01);
 
     float stepSize = rayCasterSettings->stepSize;
     float lambda = lambdaNearFar.x();

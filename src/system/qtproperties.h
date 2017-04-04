@@ -29,7 +29,6 @@
 // standard library imports
 
 // related third party imports
-#include <QtGui>
 
 // local application imports
 #include "qtpropertymanager.h"

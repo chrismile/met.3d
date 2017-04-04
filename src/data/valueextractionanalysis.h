@@ -30,6 +30,7 @@
 
 // related third party imports
 #include <QtCore>
+#include <QTextBrowser>
 
 // local application imports
 #include "datarequest.h"

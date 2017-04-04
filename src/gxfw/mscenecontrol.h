@@ -30,8 +30,6 @@
 // standard library imports
 
 // related third party imports
-#include <QtCore>
-#include <QtGui>
 #include "qttreepropertybrowser.h"
 
 // local application imports

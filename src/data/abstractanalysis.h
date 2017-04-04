@@ -30,6 +30,8 @@
 
 // related third party imports
 #include <QtCore>
+#include <QDockWidget>
+#include <QInputDialog>
 
 // local application imports
 #include "scheduleddatasource.h"

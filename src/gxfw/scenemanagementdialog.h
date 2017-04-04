@@ -32,8 +32,8 @@
 
 // related third party imports
 #include <QDialog>
-#include <QtGui>
-#include <QtCore>
+#include <QListWidgetItem>
+#include <QComboBox>
 
 #include "gxfw/actorcreationdialog.h"
 

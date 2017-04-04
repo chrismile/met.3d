@@ -33,10 +33,10 @@
 #include <string>
 
 // related third party imports
-#include <QtGui>
-#include <QtOpenGL>
 #include <log4cplus/loggingmacros.h>
 #include <QFileInfo>
+#include <QLabel>
+#include <QMouseEvent>
 
 // local application imports
 #include "util/mutil.h"
@@ -1254,23 +1254,9 @@ void MSceneViewGLWidget::initializeGL()
         const QVector<MActor*>& renderQueue = scene->getRenderQueue();
         for (int i = 0; i < renderQueue.size(); i++)
             renderQueue[i]->initializePerGLContextResources(this);
+
+        updateSceneLabel();
     }
-
-    // Add static scene labels.
-    MTextManager* tm = MGLResourcesManager::getInstance()->getTextManager();
-//    staticLabels.append(tm->addText(
-//                            "Met.3D",
-//                            MTextManager::CLIPSPACE, 0.99, -0.99, -0.99, 32, QColor(255, 0, 0),
-//                            MTextManager::BASELINERIGHT)
-//                        );
-    // Create a new scene description label (view number and scene name in
-    // lower left corner of the view).
-    sceneNameLabel = tm->addText(
-                QString("view %1 (%2)").arg(myID+1).arg(scene->getName()),
-                MTextManager::CLIPSPACE, -0.99, -0.99, -0.99, 20,
-                QColor(0, 0, 255, 150));
-
-    staticLabels.append(sceneNameLabel);
 
     // Show scene time.
 //    updateDisplayTime();

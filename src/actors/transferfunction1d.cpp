@@ -31,6 +31,7 @@
 
 // related third party imports
 #include <log4cplus/loggingmacros.h>
+#include <QFileDialog>
 
 // local application imports
 #include "gxfw/mglresourcesmanager.h"
@@ -564,7 +565,7 @@ void MTransferFunction1D::loadConfiguration(QSettings *settings)
         {
             settings->setArrayIndex(i);
             float pos = settings->value("position", 0).toFloat();
-            float alpha = settings->value("alpha", Qt::black).toFloat();
+            float alpha = settings->value("alpha", QVariant::fromValue(Qt::black)).toFloat();
 
             alphaNodes->push_back(pos, alpha);
         }
