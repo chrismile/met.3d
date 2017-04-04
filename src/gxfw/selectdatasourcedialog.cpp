@@ -55,6 +55,8 @@ MSelectDataSourceDialog::MSelectDataSourceDialog(QWidget *parent)
 {
     ui->setupUi(this);
 
+    ui->label->setText("Please select data sources and confirm with \"OK\":");
+
     createDataSourceEntries();
 }
 
@@ -67,6 +69,9 @@ MSelectDataSourceDialog::MSelectDataSourceDialog(
       dataSourceAvailable(true)
 {
     ui->setupUi(this);
+
+    ui->label->setText("Please select a variable and confirm with \"OK\":");
+
     createDataSourceEntries(supportList);
 }
 
@@ -144,6 +149,7 @@ bool MSelectDataSourceDialog::checkDataSourceForData(
     QStringList variables;
     QList<QDateTime> currentInitTimes;
     QList<QDateTime> currentValidTimes;
+    bool validTimesMissing = true;
 
     // Check if data source contains init times, valid times and
     // ensemble members.
@@ -164,6 +170,7 @@ bool MSelectDataSourceDialog::checkDataSourceForData(
                 continue;
             }
 
+            validTimesMissing = true;
             for (int iInitTime = 0; iInitTime < currentInitTimes.size();
                  iInitTime++)
             {
@@ -175,7 +182,13 @@ bool MSelectDataSourceDialog::checkDataSourceForData(
                 {
                     continue;
                 }
+                validTimesMissing = false;
             } // initTimes
+
+            if (validTimesMissing)
+            {
+                continue;
+            }
 
             if (source->availableEnsembleMembers(levelType, var).size() == 0)
             {
