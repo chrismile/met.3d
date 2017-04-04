@@ -1261,7 +1261,7 @@ void MFrontendConfiguration::initializeDefaultActors_Trajectories(
     trajectoryActor->setDataSource(dataSourceID + QString(" Reader"));
     trajectoryActor->setNormalsSource(dataSourceID + QString(" Normals"));
     trajectoryActor->setTrajectoryFilter(dataSourceID + QString(" timestepFilter"));
-    trajectoryActor->setTransferFunction(transferFunctionPressure);
+    trajectoryActor->setTransferFunction(transferFunctionPressure->getName());
     trajectoryActor->synchronizeWith(sysMC->getSyncControl("Synchronization"));
     trajectoryActor->setEnabled(true);
     glRM->registerActor(trajectoryActor);

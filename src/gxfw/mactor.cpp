@@ -222,7 +222,8 @@ QString MActor::getName()
 
 void MActor::registerScene(MSceneControl *scene)
 {
-    if (!scenes.contains(scene)) {
+    if (!scenes.contains(scene))
+    {
         scenes.append(scene);
     }
 }

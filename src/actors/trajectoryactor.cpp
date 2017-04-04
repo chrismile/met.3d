@@ -37,6 +37,7 @@
 #include "util/mexception.h"
 #include "gxfw/mglresourcesmanager.h"
 #include "gxfw/msceneviewglwidget.h"
+#include "gxfw/selectdatasourcedialog.h"
 
 using namespace std;
 
@@ -56,12 +57,14 @@ MTrajectoryActor::MTrajectoryActor()
       trajectoryFilter(nullptr),
       trajectorySelection(nullptr),
       trajectorySingleTimeSelection(nullptr),
+      dataSourceID(""),
       suppressUpdate(false),
       normalsToBeComputed(true),
       renderMode(TRAJECTORY_TUBES),
       syncWithValidTime(true),
       synchronizationControl(nullptr),
       bbox(QRectF(-90., 0., 180., 90.)),
+      transferFunction(nullptr),
       textureUnitTransferFunction(-1),
       tubeRadius(0.1),
       sphereRadius(0.2),
@@ -73,6 +76,18 @@ MTrajectoryActor::MTrajectoryActor()
     beginInitialiseQtProperties();
 
     setName("Trajectories");
+
+    // Remove labels property group since it is not used for trajectory actors
+    // yet.
+    actorPropertiesSupGroup->removeSubProperty(labelPropertiesSupGroup);
+
+    // Data source selection.
+    selectDataSourceProperty = addProperty(CLICK_PROPERTY, "select data source",
+                                           actorPropertiesSupGroup);
+    utilizedDataSourceProperty = addProperty(STRING_PROPERTY,
+                                             "data source",
+                                             actorPropertiesSupGroup);
+    utilizedDataSourceProperty->setEnabled(false);
 
     // Render mode.
     QStringList renderModeNames;
@@ -133,6 +148,23 @@ MTrajectoryActor::MTrajectoryActor()
                                actorPropertiesSupGroup);
     properties->setRectF(bboxProperty, bbox, 2);
 
+    // Transfer function.
+    // Scan currently available actors for transfer functions. Add TFs to
+    // the list displayed in the combo box of the transferFunctionProperty.
+    QStringList availableTFs;
+    availableTFs << "None";
+    MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
+    foreach (MActor *mactor, glRM->getActors())
+    {
+        if (MTransferFunction1D *tf = dynamic_cast<MTransferFunction1D*>(mactor))
+        {
+            availableTFs << tf->transferFunctionName();
+        }
+    }
+    transferFunctionProperty = addProperty(ENUM_PROPERTY, "transfer function",
+                                           actorPropertiesSupGroup);
+    properties->mEnum()->setEnumNames(transferFunctionProperty, availableTFs);
+
     // Render mode and parameters.
     tubeRadiusProperty = addProperty(DECORATEDDOUBLE_PROPERTY, "tube radius",
                                      actorPropertiesSupGroup);
@@ -151,6 +183,13 @@ MTrajectoryActor::MTrajectoryActor()
     colourShadowProperty = addProperty(BOOL_PROPERTY, "colour shadows",
                                        actorPropertiesSupGroup);
     properties->mBool()->setValue(colourShadowProperty, shadowColoured);
+
+    // Observe the creation/deletion of other actors -- if these are transfer
+    // functions, add to the list displayed in the transfer function property.
+    connect(glRM, SIGNAL(actorCreated(MActor*)), SLOT(onActorCreated(MActor*)));
+    connect(glRM, SIGNAL(actorDeleted(MActor*)), SLOT(onActorDeleted(MActor*)));
+    connect(glRM, SIGNAL(actorRenamed(MActor*, QString)),
+            SLOT(onActorRenamed(MActor*, QString)));
 
     endInitialiseQtProperties();
 }
@@ -197,6 +236,8 @@ void MTrajectoryActor::saveConfiguration(QSettings *settings)
 {
     settings->beginGroup(MTrajectoryActor::getSettingsID());
 
+    settings->setValue("dataSourceID", dataSourceID);
+
     settings->setValue("renderMode", static_cast<int>(renderMode));
 
     settings->setValue("enableFilter",
@@ -208,6 +249,9 @@ void MTrajectoryActor::saveConfiguration(QSettings *settings)
                        properties->mDDouble()->value(deltaTimeProperty));
 
     settings->setValue("boundingBox", bbox);
+
+    settings->setValue("transferFunction",
+                       properties->getEnumItem(transferFunctionProperty));
 
     settings->setValue("tubeRadius", tubeRadius);
     settings->setValue("sphereRadius", sphereRadius);
@@ -221,6 +265,63 @@ void MTrajectoryActor::saveConfiguration(QSettings *settings)
 void MTrajectoryActor::loadConfiguration(QSettings *settings)
 {
     settings->beginGroup(MTrajectoryActor::getSettingsID());
+
+    QString dataSourceID = settings->value("dataSourceID", "").toString();
+
+
+    properties->mString()->setValue(utilizedDataSourceProperty,
+                                    dataSourceID);
+
+    releaseData();
+    enableProperties(true);
+
+    this->setDataSource(dataSourceID + QString(" Reader"));
+    this->setNormalsSource(dataSourceID + QString(" Normals"));
+    this->setTrajectoryFilter(dataSourceID + QString(" timestepFilter"));
+
+    bool dataSourceAvailable =
+            MSelectDataSourceDialog::checkForTrajectoryDataSource(dataSourceID);
+
+    // The configuration file specifies a data source which does not exist.
+    // Display warning and load rest of the configuration.
+    if (!dataSourceAvailable)
+    {
+
+        QMessageBox msgBox;
+        msgBox.setIcon(QMessageBox::Warning);
+        msgBox.setText(QString("Trajectory actor '%1':\n"
+                               "Data source '%2' does not exist.\n"
+                               "Select a new one.")
+                       .arg(getName()).arg(dataSourceID));
+        msgBox.exec();
+        if (isInitialized())
+        {
+            if (!selectDataSource())
+            {
+                // User has selected no data source. Display a warning and
+                // disable all trajectory properties.
+                QMessageBox msgBox;
+                msgBox.setIcon(QMessageBox::Warning);
+                msgBox.setText("No data source selected. Disabling all"
+                               " properties.");
+                msgBox.exec();
+                enableActorUpdates(false);
+                properties->mString()->setValue(utilizedDataSourceProperty, "");
+                properties->mInt()->setValue(ensembleMemberProperty, 0);
+                properties->mInt()->setMaximum(ensembleMemberProperty, 0);
+                enableActorUpdates(true);
+                enableProperties(false);
+            }
+            else
+            {
+                dataSourceAvailable = true;
+            }
+        }
+    }
+
+    updateInitTimeProperty();
+    updateValidTimeProperty();
+    updateTrajectoryTimeProperty();
 
     properties->mEnum()->setValue(
                 renderModeProperty,
@@ -241,6 +342,18 @@ void MTrajectoryActor::loadConfiguration(QSettings *settings)
     bbox = settings->value("boundingBox").toRectF();
     properties->mRectF()->setValue(bboxProperty, bbox);
 
+    QString tfName = settings->value("transferFunction").toString();
+    if ( !setTransferFunction(tfName) )
+    {
+        QMessageBox msgBox;
+        msgBox.setIcon(QMessageBox::Warning);
+        msgBox.setText(QString("Trajectory actor '%1':\n"
+                               "Transfer function '%2' does not exist.\n"
+                               "Setting transfer function to 'None'.")
+                       .arg(getName()).arg(tfName));
+        msgBox.exec();
+    }
+
     properties->mDDouble()->setValue(
                 tubeRadiusProperty,
                 settings->value("tubeRadius").toFloat());
@@ -259,13 +372,36 @@ void MTrajectoryActor::loadConfiguration(QSettings *settings)
 
     settings->endGroup();
 
-    if (isInitialized()) asynchronousSelectionRequest();
+    if (isInitialized() && dataSourceAvailable)
+    {
+        asynchronousSelectionRequest();
+        asynchronousDataRequest();
+    }
 }
 
 
 void MTrajectoryActor::setTransferFunction(MTransferFunction1D *tf)
 {
     transferFunction = tf;
+}
+
+
+bool MTrajectoryActor::setTransferFunction(QString tfName)
+{
+    QStringList tfNames = properties->mEnum()->enumNames(
+                transferFunctionProperty);
+    int tfIndex = tfNames.indexOf(tfName);
+
+    if (tfIndex >= 0)
+    {
+        properties->mEnum()->setValue(transferFunctionProperty, tfIndex);
+        return true;
+    }
+
+    // Set transfer function property to "None".
+    properties->mEnum()->setValue(transferFunctionProperty, 0);
+
+    return false; // the given tf name could not be found
 }
 
 
@@ -679,6 +815,7 @@ void MTrajectoryActor::prepareAvailableDataForRendering()
         // ===========
 
         foreach (MSceneViewGLWidget *view, trqi.normalsRequests.keys())
+        {
             if (trqi.normalsRequests[view].available)
             {
                 if (normals.value(view, nullptr))
@@ -690,6 +827,7 @@ void MTrajectoryActor::prepareAvailableDataForRendering()
                             trqi.normalsRequests[view].request);
                 normalsVertexBuffer[view] = normals[view]->getVertexBuffer();
             }
+        }
 
         // 3. Selection.
         // =============
@@ -726,29 +864,131 @@ void MTrajectoryActor::prepareAvailableDataForRendering()
 }
 
 
+void MTrajectoryActor::onActorCreated(MActor *actor)
+{
+    // If the new actor is a transfer function, add it to the list of
+    // available transfer functions.
+    if (MTransferFunction1D *tf = dynamic_cast<MTransferFunction1D*>(actor))
+    {
+        // Don't render while the properties are being updated.
+        enableEmissionOfActorChangedSignal(false);
+
+        int index = properties->mEnum()->value(transferFunctionProperty);
+        QStringList availableTFs = properties->mEnum()->enumNames(
+                    transferFunctionProperty);
+        availableTFs << tf->transferFunctionName();
+        properties->mEnum()->setEnumNames(transferFunctionProperty, availableTFs);
+        properties->mEnum()->setValue(transferFunctionProperty, index);
+
+        enableEmissionOfActorChangedSignal(true);
+    }
+}
+
+
+void MTrajectoryActor::onActorDeleted(MActor *actor)
+{
+    // If the deleted actor is a transfer function, remove it from the list of
+    // available transfer functions.
+    if (MTransferFunction1D *tf = dynamic_cast<MTransferFunction1D*>(actor))
+    {
+        enableEmissionOfActorChangedSignal(false);
+
+        int index = properties->mEnum()->value(transferFunctionProperty);
+        QStringList availableTFs = properties->mEnum()->enumNames(
+                    transferFunctionProperty);
+
+        // If the deleted transfer function is currently connected to this
+        // variable, set current transfer function to "None" (index 0).
+        if (availableTFs.at(index) == tf->getName()) index = 0;
+
+        availableTFs.removeOne(tf->getName());
+        properties->mEnum()->setEnumNames(transferFunctionProperty, availableTFs);
+        properties->mEnum()->setValue(transferFunctionProperty, index);
+
+        enableEmissionOfActorChangedSignal(true);
+    }
+}
+
+
+void MTrajectoryActor::onActorRenamed(MActor *actor, QString oldName)
+{
+    // If the renamed actor is a transfer function, change its name in the list
+    // of available transfer functions.
+    if (MTransferFunction1D *tf = dynamic_cast<MTransferFunction1D*>(actor))
+    {
+        // Don't render while the properties are being updated.
+        enableEmissionOfActorChangedSignal(false);
+
+        int index = properties->mEnum()->value(transferFunctionProperty);
+        QStringList availableTFs = properties->mEnum()->enumNames(
+                    transferFunctionProperty);
+
+        // Replace affected entry.
+        availableTFs[availableTFs.indexOf(oldName)] = tf->getName();
+
+        properties->mEnum()->setEnumNames(transferFunctionProperty, availableTFs);
+        properties->mEnum()->setValue(transferFunctionProperty, index);
+
+        enableEmissionOfActorChangedSignal(true);
+    }
+}
+
+
+void MTrajectoryActor::registerScene(MSceneControl *scene)
+{
+    MActor::registerScene(scene);
+    // Only send data request if data source exists, but for each scene since
+    // they have different scene views and thus different normals.
+    if (dataSourceID != "")
+    {
+        asynchronousDataRequest();
+    }
+}
+
+
 /******************************************************************************
 ***                          PROTECTED METHODS                              ***
 *******************************************************************************/
 
 void MTrajectoryActor::initializeActorResources()
-{
-    if (textureUnitTransferFunction >=0)
-        releaseTextureUnit(textureUnitTransferFunction);
-    textureUnitTransferFunction = assignImageUnit();
+{    
+    MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
 
-    updateInitTimeProperty();
-    updateValidTimeProperty();
-
-    // Get values from sync control, if connected to one.
-    if (synchronizationControl != nullptr)
+    // Since no data source was selected disable actor properties since they
+    // have no use without a data source.
+    if (dataSourceID == "" && !selectDataSource())
     {
-        setInitDateTime(synchronizationControl->initDateTime());
-        updateValidTimeProperty();
-        setValidDateTime(synchronizationControl->validDateTime());
-        setEnsembleMember(synchronizationControl->ensembleMember());
+        // User has selected no data source. Display a warning and disable all
+        // trajectory properties.
+        QMessageBox msgBox;
+        msgBox.setIcon(QMessageBox::Warning);
+        msgBox.setText("No data source selected. Disabling all properties.");
+        msgBox.exec();
+        enableProperties(false);
     }
+    else
+    {
+        enableProperties(true);
+        this->synchronizeWith(sysMC->getSyncControl("Synchronization"));
 
-    asynchronousDataRequest();
+        if (textureUnitTransferFunction >=0)
+            releaseTextureUnit(textureUnitTransferFunction);
+        textureUnitTransferFunction = assignImageUnit();
+
+        updateInitTimeProperty();
+        updateValidTimeProperty();
+
+        // Get values from sync control, if connected to one.
+        if (synchronizationControl != nullptr)
+        {
+            setInitDateTime(synchronizationControl->initDateTime());
+            updateValidTimeProperty();
+            setValidDateTime(synchronizationControl->validDateTime());
+            setEnsembleMember(synchronizationControl->ensembleMember());
+        }
+
+        asynchronousDataRequest();
+    }
 
     // Load shader program if the returned program is new.
     bool loadShaders = false;
@@ -769,7 +1009,26 @@ void MTrajectoryActor::initializeActorResources()
 
 void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
 {
-    if (property == ensembleMemberProperty)
+    if (property == selectDataSourceProperty)
+    {
+        if (suppressActorUpdates()) return;
+
+        if (selectDataSource())
+        {
+            enableProperties(true);
+            updateInitTimeProperty();
+            updateValidTimeProperty();
+            asynchronousDataRequest();
+        }
+    }
+
+    else if (property == utilizedDataSourceProperty)
+    {
+        dataSourceID = properties->mString()->value(utilizedDataSourceProperty);
+        return;
+    }
+
+    else if (property == ensembleMemberProperty)
     {
         if (suppressActorUpdates()) return;
         asynchronousDataRequest();
@@ -817,36 +1076,47 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
         asynchronousSelectionRequest();
     }
 
+    else if (property == transferFunctionProperty)
+    {
+        setTransferFunctionFromProperty();
+        if (suppressActorUpdates()) return;
+        emitActorChangedSignal();
+    }
+
     else if (property == tubeRadiusProperty)
     {
         tubeRadius = properties->mDDouble()->value(tubeRadiusProperty);
+        if (suppressActorUpdates()) return;
         emitActorChangedSignal();
     }
 
     else if (property == sphereRadiusProperty)
     {
         sphereRadius = properties->mDDouble()->value(sphereRadiusProperty);
+        if (suppressActorUpdates()) return;
         emitActorChangedSignal();
     }
 
     else if (property == enableShadowProperty)
     {
         shadowEnabled = properties->mBool()->value(enableShadowProperty);
+        if (suppressActorUpdates()) return;
         emitActorChangedSignal();
     }
 
     else if (property == colourShadowProperty)
     {
         shadowColoured = properties->mBool()->value(colourShadowProperty);
+        if (suppressActorUpdates()) return;
         emitActorChangedSignal();
     }
 
     // The init time has been changed. Reload valid times.
     else if (property == initTimeProperty)
     {
+        if (suppressActorUpdates()) return;
         updateValidTimeProperty();
 
-        if (suppressActorUpdates()) return;
         asynchronousDataRequest();
     }
 
@@ -870,6 +1140,7 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
     {
         int index = properties->mEnum()->value(timeSyncModeProperty);
         syncWithValidTime = (index == 0);
+        if (suppressActorUpdates()) return;
 
         // Paint the time property that is NOT synchronized in yellow.
         for (int i = 0; i < getScenes().size(); i++)
@@ -891,6 +1162,12 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
 
 void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
 {    
+    // Only render if transfer function is available.
+    if (transferFunction == nullptr)
+    {
+        return;
+    }
+
     if ( (renderMode == TRAJECTORY_TUBES)
          || (renderMode == TUBES_AND_SINGLETIME)
          || (renderMode == BACKWARDTUBES_AND_SINGLETIME))
@@ -1196,6 +1473,36 @@ QDateTime MTrajectoryActor::getPropertyTime(QtProperty *enumProperty)
 }
 
 
+void MTrajectoryActor::setTransferFunctionFromProperty()
+{
+    MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
+
+    QString tfName = properties->getEnumItem(transferFunctionProperty);
+
+    if (tfName == "None")
+    {
+        transferFunction = nullptr;
+        return;
+    }
+
+    // Find the selected transfer function in the list of actors from the
+    // resources manager. Not very efficient, but works well enough for the
+    // small number of actors at the moment..
+    foreach (MActor *actor, glRM->getActors())
+    {
+        if (MTransferFunction1D *tf = dynamic_cast<MTransferFunction1D*>(actor))
+        {
+            if (tf->transferFunctionName() == tfName)
+            {
+                transferFunction = tf;
+                return;
+            }
+
+        }
+    }
+}
+
+
 void MTrajectoryActor::asynchronousDataRequest(bool synchronizationRequest)
 {
 #ifndef DIRECT_SYNCHRONIZATION
@@ -1407,20 +1714,27 @@ void MTrajectoryActor::updateInitTimeProperty()
 {
     suppressUpdate = true;
 
-    // Get the current init time value.
-    QDateTime initTime  = getPropertyTime(initTimeProperty);
+    if (trajectorySource == nullptr)
+    {
+        properties->mEnum()->setEnumNames(initTimeProperty, QStringList());
+    }
+    else
+    {
+        // Get the current init time value.
+        QDateTime initTime  = getPropertyTime(initTimeProperty);
 
-    // Get available init times from the data loader. Convert the QDateTime
-    // objects to strings for the enum manager.
-    availableInitTimes = trajectorySource->availableInitTimes();
-    QStringList timeStrings;
-    for (int i = 0; i < availableInitTimes.size(); i++)
-        timeStrings << availableInitTimes.at(i).toString(Qt::ISODate);
+        // Get available init times from the data loader. Convert the QDateTime
+        // objects to strings for the enum manager.
+        availableInitTimes = trajectorySource->availableInitTimes();
+        QStringList timeStrings;
+        for (int i = 0; i < availableInitTimes.size(); i++)
+            timeStrings << availableInitTimes.at(i).toString(Qt::ISODate);
 
-    properties->mEnum()->setEnumNames(initTimeProperty, timeStrings);
+        properties->mEnum()->setEnumNames(initTimeProperty, timeStrings);
 
-    int newIndex = max(0, availableInitTimes.indexOf(initTime));
-    properties->mEnum()->setValue(initTimeProperty, newIndex);
+        int newIndex = max(0, availableInitTimes.indexOf(initTime));
+        properties->mEnum()->setValue(initTimeProperty, newIndex);
+    }
 
     suppressUpdate = false;
 }
@@ -1430,21 +1744,28 @@ void MTrajectoryActor::updateValidTimeProperty()
 {
     suppressUpdate = true;
 
-    // Get the current time values.
-    QDateTime initTime  = getPropertyTime(initTimeProperty);
-    QDateTime validTime = getPropertyTime(validTimeProperty);
+    if (trajectorySource == nullptr)
+    {
+        properties->mEnum()->setEnumNames(validTimeProperty, QStringList());
+    }
+    else
+    {
+        // Get the current time values.
+        QDateTime initTime  = getPropertyTime(initTimeProperty);
+        QDateTime validTime = getPropertyTime(validTimeProperty);
 
-    // Get a list of the available valid times for the new init time,
-    // convert the QDateTime objects to strings for the enum manager.
-    availableValidTimes = trajectorySource->availableValidTimes(initTime);
-    QStringList validTimeStrings;
-    for (int i = 0; i < availableValidTimes.size(); i++)
-        validTimeStrings << availableValidTimes.at(i).toString(Qt::ISODate);
+        // Get a list of the available valid times for the new init time,
+        // convert the QDateTime objects to strings for the enum manager.
+        availableValidTimes = trajectorySource->availableValidTimes(initTime);
+        QStringList validTimeStrings;
+        for (int i = 0; i < availableValidTimes.size(); i++)
+            validTimeStrings << availableValidTimes.at(i).toString(Qt::ISODate);
 
-    properties->mEnum()->setEnumNames(validTimeProperty, validTimeStrings);
+        properties->mEnum()->setEnumNames(validTimeProperty, validTimeStrings);
 
-    int newIndex = max(0, availableValidTimes.indexOf(validTime));
-    properties->mEnum()->setValue(validTimeProperty, newIndex);
+        int newIndex = max(0, availableValidTimes.indexOf(validTime));
+        properties->mEnum()->setValue(validTimeProperty, newIndex);
+    }
 
     suppressUpdate = false;
 }
@@ -1454,36 +1775,43 @@ void MTrajectoryActor::updateTrajectoryTimeProperty()
 {
     suppressUpdate = true;
 
-    QDateTime currentValue = getPropertyTime(trajectoryTimeProperty);
-
-    availableTrajectoryTimes = trajectories->getTimes().toList();
-    QStringList trajectoryTimeStrings;
-    for (int i = 0; i < trajectories->getTimes().size(); i++)
-        trajectoryTimeStrings
-                << trajectories->getTimes().at(i).toString(Qt::ISODate);
-
-    properties->mEnum()->setEnumNames(trajectoryTimeProperty,
-                                      trajectoryTimeStrings);
-
-    // Try to restore previous time value. If the previous value is not
-    // available for the new trajectories, indexOf() returns -1. This is
-    // changed to 0, i.e. the first available time value is selected.
-    int newIndex = max(0, trajectories->getTimes().indexOf(currentValue));
-    properties->mEnum()->setValue(trajectoryTimeProperty, newIndex);
-
-    // The trajectory time property is not needed when the entire
-    // trajectories are rendered.
-    switch (renderMode)
+    if (trajectories == nullptr)
     {
-    case TRAJECTORY_TUBES:
-    case ALL_POSITION_SPHERES:
-        trajectoryTimeProperty->setEnabled(false);
-        break;
-    case SINGLETIME_POSITIONS:
-    case TUBES_AND_SINGLETIME:
-    case BACKWARDTUBES_AND_SINGLETIME:
-        trajectoryTimeProperty->setEnabled(true);
-        break;
+        properties->mEnum()->setEnumNames(trajectoryTimeProperty, QStringList());
+    }
+    else
+    {
+        QDateTime currentValue = getPropertyTime(trajectoryTimeProperty);
+
+        availableTrajectoryTimes = trajectories->getTimes().toList();
+        QStringList trajectoryTimeStrings;
+        for (int i = 0; i < trajectories->getTimes().size(); i++)
+            trajectoryTimeStrings
+                    << trajectories->getTimes().at(i).toString(Qt::ISODate);
+
+        properties->mEnum()->setEnumNames(trajectoryTimeProperty,
+                                          trajectoryTimeStrings);
+
+        // Try to restore previous time value. If the previous value is not
+        // available for the new trajectories, indexOf() returns -1. This is
+        // changed to 0, i.e. the first available time value is selected.
+        int newIndex = max(0, trajectories->getTimes().indexOf(currentValue));
+        properties->mEnum()->setValue(trajectoryTimeProperty, newIndex);
+
+        // The trajectory time property is not needed when the entire
+        // trajectories are rendered.
+        switch (renderMode)
+        {
+        case TRAJECTORY_TUBES:
+        case ALL_POSITION_SPHERES:
+            trajectoryTimeProperty->setEnabled(false);
+            break;
+        case SINGLETIME_POSITIONS:
+        case TUBES_AND_SINGLETIME:
+        case BACKWARDTUBES_AND_SINGLETIME:
+            trajectoryTimeProperty->setEnabled(true);
+            break;
+        }
     }
 
     suppressUpdate = false;
@@ -1587,6 +1915,109 @@ void MTrajectoryActor::debugPrintPendingRequestsQueue()
     str += QString("\n==================\n");
 
     LOG4CPLUS_DEBUG(mlog, str.toStdString());
+}
+
+
+bool MTrajectoryActor::selectDataSource()
+{
+    // Ask the user for data sources to which times and ensemble members the
+    // sync control should be restricted to.
+    MSelectDataSourceDialog dialog(MSelectDataSourceDialogType::TRAJECTORIES, 0);
+    if (dialog.exec() == QDialog::Rejected)
+    {
+        return false;
+    }
+
+    QString dataSourceID = dialog.getSelectedDataSourceID();
+
+    if (dataSourceID == "")
+    {
+        return false;
+    }
+
+    // Only change data sources if necessary.
+    if (this->dataSourceID != dataSourceID)
+    {
+        properties->mString()->setValue(utilizedDataSourceProperty,
+                                        dataSourceID);
+
+        // Release data from old data sources before switching to new data
+        // sources.
+        releaseData();
+
+        this->setDataSource(dataSourceID + QString(" Reader"));
+        this->setNormalsSource(dataSourceID + QString(" Normals"));
+        this->setTrajectoryFilter(dataSourceID + QString(" timestepFilter"));
+
+        return true;
+    }
+
+    return false;
+}
+
+
+void MTrajectoryActor::enableProperties(bool enable)
+{
+    enableActorUpdates(false);
+    ensembleModeProperty->setEnabled(enable);
+    enableFilterProperty->setEnabled(enable);
+    deltaPressureProperty->setEnabled(enable);
+    deltaTimeProperty->setEnabled(enable);
+    renderModeProperty->setEnabled(enable);
+    transferFunctionProperty->setEnabled(enable);
+    tubeRadiusProperty->setEnabled(enable);
+    sphereRadiusProperty->setEnabled(enable);
+    enableShadowProperty->setEnabled(enable);
+    colourShadowProperty->setEnabled(enable);
+    initTimeProperty->setEnabled(enable);
+    validTimeProperty->setEnabled(enable);
+    trajectoryTimeProperty->setEnabled(enable);
+    timeSyncModeProperty->setEnabled(enable);
+    bboxProperty->setEnabled(enable);
+    ensembleMemberProperty->setEnabled(enable);
+    enableActorUpdates(true);
+}
+
+
+void MTrajectoryActor::releaseData()
+{
+    // 1. Trajectory data.
+    // ===================
+    if (trajectories)
+    {
+        trajectories->releaseVertexBuffer();
+        trajectorySource->releaseData(trajectories);
+        trajectories = nullptr;
+    }
+
+    // 2. Normals.
+    // ===========
+    foreach (MSceneViewGLWidget *view,
+             MSystemManagerAndControl::getInstance()->getRegisteredViews())
+    {
+        if (normals.value(view, nullptr))
+        {
+            normals[view]->releaseVertexBuffer();
+            normalsSource->releaseData(normals[view]);
+            normals[view] = nullptr;
+        }
+    }
+
+    // 3. Selection.
+    // =============
+    if (trajectorySelection)
+    {
+        trajectoryFilter->releaseData(trajectorySelection);
+        trajectorySelection = nullptr;
+    }
+
+    // 4. Single time selection.
+    // =========================
+    if (trajectorySingleTimeSelection)
+    {
+        trajectoryFilter->releaseData(trajectorySingleTimeSelection);
+        trajectorySingleTimeSelection = nullptr;
+    }
 }
 
 
