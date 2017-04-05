@@ -84,12 +84,26 @@ public:
      Synchronize this actor (time, ensemble) with the synchronization control
      @p sync.
      */
-    void synchronizeWith(MSyncControl *sync);
+    void synchronizeWith(MSyncControl *sync, bool updateGUIProperties=true);
 
     bool synchronizationEvent(MSynchronizationType syncType, QVector<QVariant> data);
 
     /**
+      Updates colour hints for synchronization (green property background
+      for matching sync, red for not matching sync). If @p scene is specified,
+      the colour hints are only updated for the specified scene (e.g. used
+      when the variable's actor is added to a new scene).
      */
+    void updateSyncPropertyColourHints(MSceneControl *scene = nullptr);
+
+    void setPropertyColour(QtProperty *property, const QColor& colour,
+                           bool resetColour, MSceneControl *scene = nullptr);
+
+    /**
+     */
+    void setDataSourceID(const QString& id)
+    { properties->mString()->setValue(utilizedDataSourceProperty, id); }
+
     void setDataSource(MTrajectoryDataSource* ds);
 
     void setDataSource(const QString& id);
@@ -101,6 +115,9 @@ public:
     void setTrajectoryFilter(MTrajectoryFilter* f);
 
     void setTrajectoryFilter(const QString& id);
+
+    void setSynchronizationControl(MSyncControl *synchronizationControl)
+    { this->synchronizationControl = synchronizationControl; }
 
     QString getSettingsID() override { return "TrajectoryActor"; }
 
@@ -116,9 +133,14 @@ public slots:
     bool setEnsembleMember(int member);
 
     /**
-      Set the current forecast valid time and update the scene.
+      Set the current trajectory start time and update the scene.
       */
-    bool setValidDateTime(const QDateTime& datetime);
+    bool setStartDateTime(const QDateTime& datetime);
+
+    /**
+      Set the current particle position time and update the scene.
+      */
+    bool setParticleDateTime(const QDateTime& datetime);
 
     /**
       Set the current forecast init time and update the scene.
@@ -178,11 +200,18 @@ protected:
 
     void renderToCurrentContext(MSceneViewGLWidget *sceneView);
 
+    void updateTimeProperties();
+
+    void updateEnsembleProperties();
+
 private:
     /**
       Determine the current time value of the given enum property.
      */
     QDateTime getPropertyTime(QtProperty *enumProperty);
+
+    /** Returns the current ensemble member setting. */
+    int getEnsembleMember();
 
     void setTransferFunctionFromProperty();
 
@@ -205,20 +234,20 @@ private:
     void updateInitTimeProperty();
 
     /**
-     Update the valid time property (listing the times at which trajectories
+     Update the start time property (listing the times at which trajectories
      have been started) from the current init time and the current data source.
      */
-    void updateValidTimeProperty();
+    void updateStartTimeProperty();
 
     /**
      Update the trajectory time property (available time steps for the current
      trajectory) from the loaded trajectory data. Does not use data from the
      data source.
      */
-    void updateTrajectoryTimeProperty();
+    void updateParticlePosTimeProperty();
 
     /**
-      Internal function containing common code for @ref setValidDateTime() and
+      Internal function containing common code for @ref setStartDateTime() and
       @ref setInitDateTime().
       */
     bool internalSetDateTime(const QList<QDateTime>& availableTimes,
@@ -260,25 +289,34 @@ private:
     TrajectoryRenderType renderMode;
     QtProperty *renderModeProperty;
 
+    /** Synchronisation with MSyncControl. */
+    MSyncControl *synchronizationControl;
+
+    /** Synchronization properties */
+    QtProperty *synchronizationPropertyGroup;
+    QtProperty *synchronizationProperty;
+    bool        synchronizeInitTime;
+    QtProperty *synchronizeInitTimeProperty;
+    bool        synchronizeStartTime;
+    QtProperty *synchronizeStartTimeProperty;
+    bool        synchronizeParticlePosTime;
+    QtProperty *synchronizeParticlePosTimeProperty;
+    bool        synchronizeEnsemble;
+    QtProperty *synchronizeEnsembleProperty;
+
+
     /** Time management. */
-    QtProperty *timeSyncModeProperty;
-    bool syncWithValidTime;
-    QList<QDateTime> availableValidTimes;
+    QList<QDateTime> availableStartTimes;
     QList<QDateTime> availableInitTimes;
-    QList<QDateTime> availableTrajectoryTimes;
+    QList<QDateTime> availableParticlePosTimes;
     QtProperty *initTimeProperty;
-    QtProperty *validTimeProperty;
-    QtProperty *trajectoryTimeProperty;
-    int         trajectoryTimeStep;
+    QtProperty *startTimeProperty;
+    QtProperty *particlePosTimeProperty;
+    int         particlePosTimeStep;
 
     /** Ensemble management. */
     QtProperty *ensembleModeProperty;
     QtProperty *ensembleMemberProperty;
-
-    /** Synchronisation with MSyncControl. */
-    MSyncControl *synchronizationControl;
-    QtProperty   *synchronizationProperty;
-
     /** Trajectory filtering. */
     QtProperty *enableFilterProperty;
     QtProperty *deltaPressureProperty; // filter trajectories according to this

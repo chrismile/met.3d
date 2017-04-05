@@ -1254,19 +1254,25 @@ void MFrontendConfiguration::initializeDefaultActors_Trajectories(
     transferFunctionPressure->setEnabled(true);
     glRM->registerActor(transferFunctionPressure);
     foreach (MSceneControl *scene, scenes)
+    {
         scene->addActor(transferFunctionPressure);
+    }
 
     MTrajectoryActor *trajectoryActor =
             new MTrajectoryActor();
+    trajectoryActor->setDataSourceID(dataSourceID);
     trajectoryActor->setDataSource(dataSourceID + QString(" Reader"));
     trajectoryActor->setNormalsSource(dataSourceID + QString(" Normals"));
-    trajectoryActor->setTrajectoryFilter(dataSourceID + QString(" timestepFilter"));
+    trajectoryActor->setTrajectoryFilter(dataSourceID
+                                         + QString(" timestepFilter"));
     trajectoryActor->setTransferFunction(transferFunctionPressure->getName());
     trajectoryActor->synchronizeWith(sysMC->getSyncControl("Synchronization"));
     trajectoryActor->setEnabled(true);
     glRM->registerActor(trajectoryActor);
     foreach (MSceneControl *scene, scenes)
+    {
         scene->addActor(trajectoryActor);
+    }
 }
 
 
