@@ -102,7 +102,7 @@ MMovablePoleActor::PoleSettings::PoleSettings(MActor *actor)
 
     groupProperty = actor->addProperty(GROUP_PROPERTY, "pole");
 
-    positionProperty = actor->addProperty(POINTF_PROPERTY, "position",
+    positionProperty = actor->addProperty(POINTF_LONLAT_PROPERTY, "position",
                                           groupProperty);
     MQtProperties *properties = actor->getQtProperties();
     properties->mPointF()->setValue(positionProperty, QPointF());
