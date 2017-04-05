@@ -548,7 +548,7 @@ void MTransferFunctionEditor::changeColourPos(double pos)
     colourNormPosBox->setValue(normalizedPos);
     colourNormPosBox->blockSignals(false);
 
-    colorFunction->setSelectedX(pos);
+    colorFunction->setSelectedX(normalizedPos);
     changeTransferFunction(false);
 }
 
