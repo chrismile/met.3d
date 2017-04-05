@@ -122,7 +122,11 @@ HEADERS += \
     src/data/derivedmetvarsdatasource.h \
     src/data/bboxtrajectoryfilter.h \
     src/gxfw/mresizewindowdialog.h \
-    src/actors/spatial1dtransferfunction.h
+    src/actors/spatial1dtransferfunction.h \
+    src/actors/transferfunctioneditor/transferfunctioneditor.h \
+    src/actors/transferfunctioneditor/colour.h \
+    src/actors/transferfunctioneditor/colourpicker.h \
+    src/actors/transferfunctioneditor/editortransferfunction.h
 
 SOURCES += \
     src/main.cpp \
@@ -212,7 +216,11 @@ SOURCES += \
     src/data/derivedmetvarsdatasource.cpp \
     src/data/bboxtrajectoryfilter.cpp \
     src/gxfw/mresizewindowdialog.cpp \
-    src/actors/spatial1dtransferfunction.cpp
+    src/actors/spatial1dtransferfunction.cpp \
+    src/actors/transferfunctioneditor/transferfunctioneditor.cpp \
+    src/actors/transferfunctioneditor/colourpicker.cpp \
+    src/actors/transferfunctioneditor/colour.cpp \
+    src/actors/transferfunctioneditor/editortransferfunction.cpp
 
 FORMS += \
     src/mainwindow.ui \

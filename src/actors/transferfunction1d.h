@@ -46,6 +46,11 @@ class MSceneViewGLWidget;
 namespace Met3D
 {
 
+namespace TFEditor
+{
+class MTransferFunctionEditor;
+}
+
 /**
   @brief TransferFunction1D represents a colourbar, providing both a 1D-texture
   that can be used as a lookup table by actors that map a scalar value to a
@@ -58,8 +63,10 @@ namespace Met3D
   */
 class MTransferFunction1D : public MTransferFunction
 {
+    Q_OBJECT
 public:
     MTransferFunction1D();
+    ~MTransferFunction1D();
 
     void reloadShaderEffects();
 
@@ -107,6 +114,8 @@ public:
             float alpha1, float alpha2, float poweralpha,
             bool reversed=false);
 
+    void  selectEditor();
+
     void selectHSVColourmap(QString vaporXMLFile, bool reversed=false);
 
     void setMinimumValue(float value);
@@ -137,6 +146,9 @@ protected:
     void onQtPropertyChanged(QtProperty *property);
 
     void renderToCurrentContext(MSceneViewGLWidget *sceneView);
+
+public slots:
+    void onEditorTransferFunctionChanged();
 
 private:
     /**
@@ -169,6 +181,8 @@ private:
 
     MColourmapPool colourmapPool;
 
+    TFEditor::MTransferFunctionEditor *editor;
+
     // General properties.
     QtProperty *positionProperty;
     bool        enableAlpha;
@@ -193,7 +207,8 @@ private:
     QtProperty *numStepsProperty;
 
     // Type of colourmap.
-    enum MColourmapType { PREDEFINED = 0, HCL = 1, HSV = 2 };
+    enum MColourmapType { PREDEFINED = 0, HCL = 1, HSV = 2, EDITOR = 3};
+
     QtProperty *colourmapTypeProperty;
 
     QtProperty *predefCMapPropertiesSubGroup;
@@ -220,6 +235,9 @@ private:
     QtProperty *hsvLoadFromVaporXMLProperty;
     QString     hsvVaporXMLFilename;
     QtProperty *hsvVaporXMLFilenameProperty;
+
+    QtProperty *editorPropertiesSubGroup;
+    QtProperty *editorClickProperty;
 };
 
 

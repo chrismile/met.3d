@@ -4,8 +4,9 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2016 Marc Rautenhaus
-**  Copyright 2016 Theresa Diefenbach
+**  Copyright 2016-2017 Marc Rautenhaus
+**  Copyright 2016-2017 Theresa Diefenbach
+**  Copyright 2016-2017 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -84,6 +85,10 @@ using namespace std;
  * POSSIBILITY OF SUCH DAMAGE.
  *
  */
+namespace Met3D
+{
+namespace Colourspace
+{
 
 #define NA_REAL M_MISSING_VALUE
 
@@ -108,7 +113,7 @@ using namespace std;
  *
  */
 
-static double gtrans(double u, double gamma)
+double gtrans(double u, double gamma)
 {
     if (u > 0.00304)
     return 1.055 * pow(u, (1 / gamma)) - 0.055;
@@ -116,13 +121,13 @@ static double gtrans(double u, double gamma)
     return 12.92 * u;
 }
 
-//static double ftrans(double u, double gamma)
-//{
-//    if (u > 0.03928)
-//    return pow((u + 0.055) / 1.055, gamma);
-//    else
-//    return u / 12.92;
-//}
+double ftrans(double u, double gamma)
+{
+    if (u > 0.03928)
+    return pow((u + 0.055) / 1.055, gamma);
+    else
+    return u / 12.92;
+}
 
 
 /* ----- CIE-XYZ <-> sRGB -----
@@ -133,20 +138,20 @@ static double gtrans(double u, double gamma)
  *
  */
 
-//static void sRGB_to_XYZ(double R, double G, double B,
-//                        double XN, double YN, double ZN,
-//                        double *X, double *Y, double *Z)
-//{
-//    double r, g, b;
-//    r = ftrans(R, 2.4);
-//    g = ftrans(G, 2.4);
-//    b = ftrans(B, 2.4);
-//    *X = YN * (0.412453 * r + 0.357580 * g + 0.180423 * b);
-//    *Y = YN * (0.212671 * r + 0.715160 * g + 0.072169 * b);
-//    *Z = YN * (0.019334 * r + 0.119193 * g + 0.950227 * b);
-//}
+void sRGB_to_XYZ(double R, double G, double B,
+                        double XN, double YN, double ZN,
+                        double *X, double *Y, double *Z)
+{
+    double r, g, b;
+    r = ftrans(R, 2.4);
+    g = ftrans(G, 2.4);
+    b = ftrans(B, 2.4);
+    *X = YN * (0.412453 * r + 0.357580 * g + 0.180423 * b);
+    *Y = YN * (0.212671 * r + 0.715160 * g + 0.072169 * b);
+    *Z = YN * (0.019334 * r + 0.119193 * g + 0.950227 * b);
+}
 
-static void XYZ_to_sRGB(double X, double Y, double Z,
+void XYZ_to_sRGB(double X, double Y, double Z,
                         double XN, double YN, double ZN,
                         double *R, double *G, double *B)
 {
@@ -160,7 +165,7 @@ static void XYZ_to_sRGB(double X, double Y, double Z,
 
 /* ----- CIE-XYZ <-> CIE-LUV ----- */
 
-static void XYZ_to_uv(double X, double Y, double Z, double *u, double *v)
+void XYZ_to_uv(double X, double Y, double Z, double *u, double *v)
 {
     double t, x, y;
     t = X + Y + Z;
@@ -170,20 +175,20 @@ static void XYZ_to_uv(double X, double Y, double Z, double *u, double *v)
     *v = 4.5 * y / (6 * y - x + 1.5);
 }
 
-//static void XYZ_to_LUV(double X, double Y, double Z,
-//                       double XN, double YN, double ZN,
-//                       double *L, double *U, double *V)
-//{
-//    double u, v, uN, vN, y;
-//    XYZ_to_uv(X, Y, Z, &u, &v);
-//    XYZ_to_uv(XN, YN, ZN, &uN, &vN);
-//    y = Y / YN;
-//    *L = (y > 0.008856) ? 116 * pow(y, 1.0/3.0) - 16 : 903.3 * y;
-//    *U = 13 * *L * (u - uN);
-//    *V = 13 * *L * (v - vN);
-//}
+void XYZ_to_LUV(double X, double Y, double Z,
+                       double XN, double YN, double ZN,
+                       double *L, double *U, double *V)
+{
+    double u, v, uN, vN, y;
+    XYZ_to_uv(X, Y, Z, &u, &v);
+    XYZ_to_uv(XN, YN, ZN, &uN, &vN);
+    y = Y / YN;
+    *L = (y > 0.008856) ? 116 * pow(y, 1.0/3.0) - 16 : 903.3 * y;
+    *U = 13 * *L * (u - uN);
+    *V = 13 * *L * (v - vN);
+}
 
-static void LUV_to_XYZ(double L, double U, double V,
+void LUV_to_XYZ(double L, double U, double V,
                        double XN, double YN, double ZN,
                        double *X, double *Y, double *Z)
 {
@@ -204,17 +209,17 @@ static void LUV_to_XYZ(double L, double U, double V,
 
 /* ----- LUV <-> polarLUV ----- */
 
-//static void LUV_to_polarLUV(double L, double U, double V,
-//                            double *l, double *c, double *h)
-//{
-//    *l = L;
-//    *c = sqrt(U * U + V * V);
-//    *h = RAD2DEG(atan2(V, U));
-//    while (*h > 360) *h -= 360;
-//    while (*h < 0) *h += 360;
-//}
+void LUV_to_polarLUV(double L, double U, double V,
+                            double *l, double *c, double *h)
+{
+    *l = L;
+    *c = sqrt(U * U + V * V);
+    *h = RAD2DEG(atan2(V, U));
+    while (*h > 360) *h -= 360;
+    while (*h < 0) *h += 360;
+}
 
-static void polarLUV_to_LUV(double l, double c, double h,
+void polarLUV_to_LUV(double l, double c, double h,
                             double *L, double *U, double *V)
 {
     h = DEG2RAD(h);
@@ -246,7 +251,7 @@ static void HSV_to_RGB(double h, double s, double v,
         if(!(i & 1))	/* if i is even */
             f = 1 - f;
         m = v * (1 - s);
-        n = v * (1 - s * f);   
+        n = v * (1 - s * f);
         switch (i) {
             case 6:
             case 0: RETURN_RGB(v, n, m);
@@ -260,8 +265,11 @@ static void HSV_to_RGB(double h, double s, double v,
 }
 
 
+
 // END code form the R "colorspace" package.
 // =================================================================
+}
+}
 
 
 namespace Met3D
@@ -425,7 +433,6 @@ QColor MRainbowColourmap::scalarToColour(double scalar)
     return rgba;
 }
 
-
 QColor MHCLColourmap::scalarToColour(double scalar)
 {
     // This functions provides an implementation similar to the "heat_hcl()"
@@ -487,7 +494,7 @@ QColor MHCLColourmap::scalarToColour(double scalar)
     // converting from polar LUV to LUV, then to XYZ colour space, and finally
     // to sRGB.
     double L, U, V;
-    polarLUV_to_LUV(luminance, chroma, hue, &L, &U, &V);
+    Colourspace::polarLUV_to_LUV(luminance, chroma, hue, &L, &U, &V);
 
     // Default white point used in "colorspace.c". See function "CheckWhite()".
     double Xn =  95.047; /* Use D65 by default. */
@@ -495,12 +502,12 @@ QColor MHCLColourmap::scalarToColour(double scalar)
     double Zn = 108.883;
 
     double X, Y, Z;
-    LUV_to_XYZ(L, U, V, Xn, Yn, Zn, &X, &Y, &Z);
+    Colourspace::LUV_to_XYZ(L, U, V, Xn, Yn, Zn, &X, &Y, &Z);
 
     // The "colorspace" package uses sRGB, see "colorspace.R", method "hex()".
     // "hex()" is used in "heat_hcl()" to convert polar LUV to sRGB.
     double R, G, B;
-    XYZ_to_sRGB(X, Y, Z, Xn, Yn, Zn, &R, &G, &B);
+    Colourspace::XYZ_to_sRGB(X, Y, Z, Xn, Yn, Zn, &R, &G, &B);
 
     return QColor(int(R*255.), int(G*255.), int(B*255.), int(alpha*255.));
 }
@@ -536,7 +543,7 @@ QColor MHSVColourmap::scalarToColour(double scalar)
     alpha = gsl_interp_eval(interp[ALPHA], scalars[ALPHA],
                                 colourValues[ALPHA], scalar, interpAcc[ALPHA]);
 
-    HSV_to_RGB(H, S, V, &R, &G, &B);
+    Colourspace::HSV_to_RGB(H, S, V, &R, &G, &B);
     return QColor(int(R*255.), int(G*255.), int(B*255.), int(alpha*255.));
 }
 

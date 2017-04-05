@@ -4,8 +4,9 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2016 Marc Rautenhaus
-**  Copyright 2016 Theresa Diefenbach
+**  Copyright 2016-2017 Marc Rautenhaus
+**  Copyright 2016-2017 Theresa Diefenbach
+**  Copyright 2016-2017 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -38,9 +39,90 @@
 
 // local application imports
 
+
+/******************************************************************************
+***                 COLOUR TRANSFORMATION ROUTINES                          ***
+*******************************************************************************/
+
+// The following code has been taken from colorspace.c, part of the
+// R "colorspace" package by Ross Ihaka. Parts of the code have been modified.
+// NOTE: colorspace.c contains further colorspace transformations that might
+// become useful for Met.3D.
+// =================================================================
+
+// This file incorporates work covered by the following copyright and
+// permission notice:
+
+/* Copyright 2005, Ross Ihaka. All Rights Reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ *
+ *    1. Redistributions of source code must retain the above copyright notice,
+ *       this list of conditions and the following disclaimer.
+ *
+ *    2. Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in the
+ *       documentation and/or other materials provided with the distribution.
+ *
+ *    3. The name of the Ross Ihaka may not be used to endorse or promote
+ *       products derived from this software without specific prior written
+ *       permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS''
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+ * THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+ * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL ROSS IHAKA BE LIABLE FOR
+ * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
+ * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING
+ * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ *
+ */
 namespace Met3D
 {
+namespace Colourspace
+{
+double gtrans(double u, double gamma);
+double ftrans(double u, double gamma);
 
+void sRGB_to_XYZ(double R, double G, double B,
+                        double XN, double YN, double ZN,
+                        double *X, double *Y, double *Z);
+
+void XYZ_to_sRGB(double X, double Y, double Z,
+                        double XN, double YN, double ZN,
+                        double *R, double *G, double *B);
+
+
+void XYZ_to_uv(double X, double Y, double Z, double *u, double *v);
+
+void XYZ_to_LUV(double X, double Y, double Z,
+                       double XN, double YN, double ZN,
+                       double *L, double *U, double *V);
+
+
+void LUV_to_XYZ(double L, double U, double V,
+                       double XN, double YN, double ZN,
+                       double *X, double *Y, double *Z);
+
+
+void LUV_to_polarLUV(double L, double U, double V,
+                            double *l, double *c, double *h);
+
+void polarLUV_to_LUV(double l, double c, double h,
+                            double *L, double *U, double *V);
+}
+}
+
+
+
+namespace Met3D
+{
 /**
   @brief MColourmap is the abstract base class for all colourmap classes,
   classes that implement the mapping of a scalar in the range [0..1] to an
@@ -192,7 +274,7 @@ protected:
 };
 
 
-/** 
+/**
   @brief MHSVColourmap implements an HSV based colourmap. The code ports parts
   of the R "colorspace" package by Ross Ihaka.
 
