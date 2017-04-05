@@ -309,6 +309,7 @@ private:
     QList<QDateTime> availableInitTimes;
     QList<QDateTime> availableValidTimes;
     QSet<unsigned int> availableEnsembleMembers;
+    QList<QAction*> selectedDataSourceActionList;
 
 #ifdef ENABLE_MET3D_STOPWATCH
     MStopwatch stopwatch;

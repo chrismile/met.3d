@@ -84,8 +84,31 @@ MSyncControl::MSyncControl(QString id, QWidget *parent) :
 {
     lastIinitTime = QDateTime();
     lastValidTime = QDateTime();
+    selectedDataSourceActionList.clear();
 
-    ui->setupUi(this);
+    ui->setupUi(this);    
+
+    // Configuration control elements.
+    // =========================================================================
+
+    configurationDropdownMenu = new QMenu(this);
+
+    selectDataSourcesAction = new QAction(this);
+    selectDataSourcesAction->setText(
+                "select data sources for allowed times and members");
+    configurationDropdownMenu->addAction(selectDataSourcesAction);
+    configurationDropdownMenu->addSeparator();
+    configurationDropdownMenu->addAction("Selected data sources:")
+            ->setEnabled(false);
+
+    ui->configurationButton->setMenu(configurationDropdownMenu);
+
+    connect(selectDataSourcesAction, SIGNAL(triggered()),
+            SLOT(selectDataSources()));
+    // Show menu also if the users clicks the button not only if only the arrow
+    // was clicked.
+    connect(ui->configurationButton, SIGNAL(clicked()),
+            ui->configurationButton, SLOT(showMenu()));
 
     // Time control elements.
     // =========================================================================
@@ -259,26 +282,6 @@ MSyncControl::MSyncControl(QString id, QWidget *parent) :
     connect(ui->ensembleMemberComboBox,
             SIGNAL(currentIndexChanged(int)),
             SLOT(onEnsembleModeChange(int)));
-
-
-    // Configuration control elements.
-    // =========================================================================
-
-    configurationDropdownMenu = new QMenu(this);
-
-    selectDataSourcesAction = new QAction(this);
-    selectDataSourcesAction->setText(
-                "select data sources for allowed times and members");
-    configurationDropdownMenu->addAction(selectDataSourcesAction);
-
-    ui->configurationButton->setMenu(configurationDropdownMenu);
-
-    connect(selectDataSourcesAction, SIGNAL(triggered()),
-            SLOT(selectDataSources()));
-    // Show menu also if the users clicks the button not only if only the arrow
-    // was clicked.
-    connect(ui->configurationButton, SIGNAL(clicked()),
-            ui->configurationButton, SLOT(showMenu()));
 }
 
 
@@ -286,6 +289,9 @@ MSyncControl::~MSyncControl()
 {
     delete[] timeStepIndexToSeconds;
     delete ui;
+    selectedDataSourceActionList.clear();
+    delete configurationDropdownMenu;
+    delete selectDataSourcesAction;
 }
 
 
@@ -661,6 +667,20 @@ void MSyncControl::retrictControlToDataSources(QStringList selectedDataSources)
 {
 
     MSystemManagerAndControl* sysMC = MSystemManagerAndControl::getInstance();
+    // Remove Actions displaying names of lastly selected data sources.
+    foreach (QAction *action, selectedDataSourceActionList)
+    {
+        configurationDropdownMenu->removeAction(action);
+    }
+    selectedDataSourceActionList.clear();
+
+// TODO (bt, 23Feb2017): If updated to Qt 5.0 use QSets and unite instead of
+// lists and contains since for version 4.8 there is no qHash method for QDateTime
+// and thus it is not possible to use toSet on QList<QDateTime>.
+// (See: http://doc.qt.io/qt-5/qhash.html#qHashx)
+    availableInitTimes.clear();
+    availableValidTimes.clear();
+    availableEnsembleMembers.clear();
 
     // Use all data sources if no data sources are given.
     if (selectedDataSources.empty())
@@ -699,19 +719,15 @@ void MSyncControl::retrictControlToDataSources(QStringList selectedDataSources)
     currentInitTimes.clear();
     currentValidTimes.clear();
 
-// TODO (bt, 23Feb2017): If updated to Qt 5.0 use QSets and unite instead of
-// lists and contains since for version 4.8 there is no qHash method for QDateTime
-// and thus it is not possible to use toSet on QList<QDateTime>.
-// (See: http://doc.qt.io/qt-5/qhash.html#qHashx)
-    availableInitTimes.clear();
-    availableValidTimes.clear();
-    availableEnsembleMembers.clear();
-
     foreach (QString dataSourceID, selectedDataSources)
     {
         MWeatherPredictionDataSource* source =
                 dynamic_cast<MWeatherPredictionDataSource*>
                 (sysMC->getDataSource(dataSourceID));
+        // Add selected data source as action to the configuration drop down
+        // menu and insert the action into a list for easy remove from the menu.
+        selectedDataSourceActionList.append(
+                    configurationDropdownMenu->addAction(dataSourceID));
 
         QList<MVerticalLevelType> levelTypes = source->availableLevelTypes();
         for (int ilvl = 0; ilvl < levelTypes.size(); ilvl++)
@@ -803,6 +819,12 @@ void MSyncControl::retrictControlToDataSources(QStringList selectedDataSources)
         memberList.append(QString("%1").arg(member));
     }
     ui->ensembleMemberComboBox->addItems(memberList);
+
+    // Disable all data source entries since they are supposed to be just labels.
+    foreach (QAction *action, selectedDataSourceActionList)
+    {
+        action->setEnabled(false);
+    }
 }
 
 
