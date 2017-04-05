@@ -48,8 +48,9 @@ enum MSynchronizationType
 {
     SYNC_INIT_TIME = 0,
     SYNC_VALID_TIME = 1,
-    SYNC_ENSEMBLE_MEMBER = 2,
-    SYNC_UNKNOWN = 3
+    SYNC_INIT_VALID_TIME = 2,
+    SYNC_ENSEMBLE_MEMBER = 3,
+    SYNC_UNKNOWN = 4
 };
 
 
@@ -130,6 +131,39 @@ public slots:
       Backward version of @ref timeForward().
       */
     void timeBackward();
+
+    /**
+      Opens dialog to select from which data sources to draw valid times,
+      init times and members to restrict control to.
+      */
+    void selectDataSources();
+
+    /**
+      @brief Checks @param selectedDataSources for consistency and prints error
+      messages if a given data source id has no corresponding data source or if
+      the data source does not contain any init times, valid times and ensemble
+      members.
+
+      If @selectedDataSources does not contain any, loadDataSourcesFromFrontend
+      tests all register data sources for data sources with init times, valid
+      times and ensemble members. If the method cannot find any suitable
+      data source it prints a error message and returns.
+      */
+    void restrictToDataSourcesFromFrontend(QStringList selectedDataSources);
+
+    /**
+      @brief Fetches init and valid times and members from the data sources
+      given by their IDs stored in @param selectedDataSources if present.
+
+      If @param selectedDataSources is empty, it is assumed to use all available
+      data sources. It is essential that if the data sources are given that they
+      are valid data sources containing init times, valid times and ensemble
+      members. But if loadDataSourcesTimesAndMembers uses all available data
+      sources, it checks whether they contain init times, valid times and
+      ensemble members and quits quietly if no suitable data source was found.
+     */
+    void retrictControlToDataSources(
+            QStringList selectedDataSources = QStringList());
 
     /**
       Advance time (forward or backward, depending on settings) in animation
@@ -260,11 +294,21 @@ private:
     QString syncID;
 
     bool synchronizationInProgress;
+    bool forwardBackwardButtonClicked;
     QWidget *lastFocusWidget;
     MSynchronizationType currentSyncType;
     QSet<MSynchronizedObject*> synchronizedObjects;
     QSet<MSynchronizedObject*> pendingSynchronizations;
     QSet<MSynchronizedObject*> earlyCompletedSynchronizations;
+
+    // Properties to control configuration.
+    QMenu *configurationDropdownMenu;
+    QAction *selectDataSourcesAction;
+    QDateTime lastIinitTime;
+    QDateTime lastValidTime;
+    QList<QDateTime> availableInitTimes;
+    QList<QDateTime> availableValidTimes;
+    QSet<unsigned int> availableEnsembleMembers;
 
 #ifdef ENABLE_MET3D_STOPWATCH
     MStopwatch stopwatch;
@@ -280,8 +324,14 @@ class MSynchronizedObject
 public:
     MSynchronizedObject() { }
 
+    /**
+       Handles synchronization event. The type of the synchronization event is
+       given by @param syncType while @param data stores the data for updating.
+       @param data is implemented as a vector to handle the simultanious
+       synchronization event of init(index 0) and valid(index 1) time.
+     */
     virtual bool synchronizationEvent(
-            MSynchronizationType syncType, QVariant data) = 0;
+            MSynchronizationType syncType, QVector<QVariant> data) = 0;
 };
 
 } // namespace Met3D

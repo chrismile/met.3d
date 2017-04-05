@@ -66,7 +66,7 @@ MGraticuleActor::MGraticuleActor()
 
     setName("Graticule");
 
-    cornersProperty = addProperty(RECTF_PROPERTY, "corners",
+    cornersProperty = addProperty(RECTF_LONLAT_PROPERTY, "corners",
                                   actorPropertiesSupGroup);
     properties->setRectF(cornersProperty, QRectF(-90., 0., 180., 90.), 2);
 

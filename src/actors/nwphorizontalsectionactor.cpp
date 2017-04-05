@@ -115,7 +115,7 @@ MNWPHorizontalSectionActor::MNWPHorizontalSectionActor()
     properties->mEnum()->setEnumNames(differenceModeProperty, differenceModeNames);
 
     // Horizontal bounding box of the actor.
-    boundingBoxProperty = addProperty(RECTF_PROPERTY, "bounding box",
+    boundingBoxProperty = addProperty(RECTF_LONLAT_PROPERTY, "bounding box",
                                       actorPropertiesSupGroup);
     properties->setRectF(boundingBoxProperty, horizontalBBox, 2);
 
@@ -1647,6 +1647,10 @@ void MNWPHorizontalSectionActor::renderTexturedContours(
     glTexturedContoursShader->setUniformValue(
                 "aspectRatio",
                 GLfloat(var->spatialTransferFunction->getTextureAspectRatio()));
+
+    glTexturedContoursShader->setUniformValue(
+                "gridAspectRatio",
+                GLfloat(var->grid->getDeltaLon() / var->grid->getDeltaLat()));
 
     glTexturedContoursShader->setUniformValue(
                 "worldZ", GLfloat(sceneView->worldZfromPressure(

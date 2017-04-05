@@ -74,7 +74,7 @@ MBaseMapActor::MBaseMapActor()
     properties->mString()->setValue(filenameProperty, "");
     filenameProperty->setEnabled(false);
 
-    bboxProperty = addProperty(RECTF_PROPERTY, "bounding box",
+    bboxProperty = addProperty(RECTF_LONLAT_PROPERTY, "bounding box",
                                actorPropertiesSupGroup);
     properties->setRectF(bboxProperty, bbox, 2);
 

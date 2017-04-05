@@ -52,7 +52,7 @@ namespace Met3D
 MSpatial1DTransferFunction::MSpatial1DTransferFunction()
     : MTransferFunction(),
       tfTexture(nullptr),
-      numLevels(2),
+      numLevels(0),
       useMirroredRepeat(false),
       minimumValue(0.0),
       maximumValue(100.0),
@@ -62,6 +62,7 @@ MSpatial1DTransferFunction::MSpatial1DTransferFunction()
       invertAlpha(false),
       useConstantColour(false),
       constantColour(QColor(0, 0, 0, 255)),
+      useWhiteBgForBar(false),
       textureScale(1.0),
       currentTextureWidth(0),
       currentTextureHeight(0)
@@ -81,10 +82,12 @@ MSpatial1DTransferFunction::MSpatial1DTransferFunction()
     maxNumTicksProperty = addProperty(INT_PROPERTY, "num. ticks",
                                       labelPropertiesSupGroup);
     properties->mInt()->setValue(maxNumTicksProperty, 11);
+    properties->mInt()->setMinimum(maxNumTicksProperty, 0);
 
     maxNumLabelsProperty = addProperty(INT_PROPERTY, "num. labels",
                                        labelPropertiesSupGroup);
     properties->mInt()->setValue(maxNumLabelsProperty, 6);
+    properties->mInt()->setMinimum(maxNumLabelsProperty, 0);
 
     tickWidthProperty = addProperty(DOUBLE_PROPERTY, "tick length",
                                     labelPropertiesSupGroup);
@@ -105,8 +108,7 @@ MSpatial1DTransferFunction::MSpatial1DTransferFunction()
 
     pathToLoadedImagesProperty = addProperty(STRING_PROPERTY, "level paths",
                                    levelsPropertiesSubGroup);
-    pathsToLoadedImages.resize(numLevels);
-    properties->mString()->setValue(pathToLoadedImagesProperty, pathsToLoadedImages.at(0));
+    properties->mString()->setValue(pathToLoadedImagesProperty, "");
     pathToLoadedImagesProperty->setEnabled(false);
 
     useMirroredRepeatProperty = addProperty(BOOL_PROPERTY, "use mirrored repeat",
@@ -171,11 +173,16 @@ MSpatial1DTransferFunction::MSpatial1DTransferFunction()
                                         alphaBlendingPropertiesSubGroup);
     properties->mColor()->setValue(constantColourProperty, constantColour);
 
+    useWhiteBgForBarProperty = addProperty(BOOL_PROPERTY,
+                                           "use white background for bar",
+                                           alphaBlendingPropertiesSubGroup);
+    properties->mBool()->setValue(useWhiteBgForBarProperty, useWhiteBgForBar);
+
 
     // General properties.
     // ===================
 
-    positionProperty = addProperty(RECTF_PROPERTY, "position",
+    positionProperty = addProperty(RECTF_CLIP_PROPERTY, "position",
                                    actorPropertiesSupGroup);
     properties->setRectF(positionProperty, QRectF(0.9, 0.9, 0.05, 0.5), 2);
 
@@ -474,7 +481,11 @@ void MSpatial1DTransferFunction::onQtPropertyChanged(QtProperty *property)
         QFileDialog dialog(nullptr);
         dialog.setFileMode(QFileDialog::ExistingFiles);
         dialog.setNameFilter(tr("Image Files (*.gif *.png *.jpg *.jpeg)"));
-        dialog.setDirectory(pathsToLoadedImages.at(0));
+        // Only set directory to stored path if there exists a path to set to.
+        if (!pathsToLoadedImages.empty())
+        {
+            dialog.setDirectory(pathsToLoadedImages.at(0));
+        }
         QStringList fileNames;
         if (dialog.exec())
         {
@@ -513,6 +524,8 @@ void MSpatial1DTransferFunction::onQtPropertyChanged(QtProperty *property)
                 delete listWidget;
 
                 pathsToLoadedImages.resize(numLevels);
+                // Adapt ticks and labels to the new amount of textures.
+                generateTextureBarGeometry();
                 loadImagesFromPaths(fileNames);
                 loadedImages.clear();
             }
@@ -665,6 +678,15 @@ void MSpatial1DTransferFunction::onQtPropertyChanged(QtProperty *property)
         emitActorChangedSignal();
     }
 
+    else if (property == useWhiteBgForBarProperty)
+    {
+        useWhiteBgForBar = properties->mBool()->value(useWhiteBgForBarProperty);
+
+        if (suppressActorUpdates()) return;
+
+        emitActorChangedSignal();
+    }
+
     else if (property == textureScaleDecimalsProperty)
     {
         int decimals = properties->mInt()->value(textureScaleDecimalsProperty);
@@ -739,6 +761,8 @@ void MSpatial1DTransferFunction::renderToCurrentContext(
         colourbarShader->setUniformValue("useConstantColour",
                                          GLboolean(useConstantColour));
         colourbarShader->setUniformValue("constantColour", constantColour);
+        colourbarShader->setUniformValue("useWhiteBgForBar",
+                                         GLboolean(useWhiteBgForBar));
 
         colourbarShader->setUniformValue("spatialTransferTexture", textureUnit);CHECK_GL_ERROR;
 
@@ -770,6 +794,7 @@ void MSpatial1DTransferFunction::renderToCurrentContext(
     vertexBuffer->attachToVertexAttribute(SHADER_VERTEX_ATTRIBUTE, 3, false,
                                           0,
                                           (const GLvoid*)(30 * sizeof(float)));
+
 
     glDrawArrays(GL_LINES, 0, 2 * numTicks); CHECK_GL_ERROR;
 
@@ -945,12 +970,9 @@ void MSpatial1DTransferFunction::generateTextureBarGeometry()
 
     // ========================================================================
     // Next, generate the tickmarks. maxNumTicks tickmarks are drawn, but not
-    // more than colour steps.
-//    int numSteps = properties->mInt()->value(numStepsProperty);
-//    int maxNumTicks = properties->mInt()->value(maxNumTicksProperty);
-//    numTicks = min(numSteps+1, maxNumTicks);
+    // more than texture levels.
     int maxNumTicks = properties->mInt()->value(maxNumTicksProperty);
-    numTicks = maxNumTicks;
+    numTicks = min(numLevels + 1, maxNumTicks);
 
     // This array accomodates the tickmark geometry.
     float tickmarks[6 * numTicks];
@@ -959,13 +981,26 @@ void MSpatial1DTransferFunction::generateTextureBarGeometry()
     float tickwidth = properties->mDouble()->value(tickWidthProperty);
 
     int n = 0;
-    for (uint i = 0; i < numTicks; i++)
+    // Treat numTicks equals 1 as a special case to avoid divison by zero.
+    if (numTicks != 1)
+    {
+        for (uint i = 0; i < numTicks; i++)
+        {
+            tickmarks[n++] = ulcrnr[0];
+            tickmarks[n++] = ulcrnr[1] - i * (height / (numTicks - 1));
+            tickmarks[n++] = ulcrnr[2];
+            tickmarks[n++] = ulcrnr[0] - tickwidth;
+            tickmarks[n++] = ulcrnr[1] - i * (height / (numTicks - 1));
+            tickmarks[n++] = ulcrnr[2];
+        }
+    }
+    else
     {
         tickmarks[n++] = ulcrnr[0];
-        tickmarks[n++] = ulcrnr[1] - i * (height / (numTicks-1));
+        tickmarks[n++] = ulcrnr[1];
         tickmarks[n++] = ulcrnr[2];
         tickmarks[n++] = ulcrnr[0] - tickwidth;
-        tickmarks[n++] = ulcrnr[1] - i * (height / (numTicks-1));
+        tickmarks[n++] = ulcrnr[1];
         tickmarks[n++] = ulcrnr[2];
     }
 
@@ -986,24 +1021,12 @@ void MSpatial1DTransferFunction::generateTextureBarGeometry()
         vertexBuffer = vb;
         GL::MFloatVertexBuffer* buf = dynamic_cast<GL::MFloatVertexBuffer*>(vb);
         // reallocate buffer if size has changed
-//        buf->reallocate(nullptr, 30);
-//        buf->update(coordinates, 0, 0, sizeof(coordinates));
         buf->reallocate(nullptr, 30 + numTicks * 6);
         buf->update(coordinates, 0, 0, sizeof(coordinates));
         buf->update(tickmarks, 0, sizeof(coordinates), sizeof(tickmarks));
 
     } else
     {
-//        GL::MFloatVertexBuffer* newVB = nullptr;
-//        newVB = new GL::MFloatVertexBuffer(requestKey, 30);
-//        if (glRM->tryStoreGPUItem(newVB))
-//        {
-//            newVB->reallocate(nullptr, 30, 0, true);
-//            newVB->update(coordinates, 0, 0, sizeof(coordinates));
-
-//        } else { delete newVB; }
-//        vertexBuffer = static_cast<GL::MVertexBuffer*>(glRM->getGPUItem(requestKey));
-
         GL::MFloatVertexBuffer* newVB = nullptr;
         newVB = new GL::MFloatVertexBuffer(requestKey, 30 + numTicks * 6);
         if (glRM->tryStoreGPUItem(newVB))
@@ -1012,7 +1035,11 @@ void MSpatial1DTransferFunction::generateTextureBarGeometry()
             newVB->update(coordinates, 0, 0, sizeof(coordinates));
             newVB->update(tickmarks, 0, sizeof(coordinates), sizeof(tickmarks));
 
-        } else { delete newVB; }
+        }
+        else
+        {
+            delete newVB;
+        }
         vertexBuffer = static_cast<GL::MVertexBuffer*>(glRM->getGPUItem(requestKey));
     }
 
@@ -1032,14 +1059,23 @@ void MSpatial1DTransferFunction::generateTextureBarGeometry()
     MTextManager* tm = glRM->getTextManager();
 
     // Remove all text labels of the old geometry.
-    while (!labels.isEmpty()) tm->removeText(labels.takeLast());
+    while (!labels.isEmpty())
+    {
+        tm->removeText(labels.takeLast());
+    }
+
+    // Draw no labels if either numTicks or maxNumLabels equal 0.
+    if (numTicks == 0 || maxNumLabels == 0)
+    {
+        return;
+    }
 
     // A maximum of maxNumLabels are placed. The approach taken here is to
     // compute a "tick step size" from the number of ticks drawn and the
     // maximum number of labels to be drawn. A label will then be placed
     // every tickStep-th tick. The formula tries to place a label at the
     // lower and upper end of the colourbar, if possible.
-    int tickStep = ceil(double(numTicks-1) / double(maxNumLabels-1));
+    int tickStep = ceil(double(numTicks - 1) / double(maxNumLabels - 1));
 
     // The (clip-space) distance between the ends of the tick marks and the
     // labels.
@@ -1056,19 +1092,34 @@ void MSpatial1DTransferFunction::generateTextureBarGeometry()
     bool labelbbox = properties->mBool()->value(labelBBoxProperty);
     QColor labelBBoxColour = properties->mColor()->value(labelBBoxColourProperty);
 
-    // Scale factor for labels.
-    float scaleFactor = 1.0f; //properties->mDouble()->value(scaleFactorProperty);
-
     // Register the labels with the text manager.
-    for (uint i = 0; i < numTicks; i += tickStep) {
-        float value = maximumValue - double(i) / double(numTicks-1)
-                * (maximumValue - minimumValue);
-        labels.append(tm->addText(
-                          QString("%1").arg(value*scaleFactor, 0, 'f', decimals),
-                          MTextManager::CLIPSPACE,
-                          tickmarks[6*i + 3] - labelSpacing,
+    // Treat numTicks equals 1 as a special case to avoid divison by zero.
+    if (numTicks != 1)
+    {
+        for (uint i = 0; i < numTicks; i += tickStep)
+        {
+            float value = maximumValue - double(i) / double(numTicks - 1)
+                    * (maximumValue - minimumValue);
+            labels.append(tm->addText(
+                              QString("%1").arg(value, 0, 'f', decimals),
+                              MTextManager::CLIPSPACE,
+                              tickmarks[6*i + 3] - labelSpacing,
                           tickmarks[6*i + 4],
-                          tickmarks[6*i + 5],
+                    tickmarks[6*i + 5],
+                    labelsize,
+                    labelColour, MTextManager::MIDDLERIGHT,
+                    labelbbox, labelBBoxColour)
+                    );
+        }
+    }
+    else
+    {
+        labels.append(tm->addText(
+                          QString("%1").arg(maximumValue, 0, 'f', decimals),
+                          MTextManager::CLIPSPACE,
+                          tickmarks[3] - labelSpacing,
+                          tickmarks[4],
+                          tickmarks[5],
                           labelsize,
                           labelColour, MTextManager::MIDDLERIGHT,
                           labelbbox, labelBBoxColour)

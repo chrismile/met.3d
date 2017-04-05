@@ -123,7 +123,7 @@ HEADERS += \
     src/data/bboxtrajectoryfilter.h \
     src/gxfw/mresizewindowdialog.h \
     src/actors/spatial1dtransferfunction.h \
-    src/actors/transferfunctioneditor/transferFunctionEditor.h \
+    src/actors/transferfunctioneditor/transferfunctioneditor.h \
     src/actors/transferfunctioneditor/colour.h \
     src/actors/transferfunctioneditor/colourpicker.h \
     src/actors/transferfunctioneditor/editortransferfunction.h

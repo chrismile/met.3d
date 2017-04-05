@@ -162,7 +162,7 @@ MNWPVolumeRaycasterActor::BoundingBoxSettings::BoundingBoxSettings(
 
     groupProp = a->addProperty(GROUP_PROPERTY, "bounding box");
 
-    boxCornersProp = a->addProperty(RECTF_PROPERTY, "corners", groupProp);
+    boxCornersProp = a->addProperty(RECTF_LONLAT_PROPERTY, "corners", groupProp);
     properties->setRectF(boxCornersProp, QRectF(-60., 30., 100., 40.), 2);
 
     pBotProp = a->addProperty(DOUBLE_PROPERTY, "bottom pressure", groupProp);

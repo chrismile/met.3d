@@ -222,7 +222,8 @@ QString MActor::getName()
 
 void MActor::registerScene(MSceneControl *scene)
 {
-    if (!scenes.contains(scene)) {
+    if (!scenes.contains(scene))
+    {
         scenes.append(scene);
     }
 }
@@ -284,9 +285,35 @@ void MActor::saveConfigurationToFile(QString filename)
     LOG4CPLUS_DEBUG(mlog, "Saving configuration to " << filename.toStdString());
 
     // Overwrite if the file exists.
-    if (QFile::exists(filename)) QFile::remove(filename);
+    if (QFile::exists(filename))
+    {
+        QSettings* settings = new QSettings(filename, QSettings::IniFormat);
+
+        QStringList groups = settings->childGroups();
+        // Only overwrite file if it contains already configuration for the
+        // actor to save.
+        if ( !groups.contains(getSettingsID()) )
+        {
+            QMessageBox msg;
+            msg.setWindowTitle("Error");
+            msg.setText("The selected file contains a configuration other than "
+                        + getSettingsID() + ".\n"
+                        "I will NOT overwrite this file -- have you selected "
+                        "the correct file?");
+            msg.setIcon(QMessageBox::Warning);
+            msg.exec();
+            return;
+        }
+
+        QFile::remove(filename);
+    }
 
     QSettings* settings = new QSettings(filename, QSettings::IniFormat);
+
+    settings->beginGroup("FileFormat");
+    // Save version id of Met.3D.
+    settings->setValue("met3dVersion", met3dVersionString);
+    settings->endGroup();
 
     // Save basic MActor settings.
     settings->beginGroup(MActor::getSettingsID());
@@ -444,7 +471,10 @@ QtProperty* MActor::addProperty(
     case (ENUM_PROPERTY):
         manager = properties->mEnum();
         break;
-    case (RECTF_PROPERTY):
+    case (RECTF_LONLAT_PROPERTY):
+        manager = properties->mRectF();
+        break;
+    case (RECTF_CLIP_PROPERTY):
         manager = properties->mRectF();
         break;
     case (POINTF_PROPERTY):
@@ -479,6 +509,15 @@ QtProperty* MActor::addProperty(
     // If a property group has been specified place the new property into
     // this group.
     if (group != nullptr) group->addSubProperty(p);
+
+    // Change names of subProperties for RECTF_LONLAT_PROPERTY properties.
+    if (type == RECTF_LONLAT_PROPERTY)
+    {
+        p->subProperties().at(0)->setPropertyName("western longitude");
+        p->subProperties().at(1)->setPropertyName("southern latitude");
+        p->subProperties().at(2)->setPropertyName("east-west extend");
+        p->subProperties().at(3)->setPropertyName("north-south extend");
+    }
 
     return p;
 }

@@ -71,10 +71,12 @@ MTransferFunction1D::MTransferFunction1D()
     maxNumTicksProperty = addProperty(INT_PROPERTY, "num. ticks",
                                       labelPropertiesSupGroup);
     properties->mInt()->setValue(maxNumTicksProperty, 11);
+    properties->mInt()->setMinimum(maxNumTicksProperty, 0);
 
     maxNumLabelsProperty = addProperty(INT_PROPERTY, "num. labels",
                                        labelPropertiesSupGroup);
     properties->mInt()->setValue(maxNumLabelsProperty, 6);
+    properties->mInt()->setMinimum(maxNumLabelsProperty, 0);
 
     tickWidthProperty = addProperty(DOUBLE_PROPERTY, "tick length",
                                     labelPropertiesSupGroup);
@@ -114,12 +116,12 @@ MTransferFunction1D::MTransferFunction1D()
 
     numStepsProperty = addProperty(INT_PROPERTY, "steps",
                                    rangePropertiesSubGroup);
-    properties->setInt(numStepsProperty, 50, 0, 32768, 1);
+    properties->setInt(numStepsProperty, 50, 2, 32768, 1);
 
     // General properties.
     // ===================
 
-    positionProperty = addProperty(RECTF_PROPERTY, "position",
+    positionProperty = addProperty(RECTF_CLIP_PROPERTY, "position",
                                    actorPropertiesSupGroup);
     properties->setRectF(positionProperty, QRectF(0.9, 0.9, 0.05, 0.5), 2);
 
@@ -221,6 +223,7 @@ MTransferFunction1D::MTransferFunction1D()
 
     updateHCLProperties();
 
+
     // HSV ...
 
     hsvCMapPropertiesSubGroup = addProperty(GROUP_PROPERTY, "HSV",
@@ -234,6 +237,7 @@ MTransferFunction1D::MTransferFunction1D()
                                               hsvCMapPropertiesSubGroup);
     properties->mString()->setValue(hsvVaporXMLFilenameProperty, "");
     hsvVaporXMLFilenameProperty->setEnabled(false);
+
 
     // Editor
     editorPropertiesSubGroup = addProperty(GROUP_PROPERTY, "Editor",
@@ -390,6 +394,7 @@ void MTransferFunction1D::selectHSVColourmap(
     }
 }
 
+
 void MTransferFunction1D::selectEditor()
 {
     enableActorUpdates(false);
@@ -403,10 +408,12 @@ void MTransferFunction1D::selectEditor()
     enableActorUpdates(true);
 }
 
+
 void MTransferFunction1D::setMinimumValue(float value)
 {
     properties->mDouble()->setValue(minimumValueProperty, value);
 }
+
 
 void MTransferFunction1D::setMaximumValue(float value)
 {
@@ -725,6 +732,7 @@ void MTransferFunction1D::initializeActorResources()
                                                simpleGeometryShader);
 
     if (loadShaders) reloadShaderEffects();
+
     generateColourBarGeometry();
 }
 
@@ -844,6 +852,7 @@ void MTransferFunction1D::onQtPropertyChanged(QtProperty *property)
         generateColourBarGeometry();
         emitActorChangedSignal();
     }
+
     else if (property == hsvLoadFromVaporXMLProperty)
     {
         QString filename = QFileDialog::getOpenFileName(
@@ -1171,7 +1180,7 @@ void MTransferFunction1D::generateColourBarGeometry()
     // more than colour steps.
     int numSteps = properties->mInt()->value(numStepsProperty);
     int maxNumTicks = properties->mInt()->value(maxNumTicksProperty);
-    numTicks = min(numSteps+1, maxNumTicks);
+    numTicks = min(numSteps + 1, maxNumTicks);
 
     // This array accomodates the tickmark geometry.
     float tickmarks[6 * numTicks];
@@ -1180,13 +1189,26 @@ void MTransferFunction1D::generateColourBarGeometry()
     float tickwidth = properties->mDouble()->value(tickWidthProperty);
 
     int n = 0;
-    for (uint i = 0; i < numTicks; i++)
+    // Treat numTicks equals 1 as a special case to avoid divison by zero.
+    if (numTicks != 1)
+    {
+        for (uint i = 0; i < numTicks; i++)
+        {
+            tickmarks[n++] = ulcrnr[0];
+            tickmarks[n++] = ulcrnr[1] - i * (height / (numTicks - 1));
+            tickmarks[n++] = ulcrnr[2];
+            tickmarks[n++] = ulcrnr[0] - tickwidth;
+            tickmarks[n++] = ulcrnr[1] - i * (height / (numTicks - 1));
+            tickmarks[n++] = ulcrnr[2];
+        }
+    }
+    else
     {
         tickmarks[n++] = ulcrnr[0];
-        tickmarks[n++] = ulcrnr[1] - i * (height / (numTicks-1));
+        tickmarks[n++] = ulcrnr[1];
         tickmarks[n++] = ulcrnr[2];
         tickmarks[n++] = ulcrnr[0] - tickwidth;
-        tickmarks[n++] = ulcrnr[1] - i * (height / (numTicks-1));
+        tickmarks[n++] = ulcrnr[1];
         tickmarks[n++] = ulcrnr[2];
     }
 
@@ -1211,7 +1233,8 @@ void MTransferFunction1D::generateColourBarGeometry()
         buf->update(coordinates, 0, 0, sizeof(coordinates));
         buf->update(tickmarks, 0, sizeof(coordinates), sizeof(tickmarks));
 
-    } else
+    }
+    else
     {
         GL::MFloatVertexBuffer* newVB = nullptr;
         newVB = new GL::MFloatVertexBuffer(requestKey, 24 + numTicks * 6);
@@ -1221,7 +1244,11 @@ void MTransferFunction1D::generateColourBarGeometry()
             newVB->update(coordinates, 0, 0, sizeof(coordinates));
             newVB->update(tickmarks, 0, sizeof(coordinates), sizeof(tickmarks));
 
-        } else { delete newVB; }
+        }
+        else
+        {
+            delete newVB;
+        }
         vertexBuffer = static_cast<GL::MVertexBuffer*>(glRM->getGPUItem(requestKey));
     }
 
@@ -1240,14 +1267,23 @@ void MTransferFunction1D::generateColourBarGeometry()
     MTextManager* tm = glRM->getTextManager();
 
     // Remove all text labels of the old geometry.
-    while (!labels.isEmpty()) tm->removeText(labels.takeLast());
+    while (!labels.isEmpty())
+    {
+        tm->removeText(labels.takeLast());
+    }
+
+    // Draw no labels if either numTicks or maxNumLabels equal 0.
+    if (numTicks == 0 || maxNumLabels == 0)
+    {
+        return;
+    }
 
     // A maximum of maxNumLabels are placed. The approach taken here is to
     // compute a "tick step size" from the number of ticks drawn and the
     // maximum number of labels to be drawn. A label will then be placed
     // every tickStep-th tick. The formula tries to place a label at the
     // lower and upper end of the colourbar, if possible.
-    int tickStep = ceil(double(numTicks-1) / double(maxNumLabels-1));
+    int tickStep = ceil(double(numTicks - 1) / double(maxNumLabels - 1));
 
     // The (clip-space) distance between the ends of the tick marks and the
     // labels.
@@ -1268,16 +1304,34 @@ void MTransferFunction1D::generateColourBarGeometry()
     float scaleFactor = properties->mDouble()->value(scaleFactorProperty);
 
     // Register the labels with the text manager.
-    for (uint i = 0; i < numTicks; i += tickStep)
+    // Treat numTicks equals 1 as a special case to avoid divison by zero.
+    if (numTicks != 1)
     {
-        float value = maximumValue - double(i) / double(numTicks-1)
-                * (maximumValue - minimumValue);
+        for (uint i = 0; i < numTicks; i += tickStep)
+        {
+            float value = (maximumValue - double(i) / double(numTicks-1)
+                           * (maximumValue - minimumValue)) * scaleFactor;
+            labels.append(tm->addText(
+                              QString("%1").arg(value, 0, 'f', decimals),
+                              MTextManager::CLIPSPACE,
+                              tickmarks[6*i + 3] - labelSpacing,
+                              tickmarks[6*i + 4],
+                              tickmarks[6*i + 5],
+                              labelsize,
+                              labelColour, MTextManager::MIDDLERIGHT,
+                              labelbbox, labelBBoxColour)
+                          );
+        }
+    }
+    else
+    {
+        float value = maximumValue * scaleFactor;
         labels.append(tm->addText(
-                          QString("%1").arg(value*scaleFactor, 0, 'f', decimals),
+                          QString("%1").arg(value, 0, 'f', decimals),
                           MTextManager::CLIPSPACE,
-                          tickmarks[6*i + 3] - labelSpacing,
-                          tickmarks[6*i + 4],
-                          tickmarks[6*i + 5],
+                          tickmarks[3] - labelSpacing,
+                          tickmarks[4],
+                          tickmarks[5],
                           labelsize,
                           labelColour, MTextManager::MIDDLERIGHT,
                           labelbbox, labelBBoxColour)
@@ -1350,11 +1404,13 @@ void MTransferFunction1D::updateHCLProperties()
     }
 }
 
+
 void MTransferFunction1D::updateHSVProperties()
 {
     properties->mString()->setValue(
                 hsvVaporXMLFilenameProperty, hsvVaporXMLFilename);
 }
+
 
 void MTransferFunction1D::onEditorTransferFunctionChanged()
 {

@@ -1307,38 +1307,147 @@ bool MGribReader::checkIndexForVariable(MGribVariableInfo *vinfo)
 
         if (!levelsAreContinous)
         {
-            LOG4CPLUS_ERROR(mlog, "Variable "
+            LOG4CPLUS_ERROR(mlog, "Variable '"
                             << vinfo->longname.toStdString()
-                            << " has missing levels ... discarding "
-                            " variable.");
+                            << "' has missing levels ... discarding variable.");
             return false;
+        }
+
+        // Get variable info of corresponding surface pressure.
+        MGribVariableInfo *sPVInfo = availableDataFields
+                .value(SURFACE_2D).value(vinfo->surfacePressureName);
+        // Discard variable if surface pressure variable is missing.
+        if ((sPVInfo) == nullptr)
+        {
+            LOG4CPLUS_ERROR(mlog, "Variable '"
+                            << vinfo->longname.toStdString()
+                            << "' has missing surface pressure field "
+                            "... discarding variable.");
+            return false;
+        }
+
+        // Defining error message to reduce code length.
+        QString errorMessage0 = QString("Variable '" + vinfo->longname
+                + "' has an inconsistency with its surface pressure variable '"
+                + vinfo->surfacePressureName) + "'. Surface pressure field is "
+                                                "missing ";
+        std::string errorMessage1 =  " ... discarding variable.";
+
+        // Check consistency of surface pressure variable and variable for each
+        // member at each valid time step of the given variabel.
+        foreach (QDateTime initTime, vinfo->timeMap.keys())
+        {
+            MGribValidTimeMap validTimeMap = vinfo->timeMap.value(initTime);
+            MGribValidTimeMap spValidTimeMap =
+                    sPVInfo->timeMap.value(initTime, MGribValidTimeMap());
+            if (spValidTimeMap.empty())
+            {
+                LOG4CPLUS_ERROR(mlog, errorMessage0.toStdString()
+                                << "at initTime "
+                                << initTime.toString().toStdString()
+                                << errorMessage1);
+                return false;
+            }
+            foreach (QDateTime validTime, validTimeMap.keys())
+            {
+                MGribEnsembleMemberMap ensembleMemberMap =
+                        validTimeMap.value(validTime);
+                MGribEnsembleMemberMap spEnsembleMemberMap =
+                        spValidTimeMap.value(validTime,
+                                             MGribEnsembleMemberMap());
+                if (spEnsembleMemberMap.empty())
+                {
+                    LOG4CPLUS_ERROR(mlog, errorMessage0.toStdString()
+                                    << "at validTime "
+                                    << validTime.toString().toStdString()
+                                    << " of initTime "
+                                    << initTime.toString().toStdString()
+                                    << errorMessage1);
+                    return false;
+                }
+                foreach (int member, ensembleMemberMap.keys())
+                {
+                    MGribDatafieldInfo datafieldInfo =
+                            ensembleMemberMap.value(member);
+                    MGribDatafieldInfo spDatafieldInfo =
+                            spEnsembleMemberMap.value(member,
+                                                      MGribDatafieldInfo());
+                    if (spDatafieldInfo.filename == "")
+                    {
+                        LOG4CPLUS_ERROR(mlog, errorMessage0.toStdString()
+                                        << "for member " << member
+                                        << " at validTime "
+                                        << validTime.toString().toStdString()
+                                        << " of initTime "
+                                        << initTime.toString().toStdString()
+                                        << errorMessage1);
+                        return false;
+                    }
+                    if ( !spDatafieldInfo.offsetForLevel.keys().contains(0))
+                    {
+                        LOG4CPLUS_ERROR(mlog, errorMessage0.toStdString()
+                                        << "at level " << 0
+                                        << " for member " << member
+                                        << " at validTime "
+                                        << validTime.toString().toStdString()
+                                        << " of initTime "
+                                        << initTime.toString().toStdString()
+                                        << errorMessage1);
+                        return false;
+                    }
+
+                    for (long level = 0; level < vinfo->levels.size() - 1;
+                         level++)
+                    {
+                        if ( !datafieldInfo.offsetForLevel.keys().contains(
+                                 vinfo->levels[level]))
+                        {
+                            LOG4CPLUS_ERROR(mlog, "Variable '"
+                                            << vinfo->longname.toStdString()
+                                            << "' has an inconsistency for level "
+                                            << vinfo->levels[level]
+                                            << " ... discarding variable.");
+                            return false;
+                        }
+                    }
+
+                }
+            }
         }
     }
 
-    // Check if all levels are present for all times/members.
-    for (auto it_it = vinfo->timeMap.begin();
-         it_it != vinfo->timeMap.end(); it_it++)
-        for (auto it_vt = it_it->begin();
-             it_vt != it_it->end(); it_vt++)
-            for (auto it_ens = it_vt->begin();
-                 it_ens != it_vt->end(); it_ens++)
+    else
+    {
+        foreach (MGribValidTimeMap validTimeMap, vinfo->timeMap)
+        {
+            foreach (MGribEnsembleMemberMap ensembleMemberMap, validTimeMap)
             {
-                for (long ilev = 0; ilev < vinfo->levels.size()-1; ilev++)
-                    if ( !(*it_ens).offsetForLevel.keys().contains(
-                             vinfo->levels[ilev]) )
+                foreach (MGribDatafieldInfo datafieldInfo, ensembleMemberMap)
+                {
+                    for (long level = 0; level < vinfo->levels.size() - 1;
+                         level++)
                     {
-                        LOG4CPLUS_ERROR(mlog, "Variable "
-                                        << vinfo->longname.toStdString()
-                                        << " has an inconsistency for level "
-                                        << vinfo->levels[ilev]
-                                        << " ... discarding variable.");
-                        return false;
+                        if ( !datafieldInfo.offsetForLevel.keys().contains(
+                                 vinfo->levels[level]) )
+                        {
+                            LOG4CPLUS_ERROR(mlog, "Variable '"
+                                            << vinfo->longname.toStdString()
+                                            << "' has an inconsistency for level "
+                                            << vinfo->levels[level]
+                                            << " ... discarding variable.");
+                            return false;
+                        }
                     }
+
+                }
             }
+        }
+    }
+
 
     // Everything is ok.
-    LOG4CPLUS_DEBUG(mlog, "... variable "
-                    << vinfo->longname.toStdString() << " is ok.");
+    LOG4CPLUS_DEBUG(mlog, "... variable '"
+                    << vinfo->longname.toStdString() << "' is ok.");
     return true;
 }
 

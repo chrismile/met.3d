@@ -73,7 +73,12 @@ public:
     /**
       Set a transfer function to map vertical position (pressure) to colour.
       */
-    void setTransferFunction(MTransferFunction1D *tf);
+    void setTransferFunction(MTransferFunction1D *tf);    
+    /**
+      Set a transfer function by its name. Set to 'none' if @oaram tfName does
+      not exit.
+      */
+    bool setTransferFunction(QString tfName);
 
     /**
      Synchronize this actor (time, ensemble) with the synchronization control
@@ -81,7 +86,7 @@ public:
      */
     void synchronizeWith(MSyncControl *sync);
 
-    bool synchronizationEvent(MSynchronizationType syncType, QVariant data);
+    bool synchronizationEvent(MSynchronizationType syncType, QVector<QVariant> data);
 
     /**
      */
@@ -142,6 +147,30 @@ public slots:
 
     void prepareAvailableDataForRendering();
 
+    /**
+     Connects to the MGLResourcesManager::actorCreated() signal. If the new
+     actor is a transfer function, it is added to the list of transfer
+     functions displayed by the transferFunctionProperty.
+     */
+    void onActorCreated(MActor *actor);
+
+    /**
+     Connects to the MGLResourcesManager::actorDeleted() signal. If the deleted
+     actor is a transfer function, update the list of transfer functions
+     displayed by the transferFunctionProperty, possibly disconnect from the
+     transfer function.
+     */
+    void onActorDeleted(MActor *actor);
+
+    /**
+     Connects to the MGLResourcesManager::actorRenamed() signal. If the renamed
+     actor is a transfer function, it is renamed in the list of transfer
+     functions displayed by the transferFunctionProperty.
+     */
+    void onActorRenamed(MActor *actor, QString oldName);
+
+    void registerScene(MSceneControl *scene) override;
+
 protected:
     void initializeActorResources();
 
@@ -154,6 +183,8 @@ private:
       Determine the current time value of the given enum property.
      */
     QDateTime getPropertyTime(QtProperty *enumProperty);
+
+    void setTransferFunctionFromProperty();
 
     /**
      Request trajectory data, normals and filter for current time and member
@@ -209,6 +240,10 @@ private:
     MTrajectorySelection *trajectorySelection;
     MTrajectorySelection *trajectorySingleTimeSelection;
 
+    QtProperty *selectDataSourceProperty;
+    QtProperty *utilizedDataSourceProperty;
+    QString dataSourceID;
+
     bool suppressUpdate;
     bool normalsToBeComputed; // true if the z-scaling of the scene view has
                               // changed: normals need to be recomputed
@@ -260,6 +295,7 @@ private:
     std::shared_ptr<GL::MShaderEffect> positionSphereShader;
     std::shared_ptr<GL::MShaderEffect> positionSphereShadowShader;
 
+    QtProperty *transferFunctionProperty;
     /** Pointer to transfer function object and cooresponding texture unit. */
     MTransferFunction1D *transferFunction;
     int                 textureUnitTransferFunction;
@@ -290,6 +326,36 @@ private:
     QQueue<MTrajectoryRequestQueueInfo> pendingRequestsQueue;
 
     void debugPrintPendingRequestsQueue();
+
+    /**
+      @brief selectDataSource calls a selection dialog to select the data source
+      for this trajectory actor.
+
+      Additionally, selectDataSource sets data source, normals source and
+      trajectory filter to the selected one if one was selected.
+
+      @return false if the user cancled the selection dialog, no data sources
+      are available to select or the user selected no data source or the same
+      as already selected, @return true otherwise.
+     */
+    bool selectDataSource();
+    /**
+      @brief enableProperties changes the enabled status of all properties to
+      @param enable exept for @ref selectDataSourceProperty and
+      @ref utilizedDataSourceProperty.
+
+      enableProperties is used to disable all properties if the user selects no
+      data source for the trajectory actor to avoid changes in properties to
+      cause a program crash.
+     */
+    void enableProperties(bool enable);
+    /**
+      @brief releaseData releases all trajectory, normals, selection and single
+      time selection data if present.
+
+      releaseData is used to release all data before switching data sources.
+     */
+    void releaseData();
 };
 
 

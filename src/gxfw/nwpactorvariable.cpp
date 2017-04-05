@@ -477,33 +477,65 @@ void MNWPActorVariable::synchronizeWith(
 
 
 bool MNWPActorVariable::synchronizationEvent(
-        MSynchronizationType syncType, QVariant data)
+        MSynchronizationType syncType, QVector<QVariant> data)
 {
     switch (syncType)
     {
     case SYNC_INIT_TIME:
     {
-        if (!synchronizeInitTime) return false;
+        if (!synchronizeInitTime)
+        {
+            return false;
+        }
         actor->enableActorUpdates(false);
-        bool newInitTimeSet = setInitDateTime(data.toDateTime());
+        bool newInitTimeSet = setInitDateTime(data.at(0).toDateTime());
         actor->enableActorUpdates(true);
-        if (newInitTimeSet) asynchronousDataRequest(true);
+        if (newInitTimeSet)
+        {
+            asynchronousDataRequest(true);
+        }
         return newInitTimeSet;
     }
     case SYNC_VALID_TIME:
     {
-        if (!synchronizeValidTime) return false;
+        if (!synchronizeValidTime)
+        {
+            return false;
+        }
         actor->enableActorUpdates(false);
-        bool newValidTimeSet = setValidDateTime(data.toDateTime());
+        bool newValidTimeSet = setValidDateTime(data.at(0).toDateTime());
         actor->enableActorUpdates(true);
-        if (newValidTimeSet) asynchronousDataRequest(true);
+        if (newValidTimeSet)
+        {
+            asynchronousDataRequest(true);
+        }
         return newValidTimeSet;
+    }
+    case SYNC_INIT_VALID_TIME:
+    {
+        actor->enableActorUpdates(false);
+        bool newInitTimeSet = false;
+        bool newValidTimeSet = false;
+        if (synchronizeInitTime)
+        {
+            newInitTimeSet = setInitDateTime(data.at(0).toDateTime());
+        }
+        if (synchronizeValidTime)
+        {
+            newValidTimeSet = setValidDateTime(data.at(1).toDateTime());
+        }
+        actor->enableActorUpdates(true);
+        if (newInitTimeSet || newValidTimeSet)
+        {
+            asynchronousDataRequest(true);
+        }
+        return (newInitTimeSet || newValidTimeSet);
     }
     case SYNC_ENSEMBLE_MEMBER:
     {
         if (!synchronizeEnsemble) return false;
         actor->enableActorUpdates(false);
-        bool newEnsembleMemberSet = setEnsembleMember(data.toInt());
+        bool newEnsembleMemberSet = setEnsembleMember(data.at(0).toInt());
         actor->enableActorUpdates(true);
         if (newEnsembleMemberSet) asynchronousDataRequest(true);
         return newEnsembleMemberSet;
@@ -1819,7 +1851,7 @@ bool MNWPActorVariable::changeVariable()
 {
     // Open an MSelectDataSourceDialog and re-initialize the variable with
     // information returned from the dialog.
-    MSelectDataSourceDialog dialog;
+    MSelectDataSourceDialog dialog(actor->supportedLevelTypes());
 
     if (dialog.exec() == QDialog::Rejected) return false;
 
@@ -2411,7 +2443,7 @@ MNWP2DHorizontalActorVariable::MNWP2DHorizontalActorVariable(
     }
 
     spatialTransferFunctionProperty = a->addProperty(ENUM_PROPERTY,
-                                                     "spatial transfer function",
+                                                     "textured transfer function",
                                                      renderGroup);
     properties->mEnum()->setEnumNames(spatialTransferFunctionProperty,
                                       availableSTFs);

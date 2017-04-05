@@ -86,6 +86,7 @@ uniform int alphaBlendingMode;
 uniform bool invertAlpha;
 uniform bool useConstantColour;
 uniform vec4 constantColour;
+uniform bool useWhiteBgForBar;
 
 shader FSspatialTF(in VStoFS Input, out vec4 fragColour)
 {
@@ -192,6 +193,12 @@ shader FSspatialTF(in VStoFS Input, out vec4 fragColour)
     if (useConstantColour)
     {
         colour = vec4(constantColour.rgb, colour.a);
+    }
+
+    if (useWhiteBgForBar)
+    {
+        colour = vec4(colour.rgb * colour.a + vec3(1.0f) * (1.f - colour.a),
+                      1.0f);
     }
 
     fragColour = colour;

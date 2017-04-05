@@ -166,31 +166,23 @@ void MFrontendConfiguration::initializeFrontendFromConfigFile(
 
         // Read settings from file.
         QString name = config.value("name").toString();
-        QString dataSourceID = config.value("initialiseFromDatasource").toString();
-        QString levelTypeStr = config.value("initialiseFromLeveltype").toString();
-        QString varName = config.value("initialiseFromVariable").toString();
+        QString dataSourceIDs = config.value("initialiseFromDatasource").toString();
 
         LOG4CPLUS_DEBUG(mlog, "initializing synchronization control #" << i << ": ");
         LOG4CPLUS_DEBUG(mlog, "  name = " << name.toStdString());
-        LOG4CPLUS_DEBUG(mlog, "  dataSource = " << dataSourceID.toStdString());
-        LOG4CPLUS_DEBUG(mlog, "  levelType = " << levelTypeStr.toStdString());
-        LOG4CPLUS_DEBUG(mlog, "  variable = " << varName.toStdString());
-
-        MVerticalLevelType levelType =
-                MStructuredGrid::verticalLevelTypeFromConfigString(levelTypeStr);
+        LOG4CPLUS_DEBUG(mlog, "  dataSources = " << dataSourceIDs.toStdString());
 
         // Check parameter validity.
         if ( name.isEmpty()
-             || dataSourceID.isEmpty()
-             || varName.isEmpty()
-             || (levelType == SIZE_LEVELTYPES) )
+             || dataSourceIDs.isEmpty())
         {
             LOG4CPLUS_WARN(mlog, "invalid parameters encountered; skipping.");
             continue;
         }
 
         // Create new synchronization control.
-        initializeSynchronization(name, dataSourceID, levelType, varName);
+        initializeSynchronization(
+                    name, dataSourceIDs.split("/",QString::SkipEmptyParts));
     }
 
     config.endArray();
@@ -496,9 +488,7 @@ void MFrontendConfiguration::initializeFrontendFromConfigFile(
 
 void MFrontendConfiguration::initializeSynchronization(
         QString syncName,
-        QString initializeFromDataSource,
-        MVerticalLevelType initializeFromLevelType,
-        QString initializeFromVariable)
+        QStringList initializeFromDataSources)
 {
     MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
 
@@ -506,40 +496,8 @@ void MFrontendConfiguration::initializeSynchronization(
     sysMC->registerSyncControl(syncControl);
     sysMC->getMainWindow()->dockSyncControl(syncControl);
 
-    MWeatherPredictionDataSource* nwpDataSource =
-            dynamic_cast<MWeatherPredictionDataSource*>(
-                sysMC->getDataSource(initializeFromDataSource));
-
-    if (nwpDataSource)
-    {
-        // Data soure exists. Try to determine most recent forecast init time
-        // and the corresponding first available valid time. Catch any
-        // exception that is thrown if the requested variable is not available.
-        try
-        {
-            int numFCRuns = nwpDataSource->availableInitTimes(
-                        initializeFromLevelType,
-                        initializeFromVariable).size();
-            QDateTime initialInitTime = nwpDataSource->availableInitTimes(
-                        initializeFromLevelType,
-                        initializeFromVariable)[numFCRuns-1];
-            syncControl->setInitDateTime(initialInitTime);
-            QDateTime initialValidTime = nwpDataSource->availableValidTimes(
-                        initializeFromLevelType,
-                        initializeFromVariable,
-                        initialInitTime)[0];
-            syncControl->setValidDateTime(initialValidTime);
-            syncControl->copyValidTimeToTimeAnimationFromTo();
-        }
-        catch (MBadDataFieldRequest)
-        {
-            LOG4CPLUS_WARN(mlog, "WARNING: requested variable not available.");
-        }
-    }
-    else
-    {
-        LOG4CPLUS_WARN(mlog, "WARNING: requested data source not available.");
-    }
+    syncControl->restrictToDataSourcesFromFrontend(
+                QStringList(initializeFromDataSources));
 }
 
 
@@ -1303,7 +1261,7 @@ void MFrontendConfiguration::initializeDefaultActors_Trajectories(
     trajectoryActor->setDataSource(dataSourceID + QString(" Reader"));
     trajectoryActor->setNormalsSource(dataSourceID + QString(" Normals"));
     trajectoryActor->setTrajectoryFilter(dataSourceID + QString(" timestepFilter"));
-    trajectoryActor->setTransferFunction(transferFunctionPressure);
+    trajectoryActor->setTransferFunction(transferFunctionPressure->getName());
     trajectoryActor->synchronizeWith(sysMC->getSyncControl("Synchronization"));
     trajectoryActor->setEnabled(true);
     glRM->registerActor(trajectoryActor);
@@ -1319,9 +1277,7 @@ void MFrontendConfiguration::initializeDevelopmentFrontend()
 
     initializeSynchronization(
                 "Synchronization",
-                "ECMWF ENS EUR_LL10",
-                HYBRID_SIGMA_PRESSURE_3D,
-                "eastward_wind");
+                QStringList("ECMWF ENS EUR_LL10"));
 
     // Create scene controls.
     //==========================================================================

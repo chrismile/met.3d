@@ -59,7 +59,7 @@ MVolumeBoundingBoxActor::MVolumeBoundingBoxActor()
 
     setName("Volume bounding box");
 
-    boxCornersProperty = addProperty(RECTF_PROPERTY, "corners",
+    boxCornersProperty = addProperty(RECTF_LONLAT_PROPERTY, "corners",
                                      actorPropertiesSupGroup);
     properties->setRectF(boxCornersProperty, QRectF(-50.1, 30., 100.2, 40.05), 2);
 
