@@ -480,6 +480,9 @@ QtProperty* MActor::addProperty(
     case (POINTF_PROPERTY):
         manager = properties->mPointF();
         break;
+    case (POINTF_LONLAT_PROPERTY):
+        manager = properties->mPointF();
+        break;
     case (COLOR_PROPERTY):
         manager = properties->mColor();
         break;
@@ -517,6 +520,13 @@ QtProperty* MActor::addProperty(
         p->subProperties().at(1)->setPropertyName("southern latitude");
         p->subProperties().at(2)->setPropertyName("east-west extend");
         p->subProperties().at(3)->setPropertyName("north-south extend");
+    }
+
+    // Change names of subProperties for POINTF_LONLAT_PROPERTY properties.
+    if (type == POINTF_LONLAT_PROPERTY)
+    {
+        p->subProperties().at(0)->setPropertyName("lon");
+        p->subProperties().at(1)->setPropertyName("lat");
     }
 
     return p;

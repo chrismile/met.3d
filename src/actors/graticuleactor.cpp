@@ -70,7 +70,7 @@ MGraticuleActor::MGraticuleActor()
                                   actorPropertiesSupGroup);
     properties->setRectF(cornersProperty, QRectF(-90., 0., 180., 90.), 2);
 
-    spacingProperty = addProperty(POINTF_PROPERTY, "spacing",
+    spacingProperty = addProperty(POINTF_LONLAT_PROPERTY, "spacing",
                                   actorPropertiesSupGroup);
     properties->setPointF(spacingProperty, QPointF(10., 5.), 2);
 
