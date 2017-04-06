@@ -1522,7 +1522,7 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
         case SINGLETIME_POSITIONS:
         case TUBES_AND_SINGLETIME:
         case BACKWARDTUBES_AND_SINGLETIME:
-            particlePosTimeProperty->setEnabled(true);
+            particlePosTimeProperty->setEnabled(!synchronizeParticlePosTime);
             break;
         }
 
@@ -2311,7 +2311,7 @@ void MTrajectoryActor::updateParticlePosTimeProperty()
         case SINGLETIME_POSITIONS:
         case TUBES_AND_SINGLETIME:
         case BACKWARDTUBES_AND_SINGLETIME:
-            particlePosTimeProperty->setEnabled(true);
+            particlePosTimeProperty->setEnabled(!synchronizeParticlePosTime);
             break;
         }
     }
