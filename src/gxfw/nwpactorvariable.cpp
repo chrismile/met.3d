@@ -327,12 +327,18 @@ void MNWPActorVariable::initialize()
     else
     {
         if (synchronizeInitTime)
+        {
             setInitDateTime(synchronizationControl->initDateTime());
+        }
         updateValidTimeProperty();
         if (synchronizeValidTime)
+        {
             setValidDateTime(synchronizationControl->validDateTime());
+        }
         if (synchronizeEnsemble)
+        {
             setEnsembleMember(synchronizationControl->ensembleMember());
+        }
     }
 
     updateTimeProperties();
@@ -371,7 +377,9 @@ void MNWPActorVariable::synchronizeWith(
     if (synchronizationControl != nullptr)
     {
         foreach (MSceneControl* scene, actor->getScenes())
+        {
             scene->variableDeletesSynchronizationWith(synchronizationControl);
+        }
 
 #ifdef DIRECT_SYNCHRONIZATION
         synchronizationControl->deregisterSynchronizedClass(this);
@@ -384,7 +392,7 @@ void MNWPActorVariable::synchronizeWith(
                    this, SLOT(setEnsembleMember(int)));
 #endif
     }
-
+    // Connect to new sync control and try to switch to its current times.
     synchronizationControl = sync;
 
     // Update "synchronizationProperty".
@@ -392,8 +400,10 @@ void MNWPActorVariable::synchronizeWith(
     if (updateGUIProperties)
     {
         MQtProperties *properties = actor->getQtProperties();
-        QString displayedSyncID = properties->getEnumItem(synchronizationProperty);
-        QString newSyncID = (sync == nullptr) ? "None" : synchronizationControl->getID();
+        QString displayedSyncID =
+                properties->getEnumItem(synchronizationProperty);
+        QString newSyncID =
+                (sync == nullptr) ? "None" : synchronizationControl->getID();
         if (displayedSyncID != newSyncID)
         {
             actor->enableActorUpdates(false);
@@ -409,7 +419,9 @@ void MNWPActorVariable::synchronizeWith(
         // Tell the actor's scenes that this variable synchronized with this
         // sync control.
         foreach (MSceneControl* scene, actor->getScenes())
+        {
             scene->variableSynchronizesWith(sync);
+        }
 
 #ifdef DIRECT_SYNCHRONIZATION
         synchronizationControl->registerSynchronizedClass(this);
@@ -438,9 +450,18 @@ void MNWPActorVariable::synchronizeWith(
             actor->enableActorUpdates(true);
         }
 
-        if (synchronizeInitTime) setInitDateTime(sync->initDateTime());
-        if (synchronizeValidTime) setValidDateTime(sync->validDateTime());
-        if (synchronizeEnsemble) setEnsembleMember(sync->ensembleMember());
+        if (synchronizeInitTime)
+        {
+            setInitDateTime(sync->initDateTime());
+        }
+        if (synchronizeValidTime)
+        {
+            setValidDateTime(sync->validDateTime());
+        }
+        if (synchronizeEnsemble)
+        {
+            setEnsembleMember(sync->ensembleMember());
+        }
     }
     else
     {
@@ -533,11 +554,17 @@ bool MNWPActorVariable::synchronizationEvent(
     }
     case SYNC_ENSEMBLE_MEMBER:
     {
-        if (!synchronizeEnsemble) return false;
+        if (!synchronizeEnsemble)
+        {
+            return false;
+        }
         actor->enableActorUpdates(false);
         bool newEnsembleMemberSet = setEnsembleMember(data.at(0).toInt());
         actor->enableActorUpdates(true);
-        if (newEnsembleMemberSet) asynchronousDataRequest(true);
+        if (newEnsembleMemberSet)
+        {
+            asynchronousDataRequest(true);
+        }
         return newEnsembleMemberSet;
     }
     default:
@@ -595,22 +622,34 @@ void MNWPActorVariable::setPropertyColour(
     if (resetColour)
     {
         if (scene == nullptr)
+        {
             // Reset colour for all scenes in which the actor appears.
             foreach (MSceneControl* sc, actor->getScenes())
+            {
                 sc->resetPropertyColour(property);
+            }
+        }
         else
+        {
             // Reset colour only for the specifed scene.
             scene->resetPropertyColour(property);
+        }
     }
     else
     {
         if (scene == nullptr)
+        {
             // Set colour for all scenes in which the actor appears.
             foreach (MSceneControl* sc, actor->getScenes())
+            {
                 sc->setPropertyColour(property, colour);
+            }
+        }
         else
+        {
             // Set colour only for the specifed scene.
             scene->setPropertyColour(property, colour);
+        }
     }
 }
 

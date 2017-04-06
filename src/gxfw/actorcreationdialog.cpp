@@ -33,6 +33,7 @@
 
 // local application imports
 #include "gxfw/mglresourcesmanager.h"
+#include "actors/trajectoryactor.h"
 
 
 namespace Met3D
@@ -80,9 +81,30 @@ MActor* MActorCreationDialog::createActorInstance()
     MAbstractActorFactory *factory =
             MGLResourcesManager::getInstance()->getActorFactory(actorType);
 
+
     MActor* actor = factory->create();
     actor->setName(actorName);
     actor->setEnabled(true);
+
+    if (dynamic_cast<MTrajectoryActorFactory*>(factory))
+    {
+        bool accepted = false;
+        MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
+        // ask user which sync control should be synchronized with variable
+        QString syncName = QInputDialog::getItem(
+                    nullptr, "Choose Sync Control",
+                    "Please select a sync control to synchronize with: ",
+                    sysMC->getSyncControlIdentifiers(),
+                    0, false, &accepted);
+        // if user has aborted do not create actor
+        if (!accepted)
+        {
+            return nullptr;
+        }
+        static_cast<MTrajectoryActor *>(actor)->setSynchronizationControl(
+                    sysMC->getSyncControl(syncName));
+
+    }
 
     return actor;
 }

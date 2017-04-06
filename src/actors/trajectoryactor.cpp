@@ -61,8 +61,11 @@ MTrajectoryActor::MTrajectoryActor()
       suppressUpdate(false),
       normalsToBeComputed(true),
       renderMode(TRAJECTORY_TUBES),
-      syncWithValidTime(true),
       synchronizationControl(nullptr),
+      synchronizeInitTime(true),
+      synchronizeStartTime(true),
+      synchronizeParticlePosTime(true),
+      synchronizeEnsemble(true),
       bbox(QRectF(-90., 0., 180., 90.)),
       transferFunction(nullptr),
       textureUnitTransferFunction(-1),
@@ -101,23 +104,48 @@ MTrajectoryActor::MTrajectoryActor()
     properties->mEnum()->setEnumNames(renderModeProperty, renderModeNames);
     properties->mEnum()->setValue(renderModeProperty, renderMode);
 
-    // Init, start, valid time.
-    QStringList timeSyncModeNames;
-    timeSyncModeNames << "with valid time"
-                      << "with trajectory time";
-    timeSyncModeProperty = addProperty(ENUM_PROPERTY, "time sync",
-                                       actorPropertiesSupGroup);
-    properties->mEnum()->setEnumNames(timeSyncModeProperty, timeSyncModeNames);
-    properties->mEnum()->setValue(timeSyncModeProperty, 0);
+
+    // Property: Synchronize time and ensemble with an MSyncControl instance?
+    synchronizationPropertyGroup = addProperty(
+                GROUP_PROPERTY, "synchronization", actorPropertiesSupGroup);
+
+    MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
+    synchronizationProperty = addProperty(
+                ENUM_PROPERTY, "synchronize with", synchronizationPropertyGroup);
+    properties->mEnum()->setEnumNames(
+                synchronizationProperty, sysMC->getSyncControlIdentifiers());
+
+    synchronizeInitTimeProperty = addProperty(
+                BOOL_PROPERTY, "sync init time", synchronizationPropertyGroup);
+    properties->mBool()->setValue(synchronizeInitTimeProperty,
+                                  synchronizeInitTime);
+    synchronizeStartTimeProperty = addProperty(
+                BOOL_PROPERTY, "sync valid with start time",
+                synchronizationPropertyGroup);
+    properties->mBool()->setValue(synchronizeStartTimeProperty,
+                                  synchronizeStartTime);
+    synchronizeParticlePosTimeProperty = addProperty(
+                BOOL_PROPERTY, "sync valid with particles",
+                synchronizationPropertyGroup);
+    properties->mBool()->setValue(synchronizeParticlePosTimeProperty,
+                                  synchronizeParticlePosTime);
+    synchronizeEnsembleProperty = addProperty(
+                BOOL_PROPERTY, "sync ensemble", synchronizationPropertyGroup);
+    properties->mBool()->setValue(synchronizeEnsembleProperty,
+                                  synchronizeEnsemble);
+
 
     initTimeProperty = addProperty(ENUM_PROPERTY, "initialisation",
                                    actorPropertiesSupGroup);
 
-    validTimeProperty = addProperty(ENUM_PROPERTY, "valid",
+    startTimeProperty = addProperty(ENUM_PROPERTY, "trajectory start",
                                     actorPropertiesSupGroup);
 
-    trajectoryTimeProperty = addProperty(ENUM_PROPERTY, "trajectory",
-                                         actorPropertiesSupGroup);
+    particlePosTimeProperty = addProperty(ENUM_PROPERTY, "particle positions",
+                                          actorPropertiesSupGroup);
+    particlePosTimeProperty->setToolTip("Not selectable for 'tubes' and 'all"
+                                        " positions' render mode");
+
 
     // Ensemble.
     QStringList ensembleModeNames;
@@ -125,6 +153,7 @@ MTrajectoryActor::MTrajectoryActor()
     ensembleModeProperty = addProperty(ENUM_PROPERTY, "ensemble mode",
                                        actorPropertiesSupGroup);
     properties->mEnum()->setEnumNames(ensembleModeProperty, ensembleModeNames);
+    ensembleModeProperty->setEnabled(false);
 
     ensembleMemberProperty = addProperty(INT_PROPERTY, "ensemble member",
                                          actorPropertiesSupGroup);
@@ -138,7 +167,8 @@ MTrajectoryActor::MTrajectoryActor()
     deltaPressureProperty = addProperty(DECORATEDDOUBLE_PROPERTY,
                                         "pressure difference",
                                         actorPropertiesSupGroup);
-    properties->setDDouble(deltaPressureProperty, 500., 1., 1050., 2, 5., " hPa");
+    properties->setDDouble(deltaPressureProperty, 500., 1., 1050., 2, 5.,
+                           " hPa");
 
     deltaTimeProperty = addProperty(DECORATEDDOUBLE_PROPERTY, "time interval",
                                     actorPropertiesSupGroup);
@@ -147,6 +177,7 @@ MTrajectoryActor::MTrajectoryActor()
     bboxProperty = addProperty(RECTF_LONLAT_PROPERTY, "bounding box",
                                actorPropertiesSupGroup);
     properties->setRectF(bboxProperty, bbox, 2);
+    bboxProperty->setEnabled(false);
 
     // Transfer function.
     // Scan currently available actors for transfer functions. Add TFs to
@@ -197,6 +228,10 @@ MTrajectoryActor::MTrajectoryActor()
 
 MTrajectoryActor::~MTrajectoryActor()
 {
+    // Delete synchronization links (don't update the already deleted GUI
+    // properties anymore...).
+    synchronizeWith(nullptr, false);
+
     if (textureUnitTransferFunction >=0)
         releaseTextureUnit(textureUnitTransferFunction);
 }
@@ -240,6 +275,20 @@ void MTrajectoryActor::saveConfiguration(QSettings *settings)
 
     settings->setValue("renderMode", static_cast<int>(renderMode));
 
+    // Save synchronization properties.
+    settings->setValue("synchronizationID",
+                       (synchronizationControl != nullptr) ?
+                           synchronizationControl->getID() : "");
+    settings->setValue("synchronizeInitTime",
+                       properties->mBool()->value(synchronizeInitTimeProperty));
+    settings->setValue("synchronizeStartTime",
+                       properties->mBool()->value(synchronizeStartTimeProperty));
+    settings->setValue("synchronizeParticlePosTime",
+                       properties->mBool()->value(
+                           synchronizeParticlePosTimeProperty));
+    settings->setValue("synchronizeEnsemble",
+                       properties->mBool()->value(synchronizeEnsembleProperty));
+
     settings->setValue("enableFilter",
                        properties->mBool()->value(enableFilterProperty));
 
@@ -268,64 +317,111 @@ void MTrajectoryActor::loadConfiguration(QSettings *settings)
 
     QString dataSourceID = settings->value("dataSourceID", "").toString();
 
-
-    properties->mString()->setValue(utilizedDataSourceProperty,
-                                    dataSourceID);
-
     releaseData();
     enableProperties(true);
 
-    this->setDataSource(dataSourceID + QString(" Reader"));
-    this->setNormalsSource(dataSourceID + QString(" Normals"));
-    this->setTrajectoryFilter(dataSourceID + QString(" timestepFilter"));
+    bool dataSourceAvailable = false;
 
-    bool dataSourceAvailable =
-            MSelectDataSourceDialog::checkForTrajectoryDataSource(dataSourceID);
-
-    // The configuration file specifies a data source which does not exist.
-    // Display warning and load rest of the configuration.
-    if (!dataSourceAvailable)
+    if ( !dataSourceID.isEmpty() )
     {
-
-        QMessageBox msgBox;
-        msgBox.setIcon(QMessageBox::Warning);
-        msgBox.setText(QString("Trajectory actor '%1':\n"
-                               "Data source '%2' does not exist.\n"
-                               "Select a new one.")
-                       .arg(getName()).arg(dataSourceID));
-        msgBox.exec();
-        if (isInitialized())
+        dataSourceAvailable =
+                MSelectDataSourceDialog::checkForTrajectoryDataSource(
+                    dataSourceID);
+        // The configuration file specifies a data source which does not exist.
+        // Display warning and load rest of the configuration.
+        if (!dataSourceAvailable)
         {
-            if (!selectDataSource())
+
+            QMessageBox msgBox;
+            msgBox.setIcon(QMessageBox::Warning);
+            msgBox.setText(QString("Trajectory actor '%1':\n"
+                                   "Data source '%2' does not exist.\n"
+                                   "Select a new one.")
+                           .arg(getName()).arg(dataSourceID));
+            msgBox.exec();
+            if (isInitialized())
             {
-                // User has selected no data source. Display a warning and
-                // disable all trajectory properties.
-                QMessageBox msgBox;
-                msgBox.setIcon(QMessageBox::Warning);
-                msgBox.setText("No data source selected. Disabling all"
-                               " properties.");
-                msgBox.exec();
-                enableActorUpdates(false);
-                properties->mString()->setValue(utilizedDataSourceProperty, "");
-                properties->mInt()->setValue(ensembleMemberProperty, 0);
-                properties->mInt()->setMaximum(ensembleMemberProperty, 0);
-                enableActorUpdates(true);
-                enableProperties(false);
-            }
-            else
-            {
-                dataSourceAvailable = true;
+                if (!selectDataSource())
+                {
+                    // User has selected no data source. Display a warning and
+                    // disable all trajectory properties.
+                    QMessageBox msgBox;
+                    msgBox.setIcon(QMessageBox::Warning);
+                    msgBox.setText("No data source selected. Disabling all"
+                                   " properties.");
+                    msgBox.exec();
+                    enableActorUpdates(false);
+                    properties->mString()->setValue(utilizedDataSourceProperty,
+                                                    "");
+                    properties->mInt()->setValue(ensembleMemberProperty, 0);
+                    properties->mInt()->setMaximum(ensembleMemberProperty, 0);
+                    enableActorUpdates(true);
+                    enableProperties(false);
+                }
+                else
+                {
+                    dataSourceAvailable = true;
+                }
             }
         }
-    }
 
-    updateInitTimeProperty();
-    updateValidTimeProperty();
-    updateTrajectoryTimeProperty();
+        if (dataSourceAvailable)
+        {
+            properties->mString()->setValue(utilizedDataSourceProperty,
+                                            dataSourceID);
+
+            this->setDataSource(dataSourceID + QString(" Reader"));
+            this->setNormalsSource(dataSourceID + QString(" Normals"));
+            this->setTrajectoryFilter(dataSourceID + QString(" timestepFilter"));
+
+            updateInitTimeProperty();
+            updateStartTimeProperty();
+            updateParticlePosTimeProperty();
+        }
+    }
 
     properties->mEnum()->setValue(
                 renderModeProperty,
                 settings->value("renderMode").toInt());
+
+    // Load synchronization properties (AFTER the ensemble mode properties
+    // have been loaded; sync may overwrite some settings).
+    // ===================================================================
+    properties->mBool()->setValue(
+                synchronizeInitTimeProperty,
+                settings->value("synchronizeInitTime", true).toBool());
+    properties->mBool()->setValue(
+                synchronizeStartTimeProperty,
+                settings->value("synchronizeStartTime", true).toBool());
+    properties->mBool()->setValue(
+                synchronizeParticlePosTimeProperty,
+                settings->value("synchronizeParticlePosTime", true).toBool());
+    properties->mBool()->setValue(
+                synchronizeEnsembleProperty,
+                settings->value("synchronizeEnsemble", true).toBool());
+
+    QString syncID = settings->value("synchronizationID", "").toString();
+
+    if ( !syncID.isEmpty() )
+    {
+        MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
+        if (sysMC->getSyncControlIdentifiers().contains(syncID))
+        {
+            synchronizeWith(sysMC->getSyncControl(syncID));
+        }
+        else
+        {
+            QMessageBox msgBox;
+            msgBox.setIcon(QMessageBox::Warning);
+            msgBox.setText(QString("Trajectory actor '%1':\n"
+                                   "Synchronization control '%2' does not exist.\n"
+                                   "Setting synchronization control to 'None'.")
+                           .arg(getName()).arg(syncID));
+            msgBox.exec();
+
+            synchronizeWith(nullptr);
+        }
+    }
 
     properties->mBool()->setValue(
                 enableFilterProperty,
@@ -377,6 +473,7 @@ void MTrajectoryActor::loadConfiguration(QSettings *settings)
         asynchronousSelectionRequest();
         asynchronousDataRequest();
     }
+    enableProperties(dataSourceAvailable);
 }
 
 
@@ -405,19 +502,24 @@ bool MTrajectoryActor::setTransferFunction(QString tfName)
 }
 
 
-void MTrajectoryActor::synchronizeWith(MSyncControl *sync)
+void MTrajectoryActor::synchronizeWith(
+        MSyncControl *sync, bool updateGUIProperties)
 
 {
+    if (synchronizationControl == sync) return;
+
+    // Reset connection to current synchronization control.
+    // ====================================================
+
     // If the variable is currently connected to a sync control, reset the
-    // background colours of the valid and init time properties (they have
+    // background colours of the start and init time properties (they have
     // been set to red/green from this class to indicate time sync status,
-    // see setValidDateTime()) and disconnect the signals.
+    // see setStartDateTime()) and disconnect the signals.
     if (synchronizationControl != nullptr)
     {
-        for (int i = 0; i < getScenes().size(); i++)
+        foreach (MSceneControl* scene, getScenes())
         {
-            getScenes().at(i)->variableDeletesSynchronizationWith(
-                        synchronizationControl);
+            scene->variableDeletesSynchronizationWith(synchronizationControl);
         }
 
 #ifdef DIRECT_SYNCHRONIZATION
@@ -426,50 +528,121 @@ void MTrajectoryActor::synchronizeWith(MSyncControl *sync)
         disconnect(synchronizationControl, SIGNAL(initDateTimeChanged(QDateTime)),
                    this, SLOT(setInitDateTime(QDateTime)));
         disconnect(synchronizationControl, SIGNAL(validDateTimeChanged(QDateTime)),
-                   this, SLOT(setValidDateTime(QDateTime)));
+                   this, SLOT(setStartDateTime(QDateTime)));
         disconnect(synchronizationControl, SIGNAL(ensembleMemberChanged(int)),
                    this, SLOT(setEnsembleMember(int)));
 #endif
     }
     // Connect to new sync control and try to switch to its current times.
     synchronizationControl = sync;
+
+    // Update "synchronizationProperty".
+    // =================================
+    if (updateGUIProperties)
+    {
+        QString displayedSyncID =
+                properties->getEnumItem(synchronizationProperty);
+        QString newSyncID =
+                (sync == nullptr) ? "None" : synchronizationControl->getID();
+        if (displayedSyncID != newSyncID)
+        {
+            enableActorUpdates(false);
+            properties->setEnumItem(synchronizationProperty, newSyncID);
+            enableActorUpdates(true);
+        }
+    }
+
+    // Connect to new sync control and synchronize.
+    // ============================================
     if (sync != nullptr)
     {
         // Tell the actor's scenes that this variable synchronized with this
         // sync control.
-        for (int i = 0; i < getScenes().size(); i++)
-            getScenes().at(i)->variableSynchronizesWith(sync);
+        foreach (MSceneControl* scene, getScenes())
+        {
+            scene->variableSynchronizesWith(sync);
+        }
 
 #ifdef DIRECT_SYNCHRONIZATION
         synchronizationControl->registerSynchronizedClass(this);
 #else
+//TODO (mr, 01Dec2015) -- add checks for synchronizeInitTime etc..
         connect(sync, SIGNAL(initDateTimeChanged(QDateTime)),
                 this, SLOT(setInitDateTime(QDateTime)));
         connect(sync, SIGNAL(validDateTimeChanged(QDateTime)),
-                this, SLOT(setValidDateTime(QDateTime)));
+                this, SLOT(setStartDateTime(QDateTime)));
         connect(sync, SIGNAL(ensembleMemberChanged(int)),
                 this, SLOT(setEnsembleMember(int)));
 #endif
-        setInitDateTime(sync->initDateTime());
-        setValidDateTime(sync->validDateTime());
-        setEnsembleMember(sync->ensembleMember());
+        if (updateGUIProperties)
+        {
+            enableActorUpdates(false);
+            synchronizeInitTimeProperty->setEnabled(true);
+            synchronizeInitTime = properties->mBool()->value(
+                        synchronizeInitTimeProperty);
+            synchronizeStartTimeProperty->setEnabled(true);
+            synchronizeStartTime = properties->mBool()->value(
+                        synchronizeStartTimeProperty);
+            synchronizeParticlePosTimeProperty->setEnabled(true);
+            synchronizeParticlePosTime = properties->mBool()->value(
+                        synchronizeParticlePosTimeProperty);
+            synchronizeEnsembleProperty->setEnabled(true);
+            synchronizeEnsemble = properties->mBool()->value(
+                        synchronizeEnsembleProperty);
+            enableActorUpdates(true);
+        }
+
+        if (synchronizeInitTime)
+        {
+            setInitDateTime(sync->initDateTime());
+        }
+        if (synchronizeStartTime)
+        {
+            setStartDateTime(sync->validDateTime());
+        }
+        if (synchronizeParticlePosTime)
+        {
+            setParticleDateTime(sync->validDateTime());
+        }
+        if (synchronizeEnsemble)
+        {
+            setEnsembleMember(sync->ensembleMember());
+        }
     }
     else
     {
-        for (int i = 0; i < getScenes().size(); i++)
+        // No synchronization. Reset property colours and disable sync
+        // checkboxes.
+        foreach (MSceneControl* scene, getScenes())
         {
-            getScenes().at(i)->resetPropertyColour(initTimeProperty);
-            getScenes().at(i)->resetPropertyColour(validTimeProperty);
-            getScenes().at(i)->resetPropertyColour(trajectoryTimeProperty);
+            scene->resetPropertyColour(initTimeProperty);
+            scene->resetPropertyColour(startTimeProperty);
+            scene->resetPropertyColour(particlePosTimeProperty);
+            scene->resetPropertyColour(ensembleMemberProperty);
+        }
+
+        if (updateGUIProperties)
+        {
+            enableActorUpdates(false);
+            synchronizeInitTimeProperty->setEnabled(false);
+            synchronizeInitTime = false;
+            synchronizeStartTimeProperty->setEnabled(false);
+            synchronizeStartTime = false;
+            synchronizeParticlePosTimeProperty->setEnabled(false);
+            synchronizeParticlePosTime = false;
+            synchronizeEnsembleProperty->setEnabled(false);
+            synchronizeEnsemble = false;
+            enableActorUpdates(true);
         }
     }
 
-    // Paint the time property that is NOT synchronized in yellow.
-    for (int i = 0; i < getScenes().size(); i++)
+
+    // Update "synchronize xyz" GUI properties.
+    // ========================================
+    if (updateGUIProperties && isInitialized())
     {
-        getScenes().at(i)->setPropertyColour(
-                    syncWithValidTime ? trajectoryTimeProperty : validTimeProperty,
-                    QColor(200, 200, 0));
+        updateTimeProperties();
+        updateEnsembleProperties();
     }
 }
 
@@ -481,36 +654,83 @@ bool MTrajectoryActor::synchronizationEvent(
     {
     case SYNC_INIT_TIME:
     {
+        if (!synchronizeInitTime)
+        {
+            return false;
+        }
         enableActorUpdates(false);
         bool newInitTimeSet = setInitDateTime(data.at(0).toDateTime());
         enableActorUpdates(true);
-        if (newInitTimeSet) asynchronousDataRequest(true);
+        if (newInitTimeSet)
+        {
+            asynchronousDataRequest(true);
+        }
         return newInitTimeSet;
     }
     case SYNC_VALID_TIME:
     {
+        // todo Adapt to fit trajectory time as well
+        if (!synchronizeStartTime && !synchronizeParticlePosTime)
+        {
+            return false;
+        }
         enableActorUpdates(false);
-        bool newValidTimeSet = setValidDateTime(data.at(0).toDateTime());
+        bool newStartTimeSet = false;
+        bool newParticleTimeSet = false;
+        if (synchronizeStartTime)
+        {
+            newStartTimeSet = setStartDateTime(data.at(0).toDateTime());
+        }
+        if (synchronizeParticlePosTime)
+        {
+            newParticleTimeSet = setParticleDateTime(data.at(0).toDateTime());
+        }
         enableActorUpdates(true);
-        if (newValidTimeSet) asynchronousDataRequest(true);
-        return newValidTimeSet;
-        break;
+        if (newStartTimeSet || newParticleTimeSet)
+        {
+            asynchronousDataRequest(true);
+        }
+        return (newStartTimeSet || newParticleTimeSet);
     }
     case SYNC_INIT_VALID_TIME:
     {
+        // todo Adapt to fit trajectory time as well
         enableActorUpdates(false);
-        bool newInitTimeSet = setInitDateTime(data.at(0).toDateTime());
-        bool newValidTimeSet = setValidDateTime(data.at(1).toDateTime());
+        bool newInitTimeSet = false;
+        bool newStartTimeSet = false;
+        bool newParticleTimeSet = false;
+        if (synchronizeInitTime)
+        {
+            newInitTimeSet = setInitDateTime(data.at(0).toDateTime());
+        }
+        if (synchronizeStartTime)
+        {
+            newStartTimeSet = setStartDateTime(data.at(0).toDateTime());
+        }
+        if (synchronizeParticlePosTime)
+        {
+            newParticleTimeSet = setParticleDateTime(data.at(0).toDateTime());
+        }
         enableActorUpdates(true);
-        if (newInitTimeSet || newValidTimeSet) asynchronousDataRequest(true);
-        return (newInitTimeSet || newValidTimeSet);
+        if (newInitTimeSet || newStartTimeSet || newParticleTimeSet)
+        {
+            asynchronousDataRequest(true);
+        }
+        return (newInitTimeSet || newStartTimeSet || newParticleTimeSet);
     }
     case SYNC_ENSEMBLE_MEMBER:
     {
+        if (!synchronizeEnsemble)
+        {
+            return false;
+        }
         enableActorUpdates(false);
         bool newEnsembleMemberSet = setEnsembleMember(data.at(0).toInt());
         enableActorUpdates(true);
-        if (newEnsembleMemberSet) asynchronousDataRequest(true);
+        if (newEnsembleMemberSet)
+        {
+            asynchronousDataRequest(true);
+        }
         return newEnsembleMemberSet;
     }
     default:
@@ -518,6 +738,93 @@ bool MTrajectoryActor::synchronizationEvent(
     }
 
     return false;
+}
+
+
+void MTrajectoryActor::updateSyncPropertyColourHints(MSceneControl *scene)
+{
+    if (synchronizationControl == nullptr)
+    {
+        // No synchronization -- reset all property colours.
+        setPropertyColour(initTimeProperty, QColor(), true, scene);
+        setPropertyColour(startTimeProperty, QColor(), true, scene);
+        setPropertyColour(particlePosTimeProperty, QColor(), true, scene);
+        setPropertyColour(ensembleMemberProperty, QColor(), true, scene);
+    }
+    else
+    {
+        // ( Also see internalSetDateTime() ).
+
+        // Init time.
+        // ==========
+        bool match = (getPropertyTime(initTimeProperty)
+                      == synchronizationControl->initDateTime());
+        QColor colour = match ? QColor(0, 255, 0) : QColor(255, 0, 0);
+        setPropertyColour(initTimeProperty, colour,
+                          !synchronizeInitTime, scene);
+
+        // Valid time.
+        // ===========
+
+        match = (getPropertyTime(startTimeProperty)
+                 == synchronizationControl->validDateTime());
+        colour = match ? QColor(0, 255, 0) : QColor(255, 0, 0);
+        setPropertyColour(startTimeProperty, colour,
+                          !synchronizeStartTime, scene);
+
+        match = (getPropertyTime(particlePosTimeProperty)
+                 == synchronizationControl->validDateTime());
+        colour = match ? QColor(0, 255, 0) : QColor(255, 0, 0);
+        setPropertyColour(particlePosTimeProperty, colour,
+                          !synchronizeParticlePosTime, scene);
+
+        // Ensemble.
+        // =========
+        match = (getEnsembleMember()
+                 == synchronizationControl->ensembleMember());
+        colour = match ? QColor(0, 255, 0) : QColor(255, 0, 0);
+        setPropertyColour(ensembleMemberProperty, colour,
+                          !synchronizeEnsemble, scene);
+    }
+}
+
+
+void MTrajectoryActor::setPropertyColour(
+        QtProperty* property, const QColor &colour, bool resetColour,
+        MSceneControl *scene)
+{
+    if (resetColour)
+    {
+        if (scene == nullptr)
+        {
+            // Reset colour for all scenes in which the actor appears.
+            foreach (MSceneControl* sc, getScenes())
+            {
+                sc->resetPropertyColour(property);
+            }
+        }
+        else
+        {
+            // Reset colour only for the specifed scene.
+            scene->resetPropertyColour(property);
+        }
+    }
+    else
+    {
+        if (scene == nullptr)
+        {
+            // Set colour for all scenes in which the actor appears.
+            foreach (MSceneControl* sc, getScenes())
+            {
+                sc->setPropertyColour(property, colour);
+            }
+        }
+        else
+        {
+            // Set colour only for the specifed scene.
+            scene->setPropertyColour(property, colour);
+        }
+    }
 }
 
 
@@ -578,7 +885,8 @@ void MTrajectoryActor::setTrajectoryFilter(MTrajectoryFilter *f)
         disconnect(trajectoryFilter, SIGNAL(dataRequestCompleted(MDataRequest)),
                    this, SLOT(asynchronousSelectionAvailable(MDataRequest)));
         disconnect(trajectoryFilter, SIGNAL(dataRequestCompleted(MDataRequest)),
-                   this, SLOT(asynchronousSingleTimeSelectionAvailable(MDataRequest)));
+                   this,
+                   SLOT(asynchronousSingleTimeSelectionAvailable(MDataRequest)));
     }
 
     trajectoryFilter = f;
@@ -587,7 +895,8 @@ void MTrajectoryActor::setTrajectoryFilter(MTrajectoryFilter *f)
         connect(trajectoryFilter, SIGNAL(dataRequestCompleted(MDataRequest)),
                 this, SLOT(asynchronousSelectionAvailable(MDataRequest)));
         connect(trajectoryFilter, SIGNAL(dataRequestCompleted(MDataRequest)),
-                this, SLOT(asynchronousSingleTimeSelectionAvailable(MDataRequest)));
+                this,
+                SLOT(asynchronousSingleTimeSelectionAvailable(MDataRequest)));
     }
 }
 
@@ -606,6 +915,12 @@ void MTrajectoryActor::setTrajectoryFilter(const QString& id)
 
 bool MTrajectoryActor::setEnsembleMember(int member)
 {
+    // Don't change member if no data source is selected.
+    if (dataSourceID == "")
+    {
+        return false;
+    }
+
     int prevEnsembleMode = properties->mEnum()->value(ensembleModeProperty);
 
     if (member < 0)
@@ -630,6 +945,21 @@ bool MTrajectoryActor::setEnsembleMember(int member)
         properties->mInt()->setValue(ensembleMemberProperty, member);
         properties->mEnum()->setValue(ensembleModeProperty, 0);
 
+        // Update background colour of the property in the connected
+        // scene's property browser: green if "value" is an
+        // exact match with one of the available values, red otherwise.
+        if (synchronizeEnsemble)
+        {
+            bool exactMatch =
+                    (member == properties->mInt()->value(ensembleMemberProperty));
+            QColor colour = exactMatch ? QColor(0, 255, 0) : QColor(255, 0, 0);
+            foreach (MSceneControl* scene, getScenes())
+            {
+                scene->setPropertyColour(ensembleMemberProperty, colour);
+            }
+        }
+
+
 #ifdef DIRECT_SYNCHRONIZATION
         // Does a new data request need to be emitted?
         if (prevEnsembleMode == 1) return true;
@@ -642,18 +972,17 @@ bool MTrajectoryActor::setEnsembleMember(int member)
 }
 
 
-bool MTrajectoryActor::setValidDateTime(const QDateTime& datetime)
+bool MTrajectoryActor::setStartDateTime(const QDateTime& datetime)
 {
-    if (syncWithValidTime)
-    {
-        return internalSetDateTime(availableValidTimes, datetime,
-                                   validTimeProperty);
-    }
-    else
-    {
-        return internalSetDateTime(availableTrajectoryTimes, datetime,
-                                   trajectoryTimeProperty);
-    }
+    return internalSetDateTime(availableStartTimes, datetime,
+                               startTimeProperty);
+}
+
+
+bool MTrajectoryActor::setParticleDateTime(const QDateTime& datetime)
+{
+    return internalSetDateTime(availableParticlePosTimes, datetime,
+                               particlePosTimeProperty);
 }
 
 
@@ -690,7 +1019,9 @@ void MTrajectoryActor::asynchronousDataAvailable(MDataRequest request)
     }
 
     if (queueContainsEntryWithNoPendingRequests)
+    {
         prepareAvailableDataForRendering();
+    }
 }
 
 
@@ -719,7 +1050,9 @@ void MTrajectoryActor::asynchronousNormalsAvailable(MDataRequest request)
     }
 
     if (queueContainsEntryWithNoPendingRequests)
+    {
         prepareAvailableDataForRendering();
+    }
 }
 
 
@@ -744,7 +1077,9 @@ void MTrajectoryActor::asynchronousSelectionAvailable(MDataRequest request)
     }
 
     if (queueContainsEntryWithNoPendingRequests)
+    {
         prepareAvailableDataForRendering();
+    }
 }
 
 
@@ -770,7 +1105,9 @@ void MTrajectoryActor::asynchronousSingleTimeSelectionAvailable(
     }
 
     if (queueContainsEntryWithNoPendingRequests)
+    {
         prepareAvailableDataForRendering();
+    }
 }
 
 
@@ -808,7 +1145,7 @@ void MTrajectoryActor::prepareAvailableDataForRendering()
                         (trajectories->getNumTimeStepsPerTrajectory() - 1)
                         * timeStepLength_hours);
 
-            updateTrajectoryTimeProperty();
+            updateParticlePosTimeProperty();
         }
 
         // 2. Normals.
@@ -860,6 +1197,7 @@ void MTrajectoryActor::prepareAvailableDataForRendering()
 #endif
 
         emitActorChangedSignal();
+        updateSyncPropertyColourHints();
     }
 }
 
@@ -877,7 +1215,8 @@ void MTrajectoryActor::onActorCreated(MActor *actor)
         QStringList availableTFs = properties->mEnum()->enumNames(
                     transferFunctionProperty);
         availableTFs << tf->transferFunctionName();
-        properties->mEnum()->setEnumNames(transferFunctionProperty, availableTFs);
+        properties->mEnum()->setEnumNames(transferFunctionProperty,
+                                          availableTFs);
         properties->mEnum()->setValue(transferFunctionProperty, index);
 
         enableEmissionOfActorChangedSignal(true);
@@ -902,7 +1241,8 @@ void MTrajectoryActor::onActorDeleted(MActor *actor)
         if (availableTFs.at(index) == tf->getName()) index = 0;
 
         availableTFs.removeOne(tf->getName());
-        properties->mEnum()->setEnumNames(transferFunctionProperty, availableTFs);
+        properties->mEnum()->setEnumNames(transferFunctionProperty,
+                                          availableTFs);
         properties->mEnum()->setValue(transferFunctionProperty, index);
 
         enableEmissionOfActorChangedSignal(true);
@@ -926,7 +1266,8 @@ void MTrajectoryActor::onActorRenamed(MActor *actor, QString oldName)
         // Replace affected entry.
         availableTFs[availableTFs.indexOf(oldName)] = tf->getName();
 
-        properties->mEnum()->setEnumNames(transferFunctionProperty, availableTFs);
+        properties->mEnum()->setEnumNames(transferFunctionProperty,
+                                          availableTFs);
         properties->mEnum()->setValue(transferFunctionProperty, index);
 
         enableEmissionOfActorChangedSignal(true);
@@ -951,15 +1292,13 @@ void MTrajectoryActor::registerScene(MSceneControl *scene)
 *******************************************************************************/
 
 void MTrajectoryActor::initializeActorResources()
-{    
-    MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
-
+{
     // Since no data source was selected disable actor properties since they
     // have no use without a data source.
     if (dataSourceID == "" && !selectDataSource())
     {
-        // User has selected no data source. Display a warning and disable all
-        // trajectory properties.
+        // User has selected no data source. Display a warning and disable
+        // all trajectory properties.
         QMessageBox msgBox;
         msgBox.setIcon(QMessageBox::Warning);
         msgBox.setText("No data source selected. Disabling all properties.");
@@ -969,22 +1308,36 @@ void MTrajectoryActor::initializeActorResources()
     else
     {
         enableProperties(true);
-        this->synchronizeWith(sysMC->getSyncControl("Synchronization"));
 
-        if (textureUnitTransferFunction >=0)
+        if (textureUnitTransferFunction >= 0)
+        {
             releaseTextureUnit(textureUnitTransferFunction);
+        }
         textureUnitTransferFunction = assignImageUnit();
 
         updateInitTimeProperty();
-        updateValidTimeProperty();
+        updateStartTimeProperty();
 
         // Get values from sync control, if connected to one.
-        if (synchronizationControl != nullptr)
+        if (synchronizationControl == nullptr)
         {
-            setInitDateTime(synchronizationControl->initDateTime());
-            updateValidTimeProperty();
-            setValidDateTime(synchronizationControl->validDateTime());
-            setEnsembleMember(synchronizationControl->ensembleMember());
+            synchronizeInitTimeProperty->setEnabled(false);
+            synchronizeInitTime = false;
+            synchronizeStartTimeProperty->setEnabled(false);
+            synchronizeStartTime = false;
+            synchronizeParticlePosTimeProperty->setEnabled(false);
+            synchronizeParticlePosTime = false;
+            synchronizeEnsembleProperty->setEnabled(false);
+            synchronizeEnsemble = false;
+        }
+        else
+        {
+            // Set synchronizationControl to nullptr and sync with its
+            // original value since otherwise the synchronisation won't
+            // be executed.
+            MSyncControl *temp = synchronizationControl;
+            synchronizationControl = nullptr;
+            synchronizeWith(temp);
         }
 
         asynchronousDataRequest();
@@ -1017,7 +1370,17 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
         {
             enableProperties(true);
             updateInitTimeProperty();
-            updateValidTimeProperty();
+            updateStartTimeProperty();
+            // Synchronise with synchronisation control if available.
+            if (synchronizationControl != nullptr)
+            {
+                // Set synchronizationControl to nullptr and sync with its
+                // original value since otherwise the synchronisation won't
+                // be executed.
+                MSyncControl *temp = synchronizationControl;
+                synchronizationControl = nullptr;
+                synchronizeWith(temp);
+            }
             asynchronousDataRequest();
         }
     }
@@ -1028,8 +1391,99 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
         return;
     }
 
+    // Connect to the time signals of the selected scene.
+    else if (property == synchronizationProperty)
+    {
+        if (suppressActorUpdates()) return;
+
+        MSystemManagerAndControl *sysMC =
+                MSystemManagerAndControl::getInstance();
+        QString syncID = properties->getEnumItem(synchronizationProperty);
+        synchronizeWith(sysMC->getSyncControl(syncID));
+
+        return;
+    }
+
+    else if (property == synchronizeInitTimeProperty)
+    {
+        synchronizeInitTime = properties->mBool()->value(
+                    synchronizeInitTimeProperty);
+        updateTimeProperties();
+
+        if (suppressActorUpdates()) return;
+
+        if (synchronizeInitTime)
+        {
+            if (setInitDateTime(synchronizationControl->initDateTime()))
+            {
+                asynchronousDataRequest();
+            }
+        }
+
+        return;
+    }
+
+    else if (property == synchronizeStartTimeProperty)
+    {
+        synchronizeStartTime = properties->mBool()->value(
+                    synchronizeStartTimeProperty);
+        updateTimeProperties();
+
+        if (suppressActorUpdates()) return;
+
+        if (synchronizeStartTime)
+        {
+            if (setStartDateTime(synchronizationControl->validDateTime()))
+            {
+                asynchronousDataRequest();
+            }
+        }
+
+        return;
+    }
+
+    else if (property == synchronizeParticlePosTimeProperty)
+    {
+        synchronizeParticlePosTime = properties->mBool()->value(
+                    synchronizeParticlePosTimeProperty);
+        updateTimeProperties();
+
+        if (suppressActorUpdates()) return;
+
+        if (synchronizeParticlePosTime)
+        {
+            if (setParticleDateTime(synchronizationControl->validDateTime()))
+            {
+                asynchronousDataRequest();
+            }
+        }
+
+        return;
+    }
+
+    else if (property == synchronizeEnsembleProperty)
+    {
+        synchronizeEnsemble = properties->mBool()->value(
+                    synchronizeEnsembleProperty);
+        updateEnsembleProperties();
+        updateSyncPropertyColourHints();
+
+        if (suppressActorUpdates()) return;
+
+        if (synchronizeEnsemble)
+        {
+            if (setEnsembleMember(synchronizationControl->ensembleMember()))
+            {
+                asynchronousDataRequest();
+            }
+        }
+
+        return;
+    }
+
     else if (property == ensembleMemberProperty)
     {
+//        updateSyncPropertyColourHints();
         if (suppressActorUpdates()) return;
         asynchronousDataRequest();
     }
@@ -1063,12 +1517,12 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
         {
         case TRAJECTORY_TUBES:
         case ALL_POSITION_SPHERES:
-            trajectoryTimeProperty->setEnabled(false);
+            particlePosTimeProperty->setEnabled(false);
             break;
         case SINGLETIME_POSITIONS:
         case TUBES_AND_SINGLETIME:
         case BACKWARDTUBES_AND_SINGLETIME:
-            trajectoryTimeProperty->setEnabled(true);
+            particlePosTimeProperty->setEnabled(!synchronizeParticlePosTime);
             break;
         }
 
@@ -1111,44 +1565,30 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
         emitActorChangedSignal();
     }
 
-    // The init time has been changed. Reload valid times.
+    // The init time has been changed. Reload start times.
     else if (property == initTimeProperty)
     {
         if (suppressActorUpdates()) return;
-        updateValidTimeProperty();
+        updateStartTimeProperty();
 
         asynchronousDataRequest();
     }
 
-    else if (property == validTimeProperty)
+    else if (property == startTimeProperty)
     {
         if (suppressUpdate) return; // ignore if init times are being updated
         if (suppressActorUpdates()) return;
         asynchronousDataRequest();
     }
 
-    else if (property == trajectoryTimeProperty)
+    else if (property == particlePosTimeProperty)
     {
-        trajectoryTimeStep = properties->mEnum()->value(trajectoryTimeProperty);
+        particlePosTimeStep = properties->mEnum()->value(
+                    particlePosTimeProperty);
 
         if (suppressUpdate) return;
         if (suppressActorUpdates()) return;
         asynchronousSelectionRequest();
-    }
-
-    else if (property == timeSyncModeProperty)
-    {
-        int index = properties->mEnum()->value(timeSyncModeProperty);
-        syncWithValidTime = (index == 0);
-        if (suppressActorUpdates()) return;
-
-        // Paint the time property that is NOT synchronized in yellow.
-        for (int i = 0; i < getScenes().size(); i++)
-            getScenes().at(i)->setPropertyColour(
-                        syncWithValidTime ? trajectoryTimeProperty : validTimeProperty,
-                        QColor(200, 200, 0));
-
-        setValidDateTime(synchronizationControl->validDateTime());
     }
 
     else if (property == bboxProperty)
@@ -1214,7 +1654,7 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
         {
             tubeShader->setUniformValue(
                         "renderTubesUpToIndex",
-                        trajectoryTimeStep);
+                        particlePosTimeStep);
         }
         else
         {
@@ -1223,9 +1663,9 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
                         trajectories->getNumTimeStepsPerTrajectory());
         }
 
-        // Texture bindings for transfer function for data scalar (1D texture from
-        // transfer function class). The data scalar is stored in the vertex.w
-        // component passed to the vertex shader.
+        // Texture bindings for transfer function for data scalar (1D texture
+        // from transfer function class). The data scalar is stored in the
+        // vertex.w component passed to the vertex shader.
         transferFunction->getTexture()->bindToTextureUnit(
                     textureUnitTransferFunction);
         tubeShader->setUniformValue(
@@ -1281,7 +1721,7 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
             {
                 tubeShadowShader->setUniformValue(
                             "renderTubesUpToIndex",
-                            trajectoryTimeStep);
+                            particlePosTimeStep);
             }
             else
             {
@@ -1298,9 +1738,11 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
                 tubeShadowShader->setUniformValue(
                             "transferFunction", textureUnitTransferFunction);
                 tubeShadowShader->setUniformValue(
-                            "scalarMinimum", transferFunction->getMinimumValue());
+                            "scalarMinimum",
+                            transferFunction->getMinimumValue());
                 tubeShadowShader->setUniformValue(
-                            "scalarMaximum", transferFunction->getMaximimValue());
+                            "scalarMaximum",
+                            transferFunction->getMaximimValue());
             }
             else
                 tubeShadowShader->setUniformValue(
@@ -1361,9 +1803,9 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
                     GLboolean(false));
 
 
-        // Texture bindings for transfer function for data scalar (1D texture from
-        // transfer function class). The data scalar is stored in the vertex.w
-        // component passed to the vertex shader.
+        // Texture bindings for transfer function for data scalar (1D texture
+        // from transfer function class). The data scalar is stored in the
+        // vertex.w component passed to the vertex shader.
         transferFunction->getTexture()->bindToTextureUnit(
                     textureUnitTransferFunction);
         positionSphereShader->setUniformValue(
@@ -1402,7 +1844,8 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
 
             positionSphereShadowShader->setUniformValue(
                         "mvpMatrix",
-                        *(sceneView->getModelViewProjectionMatrix())); CHECK_GL_ERROR;
+                        *(sceneView->getModelViewProjectionMatrix()));
+            CHECK_GL_ERROR;
             positionSphereShadowShader->setUniformValue(
                         "pToWorldZParams",
                         sceneView->pressureToWorldZParameters()); CHECK_GL_ERROR;
@@ -1420,18 +1863,22 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
                         GLboolean(false)); CHECK_GL_ERROR;
 
             positionSphereShadowShader->setUniformValue(
-                        "useTransferFunction", GLboolean(shadowColoured)); CHECK_GL_ERROR;
+                        "useTransferFunction",
+                        GLboolean(shadowColoured)); CHECK_GL_ERROR;
 
             if (shadowColoured)
             {
                 // Transfer function texture is still bound from the sphere
                 // shader.
                 positionSphereShadowShader->setUniformValue(
-                            "transferFunction", textureUnitTransferFunction); CHECK_GL_ERROR;
+                            "transferFunction",
+                            textureUnitTransferFunction); CHECK_GL_ERROR;
                 positionSphereShadowShader->setUniformValue(
-                            "scalarMinimum", transferFunction->getMinimumValue()); CHECK_GL_ERROR;
+                            "scalarMinimum",
+                            transferFunction->getMinimumValue()); CHECK_GL_ERROR;
                 positionSphereShadowShader->setUniformValue(
-                            "scalarMaximum", transferFunction->getMaximimValue()); CHECK_GL_ERROR;
+                            "scalarMaximum",
+                            transferFunction->getMaximimValue()); CHECK_GL_ERROR;
 
             }
             else
@@ -1457,6 +1904,32 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
 }
 
 
+void MTrajectoryActor::updateTimeProperties()
+{
+    enableActorUpdates(false);
+
+    initTimeProperty->setEnabled(!synchronizeInitTime);
+    startTimeProperty->setEnabled(!synchronizeStartTime);
+    particlePosTimeProperty->setEnabled(!synchronizeParticlePosTime);
+
+    updateSyncPropertyColourHints();
+
+    enableActorUpdates(true);
+}
+
+
+void MTrajectoryActor::updateEnsembleProperties()
+{
+    enableActorUpdates(false);
+
+    // If the ensemble is synchronized, disable all properties (they are set
+    // via the synchronization control).
+    ensembleMemberProperty->setEnabled(!synchronizeEnsemble);
+
+    enableActorUpdates(true);
+}
+
+
 /******************************************************************************
 ***                           PRIVATE METHODS                               ***
 *******************************************************************************/
@@ -1466,10 +1939,26 @@ QDateTime MTrajectoryActor::getPropertyTime(QtProperty *enumProperty)
     QStringList dateStrings = properties->mEnum()->enumNames(enumProperty);
 
     // If the list of date strings is empty return an invalid null time.
-    if (dateStrings.empty()) return QDateTime();
+    if (dateStrings.empty())
+    {
+        return QDateTime();
+    }
 
     int index = properties->mEnum()->value(enumProperty);
     return QDateTime::fromString(dateStrings.at(index), Qt::ISODate);
+}
+
+
+int MTrajectoryActor::getEnsembleMember()
+{
+    return properties->mInt()->value(ensembleMemberProperty);
+//    QString memberString =
+//            getQtProperties()->getEnumItem(ensembleMemberProperty);
+
+//    bool ok = true;
+//    int member = memberString.toInt(&ok);
+
+//    if (ok) return member; else return -99999;
 }
 
 
@@ -1505,6 +1994,15 @@ void MTrajectoryActor::setTransferFunctionFromProperty()
 
 void MTrajectoryActor::asynchronousDataRequest(bool synchronizationRequest)
 {
+    // No calculations necessary if trajectories are not displayed. (Besides
+    // data requests not needed lead to predefined trajectory actor not being
+    // displayed and system crash due to waiting for a unfinished thread at
+    // program end.)
+    if (getViews().size() == 0)
+    {
+        return;
+    }
+
 #ifndef DIRECT_SYNCHRONIZATION
     Q_UNUSED(synchronizationRequest);
 #endif
@@ -1524,7 +2022,7 @@ void MTrajectoryActor::asynchronousDataRequest(bool synchronizationRequest)
     // Request 1: Trajectories for the current time and ensemble settings.
     // ===================================================================
     QDateTime initTime  = getPropertyTime(initTimeProperty);
-    QDateTime validTime = getPropertyTime(validTimeProperty);
+    QDateTime validTime = getPropertyTime(startTimeProperty);
     unsigned int member = properties->mInt()->value(ensembleMemberProperty);
 
     MDataRequestHelper rh;
@@ -1583,7 +2081,7 @@ void MTrajectoryActor::asynchronousDataRequest(bool synchronizationRequest)
             || (renderMode == TUBES_AND_SINGLETIME)
             || (renderMode == BACKWARDTUBES_AND_SINGLETIME))
     {
-        rh.insert("FILTER_TIMESTEP", QString("%1").arg(trajectoryTimeStep));        
+        rh.insert("FILTER_TIMESTEP", QString("%1").arg(particlePosTimeStep));
         trqi.singleTimeFilterRequest.request = rh.request();
         trqi.numPendingRequests++;
     }
@@ -1643,7 +2141,7 @@ void MTrajectoryActor::asynchronousSelectionRequest()
 
     // Get the current init and valid (= trajectory start) time.
     QDateTime initTime  = getPropertyTime(initTimeProperty);
-    QDateTime validTime = getPropertyTime(validTimeProperty);
+    QDateTime validTime = getPropertyTime(startTimeProperty);
     unsigned int member = properties->mInt()->value(ensembleMemberProperty);
 
     MDataRequestHelper rh;
@@ -1682,7 +2180,7 @@ void MTrajectoryActor::asynchronousSelectionRequest()
             || (renderMode == TUBES_AND_SINGLETIME)
             || (renderMode == BACKWARDTUBES_AND_SINGLETIME))
     {
-        rh.insert("FILTER_TIMESTEP", QString("%1").arg(trajectoryTimeStep));
+        rh.insert("FILTER_TIMESTEP", QString("%1").arg(particlePosTimeStep));
         trqi.singleTimeFilterRequest.request = rh.request();
         trqi.numPendingRequests++;
     }
@@ -1728,7 +2226,9 @@ void MTrajectoryActor::updateInitTimeProperty()
         availableInitTimes = trajectorySource->availableInitTimes();
         QStringList timeStrings;
         for (int i = 0; i < availableInitTimes.size(); i++)
+        {
             timeStrings << availableInitTimes.at(i).toString(Qt::ISODate);
+        }
 
         properties->mEnum()->setEnumNames(initTimeProperty, timeStrings);
 
@@ -1740,63 +2240,65 @@ void MTrajectoryActor::updateInitTimeProperty()
 }
 
 
-void MTrajectoryActor::updateValidTimeProperty()
+void MTrajectoryActor::updateStartTimeProperty()
 {
     suppressUpdate = true;
 
     if (trajectorySource == nullptr)
     {
-        properties->mEnum()->setEnumNames(validTimeProperty, QStringList());
+        properties->mEnum()->setEnumNames(startTimeProperty, QStringList());
     }
     else
     {
         // Get the current time values.
         QDateTime initTime  = getPropertyTime(initTimeProperty);
-        QDateTime validTime = getPropertyTime(validTimeProperty);
+        QDateTime startTime = getPropertyTime(startTimeProperty);
 
-        // Get a list of the available valid times for the new init time,
+        // Get a list of the available start times for the new init time,
         // convert the QDateTime objects to strings for the enum manager.
-        availableValidTimes = trajectorySource->availableValidTimes(initTime);
-        QStringList validTimeStrings;
-        for (int i = 0; i < availableValidTimes.size(); i++)
-            validTimeStrings << availableValidTimes.at(i).toString(Qt::ISODate);
+        availableStartTimes = trajectorySource->availableValidTimes(initTime);
+        QStringList startTimeStrings;
+        for (int i = 0; i < availableStartTimes.size(); i++)
+            startTimeStrings << availableStartTimes.at(i).toString(Qt::ISODate);
 
-        properties->mEnum()->setEnumNames(validTimeProperty, validTimeStrings);
+        properties->mEnum()->setEnumNames(startTimeProperty, startTimeStrings);
 
-        int newIndex = max(0, availableValidTimes.indexOf(validTime));
-        properties->mEnum()->setValue(validTimeProperty, newIndex);
+        int newIndex = max(0, availableStartTimes.indexOf(startTime));
+        properties->mEnum()->setValue(startTimeProperty, newIndex);
     }
 
     suppressUpdate = false;
 }
 
 
-void MTrajectoryActor::updateTrajectoryTimeProperty()
+void MTrajectoryActor::updateParticlePosTimeProperty()
 {
     suppressUpdate = true;
 
     if (trajectories == nullptr)
     {
-        properties->mEnum()->setEnumNames(trajectoryTimeProperty, QStringList());
+        properties->mEnum()->setEnumNames(particlePosTimeProperty, QStringList());
     }
     else
     {
-        QDateTime currentValue = getPropertyTime(trajectoryTimeProperty);
+        QDateTime currentValue = getPropertyTime(particlePosTimeProperty);
 
-        availableTrajectoryTimes = trajectories->getTimes().toList();
-        QStringList trajectoryTimeStrings;
+        availableParticlePosTimes = trajectories->getTimes().toList();
+        QStringList particlePosTimeStrings;
         for (int i = 0; i < trajectories->getTimes().size(); i++)
-            trajectoryTimeStrings
+        {
+            particlePosTimeStrings
                     << trajectories->getTimes().at(i).toString(Qt::ISODate);
+        }
 
-        properties->mEnum()->setEnumNames(trajectoryTimeProperty,
-                                          trajectoryTimeStrings);
+        properties->mEnum()->setEnumNames(particlePosTimeProperty,
+                                          particlePosTimeStrings);
 
         // Try to restore previous time value. If the previous value is not
         // available for the new trajectories, indexOf() returns -1. This is
         // changed to 0, i.e. the first available time value is selected.
         int newIndex = max(0, trajectories->getTimes().indexOf(currentValue));
-        properties->mEnum()->setValue(trajectoryTimeProperty, newIndex);
+        properties->mEnum()->setValue(particlePosTimeProperty, newIndex);
 
         // The trajectory time property is not needed when the entire
         // trajectories are rendered.
@@ -1804,12 +2306,12 @@ void MTrajectoryActor::updateTrajectoryTimeProperty()
         {
         case TRAJECTORY_TUBES:
         case ALL_POSITION_SPHERES:
-            trajectoryTimeProperty->setEnabled(false);
+            particlePosTimeProperty->setEnabled(false);
             break;
         case SINGLETIME_POSITIONS:
         case TUBES_AND_SINGLETIME:
         case BACKWARDTUBES_AND_SINGLETIME:
-            trajectoryTimeProperty->setEnabled(true);
+            particlePosTimeProperty->setEnabled(!synchronizeParticlePosTime);
             break;
         }
     }
@@ -1827,7 +2329,7 @@ bool MTrajectoryActor::internalSetDateTime(
     // times.
     int i = -1; // use of "++i" below
     bool exactMatch = false;
-    while (i < availableTimes.size()-1)
+    while (i < availableTimes.size() - 1)
     {
         // Loop as long as datetime is larger that the currently inspected
         // element (use "++i" to have the same i available for the remaining
@@ -1860,7 +2362,9 @@ bool MTrajectoryActor::internalSetDateTime(
         {
             QColor colour = exactMatch ? QColor(0, 255, 0) : QColor(255, 0, 0);
             for (int i = 0; i < getScenes().size(); i++)
+            {
                 getScenes().at(i)->setPropertyColour(timeProperty, colour);
+            }
         }
 
         // Get the currently selected index.
@@ -1959,22 +2463,33 @@ bool MTrajectoryActor::selectDataSource()
 void MTrajectoryActor::enableProperties(bool enable)
 {
     enableActorUpdates(false);
-    ensembleModeProperty->setEnabled(enable);
+//    ensembleModeProperty->setEnabled(enable);
     enableFilterProperty->setEnabled(enable);
     deltaPressureProperty->setEnabled(enable);
     deltaTimeProperty->setEnabled(enable);
     renderModeProperty->setEnabled(enable);
+
+    // Synchronisation properties should only be enabled if actor is connected
+    // to a sync control.
+    bool enableSync = (enable && (synchronizationControl != nullptr));
+    synchronizationProperty->setEnabled(enable);
+    synchronizeInitTimeProperty->setEnabled(enableSync);
+    synchronizeStartTimeProperty->setEnabled(enableSync);
+    synchronizeParticlePosTimeProperty->setEnabled(enableSync);
+    synchronizeEnsembleProperty->setEnabled(enableSync);
+
     transferFunctionProperty->setEnabled(enable);
     tubeRadiusProperty->setEnabled(enable);
     sphereRadiusProperty->setEnabled(enable);
     enableShadowProperty->setEnabled(enable);
     colourShadowProperty->setEnabled(enable);
-    initTimeProperty->setEnabled(enable);
-    validTimeProperty->setEnabled(enable);
-    trajectoryTimeProperty->setEnabled(enable);
-    timeSyncModeProperty->setEnabled(enable);
-    bboxProperty->setEnabled(enable);
-    ensembleMemberProperty->setEnabled(enable);
+
+    initTimeProperty->setEnabled(enable && !synchronizeInitTime);
+    startTimeProperty->setEnabled(enable && !synchronizeStartTime);
+    particlePosTimeProperty->setEnabled(enable && !synchronizeParticlePosTime);
+
+//    bboxProperty->setEnabled(enable);
+    ensembleMemberProperty->setEnabled(enable && !synchronizeEnsemble);
     enableActorUpdates(true);
 }
 
