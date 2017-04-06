@@ -338,7 +338,12 @@ bool MNWPMultiVarActor::isConnectedTo(MActor *actor)
     // This actor is connected to the argument actor if the actor is the
     // transfer function of any variable.
     foreach (MNWPActorVariable* var, variables)
-        if (var->transferFunction == actor) return true;
+    {
+        if (var->transferFunction == actor)
+        {
+            return true;
+        }
+    }
 
     return false;
 }

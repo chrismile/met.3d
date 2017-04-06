@@ -43,6 +43,7 @@
 #include "gxfw/selectdatasourcedialog.h"
 #include "gxfw/nwpmultivaractor.h"
 #include "gxfw/memberselectiondialog.h"
+#include "actors/nwpvolumeraycasteractor.h"
 
 using namespace std;
 
@@ -1907,11 +1908,13 @@ bool MNWPActorVariable::setTransferFunctionFromProperty()
     foreach (MActor *ma, glRM->getActors())
     {
         if (MTransferFunction1D *tf = dynamic_cast<MTransferFunction1D*>(ma))
+        {
             if (tf->transferFunctionName() == tfName)
             {
                 transferFunction = tf;
                 return true;
             }
+        }
     }
 
     return false;
@@ -3224,6 +3227,31 @@ void MNWP3DVolumeActorVariable::releaseDataItems()
     }
 
     MNWPActorVariable::releaseDataItems();
+}
+
+
+bool MNWP3DVolumeActorVariable::setTransferFunctionFromProperty()
+{
+    // Since the shadow of volume raycaster actor depends on the transfer
+    // function, it is necessary to trigger an update if the transfer function
+    // changes otherwise the shadow won't adapt to the changes.
+    if (transferFunction != nullptr)
+    {
+        disconnect(transferFunction, SIGNAL(actorChanged()),
+                   static_cast<MNWPVolumeRaycasterActor*>(actor),
+                   SLOT(updateShadow()));
+    }
+
+    bool returnValue = MNWPActorVariable::setTransferFunctionFromProperty();
+
+    if (returnValue == true && transferFunction != nullptr)
+    {
+        connect(transferFunction, SIGNAL(actorChanged()),
+                static_cast<MNWPVolumeRaycasterActor*>(actor),
+                SLOT(updateShadow()));
+    }
+
+    return returnValue;
 }
 
 

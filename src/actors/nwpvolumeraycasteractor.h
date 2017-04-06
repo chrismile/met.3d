@@ -108,6 +108,12 @@ public:
     const MNWPActorVariable* getCurrentShadingVariable() const
     { return shadingVar; }
 
+public slots:
+    /**
+      todo
+     */
+    void updateShadow();
+
 protected:
     void initializeActorResources();
 

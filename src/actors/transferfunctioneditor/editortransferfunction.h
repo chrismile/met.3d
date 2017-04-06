@@ -45,8 +45,9 @@ namespace TFEditor
 
 enum InterpolationType
 {
-    HCL,
-    RGB
+    INVALID = -1,
+    HCL = 0,
+    RGB = 1
 };
 
 /**

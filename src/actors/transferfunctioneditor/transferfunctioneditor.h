@@ -82,13 +82,22 @@ public:
     void resetUI();
 
     void setType(InterpolationType type);
-    InterpolationType getType() const;
+    InterpolationType getType() const  { return transferFunction.getType(); }
 
-    MColorFunction* getColorFunction();
-    MAlphaFunction* getAlphaFunction();
-    MFinalFunction* getFinalFunction();
+    /** Returns the name of the given interpolation type as QString. */
+    QString interpolationTypeToString(InterpolationType interpolationType);
 
-    MEditorTransferFunction* getTransferFunction();
+    /** Returns enum associated with the given name. Returns Invalid if no type
+        exists with the given name. */
+    InterpolationType stringToInterpolationType(QString interpolationTypeName);
+
+    MColorFunction* getColorFunction() { return colorFunction; }
+    MAlphaFunction* getAlphaFunction() { return alphaFunction; }
+    MFinalFunction* getFinalFunction() { return finalFunction; }
+
+    MEditorTransferFunction* getTransferFunction() { return &transferFunction; }
+
+    void setAlphaBoxesBounds(float lowerBound, float upperBound);
 
 signals:
     void transferFunctionChanged();
@@ -176,7 +185,7 @@ public:
     float selectedX() const;
     float selectedY() const;
 
-    void setSelectedX(float x);
+    virtual void setSelectedX(float x);
     void setSelectedY(float y);
 
     void setSelectedPoint(int point);
@@ -262,6 +271,8 @@ public:
                   MRuler *yRuler,
                   QWidget *parent = nullptr);
 
+    void setSelectedX(float x) override;
+
 protected:
     void paintEvent(QPaintEvent *event) override;
     void mousePressEvent(QMouseEvent * event) override;
@@ -278,10 +289,13 @@ protected:
     void setNeighbouringNodes();
 
 private:
+    void selectionChanged();
+
     MRuler *xRuler;
     MRuler *yRuler;
     float posXNeighbourLeft;
     float posXNeighbourRight;
+    MTransferFunctionEditor *transferFunctionEditor;
 };
 
 

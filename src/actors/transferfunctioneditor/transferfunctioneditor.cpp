@@ -387,33 +387,54 @@ void MTransferFunctionEditor::setType(InterpolationType type)
 }
 
 
-InterpolationType MTransferFunctionEditor::getType() const
+QString MTransferFunctionEditor::interpolationTypeToString(
+        InterpolationType interpolationType)
 {
-    return transferFunction.getType();
+    switch (interpolationType)
+    {
+    case InterpolationType::HCL:
+        return QString("hcl");
+    case InterpolationType::RGB:
+        return QString("rgb");
+    default:
+        return QString("");
+    }
 }
 
 
-MColorFunction* MTransferFunctionEditor::getColorFunction()
+InterpolationType
+MTransferFunctionEditor::stringToInterpolationType(QString interpolationTypeName)
 {
-    return colorFunction;
+    // NOTE: Interpolation type identification was changed in Met.3D version
+    // 1.1. For compatibility with version 1.0, the old numeric identifiers are
+    // considered here as well.
+    if (interpolationTypeName == QString("hcl")
+            || interpolationTypeName == QString("0")) // compatibility with Met.3D 1.0
+    {
+        return InterpolationType::HCL;
+    }
+    else if (interpolationTypeName == QString("rgb")
+             || interpolationTypeName == QString("1"))
+    {
+        return InterpolationType::RGB;
+    }
+    else
+    {
+        return InterpolationType::INVALID;
+    }
 }
 
 
-MAlphaFunction* MTransferFunctionEditor::getAlphaFunction()
+void MTransferFunctionEditor::setAlphaBoxesBounds(
+        float lowerBound, float upperBound)
 {
-    return alphaFunction;
-}
-
-
-MFinalFunction* MTransferFunctionEditor::getFinalFunction()
-{
-    return finalFunction;
-}
-
-
-MEditorTransferFunction* MTransferFunctionEditor::getTransferFunction()
-{
-    return &transferFunction;
+    alphaPosBox->blockSignals(true);
+    alphaPosBox->setRange(double(denormalizeValue(lowerBound)),
+                          double(denormalizeValue(upperBound)));
+    alphaPosBox->blockSignals(false);
+    alphaNormPosBox->blockSignals(true);
+    alphaNormPosBox->setRange(double(lowerBound), double(upperBound));
+    alphaNormPosBox->blockSignals(false);
 }
 
 
@@ -1243,7 +1264,21 @@ MAlphaFunction::MAlphaFunction(
     MAbstractFunction(transferFunction, transferFunction->getAlphaNodes(), parent),
     xRuler(xRuler),
     yRuler(yRuler)
-{}
+{
+    transferFunctionEditor = dynamic_cast<MTransferFunctionEditor*>(parent);
+}
+
+
+/******************************************************************************
+***                            PUBLIC METHODS                               ***
+*******************************************************************************/
+
+void MAlphaFunction::setSelectedX(float x)
+{
+    // Avoid crossing neighbouring nodes.
+    x = std::max(posXNeighbourLeft, std::min(x, posXNeighbourRight));
+    abstractNodes->setXAt(selectedPoint, x);
+}
 
 
 /******************************************************************************
@@ -1371,10 +1406,7 @@ void MAlphaFunction::mouseMoveEvent(QMouseEvent * event)
         // start and end point (first two points in the vector storing nodes).
         if (selectedPoint > 1)
         {
-            // Avoid crossing neighbouring nodes.
-            float xMinimum = posXNeighbourLeft;
-            float xMaximum = posXNeighbourRight;
-            setSelectedX(std::max(xMinimum, std::min((float)pos.x(), xMaximum)));
+            setSelectedX(pos.x());
         }
 
         setSelectedY(std::max(0.f, std::min((float)pos.y(), 1.f)));
@@ -1450,7 +1482,18 @@ void MAlphaFunction::setNeighbouringNodes()
             }
         }
     }
-    distLeft = distRight + 1;
+    transferFunctionEditor->setAlphaBoxesBounds(posXNeighbourLeft,
+                                                posXNeighbourRight);
+}
+
+
+/******************************************************************************
+***                           PRIVATE METHODS                               ***
+*******************************************************************************/
+
+void MAlphaFunction::selectionChanged()
+{
+    setNeighbouringNodes();
 }
 
 

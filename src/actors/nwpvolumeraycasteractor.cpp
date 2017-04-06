@@ -1059,6 +1059,16 @@ MNWPActorVariable* MNWPVolumeRaycasterActor::createActorVariable(
 
 
 /******************************************************************************
+***                             PUBLIC SLOTS                                ***
+*******************************************************************************/
+
+void MNWPVolumeRaycasterActor::updateShadow()
+{
+    updateNextRenderFrame.set(UpdateShadowImage);
+}
+
+
+/******************************************************************************
 ***                          PROTECTED METHODS                              ***
 *******************************************************************************/
 
@@ -2509,6 +2519,13 @@ void MNWPVolumeRaycasterActor::renderRayCaster(
 {
     if (rayCasterSettings->isoValueSetList.size() == 0) return;
 
+    // Don't render DVR if observered variable doesn't have a transfer function
+    // assigned.
+    if ((renderMode == RenderMode::DVR) && var->transferFunction == nullptr)
+    {
+        return;
+    }
+
     effect->bindProgram("Volume");
 
     setRayCasterShaderVars(effect, sceneView); CHECK_GL_ERROR;
@@ -2783,6 +2800,13 @@ void MNWPVolumeRaycasterActor::createShadowImage(
 void MNWPVolumeRaycasterActor::renderShadows(
         MSceneViewGLWidget* sceneView)
 {
+    // Don't render DVR shadow if observered variable doesn't have a transfer
+    // function assigned.
+    if ((renderMode == RenderMode::DVR) && var->transferFunction == nullptr)
+    {
+        return;
+    }
+
     float vertexData[] =
     {
         bbSettings->llcrnLon, bbSettings->llcrnLat, 0.01f,
