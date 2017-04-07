@@ -291,6 +291,9 @@ protected:
     virtual void asynchronousDataAvailableEvent(MStructuredGrid *grid)
     { Q_UNUSED(grid); }
 
+    // todo move cpp implementation accordingly
+    virtual bool setTransferFunctionFromProperty();
+
     /** Actor that this instance belongs to. */
     MNWPMultiVarActor *actor;
 
@@ -379,8 +382,6 @@ private:
             const T& value,
             QtProperty* property,
             bool setSyncColour=true);
-
-    bool setTransferFunctionFromProperty();
 
     bool suppressUpdate;
 };
@@ -661,6 +662,9 @@ public:
     int          textureUnitMinMaxAccelStructure;
 
 protected:
+    bool setTransferFunctionFromProperty() override;
+
+private:
 };
 
 } // namespace Met3D

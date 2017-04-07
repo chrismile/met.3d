@@ -25,7 +25,15 @@
 **  along with Met.3D.  If not, see <http://www.gnu.org/licenses/>.
 **
 *******************************************************************************/
-// SOURCE: https://github.com/gudajan/Windsim
+
+// NOTE:
+// ==================
+//
+// Parts of the code in this file is based on code from the "Windsim"
+// repository by Jan Krohn: https://github.com/gudajan/Windsim
+//
+// ==================
+
 #include "transferfunctioneditor.h"
 
 // standard library imports
@@ -64,7 +72,7 @@ MTransferFunctionEditor::MTransferFunctionEditor(QWidget *parent) :
     rangeRuler(nullptr),
     alphaRuler(nullptr),
     bigAlphaRuler(nullptr),
-    colorFunction(nullptr),
+    colourFunction(nullptr),
     alphaFunction(nullptr),
     finalFunction(nullptr),
     alphaPosBox(nullptr),
@@ -72,7 +80,7 @@ MTransferFunctionEditor::MTransferFunctionEditor(QWidget *parent) :
     alphaValueBox(nullptr),
     colourPosBox(nullptr),
     colourNormPosBox(nullptr),
-    colorTypeComboBox(nullptr),
+    colourTypeComboBox(nullptr),
     colourValueBox(nullptr),
     channelsWidget(nullptr),
     openChannelsButton(nullptr),
@@ -80,7 +88,7 @@ MTransferFunctionEditor::MTransferFunctionEditor(QWidget *parent) :
 {
     setWindowTitle("Transferfunction Editor");
 
-    transferFunction.setType(HCL);
+    transferFunction.setCSpaceForCNodeInterpolation(HCL);
     this->setMinimumWidth(700);
 
     QHBoxLayout *layout = new QHBoxLayout(this);
@@ -91,14 +99,14 @@ MTransferFunctionEditor::MTransferFunctionEditor(QWidget *parent) :
             alphaRuler = new MAlphaRuler(this);
             bigAlphaRuler = new MBigAlphaRuler(this);
 
-            colorFunction = new MColorFunction(&transferFunction, this);
+            colourFunction = new MColourFunction(&transferFunction, this);
             alphaFunction = new MAlphaFunction(&transferFunction, rangeRuler,
                                               alphaRuler, this);
             finalFunction = new MFinalFunction(&transferFunction, this);
 
             openChannelsButton = new QPushButton("channels", this);
 
-            colorFunction->setMinimumHeight(40);
+            colourFunction->setMinimumHeight(40);
             alphaFunction->setMinimumHeight(70);
             finalFunction->setMinimumHeight(30);
 
@@ -120,7 +128,7 @@ MTransferFunctionEditor::MTransferFunctionEditor(QWidget *parent) :
             functionLayout->addWidget(alphaRuler, 0, 1);
             functionLayout->addWidget(bigAlphaRuler, 0, 2);
             functionLayout->addWidget(rangeRuler, 1, 0);
-            functionLayout->addWidget(colorFunction, 2, 0);
+            functionLayout->addWidget(colourFunction, 2, 0);
             functionLayout->addWidget(finalFunction, 3, 0);
             functionLayout->addWidget(openChannelsButton, 2, 1, 2, 2);
         }
@@ -164,7 +172,7 @@ MTransferFunctionEditor::MTransferFunctionEditor(QWidget *parent) :
                 QFormLayout *colorBoxFormLayout = new QFormLayout();
                 colourPosBox = new QDoubleSpinBox(this);
                 colourNormPosBox = new QDoubleSpinBox(this);
-                colourValueBox = new MColorBox(colorFunction, this);
+                colourValueBox = new MColourBox(colourFunction, this);
 
                 colorBoxFormLayout->addRow("position:", colourPosBox);
                 colorBoxFormLayout->addRow("normalized position:",
@@ -224,10 +232,10 @@ MTransferFunctionEditor::MTransferFunctionEditor(QWidget *parent) :
 
             QGroupBox *colourSpaceBox = new QGroupBox("colour space", this);
             {
-                colorTypeComboBox = new QComboBox(this);
+                colourTypeComboBox = new QComboBox(this);
 
                 colourSpaceBox->setLayout(new QHBoxLayout());
-                colourSpaceBox->layout()->addWidget(colorTypeComboBox);
+                colourSpaceBox->layout()->addWidget(colourTypeComboBox);
             }
 
             boxLayout->addWidget(alphaBox);
@@ -250,7 +258,7 @@ MTransferFunctionEditor::MTransferFunctionEditor(QWidget *parent) :
             alphaNormPosBox->setFixedWidth(80);
             alphaValueBox->setFixedWidth(80);
 
-            colorTypeComboBox->addItems({"HCL", "RGB"});
+            colourTypeComboBox->addItems({"HCL", "RGB"});
         }
 
         QVBoxLayout *channelsLayout = new QVBoxLayout();
@@ -265,7 +273,7 @@ MTransferFunctionEditor::MTransferFunctionEditor(QWidget *parent) :
         layout->addLayout(channelsLayout);
     }
 
-    connect(colorFunction, SIGNAL(functionChanged()),
+    connect(colourFunction, SIGNAL(functionChanged()),
             this, SLOT(changeTransferFunction()));
     connect(alphaFunction, SIGNAL(functionChanged()),
             this, SLOT(changeTransferFunction()));
@@ -296,8 +304,8 @@ MTransferFunctionEditor::MTransferFunctionEditor(QWidget *parent) :
     connect(alphaValueBox, SIGNAL(valueChanged(double)),
             this, SLOT(changeAlphaValue(double)));
 
-    connect(colorTypeComboBox, SIGNAL(currentIndexChanged(int)),
-            this, SLOT(changeColorType(int)));
+    connect(colourTypeComboBox, SIGNAL(currentIndexChanged(int)),
+            this, SLOT(changeColourType(int)));
 
     connect(bigAlphaRuler, SIGNAL(rangeChanged(float, float)),
             this, SLOT(changeAlphaRange(float, float)));
@@ -315,7 +323,7 @@ MTransferFunctionEditor::~MTransferFunctionEditor()
     delete openChannelsButton;
 
     delete colourValueBox;
-    delete colorTypeComboBox;
+    delete colourTypeComboBox;
     delete alphaValueBox;
     delete alphaPosBox;
     delete alphaNormPosBox;
@@ -331,7 +339,7 @@ MTransferFunctionEditor::~MTransferFunctionEditor()
 
     delete finalFunction;
     delete alphaFunction;
-    delete colorFunction;
+    delete colourFunction;
 
     delete bigAlphaRuler;
     delete alphaRuler;
@@ -372,48 +380,69 @@ void MTransferFunctionEditor::updateNumSteps(int numSteps)
 
 void MTransferFunctionEditor::resetUI()
 {
-    colorFunction->reset();
+    colourFunction->reset();
     alphaFunction->reset();
 }
 
 
-void MTransferFunctionEditor::setType(InterpolationType type)
+void MTransferFunctionEditor::setCSpaceForCNodeInterpolation(ColourSpaceForColourNodeInterpolation type)
 {
-    transferFunction.setType(type);
+    transferFunction.setCSpaceForCNodeInterpolation(type);
 
-    colorTypeComboBox->blockSignals(true);
-    colorTypeComboBox->setCurrentIndex((int)type);
-    colorTypeComboBox->blockSignals(false);
+    colourTypeComboBox->blockSignals(true);
+    colourTypeComboBox->setCurrentIndex((int)type);
+    colourTypeComboBox->blockSignals(false);
 }
 
 
-InterpolationType MTransferFunctionEditor::getType() const
+QString MTransferFunctionEditor::interpolationCSpaceToString(
+        ColourSpaceForColourNodeInterpolation interpolationType)
 {
-    return transferFunction.getType();
+    switch (interpolationType)
+    {
+    case ColourSpaceForColourNodeInterpolation::HCL:
+        return QString("hcl");
+    case ColourSpaceForColourNodeInterpolation::RGB:
+        return QString("rgb");
+    default:
+        return QString("");
+    }
 }
 
 
-MColorFunction* MTransferFunctionEditor::getColorFunction()
+ColourSpaceForColourNodeInterpolation
+MTransferFunctionEditor::stringToInterpolationCSpace(QString interpolationTypeName)
 {
-    return colorFunction;
+    // NOTE: Interpolation type identification was changed in Met.3D version
+    // 1.1. For compatibility with version 1.0, the old numeric identifiers are
+    // considered here as well.
+    if (interpolationTypeName == QString("hcl")
+            || interpolationTypeName == QString("0")) // compatibility with Met.3D 1.0
+    {
+        return ColourSpaceForColourNodeInterpolation::HCL;
+    }
+    else if (interpolationTypeName == QString("rgb")
+             || interpolationTypeName == QString("1"))
+    {
+        return ColourSpaceForColourNodeInterpolation::RGB;
+    }
+    else
+    {
+        return ColourSpaceForColourNodeInterpolation::INVALID;
+    }
 }
 
 
-MAlphaFunction* MTransferFunctionEditor::getAlphaFunction()
+void MTransferFunctionEditor::setAlphaBoxesBounds(
+        float lowerBound, float upperBound)
 {
-    return alphaFunction;
-}
-
-
-MFinalFunction* MTransferFunctionEditor::getFinalFunction()
-{
-    return finalFunction;
-}
-
-
-MEditorTransferFunction* MTransferFunctionEditor::getTransferFunction()
-{
-    return &transferFunction;
+    alphaPosBox->blockSignals(true);
+    alphaPosBox->setRange(double(denormalizeValue(lowerBound)),
+                          double(denormalizeValue(upperBound)));
+    alphaPosBox->blockSignals(false);
+    alphaNormPosBox->blockSignals(true);
+    alphaNormPosBox->setRange(double(lowerBound), double(upperBound));
+    alphaNormPosBox->blockSignals(false);
 }
 
 
@@ -435,7 +464,7 @@ void MTransferFunctionEditor::closeEvent(QCloseEvent *event)
 {
     // Close colour picker manually since it is not closed with the transfer
     // function editor.
-    colorFunction->closeColourPicker();
+    colourFunction->closeColourPicker();
 
     QDialog::closeEvent(event);
 }
@@ -473,11 +502,11 @@ void MTransferFunctionEditor::changeTransferFunction(bool updateBoxes)
         alphaNormPosBox->blockSignals(true);
         alphaValueBox->blockSignals(true);
 
-        colourNormPosBox->setValue(colorFunction->selectedX());
-        colourPosBox->setValue(denormalizeValue(colorFunction->selectedX()));
+        colourNormPosBox->setValue(colourFunction->selectedX());
+        colourPosBox->setValue(denormalizeValue(colourFunction->selectedX()));
         colourPosBox->setToolTip(QString("%1").arg(
                                      denormalizeValue(
-                                         colorFunction->selectedX())));
+                                         colourFunction->selectedX())));
         alphaPosBox->setValue(denormalizeValue(alphaFunction->selectedX()));
         alphaPosBox->setToolTip(QString("%1").arg(
                                     denormalizeValue(
@@ -492,8 +521,8 @@ void MTransferFunctionEditor::changeTransferFunction(bool updateBoxes)
         alphaValueBox->blockSignals(false);
     }
 
-    bool isFirstColor = colorFunction->selectedPoint == 0;
-    bool isLastColor = colorFunction->selectedPoint == 1;
+    bool isFirstColor = colourFunction->selectedPoint == 0;
+    bool isLastColor = colourFunction->selectedPoint == 1;
 
     colourPrevButton->setEnabled(!isFirstColor);
     colourNextButton->setEnabled(!isLastColor);
@@ -520,20 +549,20 @@ void MTransferFunctionEditor::changeTransferFunction(bool updateBoxes)
 
 void MTransferFunctionEditor::prevColourNode()
 {
-    colorFunction->selectPrev();
+    colourFunction->selectPrev();
 }
 
 
 void MTransferFunctionEditor::nextColourNode()
 {
-    colorFunction->selectNext();
+    colourFunction->selectNext();
 }
 
 
 void MTransferFunctionEditor::deleteColourNode()
 {
-    int point = colorFunction->selectedPoint;
-    colorFunction->deletePoint(point);
+    int point = colourFunction->selectedPoint;
+    colourFunction->deletePoint(point);
 }
 
 
@@ -548,7 +577,7 @@ void MTransferFunctionEditor::changeColourPos(double pos)
     colourNormPosBox->setValue(normalizedPos);
     colourNormPosBox->blockSignals(false);
 
-    colorFunction->setSelectedX(normalizedPos);
+    colourFunction->setSelectedX(normalizedPos);
     changeTransferFunction(false);
 }
 
@@ -563,7 +592,7 @@ void MTransferFunctionEditor::changeColourNormPos(double pos)
     colourPosBox->setToolTip(QString("%1").arg(denormalizedPos));
     colourPosBox->blockSignals(false);
 
-    colorFunction->setSelectedX(pos);
+    colourFunction->setSelectedX(pos);
     changeTransferFunction(false);
 }
 
@@ -632,10 +661,10 @@ void MTransferFunctionEditor::changeAlphaRange(float min, float max)
 }
 
 
-void MTransferFunctionEditor::changeColorType(int index)
+void MTransferFunctionEditor::changeColourType(int index)
 {
-    colorFunction->closeColourPicker();
-    transferFunction.setType((InterpolationType)index);
+    colourFunction->closeColourPicker();
+    transferFunction.setCSpaceForCNodeInterpolation((ColourSpaceForColourNodeInterpolation)index);
     changeTransferFunction();
 }
 
@@ -1029,19 +1058,19 @@ float MAbstractFunction::yMax() const
 ***                     CONSTRUCTOR / DESTRUCTOR                            ***
 *******************************************************************************/
 
-MColorFunction::MColorFunction(
+MColourFunction::MColourFunction(
         MEditorTransferFunction *transferFunction,
         QWidget *parent) :
     MAbstractFunction(transferFunction, transferFunction->getColourNodes(), parent),
-    hclColorPicker(transferFunction->getColourNodes(), parent)
+    hclColourPicker(transferFunction->getColourNodes(), parent)
 {
-    rgbColorPicker.setOption(QColorDialog::NoButtons);
+    rgbColourPicker.setOption(QColorDialog::NoButtons);
 
-    connect(&rgbColorPicker, SIGNAL(currentColorChanged(QColor)),
-            this, SLOT(rgbColorChanged(QColor)));
+    connect(&rgbColourPicker, SIGNAL(currentColorChanged(QColor)),
+            this, SLOT(rgbColourChanged(QColor)));
 
-    connect(&hclColorPicker, SIGNAL(colorChanged(MColorHCL16)),
-            this, SLOT(hclColorChanged(MColorHCL16)));
+    connect(&hclColourPicker, SIGNAL(colorChanged(MColourHCL16)),
+            this, SLOT(hclColourChanged(MColourHCL16)));
 }
 
 
@@ -1049,27 +1078,27 @@ MColorFunction::MColorFunction(
 ***                            PUBLIC METHODS                               ***
 *******************************************************************************/
 
-void MColorFunction::openColorPicker()
+void MColourFunction::openColourPicker()
 {
-    if (transferFunction->getType() == HCL)
+    if (transferFunction->getCSpaceForCNodeInterpolation() == HCL)
     {
-        hclColorPicker.setCurrentIndex(selectedPoint);
-        hclColorPicker.show();
+        hclColourPicker.setCurrentIndex(selectedPoint);
+        hclColourPicker.show();
     }
     else
     {
-        MColorRGB8 rgb = (MColorRGB8)
+        MColourRGB8 rgb = (MColourRGB8)
                 transferFunction->getColourNodes()->colourAt(selectedPoint);
-        rgbColorPicker.setCurrentColor(QColor(rgb.r, rgb.g, rgb.b));
-        rgbColorPicker.show();
+        rgbColourPicker.setCurrentColor(QColor(rgb.r, rgb.g, rgb.b));
+        rgbColourPicker.show();
     }
 }
 
 
-void MColorFunction::closeColourPicker()
+void MColourFunction::closeColourPicker()
 {
-    rgbColorPicker.close();
-    hclColorPicker.close();
+    rgbColourPicker.close();
+    hclColourPicker.close();
 }
 
 
@@ -1077,7 +1106,7 @@ void MColorFunction::closeColourPicker()
 ***                          PROTECTED METHODS                              ***
 *******************************************************************************/
 
-void MColorFunction::paintEvent(QPaintEvent *event)
+void MColourFunction::paintEvent(QPaintEvent *event)
 {
     Q_UNUSED(event);
     QPainter painter(this);
@@ -1103,16 +1132,16 @@ void MColorFunction::paintEvent(QPaintEvent *event)
 }
 
 
-void MColorFunction::mouseDoubleClickEvent(QMouseEvent *event)
+void MColourFunction::mouseDoubleClickEvent(QMouseEvent *event)
 {
     if (event->button() == Qt::LeftButton)
     {
-        openColorPicker();
+        openColourPicker();
     }
 }
 
 
-void MColorFunction::mousePressEvent(QMouseEvent *event)
+void MColourFunction::mousePressEvent(QMouseEvent *event)
 {
     // Adding or selecting node.
     if (event->button() == Qt::LeftButton)
@@ -1143,7 +1172,7 @@ void MColorFunction::mousePressEvent(QMouseEvent *event)
 }
 
 
-void MColorFunction::mouseMoveEvent(QMouseEvent * event)
+void MColourFunction::mouseMoveEvent(QMouseEvent * event)
 {
     if (event->buttons() == Qt::LeftButton)
     {
@@ -1162,13 +1191,13 @@ void MColorFunction::mouseMoveEvent(QMouseEvent * event)
 }
 
 
-float MColorFunction::yMin() const
+float MColourFunction::yMin() const
 {
     return 0.5f;
 }
 
 
-float MColorFunction::yMax() const
+float MColourFunction::yMax() const
 {
     return 0.5f;
 }
@@ -1178,18 +1207,18 @@ float MColorFunction::yMax() const
 ***                           PRIVATE METHODS                               ***
 *******************************************************************************/
 
-void MColorFunction::selectionChanged()
+void MColourFunction::selectionChanged()
 {
-    if (rgbColorPicker.isVisible())
+    if (rgbColourPicker.isVisible())
     {
-        MColorRGB8 rgb = (MColorRGB8)
+        MColourRGB8 rgb = (MColourRGB8)
                 transferFunction->getColourNodes()->colourAt(selectedPoint);
-        rgbColorPicker.setCurrentColor(QColor(rgb.r, rgb.g, rgb.b));
+        rgbColourPicker.setCurrentColor(QColor(rgb.r, rgb.g, rgb.b));
     }
 
-    if (hclColorPicker.isVisible())
+    if (hclColourPicker.isVisible())
     {
-        hclColorPicker.setCurrentIndex(selectedPoint);
+        hclColourPicker.setCurrentIndex(selectedPoint);
     }
 }
 
@@ -1198,32 +1227,32 @@ void MColorFunction::selectionChanged()
 ***                            PRIVATE SLOTS                                ***
 *******************************************************************************/
 
-void MColorFunction::rgbColorChanged(const QColor& color)
+void MColourFunction::rgbColourChanged(const QColor& color)
 {
-    if (!rgbColorPicker.isVisible())
+    if (!rgbColourPicker.isVisible())
     {
         return;
     }
 
-    MColorRGB8 rgb(color.redF(), color.greenF(), color.blueF());
+    MColourRGB8 rgb(color.redF(), color.greenF(), color.blueF());
 
-    transferFunction->getColourNodes()->colourAt(selectedPoint) = (MColorXYZ64)rgb;
+    transferFunction->getColourNodes()->colourAt(selectedPoint) = (MColourXYZ64)rgb;
     emit functionChanged();
 }
 
 
-void MColorFunction::hclColorChanged(const MColorHCL16&)
+void MColourFunction::hclColourChanged(const MColourHCL16&)
 {
-    if (!hclColorPicker.isVisible())
+    if (!hclColourPicker.isVisible())
     {
         return;
     }
 
-    MColorHCL16 hcl = hclColorPicker.color();
+    MColourHCL16 hcl = hclColourPicker.color();
     hcl.c = std::max(hcl.c, (unsigned short)1);
     hcl.l = std::max(hcl.l, (unsigned short)1);
 
-    transferFunction->getColourNodes()->colourAt(selectedPoint) = (MColorXYZ64)hcl;
+    transferFunction->getColourNodes()->colourAt(selectedPoint) = (MColourXYZ64)hcl;
     emit functionChanged();
 }
 
@@ -1243,7 +1272,21 @@ MAlphaFunction::MAlphaFunction(
     MAbstractFunction(transferFunction, transferFunction->getAlphaNodes(), parent),
     xRuler(xRuler),
     yRuler(yRuler)
-{}
+{
+    transferFunctionEditor = dynamic_cast<MTransferFunctionEditor*>(parent);
+}
+
+
+/******************************************************************************
+***                            PUBLIC METHODS                               ***
+*******************************************************************************/
+
+void MAlphaFunction::setSelectedX(float x)
+{
+    // Avoid crossing neighbouring nodes.
+    x = std::max(posXNeighbourLeft, std::min(x, posXNeighbourRight));
+    abstractNodes->setXAt(selectedPoint, x);
+}
 
 
 /******************************************************************************
@@ -1371,10 +1414,7 @@ void MAlphaFunction::mouseMoveEvent(QMouseEvent * event)
         // start and end point (first two points in the vector storing nodes).
         if (selectedPoint > 1)
         {
-            // Avoid crossing neighbouring nodes.
-            float xMinimum = posXNeighbourLeft;
-            float xMaximum = posXNeighbourRight;
-            setSelectedX(std::max(xMinimum, std::min((float)pos.x(), xMaximum)));
+            setSelectedX(pos.x());
         }
 
         setSelectedY(std::max(0.f, std::min((float)pos.y(), 1.f)));
@@ -1450,7 +1490,18 @@ void MAlphaFunction::setNeighbouringNodes()
             }
         }
     }
-    distLeft = distRight + 1;
+    transferFunctionEditor->setAlphaBoxesBounds(posXNeighbourLeft,
+                                                posXNeighbourRight);
+}
+
+
+/******************************************************************************
+***                           PRIVATE METHODS                               ***
+*******************************************************************************/
+
+void MAlphaFunction::selectionChanged()
+{
+    setNeighbouringNodes();
 }
 
 
@@ -2017,9 +2068,9 @@ void MBigAlphaRuler::leaveEvent(QEvent *event)
 ***                     CONSTRUCTOR / DESTRUCTOR                            ***
 *******************************************************************************/
 
-MColorBox::MColorBox(MColorFunction *colorFunction, QWidget *parent) :
+MColourBox::MColourBox(MColourFunction *colorFunction, QWidget *parent) :
     QWidget(parent),
-    colorFunction(colorFunction)
+    colourFunction(colorFunction)
 {
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 }
@@ -2029,7 +2080,7 @@ MColorBox::MColorBox(MColorFunction *colorFunction, QWidget *parent) :
 ***                            PUBLIC METHODS                               ***
 *******************************************************************************/
 
-QSize MColorBox::minimumSizeHint() const
+QSize MColourBox::minimumSizeHint() const
 {
     return QSize(32, 32);
 }
@@ -2039,15 +2090,15 @@ QSize MColorBox::minimumSizeHint() const
 ***                          PROTECTED METHODS                              ***
 *******************************************************************************/
 
-void MColorBox::paintEvent(QPaintEvent *event)
+void MColourBox::paintEvent(QPaintEvent *event)
 {
     Q_UNUSED(event);
     QPainter painter(this);
 
-    int index = colorFunction->selectedPoint;
+    int index = colourFunction->selectedPoint;
     MColourNodes *colourNodes =
-            colorFunction->transferFunction->getColourNodes();
-    MColorRGB8 colour = (MColorRGB8)colourNodes->colourAt(index);
+            colourFunction->transferFunction->getColourNodes();
+    MColourRGB8 colour = (MColourRGB8)colourNodes->colourAt(index);
 
     painter.setPen(Qt::gray);
     painter.setBrush(QColor(colour.r, colour.g, colour.b));
@@ -2055,10 +2106,10 @@ void MColorBox::paintEvent(QPaintEvent *event)
 }
 
 
-void MColorBox::mouseDoubleClickEvent(QMouseEvent *event)
+void MColourBox::mouseDoubleClickEvent(QMouseEvent *event)
 {
     Q_UNUSED(event);
-    colorFunction->openColorPicker();
+    colourFunction->openColourPicker();
 }
 
 
@@ -2156,9 +2207,9 @@ void MChannelsWidget::paintEvent(QPaintEvent *event)
     for (int x = 0; x < width(); x++)
     {
         float t = x / (float)(width() - 1);
-        MColorXYZ64 color = colourNodes->interpolate(t);
-        MColorRGB8 rgb = color.toRGB(100);
-        MColorHCL16 hcl = color.toHCL(100);
+        MColourXYZ64 color = colourNodes->interpolate(t);
+        MColourRGB8 rgb = color.toRGB(100);
+        MColourHCL16 hcl = color.toHCL(100);
 
         xs[x] = t;
 

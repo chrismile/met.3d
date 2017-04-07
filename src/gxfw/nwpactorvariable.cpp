@@ -43,6 +43,7 @@
 #include "gxfw/selectdatasourcedialog.h"
 #include "gxfw/nwpmultivaractor.h"
 #include "gxfw/memberselectiondialog.h"
+#include "actors/nwpvolumeraycasteractor.h"
 
 using namespace std;
 
@@ -1738,6 +1739,53 @@ bool MNWPActorVariable::updateEnsembleSingleMemberProperty()
 }
 
 
+bool MNWPActorVariable::setTransferFunctionFromProperty()
+{
+    MQtProperties *properties = actor->getQtProperties();
+    MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
+
+    QString tfName = properties->getEnumItem(transferFunctionProperty);
+
+    if (tfName == "None")
+    {
+        transferFunction = nullptr;
+
+        // Update enum items: Scan currently available actors for transfer
+        // functions. Add TFs to the list displayed in the combo box of the
+        // transferFunctionProperty.
+        QStringList availableTFs;
+        availableTFs << "None";
+        foreach (MActor *ma, glRM->getActors())
+        {
+            if (MTransferFunction1D *tf = dynamic_cast<MTransferFunction1D*>(ma))
+            {
+                availableTFs << tf->transferFunctionName();
+            }
+        }
+        properties->mEnum()->setEnumNames(transferFunctionProperty, availableTFs);
+
+        return true;
+    }
+
+    // Find the selected transfer function in the list of actors from the
+    // resources manager. Not very efficient, but works well enough for the
+    // small number of actors at the moment..
+    foreach (MActor *ma, glRM->getActors())
+    {
+        if (MTransferFunction1D *tf = dynamic_cast<MTransferFunction1D*>(ma))
+        {
+            if (tf->transferFunctionName() == tfName)
+            {
+                transferFunction = tf;
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+
 /******************************************************************************
 ***                            PRIVATE METHODS                              ***
 *******************************************************************************/
@@ -1909,51 +1957,6 @@ bool MNWPActorVariable::changeVariable()
     actor->enableActorUpdates(true);
 
     return true;
-}
-
-
-bool MNWPActorVariable::setTransferFunctionFromProperty()
-{
-    MQtProperties *properties = actor->getQtProperties();
-    MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
-
-    QString tfName = properties->getEnumItem(transferFunctionProperty);
-
-    if (tfName == "None")
-    {
-        transferFunction = nullptr;
-
-        // Update enum items: Scan currently available actors for transfer
-        // functions. Add TFs to the list displayed in the combo box of the
-        // transferFunctionProperty.
-        QStringList availableTFs;
-        availableTFs << "None";
-        foreach (MActor *ma, glRM->getActors())
-        {
-            if (MTransferFunction1D *tf = dynamic_cast<MTransferFunction1D*>(ma))
-            {
-                availableTFs << tf->transferFunctionName();
-            }
-        }
-        properties->mEnum()->setEnumNames(transferFunctionProperty, availableTFs);
-
-        return true;
-    }
-
-    // Find the selected transfer function in the list of actors from the
-    // resources manager. Not very efficient, but works well enough for the
-    // small number of actors at the moment..
-    foreach (MActor *ma, glRM->getActors())
-    {
-        if (MTransferFunction1D *tf = dynamic_cast<MTransferFunction1D*>(ma))
-            if (tf->transferFunctionName() == tfName)
-            {
-                transferFunction = tf;
-                return true;
-            }
-    }
-
-    return false;
 }
 
 
@@ -3263,6 +3266,31 @@ void MNWP3DVolumeActorVariable::releaseDataItems()
     }
 
     MNWPActorVariable::releaseDataItems();
+}
+
+
+bool MNWP3DVolumeActorVariable::setTransferFunctionFromProperty()
+{
+    // Since the shadow of volume raycaster actor depends on the transfer
+    // function, it is necessary to trigger an update if the transfer function
+    // changes otherwise the shadow won't adapt to the changes.
+    if (transferFunction != nullptr)
+    {
+        disconnect(transferFunction, SIGNAL(actorChanged()),
+                   static_cast<MNWPVolumeRaycasterActor*>(actor),
+                   SLOT(updateShadow()));
+    }
+
+    bool returnValue = MNWPActorVariable::setTransferFunctionFromProperty();
+
+    if (returnValue == true && transferFunction != nullptr)
+    {
+        connect(transferFunction, SIGNAL(actorChanged()),
+                static_cast<MNWPVolumeRaycasterActor*>(actor),
+                SLOT(updateShadow()));
+    }
+
+    return returnValue;
 }
 
 

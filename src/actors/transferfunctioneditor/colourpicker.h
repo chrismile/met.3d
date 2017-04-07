@@ -75,30 +75,30 @@ class MHCLColorPicker : public QDialog
     friend class MHCLColorRange2DWidget;
 
 public:
-    typedef MColorHCL16 Color;
+    typedef MColourHCL16 Color;
 
 public:
     MHCLColorPicker(MColourNodes *colourNodes, QWidget *parent = nullptr);
 
     void setCurrentIndex(int index);
 
-    const MColorHCL16& color() const;
-    MColorHCL16& color();
+    const MColourHCL16& color() const;
+    MColourHCL16& color();
 
 private slots:
     void changed(bool updateBoxes = true);
     void hueBoxChanged(double value);
     void chromaBoxChanged(double value);
     void luminanceBoxChanged(double value);
-    void changed(const MColorHCL16& color);
+    void changed(const MColourHCL16& color);
     void typeBoxChanged(int index);
     void interpolationPathsBoxChanged(bool checked);
 
 signals:
-    void colorChanged(const MColorHCL16& color);
+    void colorChanged(const MColourHCL16& color);
 
 private:
-    MColorHCL16 currentColor;
+    MColourHCL16 currentColor;
     MColourNodes *colourNodes;
     int colorIndex;
 
@@ -120,7 +120,7 @@ class MHCLColorRangeWidget : public QWidget
     Q_OBJECT
 
 public:
-    typedef MColorHCL16 Color;
+    typedef MColourHCL16 Color;
 
 public:
     MHCLColorRangeWidget(MHCLColorPicker *colorPicker,
@@ -136,14 +136,14 @@ public:
      * @return generated color.
      * @see HCLColorRangeWidget::getValue()
      */
-    MColorHCL16 getColor(float t) const;
+    MColourHCL16 getColor(float t) const;
 
     /**
      * @return normalized component value of given color
      * @see HCLColorRangeWidget::getColor()
      * @see Met3D::TFEditor::Type1D
      */
-    float getValue(const MColorHCL16& color) const;
+    float getValue(const MColourHCL16& color) const;
     /**
      * @return normalized component value of base color
      * @see HCLColorRangeWidget::getColor()
@@ -157,7 +157,7 @@ protected:
     void mouseMoveEvent(QMouseEvent *event) override;
 
 signals:
-    void changed(const MColorHCL16& color);
+    void changed(const MColourHCL16& color);
 
 private:
     MHCLColorPicker *colorPicker;
@@ -190,7 +190,7 @@ class MHCLColorRange2DWidget : public QWidget
     Q_OBJECT
 
 public:
-    typedef MColorHCL16 Color;
+    typedef MColourHCL16 Color;
 
 public:
     MHCLColorRange2DWidget(MHCLColorPicker *colourPicker,
@@ -212,7 +212,7 @@ public:
      * @see HCLColorRange2DWidget::getValueY()
      * @see HCLColorRange2DWidget::getValueZ()
      */
-    MColorHCL16 getColor(float tx, float ty) const;
+    MColourHCL16 getColor(float tx, float ty) const;
 
     /**
      * @return first normalized component value of base color
@@ -237,19 +237,19 @@ public:
      * @see HCLColorRange2DWidget::getColor()
      * @see Met3D::TFEditor::Type2D
      */
-    float getValueX(const MColorHCL16& color) const;
+    float getValueX(const MColourHCL16& color) const;
     /**
      * @return second normalized component value of given color
      * @see HCLColorRange2DWidget::getColor()
      * @see Met3D::TFEditor::Type2D
      */
-    float getValueY(const MColorHCL16& color) const;
+    float getValueY(const MColourHCL16& color) const;
     /**
      * @return third (unchanged) normalized component value of given color
      * @see HCLColorRange2DWidget::getColor()
      * @see Met3D::TFEditor::Type2D
      */
-    float getValueZ(const MColorHCL16& color) const;
+    float getValueZ(const MColourHCL16& color) const;
 
 protected:
     void paintEvent(QPaintEvent *event) override;
@@ -258,7 +258,7 @@ protected:
     void mouseMoveEvent(QMouseEvent * event) override;
 
 signals:
-    void changed(const MColorHCL16& color);
+    void changed(const MColourHCL16& color);
 
 private:
     void drawArrow(QPainter& painter, const QPoint& startPos,

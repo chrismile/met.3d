@@ -170,6 +170,17 @@ private:
 
     void updateHSVProperties();
 
+    // Type of colourmap.
+    enum MColourmapType { INVALID = -1, PREDEFINED = 0, HCL = 1, HSV = 2,
+                          EDITOR = 3 };
+
+    /** Returns the name of the given colour map type as QString. */
+    QString colourMapTypeToString(MColourmapType colourMapType);
+
+    /** Returns enum associated with the given name. Returns Invalid if no mode
+        exists with the given name. */
+    MColourmapType stringToColourMapType(QString colourMapTypeName);
+
     std::shared_ptr<GL::MShaderEffect> colourbarShader;
     std::shared_ptr<GL::MShaderEffect> simpleGeometryShader;
 
@@ -205,9 +216,6 @@ private:
     float       minimumValue;
     float       maximumValue;
     QtProperty *numStepsProperty;
-
-    // Type of colourmap.
-    enum MColourmapType { PREDEFINED = 0, HCL = 1, HSV = 2, EDITOR = 3};
 
     QtProperty *colourmapTypeProperty;
 

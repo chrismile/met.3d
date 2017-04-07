@@ -108,6 +108,15 @@ public:
     const MNWPActorVariable* getCurrentShadingVariable() const
     { return shadingVar; }
 
+public slots:
+    /**
+      Sets flag for shadow image to be updated in the next frame.
+
+      Connected to @ref MTransferFunction1D::actorChanged() to update shadow if
+      transfer function is changed.
+     */
+    void updateShadow();
+
 protected:
     void initializeActorResources();
 

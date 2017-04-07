@@ -25,7 +25,16 @@
 **  along with Met.3D.  If not, see <http://www.gnu.org/licenses/>.
 **
 *******************************************************************************/
-// SOURCE: https://github.com/gudajan/Windsim
+
+// NOTE:
+// ==================
+//
+// Parts of the code in this file is based on code from the "Windsim"
+// repository by Jan Krohn: https://github.com/gudajan/Windsim
+//
+// ==================
+
+
 #ifndef TRANSFERFUNCTIONEDITOR_H
 #define TRANSFERFUNCTIONEDITOR_H
 
@@ -53,14 +62,14 @@ namespace TFEditor
 {
 
 class MAbstractFunction;
-class MColorFunction;
+class MColourFunction;
 class MAlphaFunction;
 class MFinalFunction;
 class MRuler;
 class MRangeRuler;
 class MAlphaRuler;
 class MBigAlphaRuler;
-class MColorBox;
+class MColourBox;
 class MChannelsWidget;
 
 /**
@@ -81,14 +90,23 @@ public:
     void updateNumSteps(int numSteps);
     void resetUI();
 
-    void setType(InterpolationType type);
-    InterpolationType getType() const;
+    void setCSpaceForCNodeInterpolation(ColourSpaceForColourNodeInterpolation type);
+    ColourSpaceForColourNodeInterpolation getCSpaceForCNodeInterpolation() const  { return transferFunction.getCSpaceForCNodeInterpolation(); }
 
-    MColorFunction* getColorFunction();
-    MAlphaFunction* getAlphaFunction();
-    MFinalFunction* getFinalFunction();
+    /** Returns the name of the given interpolation colour space as QString. */
+    QString interpolationCSpaceToString(ColourSpaceForColourNodeInterpolation interpolationType);
 
-    MEditorTransferFunction* getTransferFunction();
+    /** Returns enum associated with the given name. Returns Invalid if no
+        colour space exists with the given name. */
+    ColourSpaceForColourNodeInterpolation stringToInterpolationCSpace(QString interpolationTypeName);
+
+    MColourFunction* getColourFunction() { return colourFunction; }
+    MAlphaFunction* getAlphaFunction() { return alphaFunction; }
+    MFinalFunction* getFinalFunction() { return finalFunction; }
+
+    MEditorTransferFunction* getTransferFunction() { return &transferFunction; }
+
+    void setAlphaBoxesBounds(float lowerBound, float upperBound);
 
 signals:
     void transferFunctionChanged();
@@ -106,7 +124,7 @@ private:
     MAlphaRuler *alphaRuler;
     MBigAlphaRuler *bigAlphaRuler;
 
-    MColorFunction *colorFunction;
+    MColourFunction *colourFunction;
     MAlphaFunction *alphaFunction;
     MFinalFunction *finalFunction;
 
@@ -123,8 +141,8 @@ private:
 
     QDoubleSpinBox *colourPosBox;
     QDoubleSpinBox *colourNormPosBox;
-    QComboBox *colorTypeComboBox;
-    MColorBox *colourValueBox;
+    QComboBox *colourTypeComboBox;
+    MColourBox *colourValueBox;
 
     MChannelsWidget *channelsWidget;
     QPushButton *openChannelsButton;
@@ -148,7 +166,7 @@ private slots:
     void changeAlphaValue(double value);
     void changeAlphaRange(float min, float max);
 
-    void changeColorType(int index);
+    void changeColourType(int index);
 
     void openChannelDialog();
 };
@@ -176,7 +194,7 @@ public:
     float selectedX() const;
     float selectedY() const;
 
-    void setSelectedX(float x);
+    virtual void setSelectedX(float x);
     void setSelectedY(float y);
 
     void setSelectedPoint(int point);
@@ -220,15 +238,15 @@ private:
 };
 
 
-class MColorFunction : public MAbstractFunction
+class MColourFunction : public MAbstractFunction
 {
     Q_OBJECT
 
 public:
-    MColorFunction(MEditorTransferFunction *transferFunction,
+    MColourFunction(MEditorTransferFunction *transferFunction,
                    QWidget *parent = nullptr);
 
-    void openColorPicker();
+    void openColourPicker();
     void closeColourPicker();
 
 protected:
@@ -243,12 +261,12 @@ protected:
 private:
     void selectionChanged() override;
 
-    QColorDialog rgbColorPicker;
-    MHCLColorPicker hclColorPicker;
+    QColorDialog rgbColourPicker;
+    MHCLColorPicker hclColourPicker;
 
 private slots:
-    void rgbColorChanged(const QColor& color);
-    void hclColorChanged(const MColorHCL16& color);
+    void rgbColourChanged(const QColor& color);
+    void hclColourChanged(const MColourHCL16& color);
 };
 
 
@@ -261,6 +279,8 @@ public:
                   MRuler *xRuler,
                   MRuler *yRuler,
                   QWidget *parent = nullptr);
+
+    void setSelectedX(float x) override;
 
 protected:
     void paintEvent(QPaintEvent *event) override;
@@ -278,10 +298,13 @@ protected:
     void setNeighbouringNodes();
 
 private:
+    void selectionChanged();
+
     MRuler *xRuler;
     MRuler *yRuler;
     float posXNeighbourLeft;
     float posXNeighbourRight;
+    MTransferFunctionEditor *transferFunctionEditor;
 };
 
 
@@ -382,12 +405,12 @@ private:
 };
 
 
-class MColorBox : public QWidget
+class MColourBox : public QWidget
 {
     Q_OBJECT
 
 public:
-    MColorBox(MColorFunction *colorFunction, QWidget *parent = nullptr);
+    MColourBox(MColourFunction *colourFunction, QWidget *parent = nullptr);
     QSize minimumSizeHint() const override;
 
 signals:
@@ -398,7 +421,7 @@ protected:
     void mouseDoubleClickEvent(QMouseEvent *event) override;
 
 private:
-    MColorFunction *colorFunction;
+    MColourFunction *colourFunction;
 };
 
 

@@ -116,7 +116,7 @@ int MColourNodes::addNode(float t)
 {
     int i = nodes.size();
 
-    MColorXYZ64 color = interpolate(t);
+    MColourXYZ64 color = interpolate(t);
     nodes.push_back({t, color});
 
     return i;
@@ -135,25 +135,25 @@ void MColourNodes::clear()
 }
 
 
-const MColorXYZ64& MColourNodes::colourAt(int i) const
+const MColourXYZ64& MColourNodes::colourAt(int i) const
 {
     return nodes[i].second;
 }
 
 
-MColorXYZ64& MColourNodes::colourAt(int i)
+MColourXYZ64& MColourNodes::colourAt(int i)
 {
     return nodes[i].second;
 }
 
 
-void MColourNodes::push_back(float t, const MColorXYZ64& color)
+void MColourNodes::push_back(float t, const MColourXYZ64& color)
 {
     nodes.push_back(ColourNode(t, color));
 }
 
 
-MColorXYZ64 MColourNodes::interpolate(float t)
+MColourXYZ64 MColourNodes::interpolate(float t)
 {
     MColourNodes::const_iterator i1, i2;
     findIteratorPair(nodes, i1, i2, t);
@@ -161,7 +161,7 @@ MColorXYZ64 MColourNodes::interpolate(float t)
     // Return 0 if one node could not be found (should not happen).
     if (i1 == nodes.end() || i2 == nodes.end())
     {
-        return MColorXYZ64();
+        return MColourXYZ64();
     }
 
     if (i1 == i2)
@@ -171,11 +171,11 @@ MColorXYZ64 MColourNodes::interpolate(float t)
 
     float l = (t - i1->first) / (i2->first - i1->first);
 
-    if (type == HCL)
+    if (interpolationColourSpace == HCL)
     {
         return lerpHCL(i1->second, i2->second, l);
     }
-    else if (type == RGB)
+    else if (interpolationColourSpace == RGB)
     {
         return lerpRGB(i1->second, i2->second, l);
     }
@@ -287,8 +287,8 @@ MEditorTransferFunction::MEditorTransferFunction()
 
     colourNodes.nodes =
     {
-        ColourNode(0.0, (MColorXYZ64)(MColorHCL16(6.f, 80.f, 28.f))),
-        ColourNode(1.0, (MColorXYZ64)(MColorHCL16(90.f, 5.f, 86.f)))
+        ColourNode(0.0, (MColourXYZ64)(MColourHCL16(6.f, 80.f, 28.f))),
+        ColourNode(1.0, (MColourXYZ64)(MColourHCL16(90.f, 5.f, 86.f)))
     };
     alphaNodes.nodes =
     {
@@ -315,25 +315,25 @@ void MEditorTransferFunction::update(int numSamples)
         float l = i / float(numSamples - 1);
         l = l * (max - min) + min;
 
-        MColorXYZ64 color = colourNodes.interpolate(l);
+        MColourXYZ64 color = colourNodes.interpolate(l);
         float alpha = alphaNodes.interpolate(l);
 
-        MColorRGB8 rgb = (MColorRGB8)color;
+        MColourRGB8 rgb = (MColourRGB8)color;
 
         sampledBuffer[i] = qRgba(rgb.r, rgb.g, rgb.b, int(alpha * 255));
     }
 }
 
 
-void MEditorTransferFunction::setType(InterpolationType type)
+void MEditorTransferFunction::setCSpaceForCNodeInterpolation(ColourSpaceForColourNodeInterpolation type)
 {
-    colourNodes.type = type;
+    colourNodes.interpolationColourSpace = type;
 }
 
 
-InterpolationType MEditorTransferFunction::getType() const
+ColourSpaceForColourNodeInterpolation MEditorTransferFunction::getCSpaceForCNodeInterpolation() const
 {
-    return colourNodes.type;
+    return colourNodes.interpolationColourSpace;
 }
 
 

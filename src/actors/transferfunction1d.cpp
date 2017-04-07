@@ -494,7 +494,8 @@ void MTransferFunction1D::saveConfiguration(QSettings *settings)
     // ========================================
     MColourmapType cmaptype = MColourmapType(
                 properties->mEnum()->value(colourmapTypeProperty));
-    settings->setValue("colourMapType", int(cmaptype));
+    settings->setValue("colourMapType",
+                       colourMapTypeToString(cmaptype));
     settings->setValue("displayOpacity",
                        properties->mBool()->value(enableAlphaInTFProperty));
     settings->setValue("reverseColourMap",
@@ -557,10 +558,10 @@ void MTransferFunction1D::saveConfiguration(QSettings *settings)
         for (int i= 0; i < colourNodes->getNumNodes(); i++)
         {
             settings->setArrayIndex(i);
-            settings->setValue("pos", colourNodes->xAt(i));
+            settings->setValue("position", colourNodes->xAt(i));
 
-            MColorXYZ64 colour = colourNodes->colourAt(i);
-            QByteArray array((char*)&colour, sizeof(MColorXYZ64));
+            MColourXYZ64 colour = colourNodes->colourAt(i);
+            QByteArray array((char*)&colour, sizeof(MColourXYZ64));
             settings->setValue("colour", array);
         }
         settings->endArray();
@@ -569,14 +570,18 @@ void MTransferFunction1D::saveConfiguration(QSettings *settings)
         for (int i= 0; i < alphaNodes->getNumNodes(); i++)
         {
             settings->setArrayIndex(i);
-            settings->setValue("pos", alphaNodes->xAt(i));
+            settings->setValue("position", alphaNodes->xAt(i));
             settings->setValue("alpha", alphaNodes->yAt(i));
         }
         settings->endArray();
 
-        int type = (int)editor->getType();
-        settings->setValue("interpolationType", type);
+        QString type = editor->interpolationCSpaceToString(editor->getCSpaceForCNodeInterpolation());
+        settings->setValue("colourSpaceForColourNodeInterpolation", type);
 
+        break;
+    }
+    case INVALID:
+    {
         break;
     }
     }
@@ -618,11 +623,27 @@ void MTransferFunction1D::loadConfiguration(QSettings *settings)
 
     // Properties related to type of colourmap.
     // ========================================
-    MColourmapType cmaptype = MColourmapType(
-                settings->value("colourMapType").toInt());
+    QString colourMapTypeString =
+            settings->value("colourMapType", "predefined").toString();
+    MColourmapType cmaptype = stringToColourMapType(colourMapTypeString);
 
     switch (cmaptype)
     {
+    // Display error message and continue with colour map type equals predefined
+    // initialisation.
+    case INVALID:
+    {
+        QMessageBox msgBox;
+        msgBox.setIcon(QMessageBox::Warning);
+        msgBox.setText(QString("Error reading configuration file: "
+                               "Could not find colour map type '%1'.\n"
+                               "Setting colour map type to 'predefined'.")
+                       .arg(colourMapTypeString));
+        msgBox.exec();
+
+        cmaptype = stringToColourMapType(QString("predefined"));
+        // No break to continue directly with setting type to predefined.
+    }
     case PREDEFINED:
     {
         selectPredefinedColourmap(settings->value("predefinedColourMap").toString(),
@@ -666,12 +687,12 @@ void MTransferFunction1D::loadConfiguration(QSettings *settings)
         for (int i=0; i < numColourNodes; i++)
         {
             settings->setArrayIndex(i);
-            float pos = settings->value("pos", 0).toFloat();
+            float pos = settings->value("position", 0).toFloat();
 
             QByteArray array = settings->value("colour", QByteArray()).toByteArray();
-            MColorXYZ64 colour;
-            if (array.size() == sizeof(MColorXYZ64))
-                memcpy(&colour, array.data(), sizeof(MColorXYZ64));
+            MColourXYZ64 colour;
+            if (array.size() == sizeof(MColourXYZ64))
+                memcpy(&colour, array.data(), sizeof(MColourXYZ64));
             colourNodes->push_back(pos, colour);
         }
         settings->endArray();
@@ -680,14 +701,30 @@ void MTransferFunction1D::loadConfiguration(QSettings *settings)
         for (int i= 0; i < numAlphaPoints; i++)
         {
             settings->setArrayIndex(i);
-            float pos = settings->value("pos", 0).toFloat();
+            float pos = settings->value("position", 0).toFloat();
             float alpha = settings->value("alpha", Qt::black).toFloat();
 
             alphaNodes->push_back(pos, alpha);
         }
         settings->endArray();
-        int type = settings->value("interpolationType", 0).toInt();
-        editor->setType((InterpolationType)type);
+        QString typeString =
+                settings->value("colourSpaceForColourNodeInterpolation", "hcl").toString();
+        ColourSpaceForColourNodeInterpolation type = editor->stringToInterpolationCSpace(typeString);
+        // Display error message and set type to hcl for strings in configuration
+        // not defining a type.
+        if (type == ColourSpaceForColourNodeInterpolation::INVALID)
+        {
+            QMessageBox msgBox;
+            msgBox.setIcon(QMessageBox::Warning);
+            msgBox.setText(QString("Error reading configuration file: "
+                                   "Could not find colour space '%1' for interpolation.\n"
+                                   "Setting colour space to 'hcl'.")
+                           .arg(typeString));
+            msgBox.exec();
+
+            type = editor->stringToInterpolationCSpace(QString("hcl"));
+        }
+        editor->setCSpaceForCNodeInterpolation(type);
 
         editor->resetUI();
         selectEditor();
@@ -816,6 +853,8 @@ void MTransferFunction1D::onQtPropertyChanged(QtProperty *property)
             hsvCMapPropertiesSubGroup->setEnabled(false);
             editorPropertiesSubGroup->setEnabled(true);
             break;
+        case INVALID:
+                break;
         }
 
         if (suppressActorUpdates()) return;
@@ -1096,6 +1135,8 @@ void MTransferFunction1D::generateTransferTexture()
         }
         break;
     }
+    case INVALID:
+            break;
     }
 
     if (deleteColourMap && (cmap != nullptr)) delete cmap;
@@ -1415,7 +1456,58 @@ void MTransferFunction1D::updateHSVProperties()
 void MTransferFunction1D::onEditorTransferFunctionChanged()
 {
     generateTransferTexture();
-    emit actorChanged();
+    emitActorChangedSignal();
+}
+
+
+QString MTransferFunction1D::colourMapTypeToString(MColourmapType colourMapType)
+{
+    switch (colourMapType)
+    {
+    case MColourmapType::PREDEFINED:
+        return QString("predefined");
+    case MColourmapType::HCL:
+        return QString("hcl");
+    case MColourmapType::HSV:
+        return QString("hsv");
+    case MColourmapType::EDITOR:
+        return QString("editor");
+    default:
+        return QString("");
+    }
+}
+
+
+MTransferFunction1D::MColourmapType
+MTransferFunction1D::stringToColourMapType(QString colourMapTypeName)
+{
+    // NOTE: Colour map type identification was changed in Met.3D version 1.1.
+    // For compatibility with version 1.0, the old numeric identifiers are
+    // considered here as well.
+    if (colourMapTypeName == QString("predefined")
+            || colourMapTypeName == QString("0")) // compatibility with Met.3D 1.0
+    {
+        return MColourmapType::PREDEFINED;
+    }
+    else if (colourMapTypeName == QString("hcl")
+             || colourMapTypeName == QString("1"))
+    {
+        return MColourmapType::HCL;
+    }
+    else if (colourMapTypeName == QString("hsv")
+             || colourMapTypeName == QString("2"))
+    {
+        return MColourmapType::HSV;
+    }
+    else if (colourMapTypeName == QString("editor")
+             || colourMapTypeName == QString("3"))
+    {
+        return MColourmapType::EDITOR;
+    }
+    else
+    {
+        return MColourmapType::INVALID;
+    }
 }
 
 } // namespace Met3D
