@@ -44,6 +44,7 @@
 #include "gxfw/mscenecontrol.h"
 #include "gxfw/msystemcontrol.h"
 #include "gxfw/mtypes.h"
+#include "gxfw/mresizewindowdialog.h"
 
 namespace Met3D
 {
@@ -308,6 +309,8 @@ private:
      */
     void takeScreenshot();
 
+    void resizeView();
+
     MSceneControl *scene;
 
     // Background colour.
@@ -389,6 +392,7 @@ private:
     QtProperty *cameraLoadFromFileProperty;
 
     QtProperty *interactionGroupProperty;
+    QtProperty *resizeProperty;
     QtProperty *sceneSaveToImageProperty;
     QtProperty *sceneNavigationModeProperty;
     QtProperty *sceneRotationCenterProperty;
@@ -429,6 +433,8 @@ private:
      * ignored for the instance of the scene.
      */
     bool enablePropertyEvents;
+
+    MResizeWindowDialog *resizeViewDialog;
 };
 
 } // namespace Met3D

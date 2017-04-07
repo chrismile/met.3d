@@ -74,7 +74,8 @@ MSceneViewGLWidget::MSceneViewGLWidget()
       visualizationParameterChange(false),
       cameraSyncronizedWith(nullptr),
       singleInteractionActor(nullptr),
-      enablePropertyEvents(true)
+      enablePropertyEvents(true),
+      resizeViewDialog(new MResizeWindowDialog)
 {
     viewIsInitialised = false;
     focusShader = nullptr;
@@ -176,6 +177,10 @@ MSceneViewGLWidget::MSceneViewGLWidget()
     interactionGroupProperty = systemControl->getGroupPropertyManager()
             ->addProperty("interaction");
     propertyGroup->addSubProperty(interactionGroupProperty);
+
+    resizeProperty = systemControl->getClickPropertyManager()
+            ->addProperty("resize");
+    interactionGroupProperty->addSubProperty(resizeProperty);
 
     sceneSaveToImageProperty = systemControl->getClickPropertyManager()
             ->addProperty("save to image file");
@@ -772,6 +777,11 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
 #ifndef CONTINUOUS_GL_UPDATE
         if (viewIsInitialised) updateGL();
 #endif
+    }
+
+    else if (property == resizeProperty)
+    {
+        resizeView();
     }
 
     else if (property == sceneSaveToImageProperty)
@@ -1638,22 +1648,35 @@ void MSceneViewGLWidget::keyPressEvent(QKeyEvent *event)
         setAnalysisMode(!analysisMode);
         break;
     case Qt::Key_R:
+        if (event->modifiers() & Qt::AltModifier)
+        {
+            resizeView();
+            break;
+        }
         // Toggle auto-rotation mode.
         setAutoRotationMode(!cameraAutorotationMode);
         break;
     case Qt::Key_N:
-        if (event->modifiers() & Qt::AltModifier) executeCameraAction(CAMERA_NORTHUP);
+        if (event->modifiers() & Qt::AltModifier)
+        {
+            executeCameraAction(CAMERA_NORTHUP);
+        }
         break;
     case Qt::Key_U:
-        if (event->modifiers() & Qt::AltModifier) executeCameraAction(CAMERA_UPRIGHT);
+        if (event->modifiers() & Qt::AltModifier)
+        {
+            executeCameraAction(CAMERA_UPRIGHT);
+        }
         break;
     case Qt::Key_T:
-        if (event->modifiers() & Qt::AltModifier) executeCameraAction(CAMERA_TOPVIEW);
+        if (event->modifiers() & Qt::AltModifier)
+        {
+            executeCameraAction(CAMERA_TOPVIEW);
+        }
         break;
     case Qt::Key_S:
         takeScreenshot();
         break;
-        // if (event->modifiers() & Qt::AltModifier) executeCameraAction(CAMERA_TOPVIEW);
     default:
         // If we do not act upon the key, pass event to base class
         // implementation.
@@ -1760,9 +1783,12 @@ void MSceneViewGLWidget::takeScreenshot()
 {
     // Take Screenshot of current scene.
     QImage screenshot = this->grabFrameBuffer();
-    // Chop red frame.
-    screenshot = screenshot.copy(1, 1, screenshot.width() - 2,
-                                 screenshot.height() - 2);
+    // Chop red frame. (Only visible if view has focus.)
+    if (this->hasFocus())
+    {
+        screenshot = screenshot.copy(1, 1, screenshot.width() - 2,
+                                     screenshot.height() - 2);
+    }
 
     // Filter containing all imagefile-extensions Qt is able to write (Oct2016).
     // All extensions are: .png .jpg .jpeg .bmp .ppm .tiff .xbm .xpm .
@@ -1846,6 +1872,26 @@ void MSceneViewGLWidget::takeScreenshot()
         }
     }
 
+}
+
+
+void MSceneViewGLWidget::resizeView()
+{
+    resizeViewDialog->setWindowTitle("Resize View");
+    // Initialise input boxes and ratio with current window size
+    resizeViewDialog->setup(this->width(),this->height());
+
+    if (resizeViewDialog->exec() == QDialog::Rejected)
+    {
+        return;
+    }
+
+    int newWidth = resizeViewDialog->getWidth();
+    int newHeight = resizeViewDialog->getHeight();
+
+    MMainWindow *mainWindow =
+            MSystemManagerAndControl::getInstance()->getMainWindow();
+    mainWindow->resizeSceneView(newWidth, newHeight, this);
 }
 
 } // namespace Met3D

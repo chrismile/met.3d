@@ -80,6 +80,9 @@ public:
 
     QVector<MSceneViewGLWidget*>& getGLWidgets();
 
+    void resizeSceneView(int newWidth, int newHeight,
+                         MSceneViewGLWidget *sceneView);
+
 public slots:
     void setFullScreen(bool b);
 
@@ -124,6 +127,8 @@ private:
 
     MWaypointsView *waypointsTableView;
     QDockWidget    *waypointsTableDock;
+
+    int sceneViewLayout;
 };
 
 } // namespace Met3D

@@ -51,7 +51,8 @@ MMainWindow::MMainWindow(QStringList commandLineArguments, QWidget *parent)
     : QMainWindow(parent),
       ui(new Ui::MainWindow),
       sceneManagementDialog(new MSceneManagementDialog),
-      resizeWindowDialog(new MResizeWindowDialog)
+      resizeWindowDialog(new MResizeWindowDialog),
+      sceneViewLayout(0)
 {
     // Qt Designer specific initialization.
     ui->setupUi(this);
@@ -324,6 +325,164 @@ QVector<MSceneViewGLWidget*>& MMainWindow::getGLWidgets()
 }
 
 
+void MMainWindow::resizeSceneView(int newWidth, int newHeight,
+                                  MSceneViewGLWidget *sceneView)
+{
+    unsigned int sceneViewID = sceneView->getID();
+
+    // Exit full screen mode to be able to change size of window.
+    // (Especially necessary if one wants to resize view in single view mode.)
+    setFullScreen(false);
+
+    // Store old sizes of the widgets which act as placeholders and will be
+    // replaced by the new sizes.
+    QList<int> mainSplitterSizes = mainSplitter->sizes();
+    QList<int> rightSplitterSizes = rightSplitter->sizes();
+    QList<int> topSplitterSizes = topSplitter->sizes();
+    QList<int> bottomSplitterSizes = bottomSplitter->sizes();
+
+    // Get size of screen containing the largest part of the sceneView to resize.
+    QDesktopWidget widget;
+    QRect screenSize = widget.screenGeometry(widget.screenNumber(sceneView));
+
+    // Get size of window frame since resize affects the window without frame.
+    // (Maximum value to apply: screenSize - (frameSize - windowSize))
+    int frameWidth = frameGeometry().width() - width();
+    int frameHeight = frameGeometry().height() - height();
+    // Adjust size to fit new scene size, but avoid resizing larger than the
+    // current screen (minus window frame). (Resizing to larger size than the
+    // current screen results in a following resize event, adjusting the window
+    // to the screen).
+    int newWindowWidth = width() + (newWidth - sceneView->width());
+    newWindowWidth = min(screenSize.width() - frameWidth, newWindowWidth);
+    int newWindowHeight = height() + (newHeight - sceneView->height());
+    newWindowHeight = min(screenSize.height() - frameHeight, newWindowHeight);
+
+    // Resize window.
+    this->resize(newWindowWidth, newWindowHeight);
+
+    // Get main splitter widht and height.
+    int w = mainSplitter->width();
+    int h = mainSplitter->height();
+
+    // Assign new width and/or height to scene view according to the layout used
+    // and adjust sizes of the remaining scene views to fill remaining space.
+    switch (sceneViewLayout)
+    {
+    case 1:
+        // Single view: Nothing to do here since size is adjusted by resizing
+        // the main window.
+        break;
+
+    case 2:
+    {
+        // Dual view: Horizontal order.
+        mainSplitterSizes.replace(sceneViewID, newWidth);
+        newWidth = max(w - 1 - newWidth, 0);
+        mainSplitterSizes.replace((sceneViewID + 1) % 2, newWidth);
+        mainSplitter->setSizes(mainSplitterSizes);
+        break;
+    }
+
+    case 3:
+    {
+        // Dual view: Vertical order.
+        mainSplitterSizes.replace(sceneViewID, newHeight);
+        newHeight = max(h - 1 - newHeight, 0);
+        mainSplitterSizes.replace((sceneViewID + 1) % 2, newHeight);
+        mainSplitter->setSizes(mainSplitterSizes);
+        break;
+    }
+
+    case 4:
+    {
+        // One large view(view0) and two small views(view1 and view2).
+        // view1 and view2 positioned on the right and ordered vertically.
+        if (sceneViewID > 0)
+        {
+            // ID = 1 -> upper widget; ID = 2 -> lower Widget.
+            rightSplitterSizes.replace((sceneViewID + 1) % 2, newHeight);
+            newHeight = max(h - 1 - newHeight, 0);
+            rightSplitterSizes.replace(sceneViewID % 2, newHeight);
+            rightSplitter->setSizes(rightSplitterSizes);
+        }
+
+        // Since view1 and view2 share the same width and positioned on the
+        // righthand side, map their ids both to 1.
+        unsigned int id = min(sceneViewID, uint(1));
+        mainSplitterSizes.replace(id, newWidth);
+        newWidth = max(w - 1 - newWidth, 0);
+        mainSplitterSizes.replace((id + 1) % 2, newWidth);
+        mainSplitter->setSizes(mainSplitterSizes);
+        break;
+    }
+
+    case 5:
+    {
+        // One large view(view0) and three small views(view1, view2, view3).
+        // view1, view2 and view3 positioned on the right and ordered vertically.
+        if (sceneViewID > 0)
+        {
+            unsigned int id = sceneViewID - 1;
+            // ID = 1 -> upper widget; ID = 2 -> middle widget;
+            // ID = 2 -> lower widget.
+            rightSplitterSizes.replace(id, newHeight);
+            newHeight = max(h - 2 - newHeight, 0);
+            rightSplitterSizes.replace((id + 1) % 3, floor(newHeight / 2.0));
+            rightSplitterSizes.replace((id + 2) % 3, ceil(newHeight / 2.0));
+            rightSplitter->setSizes(rightSplitterSizes);
+        }
+
+        // Since view1, view2 and view3 share the same width and positioned on
+        // the righthand side, map their ids all to 1.
+        unsigned int id = min(sceneViewID, uint(1));
+        mainSplitterSizes.replace(id, newWidth);
+        newWidth = max(w - 1 - newWidth, 0);
+        mainSplitterSizes.replace((id + 1) % 2, newWidth);
+        mainSplitter->setSizes(mainSplitterSizes);
+        break;
+    }
+
+    case 6:
+    {
+        // Four views in 2x2 grid.
+        // Top row with view 0 and view 1 ordered horizontally.
+        if (sceneViewID <= 1)
+        {
+            unsigned int id = sceneViewID;
+            // ID = 0 -> left widget; ID = 1 -> right Widget.
+            topSplitterSizes.replace(id, newWidth);
+            newWidth = max(w - 1 - newWidth, 0);
+            topSplitterSizes.replace((id + 1) % 2, newWidth);
+            topSplitter->setSizes(topSplitterSizes);
+        }
+        // Bottom row with view 2 and view 3 ordered horizontally.
+        if (sceneViewID >= 2)
+        {
+            unsigned int id = sceneViewID - 2;
+            // ID = 2 -> left widget; ID = 3 -> right Widget.
+            bottomSplitterSizes.replace(id, newWidth);
+            newWidth = max(w - 1 - newWidth, 0);
+            bottomSplitterSizes.replace((id + 1) % 2, newWidth);
+            bottomSplitter->setSizes(bottomSplitterSizes);
+        }
+
+        // Vertically view0 and view1 respectivly view2 and view3 share the same
+        // height thus map these pairings to the same index.
+        unsigned int id = uint(sceneViewID / 2);
+        mainSplitterSizes.replace(id, newHeight);
+        newHeight = max(h - 1 - newHeight, 0);
+        mainSplitterSizes.replace((id + 1) % 2, newHeight);
+        mainSplitter->setSizes(mainSplitterSizes);
+        break;
+    }
+
+    default:
+        break;
+    }
+}
+
+
 /******************************************************************************
 ***                             PUBLIC SLOTS                                ***
 *******************************************************************************/
@@ -345,6 +504,8 @@ void MMainWindow::showWaypointsTable(bool b)
 
 void MMainWindow::setSceneViewLayout(int layout)
 {
+    sceneViewLayout = layout;
+
     // Hide everything.
     rightSplitter->hide();
     topSplitter->hide();
