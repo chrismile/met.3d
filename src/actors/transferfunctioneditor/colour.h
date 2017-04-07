@@ -40,29 +40,29 @@ namespace TFEditor
 {
 
 /**
-  @brief Color class for storing 8bit rgb colors values.
+  @brief Colour class for storing 8bit rgb colors values.
  */
-class MColorRGB8
+class MColourRGB8
 {
 public:
     /**
-     * Default constructor. Initializes black color.
+     * Default constructor. Initializes black colour.
      */
-    MColorRGB8();
+    MColourRGB8();
     /**
      * @param rgb Array of red, green and blue component (Range: [0, 255]).
      */
-    MColorRGB8(const unsigned char (&rgb)[3]);
+    MColourRGB8(const unsigned char (&rgb)[3]);
     /**
      * @param rgb Array of red, green and blue component (Range: [0, 1]).
      */
-    MColorRGB8(const double (&rgb)[3]);
+    MColourRGB8(const double (&rgb)[3]);
     /**
      * @param R red component (Range: [0, 1]).
      * @param G green component (Range: [0, 1]).
      * @param B blue component (Range: [0, 1]).
      */
-    MColorRGB8(double R, double G, double B);
+    MColourRGB8(double R, double G, double B);
 
     /**
      * @return red component (Range: [0, 1]).
@@ -101,26 +101,26 @@ public:
 
 
 /**
-  @brief Color class for storing 16bit hcl colors values.
+  @brief Colour class for storing 16bit hcl colours values.
  */
-class MColorHCL16
+class MColourHCL16
 {
 public:
     /**
-     * Default constructor. Initializes black color.
+     * Default constructor. Initializes black colour.
      */
-    MColorHCL16();
+    MColourHCL16();
     /**
      * @param rgb Array of hue, chroma and luminace component
      * (Range: [-360, 360], [0, 100], [0, 100]).
      */
-    MColorHCL16(const double (&hcl)[3]);
+    MColourHCL16(const double (&hcl)[3]);
     /**
      * @param H hue component (Range: [-360, 360]).
      * @param C chroma component (Range: [0, 100]).
      * @param L luminance component (Range: [0, 100]).
      */
-    MColorHCL16(double H, double C, double L);
+    MColourHCL16(double H, double C, double L);
 
     /**
      * @return hue component (Range: [-360, 360]).
@@ -159,112 +159,112 @@ public:
 
 
 /**
-  @brief Color class for storing 64bit xyz colors values.
+  @brief Colour class for storing 64bit xyz colours values.
  */
-class MColorXYZ64
+class MColourXYZ64
 {
 public:
     /**
-     * Default constructor. Initializes color at D65 whitepoint.
+     * Default constructor. Initializes colour at D65 whitepoint.
      */
-    MColorXYZ64();
-    bool operator==(const MColorXYZ64& rhs) const;
-    bool operator!=(const MColorXYZ64& rhs) const;
+    MColourXYZ64();
+    bool operator==(const MColourXYZ64& rhs) const;
+    bool operator!=(const MColourXYZ64& rhs) const;
 
     /**
      * ColorRGB8 to ColorXYZ64 conversion.
      */
-    explicit MColorXYZ64(const MColorRGB8& rgb);
+    explicit MColourXYZ64(const MColourRGB8& rgb);
     /**
      * ColorHCL16 to ColorXYZ64 conversion.
      */
-    explicit MColorXYZ64(const MColorHCL16& hcl);
+    explicit MColourXYZ64(const MColourHCL16& hcl);
 
     /**
      * ColorXYZ64 to ColorRGB8 conversion.
      *
      * Same as ColorXYZ64::toRGB but with fixed e = 1e-4.
      */
-    explicit operator MColorRGB8() const;
+    explicit operator MColourRGB8() const;
 
     /**
      * ColorXYZ64 to ColorHCL16 conversion.
      *
      * Same as ColorXYZ64::toHCL but with fixed e = 1.0.
      */
-    explicit operator MColorHCL16() const;
+    explicit operator MColourHCL16() const;
 
     /**
-     * ColorXYZ64 to ColorRGB8 conversion. RGB colors with values outside the
+     * ColorXYZ64 to ColorRGB8 conversion. RGB colours with values outside the
      * range of [0 - e, 1 + e] will be mapped to black.
      * @param e maximum error.
      */
-    MColorRGB8 toRGB(double e) const;
+    MColourRGB8 toRGB(double e) const;
     /**
-     * ColorXYZ64 to ColorHCL16 conversion. HCL colors with values outside the
+     * ColorXYZ64 to ColorHCL16 conversion. HCL colours with values outside the
      * range of [-360 - e, 360 + e] or [0 - e, 100 + e] will be mapped to black.
      * @param e maximum error.
      */
-    MColorHCL16 toHCL(double e) const;
+    MColourHCL16 toHCL(double e) const;
 
     double x;
     double y;
     double z;
     /**
-     * Flag to indicate whether the hue value of the original HCL color was
+     * Flag to indicate whether the hue value of the original HCL colour was
      * negative.
      *
-     * Only used for conversions between ColorHCL16 <--> ColorXYZ64.
+     * Only used for conversions between ColourHCL16 <--> ColourXYZ64.
      */
     bool hueSgn;
 };
 
 /**
- * @brief Linear componentwise interpolation between two ColorRGB8's.
- * @param c1 The first color.
- * @param c2 The second color.
+ * @brief Linear componentwise interpolation between two ColourRGB8's.
+ * @param c1 The first colour.
+ * @param c2 The second colour.
  * @param pos Position at which the interpolation is evaluated (Range: [0, 1]).
- * @return ColorRGB8 between c1 and c2 at position pos.
+ * @return ColourRGB8 between c1 and c2 at position pos.
  */
-MColorRGB8 lerp(const MColorRGB8& c1, const MColorRGB8& c2, float pos);
+MColourRGB8 lerp(const MColourRGB8& c1, const MColourRGB8& c2, float pos);
 
 /**
- * @brief Linear componentwise interpolation between two ColorHCL16's.
- * @param c1 The first color.
- * @param c2 The second color.
+ * @brief Linear componentwise interpolation between two ColourHCL16's.
+ * @param c1 The first colour.
+ * @param c2 The second colour.
  * @param pos Position at which the interpolation is evaluated, (Range: [0, 1]).
- * @return ColorHCL16 between c1 and c2 at position pos.
+ * @return ColourHCL16 between c1 and c2 at position pos.
  */
-MColorHCL16 lerp(const MColorHCL16& c1, const MColorHCL16& c2, float pos);
+MColourHCL16 lerp(const MColourHCL16& c1, const MColourHCL16& c2, float pos);
 
 /**
- * @brief Linear componentwise interpolation between two ColorXYZ64's.
- * @param c1 The first color.
- * @param c2 The second color.
+ * @brief Linear componentwise interpolation between two ColourXYZ64's.
+ * @param c1 The first colour.
+ * @param c2 The second colour.
  * @param pos Position at which the interpolation is evaluated, (Range: [0, 1]).
- * @return ColorXYZ64 between c1 and c2 at position pos.
+ * @return ColourXYZ64 between c1 and c2 at position pos.
  */
-MColorXYZ64 lerp(const MColorXYZ64& c1, const MColorXYZ64& c2, float pos);
+MColourXYZ64 lerp(const MColourXYZ64& c1, const MColourXYZ64& c2, float pos);
 
 /**
- * @brief Linear interpolation between two ColorXYZ64's, based on their
+ * @brief Linear interpolation between two ColourXYZ64's, based on their
  * RGB representation.
- * @param c1 The first color.
- * @param c2 The second color.
+ * @param c1 The first colour.
+ * @param c2 The second colour.
  * @param pos Position at which the interpolation is evaluated, (Range: [0, 1]).
- * @return ColorXYZ64 between (ColorRGB8)c1 and (ColorRGB8)c2 at position pos.
+ * @return ColourXYZ64 between (ColorRGB8)c1 and (ColorRGB8)c2 at position pos.
  */
-MColorXYZ64 lerpRGB(const MColorXYZ64& c1, const MColorXYZ64& c2, float pos);
+MColourXYZ64 lerpRGB(const MColourXYZ64& c1, const MColourXYZ64& c2, float pos);
 
 /**
- * @brief Linear interpolation between two ColorXYZ64's, based on their
+ * @brief Linear interpolation between two ColourXYZ64's, based on their
  * HCL representation.
- * @param c1 The first color.
- * @param c2 The second color.
+ * @param c1 The first colour.
+ * @param c2 The second colour.
  * @param pos Position at which the interpolation is evaluated, (Range: [0, 1]).
- * @return ColorXYZ64 between (ColorHCL16)c1 and (ColorHCL16)c2 at position pos.
+ * @return ColourXYZ64 between (ColorHCL16)c1 and (ColorHCL16)c2 at position pos.
  */
-MColorXYZ64 lerpHCL(const MColorXYZ64& c1, const MColorXYZ64& c2, float pos);
+MColourXYZ64 lerpHCL(const MColourXYZ64& c1, const MColourXYZ64& c2, float pos);
 
 
 } // namespace TFEditor

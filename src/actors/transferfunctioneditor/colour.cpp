@@ -50,21 +50,21 @@ namespace TFEditor
 /******************************************************************************
 ***                     CONSTRUCTOR / DESTRUCTOR                            ***
 *******************************************************************************/
-MColorRGB8::MColorRGB8() :
+MColourRGB8::MColourRGB8() :
     r(0),
     g(0),
     b(0)
 {}
 
 
-MColorRGB8::MColorRGB8(const unsigned char (&rgb)[3]) :
+MColourRGB8::MColourRGB8(const unsigned char (&rgb)[3]) :
     r(rgb[0]),
     g(rgb[1]),
     b(rgb[2])
 {}
 
 
-MColorRGB8::MColorRGB8(const double (&rgb)[3])
+MColourRGB8::MColourRGB8(const double (&rgb)[3])
 {
     setR(rgb[0]);
     setG(rgb[1]);
@@ -72,7 +72,7 @@ MColorRGB8::MColorRGB8(const double (&rgb)[3])
 }
 
 
-MColorRGB8::MColorRGB8(double R, double G, double B)
+MColourRGB8::MColourRGB8(double R, double G, double B)
 {
     setR(R);
     setG(G);
@@ -84,39 +84,39 @@ MColorRGB8::MColorRGB8(double R, double G, double B)
 ***                            PUBLIC METHODS                               ***
 *******************************************************************************/
 
-double MColorRGB8::getR() const
+double MColourRGB8::getR() const
 {
     return (double)r / 255;
 }
 
 
-void MColorRGB8::setR(double R)
+void MColourRGB8::setR(double R)
 {
     R = std::min(std::max(0.0, R), 1.0);
     r = (int)(std::round(R * 255));
 }
 
 
-double MColorRGB8::getG() const
+double MColourRGB8::getG() const
 {
     return (double)g / 255;
 }
 
 
-void MColorRGB8::setG(double G)
+void MColourRGB8::setG(double G)
 {
     G = std::min(std::max(0.0, G), 1.0);
     g = (int)(std::round(G * 255));
 }
 
 
-double MColorRGB8::getB() const
+double MColourRGB8::getB() const
 {
     return (double)b / 255;
 }
 
 
-void MColorRGB8::setB(double B)
+void MColourRGB8::setB(double B)
 {
     B = std::min(std::max(0.0, B), 1.0);
     b = (int)(std::round(B * 255));
@@ -130,14 +130,14 @@ void MColorRGB8::setB(double B)
 ***                     CONSTRUCTOR / DESTRUCTOR                            ***
 *******************************************************************************/
 
-MColorHCL16::MColorHCL16() :
+MColourHCL16::MColourHCL16() :
     h(0),
     c(0),
     l(0)
 {}
 
 
-MColorHCL16::MColorHCL16(const double (&hcl)[3])
+MColourHCL16::MColourHCL16(const double (&hcl)[3])
 {
     setH(hcl[0]);
     setC(hcl[1]);
@@ -145,7 +145,7 @@ MColorHCL16::MColorHCL16(const double (&hcl)[3])
 }
 
 
-MColorHCL16::MColorHCL16(double H, double C, double L)
+MColourHCL16::MColourHCL16(double H, double C, double L)
 {
     setH(H);
     setC(C);
@@ -157,39 +157,39 @@ MColorHCL16::MColorHCL16(double H, double C, double L)
 ***                            PUBLIC METHODS                               ***
 *******************************************************************************/
 
-double MColorHCL16::getH() const
+double MColourHCL16::getH() const
 {
     return (double)h / 32767 * 360;
 }
 
 
-void MColorHCL16::setH(double H)
+void MColourHCL16::setH(double H)
 {
     H = std::min(std::max(-360.0, H), 360.0);
     h = std::floor(H / 360 * 32767);
 }
 
 
-double MColorHCL16::getC() const
+double MColourHCL16::getC() const
 {
     return (double)c / 65535 * 100;
 }
 
 
-void MColorHCL16::setC(double C)
+void MColourHCL16::setC(double C)
 {
     C = std::min(std::max(0.0, C), 100.0);
     c = std::floor(C / 100 * 65535);
 }
 
 
-double MColorHCL16::getL() const
+double MColourHCL16::getL() const
 {
     return (double)l / 65535 * 100;
 }
 
 
-void MColorHCL16::setL(double L)
+void MColourHCL16::setL(double L)
 {
     L = std::min(std::max(0.0, L), 100.0);
     l = std::floor(L / 100 * 65535);
@@ -203,7 +203,7 @@ void MColorHCL16::setL(double L)
 ***                     CONSTRUCTOR / DESTRUCTOR                            ***
 *******************************************************************************/
 
-MColorXYZ64::MColorXYZ64() :
+MColourXYZ64::MColourXYZ64() :
     x(Xn),
     y(Yn),
     z(Zn),
@@ -215,28 +215,28 @@ MColorXYZ64::MColorXYZ64() :
 ***                            PUBLIC METHODS                               ***
 *******************************************************************************/
 
-bool MColorXYZ64::operator==(const MColorXYZ64& rhs) const
+bool MColourXYZ64::operator==(const MColourXYZ64& rhs) const
 {
-    return memcmp(this, &rhs, sizeof(MColorXYZ64)) == 0;
+    return memcmp(this, &rhs, sizeof(MColourXYZ64)) == 0;
 }
 
 
-bool MColorXYZ64::operator!=(const MColorXYZ64& rhs) const
+bool MColourXYZ64::operator!=(const MColourXYZ64& rhs) const
 {
-    return memcmp(this, &rhs, sizeof(MColorXYZ64)) != 0;
+    return memcmp(this, &rhs, sizeof(MColourXYZ64)) != 0;
 }
 
 
 // Colorconversion based on colorspace.c from
 // https://cran.r-project.org/web/packages/colorspace/index.html
-MColorXYZ64::MColorXYZ64(const MColorRGB8& rgb)
+MColourXYZ64::MColourXYZ64(const MColourRGB8& rgb)
 {
     Colourspace::sRGB_to_XYZ(rgb.getR(), rgb.getG(), rgb.getB(), Xn, Yn, Zn, &x,
                              &y, &z);
 }
 
 
-MColorXYZ64::MColorXYZ64(const MColorHCL16& hcl)
+MColourXYZ64::MColourXYZ64(const MColourHCL16& hcl)
 {
     double L_, U_, V_;
     Colourspace::polarLUV_to_LUV(hcl.getL(), hcl.getC(), hcl.getH(), &L_, &U_,
@@ -247,19 +247,19 @@ MColorXYZ64::MColorXYZ64(const MColorHCL16& hcl)
 }
 
 
-MColorXYZ64::operator MColorRGB8() const
+MColourXYZ64::operator MColourRGB8() const
 {
     return toRGB(1e-4);
 }
 
 
-MColorXYZ64::operator MColorHCL16() const
+MColourXYZ64::operator MColourHCL16() const
 {
     return toHCL(1);
 }
 
 
-MColorRGB8 MColorXYZ64::toRGB(double e) const
+MColourRGB8 MColourXYZ64::toRGB(double e) const
 {
     double R, G, B;
     Colourspace::XYZ_to_sRGB(x, y, z, Xn, Yn, Zn, &R, &G, &B);
@@ -274,11 +274,11 @@ MColorRGB8 MColorXYZ64::toRGB(double e) const
         r = g = b = 0;
     }
 
-    return MColorRGB8(r, g, b);
+    return MColourRGB8(r, g, b);
 }
 
 
-MColorHCL16 MColorXYZ64::toHCL(double e) const
+MColourHCL16 MColourXYZ64::toHCL(double e) const
 {
     double L_, U_, V_;
     Colourspace::XYZ_to_LUV(x, y, z, Xn, Yn, Zn, &L_, &U_, &V_);
@@ -302,7 +302,7 @@ MColorHCL16 MColorXYZ64::toHCL(double e) const
         h -= 360;
     }
 
-    return MColorHCL16(h, c, l);
+    return MColourHCL16(h, c, l);
 }
 
 
@@ -310,9 +310,9 @@ MColorHCL16 MColorXYZ64::toHCL(double e) const
 ***                                 Colours                                 ***
 *******************************************************************************/
 
-MColorRGB8 lerp(const MColorRGB8& c1, const MColorRGB8& c2, float pos)
+MColourRGB8 lerp(const MColourRGB8& c1, const MColourRGB8& c2, float pos)
 {
-    MColorRGB8 result;
+    MColourRGB8 result;
     pos = std::min(std::max(0.f, pos), 1.f);
     result.setR(c1.getR() * (1 - pos) + c2.getR() * pos);
     result.setG(c1.getG() * (1 - pos) + c2.getG() * pos);
@@ -321,9 +321,9 @@ MColorRGB8 lerp(const MColorRGB8& c1, const MColorRGB8& c2, float pos)
 }
 
 
-MColorHCL16 lerp(const MColorHCL16& c1, const MColorHCL16& c2, float pos)
+MColourHCL16 lerp(const MColourHCL16& c1, const MColourHCL16& c2, float pos)
 {
-    MColorHCL16 result;
+    MColourHCL16 result;
     pos = std::min(std::max(0.f, pos), 1.f);
     result.setH(c1.getH() * (1 - pos) + c2.getH() * pos);
     result.setC(c1.getC() * (1 - pos) + c2.getC() * pos);
@@ -332,9 +332,9 @@ MColorHCL16 lerp(const MColorHCL16& c1, const MColorHCL16& c2, float pos)
 }
 
 
-MColorXYZ64 lerp(const MColorXYZ64& c1, const MColorXYZ64& c2, float pos)
+MColourXYZ64 lerp(const MColourXYZ64& c1, const MColourXYZ64& c2, float pos)
 {
-    MColorXYZ64 result;
+    MColourXYZ64 result;
     pos = std::min(std::max(0.f, pos), 1.f);
     result.x = c1.x * (1 - pos) + c2.x * pos;
     result.y = c1.y * (1 - pos) + c2.y * pos;
@@ -343,15 +343,15 @@ MColorXYZ64 lerp(const MColorXYZ64& c1, const MColorXYZ64& c2, float pos)
 }
 
 
-MColorXYZ64 lerpRGB(const MColorXYZ64& c1, const MColorXYZ64& c2, float pos)
+MColourXYZ64 lerpRGB(const MColourXYZ64& c1, const MColourXYZ64& c2, float pos)
 {
-    return MColorXYZ64(lerp((MColorRGB8)c1, (MColorRGB8)c2, pos));
+    return MColourXYZ64(lerp((MColourRGB8)c1, (MColourRGB8)c2, pos));
 }
 
 
-MColorXYZ64 lerpHCL(const MColorXYZ64& c1, const MColorXYZ64& c2, float pos)
+MColourXYZ64 lerpHCL(const MColourXYZ64& c1, const MColourXYZ64& c2, float pos)
 {
-    return MColorXYZ64(lerp((MColorHCL16)c1, (MColorHCL16)c2, pos));
+    return MColourXYZ64(lerp((MColourHCL16)c1, (MColourHCL16)c2, pos));
 }
 
 

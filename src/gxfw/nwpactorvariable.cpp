@@ -1700,6 +1700,53 @@ bool MNWPActorVariable::updateEnsembleSingleMemberProperty()
 }
 
 
+bool MNWPActorVariable::setTransferFunctionFromProperty()
+{
+    MQtProperties *properties = actor->getQtProperties();
+    MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
+
+    QString tfName = properties->getEnumItem(transferFunctionProperty);
+
+    if (tfName == "None")
+    {
+        transferFunction = nullptr;
+
+        // Update enum items: Scan currently available actors for transfer
+        // functions. Add TFs to the list displayed in the combo box of the
+        // transferFunctionProperty.
+        QStringList availableTFs;
+        availableTFs << "None";
+        foreach (MActor *ma, glRM->getActors())
+        {
+            if (MTransferFunction1D *tf = dynamic_cast<MTransferFunction1D*>(ma))
+            {
+                availableTFs << tf->transferFunctionName();
+            }
+        }
+        properties->mEnum()->setEnumNames(transferFunctionProperty, availableTFs);
+
+        return true;
+    }
+
+    // Find the selected transfer function in the list of actors from the
+    // resources manager. Not very efficient, but works well enough for the
+    // small number of actors at the moment..
+    foreach (MActor *ma, glRM->getActors())
+    {
+        if (MTransferFunction1D *tf = dynamic_cast<MTransferFunction1D*>(ma))
+        {
+            if (tf->transferFunctionName() == tfName)
+            {
+                transferFunction = tf;
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+
 /******************************************************************************
 ***                            PRIVATE METHODS                              ***
 *******************************************************************************/
@@ -1871,53 +1918,6 @@ bool MNWPActorVariable::changeVariable()
     actor->enableActorUpdates(true);
 
     return true;
-}
-
-
-bool MNWPActorVariable::setTransferFunctionFromProperty()
-{
-    MQtProperties *properties = actor->getQtProperties();
-    MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
-
-    QString tfName = properties->getEnumItem(transferFunctionProperty);
-
-    if (tfName == "None")
-    {
-        transferFunction = nullptr;
-
-        // Update enum items: Scan currently available actors for transfer
-        // functions. Add TFs to the list displayed in the combo box of the
-        // transferFunctionProperty.
-        QStringList availableTFs;
-        availableTFs << "None";
-        foreach (MActor *ma, glRM->getActors())
-        {
-            if (MTransferFunction1D *tf = dynamic_cast<MTransferFunction1D*>(ma))
-            {
-                availableTFs << tf->transferFunctionName();
-            }
-        }
-        properties->mEnum()->setEnumNames(transferFunctionProperty, availableTFs);
-
-        return true;
-    }
-
-    // Find the selected transfer function in the list of actors from the
-    // resources manager. Not very efficient, but works well enough for the
-    // small number of actors at the moment..
-    foreach (MActor *ma, glRM->getActors())
-    {
-        if (MTransferFunction1D *tf = dynamic_cast<MTransferFunction1D*>(ma))
-        {
-            if (tf->transferFunctionName() == tfName)
-            {
-                transferFunction = tf;
-                return true;
-            }
-        }
-    }
-
-    return false;
 }
 
 

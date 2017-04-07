@@ -558,10 +558,10 @@ void MTransferFunction1D::saveConfiguration(QSettings *settings)
         for (int i= 0; i < colourNodes->getNumNodes(); i++)
         {
             settings->setArrayIndex(i);
-            settings->setValue("pos", colourNodes->xAt(i));
+            settings->setValue("position", colourNodes->xAt(i));
 
-            MColorXYZ64 colour = colourNodes->colourAt(i);
-            QByteArray array((char*)&colour, sizeof(MColorXYZ64));
+            MColourXYZ64 colour = colourNodes->colourAt(i);
+            QByteArray array((char*)&colour, sizeof(MColourXYZ64));
             settings->setValue("colour", array);
         }
         settings->endArray();
@@ -570,13 +570,13 @@ void MTransferFunction1D::saveConfiguration(QSettings *settings)
         for (int i= 0; i < alphaNodes->getNumNodes(); i++)
         {
             settings->setArrayIndex(i);
-            settings->setValue("pos", alphaNodes->xAt(i));
+            settings->setValue("position", alphaNodes->xAt(i));
             settings->setValue("alpha", alphaNodes->yAt(i));
         }
         settings->endArray();
 
-        QString type = editor->interpolationTypeToString(editor->getType());
-        settings->setValue("interpolationType", type);
+        QString type = editor->interpolationCSpaceToString(editor->getCSpaceForCNodeInterpolation());
+        settings->setValue("colourSpaceForColourNodeInterpolation", type);
 
         break;
     }
@@ -687,12 +687,12 @@ void MTransferFunction1D::loadConfiguration(QSettings *settings)
         for (int i=0; i < numColourNodes; i++)
         {
             settings->setArrayIndex(i);
-            float pos = settings->value("pos", 0).toFloat();
+            float pos = settings->value("position", 0).toFloat();
 
             QByteArray array = settings->value("colour", QByteArray()).toByteArray();
-            MColorXYZ64 colour;
-            if (array.size() == sizeof(MColorXYZ64))
-                memcpy(&colour, array.data(), sizeof(MColorXYZ64));
+            MColourXYZ64 colour;
+            if (array.size() == sizeof(MColourXYZ64))
+                memcpy(&colour, array.data(), sizeof(MColourXYZ64));
             colourNodes->push_back(pos, colour);
         }
         settings->endArray();
@@ -701,30 +701,30 @@ void MTransferFunction1D::loadConfiguration(QSettings *settings)
         for (int i= 0; i < numAlphaPoints; i++)
         {
             settings->setArrayIndex(i);
-            float pos = settings->value("pos", 0).toFloat();
+            float pos = settings->value("position", 0).toFloat();
             float alpha = settings->value("alpha", Qt::black).toFloat();
 
             alphaNodes->push_back(pos, alpha);
         }
         settings->endArray();
         QString typeString =
-                settings->value("interpolationType", "hcl").toString();
-        InterpolationType type = editor->stringToInterpolationType(typeString);
+                settings->value("colourSpaceForColourNodeInterpolation", "hcl").toString();
+        ColourSpaceForColourNodeInterpolation type = editor->stringToInterpolationCSpace(typeString);
         // Display error message and set type to hcl for strings in configuration
         // not defining a type.
-        if (type == InterpolationType::INVALID)
+        if (type == ColourSpaceForColourNodeInterpolation::INVALID)
         {
             QMessageBox msgBox;
             msgBox.setIcon(QMessageBox::Warning);
             msgBox.setText(QString("Error reading configuration file: "
-                                   "Could not find interpolation type '%1'.\n"
-                                   "Setting interpolation type to 'hcl'.")
+                                   "Could not find colour space '%1' for interpolation.\n"
+                                   "Setting colour space to 'hcl'.")
                            .arg(typeString));
             msgBox.exec();
 
-            type = editor->stringToInterpolationType(QString("hcl"));
+            type = editor->stringToInterpolationCSpace(QString("hcl"));
         }
-        editor->setType(type);
+        editor->setCSpaceForCNodeInterpolation(type);
 
         editor->resetUI();
         selectEditor();

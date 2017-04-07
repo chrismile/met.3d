@@ -43,7 +43,7 @@ namespace Met3D
 namespace TFEditor
 {
 
-enum InterpolationType
+enum ColourSpaceForColourNodeInterpolation
 {
     INVALID = -1,
     HCL = 0,
@@ -70,7 +70,7 @@ public:
 };
 
 
-typedef QPair<float, MColorXYZ64> ColourNode;
+typedef QPair<float, MColourXYZ64> ColourNode;
 
 /**
  * @brief Class for storing Met3D::TFEditor::ColourNode's.
@@ -94,15 +94,15 @@ public:
     void    clear() override;
 
 
-    const MColorXYZ64&   colourAt(int i) const;
-    MColorXYZ64&         colourAt(int i);
+    const MColourXYZ64&   colourAt(int i) const;
+    MColourXYZ64&         colourAt(int i);
 
-    void push_back(float t, const MColorXYZ64& color);
+    void push_back(float t, const MColourXYZ64& color);
 
-    MColorXYZ64 interpolate(float t);
+    MColourXYZ64 interpolate(float t);
 
     QVector<ColourNode> nodes;
-    InterpolationType type;
+    ColourSpaceForColourNodeInterpolation interpolationColourSpace;
 };
 
 typedef QPair<float, float> AlphaNode;
@@ -151,8 +151,8 @@ public:
      */
     void update(int numSamples);
 
-    void setType(InterpolationType type);
-    InterpolationType getType() const;
+    void setCSpaceForCNodeInterpolation(ColourSpaceForColourNodeInterpolation type);
+    ColourSpaceForColourNodeInterpolation getCSpaceForCNodeInterpolation() const;
 
     const MColourNodes* getColourNodes() const;
     MColourNodes* getColourNodes();

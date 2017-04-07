@@ -118,15 +118,15 @@ MHCLColorPicker::MHCLColorPicker(MColourNodes *cs, QWidget *parent) :
     connect(luminanceBox, SIGNAL(valueChanged(double)),
             this, SLOT(luminanceBoxChanged(double)));
 
-    connect(hueRange, SIGNAL(changed(MColorHCL16)),
-            this, SLOT(changed(MColorHCL16)));
-    connect(chromaRange, SIGNAL(changed(MColorHCL16)),
-            this, SLOT(changed(MColorHCL16)));
-    connect(luminanceRange, SIGNAL(changed(MColorHCL16)),
-            this, SLOT(changed(MColorHCL16)));
+    connect(hueRange, SIGNAL(changed(MColourHCL16)),
+            this, SLOT(changed(MColourHCL16)));
+    connect(chromaRange, SIGNAL(changed(MColourHCL16)),
+            this, SLOT(changed(MColourHCL16)));
+    connect(luminanceRange, SIGNAL(changed(MColourHCL16)),
+            this, SLOT(changed(MColourHCL16)));
 
-    connect(range2D, SIGNAL(changed(MColorHCL16)),
-            this, SLOT(changed(MColorHCL16)));
+    connect(range2D, SIGNAL(changed(MColourHCL16)),
+            this, SLOT(changed(MColourHCL16)));
 
     connect(typeBox, SIGNAL(currentIndexChanged(int)),
             this, SLOT(typeBoxChanged(int)));
@@ -145,18 +145,18 @@ MHCLColorPicker::MHCLColorPicker(MColourNodes *cs, QWidget *parent) :
 void MHCLColorPicker::setCurrentIndex(int index)
 {
     colorIndex = index;
-    currentColor = (MColorHCL16)colourNodes->colourAt(colorIndex);
+    currentColor = (MColourHCL16)colourNodes->colourAt(colorIndex);
     changed();
 }
 
 
-const MColorHCL16& MHCLColorPicker::color() const
+const MColourHCL16& MHCLColorPicker::color() const
 {
     return currentColor;
 }
 
 
-MColorHCL16& MHCLColorPicker::color()
+MColourHCL16& MHCLColorPicker::color()
 {
     return currentColor;
 }
@@ -214,7 +214,7 @@ void MHCLColorPicker::luminanceBoxChanged(double value)
 }
 
 
-void MHCLColorPicker::changed(const MColorHCL16& c)
+void MHCLColorPicker::changed(const MColourHCL16& c)
 {
     color() = c;
     changed();
@@ -258,9 +258,9 @@ MHCLColorRangeWidget::MHCLColorRangeWidget(
 ***                            PUBLIC METHODS                               ***
 *******************************************************************************/
 
-MColorHCL16 MHCLColorRangeWidget::getColor(float t) const
+MColourHCL16 MHCLColorRangeWidget::getColor(float t) const
 {
-    MColorHCL16 color = colorPicker->color();
+    MColourHCL16 color = colorPicker->color();
     switch(type)
     {
     case Hue:
@@ -278,7 +278,7 @@ MColorHCL16 MHCLColorRangeWidget::getColor(float t) const
 }
 
 
-float MHCLColorRangeWidget::getValue(const MColorHCL16& color) const
+float MHCLColorRangeWidget::getValue(const MColourHCL16& color) const
 {
     switch(type)
     {
@@ -314,8 +314,8 @@ void MHCLColorRangeWidget::paintEvent(QPaintEvent *event)
     {
         float t = i / float(width() + 1);
 
-        MColorXYZ64 xyz = (MColorXYZ64)getColor(t);
-        MColorRGB8 rgb = (MColorRGB8)xyz;
+        MColourXYZ64 xyz = (MColourXYZ64)getColor(t);
+        MColourRGB8 rgb = (MColourRGB8)xyz;
 
         function[i] = qRgb(rgb.r, rgb.g, rgb.b);
     }
@@ -391,9 +391,9 @@ void MHCLColorRange2DWidget::setShowInterpolationPaths(bool show)
 }
 
 
-MColorHCL16 MHCLColorRange2DWidget::getColor(float tx, float ty) const
+MColourHCL16 MHCLColorRange2DWidget::getColor(float tx, float ty) const
 {
-    MColorHCL16 color = colourPicker->color();
+    MColourHCL16 color = colourPicker->color();
     switch(type)
     {
     case HueChroma:
@@ -422,7 +422,7 @@ float MHCLColorRange2DWidget::getValueX() const
 }
 
 
-float MHCLColorRange2DWidget::getValueX(const MColorHCL16& color) const
+float MHCLColorRange2DWidget::getValueX(const MColourHCL16& color) const
 {
     switch(type)
     {
@@ -444,7 +444,7 @@ float MHCLColorRange2DWidget::getValueY() const
 }
 
 
-float MHCLColorRange2DWidget::getValueY(const MColorHCL16& color) const
+float MHCLColorRange2DWidget::getValueY(const MColourHCL16& color) const
 {
     switch(type)
     {
@@ -466,7 +466,7 @@ float MHCLColorRange2DWidget::getValueZ() const
 }
 
 
-float MHCLColorRange2DWidget::getValueZ(const MColorHCL16& color) const
+float MHCLColorRange2DWidget::getValueZ(const MColourHCL16& color) const
 {
     switch(type)
     {
@@ -506,8 +506,8 @@ void MHCLColorRange2DWidget::paintEvent(QPaintEvent *event)
         {
             float ty = y / float(nY + 1);
 
-            MColorXYZ64 xyz = (MColorXYZ64)getColor(tx, ty);
-            MColorRGB8 rgb = (MColorRGB8)xyz;
+            MColourXYZ64 xyz = (MColourXYZ64)getColor(tx, ty);
+            MColourRGB8 rgb = (MColourRGB8)xyz;
 
             function[x + y * nX] = qRgb(rgb.r, rgb.g, rgb.b);
         }
@@ -535,7 +535,7 @@ void MHCLColorRange2DWidget::paintEvent(QPaintEvent *event)
 
         for (int i = 0; i < nodes.size(); i++)
         {
-            MColorHCL16 color;
+            MColourHCL16 color;
 
             if (nodes[i].first == currentPos)
             {
@@ -543,7 +543,7 @@ void MHCLColorRange2DWidget::paintEvent(QPaintEvent *event)
             }
             else
             {
-                color = (MColorHCL16)nodes[i].second;
+                color = (MColourHCL16)nodes[i].second;
             }
 
             float tx = getValueX(color);
@@ -613,7 +613,7 @@ void MHCLColorRange2DWidget::paintEvent(QPaintEvent *event)
     }
 
     // Draw selection
-    MColorHCL16 color = colourPicker->color();
+    MColourHCL16 color = colourPicker->color();
 
     float tx = getValueX(color);
     float ty = getValueY(color);
@@ -638,7 +638,7 @@ void MHCLColorRange2DWidget::mousePressEvent(QMouseEvent * event)
         float mousePosY = event->pos().y() / float(height());
         mousePosY = std::max(0.f, std::min(mousePosY, 1.f));
 
-        MColorHCL16 color = colourPicker->color();
+        MColourHCL16 color = colourPicker->color();
 
         float nodePosX = getValueX(color);
         float nodePosY = getValueY(color);
