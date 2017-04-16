@@ -198,6 +198,12 @@ bool MActor::isInitialized()
 }
 
 
+bool MActor::isEnabled()
+{
+    return actorIsEnabled;
+}
+
+
 unsigned int MActor::getID()
 {
     return myID;

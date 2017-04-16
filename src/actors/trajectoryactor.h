@@ -44,6 +44,7 @@
 #include "data/trajectorydatasource.h"
 #include "data/trajectorynormalssource.h"
 #include "data/pressuretimetrajectoryfilter.h"
+#include "data/trajectorycalculator.h"
 
 
 class MGLResourcesManager;
@@ -167,7 +168,7 @@ public slots:
 
     void asynchronousSingleTimeSelectionAvailable(MDataRequest request);
 
-    void prepareAvailableDataForRendering();
+    void prepareAvailableDataForRendering(uint slot);
 
     /**
      Connects to the MGLResourcesManager::actorCreated() signal. If the new
@@ -193,6 +194,8 @@ public slots:
 
     void registerScene(MSceneControl *scene) override;
 
+    void onSeedActorChanged();
+
 protected:
     void initializeActorResources();
 
@@ -205,6 +208,9 @@ protected:
     void updateEnsembleProperties();
 
 private:
+
+    void updateActorData();
+
     /**
       Determine the current time value of the given enum property.
      */
@@ -247,6 +253,12 @@ private:
     void updateParticlePosTimeProperty();
 
     /**
+     * Update the delta time property (listing all times that are available
+     * for computation. Precomputed datasources do not support that property)
+     */
+    void updateDeltaTimeProperty();
+
+    /**
       Internal function containing common code for @ref setStartDateTime() and
       @ref setInitDateTime().
       */
@@ -255,23 +267,51 @@ private:
                              QtProperty* timeProperty);
 
 
+    /** Request information */
+    struct MRequestQueueInfo { MDataRequest request; bool available; };
+    struct MTrajectoryRequestQueueInfo
+    {
+        MRequestQueueInfo dataRequest;
+        QHash<MSceneViewGLWidget*, MRequestQueueInfo> normalsRequests;
+        MRequestQueueInfo filterRequest;
+        MRequestQueueInfo singleTimeFilterRequest;
+        int numPendingRequests;
+#ifdef DIRECT_SYNCHRONIZATION
+        bool syncchronizationRequest;
+#endif
+    };
 
     /** Data sources and pointers to current data objects. */
+    struct MTrajectoryRequestBuffer
+    {
+        MTrajectoryRequestBuffer()
+                : trajectories(nullptr),
+                  trajectorySelection(nullptr),
+                  trajectorySingleTimeSelection(nullptr),
+                  trajectoriesVertexBuffer(nullptr)
+        { }
+
+        MTrajectories* trajectories;
+        MTrajectorySelection* trajectorySelection;
+        MTrajectorySelection* trajectorySingleTimeSelection;
+        GL::MVertexBuffer* trajectoriesVertexBuffer;
+
+        QHash<MSceneViewGLWidget*, MTrajectoryNormals*> normals;
+        QHash<MSceneViewGLWidget*, GL::MVertexBuffer*> normalsVertexBuffer;
+
+        QQueue<MTrajectoryRequestQueueInfo> pendingRequestsQueue;
+    };
+    QVector<MTrajectoryRequestBuffer> trajectoryRequests;
+
     MTrajectoryDataSource *trajectorySource;
-    MTrajectories *trajectories;
-    GL::MVertexBuffer *trajectoriesVertexBuffer;
-
     MTrajectoryNormalsSource *normalsSource;
-    QHash<MSceneViewGLWidget*, MTrajectoryNormals*> normals;
-    QHash<MSceneViewGLWidget*, GL::MVertexBuffer*> normalsVertexBuffer;
-
     MTrajectoryFilter *trajectoryFilter;
-    MTrajectorySelection *trajectorySelection;
-    MTrajectorySelection *trajectorySingleTimeSelection;
 
     QtProperty *selectDataSourceProperty;
     QtProperty *utilizedDataSourceProperty;
     QString dataSourceID;
+
+    bool precomputedDataSource; // indicate whether a precomputed dataSource is used
 
     bool suppressUpdate;
     bool normalsToBeComputed; // true if the z-scaling of the scene view has
@@ -304,6 +344,47 @@ private:
     bool        synchronizeEnsemble;
     QtProperty *synchronizeEnsembleProperty;
 
+    /** Trajectory Calculation properties */
+    QtProperty *calculationPropertyGroup;
+    QtProperty *calculationDeltaTimeProperty;
+    QtProperty *calculationInterpolationMethodProperty;
+    QtProperty *calculationLineTypeProperty;
+    QtProperty* calculationIterationMethodProperty;
+    QtProperty *calculationIterationCountProperty;
+    QtProperty* calculationSeedPropertyGroup;
+    QtProperty* calculationSeedAddActorProperty;
+    QtProperty* calculationSeedClearActorProperty;
+
+    enum SeedActorType
+    {
+        POLE_ACTOR,
+        HORIZONTAL_ACTOR,
+        VERTICAL_ACTOR,
+        BOX_ACTOR
+    };
+
+    struct SeedActorSettings
+    {
+        MActor* actor;
+        SeedActorType type;
+        QtProperty* propertyGroup;
+        QtProperty *stepSizeLon;
+        QtProperty *stepSizeLat;
+        QtProperty *pressureLevels;
+        QtProperty *removeProperty;
+
+    };
+    QList<SeedActorSettings> calculationSeedActorProperties;
+
+    struct SeedActorData
+    {
+        QVector3D minPosition;
+        QVector3D maxPosition;
+        QVector2D stepSize;
+        QVector<float> pressureLevels;
+        TRAJ_CALC_SEED_TYPE type;
+    };
+    QVector<SeedActorData> seedActorData;
 
     /** Time management. */
     QList<QDateTime> availableStartTimes;
@@ -319,9 +400,9 @@ private:
     QtProperty *ensembleMemberProperty;
     /** Trajectory filtering. */
     QtProperty *enableFilterProperty;
-    QtProperty *deltaPressureProperty; // filter trajectories according to this
+    QtProperty *deltaPressureFilterProperty; // filter trajectories according to this
                                        // criterion
-    QtProperty *deltaTimeProperty;
+    QtProperty *deltaTimeFilterProperty;
 
     // Bounding box.
     QRectF      bbox;
@@ -349,20 +430,6 @@ private:
     QtProperty *colourShadowProperty;
     bool        shadowColoured;
 
-    struct MRequestQueueInfo { MDataRequest request; bool available; };
-    struct MTrajectoryRequestQueueInfo
-    {
-        MRequestQueueInfo dataRequest;
-        QHash<MSceneViewGLWidget*, MRequestQueueInfo> normalsRequests;
-        MRequestQueueInfo filterRequest;
-        MRequestQueueInfo singleTimeFilterRequest;
-        int numPendingRequests;
-#ifdef DIRECT_SYNCHRONIZATION
-        bool syncchronizationRequest;
-#endif
-    };
-    QQueue<MTrajectoryRequestQueueInfo> pendingRequestsQueue;
-
     void debugPrintPendingRequestsQueue();
 
     /**
@@ -377,6 +444,15 @@ private:
       as already selected, @return true otherwise.
      */
     bool selectDataSource();
+
+    void openSeedActorDialog();
+
+    void addSeedActor(QString name, float deltaLon, float deltaLat, QVector<float> presLvls);
+
+    void clearSeedActor();
+
+    void removeSeedActor(QString name);
+
     /**
       @brief enableProperties changes the enabled status of all properties to
       @param enable exept for @ref selectDataSourceProperty and
@@ -394,6 +470,12 @@ private:
       releaseData is used to release all data before switching data sources.
      */
     void releaseData();
+
+    /**
+      @brief releaseData releases trajectories, normals, selection and single
+      time selection data for given slot.
+     */
+    void releaseData(int slot);
 };
 
 

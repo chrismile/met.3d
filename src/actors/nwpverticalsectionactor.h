@@ -60,6 +60,7 @@ class MNWPVerticalSectionActor : public MNWPMultiVarActor
     Q_OBJECT
 
 public:
+
     MNWPVerticalSectionActor();
 
     ~MNWPVerticalSectionActor();
@@ -107,6 +108,12 @@ public:
      the vertical section path are taken.
      */
     void setWaypointsModel(MWaypointsTableModel *model);
+
+    MWaypointsTableModel* getWaypointsModel();
+
+    double getBottomPressure();
+
+    double getTopPressure();
 
     QString getSettingsID() override { return "NWPVerticalSectionActor"; }
 
@@ -156,12 +163,6 @@ protected:
      updateVerticalLevelRange()).
      */
     void dataFieldChangedEvent();
-
-    /**
-      Parses the string @p pressureLevelStr for pressure level definitions.
-      @see MNWP2DSectionActorVariable::parseContourLevelString().
-     */
-    bool parseIsoPressureLevelString(QString pressureLevelStr);
 
     /**
      Computes a list of pressure levels at which iso-pressure lines are plotted

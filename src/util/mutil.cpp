@@ -96,3 +96,75 @@ QString expandEnvironmentVariables(QString path)
 
     return path;
 }
+
+QVector<float> parsePressureLevelString(QString lvlString)
+{
+    // Clear the current list of pressure line levels; if pLevelStr does not
+    // match any accepted format no pressure lines are drawn.
+    QVector<float> pressureLevels;
+
+    // Empty strings, i.e. no pressure lines, are accepted.
+    if (lvlString.isEmpty()) return pressureLevels;
+
+    // Match strings of format "[0,100,10]" or "[0.5,10,0.5]".
+    QRegExp rxRange("^\\[([\\-|\\+]*\\d+\\.*\\d*),([\\-|\\+]*\\d+\\.*\\d*),"
+                            "([\\-|\\+]*\\d+\\.*\\d*)\\]$");
+    // Match strings of format "1,2,3,4,5" or "0,0.5,1,1.5,5,10" (number of
+    // values is arbitrary).
+    QRegExp rxList("^([\\-|\\+]*\\d+\\.*\\d*,*)+$");
+
+    if (rxRange.exactMatch(lvlString))
+    {
+        QStringList rangeValues = rxRange.capturedTexts();
+
+        bool ok;
+        double from = rangeValues.value(1).toFloat(&ok);
+        double to   = rangeValues.value(2).toFloat(&ok);
+        double step = rangeValues.value(3).toFloat(&ok);
+
+        if (step > 0)
+        {
+            for (float d = from; d <= to; d += step)
+            {
+                pressureLevels << d;
+            }
+        }
+        else if (step < 0)
+        {
+            for (float d = from; d >= to; d += step)
+            {
+                pressureLevels << d;
+            }
+        }
+    }
+    else if (rxList.exactMatch(lvlString))
+    {
+        QStringList listValues = lvlString.split(",");
+
+        bool ok;
+        for (int i = 0; i < listValues.size(); i++)
+        {
+            pressureLevels << listValues.value(i).toFloat(&ok);
+        }
+    }
+
+    return pressureLevels;
+}
+
+QString encodePressureLevels(QVector<float> lvls, QString delimiter)
+{
+    // create empty string
+    QString stringValue = QString("");
+
+    // add values to string with given delimiter
+    for(int i = 0; i < lvls.size(); i++)
+    {
+        if(i == 0)
+            stringValue.append(QString("%1").arg(lvls.at(i)));
+        else
+            stringValue.append(QString("%1%2").arg(delimiter).arg(lvls.at(i)));
+        cout << lvls.at(i) << ",";
+    }
+
+    return stringValue;
+}

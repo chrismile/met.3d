@@ -52,6 +52,7 @@ namespace Met3D
 class MMovablePoleActor : public MActor
 {
 public:
+
     MMovablePoleActor();
     ~MMovablePoleActor();
 

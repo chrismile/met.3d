@@ -125,4 +125,13 @@ inline int clamp(int x, int a, int b)
  */
 QString expandEnvironmentVariables(QString path);
 
+
+/**
+ * Parse Pressure lvls given by a ranged String e.g. "[0, 100, 10]" or a list
+ * of values e.g. "10, 20, 50, 100, 200, 500, 700, 900"
+ */
+QVector<float> parsePressureLevelString(QString lvls);
+
+QString encodePressureLevels(QVector<float> lvls, QString delimiter);
+
 #endif // MUTIL_H

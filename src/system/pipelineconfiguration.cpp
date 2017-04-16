@@ -29,6 +29,7 @@
 
 // related third party imports
 #include <log4cplus/loggingmacros.h>
+#include <src/data/trajectorycalculator.h>
 
 // local application imports
 #include "util/mutil.h"
@@ -49,6 +50,7 @@
 #include "data/derivedmetvarsdatasource.h"
 
 #include "data/trajectoryreader.h"
+#include "data/trajectorycalculator.h"
 #include "data/trajectorynormalssource.h"
 #include "data/trajectoryselectionsource.h"
 #include "data/deltapressurepertrajectory.h"
@@ -253,33 +255,78 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
         bool ablTrajectories = config.value("ABLTrajectories").toBool();
         QString schedulerID = config.value("schedulerID").toString();
         QString memoryManagerID = config.value("memoryManagerID").toString();
+        bool precomputed = config.value("precomputed").toBool();
+        QString computationResource = config.value("computationResourceName").toString();
+        QString computationVariableU = config.value("computationVariableU").toString();
+        QString computationVariableV = config.value("computationVariableV").toString();
+        QString computationVariableP = config.value("computationVariableP").toString();
 
-        LOG4CPLUS_DEBUG(mlog, "initializing LAGRANTO pipeline #" << i << ": ");
-        LOG4CPLUS_DEBUG(mlog, "  name = " << name.toStdString());
-        LOG4CPLUS_DEBUG(mlog, "  " << (isEnsemble ? "ensemble" : "deterministic"));
-        LOG4CPLUS_DEBUG(mlog, "  path = " << path.toStdString());
-        LOG4CPLUS_DEBUG(mlog, "  type = " << (ablTrajectories ? "ABL-T" : "DF-T"));
-        LOG4CPLUS_DEBUG(mlog, "  schedulerID = " << schedulerID.toStdString());
-        LOG4CPLUS_DEBUG(mlog, "  memoryManagerID = " << memoryManagerID.toStdString());
-
-        // Check parameter validity.
-        if ( name.isEmpty()
-             || path.isEmpty()
-             || schedulerID.isEmpty()
-             || memoryManagerID.isEmpty() )
+        if(precomputed)
         {
-            LOG4CPLUS_WARN(mlog, "invalid parameters encountered; skipping.");
-            continue;
-        }
+            LOG4CPLUS_DEBUG(mlog, "initializing precomputed LAGRANTO pipeline #" << i << ": ");
+            LOG4CPLUS_DEBUG(mlog, "  name = " << name.toStdString());
+            LOG4CPLUS_DEBUG(mlog, "  " << (isEnsemble ? "ensemble" : "deterministic"));
+            LOG4CPLUS_DEBUG(mlog, "  path = " << path.toStdString());
+            LOG4CPLUS_DEBUG(mlog, "  type = " << (ablTrajectories ? "ABL-T" : "DF-T"));
+            LOG4CPLUS_DEBUG(mlog, "  schedulerID = " << schedulerID.toStdString());
+            LOG4CPLUS_DEBUG(mlog, "  memoryManagerID = " << memoryManagerID.toStdString());
 
-        // Create new pipeline.
-        if (isEnsemble)
-            initializeLagrantoEnsemblePipeline(
+            // Check parameter validity.
+            if ( name.isEmpty()
+                 || path.isEmpty()
+                 || schedulerID.isEmpty()
+                 || memoryManagerID.isEmpty() )
+            {
+                LOG4CPLUS_WARN(mlog, "invalid parameters encountered; skipping.");
+                continue;
+            }
+
+            // Create new pipeline.
+            if (isEnsemble)
+                initializeLagrantoEnsemblePipeline(
                         name, path, ablTrajectories, schedulerID,
                         memoryManagerID);
+            else
+                LOG4CPLUS_WARN(mlog, "deterministic precomputed LAGRANTO pipeline has not"
+                        "been implemented yet; skipping.");
+        }
         else
-            LOG4CPLUS_WARN(mlog, "deterministic LAGRANTO pipeline has not"
-                           "been implemented yet; skipping.");
+        {
+            LOG4CPLUS_DEBUG(mlog, "initializing computed LAGRANTO pipeline #" << i << ": ");
+            LOG4CPLUS_DEBUG(mlog, "  name = " << name.toStdString());
+            LOG4CPLUS_DEBUG(mlog, "  " << (isEnsemble ? "ensemble" : "deterministic"));
+            LOG4CPLUS_DEBUG(mlog, "  type = " << (ablTrajectories ? "ABL-T" : "DF-T"));
+            LOG4CPLUS_DEBUG(mlog, "  schedulerID = " << schedulerID.toStdString());
+            LOG4CPLUS_DEBUG(mlog, "  memoryManagerID = " << memoryManagerID.toStdString());
+            LOG4CPLUS_DEBUG(mlog, "  computationResourceName = " << computationResource.toStdString());
+            LOG4CPLUS_DEBUG(mlog, "  computation U-Variable = " << computationVariableU.toStdString());
+            LOG4CPLUS_DEBUG(mlog, "  computation V-Variable = " << computationVariableV.toStdString());
+            LOG4CPLUS_DEBUG(mlog, "  computation P-Variable = " << computationVariableP.toStdString());
+
+            // Check parameter validity.
+            if ( name.isEmpty()
+                 || computationResource.isEmpty()
+                 || computationVariableU.isEmpty()
+                 || computationVariableV.isEmpty()
+                 || computationVariableP.isEmpty()
+                 || schedulerID.isEmpty()
+                 || memoryManagerID.isEmpty() )
+            {
+                LOG4CPLUS_WARN(mlog, "invalid parameters encountered; skipping.");
+                continue;
+            }
+
+            // Create new pipeline.
+            if (isEnsemble)
+                initializeComputationEnsemblePipeline(
+                        name, ablTrajectories, schedulerID,
+                        memoryManagerID, computationResource,
+                        computationVariableU, computationVariableV,
+                        computationVariableP);
+            else
+                LOG4CPLUS_WARN(mlog, "deterministic computed LAGRANTO pipeline has not"
+                        "been implemented yet; skipping.");
+        }
     }
 
     config.endArray();
@@ -321,9 +368,8 @@ void MPipelineConfiguration::initializeNWPPipeline(
     nwpReaderENS->setMemoryManager(memoryManager);
     nwpReaderENS->setScheduler(scheduler);
     nwpReaderENS->setDataRoot(fileDir, fileFilter);
-
-    // (Should the "raw" data reader be selectable as a data source?)
-    // sysMC->registerDataSource(dataSourceId, nwpReaderENS);
+    // (Should the "raw" data reader be selectable as a data source?) Yes it should, for computed trajectories
+    sysMC->registerDataSource(dataSourceId, nwpReaderENS);
 
     MStructuredGridEnsembleFilter *ensFilter =
             new MStructuredGridEnsembleFilter();
@@ -434,33 +480,85 @@ void MPipelineConfiguration::initializeLagrantoEnsemblePipeline(
 {
     MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
     MAbstractScheduler* scheduler = sysMC->getScheduler(schedulerID);
-    MAbstractMemoryManager* memoryManager =
-            sysMC->getMemoryManager(memoryManagerID);
+    MAbstractMemoryManager* memoryManager = sysMC->getMemoryManager(memoryManagerID);
 
     const QString dataSourceId = name;
     LOG4CPLUS_DEBUG(mlog, "Initializing LAGRANTO ensemble pipeline ''"
                     << dataSourceId.toStdString() << "'' ...");
 
     // Trajectory reader.
-    MTrajectoryReader *trajectoryReader =
-            new MTrajectoryReader(dataSourceId);
+    MTrajectoryReader *trajectoryReader = new MTrajectoryReader(dataSourceId);
     trajectoryReader->setMemoryManager(memoryManager);
     trajectoryReader->setScheduler(scheduler);
     trajectoryReader->setDataRoot(fileDir, "*");
-    sysMC->registerDataSource(dataSourceId + QString(" Reader"),
-                              trajectoryReader);
+    sysMC->registerDataSource(dataSourceId + QString(" Reader"), trajectoryReader);
+
+    // initialize trajectory pipeline
+    initializeEnsemblePipeline(dataSourceId, boundaryLayerTrajectories, trajectoryReader, scheduler, memoryManager);
+
+    LOG4CPLUS_DEBUG(mlog, "Pipeline ''" << dataSourceId.toStdString()
+                    << "'' has been initialized.");
+}
+
+
+void MPipelineConfiguration::initializeComputationEnsemblePipeline(
+        QString name,
+        bool boundaryLayerTrajectories,
+        QString schedulerID,
+        QString memoryManagerID,
+        QString resourceID,
+        QString variableU,
+        QString variableV,
+        QString variableP)
+{
+    MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
+    MAbstractScheduler* scheduler = sysMC->getScheduler(schedulerID);
+    MAbstractMemoryManager* memoryManager = sysMC->getMemoryManager(memoryManagerID);
+
+    const QString dataSourceId = name;
+    LOG4CPLUS_DEBUG(mlog, "Initializing COMPUTATION pipeline ''" << dataSourceId.toStdString() << "'' ...");
+
+    MWeatherPredictionDataSource* mwpResource = dynamic_cast<MWeatherPredictionDataSource*>(sysMC->getDataSource(resourceID));
+    if(!mwpResource)
+    {
+        LOG4CPLUS_WARN(mlog, "MWeatherPredictionDataSource ''" << resourceID.toStdString() << "'' is invalid; skipping.");
+        return;
+    }
+
+    MTrajectoryCalculator* trajectoryCalculator = new MTrajectoryCalculator(dataSourceId);
+    trajectoryCalculator->setMemoryManager(memoryManager);
+    trajectoryCalculator->setScheduler(scheduler);
+    trajectoryCalculator->setUVPVariables(variableU, variableV, variableP);
+    trajectoryCalculator->setInputSource(mwpResource);
+    sysMC->registerDataSource(dataSourceId + QString(" Reader"), trajectoryCalculator);
+
+    // initialize trajectory pipeline
+    initializeEnsemblePipeline(dataSourceId, boundaryLayerTrajectories, trajectoryCalculator, scheduler, memoryManager);
+
+    LOG4CPLUS_DEBUG(mlog, "Pipeline ''" << dataSourceId.toStdString() << "'' has been initialized.");
+}
+
+
+void MPipelineConfiguration::initializeEnsemblePipeline(
+        QString dataSourceId,
+        bool boundaryLayerTrajectories,
+        MTrajectoryDataSource* baseDataSource,
+        MAbstractScheduler* scheduler,
+        MAbstractMemoryManager* memoryManager)
+{
+    MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
 
     MDeltaPressurePerTrajectorySource *dpSource =
             new MDeltaPressurePerTrajectorySource();
     dpSource->setMemoryManager(memoryManager);
     dpSource->setScheduler(scheduler);
-    dpSource->setTrajectorySource(trajectoryReader);
+    dpSource->setTrajectorySource(baseDataSource);
 
     MThinOutTrajectoryFilter *thinoutFilter =
             new MThinOutTrajectoryFilter();
     thinoutFilter->setMemoryManager(memoryManager);
     thinoutFilter->setScheduler(scheduler);
-    thinoutFilter->setTrajectorySource(trajectoryReader);
+    thinoutFilter->setTrajectorySource(baseDataSource);
 
     MPressureTimeTrajectoryFilter *dpdtFilter =
             new MPressureTimeTrajectoryFilter();
@@ -474,24 +572,20 @@ void MPipelineConfiguration::initializeLagrantoEnsemblePipeline(
     bboxFilter->setMemoryManager(memoryManager);
     bboxFilter->setScheduler(scheduler);
     bboxFilter->setInputSelectionSource(dpdtFilter);
-    bboxFilter->setTrajectorySource(trajectoryReader);
+    bboxFilter->setTrajectorySource(baseDataSource);
 
-    MSingleTimeTrajectoryFilter *timestepFilter =
-            new MSingleTimeTrajectoryFilter();
+    MSingleTimeTrajectoryFilter *timestepFilter = new MSingleTimeTrajectoryFilter();
     timestepFilter->setMemoryManager(memoryManager);
     timestepFilter->setScheduler(scheduler);
     timestepFilter->setInputSelectionSource(dpdtFilter);
 //    timestepFilter->setInputSelectionSource(bboxFilter);
-    sysMC->registerDataSource(dataSourceId + QString(" timestepFilter"),
-                              timestepFilter);
+    sysMC->registerDataSource(dataSourceId + QString(" timestepFilter"), timestepFilter);
 
-    MTrajectoryNormalsSource *trajectoryNormals =
-            new MTrajectoryNormalsSource();
+    MTrajectoryNormalsSource *trajectoryNormals = new MTrajectoryNormalsSource();
     trajectoryNormals->setMemoryManager(memoryManager);
     trajectoryNormals->setScheduler(scheduler);
-    trajectoryNormals->setTrajectorySource(trajectoryReader);
-    sysMC->registerDataSource(dataSourceId + QString(" Normals"),
-                              trajectoryNormals);
+    trajectoryNormals->setTrajectorySource(baseDataSource);
+    sysMC->registerDataSource(dataSourceId + QString(" Normals"), trajectoryNormals);
 
     // Probability filter.
     MWeatherPredictionDataSource* pwcbSource;
@@ -501,7 +595,7 @@ void MPipelineConfiguration::initializeLagrantoEnsemblePipeline(
                 new MProbABLTrajectoriesSource();
         source->setMemoryManager(memoryManager);
         source->setScheduler(scheduler);
-        source->setTrajectorySource(trajectoryReader);
+        source->setTrajectorySource(baseDataSource);
         source->setInputSelectionSource(timestepFilter);
 
         pwcbSource = source;
@@ -512,7 +606,7 @@ void MPipelineConfiguration::initializeLagrantoEnsemblePipeline(
                 new MProbDFTrajectoriesSource();
         source->setMemoryManager(memoryManager);
         source->setScheduler(scheduler);
-        source->setTrajectorySource(trajectoryReader);
+        source->setTrajectorySource(baseDataSource);
         source->setInputSelectionSource(timestepFilter);
 
         pwcbSource = source;
@@ -527,11 +621,7 @@ void MPipelineConfiguration::initializeLagrantoEnsemblePipeline(
     probRegDetector->setInputSource(pwcbSource);
     sysMC->registerDataSource(dataSourceId + QString(" ProbReg"),
                               probRegDetector);
-
-    LOG4CPLUS_DEBUG(mlog, "Pipeline ''" << dataSourceId.toStdString()
-                    << "'' has been initialized.");
 }
-
 
 void MPipelineConfiguration::initializeDevelopmentDataPipeline()
 {

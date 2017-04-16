@@ -520,6 +520,7 @@ protected:
     friend class MClimateForecastReader; // NetCDF can read directly into data
                                          // fields.
     friend class MTrajectoryReader;
+    friend class MTrajectoryCalculator;
     friend class MNWPHorizontalSectionActor;
     friend class MNWPVerticalSectionActor;
     friend class MNWPSurfaceTopographyActor;

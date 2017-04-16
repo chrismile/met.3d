@@ -169,6 +169,20 @@ void MVolumeBoundingBoxActor::loadConfiguration(QSettings *settings)
     settings->endGroup();
 }
 
+QRectF MVolumeBoundingBoxActor::getBBox()
+{
+    return properties->mRectF()->value(boxCornersProperty);
+}
+
+double MVolumeBoundingBoxActor::getBottomPressure()
+{
+    return properties->mDDouble()->value(bottomPressureProperty);
+}
+
+double MVolumeBoundingBoxActor::getTopPressure()
+{
+    return properties->mDDouble()->value(topPressureProperty);
+}
 
 /******************************************************************************
 ***                          PROTECTED METHODS                              ***

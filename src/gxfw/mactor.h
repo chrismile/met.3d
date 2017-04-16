@@ -107,6 +107,12 @@ public:
       */
     bool isInitialized();
 
+
+    /**
+     * Returns whether the actor is enabled
+     */
+    bool isEnabled();
+
     /**
       Recompiles the actor's GLSL shaders. Needs to call
       @ref beginCompileShaders() and @ref endCompileShaders().
