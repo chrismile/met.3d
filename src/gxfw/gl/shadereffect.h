@@ -444,7 +444,7 @@ protected:
                             const int8_t cols, const int8_t rows,
                             const GLenum type, const qreal* data);
 
-    void setUniformMatrixXYf(const QString name, const int8_t count,
+    void setUniformMatrixXY(const QString name, const int8_t count,
                             const int8_t cols, const int8_t rows,
                             const GLenum type, const float* data);
 

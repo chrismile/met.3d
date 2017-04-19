@@ -32,8 +32,8 @@ include(../third-party/qt-solutions/qtpropertybrowser/src/qtpropertybrowser.pri)
 
 CONFIG += console
 
-QT += opengl core gui network xml concurrent
-greaterThan(QT_MAJOR_VERSION, 4): QT += widgets printsupport
+QT += opengl core gui network xml
+greaterThan(QT_MAJOR_VERSION, 4): QT += widgets printsupport concurrent
 
 HEADERS += \
     src/util/mstopwatch.h \

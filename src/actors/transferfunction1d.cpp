@@ -565,7 +565,7 @@ void MTransferFunction1D::loadConfiguration(QSettings *settings)
         {
             settings->setArrayIndex(i);
             float pos = settings->value("position", 0).toFloat();
-            float alpha = settings->value("alpha", QVariant::fromValue(Qt::black)).toFloat();
+            float alpha = settings->value("alpha", 0.0f).toFloat();
 
             alphaNodes->push_back(pos, alpha);
         }
