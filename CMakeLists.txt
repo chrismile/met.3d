@@ -50,6 +50,9 @@ add_definitions(-DENABLE_MET3D_STOPWATCH
                 -DQCUSTOMPLOT_USE_LIBRARY
                 -DNOMINMAX) # required for windows support
 
+set(CMAKE_CXX_STANDARD 11)
+
+
 # Add global options
 option(USE_CLANG "Build application with clang" OFF)
 
@@ -92,6 +95,7 @@ endif(UNIX)
 
 
 
+
 ##############################################################################
 #                      Create Configure File                                 #
 ##############################################################################
@@ -123,15 +127,21 @@ set(CMAKE_AUTOMOC ON) # instead of using the macro QT4_WRAP_CPP
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 cmake_policy(SET CMP0020 NEW)
 
-find_package(Qt4 4.8 REQUIRED QTCORE QTGUI QTOPENGL QTXML QTNETWORK)
-# Future: Change to Qt5.
-#find_package(Qt5Core REQUIRED)
-#find_package(Qt5Xml REQUIRED)
-#find_package(Qt5XmlPatterns REQUIRED)
-#find_package(Qt5Widgets REQUIRED)
+option(MET3D_FORCE_QT4 "Build with Qt4 even if Qt5 could be found." OFF)
 
-# Import Qt headers.
-INCLUDE(${QT_USE_FILE})
+if(NOT MET3D_FORCE_QT4)
+    find_package(Qt5 COMPONENTS Core Widgets Gui OpenGL Xml Network Concurrent)
+endif()
+
+if(MET3D_FORCE_QT4
+        OR NOT Qt5_FOUND)
+    find_package(Qt4 4.8 REQUIRED QTCORE QTGUI QTOPENGL QTXML QTNETWORK)
+    include(${QT_USE_FILE})
+    set(USE_QT4 TRUE)
+else()
+    set(USE_QT4 FALSE)
+endif()
+
 
 # Qt4 forms / designer forms
 file (GLOB_RECURSE  MET3D_UIS 	src/*.ui)
@@ -139,12 +149,17 @@ file (GLOB_RECURSE  MET3D_UIS 	src/*.ui)
 file (GLOB_RECURSE  MET3D_RCS   "../third-party/*.qrc"
 								"src/*.qrc")
 
-# Build cpp and header from UI forms
-qt4_wrap_ui(MET3D_UIS_H ${MET3D_UIS})
-# Add QT resources
-qt4_add_resources(MET3D_RC_SRCS ${MET3D_RCS})
-# Future: Change to Qt5.
-#qt5_use_modules(OpenGL Xml XmlPatterns)
+if(USE_QT4)
+    # Build cpp and header from UI forms
+    qt4_wrap_ui(MET3D_UIS_H ${MET3D_UIS})
+    # Add QT resources
+    qt4_add_resources(MET3D_RC_SRCS ${MET3D_RCS})
+else()
+    # Build cpp and header from UI forms
+    qt5_wrap_ui(MET3D_UIS_H ${MET3D_UIS})
+    # Add QT resources
+    qt5_add_resources(MET3D_RC_SRCS ${MET3D_RCS})
+endif()
 
 
 ##############################################################################
@@ -161,7 +176,7 @@ include_directories(${FREETYPE_INCLUDE_DIRS})
 
 # OpenGL packages
 find_package(OpenGL REQUIRED)
-find_package(GLU REQUIRED)
+#find_package(GLU REQUIRED)
 find_package(GLEW REQUIRED)
 # TODO: glew is not supported with OpenGL widget (which is deprecated anyway)
 include_directories(${GLEW_INCLUDE_DIRS})
@@ -236,6 +251,7 @@ file (GLOB          Met3D_Configs   config/*)
 
 # Third-party souce files.
 file (GLOB QT_PROPERTYBROWSER_Source ../third-party/qt-solutions/qtpropertybrowser/src/*)
+add_definitions(-DQT_DISABLE_DEPRECATED_BEFORE=0) # as in qtpropertybrowser.pri
 
 # Set filters.
 if (WIN32)
@@ -267,11 +283,6 @@ add_executable(Met3D # executable name
 
 # Link Qt4 and other libraries to executable.
 target_link_libraries(Met3D
-                        Qt4::QtCore
-                        Qt4::QtGui
-                        Qt4::QtOpenGL
-                        Qt4::QtXml
-                        Qt4::QtNetwork
                         ${FREETYPE_LIBRARIES}
                         ${OPENGL_gl_LIBRARY}
                         ${OPENGL_glu_LIBRARY}
@@ -286,6 +297,12 @@ target_link_libraries(Met3D
                         ${glfx_LIBRARIES}
                         #${EIGEN3_LIBRARIES}
   )
+
+if(USE_QT4)
+    target_link_libraries(Met3D Qt4::QtCore Qt4::QtGui Qt4::QtOpenGL Qt4::QtXml Qt4::QtNetwork)
+else()
+    qt5_use_modules(Met3D Core Widgets Gui OpenGL Xml Network Concurrent)
+endif()
 
 # Set command line arguments TODO does not work!
 #set_target_properties(Met3D PROPERTIES COMMAND_LINE_ARGUMENTS "--pipeline=config/pipeline.cfg --frontend=config/frontend.cfg")
