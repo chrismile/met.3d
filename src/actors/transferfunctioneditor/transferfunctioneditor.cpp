@@ -2130,10 +2130,12 @@ MChannelsWidget::MChannelsWidget(MEditorTransferFunction *transferFunction,
     this->setMinimumSize(500, 400);
 
     rgbPlot = new QCustomPlot();
-    rgbPlot->setMinimumSize(500, 200);
+    rgbPlot->setFixedWidth(500);
+    rgbPlot->setMinimumHeight(200);
 
     hclPlot = new QCustomPlot();
-    hclPlot->setMinimumSize(500, 200);
+    hclPlot->setFixedWidth(500);
+    hclPlot->setMinimumHeight(200);
 
     QVBoxLayout *layout = new QVBoxLayout();
     layout->addWidget(rgbPlot);
@@ -2143,6 +2145,8 @@ MChannelsWidget::MChannelsWidget(MEditorTransferFunction *transferFunction,
 
     rgbPlot->xAxis->setRange(0, 1);
     rgbPlot->yAxis->setRange(0, 1);
+    rgbPlot->yAxis2->setRange(0, 1);
+    rgbPlot->yAxis2->setVisible(true);
     hclPlot->xAxis->setRange(0, 1);
     hclPlot->yAxis->setRange(0, 100);
 
@@ -2174,6 +2178,23 @@ MChannelsWidget::MChannelsWidget(MEditorTransferFunction *transferFunction,
     hueGraph->setName("h");
     chromaGraph->setName("c");
     luminanceGraph->setName("l");
+
+    rgbPlot->replot();
+    hclPlot->replot();
+
+    // Calculate difference in position of the starting points of the x-axes of
+    // rgb and hcl plot to align left y-axes of the plots.
+    int posDifference = rgbPlot->xAxis->axisRect()->left()
+            - hclPlot->xAxis->axisRect()->left();
+
+    // Calculate difference in length of x-axes of rgb and hcl plot to align
+    // right y-axes of the plots considering changed padding of the hcl plot.
+    int lengthDifference = rgbPlot->xAxis->axisRect()->width()
+            - (hclPlot->xAxis->axisRect()->width() - posDifference);
+
+    // Change padding of the one y-axis per side to align the plots.
+    hclPlot->yAxis->setPadding(hclPlot->yAxis->padding() + posDifference);
+    rgbPlot->yAxis2->setPadding(rgbPlot->yAxis2->padding() + lengthDifference);
 }
 
 
