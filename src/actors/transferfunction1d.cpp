@@ -139,8 +139,8 @@ MTransferFunction1D::MTransferFunction1D()
     colourmapTypeProperty = addProperty(ENUM_PROPERTY, "colourmap type",
                                         actorPropertiesSupGroup);
 
-    QStringList cmapTypes = QStringList() << "predefined" << "HCL" << "HSV"
-                                          << "Editor";
+    QStringList cmapTypes = QStringList() << "HCL" << "Editor" << "predefined"
+                                          << "HSV";
 
     properties->mEnum()->setEnumNames(colourmapTypeProperty, cmapTypes);
 
@@ -624,12 +624,12 @@ void MTransferFunction1D::loadConfiguration(QSettings *settings)
     // Properties related to type of colourmap.
     // ========================================
     QString colourMapTypeString =
-            settings->value("colourMapType", "predefined").toString();
+            settings->value("colourMapType", "hcl").toString();
     MColourmapType cmaptype = stringToColourMapType(colourMapTypeString);
 
     switch (cmaptype)
     {
-    // Display error message and continue with colour map type equals predefined
+    // Display error message and continue with colour map type 'hcl'
     // initialisation.
     case INVALID:
     {
@@ -637,20 +637,12 @@ void MTransferFunction1D::loadConfiguration(QSettings *settings)
         msgBox.setIcon(QMessageBox::Warning);
         msgBox.setText(QString("Error reading configuration file: "
                                "Could not find colour map type '%1'.\n"
-                               "Setting colour map type to 'predefined'.")
+                               "Setting colour map type to 'hcl'.")
                        .arg(colourMapTypeString));
         msgBox.exec();
 
-        cmaptype = stringToColourMapType(QString("predefined"));
+        cmaptype = stringToColourMapType(QString("hcl"));
         // No break to continue directly with setting type to predefined.
-    }
-    case PREDEFINED:
-    {
-        selectPredefinedColourmap(settings->value("predefinedColourMap").toString(),
-                                  settings->value("reverseColourMap").toBool(),
-                                  settings->value("saturationAdjust").toInt(),
-                                  settings->value("lightnessAdjust").toInt());
-        break;
     }
     case HCL:
     {
@@ -669,12 +661,6 @@ void MTransferFunction1D::loadConfiguration(QSettings *settings)
                            settings->value("reverseColourMap").toBool());
         break;
     }
-    case HSV:
-    {
-        selectHSVColourmap(settings->value("vaporXMLFile").toString(),
-                           settings->value("reverseColourMap").toBool());
-        break;
-    }
     case EDITOR:
     {
         auto colourNodes = editor->getTransferFunction()->getColourNodes();
@@ -684,12 +670,13 @@ void MTransferFunction1D::loadConfiguration(QSettings *settings)
         alphaNodes->clear();
 
         int numColourNodes = settings->beginReadArray("colourNode");
-        for (int i=0; i < numColourNodes; i++)
+        for (int i = 0; i < numColourNodes; i++)
         {
             settings->setArrayIndex(i);
             float pos = settings->value("position", 0).toFloat();
 
-            QByteArray array = settings->value("colour", QByteArray()).toByteArray();
+            QByteArray array =
+                    settings->value("colour", QByteArray()).toByteArray();
             MColourXYZ64 colour;
             if (array.size() == sizeof(MColourXYZ64))
                 memcpy(&colour, array.data(), sizeof(MColourXYZ64));
@@ -708,8 +695,10 @@ void MTransferFunction1D::loadConfiguration(QSettings *settings)
         }
         settings->endArray();
         QString typeString =
-                settings->value("colourSpaceForColourNodeInterpolation", "hcl").toString();
-        ColourSpaceForColourNodeInterpolation type = editor->stringToInterpolationCSpace(typeString);
+                settings->value("colourSpaceForColourNodeInterpolation",
+                                "hcl").toString();
+        ColourSpaceForColourNodeInterpolation type =
+                editor->stringToInterpolationCSpace(typeString);
         // Display error message and set type to hcl for strings in configuration
         // not defining a type.
         if (type == ColourSpaceForColourNodeInterpolation::INVALID)
@@ -728,6 +717,20 @@ void MTransferFunction1D::loadConfiguration(QSettings *settings)
 
         editor->resetUI();
         selectEditor();
+        break;
+    }
+    case PREDEFINED:
+    {
+        selectPredefinedColourmap(settings->value("predefinedColourMap").toString(),
+                                  settings->value("reverseColourMap").toBool(),
+                                  settings->value("saturationAdjust").toInt(),
+                                  settings->value("lightnessAdjust").toInt());
+        break;
+    }
+    case HSV:
+    {
+        selectHSVColourmap(settings->value("vaporXMLFile").toString(),
+                           settings->value("reverseColourMap").toBool());
         break;
     }
     }

@@ -287,13 +287,13 @@ MEditorTransferFunction::MEditorTransferFunction()
 
     colourNodes.nodes =
     {
-        ColourNode(0.0, (MColourXYZ64)(MColourHCL16(6.f, 80.f, 28.f))),
-        ColourNode(1.0, (MColourXYZ64)(MColourHCL16(90.f, 5.f, 86.f)))
+        ColourNode(0.f, (MColourXYZ64)(MColourHCL16(6.f, 80.f, 28.f))),
+        ColourNode(1.f, (MColourXYZ64)(MColourHCL16(90.f, 5.f, 86.f)))
     };
     alphaNodes.nodes =
     {
-        AlphaNode(0.0, 1.0),
-        AlphaNode(1.0, 1.0)
+        AlphaNode(0.f, 1.f),
+        AlphaNode(1.f, 1.f)
     };
 }
 
