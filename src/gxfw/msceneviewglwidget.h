@@ -105,7 +105,7 @@ public:
 
     QSize sizeHint() const;
 
-    void setClearColor(const QColor &color);
+    void setBackgroundColour(const QColor &color);
 
     MSceneControl* getScene() { return scene; } // implicit inline
 
@@ -311,7 +311,7 @@ private:
     MSceneControl *scene;
 
     // Background colour.
-    QColor clearColor;
+    QColor backgroundColour;
 
     // Stores the position of the mourse cursor, used in the mouse??Event()
     // methods.
@@ -404,6 +404,7 @@ private:
     QtProperty *cameraAutoRotationModeProperty;
 
     QtProperty *renderingGroupProperty;
+    QtProperty *backgroundColourProperty;
     QtProperty *multisamplingProperty;
     QtProperty *antialiasingProperty;
     QtProperty *labelDepthTestProperty;

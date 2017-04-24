@@ -82,7 +82,7 @@ MSceneViewGLWidget::MSceneViewGLWidget()
     // Obtain a "personal" identification number.
     this->myID = MSceneViewGLWidget::idCounter++;
 
-    clearColor = QColor(240, 240, 255);
+    backgroundColour = QColor(240, 240, 255);
 
     pbot    = 1050.; // hPa
     ptop    = 20.;
@@ -263,6 +263,12 @@ MSceneViewGLWidget::MSceneViewGLWidget()
             ->addProperty("rendering");
     propertyGroup->addSubProperty(renderingGroupProperty);
 
+    backgroundColourProperty = systemControl->getColorPropertyManager()
+            ->addProperty("background colour");
+    systemControl->getColorPropertyManager()
+            ->setValue(backgroundColourProperty, backgroundColour);
+    renderingGroupProperty->addSubProperty(backgroundColourProperty);
+
     multisamplingProperty = systemControl->getBoolPropertyManager()
             ->addProperty("multisampling");
     systemControl->getBoolPropertyManager()
@@ -324,6 +330,9 @@ MSceneViewGLWidget::MSceneViewGLWidget()
             SIGNAL(propertyChanged(QtProperty*)),
             SLOT(onPropertyChanged(QtProperty*)));
     connect(systemControl->getClickPropertyManager(),
+            SIGNAL(propertyChanged(QtProperty*)),
+            SLOT(onPropertyChanged(QtProperty*)));
+    connect(systemControl->getColorPropertyManager(),
             SIGNAL(propertyChanged(QtProperty*)),
             SLOT(onPropertyChanged(QtProperty*)));
 
@@ -417,9 +426,9 @@ QSize MSceneViewGLWidget::sizeHint() const
 }
 
 
-void MSceneViewGLWidget::setClearColor(const QColor &color)
+void MSceneViewGLWidget::setBackgroundColour(const QColor &color)
 {
-    clearColor = color;
+    backgroundColour = color;
 #ifndef CONTINUOUS_GL_UPDATE
     updateGL();
 #endif
@@ -671,6 +680,13 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
 #ifndef CONTINUOUS_GL_UPDATE
         updateGL();
 #endif
+    }
+
+    else if (property == backgroundColourProperty)
+    {
+        setBackgroundColour(
+                MSystemManagerAndControl::getInstance()
+                ->getColorPropertyManager()->value(backgroundColourProperty));
     }
 
     else if (property == multisamplingProperty)
@@ -1055,7 +1071,7 @@ void MSceneViewGLWidget::paintGL()
     if (!isVisible()) return;
     if (freezeMode) return;
 
-    qglClearColor(clearColor);
+    qglClearColor(backgroundColour);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     // Status information: The "main" scene view instance measures frame rate.
