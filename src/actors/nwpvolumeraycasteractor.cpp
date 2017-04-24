@@ -154,13 +154,17 @@ MNWPVolumeRaycasterActor::OpenGL::OpenGL()
 
 MNWPVolumeRaycasterActor::BoundingBoxSettings::BoundingBoxSettings(
         MNWPVolumeRaycasterActor *hostActor)
-    : pBot_hPa(1050.),
+    : show(true),
+      pBot_hPa(1050.),
       pTop_hPa(100.)
 {
     MActor *a = hostActor;
     MQtProperties *properties = a->getQtProperties();
 
     groupProp = a->addProperty(GROUP_PROPERTY, "bounding box");
+
+    showProperty = a->addProperty(BOOL_PROPERTY, "show", groupProp);
+    properties->mBool()->setValue(showProperty, show);
 
     boxCornersProp = a->addProperty(RECTF_LONLAT_PROPERTY, "corners", groupProp);
     properties->setRectF(boxCornersProp, QRectF(-60., 30., 100., 40.), 2);
@@ -596,6 +600,7 @@ void MNWPVolumeRaycasterActor::saveConfiguration(QSettings *settings)
     // =====================
     settings->beginGroup("BoundingBox");
 
+    settings->setValue("show", bbSettings->show);
     settings->setValue("llcrnLat", bbSettings->llcrnLat);
     settings->setValue("llcrnLon", bbSettings->llcrnLon);
     settings->setValue("urcrnLat", bbSettings->urcrnLat);
@@ -704,6 +709,9 @@ void MNWPVolumeRaycasterActor::loadConfiguration(QSettings *settings)
     // bounding box settings
     // =====================
     settings->beginGroup("BoundingBox");
+
+    properties->mBool()->setValue(bbSettings->showProperty,
+                                  settings->value("show", true).toBool());
 
     bbSettings->llcrnLat = settings->value("llcrnLat").toFloat();
     bbSettings->llcrnLon = settings->value("llcrnLon").toFloat();
@@ -1195,6 +1203,13 @@ void MNWPVolumeRaycasterActor::onQtPropertyChanged(QtProperty* property)
         updateNextRenderFrame.set(UpdateShadowImage);
         updateNextRenderFrame.set(ComputeNCInitPoints);
         updateNextRenderFrame.set(RecomputeNCLines);
+
+        emitActorChangedSignal();
+    }
+
+    else if (property == bbSettings->showProperty)
+    {
+        bbSettings->show = properties->mBool()->value(bbSettings->showProperty);
 
         emitActorChangedSignal();
     }
@@ -1748,7 +1763,10 @@ void MNWPVolumeRaycasterActor::renderToCurrentContext(
 {     
     // Render volume bounding box
     // ==========================
-    renderBoundingBox(sceneView);
+    if (bbSettings->show)
+    {
+        renderBoundingBox(sceneView);
+    }
 
     // Check for valid actor variables.
     // ================================
@@ -2705,7 +2723,7 @@ void MNWPVolumeRaycasterActor::createShadowImage(
     glViewport(0,0,resX,resY);
 
     // clear framebuffer
-    glClearColor(0,0,0,0);
+    glClearColor(0, 0, 0, 0);
     glClear(GL_COLOR_BUFFER_BIT);
 
     // bind current buffers
