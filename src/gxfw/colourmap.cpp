@@ -142,6 +142,7 @@ void sRGB_to_XYZ(double R, double G, double B,
                         double XN, double YN, double ZN,
                         double *X, double *Y, double *Z)
 {
+    Q_UNUSED(XN); Q_UNUSED(ZN);
     double r, g, b;
     r = ftrans(R, 2.4);
     g = ftrans(G, 2.4);
