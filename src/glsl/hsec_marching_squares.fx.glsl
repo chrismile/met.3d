@@ -225,6 +225,19 @@ shader FSmain(out vec4 fragColour)
     fragColour = colour;
 }
 
+uniform sampler1D transferFunction; // 1D transfer function
+uniform float     scalarMinimum;    // min/max data values to scale to 0..1
+uniform float     scalarMaximum;
+
+shader FStransferfunction(out vec4 fragColour)
+{
+    // Scale the scalar range to 0..1.
+    float scalar = (isoValue - scalarMinimum) / (scalarMaximum - scalarMinimum);
+
+    // Fetch colour from the transfer function and apply shading term.
+    fragColour = texture(transferFunction, scalar);
+}
+
 
 /*****************************************************************************
  ***                             PROGRAMS
@@ -235,4 +248,12 @@ program Standard
     vs(420)=VSmain();
     gs(420)=GSmain() : in(points), out(line_strip, max_vertices = 4);
     fs(420)=FSmain();
+};
+
+
+program TransferFunction
+{
+    vs(420)=VSmain();
+    gs(420)=GSmain() : in(points), out(line_strip, max_vertices = 4);
+    fs(420)=FStransferfunction();
 };

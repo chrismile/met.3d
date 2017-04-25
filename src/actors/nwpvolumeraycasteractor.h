@@ -391,8 +391,8 @@ private:
                          TransferFuncShadingVar,
                          TransferFuncShadingVarMaxNeighbour };
 
-        IsoValueSettings(MNWPVolumeRaycasterActor *hostActor,
-                         const uint8_t index,
+        IsoValueSettings(MNWPVolumeRaycasterActor *hostActor = nullptr,
+                         const uint8_t index = 0,
                          bool _enabled = true,
                          float _isoValue = 0.5,
                          int decimals = 1,
@@ -436,12 +436,12 @@ private:
 
         MNWPVolumeRaycasterActor      *hostActor;
         // iso value settings from GUI
-        std::vector<IsoValueSettings>  isoValueSetList;
+        QVector<IsoValueSettings>  isoValueSetList;
         // list need to be sorted so that crossing levels work correct
-        std::vector<GLint>             isoEnabled;
-        std::vector<GLfloat>           isoValues;
-        std::vector<QVector4D>         isoColors;
-        std::vector<GLint>             isoColorTypes;
+        QVector<GLint>                 isoEnabled;
+        QVector<GLfloat>               isoValues;
+        QVector<QVector4D>             isoColors;
+        QVector<GLint>                 isoColorTypes;
 
         GLfloat                        stepSize;
         GLfloat                        interactionStepSize;

@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2015-2017 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -1003,7 +1004,36 @@ void MNWPVerticalSectionActor::renderToCurrentContext(MSceneViewGLWidget *sceneV
              (var->renderSettings.renderMode
               == MNWP2DSectionActorVariable::RenderMode::FilledAndLineContours) )
         {
-            marchingSquaresShader->bind();
+            if (var->renderSettings.contoursUseTF)
+            {
+                marchingSquaresShader->bindProgram("TransferFunction");
+
+                // Texture bindings for transfer function for data field (1D texture from
+                // transfer function class).
+                if (var->transferFunction != 0)
+                {
+                    var->transferFunction->getTexture()->bindToTextureUnit(
+                                var->textureUnitTransferFunction);
+                    marchingSquaresShader->setUniformValue(
+                                "transferFunction",
+                                var->textureUnitTransferFunction); CHECK_GL_ERROR;
+                    marchingSquaresShader->setUniformValue(
+                                "scalarMinimum",
+                                var->transferFunction->getMinimumValue()); CHECK_GL_ERROR;
+                    marchingSquaresShader->setUniformValue(
+                                "scalarMaximum",
+                                var->transferFunction->getMaximimValue()); CHECK_GL_ERROR;
+                }
+                // Don't draw anything if no transfer function is present.
+                else
+                {
+                    return;
+                }
+            }
+            else
+            {
+                marchingSquaresShader->bindProgram("Standard");
+            }
 
             marchingSquaresShader->setUniformValue(
                         "mvpMatrix", *(sceneView->getModelViewProjectionMatrix())); CHECK_GL_ERROR;
@@ -1038,43 +1068,34 @@ void MNWPVerticalSectionActor::renderToCurrentContext(MSceneViewGLWidget *sceneV
             // connected polygon is created).
             glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); CHECK_GL_ERROR;
 
-            // Loop over all iso values for which thin contour lines should be
-            // rendered -- one render pass per isovalue.
-            glLineWidth(var->thinContourThickness); CHECK_GL_ERROR;
-
-//TODO put this somewhere else (mr, 28Jan2013)
-            var->thinContoursStartIndex  = 0;
-            var->thinContoursStopIndex   = var->thinContourLevels.size();
-            var->thickContoursStartIndex = 0;
-            var->thickContoursStopIndex  = var->thickContourLevels.size();
-
-            marchingSquaresShader->setUniformValue(
-                        "colour", var->thinContourColour);  CHECK_GL_ERROR;
-            for (int i = var->thinContoursStartIndex;
-                 i < var->thinContoursStopIndex; i++)
+            // Loop over all contour sets.
+            foreach (MNWP2DSectionActorVariable::ContourSettings
+                     contourSet, var->contourSetList)
             {
-                marchingSquaresShader->setUniformValue(
-                            "isoValue", GLfloat(var->thinContourLevels.at(i)));
-                glDrawArraysInstanced(GL_POINTS,
-                                      var->gridVerticalLevelStart,
-                                      var->gridVerticalLevelCount - 1,
-                                      path.size() - 1); CHECK_GL_ERROR;
+                if (contourSet.enabled)
+                {
+                    glLineWidth(contourSet.thickness); CHECK_GL_ERROR;
+                    if (!var->renderSettings.contoursUseTF)
+                    {
+                        marchingSquaresShader->setUniformValue(
+                                    "colour", contourSet.colour); CHECK_GL_ERROR;
+                    }
+                    // Loop over all iso values for which contour lines should
+                    // be rendered -- one render pass per isovalue.
+                    for (int i = contourSet.startIndex;
+                         i < contourSet.stopIndex; i++)
+                    {
+                        marchingSquaresShader->setUniformValue(
+                                    "isoValue",
+                                    GLfloat(contourSet.levels.at(i)));
+                        CHECK_GL_ERROR;
+                        glDrawArraysInstanced(GL_POINTS,
+                                              var->gridVerticalLevelStart,
+                                              var->gridVerticalLevelCount - 1,
+                                              path.size() - 1); CHECK_GL_ERROR;
+                    }
+                }
             }
-
-            // The same for the thick iso lines.
-            glLineWidth(var->thickContourThickness); CHECK_GL_ERROR;
-            marchingSquaresShader->setUniformValue(
-                        "colour", var->thickContourColour);  CHECK_GL_ERROR;
-            for (int i = var->thickContoursStartIndex;
-                 i < var->thickContoursStopIndex; i++) {
-                marchingSquaresShader->setUniformValue(
-                            "isoValue", GLfloat(var->thickContourLevels.at(i)));
-                glDrawArraysInstanced(GL_POINTS,
-                                      var->gridVerticalLevelStart,
-                                      var->gridVerticalLevelCount - 1,
-                                      path.size() - 1); CHECK_GL_ERROR;
-            }
-
         } // marching squares shader
     } // for (variables)
 

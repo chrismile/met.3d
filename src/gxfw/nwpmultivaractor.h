@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2015-2017 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -141,6 +142,8 @@ public:
             MPropertyType::ChangeNotification ptype, void *value);
 
     bool isConnectedTo(MActor *actor) override;
+
+    QStringList configVersionID; // Version ID read in config file during loading.
 
 protected:
     friend class MNWPActorVariable;

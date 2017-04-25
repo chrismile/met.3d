@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2015-2017 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -44,6 +45,7 @@
 #include "gxfw/nwpmultivaractor.h"
 #include "gxfw/memberselectiondialog.h"
 #include "actors/nwpvolumeraycasteractor.h"
+#include "actors/nwphorizontalsectionactor.h"
 
 using namespace std;
 
@@ -1980,12 +1982,7 @@ MNWP2DSectionActorVariable::MNWP2DSectionActorVariable(
       textureTargetGrid(nullptr),
       textureUnitTargetGrid(-1),
       imageUnitTargetGrid(-1),
-      thinContoursStartIndex(0),
-      thinContoursStopIndex(0),
-      thickContoursStartIndex(0),
-      thickContoursStopIndex(0),
-      thinContourThickness(1.2),
-      thickContourThickness(2.)
+      renderContourLabels(0)
 {
     assert(actor != nullptr);
     MNWPMultiVarActor *a = actor;
@@ -2013,35 +2010,24 @@ MNWP2DSectionActorVariable::MNWP2DSectionActorVariable(
     properties->mEnum()->setEnumNames(
                 renderSettings.renderModeProperty, renderModeNames);
 
-    renderSettings.thinContourLevelsProperty = a->addProperty(
-                STRING_PROPERTY, "thin contour levels",
+    renderSettings.addContourSetProperty = a->addProperty(
+                CLICK_PROPERTY, "add contour set",
                 renderSettings.groupProperty);
 
-    renderSettings.thinContourThicknessProperty = a->addProperty(
-                DOUBLE_PROPERTY, "thin contour thickness",
-                renderSettings.groupProperty);
-    properties->setDouble(renderSettings.thinContourThicknessProperty,
-                          thinContourThickness, 0.1, 10.0, 2, 0.1);
-
-    renderSettings.thinContourColourProperty = a->addProperty(
-                COLOR_PROPERTY, "thin contour colour",
+    renderSettings.contourSetGroupProperty = a->addProperty(
+                GROUP_PROPERTY, "contour sets",
                 renderSettings.groupProperty);
 
-    renderSettings.thickContourLevelsProperty = a->addProperty(
-                STRING_PROPERTY, "thick contour levels",
-                renderSettings.groupProperty);
-
-    renderSettings.thickContourThicknessProperty = a->addProperty(
-                DOUBLE_PROPERTY, "thick contour thickness",
-                renderSettings.groupProperty);
-    properties->setDouble(renderSettings.thickContourThicknessProperty,
-                          thinContourThickness, 0.1, 10.0, 2, 0.1);
-
-    renderSettings.thickContourColourProperty = a->addProperty(
-                COLOR_PROPERTY, "thick contour colour",
-                renderSettings.groupProperty);
+    renderSettings.contoursUseTF = false;
+    renderSettings.contoursUseTFProperty = a->addProperty(
+                BOOL_PROPERTY, "use transfer function",
+                renderSettings.contourSetGroupProperty);
+    properties->mBool()->setValue(renderSettings.contoursUseTFProperty,
+                                  renderSettings.contoursUseTF);
 
     a->endInitialiseQtProperties();
+
+    addContourSet();
 }
 
 
@@ -2051,6 +2037,51 @@ MNWP2DSectionActorVariable::~MNWP2DSectionActorVariable()
         actor->releaseImageUnit(imageUnitTargetGrid);
     if (textureUnitTargetGrid >= 0)
         actor->releaseTextureUnit(textureUnitTargetGrid);
+}
+
+
+MNWP2DSectionActorVariable::ContourSettings::ContourSettings(
+        MActor *actor, const uint8_t index, bool enabled, QColor colour,
+        double thickness, bool labelsEnabled, QString levelsString)
+    : enabled(enabled),
+      levels(QVector<double>()),
+      colour(colour),
+      thickness(thickness),
+      labelsEnabled(labelsEnabled),
+      startIndex(0),
+      stopIndex(0)
+{
+    MQtProperties *properties = actor->getQtProperties();
+
+    actor->beginInitialiseQtProperties();
+
+    QString propertyTitle = QString("contour set #%1").arg(index  + 1);
+    groupProperty = actor->addProperty(GROUP_PROPERTY, propertyTitle);
+
+    enabledProperty = actor->addProperty(BOOL_PROPERTY, "enabled", groupProperty);
+    properties->mBool()->setValue(enabledProperty, enabled);
+
+    levelsProperty = actor->addProperty(STRING_PROPERTY, "levels", groupProperty);
+    properties->mString()->setValue(levelsProperty, levelsString);
+
+    thicknessProperty =
+            actor->addProperty(DOUBLE_PROPERTY, "thickness", groupProperty);
+    properties->setDouble(thicknessProperty, thickness, 0.1, 10.0, 2, 0.1);
+
+    colourProperty = actor->addProperty(COLOR_PROPERTY, "colour", groupProperty);
+    properties->mColor()->setValue(colourProperty, colour);
+
+    // Contour labels are only implemented for horizontal cross-section actors.
+    if (dynamic_cast<MNWPHorizontalSectionActor*>(actor))
+    {
+        labelsEnabledProperty = actor->addProperty(BOOL_PROPERTY, "labels",
+                                                   groupProperty);
+        properties->mBool()->setValue(labelsEnabledProperty, labelsEnabled);
+    }
+
+    removeProperty = actor->addProperty(CLICK_PROPERTY, "remove", groupProperty);
+
+    actor->endInitialiseQtProperties();
 }
 
 
@@ -2071,12 +2102,13 @@ void MNWP2DSectionActorVariable::initialize()
     MNWPActorVariable::initialize();
 
     MQtProperties *properties = actor->getQtProperties();
-    parseContourLevelString(properties->mString()->value(
-                                renderSettings.thinContourLevelsProperty),
-                            &thinContourLevels);
-    parseContourLevelString(properties->mString()->value(
-                                renderSettings.thickContourLevelsProperty),
-                            &thickContourLevels);
+    for (int i = 0; i < contourSetList.size(); i++)
+    {
+        ContourSettings *contours = &(contourSetList[i]);
+        parseContourLevelString(
+                    properties->mString()->value(contours->levelsProperty),
+                    contours);
+    }
 }
 
 
@@ -2109,64 +2141,114 @@ bool MNWP2DSectionActorVariable::onQtPropertyChanged(QtProperty *property)
         return false;
     }
 
-    else if (property == renderSettings.thinContourColourProperty)
-    {
-        thinContourColour = properties->mColor()->value(
-                    renderSettings.thinContourColourProperty);
-        return true; // redraw actor
-    }
-
-    else if (property == renderSettings.thinContourThicknessProperty)
-    {
-        thinContourThickness = properties->mDouble()->value(
-                    renderSettings.thinContourThicknessProperty);
-        return true; // redraw actor
-    }
-
-    else if (property == renderSettings.thinContourLevelsProperty)
-    {
-        QString cLevelStr = properties->mString()->value(
-                    renderSettings.thinContourLevelsProperty);
-        parseContourLevelString(cLevelStr, &thinContourLevels);
-
-        if (actor->suppressActorUpdates()) return false;
-
-        contourValuesUpdateEvent();
-        return true;
-    }
-
-    else if (property == renderSettings.thickContourColourProperty)
-    {
-        thickContourColour = properties->mColor()->value(
-                    renderSettings.thickContourColourProperty);
-        return true;
-    }
-
-    else if (property == renderSettings.thickContourThicknessProperty)
-    {
-        thickContourThickness = properties->mDouble()->value(
-                    renderSettings.thickContourThicknessProperty);
-        return true; // redraw actor
-    }
-
-    else if (property == renderSettings.thickContourLevelsProperty)
-    {
-        QString cLevelStr = properties->mString()->value(
-                    renderSettings.thickContourLevelsProperty);
-        parseContourLevelString(cLevelStr, &thickContourLevels);
-
-        if (actor->suppressActorUpdates()) return false;
-
-        contourValuesUpdateEvent();
-        return true;
-    }
-
     else if (property == renderSettings.renderModeProperty)
     {
         renderSettings.renderMode = static_cast<RenderMode::Type>(
                     properties->mEnum()->value(
                         renderSettings.renderModeProperty));
         return true;
+    }
+
+    else if (property == renderSettings.addContourSetProperty)
+    {
+        actor->enableEmissionOfActorChangedSignal(false);
+        addContourSet();
+        actor->enableEmissionOfActorChangedSignal(true);
+        return false; // no redraw necessary
+    }
+
+    else if (property == renderSettings.contoursUseTFProperty)
+    {
+        renderSettings.contoursUseTF =
+                properties->mBool()->value(renderSettings.contoursUseTFProperty);
+        return true; // redraw necessary
+    }
+
+    else
+    {
+        ContourSettings *contourSet = nullptr;
+        for (int index = 0; index < contourSetList.size(); index++)
+        {
+            contourSet = &contourSetList[index];
+
+            if (property == contourSet->enabledProperty)
+            {
+                contourSet->enabled = properties->mBool()->value(
+                            contourSet->enabledProperty);
+                if ( contourSet->labelsEnabled && contourSet->enabled )
+                {
+                    renderContourLabels++;
+                    updateContourLabels();
+                }
+                // Since labels are only visible if contour set and labels are
+                // enabled, we need to decrement the indicator only if labels
+                // are enabled.
+                else if ( contourSet->labelsEnabled )
+                {
+                    renderContourLabels--;
+                    if (renderContourLabels > 0)
+                    {
+                        updateContourLabels();
+                    }
+                }
+                return true;
+            }
+
+            if (property == contourSet->removeProperty)
+            {
+                return removeContourSet(index);
+            }
+
+            else if (property == contourSet->levelsProperty)
+            {
+                QString cLevelStr = properties->mString()->value(
+                            contourSet->levelsProperty);
+                parseContourLevelString(cLevelStr, contourSet);
+
+                if (actor->suppressActorUpdates()) return false;
+
+                contourValuesUpdateEvent(contourSet);
+                return true;
+            }
+
+            else if (property == contourSet->thicknessProperty)
+            {
+                contourSet->thickness = properties->mDouble()->value(
+                            contourSet->thicknessProperty);
+                return true;
+            }
+
+            else if (property == contourSet->colourProperty)
+            {
+                contourSet->colour = properties->mColor()->value(
+                            contourSet->colourProperty);
+
+                return true;
+            }
+
+            else if (property == contourSet->labelsEnabledProperty)
+            {
+                contourSet->labelsEnabled = properties->mBool()->value(
+                            contourSet->labelsEnabledProperty);
+                if ( contourSet->labelsEnabled && contourSet->enabled )
+                {
+                    renderContourLabels++;
+                    updateContourLabels();
+                }
+                // Since labels are only visible if contour set and labels are
+                // enabled, we need to decrement the indicator only if the
+                // contour set is enabled.
+                else if ( contourSet->enabled )
+                {
+                    renderContourLabels--;
+                    if (renderContourLabels > 0)
+                    {
+                        updateContourLabels();
+                    }
+                }
+                return true;
+            }
+        }
     }
 
     return false; // no redraw necessary
@@ -2182,15 +2264,23 @@ void MNWP2DSectionActorVariable::saveConfiguration(QSettings *settings)
     settings->setValue("renderMode",
                        renderModeToString(renderSettings.renderMode));
 
-    settings->setValue("thinContourColour", thinContourColour);
-    settings->setValue("thinContourThickness", thinContourThickness);
-    settings->setValue("thinContourLevels", properties->mString()->value(
-                           renderSettings.thinContourLevelsProperty));
-
-    settings->setValue("thickContourColour", thickContourColour);
-    settings->setValue("thickContourThickness", thickContourThickness);
-    settings->setValue("thickContourLevels", properties->mString()->value(
-                           renderSettings.thickContourLevelsProperty));
+    // Contour Sets.
+    //================
+    settings->beginWriteArray("contourSet", contourSetList.size());
+    settings->setValue("useTransferFunction", renderSettings.contoursUseTF);
+    int index = 0;
+    foreach (ContourSettings contourSet, contourSetList)
+    {
+        settings->setArrayIndex(index);
+        settings->setValue("enabled", contourSet.enabled);
+        settings->setValue("levels", properties->mString()->value(
+                               contourSet.levelsProperty));
+        settings->setValue("thickness", contourSet.thickness);
+        settings->setValue("colour", contourSet.colour);
+        settings->setValue("labelsEnabled", contourSet.labelsEnabled);
+        index++;
+    }
+    settings->endArray();
 }
 
 
@@ -2221,58 +2311,64 @@ void MNWP2DSectionActorVariable::loadConfiguration(QSettings *settings)
     properties->mEnum()->setValue(renderSettings.renderModeProperty,
                                   renderMode);
 
-    const QString thinContourLevs = settings->value("thinContourLevels").toString();
-    //parseContourLevelString(thinContourLevs, &thinContourLevels);
-    properties->mString()->setValue(renderSettings.thinContourLevelsProperty,
-                                    thinContourLevs);
+    // Contour Sets.
+    //================
+    foreach (ContourSettings contourSet, contourSetList)
+    {
+        renderSettings.contourSetGroupProperty->removeSubProperty(
+                    contourSet.groupProperty);
+    }
+    contourSetList.clear();
+    int numContourSet = settings->beginReadArray("contourSet");
+    properties->mBool()->setValue(
+                renderSettings.contoursUseTFProperty,
+                settings->value("useTransferFunction", false).toBool());
+    for (int i = 0; i < numContourSet; i++)
+    {
+        settings->setArrayIndex(i);
+        bool enabled = settings->value("enabled", true).toBool();
+        QString levels = settings->value("levels", "").toString();
+        double thickness = settings->value("thickness", 1.5).toDouble();
+        QColor colour = settings->value("colour",
+                                        QColor(0, 0, 0, 255)).value<QColor>();
+        bool labelsEnabled = settings->value("labelsEnabled", false).toBool();
+        addContourSet(enabled, colour, thickness, labelsEnabled, levels);
+    }
+    settings->endArray();
 
-    properties->mDouble()->setValue(renderSettings.thinContourThicknessProperty,
-                                     settings->value("thinContourThickness",
-                                                     1.2).toDouble());
+    // Thin and thick contour lines. (For compatibility with version < 1.2)
+    //=====================================================================
 
-    properties->mColor()->setValue(renderSettings.thinContourColourProperty,
-                                   settings->value("thinContourColour").value<QColor>());
+    if (actor->configVersionID[0].toInt() <= 1
+            && actor->configVersionID[1].toInt() < 2)
+    {
+        QString levels =
+                settings->value("thinContourLevels").toString();
 
-    const QString thickContourLevs = settings->value("thickContourLevels").toString();
-    //parseContourLevelString(thickContourLevs, &thickContourLevels);
-    properties->mString()->setValue(renderSettings.thickContourLevelsProperty,
-                                    thickContourLevs);
+        double thickness =
+                settings->value("thinContourThickness", 1.2).toDouble();
+        QColor colour = settings->value("thinContourColour",
+                                        QColor(0, 0, 0, 255)).value<QColor>();
 
-    properties->mDouble()->setValue(renderSettings.thickContourThicknessProperty,
-                                     settings->value("thickContourThickness",
-                                                     2.).toDouble());
-
-    properties->mColor()->setValue(renderSettings.thickContourColourProperty,
-                                   settings->value("thickContourColour").value<QColor>());
-
-
-// TODO (bt, 29NOV2016): Connect these variables to their ContourLevels
-// variable they belong to, so one can update these in parseContourLevelString()
-    // Update [thin/thick]Contours[Start/Stop]Index to avoid contours not being
-    // displayed if one loads config with given contour levels but with a render
-    // mode selected not displaying the contours. If one selects a render mode
-    // for contour lines without changing the contour levels meanwhile, the
-    // contours won't be displayed unless one changes the levels.
-    thinContoursStartIndex  = 0;
-    thinContoursStopIndex   = thinContourLevels.size();
-    thickContoursStartIndex = 0;
-    thickContoursStopIndex  = thickContourLevels.size();
-}
-
-
-void MNWP2DSectionActorVariable::setThinContourLevelsFromString(
-        QString cLevelStr)
-{
-    actor->getQtProperties()->mString()->setValue(
-                renderSettings.thinContourLevelsProperty, cLevelStr);
-}
+        addContourSet(true, colour, thickness, false, levels);
 
 
-void MNWP2DSectionActorVariable::setThickContourLevelsFromString(
-        QString cLevelStr)
-{
-    actor->getQtProperties()->mString()->setValue(
-            renderSettings.thickContourLevelsProperty, cLevelStr);
+        levels = settings->value("thickContourLevels").toString();
+        thickness = settings->value("thickContourThickness", 2.).toDouble();
+        colour = settings->value("thickContourColour",
+                                 QColor(0, 0, 0, 255)).value<QColor>();
+
+        addContourSet(true, colour, thickness, false, levels);
+
+        numContourSet = 2;
+    }
+
+    // If configuration file has no contour set setting defined, add one so
+    // that at least one contour sets setting is available.
+    if (numContourSet == 0)
+    {
+        addContourSet();
+    }
 }
 
 
@@ -2354,6 +2450,48 @@ MNWP2DSectionActorVariable::stringToRenderMode(QString renderModeName)
 }
 
 
+void MNWP2DSectionActorVariable::addContourSet(
+        const bool enabled, const QColor colour, const double thickness,
+        const bool labelsEnabled, QString levelString)
+{
+    ContourSettings contourSet(actor, contourSetList.size(), enabled, colour,
+                                thickness, labelsEnabled, levelString);
+    contourSetList.append(contourSet);
+    renderSettings.contourSetGroupProperty->addSubProperty(
+                contourSetList.back().groupProperty);
+
+}
+
+
+
+bool MNWP2DSectionActorVariable::removeContourSet(int index)
+{
+    ContourSettings *contourSet = &contourSetList[index];
+    // Redraw is only needed if contour sets to delete are enabled.
+    bool needsRedraw = contourSet->enabled;
+    // Avoid removing all contour sets.
+    if (contourSetList.size() > 1)
+    {
+        MQtProperties *properties = actor->getQtProperties();
+        properties->mBool()->setValue(contourSet->enabledProperty,
+                                      false);
+        renderSettings.contourSetGroupProperty->removeSubProperty(
+                    contourSet->groupProperty);
+        contourSetList.remove(index);
+    }
+    QString text = contourSet->groupProperty->propertyName();
+    text = text.mid(0, text.indexOf("#") + 1);
+    // Rename contour sets after deleted contour sets to
+    // close gap left by deleted contour sets.
+    for (; index < contourSetList.size(); index++)
+    {
+        contourSetList[index].groupProperty->setPropertyName(
+                    text + QString::number(index + 1));
+    }
+    return needsRedraw;
+}
+
+
 void MNWP2DSectionActorVariable::setRenderMode(
         MNWP2DSectionActorVariable::RenderMode::Type mode)
 {
@@ -2368,11 +2506,14 @@ void MNWP2DSectionActorVariable::setRenderMode(
 *******************************************************************************/
 
 bool MNWP2DSectionActorVariable::parseContourLevelString(
-        QString cLevelStr, QVector<double> *contourLevels)
+        QString cLevelStr, ContourSettings *contours)
 {
-    // Clear the current list of contour levels; if cLevelStr does not match
+    QVector<double> *contourSet = &(contours->levels);
+    contours->startIndex = 0;
+    contours->stopIndex = 0;
+    // Clear the current list of contour sets; if cLevelStr does not match
     // any accepted format no contours are drawn.
-    contourLevels->clear();
+    contourSet->clear();
 
     // Empty strings, i.e. no contour lines, are accepted.
     if (cLevelStr.isEmpty()) return true;
@@ -2394,10 +2535,11 @@ bool MNWP2DSectionActorVariable::parseContourLevelString(
         double step = rangeValues.value(3).toDouble(&ok);
 
         if (step > 0)
-            for (double d = from; d <= to; d += step) *contourLevels << d;
+            for (double d = from; d <= to; d += step) *contourSet << d;
         else if (step < 0)
-            for (double d = from; d >= to; d += step) *contourLevels << d;
+            for (double d = from; d >= to; d += step) *contourSet << d;
 
+        contours->stopIndex = contourSet->size();
         return true;
     }
     else if (rxList.indexIn(cLevelStr) == 0)
@@ -2406,8 +2548,9 @@ bool MNWP2DSectionActorVariable::parseContourLevelString(
 
         bool ok;
         for (int i = 0; i < listValues.size(); i++)
-            *contourLevels << listValues.value(i).toDouble(&ok);
+            *contourSet << listValues.value(i).toDouble(&ok);
 
+        contours->stopIndex = contourSet->size();
         return true;
     }
 
@@ -2437,7 +2580,6 @@ MNWP2DHorizontalActorVariable::MNWP2DHorizontalActorVariable(
       llcrnrlat(0),
       urcrnrlon(0),
       urcrnrlat(0),
-      contourLabelsEnabled(false),
       contourLabelSuffix("")
 {
     assert(actor != nullptr);
@@ -2451,12 +2593,8 @@ MNWP2DHorizontalActorVariable::MNWP2DHorizontalActorVariable(
     // Remove properties to place spatial transfer function selection propery
     // above them.
     renderGroup->removeSubProperty(renderSettings.renderModeProperty);
-    renderGroup->removeSubProperty(renderSettings.thinContourLevelsProperty);
-    renderGroup->removeSubProperty(renderSettings.thinContourThicknessProperty);
-    renderGroup->removeSubProperty(renderSettings.thinContourColourProperty);
-    renderGroup->removeSubProperty(renderSettings.thickContourLevelsProperty);
-    renderGroup->removeSubProperty(renderSettings.thickContourThicknessProperty);
-    renderGroup->removeSubProperty(renderSettings.thickContourColourProperty);
+    renderGroup->removeSubProperty(renderSettings.addContourSetProperty);
+    renderGroup->removeSubProperty(renderSettings.contourSetGroupProperty);
 
     QStringList renderModeNames =
             properties->getEnumItems(renderSettings.renderModeProperty);
@@ -2492,18 +2630,8 @@ MNWP2DHorizontalActorVariable::MNWP2DHorizontalActorVariable(
 
     // Re-add properties after spatial transfer function selection property.
     renderGroup->addSubProperty(renderSettings.renderModeProperty);
-    renderGroup->addSubProperty(renderSettings.thinContourLevelsProperty);
-    renderGroup->addSubProperty(renderSettings.thinContourThicknessProperty);
-    renderGroup->addSubProperty(renderSettings.thinContourColourProperty);
-    renderGroup->addSubProperty(renderSettings.thickContourLevelsProperty);
-    renderGroup->addSubProperty(renderSettings.thickContourThicknessProperty);
-    renderGroup->addSubProperty(renderSettings.thickContourColourProperty);
-
-
-
-    contourLabelsEnabledProperty = a->addProperty(
-                BOOL_PROPERTY, "(thin) contour labels",
-                renderGroup);
+    renderGroup->addSubProperty(renderSettings.addContourSetProperty);
+    renderGroup->addSubProperty(renderSettings.contourSetGroupProperty);
 
     contourLabelSuffixProperty = a->addProperty(
                 STRING_PROPERTY, "contour label suffix",
@@ -2547,7 +2675,6 @@ void MNWP2DHorizontalActorVariable::saveConfiguration(QSettings *settings)
     settings->setValue("spatialTransferFunction",
                        properties->getEnumItem(spatialTransferFunctionProperty));
 
-    settings->setValue("contourLabelsEnabled", contourLabelsEnabled);
     settings->setValue("contourLabelSuffix", contourLabelSuffix);
 }
 
@@ -2572,10 +2699,6 @@ void MNWP2DHorizontalActorVariable::loadConfiguration(QSettings *settings)
         msgBox.exec();
     }
 
-    contourLabelsEnabled = settings->value("contourLabelsEnabled").toBool();
-    properties->mBool()->setValue(contourLabelsEnabledProperty,
-                                  contourLabelsEnabled);
-
     contourLabelSuffix = settings->value("contourLabelSuffix").toString();
     properties->mString()->setValue(contourLabelSuffixProperty,
                                     contourLabelSuffix);
@@ -2588,17 +2711,7 @@ bool MNWP2DHorizontalActorVariable::onQtPropertyChanged(QtProperty *property)
 
     MQtProperties *properties = actor->getQtProperties();
 
-    if (property == contourLabelsEnabledProperty)
-    {
-        contourLabelsEnabled = properties->mBool()->value(
-                    contourLabelsEnabledProperty);
-
-        if (contourLabelsEnabled) updateContourLabels();
-
-        return true;
-    }
-
-    else if (property == contourLabelSuffixProperty)
+    if (property == contourLabelSuffixProperty)
     {
         contourLabelSuffix = properties->mString()->value(
                     contourLabelSuffixProperty);
@@ -2701,7 +2814,7 @@ void MNWP2DHorizontalActorVariable::computeRenderRegionParameters(
 
 
 void MNWP2DHorizontalActorVariable::updateContourIndicesFromTargetGrid(
-        float slicePosition_hPa)
+        float slicePosition_hPa, ContourSettings *contourSet)
 {
     // Download generated grid from GPU via imageStore() in vertex shader
     // and glGetTexImage() here.
@@ -2719,54 +2832,55 @@ void MNWP2DHorizontalActorVariable::updateContourIndicesFromTargetGrid(
     float tgmin = targetGrid2D->min();
     float tgmax = targetGrid2D->max();
 
-    thinContoursStartIndex = 0;
-    thinContoursStopIndex  = thinContourLevels.size();
+    // Update start and stop indices of contour sets.
 
-    int i = 0;
-    if (!thinContourLevels.isEmpty() && tgmin > thinContourLevels.last())
+    QVector<ContourSettings*> localContourSetList;
+    localContourSetList.clear();
+
+    // No contour sets given results in updating all levels available.
+    if (contourSet == nullptr)
     {
-        thinContoursStartIndex = thinContourLevels.size();
+        for (int i = 0; i < contourSetList.size(); i++)
+        {
+            localContourSetList.append(&contourSetList[i]);
+        }
     }
     else
     {
-        for (; i < thinContourLevels.size(); i++)
-            if (thinContourLevels[i] >= tgmin)
-            {
-                thinContoursStartIndex = i;
-                break;
-            }
-        for (; i < thinContourLevels.size(); i++)
-            if (thinContourLevels[i] > tgmax)
-            {
-                thinContoursStopIndex = i;
-                break;
-            }
+        localContourSetList.append(contourSet);
     }
 
-    thickContoursStartIndex = 0;
-    thickContoursStopIndex  = thickContourLevels.size();
-
-    i = 0;
-    if (!thickContourLevels.isEmpty() && tgmin > thickContourLevels.last())
+    foreach (ContourSettings *contourSet, localContourSetList)
     {
-        thickContoursStartIndex = thickContourLevels.size();
-    }
-    else
-    {
-        for (; i < thickContourLevels.size(); i++)
-            if (thickContourLevels[i] >= tgmin)
-            {
-                thickContoursStartIndex = i;
-                break;
-            }
-        for (; i < thickContourLevels.size(); i++)
-            if (thickContourLevels[i] > tgmax)
-            {
-                thickContoursStopIndex = i;
-                break;
-            }
-    }
+        contourSet->startIndex = 0;
+        contourSet->stopIndex  = contourSet->levels.size();
 
+        int i = 0;
+        if (!contourSet->levels.isEmpty()
+                && tgmin > contourSet->levels.last())
+        {
+            contourSet->startIndex = contourSet->levels.size();
+        }
+        else
+        {
+            for (; i < contourSet->levels.size(); i++)
+            {
+                if (contourSet->levels[i] >= tgmin)
+                {
+                    contourSet->startIndex = i;
+                    break;
+                }
+            }
+            for (; i < contourSet->levels.size(); i++)
+            {
+                if (contourSet->levels[i] > tgmax)
+                {
+                    contourSet->stopIndex = i;
+                    break;
+                }
+            }
+        }
+    }
     // Update contour labels.
     updateContourLabels();
 }
@@ -2925,9 +3039,10 @@ void MNWP2DHorizontalActorVariable::dataFieldChangedEvent()
 }
 
 
-void MNWP2DHorizontalActorVariable::contourValuesUpdateEvent()
+void MNWP2DHorizontalActorVariable::contourValuesUpdateEvent(
+        ContourSettings *levels)
 {
-    updateContourIndicesFromTargetGrid(targetGrid2D->levels[0]);
+    updateContourIndicesFromTargetGrid(targetGrid2D->levels[0], levels);
 }
 
 
@@ -2967,25 +3082,41 @@ void MNWP2DHorizontalActorVariable::updateContourLabels()
 
     // Step incrementation.
     int step = 1;
+    int contourSetIndex = 0;
 
-    // Step along all borders and search for potential iso-contours.
-    for (int i = thinContoursStartIndex; i < thinContoursStopIndex; ++i)
+    foreach (ContourSettings contourSet, contourSetList)
     {
-        float isoValue = thinContourLevels.at(i);
-
-        // Traverse grid downwards.
-        for (int j = minY + 1; j <= maxY; j += step)
+        // Skip labels of contour sets, which are not enabled or which
+        // labels are not enabled.
+        if (!(contourSet.enabled && contourSet.labelsEnabled))
         {
-            checkGridForContourLabel(targetGrid2D, j, minX, 1, 0, isoValue);
-            checkGridForContourLabel(targetGrid2D, j, maxX, 1, 0, isoValue);
+            contourSetIndex++;
+            continue;
         }
-
-        // Traverse grid rightwards.
-        for (int j = minX + 1; j <= maxX; j += step)
+        // Step along all borders and search for potential iso-contours.
+        for (int i = contourSet.startIndex; i < contourSet.stopIndex; ++i)
         {
-            checkGridForContourLabel(targetGrid2D, minY, j, 0, 1, isoValue);
-            checkGridForContourLabel(targetGrid2D, maxY, j, 0, 1, isoValue);
+            float isoValue = contourSet.levels.at(i);
+
+            // Traverse grid downwards.
+            for (int j = minY + 1; j <= maxY; j += step)
+            {
+                checkGridForContourLabel(targetGrid2D, j, minX, 1, 0, isoValue,
+                                         contourSetIndex);
+                checkGridForContourLabel(targetGrid2D, j, maxX, 1, 0, isoValue,
+                                         contourSetIndex);
+            }
+
+            // Traverse grid rightwards.
+            for (int j = minX + 1; j <= maxX; j += step)
+            {
+                checkGridForContourLabel(targetGrid2D, minY, j, 0, 1, isoValue,
+                                         contourSetIndex);
+                checkGridForContourLabel(targetGrid2D, maxY, j, 0, 1, isoValue,
+                                         contourSetIndex);
+            }
         }
+        contourSetIndex++;
     }
 }
 
@@ -2994,7 +3125,7 @@ void MNWP2DHorizontalActorVariable::checkGridForContourLabel(
         const MRegularLonLatGrid* grid,
         const int lat, const int lon,
         const int deltaLat, const int deltaLon,
-        const float isoValue)
+        const float isoValue, const int index)
 {
     // Check if there is any possible isovalue between two grid cells
     if (!isoLineInGridCell(targetGrid2D, lat - deltaLat, lon - deltaLon,
@@ -3014,7 +3145,7 @@ void MNWP2DHorizontalActorVariable::checkGridForContourLabel(
     float valuePrev = targetGrid2D->getValue(lat, lon);
     float valueNext = targetGrid2D->getValue(lat - deltaLat, lon - deltaLon);
 
-    addNewContourLabel(posPrev, posNext, valuePrev, valueNext, isoValue);
+    addNewContourLabel(posPrev, posNext, valuePrev, valueNext, isoValue, index);
 }
 
 
@@ -3033,7 +3164,8 @@ bool MNWP2DHorizontalActorVariable::isoLineInGridCell(
 
 void MNWP2DHorizontalActorVariable::addNewContourLabel(
         const QVector3D& posPrev, const QVector3D& posNext,
-        const float isoPrev, const float isoNext, const float isoValue)
+        const float isoPrev, const float isoNext, const float isoValue,
+        const int index)
 
 {
     // Compute interpolant.
@@ -3050,8 +3182,9 @@ void MNWP2DHorizontalActorVariable::addNewContourLabel(
                 tm->addText(
                     QString("%1 %2").arg(isoValue).arg(contourLabelSuffix),
                     MTextManager::LONLATP, pos.x(), pos.y(), pos.z(),
-                    16, thinContourColour, MTextManager::BASELINECENTRE,
-                    true, QColor(255, 255, 255, 200), 0.3)
+                    16, contourSetList[index].colour,
+                    MTextManager::BASELINECENTRE, true,
+                    QColor(255, 255, 255, 200), 0.3)
                 );
 }
 
@@ -3197,6 +3330,35 @@ void MNWP2DVerticalActorVariable::updateVerticalLevelRange(
         int k_top = grid->findLevel(0, 0, p_top_hPa);
         gridVerticalLevelStart = min(k_bot, k_top);
         gridVerticalLevelCount = abs(k_bot - k_top) + 1;
+    }
+}
+
+
+void MNWP2DVerticalActorVariable::contourValuesUpdateEvent(
+        ContourSettings *levels)
+{
+    // Update start and stop indices of contour sets.
+
+    QVector<ContourSettings*> localContourSetList;
+    localContourSetList.clear();
+
+    // If no contour sets are given, update all levels available.
+    if (levels == nullptr)
+    {
+        for (int i = 0; i < contourSetList.size(); i++)
+        {
+            localContourSetList.append(&contourSetList[i]);
+        }
+    }
+    else
+    {
+        localContourSetList.append(levels);
+    }
+
+    foreach (ContourSettings *contourSet, localContourSetList)
+    {
+        contourSet->startIndex = 0;
+        contourSet->stopIndex  = contourSet->levels.size();
     }
 }
 
