@@ -129,7 +129,8 @@ public slots:
       @todo Switch between linear lat/lon connections and great circles.
       */
     void generatePathFromWaypoints(QModelIndex mindex1=QModelIndex(),
-                                   QModelIndex mindex2=QModelIndex());
+                                   QModelIndex mindex2=QModelIndex(),
+                                   QGLWidget* currentGLContext = nullptr);
 
     void actOnWaypointInsertDelete(const QModelIndex &parent,
                                    int start, int end);

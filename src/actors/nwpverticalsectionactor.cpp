@@ -401,6 +401,10 @@ void MNWPVerticalSectionActor::setWaypointsModel(MWaypointsTableModel *model)
     }
     else
     {
+        // Remove labels -- otherwise labels of the previous waypoints model
+        // will remain visible.
+        removeAllLabels();
+
         // Set GUI property to "None".
         properties->setEnumItem(waypointsModelProperty, "None");
     }
@@ -525,7 +529,7 @@ void MNWPVerticalSectionActor::onQtPropertyChanged(QtProperty *property)
 
 
 void MNWPVerticalSectionActor::generatePathFromWaypoints(
-        QModelIndex mindex1, QModelIndex mindex2)
+        QModelIndex mindex1, QModelIndex mindex2, QGLWidget *currentGLContext)
 {
 //TODO: implement great circles.
     // Great circles (ECMWF seems to use a perfect sphere for the IFS):
@@ -762,7 +766,8 @@ void MNWPVerticalSectionActor::generatePathFromWaypoints(
     vbVerticalWaypointLines = new GL::MVector3DVertexBuffer(
                 QString("vbwp_%1").arg(myID),
                 verticesVerticalWaypointLines.size());
-    vbVerticalWaypointLines->upload(verticesVerticalWaypointLines);
+    vbVerticalWaypointLines->upload(verticesVerticalWaypointLines,
+                                    currentGLContext);
     // Required for the glDrawArrays() call in renderToCurrentContext().
     numVerticesVerticalWaypointLines = verticesVerticalWaypointLines.size();
 
@@ -771,10 +776,14 @@ void MNWPVerticalSectionActor::generatePathFromWaypoints(
     vbInteractionHandlePositions = new GL::MVector3DVertexBuffer(
                 QString("vbdhpos_%1").arg(myID),
                 verticesInteractionHandlePositions.size());
-    vbInteractionHandlePositions->upload(verticesInteractionHandlePositions);
+    vbInteractionHandlePositions->upload(verticesInteractionHandlePositions,
+                                         currentGLContext);
     numInteractionHandlePositions = verticesInteractionHandlePositions.size();
 
+    //NOTE: generateLabels() switches to the MGLResourcesManager OpenGL context,
+    // hence we need to switch back to the currentGLContext afterwards.
     generateLabels();
+    if (currentGLContext) currentGLContext->makeCurrent();
 
     emitActorChangedSignal();
 }
@@ -849,7 +858,7 @@ void MNWPVerticalSectionActor::renderToCurrentContext(MSceneViewGLWidget *sceneV
         // Prevent generatePathFromWaypoints() from emitting a signal.
         enableEmissionOfActorChangedSignal(false);
         updateVerticalLevelRange();
-        generatePathFromWaypoints();
+        generatePathFromWaypoints(QModelIndex(), QModelIndex(), sceneView);
         updatePath = false;
         enableEmissionOfActorChangedSignal(true);
     }
@@ -1366,6 +1375,13 @@ void MNWPVerticalSectionActor::generateLabels()
 void MNWPVerticalSectionActor::onDeleteActorVariable(MNWPActorVariable *var)
 {
     Q_UNUSED(var);
+
+    // Remove labels if no variable is left. (Since variable is deleted
+    // afterwards, current size() must be 1).
+    if (variables.size() == 1)
+    {
+        removeAllLabels();
+    }
 }
 
 
