@@ -1,7 +1,7 @@
 Met.3D Installation Guidelines.
 ===============================
 
-** NOTE: This file may be slightly out of date. Please refer to the online
+** NOTE: This file is slightly out of date. Please refer to the online
          documentation at http://met3d.readthedocs.org/ for the latest
          installation guidelines.
 
@@ -221,7 +221,7 @@ D) Checkout Met.3D from the GIT repository.
 
 The latest version of Met.3D can be checked out from
 
-               https://bitbucket.org/wxmetvis/met.3d/
+               https://gitlab.com/wxmetvis/met.3d/
 
 Place the repository into the "met.3d-base" base directory:
 

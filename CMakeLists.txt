@@ -54,12 +54,12 @@ option(USE_CLANG "Build application with clang" OFF)
 
 if (WIN32)
     # TODO: support for windows
-    set(EXECUTABLE_OUTPUT_PATH ${CMAKE_CURRENT_SOURCE_DIR}/build/win32 CACHE PATH "Build directory" FORCE)
+    #set(EXECUTABLE_OUTPUT_PATH ${CMAKE_CURRENT_SOURCE_DIR}/build/win32 CACHE PATH "Build directory" FORCE)
 endif (WIN32)
 
 if (UNIX)
-    set(EXECUTABLE_OUTPUT_PATH ${CMAKE_CURRENT_SOURCE_DIR}/build/unix CACHE PATH "Build directory" FORCE)
-    set(RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/build/unix)
+    #set(EXECUTABLE_OUTPUT_PATH ${CMAKE_CURRENT_SOURCE_DIR}/build/unix CACHE PATH "Build directory" FORCE)
+    #set(RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/build/unix)
     #set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/build/unix")
 endif(UNIX)
 

@@ -2,7 +2,7 @@ Met.3D -- 3D visualization of numerical ensemble weather prediction data
 ========================================================================
 
 *********************************************************************
-NEWS (July 2016): The Met.3D documentation is now available online at
+The current, up-to-date Met.3D documentation is available online at
 
                       http://met3d.readthedocs.org/
 
@@ -45,17 +45,18 @@ consumer (i.e. gaming) model works fine. Met.3D's current features include:
   including filled and line contours.
 * 3D isosurface volume renderer that supports multiple isosurfaces. Isosurfaces
   can be coloured according to an auxiliary variable.
+* 3D direction volume rendering.
 * Surface shadows and interactive vertical axes to improve spatial perception.
 * Navigation for forecast initialisation and valid time and ensemble member.
 * Interactive computation of ensemble statistical quantities (mean, standard
   deviation, probabilities, ...) of any ensemble data field.
 * 3D trajectory rendering for trajectories computed by the LAGRANTO model
-  (Sprenger and Wernli, Geosci. Model Devel. Discuss., 2015).
+  (Sprenger and Wernli, Geosci. Model Dev., 2015).
 * On-the-fly gridding of ensemble trajectories into 3D probability volumes.
 * Support for 3D model data that is regular in the horizontal. In the vertical,
   both pressure levels and in particular sigma-hybrid-pressure-levels (ECMWF
   model) are natively supported.
-* Data can be read from CF-compliant NetCDF files or ECMWF Grib files.
+* Data can be read from CF-compliant NetCDF files and from ECMWF GRIB files.
 * Interactive visual analysis of probability volumes.
 * Multithreaded data pipeline architecture.
 * Modular architecture designed to allow the straightforward implementation
@@ -65,7 +66,7 @@ consumer (i.e. gaming) model works fine. Met.3D's current features include:
 Documentation:
 ==============
 
-User guide: A short (and evolving) user guide (pdf) is available online at
+User guide: An evolving user guide is available online at
 
                       http://met3d.readthedocs.org/
 
@@ -91,6 +92,5 @@ A high-level description of the project can be found in the ECMWF Newsletter:
 Installation and configuration
 ==============================
 
-Installation and configuration notes can be found in the file "INSTALL" located
-in the same directory as this file, and online in the user documentation at
-http://met3d.readthedocs.org/.
+Installation and configuration notes can be found online in the user
+documentation at http://met3d.readthedocs.org/.

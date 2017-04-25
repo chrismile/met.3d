@@ -40,7 +40,7 @@
 ***                      VERSION INFORMATION                                ***
 *******************************************************************************/
 
-const QString met3dVersionString = "1.1.0-devel";
+const QString met3dVersionString = "1.1.0";
 const QString met3dBuildDate = QString("built on %1 %2").arg(__DATE__).arg(__TIME__);
 
 
