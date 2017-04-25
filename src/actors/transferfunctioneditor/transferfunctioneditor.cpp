@@ -1271,7 +1271,9 @@ MAlphaFunction::MAlphaFunction(
         QWidget *parent) :
     MAbstractFunction(transferFunction, transferFunction->getAlphaNodes(), parent),
     xRuler(xRuler),
-    yRuler(yRuler)
+    yRuler(yRuler),
+    posXNeighbourLeft(0.f),
+    posXNeighbourRight(1.f)
 {
     transferFunctionEditor = dynamic_cast<MTransferFunctionEditor*>(parent);
 }
