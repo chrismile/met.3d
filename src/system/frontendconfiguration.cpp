@@ -198,6 +198,8 @@ void MFrontendConfiguration::initializeFrontendFromConfigFile(
     QString mouseButtonZoom = config.value("mouseButtonZoom").toString();
     bool reverseDefaultZoomDirection = config.value(
                 "reverseDefaultZoomDirection").toBool();
+    bool reverseDefaultPanDirection = config.value(
+                "reverseDefaultPanDirection", false).toBool();
 
     if (mouseButtonRotate == "left")
         glRM->setGlobalMouseButtonRotate(Qt::LeftButton);
@@ -221,6 +223,7 @@ void MFrontendConfiguration::initializeFrontendFromConfigFile(
         glRM->setGlobalMouseButtonZoom(Qt::RightButton);
 
     glRM->reverseDefaultZoomDirection(reverseDefaultZoomDirection);
+    glRM->reverseDefaultPanDirection(reverseDefaultPanDirection);
 
     config.endGroup();
 

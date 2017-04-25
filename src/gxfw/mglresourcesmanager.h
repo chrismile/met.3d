@@ -330,6 +330,17 @@ public:
     void reverseDefaultZoomDirection(bool reverse)
     { isReverseCameraZoom = reverse; }
 
+    /**
+     Configure whether pan direction should be reversed. Default direction is
+     "mouse movement = scene movement" when holding right mouse button pressed
+     and if neither actor interaction mode nor analysis mode are active.
+
+     @see MSceneViewGLWidget::actorInteractionMode
+     @see MSceneViewGLWidget::analysisMode
+     */
+    void reverseDefaultPanDirection(bool reverse)
+    { isReverseCameraPan = reverse; }
+
 public slots:
     /**
       Updates the property labels that display the current memory usage. The
@@ -376,6 +387,7 @@ protected:
     Qt::MouseButton globalMouseButtonPan;
     Qt::MouseButton globalMouseButtonZoom;
     bool isReverseCameraZoom;
+    bool isReverseCameraPan;
 
 private:
     /**

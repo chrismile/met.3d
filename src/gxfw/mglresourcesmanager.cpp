@@ -72,6 +72,7 @@ MGLResourcesManager::MGLResourcesManager(const QGLFormat &format,
       globalMouseButtonPan(Qt::RightButton),
       globalMouseButtonZoom(Qt::MiddleButton),
       isReverseCameraZoom(false),
+      isReverseCameraPan(false),
       videoMemoryUsage_kb(0),
       selectSceneCentreActor(nullptr),
       selectSceneCentreText(nullptr)
