@@ -76,7 +76,7 @@ MNWPVolumeRaycasterActor::MNWPVolumeRaycasterActor()
     setName("Volume raycaster");
 
     QStringList modesLst;
-    modesLst << "standard" << "bitfield" << "DVR";
+    modesLst << "isosurface" << "bitfield" << "DVR";
     renderModeProp = addProperty(
                 ENUM_PROPERTY, "render mode", actorPropertiesSupGroup);
     properties->mEnum()->setEnumNames(renderModeProp, modesLst);
