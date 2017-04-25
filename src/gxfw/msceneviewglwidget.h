@@ -262,6 +262,8 @@ protected:
 
     void resizeGL(int width, int height);
 
+    void mouseDoubleClickEvent(QMouseEvent *event);
+
     void mousePressEvent(QMouseEvent *event);
 
     /**
