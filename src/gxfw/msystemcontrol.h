@@ -101,6 +101,8 @@ public:
 
     QtExtensions::QtClickPropertyManager* getClickPropertyManager();
 
+    QtColorPropertyManager* getColorPropertyManager();
+
     /**
       Returns a pointer to the label that displays render performances.
      */
@@ -200,6 +202,7 @@ private:
     QtEnumPropertyManager                *enumPropertyManager;
     QtStringPropertyManager              *stringPropertyManager;
     QtExtensions::QtClickPropertyManager *clickPropertyManager;
+    QtColorPropertyManager               *colorPropertyManager;
 
     QList<MSceneViewGLWidget*> registeredViews;
 

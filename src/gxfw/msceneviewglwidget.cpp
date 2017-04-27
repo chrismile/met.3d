@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2015-2017 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -311,6 +312,71 @@ MSceneViewGLWidget::MSceneViewGLWidget()
     renderingGroupProperty->addSubProperty(measureFPSProperty);
 #endif
 
+    // North arrow.
+    northArrow.enabled = true;
+    northArrow.scale = 1.;
+    northArrow.colour = QColor(222, 46, 30, 255);
+    northArrow.lon = 0.;
+    northArrow.lat = 0.;
+    northArrow.level = 0.;
+    northArrow.groupProperty = systemControl->getGroupPropertyManager()
+            ->addProperty("north arrow");
+    propertyGroup->addSubProperty(northArrow.groupProperty);
+
+    northArrow.enableProperty = systemControl->getBoolPropertyManager()
+            ->addProperty("enable");
+    systemControl->getBoolPropertyManager()
+            ->setValue(northArrow.enableProperty, northArrow.enabled);
+    northArrow.groupProperty->addSubProperty(northArrow.enableProperty);
+
+    northArrow.scaleProperty = systemControl->getDecoratedDoublePropertyManager()
+            ->addProperty("scale factor");
+    systemControl->getDecoratedDoublePropertyManager()
+            ->setValue(northArrow.scaleProperty, northArrow.scale);
+    systemControl->getDecoratedDoublePropertyManager()
+            ->setSingleStep(northArrow.scaleProperty, .1);
+    systemControl->getDecoratedDoublePropertyManager()
+            ->setDecimals(northArrow.scaleProperty, 2);
+    systemControl->getDecoratedDoublePropertyManager()
+            ->setMinimum(northArrow.scaleProperty, 0.01);
+    systemControl->getDecoratedDoublePropertyManager()
+            ->setMaximum(northArrow.scaleProperty, 100.);
+    northArrow.groupProperty->addSubProperty(northArrow.scaleProperty);
+
+    northArrow.lonPositionProperty =
+            systemControl->getDecoratedDoublePropertyManager()
+            ->addProperty("logitude position");
+    systemControl->getDecoratedDoublePropertyManager()
+            ->setValue(northArrow.lonPositionProperty, northArrow.lon);
+    systemControl->getDecoratedDoublePropertyManager()
+            ->setSingleStep(northArrow.lonPositionProperty, .1);
+    northArrow.groupProperty->addSubProperty(northArrow.lonPositionProperty);
+
+    northArrow.latPositionProperty =
+            systemControl->getDecoratedDoublePropertyManager()
+            ->addProperty("latitude position");
+    systemControl->getDecoratedDoublePropertyManager()
+            ->setValue(northArrow.latPositionProperty, northArrow.lat);
+    systemControl->getDecoratedDoublePropertyManager()
+            ->setSingleStep(northArrow.latPositionProperty, .1);
+    northArrow.groupProperty->addSubProperty(northArrow.latPositionProperty);
+
+    northArrow.levelPositionProperty =
+            systemControl->getDecoratedDoublePropertyManager()
+            ->addProperty("level");
+    systemControl->getDecoratedDoublePropertyManager()
+            ->setValue(northArrow.levelPositionProperty, northArrow.level);
+    systemControl->getDecoratedDoublePropertyManager()
+            ->setSingleStep(northArrow.levelPositionProperty, .1);
+    northArrow.groupProperty->addSubProperty(northArrow.levelPositionProperty);
+
+    northArrow.colourProperty = systemControl->getColorPropertyManager()
+            ->addProperty("colour");
+    systemControl->getColorPropertyManager()
+            ->setValue(northArrow.colourProperty, northArrow.colour);
+    northArrow.groupProperty->addSubProperty(northArrow.colourProperty);
+
+
     // Inform the scene view control about this scene view and connect to its
     // propertyChanged() signal.
     systemControl->registerSceneView(this);
@@ -324,6 +390,9 @@ MSceneViewGLWidget::MSceneViewGLWidget()
             SIGNAL(propertyChanged(QtProperty*)),
             SLOT(onPropertyChanged(QtProperty*)));
     connect(systemControl->getClickPropertyManager(),
+            SIGNAL(propertyChanged(QtProperty*)),
+            SLOT(onPropertyChanged(QtProperty*)));    
+    connect(systemControl->getColorPropertyManager(),
             SIGNAL(propertyChanged(QtProperty*)),
             SLOT(onPropertyChanged(QtProperty*)));
 
@@ -909,6 +978,64 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
         updateGL();
     }
 #endif
+
+    else if (property == northArrow.enableProperty)
+    {
+        northArrow.enabled = MSystemManagerAndControl::getInstance()
+                ->getBoolPropertyManager()->value(northArrow.enableProperty);
+#ifndef CONTINUOUS_GL_UPDATE
+        updateGL();
+#endif
+    }
+
+    else if (property == northArrow.scaleProperty)
+    {
+        northArrow.scale = MSystemManagerAndControl::getInstance()
+                ->getDecoratedDoublePropertyManager()
+                ->value(northArrow.scaleProperty);
+#ifndef CONTINUOUS_GL_UPDATE
+        updateGL();
+#endif
+    }
+
+    else if (property == northArrow.lonPositionProperty)
+    {
+        northArrow.lon = MSystemManagerAndControl::getInstance()
+                ->getDecoratedDoublePropertyManager()
+                ->value(northArrow.lonPositionProperty);
+#ifndef CONTINUOUS_GL_UPDATE
+        updateGL();
+#endif
+    }
+
+    else if (property == northArrow.latPositionProperty)
+    {
+        northArrow.lat = MSystemManagerAndControl::getInstance()
+                ->getDecoratedDoublePropertyManager()
+                ->value(northArrow.latPositionProperty);
+#ifndef CONTINUOUS_GL_UPDATE
+        updateGL();
+#endif
+    }
+
+    else if (property == northArrow.levelPositionProperty)
+    {
+        northArrow.level = MSystemManagerAndControl::getInstance()
+                ->getDecoratedDoublePropertyManager()
+                ->value(northArrow.levelPositionProperty);
+#ifndef CONTINUOUS_GL_UPDATE
+        updateGL();
+#endif
+    }
+
+    else if (property == northArrow.colourProperty)
+    {
+        northArrow.colour = MSystemManagerAndControl::getInstance()
+                ->getColorPropertyManager()->value(northArrow.colourProperty);
+#ifndef CONTINUOUS_GL_UPDATE
+        updateGL();
+#endif
+    }
 }
 
 
@@ -1003,6 +1130,15 @@ void MSceneViewGLWidget::initializeGL()
 #define FOCUSSHADER_VERTEX_ATTRIBUTE 0
     focusShader->bindAttributeLocation("vertex", FOCUSSHADER_VERTEX_ATTRIBUTE);
     focusShader->link();
+
+    MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
+    bool loadShaders = false;
+    loadShaders |= glRM->generateEffectProgram("north_arrow", northArrowShader);
+    if (loadShaders)
+    {
+        northArrowShader->compileFromFile_Met3DHome(
+                    "src/glsl/north_arrow.fx.glsl");
+    }
 
     // Initial OpenGL settings.
     glEnable(GL_DEPTH_TEST);
@@ -1194,6 +1330,24 @@ void MSceneViewGLWidget::paintGL()
         focusShader->setUniformValue("colourValue", QColor(Qt::red));
         glLineWidth(2);
         glDrawArrays(GL_LINE_LOOP, 0, 4);
+    }
+
+    if (northArrow.enabled)
+    {
+        glEnable(GL_CULL_FACE);
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+        northArrowShader->bind();
+        northArrowShader->setUniformValue("colour", northArrow.colour);
+        northArrowShader->setUniformValue("lightDirection", getLightDirection());
+        northArrowShader->setUniformValue("scale", GLfloat(northArrow.scale));
+        northArrowShader->setUniformValue("lon", GLfloat(northArrow.lon));
+        northArrowShader->setUniformValue("lat", GLfloat(northArrow.lat));
+        northArrowShader->setUniformValue("level", GLfloat(northArrow.level));
+        northArrowShader->setUniformValue("rotationMatrix", sceneRotationMatrix);
+        northArrowShader->setUniformValue("mvpMatrix",
+                                          modelViewProjectionMatrix);
+        glDrawArrays(GL_POINTS, 0, 1);
+        glDisable(GL_CULL_FACE);
     }
 
     // All actors have been rendered; they won't query this variable until the
