@@ -67,6 +67,7 @@ MSystemManagerAndControl::MSystemManagerAndControl(QWidget *parent) :
     enumPropertyManager            = new QtEnumPropertyManager(this);
     stringPropertyManager          = new QtStringPropertyManager(this);
     clickPropertyManager           = new QtClickPropertyManager(this);
+    colorPropertyManager           = new QtColorPropertyManager(this);
 
     // The sceneViewPropertiesBrowser needs "GUI editor factories" that provide
     // the required GUI elements (spin boxes, line edits, combo boxes, ...) for
@@ -77,6 +78,7 @@ MSystemManagerAndControl::MSystemManagerAndControl(QWidget *parent) :
             new QtDecoratedDoubleSpinBoxFactory(this);
     QtEnumEditorFactory *enumEditorFactory = new QtEnumEditorFactory(this);
     QtToolButtonFactory *toolButtonFactory = new QtToolButtonFactory(this);
+    QtColorEditorFactory *colorEditorFactory = new QtColorEditorFactory(this);
 
     // Properties of the scene view are displayed in a tree property browser
     // widget. Connect with the respective property managers (see
@@ -90,6 +92,8 @@ MSystemManagerAndControl::MSystemManagerAndControl(QWidget *parent) :
                 enumPropertyManager, enumEditorFactory);
     systemPropertiesBrowser->setFactoryForManager(
                 clickPropertyManager, toolButtonFactory);
+    systemPropertiesBrowser->setFactoryForManager(
+                colorPropertyManager, colorEditorFactory);
 
     // Mode for resizing the columns. Useful are QtTreePropertyBrowser::
     // ::ResizeToContents and ::Interactive
@@ -254,6 +258,12 @@ QtStringPropertyManager* MSystemManagerAndControl::getStringPropertyManager()
 QtClickPropertyManager* MSystemManagerAndControl::getClickPropertyManager()
 {
     return clickPropertyManager;
+}
+
+
+QtColorPropertyManager* MSystemManagerAndControl::getColorPropertyManager()
+{
+    return colorPropertyManager;
 }
 
 
