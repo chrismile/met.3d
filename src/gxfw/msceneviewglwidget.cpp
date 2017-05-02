@@ -82,7 +82,7 @@ MSceneViewGLWidget::MSceneViewGLWidget()
     // Obtain a "personal" identification number.
     this->myID = MSceneViewGLWidget::idCounter++;
 
-    backgroundColour = QColor(240, 240, 255);
+    backgroundColour = QColor(255, 255, 255);
 
     pbot    = 1050.; // hPa
     ptop    = 20.;
