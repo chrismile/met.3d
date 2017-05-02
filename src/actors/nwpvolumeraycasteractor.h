@@ -340,7 +340,7 @@ private:
     {
         BoundingBoxSettings(MNWPVolumeRaycasterActor *hostActor);
 
-        bool                show;
+        bool                enabled;
 
         // coordinates of bounding box
         GLfloat             llcrnLat;
@@ -354,7 +354,7 @@ private:
         // properties
         QtProperty*         groupProp;
 
-        QtProperty*         showProperty;
+        QtProperty*         enabledProperty;
 
         QtProperty*         boxCornersProp;
         QtProperty*         pBotProp;

@@ -154,7 +154,7 @@ MNWPVolumeRaycasterActor::OpenGL::OpenGL()
 
 MNWPVolumeRaycasterActor::BoundingBoxSettings::BoundingBoxSettings(
         MNWPVolumeRaycasterActor *hostActor)
-    : show(true),
+    : enabled(true),
       pBot_hPa(1050.),
       pTop_hPa(100.)
 {
@@ -163,8 +163,8 @@ MNWPVolumeRaycasterActor::BoundingBoxSettings::BoundingBoxSettings(
 
     groupProp = a->addProperty(GROUP_PROPERTY, "bounding box");
 
-    showProperty = a->addProperty(BOOL_PROPERTY, "show", groupProp);
-    properties->mBool()->setValue(showProperty, show);
+    enabledProperty = a->addProperty(BOOL_PROPERTY, "enabled", groupProp);
+    properties->mBool()->setValue(enabledProperty, enabled);
 
     boxCornersProp = a->addProperty(RECTF_LONLAT_PROPERTY, "corners", groupProp);
     properties->setRectF(boxCornersProp, QRectF(-60., 30., 100., 40.), 2);
@@ -600,7 +600,7 @@ void MNWPVolumeRaycasterActor::saveConfiguration(QSettings *settings)
     // =====================
     settings->beginGroup("BoundingBox");
 
-    settings->setValue("show", bbSettings->show);
+    settings->setValue("enabled", bbSettings->enabled);
     settings->setValue("llcrnLat", bbSettings->llcrnLat);
     settings->setValue("llcrnLon", bbSettings->llcrnLon);
     settings->setValue("urcrnLat", bbSettings->urcrnLat);
@@ -710,8 +710,8 @@ void MNWPVolumeRaycasterActor::loadConfiguration(QSettings *settings)
     // =====================
     settings->beginGroup("BoundingBox");
 
-    properties->mBool()->setValue(bbSettings->showProperty,
-                                  settings->value("show", true).toBool());
+    properties->mBool()->setValue(bbSettings->enabledProperty,
+                                  settings->value("enabled", true).toBool());
 
     bbSettings->llcrnLat = settings->value("llcrnLat").toFloat();
     bbSettings->llcrnLon = settings->value("llcrnLon").toFloat();
@@ -1207,9 +1207,9 @@ void MNWPVolumeRaycasterActor::onQtPropertyChanged(QtProperty* property)
         emitActorChangedSignal();
     }
 
-    else if (property == bbSettings->showProperty)
+    else if (property == bbSettings->enabledProperty)
     {
-        bbSettings->show = properties->mBool()->value(bbSettings->showProperty);
+        bbSettings->enabled = properties->mBool()->value(bbSettings->enabledProperty);
 
         emitActorChangedSignal();
     }
@@ -1763,7 +1763,7 @@ void MNWPVolumeRaycasterActor::renderToCurrentContext(
 {     
     // Render volume bounding box
     // ==========================
-    if (bbSettings->show)
+    if (bbSettings->enabled)
     {
         renderBoundingBox(sceneView);
     }
