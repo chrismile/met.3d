@@ -1448,8 +1448,19 @@ void MSceneViewGLWidget::mouseMoveEvent(QMouseEvent *event)
     else if (event->buttons() & glRM->globalMouseButtonPan)
     {
         // The right mouse button moves the camera around in the scene.
-        camera.moveUp(-dy/10./sensitivity, 1.);
-        camera.moveRight(dx/10./sensitivity);
+
+        if (glRM->isReverseCameraPan)
+        {
+            // Move camera with respect to the mouse movement.
+            camera.moveUp(dy/10./sensitivity, 1.);
+            camera.moveRight(-dx/10./sensitivity);
+        }
+        else
+        {
+            // Move scene with respect to the mouse movement.
+            camera.moveUp(-dy/10./sensitivity, 1.);
+            camera.moveRight(dx/10./sensitivity);
+        }
     }
 
     else if (event->buttons() & glRM->globalMouseButtonZoom)

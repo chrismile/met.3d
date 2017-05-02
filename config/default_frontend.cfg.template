@@ -19,6 +19,10 @@ size=1
 # buttons are "left", "middle", "right".
 mouseButtonRotate=left
 mouseButtonPan=right
+# Reverse the pan direction results in the camera moving with the mouse and
+# therefore the scene moves in the opposite direction. Default configuration is
+# the scene moving with the mouse.
+reverseDefaultPanDirection=false
 
 # Configure which mouse button is used to zoom. If set to "middle", the
 # mouse wheel is used to zoom; otherwise the specified button + move up/down
