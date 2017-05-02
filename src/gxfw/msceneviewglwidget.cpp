@@ -1279,6 +1279,14 @@ bool MSceneViewGLWidget::isViewPortResized()
 }
 
 
+void MSceneViewGLWidget::mouseDoubleClickEvent(QMouseEvent *event)
+{
+    Q_UNUSED(event);
+    // Toggle interaction mode.
+    setInteractionMode(!actorInteractionMode);
+}
+
+
 void MSceneViewGLWidget::mousePressEvent(QMouseEvent *event)
 {
     lastPos = event->pos();
