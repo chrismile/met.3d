@@ -642,7 +642,7 @@ void MTransferFunctionEditor::changeAlphaPos(double pos)
     alphaNormPosBox->setValue(normalizedPos);
     alphaNormPosBox->blockSignals(false);
 
-    alphaFunction->setSelectedX(normalizedPos);
+    alphaFunction->setSelectedX(float(normalizedPos));
     changeTransferFunction(false);
 }
 

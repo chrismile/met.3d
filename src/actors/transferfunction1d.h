@@ -171,8 +171,8 @@ private:
     void updateHSVProperties();
 
     // Type of colourmap.
-    enum MColourmapType { INVALID = -1, PREDEFINED = 0, HCL = 1, HSV = 2,
-                          EDITOR = 3 };
+    enum MColourmapType { INVALID = -1, HCL = 0, EDITOR = 1, PREDEFINED = 2,
+                          HSV = 3 };
 
     /** Returns the name of the given colour map type as QString. */
     QString colourMapTypeToString(MColourmapType colourMapType);

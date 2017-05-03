@@ -139,36 +139,16 @@ MTransferFunction1D::MTransferFunction1D()
     colourmapTypeProperty = addProperty(ENUM_PROPERTY, "colourmap type",
                                         actorPropertiesSupGroup);
 
-    QStringList cmapTypes = QStringList() << "predefined" << "HCL" << "HSV"
-                                          << "Editor";
+    QStringList cmapTypes = QStringList() << "HCL" << "Editor" << "predefined"
+                                          << "HSV";
 
     properties->mEnum()->setEnumNames(colourmapTypeProperty, cmapTypes);
-
-    // Predefined ...
-
-    predefCMapPropertiesSubGroup = addProperty(GROUP_PROPERTY, "predefined",
-                                               actorPropertiesSupGroup);
-    predefCMapPropertiesSubGroup->setEnabled(true);
-
-    QStringList availableColourmaps = colourmapPool.availableColourmaps();
-    availableColourmaps.sort();
-    predefColourmapProperty = addProperty(ENUM_PROPERTY, "colour map",
-                                          predefCMapPropertiesSubGroup);
-    properties->mEnum()->setEnumNames(predefColourmapProperty, availableColourmaps);
-
-    predefLightnessAdjustProperty = addProperty(INT_PROPERTY, "lightness",
-                                                predefCMapPropertiesSubGroup);
-    properties->mInt()->setValue(predefLightnessAdjustProperty, 0);
-
-    predefSaturationAdjustProperty = addProperty(INT_PROPERTY, "saturation",
-                                                 predefCMapPropertiesSubGroup);
-    properties->mInt()->setValue(predefSaturationAdjustProperty, 0);
 
     // HCL ...
 
     hclCMapPropertiesSubGroup = addProperty(GROUP_PROPERTY, "HCL",
                                             actorPropertiesSupGroup);
-    hclCMapPropertiesSubGroup->setEnabled(false);
+    hclCMapPropertiesSubGroup->setEnabled(true);
 
     QStringList hclTypes = QStringList() << "diverging" << "qualitative"
                                          << "sequential single hue"
@@ -176,6 +156,8 @@ MTransferFunction1D::MTransferFunction1D()
     hclTypeProperty = addProperty(ENUM_PROPERTY, "type",
                                   hclCMapPropertiesSubGroup);
     properties->mEnum()->setEnumNames(hclTypeProperty, hclTypes);
+    properties->mEnum()->setValue(hclTypeProperty,
+                                  MHCLType::SEQUENTIAL_MULTIPLE_HUE);
 
     hclHue1Property = addProperty(DOUBLE_PROPERTY, "hue 1",
                                   hclCMapPropertiesSubGroup);
@@ -183,31 +165,31 @@ MTransferFunction1D::MTransferFunction1D()
 
     hclHue2Property = addProperty(DOUBLE_PROPERTY, "hue 2",
                                   hclCMapPropertiesSubGroup);
-    properties->setDouble(hclHue2Property, 360., -360., 360., 1., 1.);
+    properties->setDouble(hclHue2Property, 90., -360., 360., 1., 1.);
 
     hclChroma1Property = addProperty(DOUBLE_PROPERTY, "chroma 1",
                                      hclCMapPropertiesSubGroup);
-    properties->setDouble(hclChroma1Property, 50., 0., 100., 1., 1.);
+    properties->setDouble(hclChroma1Property, 80., 0., 100., 1., 1.);
 
     hclChroma2Property = addProperty(DOUBLE_PROPERTY, "chroma 2",
                                      hclCMapPropertiesSubGroup);
-    properties->setDouble(hclChroma2Property, 50., 0., 100., 1., 1.);
+    properties->setDouble(hclChroma2Property, 30., 0., 100., 1., 1.);
 
     hclLuminance1Property = addProperty(DOUBLE_PROPERTY, "luminance 1",
                                         hclCMapPropertiesSubGroup);
-    properties->setDouble(hclLuminance1Property, 70., 0., 100., 1., 1.);
+    properties->setDouble(hclLuminance1Property, 30., 0., 100., 1., 1.);
 
     hclLuminance2Property = addProperty(DOUBLE_PROPERTY, "luminance 2",
                                         hclCMapPropertiesSubGroup);
-    properties->setDouble(hclLuminance2Property, 70., 0., 100., 1., 1.);
+    properties->setDouble(hclLuminance2Property, 90., 0., 100., 1., 1.);
 
     hclPower1Property = addProperty(DOUBLE_PROPERTY, "power 1/C",
                                     hclCMapPropertiesSubGroup);
-    properties->setDouble(hclPower1Property, 1., 0., 100., 2., 0.1);
+    properties->setDouble(hclPower1Property, .2, 0., 100., 2., 0.1);
 
     hclPower2Property = addProperty(DOUBLE_PROPERTY, "power 2/L",
                                     hclCMapPropertiesSubGroup);
-    properties->setDouble(hclPower2Property, 1., 0., 100., 2., 0.1);
+    properties->setDouble(hclPower2Property, 2., 0., 100., 2., 0.1);
 
     hclAlpha1Property = addProperty(DOUBLE_PROPERTY, "alpha 1",
                                     hclCMapPropertiesSubGroup);
@@ -224,6 +206,35 @@ MTransferFunction1D::MTransferFunction1D()
     updateHCLProperties();
 
 
+    // Editor
+    editorPropertiesSubGroup = addProperty(GROUP_PROPERTY, "Editor",
+                                            actorPropertiesSupGroup);
+    editorPropertiesSubGroup->setEnabled(false);
+
+    editorClickProperty = addProperty(CLICK_PROPERTY, "open",
+                                      editorPropertiesSubGroup);
+
+    // Predefined ...
+
+    predefCMapPropertiesSubGroup = addProperty(GROUP_PROPERTY, "predefined",
+                                               actorPropertiesSupGroup);
+    predefCMapPropertiesSubGroup->setEnabled(false);
+
+    QStringList availableColourmaps = colourmapPool.availableColourmaps();
+    availableColourmaps.sort();
+    predefColourmapProperty = addProperty(ENUM_PROPERTY, "colour map",
+                                          predefCMapPropertiesSubGroup);
+    properties->mEnum()->setEnumNames(predefColourmapProperty, availableColourmaps);
+
+    predefLightnessAdjustProperty = addProperty(INT_PROPERTY, "lightness",
+                                                predefCMapPropertiesSubGroup);
+    properties->mInt()->setValue(predefLightnessAdjustProperty, 0);
+
+    predefSaturationAdjustProperty = addProperty(INT_PROPERTY, "saturation",
+                                                 predefCMapPropertiesSubGroup);
+    properties->mInt()->setValue(predefSaturationAdjustProperty, 0);
+
+
     // HSV ...
 
     hsvCMapPropertiesSubGroup = addProperty(GROUP_PROPERTY, "HSV",
@@ -237,15 +248,6 @@ MTransferFunction1D::MTransferFunction1D()
                                               hsvCMapPropertiesSubGroup);
     properties->mString()->setValue(hsvVaporXMLFilenameProperty, "");
     hsvVaporXMLFilenameProperty->setEnabled(false);
-
-
-    // Editor
-    editorPropertiesSubGroup = addProperty(GROUP_PROPERTY, "Editor",
-                                            actorPropertiesSupGroup);
-    editorPropertiesSubGroup->setEnabled(false);
-
-    editorClickProperty = addProperty(CLICK_PROPERTY, "open",
-                                      editorPropertiesSubGroup);
 
 
     endInitialiseQtProperties();
@@ -598,38 +600,39 @@ void MTransferFunction1D::loadConfiguration(QSettings *settings)
 
     // Properties related to labelling the colour bar.
     // ===============================================
-    setNumTicks(settings->value("maxNumTicks").toInt());
-    setNumLabels(settings->value("maxNumLabels").toInt());
+    setNumTicks(settings->value("maxNumTicks", 11).toInt());
+    setNumLabels(settings->value("maxNumLabels", 6).toInt());
     properties->mDouble()->setValue(
                 tickWidthProperty,
-                settings->value("tickLength").toDouble());
+                settings->value("tickLength", 0.015).toDouble());
     properties->mDouble()->setValue(
                 labelSpacingProperty,
-                settings->value("labelSpacing").toDouble());
+                settings->value("labelSpacing", 0.01).toDouble());
     properties->mDouble()->setValue(
                 scaleFactorProperty,
-                settings->value("labelValueScaling").toDouble());
+                settings->value("labelValueScaling", 1.).toDouble());
 
     // Properties related to data range.
     // =================================
-    setValueDecimals(settings->value("valueDecimals").toInt());
-    setMinimumValue(settings->value("minimumValue").toFloat());
-    setMaximumValue(settings->value("maximumValue").toFloat());
-    setSteps(settings->value("numSteps").toInt());
+    setValueDecimals(settings->value("valueDecimals", 3).toInt());
+    setMinimumValue(settings->value("minimumValue", 203.15f).toFloat());
+    setMaximumValue(settings->value("maximumValue", 303.15f).toFloat());
+    setSteps(settings->value("numSteps", 50).toInt());
 
     // General properties.
     // ===================
-    setPosition(settings->value("position").toRectF());
+    setPosition(settings->value("position",
+                                QRectF(0.9, 0.9, 0.05, 0.5)).toRectF());
 
     // Properties related to type of colourmap.
     // ========================================
     QString colourMapTypeString =
-            settings->value("colourMapType", "predefined").toString();
+            settings->value("colourMapType", "hcl").toString();
     MColourmapType cmaptype = stringToColourMapType(colourMapTypeString);
 
     switch (cmaptype)
     {
-    // Display error message and continue with colour map type equals predefined
+    // Display error message and continue with colour map type 'hcl'
     // initialisation.
     case INVALID:
     {
@@ -637,42 +640,31 @@ void MTransferFunction1D::loadConfiguration(QSettings *settings)
         msgBox.setIcon(QMessageBox::Warning);
         msgBox.setText(QString("Error reading configuration file: "
                                "Could not find colour map type '%1'.\n"
-                               "Setting colour map type to 'predefined'.")
+                               "Setting colour map type to 'hcl'.")
                        .arg(colourMapTypeString));
         msgBox.exec();
 
-        cmaptype = stringToColourMapType(QString("predefined"));
+        cmaptype = stringToColourMapType(QString("hcl"));
         // No break to continue directly with setting type to predefined.
-    }
-    case PREDEFINED:
-    {
-        selectPredefinedColourmap(settings->value("predefinedColourMap").toString(),
-                                  settings->value("reverseColourMap").toBool(),
-                                  settings->value("saturationAdjust").toInt(),
-                                  settings->value("lightnessAdjust").toInt());
-        break;
     }
     case HCL:
     {
-        selectHCLColourmap(MHCLType(settings->value("hclType").toInt()),
-                           settings->value("hue1").toFloat(),
-                           settings->value("hue2").toFloat(),
-                           settings->value("chroma1").toFloat(),
-                           settings->value("chroma2").toFloat(),
-                           settings->value("luminance1").toFloat(),
-                           settings->value("luminance2").toFloat(),
-                           settings->value("power1").toFloat(),
-                           settings->value("power2").toFloat(),
-                           settings->value("alpha1").toFloat(),
-                           settings->value("alpha2").toFloat(),
-                           settings->value("poweralpha").toFloat(),
-                           settings->value("reverseColourMap").toBool());
-        break;
-    }
-    case HSV:
-    {
-        selectHSVColourmap(settings->value("vaporXMLFile").toString(),
-                           settings->value("reverseColourMap").toBool());
+        selectHCLColourmap(MHCLType(settings->value(
+                                        "hclType",
+                                        MHCLType::SEQUENTIAL_MULTIPLE_HUE)
+                                    .toInt()),
+                           settings->value("hue1", 0.f).toFloat(),
+                           settings->value("hue2", 90.f).toFloat(),
+                           settings->value("chroma1", 80.f).toFloat(),
+                           settings->value("chroma2", 30.f).toFloat(),
+                           settings->value("luminance1", 30.f).toFloat(),
+                           settings->value("luminance2", 90.f).toFloat(),
+                           settings->value("power1", .2f).toFloat(),
+                           settings->value("power2", 2.f).toFloat(),
+                           settings->value("alpha1", 1.f).toFloat(),
+                           settings->value("alpha2", 1.f).toFloat(),
+                           settings->value("poweralpha", 1.f).toFloat(),
+                           settings->value("reverseColourMap", false).toBool());
         break;
     }
     case EDITOR:
@@ -684,12 +676,13 @@ void MTransferFunction1D::loadConfiguration(QSettings *settings)
         alphaNodes->clear();
 
         int numColourNodes = settings->beginReadArray("colourNode");
-        for (int i=0; i < numColourNodes; i++)
+        for (int i = 0; i < numColourNodes; i++)
         {
             settings->setArrayIndex(i);
             float pos = settings->value("position", 0).toFloat();
 
-            QByteArray array = settings->value("colour", QByteArray()).toByteArray();
+            QByteArray array =
+                    settings->value("colour", QByteArray()).toByteArray();
             MColourXYZ64 colour;
             if (array.size() == sizeof(MColourXYZ64))
                 memcpy(&colour, array.data(), sizeof(MColourXYZ64));
@@ -708,8 +701,10 @@ void MTransferFunction1D::loadConfiguration(QSettings *settings)
         }
         settings->endArray();
         QString typeString =
-                settings->value("colourSpaceForColourNodeInterpolation", "hcl").toString();
-        ColourSpaceForColourNodeInterpolation type = editor->stringToInterpolationCSpace(typeString);
+                settings->value("colourSpaceForColourNodeInterpolation",
+                                "hcl").toString();
+        ColourSpaceForColourNodeInterpolation type =
+                editor->stringToInterpolationCSpace(typeString);
         // Display error message and set type to hcl for strings in configuration
         // not defining a type.
         if (type == ColourSpaceForColourNodeInterpolation::INVALID)
@@ -728,6 +723,25 @@ void MTransferFunction1D::loadConfiguration(QSettings *settings)
 
         editor->resetUI();
         selectEditor();
+        break;
+    }
+    case PREDEFINED:
+    {
+        QStringList availableColourmaps = colourmapPool.availableColourmaps();
+        availableColourmaps.sort();
+        selectPredefinedColourmap(settings->value(
+                                      "predefinedColourMap",
+                                      availableColourmaps.at(0)).toString(),
+                                  settings->value("reverseColourMap",
+                                                  false).toBool(),
+                                  settings->value("saturationAdjust", 0).toInt(),
+                                  settings->value("lightnessAdjust", 0).toInt());
+        break;
+    }
+    case HSV:
+    {
+        selectHSVColourmap(settings->value("vaporXMLFile", "").toString(),
+                           settings->value("reverseColourMap", false).toBool());
         break;
     }
     }
