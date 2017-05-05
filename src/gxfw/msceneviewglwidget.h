@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2015-2017 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -375,6 +376,7 @@ private:
     QMatrix4x4 sceneNorthWestRotationMatrix;
 
     QGLShaderProgram *focusShader;
+    std::shared_ptr<GL::MShaderEffect> northArrowShader;
 
     // In modification mode, stores the currently picked actor.
     PickActor pickedActor;
@@ -416,6 +418,27 @@ private:
     QtProperty *labelDepthTestProperty;
     QtProperty *lightingProperty;
     QtProperty *verticalScalingProperty;
+
+    struct NorthArrow
+    {
+      NorthArrow() {}
+
+      QtProperty *groupProperty;
+      QtProperty *enabledProperty;
+      QtProperty *colourProperty;
+      QtProperty *scaleProperty;
+      QtProperty *lonPositionProperty;
+      QtProperty *latPositionProperty;
+      QtProperty *worldZPositionProperty;
+
+      bool enabled;
+      QColor colour;
+      double scale;
+      double lon;
+      double lat;
+      double worldZ;
+    };
+    NorthArrow northArrow;
 
     bool measureFPS;
     uint measureFPSFrameCount;
