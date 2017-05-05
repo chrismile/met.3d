@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2015-2017 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -219,6 +220,16 @@ void MNWPMultiVarActor::loadConfiguration(QSettings *settings)
 
         delete var;
     }
+
+    // Read version id of config file.
+    // ===============================
+
+    settings->beginGroup("FileFormat");
+
+    configVersionID =
+            (settings->value("met3dVersion", "0.0.0").toString()).split(".");
+
+    settings->endGroup();
 
     // Read MNWPMultiVarActor specific properties.
     // ===========================================

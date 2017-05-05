@@ -642,7 +642,7 @@ void MNWPVolumeRaycasterActor::saveConfiguration(QSettings *settings)
 
     for (unsigned int i = 0; i < rayCasterSettings->isoValueSetList.size(); ++i)
     {
-        IsoValueSettings& setting =  rayCasterSettings->isoValueSetList.at(i);
+        IsoValueSettings& setting =  rayCasterSettings->isoValueSetList[i];
 
         settings->beginGroup(QString("isoValue%1").arg(i));
 
@@ -766,7 +766,7 @@ void MNWPVolumeRaycasterActor::loadConfiguration(QSettings *settings)
     // Remove current isovalue properties.
     for (uint i = 0; i < rayCasterSettings->isoValueSetList.size(); ++i)
     {
-        IsoValueSettings& setting = rayCasterSettings->isoValueSetList.at(i);
+        IsoValueSettings& setting = rayCasterSettings->isoValueSetList[i];
         rayCasterSettings->isoValuesProp->removeSubProperty(setting.groupProp);
     }
     rayCasterSettings->isoValueSetList.clear();

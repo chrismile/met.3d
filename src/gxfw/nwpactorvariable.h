@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2015-2017 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -291,7 +292,6 @@ protected:
     virtual void asynchronousDataAvailableEvent(MStructuredGrid *grid)
     { Q_UNUSED(grid); }
 
-    // todo move cpp implementation accordingly
     virtual bool setTransferFunctionFromProperty();
 
     /** Actor that this instance belongs to. */
@@ -407,26 +407,53 @@ public:
 
     void loadConfiguration(QSettings *settings) override;
 
-    void setThinContourLevelsFromString(QString cLevelStr);
-
-    void setThickContourLevelsFromString(QString cLevelStr);
-
     MRegularLonLatGrid *targetGrid2D;
     GL::MTexture        *textureTargetGrid;
     int                 textureUnitTargetGrid;
     int                 imageUnitTargetGrid;
 
-    QVector<double> thinContourLevels;
-    QColor          thinContourColour;
-    QVector<double> thickContourLevels;
-    QColor          thickContourColour;
-    int thinContoursStartIndex;
-    int thinContoursStopIndex;
-    int thickContoursStartIndex;
-    int thickContoursStopIndex;
+    struct ContourSettings
+    {
 
-    double thinContourThickness;
-    double thickContourThickness;
+        ContourSettings(MActor *actor = nullptr,
+                         const uint8_t index = 0,
+                         bool enabled = true,
+                         QColor colour = QColor(0, 0, 0, 255),
+                         double thickness = 1.5,
+                         bool labelsEnabled = false,
+                         QString levelsString = "");
+
+        bool            enabled;
+        QVector<double> levels;
+        QColor          colour;
+        double          thickness;
+        bool            labelsEnabled;
+        int             startIndex;
+        int             stopIndex;
+
+        QtProperty *groupProperty;
+        QtProperty *enabledProperty;
+        QtProperty *levelsProperty;
+        QtProperty *thicknessProperty;
+        QtProperty *colourProperty;
+        QtProperty *labelsEnabledProperty;
+        QtProperty *removeProperty;
+    };
+
+    /**
+      Indicator whether to render contour labels. It is incremented if user
+      enables labels for a contour set and decremented if user disables labels
+      for a contour set. If renderContourLabel equals 0, no labels should be
+      drawn.
+      */
+    int renderContourLabels;
+
+    void addContourSet(const bool enabled = true,
+            const QColor colour = QColor(0, 0, 0, 255),
+            const double thickness = 1.5, const bool labelsEnabled = false,
+            QString levelString = "");
+
+    bool removeContourSet(int index);
 
     struct RenderMode
     {
@@ -465,15 +492,18 @@ protected:
       "[0,100,10]" or "[0.5,10,0.5]", or a list of values as
       "val1,val2,val3,...", e.g. "1,2,3,4,5" or "0,0.5,1,1.5,5,10". If either
       of the two formats was successfully parsed, the extracted values are
-      written to @p contourLevels and @p true is returned.
+      written to @p contours and @p true is returned.
      */
     bool parseContourLevelString(QString cLevelStr,
-                                 QVector<double> *contourLevels);
+                                 ContourSettings *contours);
 
     /**
       Called when the contour values are updated.
      */
-    virtual void contourValuesUpdateEvent() { }
+    virtual void contourValuesUpdateEvent(
+            ContourSettings *levels) { Q_UNUSED(levels) }
+
+    virtual void updateContourLabels() { }
 
     struct RenderSettings
     {
@@ -481,17 +511,17 @@ protected:
 
         RenderMode::Type renderMode;
 
+        bool contoursUseTF;
+
         QtProperty *groupProperty;
         QtProperty *renderModeProperty;
-        QtProperty *thinContourLevelsProperty;
-        QtProperty *thinContourThicknessProperty;
-        QtProperty *thinContourColourProperty;
-        QtProperty *thickContourLevelsProperty;
-        QtProperty *thickContourThicknessProperty;
-        QtProperty *thickContourColourProperty;
+        QtProperty *addContourSetProperty;
+        QtProperty *contourSetGroupProperty;
+        QtProperty *contoursUseTFProperty;
     };
 
-    RenderSettings renderSettings;
+    RenderSettings renderSettings;    
+    QVector<ContourSettings> contourSetList;
 
 private:
     QtProperty *varDebugPropertyGroup;
@@ -528,7 +558,8 @@ public:
     void computeRenderRegionParameters(double llcrnrlon, double llcrnrlat,
                                        double urcrnrlon, double urcrnrlat);
 
-    void updateContourIndicesFromTargetGrid(float slicePosition_hPa);
+    void updateContourIndicesFromTargetGrid(float slicePosition_hPa,
+            ContourSettings *contourSet = nullptr);
 
     /**
      * Returns the contour labels of each variable that can be rendered on the screen.
@@ -552,7 +583,7 @@ protected:
 
     void dataFieldChangedEvent() override;
 
-    void contourValuesUpdateEvent() override;
+    void contourValuesUpdateEvent(ContourSettings *levels) override;
 
     /** Render region parameters; stores the index range of the data grid
         that is rendered for the current bbox. */
@@ -566,8 +597,6 @@ protected:
     double urcrnrlat;
 
     /** Properties of the contour labels */
-    QtProperty* contourLabelsEnabledProperty;
-    bool contourLabelsEnabled;
     QtProperty* contourLabelSuffixProperty;
     QString contourLabelSuffix;
 
@@ -580,7 +609,7 @@ protected:
       Searches for potential iso-label position and determines which labels are
       drawn.
      */
-    void updateContourLabels();
+    void updateContourLabels() override;
 
     /**
      Checks if a given cell contains an isoline for the given isovalue @p iso.
@@ -594,7 +623,7 @@ protected:
      */
     void addNewContourLabel(const QVector3D& posPrev, const QVector3D& posNext,
                             const float isoPrev, const float isoNext,
-                            const float isoValue);
+                            const float isoValue, const int index);
 
     /**
      Samples the grid at grid cell lat/lon and searches for a new contour
@@ -603,7 +632,7 @@ protected:
     void checkGridForContourLabel(const MRegularLonLatGrid* grid,
                                   const int lat, const int lon,
                                   const int deltaLat, const int deltaLon,
-                                  const float isoValue);
+                                  const float isoValue, const int index);
 
 private:
 
@@ -624,6 +653,8 @@ protected:
     friend class MNWPVerticalSectionActor;
 
     void dataFieldChangedEvent() override;
+
+    void contourValuesUpdateEvent(ContourSettings *levels) override;
 
     /**
      Compute the vertical levels that need to be rendered to cover the range

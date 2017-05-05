@@ -669,7 +669,6 @@ bool MTrajectoryActor::synchronizationEvent(
     }
     case SYNC_VALID_TIME:
     {
-        // todo Adapt to fit trajectory time as well
         if (!synchronizeStartTime && !synchronizeParticlePosTime)
         {
             return false;
@@ -694,7 +693,6 @@ bool MTrajectoryActor::synchronizationEvent(
     }
     case SYNC_INIT_VALID_TIME:
     {
-        // todo Adapt to fit trajectory time as well
         enableActorUpdates(false);
         bool newInitTimeSet = false;
         bool newStartTimeSet = false;
