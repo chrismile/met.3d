@@ -1411,7 +1411,7 @@ void MNWPHorizontalSectionActor::renderFilledContours(
         glFilledContoursShader->setUniformValue(
                     "scalarMinimum", var->transferFunction->getMinimumValue()); CHECK_GL_ERROR;
         glFilledContoursShader->setUniformValue(
-                    "scalarMaximum", var->transferFunction->getMaximimValue()); CHECK_GL_ERROR;
+                    "scalarMaximum", var->transferFunction->getMaximumValue()); CHECK_GL_ERROR;
     }
 
     glFilledContoursShader->setUniformValue(
@@ -1493,7 +1493,7 @@ void MNWPHorizontalSectionActor::renderPseudoColour(
         glPseudoColourShader->setUniformValue(
                     "scalarMinimum", var->transferFunction->getMinimumValue()); CHECK_GL_ERROR;
         glPseudoColourShader->setUniformValue(
-                    "scalarMaximum", var->transferFunction->getMaximimValue()); CHECK_GL_ERROR;
+                    "scalarMaximum", var->transferFunction->getMaximumValue()); CHECK_GL_ERROR;
     }
 
     glPolygonOffset(.8f, 1.0f); CHECK_GL_ERROR;

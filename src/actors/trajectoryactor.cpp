@@ -1671,7 +1671,7 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
         tubeShader->setUniformValue(
                     "scalarMinimum", transferFunction->getMinimumValue());
         tubeShader->setUniformValue(
-                    "scalarMaximum", transferFunction->getMaximimValue());
+                    "scalarMaximum", transferFunction->getMaximumValue());
 
         // Bind trajectories and normals vertex buffer objects.
         trajectoriesVertexBuffer
@@ -1740,7 +1740,7 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
                             transferFunction->getMinimumValue());
                 tubeShadowShader->setUniformValue(
                             "scalarMaximum",
-                            transferFunction->getMaximimValue());
+                            transferFunction->getMaximumValue());
             }
             else
                 tubeShadowShader->setUniformValue(
@@ -1813,7 +1813,7 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
         positionSphereShader->setUniformValue(
                     "scalarMinimum", transferFunction->getMinimumValue());
         positionSphereShader->setUniformValue(
-                    "scalarMaximum", transferFunction->getMaximimValue());
+                    "scalarMaximum", transferFunction->getMaximumValue());
 
         // Bind vertex buffer object.
         trajectoriesVertexBuffer
@@ -1876,7 +1876,7 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
                             transferFunction->getMinimumValue()); CHECK_GL_ERROR;
                 positionSphereShadowShader->setUniformValue(
                             "scalarMaximum",
-                            transferFunction->getMaximimValue()); CHECK_GL_ERROR;
+                            transferFunction->getMaximumValue()); CHECK_GL_ERROR;
 
             }
             else

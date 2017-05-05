@@ -225,7 +225,7 @@ void MNWPSurfaceTopographyActor::renderToCurrentContext(MSceneViewGLWidget *scen
         shaderProgram->setUniformValue(
                     "scalarMinimum", var->transferFunction->getMinimumValue());
         shaderProgram->setUniformValue(
-                    "scalarMaximum", var->transferFunction->getMaximimValue());
+                    "scalarMaximum", var->transferFunction->getMaximumValue());
     }
     else
     {
