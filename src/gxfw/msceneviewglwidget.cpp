@@ -313,24 +313,24 @@ MSceneViewGLWidget::MSceneViewGLWidget()
 #endif
 
     // North arrow.
-    northArrow.enabled = true;
-    northArrow.scale = 1.;
+    northArrow.enabled = false;
+    northArrow.scale = 5.;
     northArrow.colour = QColor(222, 46, 30, 255);
     northArrow.lon = 0.;
-    northArrow.lat = 0.;
-    northArrow.level = 0.;
+    northArrow.lat = 80.;
+    northArrow.worldZ = 1.;
     northArrow.groupProperty = systemControl->getGroupPropertyManager()
-            ->addProperty("north arrow");
+            ->addProperty("arrow pointing north");
     propertyGroup->addSubProperty(northArrow.groupProperty);
 
-    northArrow.enableProperty = systemControl->getBoolPropertyManager()
-            ->addProperty("enable");
+    northArrow.enabledProperty = systemControl->getBoolPropertyManager()
+            ->addProperty("enabled");
     systemControl->getBoolPropertyManager()
-            ->setValue(northArrow.enableProperty, northArrow.enabled);
-    northArrow.groupProperty->addSubProperty(northArrow.enableProperty);
+            ->setValue(northArrow.enabledProperty, northArrow.enabled);
+    northArrow.groupProperty->addSubProperty(northArrow.enabledProperty);
 
     northArrow.scaleProperty = systemControl->getDecoratedDoublePropertyManager()
-            ->addProperty("scale factor");
+            ->addProperty("scale");
     systemControl->getDecoratedDoublePropertyManager()
             ->setValue(northArrow.scaleProperty, northArrow.scale);
     systemControl->getDecoratedDoublePropertyManager()
@@ -345,7 +345,7 @@ MSceneViewGLWidget::MSceneViewGLWidget()
 
     northArrow.lonPositionProperty =
             systemControl->getDecoratedDoublePropertyManager()
-            ->addProperty("logitude position");
+            ->addProperty("longitude");
     systemControl->getDecoratedDoublePropertyManager()
             ->setValue(northArrow.lonPositionProperty, northArrow.lon);
     systemControl->getDecoratedDoublePropertyManager()
@@ -354,21 +354,21 @@ MSceneViewGLWidget::MSceneViewGLWidget()
 
     northArrow.latPositionProperty =
             systemControl->getDecoratedDoublePropertyManager()
-            ->addProperty("latitude position");
+            ->addProperty("latitude");
     systemControl->getDecoratedDoublePropertyManager()
             ->setValue(northArrow.latPositionProperty, northArrow.lat);
     systemControl->getDecoratedDoublePropertyManager()
             ->setSingleStep(northArrow.latPositionProperty, .1);
     northArrow.groupProperty->addSubProperty(northArrow.latPositionProperty);
 
-    northArrow.levelPositionProperty =
+    northArrow.worldZPositionProperty =
             systemControl->getDecoratedDoublePropertyManager()
-            ->addProperty("level");
+            ->addProperty("z");
     systemControl->getDecoratedDoublePropertyManager()
-            ->setValue(northArrow.levelPositionProperty, northArrow.level);
+            ->setValue(northArrow.worldZPositionProperty, northArrow.worldZ);
     systemControl->getDecoratedDoublePropertyManager()
-            ->setSingleStep(northArrow.levelPositionProperty, .1);
-    northArrow.groupProperty->addSubProperty(northArrow.levelPositionProperty);
+            ->setSingleStep(northArrow.worldZPositionProperty, .1);
+    northArrow.groupProperty->addSubProperty(northArrow.worldZPositionProperty);
 
     northArrow.colourProperty = systemControl->getColorPropertyManager()
             ->addProperty("colour");
@@ -979,10 +979,10 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
     }
 #endif
 
-    else if (property == northArrow.enableProperty)
+    else if (property == northArrow.enabledProperty)
     {
         northArrow.enabled = MSystemManagerAndControl::getInstance()
-                ->getBoolPropertyManager()->value(northArrow.enableProperty);
+                ->getBoolPropertyManager()->value(northArrow.enabledProperty);
 #ifndef CONTINUOUS_GL_UPDATE
         updateGL();
 #endif
@@ -1018,11 +1018,11 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
 #endif
     }
 
-    else if (property == northArrow.levelPositionProperty)
+    else if (property == northArrow.worldZPositionProperty)
     {
-        northArrow.level = MSystemManagerAndControl::getInstance()
+        northArrow.worldZ = MSystemManagerAndControl::getInstance()
                 ->getDecoratedDoublePropertyManager()
-                ->value(northArrow.levelPositionProperty);
+                ->value(northArrow.worldZPositionProperty);
 #ifndef CONTINUOUS_GL_UPDATE
         updateGL();
 #endif
@@ -1342,7 +1342,7 @@ void MSceneViewGLWidget::paintGL()
         northArrowShader->setUniformValue("scale", GLfloat(northArrow.scale));
         northArrowShader->setUniformValue("lon", GLfloat(northArrow.lon));
         northArrowShader->setUniformValue("lat", GLfloat(northArrow.lat));
-        northArrowShader->setUniformValue("level", GLfloat(northArrow.level));
+        northArrowShader->setUniformValue("worldZ", GLfloat(northArrow.worldZ));
         northArrowShader->setUniformValue("rotationMatrix", sceneRotationMatrix);
         northArrowShader->setUniformValue("mvpMatrix",
                                           modelViewProjectionMatrix);

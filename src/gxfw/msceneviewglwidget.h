@@ -417,19 +417,19 @@ private:
       NorthArrow() {}
 
       QtProperty *groupProperty;
-      QtProperty *enableProperty;
+      QtProperty *enabledProperty;
       QtProperty *colourProperty;
       QtProperty *scaleProperty;
       QtProperty *lonPositionProperty;
       QtProperty *latPositionProperty;
-      QtProperty *levelPositionProperty;
+      QtProperty *worldZPositionProperty;
 
       bool enabled;
       QColor colour;
       double scale;
       double lon;
       double lat;
-      double level;
+      double worldZ;
     };
     NorthArrow northArrow;
 

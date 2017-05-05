@@ -279,7 +279,8 @@ OTHER_FILES += \
     src/glsl/volume_normalcurves_initpoints.fx.glsl \
     src/glsl/hsec_texturedcontours.fx.glsl \
     config/cf_stdnames.dat \
-    config/log4cplus.properties
+    config/log4cplus.properties \
+    src/glsl/north_arrow.fx.glsl
 
 
 DEFINES += \

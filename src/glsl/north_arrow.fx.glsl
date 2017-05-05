@@ -72,11 +72,11 @@ uniform mat4      rotationMatrix; // scene rotation matrix
 uniform float     scale;
 uniform float     lon;
 uniform float     lat;
-uniform float     level;
+uniform float     worldZ;
 
 shader GSmain(out vec3 shadingColour)
 {
-    vec4 base = vec4(lon, lat, level, 0.f);
+    vec4 base = vec4(lon, lat, worldZ, 0.f);
     vec3 size = scale * vec3(1.5f, 1.f, 1.f);
 
     vec4 tip = base + vec4(0.f, 4.f * size.y, 0.f, 1.f);
