@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2015-2017 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -41,6 +42,8 @@
 *******************************************************************************/
 
 const QString met3dVersionString = "1.2.0-devel";
+// String containing default value for missing version number in config.
+const QString defaultConfigVersion = "1.0.0";
 const QString met3dBuildDate = QString("built on %1 %2").arg(__DATE__).arg(__TIME__);
 
 

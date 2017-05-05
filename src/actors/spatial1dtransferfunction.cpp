@@ -49,13 +49,10 @@ namespace Met3D
 ***                     CONSTRUCTOR / DESTRUCTOR                            ***
 *******************************************************************************/
 
-MSpatial1DTransferFunction::MSpatial1DTransferFunction()
-    : MTransferFunction(),
-      tfTexture(nullptr),
+MSpatial1DTransferFunction::MSpatial1DTransferFunction(QObject *parent)
+    : MTransferFunction(parent),
       numLevels(0),
       useMirroredRepeat(false),
-      minimumValue(0.0),
-      maximumValue(100.0),
       clampMaximum(true),
       interpolationRange(1.0),
       alphaBlendingMode(AlphaBlendingMode::AlphaChannel),
@@ -75,27 +72,6 @@ MSpatial1DTransferFunction::MSpatial1DTransferFunction()
     beginInitialiseQtProperties();
 
     setName("Transfer function scalar to texture");
-
-    // Properties related to labelling the colour bar.
-    // ===============================================
-
-    maxNumTicksProperty = addProperty(INT_PROPERTY, "num. ticks",
-                                      labelPropertiesSupGroup);
-    properties->mInt()->setValue(maxNumTicksProperty, 11);
-    properties->mInt()->setMinimum(maxNumTicksProperty, 0);
-
-    maxNumLabelsProperty = addProperty(INT_PROPERTY, "num. labels",
-                                       labelPropertiesSupGroup);
-    properties->mInt()->setValue(maxNumLabelsProperty, 6);
-    properties->mInt()->setMinimum(maxNumLabelsProperty, 0);
-
-    tickWidthProperty = addProperty(DOUBLE_PROPERTY, "tick length",
-                                    labelPropertiesSupGroup);
-    properties->setDouble(tickWidthProperty, 0.015, 3, 0.001);
-
-    labelSpacingProperty = addProperty(DOUBLE_PROPERTY, "space label-tick",
-                                       labelPropertiesSupGroup);
-    properties->setDouble(labelSpacingProperty, 0.01, 3, 0.001);
 
     // Properties related to texture levels.
     // =====================================
@@ -118,28 +94,11 @@ MSpatial1DTransferFunction::MSpatial1DTransferFunction()
     // Properties related to data range.
     // =================================
 
-    rangePropertiesSubGroup = addProperty(GROUP_PROPERTY, "range",
-                                          actorPropertiesSupGroup);
-
-    int decimals = 1;
-    valueDecimalsProperty = addProperty(INT_PROPERTY, "decimals",
-                                        rangePropertiesSubGroup);
-    properties->setInt(valueDecimalsProperty, decimals, 0, 9);
-
-    minimumValueProperty = addProperty(DOUBLE_PROPERTY, "minimum value",
-                                       rangePropertiesSubGroup);
-    properties->setDouble(minimumValueProperty, minimumValue,
-                          decimals, pow(10., -decimals));
-
-    maximumValueProperty = addProperty(DOUBLE_PROPERTY, "maximum value",
-                                       rangePropertiesSubGroup);
-    properties->setDouble(maximumValueProperty, maximumValue,
-                          decimals, pow(10., -decimals));
-
     clampMaximumProperty = addProperty(BOOL_PROPERTY, "clamp maximum",
                                        rangePropertiesSubGroup);
     properties->mBool()->setValue(clampMaximumProperty, clampMaximum);
 
+    int decimals = 3;
     interpolationRangeProperty = addProperty(DOUBLE_PROPERTY, "interpolation range",
                                        rangePropertiesSubGroup);
     properties->setDouble(interpolationRangeProperty, interpolationRange,
@@ -179,14 +138,6 @@ MSpatial1DTransferFunction::MSpatial1DTransferFunction()
     properties->mBool()->setValue(useWhiteBgForBarProperty, useWhiteBgForBar);
 
 
-    // General properties.
-    // ===================
-
-    positionProperty = addProperty(RECTF_CLIP_PROPERTY, "position",
-                                   actorPropertiesSupGroup);
-    properties->setRectF(positionProperty, QRectF(0.9, 0.9, 0.05, 0.5), 2);
-
-
     // Properties related to scale of texture.
     // =======================================
 
@@ -221,47 +172,14 @@ MSpatial1DTransferFunction::~MSpatial1DTransferFunction()
 #define SHADER_VERTEX_ATTRIBUTE  0
 #define SHADER_TEXTURE_ATTRIBUTE 1
 
-void MSpatial1DTransferFunction::reloadShaderEffects()
-{
-    LOG4CPLUS_DEBUG(mlog, "loading shader programs" << flush);
-
-    beginCompileShaders(2);
-
-    compileShadersFromFileWithProgressDialog(
-                simpleGeometryShader,
-                "src/glsl/simple_coloured_geometry.fx.glsl");
-    compileShadersFromFileWithProgressDialog(
-                colourbarShader,
-                "src/glsl/colourbar.fx.glsl");
-
-    endCompileShaders();
-}
-
 
 void MSpatial1DTransferFunction::saveConfiguration(QSettings *settings)
 {
     MTransferFunction::saveConfiguration(settings);
     settings->beginGroup(MSpatial1DTransferFunction::getSettingsID());
 
-    // Properties related to labelling the colour bar.
-    // ===============================================
-    settings->setValue("maxNumTicks",
-                       properties->mInt()->value(maxNumTicksProperty));
-    settings->setValue("maxNumLabels",
-                       properties->mInt()->value(maxNumLabelsProperty));
-    settings->setValue("tickLength",
-                       properties->mDouble()->value(tickWidthProperty));
-    settings->setValue("labelSpacing",
-                       properties->mDouble()->value(labelSpacingProperty));
-
     // Properties related to data range.
     // =================================
-    settings->setValue("valueDecimals",
-                       properties->mInt()->value(valueDecimalsProperty));
-    settings->setValue("minimumValue",
-                       properties->mDouble()->value(minimumValueProperty));
-    settings->setValue("maximumValue",
-                       properties->mDouble()->value(maximumValueProperty));
     settings->setValue("clampMaximum",
                        properties->mBool()->value(clampMaximumProperty));
     settings->setValue("interpolationRange",
@@ -277,11 +195,6 @@ void MSpatial1DTransferFunction::saveConfiguration(QSettings *settings)
                        properties->mBool()->value(useConstantColourProperty));
     settings->setValue("constantColour",
                        properties->mColor()->value(constantColourProperty));
-
-    // General properties.
-    // ===================
-    settings->setValue("position",
-                       properties->mRectF()->value(positionProperty));
 
     // Properties related to type of texture.
     // ======================================
@@ -306,25 +219,8 @@ void MSpatial1DTransferFunction::loadConfiguration(QSettings *settings)
 
     settings->beginGroup(MSpatial1DTransferFunction::getSettingsID());
 
-    // Properties related to labelling the colour bar.
-    // ===============================================
-    properties->mInt()->setValue(maxNumTicksProperty,
-                                 settings->value("maxNumTicks", 11).toInt());
-    properties->mInt()->setValue(maxNumLabelsProperty,
-                                 settings->value("maxNumLabels", 6).toInt());
-
-    properties->mDouble()->setValue(
-                tickWidthProperty,
-                settings->value("tickLength", 0.015).toDouble());
-    properties->mDouble()->setValue(
-                labelSpacingProperty,
-                settings->value("labelSpacing", 0.010).toDouble());
-
     // Properties related to data range.
     // =================================
-    setValueDecimals(settings->value("valueDecimals", 3).toInt());
-    setMinimumValue(settings->value("minimumValue", 203.15f).toDouble());
-    setMaximumValue(settings->value("maximumValue", 303.15f).toDouble());
     properties->mBool()->setValue(
                 clampMaximumProperty,
                 settings->value("clampMaximum", true).toBool());
@@ -345,10 +241,6 @@ void MSpatial1DTransferFunction::loadConfiguration(QSettings *settings)
                                  settings->value("constantColour",
                                                  QColor(0, 0, 0, 255))
                                    .value<QColor>());
-
-    // General properties.
-    // ===================
-    setPosition(settings->value("position", QRectF(0.9, 0.9, 0.05, 0.5)).toRectF());
 
     // Properties related to type of texture.
     // ======================================
@@ -380,43 +272,9 @@ void MSpatial1DTransferFunction::loadConfiguration(QSettings *settings)
             generateTransferTexture(level, false);
         }
         loadedImages.clear();
-        generateTextureBarGeometry();
+        generateBarGeometry();
     }
 
-}
-
-
-void MSpatial1DTransferFunction::setMinimumValue(float value)
-{
-    properties->mDouble()->setValue(minimumValueProperty, value);
-}
-
-
-void MSpatial1DTransferFunction::setMaximumValue(float value)
-{
-    properties->mDouble()->setValue(maximumValueProperty, value);
-}
-
-
-void MSpatial1DTransferFunction::setValueDecimals(int decimals)
-{
-    properties->mInt()->setValue(valueDecimalsProperty, decimals);
-    properties->mDouble()->setDecimals(minimumValueProperty, decimals);
-    properties->mDouble()->setSingleStep(minimumValueProperty, pow(10.,-decimals));
-    properties->mDouble()->setDecimals(maximumValueProperty, decimals);
-    properties->mDouble()->setSingleStep(maximumValueProperty, pow(10.,-decimals));
-}
-
-
-void MSpatial1DTransferFunction::setPosition(QRectF position)
-{
-    properties->mRectF()->setValue(positionProperty, position);
-}
-
-
-QString MSpatial1DTransferFunction::transferFunctionName()
-{
-    return getName();
 }
 
 
@@ -424,12 +282,8 @@ QString MSpatial1DTransferFunction::transferFunctionName()
 ***                          PROTECTED METHODS                              ***
 *******************************************************************************/
 
-void MSpatial1DTransferFunction::initializeActorResources()
+void MSpatial1DTransferFunction::generateTransferTexture()
 {
-    MGLResourcesManager* glRM = MGLResourcesManager::getInstance();
-
-    textureUnit = assignTextureUnit();
-
     if (!loadedImages.empty())
     {
         generateTransferTexture(0, true);
@@ -439,18 +293,6 @@ void MSpatial1DTransferFunction::initializeActorResources()
         }
         loadedImages.clear();
     }
-
-    // Load shader programs.
-    bool loadShaders = false;
-
-    loadShaders |= glRM->generateEffectProgram("transfer_colourbar",
-                                               colourbarShader);
-    loadShaders |= glRM->generateEffectProgram("transfer_geom",
-                                               simpleGeometryShader);
-
-    if (loadShaders) reloadShaderEffects();
-
-    generateTextureBarGeometry();
 }
 
 
@@ -472,7 +314,7 @@ void MSpatial1DTransferFunction::onQtPropertyChanged(QtProperty *property)
     {
         if (suppressActorUpdates()) return;
 
-        generateTextureBarGeometry();
+        generateBarGeometry();
         emitActorChangedSignal();
     }
 
@@ -525,7 +367,7 @@ void MSpatial1DTransferFunction::onQtPropertyChanged(QtProperty *property)
 
                 pathsToLoadedImages.resize(numLevels);
                 // Adapt ticks and labels to the new amount of textures.
-                generateTextureBarGeometry();
+                generateBarGeometry();
                 loadImagesFromPaths(fileNames);
                 loadedImages.clear();
             }
@@ -610,7 +452,7 @@ void MSpatial1DTransferFunction::onQtPropertyChanged(QtProperty *property)
         if (suppressActorUpdates()) return;
 
         // Texture remains unchanged; only geometry needs to be updated.
-        generateTextureBarGeometry();
+        generateBarGeometry();
         emitActorChangedSignal();
     }
 
@@ -803,10 +645,6 @@ void MSpatial1DTransferFunction::renderToCurrentContext(
 }
 
 
-/******************************************************************************
-***                           PRIVATE METHODS                               ***
-*******************************************************************************/
-
 void MSpatial1DTransferFunction::generateTransferTexture(int level, bool recreate)
 {
     if (!loadedImages.at(level).isNull())
@@ -914,7 +752,6 @@ void MSpatial1DTransferFunction::generateTransferTexture(int level, bool recreat
 
         if ( tfTexture )
         {
-//            tfTexture->updateSize(loadedImage.width(), loadedImage.height());
             tfTexture->updateSize(currentTextureWidth, currentTextureHeight,
                                   numLevels);
 
@@ -941,7 +778,7 @@ void MSpatial1DTransferFunction::generateTransferTexture(int level, bool recreat
 }
 
 
-void MSpatial1DTransferFunction::generateTextureBarGeometry()
+void MSpatial1DTransferFunction::generateBarGeometry()
 {
     MGLResourcesManager* glRM = MGLResourcesManager::getInstance();
 
@@ -1025,7 +862,8 @@ void MSpatial1DTransferFunction::generateTextureBarGeometry()
         buf->update(coordinates, 0, 0, sizeof(coordinates));
         buf->update(tickmarks, 0, sizeof(coordinates), sizeof(tickmarks));
 
-    } else
+    }
+    else
     {
         GL::MFloatVertexBuffer* newVB = nullptr;
         newVB = new GL::MFloatVertexBuffer(requestKey, 30 + numTicks * 6);
@@ -1046,12 +884,11 @@ void MSpatial1DTransferFunction::generateTextureBarGeometry()
     // Required for the glDrawArrays() call in renderToCurrentContext().
     numVertices = 4;
 
-    minimumValue = properties->mDouble()->value(minimumValueProperty);
-    maximumValue = properties->mDouble()->value(maximumValueProperty);
-
     // ========================================================================
     // Finally, place labels at the tickmarks:
 
+    minimumValue = properties->mDouble()->value(minimumValueProperty);
+    maximumValue = properties->mDouble()->value(maximumValueProperty);
     int maxNumLabels = properties->mInt()->value(maxNumLabelsProperty);
 
     // Obtain a shortcut to the application's text manager to register the
@@ -1127,6 +964,10 @@ void MSpatial1DTransferFunction::generateTextureBarGeometry()
     }
 }
 
+
+/******************************************************************************
+***                           PRIVATE METHODS                               ***
+*******************************************************************************/
 
 void MSpatial1DTransferFunction::loadImagesFromPaths(QStringList pathList)
 {

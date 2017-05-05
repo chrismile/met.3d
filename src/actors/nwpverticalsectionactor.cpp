@@ -938,7 +938,7 @@ void MNWPVerticalSectionActor::renderToCurrentContext(MSceneViewGLWidget *sceneV
                 sectionGridShader->setUniformValue(
                             "scalarMinimum", var->transferFunction->getMinimumValue());
                 sectionGridShader->setUniformValue(
-                            "scalarMaximum", var->transferFunction->getMaximimValue());
+                            "scalarMaximum", var->transferFunction->getMaximumValue());
             }
 
             if (var->grid->getLevelType() == HYBRID_SIGMA_PRESSURE_3D)

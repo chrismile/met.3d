@@ -2222,7 +2222,7 @@ void MNWPVolumeRaycasterActor::setVarSpecificShaderVars(
                     var->transferFunction->getMinimumValue()); CHECK_GL_ERROR;
         shader->setUniformValue(
                     structName + ".tfMaximum",
-                    var->transferFunction->getMaximimValue()); CHECK_GL_ERROR;
+                    var->transferFunction->getMaximumValue()); CHECK_GL_ERROR;
     }
     else
     {
@@ -2488,7 +2488,7 @@ void MNWPVolumeRaycasterActor::setNormalCurveShaderVars(
         shader->setUniformValue(
                     "tfMinimum", var->transferFunction->getMinimumValue());
         shader->setUniformValue(
-                    "tfMaximum", var->transferFunction->getMaximimValue());
+                    "tfMaximum", var->transferFunction->getMaximumValue());
     }
 
     shader->setUniformValue(

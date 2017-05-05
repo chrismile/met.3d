@@ -50,14 +50,10 @@ using namespace TFEditor;
 ***                     CONSTRUCTOR / DESTRUCTOR                            ***
 *******************************************************************************/
 
-MTransferFunction1D::MTransferFunction1D()
-    : MTransferFunction(),
-      tfTexture(nullptr),
-      vertexBuffer(nullptr),
+MTransferFunction1D::MTransferFunction1D(QObject *parent)
+    : MTransferFunction(parent),
       editor(nullptr),
-      enableAlpha(true),
-      minimumValue(203.15),
-      maximumValue(303.15)
+      enableAlpha(true)
 {
     // Create and initialise QtProperties for the GUI.
     // ===============================================
@@ -67,24 +63,6 @@ MTransferFunction1D::MTransferFunction1D()
 
     // Properties related to labelling the colour bar.
     // ===============================================
-
-    maxNumTicksProperty = addProperty(INT_PROPERTY, "num. ticks",
-                                      labelPropertiesSupGroup);
-    properties->mInt()->setValue(maxNumTicksProperty, 11);
-    properties->mInt()->setMinimum(maxNumTicksProperty, 0);
-
-    maxNumLabelsProperty = addProperty(INT_PROPERTY, "num. labels",
-                                       labelPropertiesSupGroup);
-    properties->mInt()->setValue(maxNumLabelsProperty, 6);
-    properties->mInt()->setMinimum(maxNumLabelsProperty, 0);
-
-    tickWidthProperty = addProperty(DOUBLE_PROPERTY, "tick length",
-                                    labelPropertiesSupGroup);
-    properties->setDouble(tickWidthProperty, 0.015, 3, 0.001);
-
-    labelSpacingProperty = addProperty(DOUBLE_PROPERTY, "space label-tick",
-                                       labelPropertiesSupGroup);
-    properties->setDouble(labelSpacingProperty, 0.01, 3, 0.001);
 
     scaleFactorProperty = addProperty(DOUBLE_PROPERTY, "label value scaling",
                                       labelPropertiesSupGroup);
@@ -96,34 +74,12 @@ MTransferFunction1D::MTransferFunction1D()
     // Properties related to data range.
     // =================================
 
-    rangePropertiesSubGroup = addProperty(GROUP_PROPERTY, "range",
-                                          actorPropertiesSupGroup);
-
-    int decimals = 3;
-    valueDecimalsProperty = addProperty(INT_PROPERTY, "decimals",
-                                        rangePropertiesSubGroup);
-    properties->setInt(valueDecimalsProperty, decimals, 0, 9);
-
-    minimumValueProperty = addProperty(DOUBLE_PROPERTY, "minimum value",
-                                       rangePropertiesSubGroup);
-    properties->setDouble(minimumValueProperty, minimumValue,
-                          decimals, pow(10., -decimals));
-
-    maximumValueProperty = addProperty(DOUBLE_PROPERTY, "maximum value",
-                                       rangePropertiesSubGroup);
-    properties->setDouble(maximumValueProperty, maximumValue,
-                          decimals, pow(10., -decimals));
-
     numStepsProperty = addProperty(INT_PROPERTY, "steps",
                                    rangePropertiesSubGroup);
     properties->setInt(numStepsProperty, 50, 2, 32768, 1);
 
     // General properties.
     // ===================
-
-    positionProperty = addProperty(RECTF_CLIP_PROPERTY, "position",
-                                   actorPropertiesSupGroup);
-    properties->setRectF(positionProperty, QRectF(0.9, 0.9, 0.05, 0.5), 2);
 
     enableAlphaInTFProperty = addProperty(BOOL_PROPERTY, "display opacity",
                                           actorPropertiesSupGroup);
@@ -279,23 +235,6 @@ MTransferFunction1D::~MTransferFunction1D()
 #define SHADER_VERTEX_ATTRIBUTE  0
 #define SHADER_TEXTURE_ATTRIBUTE 1
 
-void MTransferFunction1D::reloadShaderEffects()
-{
-    LOG4CPLUS_DEBUG(mlog, "loading shader programs" << flush);
-
-    beginCompileShaders(2);
-
-    compileShadersFromFileWithProgressDialog(
-                simpleGeometryShader,
-                "src/glsl/simple_coloured_geometry.fx.glsl");
-    compileShadersFromFileWithProgressDialog(
-                colourbarShader,
-                "src/glsl/colourbar.fx.glsl");
-
-    endCompileShaders();
-}
-
-
 void MTransferFunction1D::selectPredefinedColourmap(
         QString name, bool reversed, int saturation, int lightness)
 {
@@ -322,7 +261,7 @@ void MTransferFunction1D::selectPredefinedColourmap(
         if (isInitialized())
         {
             generateTransferTexture();
-            generateColourBarGeometry();
+            generateBarGeometry();
             emitActorChangedSignal();
         }
     }
@@ -362,7 +301,7 @@ void MTransferFunction1D::selectHCLColourmap(
     if (isInitialized())
     {
         generateTransferTexture();
-        generateColourBarGeometry();
+        generateBarGeometry();
         emitActorChangedSignal();
     }
 }
@@ -391,7 +330,7 @@ void MTransferFunction1D::selectHSVColourmap(
     if (isInitialized())
     {
         generateTransferTexture();
-        generateColourBarGeometry();
+        generateBarGeometry();
         emitActorChangedSignal();
     }
 }
@@ -411,49 +350,9 @@ void MTransferFunction1D::selectEditor()
 }
 
 
-void MTransferFunction1D::setMinimumValue(float value)
-{
-    properties->mDouble()->setValue(minimumValueProperty, value);
-}
-
-
-void MTransferFunction1D::setMaximumValue(float value)
-{
-    properties->mDouble()->setValue(maximumValueProperty, value);
-}
-
-
-void MTransferFunction1D::setValueDecimals(int decimals)
-{
-    properties->mInt()->setValue(valueDecimalsProperty, decimals);
-    properties->mDouble()->setDecimals(minimumValueProperty, decimals);
-    properties->mDouble()->setSingleStep(minimumValueProperty, pow(10.,-decimals));
-    properties->mDouble()->setDecimals(maximumValueProperty, decimals);
-    properties->mDouble()->setSingleStep(maximumValueProperty, pow(10.,-decimals));
-}
-
-
-void MTransferFunction1D::setPosition(QRectF position)
-{
-    properties->mRectF()->setValue(positionProperty, position);
-}
-
-
 void MTransferFunction1D::setSteps(int steps)
 {
     properties->mInt()->setValue(numStepsProperty, steps);
-}
-
-
-void MTransferFunction1D::setNumTicks(int num)
-{
-    properties->mInt()->setValue(maxNumTicksProperty, num);
-}
-
-
-void MTransferFunction1D::setNumLabels(int num)
-{
-    properties->mInt()->setValue(maxNumLabelsProperty, num);
 }
 
 
@@ -465,32 +364,16 @@ void MTransferFunction1D::saveConfiguration(QSettings *settings)
 
     // Properties related to labelling the colour bar.
     // ===============================================
-    settings->setValue("maxNumTicks",
-                       properties->mInt()->value(maxNumTicksProperty));
-    settings->setValue("maxNumLabels",
-                       properties->mInt()->value(maxNumLabelsProperty));
-    settings->setValue("tickLength",
-                       properties->mDouble()->value(tickWidthProperty));
-    settings->setValue("labelSpacing",
-                       properties->mDouble()->value(labelSpacingProperty));
     settings->setValue("labelValueScaling",
                        properties->mDouble()->value(scaleFactorProperty));
 
     // Properties related to data range.
     // =================================
-    settings->setValue("valueDecimals",
-                       properties->mInt()->value(valueDecimalsProperty));
-    settings->setValue("minimumValue",
-                       properties->mDouble()->value(minimumValueProperty));
-    settings->setValue("maximumValue",
-                       properties->mDouble()->value(maximumValueProperty));
     settings->setValue("numSteps",
                        properties->mInt()->value(numStepsProperty));
 
     // General properties.
     // ===================
-    settings->setValue("position",
-                       properties->mRectF()->value(positionProperty));
 
     // Properties related to type of colourmap.
     // ========================================
@@ -600,29 +483,13 @@ void MTransferFunction1D::loadConfiguration(QSettings *settings)
 
     // Properties related to labelling the colour bar.
     // ===============================================
-    setNumTicks(settings->value("maxNumTicks", 11).toInt());
-    setNumLabels(settings->value("maxNumLabels", 6).toInt());
-    properties->mDouble()->setValue(
-                tickWidthProperty,
-                settings->value("tickLength", 0.015).toDouble());
-    properties->mDouble()->setValue(
-                labelSpacingProperty,
-                settings->value("labelSpacing", 0.01).toDouble());
     properties->mDouble()->setValue(
                 scaleFactorProperty,
                 settings->value("labelValueScaling", 1.).toDouble());
 
     // Properties related to data range.
     // =================================
-    setValueDecimals(settings->value("valueDecimals", 3).toInt());
-    setMinimumValue(settings->value("minimumValue", 203.15f).toFloat());
-    setMaximumValue(settings->value("maximumValue", 303.15f).toFloat());
     setSteps(settings->value("numSteps", 50).toInt());
-
-    // General properties.
-    // ===================
-    setPosition(settings->value("position",
-                                QRectF(0.9, 0.9, 0.05, 0.5)).toRectF());
 
     // Properties related to type of colourmap.
     // ========================================
@@ -751,246 +618,13 @@ void MTransferFunction1D::loadConfiguration(QSettings *settings)
     if (isInitialized())
     {
         generateTransferTexture();
-        generateColourBarGeometry();
+        generateBarGeometry();
     }
-}
-
-
-QString MTransferFunction1D::transferFunctionName()
-{
-    return getName();
 }
 
 
 /******************************************************************************
 ***                          PROTECTED METHODS                              ***
-*******************************************************************************/
-
-void MTransferFunction1D::initializeActorResources()
-{
-    MGLResourcesManager* glRM = MGLResourcesManager::getInstance();
-
-    textureUnit = assignTextureUnit();
-
-    generateTransferTexture();
-
-    // Load shader programs.
-    bool loadShaders = false;
-
-    loadShaders |= glRM->generateEffectProgram("transfer_colourbar",
-                                               colourbarShader);
-    loadShaders |= glRM->generateEffectProgram("transfer_geom",
-                                               simpleGeometryShader);
-
-    if (loadShaders) reloadShaderEffects();
-
-    generateColourBarGeometry();
-}
-
-
-void MTransferFunction1D::onQtPropertyChanged(QtProperty *property)
-{
-    if ( (property == minimumValueProperty)    ||
-         (property == maximumValueProperty)    ||
-         (property == numStepsProperty)        ||
-         (property == maxNumTicksProperty)     ||
-         (property == maxNumLabelsProperty)    ||
-         (property == positionProperty)        ||
-         (property == tickWidthProperty)       ||
-         (property == labelSpacingProperty)    ||
-         (property == labelSizeProperty)       ||
-         (property == labelColourProperty)     ||
-         (property == labelBBoxProperty)       ||
-         (property == labelBBoxColourProperty) ||
-         (property == scaleFactorProperty)     ||
-         (property == predefColourmapProperty) ||
-         (property == reverseTFRangeProperty)  ||
-         (property == predefLightnessAdjustProperty)  ||
-         (property == predefSaturationAdjustProperty) ||
-         (property == hclHue1Property)         ||
-         (property == hclHue2Property)         ||
-         (property == hclChroma1Property)      ||
-         (property == hclChroma2Property)      ||
-         (property == hclLuminance1Property)   ||
-         (property == hclLuminance2Property)   ||
-         (property == hclPower1Property)       ||
-         (property == hclPower2Property)       ||
-         (property == hclAlpha1Property)       ||
-         (property == hclAlpha2Property)       ||
-         (property == hclPowerAlphaProperty)      )
-    {
-        if (suppressActorUpdates()) return;
-
-        generateTransferTexture();
-        generateColourBarGeometry();
-        emitActorChangedSignal();
-    }
-
-    else if (property == colourmapTypeProperty)
-    {
-        MColourmapType cmaptype = MColourmapType(
-                    properties->mEnum()->value(colourmapTypeProperty));
-
-        switch (cmaptype)
-        {
-        case PREDEFINED:
-            predefCMapPropertiesSubGroup->setEnabled(true);
-            hclCMapPropertiesSubGroup->setEnabled(false);
-            hsvCMapPropertiesSubGroup->setEnabled(false);
-            editorPropertiesSubGroup->setEnabled(false);
-            break;
-        case HCL:
-            predefCMapPropertiesSubGroup->setEnabled(false);
-            hclCMapPropertiesSubGroup->setEnabled(true);
-            hsvCMapPropertiesSubGroup->setEnabled(false);
-            editorPropertiesSubGroup->setEnabled(false);
-            break;
-        case HSV:
-            predefCMapPropertiesSubGroup->setEnabled(false);
-            hclCMapPropertiesSubGroup->setEnabled(false);
-            hsvCMapPropertiesSubGroup->setEnabled(true);
-            editorPropertiesSubGroup->setEnabled(false);
-
-            if (hsvVaporXMLFilename.isEmpty())
-            {
-                hsvVaporXMLFilename = QFileDialog::getOpenFileName(
-                            MGLResourcesManager::getInstance(),
-                            "Load Vapor transfer function",
-                            "/",
-                            "Vapor transfer function XML (*.vtf)");
-                updateHSVProperties();
-            }
-            break;
-        case EDITOR:
-            predefCMapPropertiesSubGroup->setEnabled(false);
-            hclCMapPropertiesSubGroup->setEnabled(false);
-            hsvCMapPropertiesSubGroup->setEnabled(false);
-            editorPropertiesSubGroup->setEnabled(true);
-            break;
-        case INVALID:
-                break;
-        }
-
-        if (suppressActorUpdates()) return;
-
-        generateTransferTexture();
-        generateColourBarGeometry();
-        emitActorChangedSignal();
-    }
-
-    else if (property == hclTypeProperty)
-    {
-        updateHCLProperties();
-
-        if (suppressActorUpdates()) return;
-
-        generateTransferTexture();
-        generateColourBarGeometry();
-        emitActorChangedSignal();
-    }
-
-    else if (property == valueDecimalsProperty)
-    {
-        int decimals = properties->mInt()->value(valueDecimalsProperty);
-        properties->mDouble()->setDecimals(minimumValueProperty, decimals);
-        properties->mDouble()->setSingleStep(minimumValueProperty,
-                                             pow(10.,-decimals));
-        properties->mDouble()->setDecimals(maximumValueProperty, decimals);
-        properties->mDouble()->setSingleStep(maximumValueProperty,
-                                             pow(10.,-decimals));
-
-        if (suppressActorUpdates()) return;
-
-        // Texture remains unchanged; only geometry needs to be updated.
-        generateColourBarGeometry();
-        emitActorChangedSignal();
-    }
-
-    else if (property == hsvLoadFromVaporXMLProperty)
-    {
-        QString filename = QFileDialog::getOpenFileName(
-                    MGLResourcesManager::getInstance(),
-                    "Load Vapor transfer function",
-                    "/",
-                    "Vapor transfer function XML (*.vtf)");
-
-        if (filename.isEmpty()) return;
-
-        hsvVaporXMLFilename = filename;
-        LOG4CPLUS_DEBUG(mlog, "Loading Vapor transfer function from "
-                        << hsvVaporXMLFilename.toStdString());
-        updateHSVProperties();
-
-        if (suppressActorUpdates()) return;
-
-        generateTransferTexture();
-        generateColourBarGeometry();
-        emitActorChangedSignal();
-    }
-
-    else if (property == enableAlphaInTFProperty)
-    {
-        enableAlpha = properties->mBool()->value(enableAlphaInTFProperty);
-
-        emitActorChangedSignal();
-    }
-    else if (property == editorClickProperty)
-    {
-        editor->show();
-    }
-}
-
-
-void MTransferFunction1D::renderToCurrentContext(MSceneViewGLWidget *sceneView)
-{
-    Q_UNUSED(sceneView);
-
-    tfTexture->bindToTextureUnit(textureUnit);
-
-    // First draw the colourbar itself. glPolygonOffset is used to displace
-    // the colourbar's z-value slightly to the back, to that the frame drawn
-    // afterwards is rendered correctly.
-    colourbarShader->bind();
-    colourbarShader->setUniformValue("transferTexture", textureUnit);
-    colourbarShader->setUniformValue("enableAlpha", GLboolean(enableAlpha));
-
-    vertexBuffer->attachToVertexAttribute(SHADER_VERTEX_ATTRIBUTE, 3, false,
-                                          4 * sizeof(float), 0 * sizeof(float));
-    vertexBuffer->attachToVertexAttribute(SHADER_TEXTURE_ATTRIBUTE, 1, false,
-                                          4 * sizeof(float),
-                                          (const GLvoid*)(3 * sizeof(float)));
-
-    glPolygonOffset(.01f, 1.0f);
-    glEnable(GL_POLYGON_OFFSET_FILL);
-    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL); CHECK_GL_ERROR;
-    glDrawArrays(GL_TRIANGLE_STRIP, 0, numVertices); CHECK_GL_ERROR;
-    glDisable(GL_POLYGON_OFFSET_FILL);
-
-    // Next draw a black frame around the colourbar.
-    simpleGeometryShader->bindProgram("Simple"); CHECK_GL_ERROR;
-    simpleGeometryShader->setUniformValue("colour", QColor(0, 0, 0)); CHECK_GL_ERROR;
-    vertexBuffer->attachToVertexAttribute(SHADER_VERTEX_ATTRIBUTE, 3, false,
-                                          4 * sizeof(float),
-                                          (const GLvoid*)(8 * sizeof(float)));
-
-    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); CHECK_GL_ERROR;
-    glLineWidth(1);
-    glDrawArrays(GL_LINE_LOOP, 0, numVertices); CHECK_GL_ERROR;
-
-    // Finally draw the tick marks.
-    vertexBuffer->attachToVertexAttribute(SHADER_VERTEX_ATTRIBUTE, 3, false,
-                                          0,
-                                          (const GLvoid*)(24 * sizeof(float)));
-
-    glDrawArrays(GL_LINES, 0, 2 * numTicks); CHECK_GL_ERROR;
-
-    // Unbind VBO.
-    glBindBuffer(GL_ARRAY_BUFFER, 0); CHECK_GL_ERROR;
-}
-
-
-/******************************************************************************
-***                           PRIVATE METHODS                               ***
 *******************************************************************************/
 
 void MTransferFunction1D::generateTransferTexture()
@@ -1202,7 +836,208 @@ void MTransferFunction1D::generateTransferTexture()
 }
 
 
-void MTransferFunction1D::generateColourBarGeometry()
+void MTransferFunction1D::onQtPropertyChanged(QtProperty *property)
+{
+    if ( (property == minimumValueProperty)    ||
+         (property == maximumValueProperty)    ||
+         (property == numStepsProperty)        ||
+         (property == maxNumTicksProperty)     ||
+         (property == maxNumLabelsProperty)    ||
+         (property == positionProperty)        ||
+         (property == tickWidthProperty)       ||
+         (property == labelSpacingProperty)    ||
+         (property == labelSizeProperty)       ||
+         (property == labelColourProperty)     ||
+         (property == labelBBoxProperty)       ||
+         (property == labelBBoxColourProperty) ||
+         (property == scaleFactorProperty)     ||
+         (property == predefColourmapProperty) ||
+         (property == reverseTFRangeProperty)  ||
+         (property == predefLightnessAdjustProperty)  ||
+         (property == predefSaturationAdjustProperty) ||
+         (property == hclHue1Property)         ||
+         (property == hclHue2Property)         ||
+         (property == hclChroma1Property)      ||
+         (property == hclChroma2Property)      ||
+         (property == hclLuminance1Property)   ||
+         (property == hclLuminance2Property)   ||
+         (property == hclPower1Property)       ||
+         (property == hclPower2Property)       ||
+         (property == hclAlpha1Property)       ||
+         (property == hclAlpha2Property)       ||
+         (property == hclPowerAlphaProperty)      )
+    {
+        if (suppressActorUpdates()) return;
+
+        generateTransferTexture();
+        generateBarGeometry();
+        emitActorChangedSignal();
+    }
+
+    else if (property == colourmapTypeProperty)
+    {
+        MColourmapType cmaptype = MColourmapType(
+                    properties->mEnum()->value(colourmapTypeProperty));
+
+        switch (cmaptype)
+        {
+        case PREDEFINED:
+            predefCMapPropertiesSubGroup->setEnabled(true);
+            hclCMapPropertiesSubGroup->setEnabled(false);
+            hsvCMapPropertiesSubGroup->setEnabled(false);
+            editorPropertiesSubGroup->setEnabled(false);
+            break;
+        case HCL:
+            predefCMapPropertiesSubGroup->setEnabled(false);
+            hclCMapPropertiesSubGroup->setEnabled(true);
+            hsvCMapPropertiesSubGroup->setEnabled(false);
+            editorPropertiesSubGroup->setEnabled(false);
+            break;
+        case HSV:
+            predefCMapPropertiesSubGroup->setEnabled(false);
+            hclCMapPropertiesSubGroup->setEnabled(false);
+            hsvCMapPropertiesSubGroup->setEnabled(true);
+            editorPropertiesSubGroup->setEnabled(false);
+
+            if (hsvVaporXMLFilename.isEmpty())
+            {
+                hsvVaporXMLFilename = QFileDialog::getOpenFileName(
+                            MGLResourcesManager::getInstance(),
+                            "Load Vapor transfer function",
+                            "/",
+                            "Vapor transfer function XML (*.vtf)");
+                updateHSVProperties();
+            }
+            break;
+        case EDITOR:
+            predefCMapPropertiesSubGroup->setEnabled(false);
+            hclCMapPropertiesSubGroup->setEnabled(false);
+            hsvCMapPropertiesSubGroup->setEnabled(false);
+            editorPropertiesSubGroup->setEnabled(true);
+            break;
+        case INVALID:
+                break;
+        }
+
+        if (suppressActorUpdates()) return;
+
+        generateTransferTexture();
+        generateBarGeometry();
+        emitActorChangedSignal();
+    }
+
+    else if (property == hclTypeProperty)
+    {
+        updateHCLProperties();
+
+        if (suppressActorUpdates()) return;
+
+        generateTransferTexture();
+        generateBarGeometry();
+        emitActorChangedSignal();
+    }
+
+    else if (property == valueDecimalsProperty)
+    {
+        int decimals = properties->mInt()->value(valueDecimalsProperty);
+        properties->mDouble()->setDecimals(minimumValueProperty, decimals);
+        properties->mDouble()->setSingleStep(minimumValueProperty,
+                                             pow(10.,-decimals));
+        properties->mDouble()->setDecimals(maximumValueProperty, decimals);
+        properties->mDouble()->setSingleStep(maximumValueProperty,
+                                             pow(10.,-decimals));
+
+        if (suppressActorUpdates()) return;
+
+        // Texture remains unchanged; only geometry needs to be updated.
+        generateBarGeometry();
+        emitActorChangedSignal();
+    }
+
+    else if (property == hsvLoadFromVaporXMLProperty)
+    {
+        QString filename = QFileDialog::getOpenFileName(
+                    MGLResourcesManager::getInstance(),
+                    "Load Vapor transfer function",
+                    "/",
+                    "Vapor transfer function XML (*.vtf)");
+
+        if (filename.isEmpty()) return;
+
+        hsvVaporXMLFilename = filename;
+        LOG4CPLUS_DEBUG(mlog, "Loading Vapor transfer function from "
+                        << hsvVaporXMLFilename.toStdString());
+        updateHSVProperties();
+
+        if (suppressActorUpdates()) return;
+
+        generateTransferTexture();
+        generateBarGeometry();
+        emitActorChangedSignal();
+    }
+
+    else if (property == enableAlphaInTFProperty)
+    {
+        enableAlpha = properties->mBool()->value(enableAlphaInTFProperty);
+
+        emitActorChangedSignal();
+    }
+    else if (property == editorClickProperty)
+    {
+        editor->show();
+    }
+}
+
+
+void MTransferFunction1D::renderToCurrentContext(MSceneViewGLWidget *sceneView)
+{
+    Q_UNUSED(sceneView);
+
+    tfTexture->bindToTextureUnit(textureUnit);
+
+    // First draw the colourbar itself. glPolygonOffset is used to displace
+    // the colourbar's z-value slightly to the back, to that the frame drawn
+    // afterwards is rendered correctly.
+    colourbarShader->bind();
+    colourbarShader->setUniformValue("transferTexture", textureUnit);
+    colourbarShader->setUniformValue("enableAlpha", GLboolean(enableAlpha));
+
+    vertexBuffer->attachToVertexAttribute(SHADER_VERTEX_ATTRIBUTE, 3, false,
+                                          4 * sizeof(float), 0 * sizeof(float));
+    vertexBuffer->attachToVertexAttribute(SHADER_TEXTURE_ATTRIBUTE, 1, false,
+                                          4 * sizeof(float),
+                                          (const GLvoid*)(3 * sizeof(float)));
+
+    glPolygonOffset(.01f, 1.0f);
+    glEnable(GL_POLYGON_OFFSET_FILL);
+    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL); CHECK_GL_ERROR;
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, numVertices); CHECK_GL_ERROR;
+    glDisable(GL_POLYGON_OFFSET_FILL);
+
+    // Next draw a black frame around the colourbar.
+    simpleGeometryShader->bindProgram("Simple"); CHECK_GL_ERROR;
+    simpleGeometryShader->setUniformValue("colour", QColor(0, 0, 0)); CHECK_GL_ERROR;
+    vertexBuffer->attachToVertexAttribute(SHADER_VERTEX_ATTRIBUTE, 3, false,
+                                          4 * sizeof(float),
+                                          (const GLvoid*)(8 * sizeof(float)));
+
+    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); CHECK_GL_ERROR;
+    glLineWidth(1);
+    glDrawArrays(GL_LINE_LOOP, 0, numVertices); CHECK_GL_ERROR;
+
+    // Finally draw the tick marks.
+    vertexBuffer->attachToVertexAttribute(SHADER_VERTEX_ATTRIBUTE, 3, false,
+                                          0,
+                                          (const GLvoid*)(24 * sizeof(float)));
+
+    glDrawArrays(GL_LINES, 0, 2 * numTicks); CHECK_GL_ERROR;
+
+    // Unbind VBO.
+    glBindBuffer(GL_ARRAY_BUFFER, 0); CHECK_GL_ERROR;
+}
+
+
+void MTransferFunction1D::generateBarGeometry()
 {
     MGLResourcesManager* glRM = MGLResourcesManager::getInstance();
 
@@ -1396,6 +1231,11 @@ void MTransferFunction1D::generateColourBarGeometry()
     editor->setRange(minimumValue, maximumValue, scaleFactor,
                      maxNumTicks, maxNumLabels, numSteps, decimals);
 }
+
+
+/******************************************************************************
+***                           PRIVATE METHODS                               ***
+*******************************************************************************/
 
 
 void MTransferFunction1D::updateHCLProperties()

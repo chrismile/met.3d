@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2015-2017 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -27,17 +28,12 @@
 #define TRANSFERFUNCTION1D_H
 
 // standard library imports
-#include <memory>
 
 // related third party imports
-#include <GL/glew.h>
-#include <QtProperty>
 
 // local application imports
 #include "gxfw/transferfunction.h"
 #include "gxfw/colourmap.h"
-#include "gxfw/gl/shadereffect.h"
-#include "gxfw/gl/texture.h"
 
 class MGLResourcesManager;
 class MSceneViewGLWidget;
@@ -65,27 +61,8 @@ class MTransferFunction1D : public MTransferFunction
 {
     Q_OBJECT
 public:
-    MTransferFunction1D();
+    MTransferFunction1D(QObject *parent = 0);
     ~MTransferFunction1D();
-
-    void reloadShaderEffects();
-
-    /**
-      Returns the texture that represents the transfer function texture.
-      */
-    GL::MTexture* getTexture() { return tfTexture; }
-
-    /**
-      Returns the minimum scalar value of the current transfer function
-      settings.
-      */
-    float getMinimumValue() { return minimumValue; }
-
-    /**
-      Returns the maximum scalar value of the current transfer function
-      settings.
-      */
-    float getMaximimValue() { return maximumValue; }
 
     /**
       Select a predefined colourmap. @p name must be the name of a colourmap
@@ -118,19 +95,7 @@ public:
 
     void selectHSVColourmap(QString vaporXMLFile, bool reversed=false);
 
-    void setMinimumValue(float value);
-
-    void setMaximumValue(float value);
-
-    void setValueDecimals(int decimals);
-
-    void setPosition(QRectF position);
-
     void setSteps(int steps);
-
-    void setNumTicks(int num);
-
-    void setNumLabels(int num);
 
     QString getSettingsID() override { return "TransferFunction1D"; }
 
@@ -138,10 +103,21 @@ public:
 
     void loadConfiguration(QSettings *settings);
 
-    QString transferFunctionName();
-
 protected:
-    void initializeActorResources();
+    /**
+      Generates the colourbar texture with the colour mapping specified by the
+      user and uploads a 1D-texture to the GPU.
+
+      @see MColourmapPool
+      @see MColourmap
+      */
+    void generateTransferTexture() override;
+
+    /**
+      Creates geometry for a box filled with the colourbar texture and for tick
+      marks, and places labels at the tick marks.
+      */
+    void generateBarGeometry() override;
 
     void onQtPropertyChanged(QtProperty *property);
 
@@ -151,20 +127,6 @@ public slots:
     void onEditorTransferFunctionChanged();
 
 private:
-    /**
-      Generates the colourbar texture with the colour mapping specified by the
-      user and uploads a 1D-texture to the GPU.
-
-      @see MColourmapPool
-      @see MColourmap
-      */
-    void generateTransferTexture();
-
-    /**
-      Creates geometry for a box filled with the colourbar texture and for tick
-      marks, and places labels at the tick marks.
-      */
-    void generateColourBarGeometry();
 
     void updateHCLProperties();
 
@@ -181,40 +143,19 @@ private:
         exists with the given name. */
     MColourmapType stringToColourMapType(QString colourMapTypeName);
 
-    std::shared_ptr<GL::MShaderEffect> colourbarShader;
-    std::shared_ptr<GL::MShaderEffect> simpleGeometryShader;
-
-    GL::MTexture *tfTexture;
-    GLint textureUnit;
-
-    GL::MVertexBuffer *vertexBuffer;
-    uint numVertices;
-
     MColourmapPool colourmapPool;
 
     TFEditor::MTransferFunctionEditor *editor;
 
     // General properties.
-    QtProperty *positionProperty;
     bool        enableAlpha;
     QtProperty *enableAlphaInTFProperty;
     QtProperty *reverseTFRangeProperty;
 
     // Properties related to ticks and labels.
-    QtProperty *maxNumTicksProperty;
-    uint        numTicks;
-    QtProperty *maxNumLabelsProperty;
-    QtProperty *tickWidthProperty;
-    QtProperty *labelSpacingProperty;
     QtProperty *scaleFactorProperty;
 
     // Properties related to value range.
-    QtProperty *rangePropertiesSubGroup;
-    QtProperty *valueDecimalsProperty;
-    QtProperty *minimumValueProperty;
-    QtProperty *maximumValueProperty;
-    float       minimumValue;
-    float       maximumValue;
     QtProperty *numStepsProperty;
 
     QtProperty *colourmapTypeProperty;

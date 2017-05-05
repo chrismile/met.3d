@@ -4,8 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2016 Marc Rautenhaus
-**  Copyright 2016 Bianca Tost
+**  Copyright 2016-2017 Marc Rautenhaus
+**  Copyright 2016-2017 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -28,17 +28,12 @@
 #define MSPATIAL1DTRANSFERFUNCTION_H
 
 // standard library imports
-#include <memory>
 
 // related third party imports
-#include <GL/glew.h>
-#include <QtProperty>
 #include <QtCore>
 
 // local application imports
 #include "gxfw/transferfunction.h"
-#include "gxfw/gl/shadereffect.h"
-#include "gxfw/gl/texture.h"
 
 class MGLResourcesManager;
 class MSceneViewGLWidget;
@@ -74,33 +69,14 @@ namespace Met3D
 class MSpatial1DTransferFunction : public MTransferFunction
 {
 public:
-    MSpatial1DTransferFunction();
+    MSpatial1DTransferFunction(QObject *parent = 0);
     ~MSpatial1DTransferFunction();
-
-    void reloadShaderEffects();
 
     void saveConfiguration(QSettings *settings);
 
     void loadConfiguration(QSettings *settings);
 
     QString getSettingsID() override { return "TransferFunction1DSpatialTexture"; }
-
-    /**
-      Returns the texture that represents the spatial transfer function texture.
-      */
-    GL::MTexture* getTexture() { return tfTexture; }
-
-    /**
-      Returns the minimum scalar value of the current transfer function
-      settings.
-      */
-    float getMinimumValue() { return minimumValue; }
-
-    /**
-      Returns the maximum scalar value of the current transfer function
-      settings.
-      */
-    float getMaximumValue() { return maximumValue; }
 
     float getNumLevels() { return numLevels; }
 
@@ -119,14 +95,6 @@ public:
     float getTextureAspectRatio()
     { return (float)currentTextureHeight / (float)currentTextureWidth; }
 
-    void setMinimumValue(float value);
-
-    void setMaximumValue(float value);
-
-    void setValueDecimals(int decimals);
-
-    void setPosition(QRectF position);
-
     enum AlphaBlendingMode {
         AlphaChannel = 0,
         RedChannel,
@@ -137,10 +105,14 @@ public:
     };
     AlphaBlendingMode getAlphaBlendingMode() { return alphaBlendingMode; }
 
-    QString transferFunctionName();
-
 protected:
-    void initializeActorResources();
+    void generateTransferTexture() override;
+
+    /**
+      Creates geometry for a box filled with the texture and for tick
+      marks, and places labels at the tick marks.
+      */
+    void generateBarGeometry() override;
 
     void onQtPropertyChanged(QtProperty *property);
 
@@ -148,43 +120,21 @@ protected:
 
 private:
     /**
-      Generates the colourbar texture with the colour mapping specified by the
-      user and uploads a 1D-texture to the GPU.
+      @brief Method to create the 2D texture array with mip-mapping containing
+      the texture images and uploads the 3D-texture to the GPU and/or store the
+      @param level-th image at @param level in the texture.
 
-      @see MColourmapPool
-      @see MColourmap
+      Creates a new 2D texture array if @ref tfTexture is nullptr or
+      @param recreate is true. Takes the image stored at @param level in
+      @ref loadedImages and stores its content in the 2D texture array.
       */
     void generateTransferTexture(int level, bool recreate);
 
-    /**
-      Creates geometry for a box filled with the colourbar texture and for tick
-      marks, and places labels at the tick marks.
-      */
-    void generateTextureBarGeometry();
-
     void loadImagesFromPaths(QStringList pathList);
-
-    std::shared_ptr<GL::MShaderEffect> simpleGeometryShader;
-    std::shared_ptr<GL::MShaderEffect> colourbarShader;
-
-    GL::MTexture *tfTexture;
-    GLint textureUnit;
-
-    GL::MVertexBuffer *vertexBuffer;
-    uint numVertices;
 
     QVector<QImage> loadedImages;
 
     // General properties.
-    QtProperty *positionProperty;
-
-    // Properties related to ticks and labels.
-    QtProperty *maxNumTicksProperty;
-    uint        numTicks;
-    QtProperty *maxNumLabelsProperty;
-    QtProperty *tickWidthProperty;
-    QtProperty *labelSpacingProperty;
-    QtProperty *scaleFactorProperty;
 
     // Properties related to texture levels.
     QtProperty          *levelsPropertiesSubGroup;
@@ -198,12 +148,6 @@ private:
 
 
     // Properties related to value range.
-    QtProperty *rangePropertiesSubGroup;
-    QtProperty *valueDecimalsProperty;
-    QtProperty *minimumValueProperty;
-    QtProperty *maximumValueProperty;
-    double      minimumValue;
-    double      maximumValue;
     QtProperty *clampMaximumProperty;
     bool        clampMaximum;
     QtProperty *interpolationRangeProperty;
