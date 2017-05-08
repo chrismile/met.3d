@@ -69,6 +69,35 @@ void checkOpenGLError(const char* file, int line)
 }
 
 
+QStringList readConfigVersionID(QSettings *settings)
+{
+    QStringList groupList = settings->group().split("/");
+    // To get to FileFormat group end all current groups.
+    for (int i = 0; i < groupList.size(); i ++)
+    {
+        settings->endGroup();
+    }
+
+    settings->beginGroup("FileFormat");
+    QString versionString = (settings->value("met3dVersion",
+                                             defaultConfigVersion).toString());
+    settings->endGroup();
+
+    QStringList versionList = versionString.split(".");
+
+    // remove -devel from patch-id.
+    versionList[2] = (versionList[2].split("-"))[0];
+
+    // Restore group state from before entering this function.
+    foreach (QString groupName, groupList)
+    {
+        settings->beginGroup(groupName);
+    }
+
+    return versionList;
+}
+
+
 QString expandEnvironmentVariables(QString path)
 {
     QRegExp regExpEnvVar("\\$([A-Za-z0-9_]+)");

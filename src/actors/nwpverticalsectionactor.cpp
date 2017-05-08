@@ -1013,36 +1013,7 @@ void MNWPVerticalSectionActor::renderToCurrentContext(MSceneViewGLWidget *sceneV
              (var->renderSettings.renderMode
               == MNWP2DSectionActorVariable::RenderMode::FilledAndLineContours) )
         {
-            if (var->renderSettings.contoursUseTF)
-            {
-                marchingSquaresShader->bindProgram("TransferFunction");
-
-                // Texture bindings for transfer function for data field (1D texture from
-                // transfer function class).
-                if (var->transferFunction != 0)
-                {
-                    var->transferFunction->getTexture()->bindToTextureUnit(
-                                var->textureUnitTransferFunction);
-                    marchingSquaresShader->setUniformValue(
-                                "transferFunction",
-                                var->textureUnitTransferFunction); CHECK_GL_ERROR;
-                    marchingSquaresShader->setUniformValue(
-                                "scalarMinimum",
-                                var->transferFunction->getMinimumValue()); CHECK_GL_ERROR;
-                    marchingSquaresShader->setUniformValue(
-                                "scalarMaximum",
-                                var->transferFunction->getMaximimValue()); CHECK_GL_ERROR;
-                }
-                // Don't draw anything if no transfer function is present.
-                else
-                {
-                    return;
-                }
-            }
-            else
-            {
-                marchingSquaresShader->bindProgram("Standard");
-            }
+            marchingSquaresShader->bind();
 
             marchingSquaresShader->setUniformValue(
                         "mvpMatrix", *(sceneView->getModelViewProjectionMatrix())); CHECK_GL_ERROR;
@@ -1084,10 +1055,44 @@ void MNWPVerticalSectionActor::renderToCurrentContext(MSceneViewGLWidget *sceneV
                 if (contourSet.enabled)
                 {
                     glLineWidth(contourSet.thickness); CHECK_GL_ERROR;
-                    if (!var->renderSettings.contoursUseTF)
+                    marchingSquaresShader->setUniformValue(
+                                "useTransferFunction",
+                                GLboolean(var->renderSettings.contoursUseTF
+                                          || contourSet.useTF)); CHECK_GL_ERROR;
+                    if (!(var->renderSettings.contoursUseTF || contourSet.useTF))
                     {
                         marchingSquaresShader->setUniformValue(
                                     "colour", contourSet.colour); CHECK_GL_ERROR;
+                    }
+                    else
+                    {
+                        // Texture bindings for transfer function for data field
+                        // (1D texture from transfer function class).
+                        if (var->transferFunction != 0)
+                        {
+                            var->transferFunction->getTexture()->bindToTextureUnit(
+                                        var->textureUnitTransferFunction);
+                            marchingSquaresShader->setUniformValue(
+                                        "transferFunction",
+                                        var->textureUnitTransferFunction);
+                            CHECK_GL_ERROR;
+                            marchingSquaresShader->setUniformValue(
+                                        "scalarMinimum",
+                                        GLfloat(var->transferFunction
+                                                ->getMinimumValue()));
+                            CHECK_GL_ERROR;
+                            marchingSquaresShader->setUniformValue(
+                                        "scalarMaximum",
+                                        GLfloat(var->transferFunction
+                                                ->getMaximumValue()));
+                            CHECK_GL_ERROR;
+                        }
+                        // Don't draw contour set if transfer function is not
+                        // present.
+                        else
+                        {
+                            continue;
+                        }
                     }
                     // Loop over all iso values for which contour lines should
                     // be rendered -- one render pass per isovalue.

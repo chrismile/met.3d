@@ -1510,36 +1510,7 @@ void MNWPHorizontalSectionActor::renderPseudoColour(
 void MNWPHorizontalSectionActor::renderLineCountours(
         MSceneViewGLWidget *sceneView, MNWP2DHorizontalActorVariable *var)
 {
-    if (var->renderSettings.contoursUseTF)
-    {
-        glMarchingSquaresShader->bindProgram("TransferFunction");
-
-        // Texture bindings for transfer function for data field (1D texture from
-        // transfer function class).
-        if (var->transferFunction != 0)
-        {
-            var->transferFunction->getTexture()->bindToTextureUnit(
-                        var->textureUnitTransferFunction);
-            glMarchingSquaresShader->setUniformValue(
-                        "transferFunction",
-                        var->textureUnitTransferFunction); CHECK_GL_ERROR;
-            glMarchingSquaresShader->setUniformValue(
-                        "scalarMinimum",
-                        var->transferFunction->getMinimumValue()); CHECK_GL_ERROR;
-            glMarchingSquaresShader->setUniformValue(
-                        "scalarMaximum",
-                        var->transferFunction->getMaximimValue()); CHECK_GL_ERROR;
-        }
-        // Don't draw anything if no transfer function is present.
-        else
-        {
-            return;
-        }
-    }
-    else
-    {
-        glMarchingSquaresShader->bindProgram("Standard");
-    }
+    glMarchingSquaresShader->bind();
 
     // Model-view-projection matrix from the current scene view.
     glMarchingSquaresShader->setUniformValue(
@@ -1583,12 +1554,42 @@ void MNWPHorizontalSectionActor::renderLineCountours(
     {
         if (contourSet.enabled)
         {
-            glLineWidth(contourSet.thickness); CHECK_GL_ERROR;
-            if (!var->renderSettings.contoursUseTF)
+            glMarchingSquaresShader->setUniformValue(
+                        "useTransferFunction",
+                        GLboolean(var->renderSettings.contoursUseTF
+                                  || contourSet.useTF)); CHECK_GL_ERROR;
+            if (!(var->renderSettings.contoursUseTF || contourSet.useTF))
             {
                 glMarchingSquaresShader->setUniformValue(
                             "colour", contourSet.colour); CHECK_GL_ERROR;
             }
+            else
+            {
+                // Texture bindings for transfer function for data field
+                // (1D texture from transfer function class).
+                if (var->transferFunction != 0)
+                {
+                    var->transferFunction->getTexture()->bindToTextureUnit(
+                                var->textureUnitTransferFunction);
+                    glMarchingSquaresShader->setUniformValue(
+                                "transferFunction",
+                                var->textureUnitTransferFunction); CHECK_GL_ERROR;
+                    glMarchingSquaresShader->setUniformValue(
+                                "scalarMinimum",
+                                GLfloat(var->transferFunction
+                                        ->getMinimumValue())); CHECK_GL_ERROR;
+                    glMarchingSquaresShader->setUniformValue(
+                                "scalarMaximum",
+                                GLfloat(var->transferFunction
+                                        ->getMaximumValue())); CHECK_GL_ERROR;
+                }
+                // Don't draw contour set if transfer function is not present.
+                else
+                {
+                    continue;
+                }
+            }
+            glLineWidth(contourSet.thickness); CHECK_GL_ERROR;
             // Loop over all iso values for which contour lines should
             // be rendered -- one render pass per isovalue.
             for (int i = contourSet.startIndex; i < contourSet.stopIndex; i++)

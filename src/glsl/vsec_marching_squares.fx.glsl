@@ -234,6 +234,13 @@ uniform vec2  verticalBounds;  // lower and upper bound of this section. If
                                // worldZ is outside this interval discard
                                // the fragment.
 
+uniform bool useTransferFunction;
+
+uniform sampler1D transferFunction; // 1D transfer function
+uniform float     scalarMinimum;    // min/max data values to scale to 0..1
+uniform float     scalarMaximum;
+
+
 shader FSmain(in GStoFS input, out vec4 fragColour)
 {
     if ((input.worldZ < verticalBounds.x) || (input.worldZ > verticalBounds.y))
@@ -241,25 +248,18 @@ shader FSmain(in GStoFS input, out vec4 fragColour)
         discard;
     }
 
-    fragColour = colour;
-}
-
-uniform sampler1D transferFunction; // 1D transfer function
-uniform float     scalarMinimum;    // min/max data values to scale to 0..1
-uniform float     scalarMaximum;
-
-
-shader FStransferfunction(in GStoFS input, out vec4 fragColour)
-{
-    if ((input.worldZ < verticalBounds.x) || (input.worldZ > verticalBounds.y))
+    if (useTransferFunction)
     {
-        discard;
-    }
-    // Scale the scalar range to 0..1.
-    float scalar = (isoValue - scalarMinimum) / (scalarMaximum - scalarMinimum);
+        // Scale the scalar range to 0..1.
+        float scalar = (isoValue - scalarMinimum) / (scalarMaximum - scalarMinimum);
 
-    // Fetch colour from the transfer function and apply shading term.
-    fragColour = texture(transferFunction, scalar);
+        // Fetch colour from the transfer function and apply shading term.
+        fragColour = texture(transferFunction, scalar);
+    }
+    else
+    {
+        fragColour = colour;
+    }
 }
 
 
@@ -273,11 +273,3 @@ program Standard
     gs(420)=GSmain() : in(points), out(line_strip, max_vertices = 4);
     fs(420)=FSmain();
 };
-
-program TransferFunction
-{
-    vs(420)=VSmain();
-    gs(420)=GSmain() : in(points), out(line_strip, max_vertices = 4);
-    fs(420)=FStransferfunction();
-};
-
