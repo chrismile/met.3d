@@ -74,7 +74,8 @@ MSceneViewGLWidget::MSceneViewGLWidget()
       visualizationParameterChange(false),
       cameraSyncronizedWith(nullptr),
       singleInteractionActor(nullptr),
-      enablePropertyEvents(true)
+      enablePropertyEvents(true),
+      overwriteImageSerie(false)
 {
     viewIsInitialised = false;
     focusShader = nullptr;
@@ -792,7 +793,7 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
 
     else if (property == sceneSaveToImageProperty)
     {
-        takeScreenshot();
+        saveScreenshot();
     }
 
     else if (property == sceneNavigationModeProperty)
@@ -1686,7 +1687,7 @@ void MSceneViewGLWidget::keyPressEvent(QKeyEvent *event)
         if (event->modifiers() & Qt::AltModifier) executeCameraAction(CAMERA_TOPVIEW);
         break;
     case Qt::Key_S:
-        takeScreenshot();
+        saveScreenshot();
         break;
         // if (event->modifiers() & Qt::AltModifier) executeCameraAction(CAMERA_TOPVIEW);
     default:
@@ -1736,6 +1737,35 @@ void MSceneViewGLWidget::updateSceneLabel()
                 QColor(0, 0, 255, 150));
 
     staticLabels.append(sceneNameLabel);
+}
+
+
+void MSceneViewGLWidget::saveTimeAnimationImage(QString path, QString filename)
+{
+    filename = QDir(path).absoluteFilePath(filename);
+    QFileInfo checkFile(filename);
+    if (!overwriteImageSerie && checkFile.exists())
+    {
+// TODO (bt, 17Oct2016) Use operating system dependend filename splitting.
+        QMessageBox::StandardButton reply = QMessageBox::question(
+                    MGLResourcesManager::getInstance(),
+                    "Save screenshot",
+                    filename.split("/").last()
+                    + " already exits.\n"
+                    + "Do you want to replace it?",
+                    QMessageBox::Yes|QMessageBox::YesAll|QMessageBox::No,
+                    QMessageBox::No);
+        // Don't save image if user rejects to overwrite the file it.
+        if (reply == QMessageBox::No)
+        {
+            return;
+        }
+        if (reply == QMessageBox::YesAll)
+        {
+            overwriteImageSerie = true;
+        }
+    }
+    saveScreenshotToFileName(filename);
 }
 
 
@@ -1791,14 +1821,8 @@ void MSceneViewGLWidget::setSceneRotationCentre(QVector3D centre)
 ***                           PRIVATE METHODS                               ***
 *******************************************************************************/
 
-void MSceneViewGLWidget::takeScreenshot()
+void MSceneViewGLWidget::saveScreenshot()
 {
-    // Take Screenshot of current scene.
-    QImage screenshot = this->grabFrameBuffer();
-    // Chop red frame.
-    screenshot = screenshot.copy(1, 1, screenshot.width() - 2,
-                                 screenshot.height() - 2);
-
     // Filter containing all imagefile-extensions Qt is able to write (Oct2016).
     // All extensions are: .png .jpg .jpeg .bmp .ppm .tiff .xbm .xpm .
     QString filter = QString("png (*.png);;jpg (*.jpg);;jpeg (*.jpeg);;")
@@ -1863,6 +1887,20 @@ void MSceneViewGLWidget::takeScreenshot()
                 }
             }
         }
+        saveScreenshotToFileName(filename);
+    }
+}
+
+
+void MSceneViewGLWidget::saveScreenshotToFileName(QString filename)
+{
+    // Take Screenshot of current scene.
+    QImage screenshot = this->grabFrameBuffer();
+    // Chop red frame.
+    screenshot = screenshot.copy(1, 1, screenshot.width() - 2,
+                                 screenshot.height() - 2);
+    if (!filename.isEmpty())
+    {
         if (screenshot.save(filename))
         {
             QString str = "Saved screenshot of current view to " + filename
@@ -1880,7 +1918,6 @@ void MSceneViewGLWidget::takeScreenshot()
             LOG4CPLUS_ERROR(mlog, str.toStdString());
         }
     }
-
 }
 
 } // namespace Met3D

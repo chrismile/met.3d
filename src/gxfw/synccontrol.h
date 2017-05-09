@@ -209,6 +209,8 @@ signals:
      */
     void ensembleMemberChanged(const int member);
 
+    void imageOfTimeAnimationReady(QString path, QString fileName);
+
 protected slots:
     void onValidDateTimeChange(const QDateTime &datetime);
 
@@ -236,6 +238,11 @@ protected slots:
       */
     void copyValidToTo();
 
+    void activateTimeAnimationImageSaving(bool activate);
+    void saveTimeAnimation();
+
+    void changeSaveTADirectory();
+
 private:
     /**
       Used by @ref timeForward() and @ref timeBackward() to apply a change to a
@@ -249,6 +256,10 @@ private:
      time.
      */
     void updateTimeDifference();
+
+    void handleMissingDateTime(QDateTimeEdit *dte,
+                               QList<QDateTime> *availableDatetimes,
+                               QDateTime datetime, QDateTime *lastDatetime);
 
     void beginSceneSynchronization();
 
@@ -264,6 +275,8 @@ private:
     void setTimeSynchronizationGUIEnabled(bool enabled);
 
     void setSynchronizationGUIEnabled(bool enabled);
+
+    void emitSaveImageSignal();
 
     Ui::MSyncControl *ui;
 
@@ -291,6 +304,15 @@ private:
     QAction *timeAnimationReverseTimeDirectionAction;
     QTimer *animationTimer;
 
+    // Properties to control saving of images of time serie.
+    QCheckBox   *saveTimeAnimationCheckBox;
+    QLineEdit   *saveTAFileNameLineEdit;
+    QComboBox   *saveTAFileNameSuffixComboBox;
+    QComboBox   *saveTAFileExtensionComboBox;
+    QLabel      *saveTADirectoryLabel;
+    QPushButton *saveTADirectoryChangeButton;
+    QComboBox   *saveTASceneViewsComboBox;
+
     QString syncID;
 
     bool synchronizationInProgress;
@@ -304,10 +326,10 @@ private:
     // Properties to control configuration.
     QMenu *configurationDropdownMenu;
     QAction *selectDataSourcesAction;
-    QDateTime lastIinitTime;
-    QDateTime lastValidTime;
-    QList<QDateTime> availableInitTimes;
-    QList<QDateTime> availableValidTimes;
+    QDateTime lastInitDatetime;
+    QDateTime lastValidDatetime;
+    QList<QDateTime> availableInitDatetimes;
+    QList<QDateTime> availableValidDatetimes;
     QSet<unsigned int> availableEnsembleMembers;
     QList<QAction*> selectedDataSourceActionList;
 
