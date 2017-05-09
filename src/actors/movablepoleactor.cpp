@@ -139,36 +139,50 @@ int MMovablePoleActor::checkIntersectionWithHandle(MSceneViewGLWidget *sceneView
                                          float clipX, float clipY,
                                          float clipRadius)
 {
-    // MLOG << "checkIntersection(" << clipX << ", " << clipY << " / "
-    //      << clipRadius << ")\n" << flush;
-
     // Default: No pole has been touched by the mouse. Note: This instance
     // variable is used in renderToCurrentContext; if it is >= 0 the pole
     // with the corresponding index is highlighted.
     highlightPole = -1;
 
-    float clipRadiusSq = clipRadius*clipRadius;
-
     // Loop over all poles and check whether the mouse cursor is inside a
     // circle with radius "clipRadius" around the bottom pole point (in clip
     // space).
-    for (int i = 0; i < poleVertices.size(); i+=2)
+    for (int i = 0; i < poleVertices.size(); i++)
     {
-        // Transform the bottom pole coordinate to clip space.
-        QVector3D pClip = sceneView->lonLatPToClipSpace(poleVertices.at(i));
+        // Compute the world position of the current pole
+        QVector3D posPole = poleVertices.at(i);
+        posPole.setZ(sceneView->worldZfromPressure(posPole.z()));
 
-        // cout << "\tWP " << i << ": (" << pClip.x() << ", " << pClip.y()
-        //      << ", " << pClip.z() << ")\n" << flush;
+        // Obtain the camera position and the view direction
+        const QVector3D& cameraPos = sceneView->getCamera()->getOrigin();
+        QVector3D viewDir = posPole - cameraPos;
+        // Scale the radius (in world space) with respect to the viewer distance
+        float radius = static_cast<float>(clipRadius * viewDir.length() / 100.0);
 
-        float dx = pClip.x() - clipX;
-        float dy = pClip.y() - clipY;
+        QMatrix4x4 *mvpMatrix = sceneView->getModelViewProjectionMatrix();
+        // Compute the world position of the current mouse position
+        QVector3D mouseWorldPos = mvpMatrix->inverted() * QVector3D(clipX, clipY, 1);
 
-        // Compute the distance between point and mouse in clip space. If it
-        // is less than clipRadius, store this waypoint as the "matched" one
-        // and return from this function.
-        if ( (dx*dx + dy*dy) < clipRadiusSq )
+        // Get the ray direction from the camera to the mouse position
+        QVector3D l = mouseWorldPos - cameraPos;
+        l.normalize();
+
+        // Compute (o - c) // ray origin (o) - sphere center (c)
+        QVector3D oc = cameraPos - posPole;
+        // Length of (o - c) = || o - c ||
+        float lenOC = static_cast<float>(oc.length());
+        // Compute l * (o - c)
+        float loc = static_cast<float>(QVector3D::dotProduct(l, oc));
+
+        // Solve equation:
+        // d = - (l * (o - c) +- sqrt( (l * (o - c))² - || o - c ||² + r² )
+        // Since the equation can be solved only if root discriminant is >= 0
+        // just compute the discriminant
+        float root = loc * loc - lenOC * lenOC + radius * radius;
+
+        // If root discriminant is positive or zero, there's an intersection
+        if (root >= 0)
         {
-            // cout << "Match with WP" << i << "\n" << flush;
             highlightPole = i;
             break;
         }
@@ -209,10 +223,10 @@ void MMovablePoleActor::dragEvent(MSceneViewGLWidget *sceneView,
     // space is lcoated on the plane.
     QVector3D n = QVector3D(0, 0, 1);
     QVector3D p0 = QVector3D(0, 0, sceneView->worldZfromPressure(
-                                 poleVertices[handleID].z()));
+            poleVertices[handleID].z()));
 
     // Compute the mouse position in world space.
-    float d = QVector3D::dotProduct(p0 - l0, n) / QVector3D::dotProduct(l, n);
+    float d = static_cast<float>(QVector3D::dotProduct(p0 - l0, n) / QVector3D::dotProduct(l, n));
     QVector3D mousePosWorldSpace = l0 + d * l;
 
     // DEBUG output.
@@ -229,14 +243,17 @@ void MMovablePoleActor::dragEvent(MSceneViewGLWidget *sceneView,
     // Update the coordinates of pole, axis tick marks and labels. Upload new
     // positions to vertex buffers and redraw the scene.
 
-    poleVertices[handleID  ].setX(mousePosWorldSpace.x());
-    poleVertices[handleID  ].setY(mousePosWorldSpace.y());
-    poleVertices[handleID+1].setX(mousePosWorldSpace.x());
-    poleVertices[handleID+1].setY(mousePosWorldSpace.y());
+    // We only have one pole vertex in a pole actor. So simply use handleID = 0
+    int pole = handleID / 2;
+
+    poleVertices[pole  ].setX(mousePosWorldSpace.x());
+    poleVertices[pole  ].setY(mousePosWorldSpace.y());
+    poleVertices[pole + 1].setX(mousePosWorldSpace.x());
+    poleVertices[pole + 1].setY(mousePosWorldSpace.y());
 
     // Update tick mark positions.
     int numPoles = poleVertices.size() / 2; // two vertices per pole
-    int pole = handleID / 2;
+
     for (int i = pole; i < axisTicks.size(); i+=numPoles)
     {
         axisTicks[i].setX(mousePosWorldSpace.x());
@@ -244,11 +261,11 @@ void MMovablePoleActor::dragEvent(MSceneViewGLWidget *sceneView,
     }
 
     const QString poleRequestKey = "pole_vertices_actor#"
-                                    + QString::number(getID());
+                                   + QString::number(getID());
     uploadVec3ToVertexBuffer(poleVertices, poleRequestKey, &poleVertexBuffer, sceneView);
 
     const QString axisRequestKey = "axis_vertices_actor#"
-                                    + QString::number(getID());
+                                   + QString::number(getID());
     uploadVec3ToVertexBuffer(axisTicks, axisRequestKey, &axisVertexBuffer, sceneView);
 
     // Update label positions.
@@ -260,8 +277,8 @@ void MMovablePoleActor::dragEvent(MSceneViewGLWidget *sceneView,
 
     // Update GUI properties.
     properties->mPointF()->setValue(
-                poleProperties[pole].positionProperty,
-                QPointF(mousePosWorldSpace.x(), mousePosWorldSpace.y()));
+            poleProperties[pole].positionProperty,
+            QPointF(mousePosWorldSpace.x(), mousePosWorldSpace.y()));
 
     emitActorChangedSignal();
 }
@@ -589,7 +606,7 @@ void MMovablePoleActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
                         GLfloat(0.51));
             positionSpheresShader->setUniformValue(
                         "constColour", QColor(Qt::red));
-            glDrawArrays(GL_POINTS, highlightPole, 2); CHECK_GL_ERROR;
+            glDrawArrays(GL_POINTS, highlightPole, 1); CHECK_GL_ERROR;
         }
 
         // Unbind VBO.

@@ -368,23 +368,46 @@ int MNWPHorizontalSectionActor::checkIntersectionWithHandle(
     // First call? Generate positions of corner points.
     if (mouseHandlePoints.size() == 0) updateMouseHandlePositions();
 
-    float clipRadiusSq = clipRadius*clipRadius;
-
     selectedMouseHandle = -1;
 
     // Loop over all corner points and check whether the mouse cursor is inside
     // a circle with radius "clipRadius" around the corner point (in clip space).
     for (int i = 0; i < mouseHandlePoints.size(); i++)
     {
-        // Transform the corner point coordinate to clip space.
-        QVector3D pClip = sceneView->lonLatPToClipSpace(mouseHandlePoints.at(i));
+        // Compute the world position of the current pole
+        QVector3D posPole = mouseHandlePoints.at(i);
+        posPole.setZ(sceneView->worldZfromPressure(posPole.z()));
 
-        float dx = pClip.x() - clipX;
-        float dy = pClip.y() - clipY;
+        // Obtain the camera position and the view direction
+        const QVector3D& cameraPos = sceneView->getCamera()->getOrigin();
+        QVector3D viewDir = posPole - cameraPos;
 
-        // Compute the distance between point and mouse in clip space. If it
-        // is less than clipRadius return one.
-        if ( (dx*dx + dy*dy) < clipRadiusSq )
+        // Scale the radius (in world space) with respect to the viewer distance
+        float radius = static_cast<float>(clipRadius * viewDir.length() / 100.0);
+
+        QMatrix4x4 *mvpMatrix = sceneView->getModelViewProjectionMatrix();
+        // Compute the world position of the current mouse position
+        QVector3D mouseWorldPos = mvpMatrix->inverted() * QVector3D(clipX, clipY, 1);
+
+        // Get the ray direction from the camera to the mouse position
+        QVector3D l = mouseWorldPos - cameraPos;
+        l.normalize();
+
+        // Compute (o - c) // ray origin (o) - sphere center (c)
+        QVector3D oc = cameraPos - posPole;
+        // Length of (o - c) = || o - c ||
+        float lenOC = static_cast<float>(oc.length());
+        // Compute l * (o - c)
+        float loc = static_cast<float>(QVector3D::dotProduct(l, oc));
+
+        // Solve equation:
+        // d = - (l * (o - c) +- sqrt( (l * (o - c))² - || o - c ||² + r² )
+        // Since the equation can be solved only if root discriminant is >= 0
+        // just compute the discriminant
+        float root = loc * loc - lenOC * lenOC + radius * radius;
+
+        // If root discriminant is positive or zero, there's an intersection
+        if (root >= 0)
         {
             selectedMouseHandle = i;
             break;
@@ -956,13 +979,16 @@ void MNWPHorizontalSectionActor::renderToCurrentContext(MSceneViewGLWidget *scen
         positionSpheresShader->setUniformValue(
                     "constColour", QColor(Qt::white));
 
-        vbMouseHandlePoints->attachToVertexAttribute(SHADER_VERTEX_ATTRIBUTE);
-
         if (selectedMouseHandle >= 0)
         {
             positionSpheresShader->setUniformValue(
-                        "constColour", QColor(Qt::red));
+                    "constColour", QColor(Qt::red));
+
+            positionSpheresShader->setUniformValue(
+                    "radius", GLfloat(0.51));
         }
+
+        vbMouseHandlePoints->attachToVertexAttribute(SHADER_VERTEX_ATTRIBUTE);
 
         glPolygonMode(GL_FRONT_AND_BACK,
                       renderAsWireFrame ? GL_LINE : GL_FILL); CHECK_GL_ERROR;
@@ -1528,7 +1554,7 @@ void MNWPHorizontalSectionActor::renderLineCountours(
                         var->transferFunction->getMinimumValue()); CHECK_GL_ERROR;
             glMarchingSquaresShader->setUniformValue(
                         "scalarMaximum",
-                        var->transferFunction->getMaximimValue()); CHECK_GL_ERROR;
+                        var->transferFunction->getMaximumValue()); CHECK_GL_ERROR;
         }
         // Don't draw anything if no transfer function is present.
         else

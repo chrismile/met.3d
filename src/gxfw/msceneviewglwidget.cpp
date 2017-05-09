@@ -1529,7 +1529,7 @@ void MSceneViewGLWidget::mouseMoveEvent(QMouseEvent *event)
                            singleInteractionActor->getName() == actor->getName())
                     {
                         pickedActor.handleID = actor->checkIntersectionWithHandle(
-                                    this, clipX, clipY, 10. / float(viewPortWidth));
+                                    this, clipX, clipY, 0.5f);
                         // If the test returned a valid handle ID, store the actor
                         // and its handle as the currently picked actor.
                         if (pickedActor.handleID >= 0)
