@@ -26,7 +26,6 @@
 #include "movablepoleactor.h"
 
 // standard library imports
-#include <iostream>
 
 // related third party imports
 #include <log4cplus/loggingmacros.h>
@@ -37,10 +36,7 @@
 #include "gxfw/msceneviewglwidget.h"
 
 using namespace std;
-
-
-namespace Met3D
-{
+using namespace Met3D;
 
 /******************************************************************************
 ***                     CONSTRUCTOR / DESTRUCTOR                            ***
@@ -48,11 +44,14 @@ namespace Met3D
 
 MMovablePoleActor::MMovablePoleActor()
     : MActor(),
-      pbot_hPa(1050.),
-      ptop_hPa(100.),
       tickLength(0.8),
       lineColour(QColor(0, 104, 139, 255)),
-      highlightPole(-1)
+      renderMode(RenderModes::TUBES),
+      tubeRadius(0.06f),
+      highlightPole(-1),
+      bottomPressure_hPa(1050.f), topPressure_hPa(100.f),
+      individualPoleHeightsEnabled(false),
+      movementEnabled(true)
 {
     enablePicking(true);
 
@@ -62,27 +61,68 @@ MMovablePoleActor::MMovablePoleActor()
 
     setName("Movable poles");
 
+    colourProperty = addProperty(COLOR_PROPERTY, "colour",
+                                 actorPropertiesSupGroup);
+    properties->mColor()->setValue(colourProperty, lineColour);
+
+    renderModeProperty = addProperty(ENUM_PROPERTY, "render mode",
+                                     actorPropertiesSupGroup);
+    QStringList modes;
+    modes << "Tubes" << "Lines";
+    properties->mEnum()->setEnumNames(renderModeProperty, modes);
+    properties->mEnum()->setValue(renderModeProperty, static_cast<int>(renderMode));
+
+    tubeRadiusProperty = addProperty(DOUBLE_PROPERTY, "tube radius",
+                                         actorPropertiesSupGroup);
+    properties->setDouble(tubeRadiusProperty, tubeRadius, 0.01, 5, 2, 0.01);
+
+    individualPoleHeightsProperty = addProperty(BOOL_PROPERTY,
+                                                "individual pole heights",
+                                        actorPropertiesSupGroup);
+    properties->mBool()->setValue(individualPoleHeightsProperty,
+                                  individualPoleHeightsEnabled);
+
     bottomPressureProperty = addProperty(DECORATEDDOUBLE_PROPERTY,
                                          "bottom pressure",
                                          actorPropertiesSupGroup);
-    properties->setDDouble(bottomPressureProperty, pbot_hPa,
+    properties->setDDouble(bottomPressureProperty, bottomPressure_hPa,
                            1050., 20., 1, 10., " hPa");
 
     topPressureProperty = addProperty(DECORATEDDOUBLE_PROPERTY,
                                       "top pressure",
                                       actorPropertiesSupGroup);
-    properties->setDDouble(topPressureProperty, ptop_hPa,
+    properties->setDDouble(topPressureProperty, topPressure_hPa,
                            1050., 20., 1, 10., " hPa");
+
+    ticksGroupProperty = addProperty(GROUP_PROPERTY, "tick marks",
+                                     actorPropertiesSupGroup);
 
     tickLengthProperty = addProperty(DECORATEDDOUBLE_PROPERTY,
                                      "tick length",
-                                     actorPropertiesSupGroup);
+                                     ticksGroupProperty);
     properties->setDDouble(tickLengthProperty, tickLength,
                            0.05, 20., 2, 0.05, " (world space)");
 
-    colourProperty = addProperty(COLOR_PROPERTY, "colour",
-                                 actorPropertiesSupGroup);
-    properties->mColor()->setValue(colourProperty, lineColour);
+    tickPressureThresholdProperty = addProperty(DECORATEDDOUBLE_PROPERTY,
+                                                "tick interval threshold",
+                                                ticksGroupProperty);
+    properties->setDDouble(tickPressureThresholdProperty, 100.,
+                           1050., 20., 1, 10., " hPa");
+    tickIntervalAboveThreshold = addProperty(DOUBLE_PROPERTY, "tick interval above threshold",
+                                        ticksGroupProperty);
+
+    properties->setDouble(tickIntervalAboveThreshold, 100.,
+                          10., 300., 1, 10.);
+
+    tickIntervalBelowThreshold = addProperty(DOUBLE_PROPERTY, "tick interval below threshold",
+                                        ticksGroupProperty);
+
+    properties->setDouble(tickIntervalBelowThreshold, 10.,
+                          10., 300., 1, 10.);
+
+    labelSpacingProperty = addProperty(INT_PROPERTY, "label spacing",
+                                        ticksGroupProperty);
+    properties->setInt(labelSpacingProperty, 3, 1, 100, 1);
 
     addPoleProperty = addProperty(CLICK_PROPERTY, "add pole",
                                   actorPropertiesSupGroup);
@@ -96,7 +136,7 @@ MMovablePoleActor::~MMovablePoleActor()
 }
 
 
-MMovablePoleActor::PoleSettings::PoleSettings(MActor *actor)
+MovablePole::MovablePole(MActor *actor)
 {
     if (actor == nullptr) return;
 
@@ -106,6 +146,16 @@ MMovablePoleActor::PoleSettings::PoleSettings(MActor *actor)
                                           groupProperty);
     MQtProperties *properties = actor->getQtProperties();
     properties->mPointF()->setValue(positionProperty, QPointF());
+
+    pBotProperty = actor->addProperty(DECORATEDDOUBLE_PROPERTY,
+                                      "bottom pressure", groupProperty);
+    properties->setDDouble(pBotProperty, 1050.,
+                           1050., 20., 1, 10., " hPa");
+
+    pTopProperty = actor->addProperty(DECORATEDDOUBLE_PROPERTY,
+                                      "top pressure", groupProperty);
+    properties->setDDouble(pTopProperty, 100,
+                           1050., 20., 1, 10., " hPa");
 
     removePoleProperty = actor->addProperty(CLICK_PROPERTY, "remove",
                                             groupProperty);
@@ -121,54 +171,395 @@ MMovablePoleActor::PoleSettings::PoleSettings(MActor *actor)
 void MMovablePoleActor::reloadShaderEffects()
 {
     LOG4CPLUS_DEBUG(mlog, "loading shader programs" << flush);
-
-    beginCompileShaders(2);
-
-    compileShadersFromFileWithProgressDialog(
-                simpleGeometryEffect,
-                "src/glsl/simple_coloured_geometry.fx.glsl");
-    compileShadersFromFileWithProgressDialog(
-                positionSpheresShader,
-                "src/glsl/trajectory_positions.fx.glsl");
-
-    endCompileShaders();
+    simpleGeometryEffect
+     ->compileFromFile_Met3DHome("src/glsl/simple_geometry_generation.fx.glsl");
+    positionSpheresShader
+     ->compileFromFile_Met3DHome("src/glsl/trajectory_positions.fx.glsl");
 }
 
 
-int MMovablePoleActor::checkIntersectionWithHandle(MSceneViewGLWidget *sceneView,
-                                         float clipX, float clipY,
-                                         float clipRadius)
+void MMovablePoleActor::removeAllPoles()
 {
-    // MLOG << "checkIntersection(" << clipX << ", " << clipY << " / "
-    //      << clipRadius << ")\n" << flush;
+    foreach (const std::shared_ptr<MovablePole> pole, poles)
+        actorPropertiesSupGroup->removeSubProperty(pole->groupProperty);
+
+    poles.clear();
+
+    if (isInitialized())
+    {
+        generateGeometry();
+        emitActorChangedSignal();
+    }
+}
+
+
+void MMovablePoleActor::addPole(QPointF pos)
+{
+    std::shared_ptr<MovablePole> pole = std::make_shared<MovablePole>(this);
+    properties->mPointF()->setValue(pole->positionProperty, pos);
+    poles.append(pole);
+    actorPropertiesSupGroup->addSubProperty(pole->groupProperty);
+
+    if (isInitialized())
+    {
+        generateGeometry();
+        emitActorChangedSignal();
+    }
+}
+
+void MMovablePoleActor::addPole(const QVector3D& lonlatP)
+{
+    std::shared_ptr<MovablePole> pole = std::make_shared<MovablePole>(this);
+    properties->mPointF()->setValue(pole->positionProperty, lonlatP.toPointF());
+    properties->mDDouble()->setValue(pole->pTopProperty, lonlatP.z());
+    properties->mDDouble()->setValue(pole->pBotProperty, 1050.0);
+    poles.append(pole);
+    actorPropertiesSupGroup->addSubProperty(pole->groupProperty);
+
+    if (isInitialized())
+    {
+        generateGeometry();
+        emitActorChangedSignal();
+    }
+}
+
+
+void MMovablePoleActor::saveConfiguration(QSettings *settings)
+{
+    settings->setValue("tickLength",
+                       properties->mDDouble()->value(tickLengthProperty));
+
+    settings->setValue("lineColour",
+                       properties->mColor()->value(colourProperty));
+
+    settings->setValue("renderMode", static_cast<int>(renderMode));
+
+    settings->setValue("tubeRadius", tubeRadius);
+
+    settings->setValue("individualPoleHeightsEnabled", individualPoleHeightsEnabled);
+
+    settings->setValue("bottomPressure",
+                       properties->mDDouble()->value(bottomPressureProperty));
+
+    settings->setValue("topPressure",
+                       properties->mDDouble()->value(topPressureProperty));
+
+    settings->setValue("numPoles", poles.size());
+
+    settings->setValue("tickIntervalAboveThreshold",
+                       properties->mDouble()->value(tickIntervalAboveThreshold));
+
+    settings->setValue("tickIntervalBelowThreshold",
+                       properties->mDouble()->value(tickIntervalBelowThreshold));
+
+    settings->setValue("tickIntervalThreshold",
+                       properties->mDDouble()->value(tickPressureThresholdProperty));
+
+    settings->setValue("labelSpacing",
+                       properties->mInt()->value(labelSpacingProperty));
+
+    for (int i = 0; i < poles.size(); i++)
+    {
+        std::shared_ptr<MovablePole> pole = poles.at(i);
+
+        QString poleID = QString("polePosition_%1").arg(i);
+
+        settings->setValue(
+                poleID, properties->mPointF()->value(pole->positionProperty));
+        settings->setValue(QString("polePBot_%1").arg(i),
+                        properties->mDDouble()->value(pole->pTopProperty));
+        settings->setValue(QString("polePTop_%1").arg(i),
+                        properties->mDDouble()->value(pole->pBotProperty));
+    }
+
+}
+
+
+void MMovablePoleActor::loadConfiguration(QSettings *settings)
+{
+    properties->mDDouble()->setValue(tickLengthProperty,
+                settings->value("tickLength").toDouble());
+
+    properties->mColor()->setValue(colourProperty,
+                settings->value("lineColour").value<QColor>());
+
+    properties->mEnum()->setValue(renderModeProperty,
+                settings->value("renderMode").toInt());
+
+    properties->mDouble()->setValue(tubeRadiusProperty,
+                settings->value("tubeRadius").toDouble());
+
+    individualPoleHeightsEnabled = settings->value("individualPoleHeightsEnabled").toBool();
+    properties->mBool()->setValue(individualPoleHeightsProperty, individualPoleHeightsEnabled);
+
+    properties->mDDouble()->setValue(bottomPressureProperty,
+                                     settings->value("bottomPressure").toDouble());
+
+    properties->mDDouble()->setValue(topPressureProperty,
+                                     settings->value("topPressure").toDouble());
+
+    properties->mDouble()->setValue(tickIntervalAboveThreshold,
+                                    settings->value("tickIntervalAboveThreshold").toDouble());
+
+    properties->mDouble()->setValue(tickIntervalBelowThreshold,
+                                    settings->value("tickIntervalBelowThreshold").toDouble());
+
+    properties->mDDouble()->setValue(tickPressureThresholdProperty,
+                                    settings->value("tickIntervalThreshold").toDouble());
+
+    properties->mInt()->setValue(labelSpacingProperty,
+                                     settings->value("labelSpacing").toInt());
+
+    int numPoles = settings->value("numPoles").toInt();
+
+    // Clear current poles.
+    foreach(const std::shared_ptr<MovablePole> ps, poles)
+    {
+        actorPropertiesSupGroup->removeSubProperty(ps->groupProperty);
+    }
+    poles.clear();
+
+    // Read saved poles.
+    for (int i = 0; i < numPoles; i++)
+    {
+        QString poleID = QString("polePosition_%1").arg(i);
+        QPointF pos = settings->value(poleID).toPointF();
+        float pBot = settings->value(QString("polePBot_%1").arg(i)).toFloat();
+        float pTop= settings->value(QString("polePTop_%1").arg(i)).toFloat();
+
+        std::shared_ptr<MovablePole> pole = std::make_shared<MovablePole>(this);
+
+        properties->mPointF()->setValue(pole->positionProperty, pos);
+        pole->pBotProperty->setEnabled(individualPoleHeightsEnabled);
+        pole->pTopProperty->setEnabled(individualPoleHeightsEnabled);
+
+        properties->mDouble()->setValue(pole->pBotProperty, pBot);
+        properties->mDouble()->setValue(pole->pBotProperty, pTop);
+        poles.append(pole);
+        actorPropertiesSupGroup->addSubProperty(pole->groupProperty);
+    }
+
+    if (isInitialized()) generateGeometry();
+}
+
+
+const QVector<QVector3D>& MMovablePoleActor::getPoleVertices() const
+{
+    return poleVertices;
+}
+
+void MMovablePoleActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
+{
+    // A) Render vertical axes.
+    // ========================
+
+    // Bind shader program.
+    switch (renderMode)
+    {
+        case RenderModes::LINES:
+            tubeRadius = 0;
+            simpleGeometryEffect->bindProgram("LonLatPLines");
+            break;
+        case RenderModes::TUBES:
+            simpleGeometryEffect->bindProgram("LonLatPTubes");
+            break;
+    }
+
+    const float tubeRadiusTick = tubeRadius * 0.5f;
+
+    // Set uniform and attribute values.
+    simpleGeometryEffect->setUniformValue(
+            "mvpMatrix", *(sceneView->getModelViewProjectionMatrix()));
+    simpleGeometryEffect->setUniformValue(
+            "pToWorldZParams", sceneView->pressureToWorldZParameters());
+    simpleGeometryEffect->setUniformValue("tubeRadius", tubeRadius);
+    simpleGeometryEffect->setUniformValue(
+            "lightDirection", sceneView->getLightDirection());
+    simpleGeometryEffect->setUniformValue(
+            "cameraPosition", sceneView->getCamera()->getOrigin());
+    simpleGeometryEffect->setUniformValue("endSegmentOffset", tubeRadius);
+    simpleGeometryEffect->setUniformValue("geometryColor", lineColour);
+
+    poleVertexBuffer->attachToVertexAttribute(SHADER_VERTEX_ATTRIBUTE);
+
+    glLineWidth(2);
+    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL); CHECK_GL_ERROR;
+    glDrawArrays(GL_LINES, 0, poleVertices.size()); CHECK_GL_ERROR;
+
+    // B) Render tick marks and adjust label positions.
+    // ================================================
+
+    // Bind shader program.
+    switch (renderMode)
+    {
+        case RenderModes::LINES:
+            simpleGeometryEffect->bindProgram("TickLines");
+            break;
+        case RenderModes::TUBES:
+            simpleGeometryEffect->bindProgram("TickTubes");
+            break;
+    }
+
+    // Set uniform and attribute values.
+    simpleGeometryEffect->setUniformValue(
+            "pToWorldZParams", sceneView->pressureToWorldZParameters());
+    simpleGeometryEffect->setUniformValue(
+            "mvpMatrix", *(sceneView->getModelViewProjectionMatrix()));
+    simpleGeometryEffect->setUniformValue("geometryColor", lineColour);
+    simpleGeometryEffect->setUniformValue(
+            "pToWorldZParams", sceneView->pressureToWorldZParameters());
+    simpleGeometryEffect->setUniformValue("tubeRadius", tubeRadiusTick);
+    simpleGeometryEffect->setUniformValue(
+            "lightDirection", sceneView->getLightDirection());
+    simpleGeometryEffect->setUniformValue(
+            "cameraPosition", sceneView->getCamera()->getOrigin());
+    simpleGeometryEffect->setUniformValue("endSegmentOffset", 0.1f);
+
+
+    // Offset for the "other end" of the tick line and anchor offset for
+    // the labels.
+    QVector3D anchorOffset = tickLength * sceneView->getCamera()->getXAxis();
+
+    simpleGeometryEffect->setUniformValue(
+            "offsetDirection", anchorOffset);
+
+    // Set label offset; the labels are rendered by the text manager.
+    for (int i = 0; i < labels.size(); i++)
+        labels[i]->anchorOffset = anchorOffset + tubeRadius * sceneView->getCamera()->getXAxis();
+
+    // Render tick marks.
+
+    axisVertexBuffer->attachToVertexAttribute(SHADER_VERTEX_ATTRIBUTE);
+
+    glLineWidth(2);
+    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL); CHECK_GL_ERROR;
+    glDrawArrays(GL_POINTS, 0, axisTicks.size()); CHECK_GL_ERROR;
+
+    // Unbind VBO.
+    glBindBuffer(GL_ARRAY_BUFFER, 0); CHECK_GL_ERROR;
+
+    // C) Highlight pole if one is currently dragged.
+    // ================================================
+
+    // If the index "highlightPole" is < 0, no waypoint should be highlighted.
+    if (sceneView->interactionModeEnabled() && movementEnabled)
+    {
+
+        // Bind shader program.
+        positionSpheresShader->bind();
+
+        // Set MVP-matrix and parameters to map pressure to world space in the
+        // vertex shader.
+        positionSpheresShader->setUniformValue(
+                "mvpMatrix",
+                *(sceneView->getModelViewProjectionMatrix()));
+        positionSpheresShader->setUniformValue(
+                "pToWorldZParams",
+                sceneView->pressureToWorldZParameters());
+        positionSpheresShader->setUniformValue(
+                "lightDirection",
+                sceneView->getLightDirection());
+        positionSpheresShader->setUniformValue(
+                "cameraPosition",
+                sceneView->getCamera()->getOrigin());
+        positionSpheresShader->setUniformValue(
+                "cameraUpDir",
+                sceneView->getCamera()->getYAxis());
+        positionSpheresShader->setUniformValue(
+                "radius",
+                GLfloat(0.5));
+        positionSpheresShader->setUniformValue(
+                "scaleRadius",
+                GLboolean(true));
+
+
+        // Texture bindings for transfer function for data scalar (1D texture from
+        // transfer function class). The data scalar is stored in the vertex.w
+        // component passed to the vertex shader.
+        positionSpheresShader->setUniformValue(
+                "useTransferFunction", GLboolean(false));
+        positionSpheresShader->setUniformValue(
+                "constColour", QColor(Qt::white));
+
+        // Bind vertex buffer object.
+
+        poleVertexBuffer->attachToVertexAttribute(SHADER_VERTEX_ATTRIBUTE);
+
+        glPolygonMode(GL_FRONT_AND_BACK,
+                      renderAsWireFrame ? GL_LINE : GL_FILL); CHECK_GL_ERROR;
+        glLineWidth(1); CHECK_GL_ERROR;
+
+        glDrawArrays(GL_POINTS, 0, poleVertices.size()); CHECK_GL_ERROR;
+
+        if (highlightPole >= 0)
+        {
+            positionSpheresShader->setUniformValue(
+                    "radius",
+                    GLfloat(0.51));
+            positionSpheresShader->setUniformValue(
+                    "constColour", QColor(Qt::red));
+            glDrawArrays(GL_POINTS, highlightPole / 2 * 2, 2); CHECK_GL_ERROR;
+        }
+
+        // Unbind VBO.
+        glBindBuffer(GL_ARRAY_BUFFER, 0); CHECK_GL_ERROR;
+    }
+}
+
+int MMovablePoleActor::checkIntersectionWithHandle(MSceneViewGLWidget *sceneView,
+                                                   float clipX, float clipY,
+                                                   float clipRadius)
+{
+    if (!movementEnabled) { return -1; }
 
     // Default: No pole has been touched by the mouse. Note: This instance
     // variable is used in renderToCurrentContext; if it is >= 0 the pole
     // with the corresponding index is highlighted.
     highlightPole = -1;
 
-    float clipRadiusSq = clipRadius*clipRadius;
+    //! TODO: HACK for pole actor. Should be changed for all movable actors!
+    clipRadius = 0.5f;
 
     // Loop over all poles and check whether the mouse cursor is inside a
     // circle with radius "clipRadius" around the bottom pole point (in clip
     // space).
-    for (int i = 0; i < poleVertices.size(); i+=2)
+    for (int i = 0; i < poleVertices.size(); i++)
     {
-        // Transform the bottom pole coordinate to clip space.
-        QVector3D pClip = sceneView->lonLatPToClipSpace(poleVertices.at(i));
+        // Compute the world position of the current pole
+        QVector3D posPole = poleVertices.at(i);
+        posPole.setZ(sceneView->worldZfromPressure(posPole.z()));
 
-        // cout << "\tWP " << i << ": (" << pClip.x() << ", " << pClip.y()
-        //      << ", " << pClip.z() << ")\n" << flush;
+        // Obtain the camera position and the view direction
+        const QVector3D& cameraPos = sceneView->getCamera()->getOrigin();
+        QVector3D viewDir = posPole - cameraPos;
 
-        float dx = pClip.x() - clipX;
-        float dy = pClip.y() - clipY;
+        // Scale the radius (in world space) with respect to the viewer distance
+        float radius = static_cast<float>(clipRadius * viewDir.length() / 100.0);
 
-        // Compute the distance between point and mouse in clip space. If it
-        // is less than clipRadius, store this waypoint as the "matched" one
-        // and return from this function.
-        if ( (dx*dx + dy*dy) < clipRadiusSq )
+        QMatrix4x4 *mvpMatrix = sceneView->getModelViewProjectionMatrix();
+        // Compute the world position of the current mouse position
+        QVector3D mouseWorldPos = mvpMatrix->inverted() * QVector3D(clipX, clipY, 1);
+
+        // Get the ray direction from the camera to the mouse position
+        QVector3D l = mouseWorldPos - cameraPos;
+        l.normalize();
+
+        // Compute (o - c) // ray origin (o) - sphere center (c)
+        QVector3D oc = cameraPos - posPole;
+        // Length of (o - c) = || o - c ||
+        float lenOC = static_cast<float>(oc.length());
+        // Compute l * (o - c)
+        float loc = static_cast<float>(QVector3D::dotProduct(l, oc));
+
+        // Solve equation:
+        // d = - (l * (o - c) +- sqrt( (l * (o - c))² - || o - c ||² + r² )
+        // Since the equation can be solved only if root discriminant is >= 0
+        // just compute the discriminant
+        float root = loc * loc - lenOC * lenOC + radius * radius;
+
+        // If root discriminant is positive or zero, there's an intersection
+        if (root >= 0)
         {
-            // cout << "Match with WP" << i << "\n" << flush;
             highlightPole = i;
             break;
         }
@@ -181,6 +572,8 @@ int MMovablePoleActor::checkIntersectionWithHandle(MSceneViewGLWidget *sceneView
 void MMovablePoleActor::dragEvent(MSceneViewGLWidget *sceneView,
                                   int handleID, float clipX, float clipY)
 {
+    if (!movementEnabled) { return; }
+
     // Select an arbitrary z-value to construct a point in clip space that,
     // transformed to world space, lies on the ray passing through the camera
     // and the location on the worldZ==0 plane "picked" by the mouse.
@@ -209,46 +602,38 @@ void MMovablePoleActor::dragEvent(MSceneViewGLWidget *sceneView,
     // space is lcoated on the plane.
     QVector3D n = QVector3D(0, 0, 1);
     QVector3D p0 = QVector3D(0, 0, sceneView->worldZfromPressure(
-                                 poleVertices[handleID].z()));
+            poleVertices[handleID].z()));
 
     // Compute the mouse position in world space.
-    float d = QVector3D::dotProduct(p0 - l0, n) / QVector3D::dotProduct(l, n);
+    float d = static_cast<float>(QVector3D::dotProduct(p0 - l0, n) / QVector3D::dotProduct(l, n));
     QVector3D mousePosWorldSpace = l0 + d * l;
-
-    // DEBUG output.
-//    MLOG << "dragging handle " << handleID << endl << flush;
-//    cout << "\tmouse position clip space = (" << mousePosClipSpace.x() << "," << mousePosClipSpace.y() << "," << mousePosClipSpace.z() << ")\n" << flush;
-//    cout << "\tl0 = (" << l0.x() << "," << l0.y() << "," << l0.z() << ")\n" << flush;
-//    QVector3D l0Clip = *(mvpMatrix) * l0;
-//    cout << "\tcheck: l0, transformed back to clip space = (" << l0Clip.x() << "," << l0Clip.y() << "," << l0Clip.z() << ")\n" << flush;
-//    cout << "\tl = (" << l.x() << "," << l.y() << "," << l.z() << ")\n" << flush;
-//    cout << "\tmouse position, world space, on worldZ==0 plane = (" << mousePosWorldSpace.x() << "," << mousePosWorldSpace.y()
-//         << "," << mousePosWorldSpace.z()
-//         << "); d = " << d << "\n" << flush;
 
     // Update the coordinates of pole, axis tick marks and labels. Upload new
     // positions to vertex buffers and redraw the scene.
 
-    poleVertices[handleID  ].setX(mousePosWorldSpace.x());
-    poleVertices[handleID  ].setY(mousePosWorldSpace.y());
-    poleVertices[handleID+1].setX(mousePosWorldSpace.x());
-    poleVertices[handleID+1].setY(mousePosWorldSpace.y());
+    // We only have one pole vertex in a pole actor. So simply use handleID = 0
+    int pole = handleID / 2;
+
+    poleVertices[pole  ].setX(mousePosWorldSpace.x());
+    poleVertices[pole  ].setY(mousePosWorldSpace.y());
+    poleVertices[pole + 1].setX(mousePosWorldSpace.x());
+    poleVertices[pole + 1].setY(mousePosWorldSpace.y());
 
     // Update tick mark positions.
     int numPoles = poleVertices.size() / 2; // two vertices per pole
-    int pole = handleID / 2;
-    for (int i = pole; i < axisTicks.size(); i+=numPoles)
+
+    for (int i = pole; i < axisTicks.size(); i += numPoles)
     {
         axisTicks[i].setX(mousePosWorldSpace.x());
         axisTicks[i].setY(mousePosWorldSpace.y());
     }
 
     const QString poleRequestKey = "pole_vertices_actor#"
-                                    + QString::number(getID());
+                                   + QString::number(getID());
     uploadVec3ToVertexBuffer(poleVertices, poleRequestKey, &poleVertexBuffer, sceneView);
 
     const QString axisRequestKey = "axis_vertices_actor#"
-                                    + QString::number(getID());
+                                   + QString::number(getID());
     uploadVec3ToVertexBuffer(axisTicks, axisRequestKey, &axisVertexBuffer, sceneView);
 
     // Update label positions.
@@ -260,122 +645,16 @@ void MMovablePoleActor::dragEvent(MSceneViewGLWidget *sceneView,
 
     // Update GUI properties.
     properties->mPointF()->setValue(
-                poleProperties[pole].positionProperty,
-                QPointF(mousePosWorldSpace.x(), mousePosWorldSpace.y()));
+            poles[pole]->positionProperty,
+            QPointF(mousePosWorldSpace.x(), mousePosWorldSpace.y()));
 
     emitActorChangedSignal();
 }
 
-
-void MMovablePoleActor::removeAllPoles()
+void MMovablePoleActor::setMovement(bool enabled)
 {
-    foreach (PoleSettings pole, poleProperties)
-        actorPropertiesSupGroup->removeSubProperty(pole.groupProperty);
-
-    poleProperties.clear();
-
-    if (isInitialized())
-    {
-        generateGeometry();
-        emitActorChangedSignal();
-    }
+    movementEnabled = enabled;
 }
-
-
-void MMovablePoleActor::addPole(QPointF pos)
-{
-    PoleSettings poleSettings(this);
-    properties->mPointF()->setValue(poleSettings.positionProperty, pos);
-    poleProperties.append(poleSettings);
-    actorPropertiesSupGroup->addSubProperty(poleSettings.groupProperty);
-
-    if (isInitialized())
-    {
-        generateGeometry();
-        emitActorChangedSignal();
-    }
-}
-
-
-void MMovablePoleActor::saveConfiguration(QSettings *settings)
-{
-    settings->beginGroup(MMovablePoleActor::getSettingsID());
-
-    settings->setValue("bottomPressure",
-                       properties->mDDouble()->value(bottomPressureProperty));
-
-    settings->setValue("topPressure",
-                       properties->mDDouble()->value(topPressureProperty));
-
-    settings->setValue("tickLength",
-                       properties->mDDouble()->value(tickLengthProperty));
-
-    settings->setValue("lineColour",
-                       properties->mColor()->value(colourProperty));
-
-    settings->setValue("numPoles", poleProperties.size());
-
-    for (int i = 0; i < poleProperties.size(); i++)
-    {
-        const PoleSettings& ps = poleProperties.at(i);
-        QString poleID = QString("polePosition_%1").arg(i);
-        settings->setValue(
-                    poleID, properties->mPointF()->value(ps.positionProperty));
-    }
-
-    settings->endGroup();
-}
-
-
-void MMovablePoleActor::loadConfiguration(QSettings *settings)
-{
-    settings->beginGroup(MMovablePoleActor::getSettingsID());
-
-    properties->mDDouble()->setValue(
-                bottomPressureProperty,
-                settings->value("bottomPressure").toDouble());
-
-    properties->mDDouble()->setValue(
-                topPressureProperty,
-                settings->value("topPressure").toDouble());
-
-    properties->mDDouble()->setValue(
-                tickLengthProperty,
-                settings->value("tickLength").toDouble());
-
-    properties->mColor()->setValue(
-                colourProperty,
-                settings->value("lineColour").value<QColor>());
-
-    int numPoles = settings->value("numPoles").toInt();
-
-    // Clear current poles.
-    foreach(const PoleSettings& ps, poleProperties)
-        actorPropertiesSupGroup->removeSubProperty(ps.groupProperty);
-    poleProperties.clear();
-
-    // Read saved poles.
-    for (int i = 0; i < numPoles; i++)
-    {
-        QString poleID = QString("polePosition_%1").arg(i);
-        QPointF pos = settings->value(poleID).toPointF();
-        PoleSettings poleSettings(this);
-        properties->mPointF()->setValue(poleSettings.positionProperty, pos);
-        poleProperties.append(poleSettings);
-        actorPropertiesSupGroup->addSubProperty(poleSettings.groupProperty);
-    }
-
-    settings->endGroup();
-
-    if (isInitialized()) generateGeometry();
-}
-
-
-const QVector<QVector3D>& MMovablePoleActor::getPoleVertices()
-{
-    return poleVertices;
-}
-
 
 /******************************************************************************
 ***                             PUBLIC SLOTS                                ***
@@ -384,9 +663,19 @@ const QVector<QVector3D>& MMovablePoleActor::getPoleVertices()
 void MMovablePoleActor::onQtPropertyChanged(QtProperty *property)
 {
     // The slice position has been changed.
-    if ( property == bottomPressureProperty
-         || (property == topPressureProperty)
-         || (property == labelSizeProperty)
+    if (property == bottomPressureProperty
+         || (property == topPressureProperty))
+    {
+        bottomPressure_hPa = properties->mDDouble()->value(bottomPressureProperty);
+        topPressure_hPa = properties->mDDouble()->value(topPressureProperty);
+
+        if (suppressActorUpdates()) return;
+        generateGeometry();
+        emitActorChangedSignal();
+    }
+
+    // The slice position has been changed.
+    else if (property == labelSizeProperty
          || (property == labelColourProperty)
          || (property == labelBBoxProperty)
          || (property == labelBBoxColourProperty) )
@@ -398,7 +687,8 @@ void MMovablePoleActor::onQtPropertyChanged(QtProperty *property)
 
     else if (property == tickLengthProperty)
     {
-        tickLength = properties->mDDouble()->value(tickLengthProperty);
+        tickLength = static_cast<float>(properties->mDDouble()
+                                                ->value(tickLengthProperty));
         emitActorChangedSignal();
     }
 
@@ -410,22 +700,54 @@ void MMovablePoleActor::onQtPropertyChanged(QtProperty *property)
 
     else if (property == addPoleProperty)
     {
-        PoleSettings poleSettings(this);
-        poleProperties.append(poleSettings);
-        actorPropertiesSupGroup->addSubProperty(poleSettings.groupProperty);
-
+        generatePole();
         if (suppressActorUpdates()) return;
         generateGeometry();
         emitActorChangedSignal();
     }
 
+    else if (property == tickPressureThresholdProperty
+            || property == tickIntervalAboveThreshold
+            || property == tickIntervalBelowThreshold
+            || property == labelSpacingProperty)
+    {
+        if (suppressActorUpdates()) return;
+        generateGeometry();
+        emitActorChangedSignal();
+    }
+
+    else if (property == renderModeProperty
+            || property == tubeRadiusProperty)
+    {
+        renderMode = static_cast<RenderModes>(properties->mEnum()
+                                                 ->value(renderModeProperty));
+
+        tubeRadiusProperty->setEnabled(renderMode == RenderModes::TUBES);
+
+        tubeRadius =
+            static_cast<float>(properties->mDouble()->value(tubeRadiusProperty));
+
+        emitActorChangedSignal();
+    }
+
     else
     {
-        for (int i = 0; i < poleProperties.size(); i++)
+        individualPoleHeightsEnabled = properties->mBool()->value(individualPoleHeightsProperty);
+
+        for (int i = 0; i < poles.size(); i++)
         {
-            const PoleSettings& ps = poleProperties.at(i);
+            std::shared_ptr<MovablePole> pole = poles.at(i);
 
-            if (property == ps.positionProperty)
+            if (property == individualPoleHeightsProperty)
+            {
+                pole->pBotProperty->setEnabled(individualPoleHeightsEnabled);
+                pole->pTopProperty->setEnabled(individualPoleHeightsEnabled);
+            }
+
+            else if (property == pole->positionProperty
+                    || (individualPoleHeightsEnabled
+                        && (property == pole->pBotProperty
+                            || property == pole->pTopProperty)))
             {
                 if (suppressActorUpdates()) return;
                 generateGeometry();
@@ -433,15 +755,22 @@ void MMovablePoleActor::onQtPropertyChanged(QtProperty *property)
                 break;
             }
 
-            else if (property == ps.removePoleProperty)
+            else if (property == pole->removePoleProperty)
             {
-                actorPropertiesSupGroup->removeSubProperty(ps.groupProperty);
-                poleProperties.remove(i);
+                actorPropertiesSupGroup->removeSubProperty(pole->groupProperty);
+                poles.remove(i);
                 if (suppressActorUpdates()) return;
                 generateGeometry();
                 emitActorChangedSignal();
                 break;
             }
+        }
+
+        if (property == individualPoleHeightsProperty)
+        {
+            if (suppressActorUpdates()) return;
+            generateGeometry();
+            emitActorChangedSignal();
         }
     }
 }
@@ -466,194 +795,25 @@ void MMovablePoleActor::initializeActorResources()
     if (loadShaders) reloadShaderEffects();
 }
 
-
-void MMovablePoleActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
+void MMovablePoleActor::generatePole()
 {
-    // A) Render vertical axes.
-    // ========================
-
-    // Bind shader program.
-    simpleGeometryEffect->bindProgram("Pressure");
-
-    // Set uniform and attribute values.
-    simpleGeometryEffect->setUniformValue(
-                "mvpMatrix", *(sceneView->getModelViewProjectionMatrix()));
-    simpleGeometryEffect->setUniformValue(
-                "pToWorldZParams", sceneView->pressureToWorldZParameters());
-
-    poleVertexBuffer->attachToVertexAttribute(SHADER_VERTEX_ATTRIBUTE);
-
-    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); CHECK_GL_ERROR;
-    simpleGeometryEffect->setUniformValue("colour", lineColour);
-    glLineWidth(2); CHECK_GL_ERROR;
-    glDrawArrays(GL_LINES, 0, poleVertices.size()); CHECK_GL_ERROR;
-
-    // Unbind VBO.
-    glBindBuffer(GL_ARRAY_BUFFER, 0); CHECK_GL_ERROR;
-
-
-    // B) Render tick marks and adjust label positions.
-    // ================================================
-
-    // Bind shader program.
-    simpleGeometryEffect->bindProgram("TickMarks");
-
-    // Set uniform and attribute values.
-    simpleGeometryEffect->setUniformValue(
-                "pToWorldZParams", sceneView->pressureToWorldZParameters());
-    simpleGeometryEffect->setUniformValue(
-                "mvpMatrix", *(sceneView->getModelViewProjectionMatrix()));
-    simpleGeometryEffect->setUniformValue(
-                "colour", lineColour);
-
-    // Offset for the "other end" of the tick line and anchor offset for
-    // the labels.
-    QVector3D anchorOffset = tickLength * sceneView->getCamera()->getXAxis();
-
-    simpleGeometryEffect->setUniformValue(
-                "offsetDirection", anchorOffset);
-
-    // Set label offset; the labels are rendered by the text manager.
-    for (int i = 0; i < labels.size(); i++)
-        labels[i]->anchorOffset = anchorOffset;
-
-    // Render tick marks.
-
-    axisVertexBuffer->attachToVertexAttribute(SHADER_VERTEX_ATTRIBUTE);
-
-    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); CHECK_GL_ERROR;
-    glLineWidth(2); CHECK_GL_ERROR;
-    glDrawArrays(GL_POINTS, 0, axisTicks.size()); CHECK_GL_ERROR;
-
-    // Unbind VBO.
-    glBindBuffer(GL_ARRAY_BUFFER, 0); CHECK_GL_ERROR;
-
-
-    // C) Highlight pole if one is currently dragged.
-    // ================================================
-
-    // If the index "highlightPole" is < 0, no waypoint should be highlighted.
-    if (sceneView->interactionModeEnabled())
-    {
-
-        // Bind shader program.
-        positionSpheresShader->bind();
-
-        // Set MVP-matrix and parameters to map pressure to world space in the
-        // vertex shader.
-        positionSpheresShader->setUniformValue(
-                    "mvpMatrix",
-                    *(sceneView->getModelViewProjectionMatrix()));
-        positionSpheresShader->setUniformValue(
-                    "pToWorldZParams",
-                    sceneView->pressureToWorldZParameters());
-        positionSpheresShader->setUniformValue(
-                    "lightDirection",
-                    sceneView->getLightDirection());
-        positionSpheresShader->setUniformValue(
-                    "cameraPosition",
-                    sceneView->getCamera()->getOrigin());
-        positionSpheresShader->setUniformValue(
-                    "cameraUpDir",
-                    sceneView->getCamera()->getYAxis());
-        positionSpheresShader->setUniformValue(
-                    "radius",
-                    GLfloat(0.5));
-        positionSpheresShader->setUniformValue(
-                    "scaleRadius",
-                    GLboolean(true));
-
-
-        // Texture bindings for transfer function for data scalar (1D texture from
-        // transfer function class). The data scalar is stored in the vertex.w
-        // component passed to the vertex shader.
-        positionSpheresShader->setUniformValue(
-                    "useTransferFunction", GLboolean(false));
-        positionSpheresShader->setUniformValue(
-                    "constColour", QColor(Qt::white));
-
-        // Bind vertex buffer object.
-
-        poleVertexBuffer->attachToVertexAttribute(SHADER_VERTEX_ATTRIBUTE);
-
-        glPolygonMode(GL_FRONT_AND_BACK,
-                      renderAsWireFrame ? GL_LINE : GL_FILL); CHECK_GL_ERROR;
-        glLineWidth(1); CHECK_GL_ERROR;
-
-        glDrawArrays(GL_POINTS, 0, poleVertices.size()); CHECK_GL_ERROR;
-
-        if (highlightPole >= 0)
-        {
-            positionSpheresShader->setUniformValue(
-                        "radius",
-                        GLfloat(0.51));
-            positionSpheresShader->setUniformValue(
-                        "constColour", QColor(Qt::red));
-            glDrawArrays(GL_POINTS, highlightPole, 2); CHECK_GL_ERROR;
-        }
-
-        // Unbind VBO.
-        glBindBuffer(GL_ARRAY_BUFFER, 0); CHECK_GL_ERROR;
-    }
+    std::shared_ptr<MovablePole> pole = std::make_shared<MovablePole>(this);
+    pole->pBotProperty->setEnabled(individualPoleHeightsEnabled);
+    pole->pTopProperty->setEnabled(individualPoleHeightsEnabled);
+    poles.append(pole);
+    actorPropertiesSupGroup->addSubProperty(pole->groupProperty);
 }
 
-
-/******************************************************************************
-***                           PRIVATE METHODS                               ***
-*******************************************************************************/
 
 void MMovablePoleActor::generateGeometry()
 {
     // A) Update/generate geometry.
     // =====================
 
+    // Clear all poles
     poleVertices.clear();
-    foreach(const PoleSettings& ps, poleProperties)
-    {
-        QPointF pos = properties->mPointF()->value(ps.positionProperty);
-        poleVertices.append(QVector3D(pos)); // for pbot
-        poleVertices.append(QVector3D(pos)); // for ptop
-    }
-
-    pbot_hPa = properties->mDDouble()->value(bottomPressureProperty);
-    ptop_hPa = properties->mDDouble()->value(topPressureProperty);
-
-    // Update pressure limits of the poles.
-    for (int i = 0; i < poleVertices.size(); i+=2)
-    {
-        poleVertices[i  ].setZ(pbot_hPa);
-        poleVertices[i+1].setZ(ptop_hPa);
-    }
-
-    // Create new axis ticks geometry, according to the pressure limits.
+    // Clear all ticks
     axisTicks.clear();
-    int interval = pbot_hPa > 100. ? 100 : 10;
-    int p = int(pbot_hPa / interval) * interval;
-
-    while (p >= ptop_hPa)
-    {
-        for (int i = 0; i < poleVertices.size(); i+=2) // two vertices per pole
-        {
-            QVector3D pos = poleVertices.at(i);
-            axisTicks.append(QVector3D(pos.x(), pos.y(), p));
-        }
-        p -= (p > 100) ? 100 : 10;
-    }
-
-
-    // B) Upload geometry data to VBO.
-    // ===============================
-
-    const QString poleRequestKey = "pole_vertices_actor#"
-                                    + QString::number(getID());
-    uploadVec3ToVertexBuffer(poleVertices, poleRequestKey, &poleVertexBuffer);
-
-    const QString axisRequestKey = "axis_vertices_actor#"
-                                    + QString::number(getID());
-    uploadVec3ToVertexBuffer(axisTicks, axisRequestKey, &axisVertexBuffer);
-
-    // (MActor method).
-
 
     // C) Generate labels.
     // ===================
@@ -669,24 +829,77 @@ void MMovablePoleActor::generateGeometry()
     bool labelbbox = properties->mBool()->value(labelBBoxProperty);
     QColor labelBBoxColour = properties->mColor()->value(labelBBoxColourProperty);
 
-    int drawLabel = 0;
-    for (int i = 0; i < axisTicks.size(); i++)
+    for (int i = 0; i < poles.size(); ++i)
     {
-        // Label only every 3rd tick mark (numPoles labelled axes, hence
-        // numPoles ticks for each pressure).
-        if (drawLabel++ < 0) continue;
-        int numPoles = poleVertices.size() / 2; // two vertices per pole
-        if (drawLabel == numPoles) drawLabel = -2 * numPoles;
+        std::shared_ptr<MovablePole> pole = poles.at(i);
 
-        QVector3D tickPosition = axisTicks.at(i);
-        labels.append(tm->addText(
-                          QString("%1").arg(tickPosition.z()),
-                          MTextManager::LONLATP,
-                          tickPosition.x(), tickPosition.y(), tickPosition.z(),
-                          labelsize, labelColour, MTextManager::MIDDLELEFT,
-                          labelbbox, labelBBoxColour)
-                      );
+        QPointF pos = properties->mPointF()->value(pole->positionProperty);
+        QVector3D polePos(pos);
+
+        double pBot = 0; double pTop = 0;
+
+        if (individualPoleHeightsEnabled)
+        {
+            pBot = properties->mDDouble()->value(pole->pBotProperty);
+            pTop = properties->mDDouble()->value(pole->pTopProperty);
+        }
+        else
+        {
+            pBot = bottomPressure_hPa; pTop = topPressure_hPa;
+        }
+
+        polePos.setZ(pBot);
+        poleVertices.append(polePos); // for pbot
+        polePos.setZ(pTop);
+        poleVertices.append(polePos); // for ptop
+
+        // Create new axis ticks geometry, according to the pressure limits.
+        const double upperTickStep =
+                properties->mDouble()->value(tickIntervalAboveThreshold);
+
+        const double lowerTickStep =
+                properties->mDouble()->value(tickIntervalBelowThreshold);
+
+        const double pressureThreshold =
+                properties->mDDouble()->value(tickPressureThresholdProperty);
+
+        const int labelIteration =
+                properties->mInt()->value(labelSpacingProperty);
+
+        int interval = static_cast<int>((pBot > pressureThreshold) ? upperTickStep : lowerTickStep);
+        int p = int(pBot / interval) * interval;
+        int counter = 0;
+
+        while (p >= pTop)
+        {
+            axisTicks.append(QVector3D(polePos.x(), polePos.y(), p));
+
+            // Generate labels for every ith tick mark
+            if (counter % labelIteration == 0)
+            {
+                labels.append(tm->addText(
+                        QString("%1").arg(p),
+                        MTextManager::LONLATP,
+                        polePos.x(), polePos.y(), p,
+                        labelsize, labelColour, MTextManager::MIDDLELEFT,
+                        labelbbox, labelBBoxColour)
+                );
+            }
+
+            counter++;
+            p -= (p > pressureThreshold) ? upperTickStep : lowerTickStep;
+        }
     }
+
+    // B) Upload geometry data to VBO.
+    // ===============================
+
+    const QString poleRequestKey = "pole_vertices_actor#"
+                                   + QString::number(getID());
+    uploadVec3ToVertexBuffer(poleVertices, poleRequestKey, &poleVertexBuffer);
+
+    const QString axisRequestKey = "axis_vertices_actor#"
+                                   + QString::number(getID());
+    uploadVec3ToVertexBuffer(axisTicks, axisRequestKey, &axisVertexBuffer);
 }
 
-} // namespace Met3D

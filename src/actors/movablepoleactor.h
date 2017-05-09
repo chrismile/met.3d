@@ -45,6 +45,17 @@ class MSceneViewGLWidget;
 namespace Met3D
 {
 
+class MovablePole
+{
+public:
+    MovablePole(MActor *actor = nullptr);
+    QtProperty *groupProperty;
+    QtProperty *positionProperty;
+    QtProperty *pTopProperty;
+    QtProperty *pBotProperty;
+    QtProperty *removePoleProperty;
+};
+
 /**
   @brief MMovablePoleActor implements vertical axes ("poles") that are labelled
   and can be interactively moved by the user in interaction mode.
@@ -57,8 +68,15 @@ public:
 
     void reloadShaderEffects();
 
+    void addPole(QPointF pos);
+    void addPole(const QVector3D& lonlatP);
+
+    void removeAllPoles();
+
+    QString getSettingsID() override { return "PressurePoleActor"; }
+
     int checkIntersectionWithHandle(MSceneViewGLWidget *sceneView,
-                          float clipX, float clipY, float clipRadius);
+                                    float clipX, float clipY, float clipRadius);
 
     /**
       @todo Currently uses the worldZ==0 plane, make this work with the
@@ -67,17 +85,13 @@ public:
     void dragEvent(MSceneViewGLWidget *sceneView,
                    int handleID, float clipX, float clipY);
 
-    void addPole(QPointF pos);
-
-    void removeAllPoles();
-
-    QString getSettingsID() override { return "PressurePoleActor"; }
-
     void saveConfiguration(QSettings *settings);
 
     void loadConfiguration(QSettings *settings);
 
-    const QVector<QVector3D>& getPoleVertices();
+    const QVector<QVector3D>& getPoleVertices() const;
+
+    void setMovement(bool enabled);
 
 protected:
     void initializeActorResources();
@@ -86,21 +100,17 @@ protected:
 
     void renderToCurrentContext(MSceneViewGLWidget *sceneView);
 
-private:
+    void generatePole();
+
     void generateGeometry();
 
     std::shared_ptr<GL::MShaderEffect> simpleGeometryEffect;
     std::shared_ptr<GL::MShaderEffect> positionSpheresShader;
 
-    QVector<QVector3D> poleVertices;
-    GL::MVertexBuffer* poleVertexBuffer;
     QVector<QVector3D> axisTicks;
     GL::MVertexBuffer* axisVertexBuffer;
 
-    QtProperty *bottomPressureProperty;
-    QtProperty *topPressureProperty;
-    float       pbot_hPa;
-    float       ptop_hPa;
+    QtProperty *ticksGroupProperty;
     QtProperty *tickLengthProperty;
     float       tickLength;
 
@@ -109,15 +119,32 @@ private:
 
     QtProperty *addPoleProperty;
 
-    struct PoleSettings
-    {
-        PoleSettings(MActor *actor = nullptr);
-        QtProperty *groupProperty;
-        QtProperty *positionProperty;
-        QtProperty *removePoleProperty;
-    };
+    QtProperty *tickIntervalAboveThreshold;
+    QtProperty *tickIntervalBelowThreshold;
+    QtProperty *tickPressureThresholdProperty;
+    QtProperty *labelSpacingProperty;
 
-    QVector<PoleSettings> poleProperties;
+    QtProperty *bottomPressureProperty;
+    QtProperty *topPressureProperty;
+    float       bottomPressure_hPa;
+    float       topPressure_hPa;
+
+    QtProperty *renderModeProperty;
+    enum class RenderModes : uint8_t { TUBES = 0, LINES = 1 };
+    RenderModes renderMode;
+
+    QtProperty *tubeRadiusProperty;
+    float       tubeRadius;
+
+    QtProperty *individualPoleHeightsProperty;
+    bool        individualPoleHeightsEnabled;
+
+    bool        movementEnabled;
+
+    QVector<std::shared_ptr<MovablePole>> poles;
+
+    QVector<QVector3D> poleVertices;
+    GL::MVertexBuffer* poleVertexBuffer;
 
     /** This variable stores the ID of a pole to be highlighted. If the value
         is -1, no waypoint will be highlighted. */
