@@ -43,6 +43,7 @@ namespace Met3D
 {
 
 class MSynchronizedObject;
+class MSceneViewGLWidget;
 
 enum MSynchronizationType
 {
@@ -238,10 +239,14 @@ protected slots:
       */
     void copyValidToTo();
 
+    void onAnimationLoopGroupChanged(QAction *action);
+
     void activateTimeAnimationImageSaving(bool activate);
     void saveTimeAnimation();
+    void switchSelectedView(QString viewID);
 
     void changeSaveTADirectory();
+    void adjustSaveTADirLabelText();
 
 private:
     /**
@@ -278,6 +283,9 @@ private:
 
     void emitSaveImageSignal();
 
+    void setAnimationTimeToStartTime(QDateTime startDateTime,
+                                     QDateTime endDateTime);
+
     Ui::MSyncControl *ui;
 
     // Maps index of ui->timeStepComboBox to seconds (see constructor and
@@ -305,23 +313,28 @@ private:
     QTimer *animationTimer;
 
     // Properties to control saving of images of time serie.
-    QCheckBox   *saveTimeAnimationCheckBox;
-    QLineEdit   *saveTAFileNameLineEdit;
-    QComboBox   *saveTAFileNameSuffixComboBox;
-    QComboBox   *saveTAFileExtensionComboBox;
-    QLabel      *saveTADirectoryLabel;
-    QPushButton *saveTADirectoryChangeButton;
-    QComboBox   *saveTASceneViewsComboBox;
+    QCheckBox          *saveTimeAnimationCheckBox;
+    QLineEdit          *saveTAFileNameLineEdit;
+    QComboBox          *saveTAFileExtensionComboBox;
+    QLabel             *saveTADirectoryLabel;
+    QPushButton        *saveTADirectoryChangeButton;
+    QComboBox          *saveTASceneViewsComboBox;
+    MSceneViewGLWidget *saveTASceneView;
 
     QString syncID;
 
     bool synchronizationInProgress;
     bool forwardBackwardButtonClicked;
+    /**
+     * Handle sync event if valid and init time should be updated, but only
+     * valid time changes due to restriction to the data set.
+     */
+    bool validDateTimeHasChanged;
     QWidget *lastFocusWidget;
     MSynchronizationType currentSyncType;
     QSet<MSynchronizedObject*> synchronizedObjects;
     QSet<MSynchronizedObject*> pendingSynchronizations;
-    QSet<MSynchronizedObject*> earlyCompletedSynchronizations;
+    QSet<MSynchronizedObject*> earlyCompletedSynchronizations;    
 
     // Properties to control configuration.
     QMenu *configurationDropdownMenu;
