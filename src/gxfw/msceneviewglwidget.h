@@ -225,6 +225,9 @@ public:
 
     void setSceneRotationCentre(QVector3D centre);
 
+    void setOverwriteImageSerie(bool overwriteImageSerie)
+    { this->overwriteImageSerie = overwriteImageSerie; }
+
 signals:
     /**
       Emitted when a mouse button is released on the GL canvas.
@@ -256,6 +259,8 @@ public slots:
     void stopFPSMeasurement();
 
     void updateSceneLabel();
+
+    void saveTimeAnimationImage(QString path, QString filename);
 
 protected:
     void initializeGL();
@@ -306,11 +311,16 @@ protected slots:
     void autoRotateCamera();
 
 private:
+    /**
+     * Handels opening of file dialog and letting the user choose where to save
+     * the screenshot, how to call it and as which image file type.
+     */
+    void saveScreenshot();
 
     /**
-     * Handels taking and saving a screenshot of the scene.
+     * Handels taking and saving a screenshot of the scene to @param filename.
      */
-    void takeScreenshot();
+    void saveScreenshotToFileName(QString filename);
 
     void resizeView();
 
@@ -455,12 +465,18 @@ private:
     MActor *singleInteractionActor;
 
     /**
-     * When this variable is set to false the qt property changed events will be
+     * If this variable is set to false, the qt property changed events will be
      * ignored for the instance of the scene.
      */
     bool enablePropertyEvents;
 
     MResizeWindowDialog *resizeViewDialog;
+
+    /**
+     * If this variable is set to true, Met.3D will write the files of a time
+     * series without checking if the file name allready exists.
+     */
+    bool overwriteImageSerie;
 };
 
 } // namespace Met3D

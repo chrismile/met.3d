@@ -1528,7 +1528,7 @@ void MNWPHorizontalSectionActor::renderLineCountours(
                         var->transferFunction->getMinimumValue()); CHECK_GL_ERROR;
             glMarchingSquaresShader->setUniformValue(
                         "scalarMaximum",
-                        var->transferFunction->getMaximimValue()); CHECK_GL_ERROR;
+                        var->transferFunction->getMaximumValue()); CHECK_GL_ERROR;
         }
         // Don't draw anything if no transfer function is present.
         else
