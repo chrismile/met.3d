@@ -1906,9 +1906,11 @@ void MTrajectoryActor::updateTimeProperties()
 {
     enableActorUpdates(false);
 
-    initTimeProperty->setEnabled(!synchronizeInitTime);
-    startTimeProperty->setEnabled(!synchronizeStartTime);
-    particlePosTimeProperty->setEnabled(!synchronizeParticlePosTime);
+    bool enableSync = synchronizationControl != nullptr;
+
+    initTimeProperty->setEnabled(!(enableSync && synchronizeInitTime));
+    startTimeProperty->setEnabled(!(enableSync && synchronizeStartTime));
+    particlePosTimeProperty->setEnabled(!(enableSync && synchronizeParticlePosTime));
 
     updateSyncPropertyColourHints();
 
@@ -2482,9 +2484,9 @@ void MTrajectoryActor::enableProperties(bool enable)
     enableShadowProperty->setEnabled(enable);
     colourShadowProperty->setEnabled(enable);
 
-    initTimeProperty->setEnabled(enable && !synchronizeInitTime);
-    startTimeProperty->setEnabled(enable && !synchronizeStartTime);
-    particlePosTimeProperty->setEnabled(enable && !synchronizeParticlePosTime);
+    initTimeProperty->setEnabled(enable && !(enableSync && synchronizeInitTime));
+    startTimeProperty->setEnabled(enable && !(enableSync && synchronizeStartTime));
+    particlePosTimeProperty->setEnabled(enable && !(enableSync && synchronizeParticlePosTime));
 
 //    bboxProperty->setEnabled(enable);
     ensembleMemberProperty->setEnabled(enable && !synchronizeEnsemble);
