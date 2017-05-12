@@ -73,12 +73,12 @@ MMovablePoleActor::MMovablePoleActor()
     properties->mEnum()->setValue(renderModeProperty, static_cast<int>(renderMode));
 
     tubeRadiusProperty = addProperty(DOUBLE_PROPERTY, "tube radius",
-                                         actorPropertiesSupGroup);
+                                     actorPropertiesSupGroup);
     properties->setDouble(tubeRadiusProperty, tubeRadius, 0.01, 5, 2, 0.01);
 
-    individualPoleHeightsProperty = addProperty(BOOL_PROPERTY,
-                                                "individual pole heights",
-                                        actorPropertiesSupGroup);
+    individualPoleHeightsProperty = addProperty(
+                BOOL_PROPERTY, "specify height per pole",
+                actorPropertiesSupGroup);
     properties->mBool()->setValue(individualPoleHeightsProperty,
                                   individualPoleHeightsEnabled);
 
@@ -108,20 +108,21 @@ MMovablePoleActor::MMovablePoleActor()
                                                 ticksGroupProperty);
     properties->setDDouble(tickPressureThresholdProperty, 100.,
                            1050., 20., 1, 10., " hPa");
-    tickIntervalAboveThreshold = addProperty(DOUBLE_PROPERTY, "tick interval above threshold",
-                                        ticksGroupProperty);
 
+    tickIntervalAboveThreshold = addProperty(
+                DOUBLE_PROPERTY, "tick interval above threshold",
+                ticksGroupProperty);
     properties->setDouble(tickIntervalAboveThreshold, 100.,
                           10., 300., 1, 10.);
 
-    tickIntervalBelowThreshold = addProperty(DOUBLE_PROPERTY, "tick interval below threshold",
-                                        ticksGroupProperty);
-
+    tickIntervalBelowThreshold = addProperty(
+                DOUBLE_PROPERTY, "tick interval below threshold",
+                ticksGroupProperty);
     properties->setDouble(tickIntervalBelowThreshold, 10.,
                           10., 300., 1, 10.);
 
     labelSpacingProperty = addProperty(INT_PROPERTY, "label spacing",
-                                        ticksGroupProperty);
+                                       ticksGroupProperty);
     properties->setInt(labelSpacingProperty, 3, 1, 100, 1);
 
     addPoleProperty = addProperty(CLICK_PROPERTY, "add pole",
@@ -147,14 +148,14 @@ MovablePole::MovablePole(MActor *actor)
     MQtProperties *properties = actor->getQtProperties();
     properties->mPointF()->setValue(positionProperty, QPointF());
 
-    pBotProperty = actor->addProperty(DECORATEDDOUBLE_PROPERTY,
-                                      "bottom pressure", groupProperty);
-    properties->setDDouble(pBotProperty, 1050.,
+    bottomPressureProperty = actor->addProperty(DECORATEDDOUBLE_PROPERTY,
+                                                "bottom pressure", groupProperty);
+    properties->setDDouble(bottomPressureProperty, 1050.,
                            1050., 20., 1, 10., " hPa");
 
-    pTopProperty = actor->addProperty(DECORATEDDOUBLE_PROPERTY,
-                                      "top pressure", groupProperty);
-    properties->setDDouble(pTopProperty, 100,
+    topPressureProperty = actor->addProperty(DECORATEDDOUBLE_PROPERTY,
+                                             "top pressure", groupProperty);
+    properties->setDDouble(topPressureProperty, 100,
                            1050., 20., 1, 10., " hPa");
 
     removePoleProperty = actor->addProperty(CLICK_PROPERTY, "remove",
@@ -171,10 +172,17 @@ MovablePole::MovablePole(MActor *actor)
 void MMovablePoleActor::reloadShaderEffects()
 {
     LOG4CPLUS_DEBUG(mlog, "loading shader programs" << flush);
-    simpleGeometryEffect
-     ->compileFromFile_Met3DHome("src/glsl/simple_geometry_generation.fx.glsl");
-    positionSpheresShader
-     ->compileFromFile_Met3DHome("src/glsl/trajectory_positions.fx.glsl");
+
+    beginCompileShaders(2);
+
+    compileShadersFromFileWithProgressDialog(
+                simpleGeometryEffect,
+                "src/glsl/simple_geometry_generation.fx.glsl");
+    compileShadersFromFileWithProgressDialog(
+                positionSpheresShader,
+                "src/glsl/trajectory_positions.fx.glsl");
+
+    endCompileShaders();
 }
 
 
@@ -207,12 +215,13 @@ void MMovablePoleActor::addPole(QPointF pos)
     }
 }
 
+
 void MMovablePoleActor::addPole(const QVector3D& lonlatP)
 {
     std::shared_ptr<MovablePole> pole = std::make_shared<MovablePole>(this);
     properties->mPointF()->setValue(pole->positionProperty, lonlatP.toPointF());
-    properties->mDDouble()->setValue(pole->pTopProperty, lonlatP.z());
-    properties->mDDouble()->setValue(pole->pBotProperty, 1050.0);
+    properties->mDDouble()->setValue(pole->topPressureProperty, lonlatP.z());
+    properties->mDDouble()->setValue(pole->bottomPressureProperty, 1050.0);
     poles.append(pole);
     actorPropertiesSupGroup->addSubProperty(pole->groupProperty);
 
@@ -226,6 +235,8 @@ void MMovablePoleActor::addPole(const QVector3D& lonlatP)
 
 void MMovablePoleActor::saveConfiguration(QSettings *settings)
 {
+    settings->beginGroup(MMovablePoleActor::getSettingsID());
+
     settings->setValue("tickLength",
                        properties->mDDouble()->value(tickLengthProperty));
 
@@ -264,56 +275,66 @@ void MMovablePoleActor::saveConfiguration(QSettings *settings)
 
         QString poleID = QString("polePosition_%1").arg(i);
 
-        settings->setValue(
-                poleID, properties->mPointF()->value(pole->positionProperty));
-        settings->setValue(QString("polePBot_%1").arg(i),
-                        properties->mDDouble()->value(pole->pTopProperty));
-        settings->setValue(QString("polePTop_%1").arg(i),
-                        properties->mDDouble()->value(pole->pBotProperty));
+        settings->setValue(poleID,
+                           properties->mPointF()->value(pole->positionProperty));
+        settings->setValue(QString("poleBottomPressure_%1").arg(i),
+                           properties->mDDouble()->value(pole->topPressureProperty));
+        settings->setValue(QString("poleTopPressure_%1").arg(i),
+                           properties->mDDouble()->value(pole->bottomPressureProperty));
     }
 
+    settings->endGroup();
 }
 
 
 void MMovablePoleActor::loadConfiguration(QSettings *settings)
 {
-    properties->mDDouble()->setValue(tickLengthProperty,
-                settings->value("tickLength").toDouble());
+    settings->beginGroup(MMovablePoleActor::getSettingsID());
 
-    properties->mColor()->setValue(colourProperty,
-                settings->value("lineColour").value<QColor>());
+    properties->mDDouble()->setValue(tickLengthProperty,
+                settings->value("tickLength", 0.8).toDouble());
+
+    properties->mColor()->setValue(
+                colourProperty,
+                settings->value("lineColour", QColor(Qt::black)).value<QColor>());
 
     properties->mEnum()->setValue(renderModeProperty,
-                settings->value("renderMode").toInt());
+                settings->value("renderMode", int(RenderModes::TUBES)).toInt());
 
     properties->mDouble()->setValue(tubeRadiusProperty,
-                settings->value("tubeRadius").toDouble());
+                settings->value("tubeRadius", 0.1).toDouble());
 
     individualPoleHeightsEnabled = settings->value("individualPoleHeightsEnabled").toBool();
     properties->mBool()->setValue(individualPoleHeightsProperty, individualPoleHeightsEnabled);
 
-    properties->mDDouble()->setValue(bottomPressureProperty,
-                                     settings->value("bottomPressure").toDouble());
+    properties->mDDouble()->setValue(
+                bottomPressureProperty,
+                settings->value("bottomPressure", 1050.).toDouble());
 
-    properties->mDDouble()->setValue(topPressureProperty,
-                                     settings->value("topPressure").toDouble());
+    properties->mDDouble()->setValue(
+                topPressureProperty,
+                settings->value("topPressure", 100.).toDouble());
 
-    properties->mDouble()->setValue(tickIntervalAboveThreshold,
-                                    settings->value("tickIntervalAboveThreshold").toDouble());
+    properties->mDouble()->setValue(
+                tickIntervalAboveThreshold,
+                settings->value("tickIntervalAboveThreshold", 100.).toDouble());
 
-    properties->mDouble()->setValue(tickIntervalBelowThreshold,
-                                    settings->value("tickIntervalBelowThreshold").toDouble());
+    properties->mDouble()->setValue(
+                tickIntervalBelowThreshold,
+                settings->value("tickIntervalBelowThreshold", 10.).toDouble());
 
-    properties->mDDouble()->setValue(tickPressureThresholdProperty,
-                                    settings->value("tickIntervalThreshold").toDouble());
+    properties->mDDouble()->setValue(
+                tickPressureThresholdProperty,
+                settings->value("tickIntervalThreshold", 100.).toDouble());
 
-    properties->mInt()->setValue(labelSpacingProperty,
-                                     settings->value("labelSpacing").toInt());
+    properties->mInt()->setValue(
+                labelSpacingProperty,
+                settings->value("labelSpacing", 3).toInt());
 
-    int numPoles = settings->value("numPoles").toInt();
+    int numPoles = settings->value("numPoles", 0).toInt();
 
     // Clear current poles.
-    foreach(const std::shared_ptr<MovablePole> ps, poles)
+    foreach (const std::shared_ptr<MovablePole> ps, poles)
     {
         actorPropertiesSupGroup->removeSubProperty(ps->groupProperty);
     }
@@ -324,20 +345,22 @@ void MMovablePoleActor::loadConfiguration(QSettings *settings)
     {
         QString poleID = QString("polePosition_%1").arg(i);
         QPointF pos = settings->value(poleID).toPointF();
-        float pBot = settings->value(QString("polePBot_%1").arg(i)).toFloat();
-        float pTop= settings->value(QString("polePTop_%1").arg(i)).toFloat();
+        float pBot = settings->value(QString("poleBottomPressure_%1").arg(i), 1050.).toFloat();
+        float pTop= settings->value(QString("poleTopPressure_%1").arg(i), 100.).toFloat();
 
         std::shared_ptr<MovablePole> pole = std::make_shared<MovablePole>(this);
 
         properties->mPointF()->setValue(pole->positionProperty, pos);
-        pole->pBotProperty->setEnabled(individualPoleHeightsEnabled);
-        pole->pTopProperty->setEnabled(individualPoleHeightsEnabled);
+        pole->bottomPressureProperty->setEnabled(individualPoleHeightsEnabled);
+        pole->topPressureProperty->setEnabled(individualPoleHeightsEnabled);
 
-        properties->mDouble()->setValue(pole->pBotProperty, pBot);
-        properties->mDouble()->setValue(pole->pBotProperty, pTop);
+        properties->mDouble()->setValue(pole->bottomPressureProperty, pBot);
+        properties->mDouble()->setValue(pole->bottomPressureProperty, pTop);
         poles.append(pole);
         actorPropertiesSupGroup->addSubProperty(pole->groupProperty);
     }
+
+    settings->endGroup();
 
     if (isInitialized()) generateGeometry();
 }
@@ -347,6 +370,7 @@ const QVector<QVector3D>& MMovablePoleActor::getPoleVertices() const
 {
     return poleVertices;
 }
+
 
 void MMovablePoleActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
 {
@@ -506,11 +530,15 @@ void MMovablePoleActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
     }
 }
 
+
 int MMovablePoleActor::checkIntersectionWithHandle(MSceneViewGLWidget *sceneView,
                                                    float clipX, float clipY,
                                                    float clipRadius)
 {
-    if (!movementEnabled) { return -1; }
+    if (!movementEnabled)
+    {
+        return -1;
+    }
 
     // Default: No pole has been touched by the mouse. Note: This instance
     // variable is used in renderToCurrentContext; if it is >= 0 the pole
@@ -572,7 +600,10 @@ int MMovablePoleActor::checkIntersectionWithHandle(MSceneViewGLWidget *sceneView
 void MMovablePoleActor::dragEvent(MSceneViewGLWidget *sceneView,
                                   int handleID, float clipX, float clipY)
 {
-    if (!movementEnabled) { return; }
+    if (!movementEnabled)
+    {
+        return;
+    }
 
     // Select an arbitrary z-value to construct a point in clip space that,
     // transformed to world space, lies on the ray passing through the camera
@@ -651,10 +682,12 @@ void MMovablePoleActor::dragEvent(MSceneViewGLWidget *sceneView,
     emitActorChangedSignal();
 }
 
+
 void MMovablePoleActor::setMovement(bool enabled)
 {
     movementEnabled = enabled;
 }
+
 
 /******************************************************************************
 ***                             PUBLIC SLOTS                                ***
@@ -664,7 +697,7 @@ void MMovablePoleActor::onQtPropertyChanged(QtProperty *property)
 {
     // The slice position has been changed.
     if (property == bottomPressureProperty
-         || (property == topPressureProperty))
+            || (property == topPressureProperty))
     {
         bottomPressure_hPa = properties->mDDouble()->value(bottomPressureProperty);
         topPressure_hPa = properties->mDDouble()->value(topPressureProperty);
@@ -676,9 +709,9 @@ void MMovablePoleActor::onQtPropertyChanged(QtProperty *property)
 
     // The slice position has been changed.
     else if (property == labelSizeProperty
-         || (property == labelColourProperty)
-         || (property == labelBBoxProperty)
-         || (property == labelBBoxColourProperty) )
+             || (property == labelColourProperty)
+             || (property == labelBBoxProperty)
+             || (property == labelBBoxColourProperty) )
     {
         if (suppressActorUpdates()) return;
         generateGeometry();
@@ -688,7 +721,7 @@ void MMovablePoleActor::onQtPropertyChanged(QtProperty *property)
     else if (property == tickLengthProperty)
     {
         tickLength = static_cast<float>(properties->mDDouble()
-                                                ->value(tickLengthProperty));
+                                        ->value(tickLengthProperty));
         emitActorChangedSignal();
     }
 
@@ -707,9 +740,9 @@ void MMovablePoleActor::onQtPropertyChanged(QtProperty *property)
     }
 
     else if (property == tickPressureThresholdProperty
-            || property == tickIntervalAboveThreshold
-            || property == tickIntervalBelowThreshold
-            || property == labelSpacingProperty)
+             || property == tickIntervalAboveThreshold
+             || property == tickIntervalBelowThreshold
+             || property == labelSpacingProperty)
     {
         if (suppressActorUpdates()) return;
         generateGeometry();
@@ -717,22 +750,23 @@ void MMovablePoleActor::onQtPropertyChanged(QtProperty *property)
     }
 
     else if (property == renderModeProperty
-            || property == tubeRadiusProperty)
+             || property == tubeRadiusProperty)
     {
         renderMode = static_cast<RenderModes>(properties->mEnum()
-                                                 ->value(renderModeProperty));
+                                              ->value(renderModeProperty));
 
         tubeRadiusProperty->setEnabled(renderMode == RenderModes::TUBES);
 
-        tubeRadius =
-            static_cast<float>(properties->mDouble()->value(tubeRadiusProperty));
+        tubeRadius = static_cast<float>(
+                    properties->mDouble()->value(tubeRadiusProperty));
 
         emitActorChangedSignal();
     }
 
     else
     {
-        individualPoleHeightsEnabled = properties->mBool()->value(individualPoleHeightsProperty);
+        individualPoleHeightsEnabled = properties->mBool()->value(
+                    individualPoleHeightsProperty);
 
         for (int i = 0; i < poles.size(); i++)
         {
@@ -740,14 +774,14 @@ void MMovablePoleActor::onQtPropertyChanged(QtProperty *property)
 
             if (property == individualPoleHeightsProperty)
             {
-                pole->pBotProperty->setEnabled(individualPoleHeightsEnabled);
-                pole->pTopProperty->setEnabled(individualPoleHeightsEnabled);
+                pole->bottomPressureProperty->setEnabled(individualPoleHeightsEnabled);
+                pole->topPressureProperty->setEnabled(individualPoleHeightsEnabled);
             }
 
             else if (property == pole->positionProperty
-                    || (individualPoleHeightsEnabled
-                        && (property == pole->pBotProperty
-                            || property == pole->pTopProperty)))
+                     || (individualPoleHeightsEnabled
+                         && (property == pole->bottomPressureProperty
+                             || property == pole->topPressureProperty)))
             {
                 if (suppressActorUpdates()) return;
                 generateGeometry();
@@ -795,11 +829,12 @@ void MMovablePoleActor::initializeActorResources()
     if (loadShaders) reloadShaderEffects();
 }
 
+
 void MMovablePoleActor::generatePole()
 {
     std::shared_ptr<MovablePole> pole = std::make_shared<MovablePole>(this);
-    pole->pBotProperty->setEnabled(individualPoleHeightsEnabled);
-    pole->pTopProperty->setEnabled(individualPoleHeightsEnabled);
+    pole->bottomPressureProperty->setEnabled(individualPoleHeightsEnabled);
+    pole->topPressureProperty->setEnabled(individualPoleHeightsEnabled);
     poles.append(pole);
     actorPropertiesSupGroup->addSubProperty(pole->groupProperty);
 }
@@ -840,8 +875,8 @@ void MMovablePoleActor::generateGeometry()
 
         if (individualPoleHeightsEnabled)
         {
-            pBot = properties->mDDouble()->value(pole->pBotProperty);
-            pTop = properties->mDDouble()->value(pole->pTopProperty);
+            pBot = properties->mDDouble()->value(pole->bottomPressureProperty);
+            pTop = properties->mDDouble()->value(pole->topPressureProperty);
         }
         else
         {

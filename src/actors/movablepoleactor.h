@@ -51,8 +51,8 @@ public:
     MovablePole(MActor *actor = nullptr);
     QtProperty *groupProperty;
     QtProperty *positionProperty;
-    QtProperty *pTopProperty;
-    QtProperty *pBotProperty;
+    QtProperty *topPressureProperty;
+    QtProperty *bottomPressureProperty;
     QtProperty *removePoleProperty;
 };
 
