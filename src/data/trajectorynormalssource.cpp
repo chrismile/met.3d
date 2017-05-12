@@ -87,6 +87,13 @@ MTrajectoryNormals *MTrajectoryNormalsSource::produceData(
     {
         int baseIndex = i * numTimeStepsPerTrajectory;
 
+        // Prevent "out of bound exception" ("vertices" are access at
+        // "baseIndex+1").
+        if (baseIndex+1 >= vertices.size())
+        {
+            continue;
+        }
+
         // Get the two points of the first line segment; convert pressure to
         // world Z. If p1 (the second point) is invalid, then (a) the normal
         // for the first point cannot be computed, and (b) we assume that the
