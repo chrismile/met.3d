@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2015-2017 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -106,6 +107,7 @@ MSystemManagerAndControl::MSystemManagerAndControl(QWidget *parent) :
     // Insert a dummy "None" entry into the list of waypoints models.
     waypointsTableModelPool.insert("None", nullptr);
     syncControlPool.insert("None", nullptr);
+    boundingBoxPool.insert(QString("None"), nullptr);
 
     // Determine the Met.3D home directory (the base directory to find
     // shader files and data files that do not change).
@@ -160,6 +162,14 @@ MSystemManagerAndControl::~MSystemManagerAndControl()
     LOG4CPLUS_DEBUG(mlog, "\twaypoints model pool");
     for (auto it = waypointsTableModelPool.begin();
          it != waypointsTableModelPool.end(); ++it)
+    {
+        std::string key = it.key().toStdString();
+        LOG4CPLUS_DEBUG(mlog, "\t\t -> deleting \''" << key << "''");
+        delete it.value();
+    }
+
+    LOG4CPLUS_DEBUG(mlog, "\tbounding box pool");
+    for (auto it = boundingBoxPool.begin(); it != boundingBoxPool.end(); ++it)
     {
         std::string key = it.key().toStdString();
         LOG4CPLUS_DEBUG(mlog, "\t\t -> deleting \''" << key << "''");
@@ -404,6 +414,54 @@ MWaypointsTableModel *MSystemManagerAndControl::getWaypointsModel(
 QStringList MSystemManagerAndControl::getWaypointsModelsIdentifiers() const
 {
     return waypointsTableModelPool.keys();
+}
+
+
+void MSystemManagerAndControl::registerBoundingBox(MBoundingBox *bbox)
+{
+    boundingBoxPool.insert(bbox->getID(), bbox);
+    emit boundingBoxCreated();
+}
+
+
+void MSystemManagerAndControl::deleteBoundingBox(const QString& id)
+{
+    delete boundingBoxPool.value(id);
+    boundingBoxPool.remove(id);
+    emit boundingBoxDeleted(id);
+}
+
+
+void MSystemManagerAndControl::renameBoundingBox(const QString& oldId,
+                                                 MBoundingBox *bbox)
+{
+    boundingBoxPool.remove(oldId);
+    boundingBoxPool.insert(bbox->getID(), bbox);
+    emit boundingBoxRenamed();
+}
+
+
+MBoundingBox *MSystemManagerAndControl::getBoundingBox(const QString &id) const
+{
+    if ( !boundingBoxPool.contains(id) )
+    {
+        LOG4CPLUS_ERROR(mlog, "Bounding box with ID " << id.toStdString()
+                        << " is not available!");
+        return nullptr;
+    }
+    return boundingBoxPool.value(id);
+}
+
+
+QStringList MSystemManagerAndControl::getBoundingBoxesIdentifiers() const
+{
+    return boundingBoxPool.keys();
+}
+
+
+MBoundingBoxDockWidget *MSystemManagerAndControl::getBoundingBoxDock() const
+{
+    return mainWindow->getBoundingBoxDock();
 }
 
 

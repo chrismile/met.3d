@@ -56,7 +56,8 @@ namespace Met3D
 
   @todo Make the horizontal pressure isolines customizable.
   */
-class MNWPVerticalSectionActor : public MNWPMultiVarActor
+class MNWPVerticalSectionActor : public MNWPMultiVarActor,
+        public MBoundingBoxInterface
 {
     Q_OBJECT
 
@@ -122,6 +123,8 @@ public:
 
     MNWPActorVariable *createActorVariable(
             const MSelectableDataSource& dataSource) override;
+
+    void onBoundingBoxChanged() override;
 
 public slots:
     /**
@@ -230,8 +233,6 @@ private:
 
     double p_top_hPa;
     double p_bot_hPa;
-    QtProperty *upperLimitProperty;
-    QtProperty *lowerLimitProperty;
     QVector<float> pressureLineLevels;
     QVector<float> selectedPressureLineLevels;
     QtProperty *pressureLineLevelsProperty;

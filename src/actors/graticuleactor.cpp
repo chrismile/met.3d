@@ -48,8 +48,9 @@ namespace Met3D
 ***                     CONSTRUCTOR / DESTRUCTOR                            ***
 *******************************************************************************/
 
-MGraticuleActor::MGraticuleActor()
+MGraticuleActor::MGraticuleActor(MBoundingBoxConnection *boundingBoxConnection)
     : MRotatedGridSupportingActor(),
+      MBoundingBoxInterface(this),
       graticuleVertexBuffer(nullptr),
       numVerticesGraticule(0),
       coastlineVertexBuffer(nullptr),
@@ -63,6 +64,18 @@ MGraticuleActor::MGraticuleActor()
     naturalEarthDataLoader = MSystemManagerAndControl::getInstance()
             ->getNaturalEarthDataLoader();
 
+    // Use boundingBoxActor of horizontal cross section actor if graticule is
+    // part of it.
+    this->bBoxConnection = boundingBoxConnection;
+    // Created graticule actor as standalone actor and thus it needs its own
+    // bounding box actor. (As part of 2D Horizontal Cross-Section it uses
+    // the bounding box connected to the Horizontal Cross-Section.)
+    if (boundingBoxConnection == nullptr)
+    {
+        this->bBoxConnection = new MBoundingBoxConnection(
+                    this, MBoundingBoxConnection::HORIZONTAL);
+    }
+
     nLats.clear();
     nLats.append(0);
     nLons.clear();
@@ -74,9 +87,13 @@ MGraticuleActor::MGraticuleActor()
 
     setName("Graticule");
 
-    cornersProperty = addProperty(RECTF_LONLAT_PROPERTY, "corners",
-                                  actorPropertiesSupGroup);
-    properties->setRectF(cornersProperty, QRectF(-90., 0., 180., 90.), 2);
+    // Only add property group if graticule is not part of a horizontal cross
+    // section.
+    if (boundingBoxConnection == nullptr)
+    {
+        actorPropertiesSupGroup->addSubProperty(
+                    this->bBoxConnection->getProperty());
+    }
 
     spacingProperty = addProperty(POINTF_LONLAT_PROPERTY, "spacing",
                                   actorPropertiesSupGroup);
@@ -122,7 +139,13 @@ void MGraticuleActor::saveConfiguration(QSettings *settings)
 
     settings->beginGroup(MGraticuleActor::getSettingsID());
 
-    settings->setValue("bbox", properties->mRectF()->value(cornersProperty));
+    // Only save bounding box if the graticule is directly connected to it.
+    // Otherwise graticule is part of a horizontal cross-section actor and thus
+    // its bounding box is handled via the horizontal cross-section actor.
+    if (bBoxConnection->getActor() == this)
+    {
+        MBoundingBoxInterface::saveConfiguration(settings);
+    }
     settings->setValue("spacing", properties->mPointF()->value(spacingProperty));
     settings->setValue("colour", graticuleColour);
     settings->setValue("drawGraticule", drawGraticule);
@@ -140,8 +163,13 @@ void MGraticuleActor::loadConfiguration(QSettings *settings)
 
     settings->beginGroup(MGraticuleActor::getSettingsID());
 
-    QRectF bbox = settings->value("bbox").toRectF();
-    properties->mRectF()->setValue(cornersProperty, bbox);
+    // Only load bounding box if the graticule is directly connected to it.
+    // Otherwise graticule is part of a horizontal cross-section actor and thus
+    // its bounding box is handled via the horizontal cross-section actor.
+    if (bBoxConnection->getActor() == this)
+    {
+        MBoundingBoxInterface::loadConfiguration(settings);
+    }
 
     QPointF spacing = settings->value("spacing").toPointF();
     properties->mPointF()->setValue(spacingProperty, spacing);
@@ -173,12 +201,6 @@ void MGraticuleActor::reloadShaderEffects()
 }
 
 
-void MGraticuleActor::setBBox(QRectF bbox)
-{
-    properties->mRectF()->setValue(cornersProperty, bbox);
-}
-
-
 void MGraticuleActor::setVerticalPosition(double pressure_hPa)
 {
     // NOTE that the vertical position cannot be set by the user. Hence no
@@ -192,6 +214,24 @@ void MGraticuleActor::setVerticalPosition(double pressure_hPa)
 void MGraticuleActor::setColour(QColor c)
 {
     properties->mColor()->setValue(colourProperty, c);
+}
+
+
+void MGraticuleActor::onBoundingBoxChanged()
+{
+    labels.clear();
+
+    if (suppressActorUpdates())
+    {
+        return;
+    }
+    // Switching to no bounding box only needs a redraw, but no recomputation
+    // because it disables rendering of the actor.
+    if (bBoxConnection->getBoundingBox() != nullptr)
+    {
+        generateGeometry();
+    }
+    emitActorChangedSignal();
 }
 
 
@@ -216,8 +256,7 @@ void MGraticuleActor::initializeActorResources()
 void MGraticuleActor::onQtPropertyChanged(QtProperty *property)
 {
     // Recompute the geometry when bounding box or spacing have been changed.
-    if ( (property == cornersProperty)
-         || (property == spacingProperty)
+    if ( (property == spacingProperty)
          || (property == labelSizeProperty)
          || (property == labelColourProperty)
          || (property == labelBBoxProperty)
@@ -277,6 +316,11 @@ void MGraticuleActor::onQtPropertyChanged(QtProperty *property)
 
 void MGraticuleActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
 {
+    // Draw nothing if no bounding box is available.
+    if (bBoxConnection->getBoundingBox() == nullptr)
+    {
+        return;
+    }
     shaderProgram->bindProgram("IsoPressure");
 
     // Set uniform and attribute values.
@@ -382,6 +426,11 @@ void MGraticuleActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
 
 void MGraticuleActor::generateGeometry()
 {
+    // Generate nothing if no bounding box is available.
+    if (bBoxConnection->getBoundingBox() == nullptr)
+    {
+        return;
+    }
     // Make sure that "glResourcesManager" is the currently active context,
     // otherwise glDrawArrays on the VBO generated here will fail in any other
     // context than the currently active. The "glResourcesManager" context is
@@ -402,13 +451,13 @@ void MGraticuleActor::generateGeometry()
     QColor labelBBoxColour = properties->mColor()->value(labelBBoxColourProperty);
 
     // Get (user-defined) corner coordinates from the property browser.
-    QRectF cornerRect = properties->mRectF()->value(cornersProperty);
+    QRectF cornerRect = bBoxConnection->horizontal2DCoords();
     QPointF spacing = properties->mPointF()->value(spacingProperty);
 
-    float llcrnrlat = cornerRect.y();
-    float llcrnrlon = cornerRect.x();
-    float urcrnrlat = cornerRect.y() + cornerRect.height();
-    float urcrnrlon = cornerRect.x() + cornerRect.width();
+    float llcrnrlat = float(bBoxConnection->southLat());
+    float llcrnrlon = float(bBoxConnection->westLon());
+    float urcrnrlat = float(bBoxConnection->northLat());
+    float urcrnrlon = float(bBoxConnection->eastLon());
     float deltalat  = spacing.y();
     float deltalon  = spacing.x();
 

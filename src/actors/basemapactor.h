@@ -40,6 +40,7 @@
 #include "gxfw/rotatedgridsupportingactor.h"
 #include "gxfw/gl/shadereffect.h"
 #include "gxfw/gl/texture.h"
+#include "gxfw/boundingbox/boundingbox.h"
 
 
 class MGLResourcesManager;
@@ -52,19 +53,13 @@ namespace Met3D
   @brief MBaseMapActor draws a map into the scene. Map raster data is loaded
   from a GeoTiff file.
   */
-class MBaseMapActor : public MRotatedGridSupportingActor
+class MBaseMapActor : public MRotatedGridSupportingActor, public MBoundingBoxInterface
 {
 public:
     MBaseMapActor();
     ~MBaseMapActor();
 
     void reloadShaderEffects();
-
-    /**
-      Set a horizontal bounding box for the region (lonEast, latSouth, width,
-      height).
-      */
-    void setBBox(QRectF bbox);
 
     /**
       Set the filename for a GeoTIFF file from which the map data is loaded.
@@ -76,6 +71,8 @@ public:
     void saveConfiguration(QSettings *settings) override;
 
     void loadConfiguration(QSettings *settings) override;
+
+    void onBoundingBoxChanged() override;
 
 protected:
     /**
@@ -123,9 +120,7 @@ private:
     QtProperty* filenameProperty;
     QtProperty* loadMapProperty;
 
-    // Bounding box.
-    QRectF      bbox;
-    QtProperty* bboxProperty;
+    // Bounding box
     QVector4D   bboxForRotatedGrids;
 
     // Bounding box of the loaded map.

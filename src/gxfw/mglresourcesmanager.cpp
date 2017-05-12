@@ -657,6 +657,28 @@ QList<MActor*> MGLResourcesManager::getActorsConnectedTo(MActor *actor)
 }
 
 
+QList<MActor*> MGLResourcesManager::getActorsConnectedToBBox(QString bBoxName)
+{
+    QList<MActor*> connectedActors;
+
+    foreach (MActor* actor, actorPool)
+    {
+        // Only actors inheriting from MBoundingBoxInterface can be connected to
+        // a bounding box.
+        if (MBoundingBoxInterface *bBoxActor =
+                dynamic_cast<MBoundingBoxInterface*>(actor))
+        {
+            if (bBoxActor->getBoundingBoxName() == bBoxName)
+            {
+                connectedActors << actor;
+            }
+        }
+    }
+
+    return connectedActors;
+}
+
+
 void MGLResourcesManager::gpuMemoryInfo_kb(uint& total, uint& available)
 {
     // Get CPU memory usage via NVIDIA extension.

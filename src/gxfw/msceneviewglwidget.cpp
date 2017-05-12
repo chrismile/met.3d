@@ -434,9 +434,6 @@ MSceneViewGLWidget::MSceneViewGLWidget()
     connect(systemControl->getColorPropertyManager(),
             SIGNAL(propertyChanged(QtProperty*)),
             SLOT(onPropertyChanged(QtProperty*)));
-    connect(systemControl->getColorPropertyManager(),
-            SIGNAL(propertyChanged(QtProperty*)),
-            SLOT(onPropertyChanged(QtProperty*)));
 
     // Set up a timer for camera auto-rotation.
     cameraAutoRotationTimer = new QTimer();

@@ -54,12 +54,16 @@ namespace Met3D
 
 MBaseMapActor::MBaseMapActor()
     : MRotatedGridSupportingActor(),
+      MBoundingBoxInterface(this),
       texture(nullptr),
       numVertices(4),
-      bbox(QRectF(-90., 0., 180., 90.)),
       colourSaturation(0.3)
 {
     GDALAllRegister();
+
+    bBoxConnection = new MBoundingBoxConnection(
+                this, MBoundingBoxConnection::HORIZONTAL);
+
 
     // Create and initialise QtProperties for the GUI.
     // ===============================================
@@ -75,9 +79,8 @@ MBaseMapActor::MBaseMapActor()
     properties->mString()->setValue(filenameProperty, "");
     filenameProperty->setEnabled(false);
 
-    bboxProperty = addProperty(RECTF_LONLAT_PROPERTY, "bounding box",
-                               actorPropertiesSupGroup);
-    properties->setRectF(bboxProperty, bbox, 2);
+    // Bounding box of the actor.
+    actorPropertiesSupGroup->addSubProperty(bBoxConnection->getProperty());
 
     colourSaturationProperty = addProperty(DECORATEDDOUBLE_PROPERTY,
                                            "colour saturation",
@@ -116,7 +119,7 @@ void MBaseMapActor::saveConfiguration(QSettings *settings)
 
     settings->beginGroup(MBaseMapActor::getSettingsID());
 
-    settings->setValue("boundingBox", bbox);
+    MBoundingBoxInterface::saveConfiguration(settings);
     settings->setValue("colourSaturation", float(colourSaturation));
 
     QString filename = properties->mString()->value(filenameProperty);
@@ -132,8 +135,7 @@ void MBaseMapActor::loadConfiguration(QSettings *settings)
 
     settings->beginGroup(MBaseMapActor::getSettingsID());
 
-    bbox = settings->value("boundingBox").toRectF();
-    properties->mRectF()->setValue(bboxProperty, bbox);
+    MBoundingBoxInterface::loadConfiguration(settings);
 
     colourSaturation = settings->value("colourSaturation").toFloat();
     properties->mDDouble()->setValue(colourSaturationProperty, colourSaturation);
@@ -147,15 +149,29 @@ void MBaseMapActor::loadConfiguration(QSettings *settings)
 }
 
 
-void MBaseMapActor::setBBox(QRectF bbox)
-{
-    properties->mRectF()->setValue(bboxProperty, bbox);
-}
-
-
 void MBaseMapActor::setFilename(QString filename)
 {
     properties->mString()->setValue(filenameProperty, filename);
+}
+
+
+void MBaseMapActor::onBoundingBoxChanged()
+{
+    labels.clear();
+
+    // Only adapt bounding box for rotated grids if base map is connected to
+    // a bounding box.
+    if (bBoxConnection->getBoundingBox() != nullptr)
+    {
+        adaptBBoxForRotatedGrids();
+    }
+
+    if (suppressActorUpdates())
+    {
+        return;
+    }
+
+    emitActorChangedSignal();
 }
 
 
@@ -184,14 +200,7 @@ void MBaseMapActor::initializeActorResources()
 
 void MBaseMapActor::onQtPropertyChanged(QtProperty* property)
 {
-    if (property == bboxProperty)
-    {
-        bbox = properties->mRectF()->value(bboxProperty);
-        adaptBBoxForRotatedGrids();
-        emitActorChangedSignal();
-    }
-
-    else if (property == loadMapProperty)
+    if (property == loadMapProperty)
     {
         // open file dialog to select geotiff file
         QString filename = QFileDialog::getOpenFileName(
@@ -249,9 +258,10 @@ void MBaseMapActor::onQtPropertyChanged(QtProperty* property)
 
 void MBaseMapActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
 {
-    if (texture != nullptr)
+    if (texture != nullptr && bBoxConnection->getBoundingBox() != nullptr)
     {
-        QVector4D bboxVec4;
+        QVector4D bboxVec4(bBoxConnection->westLon(), bBoxConnection->southLat(),
+                           bBoxConnection->eastLon(), bBoxConnection->northLat());
         // Bind shader program.
         if (enableGridRotation)
         {
@@ -270,9 +280,6 @@ void MBaseMapActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
             else
             {
                 shaderProgram->bindProgram("BasemapRotationRotatedBBox");
-                bboxVec4 = QVector4D(
-                            bbox.x(), bbox.y(),
-                            bbox.width() + bbox.x(), bbox.height() + bbox.y());
                 shaderProgram->setUniformValue("cornersRotatedBox",
                                                bboxVec4);
             }
@@ -284,8 +291,6 @@ void MBaseMapActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
         else
         {
             shaderProgram->bindProgram("Basemap");
-            bboxVec4 = QVector4D(bbox.x(), bbox.y(),
-                     bbox.width() + bbox.x(), bbox.height() + bbox.y());
             shaderProgram->setUniformValue("cornersBox", bboxVec4);
         }
 
@@ -528,8 +533,8 @@ QVector4D MBaseMapActor::getBBoxOfRotatedBBox()
 void MBaseMapActor::adaptBBoxForRotatedGrids()
 {
     double right, left, lower, upper;
-    // Bounding box covers the full "width" of the sphere.
-    if (bbox.width() >= 360.)
+    // Bounding box covers the full "east wast extend" of the sphere.
+    if (bBoxConnection->eastWestExtent() >= 360.)
     {
         left = -180.;
         right = 180.;
@@ -539,8 +544,8 @@ void MBaseMapActor::adaptBBoxForRotatedGrids()
         // Map values greater than 360 and smaller than -360 to one of their
         // representative in the interval [-360, 360]
 
-        left = fmod(bbox.x(), 360.);
-        right = fmod(bbox.width() + bbox.x(), 360.);
+        left = fmod(bBoxConnection->westLon(), 360.);
+        right = fmod(bBoxConnection->eastLon(), 360.);
 
         // Map left and right to the interval [-180, 180]
 
@@ -562,8 +567,8 @@ void MBaseMapActor::adaptBBoxForRotatedGrids()
         }
 
     }
-    // Bounding box covers the full "height" of the sphere.
-    if (bbox.height() >= 360.)
+    // Bounding box covers the full "north south extend" of the sphere.
+    if (bBoxConnection->northSouthExtent() >= 360.)
     {
         lower = -90.;
         upper = 90.;
@@ -573,8 +578,8 @@ void MBaseMapActor::adaptBBoxForRotatedGrids()
         // Map values greater than 360 and smaller than -360 to one of their
         // representative in the interval [-360, 360]
 
-        lower = fmod(bbox.y(), 360.);
-        upper = fmod(bbox.height() + bbox.y(), 360.);
+        lower = fmod(bBoxConnection->southLat(), 360.);
+        upper = fmod(bBoxConnection->northLat(), 360.);
 
         // Map lower and upper to the interval [-90, 90] by mapping the values
         // at the "backside" of the sphere to -90 and 90 respectively.

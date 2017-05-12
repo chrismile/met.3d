@@ -366,6 +366,28 @@ void MFrontendConfiguration::initializeFrontendFromConfigFile(
     config.endArray();
 
 
+    // Initialize bounding boxes.
+    // ==========================
+    config.beginGroup("BoundingBoxes");
+
+    QString bboxes = expandEnvironmentVariables(config.value("config", "")
+                                                .toString());
+
+    LOG4CPLUS_DEBUG(mlog, "initializing bounding boxes: ");
+    if (bboxes.isEmpty())
+    {
+        LOG4CPLUS_WARN(mlog, "No configuration file for bounding boxes is"
+                             " specified in the frontend configuration."
+                             " Using default bounding box configuration.");
+        bboxes = expandEnvironmentVariables(
+                    "$MET3D_HOME/config/default_boundingboxes.bbox.conf");
+    }
+    LOG4CPLUS_DEBUG(mlog, "  file path = " << bboxes.toStdString());
+    sysMC->getBoundingBoxDock()->loadConfigurationFromFile(bboxes);
+
+    config.endGroup();
+
+
     // Add predefined actors to the scenes.
     // ====================================
 
@@ -568,17 +590,22 @@ void MFrontendConfiguration::initializeDefaultActors_Basemap(
         QList<MSceneControl *> scenes)
 {
     MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
+    QString bBoxName = "Base Map Bounding Box";
+    // User might change the bounding box name, if it already exists.
+    bBoxName = MSystemManagerAndControl::getInstance()->getBoundingBoxDock()
+            ->addBoundingBox(bBoxName, &bbox);
 
     MBaseMapActor *mapActor = new MBaseMapActor();
     mapActor->setFilename(mapfile);
     mapActor->setEnabled(true);
     glRM->registerActor(mapActor);
+    mapActor->switchToBoundingBox(bBoxName);
     foreach (MSceneControl *scene, scenes) scene->addActor(mapActor);
 
     MGraticuleActor *graticuleActor = new MGraticuleActor();
-    graticuleActor->setBBox(bbox);
     graticuleActor->setColour(QColor(128, 128, 128, 255));
     glRM->registerActor(graticuleActor);
+    graticuleActor->switchToBoundingBox(bBoxName);
     foreach (MSceneControl *scene, scenes) scene->addActor(graticuleActor);
 }
 
@@ -590,7 +617,11 @@ void MFrontendConfiguration::initializeDefaultActors_VolumeBox(
     MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
 
     MVolumeBoundingBoxActor *volumeBoxActor = new MVolumeBoundingBoxActor();
-    volumeBoxActor->setBBox(bbox);
+    QString bBoxName = "Volume Bounding Box";
+    // User might change the bounding box name, if it already exists.
+    bBoxName = MSystemManagerAndControl::getInstance()->getBoundingBoxDock()
+            ->addBoundingBox(bBoxName, &bbox);
+    volumeBoxActor->switchToBoundingBox(bBoxName);
     glRM->registerActor(volumeBoxActor);
     foreach (MSceneControl *scene, scenes) scene->addActor(volumeBoxActor);
 }
@@ -615,15 +646,20 @@ void MFrontendConfiguration::initializeDefaultActors_MSLP(
                     "Mean_sea_level_pressure_surface")
                 );
     var->setRenderMode(MNWP2DSectionActorVariable::RenderMode::LineContours);
-    var->addContourSet(true, 1.2, false, QColor(139, 102, 139, 255),
+    var->addContourSet(true, 1.2, false, QColor(139, 102, 139, 255), false,
                           "[90000,105000,100]");
-    var->addContourSet(true, 2., false, QColor(139, 102, 139, 255),
+    var->addContourSet(true, 2., false, QColor(139, 102, 139, 255), false,
                           "[90000,105000,400]");
     // Remove first contour set which was inserted during creation.
     var->removeContourSet(0);
     mslpActor->addActorVariable(var, "Synchronization");
 
-    mslpActor->setBBox(bbox);
+    QString bBoxName = "MSLP Bounding Box";
+    // User might change the bounding box name, if it already exists.
+    bBoxName = MSystemManagerAndControl::getInstance()->getBoundingBoxDock()
+            ->addBoundingBox(bBoxName, &bbox);
+    mslpActor->switchToBoundingBox(bBoxName);
+
     mslpActor->setSlicePosition(1045.);
     mslpActor->getGraticuleActor()->setColour(QColor(128, 128, 128, 255));
     mslpActor->setLabelsEnabled(false);
@@ -711,7 +747,11 @@ void MFrontendConfiguration::initializeDefaultActors_HSec(
 
     MNWPHorizontalSectionActor *geopWindActor =
             new MNWPHorizontalSectionActor();
-    geopWindActor->setBBox(bbox);
+    QString bBoxName = "HSec: Geopotential Height and Wind Speed";
+    // User might change the bounding box name, if it already exists.
+    bBoxName = MSystemManagerAndControl::getInstance()->getBoundingBoxDock()
+            ->addBoundingBox(bBoxName, &bbox);
+    geopWindActor->switchToBoundingBox(bBoxName);
     geopWindActor->setSlicePosition(250.);
     geopWindActor->setName("HSec: Geopotential Height and Wind Speed");
 
@@ -733,9 +773,9 @@ void MFrontendConfiguration::initializeDefaultActors_HSec(
                     "geopotential_height")
                 );
     var->setRenderMode(MNWP2DSectionActorVariable::RenderMode::LineContours);
-    var->addContourSet(true, 1.2, false, QColor(Qt::darkGreen),
+    var->addContourSet(true, 1.2, false, QColor(Qt::darkGreen), false,
                           "[0,26000,40]");
-    var->addContourSet(true, 2., false, QColor(Qt::darkGreen),
+    var->addContourSet(true, 2., false, QColor(Qt::darkGreen), false,
                           "[0,26000,200]");
     // Remove first contour set which was inserted during creation.
     var->removeContourSet(0);
@@ -793,7 +833,11 @@ void MFrontendConfiguration::initializeDefaultActors_HSec_Difference(
         scene->addActor(transferFunctionDiff);
 
     MNWPHorizontalSectionActor *diffActor = new MNWPHorizontalSectionActor();
-    diffActor->setBBox(bbox);
+    QString bBoxName = "HSec: Geopotential Height and Wind Speed Difference";
+    // User might change the bounding box name, if it already exists.
+    bBoxName = MSystemManagerAndControl::getInstance()->getBoundingBoxDock()
+            ->addBoundingBox(bBoxName, &bbox);
+    diffActor->switchToBoundingBox(bBoxName);
     diffActor->setSlicePosition(950.);
     diffActor->setName("HSec: Geopotential Height and Wind Speed Difference");
 
@@ -824,9 +868,9 @@ void MFrontendConfiguration::initializeDefaultActors_HSec_Difference(
                     "wind_speed")
                 );
     var->setRenderMode(MNWP2DSectionActorVariable::RenderMode::LineContours);
-    var->addContourSet(true, 1.2, false, QColor(Qt::blue),
+    var->addContourSet(true, 1.2, false, QColor(Qt::blue), false,
                           "[0,100,10]");
-    var->addContourSet(true, 2., false, QColor(Qt::blue),
+    var->addContourSet(true, 2., false, QColor(Qt::blue), false,
                           "[0,100,20]");
     // Remove first contour set which was inserted during creation.
     var->removeContourSet(0);
@@ -839,9 +883,9 @@ void MFrontendConfiguration::initializeDefaultActors_HSec_Difference(
                     "geopotential_height")
                 );
     var->setRenderMode(MNWP2DSectionActorVariable::RenderMode::LineContours);
-    var->addContourSet(true, 1.2, false, QColor(Qt::darkGreen),
+    var->addContourSet(true, 1.2, false, QColor(Qt::darkGreen), false,
                           "[0,26000,40]");
-    var->addContourSet(true, 2., false, QColor(Qt::darkGreen),
+    var->addContourSet(true, 2., false, QColor(Qt::darkGreen), false,
                           "[0,26000,200]");
     // Remove first contour set which was inserted during creation.
     var->removeContourSet(0);
@@ -876,6 +920,12 @@ void MFrontendConfiguration::initializeDefaultActors_VSec_PV(
 
     MNWPVerticalSectionActor *vsecActorPV =
             new MNWPVerticalSectionActor();
+    QRectF bbox = QRectF(-60.f, 40.f, 100.f, 30.f);
+    QString bBoxName = "VSec: PV, PT, CIWC and CLWC";
+    // User might change the bounding box name, if it already exists.
+    bBoxName = MSystemManagerAndControl::getInstance()->getBoundingBoxDock()
+            ->addBoundingBox(bBoxName, &bbox, 1050., 100.);
+    vsecActorPV->switchToBoundingBox(bBoxName);
     vsecActorPV->setName("VSec: PV, PT, CIWC and CLWC");
 
     // Potential vorticity.
@@ -898,7 +948,8 @@ void MFrontendConfiguration::initializeDefaultActors_VSec_PV(
                     "Potential_temperature_hybrid")
                 );
     var->setRenderMode(MNWP2DSectionActorVariable::RenderMode::LineContours);
-    var->addContourSet(true, 1.2, false, QColor(Qt::black), "[270,450,10]");
+    var->addContourSet(true, 1.2, false, QColor(Qt::black), false,
+                       "[270,450,10]");
     // Remove first contour set which was inserted during creation.
     var->removeContourSet(0);
     vsecActorPV->addActorVariable(var, "Synchronization");
@@ -911,7 +962,7 @@ void MFrontendConfiguration::initializeDefaultActors_VSec_PV(
                     "Specific_cloud_ice_water_content_hybrid")
                 );
     var->setRenderMode(MNWP2DSectionActorVariable::RenderMode::LineContours);
-    var->addContourSet(true, 1.2, false, QColor(Qt::white),
+    var->addContourSet(true, 1.2, false, QColor(Qt::white), false,
                           "0.00001,0.00003,0.00005,0.00007,0.0001,0.0003,"
                           "0.0005,0.0007,0.001");
     // Remove first contour set which was inserted during creation.
@@ -926,7 +977,7 @@ void MFrontendConfiguration::initializeDefaultActors_VSec_PV(
                     "Specific_cloud_liquid_water_content_hybrid")
                 );
     var->setRenderMode(MNWP2DSectionActorVariable::RenderMode::LineContours);
-    var->addContourSet(true, 1.2, false, QColor(Qt::blue),
+    var->addContourSet(true, 1.2, false, QColor(Qt::blue), false,
                           "0.00001,0.00003,0.00005,0.00007,0.0001,0.0003,"
                           "0.0005,0.0007,0.001");
     // Remove first contour set which was inserted during creation.
@@ -962,6 +1013,12 @@ void MFrontendConfiguration::initializeDefaultActors_VSec_Clouds(
 
     MNWPVerticalSectionActor *vsecActor =
             new MNWPVerticalSectionActor();
+    QRectF bbox = QRectF(-60.f, 40.f, 100.f, 30.f);
+    QString bBoxName = "VSec: Cloud Cover and Temperature";
+    // User might change the bounding box name, if it already exists.
+    bBoxName = MSystemManagerAndControl::getInstance()->getBoundingBoxDock()
+            ->addBoundingBox(bBoxName, &bbox, 1050., 100.);
+    vsecActor->switchToBoundingBox(bBoxName);
     vsecActor->setName("VSec: Cloud Cover and Temperature");
 
     // Cloud cover.
@@ -985,10 +1042,12 @@ void MFrontendConfiguration::initializeDefaultActors_VSec_Clouds(
 //                    "Temperature_hybrid")
                 );
     var->setRenderMode(MNWP2DSectionActorVariable::RenderMode::LineContours);
-//    var->addContourSet(true, 1.2, false, QColor(211, 75, 71), "[200,300,4]");
-//    var->addContourSet(true, 2., false, QColor(211, 75, 71), "234");
-    var->addContourSet(true, 1.2, false, QColor(211, 75, 71), "[200,500,4]");
-    var->addContourSet(true, 2., false, QColor(211, 75, 71), "[308,320,2]");
+//    var->addContourSet(true, 1.2, false, QColor(211, 75, 71), false, "[200,300,4]");
+//    var->addContourSet(true, 2., false, QColor(211, 75, 71), false, "234");
+    var->addContourSet(true, 1.2, false, QColor(211, 75, 71), false,
+                       "[200,500,4]");
+    var->addContourSet(true, 2., false, QColor(211, 75, 71), false,
+                       "[308,320,2]");
     // Remove first contour set which was inserted during creation.
     var->removeContourSet(0);
     vsecActor->addActorVariable(var, "Synchronization");
@@ -1001,7 +1060,7 @@ void MFrontendConfiguration::initializeDefaultActors_VSec_Clouds(
                     "Potential_temperature_hybrid")
                 );
     var->setRenderMode(MNWP2DSectionActorVariable::RenderMode::LineContours);
-    var->addContourSet(true, 1.2, false, QColor(Qt::gray), "[270,400,10]");
+    var->addContourSet(true, 1.2, false, QColor(Qt::gray), false, "[270,400,10]");
     // Remove first contour set which was inserted during creation.
     var->removeContourSet(0);
     vsecActor->addActorVariable(var, "Synchronization");
@@ -1053,7 +1112,11 @@ void MFrontendConfiguration::initializeDefaultActors_Volume(
     var->setTransferFunction("Pressure");
     nwpVolumeActor->addActorVariable(var, "Synchronization");
 
-    nwpVolumeActor->setBoundingBox(bbox, 1050., 100.);
+    QString bBoxName = "Volume: NWP";
+    // User might change the bounding box name, if it already exists.
+    bBoxName = MSystemManagerAndControl::getInstance()->getBoundingBoxDock()
+            ->addBoundingBox(bBoxName, &bbox, 1050., 100.);
+    nwpVolumeActor->switchToBoundingBox(bBoxName);
     nwpVolumeActor->setEnabled(true);
     glRM->registerActor(nwpVolumeActor);
     foreach (MSceneControl *scene, scenes)
@@ -1098,7 +1161,7 @@ void MFrontendConfiguration::initializeDefaultActors_VolumeProbability(
 
     MTransferFunction1D *transferFunctionProb = new MTransferFunction1D();
     transferFunctionProb->setName("Probability (%)");
-    transferFunctionProb->selectPredefinedColourmap("hot_wind_r");
+//    transferFunctionProb->selectPredefinedColourmap("hot_wind_r");
     transferFunctionProb->setMinimumValue(0.);
     transferFunctionProb->setMaximumValue(1.);
     transferFunctionProb->setValueDecimals(2);
@@ -1114,6 +1177,11 @@ void MFrontendConfiguration::initializeDefaultActors_VolumeProbability(
     // =====================================
 
     MNWPVerticalSectionActor *vsecActorWCB = new MNWPVerticalSectionActor();
+    QString bBoxName = "Probability of WCB occurrence";
+    // User might change the bounding box name, if it already exists.
+    bBoxName = MSystemManagerAndControl::getInstance()->getBoundingBoxDock()
+            ->addBoundingBox(bBoxName, &bbox, 1050., 100.);
+    vsecActorWCB->switchToBoundingBox(bBoxName);
     vsecActorWCB->setName("VSec: Probability of WCB occurrence");
 
     // Potential vorticity.
@@ -1136,8 +1204,10 @@ void MFrontendConfiguration::initializeDefaultActors_VolumeProbability(
                     "Equivalent_potential_temperature_hybrid")
                 );
     vvar->setRenderMode(MNWP2DSectionActorVariable::RenderMode::LineContours);
-    vvar->addContourSet(true, 1.2, false, QColor(Qt::black), "[200,500,4]");
-    vvar->addContourSet(true, 2., false, QColor(Qt::black), "[308,320,2]");
+    vvar->addContourSet(true, 1.2, false, QColor(Qt::black), false,
+                        "[200,500,4]");
+    vvar->addContourSet(true, 2., false, QColor(Qt::black), false,
+                        "[308,320,2]");
     // Remove first contour set which was inserted during creation.
     vvar->removeContourSet(0);
     vsecActorWCB->addActorVariable(vvar, "Synchronization");
@@ -1150,7 +1220,7 @@ void MFrontendConfiguration::initializeDefaultActors_VolumeProbability(
                     "Specific_cloud_ice_water_content_hybrid")
                 );
     vvar->setRenderMode(MNWP2DSectionActorVariable::RenderMode::LineContours);
-    vvar->addContourSet(true, 1.2, false, QColor(Qt::white),
+    vvar->addContourSet(true, 1.2, false, QColor(Qt::white), false,
                           "0.00001,0.00003,0.00005,0.00007,0.0001,0.0003,"
                           "0.0005,0.0007,0.001");
     // Remove first contour set which was inserted during creation.
@@ -1165,7 +1235,7 @@ void MFrontendConfiguration::initializeDefaultActors_VolumeProbability(
                     "Specific_cloud_liquid_water_content_hybrid")
                 );
     vvar->setRenderMode(MNWP2DSectionActorVariable::RenderMode::LineContours);
-    vvar->addContourSet(true, 1.2, false, QColor(Qt::blue),
+    vvar->addContourSet(true, 1.2, false, QColor(Qt::blue), false,
                           "0.00001,0.00003,0.00005,0.00007,0.0001,0.0003,"
                           "0.0005,0.0007,0.001");
     // Remove first contour set which was inserted during creation.
@@ -1211,8 +1281,10 @@ void MFrontendConfiguration::initializeDefaultActors_VolumeProbability(
                     "geopotential_height")
                 );
     hvar->setRenderMode(MNWP2DSectionActorVariable::RenderMode::LineContours);
-    hvar->addContourSet(true, 1.2, false, QColor(Qt::darkGreen), "[0,26000,40]");
-    hvar->addContourSet(true, 2., false, QColor(Qt::darkGreen), "[0,26000,200]");
+    hvar->addContourSet(true, 1.2, false, QColor(Qt::darkGreen), false,
+                        "[0,26000,40]");
+    hvar->addContourSet(true, 2., false, QColor(Qt::darkGreen), false,
+                        "[0,26000,200]");
     // Remove first contour set which was inserted during creation.
     hvar->removeContourSet(0);
     pwcbHSecActor->addActorVariable(hvar, "Synchronization");
@@ -1237,7 +1309,7 @@ void MFrontendConfiguration::initializeDefaultActors_VolumeProbability(
     hvar->setRenderMode(MNWP2DSectionActorVariable::RenderMode::Disabled);
     pwcbHSecActor->addActorVariable(hvar, "Synchronization");
 
-    pwcbHSecActor->setBBox(bbox);
+    pwcbHSecActor->switchToBoundingBox(bBoxName);
     pwcbHSecActor->setSlicePosition(390.);
     pwcbHSecActor->setEnabled(true);
     glRM->registerActor(pwcbHSecActor);
@@ -1266,7 +1338,7 @@ void MFrontendConfiguration::initializeDefaultActors_VolumeProbability(
     var->setTransferFunction("Probability (%)");
     pwcbVolumeActor->addActorVariable(var, "Synchronization");
 
-    pwcbVolumeActor->setBoundingBox(bbox, 1050., 100.);
+    pwcbVolumeActor->switchToBoundingBox(bBoxName);
     pwcbVolumeActor->setEnabled(false);
     glRM->registerActor(pwcbVolumeActor);
     foreach (MSceneControl *scene, scenes)
