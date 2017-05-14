@@ -20,3 +20,4 @@ cmake_install.cmake
 __
 build
 .idea
+cmake-build-*

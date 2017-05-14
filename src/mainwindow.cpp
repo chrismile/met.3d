@@ -33,6 +33,7 @@
 // related third party imports
 #include <QDockWidget>
 #include <QDesktopServices>
+#include <QDesktopWidget>
 
 #include <log4cplus/loggingmacros.h>
 
