@@ -233,34 +233,6 @@ private:
         bool        enabled;
         QtProperty* enabledProperty;
 
-        bool        automaticEnabled;
-        QtProperty* automaticEnabledProperty;
-        float       oldScale;
-
-        float       lineWidth;
-        QtProperty* lineWidthProperty;
-
-        int         numFlags;
-        QtProperty* numFlagsProperty;
-
-        QColor      color;
-        QtProperty* colorProperty;
-
-        bool        showCalmGlyphs;
-        QtProperty* showCalmGlyphsProperty;
-
-        // reduction factor c
-        float       reduceFactor;
-        QtProperty* reduceFactorProperty;
-
-        // slope factor b
-        float       reduceSlope;
-        QtProperty* reduceSlopeProperty;
-
-        // sensibility of glyph res-change
-        float       sensibility;
-        QtProperty* sensibilityProperty;
-
         int8_t      uComponentVarIndex;
         QtProperty* uComponentVarProperty;
 
@@ -268,6 +240,38 @@ private:
         QtProperty* vComponentVarProperty;
 
         QList<QString> varNameList;
+
+        QtProperty* appearanceGroupProperty;
+
+        float       lineWidth;
+        QtProperty* lineWidthProperty;
+
+        int         pennantTilt;
+        QtProperty* pennantTiltProperty;
+
+        QColor      color;
+        QtProperty* colorProperty;
+
+        bool        showCalmGlyphs;
+        QtProperty* showCalmGlyphsProperty;
+
+        float       deltaBarbsLonLat;
+        QtProperty* deltaBarbsLonLatProperty;
+
+        bool        automaticScalingEnabled;
+        QtProperty* automaticScalingEnabledProperty;
+        float       oldScale;
+
+        QtProperty* scalingGroupProperty;
+
+        float       reduceFactor;
+        QtProperty* reduceFactorProperty;
+
+        float       reduceSlope;
+        QtProperty* reduceSlopeProperty;
+
+        float       sensitivity;
+        QtProperty* sensitivityProperty;
     };
 
     friend struct WindBarbsSettings;
