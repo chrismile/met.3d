@@ -558,9 +558,9 @@ void MFrontendConfiguration::initializeDefaultActors_MSLP(
                     "Mean_sea_level_pressure_surface")
                 );
     var->setRenderMode(MNWP2DSectionActorVariable::RenderMode::LineContours);
-    var->addContourSet(true, QColor(139, 102, 139, 255), 1.2,
+    var->addContourSet(true, 1.2, false, QColor(139, 102, 139, 255),
                           "[90000,105000,100]");
-    var->addContourSet(true, QColor(139, 102, 139, 255), 2.,
+    var->addContourSet(true, 2., false, QColor(139, 102, 139, 255),
                           "[90000,105000,400]");
     // Remove first contour set which was inserted during creation.
     var->removeContourSet(0);
@@ -676,9 +676,9 @@ void MFrontendConfiguration::initializeDefaultActors_HSec(
                     "geopotential_height")
                 );
     var->setRenderMode(MNWP2DSectionActorVariable::RenderMode::LineContours);
-    var->addContourSet(true, QColor(Qt::darkGreen), 1.2,
+    var->addContourSet(true, 1.2, false, QColor(Qt::darkGreen),
                           "[0,26000,40]");
-    var->addContourSet(true, QColor(Qt::darkGreen), 2.,
+    var->addContourSet(true, 2., false, QColor(Qt::darkGreen),
                           "[0,26000,200]");
     // Remove first contour set which was inserted during creation.
     var->removeContourSet(0);
@@ -767,9 +767,9 @@ void MFrontendConfiguration::initializeDefaultActors_HSec_Difference(
                     "wind_speed")
                 );
     var->setRenderMode(MNWP2DSectionActorVariable::RenderMode::LineContours);
-    var->addContourSet(true, QColor(Qt::blue), 1.2,
+    var->addContourSet(true, 1.2, false, QColor(Qt::blue),
                           "[0,100,10]");
-    var->addContourSet(true, QColor(Qt::blue), 2.,
+    var->addContourSet(true, 2., false, QColor(Qt::blue),
                           "[0,100,20]");
     // Remove first contour set which was inserted during creation.
     var->removeContourSet(0);
@@ -782,9 +782,9 @@ void MFrontendConfiguration::initializeDefaultActors_HSec_Difference(
                     "geopotential_height")
                 );
     var->setRenderMode(MNWP2DSectionActorVariable::RenderMode::LineContours);
-    var->addContourSet(true, QColor(Qt::darkGreen), 1.2,
+    var->addContourSet(true, 1.2, false, QColor(Qt::darkGreen),
                           "[0,26000,40]");
-    var->addContourSet(true, QColor(Qt::darkGreen), 2.,
+    var->addContourSet(true, 2., false, QColor(Qt::darkGreen),
                           "[0,26000,200]");
     // Remove first contour set which was inserted during creation.
     var->removeContourSet(0);
@@ -841,7 +841,7 @@ void MFrontendConfiguration::initializeDefaultActors_VSec_PV(
                     "Potential_temperature_hybrid")
                 );
     var->setRenderMode(MNWP2DSectionActorVariable::RenderMode::LineContours);
-    var->addContourSet(true, QColor(Qt::black), 1.2, "[270,450,10]");
+    var->addContourSet(true, 1.2, false, QColor(Qt::black), "[270,450,10]");
     // Remove first contour set which was inserted during creation.
     var->removeContourSet(0);
     vsecActorPV->addActorVariable(var, "Synchronization");
@@ -854,7 +854,7 @@ void MFrontendConfiguration::initializeDefaultActors_VSec_PV(
                     "Specific_cloud_ice_water_content_hybrid")
                 );
     var->setRenderMode(MNWP2DSectionActorVariable::RenderMode::LineContours);
-    var->addContourSet(true, QColor(Qt::white), 1.2,
+    var->addContourSet(true, 1.2, false, QColor(Qt::white),
                           "0.00001,0.00003,0.00005,0.00007,0.0001,0.0003,"
                           "0.0005,0.0007,0.001");
     // Remove first contour set which was inserted during creation.
@@ -869,7 +869,7 @@ void MFrontendConfiguration::initializeDefaultActors_VSec_PV(
                     "Specific_cloud_liquid_water_content_hybrid")
                 );
     var->setRenderMode(MNWP2DSectionActorVariable::RenderMode::LineContours);
-    var->addContourSet(true, QColor(Qt::blue), 1.2,
+    var->addContourSet(true, 1.2, false, QColor(Qt::blue),
                           "0.00001,0.00003,0.00005,0.00007,0.0001,0.0003,"
                           "0.0005,0.0007,0.001");
     // Remove first contour set which was inserted during creation.
@@ -928,10 +928,10 @@ void MFrontendConfiguration::initializeDefaultActors_VSec_Clouds(
 //                    "Temperature_hybrid")
                 );
     var->setRenderMode(MNWP2DSectionActorVariable::RenderMode::LineContours);
-//    var->addContourSet(true, QColor(211, 75, 71), 1.2, "[200,300,4]");
-//    var->addContourSet(true, QColor(211, 75, 71), 2., "234");
-    var->addContourSet(true, QColor(211, 75, 71), 1.2, "[200,500,4]");
-    var->addContourSet(true, QColor(211, 75, 71), 2., "[308,320,2]");
+//    var->addContourSet(true, 1.2, false, QColor(211, 75, 71), "[200,300,4]");
+//    var->addContourSet(true, 2., false, QColor(211, 75, 71), "234");
+    var->addContourSet(true, 1.2, false, QColor(211, 75, 71), "[200,500,4]");
+    var->addContourSet(true, 2., false, QColor(211, 75, 71), "[308,320,2]");
     // Remove first contour set which was inserted during creation.
     var->removeContourSet(0);
     vsecActor->addActorVariable(var, "Synchronization");
@@ -944,7 +944,7 @@ void MFrontendConfiguration::initializeDefaultActors_VSec_Clouds(
                     "Potential_temperature_hybrid")
                 );
     var->setRenderMode(MNWP2DSectionActorVariable::RenderMode::LineContours);
-    var->addContourSet(true, QColor(Qt::gray), 1.2, "[270,400,10]");
+    var->addContourSet(true, 1.2, false, QColor(Qt::gray), "[270,400,10]");
     // Remove first contour set which was inserted during creation.
     var->removeContourSet(0);
     vsecActor->addActorVariable(var, "Synchronization");
@@ -1079,8 +1079,8 @@ void MFrontendConfiguration::initializeDefaultActors_VolumeProbability(
                     "Equivalent_potential_temperature_hybrid")
                 );
     vvar->setRenderMode(MNWP2DSectionActorVariable::RenderMode::LineContours);
-    vvar->addContourSet(true, QColor(Qt::black), 1.2, "[200,500,4]");
-    vvar->addContourSet(true, QColor(Qt::black), 2., "[308,320,2]");
+    vvar->addContourSet(true, 1.2, false, QColor(Qt::black), "[200,500,4]");
+    vvar->addContourSet(true, 2., false, QColor(Qt::black), "[308,320,2]");
     // Remove first contour set which was inserted during creation.
     vvar->removeContourSet(0);
     vsecActorWCB->addActorVariable(vvar, "Synchronization");
@@ -1093,7 +1093,7 @@ void MFrontendConfiguration::initializeDefaultActors_VolumeProbability(
                     "Specific_cloud_ice_water_content_hybrid")
                 );
     vvar->setRenderMode(MNWP2DSectionActorVariable::RenderMode::LineContours);
-    vvar->addContourSet(true, QColor(Qt::white), 1.2,
+    vvar->addContourSet(true, 1.2, false, QColor(Qt::white),
                           "0.00001,0.00003,0.00005,0.00007,0.0001,0.0003,"
                           "0.0005,0.0007,0.001");
     // Remove first contour set which was inserted during creation.
@@ -1108,7 +1108,7 @@ void MFrontendConfiguration::initializeDefaultActors_VolumeProbability(
                     "Specific_cloud_liquid_water_content_hybrid")
                 );
     vvar->setRenderMode(MNWP2DSectionActorVariable::RenderMode::LineContours);
-    vvar->addContourSet(true, QColor(Qt::blue), 1.2,
+    vvar->addContourSet(true, 1.2, false, QColor(Qt::blue),
                           "0.00001,0.00003,0.00005,0.00007,0.0001,0.0003,"
                           "0.0005,0.0007,0.001");
     // Remove first contour set which was inserted during creation.
@@ -1154,8 +1154,8 @@ void MFrontendConfiguration::initializeDefaultActors_VolumeProbability(
                     "geopotential_height")
                 );
     hvar->setRenderMode(MNWP2DSectionActorVariable::RenderMode::LineContours);
-    hvar->addContourSet(true, QColor(Qt::darkGreen), 1.2, "[0,26000,40]");
-    hvar->addContourSet(true, QColor(Qt::darkGreen), 2., "[0,26000,200]");
+    hvar->addContourSet(true, 1.2, false, QColor(Qt::darkGreen), "[0,26000,40]");
+    hvar->addContourSet(true, 2., false, QColor(Qt::darkGreen), "[0,26000,200]");
     // Remove first contour set which was inserted during creation.
     hvar->removeContourSet(0);
     pwcbHSecActor->addActorVariable(hvar, "Synchronization");

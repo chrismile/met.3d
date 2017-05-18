@@ -143,8 +143,6 @@ public:
 
     bool isConnectedTo(MActor *actor) override;
 
-    QStringList configVersionID; // Version ID read in config file during loading.
-
 protected:
     friend class MNWPActorVariable;
 

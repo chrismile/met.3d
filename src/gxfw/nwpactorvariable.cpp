@@ -2024,6 +2024,8 @@ MNWP2DSectionActorVariable::MNWP2DSectionActorVariable(
                 renderSettings.contourSetGroupProperty);
     properties->mBool()->setValue(renderSettings.contoursUseTFProperty,
                                   renderSettings.contoursUseTF);
+    renderSettings.contoursUseTFProperty->setToolTip(
+                "Use transfer function for all contour sets");
 
     a->endInitialiseQtProperties();
 
@@ -2041,12 +2043,14 @@ MNWP2DSectionActorVariable::~MNWP2DSectionActorVariable()
 
 
 MNWP2DSectionActorVariable::ContourSettings::ContourSettings(
-        MActor *actor, const uint8_t index, bool enabled, QColor colour,
-        double thickness, bool labelsEnabled, QString levelsString)
+        MActor *actor, const uint8_t index, bool enabled, double thickness,
+        bool useTransferFunction, QColor colour,
+        bool labelsEnabled, QString levelsString)
     : enabled(enabled),
       levels(QVector<double>()),
-      colour(colour),
       thickness(thickness),
+      useTF(useTransferFunction),
+      colour(colour),
       labelsEnabled(labelsEnabled),
       startIndex(0),
       stopIndex(0)
@@ -2067,6 +2071,11 @@ MNWP2DSectionActorVariable::ContourSettings::ContourSettings(
     thicknessProperty =
             actor->addProperty(DOUBLE_PROPERTY, "thickness", groupProperty);
     properties->setDouble(thicknessProperty, thickness, 0.1, 10.0, 2, 0.1);
+
+    useTFProperty =
+            actor->addProperty(BOOL_PROPERTY, "use transfer function",
+                               groupProperty);
+    properties->mBool()->setValue(useTFProperty, useTransferFunction);
 
     colourProperty = actor->addProperty(COLOR_PROPERTY, "colour", groupProperty);
     properties->mColor()->setValue(colourProperty, colour);
@@ -2218,6 +2227,13 @@ bool MNWP2DSectionActorVariable::onQtPropertyChanged(QtProperty *property)
                 return true;
             }
 
+            else if (property == contourSet->useTFProperty)
+            {
+                contourSet->useTF = properties->mBool()->value(
+                            contourSet->useTFProperty);
+                return true;
+            }
+
             else if (property == contourSet->colourProperty)
             {
                 contourSet->colour = properties->mColor()->value(
@@ -2276,6 +2292,7 @@ void MNWP2DSectionActorVariable::saveConfiguration(QSettings *settings)
         settings->setValue("levels", properties->mString()->value(
                                contourSet.levelsProperty));
         settings->setValue("thickness", contourSet.thickness);
+        settings->setValue("useTF", contourSet.useTF);
         settings->setValue("colour", contourSet.colour);
         settings->setValue("labelsEnabled", contourSet.labelsEnabled);
         index++;
@@ -2329,18 +2346,23 @@ void MNWP2DSectionActorVariable::loadConfiguration(QSettings *settings)
         bool enabled = settings->value("enabled", true).toBool();
         QString levels = settings->value("levels", "").toString();
         double thickness = settings->value("thickness", 1.5).toDouble();
+        bool useTF = settings->value("useTF", false).toBool();
         QColor colour = settings->value("colour",
                                         QColor(0, 0, 0, 255)).value<QColor>();
         bool labelsEnabled = settings->value("labelsEnabled", false).toBool();
-        addContourSet(enabled, colour, thickness, labelsEnabled, levels);
+        addContourSet(enabled, thickness, useTF, colour, labelsEnabled, levels);
     }
     settings->endArray();
+
+    // Read version id of config file.
+    // ===============================
+
+    QStringList configVersionID = readConfigVersionID(settings);
 
     // Thin and thick contour lines. (For compatibility with version < 1.2)
     //=====================================================================
 
-    if (actor->configVersionID[0].toInt() <= 1
-            && actor->configVersionID[1].toInt() < 2)
+    if (configVersionID[0].toInt() <= 1 && configVersionID[1].toInt() < 2)
     {
         QString levels =
                 settings->value("thinContourLevels").toString();
@@ -2350,7 +2372,7 @@ void MNWP2DSectionActorVariable::loadConfiguration(QSettings *settings)
         QColor colour = settings->value("thinContourColour",
                                         QColor(0, 0, 0, 255)).value<QColor>();
 
-        addContourSet(true, colour, thickness, false, levels);
+        addContourSet(true, thickness, false, colour, false, levels);
 
 
         levels = settings->value("thickContourLevels").toString();
@@ -2358,7 +2380,7 @@ void MNWP2DSectionActorVariable::loadConfiguration(QSettings *settings)
         colour = settings->value("thickContourColour",
                                  QColor(0, 0, 0, 255)).value<QColor>();
 
-        addContourSet(true, colour, thickness, false, levels);
+        addContourSet(true, thickness, false, colour, false, levels);
 
         numContourSet = 2;
     }
@@ -2451,11 +2473,11 @@ MNWP2DSectionActorVariable::stringToRenderMode(QString renderModeName)
 
 
 void MNWP2DSectionActorVariable::addContourSet(
-        const bool enabled, const QColor colour, const double thickness,
-        const bool labelsEnabled, QString levelString)
+        const bool enabled, const double thickness, const bool useTF,
+        const QColor colour, const bool labelsEnabled, QString levelString)
 {
-    ContourSettings contourSet(actor, contourSetList.size(), enabled, colour,
-                                thickness, labelsEnabled, levelString);
+    ContourSettings contourSet(actor, contourSetList.size(), enabled,thickness,
+                               useTF, colour, labelsEnabled, levelString);
     contourSetList.append(contourSet);
     renderSettings.contourSetGroupProperty->addSubProperty(
                 contourSetList.back().groupProperty);
@@ -2466,29 +2488,52 @@ void MNWP2DSectionActorVariable::addContourSet(
 
 bool MNWP2DSectionActorVariable::removeContourSet(int index)
 {
-    ContourSettings *contourSet = &contourSetList[index];
-    // Redraw is only needed if contour sets to delete are enabled.
-    bool needsRedraw = contourSet->enabled;
     // Avoid removing all contour sets.
     if (contourSetList.size() > 1)
     {
+        QMessageBox yesNoBox;
+        yesNoBox.setWindowTitle("Delete contour set");
+        yesNoBox.setText(QString("Do you really want to delete "
+                                 "contour set #%1").arg(index + 1));
+        yesNoBox.setStandardButtons(QMessageBox::Yes | QMessageBox::No);
+        yesNoBox.setDefaultButton(QMessageBox::No);
+
+        if (yesNoBox.exec() != QMessageBox::Yes)
+        {
+            return false;
+        }
+
+        ContourSettings *contourSet = &contourSetList[index];
+        // Redraw is only needed if contour sets to delete are enabled.
+        bool needsRedraw = contourSet->enabled;
         MQtProperties *properties = actor->getQtProperties();
         properties->mBool()->setValue(contourSet->enabledProperty,
                                       false);
         renderSettings.contourSetGroupProperty->removeSubProperty(
                     contourSet->groupProperty);
         contourSetList.remove(index);
+
+        QString text = contourSet->groupProperty->propertyName();
+        text = text.mid(0, text.indexOf("#") + 1);
+        // Rename contour sets after deleted contour sets to
+        // close gap left by deleted contour sets.
+        for (; index < contourSetList.size(); index++)
+        {
+            contourSetList[index].groupProperty->setPropertyName(
+                        text + QString::number(index + 1));
+        }
+        return needsRedraw;
     }
-    QString text = contourSet->groupProperty->propertyName();
-    text = text.mid(0, text.indexOf("#") + 1);
-    // Rename contour sets after deleted contour sets to
-    // close gap left by deleted contour sets.
-    for (; index < contourSetList.size(); index++)
+    else
     {
-        contourSetList[index].groupProperty->setPropertyName(
-                    text + QString::number(index + 1));
+        // Display error message if user wants to delete last contour set.
+        QMessageBox msg;
+        msg.setWindowTitle("Error");
+        msg.setText("At least one contour set needs to be present!");
+        msg.setIcon(QMessageBox::Warning);
+        msg.exec();
+        return false;
     }
-    return needsRedraw;
 }
 
 

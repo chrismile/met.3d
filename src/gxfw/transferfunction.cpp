@@ -158,11 +158,7 @@ void MTransferFunction::saveConfiguration(QSettings *settings)
 void MTransferFunction::loadConfiguration(QSettings *settings)
 {
     // For compatibilty with versions < 1.2.
-    settings->beginGroup("FileFormat");
-    QStringList versionString =
-            (settings->value("met3dVersion",
-                             defaultConfigVersion).toString()).split(".");
-    settings->endGroup();
+    QStringList versionString = readConfigVersionID(settings);
     if (versionString[0].toInt() >= 1 && versionString[1].toInt() >= 2)
     {
         settings->beginGroup(MTransferFunction::getSettingsID());
