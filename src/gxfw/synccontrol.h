@@ -283,8 +283,7 @@ private:
 
     void emitSaveImageSignal();
 
-    void setAnimationTimeToStartTime(QDateTime startDateTime,
-                                     QDateTime endDateTime);
+    void setAnimationTimeToStartTime(QDateTime startDateTime);
 
     Ui::MSyncControl *ui;
 

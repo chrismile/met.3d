@@ -287,7 +287,7 @@ MSyncControl::MSyncControl(QString id, QWidget *parent) :
     // Set fixed size so the label won't expand the menu.
     saveTADirectoryLabel->setToolTip(saveTADirectoryLabel->text());
     adjustSaveTADirLabelText();
-    saveTADirectoryChangeButton = new QPushButton("change");
+    saveTADirectoryChangeButton = new QPushButton("...");
     QHBoxLayout *directoryLayout = new QHBoxLayout();
     directoryLayout->addWidget(saveTADirectoryLabel);
     directoryLayout->addWidget(saveTADirectoryChangeButton);
@@ -954,13 +954,11 @@ void MSyncControl::startTimeAnimation()
         {
             if (timeAnimationReverseTimeDirectionAction->isChecked())
             {
-                setAnimationTimeToStartTime(timeAnimationTo->dateTime(),
-                                            timeAnimationFrom->dateTime());
+                setAnimationTimeToStartTime(timeAnimationTo->dateTime());
             }
             else
             {
-                setAnimationTimeToStartTime(timeAnimationFrom->dateTime(),
-                                            timeAnimationTo->dateTime());
+                setAnimationTimeToStartTime(timeAnimationFrom->dateTime());
             }
         }
 
@@ -1507,9 +1505,11 @@ void MSyncControl::emitSaveImageSignal()
     QString filename = saveTAFileNameLineEdit->text();
 
     // Replace placeholders with their according values.
-    filename.replace("%it", initDateTime().toString("dd.MM.yyyy-hh:mm"));
-    filename.replace("%vt", validDateTime().toString("dd.MM.yyyy-hh:mm"));
-    QString memberString = QString("%1").arg(ensembleMember());
+    filename.replace("%it", QString("IT%1").arg(
+                         initDateTime().toString(Qt::ISODate)));
+    filename.replace("%vt", QString("VT%1").arg(
+                         validDateTime().toString(Qt::ISODate)));
+    QString memberString = QString("M%1").arg(ensembleMember());
     // Use 'mean' instead of selected ensemble member if mean is checked.
     if (ensembleMember() == -1)
     {
@@ -1524,47 +1524,24 @@ void MSyncControl::emitSaveImageSignal()
 }
 
 
-void MSyncControl::setAnimationTimeToStartTime(QDateTime startDateTime,
-                                               QDateTime endDateTime)
+void MSyncControl::setAnimationTimeToStartTime(QDateTime startDateTime)
 {
     if (ui->stepChooseVTITComboBox->currentIndex() == 0)
     {
         // Index 0 of stepChooseVTITComboBox means that the valid time should
         // be modified by the time navigation buttons.
-
-        if (startDateTime > ui->validTimeEdit->dateTime()
-                || endDateTime <= ui->validTimeEdit->dateTime())
-        {
-            ui->validTimeEdit->setDateTime(startDateTime);
-        }
+        ui->validTimeEdit->setDateTime(startDateTime);
     }
     else if (ui->stepChooseVTITComboBox->currentIndex() == 1)
     {
         // Modify initialisation time.
-
-        if (startDateTime > ui->initTimeEdit->dateTime()
-                || endDateTime <= ui->initTimeEdit->dateTime())
-        {
-            ui->initTimeEdit->setDateTime(startDateTime);
-        }
+        ui->initTimeEdit->setDateTime(startDateTime);
     }
     else
     {
-        // Both valid and init time should be changed simultaniously.        
-
-        if (startDateTime > ui->initTimeEdit->dateTime()
-                || endDateTime <= ui->initTimeEdit->dateTime())
-        {
-            ui->initTimeEdit->setDateTime(startDateTime);
-        }
-
-        if (startDateTime > ui->validTimeEdit->dateTime()
-                || endDateTime <= ui->validTimeEdit->dateTime())
-        {
-            ui->validTimeEdit->setDateTime(startDateTime);
-        }
+        ui->initTimeEdit->setDateTime(startDateTime);
+        ui->validTimeEdit->setDateTime(startDateTime);
     }
-
 
     // Save image of current time step.
     saveTimeAnimation();
