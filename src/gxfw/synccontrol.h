@@ -37,6 +37,9 @@
 #include <QDateTimeEdit>
 #include <QSpinBox>
 #include <QSet>
+#include <QComboBox>
+#include <QLabel>
+#include <QCheckBox>
 
 // local application imports
 #include "util/mstopwatch.h"
