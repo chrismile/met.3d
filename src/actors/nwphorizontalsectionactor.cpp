@@ -153,17 +153,19 @@ MNWPHorizontalSectionActor::MNWPHorizontalSectionActor()
 MNWPHorizontalSectionActor::WindBarbsSettings::WindBarbsSettings(
         MNWPHorizontalSectionActor *hostActor)
     : enabled(false),
-      automaticEnabled(true),
-      oldScale(1),
+      uComponentVarIndex(0),
+      vComponentVarIndex(0),
       lineWidth(0.04),
-      numFlags(9),
+      pennantTilt(9),
       color(QColor(0,0,127)),
       showCalmGlyphs(false),
+      deltaBarbsLonLat(1.),
+      clampDeltaBarbsToGrid(true),
+      automaticScalingEnabled(true),
+      oldScale(1),
       reduceFactor(15.0f),
       reduceSlope(0.0175f),
-      sensibility(1.0f),
-      uComponentVarIndex(0),
-      vComponentVarIndex(0)
+      sensitivity(1.0f)
 {
 
     MActor *a = hostActor;
@@ -174,40 +176,67 @@ MNWPHorizontalSectionActor::WindBarbsSettings::WindBarbsSettings(
     enabledProperty = a->addProperty(BOOL_PROPERTY, "enabled", groupProperty);
     properties->mBool()->setValue(enabledProperty, enabled);
 
-    automaticEnabledProperty = a->addProperty(BOOL_PROPERTY, "automatic scaling",
-                                              groupProperty);
-    properties->mBool()->setValue(automaticEnabledProperty, automaticEnabled);
+    uComponentVarProperty = a->addProperty(ENUM_PROPERTY, "longitudinal wind",
+                                           groupProperty);
+    vComponentVarProperty = a->addProperty(ENUM_PROPERTY, "latitudinal wind",
+                                           groupProperty);
+
+    appearanceGroupProperty = a->addProperty(GROUP_PROPERTY, "appearance",
+                                             groupProperty);
 
     lineWidthProperty = a->addProperty(DOUBLE_PROPERTY, "line width",
-                                       groupProperty);
+                                       appearanceGroupProperty);
     properties->setDouble(lineWidthProperty, lineWidth, 0.001, 0.30, 3, 0.001);
 
-    numFlagsProperty = a->addProperty(INT_PROPERTY, "num flags", groupProperty);
-    properties->setInt(numFlagsProperty, numFlags, 1, 20, 1);
-
-    colorProperty = a->addProperty(COLOR_PROPERTY, "line color", groupProperty);
+    colorProperty = a->addProperty(COLOR_PROPERTY, "line color",
+                                   appearanceGroupProperty);
     properties->mColor()->setValue(colorProperty, color);
 
     showCalmGlyphsProperty = a->addProperty(BOOL_PROPERTY, "show calm glyphs",
-                                            groupProperty);
+                                            appearanceGroupProperty);
     properties->mBool()->setValue(showCalmGlyphsProperty, showCalmGlyphs);
 
-    reduceFactorProperty = a->addProperty(DOUBLE_PROPERTY, "reduction factor",
+    pennantTiltProperty = a->addProperty(INT_PROPERTY, "pennant tilt",
+                                         appearanceGroupProperty);
+    properties->setInt(pennantTiltProperty, pennantTilt, 1, 20, 1);
+
+    deltaBarbsLonLatProperty = a->addProperty(
+                DOUBLE_PROPERTY, "barb distance (deg)",
+                groupProperty);
+    properties->setDouble(
+                deltaBarbsLonLatProperty, deltaBarbsLonLat, 0.05, 45., 2, 0.1);
+    deltaBarbsLonLatProperty->setToolTip(
+                "Manually specify the distance between the wind barbs. If the "
+                "distance if below grid point spacing, nearest-neighbour "
+                "interpolation is used.");
+
+    clampDeltaBarbsToGridProperty = a->addProperty(
+                BOOL_PROPERTY, "restrict barb distance to grid",
+                groupProperty);
+    properties->mBool()->setValue(
+                clampDeltaBarbsToGridProperty, clampDeltaBarbsToGrid);
+    clampDeltaBarbsToGridProperty->setToolTip(
+                "If enabled the manually set barb distance cannot be smaller "
+                "than the grid point spacing of the wind field.");
+
+    automaticScalingEnabledProperty = a->addProperty(BOOL_PROPERTY, "automatic scaling",
+                                              groupProperty);
+    properties->mBool()->setValue(automaticScalingEnabledProperty, automaticScalingEnabled);
+
+    scalingGroupProperty = a->addProperty(GROUP_PROPERTY, "scaling",
                                           groupProperty);
+
+    reduceFactorProperty = a->addProperty(DOUBLE_PROPERTY, "scaling factor",
+                                          scalingGroupProperty);
     properties->setDouble(reduceFactorProperty, reduceFactor, 1., 400., 1, 0.1);
 
-    reduceSlopeProperty = a->addProperty(DOUBLE_PROPERTY, "reduction slope",
-                                         groupProperty);
+    reduceSlopeProperty = a->addProperty(DOUBLE_PROPERTY, "scaling slope",
+                                         scalingGroupProperty);
     properties->setDouble(reduceSlopeProperty, reduceSlope, 0.001, 1.0, 4, 0.0001);
 
-    sensibilityProperty = a->addProperty(DOUBLE_PROPERTY, "margin for height",
-                                         groupProperty);
-    properties->setDouble(sensibilityProperty, sensibility, 1., 200., 1, 1.);
-
-    uComponentVarProperty = a->addProperty(ENUM_PROPERTY, "u-component var",
-                                           groupProperty);
-    vComponentVarProperty = a->addProperty(ENUM_PROPERTY, "v-component var",
-                                           groupProperty);
+    sensitivityProperty = a->addProperty(DOUBLE_PROPERTY, "scaling sensitivity",
+                                         scalingGroupProperty);
+    properties->setDouble(sensitivityProperty, sensitivity, 1., 200., 1, 1.);
 }
 
 
@@ -291,16 +320,18 @@ void MNWPHorizontalSectionActor::saveConfiguration(QSettings *settings)
     settings->beginGroup("Windbarbs");
 
     settings->setValue("enabled", windBarbsSettings->enabled);
-    settings->setValue("automatic", windBarbsSettings->automaticEnabled);
+    settings->setValue("automatic", windBarbsSettings->automaticScalingEnabled);
     settings->setValue("lineWidth", windBarbsSettings->lineWidth);
-    settings->setValue("numFlags", windBarbsSettings->numFlags);
+    settings->setValue("pennantTilt", windBarbsSettings->pennantTilt);
     settings->setValue("color", windBarbsSettings->color);
     settings->setValue("showCalmGlyphs", windBarbsSettings->showCalmGlyphs);
     settings->setValue("reduceFactor", windBarbsSettings->reduceFactor);
     settings->setValue("reduceSlope", windBarbsSettings->reduceSlope);
-    settings->setValue("sensibility", windBarbsSettings->sensibility);
+    settings->setValue("sensitivity", windBarbsSettings->sensitivity);
     settings->setValue("uComponent", windBarbsSettings->uComponentVarIndex);
     settings->setValue("vComponent", windBarbsSettings->vComponentVarIndex);
+    settings->setValue("deltaBarbsLonLat", windBarbsSettings->deltaBarbsLonLat);
+    settings->setValue("clampDeltaBarbsToGrid", windBarbsSettings->clampDeltaBarbsToGrid);
 
     settings->endGroup(); // Windbarbs
 
@@ -315,43 +346,64 @@ void MNWPHorizontalSectionActor::loadConfiguration(QSettings *settings)
 
     settings->beginGroup(MNWPHorizontalSectionActor::getSettingsID());
 
-    setSlicePosition(settings->value("slicePosition_hPa").toDouble());
-    setBBox(settings->value("boundingBox").toRectF());
+    setSlicePosition(settings->value("slicePosition_hPa", 500.).toDouble());
+    setBBox(settings->value("boundingBox", QRectF(-60., 30., 100., 40.)).toRectF());
 
-    properties->mInt()->setValue(differenceModeProperty,
-                                 settings->value("differenceMode").toInt());
+    properties->mInt()->setValue(
+                differenceModeProperty,
+                settings->value("differenceMode", 0).toInt());
 
-    properties->mBool()->setValue(shadowEnabledProp,
-                                  settings->value("shadowEnabled").toBool());
-    properties->mColor()->setValue(shadowColorProp,
-                                   settings->value("shadowColor").value<QColor>());
-    properties->mBool()->setValue(shadowHeightProp,
-                                  settings->value("shadowHeight").toFloat());
+    properties->mBool()->setValue(
+                shadowEnabledProp,
+                settings->value("shadowEnabled", true).toBool());
+    properties->mColor()->setValue(
+                shadowColorProp,
+                settings->value("shadowColor", QColor(60,60,60,70)).value<QColor>());
+    properties->mBool()->setValue(
+                shadowHeightProp,
+                settings->value("shadowHeight", 0.01f).toFloat());
 
     settings->beginGroup("Windbarbs");
 
-    properties->mBool()->setValue(windBarbsSettings->enabledProperty,
-                                  settings->value("enabled").toBool());
-    properties->mBool()->setValue(windBarbsSettings->automaticEnabledProperty,
-                                  settings->value("automatic").toBool());
-    properties->mDouble()->setValue(windBarbsSettings->lineWidthProperty,
-                                    settings->value("lineWidth").toFloat());
-    properties->mInt()->setValue(windBarbsSettings->numFlagsProperty,
-                                 settings->value("numFlags").toInt());
-    properties->mColor()->setValue(windBarbsSettings->colorProperty,
-                                   settings->value("color").value<QColor>());
-    properties->mBool()->setValue(windBarbsSettings->showCalmGlyphsProperty,
-                                  settings->value("showCalmGlyphs").toBool());
-    properties->mDouble()->setValue(windBarbsSettings->reduceFactorProperty,
-                                    settings->value("reduceFactor").toFloat());
-    properties->mDouble()->setValue(windBarbsSettings->reduceSlopeProperty,
-                                    settings->value("reduceSlope").toFloat());
-    properties->mDouble()->setValue(windBarbsSettings->sensibilityProperty,
-                                    settings->value("sensibility").toFloat());
-    properties->mEnum()->setValue(windBarbsSettings->uComponentVarProperty,
-                                  settings->value("uComponent").toInt());
-    properties->mEnum()->setValue(windBarbsSettings->vComponentVarProperty,
-                                  settings->value("vComponent").toInt());
+    properties->mBool()->setValue(
+                windBarbsSettings->enabledProperty,
+                settings->value("enabled", false).toBool());
+    properties->mBool()->setValue(
+                windBarbsSettings->automaticScalingEnabledProperty,
+                settings->value("automatic", false).toBool());
+    properties->mDouble()->setValue(
+                windBarbsSettings->lineWidthProperty,
+                settings->value("lineWidth", 0.04).toFloat());
+    properties->mInt()->setValue(
+                windBarbsSettings->pennantTiltProperty,
+                settings->value("pennantTilt", 9).toInt());
+    properties->mColor()->setValue(
+                windBarbsSettings->colorProperty,
+                settings->value("color", QColor(0,0,127)).value<QColor>());
+    properties->mBool()->setValue(
+                windBarbsSettings->showCalmGlyphsProperty,
+                settings->value("showCalmGlyphs", false).toBool());
+    properties->mDouble()->setValue(
+                windBarbsSettings->deltaBarbsLonLatProperty,
+                settings->value("deltaBarbsLonLat", 1.).toFloat());
+    properties->mBool()->setValue(
+                windBarbsSettings->clampDeltaBarbsToGridProperty,
+                settings->value("clampDeltaBarbsToGrid", true).toBool());
+    properties->mDouble()->setValue(
+                windBarbsSettings->reduceFactorProperty,
+                settings->value("reduceFactor", 15.).toFloat());
+    properties->mDouble()->setValue(
+                windBarbsSettings->reduceSlopeProperty,
+                settings->value("reduceSlope", 0.0175).toFloat());
+    properties->mDouble()->setValue(
+                windBarbsSettings->sensitivityProperty,
+                settings->value("sensitivity", 1.).toFloat());
+    properties->mEnum()->setValue(
+                windBarbsSettings->uComponentVarProperty,
+                settings->value("uComponent", 0).toInt());
+    properties->mEnum()->setValue(
+                windBarbsSettings->vComponentVarProperty,
+                settings->value("vComponent", 0).toInt());
 
     settings->endGroup(); // Windbarbs
 
@@ -648,35 +700,41 @@ void MNWPHorizontalSectionActor::onQtPropertyChanged(QtProperty *property)
     }
 
     else if (property == windBarbsSettings->enabledProperty ||
-             property == windBarbsSettings->automaticEnabledProperty ||
+             property == windBarbsSettings->automaticScalingEnabledProperty ||
              property == windBarbsSettings->lineWidthProperty ||
-             property == windBarbsSettings->numFlagsProperty ||
+             property == windBarbsSettings->pennantTiltProperty ||
              property == windBarbsSettings->colorProperty ||
              property == windBarbsSettings->showCalmGlyphsProperty ||
+             property == windBarbsSettings->deltaBarbsLonLatProperty ||
+             property == windBarbsSettings->clampDeltaBarbsToGridProperty ||
              property == windBarbsSettings->reduceFactorProperty ||
              property == windBarbsSettings->reduceSlopeProperty ||
-             property == windBarbsSettings->sensibilityProperty ||
+             property == windBarbsSettings->sensitivityProperty ||
              property == windBarbsSettings->uComponentVarProperty ||
              property == windBarbsSettings->vComponentVarProperty)
     {
         windBarbsSettings->enabled = properties->mBool()
                 ->value(windBarbsSettings->enabledProperty);
-        windBarbsSettings->automaticEnabled = properties->mBool()
-                ->value(windBarbsSettings->automaticEnabledProperty);
+        windBarbsSettings->automaticScalingEnabled = properties->mBool()
+                ->value(windBarbsSettings->automaticScalingEnabledProperty);
         windBarbsSettings->lineWidth = properties->mDouble()
                 ->value(windBarbsSettings->lineWidthProperty);
-        windBarbsSettings->numFlags = properties->mInt()
-                ->value(windBarbsSettings->numFlagsProperty);
+        windBarbsSettings->pennantTilt = properties->mInt()
+                ->value(windBarbsSettings->pennantTiltProperty);
         windBarbsSettings->color = properties->mColor()
                 ->value(windBarbsSettings->colorProperty);
         windBarbsSettings->showCalmGlyphs = properties->mBool()
                 ->value(windBarbsSettings->showCalmGlyphsProperty);
+        windBarbsSettings->deltaBarbsLonLat = properties->mDouble()
+                ->value(windBarbsSettings->deltaBarbsLonLatProperty);
+        windBarbsSettings->clampDeltaBarbsToGrid = properties->mBool()
+                ->value(windBarbsSettings->clampDeltaBarbsToGridProperty);
         windBarbsSettings->reduceFactor = properties->mDouble()
                 ->value(windBarbsSettings->reduceFactorProperty);
         windBarbsSettings->reduceSlope = properties->mDouble()
                 ->value(windBarbsSettings->reduceSlopeProperty);
-        windBarbsSettings->sensibility = properties->mDouble()
-                ->value(windBarbsSettings->sensibilityProperty);
+        windBarbsSettings->sensitivity = properties->mDouble()
+                ->value(windBarbsSettings->sensitivityProperty);
         windBarbsSettings->uComponentVarIndex = properties->mEnum()
                 ->value(windBarbsSettings->uComponentVarProperty);
         windBarbsSettings->vComponentVarIndex = properties->mEnum()
@@ -1734,72 +1792,57 @@ void MNWPHorizontalSectionActor::renderTexturedContours(
 
 void MNWPHorizontalSectionActor::renderWindBarbs(MSceneViewGLWidget *sceneView)
 {
-    glWindBarbsShader->bind();
-
+    // Selected variables valid?
     if (windBarbsSettings->vComponentVarIndex >= variables.size() ||
-        windBarbsSettings->vComponentVarIndex < 0 ||
-        windBarbsSettings->uComponentVarIndex >= variables.size() ||
-        windBarbsSettings->uComponentVarIndex < 0) { return; }
+            windBarbsSettings->vComponentVarIndex < 0 ||
+            windBarbsSettings->uComponentVarIndex >= variables.size() ||
+            windBarbsSettings->uComponentVarIndex < 0)
+    {
+        return;
+    }
 
-    // assume that the last two variables are the wind components
-    MNWPActorVariable *windV = variables.at(windBarbsSettings->vComponentVarIndex);
-    MNWPActorVariable *windU = variables.at(windBarbsSettings->uComponentVarIndex);
+    MNWP2DHorizontalActorVariable *varWindV =
+            static_cast<MNWP2DHorizontalActorVariable*>(
+                variables.at(windBarbsSettings->vComponentVarIndex)
+                );
+    MNWP2DHorizontalActorVariable *varWindU =
+            static_cast<MNWP2DHorizontalActorVariable*>(
+                variables.at(windBarbsSettings->uComponentVarIndex)
+                );
 
-    if (windV->grid->getLevelType() != windU->grid->getLevelType())
+    if (varWindV->grid->getLevelType() != varWindU->grid->getLevelType())
     {
         LOG4CPLUS_WARN(mlog, "WARNING: Wind barbs u and v variables must have "
                        "the same vertical level type. Disabling wind barbs.");
         return;
     }
 
-    if (windV->grid->getLevelType() == SURFACE_2D)
+    if (varWindV->grid->getLevelType() == SURFACE_2D)
     {
         LOG4CPLUS_WARN(mlog, "WARNING: Wind barbs have not been implemented for "
                        "2D surface fields. Disabling wind barbs.");
         return;
     }
 
-    // collect infos of data
-    const int widthX = std::floor(std::abs(urcrnrlon - llcrnrlon) / windU->grid->getDeltaLon());
-    const int widthY = std::floor(std::abs(urcrnrlat - llcrnrlat) / windU->grid->getDeltaLat());
 
-    const int resLon = windU->grid->nlons;
-    const int resLat = windU->grid->nlats;
-
-    // compute current boundary indices in grid
-    int minX = static_cast<int>((llcrnrlon - windU->grid->lons[0]) / windU->grid->getDeltaLon()) % 360;
-    int maxX = minX + widthX;
-
-    int minY = static_cast<int>((windU->grid->lats[0] - urcrnrlat) / windU->grid->getDeltaLat());
-    int maxY = minY + widthY;
-
-    minX = min(max(0, minX), resLon - 1);
-    minY = min(max(0, minY), resLat - 1);
-    maxX = max(min(maxX, resLon - 1), minX);
-    maxY = max(min(maxY, resLat - 1), minY);
-
-    const GLfloat worldZ = sceneView->worldZfromPressure(slicePosition_hPa) + 0.1;
-
-    const GLfloat lowerX = windU->grid->lons[minX];
-    const GLfloat lowerY = windU->grid->lats[maxY];
-
+    glWindBarbsShader->bind();
 
     // Reset optional required textures (to avoid draw errors).
     // ========================================================
 
-    windU->textureDummy1D->bindToTextureUnit(windU->textureUnitUnusedTextures);
+    varWindU->textureDummy1D->bindToTextureUnit(varWindU->textureUnitUnusedTextures);
     glWindBarbsShader->setUniformValue(
-                "hybridCoefficientsU", windU->textureUnitUnusedTextures); CHECK_GL_ERROR;
-    windV->textureDummy1D->bindToTextureUnit(windV->textureUnitUnusedTextures);
+                "hybridCoefficientsU", varWindU->textureUnitUnusedTextures); CHECK_GL_ERROR;
+    varWindV->textureDummy1D->bindToTextureUnit(varWindV->textureUnitUnusedTextures);
     glWindBarbsShader->setUniformValue(
-                "hybridCoefficientsV", windV->textureUnitUnusedTextures); CHECK_GL_ERROR;
+                "hybridCoefficientsV", varWindV->textureUnitUnusedTextures); CHECK_GL_ERROR;
 
-    windU->textureDummy2D->bindToTextureUnit(windU->textureUnitUnusedTextures);
+    varWindU->textureDummy2D->bindToTextureUnit(varWindU->textureUnitUnusedTextures);
     glWindBarbsShader->setUniformValue(
-                "surfacePressureU", windU->textureUnitUnusedTextures); CHECK_GL_ERROR;
-    windV->textureDummy2D->bindToTextureUnit(windV->textureUnitUnusedTextures);
+                "surfacePressureU", varWindU->textureUnitUnusedTextures); CHECK_GL_ERROR;
+    varWindV->textureDummy2D->bindToTextureUnit(varWindV->textureUnitUnusedTextures);
     glWindBarbsShader->setUniformValue(
-                "surfacePressureV", windV->textureUnitUnusedTextures); CHECK_GL_ERROR;
+                "surfacePressureV", varWindV->textureUnitUnusedTextures); CHECK_GL_ERROR;
 
     // Set shader variables.
     // =====================
@@ -1808,77 +1851,74 @@ void MNWPHorizontalSectionActor::renderWindBarbs(MSceneViewGLWidget *sceneView)
                 "mvpMatrix",
                 *(sceneView->getModelViewProjectionMatrix())); CHECK_GL_ERROR;
 
+//TODO (mr 17May2017) -- why is there an offset?
+    const GLfloat worldZ = sceneView->worldZfromPressure(slicePosition_hPa) + 0.1;
     glWindBarbsShader->setUniformValue(
                 "worldZ", worldZ); CHECK_GL_ERROR;
-    glWindBarbsShader->setUniformValue(
-                "bboxll", QVector2D(lowerX, lowerY)); CHECK_GL_ERROR;
 
-    windU->textureDataField->bindToTextureUnit(
-                windU->textureUnitDataField);
+    varWindU->textureDataField->bindToTextureUnit(
+                varWindU->textureUnitDataField);
     glWindBarbsShader->setUniformValue(
-                "dataUComp",windU->textureUnitDataField); CHECK_GL_ERROR;
-    windV->textureDataField->bindToTextureUnit(
-                windV->textureUnitDataField);
+                "dataUComp",varWindU->textureUnitDataField); CHECK_GL_ERROR;
+    varWindV->textureDataField->bindToTextureUnit(
+                varWindV->textureUnitDataField);
     glWindBarbsShader->setUniformValue(
-                "dataVComp",windV->textureUnitDataField); CHECK_GL_ERROR;
+                "dataVComp",varWindV->textureUnitDataField); CHECK_GL_ERROR;
 
-    if (windU->grid->getLevelType() == HYBRID_SIGMA_PRESSURE_3D)
+    if (varWindU->grid->getLevelType() == HYBRID_SIGMA_PRESSURE_3D)
     {
-        windU->textureSurfacePressure->bindToTextureUnit(
-                    windU->textureUnitSurfacePressure);
+        varWindU->textureSurfacePressure->bindToTextureUnit(
+                    varWindU->textureUnitSurfacePressure);
         glWindBarbsShader->setUniformValue(
-                    "surfacePressureU",windU->textureUnitSurfacePressure); CHECK_GL_ERROR;
-        windV->textureSurfacePressure->bindToTextureUnit(
-                    windV->textureUnitSurfacePressure);
+                    "surfacePressureU",varWindU->textureUnitSurfacePressure); CHECK_GL_ERROR;
+        varWindV->textureSurfacePressure->bindToTextureUnit(
+                    varWindV->textureUnitSurfacePressure);
         glWindBarbsShader->setUniformValue(
-                    "surfacePressureV",windV->textureUnitSurfacePressure); CHECK_GL_ERROR;
-        windU->textureHybridCoefficients->bindToTextureUnit(
-                    windU->textureUnitHybridCoefficients);
+                    "surfacePressureV",varWindV->textureUnitSurfacePressure); CHECK_GL_ERROR;
+        varWindU->textureHybridCoefficients->bindToTextureUnit(
+                    varWindU->textureUnitHybridCoefficients);
         glWindBarbsShader->setUniformValue(
-                    "hybridCoefficientsU",windU->textureUnitHybridCoefficients); CHECK_GL_ERROR;
-        windV->textureHybridCoefficients->bindToTextureUnit(
-                    windV->textureUnitHybridCoefficients);
+                    "hybridCoefficientsU",varWindU->textureUnitHybridCoefficients); CHECK_GL_ERROR;
+        varWindV->textureHybridCoefficients->bindToTextureUnit(
+                    varWindV->textureUnitHybridCoefficients);
         glWindBarbsShader->setUniformValue(
-                    "hybridCoefficientsV",windV->textureUnitHybridCoefficients);CHECK_GL_ERROR;
+                    "hybridCoefficientsV",varWindV->textureUnitHybridCoefficients);CHECK_GL_ERROR;
     }
 
     glWindBarbsShader->setUniformValue(
-                "deltaLon", windU->grid->getDeltaLon()); CHECK_GL_ERROR;
+                "deltaLon", varWindU->grid->getDeltaLon()); CHECK_GL_ERROR;
     glWindBarbsShader->setUniformValue(
-                "deltaLat", windU->grid->getDeltaLat()); CHECK_GL_ERROR;
+                "deltaLat", varWindU->grid->getDeltaLat()); CHECK_GL_ERROR;
 
     glWindBarbsShader->setUniformValue(
                 "pToWorldZParams",
                 sceneView->pressureToWorldZParameters()); CHECK_GL_ERROR;
 
     QVector3D cameraPos = sceneView->getCamera()->getOrigin();
-
     glWindBarbsShader->setUniformValue(
                 "cameraPosition", cameraPos); CHECK_GL_ERROR;
 
-    QVector2D dataSECrnr(windU->grid->lons[windU->grid->nlons - 1],
-                         windU->grid->lats[windU->grid->nlats - 1]);
-
+    QVector2D dataSECrnr(varWindU->grid->lons[varWindU->grid->nlons - 1],
+                         varWindU->grid->lats[varWindU->grid->nlats - 1]);
     glWindBarbsShader->setUniformValue(
                         "dataSECrnr", dataSECrnr); CHECK_GL_ERROR;
 
-    QVector2D dataNWCrnr(windU->grid->lons[0],
-                         windU->grid->lats[0]);
-
+    QVector2D dataNWCrnr(varWindU->grid->lons[0],
+                         varWindU->grid->lats[0]);
     glWindBarbsShader->setUniformValue(
                         "dataNWCrnr", dataNWCrnr); CHECK_GL_ERROR;
 
     // Texture bindings for Lat/Lon axes (1D textures).
-    windU->textureLonLatLevAxes->bindToTextureUnit(
-                windU->textureUnitLonLatLevAxes); CHECK_GL_ERROR;
+    varWindU->textureLonLatLevAxes->bindToTextureUnit(
+                varWindU->textureUnitLonLatLevAxes); CHECK_GL_ERROR;
     glWindBarbsShader->setUniformValue(
-                "latLonAxesData", windU->textureUnitLonLatLevAxes); CHECK_GL_ERROR;
+                "latLonAxesData", varWindU->textureUnitLonLatLevAxes); CHECK_GL_ERROR;
     glWindBarbsShader->setUniformValue(
-                "latOffset", GLint(windU->grid->nlons)); CHECK_GL_ERROR;
+                "latOffset", GLint(varWindU->grid->nlons)); CHECK_GL_ERROR;
     glWindBarbsShader->setUniformValue(
-                "verticalOffset", GLint(windU->grid->nlons + windU->grid->nlats)); CHECK_GL_ERROR;
+                "verticalOffset", GLint(varWindU->grid->nlons + varWindU->grid->nlats)); CHECK_GL_ERROR;
     glWindBarbsShader->setUniformValue(
-                "levelType", static_cast<GLint>(windU->levelType)); CHECK_GL_ERROR;
+                "levelType", static_cast<GLint>(varWindU->levelType)); CHECK_GL_ERROR;
 
     glWindBarbsShader->setUniformValue(
                 "pressure_hPa", GLfloat(slicePosition_hPa)); CHECK_GL_ERROR;
@@ -1890,17 +1930,28 @@ void MNWPHorizontalSectionActor::renderWindBarbs(MSceneViewGLWidget *sceneView)
     glWindBarbsShader->setUniformValue(
                 "showCalmGlyph", windBarbsSettings->showCalmGlyphs); CHECK_GL_ERROR;
     glWindBarbsShader->setUniformValue(
-                "numFlags", windBarbsSettings->numFlags); CHECK_GL_ERROR;
+                "numFlags", windBarbsSettings->pennantTilt); CHECK_GL_ERROR;
 
-    float scale = 1;
+    float scale = 1.;
+    float deltaBarbs = 1.;
 
-    // handle automatic resolution adaption
-    if (!windBarbsSettings->automaticEnabled && windBarbsSettings->oldScale > 0)
+    if (!windBarbsSettings->automaticScalingEnabled)
     {
         scale = windBarbsSettings->oldScale;
+        deltaBarbs = windBarbsSettings->deltaBarbsLonLat;
+
+        // Restrict wind barb distance to grid point spacing? If the barb
+        // distance is smaller than the grid point spacing, nearest-neighbour
+        // interpolation is used.
+        if (windBarbsSettings->clampDeltaBarbsToGrid)
+        {
+            deltaBarbs = max(deltaBarbs, varWindU->grid->getDeltaLon());
+        }
     }
     else
     {
+        // Automatic barb scaling.
+
         // ray definition
         const QVector3D rayDir = sceneView->getCamera()->getZAxis();
         const QVector3D rayOrig = sceneView->getCamera()->getOrigin();
@@ -1916,7 +1967,7 @@ void MNWPHorizontalSectionActor::renderWindBarbs(MSceneViewGLWidget *sceneView)
         float t = (P - rayOrig).length();
 
         // quantize distance
-        const float step = windBarbsSettings->sensibility;
+        const float step = windBarbsSettings->sensitivity;
         t = step * std::floor(t / step);
 
         // try to handle camera distance to glyphs via logistical function
@@ -1931,84 +1982,75 @@ void MNWPHorizontalSectionActor::renderWindBarbs(MSceneViewGLWidget *sceneView)
         scale = clamp(scale, 1.0f, 1024.0f);
 
         windBarbsSettings->oldScale = scale;
+        deltaBarbs = varWindU->grid->getDeltaLon() * scale;
     }
 
-    const float deltaGlyph = windU->grid->getDeltaLon() * scale;
-
-    const int width = maxX - minX + 1;
-    const int height = maxY - minY + 1;
-
-    const int resLons = static_cast<int>(std::ceil(width / scale));
-    const int resLats = static_cast<int>(std::ceil(height / scale));
-
-    glWindBarbsShader->setUniformValue("deltaGridX", deltaGlyph); CHECK_GL_ERROR;
-    glWindBarbsShader->setUniformValue("deltaGridY", deltaGlyph); CHECK_GL_ERROR;
-    glWindBarbsShader->setUniformValue("width", resLons); CHECK_GL_ERROR;
+    glWindBarbsShader->setUniformValue("deltaGridX", deltaBarbs); CHECK_GL_ERROR;
+    glWindBarbsShader->setUniformValue("deltaGridY", deltaBarbs); CHECK_GL_ERROR;
 
     MGLResourcesManager* glRM = MGLResourcesManager::getInstance();
     const QString requestKey = QString("vbo_windbarbs_actor#%1").arg(myID);
 
     GL::MVertexBuffer* vb = static_cast<GL::MVertexBuffer*>(
-                                            glRM->getGPUItem(requestKey));
+                glRM->getGPUItem(requestKey));
 
-    const GLuint NUM_VERTICES = resLons * resLats * 2;
+    int nBarbsLon = (horizontalBBox.width() / deltaBarbs) + 1;
+    int nBarbsLat = (horizontalBBox.height() / deltaBarbs) + 1;
+    const GLuint numBarbsTimes2 = nBarbsLon * nBarbsLat * 2;
 
-    // create VBO if not existed
+    // If VBO doesn't exist, create a new one.
     if (!vb)
     {
         GL::MFloatVertexBuffer* newVB = nullptr;
-        newVB = new GL::MFloatVertexBuffer(requestKey, NUM_VERTICES);
+        newVB = new GL::MFloatVertexBuffer(requestKey, numBarbsTimes2);
         if (glRM->tryStoreGPUItem(newVB))
         {
-            newVB->upload(nullptr, NUM_VERTICES, sceneView);
+            newVB->upload(nullptr, numBarbsTimes2, sceneView);
         }
         else
         {
             delete newVB; return;
         }
 
-        windBarbsVertexBuffer = static_cast<GL::MVertexBuffer*>(glRM->getGPUItem(requestKey));
-
+        windBarbsVertexBuffer = static_cast<GL::MVertexBuffer*>(
+                    glRM->getGPUItem(requestKey));
     }
     else
     {
         windBarbsVertexBuffer = vb;
     }
 
-    QVector<float> vertexData(NUM_VERTICES);
-
-    // compute positions on CPU
-    // as unfortunately on GPU some errors occured
-    for(int i = 0; i < resLons * resLats; ++i)
+    // Generate vertex data (one vertex for each wind barb).
+    QVector<float> vertexData(numBarbsTimes2);
+    int iVertex = 0;
+    for (int i = 0; i < nBarbsLon; i++)
     {
-        const int idX = i % resLons;
-        const int idY = i / resLons;
-
-        vertexData[i * 2] = lowerX + idX * deltaGlyph;
-        vertexData[i * 2 + 1] = lowerY + idY * deltaGlyph;
+        for (int j = 0; j < nBarbsLat; j++)
+        {
+            vertexData[iVertex * 2    ] = horizontalBBox.x() + i * deltaBarbs;
+            vertexData[iVertex * 2 + 1] = horizontalBBox.y() + j * deltaBarbs;
+            iVertex++;
+        }
     }
 
+    // Upload vertex data to GPU and draw barbs.
     GL::MFloatVertexBuffer* buf =
             dynamic_cast<GL::MFloatVertexBuffer*>(windBarbsVertexBuffer);
-    buf->reallocate(nullptr, NUM_VERTICES, 0, false, sceneView);
+    buf->reallocate(nullptr, numBarbsTimes2, 0, false, sceneView);
     buf->update(vertexData, 0, 0, sceneView);
 
     const int VERTEX_ATTRIBUTE = 0;
     windBarbsVertexBuffer->attachToVertexAttribute(VERTEX_ATTRIBUTE, 2);
 
-
     glPolygonOffset(.8f, 1.0f); CHECK_GL_ERROR;
     glEnable(GL_POLYGON_OFFSET_FILL); CHECK_GL_ERROR;
     glPolygonMode(GL_FRONT_AND_BACK,
                   renderAsWireFrame ? GL_LINE : GL_FILL); CHECK_GL_ERROR;
-    //glLineWidth(1); CHECK_GL_ERROR;
-    //glBindBuffer(GL_ARRAY_BUFFER, windBarbsVBO);
-    //glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
-    glDrawArrays(GL_POINTS, 0, resLons * resLats); CHECK_GL_ERROR;
+    glDrawArrays(GL_POINTS, 0, nBarbsLon * nBarbsLat); CHECK_GL_ERROR;
 
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    glDisable(GL_POLYGON_OFFSET_FILL);
+    glBindBuffer(GL_ARRAY_BUFFER, 0); CHECK_GL_ERROR;
+    glDisable(GL_POLYGON_OFFSET_FILL); CHECK_GL_ERROR;
 }
 
 

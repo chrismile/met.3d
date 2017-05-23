@@ -61,8 +61,6 @@ interface GStoFS
  *****************************************************************************/
 
 uniform mat4        mvpMatrix;
-uniform int         width;
-uniform vec2        bboxll;     // lower left position of bounding box
 uniform float       deltaGridX; // delta between two points in x
 uniform float       deltaGridY; // delta between two points in y
 uniform float       worldZ;     // world z coordinate of this section
@@ -110,17 +108,6 @@ float computeKnots(in float velMeterPerSecond)
 }
 
 
-// compute indices (i,j) and fractions wrt hybrid sigma pressure volume data
-void computeIndices(in vec2 pos, out int i, out int j)
-{
-    float Lon = mod(pos.x - dataNWCrnr.x, 360.) / deltaLon;
-    float Lat = (dataNWCrnr.y - pos.y) / deltaLat;
-
-    i = int(Lon);
-    j = int(Lat);
-}
-
-
 //TODO (mr, 03Nov2014): move all HSec sampling methods to common include.
 // sample any kind of data at given world position
 float sampleDataAtPos(  in vec3 pos,
@@ -128,15 +115,16 @@ float sampleDataAtPos(  in vec3 pos,
                         in sampler2D surfacePressure,
                         in sampler1D hybridCoefficients)
 {
-    // Variables for binary level search and interpolation.
-
-    int i,j;
-
-    computeIndices(pos.xy, i, j);
+    float mixI = mod(pos.x - dataNWCrnr.x, 360.) / deltaLon;
+    float mixJ = (dataNWCrnr.y - pos.y) / deltaLat;
+//NOTE (mr, 23May2017): This function currently implements nearest-neighbour
+//                      interpolation in the horizontal!
+    int i = int(round(mixI));
+    int j = int(round(mixJ));
 
     ivec3 dims = textureSize(volume, 0);
-    i = max(0, min(i, dims.x - 1));
-    j = max(0, min(j, dims.y - 1));
+    if (i < 0 || i >= dims.x) return MISSING_VALUE;
+    if (j < 0 || j >= dims.y) return MISSING_VALUE;
 
     int numberOfLevels = 0;
     int klower = 0;
