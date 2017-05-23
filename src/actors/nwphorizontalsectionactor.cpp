@@ -160,6 +160,7 @@ MNWPHorizontalSectionActor::WindBarbsSettings::WindBarbsSettings(
       color(QColor(0,0,127)),
       showCalmGlyphs(false),
       deltaBarbsLonLat(1.),
+      clampDeltaBarbsToGrid(true),
       automaticScalingEnabled(true),
       oldScale(1),
       reduceFactor(15.0f),
@@ -199,9 +200,24 @@ MNWPHorizontalSectionActor::WindBarbsSettings::WindBarbsSettings(
                                          appearanceGroupProperty);
     properties->setInt(pennantTiltProperty, pennantTilt, 1, 20, 1);
 
-    deltaBarbsLonLatProperty = a->addProperty(DOUBLE_PROPERTY, "barb distance (deg)",
-                                              groupProperty);
-    properties->setDouble(deltaBarbsLonLatProperty, deltaBarbsLonLat, 0.05, 45., 2, 0.1);
+    deltaBarbsLonLatProperty = a->addProperty(
+                DOUBLE_PROPERTY, "barb distance (deg)",
+                groupProperty);
+    properties->setDouble(
+                deltaBarbsLonLatProperty, deltaBarbsLonLat, 0.05, 45., 2, 0.1);
+    deltaBarbsLonLatProperty->setToolTip(
+                "Manually specify the distance between the wind barbs. If the "
+                "distance if below grid point spacing, nearest-neighbour "
+                "interpolation is used.");
+
+    clampDeltaBarbsToGridProperty = a->addProperty(
+                BOOL_PROPERTY, "restrict barb distance to grid",
+                groupProperty);
+    properties->mBool()->setValue(
+                clampDeltaBarbsToGridProperty, clampDeltaBarbsToGrid);
+    clampDeltaBarbsToGridProperty->setToolTip(
+                "If enabled the manually set barb distance cannot be smaller "
+                "than the grid point spacing of the wind field.");
 
     automaticScalingEnabledProperty = a->addProperty(BOOL_PROPERTY, "automatic scaling",
                                               groupProperty);
@@ -315,6 +331,7 @@ void MNWPHorizontalSectionActor::saveConfiguration(QSettings *settings)
     settings->setValue("uComponent", windBarbsSettings->uComponentVarIndex);
     settings->setValue("vComponent", windBarbsSettings->vComponentVarIndex);
     settings->setValue("deltaBarbsLonLat", windBarbsSettings->deltaBarbsLonLat);
+    settings->setValue("clampDeltaBarbsToGrid", windBarbsSettings->clampDeltaBarbsToGrid);
 
     settings->endGroup(); // Windbarbs
 
@@ -369,6 +386,9 @@ void MNWPHorizontalSectionActor::loadConfiguration(QSettings *settings)
     properties->mDouble()->setValue(
                 windBarbsSettings->deltaBarbsLonLatProperty,
                 settings->value("deltaBarbsLonLat", 1.).toFloat());
+    properties->mBool()->setValue(
+                windBarbsSettings->clampDeltaBarbsToGridProperty,
+                settings->value("clampDeltaBarbsToGrid", true).toBool());
     properties->mDouble()->setValue(
                 windBarbsSettings->reduceFactorProperty,
                 settings->value("reduceFactor", 15.).toFloat());
@@ -686,6 +706,7 @@ void MNWPHorizontalSectionActor::onQtPropertyChanged(QtProperty *property)
              property == windBarbsSettings->colorProperty ||
              property == windBarbsSettings->showCalmGlyphsProperty ||
              property == windBarbsSettings->deltaBarbsLonLatProperty ||
+             property == windBarbsSettings->clampDeltaBarbsToGridProperty ||
              property == windBarbsSettings->reduceFactorProperty ||
              property == windBarbsSettings->reduceSlopeProperty ||
              property == windBarbsSettings->sensitivityProperty ||
@@ -706,6 +727,8 @@ void MNWPHorizontalSectionActor::onQtPropertyChanged(QtProperty *property)
                 ->value(windBarbsSettings->showCalmGlyphsProperty);
         windBarbsSettings->deltaBarbsLonLat = properties->mDouble()
                 ->value(windBarbsSettings->deltaBarbsLonLatProperty);
+        windBarbsSettings->clampDeltaBarbsToGrid = properties->mBool()
+                ->value(windBarbsSettings->clampDeltaBarbsToGridProperty);
         windBarbsSettings->reduceFactor = properties->mDouble()
                 ->value(windBarbsSettings->reduceFactorProperty);
         windBarbsSettings->reduceSlope = properties->mDouble()
@@ -1915,6 +1938,14 @@ void MNWPHorizontalSectionActor::renderWindBarbs(MSceneViewGLWidget *sceneView)
     {
         scale = windBarbsSettings->oldScale;
         deltaBarbs = windBarbsSettings->deltaBarbsLonLat;
+
+        // Restrict wind barb distance to grid point spacing? If the barb
+        // distance is smaller than the grid point spacing, nearest-neighbour
+        // interpolation is used.
+        if (windBarbsSettings->clampDeltaBarbsToGrid)
+        {
+            deltaBarbs = max(deltaBarbs, varWindU->grid->getDeltaLon());
+        }
     }
     else
     {

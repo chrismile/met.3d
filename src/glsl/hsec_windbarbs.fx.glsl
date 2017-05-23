@@ -117,8 +117,10 @@ float sampleDataAtPos(  in vec3 pos,
 {
     float mixI = mod(pos.x - dataNWCrnr.x, 360.) / deltaLon;
     float mixJ = (dataNWCrnr.y - pos.y) / deltaLat;
-    int i = int(mixI);
-    int j = int(mixJ);
+//NOTE (mr, 23May2017): This function currently implements nearest-neighbour
+//                      interpolation in the horizontal!
+    int i = int(round(mixI));
+    int j = int(round(mixJ));
 
     ivec3 dims = textureSize(volume, 0);
     if (i < 0 || i >= dims.x) return MISSING_VALUE;

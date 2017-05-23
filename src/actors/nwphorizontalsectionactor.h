@@ -258,6 +258,9 @@ private:
         float       deltaBarbsLonLat;
         QtProperty* deltaBarbsLonLatProperty;
 
+        bool        clampDeltaBarbsToGrid;
+        QtProperty* clampDeltaBarbsToGridProperty;
+
         bool        automaticScalingEnabled;
         QtProperty* automaticScalingEnabledProperty;
         float       oldScale;
