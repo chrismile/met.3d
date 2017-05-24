@@ -416,17 +416,18 @@ public:
     {
 
         ContourSettings(MActor *actor = nullptr,
-                         const uint8_t index = 0,
-                         bool enabled = true,
-                         QColor colour = QColor(0, 0, 0, 255),
-                         double thickness = 1.5,
-                         bool labelsEnabled = false,
-                         QString levelsString = "");
+                        const uint8_t index = 0,
+                        bool enabled = true, double thickness = 1.5,
+                        bool useTF = false,
+                        QColor colour = QColor(0, 0, 0, 255),
+                        bool labelsEnabled = false,
+                        QString levelsString = "");
 
         bool            enabled;
         QVector<double> levels;
-        QColor          colour;
         double          thickness;
+        bool            useTF;
+        QColor          colour;
         bool            labelsEnabled;
         int             startIndex;
         int             stopIndex;
@@ -435,6 +436,7 @@ public:
         QtProperty *enabledProperty;
         QtProperty *levelsProperty;
         QtProperty *thicknessProperty;
+        QtProperty *useTFProperty;
         QtProperty *colourProperty;
         QtProperty *labelsEnabledProperty;
         QtProperty *removeProperty;
@@ -449,9 +451,9 @@ public:
     int renderContourLabels;
 
     void addContourSet(const bool enabled = true,
+            const double thickness = 1.5, const bool useTF = false,
             const QColor colour = QColor(0, 0, 0, 255),
-            const double thickness = 1.5, const bool labelsEnabled = false,
-            QString levelString = "");
+            const bool labelsEnabled = false, QString levelString = "");
 
     bool removeContourSet(int index);
 

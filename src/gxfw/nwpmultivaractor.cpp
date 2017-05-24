@@ -221,16 +221,6 @@ void MNWPMultiVarActor::loadConfiguration(QSettings *settings)
         delete var;
     }
 
-    // Read version id of config file.
-    // ===============================
-
-    settings->beginGroup("FileFormat");
-
-    configVersionID =
-            (settings->value("met3dVersion", "0.0.0").toString()).split(".");
-
-    settings->endGroup();
-
     // Read MNWPMultiVarActor specific properties.
     // ===========================================
 

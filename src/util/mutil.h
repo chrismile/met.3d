@@ -120,6 +120,8 @@ inline int clamp(int x, int a, int b)
     return x < a ? a : (x > b ? b : x);
 }
 
+QStringList readConfigVersionID(QSettings *settings);
+
 /**
   Expands environment variables of format $VARIABLE in the string @p path.
   Example: If the envrionment variable "MET3D_HOME" is set to "/home/user/m3d",

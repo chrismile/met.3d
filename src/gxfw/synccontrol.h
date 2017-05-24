@@ -43,6 +43,7 @@ namespace Met3D
 {
 
 class MSynchronizedObject;
+class MSceneViewGLWidget;
 
 enum MSynchronizationType
 {
@@ -209,6 +210,8 @@ signals:
      */
     void ensembleMemberChanged(const int member);
 
+    void imageOfTimeAnimationReady(QString path, QString fileName);
+
 protected slots:
     void onValidDateTimeChange(const QDateTime &datetime);
 
@@ -236,6 +239,15 @@ protected slots:
       */
     void copyValidToTo();
 
+    void onAnimationLoopGroupChanged(QAction *action);
+
+    void activateTimeAnimationImageSaving(bool activate);
+    void saveTimeAnimation();
+    void switchSelectedView(QString viewID);
+
+    void changeSaveTADirectory();
+    void adjustSaveTADirLabelText();
+
 private:
     /**
       Used by @ref timeForward() and @ref timeBackward() to apply a change to a
@@ -249,6 +261,10 @@ private:
      time.
      */
     void updateTimeDifference();
+
+    void handleMissingDateTime(QDateTimeEdit *dte,
+                               QList<QDateTime> *availableDatetimes,
+                               QDateTime datetime, QDateTime *lastDatetime);
 
     void beginSceneSynchronization();
 
@@ -264,6 +280,10 @@ private:
     void setTimeSynchronizationGUIEnabled(bool enabled);
 
     void setSynchronizationGUIEnabled(bool enabled);
+
+    void emitSaveImageSignal();
+
+    void setAnimationTimeToStartTime(QDateTime startDateTime);
 
     Ui::MSyncControl *ui;
 
@@ -291,23 +311,37 @@ private:
     QAction *timeAnimationReverseTimeDirectionAction;
     QTimer *animationTimer;
 
+    // Properties to control saving of images of time serie.
+    QCheckBox          *saveTimeAnimationCheckBox;
+    QLineEdit          *saveTAFileNameLineEdit;
+    QComboBox          *saveTAFileExtensionComboBox;
+    QLabel             *saveTADirectoryLabel;
+    QPushButton        *saveTADirectoryChangeButton;
+    QComboBox          *saveTASceneViewsComboBox;
+    MSceneViewGLWidget *saveTASceneView;
+
     QString syncID;
 
     bool synchronizationInProgress;
     bool forwardBackwardButtonClicked;
+    /**
+     * Handle sync event if valid and init time should be updated, but only
+     * valid time changes due to restriction to the data set.
+     */
+    bool validDateTimeHasChanged;
     QWidget *lastFocusWidget;
     MSynchronizationType currentSyncType;
     QSet<MSynchronizedObject*> synchronizedObjects;
     QSet<MSynchronizedObject*> pendingSynchronizations;
-    QSet<MSynchronizedObject*> earlyCompletedSynchronizations;
+    QSet<MSynchronizedObject*> earlyCompletedSynchronizations;    
 
     // Properties to control configuration.
     QMenu *configurationDropdownMenu;
     QAction *selectDataSourcesAction;
-    QDateTime lastIinitTime;
-    QDateTime lastValidTime;
-    QList<QDateTime> availableInitTimes;
-    QList<QDateTime> availableValidTimes;
+    QDateTime lastInitDatetime;
+    QDateTime lastValidDatetime;
+    QList<QDateTime> availableInitDatetimes;
+    QList<QDateTime> availableValidDatetimes;
     QSet<unsigned int> availableEnsembleMembers;
     QList<QAction*> selectedDataSourceActionList;
 
