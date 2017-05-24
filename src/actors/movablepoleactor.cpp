@@ -521,8 +521,8 @@ void MMovablePoleActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
                     "radius",
                     GLfloat(0.51));
             positionSpheresShader->setUniformValue(
-                    "constColour", QColor(Qt::red));
-            glDrawArrays(GL_POINTS, highlightPole / 2 * 2, 2); CHECK_GL_ERROR;
+                        "constColour", QColor(Qt::red));
+            glDrawArrays(GL_POINTS, highlightPole, 1); CHECK_GL_ERROR;
         }
 
         // Unbind VBO.

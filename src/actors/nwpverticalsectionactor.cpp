@@ -254,8 +254,6 @@ int MNWPVerticalSectionActor::checkIntersectionWithHandle(
     // with the corresponding index is highlighted.
     modifyWaypoint = -1;
 
-    float clipRadiusSq = clipRadius*clipRadius;
-
     // Loop over all way-/midpoints and check whether the mouse cursor is inside
     // a circle with radius "clipRadius" around the waypoint (in clip space).
     for (int i = 0; i < waypointsModel->sizeIncludingMidpoints(); i++)
@@ -263,35 +261,58 @@ int MNWPVerticalSectionActor::checkIntersectionWithHandle(
         // Transform the waypoint coordinates to clip space. As only lat/lon
         // of the waypoint is stored, assume a worldZ = 0.
         QVector3D wpPositionBottom = QVector3D(
-                    waypointsModel->positionLonLatIncludingMidpoints(i),
-                    sceneView->worldZfromPressure(p_bot_hPa));
+                waypointsModel->positionLonLatIncludingMidpoints(i),
+                sceneView->worldZfromPressure(p_bot_hPa));
         QVector3D wpPositionTop = QVector3D(
-                    waypointsModel->positionLonLatIncludingMidpoints(i),
-                    sceneView->worldZfromPressure(p_top_hPa));
+                waypointsModel->positionLonLatIncludingMidpoints(i),
+                sceneView->worldZfromPressure(p_top_hPa));
+
+        // Obtain the camera position and the view direction
+        const QVector3D& cameraPos = sceneView->getCamera()->getOrigin();
+        QVector3D viewDirBot = wpPositionBottom - cameraPos;
+        QVector3D viewDirTop = wpPositionTop - cameraPos;
+
+        // Scale the radius (in world space) with respect to the viewer distance
+        float radiusBot = static_cast<float>(clipRadius * viewDirBot.length() / 100.0);
+        float radiusTop = static_cast<float>(clipRadius * viewDirTop.length() / 100.0);
 
         QMatrix4x4 *mvpMatrix = sceneView->getModelViewProjectionMatrix();
+        // Compute the world position of the current mouse position
+        QVector3D mouseWorldPos = mvpMatrix->inverted() * QVector3D(clipX, clipY, 1);
 
-        QVector3D posClipBot = *(mvpMatrix) * wpPositionBottom;
-        QVector3D posClipTop = *(mvpMatrix) * wpPositionTop;
+        // Get the ray direction from the camera to the mouse position
+        QVector3D l = mouseWorldPos - cameraPos;
+        l.normalize();
 
-        float dxBot = posClipBot.x() - clipX;
-        float dyBot = posClipBot.y() - clipY;
-        float dxTop = posClipTop.x() - clipX;
-        float dyTop = posClipTop.y() - clipY;
+        // Compute (o - c) // ray origin (o) - sphere center (c)
+        QVector3D ocBot = cameraPos - wpPositionBottom;
+        QVector3D ocTop = cameraPos - wpPositionTop;
+        // Length of (o - c) = || o - c ||
+        float lenOCBot = static_cast<float>(ocBot.length());
+        float lenOCTop = static_cast<float>(ocTop.length());
+        // Compute l * (o - c)
+        float locBot = static_cast<float>(QVector3D::dotProduct(l, ocBot));
+        float locTop = static_cast<float>(QVector3D::dotProduct(l, ocTop));
 
-        // Compute the distance between point and mouse in clip space. If it
-        // is less than clipRadius, store this waypoint as the "matched" one
-        // and return from this function.
-        if ( (dxBot*dxBot + dyBot*dyBot) < clipRadiusSq )
+        // Solve equation:
+        // d = - (l * (o - c) +- sqrt( (l * (o - c))² - || o - c ||² + r² )
+        // Since the equation can be solved only if root discriminant is >= 0
+        // just compute the discriminant
+        float rootBot = locBot * locBot - lenOCBot * lenOCBot + radiusBot * radiusBot;
+        float rootTop = locTop * locTop - lenOCTop * lenOCTop + radiusTop * radiusTop;
+
+
+        // If root discriminant is positive or zero, there's an intersection
+        if (rootBot >= 0)
         {
             modifyWaypoint = i;
-            modifyWaypoint_worldZ = sceneView->worldZfromPressure(p_bot_hPa);
+            modifyWaypoint_worldZ = wpPositionBottom.z();
             break;
         }
-        else if ( (dxTop*dxTop + dyTop*dyTop) < clipRadiusSq )
+        else if (rootTop >= 0)
         {
             modifyWaypoint = i;
-            modifyWaypoint_worldZ = sceneView->worldZfromPressure(p_top_hPa);
+            modifyWaypoint_worldZ = wpPositionTop.z();
             break;
         }
 
