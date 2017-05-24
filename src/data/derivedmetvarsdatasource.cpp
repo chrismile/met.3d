@@ -84,12 +84,7 @@ MStructuredGrid* MDerivedMetVarsDataSource::produceData(MDataRequest request)
     foreach (QString requiredVar, requiredInputVariablesList[derivedVarName])
     {
         rh.insert("VARIABLE", requiredVar);
-
-        MLonLatHybridSigmaPressureGrid *inputGrid =
-                dynamic_cast<MLonLatHybridSigmaPressureGrid*>(
-                    inputSource->getData(rh.request()));
-
-        inputGrids << inputGrid;
+        inputGrids << inputSource->getData(rh.request());
     }
 
     // Initialize result grid.
