@@ -468,6 +468,71 @@ int MNWPHorizontalSectionActor::checkIntersectionWithHandle(
 
     return selectedMouseHandle;
 }
+void addPositionLabel(MSceneViewGLWidget *sceneView, int handleID);
+
+
+void MNWPHorizontalSectionActor::addPositionLabel(MSceneViewGLWidget *sceneView,
+                                                  int handleID, float clipX,
+                                                  float clipY)
+{
+    // Select an arbitrary z-value to construct a point in clip space that,
+    // transformed to world space, lies on the ray passing through the camera
+    // and the location on the worldZ==0 plane "picked" by the mouse.
+    // (See notes 22-23Feb2012).
+    QVector3D mousePosClipSpace = QVector3D(clipX, clipY, 0.);
+
+    // The point p at which the ray intersects the worldZ==0 plane is found by
+    // computing the value d in p=d*l+l0, where l0 is a point on the ray and l
+    // is a vector in the direction of the ray. d can be found with
+    //        (p0 - l0) * n
+    //   d = ----------------
+    //            l * n
+    // where p0 is a point on the worldZ==0 plane and n is the normal vector
+    // of the plane.
+    //       http://en.wikipedia.org/wiki/Line-plane_intersection
+
+    // To compute l0, the MVP matrix has to be inverted.
+    QMatrix4x4 *mvpMatrix = sceneView->getModelViewProjectionMatrix();
+    QVector3D l0 = mvpMatrix->inverted() * mousePosClipSpace;
+
+    // Compute l as the vector from l0 to the camera origin.
+    QVector3D cameraPosWorldSpace = sceneView->getCamera()->getOrigin();
+    QVector3D l = (l0 - cameraPosWorldSpace);
+
+    // The plane's origin is the selected mouse handle.
+    QVector3D p0 = mouseHandlePoints.at(handleID);
+    // The normal vector is taken as the vector to the camera with a zero value
+    // in the worldZ-direction -> a vector in the x/y plane.
+    QVector3D n = sceneView->getCamera()->getOrigin() - p0;
+    n.setZ(0);
+
+    // Compute the mouse position in world space.
+    float d = QVector3D::dotProduct(p0 - l0, n) / QVector3D::dotProduct(l, n);
+    QVector3D mousePosWorldSpace = l0 + d * l;
+
+    // Get properties for label font size and colour and bounding box.
+    int labelsize = properties->mInt()->value(labelSizeProperty);
+    QColor labelColour = properties->mColor()->value(labelColourProperty);
+    bool labelbbox = properties->mBool()->value(labelBBoxProperty);
+    QColor labelBBoxColour = properties->mColor()->value(labelBBoxColourProperty);
+    double elevation = properties->mDDouble()->value(slicePosProperty);
+
+    MGLResourcesManager* glRM = MGLResourcesManager::getInstance();
+    MTextManager* tm = glRM->getTextManager();
+    positionLabel = tm->addText(
+                QString("elevation:%1").arg(elevation, 0, 'f', 2),
+                MTextManager::LONLATP, mouseHandlePoints[handleID].x(),
+                mouseHandlePoints[handleID].y(), mouseHandlePoints[handleID].z(),
+                labelsize, labelColour, MTextManager::LOWERRIGHT,
+                labelbbox, labelBBoxColour);
+
+    double dist = calcPosLableDistanceWeight(sceneView->getCamera(),
+                                             mousePosWorldSpace);
+    QVector3D anchorOffset = dist * sceneView->getCamera()->getXAxis();
+    positionLabel->anchorOffset = -anchorOffset;
+
+    emitActorChangedSignal();
+}
 
 
 void MNWPHorizontalSectionActor::dragEvent(
@@ -517,6 +582,33 @@ void MNWPHorizontalSectionActor::dragEvent(
     // granularity requested by used.
     double p_hPa = sceneView->pressureFromWorldZ(mousePosWorldSpace.z());
     p_hPa = p_hPa - fmod(p_hPa, slicePositionGranularity_hPa);
+
+    if (positionLabel != nullptr)
+    {
+        double elevation = max(p_hPa,
+                               properties->mDDouble()->minimum(slicePosProperty));
+        elevation = min(elevation,
+                        properties->mDDouble()->maximum(slicePosProperty));
+        // Get properties for label font size and colour and bounding box.
+        int labelsize = properties->mInt()->value(labelSizeProperty);
+        QColor labelColour = properties->mColor()->value(labelColourProperty);
+        bool labelbbox = properties->mBool()->value(labelBBoxProperty);
+        QColor labelBBoxColour =
+                properties->mColor()->value(labelBBoxColourProperty);
+
+        MGLResourcesManager* glRM = MGLResourcesManager::getInstance();
+        MTextManager* tm = glRM->getTextManager();
+        positionLabel = tm->addText(
+                    QString("elevation:%1").arg(elevation, 0, 'f', 2),
+                    MTextManager::LONLATP, p0.x(), p0.y(), elevation,
+                    labelsize, labelColour, MTextManager::LOWERRIGHT,
+                    labelbbox, labelBBoxColour);
+
+        double dist = calcPosLableDistanceWeight(sceneView->getCamera(),
+                                                 mousePosWorldSpace);
+        QVector3D anchorOffset = dist * sceneView->getCamera()->getXAxis();
+        positionLabel->anchorOffset = -anchorOffset;
+    }
 
     // Set slice position to new pressure elevation.
     setSlicePosition(p_hPa);

@@ -46,12 +46,13 @@ MMovablePoleActor::MMovablePoleActor()
     : MActor(),
       tickLength(0.8),
       lineColour(QColor(0, 104, 139, 255)),
+      bottomPressure_hPa(1050.f),
+      topPressure_hPa(100.f),
       renderMode(RenderModes::TUBES),
       tubeRadius(0.06f),
-      highlightPole(-1),
-      bottomPressure_hPa(1050.f), topPressure_hPa(100.f),
       individualPoleHeightsEnabled(false),
-      movementEnabled(true)
+      movementEnabled(true),
+      highlightPole(-1)
 {
     enablePicking(true);
 
@@ -449,7 +450,10 @@ void MMovablePoleActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
 
     // Set label offset; the labels are rendered by the text manager.
     for (int i = 0; i < labels.size(); i++)
-        labels[i]->anchorOffset = anchorOffset + tubeRadius * sceneView->getCamera()->getXAxis();
+    {
+        labels[i]->anchorOffset = anchorOffset
+                + tubeRadius * sceneView->getCamera()->getXAxis();
+    }
 
     // Render tick marks.
 
@@ -597,6 +601,72 @@ int MMovablePoleActor::checkIntersectionWithHandle(MSceneViewGLWidget *sceneView
 }
 
 
+void MMovablePoleActor::addPositionLabel(MSceneViewGLWidget *sceneView,
+                                         int handleID, float clipX, float clipY)
+{
+    // Get properties for label font size and colour and bounding box.
+    int labelsize = properties->mInt()->value(labelSizeProperty);
+    QColor labelColour = properties->mColor()->value(labelColourProperty);
+    bool labelbbox = properties->mBool()->value(labelBBoxProperty);
+    QColor labelBBoxColour = properties->mColor()->value(labelBBoxColourProperty);
+    double lon = properties->mPointF()->value(poles[handleID / 2]
+            ->positionProperty).x();
+    double lat = properties->mPointF()->value(poles[handleID / 2]
+            ->positionProperty).y();
+
+    MGLResourcesManager* glRM = MGLResourcesManager::getInstance();
+    MTextManager* tm = glRM->getTextManager();
+    positionLabel = tm->addText(
+                QString("lon:%1, lat:%2").arg(lon, 0, 'f', 2).arg(lat, 0, 'f', 2),
+                MTextManager::LONLATP, poleVertices[handleID].x(),
+                poleVertices[handleID].y(), poleVertices[handleID].z(),
+                labelsize, labelColour, MTextManager::LOWERRIGHT,
+                labelbbox, labelBBoxColour);
+
+    // Select an arbitrary z-value to construct a point in clip space that,
+    // transformed to world space, lies on the ray passing through the camera
+    // and the location on the worldZ==0 plane "picked" by the mouse.
+    // (See notes 22-23Feb2012).
+    QVector3D mousePosClipSpace = QVector3D(clipX, clipY, 0.);
+
+    // The point p at which the ray intersects the worldZ==0 plane is found by
+    // computing the value d in p=d*l+l0, where l0 is a point on the ray and l
+    // is a vector in the direction of the ray. d can be found with
+    //        (p0 - l0) * n
+    //   d = ----------------
+    //            l * n
+    // where p0 is a point on the worldZ==p2worldZ(pbot) plane and n is the
+    // normal vector of the plane.
+    //       http://en.wikipedia.org/wiki/Line-plane_intersection
+
+    // To compute l0, the MVP matrix has to be inverted.
+    QMatrix4x4 *mvpMatrix = sceneView->getModelViewProjectionMatrix();
+    QVector3D l0 = mvpMatrix->inverted() * mousePosClipSpace;
+
+    // Compute l as the vector from l0 to the camera origin.
+    QVector3D cameraPosWorldSpace = sceneView->getCamera()->getOrigin();
+    QVector3D l = (l0 - cameraPosWorldSpace);
+
+    // The plane's normal vector simply points upward, the origin in world
+    // space is lcoated on the plane.
+    QVector3D n = QVector3D(0, 0, 1);
+    QVector3D p0 = QVector3D(0, 0, sceneView->worldZfromPressure(
+            poleVertices[handleID].z()));
+
+    // Compute the mouse position in world space.
+    float d = static_cast<float>(QVector3D::dotProduct(p0 - l0, n)
+                                 / QVector3D::dotProduct(l, n));
+    QVector3D mousePosWorldSpace = l0 + d * l;
+
+    double weight = calcPosLableDistanceWeight(sceneView->getCamera(),
+                                               mousePosWorldSpace);
+    positionLabel->anchorOffset = -((weight + tubeRadius)
+            * sceneView->getCamera()->getXAxis());
+
+    emitActorChangedSignal();
+}
+
+
 void MMovablePoleActor::dragEvent(MSceneViewGLWidget *sceneView,
                                   int handleID, float clipX, float clipY)
 {
@@ -672,6 +742,35 @@ void MMovablePoleActor::dragEvent(MSceneViewGLWidget *sceneView,
     {
         labels[i]->anchor.setX(mousePosWorldSpace.x());
         labels[i]->anchor.setY(mousePosWorldSpace.y());
+    }
+
+    // Only change label if there is one present.
+    if (positionLabel != nullptr)
+    {
+        MGLResourcesManager* glRM = MGLResourcesManager::getInstance();
+        MTextManager* tm = glRM->getTextManager();
+        tm->removeText(positionLabel);
+
+        // Get properties for label font size and colour and bounding box.
+        int labelsize = properties->mInt()->value(labelSizeProperty);
+        QColor labelColour = properties->mColor()->value(labelColourProperty);
+        bool labelbbox = properties->mBool()->value(labelBBoxProperty);
+        QColor labelBBoxColour =
+                properties->mColor()->value(labelBBoxColourProperty);
+
+        positionLabel = tm->addText(
+                    QString("lon:%1, lat:%2")
+                    .arg(poleVertices[handleID].x(), 0, 'f', 2)
+                    .arg(poleVertices[handleID].y(), 0, 'f', 2),
+                    MTextManager::LONLATP, poleVertices[handleID].x(),
+                    poleVertices[handleID].y(), poleVertices[handleID].z(),
+                    labelsize, labelColour, MTextManager::LOWERRIGHT,
+                    labelbbox, labelBBoxColour);
+
+        double weight = calcPosLableDistanceWeight(sceneView->getCamera(),
+                                                   mousePosWorldSpace);
+        positionLabel->anchorOffset = -((weight + tubeRadius)
+                * sceneView->getCamera()->getXAxis());
     }
 
     // Update GUI properties.

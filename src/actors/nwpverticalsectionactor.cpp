@@ -322,6 +322,73 @@ int MNWPVerticalSectionActor::checkIntersectionWithHandle(
 }
 
 
+void MNWPVerticalSectionActor::addPositionLabel(MSceneViewGLWidget *sceneView,
+                                                int handleID,
+                                                float clipX, float clipY)
+{
+    if (waypointsModel == nullptr) return;
+
+    // Select an arbitrary z-value to construct a point in clip space that,
+    // transformed to world space, lies on the ray passing through the camera
+    // and the location on the worldZ==0 plane "picked" by the mouse.
+    // (See notes 22-23Feb2012).
+    QVector3D mousePosClipSpace = QVector3D(clipX, clipY, modifyWaypoint_worldZ);
+
+    // The point p at which the ray intersects the worldZ==0 plane is found by
+    // computing the value d in p=d*l+l0, where l0 is a point on the ray and l
+    // is a vector in the direction of the ray. d can be found with
+    //        (p0 - l0) * n
+    //   d = ----------------
+    //            l * n
+    // where p0 is a point on the worldZ==0 plane and n is the normal vector
+    // of the plane.
+    //       http://en.wikipedia.org/wiki/Line-plane_intersection
+
+    // To compute l0, the MVP matrix has to be inverted.
+    QMatrix4x4 *mvpMatrix = sceneView->getModelViewProjectionMatrix();
+    QVector3D l0 = mvpMatrix->inverted() * mousePosClipSpace;
+
+    // Compute l as the vector from l0 to the camera origin.
+    QVector3D cameraPosWorldSpace = sceneView->getCamera()->getOrigin();
+    QVector3D l = (l0 - cameraPosWorldSpace);
+
+    // The plane's normal vector simply points upward, the origin in world
+    // space is lcoated on the plane.
+    QVector3D n = QVector3D(0, 0, 1);
+    QVector3D p0 = waypointsModel->positionLonLatIncludingMidpoints(handleID)
+            + QVector3D(0, 0, modifyWaypoint_worldZ);
+
+    // Compute the mouse position in world space.
+    float d = QVector3D::dotProduct(p0 - l0, n) / QVector3D::dotProduct(l, n);
+    QVector3D mousePosWorldSpace = l0 + d * l;
+
+    // Get properties for label font size and colour and bounding box.
+    int labelsize = properties->mInt()->value(labelSizeProperty);
+    QColor labelColour = properties->mColor()->value(labelColourProperty);
+    bool labelbbox = properties->mBool()->value(labelBBoxProperty);
+    QColor labelBBoxColour = properties->mColor()->value(labelBBoxColourProperty);
+    QVector3D pos = waypointsModel->positionLonLatIncludingMidpoints(handleID);
+    double lon = pos.x();
+    double lat = pos.y();
+
+    MGLResourcesManager* glRM = MGLResourcesManager::getInstance();
+    MTextManager* tm = glRM->getTextManager();
+    positionLabel = tm->addText(
+                QString("lon:%1, lat:%2").arg(lon, 0, 'f', 2).arg(lat, 0, 'f', 2),
+                MTextManager::LONLATP, lon, lat,
+                sceneView->pressureFromWorldZ(modifyWaypoint_worldZ),
+                labelsize, labelColour, MTextManager::LOWERRIGHT,
+                labelbbox, labelBBoxColour);
+
+    double dist = calcPosLableDistanceWeight(sceneView->getCamera(),
+                                             mousePosWorldSpace);
+    QVector3D anchorOffset = dist * sceneView->getCamera()->getXAxis();
+    positionLabel->anchorOffset = -anchorOffset;
+
+    emitActorChangedSignal();
+}
+
+
 void MNWPVerticalSectionActor::dragEvent(MSceneViewGLWidget *sceneView,
                                     int handleID, float clipX, float clipY)
 {
@@ -373,6 +440,34 @@ void MNWPVerticalSectionActor::dragEvent(MSceneViewGLWidget *sceneView,
 //    cout << "\tmouse position, world space, on worldZ==0 plane = (" << mousePosWorldSpace.x() << "," << mousePosWorldSpace.y()
 //         << "," << mousePosWorldSpace.z()
 //         << "); d = " << d << "\n" << flush;
+
+    if (positionLabel != nullptr)
+    {
+
+
+        // Get properties for label font size and colour and bounding box.
+        int labelsize = properties->mInt()->value(labelSizeProperty);
+        QColor labelColour = properties->mColor()->value(labelColourProperty);
+        bool labelbbox = properties->mBool()->value(labelBBoxProperty);
+        QColor labelBBoxColour =
+                properties->mColor()->value(labelBBoxColourProperty);
+        MGLResourcesManager* glRM = MGLResourcesManager::getInstance();
+        MTextManager* tm = glRM->getTextManager();
+        positionLabel = tm->addText(
+                    QString("lon:%1, lat:%2")
+                    .arg(mousePosWorldSpace.x(), 0, 'f', 2)
+                    .arg(mousePosWorldSpace.y(), 0, 'f', 2),
+                    MTextManager::LONLATP, mousePosWorldSpace.x(),
+                    mousePosWorldSpace.y(),
+                    sceneView->pressureFromWorldZ(modifyWaypoint_worldZ),
+                    labelsize, labelColour, MTextManager::LOWERRIGHT,
+                    labelbbox, labelBBoxColour);
+
+        double dist = calcPosLableDistanceWeight(sceneView->getCamera(),
+                                                 mousePosWorldSpace);
+        QVector3D anchorOffset = dist * sceneView->getCamera()->getXAxis();
+        positionLabel->anchorOffset = -anchorOffset;
+    }
 
     // Set the waypoint's coordinates. This will trigger a dataChanged signal
     // of the waypoints model, which in turn will call

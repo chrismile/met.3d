@@ -73,6 +73,9 @@ public:
                                     float clipX, float clipY,
                                     float clipRadius) override;
 
+    void addPositionLabel(MSceneViewGLWidget *sceneView, int handleID,
+                          float clipX, float clipY);
+
     /**
       Implements MActor::dragEvent().
 

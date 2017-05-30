@@ -419,7 +419,9 @@ private:
     QtProperty *syncCameraWithViewProperty;
     QtProperty *actorInteractionProperty;
     QtProperty *analysisModeProperty;
-    QtProperty *cameraAutoRotationModeProperty;
+    QtProperty *cameraAutoRotationModeProperty;    
+    QtProperty *posLabelEnableProperty;
+    bool        posLabelIsEnabled; /* Whether position label will be rendered. */
 
     QtProperty *renderingGroupProperty;
     QtProperty *backgroundColourProperty;
