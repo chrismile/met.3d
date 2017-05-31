@@ -93,7 +93,7 @@ MHCLColorPicker::MHCLColorPicker(MColourNodes *cs, QWidget *parent) :
     gridlayout->addWidget(luminanceRange, 2, 2);
 
     QComboBox *typeBox = new QComboBox(this);
-    typeBox->addItems({"Hue-Chroma", "Hue-Luminance", "Chroma-Luminance"});
+    typeBox->addItems(QStringList() << "Hue-Chroma" << "Hue-Luminance" << "Chroma-Luminance");
 
     QCheckBox *interpolationPathsBox = new QCheckBox(this);
     interpolationPathsBox->setText("show interpolation paths");

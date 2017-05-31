@@ -191,8 +191,8 @@ MSceneViewGLWidget::MSceneViewGLWidget()
     sceneNavigationModeProperty = systemControl->getEnumPropertyManager()
             ->addProperty("scene navigation");
     systemControl->getEnumPropertyManager()->setEnumNames(
-                sceneNavigationModeProperty, {"move camera", "rotate scene",
-                                              "2D top view"});
+                sceneNavigationModeProperty, QStringList() << "move camera" << "rotate scene" <<
+                                              "2D top view");
     interactionGroupProperty->addSubProperty(sceneNavigationModeProperty);
 
     sceneRotationCenterProperty = systemControl->getGroupPropertyManager()

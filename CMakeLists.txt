@@ -47,7 +47,8 @@ add_definitions(-DENABLE_MET3D_STOPWATCH
                 -DENABLE_HYBRID_PRESSURETEXCOORDTABLE
                 -DENABLE_RAYCASTER_ACCELERATION
                 -DDIRECT_SYNCHRONIZATION
-                -DQCUSTOMPLOT_USE_LIBRARY)
+                -DQCUSTOMPLOT_USE_LIBRARY
+                -DNOMINMAX) # required for windows support
 
 # Add global options
 option(USE_CLANG "Build application with clang" OFF)
@@ -166,6 +167,7 @@ include_directories(${grib_api_INCLUDE_DIR})
 # Netcdf
 find_package(netcdf_cxx4 REQUIRED)
 include_directories(${netcdf_cxx4_INCLUDE_DIR})
+include_directories(${netcdf_cxx4_C_INCLUDE_DIR})
 
 # Add global defines for netcdf cxx4 library version checking.
 add_definitions(-DNetCDFCXX4_VERSION_MAJOR=${netcdf_cxx4_VERSION_MAJOR}
@@ -260,8 +262,8 @@ target_link_libraries(Met3D
                         ${GSL_LIBRARIES}
                         ${log4cplus_LIBRARIES}
                         ${grib_api_LIBRARIES}
-                        ${netcdf_cxx4_LIBRARY}
-                        ${netcdf_cxx4_C_LIBRARY}
+                        ${netcdf_cxx4_LIBRARIES}
+                        ${netcdf_cxx4_C_LIBRARIES}
                         ${qcustomplot_LIBRARIES}
                         ${glfx_LIBRARIES}
                         #${EIGEN3_LIBRARIES}
@@ -274,9 +276,120 @@ target_link_libraries(Met3D
 set(ENV{MET3D_HOME} "${PROJECT_SOURCE_DIR}")
 set(ENV{MET3D_BASE} "${PROJECT_SOURCE_DIR}/../")
 
-
 ##############################################################################
 #                           Custom Commands
 ##############################################################################
+
+function(check_package PKG_NAME)
+    if(NOT ${PKG_NAME}_DLL_RELEASE)
+        message(${${PKG_NAME}_DLL_RELEASE})
+        message(SEND_ERROR "could not find ${PKG_NAME}_DLL_RELEASE")
+    elseif(NOT ${PKG_NAME}_DLL_DEBUG)
+        message(SEND_ERROR "could not find ${PKG_NAME}_DLL_DEBUG")
+    else()
+        set(DLLS_RELEASE ${DLLS_RELEASE} ${${PKG_NAME}_DLL_RELEASE} PARENT_SCOPE)
+        set(DLLS_DEBUG ${DLLS_DEBUG} ${${PKG_NAME}_DLL_DEBUG} PARENT_SCOPE)
+    endif()
+endfunction()
+
+function(find_dll_dummy PKG_NAME)
+    find_file(${PKG_NAME}_DLL_RELEASE ".dll")
+    find_file(${PKG_NAME}_DLL_DEBUG ".dll")
+    
+    check_package(${PKG_NAME})
+    set(DLLS_RELEASE ${DLLS_RELEASE} PARENT_SCOPE)
+    set(DLLS_DEBUG ${DLLS_DEBUG} PARENT_SCOPE)
+endfunction()
+
+function(find_dll_for_package PKG_NAME)
+    get_filename_component(FILENAME_RELEASE ${${PKG_NAME}_LIBRARY_RELEASE} NAME_WE)
+    get_filename_component(FILENAME_DEBUG ${${PKG_NAME}_LIBRARY_DEBUG} NAME_WE)
+    
+    get_filename_component(PARENT_DIR ${${PKG_NAME}_LIBRARY_RELEASE} DIRECTORY)
+    get_filename_component(PARENT_DIR ${PARENT_DIR} DIRECTORY)
+    
+    find_file(${PKG_NAME}_DLL_RELEASE
+          NAMES
+              ${FILENAME_RELEASE}.dll
+          HINTS 
+              ${PARENT_DIR}
+              $ENV{${PKG_NAME}_DIR}
+          PATH_SUFFIXES 
+              lib bin
+    )
+    
+    find_file(${PKG_NAME}_DLL_DEBUG
+          NAMES
+              ${FILENAME_DEBUG}.dll
+          HINTS 
+              ${PARENT_DIR}
+              $ENV{${PKG_NAME}_DIR}
+          PATH_SUFFIXES 
+              lib bin
+    )
+    
+   check_package(${PKG_NAME})
+   set(DLLS_RELEASE ${DLLS_RELEASE} PARENT_SCOPE)
+   set(DLLS_DEBUG ${DLLS_DEBUG} PARENT_SCOPE)
+endfunction()
+
+function(find_dll_for_qt MODULE)    
+    get_target_property(Qt4${MODULE}_DLL_RELEASE  "Qt4::Qt${MODULE}" LOCATION_RELEASE)
+    get_target_property(Qt4${MODULE}_DLL_DEBUG    "Qt4::Qt${MODULE}" LOCATION_DEBUG)
+  
+    string(REPLACE .lib .dll Qt4${MODULE}_DLL_RELEASE ${Qt4${MODULE}_DLL_RELEASE})
+    string(REPLACE .lib .dll Qt4${MODULE}_DLL_DEBUG   ${Qt4${MODULE}_DLL_DEBUG})
+    
+    check_package(Qt4${MODULE})
+    set(DLLS_RELEASE ${DLLS_RELEASE} PARENT_SCOPE)
+    set(DLLS_DEBUG ${DLLS_DEBUG} PARENT_SCOPE)
+endfunction()
+
+if(WIN32)
+  set(DLLS_RELEASE "")
+  set(DLLS_DEBUG "")
+
+  find_dll_for_package(log4cplus)
+  find_dll_for_package(netcdf_cxx4)
+  find_dll_for_package(netcdf_cxx4_C)
+  find_dll_for_package(glfx)
+  find_dll_for_package(GLEW)
+  find_dll_for_package(qcustomplot)
+  
+  find_dll_dummy(GEOS)
+  find_dll_dummy(GEOS_C)
+  find_dll_dummy(HDF5)
+  find_dll_dummy(HDF5_HL)
+  find_dll_dummy(LIBCURL)
+  find_dll_dummy(GDAL)
+  
+  find_dll_for_qt(Core)
+  find_dll_for_qt(Gui)
+  find_dll_for_qt(OpenGL)
+  find_dll_for_qt(Xml)
+  find_dll_for_qt(Network)
+  
+  add_custom_target(CopyDlls)
+  add_custom_command(TARGET CopyDlls POST_BUILD COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/Release)
+  add_custom_command(TARGET CopyDlls POST_BUILD COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/Debug)
+  
+  foreach(DLL_RELEASE ${DLLS_RELEASE})
+      add_custom_command(TARGET CopyDlls POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy ${DLL_RELEASE} ${CMAKE_BINARY_DIR}/Release)
+  endforeach()
+  
+  foreach(DLL_DEBUG ${DLLS_DEBUG})  
+      add_custom_command(TARGET CopyDlls POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy ${DLL_DEBUG} ${CMAKE_BINARY_DIR}/Debug)
+  endforeach()
+  
+  # rename libcurld.dll to libcurl.dll
+  if(LIBCURL_DLL_DEBUG AND LIBCURL_DLL_RELEASE)
+      get_filename_component(FILENAME_DEBUG ${LIBCURL_DLL_DEBUG} NAME)
+      get_filename_component(FILENAME_RELEASE ${LIBCURL_DLL_RELEASE} NAME)
+      
+      add_custom_command(TARGET CopyDlls POST_BUILD COMMAND ${CMAKE_COMMAND} -E rename ${CMAKE_BINARY_DIR}/Debug/${FILENAME_DEBUG} ${CMAKE_BINARY_DIR}/Debug/${FILENAME_RELEASE})
+  endif()
+
+  
+endif()
 
 # ...

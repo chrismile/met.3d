@@ -457,9 +457,13 @@ void MWaypointsTableModel::loadFromFile(QString fn)
     }
 
     // Clear the old list of waypoints ..
-    beginRemoveRows(QModelIndex(), 0, this->waypoints.length() - 1);
-    this->waypoints.clear();
-    endRemoveRows();
+	// crashes on windows if waypointsvector is empty
+	if (this->waypoints.size() > 0)
+	{
+		beginRemoveRows(QModelIndex(), 0, this->waypoints.length() - 1);
+		this->waypoints.clear();
+		endRemoveRows();
+	}
 
     // .. and replace it with the new list.
     insertRows(0, waypoints_list->count(), QModelIndex(), waypoints_list);

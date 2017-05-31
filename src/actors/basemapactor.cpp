@@ -344,7 +344,9 @@ void MBaseMapActor::loadMap(std::string filename)
     const int32_t imgSize = imgSizeX * latitudeDim;
 
     std::vector<GLbyte> tiffImg;
-    tiffImg.reserve(imgSize * sizeof(GLbyte));
+	// changed reserve to resize because of "vector subscript out of range" 
+	// error on windows
+    tiffImg.resize(imgSize * sizeof(GLbyte));
     //GLbyte* tiffImg = new GLbyte[imgSize * sizeof(GLbyte)];
 
     std::string file = filename.substr(0, filename.find_last_of("."));

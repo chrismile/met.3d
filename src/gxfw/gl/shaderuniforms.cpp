@@ -546,7 +546,8 @@ void MShaderEffect
         const int16_t matSize = cols * rows;
         const int16_t arrSize = matSize * count;
 
-        GLfloat mat[arrSize];
+		// GLfloat mat[arrSize]; VLAs not supported in msvc
+        GLfloat* mat = new GLfloat[arrSize];
 
         for (int i = 0;  i < arrSize; ++i)
         {
@@ -554,6 +555,8 @@ void MShaderEffect
         }
 
         uniform->setUniform(type, mat, count, 1);
+
+		delete[] mat;
     }
 }
 
@@ -574,7 +577,8 @@ void MShaderEffect
 
     std::shared_ptr<Uniform>& uniform = getUniform(name);
 
-    GLint idata[count];
+	// GLint idata[count]; VLAs not supported in msvc
+    GLint* idata = new GLint[count];
 
     for (int i = 0; i < count; ++i)
     {
@@ -582,6 +586,7 @@ void MShaderEffect
     }
 
     uniform->setUniform(GL_BOOL, idata, count, 1);
+	delete[] idata;
 }
 
 
@@ -597,7 +602,8 @@ void MShaderEffect
 
     std::shared_ptr<Uniform>& uniform = getUniform(name);
 
-    GLint idata[count * tupleSize];
+	// GLint idata[count]; VLAs not supported in msvc
+    GLint* idata = new GLint[count * tupleSize];
 
     for (int i = 0; i < count * tupleSize; ++i)
     {
@@ -614,6 +620,7 @@ void MShaderEffect
     }
 
     uniform->setUniform(type, idata, count, tupleSize);
+	delete[] idata;
 }
 
 
@@ -874,7 +881,8 @@ void MShaderEffect
 
     std::shared_ptr<Uniform>& uniform = getUniform(name);
 
-    GLfloat floatData[count * 4];
+	// GLint floatData[count]; VLAs not supported in msvc
+    GLfloat* floatData = new GLfloat[count * 4];
 
     for (int i = 0; i < count; ++i)
     {
@@ -885,6 +893,7 @@ void MShaderEffect
     }
 
     uniform->setUniform(GL_FLOAT_VEC4, floatData, count, 4);
+	delete[] floatData;
 }
 
 
@@ -896,7 +905,8 @@ void MShaderEffect
 
     std::shared_ptr<Uniform>& uniform = getUniform(name);
 
-    GLfloat floatData[count * 3];
+	// GLint floatData[count]; VLAs not supported in msvc
+    GLfloat* floatData = new GLfloat[count * 3];
 
     for (int i = 0; i < count; ++i)
     {
@@ -906,6 +916,7 @@ void MShaderEffect
     }
 
     uniform->setUniform(GL_FLOAT_VEC3, floatData, count, 3);
+	delete[] floatData;
 }
 
 
@@ -917,7 +928,8 @@ void MShaderEffect
 
     std::shared_ptr<Uniform>& uniform = getUniform(name);
 
-    GLfloat floatData[count * 2];
+	// GLint floatData[count]; VLAs not supported in msvc
+    GLfloat* floatData = new GLfloat[count * 2];
 
     for (int i = 0; i < count; ++i)
     {
@@ -926,6 +938,7 @@ void MShaderEffect
     }
 
     uniform->setUniform(GL_FLOAT_VEC2, floatData, count, 2);
+	delete[] floatData;
 }
 
 
@@ -937,7 +950,8 @@ void MShaderEffect
 
     std::shared_ptr<Uniform>& uniform = getUniform(name);
 
-    GLfloat floatData[count * 4];
+	// GLint floatData[count]; VLAs not supported in msvc
+    GLfloat* floatData = new GLfloat[count * 4];
 
     for (int i = 0; i < count; ++i)
     {
@@ -948,6 +962,7 @@ void MShaderEffect
     }
 
     uniform->setUniform(GL_FLOAT_VEC4, floatData, count, 4);
+	delete[] floatData;
 }
 
 
@@ -959,7 +974,8 @@ void MShaderEffect
 
     std::shared_ptr<Uniform>& uniform = getUniform(name);
 
-    GLint iData[count * 2];
+	// GLint iData[count]; VLAs not supported in msvc
+    GLint* iData = new GLint[count * 2];
 
     for (int i = 0; i < count; ++i)
     {
@@ -968,6 +984,7 @@ void MShaderEffect
     }
 
     uniform->setUniform(GL_INT_VEC2, iData, count, 2);
+	delete[] iData;
 }
 
 
@@ -979,7 +996,7 @@ void MShaderEffect
 
     std::shared_ptr<Uniform>& uniform = getUniform(name);
 
-    GLfloat floatData[count * 2];
+    GLfloat* floatData = new GLfloat[count * 2];
 
     for (int i = 0; i < count; ++i)
     {
@@ -988,6 +1005,7 @@ void MShaderEffect
     }
 
     uniform->setUniform(GL_FLOAT_VEC2, floatData, count, 2);
+	delete[] floatData;
 }
 
 

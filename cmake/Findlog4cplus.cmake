@@ -35,7 +35,7 @@ find_path(${PKG_NAME}_INCLUDE_DIR
             ${COMMON_INSTALL_DIRS}
         )
 
-find_library(${PKG_NAME}_LIBRARIES
+find_library(${PKG_NAME}_LIBRARY_RELEASE
         NAMES
             log4cplus LOG4CPLUS
         HINTS
@@ -47,7 +47,26 @@ find_library(${PKG_NAME}_LIBRARIES
         PATHS
             ${COMMON_INSTALL_DIRS}
         )
+        
+find_library(${PKG_NAME}_LIBRARY_DEBUG
+        NAMES
+            log4cplusd LOG4CPLUSD
+        HINTS
+            $ENV{${PKG_NAME}_DIR}
+            ${PKG_LIBRARY_DIRS}
+        PATH_SUFFIXES
+            lib64
+            lib
+        PATHS
+            ${COMMON_INSTALL_DIRS}
+        )
 
+if (${PKG_NAME}_LIBRARY_DEBUG AND ${PKG_NAME}_LIBRARY_RELEASE)
+    # use different libraries for different configurations
+    set (${PKG_NAME}_LIBRARIES
+            optimized ${${PKG_NAME}_LIBRARY_RELEASE}
+            debug ${${PKG_NAME}_LIBRARY_DEBUG})
+endif ()
 
 include(FindPackageHandleStandardArgs)
 # handle the QUIETLY and REQUIRED arguments and set ${PGK_NAME}_FOUND to TRUE if

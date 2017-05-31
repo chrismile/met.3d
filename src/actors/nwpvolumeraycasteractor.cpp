@@ -1600,7 +1600,6 @@ void MNWPVolumeRaycasterActor::onQtPropertyChanged(QtProperty* property)
                 properties->mBool()->setValue(it->enabledProp, false);
                 rayCasterSettings->isoValuesProp->removeSubProperty(
                           it->groupProp);
-                rayCasterSettings->isoValueSetList.erase(it);
                 QString oldDisplayText  = it->groupProp->propertyName();
                 int hashStringPosition  = oldDisplayText.indexOf("#");
                 int oldIndex            =
@@ -1627,6 +1626,9 @@ void MNWPVolumeRaycasterActor::onQtPropertyChanged(QtProperty* property)
                               oldTextFront + QString::number(oldIndex - 1));
                 }
                 enableEmissionOfActorChangedSignal(true);
+				// erase value only after iterator is not used anymore
+				rayCasterSettings->isoValueSetList.erase(it);
+				return;
             }
 
             else if ( property == it->enabledProp ||
