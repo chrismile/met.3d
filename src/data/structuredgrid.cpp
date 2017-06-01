@@ -1153,7 +1153,9 @@ GL::MTexture *MRegularLonLatStructuredPressureGrid::getPressureTexCoordTexture1D
     // 1) Compute texture coordinates for each p-level. For e.g. 6 levels,
     // texture coordinates will be 1/12, 3/12, 5/12, ...
 
-    double lnPLevels[nlevs], texCoordsPLevels[nlevs];
+	// double lnPLevels[nlevs], texCoordsPLevels[nlevs]; VLAs not supported in msvc
+	double* lnPLevels = new double[nlevs];
+	double* texCoordsPLevels = new double[nlevs];
     for (uint i = 0; i < nlevs; ++i)
     {
         lnPLevels[i] = log(levels[i]);
@@ -1177,7 +1179,8 @@ GL::MTexture *MRegularLonLatStructuredPressureGrid::getPressureTexCoordTexture1D
     double lnPtop = log(levels[0]);
     double dlnp   = (lnPbot - lnPtop) / (nTable-1);
 
-    float texCoordsTable[nTable];
+	// float texCoordsTable[nTable]; VLAs not supported in msvc
+    float* texCoordsTable = new float[nTable];
 
     for (uint i = 0; i< nTable; i++)
     {
@@ -1223,6 +1226,10 @@ GL::MTexture *MRegularLonLatStructuredPressureGrid::getPressureTexCoordTexture1D
     {
         delete t;
     }
+
+	delete[] lnPLevels;
+	delete[] texCoordsPLevels;
+	delete[] texCoordsTable;
 
     return static_cast<GL::MTexture*>(glRM->getGPUItem(pressureTableID));
 }

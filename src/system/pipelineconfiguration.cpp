@@ -91,6 +91,7 @@ void MPipelineConfiguration::configure()
         if (arg.startsWith("--pipeline="))
         {
             QString filename = arg.remove("--pipeline=");
+			filename = expandEnvironmentVariables(filename);
 
             // Production build: Read pipeline configuration from file.
             // Disadvantage: Can only read parameters for the predefined

@@ -89,6 +89,7 @@ void MFrontendConfiguration::configure()
         if (arg.startsWith("--frontend="))
         {
             QString filename = arg.remove("--frontend=");
+			filename = expandEnvironmentVariables(filename);
 
             // Production builds should use the config-from-file mechanism.
             initializeFrontendFromConfigFile(filename);

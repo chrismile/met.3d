@@ -1073,7 +1073,8 @@ void MTransferFunction1D::generateBarGeometry()
     numTicks = min(numSteps + 1, maxNumTicks);
 
     // This array accomodates the tickmark geometry.
-    float tickmarks[6 * numTicks];
+	// float tickmarks[6 * numTicks]; VLAs not supported in msvc
+    float* tickmarks = new float[6 * numTicks];
 
     // Width of the tickmarks in clip space.
     float tickwidth = properties->mDouble()->value(tickWidthProperty);
@@ -1121,7 +1122,7 @@ void MTransferFunction1D::generateBarGeometry()
         // reallocate buffer if size has changed
         buf->reallocate(nullptr, 24 + numTicks * 6);
         buf->update(coordinates, 0, 0, sizeof(coordinates));
-        buf->update(tickmarks, 0, sizeof(coordinates), sizeof(tickmarks));
+        buf->update(tickmarks, 0, sizeof(coordinates), sizeof(float) * 6 * numTicks);
 
     }
     else
@@ -1132,7 +1133,7 @@ void MTransferFunction1D::generateBarGeometry()
         {
             newVB->reallocate(nullptr, 24 + numTicks * 6, 0, true);
             newVB->update(coordinates, 0, 0, sizeof(coordinates));
-            newVB->update(tickmarks, 0, sizeof(coordinates), sizeof(tickmarks));
+            newVB->update(tickmarks, 0, sizeof(coordinates), sizeof(float) * 6 * numTicks);
 
         }
         else
@@ -1230,6 +1231,8 @@ void MTransferFunction1D::generateBarGeometry()
 
     editor->setRange(minimumValue, maximumValue, scaleFactor,
                      maxNumTicks, maxNumLabels, numSteps, decimals);
+	
+	delete[] tickmarks;
 }
 
 

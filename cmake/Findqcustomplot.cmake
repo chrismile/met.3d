@@ -35,9 +35,9 @@ find_path(${PKG_NAME}_INCLUDE_DIR
             ${COMMON_INSTALL_DIRS}
         )
 
-find_library(${PKG_NAME}_LIBRARY_DEBUG
+find_library(${PKG_NAME}_LIBRARY_RELEASE
         NAMES
-            qcustomplotd
+            qcustomplot QCUSTOMPLOT
         HINTS
             $ENV{${PKG_NAME}_DIR}
             ${PKG_LIBRARY_DIRS}
@@ -48,9 +48,9 @@ find_library(${PKG_NAME}_LIBRARY_DEBUG
             ${COMMON_INSTALL_DIRS}
         )
 
-find_library(${PKG_NAME}_LIBRARY_RELEASE
+find_library(${PKG_NAME}_LIBRARY_DEBUG
         NAMES
-            qcustomplot
+            qcustomplotd QCUSTOMPLOTD
         HINTS
             $ENV{${PKG_NAME}_DIR}
             ${PKG_LIBRARY_DIRS}

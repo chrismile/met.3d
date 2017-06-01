@@ -49,6 +49,17 @@
 
 using namespace std;
 
+
+#ifdef WIN32
+
+unsigned int abs(unsigned int a)
+{
+	return a;
+}
+
+#endif
+
+
 namespace Met3D
 {
 

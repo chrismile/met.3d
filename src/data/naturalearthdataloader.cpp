@@ -142,7 +142,9 @@ void MNaturalEarthDataLoader::loadLineGeometry(GeometryType        type,
     bboxRing.addPoint(urcrnrlon, urcrnrlat);
     bboxRing.addPoint(llcrnrlon, urcrnrlat);
     bboxRing.addPoint(llcrnrlon, llcrnrlat);
-    OGRPolygon *bboxPolygon = new OGRPolygon();
+    // OGRPolygon *bboxPolygon = new OGRPolygon(); causes problems on windows
+	OGRPolygon *bboxPolygon = dynamic_cast<OGRPolygon*>
+		(OGRGeometryFactory::createGeometry(OGRwkbGeometryType::wkbPolygon));
     bboxPolygon->addRing(&bboxRing);
 
     // Filter the layer on-load: Only load those geometries that intersect
@@ -240,7 +242,7 @@ void MNaturalEarthDataLoader::loadLineGeometry(GeometryType        type,
     }
 
     // Clean up.
-    delete bboxPolygon;
+	OGRGeometryFactory::destroyGeometry(bboxPolygon);
 }
 
 } // namespace Met3D

@@ -812,7 +812,8 @@ void MSpatial1DTransferFunction::generateBarGeometry()
     numTicks = min(numLevels + 1, maxNumTicks);
 
     // This array accomodates the tickmark geometry.
-    float tickmarks[6 * numTicks];
+	// float tickmarks[6 * numTicks]; VLAs not supported in msvc
+	float* tickmarks = new float[6 * numTicks];
 
     // Width of the tickmarks in clip space.
     float tickwidth = properties->mDouble()->value(tickWidthProperty);
@@ -962,6 +963,8 @@ void MSpatial1DTransferFunction::generateBarGeometry()
                           labelbbox, labelBBoxColour)
                       );
     }
+
+	delete[] tickmarks;
 }
 
 

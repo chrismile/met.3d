@@ -258,7 +258,7 @@ MTransferFunctionEditor::MTransferFunctionEditor(QWidget *parent) :
             alphaNormPosBox->setFixedWidth(80);
             alphaValueBox->setFixedWidth(80);
 
-            colourTypeComboBox->addItems({"HCL", "RGB"});
+            colourTypeComboBox->addItems(QStringList() << "HCL" << "RGB");
         }
 
         QVBoxLayout *channelsLayout = new QVBoxLayout();
@@ -1772,8 +1772,8 @@ void MAlphaRuler::updateTicks()
     int fontHeight = fontMetric.height();
 
     float stepSize = 1;
-    QVector<float> stepSizes = {0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.1,
-                                0.25, 0.5};
+	QVector<float> stepSizes = QVector<float>() << 0.001 << 0.0025 << 0.005 << 0.01 << 0.025 << 0.05 << 0.1
+                                << 0.25 << 0.5;
 
     foreach (float step, stepSizes)
     {
@@ -1881,8 +1881,8 @@ void MBigAlphaRuler::updateTicks()
     int fontHeight = fontMetrics.height();
 
     float stepSize = 1;
-    QVector<float> stepSizes = {0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.1,
-                                0.25, 0.5};
+    QVector<float> stepSizes = QVector<float>() << 0.001 << 0.0025 << 0.005 << 0.01 << 0.025 << 0.05 << 0.1
+                                << 0.25 << 0.5;
 
     for (float step : stepSizes)
     {

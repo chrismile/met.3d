@@ -40,10 +40,10 @@
 #include "gxfw/gl/vertexbuffer.h"
 
 class MGLResourcesManager;
-class MSceneViewGLWidget;
 
 namespace Met3D
 {
+	class MSceneViewGLWidget;
 
 class MovablePole
 {

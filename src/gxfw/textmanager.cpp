@@ -380,7 +380,8 @@ void MTextManager::renderText(
 
     // ctriangles stores vertex and texture coordinates of the triangles that
     // will represent the string. n is a counter used to index ctriangles.
-    float ctriangles[30 * text.size()];
+    // float ctriangles[30 * text.size()]; VLAs not supported in msvc
+	float* ctriangles = new float[30 * text.size()];
     int n = 0;
 
     // Min/max Y coordinate (clip space) of bounding box, updated in loop.
@@ -570,6 +571,8 @@ void MTextManager::renderText(
     glDrawArrays(GL_TRIANGLES, 0, 6 * text.size());
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+	delete[] ctriangles;
 }
 
 
@@ -595,7 +598,7 @@ MLabel* MTextManager::addText(
     // "coordinates" stores vertex and texture coordinates of the triangles
     // that will represent the string. The first 8 entries are used for
     // bounding box coordinates. n is a counter used to index coordinates.
-    float coordinates[8 + 24 * text.size()];
+	std::vector<float> coordinates(8 + 24 * text.size());
     int n = 8; // reserve first 8 entries for bbox coordinates
 
     // Estimate width of label in pixel size (mk: used for contour labels)
@@ -751,12 +754,14 @@ MLabel* MTextManager::addText(
 
     // Upload data to GPU.
     glBindBuffer(GL_ARRAY_BUFFER, label->vbo); CHECK_GL_ERROR;
-    glBufferData(GL_ARRAY_BUFFER, sizeof(coordinates), coordinates,
-                 GL_STATIC_DRAW); CHECK_GL_ERROR;
+	// glBufferData(GL_ARRAY_BUFFER, sizeof(coordinates), !! does only get size of float pointer !!
+	glBufferData(GL_ARRAY_BUFFER, sizeof(float) * coordinates.size(), 
+		coordinates.data(), GL_STATIC_DRAW); CHECK_GL_ERROR;
     glBindBuffer(GL_ARRAY_BUFFER, 0); CHECK_GL_ERROR;
 
     // Store label information in "labels" list.
     labelPool.insert(label);
+
     return label;
 }
 
@@ -1018,7 +1023,8 @@ void MTextManager::generateTextureAtlas(QString fontFile, int size)
         // alpha component can be directly used in the shader to render the
         // text with "transparent" whitespace, e.g. in "O".
 
-        unsigned char nullData[textureAtlasWidth * textureAtlasHeight];
+        unsigned char* nullData = 
+			new unsigned char[textureAtlasWidth * textureAtlasHeight];
         for (int i = 0; i < textureAtlasWidth * textureAtlasHeight; i++)
             nullData[i] = 0;
 
@@ -1081,6 +1087,8 @@ void MTextManager::generateTextureAtlas(QString fontFile, int size)
 
         glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT,
                         largestAnisotropyLevel); CHECK_GL_ERROR;
+
+		delete[] nullData;
     }
 }
 

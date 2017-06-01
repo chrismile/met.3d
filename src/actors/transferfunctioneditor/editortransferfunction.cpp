@@ -285,16 +285,12 @@ MEditorTransferFunction::MEditorTransferFunction()
 {
     // Add first and last nodes as first two nodes in nodes-vector accordingly.
 
-    colourNodes.nodes =
-    {
-        ColourNode(0.f, (MColourXYZ64)(MColourHCL16(6.f, 80.f, 28.f))),
-        ColourNode(1.f, (MColourXYZ64)(MColourHCL16(90.f, 5.f, 86.f)))
-    };
-    alphaNodes.nodes =
-    {
-        AlphaNode(0.f, 1.f),
-        AlphaNode(1.f, 1.f)
-    };
+	colourNodes.nodes = QVector<ColourNode>()
+		<< ColourNode(0.f, (MColourXYZ64)(MColourHCL16(6.f, 80.f, 28.f)))
+		<< ColourNode(1.f, (MColourXYZ64)(MColourHCL16(90.f, 5.f, 86.f)));
+	alphaNodes.nodes = QVector<AlphaNode>()
+		<< AlphaNode(0.f, 1.f)
+		<< AlphaNode(1.f, 1.f);
 }
 
 
