@@ -387,10 +387,10 @@ void MTrajectoryFilterProperties::loadConfiguration(QSettings *settings)
                 enableFilterProperty,
                 settings->value("filteringEnabled", true).toBool());
 
-    properties->mDouble()->setValue(
+    properties->mDDouble()->setValue(
                 deltaPressureProperty,
                 settings->value("deltaPressure_hPa", 500.).toDouble());
-    properties->mDouble()->setValue(
+    properties->mDDouble()->setValue(
                 deltaTimeProperty,
                 settings->value("deltaTime_hrs", 48.).toDouble());
 
@@ -564,30 +564,30 @@ void MTrajectoryGriddingProperties::loadConfiguration(QSettings *settings)
                 scaleParcelThicknessProperty,
                 settings->value("scaleParcelThickness", true).toBool());
 
-    properties->mDouble()->setValue(
+    properties->mDDouble()->setValue(
                 westernLonProperty,
                 settings->value("westernlon", -90.).toDouble());
-    properties->mDouble()->setValue(
+    properties->mDDouble()->setValue(
                 deltaLonProperty,
                 settings->value("dlon", 1.).toDouble());
     properties->mInt()->setValue(
                 numLonProperty,
                 settings->value("nlon", 180).toInt());
 
-    properties->mDouble()->setValue(
+    properties->mDDouble()->setValue(
                 northerLatProperty,
                 settings->value("northernlat", -90.).toDouble());
-    properties->mDouble()->setValue(
+    properties->mDDouble()->setValue(
                 deltaLatProperty,
                 settings->value("dlat", 1.).toDouble());
     properties->mInt()->setValue(
                 numLatProperty,
                 settings->value("nlat", 180).toInt());
 
-    properties->mDouble()->setValue(
+    properties->mDDouble()->setValue(
                 bottomPressureProperty,
                 settings->value("pbot", 1000.).toDouble());
-    properties->mDouble()->setValue(
+    properties->mDDouble()->setValue(
                 topPressureProperty,
                 settings->value("ptop", 100.).toDouble());
     properties->mInt()->setValue(
@@ -791,7 +791,7 @@ void MProbabilityRegionProperties::loadConfiguration(QSettings *settings)
 {
     MQtProperties *properties = actorVariable->getActor()->getQtProperties();
 
-    properties->mDouble()->setValue(
+    properties->mDDouble()->setValue(
                 probabilityRegionIsovalueProperty,
                 settings->value("probabilityRegionDetectionIsovalue", 0.).toDouble());
 }

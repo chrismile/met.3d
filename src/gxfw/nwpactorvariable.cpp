@@ -1041,6 +1041,23 @@ void MNWPActorVariable::loadConfiguration(QSettings *settings)
         msgBox.exec();
     }
 
+    // We need the properties list filled at this point to be able to load the
+    // configurations of properties at creation of actor.
+    if (propertiesList.empty())
+    {
+        // Get a pointer to the new source and connect to its request completed
+        // signal.
+        MAbstractDataSource *source =
+                MSystemManagerAndControl::getInstance()->getDataSource(dataSourceID);
+        dataSource = dynamic_cast<MWeatherPredictionDataSource*>(source);
+
+        if (dataSource != nullptr)
+        {
+            requestPropertiesFactory->updateProperties(
+                        &propertiesList, dataSource->requiredKeys());
+        }
+    }
+
     // Load properties of connected request property subgroups.
     foreach (MRequestProperties* props, propertiesList)
         props->loadConfiguration(settings);
