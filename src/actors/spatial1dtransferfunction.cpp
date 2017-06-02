@@ -375,9 +375,9 @@ void MSpatial1DTransferFunction::onQtPropertyChanged(QtProperty *property)
             {
                 QMessageBox msgBox;
                 msgBox.setIcon(QMessageBox::Warning);
-                msgBox.setText(QString("Amount of selceted files is not enough!\n"
+                msgBox.setText(QString("Amount of selceted files is not enough.\n"
                                        "You have to select at least 2 image "
-                                       "files!"));
+                                       "files."));
                 msgBox.exec();
                 return;
             }
@@ -1005,7 +1005,7 @@ void MSpatial1DTransferFunction::loadImagesFromPaths(QStringList pathList)
                         msgBox.setText(
                                     QString("Selected images don't have the "
                                             "same size.\n"
-                                            "Aborting texture generation!"));
+                                            "Aborting texture generation."));
                         msgBox.exec();
                         loadedImages.clear();
                         return;
@@ -1068,8 +1068,8 @@ void MSpatial1DTransferFunction::loadImagesFromPaths(QStringList pathList)
         {
             QMessageBox msgBox;
             msgBox.setIcon(QMessageBox::Warning);
-            msgBox.setText(QString("Could not create enough images!\n"
-                                   "Therefore no texture was created!"));
+            msgBox.setText(QString("Could not create enough images.\n"
+                                   "Therefore no texture was created."));
             msgBox.exec();
         }
     }

@@ -477,8 +477,43 @@ void MFrontendConfiguration::initializeFrontendFromConfigFile(
                                 << factory->getName().toStdString());
 
                 MActor *actor = factory->create(configfile);
+                if (!actor)
+                {
+                    break;
+                }
+
+                QString actorName = actor->getName();
+                bool ok = true;
+                // Check whether name already exists.
+                while (actorName.isEmpty() || glRM->getActorByName(actorName))
+                {
+                    actorName = QInputDialog::getText(
+                                nullptr, "Change actor name",
+                                "The given actor name already exists, please "
+                                "enter a new one:",
+                                QLineEdit::Normal,
+                                actorName, &ok);
+
+                    if (!ok)
+                    {
+                        // The user has pressed the "Cancel" button.
+                        delete actor;
+                        break;
+                    }
+
+                    actor->setName(actorName);
+                }
+                // The user has pressed the "Cancel" button.
+                if (!ok)
+                {
+                    break;
+                }
+
                 glRM->registerActor(actor);
-                foreach (MSceneControl *scene, scenes) scene->addActor(actor);
+                foreach (MSceneControl *scene, scenes)
+                {
+                    scene->addActor(actor);
+                }
 
                 break;
             }
