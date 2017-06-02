@@ -248,15 +248,27 @@ void MVerticalRegridProperties::actorPropertyChangeEvent(
 
 void MVerticalRegridProperties::saveConfiguration(QSettings *settings)
 {
-//TODO: implement.
-    Q_UNUSED(settings);
+    MQtProperties *properties = actorVariable->getActor()->getQtProperties();
+    settings->beginGroup("VerticalRegrid");
+    settings->setValue("regridMode",
+                       properties->getEnumItem(regridModeProperty));
+    settings->setValue("enableBroadcast",
+                       properties->mBool()->value(enableBroadcastProperty));
+    settings->endGroup();
 }
 
 
 void MVerticalRegridProperties::loadConfiguration(QSettings *settings)
 {
-//TODO: implement.
-    Q_UNUSED(settings);
+    MQtProperties *properties = actorVariable->getActor()->getQtProperties();
+    settings->beginGroup("VerticalRegrid");
+    properties->setEnumItem(
+                regridModeProperty,
+                settings->value("regridMode", "no regrid").toString());
+    properties->mBool()->setValue(
+                enableBroadcastProperty,
+                settings->value("enableBroadcast", false).toBool());
+    settings->endGroup();
 }
 
 
