@@ -54,7 +54,19 @@ add_definitions(-DENABLE_MET3D_STOPWATCH
 option(USE_CLANG "Build application with clang" OFF)
 
 if (WIN32)
-    # TODO: support for windows
+    if (MSVC)
+        # Standard:          /DWIN32 /D_WINDOWS /W3 /Zm1000 /EHsc /GR
+        # Reference: https://msdn.microsoft.com/en-us/library/fwkeyyhe.aspx
+        # WIN32 --> Win32 console application
+        # Wx  --> Warning level
+        # Zi  --> Produces a program database (PDB) for complete debug information
+        # EHsc --> Exception handling model (catches C++ exceptions only)
+        # GR- --> Disabled Run-Time Type Information
+        # MP  --> Multi-processes compilation
+        # openmp --> Enables openmp
+        set(CMAKE_CXX_FLAGS "/D_WINDOWS /W4 /Zi /EHsc /GR- /MP /bigobj")
+    endif (MSVC)
+
     #set(EXECUTABLE_OUTPUT_PATH ${CMAKE_CURRENT_SOURCE_DIR}/build/win32 CACHE PATH "Build directory" FORCE)
 endif (WIN32)
 
@@ -62,17 +74,20 @@ if (UNIX)
     #set(EXECUTABLE_OUTPUT_PATH ${CMAKE_CURRENT_SOURCE_DIR}/build/unix CACHE PATH "Build directory" FORCE)
     #set(RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/build/unix)
     #set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/build/unix")
+
+    # Set flags if we use GNUCC
+    if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall")
+        # Or CLANG
+        # TODO: clang command arguments slightly differ from GNUCC
+    elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" OR USE_CLANG)
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall")
+    endif ()
+
 endif(UNIX)
 
 
-# Set flags if we use GNUCC
-if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall")
-# Or CLANG
-# TODO: clang command arguments slightly differ from GNUCC
-elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" OR USE_CLANG)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall")
-endif ()
+
 
 
 ##############################################################################
@@ -119,12 +134,13 @@ INCLUDE(${QT_USE_FILE})
 # Qt4 forms / designer forms
 file (GLOB_RECURSE  MET3D_UIS 	src/*.ui)
 # Qt4 resources
-file (GLOB_RECURSE  MET3D_RCS   ../*.qrc)
+file (GLOB_RECURSE  MET3D_THIRDPARTY_RCS   ../third-party/*.qrc)
+file (GLOB_RECURSE  MET3D_RCS   *.qrc)
 
 # Build cpp and header from UI forms
 qt4_wrap_ui(MET3D_UIS_H ${MET3D_UIS})
 # Add QT resources
-qt4_add_resources(MET3D_RC_SRCS ${MET3D_RCS})
+qt4_add_resources(MET3D_RC_SRCS ${MET3D_RCS} ${MET3D_THIRDPARTY_RCS})
 # Future: Change to Qt5.
 #qt5_use_modules(OpenGL Xml XmlPatterns)
 

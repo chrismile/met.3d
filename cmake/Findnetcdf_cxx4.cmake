@@ -131,12 +131,20 @@ find_file(${PKG_NAME}_SETTINGS_FILE
             ${COMMON_INSTALL_DIRS}
         )
 
+if (NOT ${PKG_NAME}_C_LIBRARY_DEBUG)
+    set(${PKG_NAME}_C_LIBRARY_DEBUG "${PKG_NAME}_C_LIBRARY_RELEASE")
+endif()
+
 if (${PKG_NAME}_C_LIBRARY_DEBUG AND ${PKG_NAME}_C_LIBRARY_RELEASE)
     # use different libraries for different configurations
     set (${PKG_NAME}_C_LIBRARIES
             optimized ${${PKG_NAME}_C_LIBRARY_RELEASE}
             debug ${${PKG_NAME}_C_LIBRARY_DEBUG})
 endif ()
+
+if (NOT ${PKG_NAME}_LIBRARY_DEBUG)
+  set(${PKG_NAME}_LIBRARY_DEBUG "${PKG_NAME}_LIBRARY_RELEASE")
+endif()
 
 if (${PKG_NAME}_LIBRARY_DEBUG AND ${PKG_NAME}_LIBRARY_RELEASE)
     # use different libraries for different configurations
@@ -177,4 +185,4 @@ list(GET ${PKG_NAME}_VERSION 2 ${PKG_NAME}_VERSION_PATCH)
 
 
 # Marks cmake cached variables as advanced
-mark_as_advanced(${PKG_NAME}_INCLUDE_DIR ${PKG_NAME}_LIBRARY ${PKG_NAME}_C_LIBRARY)
+mark_as_advanced(${PKG_NAME}_INCLUDE_DIR ${PKG_NAME}_LIBRARIES ${PKG_NAME}_C_LIBRARIES)

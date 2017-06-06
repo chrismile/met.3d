@@ -60,6 +60,10 @@ find_library(${PKG_NAME}_LIBRARY_DEBUG
         PATHS
             ${COMMON_INSTALL_DIRS}
         )
+
+if (NOT ${PKG_NAME}_LIBRARY_DEBUG)
+    set(${PKG_NAME}_LIBRARY_DEBUG "${PKG_NAME}_LIBRARY_RELEASE")
+endif()
         
 if (${PKG_NAME}_LIBRARY_DEBUG AND ${PKG_NAME}_LIBRARY_RELEASE)
     # use different libraries for different configurations
