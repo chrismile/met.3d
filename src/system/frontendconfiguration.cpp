@@ -82,6 +82,9 @@ void MFrontendConfiguration::configure()
 //    initializeDevelopmentFrontend();
 //    return;
 
+    // Indicates whether Met.3D was called by Metview.
+    bool metviewConnection = false;
+
     // Scan global application command line arguments for pipeline definitions.
     MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
     foreach (QString arg, sysMC->getApplicationCommandLineArguments())
@@ -95,12 +98,39 @@ void MFrontendConfiguration::configure()
             initializeFrontendFromConfigFile(filename);
             return;
         }
+        if (arg.startsWith("--metview"))
+        {
+            metviewConnection = true;
+        }
     }
 
-    QString errMsg = QString(
-                "ERROR: No frontend configuration file specified."
-                "Use the '--frontend=<file>' command line argument.");
-    LOG4CPLUS_ERROR(mlog, errMsg.toStdString());
+    QString errMsg = "";
+    // If Met.3D is called by Metview and no configuration files are given,
+    // use default configuration files stored at
+    // $MET3D_HOME/config/metview/default_frontend.cfg .
+    if (metviewConnection)
+    {
+        QString filename = "$MET3D_HOME/config/metview/default_frontend.cfg";
+        filename = expandEnvironmentVariables(filename);
+        QFileInfo fileInfo(filename);
+        if (fileInfo.isFile())
+        {
+            // Production builds should use the config-from-file mechanism.
+            initializeFrontendFromConfigFile(filename);
+            return;
+        }
+        errMsg = QString(
+                    "ERROR: Default Metview frontend configuration file does"
+                    " not exist. Location: ") + filename;
+        LOG4CPLUS_ERROR(mlog, errMsg.toStdString());
+    }
+    else
+    {
+        errMsg = QString(
+                    "ERROR: No frontend configuration file specified."
+                    "Use the '--frontend=<file>' command line argument.");
+        LOG4CPLUS_ERROR(mlog, errMsg.toStdString());
+    }
     throw MInitialisationError(errMsg.toStdString(), __FILE__, __LINE__);
 }
 
@@ -175,8 +205,7 @@ void MFrontendConfiguration::initializeFrontendFromConfigFile(
         LOG4CPLUS_DEBUG(mlog, "  dataSources = " << dataSourceIDs.toStdString());
 
         // Check parameter validity.
-        if ( name.isEmpty()
-             || dataSourceIDs.isEmpty())
+        if ( name.isEmpty())
         {
             LOG4CPLUS_WARN(mlog, "invalid parameters encountered; skipping.");
             continue;
@@ -501,8 +530,7 @@ void MFrontendConfiguration::initializeSynchronization(
     sysMC->registerSyncControl(syncControl);
     sysMC->getMainWindow()->dockSyncControl(syncControl);
 
-    syncControl->restrictToDataSourcesFromFrontend(
-                QStringList(initializeFromDataSources));
+    syncControl->restrictToDataSourcesFromFrontend(initializeFromDataSources);
 }
 
 
