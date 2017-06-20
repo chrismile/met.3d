@@ -359,13 +359,41 @@ void MTransferFunctionEditor::setRange(float min, float max, float scaleFactor,
                          maxNumTicks, maxNumLabels,
                          numSteps, decimals);
 
-    colourPosBox->setRange(min, max);
+    // Only update spin box values but don't change position of the node.
+    colourPosBox->blockSignals(true);
+    // The maximum of the transfer function range can be smaller than the
+    // minimum, but the spinbox works only if the range is set correctly (min
+    // smaller than max) thus a check is necessary.
+    if (min <= max)
+    {
+        colourPosBox->setRange(min, max);
+    }
+    else
+    {
+        colourPosBox->setRange(max, min);
+    }
     colourPosBox->setSingleStep(pow(0.1, double(decimals)));
     colourPosBox->setDecimals(decimals);
+    colourPosBox->setValue(denormalizeValue(colourNormPosBox->value()));
+    colourPosBox->blockSignals(false);
 
-    alphaPosBox->setRange(min, max);
+    // Only update spin box values but don't change position of the node.
+    alphaPosBox->blockSignals(true);
+    // The maximum of the transfer function range can be smaller than the
+    // minimum, but the spinbox works only if the range is set correctly (min
+    // smaller than max) thus a check is necessary.
+    if (min <= max)
+    {
+        alphaPosBox->setRange(min, max);
+    }
+    else
+    {
+        alphaPosBox->setRange(max, min);
+    }
     alphaPosBox->setSingleStep(pow(0.1, double(decimals)));
     alphaPosBox->setDecimals(decimals);
+    alphaPosBox->setValue(denormalizeValue(alphaNormPosBox->value()));
+    alphaPosBox->blockSignals(false);
 
     changeTransferFunction();
 }
@@ -978,8 +1006,10 @@ int MAbstractFunction::getPointClicked(QPoint click)
 
     QPoint pointSize(10, 10);
     // Loop over all given points and search for the point nearest to the click
-    // position with the click position inside its representing rectangle.
-    for (int point = 0; point != abstractNodes->getNumNodes(); point++)
+    // position with the click position inside its representing rectangle. Check
+    // "border nodes" last to be able to drag nodes with the same position as
+    // one of the border nodes.
+    for (int point = abstractNodes->getNumNodes() - 1; point >= 0; point--)
     {
         QPoint pos = toPixelPos(QPointF(abstractNodes->xAt(point),
                                         abstractNodes->yAt(point)));
@@ -1351,16 +1381,20 @@ void MAlphaFunction::paintEvent(QPaintEvent *event)
 
     // Draw lines.
     // aCodeCopy 363 transferFunctionEditor.cpp
-	std::vector<QPoint> points;
+    QVector<QPoint> points;
     points.reserve(abstractNodes->getNumNodes());
-    for (int i = 0; i < abstractNodes->getNumNodes(); i++)
+    for (int i = 2; i < abstractNodes->getNumNodes(); i++)
     {
         points.push_back(toPixelPos(QPointF(abstractNodes->xAt(i),
                                             abstractNodes->yAt(i))));
     }
 
-    std::sort(points.begin(), points.end(),
-              [](const QPoint& a, const QPoint& b) { return a.x() < b.x(); });
+    // Prepend first node to be always the first of the nodes connected.
+    points.prepend(toPixelPos(QPointF(abstractNodes->xAt(0),
+                                      abstractNodes->yAt(0))));
+    // Append last node to be always the last of the nodes connected.
+    points.append(toPixelPos(QPointF(abstractNodes->xAt(1),
+                                      abstractNodes->yAt(1))));
     painter.setPen(QPen(QColor(0, 0, 0, 255), 2));
     painter.drawPolyline(points.data(), points.size());
 
@@ -1441,59 +1475,27 @@ float MAlphaFunction::yMax() const
 
 void MAlphaFunction::setNeighbouringNodes()
 {
-    float posXCurrentNode = abstractNodes->xAt(selectedPoint);
-    // Initialise with border nodes.
-    posXNeighbourLeft = abstractNodes->xAt(0);
-    posXNeighbourRight = abstractNodes->xAt(1);
-
-    float distLeft = posXCurrentNode - posXNeighbourLeft;
-    float distRight = posXNeighbourRight - posXCurrentNode;
-
-    // Loop over all given points and search for the point nearest to the click
-    // position with the click position inside its representing rectangle.
-    for (int i = 2; i < abstractNodes->getNumNodes(); i++)
+    // Set left neighbour to left border node stored at index 0 if node is the
+    // most left one (except border nodes) or the left border node.
+    if (selectedPoint == 2 || selectedPoint == 0)
     {
-        // Skip current node.
-        if (i == selectedPoint)
-        {
-            continue;
-        }
-
-        float posXNode = abstractNodes->xAt(i);
-
-        // Node is to the left of current node.
-        if (posXNode < posXCurrentNode)
-        {
-            if ( (posXCurrentNode - posXNode) <= distLeft )
-            {
-                distLeft = posXCurrentNode - posXNode;
-                posXNeighbourLeft = abstractNodes->xAt(i);
-            }
-        }
-        // Node is to the right of current node.
-        else if (posXNode > posXCurrentNode)
-        {
-            if ( (posXNode - posXCurrentNode) < distRight )
-            {
-                distRight = posXNode - posXCurrentNode;
-                posXNeighbourRight = abstractNodes->xAt(i);
-            }
-        }
-        // Node is at the same level in x direction as the current node.
-        else
-        {
-            if (i < selectedPoint)
-            {
-                distLeft = posXCurrentNode - posXNode;
-                posXNeighbourLeft = abstractNodes->xAt(i);
-            }
-            else
-            {
-                distRight = posXNode - posXCurrentNode;
-                posXNeighbourRight = abstractNodes->xAt(i);
-            }
-        }
+        posXNeighbourLeft = abstractNodes->xAt(0);
     }
+    else
+    {
+        posXNeighbourLeft = abstractNodes->xAt(selectedPoint - 1);
+    }
+    // Set right neighbour to right border node stored at index 1 if node is the
+    // most right one (except border nodes) or the right border node.
+    if (selectedPoint + 1 == abstractNodes->getNumNodes() || selectedPoint == 1)
+    {
+        posXNeighbourRight = abstractNodes->xAt(1);
+    }
+    else
+    {
+        posXNeighbourRight = abstractNodes->xAt(selectedPoint + 1);
+    }
+
     transferFunctionEditor->setAlphaBoxesBounds(posXNeighbourLeft,
                                                 posXNeighbourRight);
 }
