@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2015-2017 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -481,8 +482,7 @@ void MPipelineConfiguration::initializeLagrantoEnsemblePipeline(
             new MSingleTimeTrajectoryFilter();
     timestepFilter->setMemoryManager(memoryManager);
     timestepFilter->setScheduler(scheduler);
-    timestepFilter->setInputSelectionSource(dpdtFilter);
-//    timestepFilter->setInputSelectionSource(bboxFilter);
+    timestepFilter->setInputSelectionSource(bboxFilter);
     sysMC->registerDataSource(dataSourceId + QString(" timestepFilter"),
                               timestepFilter);
 
