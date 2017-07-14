@@ -52,7 +52,7 @@ void findIteratorPair(const T& nodes, typename T::const_iterator& i1,
     {
         if (i->first <= t)
         {
-            if (i1 == nodes.end() || i->first > i1->first)
+            if (i1 == nodes.end() || i->first >= i1->first)
             {
                 i1 = i;
             }
@@ -60,7 +60,10 @@ void findIteratorPair(const T& nodes, typename T::const_iterator& i1,
     }
 
     i2 = nodes.end();
-    for (auto i = nodes.begin(); i !=nodes.end(); i++)
+    // Search for node with x-position greater t but exclude border nodes since
+    // otherwise the right border would always "dominate" the nodes at the same
+    // x-position.
+    for (auto i = nodes.begin() + 2; i !=nodes.end(); i++)
     {
         if (i->first >= t)
         {
@@ -69,6 +72,13 @@ void findIteratorPair(const T& nodes, typename T::const_iterator& i1,
                 i2 = i;
             }
         }
+    }
+
+    // Set i2 to right border node (index = 1) if none other has been found yet.
+    auto right = nodes.begin() + 1;
+    if (i2 == nodes.end())
+    {
+        i2 = right;
     }
 }
 
@@ -101,7 +111,11 @@ float MColourNodes::yAt(int i) const
 
 void MColourNodes::setXAt(int i, float x)
 {
-    nodes[i].first = x;
+    // Don't change the x position of the border nodes.
+    if (i > 1)
+    {
+        nodes[i].first = x;
+    }
 }
 
 
@@ -155,6 +169,14 @@ void MColourNodes::push_back(float t, const MColourXYZ64& color)
 
 MColourXYZ64 MColourNodes::interpolate(float t)
 {
+    if (t == 0.f)
+    {
+        return nodes[0].second;
+    }
+    if (t == 1.f)
+    {
+        return nodes[1].second;
+    }
     MColourNodes::const_iterator i1, i2;
     findIteratorPair(nodes, i1, i2, t);
 
@@ -164,7 +186,7 @@ MColourXYZ64 MColourNodes::interpolate(float t)
         return MColourXYZ64();
     }
 
-    if (i1 == i2)
+    if (i1->first == i2->first)
     {
         return i1->second;
     }
@@ -213,7 +235,11 @@ float MAlphaNodes::yAt(int i) const
 
 void MAlphaNodes::setXAt(int i, float x)
 {
-    nodes[i].first = x;
+    // Don't change the x position of the border nodes.
+    if (i > 1)
+    {
+        nodes[i].first = x;
+    }
 }
 
 
@@ -225,10 +251,22 @@ void MAlphaNodes::setYAt(int i, float y)
 
 int MAlphaNodes::addNode(float t)
 {
-    int i = nodes.size();
+    int i = 2;
+
+    // Search for neighbouring node with greater x position.
+    for (; i < nodes.size(); i++)
+    {
+        if (nodes[i].first > t)
+        {
+            break;
+        }
+    }
 
     float alpha = interpolate(t);
-    nodes.push_back({t, alpha});
+    // Insert node between neighbouring nodes to avoid later added nodes being
+    // able to pass nodes earlier added when moving to the right and earlier
+    // added nodes being able to pass later nodes when moving to the left.
+    nodes.insert(i, {t, alpha});
 
     return i;
 }
@@ -254,6 +292,14 @@ void MAlphaNodes::push_back(float t, float alpha)
 
 float MAlphaNodes::interpolate(float t)
 {
+    if (t == 0.f)
+    {
+        return nodes[0].second;
+    }
+    if (t == 1.f)
+    {
+        return nodes[1].second;
+    }
     MAlphaNodes::const_iterator i1, i2;
     findIteratorPair(nodes, i1, i2, t);
 
@@ -263,7 +309,7 @@ float MAlphaNodes::interpolate(float t)
         return 0;
     }
 
-    if (i1 == i2)
+    if (i1->first == i2->first)
     {
         return i1->second;
     }
