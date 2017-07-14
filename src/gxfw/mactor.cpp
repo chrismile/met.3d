@@ -283,9 +283,8 @@ QList<MLabel*> MActor::getPositionLabelToRender()
 }
 
 
-void MActor::removePositionLabel(MSceneViewGLWidget *sceneView)
+void MActor::removePositionLabel()
 {
-    Q_UNUSED(sceneView);
     if (positionLabel != nullptr)
     {
         MGLResourcesManager* glRM = MGLResourcesManager::getInstance();
@@ -917,10 +916,11 @@ void MActor::uploadVec3ToVertexBuffer(const QVector<QVector3D> *data, GLuint *vb
 }
 
 
-double MActor::calcPosLableDistanceWeight(MCamera* camera, QVector3D mousePosWorldSpace)
+double MActor::computePositionLabelDistanceWeight(
+        MCamera* camera, QVector3D mousePosWorldSpace)
 {
 
-    // Calculate distance of lable to handle with repsect to distance of
+    // Calculate distance of label to handle with repsect to distance of
     // handle and camera. (Avoid too large distance for camera near handle
     // and too small distance for camera far away from handle.)
     QVector3D zAxis = camera->getZAxis();

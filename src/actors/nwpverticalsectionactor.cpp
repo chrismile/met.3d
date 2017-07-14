@@ -380,8 +380,8 @@ void MNWPVerticalSectionActor::addPositionLabel(MSceneViewGLWidget *sceneView,
                 labelsize, labelColour, MTextManager::LOWERRIGHT,
                 labelbbox, labelBBoxColour);
 
-    double dist = calcPosLableDistanceWeight(sceneView->getCamera(),
-                                             mousePosWorldSpace);
+    double dist = computePositionLabelDistanceWeight(sceneView->getCamera(),
+                                                     mousePosWorldSpace);
     QVector3D anchorOffset = dist * sceneView->getCamera()->getXAxis();
     positionLabel->anchorOffset = -anchorOffset;
 
@@ -463,8 +463,8 @@ void MNWPVerticalSectionActor::dragEvent(MSceneViewGLWidget *sceneView,
                     labelsize, labelColour, MTextManager::LOWERRIGHT,
                     labelbbox, labelBBoxColour);
 
-        double dist = calcPosLableDistanceWeight(sceneView->getCamera(),
-                                                 mousePosWorldSpace);
+        double dist = computePositionLabelDistanceWeight(sceneView->getCamera(),
+                                                         mousePosWorldSpace);
         QVector3D anchorOffset = dist * sceneView->getCamera()->getXAxis();
         positionLabel->anchorOffset = -anchorOffset;
     }

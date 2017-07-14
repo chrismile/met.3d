@@ -658,8 +658,8 @@ void MMovablePoleActor::addPositionLabel(MSceneViewGLWidget *sceneView,
                                  / QVector3D::dotProduct(l, n));
     QVector3D mousePosWorldSpace = l0 + d * l;
 
-    double weight = calcPosLableDistanceWeight(sceneView->getCamera(),
-                                               mousePosWorldSpace);
+    double weight = computePositionLabelDistanceWeight(sceneView->getCamera(),
+                                                       mousePosWorldSpace);
     positionLabel->anchorOffset = -((weight + tubeRadius)
             * sceneView->getCamera()->getXAxis());
 
@@ -767,8 +767,8 @@ void MMovablePoleActor::dragEvent(MSceneViewGLWidget *sceneView,
                     labelsize, labelColour, MTextManager::LOWERRIGHT,
                     labelbbox, labelBBoxColour);
 
-        double weight = calcPosLableDistanceWeight(sceneView->getCamera(),
-                                                   mousePosWorldSpace);
+        double weight = computePositionLabelDistanceWeight(sceneView->getCamera(),
+                                                           mousePosWorldSpace);
         positionLabel->anchorOffset = -((weight + tubeRadius)
                 * sceneView->getCamera()->getXAxis());
     }

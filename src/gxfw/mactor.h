@@ -226,7 +226,7 @@ public:
 
       Called by a @ref MSceneViewGLWidget in modification mode.
       */
-    void removePositionLabel(MSceneViewGLWidget *sceneView);
+    void removePositionLabel();
 
     /**
       Drags the handle with ID @p handleID to the clip space point (@p clipX,
@@ -530,8 +530,8 @@ protected:
 
     void releaseImageUnit(GLint unit);
 
-    double calcPosLableDistanceWeight(MCamera *camera,
-                                      QVector3D mousePosWorldSpace);
+    double computePositionLabelDistanceWeight(MCamera *camera,
+                                              QVector3D mousePosWorldSpace);
 
     // Properties common to all actors.
     //=================================

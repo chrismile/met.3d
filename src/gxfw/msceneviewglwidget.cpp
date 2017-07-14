@@ -268,7 +268,7 @@ MSceneViewGLWidget::MSceneViewGLWidget()
 
     // Position label properties.
     posLabelEnableProperty = systemControl->getBoolPropertyManager()
-            ->addProperty("position label enabled");
+            ->addProperty("draw position labels");
     systemControl->getBoolPropertyManager()->setValue(posLabelEnableProperty,
                                                       posLabelIsEnabled);
     interactionGroupProperty->addSubProperty(posLabelEnableProperty);
@@ -1693,7 +1693,7 @@ void MSceneViewGLWidget::mouseReleaseEvent(QMouseEvent *event)
 
     if (actorInteractionMode && pickedActor.actor != nullptr)
     {
-        pickedActor.actor->removePositionLabel(this);
+        pickedActor.actor->removePositionLabel();
     }
 
     userIsInteracting = false;
