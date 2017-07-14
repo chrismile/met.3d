@@ -60,6 +60,7 @@ MActor::MActor(QObject *parent)
       actorIsPickable(false), // by default actors are not pickable
       shaderCompilationProgressDialog(nullptr),
       shaderCompilationProgress(0),
+      positionLabel(nullptr),
       actorName("Default actor"),
       addPropertiesCounter(0),
       actorIsInitialized(false),
@@ -150,6 +151,10 @@ MActor::MActor(QObject *parent)
 MActor::~MActor()
 {
     delete shaderCompilationProgressDialog;
+    if (positionLabel != nullptr)
+    {
+        delete positionLabel;
+    }
 }
 
 
@@ -254,8 +259,40 @@ const QList<MSceneViewGLWidget*> MActor::getViews()
 QList<MLabel*> MActor::getLabelsToRender()
 {
     // If either labels or the actor itself are disabled return an empty list.
-    if (actorIsEnabled && labelsAreEnabled) return labels;
-    else return QList<MLabel*>();
+    if (actorIsEnabled && labelsAreEnabled)
+    {
+        return labels;
+    }
+    else
+    {
+        return QList<MLabel*>();
+    }
+}
+
+
+QList<MLabel*> MActor::getPositionLabelToRender()
+{
+    QList<MLabel*> labelList = QList<MLabel*>();
+    // Add position label to empty list if the lable is present and the actor
+    // and the lable are enabled.
+    if (positionLabel != nullptr && actorIsEnabled)
+    {
+        labelList.append(positionLabel);
+    }
+    return labelList;
+}
+
+
+void MActor::removePositionLabel()
+{
+    if (positionLabel != nullptr)
+    {
+        MGLResourcesManager* glRM = MGLResourcesManager::getInstance();
+        MTextManager* tm = glRM->getTextManager();
+        tm->removeText(positionLabel);
+        positionLabel = nullptr;
+    }
+    emitActorChangedSignal();
 }
 
 
@@ -381,31 +418,32 @@ void MActor::loadConfigurationFromFile(QString filename)
 
     properties->mBool()->setValue(
                 actorEnabledProperty,
-                settings->value("actorIsEnabled").toBool());
+                settings->value("actorIsEnabled", true).toBool());
 
     properties->mBool()->setValue(
                 labelsEnabledProperty,
-                settings->value("labelsAreEnabled").toBool());
+                settings->value("labelsAreEnabled", true).toBool());
 
     properties->mBool()->setValue(
                 wireFrameProperty,
-                settings->value("renderAsWireFrame").toBool());
+                settings->value("renderAsWireFrame", false).toBool());
 
     properties->mColor()->setValue(
                 labelColourProperty,
-                settings->value("labelColour").value<QColor>());
+                settings->value("labelColour", QColor(0, 0, 100)).value<QColor>());
 
     properties->mInt()->setValue(
                 labelSizeProperty,
-                settings->value("labelSize").toInt());
+                settings->value("labelSize", 16).toInt());
 
     properties->mBool()->setValue(
                 labelBBoxProperty,
-                settings->value("labelBBox").toBool());
+                settings->value("labelBBox", true).toBool());
 
     properties->mColor()->setValue(
                 labelBBoxColourProperty,
-                settings->value("labelBBoxColour").value<QColor>());
+                settings->value("labelBBoxColour",
+                                QColor(255, 255, 255, 200)).value<QColor>());
 
     settings->endGroup();
 
@@ -875,6 +913,25 @@ void MActor::uploadVec3ToVertexBuffer(const QVector<QVector3D> *data, GLuint *vb
                  data->constData(),
                  GL_STATIC_DRAW); CHECK_GL_ERROR;
     glBindBuffer(GL_ARRAY_BUFFER, 0); CHECK_GL_ERROR;
+}
+
+
+double MActor::computePositionLabelDistanceWeight(
+        MCamera* camera, QVector3D mousePosWorldSpace)
+{
+
+    // Calculate distance of label to handle with repsect to distance of
+    // handle and camera. (Avoid too large distance for camera near handle
+    // and too small distance for camera far away from handle.)
+    QVector3D zAxis = camera->getZAxis();
+    zAxis.normalize();
+    QVector3D camPos = camera->getOrigin();
+    double dist = -(QVector3D::dotProduct(zAxis, camPos)
+                    - sqrt(QVector3D::dotProduct(mousePosWorldSpace,
+                                                 mousePosWorldSpace)));
+    dist *= dist * 0.00003;
+
+    return dist;
 }
 
 

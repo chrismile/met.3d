@@ -38,6 +38,7 @@
 #include "gxfw/gl/shadereffect.h"
 #include "gxfw/gl/vertexbuffer.h"
 #include "system/qtproperties.h"
+#include "gxfw/camera.h"
 
 namespace Met3D
 {
@@ -174,9 +175,14 @@ public:
     const QList<MSceneViewGLWidget*> getViews();
 
     /**
-      Return a list with the labels that shall be rendered for this actor.
+      Returns a list with the labels that shall be rendered for this actor.
       */
     QList<MLabel*> getLabelsToRender();
+
+    /**
+      Returns the position labe in a list if it shall be rendered for this actor.
+      */
+    QList<MLabel*> getPositionLabelToRender();
 
     /**
       Returns @p true if the actor can be picked and dragged in modify mode.
@@ -199,6 +205,28 @@ public:
         Q_UNUSED(clipRadius);
         return -1;
     }
+
+    /**
+      Creates a label representing the position of handle with ID @p handleID
+      near the handle.
+
+      Called by a @ref MSceneViewGLWidget in modification mode.
+      */
+    virtual void addPositionLabel(MSceneViewGLWidget *sceneView, int handleID,
+                                  float clipX, float clipY)
+    {
+        Q_UNUSED(sceneView);
+        Q_UNUSED(handleID);
+        Q_UNUSED(clipX);
+        Q_UNUSED(clipY);
+    }
+
+    /**
+      Removes label displaying the position if present.
+
+      Called by a @ref MSceneViewGLWidget in modification mode.
+      */
+    void removePositionLabel();
 
     /**
       Drags the handle with ID @p handleID to the clip space point (@p clipX,
@@ -502,6 +530,9 @@ protected:
 
     void releaseImageUnit(GLint unit);
 
+    double computePositionLabelDistanceWeight(MCamera *camera,
+                                              QVector3D mousePosWorldSpace);
+
     // Properties common to all actors.
     //=================================
 
@@ -545,6 +576,8 @@ protected:
 
     /** List of labels that belong to this actor. */
     QList<MLabel*> labels;
+
+    MLabel* positionLabel;
 
     /**
      Removes all labels of this actor. Calls @ref MTextManager::removeText()

@@ -87,6 +87,9 @@ public:
     virtual int checkIntersectionWithHandle(MSceneViewGLWidget *sceneView,
                                   float clipX, float clipY, float clipRadius);
 
+    void addPositionLabel(MSceneViewGLWidget *sceneView, int handleID,
+                          float clipX, float clipY);
+
     /**
       Implements MActor::dragEvent().
 

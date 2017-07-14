@@ -78,6 +78,9 @@ public:
     int checkIntersectionWithHandle(MSceneViewGLWidget *sceneView,
                                     float clipX, float clipY, float clipRadius);
 
+    void addPositionLabel(MSceneViewGLWidget *sceneView, int handleID,
+                          float clipX, float clipY);
+
     /**
       @todo Currently uses the worldZ==0 plane, make this work with the
             worldZ==arbitrary.

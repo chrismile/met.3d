@@ -69,6 +69,7 @@ MSceneViewGLWidget::MSceneViewGLWidget()
       cameraAutorotationMode(false),
       freezeMode(0),
       sceneNavigationSensitivity(1.),
+      posLabelIsEnabled(true),
       measureFPS(false),
       measureFPSFrameCount(0),
       sceneNameLabel(nullptr),
@@ -264,6 +265,13 @@ MSceneViewGLWidget::MSceneViewGLWidget()
     systemControl->getBoolPropertyManager()
             ->setValue(analysisModeProperty, analysisMode);
     interactionGroupProperty->addSubProperty(analysisModeProperty);
+
+    // Position label properties.
+    posLabelEnableProperty = systemControl->getBoolPropertyManager()
+            ->addProperty("draw position labels");
+    systemControl->getBoolPropertyManager()->setValue(posLabelEnableProperty,
+                                                      posLabelIsEnabled);
+    interactionGroupProperty->addSubProperty(posLabelEnableProperty);
 
     // Rendering group.
     renderingGroupProperty = systemControl->getGroupPropertyManager()
@@ -992,6 +1000,12 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
                 ->getDecoratedDoublePropertyManager()->value(sceneNavigationSensitivityProperty);
     }
 
+    else if (property == posLabelEnableProperty)
+    {
+        posLabelIsEnabled = MSystemManagerAndControl::getInstance()
+                ->getBoolPropertyManager()->value(posLabelEnableProperty);
+    }
+
 #ifndef CONTINUOUS_GL_UPDATE
     else if (property == measureFPSProperty)
     {
@@ -1328,6 +1342,10 @@ void MSceneViewGLWidget::paintGL()
             }
 
             actor->render(this);
+            if (actor == pickedActor.actor)
+            {
+                labelList.append(actor->getPositionLabelToRender());
+            }
             labelList.append(actor->getLabelsToRender());
 
             if (singleInteractionActor != nullptr &&
@@ -1465,6 +1483,16 @@ void MSceneViewGLWidget::mouseDoubleClickEvent(QMouseEvent *event)
     Q_UNUSED(event);
     // Toggle interaction mode.
     setInteractionMode(!actorInteractionMode);
+
+    if (posLabelIsEnabled && actorInteractionMode
+            && pickedActor.actor != nullptr
+            && (event->buttons() & Qt::LeftButton))
+    {
+        float clipX = -1. + 2.*(float(event->x()) / float(viewPortWidth));
+        float clipY =  1. - 2.*(float(event->y()) / float(viewPortHeight));
+        pickedActor.actor->addPositionLabel(this, pickedActor.handleID,
+                                            clipX, clipY);
+    }
 }
 
 
@@ -1473,11 +1501,20 @@ void MSceneViewGLWidget::mousePressEvent(QMouseEvent *event)
     lastPos = event->pos();
     float clipX = -1. + 2.*(float(event->x()) / float(viewPortWidth));
     float clipY =  1. - 2.*(float(event->y()) / float(viewPortHeight));
-    lastPoint = QVector3D(clipX,clipY,0);
-    float length = sqrt(lastPoint.x() * lastPoint.x() + lastPoint.y() * lastPoint.y());
+    lastPoint = QVector3D(clipX, clipY, 0);
+    float length = sqrt(lastPoint.x() * lastPoint.x()
+                        + lastPoint.y() * lastPoint.y());
     length = (length < 1.0) ? length : 1.0;
     lastPoint.setZ(cos((M_PI/2.0) * length));
     userIsInteracting = true;
+
+    if (posLabelIsEnabled && actorInteractionMode
+            && pickedActor.actor != nullptr
+            && (event->buttons() & Qt::LeftButton))
+    {
+        pickedActor.actor->addPositionLabel(this, pickedActor.handleID,
+                                            clipX, clipY);
+    }
 }
 
 
@@ -1653,6 +1690,11 @@ void MSceneViewGLWidget::mouseMoveEvent(QMouseEvent *event)
 void MSceneViewGLWidget::mouseReleaseEvent(QMouseEvent *event)
 {
     if (freezeMode) return;
+
+    if (actorInteractionMode && pickedActor.actor != nullptr)
+    {
+        pickedActor.actor->removePositionLabel();
+    }
 
     userIsInteracting = false;
     emit clicked();
