@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2015-2017 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -350,7 +351,9 @@ void MTrajectoryFilterProperties::addToRequest(MDataRequestHelper *rh)
                   QString("%1/%2").arg(deltaPressure_hPa).arg(deltaTime_hrs));
     }
     else
+    {
         rh->insert("FILTER_PRESSURE_TIME", "ALL");
+    }
 
     bool tryPrecomputedFiltering = properties->mBool()->value(
                 tryPrecomputedFilterProperty);

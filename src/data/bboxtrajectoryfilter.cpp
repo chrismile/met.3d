@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2016 Marc Rautenhaus
+**  Copyright 2016-2017 Marc Rautenhaus
+**  Copyright 2016-2017 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -51,10 +52,23 @@ namespace Met3D
 
 void MBoundingBoxTrajectoryFilter::setTrajectorySource(MTrajectoryDataSource* s)
 {
+    MTrajectoryFilter::setTrajectorySource(s);
+}
+
+
+void MBoundingBoxTrajectoryFilter::setInputSelectionSource(
+        MTrajectorySelectionSource* s)
+{
+    inputSelectionSource = s;
+    registerInputSource(inputSelectionSource);
     // Enable pass-through to input trajectory source if required request
     // keys are not specified.
-    MTrajectoryFilter::setTrajectorySource(s);
-    enablePassThrough(s);
+    // Use inputSelectionSource instead of trajectorySource since otherwise
+    // pass through will ignore the input selection source (no call to
+    // produceData-method of inputSelectionSource). Data of trajectorySource
+    // is used only to modify data of inputSelectionSource thus should not be
+    // passed through by this filter.
+    enablePassThrough(inputSelectionSource);
 }
 
 
@@ -69,7 +83,8 @@ MTrajectorySelection* MBoundingBoxTrajectoryFilter::produceData(
 
     rh.remove("FILTER_BBOX");
     MTrajectories *trajectories = trajectorySource->getData(rh.request());
-    MTrajectorySelection *inputSelection = inputSelectionSource->getData(rh.request());
+    MTrajectorySelection *inputSelection =
+            inputSelectionSource->getData(rh.request());
 
     MWritableTrajectorySelection *filterResult =
             new MWritableTrajectorySelection(inputSelection->refersTo(),
@@ -77,46 +92,33 @@ MTrajectorySelection* MBoundingBoxTrajectoryFilter::produceData(
                                              inputSelection->getTimes(),
                                              inputSelection->getStartGridStride());
 
-    if (args[0] != "ALL")
+    // Compute the filter.
+
+    float lonWest  = args[0].toFloat();
+    float latSouth = args[1].toFloat();
+    float lonEast  = args[2].toFloat();
+    float latNorth = args[3].toFloat();
+
+    // Filtering is implemented by simply looping over all trajectories.
+    int numInputTrajectories = inputSelection->getNumTrajectories();
+    int j = 0;
+
+    for (int i = 0; i < numInputTrajectories; i++)
     {
-        // Compute the filter.
+        int startIndex = inputSelection->getStartIndices()[i];
+        QVector3D p = trajectories->getVertices().at(startIndex);
 
-        float lonWest  = args[0].toFloat();
-        float latSouth = args[1].toFloat();
-        float lonEast  = args[2].toFloat();
-        float latNorth = args[3].toFloat();
+        if (p.x() < lonWest) continue;
+        if (p.x() > lonEast) continue;
+        if (p.y() > latNorth) continue;
+        if (p.y() < latSouth) continue;
 
-        // Filtering is implemented by simply looping over all trajectories.
-        int numInputTrajectories = inputSelection->getNumTrajectories();
-        int j = 0;
-
-        for (int i = 0; i < numInputTrajectories; i++)
-        {
-            int startIndex = inputSelection->getStartIndices()[i];
-            QVector3D p = trajectories->getVertices().at(startIndex);
-
-            if (p.x() < lonWest) continue;
-            if (p.x() > lonEast) continue;
-            if (p.y() > latNorth) continue;
-            if (p.y() < latSouth) continue;
-
-            filterResult->setStartIndex(j, startIndex);
-            filterResult->setIndexCount(j, inputSelection->getIndexCount()[i]);
-            j++;
-        }
-
-        filterResult->decreaseNumSelectedTrajectories(j);
+        filterResult->setStartIndex(j, startIndex);
+        filterResult->setIndexCount(j, inputSelection->getIndexCount()[i]);
+        j++;
     }
-    else
-    {
-        // Filter bypass: Copy all timesteps from input.
 
-        for (int i = 0; i < inputSelection->getNumTrajectories(); i++)
-        {
-            filterResult->setStartIndex(i, inputSelection->getStartIndices()[i]);
-            filterResult->setIndexCount(i, inputSelection->getIndexCount()[i]);
-        }
-    }
+    filterResult->decreaseNumSelectedTrajectories(j);
 
     trajectorySource->releaseData(trajectories);
     inputSelectionSource->releaseData(inputSelection);

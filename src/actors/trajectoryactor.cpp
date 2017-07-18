@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2015-2017 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -177,7 +178,6 @@ MTrajectoryActor::MTrajectoryActor()
     bboxProperty = addProperty(RECTF_LONLAT_PROPERTY, "bounding box",
                                actorPropertiesSupGroup);
     properties->setRectF(bboxProperty, bbox, 2);
-    bboxProperty->setEnabled(false);
 
     // Transfer function.
     // Scan currently available actors for transfer functions. Add TFs to
@@ -2074,7 +2074,6 @@ void MTrajectoryActor::asynchronousDataRequest(bool synchronizationRequest)
     else
     {
         rh.insert("FILTER_PRESSURE_TIME", "ALL");
-        rh.insert("FILTER_BBOX", "ALL");
     }
 
     if ((renderMode == SINGLETIME_POSITIONS)
@@ -2173,7 +2172,6 @@ void MTrajectoryActor::asynchronousSelectionRequest()
     else
     {
         rh.insert("FILTER_PRESSURE_TIME", "ALL");
-        rh.insert("FILTER_BBOX", "ALL");
     }
 
     if ((renderMode == SINGLETIME_POSITIONS)
@@ -2463,7 +2461,6 @@ bool MTrajectoryActor::selectDataSource()
 void MTrajectoryActor::enableProperties(bool enable)
 {
     enableActorUpdates(false);
-//    ensembleModeProperty->setEnabled(enable);
     enableFilterProperty->setEnabled(enable);
     deltaPressureProperty->setEnabled(enable);
     deltaTimeProperty->setEnabled(enable);
@@ -2488,7 +2485,7 @@ void MTrajectoryActor::enableProperties(bool enable)
     startTimeProperty->setEnabled(enable && !(enableSync && synchronizeStartTime));
     particlePosTimeProperty->setEnabled(enable && !(enableSync && synchronizeParticlePosTime));
 
-//    bboxProperty->setEnabled(enable);
+    bboxProperty->setEnabled(enable);
     ensembleMemberProperty->setEnabled(enable && !synchronizeEnsemble);
     enableActorUpdates(true);
 }
