@@ -471,6 +471,11 @@ void MSceneManagementDialog::loadRequiredActorFromFile(
 
     // Set option to not use native dialog since otherwise filtering does not
     // work on some systems.
+//TODO (mr, 19Jul2017) -- using Qt's file dialog instead of the system dialog
+//                        seems to ensure correct filtering on our systems,
+//                        however, having the "real" dialog would be nicer
+//                        -- check with later Qt versions whether this problem
+//                        still exists.
     dialog.setOption(QFileDialog::DontUseNativeDialog);
     // Set proxy model to enable additional filtering.
     dialog.setProxyModel(proxyModel);
@@ -515,8 +520,13 @@ void MSceneManagementDialog::loadRequiredActorFromFile(
         {
             QMessageBox msgBox;
             msgBox.setIcon(QMessageBox::Warning);
-            msgBox.setText(QString("File contains configuration data"
-                                   " of actor but with wrong name."));
+            msgBox.setText(QString("The selected file contains configuration "
+                                   "data of the correct actor type, however, "
+                                   "of an actor but with a different name (%1) "
+                                   "than expected (%2). The actor will not "
+                                   "be loaded.")
+                           .arg(actorName)
+                           .arg(requiredActorName));
             msgBox.exec();
         }
 

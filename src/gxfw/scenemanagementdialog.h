@@ -123,7 +123,7 @@ class MActorDialogProxyModel : public QSortFilterProxyModel
     Q_OBJECT
 
 public:
-    MActorDialogProxyModel(QObject *parent = 0) {}
+    MActorDialogProxyModel(QObject *parent = 0) { Q_UNUSED(parent); }
 
     /**
       Extends filtering of rows to accept only files containing configuration
