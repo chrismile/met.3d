@@ -301,7 +301,7 @@ MSyncControl::MSyncControl(QString id, QWidget *parent) :
     saveTAFileNameLineEdit->setFixedWidth(190);
     saveTAFileNameLineEdit->setText("met3d-image.%it.%vt.%m");
     saveTAFileNameLineEdit->setToolTip("Press return to save image. "
-                                       "(Only if save animation is active!)");
+                                       "(Only if save animation is active.)");
     saveTAFileExtensionComboBox = new QComboBox();
     QStringList imageFileExtensions;
     imageFileExtensions << ".png" << ".jpg" << ".bmp" << ".jpeg";
@@ -698,7 +698,7 @@ void MSyncControl::restrictToDataSourcesFromFrontend(
                 // with next data source.
                 QMessageBox msgBox;
                 msgBox.setIcon(QMessageBox::Warning);
-                msgBox.setText(dataSourceID + " does not exist!");
+                msgBox.setText(dataSourceID + " does not exist.");
                 msgBox.exec();
                 continue;
             }
@@ -718,7 +718,7 @@ void MSyncControl::restrictToDataSourcesFromFrontend(
             QMessageBox msgBox;
             msgBox.setIcon(QMessageBox::Warning);
             msgBox.setText("No suitable data sources given in frontend."
-                           " Use data of all data sources given!");
+                           " Use data of all data sources given.");
             msgBox.exec();
 
             QStringList availableDataSources = sysMC->getDataSourceIdentifiers();
@@ -743,7 +743,7 @@ void MSyncControl::restrictToDataSourcesFromFrontend(
             // members information. Inform user and return.
             if (suitableDataSources.empty())
             {
-                msgBox.setText("No suitable data sources available!");
+                msgBox.setText("No suitable data sources available.");
                 msgBox.exec();
                 return;
             }
@@ -1206,9 +1206,9 @@ void MSyncControl::activateTimeAnimationImageSaving(bool activate)
         {
             QMessageBox::warning(
                         this, "Warning",
-                        QString("View #%1 is not visible!\n"
-                                "Please select another view or view layout!\n"
-                                "(No images will be saved!)").arg(sceneViewID));
+                        QString("View #%1 is not visible.\n"
+                                "Please select another view or view layout.\n"
+                                "(No images will be saved.)").arg(sceneViewID));
             saveTimeAnimationCheckBox->setChecked(false);
             return;
         }
@@ -1260,9 +1260,9 @@ void MSyncControl::switchSelectedView(QString viewID)
         {
             QMessageBox::warning(
                         this, "Warning",
-                        QString("View #%1 is not visible!\n"
-                                "Please select another view or view layout!\n"
-                                "(No images will be saved!)").arg(sceneViewID));
+                        QString("View #%1 is not visible.\n"
+                                "Please select another view or view layout.\n"
+                                "(No images will be saved.)").arg(sceneViewID));
             saveTimeAnimationCheckBox->setChecked(false);
             return;
         }
@@ -1298,7 +1298,7 @@ void MSyncControl::changeSaveTADirectory()
         {
             QMessageBox msg;
             msg.setWindowTitle("Error");
-            msg.setText("No writing access to ''" + path + "''!");
+            msg.setText("No writing access to ''" + path + "''.");
             msg.setIcon(QMessageBox::Warning);
             msg.exec();
             return;

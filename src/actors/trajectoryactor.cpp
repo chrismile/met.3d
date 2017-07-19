@@ -39,6 +39,7 @@
 #include "gxfw/mglresourcesmanager.h"
 #include "gxfw/msceneviewglwidget.h"
 #include "gxfw/selectdatasourcedialog.h"
+#include "mainwindow.h"
 
 using namespace std;
 
@@ -439,15 +440,36 @@ void MTrajectoryActor::loadConfiguration(QSettings *settings)
     properties->mRectF()->setValue(bboxProperty, bbox);
 
     QString tfName = settings->value("transferFunction").toString();
-    if ( !setTransferFunction(tfName) )
+    while (!setTransferFunction(tfName))
     {
         QMessageBox msgBox;
         msgBox.setIcon(QMessageBox::Warning);
-        msgBox.setText(QString("Trajectory actor '%1':\n"
-                               "Transfer function '%2' does not exist.\n"
-                               "Setting transfer function to 'None'.")
+        msgBox.setWindowTitle(this->getName());
+        msgBox.setText(QString("Variable '%1' requires a transfer function "
+                               "'%2' that does not exist.\n"
+                               "Would you like to load the transfer function "
+                               "from file?")
                        .arg(getName()).arg(tfName));
+        msgBox.setStandardButtons(QMessageBox::Yes | QMessageBox::No);
+        msgBox.button(QMessageBox::Yes)->setText("Load transfer function");
+        msgBox.button(QMessageBox::No)->setText("Discard dependency");
         msgBox.exec();
+        if (msgBox.clickedButton() == msgBox.button(QMessageBox::Yes))
+        {
+            MSystemManagerAndControl *sysMC =
+                    MSystemManagerAndControl::getInstance();
+            // Create default actor to get name of actor factory.
+            MTransferFunction1D *defaultActor = new MTransferFunction1D();
+            sysMC->getMainWindow()->getSceneManagementDialog()
+                    ->loadRequiredActorFromFile(defaultActor->getName(),
+                                                tfName,
+                                                settings->fileName());
+            delete defaultActor;
+        }
+        else
+        {
+            break;
+        }
     }
 
     properties->mDDouble()->setValue(

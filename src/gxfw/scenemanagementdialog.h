@@ -4,8 +4,9 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
-**  Copyright 2015 Michael Kern
+**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2015-2017 Michael Kern
+**  Copyright 2015-2017 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -69,6 +70,8 @@ public slots:
     void createActor();
 
     void createActorFromFile();
+    void loadRequiredActorFromFile(
+            QString factoryName, QString requiredActorName, QString directory);
 
     void deleteActor();
 
@@ -108,6 +111,47 @@ private:
 
     // Reference to the four scene view combo boxes, to facilitate loops.
     QList<QComboBox*> ui_sceneViewComboBoxes;
+};
+
+
+/**
+  Proxy model to additionally filter rows to only allow configuration files
+  containing configuration data of actors required by an actor loaded.
+ */
+class MActorDialogProxyModel : public QSortFilterProxyModel
+{
+    Q_OBJECT
+
+public:
+    MActorDialogProxyModel(QObject *parent = 0) { Q_UNUSED(parent); }
+
+    /**
+      Extends filtering of rows to accept only files containing configuration
+      data of an actor of type @ref factoryName and called @ref actorName and
+      directories.
+     */
+    bool filterAcceptsRow(int source_row, const QModelIndex &source_parent) const;
+
+    void setActorNameFilter(QString actorName)
+    {
+        this->actorName = actorName;
+    }
+
+    void setFactoryNameFilter(QString factoryName)
+    {
+        this->factoryName = factoryName;
+    }
+
+    void setDialog(QFileDialog *dialog)
+    {
+        this->dialog = dialog;
+    }
+
+private:
+    QFileDialog *dialog;
+    QString actorName;
+    QString factoryName;
+    const QAbstractItemModel *sourceModel;
 };
 
 } // namespace Met3D

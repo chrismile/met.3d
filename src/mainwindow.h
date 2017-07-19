@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2016 Marc Rautenhaus
+**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2015-2017 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -82,6 +83,9 @@ public:
 
     void resizeSceneView(int newWidth, int newHeight,
                          MSceneViewGLWidget *sceneView);
+
+    MSceneManagementDialog *getSceneManagementDialog()
+    { return sceneManagementDialog; }
 
 public slots:
     void setFullScreen(bool b);

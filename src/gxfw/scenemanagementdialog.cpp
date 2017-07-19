@@ -4,8 +4,9 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
-**  Copyright 2015 Michael Kern
+**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2015-2017 Michael Kern
+**  Copyright 2015-2017 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -130,7 +131,7 @@ void MSceneManagementDialog::createScene()
         {
             QMessageBox msg;
             msg.setWindowTitle("Error");
-            msg.setText("Scene ''" + sceneName + "'' already exists!");
+            msg.setText("Scene ''" + sceneName + "'' already exists.");
             msg.setIcon(QMessageBox::Warning);
             msg.exec();
             return;
@@ -236,7 +237,7 @@ void MSceneManagementDialog::renameScene(QListWidgetItem* item)
         {
             QMessageBox msg;
             msg.setWindowTitle("Error");
-            msg.setText("Scene ''" + sceneName + "'' already exists!");
+            msg.setText("Scene ''" + sceneName + "'' already exists.");
             msg.setIcon(QMessageBox::Warning);
             msg.exec();
             return;
@@ -358,7 +359,7 @@ void MSceneManagementDialog::createActor()
     {
         QMessageBox msg;
         msg.setWindowTitle("Error");
-        msg.setText("Actor ''" + actorName + "'' already exists!");
+        msg.setText("Actor ''" + actorName + "'' already exists.");
         msg.setIcon(QMessageBox::Warning);
         msg.exec();
         return;
@@ -411,11 +412,13 @@ void MSceneManagementDialog::createActorFromFile()
 
             QString actorName = actor->getName();
             bool ok = false;
+            // Check whether name already exists.
             while (actorName.isEmpty() || glRM->getActorByName(actorName))
             {
                 actorName = QInputDialog::getText(
                             this, "Change actor name",
-                            "The given actor name already exists, please enter a new one:",
+                            "The given actor name already exists, please enter "
+                            "a new one:",
                             QLineEdit::Normal,
                             actorName, &ok);
 
@@ -444,6 +447,120 @@ void MSceneManagementDialog::createActorFromFile()
 
     LOG4CPLUS_WARN(mlog, "could not create actor from configuration file "
                    << configfile.toStdString() << " !");
+}
+
+
+void MSceneManagementDialog::loadRequiredActorFromFile(
+        QString factoryName, QString requiredActorName, QString directory)
+{
+    if (requiredActorName.isEmpty() || factoryName.isEmpty())
+    {
+        return;
+    }
+
+    MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
+
+    QFileDialog dialog(glRM);
+
+    MActorDialogProxyModel *proxyModel = new MActorDialogProxyModel();
+    // Set dialog to have access to the current directory during filtering.
+    proxyModel->setDialog(&dialog);
+    // Set actor name and actor factory filter.
+    proxyModel->setActorNameFilter(requiredActorName);
+    proxyModel->setFactoryNameFilter(factoryName);
+
+    // Set option to not use native dialog since otherwise filtering does not
+    // work on some systems.
+//TODO (mr, 19Jul2017) -- using Qt's file dialog instead of the system dialog
+//                        seems to ensure correct filtering on our systems,
+//                        however, having the "real" dialog would be nicer
+//                        -- check with later Qt versions whether this problem
+//                        still exists.
+    dialog.setOption(QFileDialog::DontUseNativeDialog);
+    // Set proxy model to enable additional filtering.
+    dialog.setProxyModel(proxyModel);
+    // Set dialog to directory of configuration file of loaded actor.
+    dialog.setDirectory(directory);
+    dialog.setWindowTitle("Load actor configuration");
+    dialog.setNameFilter("Actor configuration files (*.actor.conf)");
+
+    QString configfile = "";
+
+    if (dialog.exec())
+    {
+        configfile = dialog.selectedFiles().at(0);
+    }
+
+    if (configfile.isEmpty())
+    {
+        return;
+    }
+
+    LOG4CPLUS_DEBUG(mlog, "loading configuration file "
+                    << configfile.toStdString() << " ...");
+
+    MAbstractActorFactory* factory = glRM->getActorFactory(factoryName);
+
+    // Test if config file contains data of the actor needed. Test is still
+    // necessary since the user can enter files in the file dialog which are
+    // present but not shown due to the filter.
+    if (factory->acceptSettings(configfile))
+    {
+        LOG4CPLUS_DEBUG(mlog, "creating actor of type "
+                        << factory->getName().toStdString());
+
+        MActor *actor = factory->create(configfile);
+        if (!actor) return;
+
+        QString actorName = actor->getName();
+        // Test if config file contains the actor with the name needed. Test is
+        // still necessary since the user can enter files in the file dialog
+        // which are present but not shown due to the filter.
+        if (actorName != requiredActorName)
+        {
+            QMessageBox msgBox;
+            msgBox.setIcon(QMessageBox::Warning);
+            msgBox.setText(QString("The selected file contains configuration "
+                                   "data of the correct actor type, however, "
+                                   "of an actor but with a different name (%1) "
+                                   "than expected (%2). The actor will not "
+                                   "be loaded.")
+                           .arg(actorName)
+                           .arg(requiredActorName));
+            msgBox.exec();
+        }
+
+        MSystemManagerAndControl *sysMC =
+                MSystemManagerAndControl::getInstance();
+
+        // Only initialise actor if application is already initialised.
+        if (sysMC->applicationIsInitialized())
+        {
+            actor->initialize();
+        }
+        glRM->registerActor(actor);
+
+        if (this->isVisible())
+        {
+            // Update GUI elements if scene management dialog is visible
+            // otherwise the created transfer function won't be added to the
+            // list.
+            ui->actorPoolListWidget->addItem(actorName);
+        }
+        return;
+    }
+    else
+    {
+        QMessageBox msgBox;
+        msgBox.setIcon(QMessageBox::Warning);
+        msgBox.setText(QString("File does not contain configuration data"
+                               " of '" + factoryName + "'."));
+        msgBox.exec();
+    }
+
+    LOG4CPLUS_WARN(mlog, "could not create actor from configuration file "
+                   << configfile.toStdString() << " !");
+    return;
 }
 
 
@@ -813,6 +930,62 @@ void MSceneManagementDialog::sceneActorConnection(const int actorIndex)
             }
         }
     }
+}
+
+
+/******************************************************************************
+*******************************************************************************/
+/******************************************************************************
+*******************************************************************************/
+
+/******************************************************************************
+***                      MActorDialogFilterProxyModel                       ***
+*******************************************************************************/
+/******************************************************************************
+***                     CONSTRUCTOR / DESTRUCTOR                            ***
+*******************************************************************************/
+
+
+/******************************************************************************
+***                            PUBLIC METHODS                               ***
+*******************************************************************************/
+
+bool MActorDialogProxyModel::filterAcceptsRow(
+        int source_row, const QModelIndex &source_parent) const
+{
+    // Filter by filter rules set in dialog.
+    bool accepted =
+            QSortFilterProxyModel::filterAcceptsRow(source_row, source_parent);
+
+    // Only test rows accepted by the filter of the dialog.
+    if (accepted)
+    {
+        // Check if current item is a file, since directories are also shown.
+        QDir dir(dialog->directory());
+        QString filename = source_parent.child(source_row, 0).data().toString();
+        filename = dir.absoluteFilePath(filename);
+        QFileInfo fileInfo(filename);
+        if (fileInfo.isFile())
+        {
+            // Get actor factory to check whether the configuration file
+            // contains data of the required actor.
+            MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
+            MAbstractActorFactory* factory = glRM->getActorFactory(factoryName);
+
+            // Get name of actor.
+            QSettings* settings = new QSettings(filename, QSettings::IniFormat);
+            settings->beginGroup(MActor::getStaticSettingsID());
+            const QString actor = settings->value("actorName").toString();
+            settings->endGroup();
+
+            // Only accept configuration files containing the actor and name
+            // required.
+            accepted = (actor == actorName)
+                    && (factory->acceptSettings(filename));
+        }
+    }
+
+    return accepted;
 }
 
 

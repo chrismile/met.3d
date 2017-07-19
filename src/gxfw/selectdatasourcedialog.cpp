@@ -278,7 +278,7 @@ int MSelectDataSourceDialog::exec()
         {
             QMessageBox msgBox;
             msgBox.setIcon(QMessageBox::Warning);
-            msgBox.setText("No variables available to select!");
+            msgBox.setText("No variables available to select.");
             msgBox.exec();
         }
         // Dialog was executed for data source selection therefore
@@ -288,7 +288,7 @@ int MSelectDataSourceDialog::exec()
         {
             QMessageBox msgBox;
             msgBox.setIcon(QMessageBox::Warning);
-            msgBox.setText("No data sources available to select!");
+            msgBox.setText("No data sources available to select.");
             msgBox.exec();
         }
         return QDialog::Rejected;

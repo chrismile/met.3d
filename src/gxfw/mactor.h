@@ -275,6 +275,8 @@ public:
      */
     virtual QString getSettingsID() { return "MActor"; }
 
+    static QString getStaticSettingsID() { return "MActor"; }
+
     /**
      Save the actor configuration to the file @p filename. Calls @ref
      saveConfiguration() to store the actor-specific settings of derived

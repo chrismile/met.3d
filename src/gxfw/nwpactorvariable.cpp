@@ -46,6 +46,7 @@
 #include "gxfw/memberselectiondialog.h"
 #include "actors/nwpvolumeraycasteractor.h"
 #include "actors/nwphorizontalsectionactor.h"
+#include "mainwindow.h"
 
 using namespace std;
 
@@ -1030,15 +1031,36 @@ void MNWPActorVariable::loadConfiguration(QSettings *settings)
     // Load rendering properties.
     // ==========================
     QString tfName = settings->value("transferFunction").toString();
-    if ( !setTransferFunction(tfName) )
+    while (!setTransferFunction(tfName))
     {
         QMessageBox msgBox;
         msgBox.setIcon(QMessageBox::Warning);
-        msgBox.setText(QString("Variable '%1':\n"
-                               "Transfer function '%2' does not exist.\n"
-                               "Setting transfer function to 'None'.")
+        msgBox.setWindowTitle(actor->getName());
+        msgBox.setText(QString("Variable '%1' requires a transfer function "
+                               "'%2' that does not exist.\n"
+                               "Would you like to load the transfer function "
+                               "from file?")
                        .arg(variableName).arg(tfName));
+        msgBox.setStandardButtons(QMessageBox::Yes | QMessageBox::No);
+        msgBox.button(QMessageBox::Yes)->setText("Load transfer function");
+        msgBox.button(QMessageBox::No)->setText("Discard dependency");
         msgBox.exec();
+        if (msgBox.clickedButton() == msgBox.button(QMessageBox::Yes))
+        {
+            MSystemManagerAndControl *sysMC =
+                    MSystemManagerAndControl::getInstance();
+            // Create default actor to get name of actor factory.
+            MTransferFunction1D *defaultActor = new MTransferFunction1D();
+            sysMC->getMainWindow()->getSceneManagementDialog()
+                    ->loadRequiredActorFromFile(defaultActor->getName(),
+                                                tfName,
+                                                settings->fileName());
+            delete defaultActor;
+        }
+        else
+        {
+            break;
+        }
     }
 
     // We need the properties list filled at this point to be able to load the
@@ -2557,7 +2579,7 @@ bool MNWP2DSectionActorVariable::removeContourSet(int index)
         // Display error message if user wants to delete last contour set.
         QMessageBox msg;
         msg.setWindowTitle("Error");
-        msg.setText("At least one contour set needs to be present!");
+        msg.setText("At least one contour set needs to be present.");
         msg.setIcon(QMessageBox::Warning);
         msg.exec();
         return false;
@@ -2761,15 +2783,36 @@ void MNWP2DHorizontalActorVariable::loadConfiguration(QSettings *settings)
     // Load rendering properties.
     // ==========================
     QString stfName = settings->value("spatialTransferFunction", "None").toString();
-    if ( !setSpatialTransferFunction(stfName) )
+    while (!setSpatialTransferFunction(stfName))
     {
         QMessageBox msgBox;
         msgBox.setIcon(QMessageBox::Warning);
-        msgBox.setText(QString("Variable '%1':\n"
-                               "Spatial transfer function '%2' does not exist.\n"
-                               "Setting spatial transfer function to 'None'.")
+        msgBox.setWindowTitle(actor->getName());
+        msgBox.setText(QString("Variable '%1' requires a transfer function "
+                               "'%2' that does not exist.\n"
+                               "Would you like to load the transfer function "
+                               "from file?")
                        .arg(variableName).arg(stfName));
+        msgBox.setStandardButtons(QMessageBox::Yes | QMessageBox::No);
+        msgBox.button(QMessageBox::Yes)->setText("Load transfer function");
+        msgBox.button(QMessageBox::No)->setText("Discard dependency");
         msgBox.exec();
+        if (msgBox.clickedButton() == msgBox.button(QMessageBox::Yes))
+        {
+            MSystemManagerAndControl *sysMC =
+                    MSystemManagerAndControl::getInstance();
+            // Create default actor to get name of actor factory.
+            MSpatial1DTransferFunction *defaultActor =
+                    new MSpatial1DTransferFunction();
+            sysMC->getMainWindow()->getSceneManagementDialog()
+                    ->loadRequiredActorFromFile(defaultActor->getName(),
+                                                stfName, settings->fileName());
+            delete defaultActor;
+        }
+        else
+        {
+            break;
+        }
     }
 
     contourLabelSuffix = settings->value("contourLabelSuffix").toString();
