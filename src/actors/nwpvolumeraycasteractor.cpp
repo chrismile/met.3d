@@ -108,7 +108,7 @@ MNWPVolumeRaycasterActor::MNWPVolumeRaycasterActor()
     // curve properties have been initialized before the constructor is called.
     // NOTE: At least one isovalue needs to be defined!
     QStringList names;
-    for (uint i = 0; i < rayCasterSettings->isoValueSetList.size(); i++)
+    for (int i = 0; i < rayCasterSettings->isoValueSetList.size(); i++)
         names << rayCasterSettings->isoValueSetList.at(i).groupProp->propertyName();
     properties->mEnum()->setEnumNames(
                 normalCurveSettings->startIsoSurfaceProp, names);
@@ -376,7 +376,7 @@ void MNWPVolumeRaycasterActor::RayCasterSettings::addIsoValue(
 
 void MNWPVolumeRaycasterActor::RayCasterSettings::sortIsoValues()
 {
-    for (uint i = 0; i < isoValueSetList.size(); ++i)
+    for (int i = 0; i < isoValueSetList.size(); ++i)
     {
         isoEnabled[i] = static_cast<int>(isoValueSetList[i].enabled);
         if (isoValueSetList[i].enabled)
@@ -394,7 +394,7 @@ void MNWPVolumeRaycasterActor::RayCasterSettings::sortIsoValues()
         isoColorTypes[i] = static_cast<GLint>(isoValueSetList[i].isoColourType);
     }
 
-    for (uint i = 1; i < isoValueSetList.size(); ++i)
+    for (int i = 1; i < isoValueSetList.size(); ++i)
     {
         bool currEnabled = isoEnabled[i];
         GLfloat currIsoValue = isoValues[i];
@@ -640,7 +640,7 @@ void MNWPVolumeRaycasterActor::saveConfiguration(QSettings *settings)
 
     settings->beginGroup("IsoValues");
 
-    for (unsigned int i = 0; i < rayCasterSettings->isoValueSetList.size(); ++i)
+    for (int i = 0; i < rayCasterSettings->isoValueSetList.size(); ++i)
     {
         IsoValueSettings& setting =  rayCasterSettings->isoValueSetList[i];
 
@@ -764,7 +764,7 @@ void MNWPVolumeRaycasterActor::loadConfiguration(QSettings *settings)
     settings->beginGroup("IsoValues");
 
     // Remove current isovalue properties.
-    for (uint i = 0; i < rayCasterSettings->isoValueSetList.size(); ++i)
+    for (int i = 0; i < rayCasterSettings->isoValueSetList.size(); ++i)
     {
         IsoValueSettings& setting = rayCasterSettings->isoValueSetList[i];
         rayCasterSettings->isoValuesProp->removeSubProperty(setting.groupProp);
@@ -800,7 +800,7 @@ void MNWPVolumeRaycasterActor::loadConfiguration(QSettings *settings)
 
     // Update normal curves properties that link to isovalues.
     QStringList names;
-    for (uint i = 0; i < rayCasterSettings->isoValueSetList.size(); i++)
+    for (int i = 0; i < rayCasterSettings->isoValueSetList.size(); i++)
         names << rayCasterSettings->isoValueSetList.at(i).groupProp->propertyName();
     properties->mEnum()->setEnumNames(
                 normalCurveSettings->startIsoSurfaceProp, names);
@@ -1305,9 +1305,9 @@ void MNWPVolumeRaycasterActor::onQtPropertyChanged(QtProperty* property)
     else if (property == normalCurveSettings->startIsoSurfaceProp ||
              property == normalCurveSettings->stopIsoSurfaceProp)
     {
-        uint startIndex = properties->mEnum()->value(
+        int startIndex = properties->mEnum()->value(
                     normalCurveSettings->startIsoSurfaceProp);
-        uint stopIndex = properties->mEnum()->value(
+        int stopIndex = properties->mEnum()->value(
                     normalCurveSettings->stopIsoSurfaceProp);
         if (startIndex < rayCasterSettings->isoValueSetList.size())
         {
@@ -1558,7 +1558,7 @@ void MNWPVolumeRaycasterActor::onQtPropertyChanged(QtProperty* property)
                     properties->mEnum()->value(normalCurveSettings->stopIsoSurfaceProp);
 
             QStringList names;
-            for (uint i = 0; i < rayCasterSettings->isoValueSetList.size(); i++)
+            for (int i = 0; i < rayCasterSettings->isoValueSetList.size(); i++)
             {
                 names << rayCasterSettings->isoValueSetList.at(i).groupProp->propertyName();
             }
@@ -1710,7 +1710,7 @@ void MNWPVolumeRaycasterActor::onQtPropertyChanged(QtProperty* property)
                         normalCurveSettings->stopIsoSurfaceProp);
 
             QStringList names;
-            for (uint i = 0; i < rayCasterSettings->isoValueSetList.size(); i++)
+            for (int i = 0; i < rayCasterSettings->isoValueSetList.size(); i++)
             {
                 names << rayCasterSettings->isoValueSetList.at(i).groupProp->propertyName();
             }
@@ -1922,7 +1922,7 @@ int MNWPVolumeRaycasterActor::computeCrossingLevel(float scalar)
     int level = 0;
 
 //TODO (mr, 17Nov2014) -- replace by numEnabledIsoValues?
-    for (unsigned int i = 0; i < rayCasterSettings->isoValueSetList.size(); i++)
+    for (int i = 0; i < rayCasterSettings->isoValueSetList.size(); i++)
     {
         if (rayCasterSettings->isoEnabled[i])
             level += int(scalar >= rayCasterSettings->isoValues[i]);
