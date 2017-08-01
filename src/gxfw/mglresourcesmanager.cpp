@@ -646,7 +646,12 @@ QList<MActor*> MGLResourcesManager::getActorsConnectedTo(MActor *actor)
     QList<MActor*> connectedActors;
 
     foreach (MActor* a, actorPool)
-        if (a->isConnectedTo(actor)) connectedActors << a;
+    {
+        if (a->isConnectedTo(actor))
+        {
+            connectedActors << a;
+        }
+    }
 
     return connectedActors;
 }

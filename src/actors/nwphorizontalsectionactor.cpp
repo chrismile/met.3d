@@ -642,8 +642,24 @@ MNWPActorVariable* MNWPHorizontalSectionActor::createActorVariable(
 
 bool MNWPHorizontalSectionActor::isConnectedTo(MActor *actor)
 {
-    if (MNWPMultiVarActor::isConnectedTo(actor)) return true;
-    if (slicePosSynchronizationActor == actor) return true;
+    if (MNWPMultiVarActor::isConnectedTo(actor))
+    {
+        return true;
+    }
+    if (slicePosSynchronizationActor == actor)
+    {
+        return true;
+    }
+    // This actor is connected to the argument actor if the argument actor is
+    // the transfer function (scalar to texture) of any variable.
+    foreach (MNWPActorVariable *var, variables)
+    {
+        if (static_cast<MNWP2DHorizontalActorVariable*>(var)
+                ->spatialTransferFunction == actor)
+        {
+            return true;
+        }
+    }
 
     return false;
 }

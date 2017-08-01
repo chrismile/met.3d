@@ -1307,6 +1307,24 @@ void MTrajectoryActor::registerScene(MSceneControl *scene)
 }
 
 
+bool MTrajectoryActor::isConnectedTo(MActor *actor)
+{
+    if (MActor::isConnectedTo(actor))
+    {
+        return true;
+    }
+
+    // This actor is connected to the argument actor if the argument actor is
+    // the transfer function this actor.
+    if (transferFunction == actor)
+    {
+        return true;
+    }
+
+    return false;
+}
+
+
 /******************************************************************************
 ***                          PROTECTED METHODS                              ***
 *******************************************************************************/
