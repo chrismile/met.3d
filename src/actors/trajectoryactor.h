@@ -193,6 +193,8 @@ public slots:
 
     void registerScene(MSceneControl *scene) override;
 
+    bool isConnectedTo(MActor *actor) override;
+
 protected:
     void initializeActorResources();
 
