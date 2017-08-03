@@ -85,27 +85,60 @@ void MPipelineConfiguration::configure()
 //    initializeDevelopmentDataPipeline();
 //    return;
 
+    // Indicates whether Met.3D was called by Metview.
+    bool metviewConnection = false;
+    QString filename = "";
+
     // Scan global application command line arguments for pipeline definitions.
     MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
     foreach (QString arg, sysMC->getApplicationCommandLineArguments())
     {
         if (arg.startsWith("--pipeline="))
         {
-            QString filename = arg.remove("--pipeline=");
-			filename = expandEnvironmentVariables(filename);
-
-            // Production build: Read pipeline configuration from file.
-            // Disadvantage: Can only read parameters for the predefined
-            // pipelines.
-            initializeDataPipelineFromConfigFile(filename);
-            return;
+            filename = arg.remove("--pipeline=");
+            filename = expandEnvironmentVariables(filename);
+        }
+        if (arg.startsWith("--metview"))
+        {
+            metviewConnection = true;
+            QString msg = QString("Starting in Metview mode. ");
+            LOG4CPLUS_INFO(mlog, msg.toStdString());
         }
     }
 
-    QString errMsg = QString(
-                "ERROR: No data pipeline configuration file specified. "
-                "Use the '--pipeline=<file>' command line argument.");
-    LOG4CPLUS_ERROR(mlog, errMsg.toStdString());
+    QString errMsg = "";
+    // If Met.3D is called by Metview and no configuration files are given,
+    // use default configuration files stored at
+    // $MET3D_HOME/config/metview/default_pipeline.cfg .
+    if (metviewConnection && filename.isEmpty())
+    {
+        filename = "$MET3D_HOME/config/metview/default_pipeline.cfg";
+        filename = expandEnvironmentVariables(filename);
+        QFileInfo fileInfo(filename);
+        if (!fileInfo.isFile())
+        {
+            errMsg = QString(
+                        "ERROR: Default Metview pipeline configuration file"
+                        " does not exist. Location: ") + filename;
+        }
+        LOG4CPLUS_ERROR(mlog, errMsg.toStdString());
+    }
+
+    if (!filename.isEmpty())
+    {
+        // Production build: Read pipeline configuration from file.
+        // Disadvantage: Can only read parameters for the predefined
+        // pipelines.
+        initializeDataPipelineFromConfigFile(filename, metviewConnection);
+        return;
+    }
+    else
+    {
+        errMsg = QString(
+                    "ERROR: No data pipeline configuration file specified. "
+                    "Use the '--pipeline=<file>' command line argument.");
+        LOG4CPLUS_ERROR(mlog, errMsg.toStdString());
+    }
     throw MInitialisationError(errMsg.toStdString(), __FILE__, __LINE__);
 }
 
@@ -124,7 +157,7 @@ void MPipelineConfiguration::initializeScheduler()
 
 
 void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
-        QString filename)
+        QString filename, bool metviewConnection)
 {
     LOG4CPLUS_INFO(mlog, "Loading data pipeline configuration from file "
                    << filename.toStdString() << "...");
@@ -177,15 +210,44 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
     // ================
     size = config.beginReadArray("NWPPipeline");
 
-    for (int i = 0; i < size; i++)
-    {    
-        config.setArrayIndex(i);
+    // Get directories and file filters specified by path command line argument
+    // if present.
+    QList<MetviewGribFilePath> filePathList;
+    if (metviewConnection)
+    {
+        getMetviewGribFilePaths(&filePathList);
+        // For Metview integration use directories and file filters specified by
+        // command line arguments instead of directories and file filters
+        // specified by pipeline configuration.
+        size = filePathList.size();
+    }
 
+    QString path, fileFilter, name;
+    config.setArrayIndex(0);
+
+    for (int i = 0; i < size; i++)
+    {
         // Read settings from file.
-        QString name = config.value("name").toString();
-        QString path = expandEnvironmentVariables(config.value("path").toString());
+
+        // If Met.3D is called from Metview use only the first entry in the
+        // pipeline configuration file to initialise each data source.
+        if (metviewConnection)
+        {
+            // Use name of first NWPPipeline entry in pipeline configuration as
+            // name and append index for each new data source.
+            name = config.value("name").toString() + QString("_%1").arg(i);
+            path = filePathList.at(i).path;
+            fileFilter = filePathList.at(i).fileFilter;
+        }
+        // Use all NWPPipeline entries if we call Met.3D as own program.
+        else
+        {
+            config.setArrayIndex(i);
+            name = config.value("name").toString();
+            path = expandEnvironmentVariables(config.value("path").toString());
+            fileFilter = config.value("fileFilter").toString();
+        }
         QString domainID = config.value("domainID").toString();
-        QString fileFilter = config.value("fileFilter").toString();
         QString schedulerID = config.value("schedulerID").toString();
         QString memoryManagerID = config.value("memoryManagerID").toString();
         QString fileFormatStr = config.value("fileFormat").toString();
@@ -616,6 +678,40 @@ void MPipelineConfiguration::initializeDevelopmentDataPipeline()
                 true,
                 "SingleThread",
                 "Trajectories ABL-T 10hPa");
+}
+
+
+void MPipelineConfiguration::getMetviewGribFilePaths(
+        QList<MPipelineConfiguration::MetviewGribFilePath> *gribFilePaths)
+{
+    gribFilePaths->clear();
+    QStringList gribFilePathsStringList;
+    gribFilePathsStringList.clear();
+    MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
+    // Scan global application command line arguments for metview definition.
+    foreach (QString arg, sysMC->getApplicationCommandLineArguments())
+    {
+        if (arg.startsWith("--path="))
+        {
+            QString path = arg.remove("--path=");
+            // Remove quotes if not already removed by shell.
+            path.remove(QChar('"'), Qt::CaseSensitive);
+            // Get list of paths (directory and file filter).
+            gribFilePathsStringList = path.split(";", QString::SkipEmptyParts);
+            // Extract directory and file filter from given paths.
+            foreach (QString path, gribFilePathsStringList)
+            {
+                QFileInfo fileInfo(expandEnvironmentVariables(path));
+                QString fileFilter = fileInfo.fileName();
+                path.chop(fileFilter.length());
+                MetviewGribFilePath metviewGribFilePath;
+                metviewGribFilePath.path = path;
+                metviewGribFilePath.fileFilter = fileFilter;
+                gribFilePaths->append(metviewGribFilePath);
+            }
+            break;
+        }
+    }
 }
 
 
