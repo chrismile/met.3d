@@ -334,7 +334,8 @@ MSceneViewGLWidget::MSceneViewGLWidget()
 
     // North arrow.
     northArrow.enabled = false;
-    northArrow.scale = 5.;
+    northArrow.horizontalScale = 5.;
+    northArrow.verticalScale = 5.;
     northArrow.colour = QColor(222, 46, 30, 255);
     northArrow.lon = 0.;
     northArrow.lat = 80.;
@@ -349,19 +350,37 @@ MSceneViewGLWidget::MSceneViewGLWidget()
             ->setValue(northArrow.enabledProperty, northArrow.enabled);
     northArrow.groupProperty->addSubProperty(northArrow.enabledProperty);
 
-    northArrow.scaleProperty = systemControl->getDecoratedDoublePropertyManager()
-            ->addProperty("scale");
+    northArrow.horizontalScaleProperty =
+            systemControl->getDecoratedDoublePropertyManager()->addProperty(
+                "horizontal scale");
     systemControl->getDecoratedDoublePropertyManager()
-            ->setValue(northArrow.scaleProperty, northArrow.scale);
+            ->setValue(northArrow.horizontalScaleProperty,
+                       northArrow.horizontalScale);
     systemControl->getDecoratedDoublePropertyManager()
-            ->setSingleStep(northArrow.scaleProperty, .1);
+            ->setSingleStep(northArrow.horizontalScaleProperty, .1);
     systemControl->getDecoratedDoublePropertyManager()
-            ->setDecimals(northArrow.scaleProperty, 2);
+            ->setDecimals(northArrow.horizontalScaleProperty, 2);
     systemControl->getDecoratedDoublePropertyManager()
-            ->setMinimum(northArrow.scaleProperty, 0.01);
+            ->setMinimum(northArrow.horizontalScaleProperty, 0.01);
     systemControl->getDecoratedDoublePropertyManager()
-            ->setMaximum(northArrow.scaleProperty, 100.);
-    northArrow.groupProperty->addSubProperty(northArrow.scaleProperty);
+            ->setMaximum(northArrow.horizontalScaleProperty, 100.);
+    northArrow.groupProperty->addSubProperty(northArrow.horizontalScaleProperty);
+
+    northArrow.verticalScaleProperty =
+            systemControl->getDecoratedDoublePropertyManager()->addProperty(
+                "vertical scale");
+    systemControl->getDecoratedDoublePropertyManager()
+            ->setValue(northArrow.verticalScaleProperty,
+                       northArrow.verticalScale);
+    systemControl->getDecoratedDoublePropertyManager()
+            ->setSingleStep(northArrow.verticalScaleProperty, .1);
+    systemControl->getDecoratedDoublePropertyManager()
+            ->setDecimals(northArrow.verticalScaleProperty, 2);
+    systemControl->getDecoratedDoublePropertyManager()
+            ->setMinimum(northArrow.verticalScaleProperty, 0.01);
+    systemControl->getDecoratedDoublePropertyManager()
+            ->setMaximum(northArrow.verticalScaleProperty, 100.);
+    northArrow.groupProperty->addSubProperty(northArrow.verticalScaleProperty);
 
     northArrow.lonPositionProperty =
             systemControl->getDecoratedDoublePropertyManager()
@@ -1029,11 +1048,21 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
 #endif
     }
 
-    else if (property == northArrow.scaleProperty)
+    else if (property == northArrow.horizontalScaleProperty)
     {
-        northArrow.scale = MSystemManagerAndControl::getInstance()
+        northArrow.horizontalScale = MSystemManagerAndControl::getInstance()
                 ->getDecoratedDoublePropertyManager()
-                ->value(northArrow.scaleProperty);
+                ->value(northArrow.horizontalScaleProperty);
+#ifndef CONTINUOUS_GL_UPDATE
+        updateGL();
+#endif
+    }
+
+    else if (property == northArrow.verticalScaleProperty)
+    {
+        northArrow.verticalScale = MSystemManagerAndControl::getInstance()
+                ->getDecoratedDoublePropertyManager()
+                ->value(northArrow.verticalScaleProperty);
 #ifndef CONTINUOUS_GL_UPDATE
         updateGL();
 #endif
@@ -1384,7 +1413,10 @@ void MSceneViewGLWidget::paintGL()
         northArrowShader->bind();
         northArrowShader->setUniformValue("colour", northArrow.colour);
         northArrowShader->setUniformValue("lightDirection", getLightDirection());
-        northArrowShader->setUniformValue("scale", GLfloat(northArrow.scale));
+        northArrowShader->setUniformValue("horizontalScale",
+                                          GLfloat(northArrow.horizontalScale));
+        northArrowShader->setUniformValue("verticalScale",
+                                          GLfloat(northArrow.verticalScale));
         northArrowShader->setUniformValue("lon", GLfloat(northArrow.lon));
         northArrowShader->setUniformValue("lat", GLfloat(northArrow.lat));
         northArrowShader->setUniformValue("worldZ", GLfloat(northArrow.worldZ));

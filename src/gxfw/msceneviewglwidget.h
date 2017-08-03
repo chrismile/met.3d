@@ -438,14 +438,16 @@ private:
       QtProperty *groupProperty;
       QtProperty *enabledProperty;
       QtProperty *colourProperty;
-      QtProperty *scaleProperty;
+      QtProperty *horizontalScaleProperty;
+      QtProperty *verticalScaleProperty;
       QtProperty *lonPositionProperty;
       QtProperty *latPositionProperty;
       QtProperty *worldZPositionProperty;
 
       bool enabled;
       QColor colour;
-      double scale;
+      double horizontalScale;
+      double verticalScale;
       double lon;
       double lat;
       double worldZ;
