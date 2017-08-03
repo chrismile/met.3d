@@ -69,7 +69,8 @@ shader VSmain()
 
 uniform mat4      mvpMatrix;      // model-view-projection
 uniform mat4      rotationMatrix; // scene rotation matrix
-uniform float     scale;
+uniform float     horizontalScale;
+uniform float     verticalScale;
 uniform float     lon;
 uniform float     lat;
 uniform float     worldZ;
@@ -77,7 +78,7 @@ uniform float     worldZ;
 shader GSmain(out vec3 shadingColour)
 {
     vec4 base = vec4(lon, lat, worldZ, 0.f);
-    vec3 size = scale * vec3(1.5f, 1.f, 1.f);
+    vec3 size = vec3(horizontalScale * vec2(1.5f, 1.f), verticalScale);
 
     vec4 tip = base + vec4(0.f, 4.f * size.y, 0.f, 1.f);
     vec4 front = base + vec4(0.f, size.y, size.z, 1.f);
