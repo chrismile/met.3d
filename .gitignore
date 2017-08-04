@@ -18,3 +18,5 @@ Met3D_automoc.cpp
 cmake_install.cmake
 __
 build
+/.cproject
+/.project

@@ -63,6 +63,7 @@ public:
 class MMovablePoleActor : public MActor
 {
 public:
+
     MMovablePoleActor();
     ~MMovablePoleActor();
 

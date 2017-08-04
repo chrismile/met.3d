@@ -33,6 +33,7 @@
 
 // local application imports
 #include "system/applicationconfiguration.h"
+#include "data/trajectorydatasource.h"
 #include "data/structuredgrid.h"
 #include "mainwindow.h"
 
@@ -125,6 +126,23 @@ protected:
             bool boundaryLayerTrajectories,
             QString schedulerID,
             QString memoryManagerID);
+
+    void initializeComputationEnsemblePipeline(
+            QString name,
+            bool boundaryLayerTrajectories,
+            QString schedulerID,
+            QString memoryManagerID,
+            QString resourceID,
+            QString variableU,
+            QString variableV,
+            QString variableP);
+
+    void initializeEnsemblePipeline(
+            QString dataSourceId,
+            bool boundaryLayerTrajectories,
+            MTrajectoryDataSource* baseDataSource,
+            MAbstractScheduler* scheduler,
+            MAbstractMemoryManager* memoryManager);
 
     /**
      Initializes hard-coded pipelines. Use this method for development

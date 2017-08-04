@@ -80,6 +80,10 @@ public:
 
     void loadConfiguration(QSettings *settings);
 
+    QRectF getBBox();
+    double getBottomPressure();
+    double getTopPressure();
+
 protected:
     void initializeActorResources();
 

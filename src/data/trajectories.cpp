@@ -242,6 +242,18 @@ void MTrajectories::copyVertexDataFrom(
         vertices[i] = QVector3D(lons[i], lats[i], pres[i]);
 }
 
+void MTrajectories::copyVertexDataFrom(QVector<QVector<QVector3D>> &v)
+{
+    for (int i = 0; i < v.size(); ++i)
+    {
+        for (int j = 0; j < v[i].size(); ++j)
+        {
+            vertices[i * v[i].size() + j] = v[i][j];
+        }
+    }
+
+}
+
 
 unsigned int MTrajectories::getTimeStepLength_sec()
 {

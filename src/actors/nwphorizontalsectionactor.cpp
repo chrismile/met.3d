@@ -665,6 +665,17 @@ bool MNWPHorizontalSectionActor::isConnectedTo(MActor *actor)
 }
 
 
+const QRectF MNWPHorizontalSectionActor::getHorizontalBBox()
+{
+    return horizontalBBox;
+}
+
+
+const double MNWPHorizontalSectionActor::getSlicePosition()
+{
+    return slicePosition_hPa;
+}
+
 /******************************************************************************
 ***                             PUBLIC SLOTS                                ***
 *******************************************************************************/

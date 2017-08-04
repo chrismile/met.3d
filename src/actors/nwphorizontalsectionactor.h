@@ -57,6 +57,7 @@ class MNWPHorizontalSectionActor : public MNWPMultiVarActor
     Q_OBJECT
 
 public:
+
     MNWPHorizontalSectionActor();
     ~MNWPHorizontalSectionActor();
 
@@ -111,6 +112,10 @@ public:
             const MSelectableDataSource& dataSource) override;
 
     bool isConnectedTo(MActor *actor) override;
+
+    const QRectF getHorizontalBBox();
+
+    const double getSlicePosition();
 
 public slots:
     /**
