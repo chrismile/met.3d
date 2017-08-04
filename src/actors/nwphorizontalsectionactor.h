@@ -57,7 +57,6 @@ class MNWPHorizontalSectionActor : public MNWPMultiVarActor
     Q_OBJECT
 
 public:
-
     MNWPHorizontalSectionActor();
     ~MNWPHorizontalSectionActor();
 

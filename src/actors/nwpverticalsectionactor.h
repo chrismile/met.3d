@@ -61,7 +61,6 @@ class MNWPVerticalSectionActor : public MNWPMultiVarActor
     Q_OBJECT
 
 public:
-
     MNWPVerticalSectionActor();
 
     ~MNWPVerticalSectionActor();

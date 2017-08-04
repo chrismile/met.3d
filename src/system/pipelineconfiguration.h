@@ -127,15 +127,15 @@ protected:
             QString schedulerID,
             QString memoryManagerID);
 
-    void initializeComputationEnsemblePipeline(
-            QString name,
+    void initializeComputationEnsemblePipeline(QString name,
             bool boundaryLayerTrajectories,
             QString schedulerID,
             QString memoryManagerID,
             QString resourceID,
             QString variableU,
             QString variableV,
-            QString variableP);
+            QString variableP,
+            QString verticalLvlType);
 
     void initializeEnsemblePipeline(
             QString dataSourceId,

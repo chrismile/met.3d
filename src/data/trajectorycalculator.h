@@ -105,6 +105,7 @@ public:
     ~MTrajectoryCalculator();
 
     void setUVPVariables(QString u, QString v, QString p);
+    void setVericalLevelType(QString levelTypeString);
 
     /**
      * Returns a @ref QList<QDateTime> containing the the available forecast
@@ -131,7 +132,6 @@ public:
     MTask* createTaskGraph(MDataRequest request);
 
 protected:
-
     // helper construct for calculation
     struct CalculationHelper
     {

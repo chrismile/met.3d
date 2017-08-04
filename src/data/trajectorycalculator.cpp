@@ -71,6 +71,13 @@ void MTrajectoryCalculator::setUVPVariables(QString u, QString v, QString p)
 }
 
 
+void MTrajectoryCalculator::setVericalLevelType(QString levelTypeString)
+{
+    levelType = MStructuredGrid::verticalLevelTypeFromConfigString(
+                levelTypeString);
+}
+
+
 QList<QDateTime> MTrajectoryCalculator::availableInitTimes()
 {
     QReadLocker availableItemsReadLocker(&availableItemsLock);

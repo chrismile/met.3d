@@ -38,7 +38,6 @@ public:
     void setInputSource(MWeatherPredictionDataSource* source);
 
 protected:
-
     /**
      * Implementations of this class should check the input dataSource
      */

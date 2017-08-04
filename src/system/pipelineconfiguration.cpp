@@ -325,6 +325,8 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
         QString computationVariableU = config.value("computationVariableU").toString();
         QString computationVariableV = config.value("computationVariableV").toString();
         QString computationVariableP = config.value("computationVariableP").toString();
+        QString computationVerticalLvlType =
+                config.value("computationVerticalLvlType").toString();
 
         if(precomputed)
         {
@@ -362,11 +364,18 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
             LOG4CPLUS_DEBUG(mlog, "  " << (isEnsemble ? "ensemble" : "deterministic"));
             LOG4CPLUS_DEBUG(mlog, "  type = " << (ablTrajectories ? "ABL-T" : "DF-T"));
             LOG4CPLUS_DEBUG(mlog, "  schedulerID = " << schedulerID.toStdString());
-            LOG4CPLUS_DEBUG(mlog, "  memoryManagerID = " << memoryManagerID.toStdString());
-            LOG4CPLUS_DEBUG(mlog, "  computationResourceName = " << computationResource.toStdString());
-            LOG4CPLUS_DEBUG(mlog, "  computation U-Variable = " << computationVariableU.toStdString());
-            LOG4CPLUS_DEBUG(mlog, "  computation V-Variable = " << computationVariableV.toStdString());
-            LOG4CPLUS_DEBUG(mlog, "  computation P-Variable = " << computationVariableP.toStdString());
+            LOG4CPLUS_DEBUG(mlog, "  memoryManagerID = "
+                            << memoryManagerID.toStdString());
+            LOG4CPLUS_DEBUG(mlog, "  computationResourceName = "
+                            << computationResource.toStdString());
+            LOG4CPLUS_DEBUG(mlog, "  computation U-Variable = "
+                            << computationVariableU.toStdString());
+            LOG4CPLUS_DEBUG(mlog, "  computation V-Variable = "
+                            << computationVariableV.toStdString());
+            LOG4CPLUS_DEBUG(mlog, "  computation P-Variable = "
+                            << computationVariableP.toStdString());
+            LOG4CPLUS_DEBUG(mlog, "  computation vertical level type  = "
+                            << computationVerticalLvlType.toStdString());
 
             // Check parameter validity.
             if ( name.isEmpty()
@@ -374,6 +383,7 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
                  || computationVariableU.isEmpty()
                  || computationVariableV.isEmpty()
                  || computationVariableP.isEmpty()
+                 || computationVerticalLvlType.isEmpty()
                  || schedulerID.isEmpty()
                  || memoryManagerID.isEmpty() )
             {
@@ -387,7 +397,7 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
                         name, ablTrajectories, schedulerID,
                         memoryManagerID, computationResource,
                         computationVariableU, computationVariableV,
-                        computationVariableP);
+                        computationVariableP, computationVerticalLvlType);
             else
                 LOG4CPLUS_WARN(mlog, "deterministic computed LAGRANTO pipeline has not"
                         "been implemented yet; skipping.");
@@ -576,7 +586,8 @@ void MPipelineConfiguration::initializeComputationEnsemblePipeline(
         QString resourceID,
         QString variableU,
         QString variableV,
-        QString variableP)
+        QString variableP,
+        QString verticalLvlType)
 {
     MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
     MAbstractScheduler* scheduler = sysMC->getScheduler(schedulerID);
@@ -596,6 +607,7 @@ void MPipelineConfiguration::initializeComputationEnsemblePipeline(
     trajectoryCalculator->setMemoryManager(memoryManager);
     trajectoryCalculator->setScheduler(scheduler);
     trajectoryCalculator->setUVPVariables(variableU, variableV, variableP);
+    trajectoryCalculator->setVericalLevelType(verticalLvlType);
     trajectoryCalculator->setInputSource(mwpResource);
     sysMC->registerDataSource(dataSourceId + QString(" Reader"), trajectoryCalculator);
 
@@ -665,7 +677,7 @@ void MPipelineConfiguration::initializeEnsemblePipeline(
                 new MProbABLTrajectoriesSource();
         source->setMemoryManager(memoryManager);
         source->setScheduler(scheduler);
-        source->setTrajectorySource(trajectoryReader);
+        source->setTrajectorySource(baseDataSource);
         source->setInputSelectionSource(timestepFilter);
 
         pwcbSource = source;
@@ -676,7 +688,7 @@ void MPipelineConfiguration::initializeEnsemblePipeline(
                 new MProbDFTrajectoriesSource();
         source->setMemoryManager(memoryManager);
         source->setScheduler(scheduler);
-        source->setTrajectorySource(trajectoryReader);
+        source->setTrajectorySource(baseDataSource);
         source->setInputSelectionSource(timestepFilter);
 
         pwcbSource = source;

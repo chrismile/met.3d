@@ -1914,7 +1914,7 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
             tubeShader->setUniformValue(
                     "scalarMinimum", transferFunction->getMinimumValue());
             tubeShader->setUniformValue(
-                    "scalarMaximum", transferFunction->getMaximimValue());
+                    "scalarMaximum", transferFunction->getMaximumValue());
 
             // Bind trajectories and normals vertex buffer objects.
             trajectoryRequests[t].trajectoriesVertexBuffer->attachToVertexAttribute(SHADER_VERTEX_ATTRIBUTE);
@@ -1981,7 +1981,7 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
                             transferFunction->getMinimumValue());
                     tubeShadowShader->setUniformValue(
                             "scalarMaximum",
-                            transferFunction->getMaximimValue());
+                            transferFunction->getMaximumValue());
                 }
                 else
                     tubeShadowShader->setUniformValue(
@@ -2057,7 +2057,7 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
             positionSphereShader->setUniformValue(
                     "scalarMinimum", transferFunction->getMinimumValue());
             positionSphereShader->setUniformValue(
-                    "scalarMaximum", transferFunction->getMaximimValue());
+                    "scalarMaximum", transferFunction->getMaximumValue());
 
             // Bind vertex buffer object.
             trajectoryRequests[t].trajectoriesVertexBuffer
@@ -2120,7 +2120,7 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
                             transferFunction->getMinimumValue()); CHECK_GL_ERROR;
                     positionSphereShadowShader->setUniformValue(
                             "scalarMaximum",
-                            transferFunction->getMaximimValue()); CHECK_GL_ERROR;
+                            transferFunction->getMaximumValue()); CHECK_GL_ERROR;
 
                 }
                 else
@@ -2474,7 +2474,6 @@ void MTrajectoryActor::asynchronousDataRequest(bool synchronizationRequest)
         else
         {
             rh.insert("FILTER_PRESSURE_TIME", "ALL");
-            rh.insert("FILTER_BBOX", "ALL");
         }
 
         if ((renderMode == SINGLETIME_POSITIONS)
@@ -2527,83 +2526,121 @@ void MTrajectoryActor::asynchronousDataRequest(bool synchronizationRequest)
 
 void MTrajectoryActor::asynchronousSelectionRequest()
 {
-    MTrajectoryRequestQueueInfo trqi;
-    trqi.dataRequest.request = "NULL";
-    trqi.dataRequest.available = false;
-    trqi.singleTimeFilterRequest.request = "NULL";
-    trqi.singleTimeFilterRequest.available = false;
-    trqi.filterRequest.request = "NULL";
-    trqi.filterRequest.available = false;
-    trqi.numPendingRequests = 0;
+    for(int t = 0; t < (precomputedDataSource ? 1 : seedActorData.size()); t++)
+    {
+        MTrajectoryRequestQueueInfo trqi;
+        trqi.dataRequest.request = "NULL";
+        trqi.dataRequest.available = false;
+        trqi.singleTimeFilterRequest.request = "NULL";
+        trqi.singleTimeFilterRequest.available = false;
+        trqi.filterRequest.request = "NULL";
+        trqi.filterRequest.available = false;
+        trqi.numPendingRequests = 0;
 #ifdef DIRECT_SYNCHRONIZATION
-    // Selection requests currently are not synchronized.
-    trqi.syncchronizationRequest = false;
+        // Selection requests currently are not synchronized.
+        trqi.syncchronizationRequest = false;
 #endif
 
-    // Get the current init and valid (= trajectory start) time.
-    QDateTime initTime  = getPropertyTime(initTimeProperty);
-    QDateTime validTime = getPropertyTime(startTimeProperty);
-    unsigned int member = properties->mInt()->value(ensembleMemberProperty);
+        // Get the current init and valid (= trajectory start) time.
+        QDateTime initTime  = getPropertyTime(initTimeProperty);
+        QDateTime validTime = getPropertyTime(startTimeProperty);
+        unsigned int member = properties->mInt()->value(ensembleMemberProperty);
 
-    MDataRequestHelper rh;
-    rh.insert("INIT_TIME", initTime);
-    rh.insert("VALID_TIME", validTime);
-    rh.insert("MEMBER", member);
-    rh.insert("TIME_SPAN", "ALL");
-//TODO: add property
-    rh.insert("TRY_PRECOMPUTED", 1);
+        MDataRequestHelper rh;
+        rh.insert("INIT_TIME", initTime);
+        rh.insert("VALID_TIME", validTime);
+        rh.insert("MEMBER", member);
+        rh.insert("TIME_SPAN", "ALL");
+        //TODO: add property
+        rh.insert("TRY_PRECOMPUTED", 1);
 
-    // Filter the trajectories of this member according to the specified
-    // pressure interval (xx hPa over the "lifetime" of the trajectories;
-    // e.g. for T-NAWDEX over 48 hours).
+        // if computed dataSource is used, additional information is needed
+        if(!precomputedDataSource)
+        {
+            QDateTime endTime = availableStartTimes.at(properties->mEnum()->value(calculationDeltaTimeProperty));
+            unsigned int lineType = properties->mEnum()->value(calculationLineTypeProperty);
+            unsigned int iterationMethod = properties->mEnum()->value(calculationIterationMethodProperty);
+            unsigned int interpolatonMethod = properties->mEnum()->value(calculationInterpolationMethodProperty);
+            unsigned int iterationCount = properties->mInt()->value(calculationIterationCountProperty);
+            unsigned int seedType = seedActorData[t].type;
+            QString seedMinPosition = QString("%1/%2/%3")
+                    .arg(seedActorData[t].minPosition.x())
+                    .arg(seedActorData[t].minPosition.y())
+                    .arg(seedActorData[t].minPosition.z());
+            QString seedMaxPosition = QString("%1/%2/%3")
+                    .arg(seedActorData[t].maxPosition.x())
+                    .arg(seedActorData[t].maxPosition.y())
+                    .arg(seedActorData[t].maxPosition.z());
+            QString seedStepSize = QString("%1/%2")
+                    .arg(seedActorData[t].stepSize.x())
+                    .arg(seedActorData[t].stepSize.y());
+            QString seedPressureLevels = encodePressureLevels(seedActorData[t].pressureLevels, QString("/"));
 
-    bool filteringEnabled = properties->mBool()->value(enableFilterProperty);
-    if (filteringEnabled)
-    {
-        float deltaPressure_hPa = properties->mDDouble()->value(
+            // insert additional infos to request
+            rh.insert("END_TIME", endTime);
+            rh.insert("LINE_TYPE", lineType);
+            rh.insert("ITERATION_PER_TIMESTEP", iterationCount);
+            rh.insert("ITERATION_METHOD", iterationMethod);
+            rh.insert("INTERPOLATION_METHOD", interpolatonMethod);
+            rh.insert("SEED_TYPE", seedType);
+            rh.insert("SEED_MIN_POSITION", seedMinPosition);
+            rh.insert("SEED_MAX_POSITION", seedMaxPosition);
+            rh.insert("SEED_STEP_SIZE_LON_LAT", seedStepSize);
+            rh.insert("SEED_PRESSURE_LEVELS", seedPressureLevels);
+        }
+
+        // Filter the trajectories of this member according to the specified
+        // pressure interval (xx hPa over the "lifetime" of the trajectories;
+        // e.g. for T-NAWDEX over 48 hours).
+
+        bool filteringEnabled = properties->mBool()->value(enableFilterProperty);
+        if (filteringEnabled)
+        {
+            float deltaPressure_hPa = properties->mDDouble()->value(
                     deltaPressureFilterProperty);
-        int deltaTime_hrs = properties->mDDouble()->value(deltaTimeFilterProperty);
-        // Request is e.g. 500/48 for 500 hPa in 48 hours.
-        rh.insert("FILTER_PRESSURE_TIME",
-                  QString("%1/%2").arg(deltaPressure_hPa).arg(deltaTime_hrs));
-        // Request bounding box filtering.
-        rh.insert("FILTER_BBOX", QString("%1/%2/%3/%4")
-                  .arg(bbox.x()).arg(bbox.y())
-                  .arg(bbox.width() + bbox.x()).arg(bbox.height() + bbox.y()));
-    }
-    else
-    {
-        rh.insert("FILTER_PRESSURE_TIME", "ALL");
-    }
+            int deltaTime_hrs = properties->mDDouble()->value(deltaTimeFilterProperty);
+            // Request is e.g. 500/48 for 500 hPa in 48 hours.
+            rh.insert("FILTER_PRESSURE_TIME",
+                      QString("%1/%2").arg(deltaPressure_hPa).arg(deltaTime_hrs));
+            // Request bounding box filtering.
+            rh.insert("FILTER_BBOX", QString("%1/%2/%3/%4")
+                    .arg(bbox.x()).arg(bbox.y())
+                    .arg(bbox.width() + bbox.x()).arg(bbox.height() + bbox.y()));
+        }
+        else
+        {
+            rh.insert("FILTER_PRESSURE_TIME", "ALL");
+        }
 
-    if ((renderMode == SINGLETIME_POSITIONS)
+        if ((renderMode == SINGLETIME_POSITIONS)
             || (renderMode == TUBES_AND_SINGLETIME)
             || (renderMode == BACKWARDTUBES_AND_SINGLETIME))
-    {
-        rh.insert("FILTER_TIMESTEP", QString("%1").arg(particlePosTimeStep));
-        trqi.singleTimeFilterRequest.request = rh.request();
-        trqi.numPendingRequests++;
-    }
+        {
+            rh.insert("FILTER_TIMESTEP", QString("%1").arg(particlePosTimeStep));
+            trqi.singleTimeFilterRequest.request = rh.request();
+            trqi.numPendingRequests++;
+        }
 
-    if (renderMode != SINGLETIME_POSITIONS)
-    {
-        rh.insert("FILTER_TIMESTEP", "ALL");
-        trqi.filterRequest.request = rh.request();
-        trqi.numPendingRequests++;
-    }
+        if (renderMode != SINGLETIME_POSITIONS)
+        {
+            rh.insert("FILTER_TIMESTEP", "ALL");
+            trqi.filterRequest.request = rh.request();
+            trqi.numPendingRequests++;
+        }
 
-    pendingRequestsQueue.enqueue(trqi);
+        trajectoryRequests[t].pendingRequestsQueue.enqueue(trqi);
 
-    if ((renderMode == SINGLETIME_POSITIONS)
+        if ((renderMode == SINGLETIME_POSITIONS)
             || (renderMode == TUBES_AND_SINGLETIME)
             || (renderMode == BACKWARDTUBES_AND_SINGLETIME))
-    {
-        trajectoryFilter->requestData(trqi.singleTimeFilterRequest.request);
-    }
+        {
+            trajectoryFilter->requestData(trqi.singleTimeFilterRequest.request);
+        }
 
-    if (renderMode != SINGLETIME_POSITIONS)
-    {
-        trajectoryFilter->requestData(trqi.filterRequest.request);
+        if (renderMode != SINGLETIME_POSITIONS)
+        {
+            trajectoryFilter->requestData(trqi.filterRequest.request);
+        }
     }
 }
 
@@ -2848,8 +2885,7 @@ void MTrajectoryActor::debugPrintPendingRequestsQueue()
         if(!precomputedDataSource)
             str += QString("Seed position #%1").arg(t);
 
-        foreach (MSceneViewGLWidget *view,
-                 pendingRequestsQueue[i].normalsRequests.keys())
+        for (int i = 0; i < trajectoryRequests[t].pendingRequestsQueue.size(); i++)
         {
             str += QString("Entry #%1 [%2]\n[%3] %4\n[%5] %6\n[%7] %8\n")
                     .arg(i).arg(trajectoryRequests[t].pendingRequestsQueue[i].numPendingRequests)
@@ -2869,6 +2905,7 @@ void MTrajectoryActor::debugPrintPendingRequestsQueue()
                 }
         }
     }
+
 
     str += QString("\n==================\n");
 

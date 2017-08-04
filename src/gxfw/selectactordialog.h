@@ -80,7 +80,7 @@ public:
     QList<MSelectableActor> getSelectedActors();
 
 
-public Q_SLOTS:
+public slots:
     /**
       @brief Reimplemented exec() to avoid execusion of dialog if no actors
       are available to select.
