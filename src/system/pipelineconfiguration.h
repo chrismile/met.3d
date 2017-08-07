@@ -106,8 +106,7 @@ protected:
       @see initializeNWPPipeline()
       @see initializeLagrantoEnsemblePipeline()
      */
-    void initializeDataPipelineFromConfigFile(QString filename,
-                                              bool metviewConnection);
+    void initializeDataPipelineFromConfigFile(QString filename);
 
     void initializeNWPPipeline(
             QString name,

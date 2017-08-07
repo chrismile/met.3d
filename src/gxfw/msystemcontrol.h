@@ -161,6 +161,8 @@ public:
      */
     bool applicationIsInitialized() { return met3dAppIsInitialized; }
 
+    bool isConnectedToMetview() { return connectedToMetview; }
+
 protected:
     friend class MGLResourcesManager;
 
@@ -189,6 +191,7 @@ private:
     Ui::MSystemControl *ui;
 
     bool met3dAppIsInitialized;
+    bool connectedToMetview;
 
     QStringList commandLineArguments;
     QDir met3DHomeDir;

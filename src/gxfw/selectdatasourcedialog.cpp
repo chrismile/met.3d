@@ -166,6 +166,19 @@ QList<QString> MSelectDataSourceDialog::getSelectedDataSourceIDs()
 }
 
 
+MSelectableDataSource MSelectDataSourceDialog::
+checkIfSingleDataSourceWithSingleVariableIsPresent(bool *ok)
+{
+    if (ui->dataFieldTable->rowCount() != 1)
+    {
+        *ok = false;
+        return MSelectableDataSource();
+    }
+    *ok = true;
+    return getDataSourceFromRow(0);
+}
+
+
 bool MSelectDataSourceDialog::checkDataSourceForData(
         MWeatherPredictionDataSource *source)
 {

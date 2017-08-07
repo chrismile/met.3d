@@ -104,7 +104,17 @@ public:
     QList<QString> getSelectedDataSourceIDs();
 
     /**
-      Checks whether the @param source contains init times, valid times and
+      checkIfSingleDataSourceWithSingleVariableIsPresent returns the data source
+      containing the only variable if just one variable of the supported level
+      Types is present.
+
+      @param ok is set to true if only one variable is present and to false
+      otherwise.
+     */
+    MSelectableDataSource checkIfSingleDataSourceWithSingleVariableIsPresent(bool *ok);
+
+    /**
+      Checks whether the @p source contains init times, valid times and
       ensemble members informations.
 
       Returns @return true if it contains all necessary data and @return false
@@ -114,7 +124,7 @@ public:
     static bool checkDataSourceForData(MWeatherPredictionDataSource *source);
 
     /**
-      Checks whether @param dataSourceID describes a data source for
+      Checks whether @p dataSourceID describes a data source for
       trajectories by checking for the data sources needed (reader, normals,
       timestepFilter).
 

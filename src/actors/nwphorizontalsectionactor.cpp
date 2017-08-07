@@ -344,6 +344,33 @@ void MNWPHorizontalSectionActor::loadConfiguration(QSettings *settings)
 {
     MNWPMultiVarActor::loadConfiguration(settings);
 
+    // Special case: If Met.3D is connected to Metview (i.e. run in "Metview
+    // mode") AND the dataset passed from Metview contains only a single
+    // variable AND by default an empty horizontal section is created, THEN the
+    // variable in the dataset shall be automatically added to the cross-section.
+    if (variables.size() == 0
+            && MSystemManagerAndControl::getInstance()->isConnectedToMetview())
+    {
+         MSelectDataSourceDialog dialog(this->supportedLevelTypes());
+         bool ok = false;
+
+         MSelectableDataSource dataSource =
+                 dialog.checkIfSingleDataSourceWithSingleVariableIsPresent(&ok);
+         if (ok)
+         {
+             // Create new actor variable.
+             MNWP2DHorizontalActorVariable *var =
+                     static_cast<MNWP2DHorizontalActorVariable*>(
+                         createActorVariable(dataSource));
+
+             // Add the variable to the actor.
+             addActorVariable(var, QString());
+             var->setTransferFunctionToFirstAvailable();
+             var->setRenderMode(
+                         MNWP2DSectionActorVariable::RenderMode::FilledContours);
+         }
+    }
+
     settings->beginGroup(MNWPHorizontalSectionActor::getSettingsID());
 
     setSlicePosition(settings->value("slicePosition_hPa", 500.).toDouble());

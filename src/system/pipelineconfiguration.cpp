@@ -85,8 +85,6 @@ void MPipelineConfiguration::configure()
 //    initializeDevelopmentDataPipeline();
 //    return;
 
-    // Indicates whether Met.3D was called by Metview.
-    bool metviewConnection = false;
     QString filename = "";
 
     // Scan global application command line arguments for pipeline definitions.
@@ -98,19 +96,13 @@ void MPipelineConfiguration::configure()
             filename = arg.remove("--pipeline=");
             filename = expandEnvironmentVariables(filename);
         }
-        if (arg.startsWith("--metview"))
-        {
-            metviewConnection = true;
-            QString msg = QString("Starting in Metview mode. ");
-            LOG4CPLUS_INFO(mlog, msg.toStdString());
-        }
     }
 
     QString errMsg = "";
     // If Met.3D is called by Metview and no configuration files are given,
     // use default configuration files stored at
     // $MET3D_HOME/config/metview/default_pipeline.cfg .
-    if (metviewConnection && filename.isEmpty())
+    if (sysMC->isConnectedToMetview() && filename.isEmpty())
     {
         filename = "$MET3D_HOME/config/metview/default_pipeline.cfg";
         filename = expandEnvironmentVariables(filename);
@@ -129,7 +121,7 @@ void MPipelineConfiguration::configure()
         // Production build: Read pipeline configuration from file.
         // Disadvantage: Can only read parameters for the predefined
         // pipelines.
-        initializeDataPipelineFromConfigFile(filename, metviewConnection);
+        initializeDataPipelineFromConfigFile(filename);
         return;
     }
     else
@@ -157,7 +149,7 @@ void MPipelineConfiguration::initializeScheduler()
 
 
 void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
-        QString filename, bool metviewConnection)
+        QString filename)
 {
     LOG4CPLUS_INFO(mlog, "Loading data pipeline configuration from file "
                    << filename.toStdString() << "...");
@@ -213,7 +205,7 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
     // Get directories and file filters specified by path command line argument
     // if present.
     QList<MetviewGribFilePath> filePathList;
-    if (metviewConnection)
+    if (sysMC->isConnectedToMetview())
     {
         getMetviewGribFilePaths(&filePathList);
         // For Metview integration use directories and file filters specified by
@@ -231,7 +223,7 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
 
         // If Met.3D is called from Metview use only the first entry in the
         // pipeline configuration file to initialise each data source.
-        if (metviewConnection)
+        if (sysMC->isConnectedToMetview())
         {
             // Use name of first NWPPipeline entry in pipeline configuration as
             // name and append index for each new data source.

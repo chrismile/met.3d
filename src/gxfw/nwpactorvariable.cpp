@@ -1126,6 +1126,14 @@ bool MNWPActorVariable::setTransferFunction(QString tfName)
 }
 
 
+void MNWPActorVariable::setTransferFunctionToFirstAvailable()
+{
+    MQtProperties *properties = actor->getQtProperties();
+    // Set transfer function property to first entry below "None" if present.
+    properties->mEnum()->setValue(transferFunctionProperty, 1);
+}
+
+
 void MNWPActorVariable::useFlags(bool b)
 {
     useFlagsIfAvailable = b;

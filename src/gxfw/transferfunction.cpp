@@ -52,8 +52,8 @@ MTransferFunction::MTransferFunction(QObject *parent) :
     MActor(parent),
     tfTexture(nullptr),
     vertexBuffer(nullptr),
-    minimumValue(203.15),
-    maximumValue(303.15)
+    minimumValue(0.f),
+    maximumValue(100.f)
 {    
     // Create and initialise QtProperties for the GUI.
     // ===============================================
