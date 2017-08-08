@@ -5,7 +5,7 @@
 **  prediction data.
 **
 **  Copyright 2015-2017 Marc Rautenhaus
-**  Copyright 2015-2017 Bianca Tost
+**  Copyright 2016-2017 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -55,7 +55,7 @@ using namespace std;
 
 unsigned int abs(unsigned int a)
 {
-	return a;
+    return a;
 }
 
 #endif
@@ -2683,10 +2683,11 @@ MNWP2DHorizontalActorVariable::MNWP2DHorizontalActorVariable(
     : MNWP2DSectionActorVariable(actor),
       spatialTransferFunction(nullptr),
       textureUnitSpatialTransferFunction(-1),
-      llcrnrlon(0),
-      llcrnrlat(0),
-      urcrnrlon(0),
-      urcrnrlat(0),
+      llcrnrlon(0.),
+      llcrnrlat(0.),
+      urcrnrlon(0.),
+      urcrnrlat(0.),
+      shiftForWesternLon(0.f),
       contourLabelSuffix("")
 {
     assert(actor != nullptr);
@@ -2869,17 +2870,9 @@ void MNWP2DHorizontalActorVariable::computeRenderRegionParameters(
 
     // Longitudes stored in ascending order.
 
-//FIXME (notes 18Apr2012)
-    // Still unsolved:
-    // -- If a grid falls apart into two disjunct regions, e.g. the grid is
-    //    defined from -90 to 90 and we want to render from 0 to 360.
-    // -- Repeating parts of a grid, e.g. the grid is defined from 0 to 360,
-    //    we want to render from -180 to 300.
-
     bool gridIsCyclic = grid->gridIsCyclicInLongitude();
 
     double shiftLon = grid->lons[0];
-    if (!gridIsCyclic) shiftLon = min(shiftLon, llcrnrlon);
 
 //WORKAROUND -- Usage of M_LONLAT_RESOLUTION defined in mutil.h
     // NOTE (mr, Dec2013): Workaround to fix a float accuracy problem
@@ -2901,19 +2894,19 @@ void MNWP2DHorizontalActorVariable::computeRenderRegionParameters(
 //                            i0, grid->lons[i0], float(grid->lons[i0]),
 //                            NMOD(grid->lons[i0]-shiftLon, 360.),
 //                            NMOD(llcrnrlon-shiftLon, 360.));
-        if (MMOD(grid->lons[i0]-shiftLon, 360.) + M_LONLAT_RESOLUTION
-                >= MMOD(llcrnrlon-shiftLon, 360.)) break;
+        if (MMOD(grid->lons[i0] - shiftLon, 360.) + M_LONLAT_RESOLUTION
+                >= MMOD(llcrnrlon - shiftLon, 360.)) break;
     }
     // Handle overshooting for non-cyclic grids (otherwise i0 = grid->nlons
     // if the bounding box is east of the grid domain).
     if (!gridIsCyclic) i0 = min(i0, grid->nlons-1);
 
     // Find the last lon index smaller than urcrnrlon.
-    int i1;
-    for (i1 = grid->nlons-1; i1 > 0; i1--)
+    unsigned int i1;
+    for (i1 = grid->nlons - 1; i1 > 0; i1--)
     {
-        if (MMOD(grid->lons[i1]-shiftLon, 360.)
-                <= MMOD(urcrnrlon-shiftLon, 360.)) break;
+        if (MMOD(grid->lons[i1] - shiftLon, 360.)
+                <= MMOD(urcrnrlon - shiftLon, 360.)) break;
     }
 
     // Latitude won't be cyclic, hence no modulo is required here.
@@ -2922,15 +2915,84 @@ void MNWP2DHorizontalActorVariable::computeRenderRegionParameters(
         if (grid->lats[j0] <= urcrnrlat) break;
     }
     int j1;
-    for (j1 = grid->nlats-1; j1 > 0; j1--)
+    for (j1 = grid->nlats - 1; j1 > 0; j1--)
     {
         if (grid->lats[j1] >= llcrnrlat) break;
     }
 
-    nlons = i1 - i0 + 1;
-    if (nlons < 0) nlons = grid->nlons + nlons; // handle cyclic grids
+
+    // Eastern bounding box border is  mapped by the modulo operation to the
+    // eastern side of the western border. We can treat the subregion defined by
+    // the mapped borders i0 and i1 as one subregion. (nlons = i1 - i0 + 1)
+
+    // Dies funktioniert auch, falls die westlichste und östlichste Teilregionen
+    // für sich genommen jeweils nur ein Ausschnitt der Gitterregion sind
+    // (eine Teilregion ergibt sich hierbei aus der Begrenzung durch die
+    // Boundingbox und einer Aufteilung des gesamten Raums in disjunkte
+    // Teilregionen mit einer Breite von 360° und einer westlichen Grenze
+    // entsprechend der westlichen Grenze plus ein (positives/negatives)
+    // Vielfaches von 360°). Grundsätzlich lässt berechnet sich nlons in diesem
+    // Fall nach folgender Formel:
+    //    nlonsWestPart + nlonsEastPart + nlonsGrid * numSubregions
+    //  mit (nlonsWestPart = grid->nlons - i0) und (nlonsEastPart = i1 + 1) folgt:
+    //   (i1 + 1 + grid->nlons - i0) + (grid->nlons * numSubregions)
+    // Wobei numSubregions die Anzahl der disjunkten Teilregionen angibt, die
+    // vollständig in der Boundingbox enthalten sind.
+    // Wird die östliche Grenze westlich der westlichen Grenze abgebildet, so
+    // gilt:
+    //   (i1 < i0) -> (i1 - i0 <= -1) -> (i1 - i0 + grid->nlons) < grid->nlons
+    // Da wiederum gilt, dass in einer Boundingboxregion von 360° Breite, die
+    // Gitterregion ein Mal enthalten ist, muss der Abstand zwischen der
+    // westlichen und östlichen Boundingboxgrenze (abzüglich 360° für jede
+    // vollständig enthaltenen Teilregion) in diesem Fall kleiner als 360° sein.
+    // Wiederrum gilt:
+    //   (i1 >= i0) -> (i1 - i0 >= 0) -> (i1 - i0 + grid->nlons) >= grid->nlons
+    // Der Umkehrschluss zeigt, dass, wenn die östliche Boundingboxgrenze
+    // östlich der westlichen abgebildet wird, der Abstand zwischen den
+    // Boundingboxgrenzen (abzüglich der vollständig enthaltenen Teilregion)
+    // größer als 360° sein muss (ausgenommen Boundingbox mit einer
+    // Gesammtbreite unter 360°). Da die Boundingbox abzüglich der Teilregionen
+    // größer als 360° ist, ergibt sich:
+    //    factor = floor((urcrnrlon - llcrnrlon) / 360.) = numSubregions + 1
+    // Außerdem lässt sich die Formel für nlons folgendermaßen umstellen:
+    //    (i1 - i0 + 1) + nlonsGrid * (numSubregions + 1)
+    // Da wir factor für die Abschätzung von numSubregions nutzen, können wir
+    // also für den Fall, dass die östliche Boundingboxgrenze östlich der
+    // westlichen Boundingboxgrenze abgebildet wird, stets (i1 - i0 + 1) zur
+    // Berechnung von nlons in einem ersten Schritt nutzen.
+    // Für Boundingboxbreiten unter 360° können nur dann seperate Teilregionen
+    // entstehen, wenn die östliche Boundingboxgrenze westlich der westlichen
+    // Boundingboxgrenze abgebildet wird.
+
+    // Eastern bunding box boundery is mapped by the modulo operation to the
+    // east of the mapped western boundery.
+    if (MMOD(llcrnrlon - shiftLon, 360.)  <= MMOD(urcrnrlon - shiftLon, 360.))
+    {
+        nlons = i1 - i0 + 1;
+    }
+    // Eastern border of the bounding box is mapped by the modulo operation to
+    // the western side of the western border thus we treat the western and
+    // eastern regions separately. The eastern sub-region goes from i0 to
+    // nlons (nlons = grid->nlons - i0) and the western subregion from
+    // 0 to i1 (nlons = i1 + 1).
+
+    // Eastern bunding box boundery is mapped by the modulo operation to the
+    // west of the mapped western boundery.
+    else
+    {
+        nlons = i1 + grid->nlons - i0 + 1;
+    }
+
+    // Since the modulo operation maps to a domain of width 360, it is necessary
+    // to add the missing width if the domain is larger than 360.
+    nlons += floor((urcrnrlon - llcrnrlon) / 360.) * grid->nlons;
+
     nlats = j1 - j0 + 1;
     if (nlats < 0) nlats = 0;
+
+    // Compute initial shift to place the grid at the correct position during
+    // rendering. It contains a multiple of 360.
+    shiftForWesternLon = float(floor((llcrnrlon - grid->lons[0]) / 360) * 360.f);
 
     LOG4CPLUS_DEBUG(mlog, "(grid is " << (gridIsCyclic ? "" : "not")
                     << " cyclic; shiftLon = " << shiftLon << ") "
@@ -2953,9 +3015,18 @@ void MNWP2DHorizontalActorVariable::updateContourIndicesFromTargetGrid(
     // Set the current isovalue to the target grid's vertical coordinate.
     targetGrid2D->levels[0] = slicePosition_hPa;
 
+    // Number of longitudinal grid points required for rendering.
+    int numRequiredDataLons = nlons - 1;
+    // Use the sub grid but don't overshoot the grid's nlons (nlons can contain
+    // a number larger than grid->nlons). maskRectangularRegion() does not
+    // mark the outside region correctly if the provided nlons is larger than
+    // the grid's nlons.
+    numRequiredDataLons = min(numRequiredDataLons, int(grid->nlons - 1));
+
     // Set the target grid points outside the render domain to
     // MISSING_VALUE, so that min() and max() work correctly.
-    targetGrid2D->maskRectangularRegion(i0, j0, 0, nlons-1, nlats-1, 1);
+    targetGrid2D->maskRectangularRegion(
+                i0, j0, 0, numRequiredDataLons, nlats-1, 1);
 
     float tgmin = targetGrid2D->min();
     float tgmax = targetGrid2D->max();

@@ -5,8 +5,8 @@
 **  prediction data.
 **
 **  Copyright 2015-2017 Marc Rautenhaus
-**  Copyright 2015-2017 Michael Kern
-**  Copyright 2015-2017 Bianca Tost
+**  Copyright 2015      Michael Kern
+**  Copyright 2016-2017 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -1465,8 +1465,11 @@ void MNWPHorizontalSectionActor::renderVerticalInterpolation(
     glVerticalInterpolationEffect->setUniformValue(
                 "jOffset", GLint(var->j0)); CHECK_GL_ERROR;
 
+    // We don't want to compute entries twice thus we need to use at most the
+    // width of the grid. (var->nlons can be larger than the grid size)
     glDrawArraysInstanced(GL_POINTS,
-                          0, var->nlons, var->nlats); CHECK_GL_ERROR;
+                          0, min(var->nlons, int(var->grid->nlons + 1)),
+                          var->nlats); CHECK_GL_ERROR;
 }
 
 
@@ -1608,8 +1611,11 @@ void MNWPHorizontalSectionActor::renderVerticalInterpolationDifference(
 
     glVerticalInterpolationEffect->setUniformValue("mode", differenceMode);
 
+    // We don't want to compute entries twice thus we need to use at most the
+    // width of the grid. (var->nlons can be larger than the grid size)
     glDrawArraysInstanced(GL_POINTS,
-                          0, var->nlons, var->nlats); CHECK_GL_ERROR;
+                          0, min(var->nlons, int(var->grid->nlons + 1)),
+                          var->nlats); CHECK_GL_ERROR;
 }
 
 
@@ -1670,6 +1676,14 @@ void MNWPHorizontalSectionActor::renderFilledContours(
     glFilledContoursShader->setUniformValue(
                 "bboxLons", QVector2D(bBoxConnection->westLon(),
                                       bBoxConnection->eastLon())); CHECK_GL_ERROR;
+    glFilledContoursShader->setUniformValue(
+                "isCyclicGrid",
+                GLboolean(var->grid->gridIsCyclicInLongitude())); CHECK_GL_ERROR;
+    glFilledContoursShader->setUniformValue(
+                "leftGridLon", GLfloat(var->grid->lons[0])); CHECK_GL_ERROR;
+    glFilledContoursShader->setUniformValue(
+                "shiftForWesternLon",
+                GLfloat(var->shiftForWesternLon)); CHECK_GL_ERROR;
 
     // Use instanced rendering to avoid geometry upload (see notes 09Feb2012).
     glPolygonOffset(.8f, 1.0f); CHECK_GL_ERROR;
@@ -1703,6 +1717,12 @@ void MNWPHorizontalSectionActor::renderPseudoColour(
                 "iOffset", GLint(var->i0)); CHECK_GL_ERROR;
     glPseudoColourShader->setUniformValue(
                 "jOffset", GLint(var->j0)); CHECK_GL_ERROR;
+    glPseudoColourShader->setUniformValue(
+                "isCyclicGrid",
+                GLboolean(var->grid->gridIsCyclicInLongitude())); CHECK_GL_ERROR;
+    glPseudoColourShader->setUniformValue(
+                "shiftForWesternLon",
+                GLfloat(var->shiftForWesternLon)); CHECK_GL_ERROR;
 
     glPseudoColourShader->setUniformValue(
                 "worldZ", GLfloat(sceneView->worldZfromPressure(slicePosition_hPa)));
@@ -1764,6 +1784,14 @@ void MNWPHorizontalSectionActor::renderLineCountours(
     glMarchingSquaresShader->setUniformValue(
                 "bboxLons", QVector2D(bBoxConnection->westLon(),
                                       bBoxConnection->eastLon())); CHECK_GL_ERROR;
+    glMarchingSquaresShader->setUniformValue(
+                "isCyclicGrid",
+                GLboolean(var->grid->gridIsCyclicInLongitude())); CHECK_GL_ERROR;
+    glMarchingSquaresShader->setUniformValue(
+                "leftGridLon", GLfloat(var->grid->lons[0])); CHECK_GL_ERROR;
+    glMarchingSquaresShader->setUniformValue(
+                "shiftForWesternLon",
+                GLfloat(var->shiftForWesternLon)); CHECK_GL_ERROR;
 
     glMarchingSquaresShader->setUniformValue(
                 "worldZ", GLfloat(sceneView->worldZfromPressure(slicePosition_hPa)));
@@ -1930,16 +1958,6 @@ void MNWPHorizontalSectionActor::renderTexturedContours(
                        0,                        // layer
                        GL_READ_WRITE,            // shader access
                        GL_R32F); CHECK_GL_ERROR; // format
-    // TODO:
-//    glBindImageTexture(var->imageUnitTargetGrid, // image unit
-//                       var->textureTargetGrid->getTextureObject(),
-//                                                 // texture object
-//                       0,                        // level
-//                       GL_FALSE,                 // layered
-//                       0,                        // layer
-//                       GL_READ_WRITE,            // shader access
-//                       // GL_WRITE_ONLY,         // shader access
-//                       GL_RG32F); CHECK_GL_ERROR; // format
 
     glTexturedContoursShader->setUniformValue(
                 "crossSectionGrid", GLint(var->imageUnitTargetGrid)); CHECK_GL_ERROR;
@@ -1952,6 +1970,14 @@ void MNWPHorizontalSectionActor::renderTexturedContours(
     glTexturedContoursShader->setUniformValue(
                 "bboxLons", QVector2D(bBoxConnection->westLon(),
                                       bBoxConnection->eastLon())); CHECK_GL_ERROR;
+    glTexturedContoursShader->setUniformValue(
+                "isCyclicGrid",
+                GLboolean(var->grid->gridIsCyclicInLongitude())); CHECK_GL_ERROR;
+    glTexturedContoursShader->setUniformValue(
+                "leftGridLon", GLfloat(var->grid->lons[0])); CHECK_GL_ERROR;
+    glTexturedContoursShader->setUniformValue(
+                "shiftForWesternLon",
+                GLfloat(var->shiftForWesternLon)); CHECK_GL_ERROR;
 
     // Use instanced rendering to avoid geometry upload (see notes 09Feb2012).
     glPolygonOffset(.8f, 1.0f); CHECK_GL_ERROR;

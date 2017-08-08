@@ -604,6 +604,20 @@ protected:
     double urcrnrlon;
     double urcrnrlat;
 
+    /**
+     Contains signed distance from left border of grid to left border of
+     bounding box in a multiple of 360 and needs to be added to vertex position
+     during rendering to position grid correctly.
+
+     During rendering the grid is placed correctly to its given coordinates but
+     if the bounding box starts outside this region (distance between western
+     border of bounding box and western border of grid greater than 360° in
+     western or eastern direction), the placement does not work correctly
+     anymore. Thus we need to add a inital shift to the world space coordinate
+     of a vertex during rendering.
+    */
+    float shiftForWesternLon;
+
     /** Properties of the contour labels */
     QtProperty* contourLabelSuffixProperty;
     QString contourLabelSuffix;
