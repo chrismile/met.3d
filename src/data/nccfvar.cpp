@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2015-2017 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -70,7 +71,7 @@ NcCFVar::NcCFVar()
 {
     // The following regular expression matches valid time units strings from
     // the "units" attribute of the time variable.
-    // Cf. http://cf-pcmdi.llnl.gov/documents/cf-conventions/1.5/cf-conventions.html#time-coordinate.
+    // Cf. http://cfconventions.org/cf-conventions/v1.6.0/cf-conventions.html#time-coordinate .
     // The groups of the expression are set so that they extract date and time
     // etc. (mr, 14Sept2011).
 
@@ -111,110 +112,170 @@ NcCFVar::NcCFVar(const NcVar& rhs)
 ***                            PUBLIC METHODS                               ***
 *******************************************************************************/
 
+// To treat rotated grids as regular grids it is necessary for both rotated
+// and regular longitude and latitude variables to be recognize as
+// longitude and latitude variables respectively. Thus more than one
+// standard name is needed at the moment.
 NcVar NcCFVar::getCFCoordinateVar(const vector<string>& units,
-                                  const string& standardname,
+                                  const vector<string>& standardnames,
                                   bool requirepositive) const
 {
     string attribute;
 
     // Loop over all coordinate (=dimension) variables of this variable.
-    for (int i = 0; i < getDimCount(); i++) {
+    for (int i = 0; i < getDimCount(); i++)
+    {
         NcVar var = getParentGroup().getVar(getDim(i).getName());
 
         // If 'requirepositive' is true, the coordinate variable has to have
         // the 'positive' attribute. This is relevant for vertical dimensions,
         // cf.
-        // http://cf-pcmdi.llnl.gov/documents/cf-conventions/1.5/cf-conventions.html#vertical-coordinate
-        if (requirepositive) {
-            try {
+        // http://cfconventions.org/cf-conventions/v1.6.0/cf-conventions.html#vertical-coordinate
+        if (requirepositive)
+        {
+            try
+            {
                 var.getAtt("positive").getValues(attribute);
                 // The 'positive' attribute is present but contains a value
                 // other that 'up' or 'down': Continue with next variable.
-                if (!((attribute == "up") || (attribute == "down"))) continue;
+                if (!((attribute == "up") || (attribute == "down")))
+                {
+                    continue;
+                }
             }
             // An NcException here means that the 'positive' attribute is not
             // defined for the variable. Continue with next variable.
-            catch (NcException) {
+            catch (NcException)
+            {
                 continue;
             }
         }
 
         // Try to match one of the values of the 'units' vector to the units
         // attribute of the variable, if available.
-        try {
+        try
+        {
             var.getAtt("units").getValues(attribute);
-            for (unsigned int i=0; i<units.size(); i++)
-                if (attribute == units[i]) return var;
+            for (unsigned int i = 0; i < units.size(); i++)
+            {
+                // degrees attribute is not unique and thus cannot be used to
+                // distinguish different horizontal coordinates.
+                if (attribute == units[i] && attribute != "degrees")
+                {
+                    return var;
+                }
+            }
         }
         // An NcException here means that the 'units' attribute is not defined
         // for the variable. Skip.
         catch (NcException) {}
 
-        // Test if the standard name of the variable (if available) equals the
-        // standard name we're looking for.
-        try {
+        // Test if the standard name of the variable (if available) equals one
+        // of the standard names we're looking for.
+        try
+        {
             var.getAtt("standard_name").getValues(attribute);
-            if (attribute == standardname) return var;
+            for (unsigned int i = 0; i < standardnames.size(); i++)
+            {
+                if (attribute == standardnames[i])
+                {
+                    return var;
+                }
+            }
         }
         catch (NcException) {}
     }
 
     // If we get here no variable has been identified. Throw an exception.
-    throw MNcException("NcException", "CF coordinate variable '" + standardname
-                      + "' not found", __FILE__, __LINE__);
+    throw MNcException("NcException", "CF coordinate variable '"
+                       + standardnames[0] + "' not found", __FILE__, __LINE__);
 }
 
 
 NcVar NcCFVar::getLatitudeVar()
 {
     // List of units from which the latitude variable can be recognised
-    // (http://cf-pcmdi.llnl.gov/documents/cf-conventions/1.5/cf-conventions.html#latitude-coordinate).
+    // (http://cfconventions.org/cf-conventions/v1.6.0/cf-conventions.html#latitude-coordinate).
     // (NOTE: extended initialiser lists require the C++-0x standard).
     vector<string> units = {"degrees_north", "degree_north", "degree_N",
-                            "degrees_N", "degreeN", "degreesN"};
+                            "degrees_N", "degreeN", "degreesN", "degrees"};
+
+    vector<string> standardNames = {"latitude", "grid_latitude"};
 
     // Find a variable whose 'units' attribute equals one of the specified
     // values or whose 'standard_name' attribute equals 'latitude'.
-    return getCFCoordinateVar(units, "latitude");
+    return getCFCoordinateVar(units, standardNames);
+}
+
+
+NcVar NcCFVar::getRotatedLatitudeVar()
+{
+    // List of units from which the latitude variable can be recognised
+    // (http://cfconventions.org/cf-conventions/v1.6.0/cf-conventions.html#latitude-coordinate).
+    // (NOTE: extended initialiser lists require the C++-0x standard).
+    vector<string> units = {"degrees"};
+
+    vector<string> standardNames = {"grid_latitude"};
+
+    // Find a variable whose 'units' attribute equals one of the specified
+    // values or whose 'standard_name' attribute equals 'latitude'.
+    return getCFCoordinateVar(units, standardNames);
 }
 
 
 NcVar NcCFVar::getLongitudeVar()
 {
     // List of units from which the longitude variable can be recognised
-    // (http://cf-pcmdi.llnl.gov/documents/cf-conventions/1.5/cf-conventions.html#longitude-coordinate).
+    // (http://cfconventions.org/cf-conventions/v1.6.0/cf-conventions.html#longitude-coordinate).
     // (NOTE: extended initialiser lists require the C++-0x standard).
     vector<string> units = {"degrees_east", "degree_east", "degree_E",
-                            "degrees_E", "degreeE", "degreesE"};
+                            "degrees_E", "degreeE", "degreesE", "degrees"};
+
+    vector<string> standardNames = {"longitude", "grid_longitude"};
 
     // Find a variable whose 'units' attribute equals one of the specified
     // values or whose 'standard_name' attribute equals 'longitude'.
-    return getCFCoordinateVar(units, "longitude");
+    return getCFCoordinateVar(units, standardNames);
+}
+
+
+NcVar NcCFVar::getRotatedLongitudeVar()
+{
+    // List of units from which the longitude variable can be recognised
+    // (http://cfconventions.org/cf-conventions/v1.6.0/cf-conventions.html#longitude-coordinate).
+    // (NOTE: extended initialiser lists require the C++-0x standard).
+    vector<string> units = {"degrees"};
+
+    vector<string> standardNames = {"grid_longitude"};
+
+    // Find a variable whose 'units' attribute equals one of the specified
+    // values or whose 'standard_name' attribute equals 'longitude'.
+    return getCFCoordinateVar(units, standardNames);
 }
 
 
 NcVar NcCFVar::getVerticalCoordinatePressure()
 {
     // The vertical pressure coordinate is identifyable by units of pressure, cf.
-    // http://cf-pcmdi.llnl.gov/documents/cf-conventions/1.5/cf-conventions.html#vertical-coordinate
+    // http://cfconventions.org/cf-conventions/v1.6.0/cf-conventions.html#vertical-coordinate
     vector<string> units = {"Pa", "hPa", "bar", "millibar",
                             "decibar", "atmosphere", "atm"};
-    return getCFCoordinateVar(units, "", true);
+    return getCFCoordinateVar(units, {""}, true);
 }
 
 
 NcVar NcCFVar::getVerticalCoordinateHybridSigmaPressure(NcVar *ap, NcVar *b,
                                                         QString* psfcName)
 {
-    // http://cf-pcmdi.llnl.gov/documents/cf-conventions/1.5/cf-conventions.html#dimensionless-vertical-coordinate
+    // http://cfconventions.org/cf-conventions/v1.6.0/cf-conventions.html#dimensionless-vertical-coordinate
     vector<string> units = {"level", "layer", "sigma_level", ""};
     NcVar hybridVar = getCFCoordinateVar(
-                units, "atmosphere_hybrid_sigma_pressure_coordinate", true);
+                units, {"atmosphere_hybrid_sigma_pressure_coordinate"}, true);
 
     // Identify the variables that accomodate the ap and b coefficients for
     // computing model level pressure. The variable names are stored in
     // the "formula_terms" attribute, as described in the CF conventions:
-    // http://cf-pcmdi.llnl.gov/documents/cf-conventions/1.5/cf-conventions.html#dimensionless-v-coord
+    // http://cfconventions.org/cf-conventions/v1.6.0/cf-conventions.html#dimensionless-v-coord
     string formulaTerms = "";
     try { hybridVar.getAtt("formula_terms").getValues(formulaTerms); }
     catch (NcException) {}
@@ -242,7 +303,7 @@ NcVar NcCFVar::getVerticalCoordinateHybridSigmaPressure(NcVar *ap, NcVar *b,
 NcVar NcCFVar::getVerticalCoordinatePotVort()
 {
     vector<string> units = {"10-6Km2/kgs"};
-    return getCFCoordinateVar(units, "", true);
+    return getCFCoordinateVar(units, {""}, true);
 }
 
 
@@ -577,6 +638,137 @@ bool NcCFVar::isCFDataVariable(const NcVar& var, NcVariableGridType type)
 }
 
 
+bool NcCFVar::isCFGridMappingVariable(const NcVar& var)
+{
+    string attribute;
+    try
+    {
+        var.getAtt("grid_mapping_name").getValues(attribute);
+        // The 'grid_mapping_name' attribute is present but contains a value
+        // other that 'rotated_latitude_longitude': return false.
+        if ((attribute != "rotated_latitude_longitude"))
+        {
+            return false;
+        }
+        return true;
+    }
+    // An NcException here means that the 'grid_mapping_name' attribute is not
+    // defined for the variable i.e. variable is not a grid mapping variable.
+    catch (NcException)
+    {
+        return false;
+    }
+}
+
+
+bool NcCFVar::isDefinedOnRotatedGrid(const NcVar& var,
+                                    const QStringList gridMappingVarNames,
+                                    QString *gridMappingVarName)
+{
+    string attribute;
+    NcVar coordinateVar;
+    // Test if variable has grid mapping attribute.
+    try
+    {
+        var.getAtt("grid_mapping").getValues(attribute);
+        *gridMappingVarName = "";
+        foreach (*gridMappingVarName, gridMappingVarNames)
+        {
+            if (attribute == gridMappingVarName->toStdString())
+            {
+                break;
+            }
+        }
+        // The 'grid_mapping' attribute is present but contains a value
+        // other that stored in gridMappingVarName: return false.
+        if ((attribute != gridMappingVarName->toStdString()))
+        {
+            return false;
+        }
+        NcCFVar cfvar(var);
+        // Test if variable has rotated longitude dimension.
+        try
+        {
+            coordinateVar = cfvar.getRotatedLongitudeVar();
+            // Test if variable has rotated latitude dimension.
+            try
+            {
+                coordinateVar = cfvar.getRotatedLatitudeVar();
+                return true;
+            }
+            // An NcException here means that there was no dimension found
+            // fulfiling the requirements of being latitude dimension in a
+            // rotated grid.
+            catch (NcException)
+            {
+                return false;
+            }
+        }
+        // An NcException here means that there was no dimension found fulfiling
+        // the requirements of being longitude dimension in a rotated grid.
+        catch (NcException)
+        {
+            return false;
+        }
+    }
+    // An NcException here means that the 'grid_mapping_name' attribute is not
+    // defined for the variable i.e. variable is not a grid mapping variable.
+    catch (NcException)
+    {
+        return false;
+    }
+
+}
+
+
+bool NcCFVar::getRotatedNorthPoleCoordinates(const NcVar& gridMappingVar,
+                                        float *rotatedNorthPoleLon,
+                                        float *rotatedNorthPoleLat)
+{
+    string attribute;
+
+    try
+    {
+        gridMappingVar.getAtt("grid_mapping_name").getValues(attribute);
+        if (attribute != "rotated_latitude_longitude")
+        {
+            return false;
+        }
+    }
+    catch (NcException)
+    {
+        return false;
+    }
+
+    float coordinate;
+
+    try
+    {
+        gridMappingVar.getAtt("grid_north_pole_longitude").getValues(
+                    &coordinate);
+        *rotatedNorthPoleLon = coordinate;
+
+    }
+    catch (NcException)
+    {
+        return false;
+    }
+
+    try
+    {
+        gridMappingVar.getAtt("grid_north_pole_latitude").getValues(
+                    &coordinate);
+        *rotatedNorthPoleLat = coordinate;
+        return true;
+    }
+    catch (NcException)
+    {
+        return false;
+    }
+
+}
+
+
 /******************************************************************************
 ***                           PRIVATE METHODS                               ***
 *******************************************************************************/
@@ -603,7 +795,7 @@ bool NcCFVar::parseTimeUnits(QString units, QDateTime *baseTime,
 
     // First group: unit of the time axis. Convert abbreviations to the full
     // name. (Cf.
-    // http://cf-pcmdi.llnl.gov/documents/cf-conventions/1.5/cf-conventions.html#time-coordinate).
+    // http://cfconventions.org/cf-conventions/v1.6.0/cf-conventions.html#time-coordinate).
     // Note that a possibly present plural "s" (e.g. minute"s") is removed
     // by the regular expression parser.
     *timeUnit = parsedValues.at(1).toLower();

@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2015-2017 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -220,6 +221,63 @@ QString MGribReader::variableSurfacePressureName(
                 "unkown variable requested: " + variableName.toStdString(),
                 __FILE__, __LINE__);
     return availableDataFields[levelType][variableName]->surfacePressureName;
+}
+
+
+MHorizontalGridType MGribReader::variableHorizontalGridType(MVerticalLevelType levelType,
+                                   const QString&     variableName)
+{
+    QReadLocker availableItemsReadLocker(&availableItemsLock);
+    if (!availableDataFields.keys().contains(levelType))
+        throw MBadDataFieldRequest(
+                "unkown level type requested: " +
+                MStructuredGrid::verticalLevelTypeToString(levelType).toStdString(),
+                __FILE__, __LINE__);
+    if (!availableDataFields[levelType].keys().contains(variableName))
+        throw MBadDataFieldRequest(
+                "unkown variable requested: " + variableName.toStdString(),
+                __FILE__, __LINE__);
+    return availableDataFields[levelType][variableName]->horizontalGridType;
+}
+
+
+QVector2D MGribReader::variableRotatedNorthPoleCoordinates(
+        MVerticalLevelType levelType, const QString& variableName)
+{
+    QReadLocker availableItemsReadLocker(&availableItemsLock);
+    if (!availableDataFields.keys().contains(levelType))
+    {
+        throw MBadDataFieldRequest(
+                    "unkown level type requested: " +
+                    MStructuredGrid::verticalLevelTypeToString(levelType).toStdString(),
+                    __FILE__, __LINE__);
+    }
+    if (!availableDataFields[levelType].keys().contains(variableName))
+    {
+        throw MBadDataFieldRequest(
+                    "unkown variable requested: " + variableName.toStdString(),
+                    __FILE__, __LINE__);
+    }
+    if (availableDataFields[levelType][variableName]->horizontalGridType
+            != ROTATED_LONLAT)
+    {
+        throw MBadDataFieldRequest(
+                    "Rotated north pole coordinates requested for grid not "
+                    "rotated", __FILE__, __LINE__);
+    }
+    // TODO (bt, 09Feb2017): Adapt to get rotated north pole coordinates
+    // read from grib file. Reading rotated north pole coordinates from grib
+    // file isn't implemented yet. If done, coordinates could be read like this:
+
+    //    QVector2D coordinates;
+    //    coordinates.setX(
+    //                availableDataFields[levelType][variableName]
+    //                ->rotatedNorthPoleLon);
+    //    coordinates.setY(
+    //                availableDataFields[levelType][variableName]
+    //                ->rotatedNorthPoleLat);
+    QVector2D coordinates(0.f, 0.f);
+    return coordinates;
 }
 
 
@@ -628,6 +686,8 @@ void MGribReader::scanDataRoot()
                     // Fill lat/lon arrays.
                     vinfo->lons = gmiInfo.lons;
                     vinfo->lats = gmiInfo.lats;
+                    // TODO (bt, 08FEB2017) Adapt to set type according to the data read.
+                    vinfo->horizontalGridType = MHorizontalGridType::REGULAR_LONLAT;
 
                     if (levelType == HYBRID_SIGMA_PRESSURE_3D)
                     {

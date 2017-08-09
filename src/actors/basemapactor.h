@@ -4,8 +4,9 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
-**  Copyright 2015 Michael Kern
+**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2015-2017 Michael Kern
+**  Copyright 2015-2017 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -33,9 +34,10 @@
 // related third party imports
 #include <GL/glew.h>
 #include <QtProperty>
+#include <ogr_geometry.h>
 
 // local application imports
-#include "gxfw/mactor.h"
+#include "gxfw/rotatedgridsupportingactor.h"
 #include "gxfw/gl/shadereffect.h"
 #include "gxfw/gl/texture.h"
 
@@ -50,7 +52,7 @@ namespace Met3D
   @brief MBaseMapActor draws a map into the scene. Map raster data is loaded
   from a GeoTiff file.
   */
-class MBaseMapActor : public MActor
+class MBaseMapActor : public MRotatedGridSupportingActor
 {
 public:
     MBaseMapActor();
@@ -88,6 +90,27 @@ protected:
 
 private:
     void loadMap(std::string filename);
+    /**
+      @brief getBBoxOfRotatedBBox calcuates a rectangle bounding box in
+      rotated coordinates covering the region of a complete map.
+
+      @return QVector4D storing coordinates of the corners of the bounding box
+      computed stored in the order leftX, lowerY, rightX, upperY.
+     */
+    QVector4D getBBoxOfRotatedBBox();
+
+    /**
+      adaptBBoxForRotatedGrids changes @ref bboxForRotatedGrids to contain
+      bounding box coordinates which can be used to determine the fragments of
+      the map to be drawn for rotated base map when the bounding box also needs
+      to be rotated. (Fragments because the map can fall appart in two or more
+      part because of the rotation.)
+
+      Since the rotation maps to the intervals [-180, 180] for longitudes and
+      [-90, 90] for latitudes the coordinates of the bounding box also needs to
+      be lie in these intervals.
+     */
+    void adaptBBoxForRotatedGrids();
 
     std::shared_ptr<GL::MShaderEffect> shaderProgram;
 
@@ -103,6 +126,7 @@ private:
     // Bounding box.
     QRectF      bbox;
     QtProperty* bboxProperty;
+    QVector4D   bboxForRotatedGrids;
 
     // Bounding box of the loaded map.
     float llcrnrlon;

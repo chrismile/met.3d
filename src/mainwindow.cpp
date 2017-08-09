@@ -681,7 +681,8 @@ void MMainWindow::addDataset()
                 pipelineConfig.memoryManagerID,
                 (MPipelineConfiguration::MNWPReaderFileFormat)pipelineConfig.dataFormat,
                 pipelineConfig.enableRegridding,
-                pipelineConfig.enableProbabiltyRegionFilter);
+                pipelineConfig.enableProbabiltyRegionFilter,
+                pipelineConfig.treatRotatedGridAsRegularGrid);
     }
 }
 

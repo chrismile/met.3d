@@ -42,6 +42,10 @@ size=2
 # Set "enableProbabilityRegionFilter" to "true" if you want to use the
 # probability region detection module.
 1\enableProbabilityRegionFilter=false
+# Set "treatRotatedGridAsRegularGrid" to "true" if you want to treat rotated
+# grids as regular grids. Setting it to false will cause rejection of data sets
+# with rotated grid coordinates.
+1\treatRotatedGridAsRegularGrid=false
 
 # Example configuration for an ensemble ECMWF CF-NetCDF dataset.
 2\name=ECMWF ENS EUR_LL10

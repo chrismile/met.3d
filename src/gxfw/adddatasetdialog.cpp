@@ -85,6 +85,8 @@ MNWPPipelineConfigurationInfo MAddDatasetDialog::getNWPPipelineConfigurationInfo
     d.memoryManagerID = memoryManagers.at(ui->memoryMCombo->currentIndex());
     d.schedulerID = "MultiThread";
     d.enableProbabiltyRegionFilter = ui->propRegBool->isChecked();
+    d.treatRotatedGridAsRegularGrid =
+            ui->treatRotatedAsRegularCheckBox->isChecked();
 
     return d;
 }

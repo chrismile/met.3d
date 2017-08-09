@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2015-2017 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -80,6 +81,7 @@ struct MGribVariableInfo
     QString surfacePressureName; // for variables on hybrid model levels
                                  // the name of the var containing the
                                  // corresponding sfc pressure field
+    MHorizontalGridType horizontalGridType;  // Enum representing the type of the grid.
 
     long nlons, nlats;
     double lon0, lat0, lon1, lat1, dlon, dlat;
@@ -176,6 +178,12 @@ public:
 protected:
     QString variableSurfacePressureName(MVerticalLevelType levelType,
                                         const QString&     variableName);
+
+    MHorizontalGridType variableHorizontalGridType(MVerticalLevelType levelType,
+                                       const QString&     variableName);
+
+    QVector2D variableRotatedNorthPoleCoordinates(MVerticalLevelType levelType,
+                                                  const QString& variableName);
 
     MStructuredGrid* readGrid(MVerticalLevelType levelType,
                               const QString&     variableName,
