@@ -82,9 +82,6 @@ void MFrontendConfiguration::configure()
 //    initializeDevelopmentFrontend();
 //    return;
 
-    // Indicates whether Met.3D was called by Metview.
-    bool metviewConnection = false;
-
     // Scan global application command line arguments for pipeline definitions.
     MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
     foreach (QString arg, sysMC->getApplicationCommandLineArguments())
@@ -98,17 +95,13 @@ void MFrontendConfiguration::configure()
             initializeFrontendFromConfigFile(filename);
             return;
         }
-        if (arg.startsWith("--metview"))
-        {
-            metviewConnection = true;
-        }
     }
 
     QString errMsg = "";
     // If Met.3D is called by Metview and no configuration files are given,
     // use default configuration files stored at
     // $MET3D_HOME/config/metview/default_frontend.cfg .
-    if (metviewConnection)
+    if (sysMC->isConnectedToMetview())
     {
         QString filename = "$MET3D_HOME/config/metview/default_frontend.cfg";
         filename = expandEnvironmentVariables(filename);

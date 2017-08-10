@@ -55,6 +55,7 @@ MSystemManagerAndControl::MSystemManagerAndControl(QWidget *parent) :
     QWidget(parent),
     ui(new Ui::MSystemControl),
     met3dAppIsInitialized(false),
+    connectedToMetview(false),
     mainWindow(nullptr),
     naturalEarthDataLoader(nullptr)
 {
@@ -190,6 +191,18 @@ void MSystemManagerAndControl::storeApplicationCommandLineArguments(
         QStringList arguments)
 {
     commandLineArguments = arguments;
+
+    // Parse command line arguments to check if application has been started
+    // from Metview.
+    foreach (QString arg, commandLineArguments)
+    {
+        if (arg.startsWith("--metview"))
+        {
+            connectedToMetview = true;
+            QString msg = QString("Starting in Metview mode. ");
+            LOG4CPLUS_INFO(mlog, msg.toStdString());
+        }
+    }
 }
 
 

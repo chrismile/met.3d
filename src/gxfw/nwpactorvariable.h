@@ -119,6 +119,12 @@ public:
     bool setTransferFunction(QString tfName);
 
     /**
+      setTransferFunctionToFirstAvailable sets used transfer function to first
+      transfer function in transfer function list below 'None' if one is present.
+     */
+    void setTransferFunctionToFirstAvailable();
+
+    /**
       Set @p true if the datafield's "flags" bitfield, if available, should
       be transferred to GPU memory.
       */
