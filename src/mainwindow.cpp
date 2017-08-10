@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2016 Marc Rautenhaus
+**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2015-2017 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -127,9 +128,20 @@ MMainWindow::MMainWindow(QStringList commandLineArguments, QWidget *parent)
     ui->centralframe->setLayout(layout);
 
     // Initial layout settings.
-    setSceneViewLayout(1);
+    setSceneViewLayout(1);    
 
-    // Init application system resources.
+    // Initialise bounding box dock widget.
+    //==========================================================================
+    boundingBoxDock = new MBoundingBoxDockWidget();
+    boundingBoxDock->setAllowedAreas(Qt::BottomDockWidgetArea);
+    // Remove "x" corner button so the user can only hide the dock widget
+    // via the corresponding menu button.
+    boundingBoxDock->setFeatures(QDockWidget::DockWidgetMovable
+                                 | QDockWidget::DockWidgetFloatable);
+    boundingBoxDock->setVisible(false);
+    addDockWidget(Qt::BottomDockWidgetArea, boundingBoxDock);
+
+    // Initialise application system resources.
     // =========================================================================
 
     MApplicationConfigurationManager appConfig;
@@ -170,6 +182,8 @@ MMainWindow::MMainWindow(QStringList commandLineArguments, QWidget *parent)
             this, SLOT(setFullScreen(bool)));
     connect(ui->actionWaypoints, SIGNAL(toggled(bool)),
             this, SLOT(showWaypointsTable(bool)));
+    connect(ui->actionBoundingBoxes, SIGNAL(toggled(bool)),
+            this, SLOT(showBoundingBoxTable(bool)));
     connect(ui->actionSceneManagement, SIGNAL(triggered()),
             this, SLOT(sceneManagement()));
     connect(ui->actionAddDataset, SIGNAL(triggered()),
@@ -499,6 +513,12 @@ void MMainWindow::setFullScreen(bool b)
 void MMainWindow::showWaypointsTable(bool b)
 {
     waypointsTableDock->setVisible(b);
+}
+
+
+void MMainWindow::showBoundingBoxTable(bool b)
+{
+    boundingBoxDock->setVisible(b);
 }
 
 

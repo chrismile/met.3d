@@ -127,7 +127,9 @@ HEADERS += \
     src/actors/transferfunctioneditor/colour.h \
     src/actors/transferfunctioneditor/colourpicker.h \
     src/actors/transferfunctioneditor/editortransferfunction.h \
-    src/gxfw/rotatedgridsupportingactor.h
+    src/gxfw/rotatedgridsupportingactor.h \
+    src/gxfw/boundingbox/bboxdockwidget.h \
+    src/gxfw/boundingbox/boundingbox.h 
 
 SOURCES += \
     src/main.cpp \
@@ -222,7 +224,9 @@ SOURCES += \
     src/actors/transferfunctioneditor/colourpicker.cpp \
     src/actors/transferfunctioneditor/colour.cpp \
     src/actors/transferfunctioneditor/editortransferfunction.cpp \
-    src/gxfw/rotatedgridsupportingactor.cpp
+    src/gxfw/rotatedgridsupportingactor.cpp \
+    src/gxfw/boundingbox/bboxdockwidget.cpp \
+    src/gxfw/boundingbox/boundingbox.cpp
 
 FORMS += \
     src/mainwindow.ui \
@@ -235,7 +239,8 @@ FORMS += \
     src/gxfw/synccontrol.ui \
     src/gxfw/memberselectiondialog.ui \
     src/gxfw/adddatasetdialog.ui \
-    src/gxfw/resizewindowdialog.ui
+    src/gxfw/resizewindowdialog.ui \
+    src/gxfw/boundingbox/bboxdockwidget.ui
 
 OTHER_FILES += \
     data/log4cplus.properties \

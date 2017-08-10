@@ -318,7 +318,7 @@ private:
     void saveScreenshot();
 
     /**
-     * Handels taking and saving a screenshot of the scene to @param filename.
+     * Handles taking and saving a screenshot of the scene.
      */
     void saveScreenshotToFileName(QString filename);
 
@@ -478,7 +478,7 @@ private:
 
     /**
      * If this variable is set to true, Met.3D will write the files of a time
-     * series without checking if the file name allready exists.
+     * series without checking if the file name already exists.
      */
     bool overwriteImageSerie;
 };

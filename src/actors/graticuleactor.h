@@ -41,6 +41,7 @@
 #include "gxfw/gl/shadereffect.h"
 #include "gxfw/gl/vertexbuffer.h"
 #include "data/naturalearthdataloader.h"
+#include "gxfw/boundingbox/boundingbox.h"
 
 class MGLResourcesManager;
 class MSceneViewGLWidget;
@@ -56,20 +57,15 @@ namespace Met3D
   (cannot be changed by the user; the method is to sync a graticule with
   an hsec actor).
   */
-class MGraticuleActor : public MRotatedGridSupportingActor
+class MGraticuleActor : public MRotatedGridSupportingActor,
+        public MBoundingBoxInterface
 {
 public:
-    MGraticuleActor();
+    MGraticuleActor(MBoundingBoxConnection *boundingBoxConnection = nullptr);
 
     ~MGraticuleActor();
 
     void reloadShaderEffects();
-
-    /**
-      Set a horizontal bounding box for the region (lonEast, latSouth, width,
-      height).
-      */
-    void setBBox(QRectF bbox);
 
     /**
       Set the vertical position of the graticule in pressure coordinates.
@@ -86,6 +82,8 @@ public:
     void saveConfiguration(QSettings *settings) override;
 
     void loadConfiguration(QSettings *settings) override;
+
+    void onBoundingBoxChanged() override;
 
 protected:
     /**
@@ -122,7 +120,6 @@ private:
     QVector<int> borderlineStartIndices;
     QVector<int> borderlineVertexCount;
 
-    QtProperty *cornersProperty;
     QtProperty *spacingProperty;
     QtProperty *colourProperty;
     QColor graticuleColour;

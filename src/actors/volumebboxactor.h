@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2015-2017 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -38,6 +39,7 @@
 #include "gxfw/mactor.h"
 #include "gxfw/gl/shadereffect.h"
 #include "gxfw/gl/vertexbuffer.h"
+#include "gxfw/boundingbox/boundingbox.h"
 
 class MGLResourcesManager;
 class MSceneViewGLWidget;
@@ -54,7 +56,7 @@ namespace Met3D
   possible in properties browser -- that is.. something similar to QtDesigner
   with the toolbuttons?).
   */
-class MVolumeBoundingBoxActor : public MActor
+class MVolumeBoundingBoxActor : public MActor, public MBoundingBoxInterface
 {
 public:
     MVolumeBoundingBoxActor();
@@ -62,12 +64,6 @@ public:
     ~MVolumeBoundingBoxActor();
 
     void reloadShaderEffects();
-
-    /**
-      Set a horizontal bounding box for the region (lonEast, latSouth, width,
-      height).
-      */
-    void setBBox(QRectF bbox);
 
     /**
       Set the colour of the lines.
@@ -79,6 +75,8 @@ public:
     void saveConfiguration(QSettings *settings);
 
     void loadConfiguration(QSettings *settings);
+
+    void onBoundingBoxChanged();
 
 protected:
     void initializeActorResources();
@@ -97,9 +95,6 @@ private:
     QVector<QVector3D> axisTicks;
     GL::MVertexBuffer* axisVertexBuffer;
 
-    QtProperty *boxCornersProperty;
-    QtProperty *bottomPressureProperty;
-    QtProperty *topPressureProperty;
     QtProperty *tickLengthProperty;
     float       tickLength;
 

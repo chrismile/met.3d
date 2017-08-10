@@ -39,7 +39,7 @@
      <x>0</x>
      <y>0</y>
      <width>800</width>
-     <height>20</height>
+     <height>30</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -68,6 +68,7 @@
     <addaction name="actionSceneManagement"/>
     <addaction name="separator"/>
     <addaction name="actionWaypoints"/>
+    <addaction name="actionBoundingBoxes"/>
     <addaction name="separator"/>
     <addaction name="actionResizeWindow"/>
     <addaction name="actionFullScreen"/>
@@ -90,7 +91,7 @@
   </widget>
   <action name="actionExit">
    <property name="text">
-    <string>E&amp;xit</string>
+    <string>&amp;Exit</string>
    </property>
    <property name="shortcut">
     <string>Ctrl+X</string>
@@ -181,7 +182,7 @@
   </action>
   <action name="actionOnlineManual">
    <property name="text">
-    <string>Online &amp;Manual</string>
+    <string>&amp;Online Manual</string>
    </property>
    <property name="toolTip">
     <string>Open the online manual in a web browser</string>
@@ -189,7 +190,7 @@
   </action>
   <action name="actionReportABug">
    <property name="text">
-    <string>Report a &amp;Bug</string>
+    <string>&amp;Report a Bug</string>
    </property>
    <property name="toolTip">
     <string>Report a bug in the online issue tracker</string>
@@ -197,20 +198,31 @@
   </action>
   <action name="actionAboutMet3D">
    <property name="text">
-    <string>&amp;About Met.3D</string>
+    <string>About &amp;Met.3D</string>
    </property>
   </action>
   <action name="actionAboutQt">
    <property name="text">
-    <string>About &amp;Qt</string>
+    <string>&amp;About Qt</string>
    </property>
   </action>
   <action name="actionResizeWindow">
    <property name="text">
-    <string>Resize Window</string>
+    <string>&amp;Resize Window</string>
    </property>
    <property name="shortcut">
     <string>F5</string>
+   </property>
+  </action>
+  <action name="actionBoundingBoxes">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Show &amp;Bounding Boxes</string>
+   </property>
+   <property name="shortcut">
+    <string>F8</string>
    </property>
   </action>
  </widget>

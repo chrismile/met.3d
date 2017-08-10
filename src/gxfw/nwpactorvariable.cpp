@@ -2549,16 +2549,20 @@ bool MNWP2DSectionActorVariable::removeContourSet(int index)
     // Avoid removing all contour sets.
     if (contourSetList.size() > 1)
     {
-        QMessageBox yesNoBox;
-        yesNoBox.setWindowTitle("Delete contour set");
-        yesNoBox.setText(QString("Do you really want to delete "
-                                 "contour set #%1").arg(index + 1));
-        yesNoBox.setStandardButtons(QMessageBox::Yes | QMessageBox::No);
-        yesNoBox.setDefaultButton(QMessageBox::No);
-
-        if (yesNoBox.exec() != QMessageBox::Yes)
+        // Don't ask for confirmation during application start.
+        if (MSystemManagerAndControl::getInstance()->applicationIsInitialized())
         {
-            return false;
+            QMessageBox yesNoBox;
+            yesNoBox.setWindowTitle("Delete contour set");
+            yesNoBox.setText(QString("Do you really want to delete "
+                                     "contour set #%1").arg(index + 1));
+            yesNoBox.setStandardButtons(QMessageBox::Yes | QMessageBox::No);
+            yesNoBox.setDefaultButton(QMessageBox::No);
+
+            if (yesNoBox.exec() != QMessageBox::Yes)
+            {
+                return false;
+            }
         }
 
         ContourSettings *contourSet = &contourSetList[index];

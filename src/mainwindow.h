@@ -43,6 +43,7 @@
 #include "gxfw/synccontrol.h"
 #include "data/waypoints/waypointstableview.h"
 #include "gxfw/mresizewindowdialog.h"
+#include "gxfw/boundingbox/bboxdockwidget.h"
 
 
 namespace Ui {
@@ -87,10 +88,15 @@ public:
     MSceneManagementDialog *getSceneManagementDialog()
     { return sceneManagementDialog; }
 
+    MBoundingBoxDockWidget *getBoundingBoxDock()
+    { return boundingBoxDock; }
+
 public slots:
     void setFullScreen(bool b);
 
     void showWaypointsTable(bool b);
+
+    void showBoundingBoxTable(bool b);
 
     void setSceneViewLayout(int layout);
 
@@ -131,6 +137,8 @@ private:
 
     MWaypointsView *waypointsTableView;
     QDockWidget    *waypointsTableDock;
+
+    MBoundingBoxDockWidget *boundingBoxDock;
 
     int sceneViewLayout;
 };

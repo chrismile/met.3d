@@ -57,21 +57,23 @@ namespace Met3D
 
 MNWPHorizontalSectionActor::MNWPHorizontalSectionActor()
     : MNWPMultiVarActor(),
+      MBoundingBoxInterface(this),
       slicePosition_hPa(250.),
       slicePositionGranularity_hPa(5.0),
       slicePosSynchronizationActor(nullptr),
       updateRenderRegion(false),
       vbMouseHandlePoints(nullptr),
       selectedMouseHandle(-1),
-      horizontalBBox(QRectF(-60., 30., 100., 40.)),
       differenceMode(0),
       windBarbsVertexBuffer(nullptr),
       windBarbsSettings(),
       renderShadowQuad(true),
-      shadowColor(QColor(60,60,60,70)),
+      shadowColor(QColor(60, 60, 60, 70)),
       shadowHeight(0.01f)
 {
     enablePicking(true);
+    bBoxConnection =
+            new MBoundingBoxConnection(this, MBoundingBoxConnection::HORIZONTAL);
 
     // Create and initialise QtProperties for the GUI.
     // ===============================================
@@ -116,9 +118,7 @@ MNWPHorizontalSectionActor::MNWPHorizontalSectionActor()
     properties->mEnum()->setEnumNames(differenceModeProperty, differenceModeNames);
 
     // Horizontal bounding box of the actor.
-    boundingBoxProperty = addProperty(RECTF_LONLAT_PROPERTY, "bounding box",
-                                      actorPropertiesSupGroup);
-    properties->setRectF(boundingBoxProperty, horizontalBBox, 2);
+    actorPropertiesSupGroup->addSubProperty(bBoxConnection->getProperty());
 
     // Wind barbs.
     windBarbsSettings = new WindBarbsSettings(this);
@@ -140,9 +140,8 @@ MNWPHorizontalSectionActor::MNWPHorizontalSectionActor()
     // Keep an instance of GraticuleActor as a "subactor" to draw a graticule
     // on top of the section. The graticule's vertical position and bounding
     // box will be synchronized with the horizontal section.
-    graticuleActor = new MGraticuleActor();
+    graticuleActor = new MGraticuleActor(bBoxConnection);
     graticuleActor->setName("section graticule");
-    graticuleActor->setBBox(horizontalBBox);
     graticuleActor->setVerticalPosition(slicePosition_hPa);
     actorPropertiesSupGroup->addSubProperty(graticuleActor->getPropertyGroup());
 
@@ -292,12 +291,6 @@ void MNWPHorizontalSectionActor::reloadShaderEffects()
 }
 
 
-void MNWPHorizontalSectionActor::setBBox(QRectF bbox)
-{
-    properties->mRectF()->setValue(boundingBoxProperty, bbox);
-}
-
-
 void MNWPHorizontalSectionActor::setSurfaceShadowEnabled(bool enable)
 {
     properties->mBool()->setValue(shadowEnabledProp, enable);
@@ -311,8 +304,8 @@ void MNWPHorizontalSectionActor::saveConfiguration(QSettings *settings)
     settings->beginGroup(MNWPHorizontalSectionActor::getSettingsID());
 
     settings->setValue("slicePosition_hPa", slicePosition_hPa);
-    settings->setValue("boundingBox", horizontalBBox);
     settings->setValue("differenceMode", differenceMode);
+    MBoundingBoxInterface::saveConfiguration(settings);
     settings->setValue("shadowEnabled", renderShadowQuad);
     settings->setValue("shadowColor", shadowColor);
     settings->setValue("shadowHeight", shadowHeight);
@@ -374,7 +367,7 @@ void MNWPHorizontalSectionActor::loadConfiguration(QSettings *settings)
     settings->beginGroup(MNWPHorizontalSectionActor::getSettingsID());
 
     setSlicePosition(settings->value("slicePosition_hPa", 500.).toDouble());
-    setBBox(settings->value("boundingBox", QRectF(-60., 30., 100., 40.)).toRectF());
+    MBoundingBoxInterface::loadConfiguration(settings);
 
     properties->mInt()->setValue(
                 differenceModeProperty,
@@ -692,6 +685,32 @@ bool MNWPHorizontalSectionActor::isConnectedTo(MActor *actor)
 }
 
 
+void MNWPHorizontalSectionActor::onBoundingBoxChanged()
+{
+    labels.clear();
+    // Inform graticule actor about the bounding box change since it has no own
+    // connection to the bounding box.
+    graticuleActor->onBoundingBoxChanged();
+    if (suppressActorUpdates())
+    {
+        return;
+    }
+    // Switching to no bounding box only needs a redraw, but no recomputation
+    // because it disables rendering of the actor.
+    if (bBoxConnection->getBoundingBox() == nullptr)
+    {
+        emitActorChangedSignal();
+        return;
+    }
+    // The bbox position has changed. In the next render cycle, update the
+    // render region, download target grid from GPU and update contours.
+    computeRenderRegionParameters();
+    updateMouseHandlePositions();
+    crossSectionGridsNeedUpdate = true;
+    emitActorChangedSignal();
+}
+
+
 /******************************************************************************
 ***                             PUBLIC SLOTS                                ***
 *******************************************************************************/
@@ -837,19 +856,6 @@ void MNWPHorizontalSectionActor::onQtPropertyChanged(QtProperty *property)
         emitActorChangedSignal();
     }
 
-    else if (property == boundingBoxProperty)
-    {
-        horizontalBBox = properties->mRectF()->value(boundingBoxProperty);
-        if (suppressActorUpdates()) return;
-
-        // The bbox position has changed. In the next render cycle, update the
-        // render region, download target grid from GPU and update contours.
-        computeRenderRegionParameters();
-        updateMouseHandlePositions();
-        crossSectionGridsNeedUpdate = true;
-        emitActorChangedSignal();
-    }
-
     else if (property == differenceModeProperty)
     {
         differenceMode = properties->mEnum()->value(differenceModeProperty);
@@ -978,6 +984,12 @@ void MNWPHorizontalSectionActor::onOtherActorDeleted(MActor *actor)
 
 void MNWPHorizontalSectionActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
 {
+    // Draw nothing if no bounding box is available.
+    if (bBoxConnection->getBoundingBox() == nullptr)
+    {
+        return;
+    }
+
     // UPDATE REGION PARAMETERS if horizontal bounding box has changed.
     // ================================================================
     if (updateRenderRegion)
@@ -1206,10 +1218,10 @@ void MNWPHorizontalSectionActor::dataFieldChangedEvent()
 
 void MNWPHorizontalSectionActor::computeRenderRegionParameters()
 {
-    llcrnrlat = horizontalBBox.y();
-    llcrnrlon = horizontalBBox.x();
-    urcrnrlat = horizontalBBox.y() + horizontalBBox.height();
-    urcrnrlon = horizontalBBox.x() + horizontalBBox.width();
+    if (bBoxConnection->getBoundingBox() == nullptr)
+    {
+        return;
+    }
 
     // Compute render region parameters for each variable.
     for (int vi = 0; vi < variables.size(); vi++)
@@ -1217,15 +1229,10 @@ void MNWPHorizontalSectionActor::computeRenderRegionParameters()
         MNWP2DHorizontalActorVariable* var =
                 static_cast<MNWP2DHorizontalActorVariable*> (variables.at(vi));
 
-        var->computeRenderRegionParameters(llcrnrlon, llcrnrlat,
-                                           urcrnrlon, urcrnrlat);
+        var->computeRenderRegionParameters(
+                    bBoxConnection->westLon(), bBoxConnection->southLat(),
+                    bBoxConnection->eastLon(), bBoxConnection->northLat());
     }
-
-    // Pass the new bbox on this hsec's graticule actor. Disable redrawing, as
-    // the scene will be redrawn after this function is completed.
-    graticuleActor->enableEmissionOfActorChangedSignal(false);
-    graticuleActor->setBBox(horizontalBBox);
-    graticuleActor->enableEmissionOfActorChangedSignal(true);
 
     // The label displaying the current pressure elevation needs to be put
     // at a new place.
@@ -1253,7 +1260,8 @@ void MNWPHorizontalSectionActor::updateDescriptionLabel(bool deleteOldLabel)
     labels.append(tm->addText(
                       QString("Elevation: %1 hPa").arg(slicePosition_hPa),
                       MTextManager::LONLATP,
-                      llcrnrlon, urcrnrlat, slicePosition_hPa,
+                      bBoxConnection->westLon(),
+                      bBoxConnection->northLat(), slicePosition_hPa,
                       labelsize, labelColour, MTextManager::BASELINELEFT,
                       labelbbox, labelBBoxColour, 0.3)
                   );
@@ -1264,21 +1272,27 @@ void MNWPHorizontalSectionActor::updateMouseHandlePositions()
 {
     mouseHandlePoints.clear();
 
+    // No handles available if no bounding box is selected.
+    if (bBoxConnection == nullptr)
+    {
+        return;
+    }
+
     mouseHandlePoints.append(
-            QVector3D(horizontalBBox.x(),
-                      horizontalBBox.y(),
+            QVector3D(bBoxConnection->westLon(),
+                      bBoxConnection->southLat(),
                       slicePosition_hPa));
     mouseHandlePoints.append(
-            QVector3D(horizontalBBox.right(),
-                      horizontalBBox.y(),
+            QVector3D(bBoxConnection->eastLon(),
+                      bBoxConnection->southLat(),
                       slicePosition_hPa));
     mouseHandlePoints.append(
-            QVector3D(horizontalBBox.right(),
-                      horizontalBBox.y() + horizontalBBox.height(),
+            QVector3D(bBoxConnection->eastLon(),
+                      bBoxConnection->northLat(),
                       slicePosition_hPa));
     mouseHandlePoints.append(
-            QVector3D(horizontalBBox.x(),
-                      horizontalBBox.y() + horizontalBBox.height(),
+            QVector3D(bBoxConnection->westLon(),
+                      bBoxConnection->northLat(),
                       slicePosition_hPa));
 
     // Send vertices of drag handle positions to video memory.
@@ -1654,7 +1668,8 @@ void MNWPHorizontalSectionActor::renderFilledContours(
     glFilledContoursShader->setUniformValue(
                 "jOffset", GLint(var->j0)); CHECK_GL_ERROR;
     glFilledContoursShader->setUniformValue(
-                "bboxLons", QVector2D(llcrnrlon, urcrnrlon)); CHECK_GL_ERROR;
+                "bboxLons", QVector2D(bBoxConnection->westLon(),
+                                      bBoxConnection->eastLon())); CHECK_GL_ERROR;
 
     // Use instanced rendering to avoid geometry upload (see notes 09Feb2012).
     glPolygonOffset(.8f, 1.0f); CHECK_GL_ERROR;
@@ -1747,7 +1762,8 @@ void MNWPHorizontalSectionActor::renderLineCountours(
     glMarchingSquaresShader->setUniformValue(
                 "jOffset", GLint(var->j0)); CHECK_GL_ERROR;
     glMarchingSquaresShader->setUniformValue(
-                "bboxLons", QVector2D(llcrnrlon, urcrnrlon)); CHECK_GL_ERROR;
+                "bboxLons", QVector2D(bBoxConnection->westLon(),
+                                      bBoxConnection->eastLon())); CHECK_GL_ERROR;
 
     glMarchingSquaresShader->setUniformValue(
                 "worldZ", GLfloat(sceneView->worldZfromPressure(slicePosition_hPa)));
@@ -1904,7 +1920,7 @@ void MNWPHorizontalSectionActor::renderTexturedContours(
                                      ->getConstantColour());
 
     glTexturedContoursShader->setUniformValue(
-                "height", GLfloat(horizontalBBox.height())); CHECK_GL_ERROR;
+                "height", GLfloat(bBoxConnection->northSouthExtent())); CHECK_GL_ERROR;
 
     glBindImageTexture(var->imageUnitTargetGrid, // image unit
                        var->textureTargetGrid->getTextureObject(),
@@ -1934,7 +1950,8 @@ void MNWPHorizontalSectionActor::renderTexturedContours(
     glTexturedContoursShader->setUniformValue(
                 "jOffset", GLint(var->j0)); CHECK_GL_ERROR;
     glTexturedContoursShader->setUniformValue(
-                "bboxLons", QVector2D(llcrnrlon, urcrnrlon)); CHECK_GL_ERROR;
+                "bboxLons", QVector2D(bBoxConnection->westLon(),
+                                      bBoxConnection->eastLon())); CHECK_GL_ERROR;
 
     // Use instanced rendering to avoid geometry upload (see notes 09Feb2012).
     glPolygonOffset(.8f, 1.0f); CHECK_GL_ERROR;
@@ -2155,8 +2172,8 @@ void MNWPHorizontalSectionActor::renderWindBarbs(MSceneViewGLWidget *sceneView)
     GL::MVertexBuffer* vb = static_cast<GL::MVertexBuffer*>(
                 glRM->getGPUItem(requestKey));
 
-    int nBarbsLon = (horizontalBBox.width() / deltaBarbs) + 1;
-    int nBarbsLat = (horizontalBBox.height() / deltaBarbs) + 1;
+    int nBarbsLon = (bBoxConnection->eastWestExtent() / deltaBarbs) + 1;
+    int nBarbsLat = (bBoxConnection->northSouthExtent() / deltaBarbs) + 1;
     const GLuint numBarbsTimes2 = nBarbsLon * nBarbsLat * 2;
 
     // If VBO doesn't exist, create a new one.
@@ -2188,8 +2205,10 @@ void MNWPHorizontalSectionActor::renderWindBarbs(MSceneViewGLWidget *sceneView)
     {
         for (int j = 0; j < nBarbsLat; j++)
         {
-            vertexData[iVertex * 2    ] = horizontalBBox.x() + i * deltaBarbs;
-            vertexData[iVertex * 2 + 1] = horizontalBBox.y() + j * deltaBarbs;
+            vertexData[iVertex * 2    ] =
+                    bBoxConnection->westLon() + i * deltaBarbs;
+            vertexData[iVertex * 2 + 1] =
+                    bBoxConnection->southLat() + j * deltaBarbs;
             iVertex++;
         }
     }
@@ -2222,8 +2241,9 @@ void MNWPHorizontalSectionActor::renderShadow(MSceneViewGLWidget* sceneView)
     glShadowQuad->setUniformValue(
                 "mvpMatrix", *(sceneView->getModelViewProjectionMatrix()));
 
-    QVector4D corners(horizontalBBox.x(), horizontalBBox.y(),
-                      horizontalBBox.width(), horizontalBBox.height());
+    QVector4D corners(bBoxConnection->westLon(), bBoxConnection->southLat(),
+                      bBoxConnection->eastWestExtent(),
+                      bBoxConnection->northSouthExtent());
 
     glShadowQuad->setUniformValue("cornersSection", corners);
     glShadowQuad->setUniformValue("colour", shadowColor);

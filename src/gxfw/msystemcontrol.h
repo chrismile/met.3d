@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2015-2017 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -44,6 +45,8 @@
 #include "data/waypoints/waypointstablemodel.h"
 #include "util/mstopwatch.h"
 #include "data/naturalearthdataloader.h"
+#include "boundingbox/boundingbox.h"
+#include "boundingbox/bboxdockwidget.h"
 
 
 namespace Ui {
@@ -148,6 +151,13 @@ public:
 
     QStringList getWaypointsModelsIdentifiers() const;
 
+    void registerBoundingBox(MBoundingBox* bbox);
+    void deleteBoundingBox(const QString& id);
+    void renameBoundingBox(const QString& oldId, MBoundingBox *bbox);
+    MBoundingBox* getBoundingBox(const QString& id) const;
+    QStringList getBoundingBoxesIdentifiers() const;
+    MBoundingBoxDockWidget *getBoundingBoxDock() const;
+
     MStopwatch& getSystemStopwatch() { return systemStopwatch; }
 
     double elapsedTimeSinceSystemStart(const MStopwatch::TimeUnits units);
@@ -162,6 +172,11 @@ public:
     bool applicationIsInitialized() { return met3dAppIsInitialized; }
 
     bool isConnectedToMetview() { return connectedToMetview; }
+
+signals:
+    void boundingBoxCreated();
+    void boundingBoxDeleted(QString name);
+    void boundingBoxRenamed();
 
 protected:
     friend class MGLResourcesManager;
@@ -216,6 +231,8 @@ private:
     QMap<QString, MAbstractDataSource*>    dataSourcePool;
     QMap<QString, MSyncControl*>           syncControlPool;
     QMap<QString, MWaypointsTableModel*>   waypointsTableModelPool;
+
+    QMap<QString, MBoundingBox*>           boundingBoxPool;
 
     MStopwatch systemStopwatch;
     MNaturalEarthDataLoader *naturalEarthDataLoader;
