@@ -1122,7 +1122,8 @@ void MTransferFunction1D::generateBarGeometry()
         // reallocate buffer if size has changed
         buf->reallocate(nullptr, 24 + numTicks * 6);
         buf->update(coordinates, 0, 0, sizeof(coordinates));
-        buf->update(tickmarks, 0, sizeof(coordinates), sizeof(float) * 6 * numTicks);
+        buf->update(tickmarks, 0, sizeof(coordinates),
+                    sizeof(float) * 6 * numTicks);
 
     }
     else
@@ -1133,7 +1134,8 @@ void MTransferFunction1D::generateBarGeometry()
         {
             newVB->reallocate(nullptr, 24 + numTicks * 6, 0, true);
             newVB->update(coordinates, 0, 0, sizeof(coordinates));
-            newVB->update(tickmarks, 0, sizeof(coordinates), sizeof(float) * 6 * numTicks);
+            newVB->update(tickmarks, 0, sizeof(coordinates),
+                          sizeof(float) * 6 * numTicks);
 
         }
         else
