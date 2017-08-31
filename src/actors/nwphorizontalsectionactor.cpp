@@ -1273,7 +1273,7 @@ void MNWPHorizontalSectionActor::updateMouseHandlePositions()
     mouseHandlePoints.clear();
 
     // No handles available if no bounding box is selected.
-    if (bBoxConnection == nullptr)
+    if (bBoxConnection->getBoundingBox() == nullptr)
     {
         return;
     }
