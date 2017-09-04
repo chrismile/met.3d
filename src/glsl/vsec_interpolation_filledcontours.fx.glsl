@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015-2018 Marc Rautenhaus
+**  Copyright 2017-2018 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -66,6 +67,7 @@ uniform int       latOffset;         // index at which lat data starts
 uniform sampler3D dataField;         // 3D texture holding the scalar data
 uniform sampler2D surfacePressure;   // surface pressure field in Pa
 uniform sampler1D hybridCoefficients;// hybrid sigma pressure coefficients
+uniform sampler3D auxPressureField_hPa;     // 3D pressure field in hPa
 uniform sampler1D path;              // points along the vertical section path
 uniform vec2      pToWorldZParams;   // parameters to convert p[hPa] to world z
 uniform mat4      mvpMatrix;         // model-view-projection
@@ -168,6 +170,19 @@ shader VSmain(out VStoFS Output)
         int numLats = textureSize(dataField, 0).y;
         int vertOffset = numLons + numLats;
         p_hPa = texelFetch(lonLatLevAxes, k + vertOffset, 0).a;
+    }
+    else if (levelType == AUXILIARY_PRESSURE_3D)
+    {
+        // Compute the pressure at the four grid points surrounding (lon/lat).
+        float p_i0j0 = texelFetch(auxPressureField_hPa, ivec3(i , j , k), 0).a;
+        float p_i1j0 = texelFetch(auxPressureField_hPa, ivec3(i1, j , k), 0).a;
+        float p_i0j1 = texelFetch(auxPressureField_hPa, ivec3(i , j1, k), 0).a;
+        float p_i1j1 = texelFetch(auxPressureField_hPa, ivec3(i1, j1, k), 0).a;
+
+        // Interpolate to get the pressure at (lon/lat).
+        float p_j0  = mix(p_i0j0, p_i1j0, mixI);
+        float p_j1  = mix(p_i0j1, p_i1j1, mixI);
+        p_hPa = mix(p_j0  , p_j1  , mixJ);
     }
     
     // Convert pressure to world Z coordinate to get the vertex positon.

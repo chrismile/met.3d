@@ -4,8 +4,9 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
-**  Copyright 2015 Michael Kern
+**  Copyright 2015-2018 Marc Rautenhaus
+**  Copyright 2015      Michael Kern
+**  Copyright 2017-2018 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -45,8 +46,14 @@ float sampleShadingDataAtPos(in vec3 pos)
     else if (dataExtentShV.levelType == 1)
     {
         return sampleHybridSigmaVolumeAtPos(dataVolumeShV, dataExtentShV,
-                                            surfacePressureShV, hybridCoefficientsShV,
-                                            pos);
+                                            surfacePressureShV,
+                                            hybridCoefficientsShV, pos);
+    }
+    // case AUXILIARY_PRESSURE_3D
+    else if (dataExtentShV.levelType == 2)
+    {
+        return sampleAuxiliaryPressureVolumeAtPos(dataVolumeShV, dataExtentShV,
+                                                  auxPressureField3DShV_hPa, pos);
     }
 
     return 0;
@@ -69,6 +76,12 @@ float sampleShadingDataAtPos_maxNeighbour(in vec3 pos)
                                         dataVolumeShV, dataExtentShV,
                                         surfacePressureShV, hybridCoefficientsShV,
                                         pos);
+    }
+    // case AUXILIARY_PRESSURE_3D
+    else if (dataExtentShV.levelType == 2)
+    {
+        return sampleAuxiliaryPressureVolumeAtPos_maxNeighbour(
+                    dataVolumeShV, dataExtentShV, auxPressureField3DShV_hPa, pos);
     }
 
     return 0;

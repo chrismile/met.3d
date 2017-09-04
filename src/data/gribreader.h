@@ -4,8 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2017 Marc Rautenhaus
-**  Copyright 2017 Bianca Tost
+**  Copyright 2015-2018 Marc Rautenhaus
+**  Copyright 2017-2018 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -83,6 +83,9 @@ struct MGribVariableInfo
     QString surfacePressureName; // for variables on hybrid model levels
                                  // the name of the var containing the
                                  // corresponding sfc pressure field
+    QString auxiliaryPressureName; // for variables with auxiliary pressure
+                                   // levels; the name of the var containing the
+                                   // corresponding 3D pressure field
     MHorizontalGridType horizontalGridType;  // Enum representing the type of the grid.
 
     long nlons, nlats;
@@ -160,7 +163,8 @@ public:
       If set to "auto", the reader tries to detect the available field--this
       unfortunately currently requires scanning through all messages: SLOW...
      */
-    MGribReader(QString identifier, QString surfacePressureFieldType);
+    MGribReader(QString identifier, QString surfacePressureFieldType,
+                bool disableGridConsistencyCheck=false);
     ~MGribReader();
 
     QList<MVerticalLevelType> availableLevelTypes();
@@ -189,6 +193,8 @@ public:
 protected:
     QString variableSurfacePressureName(MVerticalLevelType levelType,
                                         const QString&     variableName);
+    QString variableAuxiliaryPressureName(MVerticalLevelType levelType,
+                                          const QString&     variableName);
 
     MHorizontalGridType variableHorizontalGridType(MVerticalLevelType levelType,
                                        const QString&     variableName);
@@ -251,6 +257,17 @@ protected:
      */
     void setSurfacePressureFieldType(QString surfacePressureFieldType);
 
+    /**
+     Checks consistency of horizontal geographical region data stored in
+     @p referenceVInfo and @p currentVInfo.
+
+     Horizontal geographical region data includes start and end lons and lats,
+     grid spacing in lon and lat direction, number of lons and lats and one
+     vector containing all longitudes and one containing all latitudes.
+     */
+    bool checkConsistencyOfVariable(MGribVariableInfo *referenceVInfo,
+                                    MGribVariableInfo *currentVInfo);
+
     MGribLevelTypeMap availableDataFields;
     MGribLevelTypeMap availableDataFieldsByStdName;
     QReadWriteLock availableItemsLock;
@@ -259,6 +276,7 @@ protected:
     QMutex openFilesMutex;
 
     QString surfacePressureFieldType; // for hybrid grids: sp, lnsp, <empty>
+    bool disableGridConsistencyCheck;
 };
 
 

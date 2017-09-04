@@ -55,6 +55,8 @@ MDerivedMetVarsDataSource::MDerivedMetVarsDataSource()
             (QStringList() << "u (fc)" << "v (fc)");
     requiredInputVariablesList["windspeed (ens)"] =
             (QStringList() << "u (ens)" << "v (ens)");
+    requiredInputVariablesList["Windspeed"] =
+            (QStringList() << "U" << "V");
 }
 
 

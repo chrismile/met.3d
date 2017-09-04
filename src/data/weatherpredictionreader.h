@@ -4,8 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2017 Marc Rautenhaus
-**  Copyright 2015-2017 Bianca Tost
+**  Copyright 2015-2018 Marc Rautenhaus
+**  Copyright 2017-2018 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -72,13 +72,17 @@ struct MVariableInfo
     QString      surfacePressureName; // for variables on hybrid model levels
                                       // the name of the var containing the
                                       // corresponding sfc pressure field
+    QString auxiliaryPressureName; // for variables with auxiliary pressure
+                                   // levels; the name of the var containing the
+                                   // corresponding 3D pressure field
     QSet<unsigned int> availableMembers; // list of available ensemble members;
                                          // if the variable is not part of a
                                          // multimember ensemble, the list will
                                          // contain a single "0" member
-    MHorizontalGridType horizontalGridType;       // Enum representing the type of the grid.
-    float         rotatedNorthPoleLon;     // Longitude rotation for rotated grids.
-    float         rotatedNorthPoleLat;     // Latitude rotation for rotated grids.
+    MHorizontalGridType horizontalGridType; // Enum representing the type of the
+                                            // grid.
+    float         rotatedNorthPoleLon; // Longitude rotation for rotated grids.
+    float         rotatedNorthPoleLat; // Latitude rotation for rotated grids.
 };
 
 typedef QMap<QString, MVariableInfo*> MVariableNameMap;
@@ -92,7 +96,8 @@ class MWeatherPredictionReader :
         public MWeatherPredictionDataSource, public MAbstractDataReader
 {
 public:
-    MWeatherPredictionReader(QString identifier);
+    MWeatherPredictionReader(
+            QString identifier, QString auxiliary3DPressureField="");
 
     MStructuredGrid* produceData(MDataRequest request);
 
@@ -106,6 +111,15 @@ protected:
       level variable, an exception is raised.
       */
     virtual QString variableSurfacePressureName(
+            MVerticalLevelType levelType,
+            const QString&     variableName) = 0;
+    /**
+      Only applicable for auxiliary pressure levels variables. Returns the name
+      of the auxiliary pressure variable that is associated with this variable.
+      If this method is called for a non auxiliary pressure variable, an
+      exception is raised.
+      */
+    virtual QString variableAuxiliaryPressureName(
             MVerticalLevelType levelType,
             const QString&     variableName) = 0;
     /**
@@ -135,6 +149,9 @@ protected:
                                       unsigned int       ensembleMember) = 0;
 
     const QStringList locallyRequiredKeys();
+
+    /** Name of variable containing the auxiliary 3D pressure field.*/
+    QString auxiliary3DPressureField;
 };
 
 

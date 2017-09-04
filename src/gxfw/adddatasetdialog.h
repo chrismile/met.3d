@@ -4,8 +4,9 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2016 Marc Rautenhaus
-**  Copyright 2016 Christoph Heidelmann
+**  Copyright 2016-2018 Marc Rautenhaus
+**  Copyright 2016      Christoph Heidelmann
+**  Copyright 2017-2018 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -65,6 +66,8 @@ struct MNWPPipelineConfigurationInfo
     bool treatRotatedGridAsRegularGrid;
     QString surfacePressureFieldType;
     bool convertGeometricHeightToPressure_ICAOStandard;
+    QString auxiliary3DPressureField;
+    bool disableGridConsistencyCheck;
 };
 
 

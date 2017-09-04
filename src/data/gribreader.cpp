@@ -4,8 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2017 Marc Rautenhaus
-**  Copyright 2017 Bianca Tost
+**  Copyright 2015-2018 Marc Rautenhaus
+**  Copyright 2017-2018 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -49,9 +49,11 @@ namespace Met3D
 ***                     CONSTRUCTOR / DESTRUCTOR                            ***
 *******************************************************************************/
 
-MGribReader::MGribReader(QString identifier, QString surfacePressureFieldType)
+MGribReader::MGribReader(QString identifier, QString surfacePressureFieldType,
+                         bool disableGridConsistencyCheck)
     : MWeatherPredictionReader(identifier),
-      surfacePressureFieldType(surfacePressureFieldType)
+      surfacePressureFieldType(surfacePressureFieldType),
+      disableGridConsistencyCheck(disableGridConsistencyCheck)
 {
     // Name of surface pressure field to reconstruct pressure for hybrid
     // coordinates. If set to "auto" set the string to empty here (will trigger
@@ -230,6 +232,24 @@ QString MGribReader::variableSurfacePressureName(
                 "unkown variable requested: " + variableName.toStdString(),
                 __FILE__, __LINE__);
     return availableDataFields[levelType][variableName]->surfacePressureName;
+}
+
+
+QString MGribReader::variableAuxiliaryPressureName(
+        MVerticalLevelType levelType,
+        const QString&     variableName)
+{
+    QReadLocker availableItemsReadLocker(&availableItemsLock);
+    if (!availableDataFields.keys().contains(levelType))
+        throw MBadDataFieldRequest(
+                "unkown level type requested: " +
+                MStructuredGrid::verticalLevelTypeToString(levelType).toStdString(),
+                __FILE__, __LINE__);
+    if (!availableDataFields[levelType].keys().contains(variableName))
+        throw MBadDataFieldRequest(
+                "unkown variable requested: " + variableName.toStdString(),
+                __FILE__, __LINE__);
+    return availableDataFields[levelType][variableName]->auxiliaryPressureName;
 }
 
 
@@ -893,7 +913,7 @@ void MGribReader::scanDataRoot()
                 // LOG4CPLUS_DEBUG(mlog, "parameter.shortName: " << shortName.toStdString());
                 QString varName = QString("%1 (%2)").arg(shortName).arg(dataType);
 
-                // Handly special case "lnsp". "lnsp" fields at ECMWF are
+                // Handle special case "lnsp". "lnsp" fields at ECMWF are
                 // stored on model level 1 (not as a surface field). In Met.3D,
                 // we re-cast as a surface field (which it is...).
                 if (shortName == "lnsp" && levelType == HYBRID_SIGMA_PRESSURE_3D)
@@ -916,26 +936,28 @@ void MGribReader::scanDataRoot()
                 {
                     vinfo = availableDataFields[levelType].value(varName);
 
-                    // Get geographical region of the data field & check that
-                    // all messages of this 3D field have the same bounds.
-                    if ( (vinfo->nlons != getGribLongKey(gribHandle, "Ni"))
-                         || (vinfo->nlats != getGribLongKey(gribHandle, "Nj"))
-                         || (vinfo->lon0 != getGribDoubleKey(
-                                gribHandle, "longitudeOfFirstGridPointInDegrees"))
-                         || (vinfo->lat0 != getGribDoubleKey(
-                                gribHandle, "latitudeOfFirstGridPointInDegrees"))
-                         || (vinfo->lon1 != getGribDoubleKey(
-                                gribHandle, "longitudeOfLastGridPointInDegrees"))
-                         || (vinfo->lat1 != getGribDoubleKey(
-                                gribHandle, "latitudeOfLastGridPointInDegrees"))
-                         || (vinfo->dlon != getGribDoubleKey(
-                                gribHandle, "iDirectionIncrementInDegrees"))
-                         || (vinfo->dlat != getGribDoubleKey(
-                                 gribHandle, "jDirectionIncrementInDegrees")) )
+                    MGribVariableInfo currentVInfo;
+                    currentVInfo.nlons = getGribLongKey(gribHandle, "Ni");
+                    currentVInfo.nlats = getGribLongKey(gribHandle, "Nj");
+                    currentVInfo.lon0 = getGribDoubleKey(
+                                gribHandle, "longitudeOfFirstGridPointInDegrees");
+                    currentVInfo.lat0 = getGribDoubleKey(
+                                gribHandle, "latitudeOfFirstGridPointInDegrees");
+                    currentVInfo.lon1 = getGribDoubleKey(
+                                gribHandle, "longitudeOfLastGridPointInDegrees");
+                    currentVInfo.lat1 = getGribDoubleKey(
+                                gribHandle, "latitudeOfLastGridPointInDegrees");
+                    currentVInfo.dlon = getGribDoubleKey(
+                                gribHandle, "iDirectionIncrementInDegrees");
+                    currentVInfo.dlat = getGribDoubleKey(
+                                gribHandle, "jDirectionIncrementInDegrees");
+
+                    if (!checkConsistencyOfVariable(vinfo, &currentVInfo))
                     {
                         LOG4CPLUS_ERROR(mlog, "found different geographical "
-                                        "region than previously used for this "
-                                        "variable; skipping grib message");
+                                        "region than previously used for "
+                                        "variable '" + varName.toStdString()
+                                        + "'; skipping grib message");
                         grib_handle_delete(gribHandle);
                         continue;
                     }
@@ -1172,20 +1194,67 @@ void MGribReader::scanDataRoot()
     } // for (files)
 
 
+    QString horizontalRefVarName = "";
+    MVerticalLevelType referenceLevelType;
     // Perform checks, e.g. to make sure that for each data field all levels
     // are present.
-    LOG4CPLUS_DEBUG(mlog, "Checking constistency of indexed data fields...");
-    for (auto it_levtype = availableDataFields.begin();
-         it_levtype != availableDataFields.end(); it_levtype++)
+    LOG4CPLUS_DEBUG(mlog, "Checking consistency of indexed data fields...");
+    foreach (MVerticalLevelType levelType, availableDataFields.keys())
     {
-        for (auto it_varname = it_levtype->begin();
-             it_varname != it_levtype->end(); it_varname++)
+        QStringList varNames = availableDataFields[levelType].keys();
+        QString referenceVarName = "";
+        QVector<double> referenceLevels;
+        foreach (QString varName, varNames)
         {
-            if ( ! checkIndexForVariable(*it_varname) )
+            if (!checkIndexForVariable(availableDataFields[levelType][varName]))
             {
-                // Oups, something is wrong with this variable.. discard.
-                (*it_levtype).erase(it_varname);
+                delete availableDataFields[levelType].take(varName);
                 continue;
+            }
+            else if ( !disableGridConsistencyCheck )
+            {
+                if (horizontalRefVarName.isEmpty())
+                {
+                    horizontalRefVarName = varName;
+                    referenceLevelType = levelType;
+                }
+                if (referenceLevels.isEmpty())
+                {
+                    referenceVarName = varName;
+                    referenceLevels =
+                            availableDataFields[levelType][referenceVarName]
+                            ->levels;
+                }
+                // Check consistency of vertical levels.
+                else if (availableDataFields[levelType][varName]->levels
+                         != referenceLevels)
+                {
+                    LOG4CPLUS_ERROR(mlog,
+                                    "found difference in vertical levels to"
+                                    " reference variable '"
+                                    + referenceVarName.toStdString()
+                                    + "'; discarding variable: '"
+                                    + varName.toStdString() + "' [Dataset: "
+                                    + getIdentifier().toStdString() + "]");
+                    delete availableDataFields[levelType].take(varName);
+                    continue;
+                }
+                // Check consistency of horizontal coordinates.
+                else if (!checkConsistencyOfVariable(
+                            availableDataFields[referenceLevelType]
+                            [horizontalRefVarName],
+                             availableDataFields[levelType][varName]))
+                {
+                    LOG4CPLUS_ERROR(mlog,
+                                    "found difference to reference"
+                                    " variable '"
+                                    + referenceVarName.toStdString()
+                                    + "'; discarding variable: '"
+                                    + varName.toStdString() + "' [Dataset: "
+                                    + getIdentifier().toStdString() + "]");
+                    delete availableDataFields[levelType].take(varName);
+                    continue;
+                }
             }
         }
     }
@@ -1700,6 +1769,63 @@ void MGribReader::setSurfacePressureFieldType(QString surfacePressureFieldType)
                         << surfacePressureFieldType.toStdString() << "'"
                         << flush);
     }
+}
+
+
+bool MGribReader::checkConsistencyOfVariable(MGribVariableInfo *referenceVInfo,
+                                             MGribVariableInfo *currentVInfo)
+{
+    // Get geographical region of the data field & check that
+    // all messages of this 3D field have the same bounds.
+    if ( referenceVInfo->nlons != currentVInfo->nlons )
+    {
+        LOG4CPLUS_ERROR(mlog, "detected inconsistency in 'number of longitudes'");
+        return false;
+    }
+    if ( referenceVInfo->nlats != currentVInfo->nlats )
+    {
+        LOG4CPLUS_ERROR(mlog, "detected inconsistency in 'number of longitudes'");
+        return false;
+    }
+    if ( referenceVInfo->lon0 != currentVInfo->lon0 )
+    {
+        LOG4CPLUS_ERROR(mlog,
+                        "detected inconsistency in 'longitude of first grid"
+                        " point'");
+        return false;
+    }
+    if ( referenceVInfo->lat0 != currentVInfo->lat0 )
+    {
+        LOG4CPLUS_ERROR(mlog,
+                        "detected inconsistency in 'latitude of first grid"
+                        " point'");
+        return false;
+    }
+    if ( referenceVInfo->lon1 != currentVInfo->lon1 )
+    {
+        LOG4CPLUS_ERROR(mlog,
+                        "detected inconsistency in 'longitude of last grid"
+                        " point'");
+        return false;
+    }
+    if ( referenceVInfo->lat1 != currentVInfo->lat1 )
+    {
+        LOG4CPLUS_ERROR(mlog,
+                        "detected inconsistency in 'latitude of last grid"
+                        " point'");
+        return false;
+    }
+    if ( referenceVInfo->dlon != currentVInfo->dlon )
+    {
+        LOG4CPLUS_ERROR(mlog, "detected inconsistency in 'i direction increment'");
+        return false;
+    }
+    if ( referenceVInfo->dlat != currentVInfo->dlat )
+    {
+        LOG4CPLUS_ERROR(mlog, "detected inconsistency in 'j direction increment'");
+        return false;
+    }
+    return true;
 }
 
 

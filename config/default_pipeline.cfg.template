@@ -58,6 +58,22 @@ size=2
 # pressure using the ICAO standard atmosphere. (NOTE: the resulting pressure is
 # hence approximate!)
 1\convertGeometricHeightToPressure_ICAOStandard=false
+# Name of an optional auxiliary 3D pressure field. Use this flag for datasets
+# whose variables require an explicit definition of grid point pressure, e.g.,
+# grids defined on (hybrid) geometric coordinates. Currently only implemented
+# for NetCDF files. Leave empty to not use any auxiliary field. Cannot be used
+# together with convertGeometricHeightToPressure_ICAOStandard.
+1\auxiliary3DPressureField=
+# Grid consistency check ensures that all variables of one dataset are defined
+# on the same grid (lons, lats, levels, etc.). Disabling it might result in
+# wrong behaviour of vertical cross-section actors (using variables defined on
+# different grids in one actor), derived variables (variables used to calculate
+# derived variables defined on different grids) and auxiliary 3D pressure fields
+# (connection to variables defined on different grids than the auxiliary
+# pressure field). Disabling can be necessary to use data that is stored on
+# staggered grids, however, in this case, the staggering will be ignored.
+# Hence, only disable if you know what you are doing.
+1\disableGridConsistencyCheck=false
 
 # Example configuration for an ensemble ECMWF CF-NetCDF dataset.
 2\name=ECMWF ENS EUR_LL10

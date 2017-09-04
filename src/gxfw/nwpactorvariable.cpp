@@ -4,8 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2017 Marc Rautenhaus
-**  Copyright 2016-2017 Bianca Tost
+**  Copyright 2015-2018 Marc Rautenhaus
+**  Copyright 2016-2018 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -87,6 +87,8 @@ MNWPActorVariable::MNWPActorVariable(MNWPMultiVarActor *actor)
       textureUnitDataFlags(-1),
       texturePressureTexCoordTable(nullptr),
       textureUnitPressureTexCoordTable(-1),
+      textureAuxiliaryPressure(nullptr),
+      textureUnitAuxiliaryPressure(-1),
       textureDummy1D(nullptr),
       textureDummy2D(nullptr),
       textureDummy3D(nullptr),
@@ -264,7 +266,9 @@ MNWPActorVariable::~MNWPActorVariable()
         actor->releaseTextureUnit(textureUnitDataFlags);
     if (textureUnitPressureTexCoordTable >=0)
         actor->releaseTextureUnit(textureUnitPressureTexCoordTable);
-    if (textureUnitUnusedTextures >=0)
+    if (textureUnitAuxiliaryPressure >= 0)
+        actor->releaseTextureUnit(textureUnitAuxiliaryPressure);
+    if (textureUnitUnusedTextures >= 0)
         actor->releaseTextureUnit(textureUnitUnusedTextures);
 
     foreach (MRequestProperties *requestProperty, propertiesList)
@@ -306,7 +310,9 @@ void MNWPActorVariable::initialize()
         actor->releaseTextureUnit(textureUnitDataFlags);
     if (textureUnitPressureTexCoordTable >=0)
         actor->releaseTextureUnit(textureUnitPressureTexCoordTable);
-    if (textureUnitUnusedTextures >=0)
+    if (textureUnitAuxiliaryPressure >= 0)
+        actor->releaseTextureUnit(textureUnitAuxiliaryPressure);
+    if (textureUnitUnusedTextures >= 0)
         actor->releaseTextureUnit(textureUnitUnusedTextures);
 
     textureUnitDataField             = actor->assignTextureUnit();
@@ -316,6 +322,7 @@ void MNWPActorVariable::initialize()
     textureUnitHybridCoefficients    = actor->assignTextureUnit();
     textureUnitDataFlags             = actor->assignTextureUnit();
     textureUnitPressureTexCoordTable = actor->assignTextureUnit();
+    textureUnitAuxiliaryPressure     = actor->assignTextureUnit();
     textureUnitUnusedTextures        = actor->assignTextureUnit();
 
     // This method is called on variable creation and when the datafield it
@@ -346,7 +353,8 @@ void MNWPActorVariable::initialize()
 
     textureDataField = textureHybridCoefficients =
             textureLonLatLevAxes = textureSurfacePressure =
-            textureDataFlags = texturePressureTexCoordTable = nullptr;
+            textureDataFlags = texturePressureTexCoordTable =
+            textureAuxiliaryPressure = nullptr;
 
     gridTopologyMayHaveChanged = true;
 
@@ -1559,6 +1567,13 @@ void MNWPActorVariable::asynchronousDataAvailable(MDataRequest request)
 #endif
         }
 
+        if (MLonLatAuxiliaryPressureGrid *apgrid =
+                dynamic_cast<MLonLatAuxiliaryPressureGrid*>(grid))
+        {
+            textureAuxiliaryPressure =
+                    apgrid->getAuxiliaryPressureFieldGrid()->getTexture();
+        }
+
         if (MRegularLonLatStructuredPressureGrid *pgrid =
                 dynamic_cast<MRegularLonLatStructuredPressureGrid*>(grid))
         {
@@ -1600,6 +1615,13 @@ void MNWPActorVariable::releaseDataItems()
             hgrid->releasePressureTexCoordTexture2D();
             texturePressureTexCoordTable = nullptr;
 #endif
+        }
+
+        if (MLonLatAuxiliaryPressureGrid *apgrid =
+                dynamic_cast<MLonLatAuxiliaryPressureGrid*>(grid))
+        {
+            apgrid->getAuxiliaryPressureFieldGrid()->releaseTexture();
+            textureAuxiliaryPressure = nullptr;
         }
 
         if (MRegularLonLatStructuredPressureGrid *pgrid =
@@ -3611,6 +3633,22 @@ void MNWP2DVerticalActorVariable::updateVerticalLevelRange(
         LOG4CPLUS_TRACE(mlog, "\tVariable: " << variableName.toStdString()
                         << ": psfc_min = " << psfc_hPa_min
                         << " hPa, psfc_max = " << psfc_hPa_max
+                        << " hPa; vertical levels from " << gridVerticalLevelStart
+                        << ", count " << gridVerticalLevelCount << flush);
+    }
+    else  if (MLonLatAuxiliaryPressureGrid *apgrid =
+              dynamic_cast<MLonLatAuxiliaryPressureGrid*>(grid))
+    {
+        // Min and max surface pressure.
+        double pfield_hPa_min = apgrid->getAuxiliaryPressureFieldGrid()->min() / 100.;
+        double pfield_hPa_max = apgrid->getAuxiliaryPressureFieldGrid()->max() / 100.;
+
+        gridVerticalLevelStart = 0;
+        gridVerticalLevelCount = grid->nlevs;
+
+        LOG4CPLUS_TRACE(mlog, "\tVariable: " << variableName.toStdString()
+                        << ": auxPressureField_min = " << pfield_hPa_min
+                        << " hPa, auxPressureField_max = " << pfield_hPa_max
                         << " hPa; vertical levels from " << gridVerticalLevelStart
                         << ", count " << gridVerticalLevelCount << flush);
     }

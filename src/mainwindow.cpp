@@ -1117,6 +1117,8 @@ void MMainWindow::addDataset()
         LOG4CPLUS_DEBUG(mlog, "adding new dataset: "
                         << pipelineConfig.name.toStdString());
 
+        // todo Adapt!
+
         MPipelineConfiguration newPipelineConfig;
         newPipelineConfig.initializeNWPPipeline(
                     pipelineConfig.name,
@@ -1129,7 +1131,9 @@ void MMainWindow::addDataset()
                     pipelineConfig.enableProbabiltyRegionFilter,
                     pipelineConfig.treatRotatedGridAsRegularGrid,
                     pipelineConfig.surfacePressureFieldType,
-                    pipelineConfig.convertGeometricHeightToPressure_ICAOStandard);
+                    pipelineConfig.convertGeometricHeightToPressure_ICAOStandard,
+                    pipelineConfig.auxiliary3DPressureField,
+                    pipelineConfig.disableGridConsistencyCheck);
     }
 }
 
