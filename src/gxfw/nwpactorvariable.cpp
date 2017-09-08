@@ -47,6 +47,7 @@
 #include "actors/nwpvolumeraycasteractor.h"
 #include "actors/nwphorizontalsectionactor.h"
 #include "mainwindow.h"
+#include "data/structuredgridstatisticsanalysis.h"
 
 using namespace std;
 
@@ -93,6 +94,7 @@ MNWPActorVariable::MNWPActorVariable(MNWPMultiVarActor *actor)
       transferFunction(nullptr),
       textureUnitTransferFunction(-1),
       actor(actor),
+      singleVariableAnalysisControl(nullptr),
       synchronizeInitTime(true),
       synchronizeValidTime(true),
       synchronizeEnsemble(true),
@@ -124,6 +126,31 @@ MNWPActorVariable::MNWPActorVariable(MNWPMultiVarActor *actor)
 
     removeVariableProperty = a->addProperty(
                 CLICK_PROPERTY, "remove", changeVariablePropertyGroup);
+
+    dataStatisticsPropertyGroup = a->addProperty(
+                GROUP_PROPERTY, "data statistics (entire grid)", varPropertyGroup);
+
+    showDataStatisticsProperty = a->addProperty(
+                CLICK_PROPERTY, "show statistics", dataStatisticsPropertyGroup);
+
+    significantDigitsProperty = a->addProperty(
+                DOUBLE_PROPERTY, "significant digits",
+                dataStatisticsPropertyGroup);
+    properties->setDouble(significantDigitsProperty, 0., 0, 1);
+    significantDigitsProperty->setToolTip(
+                "Digits considered for computation of the data value"
+                " distribution."
+                "\nIf this number is negative, the corresponding digits in"
+                " front of the decimal point will be neglected.");
+
+    histogramDisplayModeProperty = a->addProperty(
+                ENUM_PROPERTY, "histogram display",
+                dataStatisticsPropertyGroup);
+    QStringList histogramDisplayModes;
+    histogramDisplayModes << "relative frequencies"
+                          << "absolute grid point count";
+    properties->mEnum()->setEnumNames(histogramDisplayModeProperty,
+                                      histogramDisplayModes);
 
     // Property: Synchronize time and ensemble with an MSyncControl instance?
     synchronizationPropertyGroup = a->addProperty(
@@ -740,9 +767,24 @@ bool MNWPActorVariable::onQtPropertyChanged(QtProperty *property)
 
     if (property == changeVariableProperty)
     {
-        if (actor->suppressActorUpdates()) return false;
+        if (actor->suppressActorUpdates())
+        {
+            return false;
+        }
 
         return changeVariable();
+    }
+
+    // Show data statistics of the variable.
+    else if (property == showDataStatisticsProperty)
+    {
+        if (actor->suppressActorUpdates())
+        {
+            return false;
+        }
+        runStatisticalAnalysis(
+                    properties->mDouble()->value(significantDigitsProperty),
+                    properties->mEnum()->value(histogramDisplayModeProperty));
     }
 
     // Connect to the time signals of the selected scene.
@@ -931,7 +973,15 @@ void MNWPActorVariable::saveConfiguration(QSettings *settings)
 
     MQtProperties *properties = actor->getQtProperties();
 
+    // Save data statistics properties.
+    // ================================
+    settings->setValue("statisticsSignificantDigits",
+                       properties->mDouble()->value(significantDigitsProperty));
+    settings->setValue("statisticsHistogramDisplayMode",
+                       properties->mEnum()->value(histogramDisplayModeProperty));
+
     // Save synchronization properties.
+    // ================================
     settings->setValue("synchronizationID",
                        (synchronizationControl != nullptr) ?
                            synchronizationControl->getID() : "");
@@ -943,6 +993,7 @@ void MNWPActorVariable::saveConfiguration(QSettings *settings)
                        properties->mBool()->value(synchronizeEnsembleProperty));
 
     // Save ensemble mode properties.
+    // ==============================
     settings->setValue("ensembleUtilizedMembers",
                        MDataRequestHelper::uintSetToString(
                            selectedEnsembleMembers));
@@ -954,6 +1005,7 @@ void MNWPActorVariable::saveConfiguration(QSettings *settings)
                        properties->mDouble()->value(ensembleThresholdProperty));
 
     // Save rendering properties.
+    // ==========================
     settings->setValue("transferFunction",
                        properties->getEnumItem(transferFunctionProperty));
 
@@ -972,6 +1024,18 @@ void MNWPActorVariable::loadConfiguration(QSettings *settings)
     // remaining configuration should nevertheless be loaded.
 
     MQtProperties *properties = actor->getQtProperties();
+
+    // Load data statistics properties.
+    // ================================
+    properties->mDouble()->setValue(
+                significantDigitsProperty,
+                settings->value("statisticsSignificantDigits", 0.).toDouble());
+    properties->mEnum()->setValue(
+                histogramDisplayModeProperty,
+                settings->value(
+                    "statisticsHistogramDisplayMode",
+                    MStructuredGridStatisticsAnalysisControl
+                    ::RELATIVE_FREQUENCY_DISTRIBUTION).toInt());
 
     // Load ensemble mode properties.
     // ==============================
@@ -1580,6 +1644,13 @@ void MNWPActorVariable::releaseDataItems()
         dataSource->releaseData(grid);
         grid = nullptr;
     }
+
+    // Remove data statistics analysis control if present.
+    if (singleVariableAnalysisControl != nullptr)
+    {
+        delete singleVariableAnalysisControl;
+        singleVariableAnalysisControl = nullptr;
+    }
 }
 
 
@@ -2004,13 +2075,36 @@ template<typename T> bool MNWPActorVariable::setEnumPropertyClosest(
 }
 
 
+void MNWPActorVariable::runStatisticalAnalysis(double significantDigits,
+                                               int histogramDisplayMode)
+{
+    if (singleVariableAnalysisControl == nullptr)
+    {
+        // Create new analysis control. (Constructor of analysis control
+        // sets analysis control of variable.)
+        new MStructuredGridStatisticsAnalysisControl(this);
+        singleVariableAnalysisControl->setMemoryManager(
+                    grid->getMemoryManager());
+        singleVariableAnalysisControl->setScheduler(dataSource->getScheduler());
+    }
+    MDataRequestHelper rh;
+    rh.insert("HISTOGRAM_SIGNIFICANT_DIGITS",
+              QString::number(significantDigits));
+    rh.insert("HISTOGRAM_DISPLAYMODE", histogramDisplayMode);
+    singleVariableAnalysisControl->run(rh.request());
+}
+
+
 bool MNWPActorVariable::changeVariable()
 {
     // Open an MSelectDataSourceDialog and re-initialize the variable with
     // information returned from the dialog.
     MSelectDataSourceDialog dialog(actor->supportedLevelTypes());
 
-    if (dialog.exec() == QDialog::Rejected) return false;
+    if (dialog.exec() == QDialog::Rejected)
+    {
+        return false;
+    }
 
     MSelectableDataSource dsrc = dialog.getSelectedDataSource();
 

@@ -43,7 +43,7 @@ namespace Met3D
 
 /**
   @brief Data source that computes probabilities from filtered domain filling
-  trajectories (e.g. for probability of warm conveyor belt occurence).
+  trajectories (e.g. for probability of warm conveyor belt occurrence).
   */
 class MProbDFTrajectoriesSource
         : public MWeatherPredictionDataSource

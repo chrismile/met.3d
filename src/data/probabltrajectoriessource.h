@@ -44,7 +44,7 @@ namespace Met3D
 
 /**
   @brief Data source that computes probabilities from ABL-started, filtered
-  trajectories (e.g. for probability of warm conveyor belt occurence).
+  trajectories (e.g. for probability of warm conveyor belt occurrence).
   */
 class MProbABLTrajectoriesSource
         : public MWeatherPredictionDataSource

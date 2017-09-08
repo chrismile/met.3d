@@ -41,6 +41,7 @@
 #include "gxfw/nwpactorvariableproperties.h"
 #include "data/structuredgrid.h"
 #include "data/weatherpredictiondatasource.h"
+#include "data/singlevariableanalysis.h"
 #include "actors/transferfunction1d.h"
 #include "actors/spatial1dtransferfunction.h"
 #include "util/mstopwatch.h"
@@ -78,6 +79,13 @@ public:
     virtual void initialize();
 
     MNWPMultiVarActor* getActor() { return actor; }
+
+    /**
+      Connect an analysis control to this variable.
+     */
+    void setSingleVariableAnalysisControl(
+            MSingleVariableAnalysisControl *analysisControl)
+    { this->singleVariableAnalysisControl = analysisControl; }
 
     /**
       Synchronize time, ensemble of this variable with the synchronization
@@ -300,6 +308,15 @@ protected:
     /** Actor that this instance belongs to. */
     MNWPMultiVarActor *actor;
 
+    /** Analysis control this variable is connected to. */
+    MSingleVariableAnalysisControl *singleVariableAnalysisControl;
+
+    /* Data statistics properties */
+    QtProperty *dataStatisticsPropertyGroup;
+    QtProperty *showDataStatisticsProperty;
+    QtProperty *significantDigitsProperty;
+    QtProperty *histogramDisplayModeProperty;
+
     /* Synchronization properties */
     QtProperty *synchronizationPropertyGroup;
     QtProperty *synchronizationProperty;
@@ -385,6 +402,9 @@ private:
             const T& value,
             QtProperty* property,
             bool setSyncColour=true);
+
+    void runStatisticalAnalysis(double significantDigits,
+                                int histogramDisplayMode);
 
     bool suppressUpdate;
 };

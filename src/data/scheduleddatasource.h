@@ -76,6 +76,8 @@ public:
 
     virtual MTask* createTaskGraph(MDataRequest request) = 0;
 
+    MAbstractScheduler* getScheduler() { return scheduler; }
+
 protected:
     MAbstractScheduler *scheduler;
     MScheduledDataSource *scheduledPassThroughSource;
