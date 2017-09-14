@@ -2167,15 +2167,6 @@ void MNWP2DSectionActorVariable::initialize()
     textureUnitTargetGrid = actor->assignTextureUnit();
 
     MNWPActorVariable::initialize();
-
-    MQtProperties *properties = actor->getQtProperties();
-    for (int i = 0; i < contourSetList.size(); i++)
-    {
-        ContourSettings *contours = &(contourSetList[i]);
-        parseContourLevelString(
-                    properties->mString()->value(contours->levelsProperty),
-                    contours);
-    }
 }
 
 
@@ -2539,6 +2530,7 @@ void MNWP2DSectionActorVariable::addContourSet(
     contourSetList.append(contourSet);
     renderSettings.contourSetGroupProperty->addSubProperty(
                 contourSetList.back().groupProperty);
+    parseContourLevelString(levelString, &(contourSetList.back()));
 
 }
 
