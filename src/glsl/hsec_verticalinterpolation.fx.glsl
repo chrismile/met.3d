@@ -82,7 +82,7 @@ shader VSmain()
 
     float ln_plower = 0.;
     float ln_pupper = 0.;
-    float ln_p = log(pressure_hPa);;
+    float ln_p = log(pressure_hPa);
 
 
     // Supported grid type 1: HYBRID MODEL LEVELS

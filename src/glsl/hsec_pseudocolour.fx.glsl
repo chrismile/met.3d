@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2017 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -67,6 +68,11 @@ uniform int       latOffset;      // index at which lat data starts
 uniform int       iOffset;        // grid index offsets if only a subregion
 uniform int       jOffset;        //   of the grid shall be rendered
 
+uniform float     shiftForWesternLon; // shift in multiples of 360 to get the
+                                      // correct starting position (depends on
+                                      // the distance between the left border of
+                                      // the grid and the left border of the bbox)
+
 // bug if 'out GStoFS output' is used?
 shader GSmain(out GStoFS vertex)
 {
@@ -79,30 +85,83 @@ shader GSmain(out GStoFS vertex)
     int i = (ij.x + iOffset) % numLons;
     int j = ij.y + jOffset;
 
+    // In case of repeated grid region parts, this shift places the vertex to
+    // the correct global position. This is necessary since the modulo operation
+    // maps repeated parts to the same psotion. It contains the factor 360.
+    // needs to be multiplied with to place the vertex correctly.
+    float numGlobalLonShifts = floor((ij.x + iOffset) / (latOffset));
+
     float lon, lon_west, lon_east;
     lon = texelFetch(latLonAxesData, i, 0).a;
     if (i > 0)
-        lon_west = mix(lon, texelFetch(latLonAxesData, i-1, 0).a, 0.5);
+    {
+        lon_west = mix(lon, texelFetch(latLonAxesData, i - 1, 0).a, 0.5);
+    }
     else
-        lon_west = lon;
-    if (i < numLons-1)
-        lon_east = mix(lon, texelFetch(latLonAxesData, i+1, 0).a, 0.5);
+    {
+        // Different boudning conditions for cyclic grids to avoid gap between
+        // two grids.
+        if (isCyclicGrid)
+        {
+            lon_west = mix(lon, texelFetch(latLonAxesData,
+                                           numLons - 1, 0).a - 360., 0.5);
+        }
+        else
+        {
+            lon_west = lon;
+        }
+    }
+    if (i < (numLons - 1))
+    {
+        lon_east = mix(lon, texelFetch(latLonAxesData, i + 1, 0).a, 0.5);
+    }
     else
-        lon_east = lon;
+    {
+        // Different boudning conditions for cyclic grids to avoid gap between
+        // two grids.
+        if (isCyclicGrid)
+        {
+            lon_east = mix(lon, texelFetch(latLonAxesData, 0, 0).a + 360., 0.5);
+        }
+        else
+        {
+            lon_east = lon;
+        }
+    }
 
     float lat, lat_north, lat_south;
     lat = texelFetch(latLonAxesData, j + latOffset, 0).a;
     if (j > 0)
-        lat_north = mix(lat, texelFetch(latLonAxesData, j-1 + latOffset, 0).a, 0.5);
+    {
+        lat_north = mix(lat, texelFetch(latLonAxesData, j - 1 + latOffset, 0).a,
+                        0.5);
+    }
     else
+    {
         lat_north = lat;
-    if (j < numLats-1)
-        lat_south = mix(lat, texelFetch(latLonAxesData, j+1 + latOffset, 0).a, 0.5);
+    }
+    if (j < (numLats - 1))
+    {
+        lat_south = mix(lat, texelFetch(latLonAxesData, j + 1 + latOffset, 0).a,
+                        0.5);
+    }
     else
+    {
         lat_south = lat;
+    }
+
+    // If right border of the cell is mapped to the left side of the left
+    // border, than shift the right border by 360.
+    if (lon_west > lon_east)
+    {
+        lon_east += 360.f;
+    }
+
+    lon_west += (numGlobalLonShifts * 360.f) + shiftForWesternLon;
+    lon_east += (numGlobalLonShifts * 360.f) + shiftForWesternLon;
 
     // Quad centre and scalar value are the same for all emitted vertices.
-    vertex.scalar = imageLoad(sectionGrid, ij).r;
+    vertex.scalar = imageLoad(sectionGrid, ivec2(i, j)).r;
     if (vertex.scalar != MISSING_VALUE) vertex.flag = 0.; else vertex.flag = -100.;
 
     // Upper right vertex ...
