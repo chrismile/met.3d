@@ -558,10 +558,26 @@ public:
     void loadConfiguration(QSettings *settings) override;
 
     /**
-     Computes start indices @ref i0, @ref j0 and number of grid points @ref
-     nlons, @ref nlats that are required to render the part of the variable
-     grid that fits into the bounding box given by the corner coordinates @p
-     llcrnrlon, @p llcrnrlatm @p urcrnrlon, @p urcrnrlat.
+     Computes start indices (member variables) @ref i0, @ref j0 and number of
+     grid points @ref nlons, @ref nlats that are required to render the part of
+     the data grid (or multiple parts if the bounding box is larger than 360deg
+     in longitude) that fits into the bounding box given by the corner
+     coordinates @p llcrnrlon, @p llcrnrlatm @p urcrnrlon, @p urcrnrlat.
+
+     @note If the data region falls apart into disjoint parts OR if it is
+     rendered multiple times only ONE VISUALIZATION GRID is rendered (but with
+     no vertices in places where there are no grid points). Those fragments
+     that don't map to available data points are discarded in the fragment
+     shader.
+
+     Correctly handles the following cases:
+       *  bbox is smaller than data grid --> part of data grid is rendered
+       *  bbox is larger than data grid --> region of bbox not occupied by
+          data grid is empty
+       *  bbox is larger than 360deg in lon so that parts of data grid appear
+          multiple times --> data grid is repeated
+       *  bbox is placed such that data region is cut into disjunct regions
+          --> disjuct regions are rendered
      */
     void computeRenderRegionParameters(double llcrnrlon, double llcrnrlat,
                                        double urcrnrlon, double urcrnrlat);

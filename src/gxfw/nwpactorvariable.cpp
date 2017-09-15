@@ -2855,16 +2855,22 @@ void MNWP2DHorizontalActorVariable::computeRenderRegionParameters(
         double llcrnrlon, double llcrnrlat,
         double urcrnrlon, double urcrnrlat)
 {
+    // Copy bbox coordinates to member variables.
     this->llcrnrlon = llcrnrlon;
     this->llcrnrlat = llcrnrlat;
     this->urcrnrlon = urcrnrlon;
     this->urcrnrlat = urcrnrlat;
 
-    // Longitudes stored in ascending order.
-
     bool gridIsCyclic = grid->gridIsCyclicInLongitude();
 
+    // 1A) Find longitudinal index "i0" in data grid that corresponds to
+    //     the WESTmost rendered grid point.
+    // ================================================================
+
+    // Longitudes stored in ascending order.
     double shiftLon = grid->lons[0];
+    float westBBoxBorderRelativeToWestDataBorder = llcrnrlon - shiftLon;
+    float eastBBoxBorderRelativeToWestDataBorder = urcrnrlon - shiftLon;
 
 //WORKAROUND -- Usage of M_LONLAT_RESOLUTION defined in mutil.h
     // NOTE (mr, Dec2013): Workaround to fix a float accuracy problem
@@ -2887,21 +2893,29 @@ void MNWP2DHorizontalActorVariable::computeRenderRegionParameters(
 //                            NMOD(grid->lons[i0]-shiftLon, 360.),
 //                            NMOD(llcrnrlon-shiftLon, 360.));
         if (MMOD(grid->lons[i0] - shiftLon, 360.) + M_LONLAT_RESOLUTION
-                >= MMOD(llcrnrlon - shiftLon, 360.)) break;
+                >= MMOD(westBBoxBorderRelativeToWestDataBorder, 360.)) break;
     }
     // Handle overshooting for non-cyclic grids (otherwise i0 = grid->nlons
     // if the bounding box is east of the grid domain).
     if (!gridIsCyclic) i0 = min(i0, grid->nlons-1);
+
+    // 1B) Find longitudinal index "i1" in data grid that corresponds to
+    //     the EASTmost rendered grid point.
+    // ================================================================
 
     // Find the last lon index smaller than urcrnrlon.
     unsigned int i1;
     for (i1 = grid->nlons - 1; i1 > 0; i1--)
     {
         if (MMOD(grid->lons[i1] - shiftLon, 360.)
-                <= MMOD(urcrnrlon - shiftLon, 360.)) break;
+                <= MMOD(eastBBoxBorderRelativeToWestDataBorder, 360.)) break;
     }
 
-    // Latitude won't be cyclic, hence no modulo is required here.
+    // 2) Find lat indices "j0"/"j1" that corresponds to SOUTHmost/NORTHmost
+    //    grid points.
+    // =====================================================================
+
+    // Latitude is never cyclic, hence no modulo is required here.
     for (j0 = 0; j0 < grid->nlats; j0++)
     {
         if (grid->lats[j0] <= urcrnrlat) break;
@@ -2912,66 +2926,37 @@ void MNWP2DHorizontalActorVariable::computeRenderRegionParameters(
         if (grid->lats[j1] >= llcrnrlat) break;
     }
 
+    // 3) Determine the number "nlons" of longitudes to be rendered. Special
+    // care has to be taken as data grid may need to be rendered multiple
+    // times or can fall apart into disjoint regions, depending on bbox.
+    // =====================================================================
 
-    // Eastern bounding box border is  mapped by the modulo operation to the
-    // eastern side of the western border. We can treat the subregion defined by
-    // the mapped borders i0 and i1 as one subregion. (nlons = i1 - i0 + 1)
+    // Possible cases:
+    //  a) data region is completely contained in bbox
+    //     --> nlons = num. grid points of data grid
+    //  b) bbox cuts out part of data region
+    //     --> nlons = num. grid points in displayed region
+    //  c) bbox is large enough in lon so that data region falls apart into
+    //     disjoint regions
+    //     --> nlons = num. grid points in western region + num. grid points
+    //         in eastern region
+    //  d) bbox is >360deg in lon and (parts) of the data region are repeated
+    //     --> nlons = sum of grid points in all regions
 
-    // Dies funktioniert auch, falls die westlichste und östlichste Teilregionen
-    // für sich genommen jeweils nur ein Ausschnitt der Gitterregion sind
-    // (eine Teilregion ergibt sich hierbei aus der Begrenzung durch die
-    // Boundingbox und einer Aufteilung des gesamten Raums in disjunkte
-    // Teilregionen mit einer Breite von 360° und einer westlichen Grenze
-    // entsprechend der westlichen Grenze plus ein (positives/negatives)
-    // Vielfaches von 360°). Grundsätzlich lässt berechnet sich nlons in diesem
-    // Fall nach folgender Formel:
-    //    nlonsWestPart + nlonsEastPart + nlonsGrid * numSubregions
-    //  mit (nlonsWestPart = grid->nlons - i0) und (nlonsEastPart = i1 + 1) folgt:
-    //   (i1 + 1 + grid->nlons - i0) + (grid->nlons * numSubregions)
-    // Wobei numSubregions die Anzahl der disjunkten Teilregionen angibt, die
-    // vollständig in der Boundingbox enthalten sind.
-    // Wird die östliche Grenze westlich der westlichen Grenze abgebildet, so
-    // gilt:
-    //   (i1 < i0) -> (i1 - i0 <= -1) -> (i1 - i0 + grid->nlons) < grid->nlons
-    // Da wiederum gilt, dass in einer Boundingboxregion von 360° Breite, die
-    // Gitterregion ein Mal enthalten ist, muss der Abstand zwischen der
-    // westlichen und östlichen Boundingboxgrenze (abzüglich 360° für jede
-    // vollständig enthaltenen Teilregion) in diesem Fall kleiner als 360° sein.
-    // Wiederrum gilt:
-    //   (i1 >= i0) -> (i1 - i0 >= 0) -> (i1 - i0 + grid->nlons) >= grid->nlons
-    // Der Umkehrschluss zeigt, dass, wenn die östliche Boundingboxgrenze
-    // östlich der westlichen abgebildet wird, der Abstand zwischen den
-    // Boundingboxgrenzen (abzüglich der vollständig enthaltenen Teilregion)
-    // größer als 360° sein muss (ausgenommen Boundingbox mit einer
-    // Gesammtbreite unter 360°). Da die Boundingbox abzüglich der Teilregionen
-    // größer als 360° ist, ergibt sich:
-    //    factor = floor((urcrnrlon - llcrnrlon) / 360.) = numSubregions + 1
-    // Außerdem lässt sich die Formel für nlons folgendermaßen umstellen:
-    //    (i1 - i0 + 1) + nlonsGrid * (numSubregions + 1)
-    // Da wir factor für die Abschätzung von numSubregions nutzen, können wir
-    // also für den Fall, dass die östliche Boundingboxgrenze östlich der
-    // westlichen Boundingboxgrenze abgebildet wird, stets (i1 - i0 + 1) zur
-    // Berechnung von nlons in einem ersten Schritt nutzen.
-    // Für Boundingboxbreiten unter 360° können nur dann seperate Teilregionen
-    // entstehen, wenn die östliche Boundingboxgrenze westlich der westlichen
-    // Boundingboxgrenze abgebildet wird.
-
-    // Eastern bunding box boundery is mapped by the modulo operation to the
-    // east of the mapped western boundery.
-    if (MMOD(llcrnrlon - shiftLon, 360.)  <= MMOD(urcrnrlon - shiftLon, 360.))
+    // Mapped to longitudes in the range [0..360), eastern bbox border is
+    // east of western bbox border...
+    if (MMOD(westBBoxBorderRelativeToWestDataBorder, 360.)
+            <= MMOD(eastBBoxBorderRelativeToWestDataBorder, 360.))
     {
+        // One region, no disjoint parts.
         nlons = i1 - i0 + 1;
     }
-    // Eastern border of the bounding box is mapped by the modulo operation to
-    // the western side of the western border thus we treat the western and
-    // eastern regions separately. The eastern sub-region goes from i0 to
-    // nlons (nlons = grid->nlons - i0) and the western subregion from
-    // 0 to i1 (nlons = i1 + 1).
-
-    // Eastern bunding box boundery is mapped by the modulo operation to the
-    // west of the mapped western boundery.
+    // ... or eastern bbox border is WEST of western bbox border.
     else
     {
+        // Treat west and east subregions separately. Eastern subregion goes
+        // from i0 to nlons (nlons = grid->nlons - i0), western subregion from
+        // 0 to i1 (nlons = i1 + 1).
         nlons = i1 + grid->nlons - i0 + 1;
     }
 
@@ -2979,12 +2964,61 @@ void MNWP2DHorizontalActorVariable::computeRenderRegionParameters(
     // to add the missing width if the domain is larger than 360.
     nlons += floor((urcrnrlon - llcrnrlon) / 360.) * grid->nlons;
 
+    // Compute initial shift to place the grid at the correct position during
+    // rendering. It contains a multiple of 360.
+    shiftForWesternLon = float(floor((llcrnrlon - grid->lons[0]) / 360.) * 360.f);
+
+
+    // Bianca's explanation for the above equations (sorry, only in German...):
+    // ------------------------------------------------------------------------
+    // Dies funktioniert auch, falls die westlichste und oestlichste Teilregionen
+    // fuer sich genommen jeweils nur ein Ausschnitt der Gitterregion sind
+    // (eine Teilregion ergibt sich hierbei aus der Begrenzung durch die
+    // Boundingbox und einer Aufteilung des gesamten Raums in disjunkte
+    // Teilregionen mit einer Breite von 360deg und einer westlichen Grenze
+    // entsprechend der westlichen Grenze plus ein (positives/negatives)
+    // Vielfaches von 360deg). Grundsaetzlich laesst berechnet sich nlons in diesem
+    // Fall nach folgender Formel:
+    //    nlonsWestPart + nlonsEastPart + nlonsGrid * numSubregions
+    //  mit (nlonsWestPart = grid->nlons - i0) und (nlonsEastPart = i1 + 1) folgt:
+    //   (i1 + 1 + grid->nlons - i0) + (grid->nlons * numSubregions)
+    // Wobei numSubregions die Anzahl der disjunkten Teilregionen angibt, die
+    // vollstaendig in der Boundingbox enthalten sind.
+    // Wird die oestliche Grenze westlich der westlichen Grenze abgebildet, so
+    // gilt:
+    //   (i1 < i0) -> (i1 - i0 <= -1) -> (i1 - i0 + grid->nlons) < grid->nlons
+    // Da wiederum gilt, dass in einer Boundingboxregion von 360deg Breite, die
+    // Gitterregion ein Mal enthalten ist, muss der Abstand zwischen der
+    // westlichen und oestlichen Boundingboxgrenze (abzueglich 360deg fuer jede
+    // vollstaendig enthaltenen Teilregion) in diesem Fall kleiner als 360deg sein.
+    // Wiederrum gilt:
+    //   (i1 >= i0) -> (i1 - i0 >= 0) -> (i1 - i0 + grid->nlons) >= grid->nlons
+    // Der Umkehrschluss zeigt, dass, wenn die oestliche Boundingboxgrenze
+    // oestlich der westlichen abgebildet wird, der Abstand zwischen den
+    // Boundingboxgrenzen (abzueglich der vollstaendig enthaltenen Teilregion)
+    // groesser als 360deg sein muss (ausgenommen Boundingbox mit einer
+    // Gesammtbreite unter 360deg). Da die Boundingbox abzueglich der Teilregionen
+    // groesser als 360deg ist, ergibt sich:
+    //    factor = floor((urcrnrlon - llcrnrlon) / 360.) = numSubregions + 1
+    // Ausserdem laesst sich die Formel fuer nlons folgendermassen umstellen:
+    //    (i1 - i0 + 1) + nlonsGrid * (numSubregions + 1)
+    // Da wir factor fuer die Abschaetzung von numSubregions nutzen, koennen wir
+    // also fuer den Fall, dass die oestliche Boundingboxgrenze oestlich der
+    // westlichen Boundingboxgrenze abgebildet wird, stets (i1 - i0 + 1) zur
+    // Berechnung von nlons in einem ersten Schritt nutzen.
+    // Fuer Boundingboxbreiten unter 360deg koennen nur dann seperate Teilregionen
+    // entstehen, wenn die oestliche Boundingboxgrenze westlich der westlichen
+    // Boundingboxgrenze abgebildet wird.
+
+    // 4) Determine the number "nlats" of latitudes to be rendered.
+    // ============================================================
+
     nlats = j1 - j0 + 1;
     if (nlats < 0) nlats = 0;
 
-    // Compute initial shift to place the grid at the correct position during
-    // rendering. It contains a multiple of 360.
-    shiftForWesternLon = float(floor((llcrnrlon - grid->lons[0]) / 360) * 360.f);
+
+    // DEBUG output.
+    // =============
 
     LOG4CPLUS_DEBUG(mlog, "(grid is " << (gridIsCyclic ? "" : "not")
                     << " cyclic; shiftLon = " << shiftLon << ") "
