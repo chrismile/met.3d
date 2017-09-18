@@ -1012,9 +1012,13 @@ void MNWPVerticalSectionActor::renderToCurrentContext(MSceneViewGLWidget *sceneV
         if (renderFilledContours || targetGridToBeUpdated)
         {
             if (renderFilledContours)
+            {
                 sectionGridShader->bindProgram("Standard");
+            }
             else
+            {
                 sectionGridShader->bindProgram("OnlyUpdateTargetGrid");
+            }
 
             // Reset optional textures (to avoid draw errors).
             // ===============================================
@@ -1118,7 +1122,6 @@ void MNWPVerticalSectionActor::renderToCurrentContext(MSceneViewGLWidget *sceneV
                                   2 * var->gridVerticalLevelCount,
                                   path.size() - 1); CHECK_GL_ERROR;
             glDisable(GL_POLYGON_OFFSET_FILL);
-
         } // sectionGridShader (interpolation, target grid, filled contours)
 
         // B) Contouring with the GPU Marching Squares implementation, if
