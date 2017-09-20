@@ -204,14 +204,17 @@ MBoundingBoxInterface::~MBoundingBoxInterface()
 
 void MBoundingBoxInterface::saveConfiguration(QSettings *settings)
 {
-    QRectF coord2D(bBoxConnection->westLon(), bBoxConnection->southLat(),
-                   bBoxConnection->eastWestExtent(),
-                   bBoxConnection->northSouthExtent());
     settings->setValue("useBoundingBox", getBoundingBoxName());
-    settings->setValue("horizontal2DCoords", coord2D);
-    settings->setValue("bottomPressure_hPa",
-                       bBoxConnection->bottomPressure_hPa());
-    settings->setValue("topPressure_hPa", bBoxConnection->topPressure_hPa());
+    if (bBoxConnection->getBoundingBox() != nullptr)
+    {
+        QRectF coord2D(bBoxConnection->westLon(), bBoxConnection->southLat(),
+                       bBoxConnection->eastWestExtent(),
+                       bBoxConnection->northSouthExtent());
+        settings->setValue("horizontal2DCoords", coord2D);
+        settings->setValue("bottomPressure_hPa",
+                           bBoxConnection->bottomPressure_hPa());
+        settings->setValue("topPressure_hPa", bBoxConnection->topPressure_hPa());
+    }
 }
 
 

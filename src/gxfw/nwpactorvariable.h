@@ -5,7 +5,7 @@
 **  prediction data.
 **
 **  Copyright 2015-2017 Marc Rautenhaus
-**  Copyright 2015-2017 Bianca Tost
+**  Copyright 2016-2017 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -199,10 +199,6 @@ public:
     /* Property group to accomodate this variable's subproperties. */
     QtProperty *varPropertyGroup;
     QtProperty *varRenderingPropertyGroup;
-
-    /* Synchronization (Pointer to the MSyncControl with which time/ensemble is
-       synchronised and corresponding property). */
-    MSyncControl *synchronizationControl;
 
     /* Button to remove this variable from its actor. Signal is handled by
        MNWPMultiVarActor and derived classes. */

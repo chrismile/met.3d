@@ -5,7 +5,7 @@
 **  prediction data.
 **
 **  Copyright 2015-2017 Marc Rautenhaus
-**  Copyright 2015-2017 Bianca Tost
+**  Copyright 2017      Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -61,7 +61,8 @@ MVolumeBoundingBoxActor::MVolumeBoundingBoxActor()
     // ===============================================
     beginInitialiseQtProperties();
 
-    setName("Volume bounding box");
+    setActorType("Volume bounding box");
+    setName(getActorType());
 
     // Bounding box of the actor.
     actorPropertiesSupGroup->addSubProperty(bBoxConnection->getProperty());

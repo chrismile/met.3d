@@ -5,7 +5,7 @@
 **  prediction data.
 **
 **  Copyright 2015-2017 Marc Rautenhaus
-**  Copyright 2015-2017 Bianca Tost
+**  Copyright 2017      Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -88,6 +88,9 @@ public:
 
     const QDir& getMet3DHomeDir() const;
 
+    QtTreePropertyBrowser* getSystemPropertiesBrowser()
+    { return systemPropertiesBrowser; }
+
     /**
       Returns a pointer to the group property manager responsible for @ref
       QtProperty instances in the system property tree.
@@ -145,6 +148,8 @@ public:
 
     QStringList getSyncControlIdentifiers() const;
 
+    void removeSyncControl(MSyncControl *syncControl);
+
     void registerWaypointsModel(MWaypointsTableModel* wps);
 
     MWaypointsTableModel* getWaypointsModel(const QString& id) const;
@@ -177,6 +182,13 @@ signals:
     void boundingBoxCreated();
     void boundingBoxDeleted(QString name);
     void boundingBoxRenamed();
+
+public slots:
+    /**
+      Handles change events of the properties in the property browser.
+     */
+    void actOnQtPropertyChanged(QtProperty *property);
+
 
 protected:
     friend class MGLResourcesManager;
@@ -221,6 +233,10 @@ private:
     QtStringPropertyManager              *stringPropertyManager;
     QtExtensions::QtClickPropertyManager *clickPropertyManager;
     QtColorPropertyManager               *colorPropertyManager;
+
+    QtProperty *windowLayoutGroupProperty;
+    QtProperty *loadWindowLayoutProperty;
+    QtProperty *saveWindowLayoutProperty;
 
     QList<MSceneViewGLWidget*> registeredViews;
 

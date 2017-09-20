@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2017      Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -197,6 +198,13 @@ public slots:
 
     void registerScene(MSceneControl *scene) override;
 
+    /**
+      Since normals of trajectories depend on the scene view the trajectory
+      actor is rendered in, it is necessary to trigger a data request if a scene
+      view is added to a scene the trajectory actor is connected to.
+     */
+    void onSceneViewAdded();
+
     bool isConnectedTo(MActor *actor) override;
 
 protected:
@@ -381,7 +389,7 @@ private:
     bool selectDataSource();
     /**
       @brief enableProperties changes the enabled status of all properties to
-      @param enable exept for @ref selectDataSourceProperty and
+      @p enable exept for @ref selectDataSourceProperty and
       @ref utilizedDataSourceProperty.
 
       enableProperties is used to disable all properties if the user selects no

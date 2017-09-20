@@ -5,7 +5,7 @@
 **  prediction data.
 **
 **  Copyright 2015-2017 Marc Rautenhaus
-**  Copyright 2015-2017 Bianca Tost
+**  Copyright 2016-2017 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -40,6 +40,7 @@
 #include "gxfw/mscenecontrol.h"
 #include "gxfw/scenemanagementdialog.h"
 #include "gxfw/adddatasetdialog.h"
+#include "gxfw/sessionmanagerdialog.h"
 #include "gxfw/synccontrol.h"
 #include "data/waypoints/waypointstableview.h"
 #include "gxfw/mresizewindowdialog.h"
@@ -67,7 +68,7 @@ public:
     MMainWindow(QStringList commandLineArguments, QWidget *parent = 0);
     ~MMainWindow();
 
-    void dockSyncControl(MSyncControl* syncControl);
+    void dockSyncControl(MSyncControl *syncControl);
 
     void dockSceneControl(MSceneControl *control);
 
@@ -78,7 +79,9 @@ public:
 
     void signalMapperConnect(QList<QComboBox> sceneViewComboBoxes);
 
-    void removeControl(QWidget *widget);
+    void removeSceneControl(QWidget *widget);
+
+    void removeSyncControl(MSyncControl *syncControl);
 
     QVector<MSceneViewGLWidget*>& getGLWidgets();
 
@@ -91,7 +94,43 @@ public:
     MBoundingBoxDockWidget *getBoundingBoxDock()
     { return boundingBoxDock; }
 
+    MSessionManagerDialog *getSessionManagerDialog()
+    { return sessionManagerDialog; }
+
+    /**
+     Save the window layout configuration to the file @p filename.
+     */
+    void saveConfigurationToFile(QString filename = "");
+    /**
+     Load the window layout configuration from the file @p filename.
+     */
+    void loadConfigurationFromFile(QString filename = "");
+
+    /**
+     Save window layout-specific configuration to the @ref QSettings object @p
+     settings.
+     */
+    void saveConfiguration(QSettings *settings);
+    /**
+     Load window layout-specific configuration from the @ref QSettings object @p
+     settings.
+     */
+    void loadConfiguration(QSettings *settings);
+    /**
+     Tabify system control with the scene controls.
+     */
+    void tabifyScenesAndSystem();
+
+    void onSessionsListChanged(QStringList *sessionsList, QString currentSession);
+
+    void onSessionSwitch(QString currentSession);
+
+    void updateSessionTimerInterval(int interval);
+
 public slots:
+    void show();
+    void closeEvent(QCloseEvent *event);
+
     void setFullScreen(bool b);
 
     void showWaypointsTable(bool b);
@@ -104,6 +143,8 @@ public slots:
 
     void addDataset();
 
+    void openSessionManager();
+
     void openOnlineManual();
 
     void openOnlineIssueTracker();
@@ -113,6 +154,8 @@ public slots:
     void showAboutDialog();
 
     void resizeWindow();
+
+    void switchSession(QAction *sessionAction);
 
 private:
     Ui::MainWindow *ui;
@@ -129,9 +172,11 @@ private:
     MSystemManagerAndControl *systemManagerAndControl;
     MSceneManagementDialog *sceneManagementDialog;
     MResizeWindowDialog *resizeWindowDialog;
+    MSessionManagerDialog *sessionManagerDialog;
 
     /** List of all dock widgets */
-    QList<QDockWidget*> dockWidgets;
+    QList<QDockWidget*> sceneDockWidgets;
+    QList<QDockWidget*> syncControlDockWidgets;
 
     QSignalMapper *signalMapperLayout;
 
@@ -140,7 +185,18 @@ private:
 
     MBoundingBoxDockWidget *boundingBoxDock;
 
+    /** Stores the index of the current view layout to simplify saving the
+        current state to a config file.*/
     int sceneViewLayout;
+
+    QSettings *sessionSettings;
+    QDockWidget *systemDock;
+
+    /**
+      Timer used to handle saving the session automatically everytime after the
+      time interval selected by the user has passed.
+     */
+    QTimer *sessionAutoSaveTimer;
 };
 
 } // namespace Met3D

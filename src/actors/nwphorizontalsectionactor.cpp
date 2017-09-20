@@ -79,7 +79,8 @@ MNWPHorizontalSectionActor::MNWPHorizontalSectionActor()
     // ===============================================
     beginInitialiseQtProperties();
 
-    setName("Horizontal cross-section");
+    setActorType("Horizontal cross-section");
+    setName(getActorType());
 
     slicePosProperty = addProperty(DECORATEDDOUBLE_PROPERTY, "slice position",
                                    actorPropertiesSupGroup);
@@ -807,7 +808,11 @@ void MNWPHorizontalSectionActor::onQtPropertyChanged(QtProperty *property)
         // Interpolate to target grid in next render cycle.
         crossSectionGridsNeedUpdate = true;
 
-        if (suppressActorUpdates()) return;
+        if (suppressActorUpdates()
+                || bBoxConnection->getBoundingBox() == nullptr)
+        {
+            return;
+        }
 
         updateDescriptionLabel();
         updateMouseHandlePositions();
@@ -1242,6 +1247,12 @@ void MNWPHorizontalSectionActor::computeRenderRegionParameters()
 
 void MNWPHorizontalSectionActor::updateDescriptionLabel(bool deleteOldLabel)
 {
+    // No description label available if no bounding box is selected.
+    if (bBoxConnection->getBoundingBox() == nullptr)
+    {
+        return;
+    }
+
     MTextManager* tm = MGLResourcesManager::getInstance()->getTextManager();
 
     if (deleteOldLabel && !labels.isEmpty()) // deleteOldLabel true by default
@@ -1623,7 +1634,10 @@ void MNWPHorizontalSectionActor::renderFilledContours(
         MSceneViewGLWidget *sceneView, MNWP2DHorizontalActorVariable *var)
 {
     // Abort rendering if transfer function is not defined.
-    if (var->transferFunction == nullptr) return;
+    if (var->transferFunction == nullptr)
+    {
+        return;
+    }
 
     glFilledContoursShader->bind();
 

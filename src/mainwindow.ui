@@ -39,14 +39,22 @@
      <x>0</x>
      <y>0</y>
      <width>800</width>
-     <height>20</height>
+     <height>30</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
     <property name="title">
      <string>&amp;File</string>
     </property>
+    <widget class="QMenu" name="menuSessions">
+     <property name="title">
+      <string>Sess&amp;ions</string>
+     </property>
+    </widget>
     <addaction name="actionAddDataset"/>
+    <addaction name="separator"/>
+    <addaction name="menuSessions"/>
+    <addaction name="actionSessionManager"/>
     <addaction name="separator"/>
     <addaction name="actionExit"/>
    </widget>
@@ -179,6 +187,9 @@
    <property name="text">
     <string>&amp;Add Dataset</string>
    </property>
+   <property name="shortcut">
+    <string comment="F3"/>
+   </property>
   </action>
   <action name="actionOnlineManual">
    <property name="text">
@@ -223,6 +234,24 @@
    </property>
    <property name="shortcut">
     <string>F3</string>
+   </property>
+  </action>
+  <action name="actionSessionManager">
+   <property name="text">
+    <string>&amp;Session Manager...</string>
+   </property>
+   <property name="shortcut">
+    <string>F6</string>
+   </property>
+  </action>
+  <action name="actionSessions">
+   <property name="text">
+    <string>Sessions</string>
+   </property>
+  </action>
+  <action name="actionDefault">
+   <property name="text">
+    <string>default</string>
    </property>
   </action>
  </widget>

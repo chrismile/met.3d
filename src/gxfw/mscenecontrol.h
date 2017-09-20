@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2017      Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -187,6 +188,8 @@ signals:
       */
     void sceneChanged();
 
+    void sceneViewAdded();
+
 protected:
     QVector<MActor*> renderQueue;
     QVector<QtBrowserItem*> browserItems;
@@ -204,6 +207,8 @@ private:
     QSet<MSceneViewGLWidget*> registeredSceneViews;
 
     static MQtProperties *qtProperties;
+    QList<QtAbstractEditorFactoryBase*> factories;
+    static QMutex staticSceneControlAccessMutex;
 };
 
 } // namespace Met3D

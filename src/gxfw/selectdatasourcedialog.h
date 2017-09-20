@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2017      Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -77,7 +78,7 @@ public:
       Constructs a new dialog. The dialog's data field table is filled with a
       list of the data source registered with @ref MGLResourcesManager.
 
-      Which dialog should be created is defined by @param type. If this
+      Which dialog should be created is defined by @p type. If this
       constructor is called to create a variable selection dialog, it uses all
       vertical level types available.
       */
@@ -148,7 +149,7 @@ private:
 
     /**
       Creates table entries for variable selection dialog restricted to
-      @param supportedTypes.
+      @p supportedTypes.
       */
     void createDataSourceEntries(QList<MVerticalLevelType> supportedTypes);
     /**

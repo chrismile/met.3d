@@ -5,7 +5,7 @@
 **  prediction data.
 **
 **  Copyright 2015-2017 Marc Rautenhaus
-**  Copyright 2015-2017 Bianca Tost
+**  Copyright 2016-2017 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -70,6 +70,8 @@ MSceneViewGLWidget::MSceneViewGLWidget()
       freezeMode(0),
       sceneNavigationSensitivity(1.),
       posLabelIsEnabled(true),
+      multisamplingEnabled(true),
+      antialiasingEnabled(false),
       measureFPS(false),
       measureFPSFrameCount(0),
       sceneNameLabel(nullptr),
@@ -147,6 +149,21 @@ MSceneViewGLWidget::MSceneViewGLWidget()
     propertyGroup = systemControl->getGroupPropertyManager()
             ->addProperty(QString("Scene view #%1").arg(myID+1));
 
+    // Configuration properties.
+    configurationSupGroup = systemControl->getGroupPropertyManager()
+            ->addProperty("configuration");
+    propertyGroup->addSubProperty(configurationSupGroup);
+
+    loadConfigProperty = systemControl->getClickPropertyManager()
+            ->addProperty("load");
+    configurationSupGroup->addSubProperty(loadConfigProperty);
+
+    saveConfigProperty = systemControl->getClickPropertyManager()
+            ->addProperty("save");
+    configurationSupGroup->addSubProperty(saveConfigProperty);
+
+
+    // Camera position.
     cameraPositionProperty = systemControl->getStringPropertyManager()
             ->addProperty("camera position");
     propertyGroup->addSubProperty(cameraPositionProperty);
@@ -192,8 +209,9 @@ MSceneViewGLWidget::MSceneViewGLWidget()
     sceneNavigationModeProperty = systemControl->getEnumPropertyManager()
             ->addProperty("scene navigation");
     systemControl->getEnumPropertyManager()->setEnumNames(
-                sceneNavigationModeProperty, QStringList() << "move camera" << "rotate scene" <<
-                                              "2D top view");
+                sceneNavigationModeProperty,
+                QStringList() << "move camera" << "rotate scene"
+                << "2D top view");
     interactionGroupProperty->addSubProperty(sceneNavigationModeProperty);
 
     sceneRotationCenterProperty = systemControl->getGroupPropertyManager()
@@ -287,13 +305,13 @@ MSceneViewGLWidget::MSceneViewGLWidget()
     multisamplingProperty = systemControl->getBoolPropertyManager()
             ->addProperty("multisampling");
     systemControl->getBoolPropertyManager()
-            ->setValue(multisamplingProperty, true);
+            ->setValue(multisamplingProperty, multisamplingEnabled);
     renderingGroupProperty->addSubProperty(multisamplingProperty);
 
     antialiasingProperty = systemControl->getBoolPropertyManager()
             ->addProperty("antialiasing");
     systemControl->getBoolPropertyManager()
-            ->setValue(antialiasingProperty, false);
+            ->setValue(antialiasingProperty, antialiasingEnabled);
     renderingGroupProperty->addSubProperty(antialiasingProperty);
 
     renderLabelsWithDepthTest = true;
@@ -430,7 +448,7 @@ MSceneViewGLWidget::MSceneViewGLWidget()
             SLOT(onPropertyChanged(QtProperty*)));
     connect(systemControl->getClickPropertyManager(),
             SIGNAL(propertyChanged(QtProperty*)),
-            SLOT(onPropertyChanged(QtProperty*)));    
+            SLOT(onPropertyChanged(QtProperty*)));
     connect(systemControl->getColorPropertyManager(),
             SIGNAL(propertyChanged(QtProperty*)),
             SLOT(onPropertyChanged(QtProperty*)));
@@ -731,7 +749,17 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
 
     if (!enablePropertyEvents) return;
 
-    if (property == actorInteractionProperty)
+    if (property == loadConfigProperty)
+    {
+        loadConfigurationFromFile();
+    }
+
+    else if (property == saveConfigProperty)
+    {
+        saveConfigurationToFile();
+    }
+
+    else if (property == actorInteractionProperty)
     {
         // Toggle actor interaction mode.
         actorInteractionMode = MSystemManagerAndControl::getInstance()
@@ -790,9 +818,10 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
 
     else if (property == multisamplingProperty)
     {
+        multisamplingEnabled = MSystemManagerAndControl::getInstance()
+                ->getBoolPropertyManager()->value(multisamplingProperty);
         // Toggle antialiasing by multisampling.
-        if (MSystemManagerAndControl::getInstance()->getBoolPropertyManager()
-                ->value(multisamplingProperty))
+        if (multisamplingEnabled)
         {
             glEnable(GL_MULTISAMPLE);
         }
@@ -807,9 +836,10 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
 
     else if (property == antialiasingProperty)
     {
+        antialiasingEnabled = MSystemManagerAndControl::getInstance()
+                ->getBoolPropertyManager()->value(antialiasingProperty);
         // Toggle antialiasing by point/line/polygon smoothing.
-        if (MSystemManagerAndControl::getInstance()->getBoolPropertyManager()
-                ->value(antialiasingProperty))
+        if (antialiasingEnabled)
         {
             glEnable(GL_POINT_SMOOTH);
             glHint(GL_POINT_SMOOTH_HINT, GL_NICEST);
@@ -1209,8 +1239,7 @@ void MSceneViewGLWidget::initializeGL()
 
     // Initial OpenGL settings.
     glEnable(GL_DEPTH_TEST);
-    if (MSystemManagerAndControl::getInstance()->getBoolPropertyManager()
-            ->value(multisamplingProperty))
+    if (multisamplingEnabled)
         glEnable(GL_MULTISAMPLE);
     else
         glDisable(GL_MULTISAMPLE);
@@ -1252,11 +1281,46 @@ void MSceneViewGLWidget::initializeGL()
 }
 
 
+void MSceneViewGLWidget::updateGL()
+{
+    // Don't update GL if no scene is attached to the scene view.
+    if (scene != nullptr)
+    {
+        QGLWidget::updateGL();
+    }
+}
+
+
 void MSceneViewGLWidget::paintGL()
 {
     // Only render this widget if it is visible.
     if (!isVisible()) return;
     if (freezeMode) return;
+
+    if (multisamplingEnabled)
+    {
+        glEnable(GL_MULTISAMPLE);
+    }
+    else
+    {
+        glDisable(GL_MULTISAMPLE);
+    }
+
+    if (antialiasingEnabled)
+    {
+        glEnable(GL_POINT_SMOOTH);
+        glHint(GL_POINT_SMOOTH_HINT, GL_NICEST);
+        glEnable(GL_LINE_SMOOTH);
+        glHint(GL_LINE_SMOOTH_HINT, GL_NICEST);
+        glEnable(GL_POLYGON_SMOOTH);
+        glHint(GL_POLYGON_SMOOTH_HINT, GL_NICEST);
+    }
+    else
+    {
+        glDisable(GL_LINE_SMOOTH);
+        glDisable(GL_POINT_SMOOTH);
+        glDisable(GL_POLYGON_SMOOTH);
+    }
 
     qglClearColor(backgroundColour);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -1965,6 +2029,11 @@ void MSceneViewGLWidget::updateSynchronizedCameras()
 
 void MSceneViewGLWidget::updateSceneLabel()
 {
+    // Don't update scene label if no scene is attached to the scene view.
+    if (scene == nullptr)
+    {
+        return;
+    }
     // Remove the old scene description label from the list of static labels.
     for (int i = 0; i < staticLabels.size(); i++)
         if (staticLabels[i] == sceneNameLabel)
@@ -2062,6 +2131,265 @@ void MSceneViewGLWidget::setSceneRotationCentre(QVector3D centre)
     doublePropertyManager->setValue(
                 sceneRotationCentreElevationProperty, centre.z());
     enablePropertyEvents = true;
+}
+
+
+void MSceneViewGLWidget::saveConfigurationToFile(QString filename)
+{
+    if (filename.isEmpty())
+        filename = QFileDialog::getSaveFileName(
+                    MGLResourcesManager::getInstance(),
+                    "Save scene view configuration",
+                    QString("data/sceneview%1.sceneview.conf").arg(myID + 1),
+                    "Scene view configuration files (*.sceneview.conf)");
+
+    if (filename.isEmpty()) return;
+
+    LOG4CPLUS_DEBUG(mlog, "Saving configuration to " << filename.toStdString());
+
+    QSettings *settings = new QSettings(filename, QSettings::IniFormat);
+
+    // Overwrite if the file exists.
+    if (QFile::exists(filename))
+    {
+        QStringList groups = settings->childGroups();
+        // Only overwrite file if it contains already configuration for a
+        // scene view.
+        if ( !groups.contains("MSceneView") )
+        {
+            QMessageBox msg;
+            msg.setWindowTitle("Error");
+            msg.setText("The selected file contains a configuration other than "
+                        "MSceneView.\n"
+                        "This file will NOT be overwritten -- have you selected"
+                        " the correct file?");
+            msg.setIcon(QMessageBox::Warning);
+            msg.exec();
+            delete settings;
+            return;
+        }
+        QFile::remove(filename);
+    }
+
+    settings->beginGroup("FileFormat");
+    // Save version id of Met.3D.
+    settings->setValue("met3dVersion", met3dVersionString);
+    settings->endGroup();
+
+    // Save scene view configuration.
+    settings->beginGroup("MSceneView");
+    saveConfiguration(settings);
+    settings->endGroup();
+
+    delete settings;
+
+    LOG4CPLUS_DEBUG(mlog, "... configuration has been saved.");
+}
+
+
+void MSceneViewGLWidget::loadConfigurationFromFile(QString filename)
+{
+    if (filename.isEmpty())
+        filename = QFileDialog::getOpenFileName(
+                    MGLResourcesManager::getInstance(),
+                    "Load scene view configuration",
+                    "data/config",
+                    "Scene view configuration files (*.sceneview.conf)");
+
+    if (filename.isEmpty()) return;
+
+    QSettings *settings = new QSettings(filename, QSettings::IniFormat);
+
+    QStringList groups = settings->childGroups();
+    if ( !groups.contains("MSceneView") )
+    {
+        QMessageBox msg;
+        msg.setWindowTitle("Error");
+        msg.setText("The selected file does not contain configuration data "
+                    "for scene views.");
+        msg.setIcon(QMessageBox::Warning);
+        msg.exec();
+        delete settings;
+        return;
+    }
+
+    LOG4CPLUS_DEBUG(mlog, "Loading configuration from "
+                    << filename.toStdString());
+
+    settings->beginGroup("MSceneView");
+    loadConfiguration(settings);
+    settings->endGroup();
+
+    delete settings;
+
+    LOG4CPLUS_DEBUG(mlog, "... configuration has been loaded.");
+}
+
+
+void MSceneViewGLWidget::saveConfiguration(QSettings *settings)
+{
+    MSystemManagerAndControl* sysMC = MSystemManagerAndControl::getInstance();
+
+    camera.saveConfiguration(settings);
+
+    // Save interaction properties.
+    settings->beginGroup("Interaction");
+    settings->setValue("sceneNavigation", sysMC->getEnumPropertyManager()
+                      ->enumNames(sceneNavigationModeProperty)
+                      .at(sceneNavigationMode));
+    settings->setValue("sceneRotationCentreLongitude", sceneRotationCentre.x());
+    settings->setValue("sceneRotationCentreLatitude", sceneRotationCentre.y());
+    settings->setValue("sceneRotationCentreElevation",
+                      sysMC->getDecoratedDoublePropertyManager()->value(
+                          sceneRotationCentreElevationProperty));
+    settings->setValue("NavigationSensitivity",
+                      sysMC->getDecoratedDoublePropertyManager()->value(
+                          sceneNavigationSensitivityProperty));
+    settings->setValue("autoRotateCamera", cameraAutorotationMode);
+    settings->setValue("SyncCameraWithView",
+                      sysMC->getEnumPropertyManager()->enumNames(
+                          syncCameraWithViewProperty).at(
+                          sysMC->getEnumPropertyManager()
+                          ->value(syncCameraWithViewProperty)));
+    settings->setValue("actorInteractionMode", actorInteractionMode);
+    settings->setValue("analysisMode", analysisMode);
+    settings->endGroup(); // interaction
+
+    // Save rendering properties.
+    settings->beginGroup("Rendering");
+    settings->setValue("backgroundColour",  sysMC->getColorPropertyManager()
+                       ->value(backgroundColourProperty));
+    settings->setValue("multisampling", multisamplingEnabled);
+    settings->setValue("antialiasing", antialiasingEnabled);
+    settings->setValue("depthTestForLabels", renderLabelsWithDepthTest);
+    settings->setValue("lighting",
+                      sysMC->getEnumPropertyManager()->enumNames(
+                          lightingProperty).at(lightDirection));
+    settings->setValue("verticalScaling", ztop);
+    settings->endGroup(); // rendering
+
+    // Load arrow pointing north properties.
+    settings->beginGroup("ArrowPointingNorth");
+    settings->setValue("enabled",  sysMC->getBoolPropertyManager()->value(
+                           northArrow.enabledProperty));
+    settings->setValue("horizontalScale", northArrow.horizontalScale);
+    settings->setValue("verticalScale", northArrow.verticalScale);
+    settings->setValue("lon",  sysMC->getDecoratedDoublePropertyManager()
+                       ->value(northArrow.lonPositionProperty));
+    settings->setValue("lat",  sysMC->getDecoratedDoublePropertyManager()
+                       ->value(northArrow.latPositionProperty));
+    settings->setValue("worldZPos",  sysMC->getDecoratedDoublePropertyManager()
+                       ->value(northArrow.worldZPositionProperty));
+    settings->setValue("colour",  sysMC->getColorPropertyManager()
+                       ->value(northArrow.colourProperty));
+    settings->endGroup(); // arrow pointing north
+}
+
+
+void MSceneViewGLWidget::loadConfiguration(QSettings *settings)
+{
+    MSystemManagerAndControl* sysMC = MSystemManagerAndControl::getInstance();
+
+    camera.loadConfiguration(settings);
+
+    // Load interaction properties.
+    settings->beginGroup("Interaction");
+    // Since scene navigation mode is stored as a string, get the corresponding
+    // index.
+    QString enumName = settings->value("sceneNavigation", "move camera").toString();
+    int enumIndex = (sysMC->getEnumPropertyManager()->enumNames(
+                sceneNavigationModeProperty)).indexOf(enumName);
+    sysMC->getEnumPropertyManager()->setValue(sceneNavigationModeProperty,
+                                              enumIndex);
+
+    sysMC->getDecoratedDoublePropertyManager()->setValue(
+                sceneRotationCentreLonProperty,
+                settings->value("sceneRotationCentreLongitude", 0.).toDouble());
+    sysMC->getDecoratedDoublePropertyManager()->setValue(
+                sceneRotationCentreLatProperty,
+                settings->value("sceneRotationCentreLatitude", 45.).toDouble());
+    sysMC->getDecoratedDoublePropertyManager()->setValue(
+                sceneRotationCentreElevationProperty,
+                settings->value("sceneRotationCentreElevation", 1020.).toDouble());
+
+    sysMC->getDecoratedDoublePropertyManager()->setValue(
+                sceneNavigationSensitivityProperty,
+                settings->value("NavigationSensitivity", 1.).toDouble());
+
+    sysMC->getBoolPropertyManager()->setValue(
+                cameraAutoRotationModeProperty,
+                settings->value("autoRotateCamera", false).toBool());
+
+    // Since scene sync camera with view is stored as a string, get the
+    // corresponding index.
+    enumName = settings->value("SyncCameraWithView", "None").toString();
+    enumIndex = (sysMC->getEnumPropertyManager()->enumNames(
+                    syncCameraWithViewProperty)).indexOf(enumName);
+    sysMC->getEnumPropertyManager()->setValue(syncCameraWithViewProperty,
+                                                  enumIndex);
+
+    sysMC->getBoolPropertyManager()->setValue(
+                actorInteractionProperty,
+                settings->value("actorInteractionMode", false).toBool());
+    sysMC->getBoolPropertyManager()->setValue(
+                analysisModeProperty,
+                settings->value("analysisMode", false).toBool());
+    settings->endGroup(); // interaction
+
+    // Load rendering properties.
+    settings->beginGroup("Rendering");
+    sysMC->getColorPropertyManager()->setValue(
+                backgroundColourProperty,
+                settings->value("backgroundColour", QColor(255, 255, 255))
+                .value<QColor>());
+    sysMC->getBoolPropertyManager()->setValue(
+                multisamplingProperty,
+                settings->value("multisampling", true).toBool());
+    sysMC->getBoolPropertyManager()->setValue(
+                antialiasingProperty,
+                settings->value("antialiasing", false).toBool());
+    sysMC->getBoolPropertyManager()->setValue(
+                labelDepthTestProperty,
+                settings->value("depthTestForLabels", true).toBool());
+
+    // Since scene lighting mode is stored as a string, get the corresponding
+    // index.
+    enumName = settings->value("lighting", "Top").toString();
+    enumIndex = (sysMC->getEnumPropertyManager()->enumNames(
+                    lightingProperty)).indexOf(enumName);
+    sysMC->getEnumPropertyManager()->setValue(lightingProperty, enumIndex);
+
+    sysMC->getDecoratedDoublePropertyManager()->setValue(
+                verticalScalingProperty,
+                settings->value("verticalScaling", 36.).toDouble());
+    settings->endGroup(); // rendering
+
+    // Load arrow pointing north properties.
+    settings->beginGroup("ArrowPointingNorth");
+    sysMC->getBoolPropertyManager()->setValue(
+                northArrow.enabledProperty,
+                settings->value("enabled", false).toBool());
+    settings->setValue("horizontalScale", northArrow.horizontalScale);
+    settings->setValue("verticalScale", northArrow.verticalScale);
+    sysMC->getDecoratedDoublePropertyManager()->setValue(
+                northArrow.horizontalScaleProperty,
+                settings->value("horizontalScale", 5.).toDouble());
+    sysMC->getDecoratedDoublePropertyManager()->setValue(
+                northArrow.verticalScaleProperty,
+                settings->value("verticalScale", 5.).toDouble());
+    sysMC->getDecoratedDoublePropertyManager()->setValue(
+                northArrow.lonPositionProperty,
+                settings->value("lon", 0.).toDouble());
+    sysMC->getDecoratedDoublePropertyManager()->setValue(
+                northArrow.latPositionProperty,
+                settings->value("lat", 80.).toDouble());
+    sysMC->getDecoratedDoublePropertyManager()->setValue(
+                northArrow.worldZPositionProperty,
+                settings->value("worldZPos", 1.).toDouble());
+    sysMC->getColorPropertyManager()->setValue(
+                northArrow.colourProperty,
+                settings->value("colour", QColor(222, 46, 30)).value<QColor>());
+    settings->endGroup(); // arrow pointing north
 }
 
 

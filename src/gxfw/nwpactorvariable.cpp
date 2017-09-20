@@ -92,7 +92,6 @@ MNWPActorVariable::MNWPActorVariable(MNWPMultiVarActor *actor)
       textureUnitUnusedTextures(-1),
       transferFunction(nullptr),
       textureUnitTransferFunction(-1),
-      synchronizationControl(nullptr),
       actor(actor),
       synchronizeInitTime(true),
       synchronizeValidTime(true),
@@ -1330,15 +1329,17 @@ void MNWPActorVariable::onActorDeleted(MActor *actor)
         this->actor->enableEmissionOfActorChangedSignal(false);
 
         MQtProperties *properties = actor->getQtProperties();
-        int index = properties->mEnum()->value(transferFunctionProperty);
+        QString tFName = properties->getEnumItem(transferFunctionProperty);
         QStringList availableTFs = properties->mEnum()->enumNames(
                     transferFunctionProperty);
 
-        // If the deleted transfer function is currently connected to this
-        // variable, set current transfer function to "None" (index 0).
-        if (availableTFs.at(index) == tf->getName()) index = 0;
-
         availableTFs.removeOne(tf->getName());
+
+        // Get the current index of the transfer function selected. If the
+        // transfer function is the one to be deleted, the selection is set to
+        // 'None'.
+        int index = availableTFs.indexOf(tFName);
+
         properties->mEnum()->setEnumNames(transferFunctionProperty, availableTFs);
         properties->mEnum()->setValue(transferFunctionProperty, index);
 
@@ -1355,17 +1356,18 @@ void MNWPActorVariable::onActorDeleted(MActor *actor)
             this->actor->enableEmissionOfActorChangedSignal(false);
 
             MQtProperties *properties = actor->getQtProperties();
-            int index =
-                    properties->mEnum()->value(spatialTransferFunctionProperty);
-
+            QString sTFName =
+                    properties->getEnumItem(spatialTransferFunctionProperty);
             QStringList availableSTFs = properties->mEnum()->enumNames(
                         spatialTransferFunctionProperty);
 
-            // If the deleted transfer function is currently connected to this
-            // variable, set current transfer function to "None" (index 0).
-            if (availableSTFs.at(index) == stf->getName()) index = 0;
-
             availableSTFs.removeOne(stf->getName());
+
+            // Get the current index of the spatial transfer function selected.
+            // If the transfer function is the one to be deleted, the selection
+            // is set to 'None'.
+            int index = availableSTFs.indexOf(sTFName);
+
             properties->mEnum()->setEnumNames(spatialTransferFunctionProperty,
                                               availableSTFs);
             properties->mEnum()->setValue(spatialTransferFunctionProperty,

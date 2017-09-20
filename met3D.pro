@@ -129,7 +129,8 @@ HEADERS += \
     src/actors/transferfunctioneditor/editortransferfunction.h \
     src/gxfw/rotatedgridsupportingactor.h \
     src/gxfw/boundingbox/bboxdockwidget.h \
-    src/gxfw/boundingbox/boundingbox.h 
+    src/gxfw/boundingbox/boundingbox.h \
+    src/gxfw/sessionmanagerdialog.h
 
 SOURCES += \
     src/main.cpp \
@@ -226,7 +227,8 @@ SOURCES += \
     src/actors/transferfunctioneditor/editortransferfunction.cpp \
     src/gxfw/rotatedgridsupportingactor.cpp \
     src/gxfw/boundingbox/bboxdockwidget.cpp \
-    src/gxfw/boundingbox/boundingbox.cpp
+    src/gxfw/boundingbox/boundingbox.cpp \
+    src/gxfw/sessionmanagerdialog.cpp
 
 FORMS += \
     src/mainwindow.ui \
@@ -240,7 +242,8 @@ FORMS += \
     src/gxfw/memberselectiondialog.ui \
     src/gxfw/adddatasetdialog.ui \
     src/gxfw/resizewindowdialog.ui \
-    src/gxfw/boundingbox/bboxdockwidget.ui
+    src/gxfw/boundingbox/bboxdockwidget.ui \
+    src/gxfw/sessionmanagerdialog.ui
 
 OTHER_FILES += \
     data/log4cplus.properties \
