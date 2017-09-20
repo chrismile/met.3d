@@ -1070,15 +1070,16 @@ void MMainWindow::addDataset()
 
         MPipelineConfiguration newPipelineConfig;
         newPipelineConfig.initializeNWPPipeline(
-                pipelineConfig.name,
-                pipelineConfig.fileDir,
-                pipelineConfig.fileFilter,
-                pipelineConfig.schedulerID,
-                pipelineConfig.memoryManagerID,
-                (MPipelineConfiguration::MNWPReaderFileFormat)pipelineConfig.dataFormat,
-                pipelineConfig.enableRegridding,
-                pipelineConfig.enableProbabiltyRegionFilter,
-                pipelineConfig.treatRotatedGridAsRegularGrid);
+                    pipelineConfig.name,
+                    pipelineConfig.fileDir,
+                    pipelineConfig.fileFilter,
+                    pipelineConfig.schedulerID,
+                    pipelineConfig.memoryManagerID,
+                    (MPipelineConfiguration::MNWPReaderFileFormat)pipelineConfig.dataFormat,
+                    pipelineConfig.enableRegridding,
+                    pipelineConfig.enableProbabiltyRegionFilter,
+                    pipelineConfig.treatRotatedGridAsRegularGrid,
+                    pipelineConfig.surfacePressureFieldType);
     }
 }
 

@@ -117,7 +117,8 @@ protected:
                                MNWPReaderFileFormat dataFormat,
                                bool enableRegridding,
                                bool enableProbabiltyRegionFilter,
-                               bool treatRotatedGridAsRegularGrid);
+                               bool treatRotatedGridAsRegularGrid,
+                               QString surfacePressureFieldType);
 
     void initializeLagrantoEnsemblePipeline(
             QString name,

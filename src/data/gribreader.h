@@ -56,6 +56,8 @@ struct MGribDatafieldInfo
     QString filename;                // file in which the variable is stored
     QMap<long, long> offsetForLevel; // byte offset at which the grib message
                                      // for a given vertical level is stored
+    bool applyExp;                   // indicates whether to apply exponatial
+                                     // function to data field or not.
 };
 
 // Define a hierarchy of dictionaries that provide fast access to where a
@@ -149,7 +151,7 @@ struct MGribMessageIndexInfo
 class MGribReader : public MWeatherPredictionReader
 {
 public:
-    MGribReader(QString identifier);
+    MGribReader(QString identifier, QString surfacePressureFieldType);
     ~MGribReader();
 
     QList<MVerticalLevelType> availableLevelTypes();
@@ -215,12 +217,37 @@ protected:
 
     QString forecastTypeToString(MECMWFForecastType type);
 
+    /**
+     Detects surface pressure field type for this data source if not done
+     already.
+
+     We need the type to set the surfacePressureName of hybrid sigma pressure
+     variables correctly thus we need to detect it before writing any index file for
+     this data source but only once for all files belonging to the data source and
+     only if we need to write index files (In the index files lnsp fields are stored
+     as surface fields instead of hybrid fields.)
+     */
+    void detectSurfacePressureFieldType(QStringList *availableFiles);
+
+    /**
+     Sets @ref surfacePressureFieldType to @p surfacePressureFieldType and
+     if @ref surfacePressureFieldType has not been set yet and prints which
+     type was detected.
+     */
+    void setSurfacePressureFieldType(QString surfacePressureFieldType);
+
     MGribLevelTypeMap availableDataFields;
     MGribLevelTypeMap availableDataFieldsByStdName;
     QReadWriteLock availableItemsLock;
 
     MGribOpenFileMap openFiles;
     QMutex openFilesMutex;
+
+    /**
+      Stores whether the surface pressure fields of this data source are sp,
+      lnsp or none.
+      */
+    QString surfacePressureFieldType;
 };
 
 

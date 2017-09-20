@@ -87,6 +87,8 @@ MNWPPipelineConfigurationInfo MAddDatasetDialog::getNWPPipelineConfigurationInfo
     d.enableProbabiltyRegionFilter = ui->propRegBool->isChecked();
     d.treatRotatedGridAsRegularGrid =
             ui->treatRotatedAsRegularCheckBox->isChecked();
+    d.surfacePressureFieldType = ui->surfacePressureTypeComboBox->currentText();
+
 
     return d;
 }

@@ -63,6 +63,7 @@ struct MNWPPipelineConfigurationInfo
     bool enableRegridding;
     bool enableProbabiltyRegionFilter;
     bool treatRotatedGridAsRegularGrid;
+    QString surfacePressureFieldType;
 };
 
 
