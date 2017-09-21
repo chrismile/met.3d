@@ -248,6 +248,8 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
                                                    false).toBool();
         bool treatRotatedGridAsRegularGrid =
                 config.value("treatRotatedGridAsRegularGrid", false).toBool();
+        QString gribSurfacePressureFieldType =
+                config.value("surfacePressureFieldType", "auto").toString();
 
 //TODO (mr, 16Dec2015) -- compatibility code; remove in Met.3D version 2.0
         // If no fileFilter is specified but a domainID is specified use
@@ -271,6 +273,8 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
                         << (enableProbRegionFilter ? "enabled" : "disabled"));
         LOG4CPLUS_DEBUG(mlog, "  treat rotated grid as regular grid="
                         << (treatRotatedGridAsRegularGrid ? "enabled" : "disabled"));
+        LOG4CPLUS_DEBUG(mlog, "  surfacePressureFieldType="
+                        << gribSurfacePressureFieldType.toStdString());
 
         MNWPReaderFileFormat fileFormat = INVALID_FORMAT;
         if (fileFormatStr == "CF_NETCDF") fileFormat = CF_NETCDF;
@@ -278,12 +282,17 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
         else if (fileFormatStr == "ECMWF_CF_NETCDF") fileFormat = CF_NETCDF;
         else if (fileFormatStr == "ECMWF_GRIB") fileFormat = ECMWF_GRIB;
 
+        QStringList validGribSurfacePressureFieldTypes;
+        validGribSurfacePressureFieldTypes << "auto" << "sp" << "lnsp";
+
         // Check parameter validity.
         if ( name.isEmpty()
              || path.isEmpty()
              || schedulerID.isEmpty()
              || memoryManagerID.isEmpty()
-             || (fileFormat == INVALID_FORMAT) )
+             || (fileFormat == INVALID_FORMAT)
+             || (fileFormat == ECMWF_GRIB && !validGribSurfacePressureFieldTypes
+                 .contains(gribSurfacePressureFieldType)))
         {
             LOG4CPLUS_WARN(mlog, "invalid parameters encountered; skipping.");
             continue;
@@ -293,7 +302,8 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
         initializeNWPPipeline(
                     name, path, fileFilter, schedulerID,
                     memoryManagerID, fileFormat, enableRegridding,
-                    enableProbRegionFilter, treatRotatedGridAsRegularGrid);
+                    enableProbRegionFilter, treatRotatedGridAsRegularGrid,
+                    gribSurfacePressureFieldType);
     }
 
     config.endArray();
@@ -357,7 +367,8 @@ void MPipelineConfiguration::initializeNWPPipeline(
         MNWPReaderFileFormat dataFormat,
         bool enableRegridding,
         bool enableProbabiltyRegionFilter,
-        bool treatRotatedGridAsRegularGrid)
+        bool treatRotatedGridAsRegularGrid,
+        QString surfacePressureFieldType)
 {
     MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
     MAbstractScheduler* scheduler = sysMC->getScheduler(schedulerID);
@@ -378,7 +389,8 @@ void MPipelineConfiguration::initializeNWPPipeline(
     }
     else if (dataFormat == ECMWF_GRIB)
     {
-        nwpReaderENS = new MGribReader(dataSourceId);
+        nwpReaderENS = new MGribReader(dataSourceId,
+                                       surfacePressureFieldType);
     }
     nwpReaderENS->setMemoryManager(memoryManager);
     nwpReaderENS->setScheduler(scheduler);
@@ -614,7 +626,8 @@ void MPipelineConfiguration::initializeDevelopmentDataPipeline()
                 CF_NETCDF,
                 false,
                 true,
-                false);
+                false,
+                "auto");
 
     initializeNWPPipeline(
                 "ECMWF ENS EUR_LL10",
@@ -625,7 +638,8 @@ void MPipelineConfiguration::initializeDevelopmentDataPipeline()
                 CF_NETCDF,
                 false,
                 true,
-                false);
+                false,
+                "auto");
 
     sysMC->registerMemoryManager("Trajectories DF-T psfc_1000hPa_L62",
                new MLRUMemoryManager("Trajectories DF-T psfc_1000hPa_L62",

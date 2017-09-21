@@ -9,7 +9,7 @@ pathToSessionConfigurations=$MET3D_BASE/sessions
 # Set to "None" to disable loading session at start and load frontend
 # configuration instead.
 loadSessionOnStart=None
-# Set auto save session interval in second (maximum: 86400 sec == 24 h)
+# Set auto save session interval in seconds (maximum: 86400 sec == 24 h)
 # Set interval to 0 to disable auto save session.
 autoSaveSessionIntervalInSeconds=0
 # Set to true to save current session automatically on application exit
