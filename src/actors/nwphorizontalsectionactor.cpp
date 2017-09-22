@@ -1696,6 +1696,9 @@ void MNWPHorizontalSectionActor::renderFilledContours(
     glFilledContoursShader->setUniformValue(
                 "leftGridLon", GLfloat(var->grid->lons[0])); CHECK_GL_ERROR;
     glFilledContoursShader->setUniformValue(
+                "eastGridLon", GLfloat(var->grid->lons[var->grid->nlons - 1]));
+    CHECK_GL_ERROR;
+    glFilledContoursShader->setUniformValue(
                 "shiftForWesternLon",
                 GLfloat(var->shiftForWesternLon)); CHECK_GL_ERROR;
 
@@ -1796,13 +1799,13 @@ void MNWPHorizontalSectionActor::renderLineCountours(
     glMarchingSquaresShader->setUniformValue(
                 "jOffset", GLint(var->j0)); CHECK_GL_ERROR;
     glMarchingSquaresShader->setUniformValue(
-                "bboxLons", QVector2D(bBoxConnection->westLon(),
-                                      bBoxConnection->eastLon())); CHECK_GL_ERROR;
-    glMarchingSquaresShader->setUniformValue(
                 "isCyclicGrid",
                 GLboolean(var->grid->gridIsCyclicInLongitude())); CHECK_GL_ERROR;
     glMarchingSquaresShader->setUniformValue(
                 "leftGridLon", GLfloat(var->grid->lons[0])); CHECK_GL_ERROR;
+    glMarchingSquaresShader->setUniformValue(
+                "eastGridLon", GLfloat(var->grid->lons[var->grid->nlons - 1]));
+    CHECK_GL_ERROR;
     glMarchingSquaresShader->setUniformValue(
                 "shiftForWesternLon",
                 GLfloat(var->shiftForWesternLon)); CHECK_GL_ERROR;
@@ -1989,6 +1992,9 @@ void MNWPHorizontalSectionActor::renderTexturedContours(
                 GLboolean(var->grid->gridIsCyclicInLongitude())); CHECK_GL_ERROR;
     glTexturedContoursShader->setUniformValue(
                 "leftGridLon", GLfloat(var->grid->lons[0])); CHECK_GL_ERROR;
+    glTexturedContoursShader->setUniformValue(
+                "eastGridLon", GLfloat(var->grid->lons[var->grid->nlons - 1]));
+    CHECK_GL_ERROR;
     glTexturedContoursShader->setUniformValue(
                 "shiftForWesternLon",
                 GLfloat(var->shiftForWesternLon)); CHECK_GL_ERROR;

@@ -1469,7 +1469,6 @@ void MSceneViewGLWidget::paintGL()
 
     if (northArrow.enabled)
     {
-        glEnable(GL_CULL_FACE);
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
         northArrowShader->bind();
         northArrowShader->setUniformValue("colour", northArrow.colour);
@@ -1485,7 +1484,6 @@ void MSceneViewGLWidget::paintGL()
         northArrowShader->setUniformValue("mvpMatrix",
                                           modelViewProjectionMatrix);
         glDrawArrays(GL_POINTS, 0, 1);
-        glDisable(GL_CULL_FACE);
     }
 
     // All actors have been rendered; they won't query this variable until the

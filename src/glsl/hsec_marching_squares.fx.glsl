@@ -48,7 +48,6 @@ uniform int       latOffset;      // index at which lat data starts
 uniform int       iOffset;        // grid index offsets if only a subregion
 uniform int       jOffset;        //   of the grid shall be rendered
 uniform float     isoValue;       // iso value of the contour line
-uniform vec2      bboxLons;       // western and eastern lon of the bbox
 
 uniform float     shiftForWesternLon; // shift in multiples of 360 to get the
                                       // correct starting position (depends on
@@ -237,6 +236,7 @@ uniform float     scalarMaximum;
 
 uniform bool      isCyclicGrid;
 uniform float     leftGridLon;
+uniform float     eastGridLon;    // eastmost longitude of the grid
 
 // lon holds the longitude coordinate of the fragment in world space
 // coordinates.
@@ -246,8 +246,8 @@ shader FSmain(in float lon, out vec4 fragColour)
     // discard fragments between seperated regions.
     // (cf. computeRenderRegionParameters of MNWP2DHorizontalActorVariable in
     // nwpactorvariable.cpp).
-    if (!isCyclicGrid && ((mod(lon - leftGridLon, 360.) < 0.)
-                           || (mod(lon - leftGridLon, 360.) >= latOffset - 1.)))
+    if (!isCyclicGrid
+            && (mod(lon - leftGridLon, 360.) >= (eastGridLon - leftGridLon)))
     {
         discard;
     }
