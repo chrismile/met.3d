@@ -228,7 +228,7 @@ MNWPVolumeRaycasterActor::IsoValueSettings::IsoValueSettings(
     isoValueDecimalsProperty = a->addProperty(INT_PROPERTY, "isovalue decimals", groupProp);
     properties->setInt(isoValueDecimalsProperty, decimals, 0, 10, 1);
 
-    isoValueSingleStepProperty = a->addProperty(DOUBLE_PROPERTY, "animation step", groupProp);
+    isoValueSingleStepProperty = a->addProperty(DOUBLE_PROPERTY, "isovalue step", groupProp);
     properties->setDouble(isoValueSingleStepProperty, singleStep, decimals, singleStep);
 
     QStringList modesLst;
