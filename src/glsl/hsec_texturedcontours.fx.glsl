@@ -149,6 +149,7 @@ uniform vec2      bboxLons;          // western and eastern lon of the bbox
 
 uniform bool      isCyclicGrid;   // indicates whether the grid is cyclic or not
 uniform float     leftGridLon;    // leftmost longitude of the grid
+uniform float     eastGridLon;    // eastmost longitude of the grid
 
 shader FSmain(in VStoFS input, out vec4 fragColour)
 {
@@ -168,8 +169,7 @@ shader FSmain(in VStoFS input, out vec4 fragColour)
     // (cf. computeRenderRegionParameters of MNWP2DHorizontalActorVariable in
     // nwpactorvariable.cpp).
     if (!isCyclicGrid
-            && ((mod(input.lon - leftGridLon, 360.) < 0.)
-                || (mod(input.lon - leftGridLon, 360.) > (latOffset - 1.))))
+            && (mod(input.lon - leftGridLon, 360.) >= (eastGridLon - leftGridLon)))
     {
         discard;
     }

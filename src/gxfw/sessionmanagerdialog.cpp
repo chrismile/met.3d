@@ -295,8 +295,20 @@ void MSessionManagerDialog::createNewSession()
     bool ok = false;
 
     QString sessionName = "defaultSession";
-    int index = getSmallesIndexForUniqueName(sessionName);
-    sessionName = sessionName + QString(" (%1)").arg(index);
+
+    QDir directory(path);
+
+    // If defaultSession already exists, append smallest index possible to
+    // create a unique name with.
+
+    QStringList sessions =
+            directory.entryList(QStringList("*" + fileExtension),
+                                QDir::Files);
+    if (sessions.contains(sessionName))
+    {
+        int index = getSmallestIndexForUniqueName(sessionName);
+        sessionName = sessionName + QString(" (%1)").arg(index);
+    }
 
     // Let the name input dialog reappear until the user enters a unique,
     // non-empty name or pushes cancel.
@@ -373,7 +385,7 @@ void MSessionManagerDialog::cloneSession()
     // Get smallest index to append to get unique session name.
     // =========================================================
 
-    int index = getSmallesIndexForUniqueName(sessionToClone);
+    int index = getSmallestIndexForUniqueName(sessionToClone);
 
     // =========================================================
 
@@ -1354,7 +1366,7 @@ bool MSessionManagerDialog::isValidSessionName(QString sessionName)
 }
 
 
-int MSessionManagerDialog::getSmallesIndexForUniqueName(QString sessionName)
+int MSessionManagerDialog::getSmallestIndexForUniqueName(QString sessionName)
 {
     QDir directory(path);
     // Get all files with the right file extension.

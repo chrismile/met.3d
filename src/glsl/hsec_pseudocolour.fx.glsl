@@ -72,6 +72,7 @@ uniform float     shiftForWesternLon; // shift in multiples of 360 to get the
                                       // correct starting position (depends on
                                       // the distance between the left border of
                                       // the grid and the left border of the bbox)
+uniform bool      isCyclicGrid;       // indicates whether the grid is cyclic or not
 
 // bug if 'out GStoFS output' is used?
 shader GSmain(out GStoFS vertex)

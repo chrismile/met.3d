@@ -200,7 +200,7 @@ private:
       Returns smalles index to get a unique name when appending " (index)" to
       @p sessionName.
      */
-    int getSmallesIndexForUniqueName(QString sessionName);
+    int getSmallestIndexForUniqueName(QString sessionName);
 
     Ui::MSessionManagerDialog *ui;
 
