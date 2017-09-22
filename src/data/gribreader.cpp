@@ -5,7 +5,7 @@
 **  prediction data.
 **
 **  Copyright 2015-2017 Marc Rautenhaus
-**  Copyright 2015-2017 Bianca Tost
+**  Copyright 2017 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -53,9 +53,10 @@ MGribReader::MGribReader(QString identifier, QString surfacePressureFieldType)
     : MWeatherPredictionReader(identifier),
       surfacePressureFieldType(surfacePressureFieldType)
 {
-    // Automatically search for pressure field type thus set
-    // surfacePressureFieldType to empty string (== we don't know the pressure
-    // field type).
+    // Name of surface pressure field to reconstruct pressure for hybrid
+    // coordinates. If set to "auto" set the string to empty here (will trigger
+    // search of GRIB messages for sp/lnsp field in
+    // detectSurfacePressureFieldType().
     if (surfacePressureFieldType == "auto")
     {
         this->surfacePressureFieldType = "";
@@ -401,10 +402,11 @@ MStructuredGrid *MGribReader::readGrid(
             GRIB_CHECK(grib_get_double_array(gribHandle, "values", values,
                                              &nGribValues), 0);
 
-            // Copy double data to MStructuredGrid float array and apply
-            // exponential function to ln fields.
+            // Copy double data to MStructuredGrid float array.
             if (dinfo.applyExp)
             {
+                // If surface pressure is specified as lnsp, apply exponential
+                // function to reconstruct surface pressure "sp".
                 for (uint n = 0; n < nGribValues; n++)
                 {
                     grid->data[n] = exp(values[n]);
@@ -817,7 +819,8 @@ void MGribReader::scanDataRoot()
             indexDataStream << (qint32)2;
             indexDataStream.setVersion(QDataStream::Qt_4_8);
 
-            // lnsp model level fix.
+            // lnsp model level fix (ECMWF inconsistency: lnsp is stored on
+            // a single model level, not as a surface field...).
             bool fixLNSPmodelLevel = false;
 
             // Loop over grib messages contained in the file.
@@ -888,7 +891,9 @@ void MGribReader::scanDataRoot()
                 // LOG4CPLUS_DEBUG(mlog, "parameter.shortName: " << shortName.toStdString());
                 QString varName = QString("%1 (%2)").arg(shortName).arg(dataType);
 
-                // Special case lnsp on model level 1.
+                // Handly special case "lnsp". "lnsp" fields at ECMWF are
+                // stored on model level 1 (not as a surface field). In Met.3D,
+                // we re-cast as a surface field (which it is...).
                 if (shortName == "lnsp" && levelType == HYBRID_SIGMA_PRESSURE_3D)
                 {
                     levelType = SURFACE_2D;

@@ -23,10 +23,11 @@ size=3
 [NWPPipeline]
 size=2
 
-# Example configuration for a deterministic ECMWF CF-NetCDF dataset.
+# Example configuration for a dataset.
+# ------------------------------------
 # Specifiy a name for the dataset.
 1\name=ECMWF DET EUR_LL015
-# Sepcify the directory in which the data files are stored. If you specify
+# Specify the directory in which the data files are stored. If you specify
 # a file filter (wildcards allowed), only those files that correspond to the
 # filter will be used.
 1\path=/your/path/data/mss/grid/ecmwf/netcdf
@@ -46,10 +47,12 @@ size=2
 # grids as regular grids. Setting it to false will cause rejection of data sets
 # with rotated grid coordinates.
 1\treatRotatedGridAsRegularGrid=false
-# Only for grib files to specify surface pressure field type.
-# Can be "sp" (surface pressure fields), "lnsp" (ln surface pressure fields) or
-# "auto" (Met.3D detects the surface pressure field type (might be slow!)).
-1\gribSurfacePressureFieldType=auto
+# For ECMWF grib files only: specify type and name of the surface pressure field
+# used to reconstruct pressure for hybrid sigma-pressure coordinates.
+# Can be "sp" (surface pressure), "lnsp" (log of surface pressure) or
+# "auto" (Met.3D tries to detect the surface pressure field
+# (NOTE: this can be slow!)).
+1\gribSurfacePressureFieldType=sp
 
 # Example configuration for an ensemble ECMWF CF-NetCDF dataset.
 2\name=ECMWF ENS EUR_LL10

@@ -290,7 +290,9 @@ OTHER_FILES += \
     src/glsl/hsec_texturedcontours.fx.glsl \
     config/cf_stdnames.dat \
     config/log4cplus.properties \
-    src/glsl/north_arrow.fx.glsl
+    src/glsl/north_arrow.fx.glsl \
+    config/metview/default_frontend.cfg \
+    config/metview/default_pipeline.cfg
 
 
 DEFINES += \
