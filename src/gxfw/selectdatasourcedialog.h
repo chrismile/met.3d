@@ -136,11 +136,11 @@ public Q_SLOTS:
 private:
     Ui::MSelectDataSourceDialog *ui;
 
+    void createDataSourceEntries(const QList<MVerticalLevelType> supportedTypes);
     /**
       Creates table entries for variable selection dialog restricted to
       @param supportedTypes.
       */
-    void createDataSourceEntries(QList<MVerticalLevelType> supportedTypes);
     /**
       Creates table entries for data source selection dialog.
       */

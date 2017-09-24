@@ -96,6 +96,8 @@ public:
 
     void setMovement(bool enabled);
 
+    void setIndividualPoleHeightsEnabled(bool enabled);
+
 protected:
     void initializeActorResources();
 

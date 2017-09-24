@@ -245,6 +245,8 @@ public slots:
 
 protected:
     friend class MNWPVolumeRaycasterActor;
+    friend class MIsosurfaceIntersectionActor;
+    friend class MJetcoreDetectionActor;
     friend class MVerticalRegridProperties;
 
     virtual void releaseDataItems();
@@ -698,6 +700,36 @@ protected:
     bool setTransferFunctionFromProperty() override;
 
 private:
+};
+
+/**
+  @brief Variable properties specific to isolevel rendering.
+ */
+class MNWPIsolevelActorVariable : public MNWPActorVariable
+{
+Q_OBJECT
+public:
+    MNWPIsolevelActorVariable(MNWPMultiVarActor *actor);
+
+    bool onQtPropertyChanged(QtProperty *property) override;
+
+    float getIsoValue();
+
+    void loadConfiguration(QSettings *settings) override;
+
+    void saveConfiguration(QSettings *settings) override;
+
+signals:
+
+    /**
+    * @brief This signal is fired when the isolevel of the variable was
+    * changed.
+    */
+    void isoValueChanged();
+
+protected:
+    QtProperty* isoValueProperty;
+    float isoValue;
 };
 
 } // namespace Met3D

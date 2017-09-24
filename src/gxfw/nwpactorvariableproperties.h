@@ -255,6 +255,71 @@ protected:
     QtProperty *probabilityRegionIsovalueProperty;
 };
 
+
+/**
+  Partial derivative filter.
+ */
+class MPartialDerivativeProperties : public MRequestProperties
+{
+public:
+    MPartialDerivativeProperties(MNWPActorVariable *actorVar);
+    bool onQtPropertyChanged(QtProperty *property,
+                             bool *redrawWithoutDataRequest);
+    void addToRequest(MDataRequestHelper *rh);
+
+    void saveConfiguration(QSettings *settings);
+
+    void loadConfiguration(QSettings *settings);
+
+protected:
+    QStringList derivativeOptions;
+    QtProperty *partialDerivativeProperty;
+};
+
+class MMultiVarPartialDerivativeProperties : public MRequestProperties
+{
+public:
+    MMultiVarPartialDerivativeProperties(MNWPActorVariable *actorVar);
+    bool onQtPropertyChanged(QtProperty *property,
+                             bool *redrawWithoutDataRequest);
+    void addToRequest(MDataRequestHelper *rh);
+
+    void saveConfiguration(QSettings *settings);
+
+    void loadConfiguration(QSettings *settings);
+
+protected:
+    QStringList derivativeOptions;
+    QtProperty *partialDerivativeProperty;
+
+    QStringList compatibleVars;
+    QtProperty* compatibleVarsProperty;
+    QtProperty* sourceVarsProperty;
+    QtProperty* blurEnabledProperty;
+    QtProperty* blurKernelProperty;
+    QtProperty* blurSigmaProperty;
+    QtProperty* deltaNormalStepProperty;
+};
+
+class MProjectedVelocitiesProperties : public MRequestProperties
+{
+public:
+    MProjectedVelocitiesProperties(MNWPActorVariable *actorVar);
+    bool onQtPropertyChanged(QtProperty *property,
+                             bool *redrawWithoutDataRequest);
+    void addToRequest(MDataRequestHelper *rh);
+
+    void saveConfiguration(QSettings *settings);
+
+    void loadConfiguration(QSettings *settings);
+
+protected:
+    QStringList compatibleVars;
+    QtProperty* compatibleVarsProperty;
+    QtProperty* sdirectionXProperty;
+    QtProperty* sdirectionYProperty;
+};
+
 } // namespace Met3D
 
 #endif // NWPACTORVARIABLEPROPERTIES_H

@@ -30,7 +30,7 @@
  *****************************************************************************/
 
 /* - use const datatype instead of #define */
-const int NUM_TUBESEGMENTS = 8;
+const int NUM_TUBESEGMENTS = 10;
 const float TUBE_END_OFFSET = 0.05;
 
 /*****************************************************************************
@@ -55,6 +55,14 @@ interface VStoGSTrajectory
 {
     smooth vec3 worldPos;
     smooth float value;
+    smooth float thicknessValue;
+};
+
+interface VStoGSArrowHeads
+{
+    smooth vec3 worldPos;
+    smooth vec3 direction;
+    smooth float value;
 };
 
 interface GStoFSSimple
@@ -66,8 +74,14 @@ interface GStoFSSimple
 interface GStoFSTrajectory
 {
     smooth vec3 worldPos;
+    smooth vec4 lightSpacePos;
     smooth vec3 normal;
     smooth float value;
+};
+
+interface VStoFSShadowMap
+{
+    smooth vec2 texCoords;
 };
 
 /*****************************************************************************
@@ -80,6 +94,7 @@ uniform vec2        pToWorldZParams;
 uniform int         colorMode;
 
 uniform mat4        mvpMatrix;
+uniform mat4        lightMVPMatrix;
 uniform sampler1D   transferFunction;
 uniform float       tfMinimum;
 uniform float       tfMaximum;
@@ -92,8 +107,13 @@ uniform vec3        lightDirection;
 uniform vec3        offsetDirection;
 uniform float       endSegmentOffset;
 
-uniform vec3        cameraUp;
-uniform vec3        cameraRight;
+// tube thickness parameters
+uniform bool        thicknessMapping;
+uniform vec2        thicknessRange;
+uniform vec2        thicknessValueRange;
+
+uniform sampler2D   shadowMap;
+uniform bool        enableSelfShadowing;
 
 /*****************************************************************************
  ***                             INCLUDES
@@ -123,11 +143,9 @@ struct TubeGeometryInfo
 // -----------------------------------------------------------------------------
 
 // Calculate normal and binormal from a given direction
-void calculateRayBasis(in vec3 prevPos, in vec3 nextPos,
-                        in vec3 prevBinormal,
-                        out vec3 normal, out vec3 binormal)
+void calculateRayBasisTangent(in vec3 tangent, in vec3 prevBinormal,
+                                inout vec3 normal, inout vec3 binormal)
 {
-    const vec3 tangent = nextPos - prevPos;
     bool useGivenBinormal = prevBinormal != vec3(0);
 
     if (useGivenBinormal)
@@ -156,10 +174,20 @@ void calculateRayBasis(in vec3 prevPos, in vec3 nextPos,
     normal = normalize(normal);
 }
 
+
+void calculateRayBasis(in vec3 prevPos, in vec3 nextPos,
+                        in vec3 prevBinormal,
+                        out vec3 normal, out vec3 binormal)
+{
+    const vec3 tangent = nextPos - prevPos;
+    calculateRayBasisTangent(tangent, prevBinormal, normal, binormal);
+}
+
 // -----------------------------------------------------------------------------
 
 // Compute color of blinn-phong shaded surface
 void getBlinnPhongColor(in vec3 worldPos, in vec3 normalDir, in vec3 ambientColor,
+                        in vec3 diffuseColor,
                         out vec3 color)
 {
     const vec3 lightColor = vec3(1,1,1);
@@ -174,46 +202,79 @@ void getBlinnPhongColor(in vec3 worldPos, in vec3 normalDir, in vec3 ambientColo
     const vec3 l = normalize(-lightDirection); // specialCase
     const vec3 h = normalize(v + l);
 
-    vec3 diffuse = kD * clamp(abs(dot(n,l)),0.0,1.0) * lightColor;
-    vec3 specular = kS * pow(clamp(abs(dot(n,h)),0.0,1.0),s) * lightColor;
+    vec3 diffuse = kD * clamp(abs(dot(n,l)),0.0,1.0) * diffuseColor;
+    vec3 specular = kS * pow(clamp(abs(dot(n,h)),0.0,1.0), s) * lightColor;
 
     color = kA + diffuse + specular;
 }
 
 // -----------------------------------------------------------------------------
 
+void computeTubeRadius(in float value, out float tubeRadius)
+{
+     const float tfDifference = (thicknessValueRange.y - thicknessValueRange.x);
+     const float t = (value - thicknessValueRange.x) / tfDifference;
+
+     tubeRadius = mix(thicknessRange.x, thicknessRange.y, t);
+}
+
 void computeTubeRadii(in float prevValue, in float nextValue,
                       out vec2 tubeRadii)
 {
-    float maxTubeRadius = tubeRadius;
-    float minTubeRadius = tubeRadius / 10.0;
-    const float tfDifference = (tfMaximum - tfMinimum);
-    const float prevT = (prevValue - tfMinimum) / tfDifference;
-    const float nextT = (nextValue - tfMinimum) / tfDifference;
+    const float tfDifference = (thicknessValueRange.y - thicknessValueRange.x);
+    const float prevT = (prevValue - thicknessValueRange.x) / tfDifference;
+    const float nextT = (nextValue - thicknessValueRange.x) / tfDifference;
 
-    tubeRadii.x = mix(minTubeRadius, maxTubeRadius, prevT);
-    tubeRadii.y = mix(minTubeRadius, maxTubeRadius, nextT);
+    tubeRadii.x = mix(thicknessRange.x, thicknessRange.y, prevT);
+    tubeRadii.y = mix(thicknessRange.x, thicknessRange.y, nextT);
 }
 
 /*****************************************************************************
  ***                           VERTEX SHADER
  *****************************************************************************/
 
-shader VSTrajectory(in vec3 worldPos : 0, in float value : 1, out VStoGSTrajectory Output)
+shader VSTrajectory(in vec3 worldPos : 0, in float value : 1,
+                    in float thicknessValue : 2,
+                    out VStoGSTrajectory Output)
 {
     float worldZ = (log(worldPos.z) - pToWorldZParams.x) * pToWorldZParams.y;
 
     Output.worldPos = vec3(worldPos.xy, worldZ);
     Output.value = (colorMode == 1) ? worldPos.z : value;
+    Output.thicknessValue = thicknessValue;
 }
 
 // -----------------------------------------------------------------------------
 
-shader VSTrajectoryShadow(in vec3 worldPos : 0, in float value : 1, out VStoGSTrajectory Output)
+shader VSTrajectoryShadow(in vec3 worldPos : 0, in float value : 1,
+                          in float thicknessValue : 2,
+                          out VStoGSTrajectory Output)
 {
-    Output.worldPos = vec3(worldPos.xy, 0.05);
+    Output.worldPos = vec3(worldPos.xy, 0.1);
+    Output.value = value;
+    Output.thicknessValue = thicknessValue;
+}
+
+// -----------------------------------------------------------------------------
+
+shader VSArrowHeads(in vec3 worldPos : 0, in vec3 direction : 1, in float value : 2,
+                    out VStoGSArrowHeads Output)
+{
+    float worldZ = (log(worldPos.z) - pToWorldZParams.x) * pToWorldZParams.y;
+
+    Output.worldPos = vec3(worldPos.xy, worldZ);
+    Output.direction = direction;
     Output.value = value;
 }
+
+shader VSArrowHeadsShadow(in vec3 worldPos : 0, in vec3 direction : 1,
+                            in float value : 2, out VStoGSArrowHeads Output)
+{
+    Output.worldPos = vec3(worldPos.xy, 0.1);
+    Output.direction = direction;
+    Output.value = value;
+}
+
 
 // -----------------------------------------------------------------------------
 
@@ -228,6 +289,13 @@ shader VSLonLatPGeometry(in vec3 lonlatP : 0, out VStoGSWorld Output)
 {
     float worldZ = (log(lonlatP.z) - pToWorldZParams.x) * pToWorldZParams.y;
     Output.worldPos = vec3(lonlatP.xy, worldZ);
+}
+
+shader VSShadowGroundImage(in vec3 worldPos : 0, in vec2 texCoords : 1,
+                           out VStoFSShadowMap Output)
+{
+    gl_Position = mvpMatrix * vec4(worldPos, 1);
+    Output.texCoords = texCoords;
 }
 
 /*****************************************************************************
@@ -345,6 +413,10 @@ shader GSTrajectoryTube(in VStoGSTrajectory Input[], out GStoFSTrajectory Output
     float value1 = Input[1].value;
     float value2 = Input[2].value;
 
+    // Obtain the scalar values used for thickness mapping
+    float valueT1 = Input[1].thicknessValue;
+    float valueT2 = Input[2].thicknessValue;
+
     // Obtain world positions, and handle line boundaries.
     vec3 pos1 = Input[1].worldPos;
     vec3 pos2 = Input[2].worldPos;
@@ -361,7 +433,7 @@ shader GSTrajectoryTube(in VStoGSTrajectory Input[], out GStoFSTrajectory Output
     float tubeValues[numVertices];
 
     vec2 tubeRadii = vec2(tubeRadius);
-    if (colorMode == 3) { computeTubeRadii(value1, value2, tubeRadii); }
+    if (thicknessMapping) { computeTubeRadii(valueT1, valueT2, tubeRadii); }
 
 
     TubeGeometryInfo prevInfo = {   pos1, normalPrev, binormalPrev,
@@ -381,6 +453,7 @@ shader GSTrajectoryTube(in VStoGSTrajectory Input[], out GStoFSTrajectory Output
         Output.value = tubeValues[t];
         Output.normal = tubeNormals[t];
         Output.worldPos = tubeWorlds[t];
+        Output.lightSpacePos = lightMVPMatrix * vec4(tubeWorlds[t], 1);
         EmitVertex();
     }
 
@@ -415,6 +488,7 @@ shader GSTrajectoryTube(in VStoGSTrajectory Input[], out GStoFSTrajectory Output
             gl_Position = mvpMatrix * vec4(tubeWorldsEnd[t], 1);
             Output.normal = tubeNormalsEnd[t];
             Output.worldPos = tubeWorldsEnd[t];
+            Output.lightSpacePos = lightMVPMatrix * vec4(tubeWorldsEnd[t], 1);
             EmitVertex();
         }
     }
@@ -435,6 +509,7 @@ shader GSTrajectoryTube(in VStoGSTrajectory Input[], out GStoFSTrajectory Output
             gl_Position = mvpMatrix * vec4(tubeWorldsEnd[t], 1);
             Output.normal = tubeNormalsEnd[t];
             Output.worldPos = tubeWorldsEnd[t];
+            Output.lightSpacePos = lightMVPMatrix * vec4(tubeWorldsEnd[t], 1);
             EmitVertex();
         }
     }
@@ -454,6 +529,10 @@ shader GSTrajectoryTubeShadow(in VStoGSTrajectory Input[], out GStoFSTrajectory 
     // Obtain the scalar values at each segment point
     float value1 = Input[1].value;
     float value2 = Input[2].value;
+
+    // Obtain the scalar values used for thickness mapping
+    float valueT1 = Input[1].thicknessValue;
+    float valueT2 = Input[2].thicknessValue;
 
     // Obtain world positions, and handle line boundaries.
     vec3 pos1 = Input[1].worldPos;
@@ -476,23 +555,27 @@ shader GSTrajectoryTubeShadow(in VStoGSTrajectory Input[], out GStoFSTrajectory 
     Output.normal = normalize(vec3(0,0,0));
 
     vec2 tubeRadii = vec2(tubeRadius);
-    if (colorMode == 3) { computeTubeRadii(value1, value2, tubeRadii); }
+    if (thicknessMapping) { computeTubeRadii(valueT1, valueT2, tubeRadii); }
 
     // and calculate the boundaries of the projected quad in x/y plane
     Output.worldPos = pos1 - normalPrev * tubeRadii.x;
     gl_Position = mvpMatrix * vec4(Output.worldPos, 1);
+    Output.lightSpacePos = lightMVPMatrix * vec4(Output.worldPos, 1);
     EmitVertex();
 
     Output.worldPos = pos1 + normalPrev * tubeRadii.x;
     gl_Position = mvpMatrix * vec4(Output.worldPos, 1);
+    Output.lightSpacePos = lightMVPMatrix * vec4(Output.worldPos, 1);
     EmitVertex();
 
     Output.worldPos = pos2 - normalNext * tubeRadii.y;
     gl_Position = mvpMatrix * vec4(Output.worldPos, 1);
+    Output.lightSpacePos = lightMVPMatrix * vec4(Output.worldPos, 1);
     EmitVertex();
 
     Output.worldPos = pos2 + normalNext * tubeRadii.y;
     gl_Position = mvpMatrix * vec4(Output.worldPos, 1);
+    Output.lightSpacePos = lightMVPMatrix * vec4(Output.worldPos, 1);
     EmitVertex();
 
     EndPrimitive();
@@ -576,6 +659,96 @@ shader GSSimpleTube(in VStoGSWorld Input[], out GStoFSSimple Output)
 
 // -----------------------------------------------------------------------------
 
+shader GSSimpleArrowHead(in VStoGSArrowHeads Input[], out GStoFSTrajectory Output)
+{
+    vec3 normal, binormal;
+    vec3 tangent = Input[0].direction;
+    calculateRayBasisTangent(Input[0].direction, vec3(0), normal, binormal);
+
+    float radius = tubeRadius;
+    if (thicknessMapping) { computeTubeRadius(Input[0].value, radius); }
+    radius *= 2.5;
+
+    TubeGeometryInfo endInfo = TubeGeometryInfo(Input[0].worldPos, normal, binormal,
+                                                    tangent, radius, 0);
+
+    Output.value = Input[0].value;
+
+    const int numVerticesEnd = (NUM_TUBESEGMENTS + 1) * 3;
+
+    vec3 tubeWorldsEnd[numVerticesEnd]; vec3 tubeNormalsEnd[numVerticesEnd];
+    float tubeValuesEnd[numVerticesEnd];
+
+    // Generate the ends of each tube
+    generateTubeEnd(endInfo, radius, tubeWorldsEnd,
+                    tubeNormalsEnd, tubeValuesEnd);
+
+    for (int t = 0; t < numVerticesEnd; ++t)
+    {
+        gl_Position = mvpMatrix * vec4(tubeWorldsEnd[t], 1);
+        Output.normal = tubeNormalsEnd[t];
+        Output.worldPos = tubeWorldsEnd[t];
+        Output.lightSpacePos = lightMVPMatrix * vec4(tubeWorldsEnd[t], 1);
+        EmitVertex();
+    }
+
+    EndPrimitive();
+
+    // Generate the ends of each tube
+    generateTubeEnd(endInfo, 0, tubeWorldsEnd,
+                    tubeNormalsEnd, tubeValuesEnd);
+
+    for (int t = 0; t < numVerticesEnd; ++t)
+    {
+        gl_Position = mvpMatrix * vec4(tubeWorldsEnd[t], 1);
+        Output.normal = tubeNormalsEnd[t];
+        Output.worldPos = tubeWorldsEnd[t];
+        Output.lightSpacePos = lightMVPMatrix * vec4(tubeWorldsEnd[t], 1);
+        EmitVertex();
+    }
+
+    EndPrimitive();
+}
+
+shader GSSimpleArrowShadow(in VStoGSArrowHeads Input[], out GStoFSTrajectory Output)
+{
+    vec3 tangent = Input[0].direction;
+    vec3 normal = vec3(-tangent.y, tangent.x, 0);
+
+    float radius = tubeRadius;
+    if (thicknessMapping) { computeTubeRadius(Input[0].value, radius); }
+    radius *= 2.5;
+
+    vec3 arrowBase = Input[0].worldPos;
+    vec3 arrowHead = arrowBase + tangent * radius;
+    vec3 arrowUp = arrowBase + normal * radius;
+    vec3 arrowDown = arrowBase - normal * radius;
+
+    Output.value = Input[0].value;
+    Output.normal = normalize(vec3(0,0,0));
+
+    gl_Position = mvpMatrix * vec4(arrowDown, 1);
+    Output.worldPos = arrowBase;
+    Output.lightSpacePos = lightMVPMatrix * vec4(arrowDown, 1);
+    EmitVertex();
+    gl_Position = mvpMatrix * vec4(arrowHead, 1);
+    Output.worldPos = arrowHead;
+    Output.lightSpacePos = lightMVPMatrix * vec4(arrowHead, 1);
+    EmitVertex();
+    gl_Position = mvpMatrix * vec4(arrowBase, 1);
+    Output.worldPos = arrowHead;
+    Output.lightSpacePos = lightMVPMatrix * vec4(arrowBase, 1);
+    EmitVertex();
+    gl_Position = mvpMatrix * vec4(arrowUp, 1);
+    Output.worldPos = arrowHead;
+    Output.lightSpacePos = lightMVPMatrix * vec4(arrowUp, 1);
+    EmitVertex();
+
+    EndPrimitive();
+}
+
+// -----------------------------------------------------------------------------
+
 shader GSSimpleLine(in VStoGSWorld Input[])
 {
     vec3 prevPos = Input[0].worldPos;
@@ -585,40 +758,6 @@ shader GSSimpleLine(in VStoGSWorld Input[])
     EmitVertex();
 
     gl_Position = mvpMatrix * vec4(nextPos, 1);
-    EmitVertex();
-}
-
-// -----------------------------------------------------------------------------
-
-shader GSSimplePixelQuad(in VStoGSWorld Input[], out vec3 worldPos)
-{
-    vec3 center = Input[0].worldPos;
-    vec3 scaledRight = cameraRight * pixelWidth;
-    vec3 scaledUp    = cameraUp * pixelWidth;
-
-    // 01 ----- 11
-    //   |     |
-    //   |     |
-    // 00 ----- 10
-
-    // Upper right vertex 11
-    worldPos =  center + scaledRight + scaledUp;
-    gl_Position = mvpMatrix * vec4(worldPos, 1.);
-    EmitVertex();
-
-    // Upper left 01
-    worldPos =  center - scaledRight + scaledUp;
-    gl_Position = mvpMatrix * vec4(worldPos, 1.);
-    EmitVertex();
-
-    // Lower right 10
-    worldPos =  center + scaledRight - scaledUp;
-    gl_Position = mvpMatrix * vec4(worldPos, 1.);
-    EmitVertex();
-
-    // Lower left 00
-    worldPos =  center - scaledRight - scaledUp;
-    gl_Position = mvpMatrix * vec4(worldPos, 1.);
     EmitVertex();
 }
 
@@ -709,7 +848,8 @@ shader FSSurfaceColor(in GStoFSSimple Input, out vec4 fragColor)
 {
     vec3 surfaceColor = vec3(0);
     vec3 ambientColor = geometryColor;
-    getBlinnPhongColor(Input.worldPos, Input.normal, ambientColor, surfaceColor);
+    vec3 diffuseColor = vec3(1, 1, 1);
+    getBlinnPhongColor(Input.worldPos, Input.normal, ambientColor, diffuseColor, surfaceColor);
 
     fragColor = vec4(surfaceColor, 1);
 }
@@ -719,6 +859,36 @@ shader FSSurfaceColor(in GStoFSSimple Input, out vec4 fragColor)
 shader FSJetcores(in GStoFSTrajectory Input, out vec4 fragColor)
 {
     float value = Input.value;
+
+    float shadowFactor = 1;
+
+    if (enableSelfShadowing)
+    {
+        shadowFactor = 0;
+
+        vec3 lightPosNDC = Input.lightSpacePos.xyz / Input.lightSpacePos.w;
+        lightPosNDC = lightPosNDC * 0.5 + 0.5;
+
+        float closestDepth = texture(shadowMap, lightPosNDC.xy).r;
+        float currentDepth = lightPosNDC.z;
+        const float cosTheta = dot(normalize(Input.normal), vec3(0, 0, 1));
+        float bias = 0.005 * tan(acos(cosTheta));
+
+        vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
+
+        const int kernelSize = 2;
+
+        for(int x = -kernelSize; x <= kernelSize; ++x)
+        {
+            for(int y = -kernelSize; y <= kernelSize; ++y)
+            {
+                float depth = texture(shadowMap, lightPosNDC.xy + vec2(x, y) * texelSize).r;
+                shadowFactor += (currentDepth - bias < depth) ? 1.0 : 0.0;
+            }
+        }
+
+        shadowFactor /= (kernelSize * 2.0 + 1) * (kernelSize * 2.0 + 1);
+    }
 
     if (colorMode == 1)
     {
@@ -734,12 +904,10 @@ shader FSJetcores(in GStoFSTrajectory Input, out vec4 fragColor)
     {
         // Default tube color mode
         case 0:
-        // Thickness mode
-        case 3:
             ambientColor = geometryColor;
             break;
 
-        // Height color mode
+        // Pressure height color mode
         case 1:
         // Variable color mode
         case 2:
@@ -748,7 +916,8 @@ shader FSJetcores(in GStoFSTrajectory Input, out vec4 fragColor)
     }
 
     vec3 surfaceColor;
-    getBlinnPhongColor(Input.worldPos, Input.normal, ambientColor, surfaceColor);
+    vec3 diffuseColor = vec3(1) * shadowFactor;
+    getBlinnPhongColor(Input.worldPos, Input.normal, ambientColor, diffuseColor, surfaceColor);
 
     fragColor = vec4(surfaceColor, 1);
 }
@@ -760,6 +929,43 @@ shader FSShadow(in GStoFSTrajectory Input, out vec4 fragColor)
     fragColor = vec4(shadowColor.rgba);
 }
 
+// -----------------------------------------------------------------------------
+
+shader FSShadowMap(in GStoFSTrajectory Input, out vec4 fragColor)
+{
+    // gl_FragDepth = gl_FragCoord.z;
+}
+
+shader FSShadowGroundImage(in VStoFSShadowMap Input, out vec4 fragColor)
+{
+    float depthValue = texture(shadowMap, Input.texCoords).r;
+
+    float shadowFactor = 0.0;
+    vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
+
+    for(int x = -1; x <= 1; ++x)
+    {
+        for(int y = -1; y <= 1; ++y)
+        {
+            float depth = texture(shadowMap, Input.texCoords + vec2(x, y) * texelSize).r;
+            shadowFactor += (depth < 1) ? 1.0 : 0.0;
+        }
+    }
+
+    shadowFactor /= 9.0;
+
+    if (shadowFactor > 0)
+    {
+        fragColor = vec4(shadowColor.rgb, shadowColor.a * shadowFactor);
+    }
+    else
+    {
+        discard;
+        //fragColor = vec4(1, 0, 0, 1);
+    }
+}
+
+
 /*****************************************************************************
  ***                             PROGRAMS
  *****************************************************************************/
@@ -768,7 +974,7 @@ program Trajectory
 {
     vs(420)=VSTrajectory();
     gs(420)=GSTrajectoryTube() : in(lines_adjacency),
-                                        out(triangle_strip, max_vertices = 128);
+                                        out(triangle_strip, max_vertices = 64);
     fs(420)=FSJetcores();
 };
 
@@ -778,6 +984,35 @@ program TrajectoryShadow
     gs(420)=GSTrajectoryTubeShadow() : in(lines_adjacency),
                                         out(triangle_strip, max_vertices = 128);
     fs(420)=FSShadow();
+};
+
+program TrajectoryShadowMap
+{
+    vs(420)=VSTrajectory();
+    gs(420)=GSTrajectoryTube() : in(lines_adjacency),
+                                        out(triangle_strip, max_vertices = 64);
+    fs(420)=FSShadowMap();
+};
+
+program ArrowHeads
+{
+    vs(420)=VSArrowHeads();
+    gs(420)=GSSimpleArrowHead() : in(points), out(triangle_strip, max_vertices = 64);
+    fs(420)=FSJetcores();
+};
+
+program ArrowHeadsShadow
+{
+    vs(420)=VSArrowHeadsShadow();
+    gs(420)=GSSimpleArrowShadow() : in(points), out(triangle_strip, max_vertices = 128);
+    fs(420)=FSShadow();
+};
+
+program ArrowHeadsShadowMap
+{
+    vs(420)=VSArrowHeads();
+    gs(420)=GSSimpleArrowHead() : in(points), out(triangle_strip, max_vertices = 64);
+    fs(420)=FSShadowMap();
 };
 
 program WorldTubes
@@ -814,4 +1049,11 @@ program TickTubes
     gs(420)=GSTickTube() : in(points), out(triangle_strip, max_vertices = 128);
     fs(420)=FSSurfaceColor();
 };
+
+program ShadowGroundMap
+{
+    vs(420)=VSShadowGroundImage();
+    fs(420)=FSShadowGroundImage();
+};
+
 

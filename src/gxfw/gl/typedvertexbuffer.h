@@ -95,9 +95,13 @@ protected:
     GLenum getGLEnumFromDataType();
 };
 
+typedef MTypedVertexBuffer<GLboolean, GLboolean, 1> MBooleanVertexBuffer;
 typedef MTypedVertexBuffer<GLfloat,   GLfloat, 1> MFloatVertexBuffer;
 typedef MTypedVertexBuffer<GLfloat,   GLfloat, 2> MFloat2VertexBuffer;
 typedef MTypedVertexBuffer<GLfloat,   GLfloat, 3> MFloat3VertexBuffer;
+typedef MTypedVertexBuffer<GLfloat,   GLfloat, 4> MFloat4VertexBuffer;
+typedef MTypedVertexBuffer<GLfloat,   GLfloat, 5> MFloat5VertexBuffer;
+typedef MTypedVertexBuffer<QVector4D, GLfloat, 4> MVector4DVertexBuffer;
 typedef MTypedVertexBuffer<QVector3D, GLfloat, 3> MVector3DVertexBuffer;
 typedef MTypedVertexBuffer<QVector2D, GLfloat, 2> MVector2DVertexBuffer;
 
@@ -320,6 +324,9 @@ GLenum MTypedVertexBuffer<Data,Type,Num>::getGLEnumFromDataType()
 {
     if (typeid(Type) == typeid(float)) { return GL_FLOAT; }
     if (typeid(Type) == typeid(int)) { return GL_INT; }
+    if (typeid(Type) == typeid(unsigned int)) { return GL_UNSIGNED_INT; }
+    if (typeid(Type) == typeid(unsigned char)) { return GL_UNSIGNED_BYTE; }
+    if (typeid(Type) == typeid(bool)) { return GL_UNSIGNED_BYTE; }
     if (typeid(Type) == typeid(char)) { return GL_BYTE; }
 
     std::cerr << "No enum information for this type" << std::endl << std::flush;

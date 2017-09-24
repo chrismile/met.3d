@@ -1,0 +1,783 @@
+//
+// Created by kerninator on 02.05.17.
+//
+
+#include "jetcoredetectionactor.h"
+
+using namespace Met3D;
+
+/******************************************************************************
+***                     CONSTRUCTOR / DESTRUCTOR                            ***
+*******************************************************************************/
+
+MJetcoreDetectionActor::MJetcoreDetectionActor()
+        : MIsosurfaceIntersectionActor(),
+          partialDerivFilters({nullptr, nullptr}),
+          hessianFilter(nullptr),
+          arrowsVertexBuffer(nullptr),
+          arrowHeads(nullptr)
+{
+    beginInitialiseQtProperties();
+
+    setName("Jetcore Detection Actor");
+
+    variableSettings->varsProperty[0]->setPropertyName("u-component of wind");
+    variableSettings->varsProperty[1]->setPropertyName("v-component of wind");
+
+    variableSettingsCores =
+            std::make_shared<VariableSettingsJetcores>(this,
+                                                       variableSettings->groupProp);
+
+    lineFilterSettingsCores =
+            std::make_shared<FilterSettingsJetcores>(this,
+                                                     lineFilterSettings->groupProp);
+
+    appearanceSettingsCores =
+            std::make_shared<AppearanceSettingsJetcores>(this,
+                                                         appearanceSettings->groupProp);
+
+    endInitialiseQtProperties();
+}
+
+MJetcoreDetectionActor::~MJetcoreDetectionActor()
+{
+
+}
+
+/******************************************************************************
+***                        SETTINGS CONSTRUCTORS                            ***
+*******************************************************************************/
+
+MJetcoreDetectionActor::VariableSettingsJetcores::VariableSettingsJetcores(
+        MJetcoreDetectionActor *hostActor,
+        QtProperty *groupProp) :
+        geoPotVarIndex(-1),
+        geoPotOnly(false)
+{
+    MActor *a = hostActor;
+    MQtProperties *properties = a->getQtProperties();
+
+    geoPotVarProperty = a->addProperty(ENUM_PROPERTY, "geopotential variable",
+                                       groupProp);
+
+    geoPotOnlyProperty = a->addProperty(BOOL_PROPERTY, "geopotential only",
+                                        groupProp);
+
+    properties->mBool()->setValue(geoPotOnlyProperty, geoPotOnly);
+}
+
+MJetcoreDetectionActor::FilterSettingsJetcores::FilterSettingsJetcores(
+        MJetcoreDetectionActor *hostActor,
+        QtProperty *groupProp) :
+        lambdaThreshold(0),
+        angleThreshold(50),
+        pressureDiffThreshold(10.0f)
+{
+    MActor *a = hostActor;
+    MQtProperties *properties = a->getQtProperties();
+
+    lambdaThresholdProperty = a->addProperty(DOUBLE_PROPERTY,
+                                             "lambda threshold",
+                                             groupProp);
+    properties->setDouble(lambdaThresholdProperty, lambdaThreshold, -2, 2, 20,
+                          0.1E-8);
+
+    angleThresholdProperty = a->addProperty(DOUBLE_PROPERTY, "angle threshold",
+                                            groupProp);
+    properties->setDouble(angleThresholdProperty, angleThreshold, 0, 180, 2,
+                          0.1);
+
+    pressureDiffThresholdProperty = a->addProperty(DECORATEDDOUBLE_PROPERTY,
+                                                   "pressure difference threshold",
+                                                   groupProp);
+    properties->setDDouble(pressureDiffThresholdProperty, pressureDiffThreshold,
+                           0, 1000, 2, 1, " hPa");
+}
+
+
+MJetcoreDetectionActor::AppearanceSettingsJetcores::AppearanceSettingsJetcores(
+        MJetcoreDetectionActor *hostActor,
+        QtProperty *groupProp) :
+        arrowsEnabled(false)
+{
+    MActor *a = hostActor;
+    MQtProperties *properties = a->getQtProperties();
+
+    arrowsEnabledProperty = a->addProperty(BOOL_PROPERTY, "arrows enabled",
+                                           groupProp);
+    properties->mBool()->setValue(arrowsEnabledProperty, arrowsEnabled);
+}
+
+
+/******************************************************************************
+***                            PUBLIC METHODS                               ***
+*******************************************************************************/
+
+void MJetcoreDetectionActor::saveConfiguration(QSettings *settings)
+{
+    MIsosurfaceIntersectionActor::saveConfiguration(settings);
+
+    settings->beginGroup(MJetcoreDetectionActor::getSettingsID());
+
+    settings->setValue("geoPotVarIndex", variableSettingsCores->geoPotVarIndex);
+    settings->setValue("geoPotOnly", variableSettingsCores->geoPotOnly);
+    settings->setValue("lambdaThreshold",
+                       lineFilterSettingsCores->lambdaThreshold);
+    settings->setValue("angleThreshold",
+                       lineFilterSettingsCores->angleThreshold);
+    settings->setValue("pressureDiffThreshold",
+                       lineFilterSettingsCores->pressureDiffThreshold);
+    settings->setValue("arrowsEnabled", appearanceSettingsCores->arrowsEnabled);
+
+    settings->endGroup();
+}
+
+
+void MJetcoreDetectionActor::loadConfiguration(QSettings *settings)
+{
+    MIsosurfaceIntersectionActor::loadConfiguration(settings);
+
+    supressActorUpdates = true;
+    settings->beginGroup(getSettingsID());
+
+    variableSettingsCores->geoPotVarIndex = settings->value(
+            "geoPotVarIndex").toInt();
+    properties->mEnum()->setValue(variableSettingsCores->geoPotVarProperty,
+                                  variableSettingsCores->geoPotVarIndex);
+    variableSettingsCores->geoPotOnly = settings->value(
+            "geoPotVarOnly").toBool();
+    properties->mBool()->setValue(variableSettingsCores->geoPotOnlyProperty,
+                                  variableSettingsCores->geoPotOnly);
+
+    lineFilterSettingsCores->lambdaThreshold = settings->value(
+            "lambdaThreshold").toFloat();
+    properties->mDouble()->setValue(
+            lineFilterSettingsCores->lambdaThresholdProperty,
+            lineFilterSettingsCores->lambdaThreshold);
+    lineFilterSettingsCores->angleThreshold = settings->value(
+            "angleThreshold").toFloat();
+    properties->mDouble()->setValue(
+            lineFilterSettingsCores->angleThresholdProperty,
+            lineFilterSettingsCores->angleThreshold);
+    lineFilterSettingsCores->pressureDiffThreshold = settings->value(
+            "pressureDiffThreshold").toFloat();
+    properties->mDecoratedDouble()->setValue(
+            lineFilterSettingsCores->pressureDiffThresholdProperty,
+            lineFilterSettingsCores->pressureDiffThreshold);
+
+    appearanceSettingsCores->arrowsEnabled = settings->value(
+            "arrowsEnabled").toBool();
+    properties->mBool()->setValue(
+            appearanceSettingsCores->arrowsEnabledProperty,
+            appearanceSettingsCores->arrowsEnabled);
+
+    settings->beginGroup(getSettingsID());
+    supressActorUpdates = false;
+}
+
+
+/******************************************************************************
+***                               PUBLIC SLOTS                              ***
+*******************************************************************************/
+
+
+void MJetcoreDetectionActor::onQtPropertyChanged(QtProperty *property)
+{
+    if (supressActorUpdates) return;
+
+    MIsosurfaceIntersectionActor::onQtPropertyChanged(property);
+
+    if (property == variableSettingsCores->geoPotVarProperty
+        || property == variableSettingsCores->geoPotOnlyProperty
+        || property == lineFilterSettingsCores->lambdaThresholdProperty
+        || property == lineFilterSettingsCores->angleThresholdProperty
+        || property == lineFilterSettingsCores->pressureDiffThresholdProperty)
+    {
+        variableSettingsCores->geoPotVarIndex = properties->mEnum()
+                ->value(variableSettingsCores->geoPotVarProperty);
+
+        variableSettingsCores->geoPotOnly = properties->mBool()
+                ->value(variableSettingsCores->geoPotOnlyProperty);
+
+        lineFilterSettingsCores->lambdaThreshold = properties->mDouble()
+                ->value(lineFilterSettingsCores->lambdaThresholdProperty);
+
+        lineFilterSettingsCores->angleThreshold = properties->mDouble()
+                ->value(lineFilterSettingsCores->angleThresholdProperty);
+
+        lineFilterSettingsCores->pressureDiffThreshold = properties->mDecoratedDouble()
+                ->value(lineFilterSettingsCores->pressureDiffThresholdProperty);
+
+        if (enableAutoComputation)
+        {
+            requestIsoSurfaceIntersectionLines();
+        }
+
+        emitActorChangedSignal();
+    } else if (property == appearanceSettingsCores->arrowsEnabledProperty)
+    {
+        appearanceSettingsCores->arrowsEnabled = properties->mBool()
+                ->value(appearanceSettingsCores->arrowsEnabledProperty);
+
+        emitActorChangedSignal();
+    }
+}
+
+
+/******************************************************************************
+***                            PROTECTED METHODS                            ***
+*******************************************************************************/
+
+
+void MJetcoreDetectionActor::initializeActorResources()
+{
+    MIsosurfaceIntersectionActor::initializeActorResources();
+
+    hessianFilter = std::make_shared<MHessianTrajectoryFilter>();
+    addFilter(hessianFilter);
+
+    angleFilter = std::make_shared<MAngleTrajectoryFilter>();
+    addFilter(angleFilter);
+
+    pressureDiffFilter = std::make_shared<MEndPressureDifferenceTrajectoryFilter>();
+    addFilter(pressureDiffFilter);
+
+    arrowHeadsSource = std::make_shared<MTrajectoryArrowHeadsSource>();
+    MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
+    MAbstractScheduler *scheduler = sysMC->getScheduler("MultiThread");
+    MAbstractMemoryManager *memoryManager = sysMC->getMemoryManager("NWP");
+
+    arrowHeadsSource->setMemoryManager(memoryManager);
+    arrowHeadsSource->setScheduler(scheduler);
+
+    connect(arrowHeadsSource.get(), SIGNAL(dataRequestCompleted(MDataRequest)),
+            this, SLOT(asynchronousArrowsAvailable(MDataRequest)));
+}
+
+
+void MJetcoreDetectionActor::requestIsoSurfaceIntersectionLines()
+{
+    if (getViews().empty())
+    { return; }
+
+    if (isCalculating
+        || variableSettings->varsIndex[0] == variableSettings->varsIndex[1])
+    { return; }
+
+    isCalculating = true;
+
+    // If the user has selected an ensemble member and at least one variable,
+    // then obtain all selected ensemble members.
+    if (ensembleSelectionSettings->selectedEnsembleMembers.size() == 0 &&
+        variables.size() > 0 &&
+        variables.at(0)->dataSource != nullptr)
+    {
+        ensembleSelectionSettings->selectedEnsembleMembers = variables.at(0)->
+                dataSource->availableEnsembleMembers(
+                variables.at(0)->levelType,
+                variables.at(0)->variableName);
+        QString s = MDataRequestHelper::uintSetToString(
+                ensembleSelectionSettings->selectedEnsembleMembers);
+        properties->mString()->setValue(
+                ensembleSelectionSettings->ensembleMultiMemberProperty, s);
+    }
+
+    MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
+    MAbstractScheduler *scheduler = sysMC->getScheduler("MultiThread");
+    MAbstractMemoryManager *memoryManager = sysMC->getMemoryManager("NWP");
+
+    // Create a new instance of an iso-surface intersection source if not created.
+    if (isosurfaceSource == nullptr)
+    {
+
+        isosurfaceSource = new MIsosurfaceIntersectionSource();
+
+        isosurfaceSource->setScheduler(scheduler);
+        isosurfaceSource->setMemoryManager(memoryManager);
+        setDataSource(isosurfaceSource);
+        sysMC->registerDataSource("isosurfaceIntersectionlines",
+                                  isosurfaceSource);
+    }
+
+    //  Release the current intersection lines.
+    if (intersectionLines)
+    {
+        intersectionLines->releaseVertexBuffer();
+        intersectionLines->releaseStartPointsVertexBuffer();
+        //! TODO might raise an exception!
+        //isosurfaceSource->releaseData(intersectionLines);
+        //lineGeometryFilter->releaseData(intersectionLines);
+    }
+
+    // Two filters, one for each variable.
+    for (int i = 0; i < 2; ++i)
+    {
+        if (partialDerivFilters[i] != nullptr)
+        { continue; }
+
+        partialDerivFilters[i] = new MMultiVarPartialDerivativeFilter();
+
+        partialDerivFilters[i]->setScheduler(scheduler);
+        partialDerivFilters[i]->setMemoryManager(memoryManager);
+        sysMC->registerDataSource("partialderivfilter" + QString::number(i),
+                                  partialDerivFilters[i]);
+    }
+
+    supressActorUpdates = true;
+    variableSettings->groupProp->setEnabled(false);
+    ensembleSelectionSettings->groupProp->setEnabled(false);
+    supressActorUpdates = false;
+
+    // Obtain the two variables that should be intersected.
+    MNWPIsolevelActorVariable *var1st = dynamic_cast<MNWPIsolevelActorVariable *>(
+            variables.at(variableSettings->varsIndex[0]));
+    MNWPIsolevelActorVariable *var2nd = dynamic_cast<MNWPIsolevelActorVariable *>(
+            variables.at(variableSettings->varsIndex[1]));
+
+    // Obtain the variable for geopotential height.
+    MNWPIsolevelActorVariable *varGeoPot = dynamic_cast<MNWPIsolevelActorVariable *>(
+            variables.at(variableSettingsCores->geoPotVarIndex));
+
+    partialDerivFilters[0]->setInputSource(var1st->dataSource);
+    partialDerivFilters[1]->setInputSource(var2nd->dataSource);
+
+    isosurfaceSource->setInputSourceFirstVar(partialDerivFilters[0]);
+    isosurfaceSource->setInputSourceSecondVar(partialDerivFilters[1]);
+
+    // Disable the sync control during computation.
+    if (var2nd->synchronizationControl != nullptr)
+    {
+        var2nd->synchronizationControl->setEnabled(false);
+    } else
+    {
+        if (var1st->synchronizationControl != nullptr)
+        {
+            var1st->synchronizationControl->setEnabled(false);
+        }
+    }
+
+    // Set the line request.
+    MDataRequestHelper rh;
+
+    rh.insert("INIT_TIME", var1st->getPropertyTime(var1st->initTimeProperty));
+    rh.insert("VALID_TIME", var1st->getPropertyTime(var1st->validTimeProperty));
+    rh.insert("LEVELTYPE", var1st->levelType);
+    rh.insert("MEMBER", 0);
+    rh.insert("MEMBERS", MDataRequestHelper
+    ::uintSetToString(ensembleSelectionSettings->selectedEnsembleMembers));
+
+//    rh.insert("ENS_OPERATION", "");//ensembleSelectionSettings->ensembleFilterOperation);
+    rh.insert("ISOX_VARIABLES", var1st->variableName + "/"
+                                + var2nd->variableName);
+    rh.insert("ISOX_VALUES", QString::number(var1st->getIsoValue())
+                             + "/" + QString::number(var2nd->getIsoValue()));
+    rh.insert("VARIABLE", var1st->variableName);
+
+    rh.insert("MULTI_DERIVATIVE_SETTINGS", "ddn/ddz");
+    rh.insert("MULTI_GEOPOTENTIAL", varGeoPot->variableName);
+    rh.insert("MULTI_GEOPOTENTIAL_TYPE",
+              static_cast<int>(variableSettingsCores->geoPotOnly));
+
+    rh.insert("ISOX_BOUNDING_BOX",
+              QString::number(boundingBoxSettings->llcrnLon) + "/"
+              + QString::number(boundingBoxSettings->llcrnLat) + "/"
+              + QString::number(boundingBoxSettings->pBot_hPa) + "/"
+              + QString::number(boundingBoxSettings->urcrnLon) + "/"
+              + QString::number(boundingBoxSettings->urcrnLat) + "/"
+              + QString::number(boundingBoxSettings->pTop_hPa));
+
+    lineRequest = rh.request();
+
+    // Request the crossing lines.
+    isosurfaceSource->requestData(lineRequest);
+}
+
+
+void MJetcoreDetectionActor::buildFilterChain(MDataRequestHelper &rh)
+{
+    MTrajectorySelectionSource *inputSource = isosurfaceSource;
+
+    MNWPIsolevelActorVariable *varSource = nullptr;
+
+    if (variableSettings->varsIndex[2] > 0)
+    {
+        varSource = dynamic_cast<MNWPIsolevelActorVariable *>(variables.at(
+                variableSettings->varsIndex[2] - 1));
+    }
+
+    MNWPIsolevelActorVariable *varThickness = nullptr;
+
+    if (tubeThicknessSettings->mappedVariableIndex > 0)
+    {
+        varThickness = dynamic_cast<MNWPIsolevelActorVariable *>(
+                variables.at(tubeThicknessSettings->mappedVariableIndex - 1));
+    }
+
+    MNWPIsolevelActorVariable *varMapped = nullptr;
+
+    if (appearanceSettings->colorVariableIndex > 0)
+    {
+        varMapped = dynamic_cast<MNWPIsolevelActorVariable *>(
+                variables.at(appearanceSettings->colorVariableIndex - 1));
+    }
+
+    // If the user has selected a variable to filter by, set the filter variable
+    // and the corresponding filter value.
+    if (varSource)
+    {
+        rh.insert("VARFILTER_MEMBERS", rh.value("MEMBERS"));
+        rh.insert("VARFILTER_OP", "GREATER_OR_EQUAL");
+        rh.insert("VARFILTER_VALUE",
+                  QString::number(lineFilterSettings->valueFilter));
+        rh.insert("VARFILTER_VARIABLE", varSource->variableName);
+
+        varTrajectoryFilter->setIsosurfaceSource(isosurfaceSource);
+        varTrajectoryFilter->setFilterVariableInputSource(
+                varSource->dataSource);
+        varTrajectoryFilter->setLineRequest(lineRequest);
+
+        filterRequests.push_back(
+                {varTrajectoryFilter, inputSource, rh.request()});
+        inputSource = varTrajectoryFilter.get();
+    }
+
+    MNWPIsolevelActorVariable *var1st = dynamic_cast<MNWPIsolevelActorVariable *>(
+            variables.at(variableSettings->varsIndex[0]));
+    MNWPIsolevelActorVariable *var2nd = dynamic_cast<MNWPIsolevelActorVariable *>(
+            variables.at(variableSettings->varsIndex[1]));
+
+    MNWPIsolevelActorVariable *varGeoPot = dynamic_cast<MNWPIsolevelActorVariable *>(
+            variables.at(variableSettingsCores->geoPotVarIndex));
+
+    // Set the Hessian eigenvalue filter.
+    rh.insert("HESSIANFILTER_MEMBERS", rh.value("MEMBERS"));
+    rh.insert("HESSIANFILTER_VALUE",
+              QString::number(lineFilterSettingsCores->lambdaThreshold));
+    rh.insert("HESSIANFILTER_GEOPOTENTIAL", varGeoPot->variableName);
+    rh.insert("HESSIANFILTER_GEOPOTENTIAL_TYPE",
+              static_cast<int>(variableSettingsCores->geoPotOnly));
+    rh.insert("HESSIANFILTER_VARIABLES", var1st->variableName + "/"
+                                         + var2nd->variableName);
+    rh.insert("HESSIANFILTER_DERIVOPS", "d2dn2/d2dz2/d2dndz");
+
+    hessianFilter->setIsosurfaceSource(isosurfaceSource);
+    hessianFilter->setMultiVarParialDerivSource(partialDerivFilters[0]);
+    hessianFilter->setLineRequest(lineRequest);
+
+    filterRequests.push_back({hessianFilter, inputSource, rh.request()});
+
+    inputSource = hessianFilter.get();
+
+    // Set the line segment angle filter.
+    rh.insert("ANGLEFILTER_MEMBERS", rh.value("MEMBERS"));
+    rh.insert("ANGLEFILTER_VALUE",
+              QString::number(lineFilterSettingsCores->angleThreshold));
+
+    angleFilter->setIsosurfaceSource(isosurfaceSource);
+    angleFilter->setLineRequest(lineRequest);
+
+    filterRequests.push_back({angleFilter, inputSource, rh.request()});
+
+    inputSource = angleFilter.get();
+
+    // Set the end pressure difference filter.
+    rh.insert("ENDPRESSUREDIFFFILTER_MEMBERS", rh.value("MEMBERS"));
+    rh.insert("ENDPRESSUREDIFFFILTER_ANGLE",
+              QString::number(lineFilterSettingsCores->angleThreshold));
+    rh.insert("ENDPRESSUREDIFFFILTER_VALUE",
+              QString::number(lineFilterSettingsCores->pressureDiffThreshold));
+
+    pressureDiffFilter->setIsosurfaceSource(isosurfaceSource);
+    pressureDiffFilter->setLineRequest(lineRequest);
+
+    filterRequests.push_back({pressureDiffFilter, inputSource, rh.request()});
+
+    inputSource = pressureDiffFilter.get();
+
+    // Set the geometric length filter.
+    geomLengthTrajectoryFilter->setLineRequest(lineRequest);
+    geomLengthTrajectoryFilter->setIsosurfaceSource(isosurfaceSource);
+
+    rh.insert("GEOLENFILTER_VALUE",
+              QString::number(lineFilterSettings->lineLengthFilter));
+    rh.insert("GEOLENFILTER_OP", "GREATER_OR_EQUAL");
+
+    filterRequests.push_back(
+            {geomLengthTrajectoryFilter, inputSource, rh.request()});
+
+    inputSource = geomLengthTrajectoryFilter.get();
+
+    // Set the arrow head filter.
+    arrowHeadsSource->setIsosurfaceSource(isosurfaceSource);
+    arrowHeadsSource->setLineRequest(lineRequest);
+    arrowHeadsSource->setInputSelectionSource(inputSource);
+    arrowHeadsSource->setInputSourceUVar(var1st->dataSource);
+    arrowHeadsSource->setInputSourceVVar(var2nd->dataSource);
+    if (varMapped)
+    { arrowHeadsSource->setInputSourceVar(varMapped->dataSource); }
+    else
+    { arrowHeadsSource->setInputSourceVar(nullptr); }
+
+    rh.insert("ARROWHEADS_MEMBERS", rh.value("MEMBERS"));
+    rh.insert("ARROWHEADS_UV_VARIABLES", var1st->variableName + "/"
+                                         + var2nd->variableName);
+    rh.insert("ARROWHEADS_SOURCEVAR",
+              (varMapped) ? varMapped->variableName : "");
+
+    arrowRequest = rh.request();
+
+    rh.remove("ARROWHEADS_MEMBERS");
+    rh.remove("ARROWHEADS_UV_VARIABLES");
+    rh.remove("ARROWHEADS_SOURCEVAR");
+
+    // Set the value trajectory filter. The filter gathers the value information
+    // at each intersection line vertex, especially for coloring and
+    // thickness mapping.
+    valueTrajectorySource->setIsosurfaceSource(isosurfaceSource);
+    valueTrajectorySource->setLineRequest(lineRequest);
+    valueTrajectorySource->setInputSelectionSource(inputSource);
+    if (varMapped)
+    { valueTrajectorySource->setInputSourceValueVar(varMapped->dataSource); }
+    else
+    { valueTrajectorySource->setInputSourceValueVar(nullptr); }
+    if (varThickness)
+    {
+        valueTrajectorySource->setInputSourceThicknessVar(
+                varThickness->dataSource);
+    } else
+    { valueTrajectorySource->setInputSourceThicknessVar(nullptr); }
+
+    rh.insert("TRAJECTORYVALUES_MEMBERS", rh.value("MEMBERS"));
+    rh.insert("TRAJECTORYVALUES_VARIABLE",
+              (varMapped) ? varMapped->variableName : "");
+    rh.insert("TRAJECTORYVALUES_THICKNESSVAR",
+              (varThickness) ? varThickness->variableName : "");
+
+    valueRequest = rh.request();
+}
+
+
+void MJetcoreDetectionActor::onFilterChainEnd()
+{
+    arrowHeadsSource->requestData(arrowRequest);
+}
+
+
+void MJetcoreDetectionActor::asynchronousArrowsAvailable(MDataRequest request)
+{
+    arrowHeads = arrowHeadsSource->getData(request);
+
+    arrowsVertexBuffer = arrowHeads->getVertexBuffer();
+
+    buildGPUResources();
+}
+
+
+void MJetcoreDetectionActor::renderToDepthMap(MSceneViewGLWidget *sceneView)
+{
+    MIsosurfaceIntersectionActor::renderToDepthMap(sceneView);
+
+    if (arrowsVertexBuffer && appearanceSettingsCores->arrowsEnabled)
+    {
+        // Draw arrow heads
+        lineTubeShader->bindProgram("ArrowHeadsShadowMap");
+        CHECK_GL_ERROR;
+
+        lineTubeShader->setUniformValue("mvpMatrix", lightMVP);
+        CHECK_GL_ERROR;
+
+        lineTubeShader->setUniformValue("tubeRadius",
+                                        appearanceSettings->tubeRadius);
+        //appearanceSettings->arrowRadius);
+        lineTubeShader->setUniformValue("geometryColor",
+                                        appearanceSettings->tubeColor);
+        CHECK_GL_ERROR;
+        lineTubeShader->setUniformValue("colorMode",
+                                        appearanceSettings->colorMode);
+        CHECK_GL_ERROR;
+
+
+        if (appearanceSettings->colorVariableIndex > 0 &&
+            appearanceSettings->transferFunction != 0)
+        {
+            appearanceSettings->transferFunction->getTexture()->bindToTextureUnit(
+                    static_cast<GLuint>(appearanceSettings->textureUnitTransferFunction));
+            lineTubeShader->setUniformValue("transferFunction",
+                                            appearanceSettings->textureUnitTransferFunction);
+            lineTubeShader->setUniformValue("tfMinimum",
+                                            appearanceSettings->transferFunction->getMinimumValue());
+            lineTubeShader->setUniformValue("tfMaximum",
+                                            appearanceSettings->transferFunction->getMaximumValue());
+            lineTubeShader->setUniformValue("normalized", false);
+        }
+
+
+        lineTubeShader->setUniformValue("thicknessRange",
+                                        tubeThicknessSettings->thicknessRange);
+        lineTubeShader->setUniformValue("thicknessValueRange",
+                                        tubeThicknessSettings->valueRange);
+
+        lineTubeShader->setUniformValue("pToWorldZParams",
+                                        sceneView->pressureToWorldZParameters());
+
+        lineTubeShader->setUniformValue(
+                "lightDirection", sceneView->getLightDirection());
+        lineTubeShader->setUniformValue(
+                "cameraPosition", sceneView->getCamera()->getOrigin());
+        lineTubeShader->setUniformValue("shadowColor",
+                                        QColor(100, 100, 100, 155));
+
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+        CHECK_GL_ERROR;
+        glBindBuffer(GL_ARRAY_BUFFER,
+                     arrowsVertexBuffer->getVertexBufferObject());
+        CHECK_GL_ERROR;
+
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 7 * sizeof(float),
+                              (const GLvoid *) 0);
+
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 7 * sizeof(float),
+                              (const GLvoid *) (3 * sizeof(float)));
+
+        glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, 7 * sizeof(float),
+                              (const GLvoid *) (6 * sizeof(float)));
+
+        glEnableVertexAttribArray(0);
+        CHECK_GL_ERROR;
+        glEnableVertexAttribArray(1);
+        CHECK_GL_ERROR;
+        glEnableVertexAttribArray(2);
+        CHECK_GL_ERROR;
+
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+        CHECK_GL_ERROR;
+        glDrawArrays(GL_POINTS, 0, arrowHeads->getVertices().size());
+        CHECK_GL_ERROR;
+
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        CHECK_GL_ERROR;
+    }
+}
+
+void
+MJetcoreDetectionActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
+{
+    MIsosurfaceIntersectionActor::renderToCurrentContext(sceneView);
+
+    // Draw the arrow heads at the end of each jet core line.
+    if (arrowsVertexBuffer && appearanceSettingsCores->arrowsEnabled)
+    {
+        // Draw arrow heads
+        lineTubeShader->bindProgram("ArrowHeads");
+        CHECK_GL_ERROR;
+
+        lineTubeShader->setUniformValue("mvpMatrix",
+                                        *(sceneView->getModelViewProjectionMatrix()));
+        CHECK_GL_ERROR;
+
+        lineTubeShader->setUniformValue("lightMVPMatrix", lightMVP);
+        CHECK_GL_ERROR;
+
+        lineTubeShader->setUniformValue("tubeRadius",
+                                        appearanceSettings->tubeRadius);
+        //appearanceSettings->arrowRadius);
+        lineTubeShader->setUniformValue("geometryColor",
+                                        appearanceSettings->tubeColor);
+        lineTubeShader->setUniformValue("colorMode",
+                                        appearanceSettings->colorMode);
+
+
+        if (appearanceSettings->colorVariableIndex > 0 &&
+            appearanceSettings->transferFunction != 0)
+        {
+            appearanceSettings->transferFunction->getTexture()->bindToTextureUnit(
+                    static_cast<GLuint>(appearanceSettings->textureUnitTransferFunction));
+            lineTubeShader->setUniformValue("transferFunction",
+                                            appearanceSettings->textureUnitTransferFunction);
+            lineTubeShader->setUniformValue("tfMinimum",
+                                            appearanceSettings->transferFunction->getMinimumValue());
+            lineTubeShader->setUniformValue("tfMaximum",
+                                            appearanceSettings->transferFunction->getMaximumValue());
+            lineTubeShader->setUniformValue("normalized", false);
+        }
+
+        lineTubeShader->setUniformValue("thicknessRange",
+                                        tubeThicknessSettings->thicknessRange);
+        lineTubeShader->setUniformValue("thicknessValueRange",
+                                        tubeThicknessSettings->valueRange);
+
+        lineTubeShader->setUniformValue("pToWorldZParams",
+                                        sceneView->pressureToWorldZParameters());
+
+        lineTubeShader->setUniformValue(
+                "lightDirection", sceneView->getLightDirection());
+        lineTubeShader->setUniformValue(
+                "cameraPosition", sceneView->getCamera()->getOrigin());
+        lineTubeShader->setUniformValue("shadowColor",
+                                        QColor(100, 100, 100, 155));
+
+        shadowMap->bindToTextureUnit(static_cast<GLuint>(shadowMapTexUnit));
+        lineTubeShader->setUniformValue("shadowMap", shadowMapTexUnit);
+        CHECK_GL_ERROR;
+        lineTubeShader->setUniformValue("enableSelfShadowing",
+                                        appearanceSettings->enableSelfShadowing);
+
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+        CHECK_GL_ERROR;
+        glBindBuffer(GL_ARRAY_BUFFER,
+                     arrowsVertexBuffer->getVertexBufferObject());
+        CHECK_GL_ERROR;
+
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 7 * sizeof(float),
+                              (const GLvoid *) 0);
+
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 7 * sizeof(float),
+                              (const GLvoid *) (3 * sizeof(float)));
+
+        glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, 7 * sizeof(float),
+                              (const GLvoid *) (6 * sizeof(float)));
+
+        glEnableVertexAttribArray(0);
+        CHECK_GL_ERROR;
+        glEnableVertexAttribArray(1);
+        CHECK_GL_ERROR;
+        glEnableVertexAttribArray(2);
+        CHECK_GL_ERROR;
+
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+        CHECK_GL_ERROR;
+        glDrawArrays(GL_POINTS, 0, arrowHeads->getVertices().size());
+        CHECK_GL_ERROR;
+
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        CHECK_GL_ERROR;
+    }
+}
+
+
+void MJetcoreDetectionActor::refreshEnumsProperties(MNWPActorVariable *var)
+{
+    MIsosurfaceIntersectionActor::refreshEnumsProperties(var);
+
+    QStringList names;
+    foreach (MNWPActorVariable *act, variables)
+    {
+        if (var == nullptr || var != act)
+        {
+            names.append(act->variableName);
+        }
+    }
+
+    variableSettingsCores->geoPotVarIndex = 0;
+
+    enableActorUpdates(false);
+
+    properties->mEnum()->setEnumNames(variableSettingsCores->geoPotVarProperty,
+                                      names);
+
+    enableActorUpdates(true);
+}
+
+/******************************************************************************
+***                           PRIVATE METHODS                               ***
+*******************************************************************************/

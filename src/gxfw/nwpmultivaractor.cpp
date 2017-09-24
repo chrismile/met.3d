@@ -51,7 +51,8 @@ namespace Met3D
 
 MNWPMultiVarActor::MNWPMultiVarActor()
     : MActor(),
-      analysisControl(nullptr)
+      analysisControl(nullptr),
+      supportedFilters({"all"})
 {
     // Create and initialise QtProperties for the GUI.
     // ===============================================

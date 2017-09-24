@@ -47,240 +47,395 @@ namespace Met3D
   @brief Base class for all objects that store supplemental data along with
   trajectory data.
  */
-class MSupplementalTrajectoryData : public MAbstractDataItem
-{
-public:
-    MSupplementalTrajectoryData(MDataRequest requestToReferTo,
-                                unsigned int numTrajectories);
+    class MSupplementalTrajectoryData : public MAbstractDataItem
+    {
+    public:
+        MSupplementalTrajectoryData(MDataRequest requestToReferTo,
+                                    unsigned int numTrajectories);
 
-    virtual MDataRequest refersTo() { return requestToReferTo; }
+        virtual MDataRequest refersTo() { return requestToReferTo; }
 
-    int getNumTrajectories() const { return numTrajectories; }
+        int getNumTrajectories() const { return numTrajectories; }
 
-protected:
-    int numTrajectories;
+    protected:
+        int numTrajectories;
 
-private:
-    MDataRequest requestToReferTo;
+    private:
+        MDataRequest requestToReferTo;
 
-};
+    };
 
 
 /**
   @brief Defines a selection of a trajectory dataset.
  */
-class MTrajectorySelection : public MSupplementalTrajectoryData
-{
-public:
-    MTrajectorySelection(MDataRequest requestToReferTo,
-                         unsigned int numTrajectories,
-                         QVector<QDateTime> timeValues,
-                         QVector3D startGridStride=QVector3D(1,1,1));
-    ~MTrajectorySelection();
+    class MTrajectorySelection : public MSupplementalTrajectoryData
+    {
+    public:
+        MTrajectorySelection(MDataRequest requestToReferTo,
+                             unsigned int numTrajectories,
+                             QVector<QDateTime> timeValues,
+                             QVector3D startGridStride=QVector3D(1,1,1));
+        ~MTrajectorySelection();
 
-    unsigned int getMemorySize_kb();
+        unsigned int getMemorySize_kb();
 
-    /**
-      Index [i_filtered] stores the start index of filtered trajectory
-      i_filtered in the @ref MTrajectories vertex field (@see
-      MTrajectories::getVertices()).
+        /**
+          Index [i_filtered] stores the start index of filtered trajectory
+          i_filtered in the @ref MTrajectories vertex field (@see
+          MTrajectories::getVertices()).
 
-     @note Index i_filtered is not equal to trajectory i_full in the "full",
-     unfiltered field of trajectories returned by @ref
-     MTrajectories::getVertices(). Use i_full =
-     ceil(float(startIndex)/numTimes) to get this index.
-     */
-    inline const GLint* getStartIndices() const { return startIndices; }
+         @note Index i_filtered is not equal to trajectory i_full in the "full",
+         unfiltered field of trajectories returned by @ref
+         MTrajectories::getVertices(). Use i_full =
+         ceil(float(startIndex)/numTimes) to get this index.
+         */
+        inline const GLint* getStartIndices() const { return startIndices; }
 
-    /**
-      Index [i] stores the number of vertices of filtered trajectory i in the
-      @ref MTrajectories vertex field (@see MTrajectories::getVertices()).
-     */
-    inline const GLsizei* getIndexCount() const { return indexCount; }
+        /**
+          Index [i] stores the number of vertices of filtered trajectory i in the
+          @ref MTrajectories vertex field (@see MTrajectories::getVertices()).
+         */
+        inline const GLsizei* getIndexCount() const { return indexCount; }
 
-    /**
-      Total number of timesteps of each trajectory. This number need not be
-      equal to a trajectory's index count!
-     */
-    inline int getNumTimeStepsPerTrajectory() const { return times.size(); }
+        /**
+          Total number of timesteps of each trajectory. This number need not be
+          equal to a trajectory's index count!
+         */
+        inline int getNumTimeStepsPerTrajectory() const { return times.size(); }
 
-    inline const QVector<QDateTime>& getTimes() const { return times; }
+        inline const QVector<QDateTime>& getTimes() const { return times; }
 
-    inline const QVector3D getStartGridStride() const { return startGridStride; }
+        inline const QVector3D getStartGridStride() const { return startGridStride; }
 
-protected:
-    GLint   *startIndices;
-    GLsizei *indexCount;
-    int      maxNumTrajectories;
+    protected:
+        friend class MIsosurfaceIntersectionSource;
+        friend class MLineGeometryFilter;
+        GLint* startIndices;
+        GLsizei* indexCount;
+        int      maxNumTrajectories;
 
-    QVector<QDateTime> times;
+        QVector<QDateTime> times;
 
-    QVector3D startGridStride; // this is 1 for each coordinate unless
-                               // trajectories have been thinned out
-};
+        QVector3D startGridStride; // this is 1 for each coordinate unless
+        // trajectories have been thinned out
+    };
+
+/**
+  @brief Defines a selection of a trajectory dataset.
+ */
+    class MTrajectoryEnsembleSelection : public MTrajectorySelection
+    {
+    public:
+        MTrajectoryEnsembleSelection(MDataRequest requestToReferTo,
+                                     unsigned int numTrajectories,
+                                     QVector<QDateTime> timeValues,
+                                     QVector3D startGridStride = QVector3D(1, 1, 1),
+                                     unsigned int numEnsembles = 1);
+
+        ~MTrajectoryEnsembleSelection();
+
+        inline const QVector<GLint> getEnsembleStartIndices() const
+        { return ensembleStartIndices; }
+
+        inline const QVector<GLsizei> getEnsembleIndexCount() const
+        { return ensembleIndexCount; }
+
+        inline const unsigned int getNumEnsembleMembers() const
+        { return numEnsembleMembers; }
+
+    protected:
+        QVector<GLint> ensembleStartIndices;
+        QVector<GLsizei> ensembleIndexCount;
+        unsigned int numEnsembleMembers;
+    };
 
 
 /**
   @brief As @ref MTrajectorySelection, but can be written.
  */
-class MWritableTrajectorySelection : public MTrajectorySelection
-{
-public:
-    MWritableTrajectorySelection(MDataRequest requestToReferTo,
-                                 unsigned int numTrajectories,
-                                 QVector<QDateTime> timeValues,
-                                 QVector3D startGridStride);
+    class MWritableTrajectorySelection : public MTrajectorySelection
+    {
+    public:
+        MWritableTrajectorySelection(MDataRequest requestToReferTo,
+                                     unsigned int numTrajectories,
+                                     QVector<QDateTime> timeValues,
+                                     QVector3D startGridStride);
 
-    inline void setStartIndex(unsigned int i, int value)
-    { startIndices[i] = value; }
+        inline void setStartIndex(unsigned int i, int value)
+        { startIndices[i] = value; }
 
-    inline void setIndexCount(unsigned int i, int value)
-    { indexCount[i] = value; }
+        inline void setIndexCount(unsigned int i, int value)
+        { indexCount[i] = value; }
 
-    /**
-      Only modify start grid stride if trajectories have been thinned out!
-     */
-    inline void setStartGridStride(QVector3D stride)
-    { startGridStride = stride; }
+        /**
+          Only modify start grid stride if trajectories have been thinned out!
+         */
+        inline void setStartGridStride(QVector3D stride)
+        { startGridStride = stride; }
 
-    /**
-      Decrease the number of selected trajectories to @p n. @p n needs to be
-      smaller than the number of trajectories specified in the constructor.
-     */
-    void decreaseNumSelectedTrajectories(int n);
+        /**
+          Decrease the number of selected trajectories to @p n. @p n needs to be
+          smaller than the number of trajectories specified in the constructor.
+         */
+        void decreaseNumSelectedTrajectories(int n);
 
-};
+        void increaseNumSelectedTrajectories(int n);
+
+    };
+
+/**
+@brief As @ref MTrajectorySelection, but can be written.
+*/
+    class MWritableTrajectoryEnsembleSelection : public MTrajectoryEnsembleSelection
+    {
+    public:
+        MWritableTrajectoryEnsembleSelection(MDataRequest requestToReferTo,
+                                     unsigned int numTrajectories,
+                                     QVector<QDateTime> timeValues,
+                                     QVector3D startGridStride,
+                                     unsigned int numEnsembles);
+
+        inline void setStartIndex(unsigned int i, int value)
+        { startIndices[i] = value; }
+
+        inline void setIndexCount(unsigned int i, int value)
+        { indexCount[i] = value; }
+
+        inline void setEnsembleStartIndex(unsigned int i, int value)
+        { ensembleStartIndices[i] = value; }
+
+        inline void setEnsembleIndexCount(unsigned int i, int value)
+        { ensembleIndexCount[i] = value; }
+
+        /**
+          Only modify start grid stride if trajectories have been thinned out!
+         */
+        inline void setStartGridStride(QVector3D stride)
+        { startGridStride = stride; }
+
+        /**
+          Decrease the number of selected trajectories to @p n. @p n needs to be
+          smaller than the number of trajectories specified in the constructor.
+         */
+        void decreaseNumSelectedTrajectories(int n);
+
+        void increaseNumSelectedTrajectories(int n);
+
+    };
 
 
 /**
   Supplements each trajectory of an @ref MTrajectories item with a float
   argument (only one value per trajectory, not one value per vertex!).
  */
-class MFloatPerTrajectorySupplement : public MSupplementalTrajectoryData
-{
-public:
-    MFloatPerTrajectorySupplement(MDataRequest requestToReferTo,
-                                  unsigned int numTrajectories);
+    class MFloatPerTrajectorySupplement : public MSupplementalTrajectoryData
+    {
+    public:
+        MFloatPerTrajectorySupplement(MDataRequest requestToReferTo,
+                                      unsigned int numTrajectories);
 
-    unsigned int getMemorySize_kb();
+        unsigned int getMemorySize_kb();
 
-    const QVector<float>& getValues() const { return values; }
+        const QVector<float>& getValues() const { return values; }
 
-    inline void setValue(unsigned int i, float value) { values[i] = value; }
+        inline void setValue(unsigned int i, float value) { values[i] = value; }
 
-protected:
-    friend class MTrajectoryReader;
+    protected:
+        friend class MTrajectoryReader;
 
-    QVector<float> values;
-};
+        QVector<float> values;
+    };
 
 
 /**
   @brief Normals associated with a trajectory dataset and a specific view
   (normals depend on the view's z-scaling).
  */
-class MTrajectoryNormals : public MSupplementalTrajectoryData
-{
-public:
-    MTrajectoryNormals(MDataRequest requestToReferTo,
-                       unsigned int numTrajectories,
-                       unsigned int numTimeStepsPerTrajectory);
+    class MTrajectoryNormals : public MSupplementalTrajectoryData
+    {
+    public:
+        MTrajectoryNormals(MDataRequest requestToReferTo,
+                           unsigned int numTrajectories,
+                           unsigned int numTimeStepsPerTrajectory);
 
-    ~MTrajectoryNormals();
+        // When trajectories have different lengths
+        MTrajectoryNormals(MDataRequest requestToReferTo,
+                           unsigned int numVertices);
 
-    unsigned int getMemorySize_kb();
+        ~MTrajectoryNormals();
 
-    const QVector<QVector3D>& getWorldSpaceNormals() const
-    { return normals; }
+        unsigned int getMemorySize_kb();
 
-    inline void setNormal(unsigned int i, QVector3D normal)
-    { normals[i] = normal; }
+        const QVector<QVector3D>& getWorldSpaceNormals() const
+        { return normals; }
 
-    /**
-     */
-    GL::MVertexBuffer *getVertexBuffer(QGLWidget *currentGLContext = 0);
+        inline void setNormal(unsigned int i, QVector3D normal)
+        { normals[i] = normal; }
 
-    void releaseVertexBuffer();
+        /**
+         */
+        GL::MVertexBuffer *getVertexBuffer(QGLWidget *currentGLContext = 0);
 
-private:
-    QVector<QVector3D> normals;
+        void releaseVertexBuffer();
 
-};
+    private:
+        QVector<QVector3D> normals;
+
+    };
 
 
 /**
  @brief Stores the trajectories of a single forecast member at a single
  timestep. The smallest entitiy that can be read from disk.
  */
-class MTrajectories :
-        public MTrajectorySelection, public MWeatherPredictionMetaData
-{
-public:
-    /**
-      Constructor requires data size for memory allocation.
+    class MTrajectories :
+            public MTrajectoryEnsembleSelection, public MWeatherPredictionMetaData
+    {
+    public:
+        /**
+          Constructor requires data size for memory allocation.
 
-      Call @ref MWeatherPredictionMetaData::setMetaData() to set init, valid
-      time, name and ensemble member.
-     */
-    MTrajectories(unsigned int numTrajectories,
-                  QVector<QDateTime> timeValues);
+          Call @ref MWeatherPredictionMetaData::setMetaData() to set init, valid
+          time, name and ensemble member.
+         */
+        MTrajectories(unsigned int numTrajectories,
+                      QVector<QDateTime> timeValues);
 
-    /** Destructor frees data in verticesLonLatP. */
-    ~MTrajectories();
+        /** Destructor frees data in verticesLonLatP. */
+        ~MTrajectories();
 
-    unsigned int getMemorySize_kb();
+        unsigned int getMemorySize_kb();
 
-    MDataRequest refersTo() { return getGeneratingRequest(); }
+        MDataRequest refersTo() { return getGeneratingRequest(); }
 
-    /**
-      Copies data from the given float arrays (longitude in degrees, latitude
-      in degrees, pressure in hPa) to the internal QVector-based vertex array.
-      All three arrays must have the size (numTrajectories *
-      numTimeStepsPerTrajectory).
-     */
-    void copyVertexDataFrom(float *lons, float *lats, float *pres);
+        /**
+          Copies data from the given float arrays (longitude in degrees, latitude
+          in degrees, pressure in hPa) to the internal QVector-based vertex array.
+          All three arrays must have the size (numTrajectories *
+          numTimeStepsPerTrajectory).
+         */
+        void copyVertexDataFrom(float *lons, float *lats, float *pres);
 
-    const QVector<QVector3D>& getVertices() { return vertices; }
+        const QVector<QVector3D>& getVertices() { return vertices; }
 
-    /**
-      Returns the length of a single time step in seconds.
-     */
-    unsigned int getTimeStepLength_sec();
+        /**
+          Returns the length of a single time step in seconds.
+         */
+        unsigned int getTimeStepLength_sec();
 
-    /**
-      Pass an MStructuredGrid instance that contains the geometry of the grid
-      on which the trajectories were started.
-     */
-    void setStartGrid(std::shared_ptr<MStructuredGrid> sg) { startGrid = sg; }
+        /**
+          Pass an MStructuredGrid instance that contains the geometry of the grid
+          on which the trajectories were started.
+         */
+        void setStartGrid(std::shared_ptr<MStructuredGrid> sg) { startGrid = sg; }
 
-    const std::shared_ptr<MStructuredGrid> getStartGrid() const { return startGrid; }
+        const std::shared_ptr<MStructuredGrid> getStartGrid() const { return startGrid; }
 
-    /**
-      Return a vertex buffer object that contains the trajectory data. The
-      vertex buffer is created (and data uploaded) on the first call to this
-      method.
+        /**
+          Return a vertex buffer object that contains the trajectory data. The
+          vertex buffer is created (and data uploaded) on the first call to this
+          method.
 
-      The @p currentGLContext argument is necessary as a GPU upload can switch
-      the currently active OpenGL context. As this method is usually called
-      from a render method, it should switch back to the current render context
-      (given by @p currentGLContext).
-     */
-    GL::MVertexBuffer *getVertexBuffer(QGLWidget *currentGLContext = 0);
+          The @p currentGLContext argument is necessary as a GPU upload can switch
+          the currently active OpenGL context. As this method is usually called
+          from a render method, it should switch back to the current render context
+          (given by @p currentGLContext).
+         */
+        GL::MVertexBuffer *getVertexBuffer(QGLWidget *currentGLContext = 0);
 
-    void releaseVertexBuffer();
+        void releaseVertexBuffer();
 
-    /**
-      Debug method to dump the start positions if the first @p num trajectories
-      to the debug log. If @p selection is specified, dump the first @p num
-      trajectories of the selection.
-     */
-    void dumpStartVerticesToLog(int num, MTrajectorySelection *selection=nullptr);
+        /**
+          Debug method to dump the start positions if the first @p num trajectories
+          to the debug log. If @p selection is specified, dump the first @p num
+          trajectories of the selection.
+         */
+        void dumpStartVerticesToLog(int num, MTrajectorySelection *selection=nullptr);
 
-private:
-    QVector<QVector3D> vertices;
-    std::shared_ptr<MStructuredGrid> startGrid;
+    protected:
+        friend class MLineGeometryFilter;
+        friend class MIsosurfaceIntersectionSource;
+        std::shared_ptr<MStructuredGrid> startGrid;
+        QVector<QVector3D> vertices;
+    };
 
-};
+
+    class MTrajectoryArrowHeads : public MAbstractDataItem
+    {
+    public:
+        struct ArrowHeadVertex
+        {
+            QVector3D   pos;
+            QVector3D   direction;
+            float       value;
+        };
+
+        explicit MTrajectoryArrowHeads(const int numArrows);
+        ~MTrajectoryArrowHeads();
+
+        unsigned int getMemorySize_kb();
+
+        const QVector<ArrowHeadVertex>& getVertices() const { return arrowHeads; }
+        void setVertex(const int index, const ArrowHeadVertex& arrow);
+
+        GL::MVertexBuffer *getVertexBuffer(QGLWidget *currentGLContext = 0);
+
+        void releaseVertexBuffer();
+
+    private:
+
+        QVector<ArrowHeadVertex> arrowHeads;
+    };
+
+    class MTrajectoryValues : public MAbstractDataItem
+    {
+    public:
+        explicit MTrajectoryValues(const int numValues);
+        ~MTrajectoryValues();
+
+        unsigned int getMemorySize_kb();
+
+        const QVector<float>& getValues() const { return values; }
+        void setVertex(const int index, const float value);
+
+    private:
+        QVector<float> values;
+
+    };
+
+/**
+ @brief Stores the isosurface intersectio lines in a @ref MTrajectories.
+ */
+
+    class MIsosurfaceIntersectionLines : public MTrajectories
+    {
+    public:
+        MIsosurfaceIntersectionLines():
+                MTrajectories(0, QVector<QDateTime>()) {}
+        GL::MVertexBuffer* getStartPointsVertexBuffer(QGLWidget *currentGLContext = 0);
+        void releaseStartPointsVertexBuffer();
+
+    protected:
+        friend class MIsosurfaceIntersectionSource;
+        friend class MIsosurfaceIntersectionActor;
+        friend class MLineGeometryFilter;
+        friend class MVariableTrajectoryFilter;
+        friend class MRawLineGeometryFilter;
+        QVector<GLboolean> firstVerticesOfLines;
+        QVector<QVector<QVector3D>*> *lines;
+        QVector<float>  values;
+
+//        struct ArrowHeadVertex
+//        {
+//            QVector3D   pos;
+//            QVector3D   direction;
+//            float       value;
+//        };
+
+//        QVector<ArrowHeadVertex> arrowHeads;
+
+    };
 
 
 } // namespace Met3D

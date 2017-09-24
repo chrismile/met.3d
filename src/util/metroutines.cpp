@@ -433,5 +433,28 @@ double boxVolume_dry(double northWestLon, double northWestLat,
     return boxVolume_dry(pmid_Pa, mass_kg, temp_K);
 }
 
+QVector2D getLineSegmentsIntersectionPoint(const QVector2D& p, const QVector2D& p2,
+                                          const QVector2D& q, const QVector2D& q2)
+{
+    QVector2D r = p2 - p;
+    QVector2D s = q2 - q;
+    QVector2D qmp = (q - p);
+    double rxs = crossProduct(r, s);
+    double t = crossProduct(qmp, s) / rxs;
+    double u = crossProduct(qmp, r) / rxs;
+
+    // If r x s != 0 and 0 <= t <= 1 and 0 <= u <= 1
+    // the two line segments meet at the point p + t r = q + u s.
+    if ((0.0 <= t && t <= 1.0) && (0.0 <= u && u <= 1.0))
+    {
+        // We can calculate the intersection point using either t or u.
+        return p + t * r;
+    }
+
+    // Otherwise, the two line segments are not parallel but do not intersect.
+    return  QVector2D(0, 0);
+}
+
+
 
 } // namespace Met3D

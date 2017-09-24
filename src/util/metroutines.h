@@ -32,6 +32,7 @@
 
 // local application imports
 #include "util/mutil.h"
+#include "QVector2D"
 
 
 namespace Met3D
@@ -250,6 +251,24 @@ double boxVolume_dry(double northWestLon, double northWestLat,
                      double southEastLon, double southEastLat,
                      double pmid_Pa, double pbot_Pa, double ptop_Pa,
                      double temp_K = M_MISSING_VALUE);
+
+
+inline double crossProduct(const QVector2D& a, const QVector2D& b)
+{
+    return a.x() * b.y() - a.y() * b.x();
+}
+
+
+/**
+  Calculates the intersecton between two line segments in 2D
+
+   @p p,@p p2: end points of the first line
+   @p q,@p q2: end points of the second line
+
+  @return intersection point
+ */
+QVector2D getLineSegmentsIntersectionPoint(const QVector2D& p, const QVector2D& p2,
+                                          const QVector2D& q, const QVector2D& q2);
 
 
 } // namespace Met3D

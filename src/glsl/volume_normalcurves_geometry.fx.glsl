@@ -26,7 +26,6 @@
 ******************************************************************************/
 
 
-
 /*****************************************************************************
  ***                             INTERFACES
  *****************************************************************************/
@@ -53,7 +52,10 @@ interface GStoFS
  ***                             UNIFORMS
  *****************************************************************************/
 
-uniform float tubeRadius;
+uniform float   tubeRadius;
+uniform vec3    tubeColor;
+uniform vec2    pToWorldZParams;
+uniform int     colorMode;
 
 /*****************************************************************************
  ***                           VERTEX SHADER
@@ -63,6 +65,15 @@ shader VSmain(in vec3 vertex0 : 0, in float value0 : 1, out VStoGS Output)
 {
     Output.worldSpaceCoordinate = vertex0;
     Output.value = value0;
+}
+
+shader VSTrajectoryMain(in vec3 vertex0 : 0, in float value0 : 1, out VStoGS Output)
+{
+    float worldZ = (log(vertex0.z) - pToWorldZParams.x) * pToWorldZParams.y;
+
+    Output.worldSpaceCoordinate = vec3(vertex0.xy, worldZ);
+
+    Output.value = (colorMode == 1) ? vertex0.z : value0;
 }
 
 
@@ -108,23 +119,33 @@ void calculateRayBasis( in vec3 prevPos,
 {
     vec3 lineDir = normalize(pos - prevPos);
 
-    normal = cross(lineDir,vec3(1,0,0));
-    normal = normalize(normal);
-    if (abs(normal.x) < 0.01)
-        normal = cross(lineDir,vec3(0,1,0));
+    normal = cross(lineDir,vec3(0,0,1));
+    //normal = normalize(normal);
+    //if (abs(normal.x) < 0.01)
+    //    normal = cross(lineDir,vec3(0,1,0));
+    if (length(normal) <= 0.01)
+    {
+        normal = cross(lineDir, vec3(1,0,0));
+
+        if (length(normal) <= 0.01)
+        {
+            normal = cross(lineDir, vec3(0,0,1));
+        }
+    }
 
     normal = normalize(normal);
 
     binormal = cross(lineDir,normal);
     binormal = normalize(binormal);
 
+    normal = cross(binormal, lineDir);
+    normal = normalize(normal);
 }
 
 
 shader GSBox(in VStoGS Input[], out GStoFS Output)
 {
-    if (Input[1].value == -1 || Input[2].value == -1)
-        return;
+    if (Input[1].value == -1 || Input[2].value == -1) { return; }
 
     vec3 start_position = vec3(-1,-1,-1);
     if (Input[0].value == -1)
@@ -246,10 +267,9 @@ shader GSTube(in VStoGS Input[], out GStoFS Output)
 
     Output.valuePS = 0;
 
-    if (Input[1].value == -1 || Input[2].value == -1)
-    {
-        return;
-    }
+    bool startPrimitive = gl_PrimitiveIDIn == 0;
+
+    if (Input[1].value == -1 || Input[2].value == -1) { return; }
     //    o ----o______o-----o
     vec3 pos0, pos1, pos2, pos3;
 
@@ -257,6 +277,8 @@ shader GSTube(in VStoGS Input[], out GStoFS Output)
 
     value1 = Input[1].value;
     value2 = Input[2].value;
+
+    vec3 normalPrev, binormalPrev, normalNext, binormalNext;
 
     if (Input[0].value == -1 && Input[3].value == -1)
     {
@@ -283,14 +305,11 @@ shader GSTube(in VStoGS Input[], out GStoFS Output)
         pos3 = Input[3].worldSpaceCoordinate;
     }
 
+    calculateRayBasis(pos0, pos2, normalPrev, binormalPrev);
+    calculateRayBasis(pos1, pos3, normalNext, binormalNext);
+
 
     // generate tube
-
-    vec3 normalPrev, binormalPrev, normalNext, binormalNext;
-
-    calculateRayBasis(pos0, pos2, normalPrev, binormalPrev);
-
-    calculateRayBasis(pos1, pos3, normalNext, binormalNext);
 
     int tube_segments = 8;
     float angle_t = 360. / float(tube_segments);
@@ -325,11 +344,26 @@ shader GSTube(in VStoGS Input[], out GStoFS Output)
 
     EndPrimitive();
 
-    if (pos2 == pos3)
+    if (pos2 == pos3 || pos0 == pos1 || startPrimitive)
     {
-        vec3 ray_dir = normalize(pos2 - pos1);
-
-        vec3 next_world_mid = pos2;
+        vec3 ray_dir = vec3(0);
+        vec3 next_world_mid = vec3(0);
+        vec3 normalEnd = vec3(0);
+        vec3 binormalEnd = vec3(0);
+         if (pos2 == pos3 && !startPrimitive)
+         {
+            ray_dir = normalize(pos2 - pos1);
+            next_world_mid = pos2;
+            normalEnd = normalNext;
+            binormalEnd = binormalNext;
+         }
+         if (pos0 == pos1 || startPrimitive)
+         {
+            ray_dir = normalize(pos1 - pos2);
+            next_world_mid = pos1;
+            normalEnd = normalPrev;
+            binormalEnd = binormalPrev;
+         }
 
         int ver_num = 0;
 
@@ -342,25 +376,25 @@ shader GSTube(in VStoGS Input[], out GStoFS Output)
             float cosi = cos(angle) * tubeRadius;
             float sini = sin(angle) * tubeRadius;
 
-            vec3 next_world_pos_0 = pos2 + cosi * normalNext + sini * binormalNext;
+            vec3 next_world_pos_0 = next_world_mid + cosi * normalEnd + sini * binormalEnd;
 
             angle = radians(angle_t * (t + 1));
             cosi = cos(angle) * tubeRadius;
             sini = sin(angle) * tubeRadius;
 
-            vec3 next_world_pos_1 = pos2 + cosi * normalNext + sini * binormalNext;
+            vec3 next_world_pos_1 = next_world_mid + cosi * normalEnd + sini * binormalEnd;
 
-            Output.normalPS = normalize(next_world_pos_0 - pos2);
+            Output.normalPS = normalize(next_world_pos_0 - next_world_mid);
             gl_Position = mvpMatrix * vec4(next_world_pos_0,1);
             Output.worldPos = next_world_pos_0;
             EmitVertex();
 
-            Output.normalPS = normalize(pos2 - pos1);
+            Output.normalPS = ray_dir;
             Output.worldPos = next_world_mid;
             gl_Position = mvpMatrix * vec4(next_world_mid,1);
             EmitVertex();
 
-            Output.normalPS = normalize(next_world_pos_1 - pos2);
+            Output.normalPS = normalize(next_world_pos_1 - next_world_mid);
             gl_Position = mvpMatrix * vec4(next_world_pos_1,1);
             Output.worldPos = next_world_pos_1;
             EmitVertex();
@@ -377,10 +411,7 @@ shader GSTubeShadow(in VStoGS Input[], out GStoFS Output)
     // set value of all to zero
     Output.valuePS = 0;
 
-    if (Input[1].value == -1 || Input[2].value == -1)
-    {
-        return;
-    }
+    if (Input[1].value == -1 || Input[2].value == -1) { return; }
     //    o ----o______o-----o
     vec3 pos0, pos1, pos2, pos3;
 
@@ -485,17 +516,10 @@ shader FSLine(in GStoFSLine Input, out vec4 fragColor)
 uniform vec3    cameraPosition;
 uniform vec3    lightDirection;
 
-void getBlinnPhongColor(in vec3 worldPos, in vec3 normalDir, in float t,
+void getBlinnPhongColor(in vec3 worldPos, in vec3 normalDir, in vec3 ambientColor,
                         out vec3 color)
 {
     const vec3 lightColor = vec3(1,1,1);
-
-    if (!normalized)
-    {
-        t = (t - tfMinimum) / (tfMaximum - tfMinimum);
-    }
-
-    const vec3 ambientColor = texture(transferFunction, t).rgb;
 
     const vec3 kA = 0.3 * ambientColor;
     const vec3 kD = 0.5 * ambientColor;
@@ -519,9 +543,17 @@ shader FSGeom(in GStoFS Input, out vec4 fragColor)
     if (Input.valuePS == -1) { discard; }
 
     vec3 color;
-    getBlinnPhongColor(Input.worldPos, Input.normalPS, Input.valuePS, color);
-    fragColor = vec4(color,1);
+    float t = Input.valuePS;
 
+    if (!normalized)
+    {
+        t = (t - tfMinimum) / (tfMaximum - tfMinimum);
+    }
+
+    const vec3 ambientColor = texture(transferFunction, t).rgb;
+
+    getBlinnPhongColor(Input.worldPos, Input.normalPS, ambientColor, color);
+    fragColor = vec4(color,1);
 }
 
 
@@ -530,6 +562,29 @@ shader FSShadow(in GStoFS Input, out vec4 fragColor)
     if (Input.valuePS == -1) { discard; }
 
     fragColor = shadowColor;
+}
+
+shader FSSimple(in GStoFS Input, out vec4 fragColor)
+{
+    if (Input.valuePS == -1) { discard; }
+    vec3 color;
+
+    float value = Input.valuePS;
+
+    if (colorMode == 1)
+    {
+        value = exp(Input.worldPos.z / pToWorldZParams.y + pToWorldZParams.x);
+    }
+
+    float t = (value - tfMinimum) / (tfMaximum - tfMinimum);
+
+    vec3 ambientColor = vec3(0);
+    if (colorMode == 0) { ambientColor = tubeColor; }
+    else { ambientColor = texture(transferFunction, t).rgb; }
+
+    getBlinnPhongColor(Input.worldPos, Input.normalPS, ambientColor, color);
+
+    fragColor = vec4(color, 1);
 }
 
 
@@ -566,4 +621,11 @@ program TubeShadow
     vs(420)=VSShadow();
     gs(420)=GSTubeShadow() : in(lines_adjacency), out(triangle_strip, max_vertices = 128);
     fs(420)=FSShadow();
+};
+
+program Trajectory
+{
+    vs(420)=VSTrajectoryMain();
+    gs(420)=GSTube() : in(lines_adjacency), out(triangle_strip, max_vertices = 128);
+    fs(420)=FSSimple();
 };

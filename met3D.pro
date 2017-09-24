@@ -123,10 +123,17 @@ HEADERS += \
     src/data/bboxtrajectoryfilter.h \
     src/gxfw/mresizewindowdialog.h \
     src/actors/spatial1dtransferfunction.h \
+    src/data/partialderivativefilter.h \
+    src/data/multivarpartialderivativefilter.h \
+    src/data/lines.h \
+    src/data/linegeometryfilter.h \
     src/actors/transferfunctioneditor/transferfunctioneditor.h \
     src/actors/transferfunctioneditor/colour.h \
     src/actors/transferfunctioneditor/colourpicker.h \
     src/actors/transferfunctioneditor/editortransferfunction.h
+    src/data/isosurfaceintersectionsource.h \
+    src/actors/isosurfaceintersectionactor.h \
+    src/data/mprojectedvelocitiesfilter.cpp
 
 SOURCES += \
     src/main.cpp \
@@ -217,10 +224,17 @@ SOURCES += \
     src/data/bboxtrajectoryfilter.cpp \
     src/gxfw/mresizewindowdialog.cpp \
     src/actors/spatial1dtransferfunction.cpp \
+    src/data/partialderivativefilter.cpp \
+    src/data/multivarpartialderivativefilter.cpp \
+    src/data/lines.cpp \
+    src/data/linegeometryfilter.cpp \
     src/actors/transferfunctioneditor/transferfunctioneditor.cpp \
     src/actors/transferfunctioneditor/colourpicker.cpp \
     src/actors/transferfunctioneditor/colour.cpp \
     src/actors/transferfunctioneditor/editortransferfunction.cpp
+    src/data/isosurfaceintersectionsource.cpp \
+    src/actors/isosurfaceintersectionactor.cpp \
+    src/data/mprojectedvelocitiesfilter.cpp
 
 FORMS += \
     src/mainwindow.ui \
@@ -278,6 +292,7 @@ OTHER_FILES += \
     src/glsl/vsec_marching_squares.fx.glsl \
     src/glsl/volume_normalcurves_initpoints.fx.glsl \
     src/glsl/hsec_texturedcontours.fx.glsl \
+    src/glsl/simple_geometry_generation.fx.glsl \
     config/cf_stdnames.dat \
     config/log4cplus.properties \
     src/glsl/north_arrow.fx.glsl

@@ -323,9 +323,10 @@ shader GSmain(in vec3 worldPos[], out GStoFS Output)
 
     // wind direction
     vec3 windDir = vec3(windU, windV, 0);
+    vec3 windDirProj = vec3(windU / cos(posWorld.x * 3.14 / 180.0), windV, 0);
 
     // normalized wind direction
-    vec3 dir = normalize(windDir);
+    vec3 dir = normalize(windDirProj);
     vec3 normal = normalize( vec3( -dir.y, dir.x, 0));
 
     // wind velocity in m/s

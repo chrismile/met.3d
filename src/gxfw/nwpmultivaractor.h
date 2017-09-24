@@ -55,7 +55,7 @@ namespace Met3D
   */
 class MNWPMultiVarActor : public MActor
 {
-    Q_OBJECT
+Q_OBJECT
 
 public:
     MNWPMultiVarActor();
@@ -152,7 +152,7 @@ protected:
       methods of the registered @ref NWPActorVariable instances. This method
       has to be called from derived classes.
       */
-    void initializeActorResources();
+    virtual void initializeActorResources();
 
     void onQtPropertyChanged(QtProperty *property);
 
@@ -177,6 +177,13 @@ protected:
     virtual void onAddActorVariable(MNWPActorVariable* var)
     { Q_UNUSED(var); }
 
+    /**
+      Same as @ref onDeleteActorVariable() but called just after a
+      variable has been changed.
+     */
+    virtual void onChangeActorVariable(MNWPActorVariable* var)
+    { Q_UNUSED(var); }
+
     /** List of NWP variables that are rendered in this actor. */
     QList<MNWPActorVariable*> variables;
 
@@ -186,6 +193,25 @@ protected:
 
     // Properties for the property browser.
     QtProperty *variablePropertiesGroup;
+
+    // Supported filters
+    QStringList supportedFilters;
+};
+
+/**
+* @brief MNWPMultiVarIsolevelActor serves as base class for actors
+*  that use the isolevel property of the variables.
+*/
+class MNWPMultiVarIsolevelActor : public MNWPMultiVarActor
+{
+Q_OBJECT
+public slots:
+
+    /**
+     * @brief isoValueOfVariableChanged is triggered in the moment that the
+     * isolevel property of a connected variable is changed.
+     */
+    virtual void isoValueOfVariableChanged() = 0;
 };
 
 } // namespace Met3D

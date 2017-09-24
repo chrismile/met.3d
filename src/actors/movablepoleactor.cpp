@@ -787,6 +787,11 @@ void MMovablePoleActor::setMovement(bool enabled)
     movementEnabled = enabled;
 }
 
+void MMovablePoleActor::setIndividualPoleHeightsEnabled(bool enabled)
+{
+    individualPoleHeightsEnabled = enabled;
+    properties->mBool()->setValue(individualPoleHeightsProperty, enabled);
+}
 
 /******************************************************************************
 ***                             PUBLIC SLOTS                                ***

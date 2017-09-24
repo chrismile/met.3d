@@ -90,7 +90,9 @@ MSelectDataSourceDialog::MSelectDataSourceDialog(
 
 
 MSelectDataSourceDialog::MSelectDataSourceDialog(
-        const QList<MVerticalLevelType>& supportList, QWidget *parent)
+        const QList<MVerticalLevelType>& supportedList,
+        //const QList<QString>&            supportedFilters,
+        QWidget *parent)
     : QDialog(parent),
       ui(new Ui::MSelectDataSourceDialog),
       variableAvailable(false),
@@ -100,7 +102,7 @@ MSelectDataSourceDialog::MSelectDataSourceDialog(
 
     ui->label->setText("Please select a variable and confirm with \"OK\":");
 
-    createDataSourceEntries(supportList);
+    createDataSourceEntries(supportedList);
 }
 
 
@@ -301,7 +303,8 @@ int MSelectDataSourceDialog::exec()
 *******************************************************************************/
 
 void MSelectDataSourceDialog::createDataSourceEntries(
-        QList<MVerticalLevelType> supportedTypes)
+        const QList<MVerticalLevelType> supportedTypes)
+//        const QList<QString>&           supportedFilters)
 {
     // Set the data field table's header.
     QTableWidget *table = ui->dataFieldTable;
@@ -335,7 +338,23 @@ void MSelectDataSourceDialog::createDataSourceEntries(
             MVerticalLevelType lvl = levelTypes.at(ilvl);
 
             // do not list data sources of not supported level types
-            if (!supportedTypes.contains(lvl)) continue;
+            if (!supportedTypes.contains(lvl)) { continue; }
+
+//            // do not list data sources of not supported filters
+//            bool isSupported = supportedFilters.contains("all");
+//            if (!isSupported)
+//            {
+//                foreach (const auto& filter, supportedFilters)
+//                {
+//                    if (dataSources[idl].contains(filter))
+//                    {
+//                        isSupported = true;
+//                        break;
+//                    }
+//                }
+//            }
+//
+//            if (!isSupported) { continue; }
 
             // .. and all variables for the current level type ..
             QStringList variables = source->availableVariables(lvl);
