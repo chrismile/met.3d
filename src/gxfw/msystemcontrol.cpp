@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2017      Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -55,8 +56,10 @@ MSystemManagerAndControl::MSystemManagerAndControl(QWidget *parent) :
     QWidget(parent),
     ui(new Ui::MSystemControl),
     met3dAppIsInitialized(false),
+    connectedToMetview(false),
     mainWindow(nullptr),
     naturalEarthDataLoader(nullptr)
+
 {
     LOG4CPLUS_DEBUG(mlog, "Initialising system manager...");
     ui->setupUi(this);
@@ -102,9 +105,27 @@ MSystemManagerAndControl::MSystemManagerAndControl(QWidget *parent) :
 
     ui->sceneViewPropertiesLayout->addWidget(systemPropertiesBrowser);
 
+    // Add group containing click properties to load and save the window layout.
+    windowLayoutGroupProperty =
+            groupPropertyManager->addProperty("Window layout");
+    addProperty(windowLayoutGroupProperty);
+    collapsePropertyTree(windowLayoutGroupProperty);
+
     // Insert a dummy "None" entry into the list of waypoints models.
     waypointsTableModelPool.insert("None", nullptr);
     syncControlPool.insert("None", nullptr);
+    boundingBoxPool.insert(QString("None"), nullptr);
+
+    loadWindowLayoutProperty = clickPropertyManager->addProperty("load");
+    windowLayoutGroupProperty->addSubProperty(loadWindowLayoutProperty);
+    saveWindowLayoutProperty = clickPropertyManager->addProperty("save");
+    windowLayoutGroupProperty->addSubProperty(saveWindowLayoutProperty);
+
+    // Connect click property to actOnQtPropertyChange to handle user
+    // interaction with the click properties added.
+    connect(clickPropertyManager,
+            SIGNAL(propertyChanged(QtProperty*)),
+            SLOT(actOnQtPropertyChanged(QtProperty*)));
 
     // Determine the Met.3D home directory (the base directory to find
     // shader files and data files that do not change).
@@ -141,24 +162,32 @@ MSystemManagerAndControl::~MSystemManagerAndControl()
     }*/
 
     LOG4CPLUS_DEBUG(mlog, "\tdata source pool");
-    for (auto it = dataSourcePool.begin(); it != dataSourcePool.end(); ++it)
+    foreach (MAbstractDataSource *dataSource, dataSourcePool)
     {
-        std::string key = it.key().toStdString();
+        std::string key = dataSourcePool.key(dataSource).toStdString();
         LOG4CPLUS_DEBUG(mlog, "\t\t -> deleting \''" << key << "''");
-        delete it.value();
+        delete dataSource;
     }
 
     LOG4CPLUS_DEBUG(mlog, "\tsynchronization control pool");
-    for (auto it = syncControlPool.begin(); it != syncControlPool.end(); ++it)
+    foreach (MSyncControl *syncControl, syncControlPool)//auto it = syncControlPool.begin(); it != syncControlPool.end(); ++it)
     {
-        std::string key = it.key().toStdString();
+        std::string key = syncControlPool.key(syncControl).toStdString();
         LOG4CPLUS_DEBUG(mlog, "\t\t -> deleting \''" << key << "''");
-        delete it.value();
+        delete syncControl;
     }
 
     LOG4CPLUS_DEBUG(mlog, "\twaypoints model pool");
-    for (auto it = waypointsTableModelPool.begin();
-         it != waypointsTableModelPool.end(); ++it)
+    foreach (MWaypointsTableModel *waypointsTableModel, waypointsTableModelPool)
+    {
+        std::string key =
+                waypointsTableModelPool.key(waypointsTableModel).toStdString();
+        LOG4CPLUS_DEBUG(mlog, "\t\t -> deleting \''" << key << "''");
+        delete waypointsTableModel;
+    }
+
+    LOG4CPLUS_DEBUG(mlog, "\tbounding box pool");
+    for (auto it = boundingBoxPool.begin(); it != boundingBoxPool.end(); ++it)
     {
         std::string key = it.key().toStdString();
         LOG4CPLUS_DEBUG(mlog, "\t\t -> deleting \''" << key << "''");
@@ -190,6 +219,18 @@ void MSystemManagerAndControl::storeApplicationCommandLineArguments(
         QStringList arguments)
 {
     commandLineArguments = arguments;
+
+    // Parse command line arguments to check if application has been started
+    // from Metview.
+    foreach (QString arg, commandLineArguments)
+    {
+        if (arg.startsWith("--metview"))
+        {
+            connectedToMetview = true;
+            QString msg = QString("Starting in Metview mode. ");
+            LOG4CPLUS_INFO(mlog, msg.toStdString());
+        }
+    }
 }
 
 
@@ -208,11 +249,7 @@ const QDir& MSystemManagerAndControl::getMet3DHomeDir() const
 void MSystemManagerAndControl::registerSceneView(MSceneViewGLWidget *view)
 {
     // Add the view's properties to the property browser.
-    QtBrowserItem *item = systemPropertiesBrowser
-            ->addProperty(view->getPropertyGroup());
-    // Set a light blue as background colour (the colour is taken from the
-    // QtDesigner property editor (screenshot and GIMP..)).
-    systemPropertiesBrowser->setBackgroundColor(item, QColor(191, 255, 191));
+    addProperty(view->getPropertyGroup());
     collapsePropertyTree(view->getPropertyGroup());
 
     registeredViews.append(view);
@@ -270,6 +307,8 @@ QtColorPropertyManager* MSystemManagerAndControl::getColorPropertyManager()
 void MSystemManagerAndControl::addProperty(QtProperty *property)
 {
     QtBrowserItem *item = systemPropertiesBrowser->addProperty(property);
+    // Set the background colour of the entry in the system control's property
+    // browser.
     systemPropertiesBrowser->setBackgroundColor(item, QColor(191, 255, 191));
     collapsePropertyTree(property);
 }
@@ -369,6 +408,13 @@ QStringList MSystemManagerAndControl::getSyncControlIdentifiers() const
 }
 
 
+void MSystemManagerAndControl::removeSyncControl(MSyncControl *syncControl)
+{
+    syncControlPool.remove(syncControl->getID());
+    delete syncControl;
+}
+
+
 void MSystemManagerAndControl::registerWaypointsModel(MWaypointsTableModel *wps)
 {
     waypointsTableModelPool.insert(wps->getID(), wps);
@@ -394,6 +440,54 @@ QStringList MSystemManagerAndControl::getWaypointsModelsIdentifiers() const
 }
 
 
+void MSystemManagerAndControl::registerBoundingBox(MBoundingBox *bbox)
+{
+    boundingBoxPool.insert(bbox->getID(), bbox);
+    emit boundingBoxCreated();
+}
+
+
+void MSystemManagerAndControl::deleteBoundingBox(const QString& id)
+{
+    delete boundingBoxPool.value(id);
+    boundingBoxPool.remove(id);
+    emit boundingBoxDeleted(id);
+}
+
+
+void MSystemManagerAndControl::renameBoundingBox(const QString& oldId,
+                                                 MBoundingBox *bbox)
+{
+    boundingBoxPool.remove(oldId);
+    boundingBoxPool.insert(bbox->getID(), bbox);
+    emit boundingBoxRenamed();
+}
+
+
+MBoundingBox *MSystemManagerAndControl::getBoundingBox(const QString &id) const
+{
+    if ( !boundingBoxPool.contains(id) )
+    {
+        LOG4CPLUS_ERROR(mlog, "Bounding box with ID " << id.toStdString()
+                        << " is not available!");
+        return nullptr;
+    }
+    return boundingBoxPool.value(id);
+}
+
+
+QStringList MSystemManagerAndControl::getBoundingBoxesIdentifiers() const
+{
+    return boundingBoxPool.keys();
+}
+
+
+MBoundingBoxDockWidget *MSystemManagerAndControl::getBoundingBoxDock() const
+{
+    return mainWindow->getBoundingBoxDock();
+}
+
+
 double MSystemManagerAndControl::elapsedTimeSinceSystemStart(
         const MStopwatch::TimeUnits units)
 {
@@ -407,6 +501,24 @@ MNaturalEarthDataLoader *MSystemManagerAndControl::getNaturalEarthDataLoader()
     if (naturalEarthDataLoader == nullptr)
         naturalEarthDataLoader = new MNaturalEarthDataLoader();
     return naturalEarthDataLoader;
+}
+
+
+/******************************************************************************
+***                             PUBLIC SLOTS                                ***
+*******************************************************************************/
+
+void MSystemManagerAndControl::actOnQtPropertyChanged(QtProperty *property)
+{
+    if (property == loadWindowLayoutProperty)
+    {
+        mainWindow->loadConfigurationFromFile("");
+
+    }
+    else if (property == saveWindowLayoutProperty)
+    {
+        mainWindow->saveConfigurationToFile("");
+    }
 }
 
 

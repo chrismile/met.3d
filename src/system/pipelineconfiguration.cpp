@@ -5,7 +5,7 @@
 **  prediction data.
 **
 **  Copyright 2015-2017 Marc Rautenhaus
-**  Copyright 2015-2017 Bianca Tost
+**  Copyright 2017      Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -85,27 +85,52 @@ void MPipelineConfiguration::configure()
 //    initializeDevelopmentDataPipeline();
 //    return;
 
+    QString filename = "";
+
     // Scan global application command line arguments for pipeline definitions.
     MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
     foreach (QString arg, sysMC->getApplicationCommandLineArguments())
     {
         if (arg.startsWith("--pipeline="))
         {
-            QString filename = arg.remove("--pipeline=");
-			filename = expandEnvironmentVariables(filename);
-
-            // Production build: Read pipeline configuration from file.
-            // Disadvantage: Can only read parameters for the predefined
-            // pipelines.
-            initializeDataPipelineFromConfigFile(filename);
-            return;
+            filename = arg.remove("--pipeline=");
+            filename = expandEnvironmentVariables(filename);
         }
     }
 
-    QString errMsg = QString(
-                "ERROR: No data pipeline configuration file specified. "
-                "Use the '--pipeline=<file>' command line argument.");
-    LOG4CPLUS_ERROR(mlog, errMsg.toStdString());
+    QString errMsg = "";
+    // If Met.3D is called by Metview and no configuration files are given,
+    // use default configuration files stored at
+    // $MET3D_HOME/config/metview/default_pipeline.cfg .
+    if (sysMC->isConnectedToMetview() && filename.isEmpty())
+    {
+        filename = "$MET3D_HOME/config/metview/default_pipeline.cfg";
+        filename = expandEnvironmentVariables(filename);
+        QFileInfo fileInfo(filename);
+        if (!fileInfo.isFile())
+        {
+            errMsg = QString(
+                        "ERROR: Default Metview pipeline configuration file"
+                        " does not exist. Location: ") + filename;
+        }
+        LOG4CPLUS_ERROR(mlog, errMsg.toStdString());
+    }
+
+    if (!filename.isEmpty())
+    {
+        // Production build: Read pipeline configuration from file.
+        // Disadvantage: Can only read parameters for the predefined
+        // pipelines.
+        initializeDataPipelineFromConfigFile(filename);
+        return;
+    }
+    else
+    {
+        errMsg = QString(
+                    "ERROR: No data pipeline configuration file specified. "
+                    "Use the '--pipeline=<file>' command line argument.");
+        LOG4CPLUS_ERROR(mlog, errMsg.toStdString());
+    }
     throw MInitialisationError(errMsg.toStdString(), __FILE__, __LINE__);
 }
 
@@ -177,21 +202,54 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
     // ================
     size = config.beginReadArray("NWPPipeline");
 
-    for (int i = 0; i < size; i++)
-    {    
-        config.setArrayIndex(i);
+    // Get directories and file filters specified by path command line argument
+    // if present.
+    QList<MetviewGribFilePath> filePathList;
+    if (sysMC->isConnectedToMetview())
+    {
+        getMetviewGribFilePaths(&filePathList);
+        // For Metview integration use directories and file filters specified by
+        // command line arguments instead of directories and file filters
+        // specified by pipeline configuration.
+        size = filePathList.size();
+    }
 
+    QString path, fileFilter, name;
+    config.setArrayIndex(0);
+
+    for (int i = 0; i < size; i++)
+    {
         // Read settings from file.
-        QString name = config.value("name").toString();
-        QString path = expandEnvironmentVariables(config.value("path").toString());
+
+        // If Met.3D is called from Metview use only the first entry in the
+        // pipeline configuration file to initialise each data source.
+        if (sysMC->isConnectedToMetview())
+        {
+            // Use name of first NWPPipeline entry in pipeline configuration as
+            // name and append index for each new data source.
+            name = config.value("name").toString() + QString("_%1").arg(i);
+            path = filePathList.at(i).path;
+            fileFilter = filePathList.at(i).fileFilter;
+        }
+        // Use all NWPPipeline entries if we call Met.3D as own program.
+        else
+        {
+            config.setArrayIndex(i);
+            name = config.value("name").toString();
+            path = expandEnvironmentVariables(config.value("path").toString());
+            fileFilter = config.value("fileFilter").toString();
+        }
         QString domainID = config.value("domainID").toString();
-        QString fileFilter = config.value("fileFilter").toString();
         QString schedulerID = config.value("schedulerID").toString();
         QString memoryManagerID = config.value("memoryManagerID").toString();
         QString fileFormatStr = config.value("fileFormat").toString();
         bool enableRegridding = config.value("enableRegridding", false).toBool();
         bool enableProbRegionFilter = config.value("enableProbabilityRegionFilter",
                                                    false).toBool();
+        bool treatRotatedGridAsRegularGrid =
+                config.value("treatRotatedGridAsRegularGrid", false).toBool();
+        QString gribSurfacePressureFieldType =
+                config.value("surfacePressureFieldType", "auto").toString();
 
 //TODO (mr, 16Dec2015) -- compatibility code; remove in Met.3D version 2.0
         // If no fileFilter is specified but a domainID is specified use
@@ -213,6 +271,10 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
                         << (enableRegridding ? "enabled" : "disabled"));
         LOG4CPLUS_DEBUG(mlog, "  probability region="
                         << (enableProbRegionFilter ? "enabled" : "disabled"));
+        LOG4CPLUS_DEBUG(mlog, "  treat rotated grid as regular grid="
+                        << (treatRotatedGridAsRegularGrid ? "enabled" : "disabled"));
+        LOG4CPLUS_DEBUG(mlog, "  surfacePressureFieldType="
+                        << gribSurfacePressureFieldType.toStdString());
 
         MNWPReaderFileFormat fileFormat = INVALID_FORMAT;
         if (fileFormatStr == "CF_NETCDF") fileFormat = CF_NETCDF;
@@ -220,12 +282,17 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
         else if (fileFormatStr == "ECMWF_CF_NETCDF") fileFormat = CF_NETCDF;
         else if (fileFormatStr == "ECMWF_GRIB") fileFormat = ECMWF_GRIB;
 
+        QStringList validGribSurfacePressureFieldTypes;
+        validGribSurfacePressureFieldTypes << "auto" << "sp" << "lnsp";
+
         // Check parameter validity.
         if ( name.isEmpty()
              || path.isEmpty()
              || schedulerID.isEmpty()
              || memoryManagerID.isEmpty()
-             || (fileFormat == INVALID_FORMAT) )
+             || (fileFormat == INVALID_FORMAT)
+             || (fileFormat == ECMWF_GRIB && !validGribSurfacePressureFieldTypes
+                 .contains(gribSurfacePressureFieldType)))
         {
             LOG4CPLUS_WARN(mlog, "invalid parameters encountered; skipping.");
             continue;
@@ -235,7 +302,8 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
         initializeNWPPipeline(
                     name, path, fileFilter, schedulerID,
                     memoryManagerID, fileFormat, enableRegridding,
-                    enableProbRegionFilter);
+                    enableProbRegionFilter, treatRotatedGridAsRegularGrid,
+                    gribSurfacePressureFieldType);
     }
 
     config.endArray();
@@ -298,7 +366,9 @@ void MPipelineConfiguration::initializeNWPPipeline(
         QString memoryManagerID,
         MNWPReaderFileFormat dataFormat,
         bool enableRegridding,
-        bool enableProbabiltyRegionFilter)
+        bool enableProbabiltyRegionFilter,
+        bool treatRotatedGridAsRegularGrid,
+        QString surfacePressureFieldType)
 {
     MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
     MAbstractScheduler* scheduler = sysMC->getScheduler(schedulerID);
@@ -314,11 +384,13 @@ void MPipelineConfiguration::initializeNWPPipeline(
     MWeatherPredictionReader *nwpReaderENS = nullptr;
     if (dataFormat == CF_NETCDF)
     {
-        nwpReaderENS = new MClimateForecastReader(dataSourceId);
+        nwpReaderENS = new MClimateForecastReader(dataSourceId,
+                                                  treatRotatedGridAsRegularGrid);
     }
     else if (dataFormat == ECMWF_GRIB)
     {
-        nwpReaderENS = new MGribReader(dataSourceId);
+        nwpReaderENS = new MGribReader(dataSourceId,
+                                       surfacePressureFieldType);
     }
     nwpReaderENS->setMemoryManager(memoryManager);
     nwpReaderENS->setScheduler(scheduler);
@@ -553,7 +625,9 @@ void MPipelineConfiguration::initializeDevelopmentDataPipeline()
                 "NWP",
                 CF_NETCDF,
                 false,
-                true);
+                true,
+                false,
+                "auto");
 
     initializeNWPPipeline(
                 "ECMWF ENS EUR_LL10",
@@ -563,7 +637,9 @@ void MPipelineConfiguration::initializeDevelopmentDataPipeline()
                 "NWP",
                 CF_NETCDF,
                 false,
-                true);
+                true,
+                false,
+                "auto");
 
     sysMC->registerMemoryManager("Trajectories DF-T psfc_1000hPa_L62",
                new MLRUMemoryManager("Trajectories DF-T psfc_1000hPa_L62",
@@ -616,6 +692,40 @@ void MPipelineConfiguration::initializeDevelopmentDataPipeline()
                 true,
                 "SingleThread",
                 "Trajectories ABL-T 10hPa");
+}
+
+
+void MPipelineConfiguration::getMetviewGribFilePaths(
+        QList<MPipelineConfiguration::MetviewGribFilePath> *gribFilePaths)
+{
+    gribFilePaths->clear();
+    QStringList gribFilePathsStringList;
+    gribFilePathsStringList.clear();
+    MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
+    // Scan global application command line arguments for metview definition.
+    foreach (QString arg, sysMC->getApplicationCommandLineArguments())
+    {
+        if (arg.startsWith("--path="))
+        {
+            QString path = arg.remove("--path=");
+            // Remove quotes if not already removed by shell.
+            path.remove(QChar('"'), Qt::CaseSensitive);
+            // Get list of paths (directory and file filter).
+            gribFilePathsStringList = path.split(";", QString::SkipEmptyParts);
+            // Extract directory and file filter from given paths.
+            foreach (QString path, gribFilePathsStringList)
+            {
+                QFileInfo fileInfo(expandEnvironmentVariables(path));
+                QString fileFilter = fileInfo.fileName();
+                path.chop(fileFilter.length());
+                MetviewGribFilePath metviewGribFilePath;
+                metviewGribFilePath.path = path;
+                metviewGribFilePath.fileFilter = fileFilter;
+                gribFilePaths->append(metviewGribFilePath);
+            }
+            break;
+        }
+    }
 }
 
 

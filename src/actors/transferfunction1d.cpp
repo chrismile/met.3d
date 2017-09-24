@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2016-2017 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -59,7 +60,8 @@ MTransferFunction1D::MTransferFunction1D(QObject *parent)
     // ===============================================
     beginInitialiseQtProperties();
 
-    setName("Transfer function scalar to colour (colour map)");
+    setActorType("Transfer function scalar to colour (colour map)");
+    setName(getActorType());
 
     // Properties related to labelling the colour bar.
     // ===============================================
@@ -1122,7 +1124,8 @@ void MTransferFunction1D::generateBarGeometry()
         // reallocate buffer if size has changed
         buf->reallocate(nullptr, 24 + numTicks * 6);
         buf->update(coordinates, 0, 0, sizeof(coordinates));
-        buf->update(tickmarks, 0, sizeof(coordinates), sizeof(float) * 6 * numTicks);
+        buf->update(tickmarks, 0, sizeof(coordinates),
+                    sizeof(float) * 6 * numTicks);
 
     }
     else
@@ -1133,7 +1136,8 @@ void MTransferFunction1D::generateBarGeometry()
         {
             newVB->reallocate(nullptr, 24 + numTicks * 6, 0, true);
             newVB->update(coordinates, 0, 0, sizeof(coordinates));
-            newVB->update(tickmarks, 0, sizeof(coordinates), sizeof(float) * 6 * numTicks);
+            newVB->update(tickmarks, 0, sizeof(coordinates),
+                          sizeof(float) * 6 * numTicks);
 
         }
         else

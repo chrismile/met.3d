@@ -5,7 +5,7 @@
 **  prediction data.
 **
 **  Copyright 2015-2017 Marc Rautenhaus
-**  Copyright 2015-2017 Bianca Tost
+**  Copyright 2016-2017 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -53,6 +53,7 @@ namespace Met3D
 
 MNWPVerticalSectionActor::MNWPVerticalSectionActor()
     : MNWPMultiVarActor(),
+      MBoundingBoxInterface(this),
       labelDistance(1),
       waypointsModel(nullptr),
       modifyWaypoint(-1),
@@ -71,13 +72,17 @@ MNWPVerticalSectionActor::MNWPVerticalSectionActor()
       interpolationNodeSpacing(0.15),
       updatePath(false)
 {
+    bBoxConnection =
+            new MBoundingBoxConnection(this, MBoundingBoxConnection::VERTICAL);
     enablePicking(true);
 
     // Create and initialise QtProperties for the GUI.
     // ===============================================
     beginInitialiseQtProperties();
 
-    setName("Vertical cross-section");
+    setActorType("Vertical cross-section");
+    setName(getActorType());
+
 
     labelDistanceProperty = addProperty(INT_PROPERTY, "distance (in tick marks)",
                                          labelPropertiesSupGroup);
@@ -91,15 +96,7 @@ MNWPVerticalSectionActor::MNWPVerticalSectionActor()
                                       MSystemManagerAndControl::getInstance()
                                       ->getWaypointsModelsIdentifiers());
 
-    upperLimitProperty = addProperty(DECORATEDDOUBLE_PROPERTY, "top pressure",
-                                     actorPropertiesSupGroup);
-    properties->setDDouble(upperLimitProperty, p_top_hPa, 0.01, 1050, 2, 5.,
-                           " hPa");
-
-    lowerLimitProperty = addProperty(DECORATEDDOUBLE_PROPERTY, "bottom pressure",
-                                     actorPropertiesSupGroup);
-    properties->setDDouble(lowerLimitProperty, p_bot_hPa, 0.01, 1050, 2, 5.,
-                           " hPa");
+    actorPropertiesSupGroup->addSubProperty(bBoxConnection->getProperty());
 
     QString defaultPressureLineLevel = QString("1000.,900.,800.,700.,600.,500.")
                                        + QString(",400.,300.,200.,100.,90.,80.")
@@ -183,8 +180,8 @@ void MNWPVerticalSectionActor::saveConfiguration(QSettings *settings)
         settings->setValue("waypointsModelID", waypointsModel->getID());
     }
 
-    settings->setValue("p_top_hPa", p_top_hPa);
-    settings->setValue("p_bot_hPa", p_bot_hPa);
+    MBoundingBoxInterface::saveConfiguration(settings);
+
     settings->setValue("pressureLevels",
                        properties->mString()->value(pressureLineLevelsProperty));
     settings->setValue("opacity", opacity);
@@ -207,12 +204,7 @@ void MNWPVerticalSectionActor::loadConfiguration(QSettings *settings)
     setWaypointsModel(MSystemManagerAndControl::getInstance()
                       ->getWaypointsModel(wpID));
 
-    properties->mDDouble()->setValue(
-                upperLimitProperty,
-                settings->value("p_top_hPa").toFloat());
-    properties->mDDouble()->setValue(
-                lowerLimitProperty,
-                settings->value("p_bot_hPa").toFloat());
+    MBoundingBoxInterface::loadConfiguration(settings);
 
     QString defaultPressureLineLevel = QString("1000.,900.,800.,700.,600.,500.")
                                        + QString(",400.,300.,200.,100.,90.,80.")
@@ -554,6 +546,30 @@ MNWPActorVariable* MNWPVerticalSectionActor::createActorVariable(
 }
 
 
+void MNWPVerticalSectionActor::onBoundingBoxChanged()
+{
+    labels.clear();
+    // Switching to no bounding box only needs a redraw, but no recomputation
+    // because it disables rendering of the actor.
+    if (bBoxConnection->getBoundingBox() == nullptr)
+    {
+        emitActorChangedSignal();
+        return;
+    }
+    // The vertical extent of the section has been changed.
+    p_top_hPa = bBoxConnection->topPressure_hPa();
+    p_bot_hPa = bBoxConnection->bottomPressure_hPa();
+    targetGridToBeUpdated = true;
+
+    if (suppressActorUpdates()) return;
+
+    // Adapt iso pressure lines set to new boundaries.
+    generateIsoPressureLines();
+    updatePath = true;
+    emitActorChangedSignal();
+}
+
+
 /******************************************************************************
 ***                             PUBLIC SLOTS                                ***
 *******************************************************************************/
@@ -563,22 +579,7 @@ void MNWPVerticalSectionActor::onQtPropertyChanged(QtProperty *property)
     // Parent signal processing.
     MNWPMultiVarActor::onQtPropertyChanged(property);
 
-    if ((property == upperLimitProperty) || (property == lowerLimitProperty))
-    {
-        // The vertical extent of the section has been changed.
-        p_top_hPa = properties->mDDouble()->value(upperLimitProperty);
-        p_bot_hPa = properties->mDDouble()->value(lowerLimitProperty);
-        targetGridToBeUpdated = true;
-
-        if (suppressActorUpdates()) return;
-
-        // Adapt iso pressure lines set to new boundaries.
-        generateIsoPressureLines();
-        updatePath = true;
-        emitActorChangedSignal();
-    }
-
-    else if (property == labelDistanceProperty)
+    if (property == labelDistanceProperty)
     {
         labelDistance = properties->mInt()->value(labelDistanceProperty);
 
@@ -959,10 +960,13 @@ void MNWPVerticalSectionActor::initializeActorResources()
 
 void MNWPVerticalSectionActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
 {
-    // If there is no connected waypoints model or no actor variable, nothing
-    // can be rendered.
-    if (waypointsModel == nullptr) return;
-    if (variables.size() == 0) return;
+    // If there is no connected waypoints model, no connected bounding box or
+    // no actor variable, nothing can be rendered.
+    if (waypointsModel == nullptr || bBoxConnection->getBoundingBox() == nullptr
+            || variables.size() == 0)
+    {
+        return;
+    }
 
     if (updatePath)
     {
@@ -1010,9 +1014,13 @@ void MNWPVerticalSectionActor::renderToCurrentContext(MSceneViewGLWidget *sceneV
         if (renderFilledContours || targetGridToBeUpdated)
         {
             if (renderFilledContours)
+            {
                 sectionGridShader->bindProgram("Standard");
+            }
             else
+            {
                 sectionGridShader->bindProgram("OnlyUpdateTargetGrid");
+            }
 
             // Reset optional textures (to avoid draw errors).
             // ===============================================
@@ -1116,7 +1124,6 @@ void MNWPVerticalSectionActor::renderToCurrentContext(MSceneViewGLWidget *sceneV
                                   2 * var->gridVerticalLevelCount,
                                   path.size() - 1); CHECK_GL_ERROR;
             glDisable(GL_POLYGON_OFFSET_FILL);
-
         } // sectionGridShader (interpolation, target grid, filled contours)
 
         // B) Contouring with the GPU Marching Squares implementation, if

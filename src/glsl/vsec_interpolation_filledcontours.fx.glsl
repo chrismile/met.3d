@@ -234,7 +234,11 @@ shader FSmain(in VStoFS input, out vec4 fragColour)
 
 shader FSdoNotRender(in VStoFS input, out vec4 fragColour)
 {    
-    // empty
+    // Discard fragments since otherwise transparent fragments would be "drawn"
+    // and would write to the depth buffer. Because of that variables of the
+    // same actor that are visible but drawn afterwards would fail the depth
+    // test and thus wouldn't be drawn.
+    discard;
 }
 
 

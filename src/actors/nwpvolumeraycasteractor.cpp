@@ -4,8 +4,9 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
-**  Copyright 2015 Michael Kern
+**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2015      Michael Kern
+**  Copyright 2016-2017 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -56,6 +57,7 @@ namespace Met3D
 
 MNWPVolumeRaycasterActor::MNWPVolumeRaycasterActor()
     : MNWPMultiVarActor(),
+      MBoundingBoxInterface(this),
       updateNextRenderFrame("111"),
       renderMode(RenderMode::Original),
       variableIndex(0),
@@ -63,8 +65,11 @@ MNWPVolumeRaycasterActor::MNWPVolumeRaycasterActor()
       shadingVariableIndex(0),
       shadingVar(nullptr),
       gl(), // initialize gl objects
+      bBoxEnabled(true),
       normalCurveNumVertices(0)
 {
+    bBoxConnection =
+            new MBoundingBoxConnection(this, MBoundingBoxConnection::VOLUME);
     // Enable picking for the scene view's analysis mode. See
     // triggerAnalysisOfObjectAtPos().
     enablePicking(true);
@@ -73,7 +78,8 @@ MNWPVolumeRaycasterActor::MNWPVolumeRaycasterActor()
     // ===============================================
     beginInitialiseQtProperties();
 
-    setName("Volume raycaster");
+    setActorType("Volume raycaster");
+    setName(getActorType());
 
     QStringList modesLst;
     modesLst << "isosurface" << "bitfield" << "DVR";
@@ -93,8 +99,10 @@ MNWPVolumeRaycasterActor::MNWPVolumeRaycasterActor()
     actorPropertiesSupGroup->addSubProperty(rayCasterSettings->groupProp);
 
     // Bounding box.
-    bbSettings = new BoundingBoxSettings(this);
-    actorPropertiesSupGroup->addSubProperty(bbSettings->groupProp);
+    actorPropertiesSupGroup->addSubProperty(bBoxConnection->getProperty());
+    bBoxEnabledProperty = addProperty(
+                BOOL_PROPERTY, "draw bounding box", actorPropertiesSupGroup);
+    properties->mBool()->setValue(bBoxEnabledProperty, bBoxEnabled);
 
     // Isosurface lighting.
     lightingSettings = new LightingSettings(this);
@@ -149,31 +157,6 @@ MNWPVolumeRaycasterActor::OpenGL::OpenGL()
       tex2DDepthBuffer(nullptr),
       texUnitDepthBuffer(-1)
 {
-}
-
-
-MNWPVolumeRaycasterActor::BoundingBoxSettings::BoundingBoxSettings(
-        MNWPVolumeRaycasterActor *hostActor)
-    : enabled(true),
-      pBot_hPa(1050.),
-      pTop_hPa(100.)
-{
-    MActor *a = hostActor;
-    MQtProperties *properties = a->getQtProperties();
-
-    groupProp = a->addProperty(GROUP_PROPERTY, "bounding box");
-
-    enabledProperty = a->addProperty(BOOL_PROPERTY, "enabled", groupProp);
-    properties->mBool()->setValue(enabledProperty, enabled);
-
-    boxCornersProp = a->addProperty(RECTF_LONLAT_PROPERTY, "corners", groupProp);
-    properties->setRectF(boxCornersProp, QRectF(-60., 30., 100., 40.), 2);
-
-    pBotProp = a->addProperty(DOUBLE_PROPERTY, "bottom pressure", groupProp);
-    properties->setDouble(pBotProp, pBot_hPa, 1050., 0.01, 2, 5.);
-
-    pTopProp = a->addProperty(DOUBLE_PROPERTY, "top pressure", groupProp);
-    properties->setDouble(pTopProp, pTop_hPa, 1050., 0.01, 2, 5.);
 }
 
 
@@ -245,7 +228,7 @@ MNWPVolumeRaycasterActor::IsoValueSettings::IsoValueSettings(
     isoValueDecimalsProperty = a->addProperty(INT_PROPERTY, "isovalue decimals", groupProp);
     properties->setInt(isoValueDecimalsProperty, decimals, 0, 10, 1);
 
-    isoValueSingleStepProperty = a->addProperty(DOUBLE_PROPERTY, "animation step", groupProp);
+    isoValueSingleStepProperty = a->addProperty(DOUBLE_PROPERTY, "isovalue step", groupProp);
     properties->setDouble(isoValueSingleStepProperty, singleStep, decimals, singleStep);
 
     QStringList modesLst;
@@ -533,7 +516,6 @@ MNWPVolumeRaycasterActor::~MNWPVolumeRaycasterActor()
     if (gl.texUnitShadowImage >=0) releaseTextureUnit(gl.texUnitShadowImage);
     if (gl.texUnitDepthBuffer >=0) releaseTextureUnit(gl.texUnitDepthBuffer);
 
-    delete bbSettings;
     delete lightingSettings;
     delete rayCasterSettings;
     delete normalCurveSettings;
@@ -598,17 +580,8 @@ void MNWPVolumeRaycasterActor::saveConfiguration(QSettings *settings)
 
     // bounding box settings
     // =====================
-    settings->beginGroup("BoundingBox");
 
-    settings->setValue("enabled", bbSettings->enabled);
-    settings->setValue("llcrnLat", bbSettings->llcrnLat);
-    settings->setValue("llcrnLon", bbSettings->llcrnLon);
-    settings->setValue("urcrnLat", bbSettings->urcrnLat);
-    settings->setValue("urcrnLon", bbSettings->urcrnLon);
-    settings->setValue("p_bot_hPa", bbSettings->pBot_hPa);
-    settings->setValue("p_top_hPa", bbSettings->pTop_hPa);
-
-    settings->endGroup();
+    MBoundingBoxInterface::saveConfiguration(settings);
 
     // lighting settings
     // =================
@@ -708,29 +681,8 @@ void MNWPVolumeRaycasterActor::loadConfiguration(QSettings *settings)
 
     // bounding box settings
     // =====================
-    settings->beginGroup("BoundingBox");
 
-    properties->mBool()->setValue(bbSettings->enabledProperty,
-                                  settings->value("enabled", true).toBool());
-
-    bbSettings->llcrnLat = settings->value("llcrnLat").toFloat();
-    bbSettings->llcrnLon = settings->value("llcrnLon").toFloat();
-    bbSettings->urcrnLat = settings->value("urcrnLat").toFloat();
-    bbSettings->urcrnLon = settings->value("urcrnLon").toFloat();
-
-    properties->mRectF()->setValue(
-                bbSettings->boxCornersProp,
-                QRectF(  bbSettings->llcrnLon,
-                         bbSettings->llcrnLat,
-                         bbSettings->urcrnLon - bbSettings->llcrnLon,
-                         bbSettings->urcrnLat - bbSettings->llcrnLat));
-
-    bbSettings->pBot_hPa = settings->value("p_bot_hPa").toFloat();
-    bbSettings->pTop_hPa = settings->value("p_top_hPa").toFloat();
-    properties->mDouble()->setValue(bbSettings->pBotProp, bbSettings->pBot_hPa);
-    properties->mDouble()->setValue(bbSettings->pTopProp, bbSettings->pTop_hPa);
-
-    settings->endGroup();
+    MBoundingBoxInterface::loadConfiguration(settings);
 
     // lighting settings
     // =================
@@ -931,19 +883,16 @@ void MNWPVolumeRaycasterActor::loadConfiguration(QSettings *settings)
 }
 
 
-void MNWPVolumeRaycasterActor::setBoundingBox(
-        QRectF corners, float pbot, float ptop)
-{
-    properties->mRectF()->setValue(bbSettings->boxCornersProp, corners);
-    properties->mDouble()->setValue(bbSettings->pBotProp, pbot);
-    properties->mDouble()->setValue(bbSettings->pTopProp, ptop);
-}
-
-
 bool MNWPVolumeRaycasterActor::triggerAnalysisOfObjectAtPos(
         MSceneViewGLWidget *sceneView, float clipX, float clipY,
         float clipRadius)
 {
+    if (bBoxConnection->getBoundingBox() == nullptr)
+    {
+        LOG4CPLUS_DEBUG(mlog, "No bounding box is set.");
+        return false;
+    }
+
     Q_UNUSED(clipRadius);
     LOG4CPLUS_DEBUG(mlog, "triggering isosurface analysis.");
 
@@ -956,10 +905,12 @@ bool MNWPVolumeRaycasterActor::triggerAnalysisOfObjectAtPos(
 
     // Compute the intersection points of the ray with the volume bounding
     // box. If the ray does not intersect with the box discard this fragment.
-    QVector3D volumeTopNECrnr(bbSettings->urcrnLon, bbSettings->urcrnLat,
-                              sceneView->worldZfromPressure(bbSettings->pTop_hPa));
-    QVector3D volumeBottomSWCrnr(bbSettings->llcrnLon, bbSettings->llcrnLat,
-                                 sceneView->worldZfromPressure(bbSettings->pBot_hPa));
+    QVector3D volumeTopNECrnr(
+                bBoxConnection->eastLon(), bBoxConnection->northLat(),
+                sceneView->worldZfromPressure(bBoxConnection->topPressure_hPa()));
+    QVector3D volumeBottomSWCrnr(
+                bBoxConnection->westLon(), bBoxConnection->southLat(),
+                sceneView->worldZfromPressure(bBoxConnection->bottomPressure_hPa()));
     QVector2D lambdaNearFar;
 
     bool rayIntersectsRenderVolume = rayBoxIntersection(
@@ -1063,6 +1014,30 @@ MNWPActorVariable* MNWPVolumeRaycasterActor::createActorVariable(
     newVar->variableName = dataSource.variableName;
 
     return newVar;
+}
+
+
+void MNWPVolumeRaycasterActor::onBoundingBoxChanged()
+{
+    labels.clear();
+    if (suppressActorUpdates())
+    {
+        return;
+    }
+    // Switching to no bounding box only needs a redraw, but no recomputation
+    // because it disables rendering of the actor.
+    if (bBoxConnection->getBoundingBox() == nullptr)
+    {
+        emitActorChangedSignal();
+        return;
+    }
+    generateVolumeBoxGeometry();
+
+    updateNextRenderFrame.set(UpdateShadowImage);
+    updateNextRenderFrame.set(ComputeNCInitPoints);
+    updateNextRenderFrame.set(RecomputeNCLines);
+
+    emitActorChangedSignal();
 }
 
 
@@ -1192,29 +1167,7 @@ void MNWPVolumeRaycasterActor::onQtPropertyChanged(QtProperty* property)
     // Parent signal processing.
     MNWPMultiVarActor::onQtPropertyChanged(property);
 
-    if (property == bbSettings->boxCornersProp ||
-        property == bbSettings->pBotProp ||
-        property == bbSettings->pTopProp)
-    {
-        if (suppressActorUpdates()) return;
-
-        generateVolumeBoxGeometry();
-
-        updateNextRenderFrame.set(UpdateShadowImage);
-        updateNextRenderFrame.set(ComputeNCInitPoints);
-        updateNextRenderFrame.set(RecomputeNCLines);
-
-        emitActorChangedSignal();
-    }
-
-    else if (property == bbSettings->enabledProperty)
-    {
-        bbSettings->enabled = properties->mBool()->value(bbSettings->enabledProperty);
-
-        emitActorChangedSignal();
-    }
-
-    else if (property == lightingSettings->lightingModeProp ||
+    if (property == lightingSettings->lightingModeProp ||
              property == lightingSettings->ambientProp ||
              property == lightingSettings->diffuseProp ||
              property == lightingSettings->specularProp ||
@@ -1233,6 +1186,14 @@ void MNWPVolumeRaycasterActor::onQtPropertyChanged(QtProperty* property)
 
         emitActorChangedSignal();
     }
+
+    else if (property == bBoxEnabledProperty)
+    {
+        bBoxEnabled = properties->mBool()->value(bBoxEnabledProperty);
+
+        emitActorChangedSignal();
+    }
+
 
     else if (property == lightingSettings->shadowColorProp ||
              property == rayCasterSettings->shadowsResolutionProp)
@@ -1762,10 +1723,17 @@ void MNWPVolumeRaycasterActor::onQtPropertyChanged(QtProperty* property)
 
 void MNWPVolumeRaycasterActor::renderToCurrentContext(
         MSceneViewGLWidget* sceneView)
-{     
+{
+    // Check for available bounding box.
+    // =================================
+    if ( bBoxConnection->getBoundingBox() == nullptr )
+    {
+        return;
+    }
+
     // Render volume bounding box
     // ==========================
-    if (bbSettings->enabled)
+    if (bBoxEnabled)
     {
         renderBoundingBox(sceneView);
     }
@@ -1773,7 +1741,10 @@ void MNWPVolumeRaycasterActor::renderToCurrentContext(
     // Check for valid actor variables.
     // ================================
 
-    if ( variables.empty() ) return;
+    if ( variables.empty() )
+    {
+        return;
+    }
 
     // Update variables
     var = static_cast<MNWP3DVolumeActorVariable*>(
@@ -2026,18 +1997,13 @@ void MNWPVolumeRaycasterActor::onAddActorVariable(MNWPActorVariable *var)
 
 void MNWPVolumeRaycasterActor::generateVolumeBoxGeometry()
 {
+    if ( bBoxConnection->getBoundingBox() == nullptr )
+    {
+        return;
+    }
+
     // Define geometry for bounding box
     MGLResourcesManager* glRM = MGLResourcesManager::getInstance();
-
-    QRectF cornerRect = properties->mRectF()->value(bbSettings->boxCornersProp);
-
-    bbSettings->llcrnLat = cornerRect.y();
-    bbSettings->llcrnLon = cornerRect.x();
-    bbSettings->urcrnLat = cornerRect.y() + cornerRect.height();
-    bbSettings->urcrnLon = cornerRect.x() + cornerRect.width();
-
-    bbSettings->pBot_hPa = properties->mDouble()->value(bbSettings->pBotProp);
-    bbSettings->pTop_hPa = properties->mDouble()->value(bbSettings->pTopProp);
 
     const int numVertices = 8;
     float vertexData[] =
@@ -2084,12 +2050,13 @@ void MNWPVolumeRaycasterActor::generateVolumeBoxGeometry()
 
     // convert vertices to lat/lon/p space
     for (int i = 0; i < numVertices; i++) {
-        vertexData[i * 3 + 0] = bbSettings->llcrnLon + vertexData[i * 3 + 0]
-                * (bbSettings->urcrnLon - bbSettings->llcrnLon);
-        vertexData[i * 3 + 1] = bbSettings->urcrnLat - vertexData[i * 3 + 1]
-                * (bbSettings->urcrnLat - bbSettings->llcrnLat);
+        vertexData[i * 3 + 0] = bBoxConnection->westLon() + vertexData[i * 3 + 0]
+                * (bBoxConnection->eastLon() - bBoxConnection->westLon());
+        vertexData[i * 3 + 1] = bBoxConnection->northLat() - vertexData[i * 3 + 1]
+                * (bBoxConnection->northLat() - bBoxConnection->southLat());
         vertexData[i * 3 + 2] = (vertexData[i * 3 + 2] == 0)
-                ? bbSettings->pBot_hPa : bbSettings->pTop_hPa;
+                ? bBoxConnection->bottomPressure_hPa()
+                : bBoxConnection->topPressure_hPa();
     }
 
     if (gl.vboBoundingBox)
@@ -2372,14 +2339,18 @@ void MNWPVolumeRaycasterActor::setCommonShaderVars(
 
     shader->setUniformValue(
                 "volumeBottomSECrnr",
-                QVector3D(bbSettings->urcrnLon, // upper-right == north-east
-                          bbSettings->llcrnLat,
-                          sceneView->worldZfromPressure(bbSettings->pBot_hPa))); CHECK_GL_ERROR;
+                QVector3D(bBoxConnection->eastLon(), // upper-right == north-east
+                          bBoxConnection->southLat(),
+                          sceneView->worldZfromPressure(
+                              bBoxConnection->bottomPressure_hPa())));
+    CHECK_GL_ERROR;
     shader->setUniformValue(
                 "volumeTopNWCrnr",
-                QVector3D(bbSettings->llcrnLon, // lower-left == south-west
-                          bbSettings->urcrnLat,
-                          sceneView->worldZfromPressure(bbSettings->pTop_hPa))); CHECK_GL_ERROR;
+                QVector3D(bBoxConnection->westLon(), // lower-left == south-west
+                          bBoxConnection->northLat(),
+                          sceneView->worldZfromPressure(
+                              bBoxConnection->topPressure_hPa())));
+    CHECK_GL_ERROR;
 
     shader->setUniformValue("isOrthographic", sceneView->orthographicModeEnabled());
     CHECK_GL_ERROR;
@@ -2521,6 +2492,7 @@ void MNWPVolumeRaycasterActor::renderBoundingBox(
 }
 
 
+
 void MNWPVolumeRaycasterActor::renderPositionCross(
         MSceneViewGLWidget *sceneView)
 {
@@ -2594,21 +2566,22 @@ void MNWPVolumeRaycasterActor::createShadowImage(
     float lonDist = var->grid->lons[var->grid->nlons - 1] - var->grid->lons[0];
     float latDist = var->grid->lats[0] - var->grid->lats[var->grid->nlats - 1];
 
-    //float zMin = sceneView->worldZfromPressure(bbSettings->pBot);
-    float zMax = sceneView->worldZfromPressure(bbSettings->pTop_hPa);
+    //float zMin = sceneView->worldZfromPressure(boundingBoxActor->bottomPressure());
+    float zMax = sceneView->worldZfromPressure(bBoxConnection->topPressure_hPa());
     //float zDist = zMax - zMin;
 
     // create current vertex data (positions of bounding box lad)
     float vertexData[] =
     {
         -1,-1,
-        bbSettings->llcrnLon, bbSettings->llcrnLat, zMax,
-        -1 ,1,
-        bbSettings->llcrnLon, bbSettings->urcrnLat, zMax,
-         1,-1,
-        bbSettings->urcrnLon, bbSettings->llcrnLat, zMax,
-         1, 1,
-        bbSettings->urcrnLon, bbSettings->urcrnLat, zMax,
+        float(bBoxConnection->westLon()), float(bBoxConnection->southLat()),
+        zMax, -1 ,1,
+        float(bBoxConnection->westLon()), float(bBoxConnection->northLat()),
+        zMax, 1,-1,
+        float(bBoxConnection->eastLon()), float(bBoxConnection->southLat()),
+        zMax, 1, 1,
+        float(bBoxConnection->eastLon()), float(bBoxConnection->northLat()),
+        zMax,
     };
 
 
@@ -2829,17 +2802,17 @@ void MNWPVolumeRaycasterActor::renderShadows(
 
     float vertexData[] =
     {
-        bbSettings->llcrnLon, bbSettings->llcrnLat, 0.01f,
-        0.0f,0.0f,
+        float(bBoxConnection->westLon()), float(bBoxConnection->southLat()),
+        0.01f, 0.0f, 0.0f,
 
-        bbSettings->llcrnLon, bbSettings->urcrnLat, 0.01f,
-        0.0f,1.0f,
+        float(bBoxConnection->westLon()), float(bBoxConnection->northLat()),
+        0.01f, 0.0f, 1.0f,
 
-        bbSettings->urcrnLon, bbSettings->llcrnLat, 0.01f,
-        1.0f,0.0f,
+        float(bBoxConnection->eastLon()), float(bBoxConnection->southLat()),
+        0.01f, 1.0f, 0.0f,
 
-        bbSettings->urcrnLon, bbSettings->urcrnLat, 0.01f,
-        1.0f,1.0f,
+        float(bBoxConnection->eastLon()), float(bBoxConnection->northLat()),
+        0.01f, 1.0f, 1.0f,
     };
 
     MGLResourcesManager* glRM = MGLResourcesManager::getInstance();
@@ -2918,8 +2891,10 @@ void MNWPVolumeRaycasterActor::computeNormalCurveInitialPoints(
     updateNextRenderFrame.reset(ComputeNCInitPoints);
 
     // Compute minimum and maximum z-values of the data.
-    const float dataMinZ = sceneView->worldZfromPressure(bbSettings->pBot_hPa);
-    const float dataMaxZ = sceneView->worldZfromPressure(bbSettings->pTop_hPa);
+    const float dataMinZ =
+            sceneView->worldZfromPressure(bBoxConnection->bottomPressure_hPa());
+    const float dataMaxZ =
+            sceneView->worldZfromPressure(bBoxConnection->topPressure_hPa());
 
     // Determine seed points grid spacing.
     const float gridSpaceLon = normalCurveSettings->initPointResX;
@@ -2927,8 +2902,10 @@ void MNWPVolumeRaycasterActor::computeNormalCurveInitialPoints(
     const float gridSpaceHeight = normalCurveSettings->initPointResZ;
 
     // Compute data extent in lon, lat and height domain.
-    const float dataExtentLon = std::abs(bbSettings->urcrnLon - bbSettings->llcrnLon);
-    const float dataExtentLat = std::abs(bbSettings->urcrnLat - bbSettings->llcrnLat);
+    const float dataExtentLon =
+            std::abs(bBoxConnection->eastLon() - bBoxConnection->westLon());
+    const float dataExtentLat =
+            std::abs(bBoxConnection->northLat() - bBoxConnection->southLat());
     const float dataExtentHeight = std::abs(dataMaxZ - dataMinZ);
 
     // Compute the number of rays to be shot through the scene in X/Y/Z parallel
@@ -3046,16 +3023,17 @@ void MNWPVolumeRaycasterActor::computeNormalCurveInitialPoints(
     gl.normalCurveInitPointsShader->setUniformValue(
                 "bisectionSteps", rayCasterSettings->bisectionSteps);
 
-    const QVector3D initWorldPos(bbSettings->llcrnLon, bbSettings->llcrnLat, dataMinZ);
+    const QVector3D initWorldPos(bBoxConnection->westLon(),
+                                 bBoxConnection->southLat(), dataMinZ);
     gl.normalCurveInitPointsShader->setUniformValue(
                 "initWorldPos", initWorldPos);
     gl.normalCurveInitPointsShader->setUniformValue(
-                "bboxMin", QVector3D(bbSettings->llcrnLon,
-                                     bbSettings->llcrnLat,
+                "bboxMin", QVector3D(bBoxConnection->westLon(),
+                                     bBoxConnection->southLat(),
                                      dataMinZ));
     gl.normalCurveInitPointsShader->setUniformValue(
-                "bboxMax", QVector3D(bbSettings->urcrnLon,
-                                     bbSettings->urcrnLat,
+                "bboxMax", QVector3D(bBoxConnection->eastLon(),
+                                     bBoxConnection->northLat(),
                                      dataMaxZ));
 
     // Set direction specific shader vars.

@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2015-2017 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -25,8 +26,11 @@
 *******************************************************************************/
 #include "naturalearthdataloader.h"
 
+#define _USE_MATH_DEFINES
+
 // standard library imports
 #include <iostream>
+#include <math.h>
 
 // related third party imports
 #include <log4cplus/loggingmacros.h>
@@ -127,25 +131,7 @@ void MNaturalEarthDataLoader::loadLineGeometry(GeometryType        type,
     OGRLayer *layer;
     layer = gdalDataSet[type]->GetLayer(0);
 
-    // Create a bounding box geometry: NOTE that this needs to be polygon -- if
-    // a line string or ring is used, the Intersection() method used below will
-    // only return the points that actually intersect the line, i.e. that are
-    // on the line.
-    float llcrnrlon = bbox.x();
-    float llcrnrlat = bbox.y();
-    float urcrnrlon = bbox.x() + bbox.width();
-    float urcrnrlat = bbox.y() + bbox.height();
-
-    OGRLinearRing bboxRing;
-    bboxRing.addPoint(llcrnrlon, llcrnrlat);
-    bboxRing.addPoint(urcrnrlon, llcrnrlat);
-    bboxRing.addPoint(urcrnrlon, urcrnrlat);
-    bboxRing.addPoint(llcrnrlon, urcrnrlat);
-    bboxRing.addPoint(llcrnrlon, llcrnrlat);
-    // OGRPolygon *bboxPolygon = new OGRPolygon(); causes problems on windows
-	OGRPolygon *bboxPolygon = dynamic_cast<OGRPolygon*>
-		(OGRGeometryFactory::createGeometry(OGRwkbGeometryType::wkbPolygon));
-    bboxPolygon->addRing(&bboxRing);
+    OGRPolygon *bboxPolygon = getBBoxPolygon(&bbox);
 
     // Filter the layer on-load: Only load those geometries that intersect
     // with the bounding box.
@@ -158,37 +144,9 @@ void MNaturalEarthDataLoader::loadLineGeometry(GeometryType        type,
     {
         startIndices->append(vertices->size());
 
-        // Get the geometry associated with the current feature.
-        OGRGeometry *geometry;
-        geometry = feature->GetGeometryRef();
-
-        // For coastlines, borderlines etc. we are only interested in line
-        // string features. Note that all lines that intersect with the
-        // bounding box are returned here. This includes lines that lie only
-        // partially within the bounding box. Hence we have to compute the
-        // intersection of each line with the bounding box.
-
-        // If the geometry is of type wkbLineString or wkbMultiLineString,
-        // place the contained line strings in a list with data to be
-        // processed.
         QList<OGRLineString*> lineStrings;
-        if (geometry != NULL)
-        {
-            OGRwkbGeometryType gType = wkbFlatten(geometry->getGeometryType());
-
-            if (gType == wkbLineString)
-            {
-                lineStrings.append((OGRLineString *) geometry);
-            }
-
-            else if (gType == wkbMultiLineString)
-            {
-                OGRGeometryCollection *gc = (OGRGeometryCollection *) geometry;
-                for (int g = 0; g < gc->getNumGeometries(); g++)
-                    lineStrings.append((OGRLineString *) gc->getGeometryRef(g));
-            }
-
-        } // geometry != NULL
+        // Get the geometry associated with the current feature.
+        getLineStringFeatures(&lineStrings, feature->GetGeometryRef());
 
         // Loop over the list and intersect the contained line strings with
         // the bounding box.
@@ -211,7 +169,137 @@ void MNaturalEarthDataLoader::loadLineGeometry(GeometryType        type,
                 OGRRawPoint *v = new OGRRawPoint[numLinePoints];
                 iLine->getPoints(v);
                 for (int i = 0; i < numLinePoints; i++)
+                {
                     vertices->append(QVector2D(v[i].x, v[i].y));
+                }
+                delete[] v;
+            }
+            else if (iGeometry->getGeometryType() == wkbMultiLineString)
+            {
+                // Loop over all line strings in the collection, appending
+                // their points to "vertices" as above.
+                OGRGeometryCollection *geomCollection =
+                        (OGRGeometryCollection *) iGeometry;
+
+                for (int g = 0; g < geomCollection->getNumGeometries(); g++)
+                {
+                    OGRLineString *iLine =
+                            (OGRLineString *) geomCollection->getGeometryRef(g);
+                    int numLinePoints = iLine->getNumPoints();
+                    OGRRawPoint *v = new OGRRawPoint[numLinePoints];
+                    iLine->getPoints(v);
+                    for (int i = 0; i < numLinePoints; i++)
+                    {
+                        vertices->append(QVector2D(v[i].x, v[i].y));
+                    }
+                    delete[] v;
+                }
+            }
+
+        } // for (lineStrings)
+
+        OGRFeature::DestroyFeature(feature);
+        count->append(vertices->size() - startIndices->last());
+    }
+
+    // Clean up.
+	OGRGeometryFactory::destroyGeometry(bboxPolygon);
+}
+
+
+void MNaturalEarthDataLoader::loadAndRotateLineGeometry(
+        GeometryType type, QRectF bbox, QVector<QVector2D> *vertices,
+        QVector<int> *startIndices, QVector<int> *count, bool append,
+        double poleLat, double poleLon)
+{
+    if (gdalDataSet.size() < 2)
+    {
+        QString msg = QString("ERROR: NaturalEarthDataLoader not yet "
+                              "initilised.");
+        LOG4CPLUS_ERROR(mlog, msg.toStdString());
+        throw MInitialisationError(msg.toStdString(), __FILE__, __LINE__);
+    }
+
+    string typeStr = type == COASTLINES ? "COASTLINES": "BORDERLINES";
+    LOG4CPLUS_DEBUG(mlog, "loading " << typeStr << " geometry..");
+
+    if ( !append )
+    {
+        vertices->clear();
+        startIndices->clear();;
+        count->clear();
+    }
+
+    // NaturalEarth shapefiles only contain one layer. (Do shapefiles in
+    // general contain only one layer?)
+    OGRLayer *layer;
+    layer = gdalDataSet[type]->GetLayer(0);
+
+    OGRPolygon *bboxPolygon = getBBoxPolygon(&bbox);
+
+    // Variables used to get rid of lines crossing the whole domain.
+    // (Conntection of the right most and the left most vertex)
+    QVector2D prevPosition(0., 0.);
+    QVector2D currPosition(0., 0.);
+    QVector2D centreLons(0., 0.);
+
+    OGRPoint *point = new OGRPoint();
+
+    getCentreLons(&centreLons, poleLat, poleLon);
+
+    // Filter the layer on-load: Only load those geometries that intersect
+    // with the bounding box.
+    layer->SetSpatialFilter(bboxPolygon);
+
+    // Loop over all features contained in the layer.
+    layer->ResetReading();
+    OGRFeature *feature;
+
+    while ((feature = layer->GetNextFeature()) != NULL)
+    {
+        startIndices->append(vertices->size());
+        prevPosition.setX(0.);
+
+        QList<OGRLineString*> lineStrings;
+        // Get the geometry associated with the current feature.
+        getLineStringFeatures(&lineStrings, feature->GetGeometryRef());
+
+        // Loop over the list and intersect the contained line strings with
+        // the bounding box.
+        for (int l = 0; l < lineStrings.size(); l++)
+        {
+            OGRLineString *lineString = lineStrings.at(l);
+
+            // Compute intersection with bbox.
+            OGRGeometry *iGeometry = lineString->Intersection(bboxPolygon);
+
+            // The intersection can be either a single line string, or a
+            // collection of line strings.
+
+            if (iGeometry->getGeometryType() == wkbLineString)
+            {
+                // Get all points from the intersected line string and append
+                // them to the "vertices" vector.
+                OGRLineString *iLine = (OGRLineString *) iGeometry;
+                int numLinePoints = iLine->getNumPoints();
+                OGRRawPoint *v = new OGRRawPoint[numLinePoints];
+                iLine->getPoints(v);
+
+                for (int i = 0; i < numLinePoints; i++)
+                {
+                    // Rotate the current point.
+                    point->setX(v[i].x);
+                    point->setY(v[i].y);
+                    if (!validConnectionBetweenPositions(
+                                &prevPosition, &currPosition, point,
+                                poleLat, poleLon, &centreLons))
+                    {
+                        // Start new line.
+                        count->append(vertices->size() - startIndices->last());
+                        startIndices->append(vertices->size());
+                    }
+                    vertices->append(currPosition);
+                }
                 delete[] v;
             }
 
@@ -229,20 +317,682 @@ void MNaturalEarthDataLoader::loadLineGeometry(GeometryType        type,
                     int numLinePoints = iLine->getNumPoints();
                     OGRRawPoint *v = new OGRRawPoint[numLinePoints];
                     iLine->getPoints(v);
+
                     for (int i = 0; i < numLinePoints; i++)
-                        vertices->append(QVector2D(v[i].x, v[i].y));
+                    {
+                        point->setX(v[i].x);
+                        point->setY(v[i].y);
+                        if (!validConnectionBetweenPositions(
+                                    &prevPosition, &currPosition, point,
+                                    poleLat, poleLon, &centreLons))
+                        {
+                            // Start new line.
+                            count->append(vertices->size() - startIndices->last());
+                            startIndices->append(vertices->size());
+                        }
+                        vertices->append(currPosition);
+                    }
                     delete[] v;
                 }
             }
-
-        } // for (lineStrings)
+        } // while (lineStrings)
 
         OGRFeature::DestroyFeature(feature);
         count->append(vertices->size() - startIndices->last());
     }
 
     // Clean up.
-	OGRGeometryFactory::destroyGeometry(bboxPolygon);
+    OGRGeometryFactory::destroyGeometry(bboxPolygon);
+    delete point;
+}
+
+
+void MNaturalEarthDataLoader::loadAndRotateLineGeometryUsingRotatedBBox(
+        GeometryType type, QRectF bbox, QVector<QVector2D> *vertices,
+        QVector<int> *startIndices, QVector<int> *count, bool append,
+        double poleLat, double poleLon)
+{
+    if (gdalDataSet.size() < 2)
+    {
+        QString msg = QString("ERROR: NaturalEarthDataLoader not yet "
+                              "initilised.");
+        LOG4CPLUS_ERROR(mlog, msg.toStdString());
+        throw MInitialisationError(msg.toStdString(), __FILE__, __LINE__);
+    }
+
+    string typeStr = type == COASTLINES ? "COASTLINES": "BORDERLINES";
+    LOG4CPLUS_DEBUG(mlog, "loading " << typeStr << " geometry..");
+
+    if ( !append )
+    {
+        vertices->clear();
+        startIndices->clear();;
+        count->clear();
+    }
+
+    // NaturalEarth shapefiles only contain one layer. (Do shapefiles in
+    // general contain only one layer?)
+    OGRLayer *layer;
+    layer = gdalDataSet[type]->GetLayer(0);
+
+    OGRPolygon *bboxPolygonRot = getBBoxPolygon(&bbox);
+
+    QRectF bbox2(-180., -90., 360., 180);
+    OGRPolygon *bboxPolygon = getBBoxPolygon(&bbox2);
+
+    // Filter the layer on-load: Only load those geometries that intersect
+    // with the bounding box. (Somehow it does not load the whole geometry if
+    // we don't set the filter, thus it is necessary to set the filter to a
+    // polygon covering the whole region.)
+    layer->SetSpatialFilter(bboxPolygon);
+
+    OGRPoint *point = new OGRPoint;
+
+    QList<OGRLineString*> lineStringList;
+    OGRLineString * lineString;
+
+    // Variables used to get rid of lines crossing the whole domain.
+    // (Conntection of the right most and the left most vertex)
+    QVector2D prevPosition(0., 0.);
+    QVector2D currPosition(0., 0.);
+    QVector2D centreLons(0., 0.);
+
+    getCentreLons(&centreLons, poleLat, poleLon);
+
+    // Loop over all features contained in the layer.
+    layer->ResetReading();
+    OGRFeature *feature;
+    while ((feature = layer->GetNextFeature()) != NULL)
+    {
+        startIndices->append(vertices->size());
+
+        QList<OGRLineString*> lineStrings;
+        // Get the geometry associated with the current feature.
+        getLineStringFeatures(&lineStrings, feature->GetGeometryRef());
+
+        // Loop over the list, rotate each vertex of the current line and check
+        // for connections from the right domain side to the left. Separate the
+        // line to two lines at these connections. Afterwards intersect the set
+        // of lines gotten with the bounding box.
+        for (int l = 0; l < lineStrings.size(); l++)
+        {
+            OGRLineString *originalLineString = lineStrings.at(l);
+            // Use string list to distinguish between different lines since
+            // rotation of the coast- and borderlines can lead to lines
+            // crossing the whole domain (connection between right side and
+            // left side).
+            lineStringList.append(new OGRLineString());
+            lineString = lineStringList.at(0);
+            originalLineString->getPoint(0, point);
+            geographicalToRotatedCoords(point, poleLat, poleLon);
+            prevPosition.setX(point->getX());
+            // For rotation loop over all vertices of the current lineString,
+            // apply the rotation and store the point in a new line string.
+            for (int i = 0; i < originalLineString->getNumPoints(); i++)
+            {
+                originalLineString->getPoint(i, point);
+                if (!validConnectionBetweenPositions(
+                            &prevPosition, &currPosition, point,
+                            poleLat, poleLon, &centreLons))
+                {
+                    // Start new line.
+                    lineStringList.append(new OGRLineString());
+                    lineString = lineStringList.last();
+                }
+                lineString->addPoint(currPosition.x(), currPosition.y());
+            }
+
+            // Loop over all seperated lines and intersect each with the
+            // bounding box.
+            foreach (lineString, lineStringList)
+            {
+                // Only use valid lines with more than one vertex.
+                if (lineString->getNumPoints() <= 1 || !lineString->IsValid())
+                {
+                    count->append(vertices->size() - startIndices->last());
+                    startIndices->append(vertices->size());
+                    delete lineString;
+                    continue;
+                }
+
+                // Compute intersection with bbox.
+                OGRGeometry *iGeometry = lineString->Intersection(bboxPolygonRot);
+
+                // The intersection can be either a single line string, or a
+                // collection of line strings.
+
+                if (iGeometry->getGeometryType() == wkbLineString)
+                {
+                    // Get all points from the intersected line string and append
+                    // them to the "vertices" vector.
+                    OGRLineString *iLine = (OGRLineString *) iGeometry;
+                    int numLinePoints = iLine->getNumPoints();
+                    OGRRawPoint *v = new OGRRawPoint[numLinePoints];
+                    iLine->getPoints(v);
+                    for (int i = 0; i < numLinePoints; i++)
+                    {
+                        vertices->append(QVector2D(v[i].x, v[i].y));
+                    }
+                    delete[] v;
+                }
+                else if (iGeometry->getGeometryType() == wkbMultiLineString)
+                {
+                    // Loop over all line strings in the collection, appending
+                    // their points to "vertices" as above.
+                    OGRGeometryCollection *geomCollection =
+                            (OGRGeometryCollection *) iGeometry;
+
+                    for (int g = 0; g < geomCollection->getNumGeometries(); g++)
+                    {
+                        OGRLineString *iLine =
+                                (OGRLineString *) geomCollection->getGeometryRef(g);
+                        int numLinePoints = iLine->getNumPoints();
+                        OGRRawPoint *v = new OGRRawPoint[numLinePoints];
+                        iLine->getPoints(v);
+                        for (int i = 0; i < numLinePoints; i++)
+                        {
+                            vertices->append(QVector2D(v[i].x, v[i].y));
+                        }
+                        delete[] v;
+                        // Restart after each line segment to avoid connections
+                        // between line segements seperated by intersection
+                        // with bounding box.
+                        count->append(vertices->size() - startIndices->last());
+                        startIndices->append(vertices->size());
+                    }
+                }
+                count->append(vertices->size() - startIndices->last());
+                startIndices->append(vertices->size());
+                delete lineString;
+            }
+            lineStringList.clear();
+        } // while (lineStrings)
+
+        OGRFeature::DestroyFeature(feature);
+        count->append(vertices->size() - startIndices->last());
+    }
+
+    // Clean up.
+    OGRGeometryFactory::destroyGeometry(bboxPolygon);
+    OGRGeometryFactory::destroyGeometry(bboxPolygonRot);
+    delete point;
+}
+
+
+static const double DEG2RAD = M_PI / 180.0;
+static const double RAD2DEG = 180.0 / M_PI;
+
+// Parts of the following method have been ported from the C implementation of
+// the methods 'lam_to_lamrot' and 'phi_to_phirot'. The original code has been
+// published under GNU GENERAL PUBLIC LICENSE Version 2, June 1991.
+// source: https://code.zmaw.de/projects/cdo/files  [Version 1.8.1]
+
+// Original code:
+
+// static
+// double lam_to_lamrot(double phi, double rla, double polphi, double pollam)
+// {
+//   /*
+//     Umrechnung von rla (geo. System) auf rlas (rot. System)
+
+//     phi    : Breite im geographischen System (N>0)
+//     rla    : Laenge im geographischen System (E>0)
+//     polphi : Geographische Breite des Nordpols des rot. Systems
+//     pollam : Geographische Laenge des Nordpols des rot. Systems
+
+//     result : Rotierte Laenge
+//   */
+//   double zsinpol = sin(DEG2RAD*polphi);
+//   double zcospol = cos(DEG2RAD*polphi);
+//   double zlampol =     DEG2RAD*pollam;
+
+//   if ( rla > 180.0 ) rla -= 360.0;
+
+//   double zrla = DEG2RAD*rla;
+//   double zphi = DEG2RAD*phi;
+
+//   double zarg1  = - sin(zrla-zlampol)*cos(zphi);
+//   double zarg2  = - zsinpol*cos(zphi)*cos(zrla-zlampol)+zcospol*sin(zphi);
+
+//   if ( fabs(zarg2) < 1.0e-20 ) zarg2 = 1.0e-20;
+
+//   return RAD2DEG*atan2(zarg1,zarg2);
+// }
+
+// static
+// double phi_to_phirot(double phi, double rla, double polphi, double pollam)
+// {
+//   /*
+//     Umrechnung von phi (geo. System) auf phis (rot. System)
+
+//     phi    : Breite im geographischen System (N>0)
+//     rla    : Laenge im geographischen System (E>0)
+//     polphi : Geographische Breite des Nordpols des rot. Systems
+//     pollam : Geographische Laenge des Nordpols des rot. Systems
+
+//     result : Rotierte Breite
+//   */
+//   double zsinpol = sin(DEG2RAD*polphi);
+//   double zcospol = cos(DEG2RAD*polphi);
+//   double zlampol =     DEG2RAD*pollam;
+
+//   double zphi = DEG2RAD*phi;
+//   if ( rla > 180.0 ) rla -= 360.0;
+//   double zrla = DEG2RAD*rla;
+
+//   double zarg = zcospol*cos(zphi)*cos(zrla-zlampol) + zsinpol*sin(zphi);
+
+//   return RAD2DEG*asin(zarg);
+// }
+
+bool MNaturalEarthDataLoader::geographicalToRotatedCoords(
+        OGRPoint *point, double poleLat, double poleLon)
+{
+    // Early break for rotation values with no effect.
+    if ((poleLon == -180. || poleLon == 180.) && poleLat == 90.)
+    {
+        return false;
+    }
+
+    // Get longitude and latitude from point.
+    double lon = point->getX();
+    double lat = point->getY();
+
+    if ( lon > 180.0 )
+    {
+        lon -= 360.0;
+    }
+
+    // Convert degrees to radians.
+    double poleLatRad = DEG2RAD * poleLat;
+    double poleLonRad = DEG2RAD * poleLon;
+    double lonRad = DEG2RAD * lon;
+    double latRad = DEG2RAD * lat;
+
+    // Compute sinus and cosinus of some coordinates since they are needed more
+    // often later on.
+    double sinPoleLat = sin(poleLatRad);
+    double cosPoleLat = cos(poleLatRad);
+
+    // Apply the transformation (conversation to Cartesian coordinates and  two
+    // rotations; difference to original code: no use of pollam).
+
+    double x = ((-sinPoleLat) * cos(latRad) * cos(lonRad - poleLonRad))
+            + (cosPoleLat * sin(latRad));
+    double y = (-sin(lonRad - poleLonRad)) * cos(latRad);
+    double z = (cosPoleLat * cos(latRad) * cos(lonRad - poleLonRad))
+            + (sinPoleLat * sin(latRad));
+
+    // Avoid invalid values for z (Might occure due to inaccuracies in
+    // computations).
+    z = max(-1., min(1., z));
+
+    // Too small values can lead to numerical problems in method atans2.
+    if ( std::abs(x) < 1.0e-20 )
+    {
+        x = 1.0e-20;
+    }
+
+    // Compute spherical coordinates from Cartesian coordinates and convert
+    // radians to degrees.
+
+    point->setX(RAD2DEG * (atan2(y, x)));
+    point->setY(RAD2DEG * (asin(z)));
+
+    return true;
+}
+
+
+// Parts of the following method have been ported from the C implementation of
+// the methods 'lamrot_to_lam' and 'phirot_to_phi'. The original code has been
+// published under GNU GENERAL PUBLIC LICENSE Version 2, June 1991.
+// source: https://code.zmaw.de/projects/cdo/files  [Version 1.8.1]
+// Necessary code duplicate in basemap.fx.glsl .
+
+// Original code:
+
+// double lamrot_to_lam(double phirot, double lamrot, double polphi, double pollam, double polgam)
+// {
+//   /*
+//     This function converts lambda from one rotated system to lambda in another system.
+//     If the optional argument polgam is present, the other system can also be a rotated one,
+//     where polgam is the angle between the two north poles.
+//     If polgam is not present, the other system is the real geographical system.
+
+//     phirot : latitude in the rotated system
+//     lamrot : longitude in the rotated system (E>0)
+//     polphi : latitude of the rotated north pole
+//     pollam : longitude of the rotated north pole
+
+//     result : longitude in the geographical system
+//   */
+//   double zarg1, zarg2;
+//   double zgam;
+//   double result = 0;
+
+//   double zsinpol = sin(DEG2RAD*polphi);
+//   double zcospol = cos(DEG2RAD*polphi);
+
+//   double zlampol = DEG2RAD*pollam;
+//   double zphirot = DEG2RAD*phirot;
+//   if ( lamrot > 180.0 ) lamrot -= 360.0;
+//   double zlamrot = DEG2RAD*lamrot;
+
+//   if ( fabs(polgam) > 0 )
+//     {
+//       zgam  = -DEG2RAD*polgam;
+//       zarg1 = sin(zlampol) *
+//  	     (- zsinpol*cos(zphirot) * (cos(zlamrot)*cos(zgam) - sin(zlamrot)*sin(zgam))
+//  	      + zcospol*sin(zphirot))
+// 	 - cos(zlampol)*cos(zphirot) * (sin(zlamrot)*cos(zgam) + cos(zlamrot)*sin(zgam));
+
+//       zarg2 = cos(zlampol) *
+//  	     (- zsinpol*cos(zphirot) * (cos(zlamrot)*cos(zgam) - sin(zlamrot)*sin(zgam))
+//	      + zcospol*sin(zphirot))
+//	 + sin(zlampol)*cos(zphirot) * (sin(zlamrot)*cos(zgam) + cos(zlamrot)*sin(zgam));
+//      }
+//   else
+//     {
+//       zarg1 = sin(zlampol)*(- zsinpol*cos(zlamrot)*cos(zphirot)  +
+//      		               zcospol*             sin(zphirot)) -
+//	       cos(zlampol)*           sin(zlamrot)*cos(zphirot);
+//       zarg2 = cos(zlampol)*(- zsinpol*cos(zlamrot)*cos(zphirot)  +
+//                               zcospol*             sin(zphirot)) +
+//               sin(zlampol)*           sin(zlamrot)*cos(zphirot);
+//     }
+
+//   if ( fabs(zarg2) > 0 ) result = RAD2DEG*atan2(zarg1, zarg2);
+//   if ( fabs(result) < 9.e-14 ) result = 0;
+
+//   return result;
+// }
+
+// double phirot_to_phi(double phirot, double lamrot, double polphi, double polgam)
+// {
+//   /*
+//     This function converts phi from one rotated system to phi in another
+//     system. If the optional argument polgam is present, the other system
+//     can also be a rotated one, where polgam is the angle between the two
+//     north poles.
+//     If polgam is not present, the other system is the real geographical
+//     system.
+
+//     phirot : latitude in the rotated system
+//     lamrot : longitude in the rotated system (E>0)
+//     polphi : latitude of the rotated north pole
+//     polgam : angle between the north poles of the systems
+
+//     result : latitude in the geographical system
+//   */
+//   double zarg;
+//   double zgam;
+
+//   double zsinpol = sin(DEG2RAD*polphi);
+//   double zcospol = cos(DEG2RAD*polphi);
+
+//   double zphirot   = DEG2RAD*phirot;
+//   if ( lamrot > 180.0 ) lamrot -= 360.0;
+//   double zlamrot   = DEG2RAD*lamrot;
+
+//   if ( fabs(polgam) > 0 )
+//     {
+//       zgam = -DEG2RAD*polgam;
+//       zarg = zsinpol*sin(zphirot) +
+//              zcospol*cos(zphirot)*(cos(zlamrot)*cos(zgam) - sin(zgam)*sin(zlamrot));
+//     }
+//   else
+//     zarg   = zcospol*cos(zphirot)*cos(zlamrot) + zsinpol*sin(zphirot);
+
+//   return RAD2DEG*asin(zarg);
+// }
+
+bool MNaturalEarthDataLoader::rotatedToGeograhpicalCoords(OGRPoint *point,
+                                                          double poleLat,
+                                                          double poleLon)
+{
+    // Early break for rotation values with no effect.
+    if ((poleLon == -180. || poleLon == 180.) && poleLat == 90.)
+    {
+        return false;
+    }
+
+    double result = 0;
+
+    // Get longitude and latitude from point.
+    double rotLon = point->getX();
+    double rotLat = point->getY();
+
+    if ( rotLon > 180.0 )
+    {
+        rotLon -= 360.0;
+    }
+
+    // Convert degrees to radians.
+    double poleLatRad = DEG2RAD * poleLat;
+    double poleLonRad = DEG2RAD * poleLon;
+    double rotLonRad = DEG2RAD * rotLon;
+
+    // Compute sinus and cosinus of some coordinates since they are needed more
+    // often later on.
+    double sinPoleLat = sin(poleLatRad);
+    double cosPoleLat = cos(poleLatRad);
+    double sinRotLatRad = sin(DEG2RAD * rotLat);
+    double cosRotLatRad = cos(DEG2RAD * rotLat);
+    double cosRotLonRad = cos(DEG2RAD * rotLon);
+
+    // Apply the transformation (conversation to Cartesian coordinates and  two
+    // rotations; difference to original code: no use of polgam).
+
+    double x =
+            (cos(poleLonRad) * (((-sinPoleLat) * cosRotLonRad * cosRotLatRad)
+                                + (cosPoleLat * sinRotLatRad)))
+            + (sin(poleLonRad) * sin(rotLonRad) * cosRotLatRad);
+    double y =
+            (sin(poleLonRad) * (((-sinPoleLat) * cosRotLonRad * cosRotLatRad)
+                                + (cosPoleLat * sinRotLatRad)))
+            - (cos(poleLonRad) * sin(rotLonRad) * cosRotLatRad);
+    double z = cosPoleLat * cosRotLatRad * cosRotLonRad
+            + sinPoleLat * sinRotLatRad;
+
+    // Avoid invalid values for z (Might occure due to inaccuracies in
+    // computations).
+    z = max(-1., min(1., z));
+
+    // Compute spherical coordinates from Cartesian coordinates and convert
+    // radians to degrees.
+
+    if ( std::abs(x) > 0 )
+    {
+        result = RAD2DEG * atan2(y, x);
+    }
+    if ( std::abs(result) < 9.e-14 )
+    {
+        result = 0;
+    }
+
+    point->setX(result);
+    point->setY(RAD2DEG * (asin(z)));
+    return true;
+}
+
+
+double MNaturalEarthDataLoader::getNearestLon(
+        double toLon1, double toLon2, double lon1, double lon2)
+{
+    double dist1 = abs(lon2 - toLon1);
+    double dist2 = abs(lon2 + 360. - toLon1);
+    double dist3 = abs(lon1 - toLon1);
+    double dist4 = abs(lon1 + 360. - toLon1);
+
+    double dist5 = abs(lon2 - toLon2);
+    double dist6 = abs(lon2 + 360. - toLon2);
+    double dist7 = abs(lon1 - toLon2);
+    double dist8 = abs(lon1 + 360. - toLon2);
+
+    double distMin = min(min(dist1, dist2), min(dist3, dist4));
+    distMin = min(distMin, min(min(dist5, dist6), min(dist7, dist8)));
+    if (distMin == dist1 || distMin == dist2 || distMin == dist5
+            || distMin == dist6)
+    {
+        return lon2;
+    }
+    return lon1;
+}
+
+
+void MNaturalEarthDataLoader::getCentreLons(
+        QVector2D *centreLons, double poleLat, double poleLon)
+{
+    OGRPoint *point = new OGRPoint;
+    // Get pair of longitudes consiting of the only two longitudes projected to
+    // the longitude coordinates 0, -180 and 180 by rotated north pole
+    // projection.
+    if (int(poleLat - 90) % 180 == 0)
+    {
+        // Special case: Applying the revert projection to (0., 90.) and
+        // (0., -90.) would result in a projection to the poles and this
+        // does not define the both longitudes correctly.
+        point->setX(0.);
+        point->setY(0.);
+        MNaturalEarthDataLoader::rotatedToGeograhpicalCoords(point, poleLat,
+                                                         poleLon);
+        centreLons->setX(point->getX());
+        if (centreLons->x() < 0)
+        {
+            centreLons->setY(point->getX() + 180.);
+        }
+        else
+        {
+            centreLons->setY(point->getX() - 180.);
+        }
+    }
+    else
+    {
+        point->setX(0.);
+        point->setY(90.);
+        MNaturalEarthDataLoader::rotatedToGeograhpicalCoords(point, poleLat,
+                                                         poleLon);
+        centreLons->setX(point->getX());
+        point->setX(0.);
+        point->setY(-90.);
+        MNaturalEarthDataLoader::rotatedToGeograhpicalCoords(point, poleLat,
+                                                         poleLon);
+        centreLons->setY(point->getX());
+    }
+    delete point;
+}
+
+
+/******************************************************************************
+***                           PRIVATE METHODS                               ***
+*******************************************************************************/
+
+OGRPolygon *MNaturalEarthDataLoader::getBBoxPolygon(QRectF *bbox)
+{
+    // Create a bounding box geometry: NOTE that this needs to be polygon -- if
+    // a line string or ring is used, the Intersection() method used below will
+    // only return the points that actually intersect the line, i.e. that are
+    // on the line.
+    float leftlon = bbox->x();
+    float lowerlat = bbox->y();
+    float rightlon = bbox->x() + bbox->width();
+    float upperlat = bbox->y() + bbox->height();
+
+    OGRLinearRing bboxRing;
+    bboxRing.addPoint(leftlon, lowerlat);
+    bboxRing.addPoint(rightlon, lowerlat);
+    bboxRing.addPoint(rightlon, upperlat);
+    bboxRing.addPoint(leftlon, upperlat);
+    bboxRing.addPoint(leftlon, lowerlat);
+    // OGRPolygon *bboxPolygon = new OGRPolygon(); causes problems on windows
+    OGRPolygon *bboxPolygon = dynamic_cast<OGRPolygon*>
+        (OGRGeometryFactory::createGeometry(OGRwkbGeometryType::wkbPolygon));
+    bboxPolygon->addRing(&bboxRing);
+    return bboxPolygon;
+}
+
+
+void MNaturalEarthDataLoader::getLineStringFeatures(
+        QList<OGRLineString*> *lineStrings, OGRGeometry *geometry)
+{
+    // For coastlines, borderlines etc. we are only interested in line
+    // string features. Note that all lines that intersect with the
+    // bounding box are returned here. This includes lines that lie only
+    // partially within the bounding box. Hence we have to compute the
+    // intersection of each line with the bounding box.
+
+    // If the geometry is of type wkbLineString or wkbMultiLineString,
+    // place the contained line strings in a list with data to be
+    // processed.
+    if (geometry != NULL)
+    {
+        OGRwkbGeometryType gType = wkbFlatten(geometry->getGeometryType());
+
+        if (gType == wkbLineString)
+        {
+            lineStrings->append((OGRLineString *) geometry);
+        }
+
+        else if (gType == wkbMultiLineString)
+        {
+            OGRGeometryCollection *gc = (OGRGeometryCollection *) geometry;
+            for (int g = 0; g < gc->getNumGeometries(); g++)
+                lineStrings->append((OGRLineString *) gc->getGeometryRef(g));
+        }
+
+    } // geometry != NULL
+}
+
+
+bool MNaturalEarthDataLoader::validConnectionBetweenPositions(
+        QVector2D *prevPosition, QVector2D *currPosition, OGRPoint *point,
+        double poleLat, double poleLon, QVector2D *centreLons)
+{
+    bool result = true;
+
+    geographicalToRotatedCoords(point, poleLat, poleLon);
+    currPosition->setX(point->getX());
+    currPosition->setY(point->getY());
+    // Check if connection between previous and current vertex crosses 0
+    // (middle) since this might be a connection from left to right crossing
+    // (nearly) the whole domain.
+    if (((currPosition->x() >= 0. && prevPosition->x() <= 0.)
+    || (currPosition->x() <= 0. && prevPosition->x() >= 0.)))
+    {
+        // "Normalise" coordinates of current vertex by reverting the projection
+        // since it makes it easier to compare the coordinates. (Projection and
+        // revert projection map to domain [-180,180].)
+        rotatedToGeograhpicalCoords(point, poleLat, poleLon);
+        double lonNorm = point->getX();
+        double latNorm = point->getY();
+        // "Normalise" coordinates of previous vertex by reverting the
+        // projection since it makes it easier to compare the coordinates.
+        point->setX(prevPosition->x());
+        point->setY(prevPosition->y());
+        rotatedToGeograhpicalCoords(point, poleLat, poleLon);
+        double prevLon = point->getX();
+        // Get centre longitude with overall shortest distance in longitudes to
+        // either the current or previous vertex.
+        double centreLon = getNearestLon(lonNorm, prevLon, centreLons->x(),
+                                         centreLons->y());
+
+        // Rotate vertex on the nearest centre longitude and the latitude of the
+        // current node.
+
+        point->setX(centreLon);
+        point->setY(latNorm);
+        geographicalToRotatedCoords(point, poleLat, poleLon);
+
+        // If the rotated vertex maps to the centre (= 0) than the connection
+        // between the current vertex and the previous is legitimate.
+        if (int(point->getX()) != 0)
+        {
+            result = false;
+        }
+    }
+    prevPosition->setX(currPosition->x());
+    prevPosition->setY(currPosition->y());
+    return result;
 }
 
 } // namespace Met3D

@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2015-2017 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -97,7 +98,8 @@ typedef QHash<QString, MFileInfo*> MOpenFileMap;
 class MClimateForecastReader : public MWeatherPredictionReader
 {
 public:
-    MClimateForecastReader(QString identifier);
+    MClimateForecastReader(QString identifier,
+                           bool treatRotatedGridAsRegularGrid=false);
     ~MClimateForecastReader();
 
     QList<MVerticalLevelType> availableLevelTypes();
@@ -126,6 +128,10 @@ public:
 protected:
     QString variableSurfacePressureName(MVerticalLevelType levelType,
                                         const QString&     variableName);
+    MHorizontalGridType variableHorizontalGridType(MVerticalLevelType levelType,
+                                       const QString& variableName);
+    QVector2D variableRotatedNorthPoleCoordinates( MVerticalLevelType levelType,
+                                                   const QString& variableName);
 
     void scanDataRoot();
 
@@ -163,6 +169,8 @@ protected:
       an attribute in the NetCDF file.
      */
     bool parseCfStandardNameFile(const QString& filename);
+
+    bool treatRotatedGridAsRegularGrid;
 };
 
 

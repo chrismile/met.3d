@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2017      Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -44,6 +45,8 @@
 #include "data/waypoints/waypointstablemodel.h"
 #include "util/mstopwatch.h"
 #include "data/naturalearthdataloader.h"
+#include "boundingbox/boundingbox.h"
+#include "boundingbox/bboxdockwidget.h"
 
 
 namespace Ui {
@@ -84,6 +87,9 @@ public:
     const QStringList& getApplicationCommandLineArguments() const;
 
     const QDir& getMet3DHomeDir() const;
+
+    QtTreePropertyBrowser* getSystemPropertiesBrowser()
+    { return systemPropertiesBrowser; }
 
     /**
       Returns a pointer to the group property manager responsible for @ref
@@ -142,11 +148,20 @@ public:
 
     QStringList getSyncControlIdentifiers() const;
 
+    void removeSyncControl(MSyncControl *syncControl);
+
     void registerWaypointsModel(MWaypointsTableModel* wps);
 
     MWaypointsTableModel* getWaypointsModel(const QString& id) const;
 
     QStringList getWaypointsModelsIdentifiers() const;
+
+    void registerBoundingBox(MBoundingBox* bbox);
+    void deleteBoundingBox(const QString& id);
+    void renameBoundingBox(const QString& oldId, MBoundingBox *bbox);
+    MBoundingBox* getBoundingBox(const QString& id) const;
+    QStringList getBoundingBoxesIdentifiers() const;
+    MBoundingBoxDockWidget *getBoundingBoxDock() const;
 
     MStopwatch& getSystemStopwatch() { return systemStopwatch; }
 
@@ -160,6 +175,20 @@ public:
       have been loaded and GL resources have been initialized).
      */
     bool applicationIsInitialized() { return met3dAppIsInitialized; }
+
+    bool isConnectedToMetview() { return connectedToMetview; }
+
+signals:
+    void boundingBoxCreated();
+    void boundingBoxDeleted(QString name);
+    void boundingBoxRenamed();
+
+public slots:
+    /**
+      Handles change events of the properties in the property browser.
+     */
+    void actOnQtPropertyChanged(QtProperty *property);
+
 
 protected:
     friend class MGLResourcesManager;
@@ -189,6 +218,7 @@ private:
     Ui::MSystemControl *ui;
 
     bool met3dAppIsInitialized;
+    bool connectedToMetview;
 
     QStringList commandLineArguments;
     QDir met3DHomeDir;
@@ -204,6 +234,10 @@ private:
     QtExtensions::QtClickPropertyManager *clickPropertyManager;
     QtColorPropertyManager               *colorPropertyManager;
 
+    QtProperty *windowLayoutGroupProperty;
+    QtProperty *loadWindowLayoutProperty;
+    QtProperty *saveWindowLayoutProperty;
+
     QList<MSceneViewGLWidget*> registeredViews;
 
     MMainWindow *mainWindow;
@@ -213,6 +247,8 @@ private:
     QMap<QString, MAbstractDataSource*>    dataSourcePool;
     QMap<QString, MSyncControl*>           syncControlPool;
     QMap<QString, MWaypointsTableModel*>   waypointsTableModelPool;
+
+    QMap<QString, MBoundingBox*>           boundingBoxPool;
 
     MStopwatch systemStopwatch;
     MNaturalEarthDataLoader *naturalEarthDataLoader;

@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2016-2017 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -114,6 +115,8 @@ public:
      */
     int ensembleMember() const;
 
+    void setEnsembleMember(const unsigned int member);
+
     QString getID() { return syncID; }
 
     void registerSynchronizedClass(MSynchronizedObject *object);
@@ -121,6 +124,11 @@ public:
     void deregisterSynchronizedClass(MSynchronizedObject *object);
 
     void synchronizationCompleted(MSynchronizedObject *object);
+
+    /**
+      Disconnect all registered synchronized object.
+     */
+    void disconnectSynchronizedObjects();
 
 public slots:
     /**
@@ -140,7 +148,29 @@ public slots:
     void selectDataSources();
 
     /**
-      @brief Checks @param selectedDataSources for consistency and prints error
+      Opens dialog to save configuration of sync control.
+      */
+    void saveConfigurationToFile();
+
+    /**
+      Opens dialog to load configuration of sync control.
+      */
+    void loadConfigurationFromFile();
+
+    /**
+     Save sync control-specific configuration to the @ref QSettings object @p
+     settings.
+     */
+    void saveConfiguration(QSettings *settings);
+
+    /**
+     Load sync control-specific configuration from the @ref QSettings object @p
+     settings.
+     */
+    void loadConfiguration(QSettings *settings);
+
+    /**
+      @brief Checks @p selectedDataSources for consistency and prints error
       messages if a given data source id has no corresponding data source or if
       the data source does not contain any init times, valid times and ensemble
       members.
@@ -150,20 +180,20 @@ public slots:
       times and ensemble members. If the method cannot find any suitable
       data source it prints a error message and returns.
       */
-    void restrictToDataSourcesFromFrontend(QStringList selectedDataSources);
+    void restrictToDataSourcesFromSettings(QStringList selectedDataSources);
 
     /**
       @brief Fetches init and valid times and members from the data sources
-      given by their IDs stored in @param selectedDataSources if present.
+      given by their IDs stored in @p selectedDataSources if present.
 
-      If @param selectedDataSources is empty, it is assumed to use all available
+      If @p selectedDataSources is empty, it is assumed to use all available
       data sources. It is essential that if the data sources are given that they
       are valid data sources containing init times, valid times and ensemble
       members. But if loadDataSourcesTimesAndMembers uses all available data
       sources, it checks whether they contain init times, valid times and
       ensemble members and quits quietly if no suitable data source was found.
      */
-    void retrictControlToDataSources(
+    void restrictControlToDataSources(
             QStringList selectedDataSources = QStringList());
 
     /**
@@ -333,7 +363,7 @@ private:
     MSynchronizationType currentSyncType;
     QSet<MSynchronizedObject*> synchronizedObjects;
     QSet<MSynchronizedObject*> pendingSynchronizations;
-    QSet<MSynchronizedObject*> earlyCompletedSynchronizations;    
+    QSet<MSynchronizedObject*> earlyCompletedSynchronizations;
 
     // Properties to control configuration.
     QMenu *configurationDropdownMenu;
@@ -344,6 +374,9 @@ private:
     QList<QDateTime> availableValidDatetimes;
     QSet<unsigned int> availableEnsembleMembers;
     QList<QAction*> selectedDataSourceActionList;
+    QStringList selectedDataSources;
+    QAction *loadConfigurationAction;
+    QAction *saveConfigurationAction;
 
 #ifdef ENABLE_MET3D_STOPWATCH
     MStopwatch stopwatch;
@@ -357,16 +390,28 @@ private:
 class MSynchronizedObject
 {
 public:
-    MSynchronizedObject() { }
+    MSynchronizedObject() { synchronizationControl = nullptr; }
 
     /**
        Handles synchronization event. The type of the synchronization event is
-       given by @param syncType while @param data stores the data for updating.
-       @param data is implemented as a vector to handle the simultanious
+       given by @p syncType while @p data stores the data for updating.
+       @p data is implemented as a vector to handle the simultanious
        synchronization event of init(index 0) and valid(index 1) time.
      */
     virtual bool synchronizationEvent(
             MSynchronizationType syncType, QVector<QVariant> data) = 0;
+
+    virtual void synchronizeWith(
+            MSyncControl *sync, bool updateGUIProperties=true) = 0;
+
+    MSyncControl *getSynchronizationControl() { return synchronizationControl; }
+    void setSynchronizationControl(MSyncControl *synchronizationControl)
+    { this->synchronizationControl = synchronizationControl; }
+
+protected:
+    /* Synchronization (Pointer to the MSyncControl with which time/ensemble is
+       synchronised and corresponding property). */
+    MSyncControl *synchronizationControl;
 };
 
 } // namespace Met3D

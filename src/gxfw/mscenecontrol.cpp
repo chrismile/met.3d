@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2017      Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -38,6 +39,7 @@
 #include "gxfw/mglresourcesmanager.h"
 #include "gxfw/msceneviewglwidget.h"
 #include "qt_extensions/qtpropertymanager_extensions.h"
+#include "actors/trajectoryactor.h"
 
 using namespace std;
 
@@ -48,6 +50,8 @@ namespace Met3D
 ***                     CONSTRUCTOR / DESTRUCTOR                            ***
 *******************************************************************************/
 
+QMutex MSceneControl::staticSceneControlAccessMutex;
+
 // Property managers are only required once for all scenes. Initialised in
 // MSceneControl constructor or getQtProperties(), whichever is called first.
 MQtProperties* MSceneControl::qtProperties = nullptr;
@@ -56,9 +60,11 @@ MSceneControl::MSceneControl(QString name, QWidget *parent)
     : QWidget(parent),
       ui(new Ui::MSceneControl),
       name(name),
+      actorPropertiesBrowser(nullptr),
       blockRedrawRequests(0),
       actorChangeDuringBlock(false)
 {
+    QMutexLocker scAccessMutexLocker(&staticSceneControlAccessMutex);
     ui->setupUi(this);
 
     // The actorPropertiesBrowser needs "GUI editor factories" that provide the
@@ -83,6 +89,16 @@ MSceneControl::MSceneControl(QString name, QWidget *parent)
             = new QtLineEditFactory(this);
     QtExtensions::QtToolButtonFactory *toolButtonFactory
             = new QtExtensions::QtToolButtonFactory(this);
+
+    factories.append(checkBoxFactory);
+    factories.append(spinBoxFactory);
+    factories.append(doubleSpinBoxFactory);
+    factories.append(decoratedDoubleSpinBoxFactory);
+    factories.append(dateTimeEditFactory);
+    factories.append(enumEditorFactory);
+    factories.append(colorEditorFactory);
+    factories.append(lineEditFactory);
+    factories.append(toolButtonFactory);
 
     // Scene and actor properties are displayed in a tree property browser
     // widget. Connect with the necessary property managers (see
@@ -132,13 +148,22 @@ MSceneControl::MSceneControl(QString name, QWidget *parent)
 
     // Add the actor properties browser to the GUI.
     ui->actorPropertiesLayout->addWidget(actorPropertiesBrowser);
+    scAccessMutexLocker.unlock();
 }
 
 
 MSceneControl::~MSceneControl()
 {
+    QMutexLocker scAccessMutexLocker(&staticSceneControlAccessMutex);
+    foreach (QtAbstractEditorFactoryBase* factory, factories)
+    {
+        delete factory;
+        factory = nullptr;
+    }
     delete actorPropertiesBrowser;
+    actorPropertiesBrowser = nullptr;
     delete ui;
+    scAccessMutexLocker.unlock();
 }
 
 
@@ -180,6 +205,13 @@ int MSceneControl::addActor(MActor *actor, int index)
     // Collect the "actorChanged()" signals of all registered actors in the
     // "actOnActorChange()" slot of this class.
     connect(actor, SIGNAL(actorChanged()), SLOT(onActorChanged()));
+    // Since trajectory actors' data is associated to scene views seperately, it
+    // is necessary to inform trajectory actors about new scene views added
+    // to the scene to initiate a data request.
+    if (dynamic_cast<MTrajectoryActor*>(actor))
+    {
+        connect(this, SIGNAL(sceneViewAdded()), actor, SLOT(onSceneViewAdded()));
+    }
 
     // Tell the actor that it has been added to this scene.
     actor->registerScene(this);
@@ -202,6 +234,13 @@ void MSceneControl::removeActor(int id)
     actorPropertiesBrowser->removeProperty(actor->getPropertyGroup());
 
     renderQueue.remove(id);
+
+    // Disconnect signal-slot connection if trajectory actor is removed.
+    if (dynamic_cast<MTrajectoryActor*>(actor))
+    {
+        disconnect(this, SIGNAL(sceneViewAdded()),
+                   actor, SLOT(onSceneViewAdded()));
+    }
 }
 
 
@@ -228,6 +267,13 @@ void MSceneControl::removeActorByName(const QString& actorName)
     actorPropertiesBrowser->removeProperty(actor->getPropertyGroup());
 
     actor->deregisterScene(this);
+
+    // Disconnect signal-slot connection if trajectory actor is removed.
+    if (dynamic_cast<MTrajectoryActor*>(actor))
+    {
+        disconnect(this, SIGNAL(sceneViewAdded()),
+                   actor, SLOT(onSceneViewAdded()));
+    }
 
     renderQueue.remove(id);
 
@@ -291,6 +337,7 @@ void MSceneControl::variableDeletesSynchronizationWith(MSyncControl *sync)
 void MSceneControl::registerSceneView(MSceneViewGLWidget *view)
 {
     registeredSceneViews.insert(view);
+    emit sceneViewAdded();
 }
 
 

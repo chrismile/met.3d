@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2017      Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -36,10 +37,11 @@
 #include <QtProperty>
 
 // local application imports
-#include "gxfw/mactor.h"
+#include "gxfw/rotatedgridsupportingactor.h"
 #include "gxfw/gl/shadereffect.h"
 #include "gxfw/gl/vertexbuffer.h"
 #include "data/naturalearthdataloader.h"
+#include "gxfw/boundingbox/boundingbox.h"
 
 class MGLResourcesManager;
 class MSceneViewGLWidget;
@@ -55,20 +57,15 @@ namespace Met3D
   (cannot be changed by the user; the method is to sync a graticule with
   an hsec actor).
   */
-class MGraticuleActor : public MActor
+class MGraticuleActor : public MRotatedGridSupportingActor,
+        public MBoundingBoxInterface
 {
 public:
-    MGraticuleActor();
+    MGraticuleActor(MBoundingBoxConnection *boundingBoxConnection = nullptr);
 
     ~MGraticuleActor();
 
     void reloadShaderEffects();
-
-    /**
-      Set a horizontal bounding box for the region (lonEast, latSouth, width,
-      height).
-      */
-    void setBBox(QRectF bbox);
 
     /**
       Set the vertical position of the graticule in pressure coordinates.
@@ -85,6 +82,8 @@ public:
     void saveConfiguration(QSettings *settings) override;
 
     void loadConfiguration(QSettings *settings) override;
+
+    void onBoundingBoxChanged() override;
 
 protected:
     /**
@@ -108,6 +107,9 @@ private:
     GL::MVertexBuffer* graticuleVertexBuffer;
     uint   numVerticesGraticule;
 
+    QVector<int> nLats;
+    QVector<int> nLons;
+
     MNaturalEarthDataLoader *naturalEarthDataLoader;
 
     GL::MVertexBuffer* coastlineVertexBuffer;
@@ -118,7 +120,6 @@ private:
     QVector<int> borderlineStartIndices;
     QVector<int> borderlineVertexCount;
 
-    QtProperty *cornersProperty;
     QtProperty *spacingProperty;
     QtProperty *colourProperty;
     QColor graticuleColour;
@@ -131,6 +132,13 @@ private:
     QtProperty *drawBorderLinesProperty;
 
     float verticalPosition_hPa;
+
+    // Inidcate whether coastlineVertexCount/borderlineVertexCount contains at
+    // least one value greater and therefore is valid to be used as count array
+    // during rendering. Using a count array filled with zeros leads to an
+    // program crash.
+    bool coastLinesCountIsValid;
+    bool borderLinesCountIsValid;
 };
 
 

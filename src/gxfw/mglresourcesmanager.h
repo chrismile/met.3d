@@ -284,6 +284,11 @@ public:
     QList<MActor*> getActorsConnectedTo(MActor *actor);
 
     /**
+      Returns a list of actors connected to the bounding box called @p bBoxName.
+     */
+    QList<MActor*> getActorsConnectedToBBox(QString bBoxName);
+
+    /**
      Returns an @ref MLabel displaying user intructions for interactively
      selecting a new rotation centre in "MOVE_SCENE" camera mode.
      */

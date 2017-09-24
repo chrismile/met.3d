@@ -5,7 +5,7 @@
 **  prediction data.
 **
 **  Copyright 2015-2017 Marc Rautenhaus
-**  Copyright 2015-2017 Bianca Tost
+**  Copyright 2016-2017 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -63,6 +63,7 @@ MActor::MActor(QObject *parent)
       shaderCompilationProgress(0),
       positionLabel(nullptr),
       actorName("Default actor"),
+      actorType("Default actor"),
       addPropertiesCounter(0),
       actorIsInitialized(false),
       actorChangedSignalDisabledCounter(0),
@@ -326,7 +327,6 @@ void MActor::saveConfigurationToFile(QString filename)
     if (QFile::exists(filename))
     {
         QSettings* settings = new QSettings(filename, QSettings::IniFormat);
-
         QStringList groups = settings->childGroups();
         // Only overwrite file if it contains already configuration for the
         // actor to save.
@@ -334,18 +334,19 @@ void MActor::saveConfigurationToFile(QString filename)
         {
             QMessageBox msg;
             msg.setWindowTitle("Error");
-            msg.setText("The selected file contains a configuration other than "
-                        + getSettingsID() + ".\n"
-                        "I will NOT overwrite this file -- have you selected "
-                        "the correct file?");
+            msg.setText(QString("The selected file contains a configuration"
+                                " other than %1.\n"
+                                "This file will NOT be overwritten -- have you"
+                                " selected the correct file?")
+                        .arg(getSettingsID()));
             msg.setIcon(QMessageBox::Warning);
             msg.exec();
+            delete settings;
             return;
         }
 
         QFile::remove(filename);
     }
-
     QSettings* settings = new QSettings(filename, QSettings::IniFormat);
 
     settings->beginGroup("FileFormat");
@@ -353,26 +354,8 @@ void MActor::saveConfigurationToFile(QString filename)
     settings->setValue("met3dVersion", met3dVersionString);
     settings->endGroup();
 
-    // Save basic MActor settings.
-    settings->beginGroup(MActor::getSettingsID());
-
-    settings->setValue("actorName", actorName);
-    settings->setValue("actorIsEnabled", actorIsEnabled);
-    settings->setValue("labelsAreEnabled", labelsAreEnabled);
-    settings->setValue("renderAsWireFrame", renderAsWireFrame);
-    settings->setValue("labelColour", properties->mColor()
-                       ->value(labelColourProperty));
-    settings->setValue("labelSize", properties->mInt()
-                       ->value(labelSizeProperty));
-    settings->setValue("labelBBox", properties->mBool()
-                       ->value(labelBBoxProperty));
-    settings->setValue("labelBBoxColour", properties->mColor()
-                       ->value(labelBBoxColourProperty));
-
-    settings->endGroup();
-
-    // Save settings of derived classes.
-    saveConfiguration(settings);
+    // Save actor settings.
+    saveActorConfiguration(settings);
 
     delete settings;
 
@@ -408,10 +391,51 @@ void MActor::loadConfigurationFromFile(QString filename)
                     "for this actor.");
         msg.setIcon(QMessageBox::Warning);
         msg.exec();
+        delete settings;
         return;
     }
 
-    // Load basic MActor settings.
+    // Load actor settings.
+    loadActorConfiguration(settings);
+
+    delete settings;
+
+    // Re-enable actor updates.
+    enableActorUpdates(true);
+
+    LOG4CPLUS_DEBUG(mlog, "... configuration has been loaded.");
+
+    // Signal that the actor properties have changed.
+    emitActorChangedSignal();
+}
+
+
+void MActor::saveActorConfiguration(QSettings *settings)
+{
+    settings->beginGroup(MActor::getSettingsID());
+
+    settings->setValue("actorName", actorName);
+    settings->setValue("actorIsEnabled", actorIsEnabled);
+    settings->setValue("labelsAreEnabled", labelsAreEnabled);
+    settings->setValue("renderAsWireFrame", renderAsWireFrame);
+    settings->setValue("labelColour", properties->mColor()
+                       ->value(labelColourProperty));
+    settings->setValue("labelSize", properties->mInt()
+                       ->value(labelSizeProperty));
+    settings->setValue("labelBBox", properties->mBool()
+                       ->value(labelBBoxProperty));
+    settings->setValue("labelBBoxColour", properties->mColor()
+                       ->value(labelBBoxColourProperty));
+
+    settings->endGroup();
+
+    // Save derived classes settings.
+    saveConfiguration(settings);
+}
+
+
+void MActor::loadActorConfiguration(QSettings *settings)
+{
     settings->beginGroup(MActor::getSettingsID());
 
     const QString name = settings->value("actorName").toString();
@@ -450,16 +474,6 @@ void MActor::loadConfigurationFromFile(QString filename)
 
     // Load derived classes settings.
     loadConfiguration(settings);
-
-    delete settings;
-
-    // Re-enable actor updates.
-    enableActorUpdates(true);
-
-    LOG4CPLUS_DEBUG(mlog, "... configuration has been loaded.");
-
-    // Signal that the actor properties have changed.
-    emitActorChangedSignal();
 }
 
 

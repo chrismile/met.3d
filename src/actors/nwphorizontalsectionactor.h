@@ -5,8 +5,8 @@
 **  prediction data.
 **
 **  Copyright 2015-2017 Marc Rautenhaus
-**  Copyright 2015-2017 Michael Kern
-**  Copyright 2015-2017 Bianca Tost
+**  Copyright 2015      Michael Kern
+**  Copyright 2016-2017 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -42,6 +42,7 @@
 #include "gxfw/gl/typedvertexbuffer.h"
 #include "actors/transferfunction1d.h"
 #include "actors/graticuleactor.h"
+#include "gxfw/boundingbox/boundingbox.h"
 
 class MSceneViewGLWidget;
 
@@ -52,7 +53,8 @@ namespace Met3D
   @brief MNWPHorizontalSectionActor renders a horizontal cross section from
   multiple model level or pressure level data variables.
   */
-class MNWPHorizontalSectionActor : public MNWPMultiVarActor
+class MNWPHorizontalSectionActor : public MNWPMultiVarActor,
+        public MBoundingBoxInterface
 {
     Q_OBJECT
 
@@ -86,12 +88,6 @@ public:
     void dragEvent(MSceneViewGLWidget *sceneView,
                    int handleID, float clipX, float clipY) override;
 
-    /**
-      Set the horizontal bounding box for the region (lonEast, latSouth, width,
-      height).
-      */
-    void setBBox(QRectF bbox);
-
     void setSurfaceShadowEnabled(bool enable);
 
     /**
@@ -111,6 +107,8 @@ public:
             const MSelectableDataSource& dataSource) override;
 
     bool isConnectedTo(MActor *actor) override;
+
+    void onBoundingBoxChanged() override;
 
 public slots:
     /**
@@ -209,14 +207,6 @@ private:
     QVector<QVector3D> mouseHandlePoints;
     GL::MVector3DVertexBuffer *vbMouseHandlePoints;
     int selectedMouseHandle;
-
-    /** Horizontal bounding box in which section is drawn */
-    QtProperty *boundingBoxProperty;
-    QRectF horizontalBBox;
-    double llcrnrlon;
-    double llcrnrlat;
-    double urcrnrlon;
-    double urcrnrlat;
 
     QtProperty *differenceModeProperty;
     short       differenceMode;

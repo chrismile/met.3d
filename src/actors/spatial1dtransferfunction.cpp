@@ -4,8 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2016 Marc Rautenhaus
-**  Copyright 2016 Bianca Tost
+**  Copyright 2016-2017 Marc Rautenhaus
+**  Copyright 2016-2017 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -71,7 +71,8 @@ MSpatial1DTransferFunction::MSpatial1DTransferFunction(QObject *parent)
     // ===============================================
     beginInitialiseQtProperties();
 
-    setName("Transfer function scalar to texture");
+    setActorType("Transfer function scalar to texture");
+    setName(getActorType());
 
     // Properties related to texture levels.
     // =====================================
@@ -853,7 +854,6 @@ void MSpatial1DTransferFunction::generateBarGeometry()
     GL::MVertexBuffer* vb =
             static_cast<GL::MVertexBuffer*>(glRM->getGPUItem(requestKey));
 
-
     if (vb)
     {
         vertexBuffer = vb;
@@ -861,8 +861,8 @@ void MSpatial1DTransferFunction::generateBarGeometry()
         // reallocate buffer if size has changed
         buf->reallocate(nullptr, 30 + numTicks * 6);
         buf->update(coordinates, 0, 0, sizeof(coordinates));
-        buf->update(tickmarks, 0, sizeof(coordinates), sizeof(tickmarks));
-
+        buf->update(tickmarks, 0, sizeof(coordinates),
+                    sizeof(float) * 6 * numTicks);
     }
     else
     {
@@ -872,8 +872,8 @@ void MSpatial1DTransferFunction::generateBarGeometry()
         {
             newVB->reallocate(nullptr, 30 + numTicks * 6, 0, true);
             newVB->update(coordinates, 0, 0, sizeof(coordinates));
-            newVB->update(tickmarks, 0, sizeof(coordinates), sizeof(tickmarks));
-
+            newVB->update(tickmarks, 0, sizeof(coordinates),
+                          sizeof(float) * 6 * numTicks);
         }
         else
         {

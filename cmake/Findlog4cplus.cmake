@@ -62,7 +62,13 @@ find_library(${PKG_NAME}_LIBRARY_DEBUG
         )
 
 if (NOT ${PKG_NAME}_LIBRARY_DEBUG)
-    set(${PKG_NAME}_LIBRARY_DEBUG "${PKG_NAME}_LIBRARY_RELEASE")
+    message("Debug library for ${PKG_NAME} was not found")
+    set(${PKG_NAME}_LIBRARY_DEBUG "${${PKG_NAME}_LIBRARY_RELEASE}")
+endif()
+
+if (NOT ${PKG_NAME}_LIBRARY_RELEASE)
+    message("Release library for ${PKG_NAME} was not found")
+    set(${PKG_NAME}_LIBRARY_RELEASE "${${PKG_NAME}_LIBRARY_DEBUG}")
 endif()
 
 if (${PKG_NAME}_LIBRARY_DEBUG AND ${PKG_NAME}_LIBRARY_RELEASE)

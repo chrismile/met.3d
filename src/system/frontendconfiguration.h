@@ -5,7 +5,7 @@
 **  prediction data.
 **
 **  Copyright 2015-2017 Marc Rautenhaus
-**  Copyright 2015-2017 Bianca Tost
+**  Copyright 2017      Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -48,6 +48,10 @@ namespace Met3D
   common actor intiailization mechanism, however, is that users save an actor
   configuration into an actor config file and reference this file in the
   frontend condfiguration file.
+
+  Special case: Metview integration cf. @ref MPipelineConfiguration with
+  default configuration file stored at
+  $MET3D_HOME/config/metview/default_frontend.cfg
   */
 class MFrontendConfiguration : public MAbstractApplicationConfiguration
 {

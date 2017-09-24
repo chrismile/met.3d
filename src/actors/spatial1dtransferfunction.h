@@ -122,10 +122,10 @@ private:
     /**
       @brief Method to create the 2D texture array with mip-mapping containing
       the texture images and uploads the 3D-texture to the GPU and/or store the
-      @param level-th image at @param level in the texture.
+      @p level-th image at @p level in the texture.
 
       Creates a new 2D texture array if @ref tfTexture is nullptr or
-      @param recreate is true. Takes the image stored at @param level in
+      @p recreate is true. Takes the image stored at @p level in
       @ref loadedImages and stores its content in the 2D texture array.
       */
     void generateTransferTexture(int level, bool recreate);

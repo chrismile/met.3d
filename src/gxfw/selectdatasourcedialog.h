@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2017      Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -77,7 +78,7 @@ public:
       Constructs a new dialog. The dialog's data field table is filled with a
       list of the data source registered with @ref MGLResourcesManager.
 
-      Which dialog should be created is defined by @param type. If this
+      Which dialog should be created is defined by @p type. If this
       constructor is called to create a variable selection dialog, it uses all
       vertical level types available.
       */
@@ -104,7 +105,17 @@ public:
     QList<QString> getSelectedDataSourceIDs();
 
     /**
-      Checks whether the @param source contains init times, valid times and
+      checkIfSingleDataSourceWithSingleVariableIsPresent returns the data source
+      containing the only variable if just one variable of the supported level
+      Types is present.
+
+      @param ok is set to true if only one variable is present and to false
+      otherwise.
+     */
+    MSelectableDataSource checkIfSingleDataSourceWithSingleVariableIsPresent(bool *ok);
+
+    /**
+      Checks whether the @p source contains init times, valid times and
       ensemble members informations.
 
       Returns @return true if it contains all necessary data and @return false
@@ -114,7 +125,7 @@ public:
     static bool checkDataSourceForData(MWeatherPredictionDataSource *source);
 
     /**
-      Checks whether @param dataSourceID describes a data source for
+      Checks whether @p dataSourceID describes a data source for
       trajectories by checking for the data sources needed (reader, normals,
       timestepFilter).
 
@@ -139,7 +150,7 @@ private:
     void createDataSourceEntries(const QList<MVerticalLevelType> supportedTypes);
     /**
       Creates table entries for variable selection dialog restricted to
-      @param supportedTypes.
+      @p supportedTypes.
       */
     /**
       Creates table entries for data source selection dialog.

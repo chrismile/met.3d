@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2017      Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -45,6 +46,23 @@ namespace Met3D
   of predefined pipelines are available (currently for NetCDF-CF and GRIB data,
   and for LAGRANTO trajectory data. Pipeline parameters are read from a
   configuration file.
+
+  Special case: If Met.3D is called with command line argument "--metview",
+  it uses directory paths and file filters given by the command line argument
+  "--path=" instead of the ones defined in the configuration file. Each
+  directory file filter pairing results in its own data source and must be
+  seperated in the path argument by a semicolon from other paths. For file
+  filters Met.3D supports the use of wildcard expressions. If no configuration
+  file is given via the command line, in this mode Met.3D uses a default
+  configuration file stored at $MET3D_HOME/config/metview/default_pipeline.cfg
+  if present. To configure the NWPPipeline data sources Met.3D uses only the
+  first entry of NWPPipeline in the pipeline configuration file and append
+  "_index" to the name with index being a integer incremented for each data
+  source by one starting from zero.
+
+  Example for path arguement: -\-path="path/to/filefilter1;path/to/filefilter2".
+  [The quotation marks are mendatory since some shells use semicolons as one
+   possible seperator.]
   */
 class MPipelineConfiguration : public MAbstractApplicationConfiguration
 {
@@ -66,6 +84,17 @@ protected:
     };
 
     /**
+     Represents one directory path and file filter passed to Met.3D by Metview
+     via path command line argument.
+     */
+    struct MetviewGribFilePath
+    {
+        MetviewGribFilePath() {}
+        QString path;
+        QString fileFilter;
+    };
+
+    /**
       Initializes the default scheduler (required for the pipelines to execute
       the generated task graphs).
      */
@@ -80,15 +109,16 @@ protected:
      */
     void initializeDataPipelineFromConfigFile(QString filename);
 
-    void initializeNWPPipeline(
-            QString name,
-            QString fileDir,
-            QString fileFilter,
-            QString schedulerID,
-            QString memoryManagerID,
-            MNWPReaderFileFormat dataFormat,
-            bool enableRegridding,
-            bool enableProbabiltyRegionFilter);
+    void initializeNWPPipeline(QString name,
+                               QString fileDir,
+                               QString fileFilter,
+                               QString schedulerID,
+                               QString memoryManagerID,
+                               MNWPReaderFileFormat dataFormat,
+                               bool enableRegridding,
+                               bool enableProbabiltyRegionFilter,
+                               bool treatRotatedGridAsRegularGrid,
+                               QString surfacePressureFieldType);
 
     void initializeLagrantoEnsemblePipeline(
             QString name,
@@ -102,6 +132,12 @@ protected:
      purposes.
      */
     void initializeDevelopmentDataPipeline();
+
+    /**
+     Extracts all paths and filefilters defined in the path command line
+     argument and stores them in @p gribFilePaths.
+     */
+    void getMetviewGribFilePaths(QList<MetviewGribFilePath> *gribFilePaths);
 };
 
 } // namespace Met3D

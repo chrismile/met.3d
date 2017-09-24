@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2015-2017 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -55,8 +56,11 @@ namespace Met3D
 ***                     CONSTRUCTOR / DESTRUCTOR                            ***
 *******************************************************************************/
 
-MClimateForecastReader::MClimateForecastReader(QString identifier)
-    : MWeatherPredictionReader(identifier)
+MClimateForecastReader::MClimateForecastReader(
+        QString identifier, bool treatRotatedGridAsRegularGrid)
+    : MWeatherPredictionReader(identifier),
+      treatRotatedGridAsRegularGrid(treatRotatedGridAsRegularGrid)
+
 {
     // Read mapping "variable name to CF standard name", specific to ECMWF
     // forecasts converted to NetCDF with netcdf-java.
@@ -305,6 +309,106 @@ QString MClimateForecastReader::variableSurfacePressureName(
 }
 
 
+MHorizontalGridType MClimateForecastReader::variableHorizontalGridType(
+        MVerticalLevelType levelType,
+        const QString&     variableName)
+{
+    QReadLocker availableItemsReadLocker(&availableItemsLock);
+    if (!availableDataFields.keys().contains(levelType))
+    {
+        throw MBadDataFieldRequest(
+                    "unkown level type requested: " +
+                    MStructuredGrid::verticalLevelTypeToString(
+                        levelType).toStdString(),
+                    __FILE__, __LINE__);
+    }
+    if (availableDataFields[levelType].keys().contains(variableName))
+    {
+        return availableDataFields[levelType][variableName]->horizontalGridType;
+    }
+    else if (availableDataFieldsByStdName[levelType].keys().contains(
+                 variableName))
+    {
+        return availableDataFieldsByStdName[levelType][
+                variableName]->horizontalGridType;
+    }
+    else
+    {
+        throw MBadDataFieldRequest(
+                "unkown variable requested: " + variableName.toStdString(),
+                __FILE__, __LINE__);
+    }
+
+}
+
+
+QVector2D MClimateForecastReader::variableRotatedNorthPoleCoordinates(
+        MVerticalLevelType levelType,
+        const QString&     variableName)
+{
+    QReadLocker availableItemsReadLocker(&availableItemsLock);
+    if (!availableDataFields.keys().contains(levelType))
+    {
+        throw MBadDataFieldRequest(
+                    "unkown level type requested: " +
+                    MStructuredGrid::verticalLevelTypeToString(
+                        levelType).toStdString(),
+                    __FILE__, __LINE__);
+    }
+    if (availableDataFields[levelType].keys().contains(variableName))
+    {
+        if (availableDataFields[levelType][variableName]->horizontalGridType
+                == ROTATED_LONLAT)
+        {
+            QVector2D coordinates;
+            coordinates.setX(
+                        availableDataFields[levelType][variableName]
+                        ->rotatedNorthPoleLon);
+            coordinates.setY(
+                        availableDataFields[levelType][variableName]
+                        ->rotatedNorthPoleLat);
+
+            return coordinates;
+        }
+        else
+        {
+            throw MBadDataFieldRequest(
+                        "Rotated north pole coordinates requested for grid not "
+                        "rotated", __FILE__, __LINE__);
+        }
+    }
+    else if (availableDataFieldsByStdName[levelType].keys().contains(
+                 variableName))
+    {
+        if (availableDataFields[levelType][variableName]->horizontalGridType
+                == ROTATED_LONLAT)
+        {
+            QVector2D coordinates;
+            coordinates.setX(
+                        availableDataFieldsByStdName[levelType][variableName]
+                        ->rotatedNorthPoleLon);
+            coordinates.setY(
+                        availableDataFieldsByStdName[levelType][variableName]
+                        ->rotatedNorthPoleLat);
+
+            return coordinates;
+        }
+        else
+        {
+            throw MBadDataFieldRequest(
+                        "Rotated north pole coordinates requested for grid not "
+                        "rotated", __FILE__, __LINE__);
+        }
+    }
+    else
+    {
+        throw MBadDataFieldRequest(
+                "unkown variable requested: " + variableName.toStdString(),
+                __FILE__, __LINE__);
+    }
+}
+
+
 void MClimateForecastReader::scanDataRoot()
 {
     // Lock access to all availableXX data fields.
@@ -348,9 +452,29 @@ void MClimateForecastReader::scanDataRoot()
             continue;
         }
 
+        multimap<string, NcVar> ncVariables = ncFile->getVars();
+
+        QStringList gridMappingVarNames = QStringList();
+        // Since we don't know the name of the grid mapping variable, loop over
+        // all variables, check if variable with grid_mapping_name
+        // 'rotated_latitude_longitude' exist and store their names in
+        // gridMappingVarNames. Find the grid mapping variables first since
+        // they are needed to check if a variable if defined on a rotated grid.
+        for (multimap<string, NcVar>::iterator gridVar = ncVariables.begin();
+             gridVar != ncVariables.end(); gridVar++)
+        {
+            QString varName = QString::fromStdString(gridVar->first);
+
+            bool gridVariablePresent = NcCFVar::isCFGridMappingVariable(
+                        ncFile->getVar(varName.toStdString()));
+            if (gridVariablePresent)
+            {
+                gridMappingVarNames.append(varName);
+            }
+        }
+
         // Loop over all variables: Obtain available time values for each
         // variable and insert the fields into "availableDataFields".
-        multimap<string, NcVar> ncVariables = ncFile->getVars();
         for (multimap<string, NcVar>::iterator var=ncVariables.begin();
              var != ncVariables.end(); var++)
         {
@@ -486,6 +610,39 @@ void MClimateForecastReader::scanDataRoot()
                         // No ensemble dimension could be found. List the
                         // available data field as the "0" member.
                         vinfo->availableMembers.insert(0);
+                    }
+
+
+                    vinfo->horizontalGridType = MHorizontalGridType::REGULAR_LONLAT;
+                    // Change grid data type to ROTATED_LONLAT if a grid mapping
+                    // variable exists and it is assigned to this variable.
+                    if (!gridMappingVarNames.empty())
+                    {
+                        QString gridMappingVarName = "";
+                        if (NcCFVar::isDefinedOnRotatedGrid(
+                                    ncFile->getVar(varName.toStdString()),
+                                    gridMappingVarNames, &gridMappingVarName))
+                        {
+                            if (NcCFVar::getRotatedNorthPoleCoordinates(
+                                        ncFile->getVar(
+                                            gridMappingVarName.toStdString()),
+                                        &(vinfo->rotatedNorthPoleLon),
+                                        &(vinfo->rotatedNorthPoleLat)))
+                            {
+                                vinfo->horizontalGridType = MHorizontalGridType::ROTATED_LONLAT;
+                            }
+                        }
+
+                        // At the moment, only register rotated_lonlat variable
+                        // if the user wants to treat rotated grids as regular
+                        // grids. Later it should be possible to treat rotated
+                        // grids as rotated grids.
+                        if (!treatRotatedGridAsRegularGrid
+                                && (vinfo->horizontalGridType
+                                    == MHorizontalGridType::ROTATED_LONLAT))
+                        {
+                            continue;
+                        }
                     }
                 }
 

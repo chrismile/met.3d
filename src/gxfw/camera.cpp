@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2017      Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -146,11 +147,11 @@ void MCamera::saveToFile(QString filename)
 {
     if (filename.isEmpty()) return;
 
+    QSettings *settings = new QSettings(filename, QSettings::IniFormat);
+
     // Overwrite if the file exists.
     if (QFile::exists(filename))
     {
-        QSettings* settings = new QSettings(filename, QSettings::IniFormat);
-
         QStringList groups = settings->childGroups();
         // Only overwrite file if it contains already configuration for the
         // actor to save.
@@ -160,34 +161,25 @@ void MCamera::saveToFile(QString filename)
             msg.setWindowTitle("Error");
             msg.setText("The selected file contains a configuration other "
                         "than MCamera.\n"
-                        "I will NOT overwrite this file -- have you selected "
-                        "the correct file?");
+                        "This file will NOT be overwritten -- have you selected"
+                        " the correct file?");
             msg.setIcon(QMessageBox::Warning);
             msg.exec();
+            delete settings;
             return;
         }
 
         QFile::remove(filename);
     }
 
-    QSettings settings(filename, QSettings::IniFormat);
-
-    settings.beginGroup("FileFormat");
+    settings->beginGroup("FileFormat");
     // Save version id of Met.3D.
-    settings.setValue("met3dVersion", met3dVersionString);
-    settings.endGroup();
+    settings->setValue("met3dVersion", met3dVersionString);
+    settings->endGroup();
 
-    settings.beginGroup("MCamera");
-    settings.setValue("origin_lon", origin.x());
-    settings.setValue("origin_lat", origin.y());
-    settings.setValue("origin_worldZ", origin.z());
-    settings.setValue("yAxis_lon", yAxis.x());
-    settings.setValue("yAxis_lat", yAxis.y());
-    settings.setValue("yAxis_worldZ", yAxis.z());
-    settings.setValue("zAxis_lon", zAxis.x());
-    settings.setValue("zAxis_lat", zAxis.y());
-    settings.setValue("zAxis_worldZ", zAxis.z());
-    settings.endGroup();
+    saveConfiguration(settings);
+
+    delete settings;
 }
 
 
@@ -195,19 +187,58 @@ void MCamera::loadFromFile(QString filename)
 {
     if (filename.isEmpty()) return;
 
-    QSettings settings(filename, QSettings::IniFormat);
+    QSettings *settings = new QSettings(filename, QSettings::IniFormat);
 
-    settings.beginGroup("MCamera");
-    origin.setX(settings.value("origin_lon").toFloat());
-    origin.setY(settings.value("origin_lat").toFloat());
-    origin.setZ(settings.value("origin_worldZ").toFloat());
-    yAxis.setX(settings.value("yAxis_lon").toFloat());
-    yAxis.setY(settings.value("yAxis_lat").toFloat());
-    yAxis.setZ(settings.value("yAxis_worldZ").toFloat());
-    zAxis.setX(settings.value("zAxis_lon").toFloat());
-    zAxis.setY(settings.value("zAxis_lat").toFloat());
-    zAxis.setZ(settings.value("zAxis_worldZ").toFloat());
-    settings.endGroup();
+    QStringList groups = settings->childGroups();
+    if ( !groups.contains("MCamera") )
+    {
+        QMessageBox msg;
+        msg.setWindowTitle("Error");
+        msg.setText("The selected file does not contain configuration data "
+                    "for cameras.");
+        msg.setIcon(QMessageBox::Warning);
+        msg.exec();
+        delete settings;
+        return;
+    }
+
+    loadConfiguration(settings);
+
+    delete settings;
+}
+
+
+void MCamera::saveConfiguration(QSettings *settings)
+{
+    settings->beginGroup("MCamera");
+    settings->setValue("origin_lon", origin.x());
+    settings->setValue("origin_lat", origin.y());
+    settings->setValue("origin_worldZ", origin.z());
+    settings->setValue("yAxis_lon", yAxis.x());
+    settings->setValue("yAxis_lat", yAxis.y());
+    settings->setValue("yAxis_worldZ", yAxis.z());
+    settings->setValue("zAxis_lon", zAxis.x());
+    settings->setValue("zAxis_lat", zAxis.y());
+    settings->setValue("zAxis_worldZ", zAxis.z());
+    settings->endGroup();
+}
+
+
+void MCamera::loadConfiguration(QSettings *settings)
+{
+    // Default values are taken from saved default camera position rounded to
+    // minimum amount of decimal places with nearly no visible difference.
+    settings->beginGroup("MCamera");
+    origin.setX(settings->value("origin_lon", 46.109f).toFloat());
+    origin.setY(settings->value("origin_lat", -68.208f).toFloat());
+    origin.setZ(settings->value("origin_worldZ", 141.851f).toFloat());
+    yAxis.setX(settings->value("yAxis_lon", -0.262f).toFloat());
+    yAxis.setY(settings->value("yAxis_lat", 0.72f).toFloat());
+    yAxis.setZ(settings->value("yAxis_worldZ", 0.643f).toFloat());
+    zAxis.setX(settings->value("zAxis_lon", -0.22f).toFloat());
+    zAxis.setY(settings->value("zAxis_lat", 0.604f).toFloat());
+    zAxis.setZ(settings->value("zAxis_worldZ", -0.766f).toFloat());
+    settings->endGroup();
 }
 
 } // namespace Met3D

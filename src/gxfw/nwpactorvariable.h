@@ -5,7 +5,7 @@
 **  prediction data.
 **
 **  Copyright 2015-2017 Marc Rautenhaus
-**  Copyright 2015-2017 Bianca Tost
+**  Copyright 2016-2017 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -119,6 +119,12 @@ public:
     bool setTransferFunction(QString tfName);
 
     /**
+      setTransferFunctionToFirstAvailable sets used transfer function to first
+      transfer function in transfer function list below 'None' if one is present.
+     */
+    void setTransferFunctionToFirstAvailable();
+
+    /**
       Set @p true if the datafield's "flags" bitfield, if available, should
       be transferred to GPU memory.
       */
@@ -193,10 +199,6 @@ public:
     /* Property group to accomodate this variable's subproperties. */
     QtProperty *varPropertyGroup;
     QtProperty *varRenderingPropertyGroup;
-
-    /* Synchronization (Pointer to the MSyncControl with which time/ensemble is
-       synchronised and corresponding property). */
-    MSyncControl *synchronizationControl;
 
     /* Button to remove this variable from its actor. Signal is handled by
        MNWPMultiVarActor and derived classes. */
@@ -554,10 +556,26 @@ public:
     void loadConfiguration(QSettings *settings) override;
 
     /**
-     Computes start indices @ref i0, @ref j0 and number of grid points @ref
-     nlons, @ref nlats that are required to render the part of the variable
-     grid that fits into the bounding box given by the corner coordinates @p
-     llcrnrlon, @p llcrnrlatm @p urcrnrlon, @p urcrnrlat.
+     Computes start indices (member variables) @ref i0, @ref j0 and number of
+     grid points @ref nlons, @ref nlats that are required to render the part of
+     the data grid (or multiple parts if the bounding box is larger than 360deg
+     in longitude) that fits into the bounding box given by the corner
+     coordinates @p llcrnrlon, @p llcrnrlatm @p urcrnrlon, @p urcrnrlat.
+
+     @note If the data region falls apart into disjoint parts OR if it is
+     rendered multiple times only ONE VISUALIZATION GRID is rendered (but with
+     no vertices in places where there are no grid points). Those fragments
+     that don't map to available data points are discarded in the fragment
+     shader.
+
+     Correctly handles the following cases:
+       *  bbox is smaller than data grid --> part of data grid is rendered
+       *  bbox is larger than data grid --> region of bbox not occupied by
+          data grid is empty
+       *  bbox is larger than 360deg in lon so that parts of data grid appear
+          multiple times --> data grid is repeated
+       *  bbox is placed such that data region is cut into disjunct regions
+          --> disjuct regions are rendered
      */
     void computeRenderRegionParameters(double llcrnrlon, double llcrnrlat,
                                        double urcrnrlon, double urcrnrlat);
@@ -599,6 +617,20 @@ protected:
     double llcrnrlat;
     double urcrnrlon;
     double urcrnrlat;
+
+    /**
+     Contains signed distance from left border of grid to left border of
+     bounding box in a multiple of 360 and needs to be added to vertex position
+     during rendering to position grid correctly.
+
+     During rendering the grid is placed correctly to its given coordinates but
+     if the bounding box starts outside this region (distance between western
+     border of bounding box and western border of grid greater than 360° in
+     western or eastern direction), the placement does not work correctly
+     anymore. Thus we need to add a inital shift to the world space coordinate
+     of a vertex during rendering.
+    */
+    float shiftForWesternLon;
 
     /** Properties of the contour labels */
     QtProperty* contourLabelSuffixProperty;
