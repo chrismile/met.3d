@@ -244,7 +244,7 @@ MMainWindow::MMainWindow(QStringList commandLineArguments, QWidget *parent)
     connect(ui->menuSessions, SIGNAL(triggered(QAction*)),
             this, SLOT(switchSession(QAction*)));
     connect(sessionAutoSaveTimer, SIGNAL(timeout()),
-            sessionManagerDialog, SLOT(saveSession()));
+            sessionManagerDialog, SLOT(autoSaveSession()));
 }
 
 
