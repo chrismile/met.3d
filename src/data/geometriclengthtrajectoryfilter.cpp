@@ -1,23 +1,67 @@
-
+/******************************************************************************
+**
+**  This file is part of Met.3D -- a research environment for the
+**  three-dimensional visual exploration of numerical ensemble weather
+**  prediction data.
+**
+**  Copyright 2017 Marc Rautenhaus
+**  Copyright 2017 Michael Kern
+**
+**  Computer Graphics and Visualization Group
+**  Technische Universitaet Muenchen, Garching, Germany
+**
+**  Met.3D is free software: you can redistribute it and/or modify
+**  it under the terms of the GNU General Public License as published by
+**  the Free Software Foundation, either version 3 of the License, or
+**  (at your option) any later version.
+**
+**  Met.3D is distributed in the hope that it will be useful,
+**  but WITHOUT ANY WARRANTY; without even the implied warranty of
+**  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+**  GNU General Public License for more details.
+**
+**  You should have received a copy of the GNU General Public License
+**  along with Met.3D.  If not, see <http://www.gnu.org/licenses/>.
+**
+*******************************************************************************/
 #include "geometriclengthtrajectoryfilter.h"
 
-using namespace Met3D;
+// standard library imports
 
-MGeometricLengthTrajectoryFilter::MGeometricLengthTrajectoryFilter() :
-        MTrajectoryFilter(),
-        isoSurfaceIntersectionSource(nullptr)
+// related third party imports
+
+// local application imports
+
+
+namespace Met3D
 {
 
+/******************************************************************************
+***                     CONSTRUCTOR / DESTRUCTOR                            ***
+*******************************************************************************/
+
+MGeometricLengthTrajectoryFilter::MGeometricLengthTrajectoryFilter() :
+    MTrajectoryFilter(),
+    isoSurfaceIntersectionSource(nullptr)
+{
 }
 
-void MGeometricLengthTrajectoryFilter::setIsosurfaceSource(MIsosurfaceIntersectionSource* s)
+
+/******************************************************************************
+***                            PUBLIC METHODS                               ***
+*******************************************************************************/
+
+void MGeometricLengthTrajectoryFilter::setIsosurfaceSource(
+        MIsosurfaceIntersectionSource* s)
 {
     isoSurfaceIntersectionSource = s;
     registerInputSource(isoSurfaceIntersectionSource);
     enablePassThrough(isoSurfaceIntersectionSource);
 }
 
-MTrajectoryEnsembleSelection* MGeometricLengthTrajectoryFilter::produceData(MDataRequest request)
+
+MTrajectoryEnsembleSelection*
+MGeometricLengthTrajectoryFilter::produceData(MDataRequest request)
 {
     assert(isoSurfaceIntersectionSource != nullptr);
     assert(inputSelectionSource         != nullptr);
@@ -29,12 +73,15 @@ MTrajectoryEnsembleSelection* MGeometricLengthTrajectoryFilter::produceData(MDat
     float filterValue = rh.value("GEOLENFILTER_VALUE").toFloat();
 
     // Obtain the intersection line source.
-    MIsosurfaceIntersectionLines* lineSource = isoSurfaceIntersectionSource->getData(lineRequest);
+    MIsosurfaceIntersectionLines* lineSource =
+            isoSurfaceIntersectionSource->getData(lineRequest);
 
     rh.removeAll(locallyRequiredKeys());
-    // Obtain the selection of intersection lines from the input intersection line source.
+    // Obtain the selection of intersection lines from the input intersection
+    // line source.
     MTrajectoryEnsembleSelection* lineSelection =
-            static_cast<MTrajectoryEnsembleSelection*>(inputSelectionSource->getData(rh.request()));
+            static_cast<MTrajectoryEnsembleSelection*>(
+                inputSelectionSource->getData(rh.request()));
 
     // Counts the number of new trajectories.
     int newNumTrajectories = 0;
@@ -50,7 +97,8 @@ MTrajectoryEnsembleSelection* MGeometricLengthTrajectoryFilter::produceData(MDat
 
     const int numEnsembles = lineSelection->getNumEnsembleMembers();
 
-    // Loop through each member and filter the lines corresponding to that member.
+    // Loop through each member and filter the lines corresponding to that
+    // member.
     for (uint ee = 0; ee < static_cast<uint>(numEnsembles); ++ee)
     {
         // Obtain the start and end line index for the current member.
@@ -67,7 +115,7 @@ MTrajectoryEnsembleSelection* MGeometricLengthTrajectoryFilter::produceData(MDat
             const int indexCount = lineSelection->getIndexCount()[i];
             const int endIndex = startIndex + indexCount;
 
-            // Geometric length in km
+            // Geometric length in km.
             float length = 0;
             // Nearly the distance of two grid points in latitudinal direction
             // on the Earth's sphere, ~111.2 km.
@@ -84,9 +132,11 @@ MTrajectoryEnsembleSelection* MGeometricLengthTrajectoryFilter::produceData(MDat
                 // Compute the distance between the two adjacent vertices in km.
                 // The longitudinal distance vanishes towards the poles and
                 // increases towards the equator. This effect is approximated by
-                // multiplying the x-distance with the cosine of the current latitude.
-                QVector2D distance((p1.x() - p0.x()) * std::cos(p1.y() * M_PI / 180.0f),
-                                    p1.y() - p0.y());
+                // multiplying the x-distance with the cosine of the current
+                // latitude.
+                QVector2D distance((p1.x() - p0.x())
+                                   * std::cos(p1.y() * M_PI / 180.0f),
+                                   p1.y() - p0.y());
 
                 length += distance.length() * deltaLat;
             }
@@ -108,11 +158,12 @@ MTrajectoryEnsembleSelection* MGeometricLengthTrajectoryFilter::produceData(MDat
 
     // Create the new selection of trajectory lines.
     MWritableTrajectoryEnsembleSelection *filterResult =
-            new MWritableTrajectoryEnsembleSelection(lineSelection->refersTo(),
-                                                     newNumTrajectories,
-                                                     lineSelection->getTimes(),
-                                                     lineSelection->getStartGridStride(),
-                                                     numEnsembles);
+            new MWritableTrajectoryEnsembleSelection(
+                lineSelection->refersTo(),
+                newNumTrajectories,
+                lineSelection->getTimes(),
+                lineSelection->getStartGridStride(),
+                numEnsembles);
 
     // Write back only those lines that satisfied the threshold criterion.
     for (int k = 0; k < newStartIndices.size(); ++k)
@@ -132,6 +183,7 @@ MTrajectoryEnsembleSelection* MGeometricLengthTrajectoryFilter::produceData(MDat
     return filterResult;
 }
 
+
 MTask *MGeometricLengthTrajectoryFilter::createTaskGraph(MDataRequest request)
 {
     assert(isoSurfaceIntersectionSource != nullptr);
@@ -147,14 +199,21 @@ MTask *MGeometricLengthTrajectoryFilter::createTaskGraph(MDataRequest request)
     task->addParent(inputSelectionSource->getTaskGraph(rh.request()));
     // Get original trajectory lines.
     task->addParent(isoSurfaceIntersectionSource
-                            ->getTaskGraph(lineRequest));
+                    ->getTaskGraph(lineRequest));
 
     return task;
 }
+
+
+/******************************************************************************
+***                          PROTECTED METHODS                              ***
+*******************************************************************************/
 
 const QStringList MGeometricLengthTrajectoryFilter::locallyRequiredKeys()
 {
     return (QStringList()
             << "GEOLENFILTER_OP" << "GEOLENFILTER_VALUE"
-    );
+            );
 }
+
+} // namespace Met3D

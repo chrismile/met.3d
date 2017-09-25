@@ -1,40 +1,71 @@
-//
-// Created by kerninator on 02.05.17.
-//
-
+/******************************************************************************
+**
+**  This file is part of Met.3D -- a research environment for the
+**  three-dimensional visual exploration of numerical ensemble weather
+**  prediction data.
+**
+**  Copyright 2017 Marc Rautenhaus
+**  Copyright 2017 Michael Kern
+**
+**  Computer Graphics and Visualization Group
+**  Technische Universitaet Muenchen, Garching, Germany
+**
+**  Met.3D is free software: you can redistribute it and/or modify
+**  it under the terms of the GNU General Public License as published by
+**  the Free Software Foundation, either version 3 of the License, or
+**  (at your option) any later version.
+**
+**  Met.3D is distributed in the hope that it will be useful,
+**  but WITHOUT ANY WARRANTY; without even the implied warranty of
+**  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+**  GNU General Public License for more details.
+**
+**  You should have received a copy of the GNU General Public License
+**  along with Met.3D.  If not, see <http://www.gnu.org/licenses/>.
+**
+*******************************************************************************/
 #include "jetcoredetectionactor.h"
 
-using namespace Met3D;
+// standard library imports
+
+// related third party imports
+
+// local application imports
+
+
+namespace Met3D
+{
 
 /******************************************************************************
 ***                     CONSTRUCTOR / DESTRUCTOR                            ***
 *******************************************************************************/
 
 MJetcoreDetectionActor::MJetcoreDetectionActor()
-        : MIsosurfaceIntersectionActor(),
-          partialDerivFilters({nullptr, nullptr}),
-          hessianFilter(nullptr),
-          arrowsVertexBuffer(nullptr),
-          arrowHeads(nullptr)
+    : MIsosurfaceIntersectionActor(),
+      partialDerivFilters({nullptr, nullptr}),
+      hessianFilter(nullptr),
+      arrowsVertexBuffer(nullptr),
+      arrowHeads(nullptr)
 {
     beginInitialiseQtProperties();
 
-    setName("Jetcore Detection Actor");
+    setActorType("Jetcore Detection Actor");
+    setName(getActorType());
 
     variableSettings->varsProperty[0]->setPropertyName("u-component of wind");
     variableSettings->varsProperty[1]->setPropertyName("v-component of wind");
 
     variableSettingsCores =
-            std::make_shared<VariableSettingsJetcores>(this,
-                                                       variableSettings->groupProp);
+            std::make_shared<VariableSettingsJetcores>(
+                this, variableSettings->groupProp);
 
     lineFilterSettingsCores =
-            std::make_shared<FilterSettingsJetcores>(this,
-                                                     lineFilterSettings->groupProp);
+            std::make_shared<FilterSettingsJetcores>(
+                this, lineFilterSettings->groupProp);
 
     appearanceSettingsCores =
-            std::make_shared<AppearanceSettingsJetcores>(this,
-                                                         appearanceSettings->groupProp);
+            std::make_shared<AppearanceSettingsJetcores>(
+                this, appearanceSettings->groupProp);
 
     endInitialiseQtProperties();
 }
@@ -49,10 +80,9 @@ MJetcoreDetectionActor::~MJetcoreDetectionActor()
 *******************************************************************************/
 
 MJetcoreDetectionActor::VariableSettingsJetcores::VariableSettingsJetcores(
-        MJetcoreDetectionActor *hostActor,
-        QtProperty *groupProp) :
-        geoPotVarIndex(-1),
-        geoPotOnly(false)
+        MJetcoreDetectionActor *hostActor, QtProperty *groupProp)
+    : geoPotVarIndex(-1),
+      geoPotOnly(false)
 {
     MActor *a = hostActor;
     MQtProperties *properties = a->getQtProperties();
@@ -67,11 +97,10 @@ MJetcoreDetectionActor::VariableSettingsJetcores::VariableSettingsJetcores(
 }
 
 MJetcoreDetectionActor::FilterSettingsJetcores::FilterSettingsJetcores(
-        MJetcoreDetectionActor *hostActor,
-        QtProperty *groupProp) :
-        lambdaThreshold(0),
-        angleThreshold(50),
-        pressureDiffThreshold(10.0f)
+        MJetcoreDetectionActor *hostActor, QtProperty *groupProp)
+    : lambdaThreshold(0.f),
+      angleThreshold(50.f),
+      pressureDiffThreshold(10.0f)
 {
     MActor *a = hostActor;
     MQtProperties *properties = a->getQtProperties();
@@ -87,18 +116,17 @@ MJetcoreDetectionActor::FilterSettingsJetcores::FilterSettingsJetcores(
     properties->setDouble(angleThresholdProperty, angleThreshold, 0, 180, 2,
                           0.1);
 
-    pressureDiffThresholdProperty = a->addProperty(DECORATEDDOUBLE_PROPERTY,
-                                                   "pressure difference threshold",
-                                                   groupProp);
+    pressureDiffThresholdProperty = a->addProperty(
+                DECORATEDDOUBLE_PROPERTY, "pressure difference threshold",
+                groupProp);
     properties->setDDouble(pressureDiffThresholdProperty, pressureDiffThreshold,
                            0, 1000, 2, 1, " hPa");
 }
 
 
 MJetcoreDetectionActor::AppearanceSettingsJetcores::AppearanceSettingsJetcores(
-        MJetcoreDetectionActor *hostActor,
-        QtProperty *groupProp) :
-        arrowsEnabled(false)
+        MJetcoreDetectionActor *hostActor, QtProperty *groupProp)
+    : arrowsEnabled(false)
 {
     MActor *a = hostActor;
     MQtProperties *properties = a->getQtProperties();
@@ -120,7 +148,7 @@ void MJetcoreDetectionActor::saveConfiguration(QSettings *settings)
     settings->beginGroup(MJetcoreDetectionActor::getSettingsID());
 
     settings->setValue("geoPotVarIndex", variableSettingsCores->geoPotVarIndex);
-    settings->setValue("geoPotOnly", variableSettingsCores->geoPotOnly);
+    settings->setValue("geoPotVarOnly", variableSettingsCores->geoPotOnly);
     settings->setValue("lambdaThreshold",
                        lineFilterSettingsCores->lambdaThreshold);
     settings->setValue("angleThreshold",
@@ -141,37 +169,37 @@ void MJetcoreDetectionActor::loadConfiguration(QSettings *settings)
     settings->beginGroup(getSettingsID());
 
     variableSettingsCores->geoPotVarIndex = settings->value(
-            "geoPotVarIndex").toInt();
+                "geoPotVarIndex", -1).toInt();
     properties->mEnum()->setValue(variableSettingsCores->geoPotVarProperty,
                                   variableSettingsCores->geoPotVarIndex);
     variableSettingsCores->geoPotOnly = settings->value(
-            "geoPotVarOnly").toBool();
+                "geoPotVarOnly", false).toBool();
     properties->mBool()->setValue(variableSettingsCores->geoPotOnlyProperty,
                                   variableSettingsCores->geoPotOnly);
 
     lineFilterSettingsCores->lambdaThreshold = settings->value(
-            "lambdaThreshold").toFloat();
+                "lambdaThreshold", 0.f).toFloat();
     properties->mDouble()->setValue(
-            lineFilterSettingsCores->lambdaThresholdProperty,
-            lineFilterSettingsCores->lambdaThreshold);
+                lineFilterSettingsCores->lambdaThresholdProperty,
+                lineFilterSettingsCores->lambdaThreshold);
     lineFilterSettingsCores->angleThreshold = settings->value(
-            "angleThreshold").toFloat();
+                "angleThreshold", 50.f).toFloat();
     properties->mDouble()->setValue(
-            lineFilterSettingsCores->angleThresholdProperty,
-            lineFilterSettingsCores->angleThreshold);
+                lineFilterSettingsCores->angleThresholdProperty,
+                lineFilterSettingsCores->angleThreshold);
     lineFilterSettingsCores->pressureDiffThreshold = settings->value(
-            "pressureDiffThreshold").toFloat();
+                "pressureDiffThreshold", 10.f).toFloat();
     properties->mDecoratedDouble()->setValue(
-            lineFilterSettingsCores->pressureDiffThresholdProperty,
-            lineFilterSettingsCores->pressureDiffThreshold);
+                lineFilterSettingsCores->pressureDiffThresholdProperty,
+                lineFilterSettingsCores->pressureDiffThreshold);
 
     appearanceSettingsCores->arrowsEnabled = settings->value(
-            "arrowsEnabled").toBool();
+                "arrowsEnabled", false).toBool();
     properties->mBool()->setValue(
-            appearanceSettingsCores->arrowsEnabledProperty,
-            appearanceSettingsCores->arrowsEnabled);
+                appearanceSettingsCores->arrowsEnabledProperty,
+                appearanceSettingsCores->arrowsEnabled);
 
-    settings->beginGroup(getSettingsID());
+    settings->endGroup();
     supressActorUpdates = false;
 }
 
@@ -188,10 +216,10 @@ void MJetcoreDetectionActor::onQtPropertyChanged(QtProperty *property)
     MIsosurfaceIntersectionActor::onQtPropertyChanged(property);
 
     if (property == variableSettingsCores->geoPotVarProperty
-        || property == variableSettingsCores->geoPotOnlyProperty
-        || property == lineFilterSettingsCores->lambdaThresholdProperty
-        || property == lineFilterSettingsCores->angleThresholdProperty
-        || property == lineFilterSettingsCores->pressureDiffThresholdProperty)
+            || property == variableSettingsCores->geoPotOnlyProperty
+            || property == lineFilterSettingsCores->lambdaThresholdProperty
+            || property == lineFilterSettingsCores->angleThresholdProperty
+            || property == lineFilterSettingsCores->pressureDiffThresholdProperty)
     {
         variableSettingsCores->geoPotVarIndex = properties->mEnum()
                 ->value(variableSettingsCores->geoPotVarProperty);
@@ -205,8 +233,9 @@ void MJetcoreDetectionActor::onQtPropertyChanged(QtProperty *property)
         lineFilterSettingsCores->angleThreshold = properties->mDouble()
                 ->value(lineFilterSettingsCores->angleThresholdProperty);
 
-        lineFilterSettingsCores->pressureDiffThreshold = properties->mDecoratedDouble()
-                ->value(lineFilterSettingsCores->pressureDiffThresholdProperty);
+        lineFilterSettingsCores->pressureDiffThreshold =
+                properties->mDecoratedDouble()->value(
+                    lineFilterSettingsCores->pressureDiffThresholdProperty);
 
         if (enableAutoComputation)
         {
@@ -214,7 +243,8 @@ void MJetcoreDetectionActor::onQtPropertyChanged(QtProperty *property)
         }
 
         emitActorChangedSignal();
-    } else if (property == appearanceSettingsCores->arrowsEnabledProperty)
+    }
+    else if (property == appearanceSettingsCores->arrowsEnabledProperty)
     {
         appearanceSettingsCores->arrowsEnabled = properties->mBool()
                 ->value(appearanceSettingsCores->arrowsEnabledProperty);
@@ -239,7 +269,8 @@ void MJetcoreDetectionActor::initializeActorResources()
     angleFilter = std::make_shared<MAngleTrajectoryFilter>();
     addFilter(angleFilter);
 
-    pressureDiffFilter = std::make_shared<MEndPressureDifferenceTrajectoryFilter>();
+    pressureDiffFilter =
+            std::make_shared<MEndPressureDifferenceTrajectoryFilter>();
     addFilter(pressureDiffFilter);
 
     arrowHeadsSource = std::make_shared<MTrajectoryArrowHeadsSource>();
@@ -257,29 +288,35 @@ void MJetcoreDetectionActor::initializeActorResources()
 
 void MJetcoreDetectionActor::requestIsoSurfaceIntersectionLines()
 {
-    if (getViews().empty())
-    { return; }
+    // Only send request if actor is connected to a bounding box and at least
+    // one scene view.
+    if (getViews().empty() || bBoxConnection->getBoundingBox() == nullptr)
+    {
+        return;
+    }
 
     if (isCalculating
-        || variableSettings->varsIndex[0] == variableSettings->varsIndex[1])
-    { return; }
+            || variableSettings->varsIndex[0] == variableSettings->varsIndex[1])
+    {
+        return;
+    }
 
     isCalculating = true;
 
     // If the user has selected an ensemble member and at least one variable,
     // then obtain all selected ensemble members.
     if (ensembleSelectionSettings->selectedEnsembleMembers.size() == 0 &&
-        variables.size() > 0 &&
-        variables.at(0)->dataSource != nullptr)
+            variables.size() > 0 &&
+            variables.at(0)->dataSource != nullptr)
     {
         ensembleSelectionSettings->selectedEnsembleMembers = variables.at(0)->
                 dataSource->availableEnsembleMembers(
-                variables.at(0)->levelType,
-                variables.at(0)->variableName);
+                    variables.at(0)->levelType,
+                    variables.at(0)->variableName);
         QString s = MDataRequestHelper::uintSetToString(
-                ensembleSelectionSettings->selectedEnsembleMembers);
+                    ensembleSelectionSettings->selectedEnsembleMembers);
         properties->mString()->setValue(
-                ensembleSelectionSettings->ensembleMultiMemberProperty, s);
+                    ensembleSelectionSettings->ensembleMultiMemberProperty, s);
     }
 
     MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
@@ -289,7 +326,6 @@ void MJetcoreDetectionActor::requestIsoSurfaceIntersectionLines()
     // Create a new instance of an iso-surface intersection source if not created.
     if (isosurfaceSource == nullptr)
     {
-
         isosurfaceSource = new MIsosurfaceIntersectionSource();
 
         isosurfaceSource->setScheduler(scheduler);
@@ -313,7 +349,9 @@ void MJetcoreDetectionActor::requestIsoSurfaceIntersectionLines()
     for (int i = 0; i < 2; ++i)
     {
         if (partialDerivFilters[i] != nullptr)
-        { continue; }
+        {
+            continue;
+        }
 
         partialDerivFilters[i] = new MMultiVarPartialDerivativeFilter();
 
@@ -329,14 +367,17 @@ void MJetcoreDetectionActor::requestIsoSurfaceIntersectionLines()
     supressActorUpdates = false;
 
     // Obtain the two variables that should be intersected.
-    MNWPIsolevelActorVariable *var1st = dynamic_cast<MNWPIsolevelActorVariable *>(
-            variables.at(variableSettings->varsIndex[0]));
-    MNWPIsolevelActorVariable *var2nd = dynamic_cast<MNWPIsolevelActorVariable *>(
-            variables.at(variableSettings->varsIndex[1]));
+    MNWPIsolevelActorVariable *var1st =
+            dynamic_cast<MNWPIsolevelActorVariable *>(
+                variables.at(variableSettings->varsIndex[0]));
+    MNWPIsolevelActorVariable *var2nd =
+            dynamic_cast<MNWPIsolevelActorVariable *>(
+                variables.at(variableSettings->varsIndex[1]));
 
     // Obtain the variable for geopotential height.
-    MNWPIsolevelActorVariable *varGeoPot = dynamic_cast<MNWPIsolevelActorVariable *>(
-            variables.at(variableSettingsCores->geoPotVarIndex));
+    MNWPIsolevelActorVariable *varGeoPot =
+            dynamic_cast<MNWPIsolevelActorVariable *>(
+                variables.at(variableSettingsCores->geoPotVarIndex));
 
     partialDerivFilters[0]->setInputSource(var1st->dataSource);
     partialDerivFilters[1]->setInputSource(var2nd->dataSource);
@@ -348,7 +389,8 @@ void MJetcoreDetectionActor::requestIsoSurfaceIntersectionLines()
     if (var2nd->synchronizationControl != nullptr)
     {
         var2nd->synchronizationControl->setEnabled(false);
-    } else
+    }
+    else
     {
         if (var1st->synchronizationControl != nullptr)
         {
@@ -363,14 +405,14 @@ void MJetcoreDetectionActor::requestIsoSurfaceIntersectionLines()
     rh.insert("VALID_TIME", var1st->getPropertyTime(var1st->validTimeProperty));
     rh.insert("LEVELTYPE", var1st->levelType);
     rh.insert("MEMBER", 0);
-    rh.insert("MEMBERS", MDataRequestHelper
-    ::uintSetToString(ensembleSelectionSettings->selectedEnsembleMembers));
+    rh.insert("MEMBERS", MDataRequestHelper::uintSetToString(
+                  ensembleSelectionSettings->selectedEnsembleMembers));
 
-//    rh.insert("ENS_OPERATION", "");//ensembleSelectionSettings->ensembleFilterOperation);
+//    rh.insert("ENS_OPERATION", ""); // ensembleSelectionSettings->ensembleFilterOperation);
     rh.insert("ISOX_VARIABLES", var1st->variableName + "/"
-                                + var2nd->variableName);
+              + var2nd->variableName);
     rh.insert("ISOX_VALUES", QString::number(var1st->getIsoValue())
-                             + "/" + QString::number(var2nd->getIsoValue()));
+              + "/" + QString::number(var2nd->getIsoValue()));
     rh.insert("VARIABLE", var1st->variableName);
 
     rh.insert("MULTI_DERIVATIVE_SETTINGS", "ddn/ddz");
@@ -401,8 +443,9 @@ void MJetcoreDetectionActor::buildFilterChain(MDataRequestHelper &rh)
 
     if (variableSettings->varsIndex[2] > 0)
     {
-        varSource = dynamic_cast<MNWPIsolevelActorVariable *>(variables.at(
-                variableSettings->varsIndex[2] - 1));
+        varSource =
+                dynamic_cast<MNWPIsolevelActorVariable *>(
+                    variables.at(variableSettings->varsIndex[2] - 1));
     }
 
     MNWPIsolevelActorVariable *varThickness = nullptr;
@@ -410,7 +453,8 @@ void MJetcoreDetectionActor::buildFilterChain(MDataRequestHelper &rh)
     if (tubeThicknessSettings->mappedVariableIndex > 0)
     {
         varThickness = dynamic_cast<MNWPIsolevelActorVariable *>(
-                variables.at(tubeThicknessSettings->mappedVariableIndex - 1));
+                    variables.at(tubeThicknessSettings->mappedVariableIndex - 1)
+                    );
     }
 
     MNWPIsolevelActorVariable *varMapped = nullptr;
@@ -418,7 +462,7 @@ void MJetcoreDetectionActor::buildFilterChain(MDataRequestHelper &rh)
     if (appearanceSettings->colorVariableIndex > 0)
     {
         varMapped = dynamic_cast<MNWPIsolevelActorVariable *>(
-                variables.at(appearanceSettings->colorVariableIndex - 1));
+                    variables.at(appearanceSettings->colorVariableIndex - 1));
     }
 
     // If the user has selected a variable to filter by, set the filter variable
@@ -433,21 +477,24 @@ void MJetcoreDetectionActor::buildFilterChain(MDataRequestHelper &rh)
 
         varTrajectoryFilter->setIsosurfaceSource(isosurfaceSource);
         varTrajectoryFilter->setFilterVariableInputSource(
-                varSource->dataSource);
+                    varSource->dataSource);
         varTrajectoryFilter->setLineRequest(lineRequest);
 
         filterRequests.push_back(
-                {varTrajectoryFilter, inputSource, rh.request()});
+        {varTrajectoryFilter, inputSource, rh.request()});
         inputSource = varTrajectoryFilter.get();
     }
 
-    MNWPIsolevelActorVariable *var1st = dynamic_cast<MNWPIsolevelActorVariable *>(
-            variables.at(variableSettings->varsIndex[0]));
-    MNWPIsolevelActorVariable *var2nd = dynamic_cast<MNWPIsolevelActorVariable *>(
-            variables.at(variableSettings->varsIndex[1]));
+    MNWPIsolevelActorVariable *var1st =
+            dynamic_cast<MNWPIsolevelActorVariable *>(
+                variables.at(variableSettings->varsIndex[0]));
+    MNWPIsolevelActorVariable *var2nd =
+            dynamic_cast<MNWPIsolevelActorVariable *>(
+                variables.at(variableSettings->varsIndex[1]));
 
-    MNWPIsolevelActorVariable *varGeoPot = dynamic_cast<MNWPIsolevelActorVariable *>(
-            variables.at(variableSettingsCores->geoPotVarIndex));
+    MNWPIsolevelActorVariable *varGeoPot =
+            dynamic_cast<MNWPIsolevelActorVariable *>(
+                variables.at(variableSettingsCores->geoPotVarIndex));
 
     // Set the Hessian eigenvalue filter.
     rh.insert("HESSIANFILTER_MEMBERS", rh.value("MEMBERS"));
@@ -457,7 +504,7 @@ void MJetcoreDetectionActor::buildFilterChain(MDataRequestHelper &rh)
     rh.insert("HESSIANFILTER_GEOPOTENTIAL_TYPE",
               static_cast<int>(variableSettingsCores->geoPotOnly));
     rh.insert("HESSIANFILTER_VARIABLES", var1st->variableName + "/"
-                                         + var2nd->variableName);
+              + var2nd->variableName);
     rh.insert("HESSIANFILTER_DERIVOPS", "d2dn2/d2dz2/d2dndz");
 
     hessianFilter->setIsosurfaceSource(isosurfaceSource);
@@ -503,7 +550,7 @@ void MJetcoreDetectionActor::buildFilterChain(MDataRequestHelper &rh)
     rh.insert("GEOLENFILTER_OP", "GREATER_OR_EQUAL");
 
     filterRequests.push_back(
-            {geomLengthTrajectoryFilter, inputSource, rh.request()});
+    {geomLengthTrajectoryFilter, inputSource, rh.request()});
 
     inputSource = geomLengthTrajectoryFilter.get();
 
@@ -520,7 +567,7 @@ void MJetcoreDetectionActor::buildFilterChain(MDataRequestHelper &rh)
 
     rh.insert("ARROWHEADS_MEMBERS", rh.value("MEMBERS"));
     rh.insert("ARROWHEADS_UV_VARIABLES", var1st->variableName + "/"
-                                         + var2nd->variableName);
+              + var2nd->variableName);
     rh.insert("ARROWHEADS_SOURCEVAR",
               (varMapped) ? varMapped->variableName : "");
 
@@ -537,15 +584,22 @@ void MJetcoreDetectionActor::buildFilterChain(MDataRequestHelper &rh)
     valueTrajectorySource->setLineRequest(lineRequest);
     valueTrajectorySource->setInputSelectionSource(inputSource);
     if (varMapped)
-    { valueTrajectorySource->setInputSourceValueVar(varMapped->dataSource); }
+    {
+        valueTrajectorySource->setInputSourceValueVar(varMapped->dataSource);
+    }
     else
-    { valueTrajectorySource->setInputSourceValueVar(nullptr); }
+    {
+        valueTrajectorySource->setInputSourceValueVar(nullptr);
+    }
     if (varThickness)
     {
         valueTrajectorySource->setInputSourceThicknessVar(
-                varThickness->dataSource);
-    } else
-    { valueTrajectorySource->setInputSourceThicknessVar(nullptr); }
+                    varThickness->dataSource);
+    }
+    else
+    {
+        valueTrajectorySource->setInputSourceThicknessVar(nullptr);
+    }
 
     rh.insert("TRAJECTORYVALUES_MEMBERS", rh.value("MEMBERS"));
     rh.insert("TRAJECTORYVALUES_VARIABLE",
@@ -598,16 +652,20 @@ void MJetcoreDetectionActor::renderToDepthMap(MSceneViewGLWidget *sceneView)
 
 
         if (appearanceSettings->colorVariableIndex > 0 &&
-            appearanceSettings->transferFunction != 0)
+                appearanceSettings->transferFunction != 0)
         {
             appearanceSettings->transferFunction->getTexture()->bindToTextureUnit(
-                    static_cast<GLuint>(appearanceSettings->textureUnitTransferFunction));
-            lineTubeShader->setUniformValue("transferFunction",
-                                            appearanceSettings->textureUnitTransferFunction);
-            lineTubeShader->setUniformValue("tfMinimum",
-                                            appearanceSettings->transferFunction->getMinimumValue());
-            lineTubeShader->setUniformValue("tfMaximum",
-                                            appearanceSettings->transferFunction->getMaximumValue());
+                        static_cast<GLuint>(
+                            appearanceSettings->textureUnitTransferFunction));
+            lineTubeShader->setUniformValue(
+                        "transferFunction",
+                        appearanceSettings->textureUnitTransferFunction);
+            lineTubeShader->setUniformValue(
+                        "tfMinimum",
+                        appearanceSettings->transferFunction->getMinimumValue());
+            lineTubeShader->setUniformValue(
+                        "tfMaximum",
+                        appearanceSettings->transferFunction->getMaximumValue());
             lineTubeShader->setUniformValue("normalized", false);
         }
 
@@ -621,9 +679,9 @@ void MJetcoreDetectionActor::renderToDepthMap(MSceneViewGLWidget *sceneView)
                                         sceneView->pressureToWorldZParameters());
 
         lineTubeShader->setUniformValue(
-                "lightDirection", sceneView->getLightDirection());
+                    "lightDirection", sceneView->getLightDirection());
         lineTubeShader->setUniformValue(
-                "cameraPosition", sceneView->getCamera()->getOrigin());
+                    "cameraPosition", sceneView->getCamera()->getOrigin());
         lineTubeShader->setUniformValue("shadowColor",
                                         QColor(100, 100, 100, 155));
 
@@ -659,9 +717,13 @@ void MJetcoreDetectionActor::renderToDepthMap(MSceneViewGLWidget *sceneView)
     }
 }
 
-void
-MJetcoreDetectionActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
+void MJetcoreDetectionActor::renderToCurrentContext(
+        MSceneViewGLWidget *sceneView)
 {
+    if (bBoxConnection->getBoundingBox() == nullptr)
+    {
+        return;
+    }
     MIsosurfaceIntersectionActor::renderToCurrentContext(sceneView);
 
     // Draw the arrow heads at the end of each jet core line.
@@ -671,8 +733,8 @@ MJetcoreDetectionActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
         lineTubeShader->bindProgram("ArrowHeads");
         CHECK_GL_ERROR;
 
-        lineTubeShader->setUniformValue("mvpMatrix",
-                                        *(sceneView->getModelViewProjectionMatrix()));
+        lineTubeShader->setUniformValue(
+                    "mvpMatrix", *(sceneView->getModelViewProjectionMatrix()));
         CHECK_GL_ERROR;
 
         lineTubeShader->setUniformValue("lightMVPMatrix", lightMVP);
@@ -688,16 +750,20 @@ MJetcoreDetectionActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
 
 
         if (appearanceSettings->colorVariableIndex > 0 &&
-            appearanceSettings->transferFunction != 0)
+                appearanceSettings->transferFunction != 0)
         {
             appearanceSettings->transferFunction->getTexture()->bindToTextureUnit(
-                    static_cast<GLuint>(appearanceSettings->textureUnitTransferFunction));
-            lineTubeShader->setUniformValue("transferFunction",
-                                            appearanceSettings->textureUnitTransferFunction);
-            lineTubeShader->setUniformValue("tfMinimum",
-                                            appearanceSettings->transferFunction->getMinimumValue());
-            lineTubeShader->setUniformValue("tfMaximum",
-                                            appearanceSettings->transferFunction->getMaximumValue());
+                        static_cast<GLuint>(
+                            appearanceSettings->textureUnitTransferFunction));
+            lineTubeShader->setUniformValue(
+                        "transferFunction",
+                        appearanceSettings->textureUnitTransferFunction);
+            lineTubeShader->setUniformValue(
+                        "tfMinimum",
+                        appearanceSettings->transferFunction->getMinimumValue());
+            lineTubeShader->setUniformValue(
+                        "tfMaximum",
+                        appearanceSettings->transferFunction->getMaximumValue());
             lineTubeShader->setUniformValue("normalized", false);
         }
 
@@ -710,9 +776,9 @@ MJetcoreDetectionActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
                                         sceneView->pressureToWorldZParameters());
 
         lineTubeShader->setUniformValue(
-                "lightDirection", sceneView->getLightDirection());
+                    "lightDirection", sceneView->getLightDirection());
         lineTubeShader->setUniformValue(
-                "cameraPosition", sceneView->getCamera()->getOrigin());
+                    "cameraPosition", sceneView->getCamera()->getOrigin());
         lineTubeShader->setUniformValue("shadowColor",
                                         QColor(100, 100, 100, 155));
 
@@ -781,3 +847,6 @@ void MJetcoreDetectionActor::refreshEnumsProperties(MNWPActorVariable *var)
 /******************************************************************************
 ***                           PRIVATE METHODS                               ***
 *******************************************************************************/
+
+
+} // namespace Met3D

@@ -1,17 +1,54 @@
-//
-// Created by kerninator on 17.05.17.
-//
-
+/******************************************************************************
+**
+**  This file is part of Met.3D -- a research environment for the
+**  three-dimensional visual exploration of numerical ensemble weather
+**  prediction data.
+**
+**  Copyright 2017 Marc Rautenhaus
+**  Copyright 2017 Michael Kern
+**
+**  Computer Graphics and Visualization Group
+**  Technische Universitaet Muenchen, Garching, Germany
+**
+**  Met.3D is free software: you can redistribute it and/or modify
+**  it under the terms of the GNU General Public License as published by
+**  the Free Software Foundation, either version 3 of the License, or
+**  (at your option) any later version.
+**
+**  Met.3D is distributed in the hope that it will be useful,
+**  but WITHOUT ANY WARRANTY; without even the implied warranty of
+**  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+**  GNU General Public License for more details.
+**
+**  You should have received a copy of the GNU General Public License
+**  along with Met.3D.  If not, see <http://www.gnu.org/licenses/>.
+**
+*******************************************************************************/
 #include "trajectoryarrowheadssource.h"
 
-using namespace Met3D;
+// standard library imports
+
+// related third party imports
+
+// local application imports
+
+
+namespace Met3D
+{
+
+/******************************************************************************
+***                     CONSTRUCTOR / DESTRUCTOR                            ***
+*******************************************************************************/
 
 MTrajectoryArrowHeadsSource::MTrajectoryArrowHeadsSource()
         : MScheduledDataSource(), inputSources({ nullptr, nullptr, nullptr })
 {
-
 }
 
+
+/******************************************************************************
+***                            PUBLIC METHODS                               ***
+*******************************************************************************/
 
 void MTrajectoryArrowHeadsSource::setIsosurfaceSource(
         MIsosurfaceIntersectionSource* s)
@@ -22,7 +59,8 @@ void MTrajectoryArrowHeadsSource::setIsosurfaceSource(
 }
 
 
-void MTrajectoryArrowHeadsSource::setInputSelectionSource(MTrajectorySelectionSource *s)
+void MTrajectoryArrowHeadsSource::setInputSelectionSource(
+        MTrajectorySelectionSource *s)
 {
     inputSelectionSource = s;
     registerInputSource(inputSelectionSource);
@@ -52,13 +90,17 @@ void MTrajectoryArrowHeadsSource::setInputSourceVar(
 {
     inputSources[2] = inputSource;
 
-    if (!inputSources[2]) { return; }
+    if (!inputSources[2])
+    {
+        return;
+    }
     registerInputSource(inputSources[2]);
     enablePassThrough(inputSources[2]);
 }
 
 
-MTrajectoryArrowHeads* MTrajectoryArrowHeadsSource::produceData(MDataRequest request)
+MTrajectoryArrowHeads*
+MTrajectoryArrowHeadsSource::produceData(MDataRequest request)
 {
     assert(isoSurfaceIntersectionSource != nullptr);
     assert(inputSelectionSource         != nullptr);
@@ -71,11 +113,13 @@ MTrajectoryArrowHeads* MTrajectoryArrowHeadsSource::produceData(MDataRequest req
 
     const QStringList members = rh.value("ARROWHEADS_MEMBERS").split("/");
 
-    MIsosurfaceIntersectionLines* lineSource = isoSurfaceIntersectionSource->getData(lineRequest);
+    MIsosurfaceIntersectionLines* lineSource =
+            isoSurfaceIntersectionSource->getData(lineRequest);
 
     rh.removeAll(locallyRequiredKeys());
     MTrajectoryEnsembleSelection* lineSelection =
-            static_cast<MTrajectoryEnsembleSelection*>(inputSelectionSource->getData(rh.request()));
+            static_cast<MTrajectoryEnsembleSelection*>(
+                inputSelectionSource->getData(rh.request()));
 
     MStructuredGrid *gridU      = nullptr;
     MStructuredGrid *gridV      = nullptr;
@@ -88,7 +132,8 @@ MTrajectoryArrowHeads* MTrajectoryArrowHeadsSource::produceData(MDataRequest req
     QVector<GLint> ensStartIndices = lineSelection->getEnsembleStartIndices();
     QVector<GLsizei> ensIndexCounts = lineSelection->getEnsembleIndexCount();
 
-    // Loop through each member and filter the lines corresponding to that member.
+    // Loop through each member and filter the lines corresponding to that
+    // member.
     for (uint ee = 0; ee < static_cast<uint>(members.size()); ++ee)
     {
         const QString member = members[ee];
@@ -156,9 +201,12 @@ MTrajectoryArrowHeads* MTrajectoryArrowHeadsSource::produceData(MDataRequest req
             else
             {
                 float value = 0;
-                if (gridSource) { value = gridSource->interpolateValue(pn1); }
+                if (gridSource)
+                {
+                    value = gridSource->interpolateValue(pn1);
+                }
 
-                // Add the arrow to the array
+                // Add the arrow to the array.
                 result->setVertex(i, { pn1, tangentn, value });
             }
         }
@@ -184,7 +232,7 @@ MTask *MTrajectoryArrowHeadsSource::createTaskGraph(MDataRequest request)
     const QStringList uvVars = rh.value("ARROWHEADS_UV_VARIABLES").split("/");
     const QString sourceVar = rh.value("ARROWHEADS_SOURCEVAR");
 
-    foreach (const auto& member, members)
+    foreach (const QString member, members)
     {
         MDataRequestHelper rhVar;
         rhVar.insert("MEMBER", member);
@@ -209,7 +257,7 @@ MTask *MTrajectoryArrowHeadsSource::createTaskGraph(MDataRequest request)
 
     rh.removeAll(locallyRequiredKeys());
 
-    // Get previous line selection
+    // Get previous line selection.
     task->addParent(inputSelectionSource->getTaskGraph(rh.request()));
 
     task->addParent(isoSurfaceIntersectionSource
@@ -219,6 +267,10 @@ MTask *MTrajectoryArrowHeadsSource::createTaskGraph(MDataRequest request)
 }
 
 
+/******************************************************************************
+***                          PROTECTED METHODS                              ***
+*******************************************************************************/
+
 const QStringList MTrajectoryArrowHeadsSource::locallyRequiredKeys()
 {
     return (QStringList()
@@ -226,3 +278,5 @@ const QStringList MTrajectoryArrowHeadsSource::locallyRequiredKeys()
             << "ARROWHEADS_SOURCEVAR"
     );
 }
+
+} // namespace Met3D

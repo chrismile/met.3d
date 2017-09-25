@@ -6,6 +6,7 @@
 **
 **  Copyright 2015-2017 Marc Rautenhaus
 **  Copyright 2017      Bianca Tost
+**  Copyright 2017      Michael Kern
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -55,7 +56,7 @@ namespace Met3D
   */
 class MNWPMultiVarActor : public MActor
 {
-Q_OBJECT
+    Q_OBJECT
 
 public:
     MNWPMultiVarActor();
@@ -198,18 +199,18 @@ protected:
     QStringList supportedFilters;
 };
 
-/**
-* @brief MNWPMultiVarIsolevelActor serves as base class for actors
-*  that use the isolevel property of the variables.
-*/
+    /**
+      @brief MNWPMultiVarIsolevelActor serves as base class for actors
+      that use the isolevel property of the variables.
+     */
 class MNWPMultiVarIsolevelActor : public MNWPMultiVarActor
 {
 Q_OBJECT
 public slots:
 
     /**
-     * @brief isoValueOfVariableChanged is triggered in the moment that the
-     * isolevel property of a connected variable is changed.
+      @brief isoValueOfVariableChanged is triggered when the isolevel property
+      of a connected variable has been changed.
      */
     virtual void isoValueOfVariableChanged() = 0;
 };

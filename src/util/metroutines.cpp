@@ -4,8 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
-**  Copyright 2015 Michael Kern
+**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2015-2017 Michael Kern
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -433,8 +433,10 @@ double boxVolume_dry(double northWestLon, double northWestLat,
     return boxVolume_dry(pmid_Pa, mass_kg, temp_K);
 }
 
-QVector2D getLineSegmentsIntersectionPoint(const QVector2D& p, const QVector2D& p2,
-                                          const QVector2D& q, const QVector2D& q2)
+
+QVector2D getLineSegmentsIntersectionPoint(
+        const QVector2D& p, const QVector2D& p2,
+        const QVector2D& q, const QVector2D& q2)
 {
     QVector2D r = p2 - p;
     QVector2D s = q2 - q;
@@ -443,7 +445,7 @@ QVector2D getLineSegmentsIntersectionPoint(const QVector2D& p, const QVector2D& 
     double t = crossProduct(qmp, s) / rxs;
     double u = crossProduct(qmp, r) / rxs;
 
-    // If r x s != 0 and 0 <= t <= 1 and 0 <= u <= 1
+    // If r x s != 0 and 0 <= t <= 1 and 0 <= u <= 1 ,
     // the two line segments meet at the point p + t r = q + u s.
     if ((0.0 <= t && t <= 1.0) && (0.0 <= u && u <= 1.0))
     {
@@ -451,10 +453,12 @@ QVector2D getLineSegmentsIntersectionPoint(const QVector2D& p, const QVector2D& 
         return p + t * r;
     }
 
+    // tag2017 Kann (0,0) kein Schnittpunktu sein? Wäre es nicht sinnvoller
+    // einen leeren Vektor zurückzugeben, falls es keinen Schnittpunkt gibt?
+
     // Otherwise, the two line segments are not parallel but do not intersect.
     return  QVector2D(0, 0);
 }
-
 
 
 } // namespace Met3D

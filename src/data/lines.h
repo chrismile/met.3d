@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2017 Marc Rautenhaus
+**  Copyright 2017 Michael Kern
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -23,11 +24,16 @@
 **  along with Met.3D.  If not, see <http://www.gnu.org/licenses/>.
 **
 *******************************************************************************/
-
 #ifndef LINES_H
 #define LINES_H
 
+// standard library imports
+
+// related third party imports
+
+// local application imports
 #include "data/abstractdataitem.h"
+
 
 namespace Met3D
 {
@@ -35,15 +41,16 @@ namespace Met3D
 class Lines : public MAbstractDataItem
 {
 public:
-    Lines(QVector<QVector<QVector3D> *> *_lines);
-    unsigned int getMemorySize_kb() {
-        return lines->size() * 3;
-    }
+    Lines(QVector<QVector<QVector3D> *> *lines);
+
+    unsigned int getMemorySize_kb() { return lines->size() * 3; }
 
 protected:
     friend class MIsosurfaceIntersectionSource;
+
     QVector<QVector<QVector3D>*> *lines;
 };
+
 
 } // namespace Met3D
 

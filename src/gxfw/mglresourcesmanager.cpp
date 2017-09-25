@@ -43,8 +43,11 @@
 #include "util/mexception.h"
 #include "util/mutil.h"
 
+
 using namespace std;
-using namespace Met3D;
+
+namespace Met3D
+{
 
 // Nvidia video memory info extension, see
 // http://developer.download.nvidia.com/opengl/specs/GL_NVX_gpu_memory_info.txt
@@ -54,8 +57,6 @@ using namespace Met3D;
 #define GPU_MEMORY_INFO_EVICTION_COUNT_NVX         0x904A
 #define GPU_MEMORY_INFO_EVICTED_MEMORY_NVX         0x904B
 
-namespace Met3D
-{
 
 // Initially set the single GL resources manager pointer to null.
 MGLResourcesManager* MGLResourcesManager::instance = 0;

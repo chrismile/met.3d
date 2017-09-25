@@ -7,6 +7,7 @@
 **  Copyright 2017 Marc Rautenhaus
 **  Copyright 2017 Michael Kern
 **  Copyright 2017 Christoph Heidelmann
+**  Copyright 2017 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -34,36 +35,44 @@
 // local application imports
 #include "gxfw/memberselectiondialog.h"
 
+
 using namespace std;
-using namespace Met3D;
+
+namespace Met3D
+{
 
 /******************************************************************************
 ***                     CONSTRUCTOR / DESTRUCTOR                            ***
 *******************************************************************************/
 
 MIsosurfaceIntersectionActor::MIsosurfaceIntersectionActor()
-        : MNWPMultiVarIsolevelActor(),
-          isosurfaceSource(nullptr),
-          intersectionLines(nullptr),
-          varTrajectoryFilter(nullptr),
-          geomLengthTrajectoryFilter(nullptr),
-          valueTrajectorySource(nullptr),
-          linesVertexBuffer(nullptr),
-          enableAutoComputation(true),
-          supressActorUpdates(false),
-          isCalculating(false),
-          poleActor(nullptr),
-          shadowMap(nullptr),
-          shadowImageVBO(nullptr),
-          shadowMapRes(8192),
-          vboBoundingBox(nullptr),
-          iboBoundingBox(0)
+    : MNWPMultiVarIsolevelActor(),
+      MBoundingBoxInterface(this),
+      isosurfaceSource(nullptr),
+      intersectionLines(nullptr),
+      varTrajectoryFilter(nullptr),
+      geomLengthTrajectoryFilter(nullptr),
+      valueTrajectorySource(nullptr),
+      linesVertexBuffer(nullptr),
+      enableAutoComputation(true),
+      supressActorUpdates(false),
+      isCalculating(false),
+      poleActor(nullptr),
+      shadowMap(nullptr),
+      shadowImageVBO(nullptr),
+      shadowMapRes(8192),
+      vboBoundingBox(nullptr),
+      iboBoundingBox(0)
 {
+    bBoxConnection =
+            new MBoundingBoxConnection(this, MBoundingBoxConnection::VOLUME);
+
     // Create and initialise QtProperties for the GUI.
     // ===============================================
     beginInitialiseQtProperties();
 
-    setName("Isosurface Intersection Actor");
+    setActorType("Isosurface Intersection Actor");
+    setName(getActorType());
 
     computeClickProperty = addProperty(CLICK_PROPERTY,
                                        "compute intersection",
@@ -87,18 +96,22 @@ MIsosurfaceIntersectionActor::MIsosurfaceIntersectionActor()
 
     tubeThicknessSettings = std::make_shared<TubeThicknessSettings>(this);
     appearanceSettings->groupProp->addSubProperty(
-            tubeThicknessSettings->groupProp);
+                tubeThicknessSettings->groupProp);
     tubeThicknessSettings->groupProp->setEnabled(
-            appearanceSettings->colorMode == 2);
+                appearanceSettings->colorMode == 2);
 
     ensembleSelectionSettings = std::make_shared<EnsembleSelectionSettings>(
-            this);
+                this);
     actorPropertiesSupGroup->addSubProperty(
-            ensembleSelectionSettings->groupProp);
+                ensembleSelectionSettings->groupProp);
 
     // Bounding box.
-    boundingBoxSettings = std::make_shared<BoundingBoxSettings>(this);
-    actorPropertiesSupGroup->addSubProperty(boundingBoxSettings->groupProp);
+    boundingBoxSettings = std::make_shared<BoundingBoxSettings>();
+    actorPropertiesSupGroup->addSubProperty(bBoxConnection->getProperty());
+    boundingBoxSettings->enabledProperty =
+            addProperty(BOOL_PROPERTY, "draw bounding box",
+                        actorPropertiesSupGroup);
+    properties->mBool()->setValue(boundingBoxSettings->enabledProperty, true);
 
     // Keep an instance of MovablePoleActor as a "subactor" to place poles
     // along jetstream core lines. This makes it easier for scientists to
@@ -131,7 +144,9 @@ MIsosurfaceIntersectionActor::MIsosurfaceIntersectionActor()
 MIsosurfaceIntersectionActor::~MIsosurfaceIntersectionActor()
 {
     if (appearanceSettings->textureUnitTransferFunction >= 0)
+    {
         releaseTextureUnit(appearanceSettings->textureUnitTransferFunction);
+    }
 }
 
 
@@ -141,7 +156,7 @@ MIsosurfaceIntersectionActor::~MIsosurfaceIntersectionActor()
 
 MIsosurfaceIntersectionActor::VariableSettings::VariableSettings(
         MIsosurfaceIntersectionActor *hostActor)
-        : varsIndex({{-1, -1, -1}})
+    : varsIndex({{-1, -1, -1}})
 {
     MActor *a = hostActor;
 
@@ -158,8 +173,8 @@ MIsosurfaceIntersectionActor::VariableSettings::VariableSettings(
 
 MIsosurfaceIntersectionActor::LineFilterSettings::LineFilterSettings(
         MIsosurfaceIntersectionActor *hostActor)
-        : valueFilter(40.0f),
-          lineLengthFilter(500)
+    : valueFilter(40.0f),
+      lineLengthFilter(500)
 {
     MActor *a = hostActor;
     MQtProperties *properties = a->getQtProperties();
@@ -180,17 +195,17 @@ MIsosurfaceIntersectionActor::LineFilterSettings::LineFilterSettings(
 
 MIsosurfaceIntersectionActor::AppearanceSettings::AppearanceSettings(
         MIsosurfaceIntersectionActor *hostActor) :
-        colorMode(0),
-        colorVariableIndex(-1),
-        tubeRadius(0.2),
-        tubeColor(QColor(255, 0, 0)),
-        transferFunction(nullptr),
-        textureUnitTransferFunction(-1),
-        enableShadows(true),
-        enableSelfShadowing(true),
-        thicknessMode(0),
-        polesEnabled(false),
-        dropMode(3)
+    colorMode(0),
+    colorVariableIndex(-1),
+    tubeRadius(0.2f),
+    tubeColor(QColor(255, 0, 0)),
+    transferFunction(nullptr),
+    textureUnitTransferFunction(-1),
+    enableShadows(true),
+    enableSelfShadowing(true),
+    thicknessMode(0),
+    polesEnabled(false),
+    dropMode(3)
 {
     MActor *a = hostActor;
     MQtProperties *properties = a->getQtProperties();
@@ -220,7 +235,8 @@ MIsosurfaceIntersectionActor::AppearanceSettings::AppearanceSettings(
 
     foreach (MActor *mactor, glRM->getActors())
     {
-        if (MTransferFunction1D *tf = dynamic_cast<MTransferFunction1D *>(mactor))
+        if (MTransferFunction1D *tf =
+                dynamic_cast<MTransferFunction1D *>(mactor))
         {
             availableTFs << tf->transferFunctionName();
         }
@@ -268,9 +284,9 @@ MIsosurfaceIntersectionActor::AppearanceSettings::AppearanceSettings(
 
 MIsosurfaceIntersectionActor::TubeThicknessSettings::TubeThicknessSettings(
         MIsosurfaceIntersectionActor *hostActor)
-        : mappedVariableIndex(-1),
-          valueRange(50.0, 85.0),
-          thicknessRange(0.01, 0.5)
+    : mappedVariableIndex(-1),
+      valueRange(50.0, 85.0),
+      thicknessRange(0.01, 0.5)
 {
     MActor *a = hostActor;
     MQtProperties *properties = a->getQtProperties();
@@ -292,9 +308,9 @@ MIsosurfaceIntersectionActor::TubeThicknessSettings::TubeThicknessSettings(
 }
 
 
-MIsosurfaceIntersectionActor::EnsembleSelectionSettings::EnsembleSelectionSettings(
-        MIsosurfaceIntersectionActor *hostActor)
-        : syncModeEnabled(false)
+MIsosurfaceIntersectionActor::EnsembleSelectionSettings
+::EnsembleSelectionSettings(MIsosurfaceIntersectionActor *hostActor)
+    : syncModeEnabled(false)
 {
     MActor *a = hostActor;
     MQtProperties *properties = a->getQtProperties();
@@ -302,12 +318,12 @@ MIsosurfaceIntersectionActor::EnsembleSelectionSettings::EnsembleSelectionSettin
     groupProp = a->addProperty(GROUP_PROPERTY, "ensemble selection");
 
     ensembleMultiMemberSelectionProperty = a->addProperty(
-            CLICK_PROPERTY, "select members", groupProp);
+                CLICK_PROPERTY, "select members", groupProp);
     ensembleMultiMemberSelectionProperty->setToolTip(
-            "select which ensemble members this variable should utilize");
+                "select which ensemble members this variable should utilize");
     ensembleMultiMemberSelectionProperty->setEnabled(true);
     ensembleMultiMemberProperty = a->addProperty(
-            STRING_PROPERTY, "utilized members", groupProp);
+                STRING_PROPERTY, "utilized members", groupProp);
     ensembleMultiMemberProperty->setEnabled(false);
 
     syncModeEnabledProperty = a->addProperty(BOOL_PROPERTY, "sync mode",
@@ -319,39 +335,9 @@ MIsosurfaceIntersectionActor::EnsembleSelectionSettings::EnsembleSelectionSettin
 
     properties->mString()->setValue(ensembleMultiMemberProperty,
                                     MDataRequestHelper::uintSetToString(
-                                            selectedEnsembleMembers));
+                                        selectedEnsembleMembers));
 }
 
-
-MIsosurfaceIntersectionActor::BoundingBoxSettings::BoundingBoxSettings(
-        MIsosurfaceIntersectionActor *hostActor)
-        : enabled(true),
-          llcrnLon(-100.f), llcrnLat(20),
-          urcrnLon(20), urcrnLat(80),
-          pBot_hPa(1050.f),
-          pTop_hPa(100.f)
-{
-    MActor *a = hostActor;
-    MQtProperties *properties = a->getQtProperties();
-
-    groupProp = a->addProperty(GROUP_PROPERTY, "bounding box");
-
-    enabledProperty = a->addProperty(BOOL_PROPERTY, "enable rendering",
-                                     groupProp);
-    properties->mBool()->setValue(enabledProperty, enabled);
-
-    boxCornersProp = a->addProperty(RECTF_LONLAT_PROPERTY, "corners",
-                                    groupProp);
-    properties->setRectF(boxCornersProp, QRectF(llcrnLon, llcrnLat,
-                                                urcrnLon - llcrnLon,
-                                                urcrnLat - llcrnLat), 2);
-
-    pBotProp = a->addProperty(DOUBLE_PROPERTY, "bottom pressure", groupProp);
-    properties->setDouble(pBotProp, pBot_hPa, 1050., 0.01, 2, 5.);
-
-    pTopProp = a->addProperty(DOUBLE_PROPERTY, "top pressure", groupProp);
-    properties->setDouble(pTopProp, pTop_hPa, 1050., 0.01, 2, 5.);
-}
 
 /******************************************************************************
 ***                            PUBLIC METHODS                               ***
@@ -366,14 +352,14 @@ void MIsosurfaceIntersectionActor::reloadShaderEffects()
 
     beginCompileShaders(4);
 
-    compileShadersFromFileWithProgressDialog(intersectionLinesShader,
-                                             "src/glsl/trajectory_tubes.fx.glsl");
-    compileShadersFromFileWithProgressDialog(boundingBoxShader,
-                                             "src/glsl/simple_coloured_geometry.fx.glsl");
-    compileShadersFromFileWithProgressDialog(tubeShadowShader,
-                                             "src/glsl/trajectory_tubes_shadow.fx.glsl");
-    compileShadersFromFileWithProgressDialog(lineTubeShader,
-                                             "src/glsl/simple_geometry_generation.fx.glsl");
+    compileShadersFromFileWithProgressDialog(
+                intersectionLinesShader, "src/glsl/trajectory_tubes.fx.glsl");
+    compileShadersFromFileWithProgressDialog(
+                boundingBoxShader, "src/glsl/simple_coloured_geometry.fx.glsl");
+    compileShadersFromFileWithProgressDialog(
+                tubeShadowShader, "src/glsl/trajectory_tubes_shadow.fx.glsl");
+    compileShadersFromFileWithProgressDialog(
+                lineTubeShader, "src/glsl/simple_geometry_generation.fx.glsl");
 
     endCompileShaders();
 }
@@ -389,22 +375,18 @@ void MIsosurfaceIntersectionActor::saveConfiguration(QSettings *settings)
     settings->setValue("varSourceIndex", variableSettings->varsIndex[2]);
 
     settings->setValue("filterValue", lineFilterSettings->valueFilter);
-    settings->setValue("fliterLineLength",
+    settings->setValue("filterLineLength",
                        lineFilterSettings->lineLengthFilter);
 
     settings->setValue("colorMode", appearanceSettings->colorMode);
     settings->setValue("varColorIndex", appearanceSettings->colorVariableIndex);
     settings->setValue("transferFunction",
                        properties->getEnumItem(
-                               appearanceSettings->transferFunctionProperty));
+                           appearanceSettings->transferFunctionProperty));
 
     settings->setValue("tubeRadius", appearanceSettings->tubeRadius);
 
-    QString colorString =
-            QString::number(appearanceSettings->tubeColor.red()) + "/" +
-            QString::number(appearanceSettings->tubeColor.green()) + "/" +
-            QString::number(appearanceSettings->tubeColor.blue());
-    settings->setValue("tubeColor", colorString);
+    settings->setValue("tubeColor", appearanceSettings->tubeColor);
 
     settings->setValue("thicknessMode", appearanceSettings->thicknessMode);
 
@@ -428,17 +410,14 @@ void MIsosurfaceIntersectionActor::saveConfiguration(QSettings *settings)
     settings->setValue("syncMode", ensembleSelectionSettings->syncModeEnabled);
     settings->setValue("ensembleMultiMemberProperty",
                        MDataRequestHelper::uintSetToString(
-                               ensembleSelectionSettings->selectedEnsembleMembers));
+                           ensembleSelectionSettings->selectedEnsembleMembers));
 
     settings->setValue("enableAutoComputation", enableAutoComputation);
 
-    settings->setValue("enabled", boundingBoxSettings->enabled);
-    settings->setValue("llcrnLat", boundingBoxSettings->llcrnLat);
-    settings->setValue("llcrnLon", boundingBoxSettings->llcrnLon);
-    settings->setValue("urcrnLat", boundingBoxSettings->urcrnLat);
-    settings->setValue("urcrnLon", boundingBoxSettings->urcrnLon);
-    settings->setValue("p_bot_hPa", boundingBoxSettings->pBot_hPa);
-    settings->setValue("p_top_hPa", boundingBoxSettings->pTop_hPa);
+    // bounding box settings
+    // =====================
+    MBoundingBoxInterface::saveConfiguration(settings);
+    settings->setValue("drawBBox", boundingBoxSettings->enabled);
 
     poleActor->saveConfiguration(settings);
     settings->endGroup();
@@ -451,95 +430,93 @@ void MIsosurfaceIntersectionActor::loadConfiguration(QSettings *settings)
 
     supressActorUpdates = true;
     settings->beginGroup(getSettingsID());
-    variableSettings->varsIndex[0] = settings->value("var1stIndex").toInt();
+    variableSettings->varsIndex[0] = settings->value("var1stIndex", -1).toInt();
     properties->mEnum()->setValue(variableSettings->varsProperty[0],
-                                  variableSettings->varsIndex[0]);
-    variableSettings->varsIndex[1] = settings->value("var2ndIndex").toInt();
+            variableSettings->varsIndex[0]);
+    variableSettings->varsIndex[1] = settings->value("var2ndIndex", -1).toInt();
     properties->mEnum()->setValue(variableSettings->varsProperty[1],
-                                  variableSettings->varsIndex[1]);
-    variableSettings->varsIndex[2] = settings->value("varSourceIndex").toInt();
+            variableSettings->varsIndex[1]);
+    variableSettings->varsIndex[2] = settings->value("varSourceIndex",
+                                                     -1).toInt();
     properties->mEnum()->setValue(variableSettings->varsProperty[2],
-                                  variableSettings->varsIndex[2]);
+            variableSettings->varsIndex[2]);
 
-    lineFilterSettings->valueFilter = settings->value("filterValue").toFloat();
+    lineFilterSettings->valueFilter = settings->value("filterValue",
+                                                      40.f).toFloat();
     properties->mDouble()->setValue(lineFilterSettings->valueFilterProperty,
                                     lineFilterSettings->valueFilter);
     lineFilterSettings->lineLengthFilter = settings->value(
-            "fliterLineLength").toInt();
+                "filterLineLength", 500).toInt();
     properties->mInt()->setValue(lineFilterSettings->lineLengthFilterProperty,
                                  lineFilterSettings->lineLengthFilter);
 
-    appearanceSettings->colorMode = settings->value("colorMode").toInt();
+    appearanceSettings->colorMode = settings->value("colorMode", 0).toInt();
     properties->mEnum()->setValue(appearanceSettings->colorModeProperty,
                                   appearanceSettings->colorMode);
 
     appearanceSettings->colorVariableIndex = settings->value(
-            "varColorIndex").toInt();
+                "varColorIndex", -1).toInt();
     properties->mEnum()->setValue(appearanceSettings->colorVariableProperty,
                                   appearanceSettings->colorVariableIndex);
 
-    appearanceSettings->tubeRadius = settings->value("tubeRadius").toFloat();
+    appearanceSettings->tubeRadius = settings->value("tubeRadius",
+                                                     0.2f).toFloat();
     properties->mDouble()->setValue(appearanceSettings->tubeRadiusProperty,
                                     appearanceSettings->tubeRadius);
 
-    QStringList colorString = settings->value("tubeColor").toString().split(
-            "/");
-    if (colorString.size() == 3)
-    {
-        appearanceSettings->tubeColor = QColor(colorString.at(0).toInt(),
-                                               colorString.at(1).toInt(),
-                                               colorString.at(2).toInt());
-        properties->mColor()->setValue(appearanceSettings->tubeColorProperty,
-                                       appearanceSettings->tubeColor);
-    }
+    appearanceSettings->tubeColor =
+            settings->value("tubeColor", QColor(255, 0, 0)).value<QColor>();
+    properties->mColor()->setValue(appearanceSettings->tubeColorProperty,
+                                   appearanceSettings->tubeColor);
 
-    QString tfName = settings->value("transferFunction").toString();
+    QString tfName = settings->value("transferFunction", "None").toString();
     if (!setTransferFunction(tfName))
     {
         QMessageBox msgBox;
         msgBox.setIcon(QMessageBox::Warning);
         msgBox.setText(QString("Trajectory actor '%1':\n"
-                                       "Transfer function '%2' does not exist.\n"
-                                       "Setting transfer function to 'None'.")
-                               .arg(getName()).arg(tfName));
+                               "Transfer function '%2' does not exist.\n"
+                               "Setting transfer function to 'None'.")
+                       .arg(getName()).arg(tfName));
         msgBox.exec();
     }
 
     appearanceSettings->thicknessMode = settings->value(
-            "thicknessMode").toInt();
+                "thicknessMode", 0).toInt();
     properties->mEnum()->setValue(appearanceSettings->thicknessModeProperty,
                                   appearanceSettings->thicknessMode);
 
     appearanceSettings->enableShadows = settings->value(
-            "enableShadows").toBool();
+                "enableShadows", true).toBool();
     properties->mBool()->setValue(appearanceSettings->enableShadowsProperty,
                                   appearanceSettings->enableShadows);
 
     appearanceSettings->enableSelfShadowing = settings->value(
-            "enableSelfShadowing").toBool();
+                "enableSelfShadowing", true).toBool();
     properties->mBool()->setValue(
-            appearanceSettings->enableSelfShadowingProperty,
-            appearanceSettings->enableSelfShadowing);
+                appearanceSettings->enableSelfShadowingProperty,
+                appearanceSettings->enableSelfShadowing);
 
-    appearanceSettings->polesEnabled = settings->value("polesEnabled").toBool();
+    appearanceSettings->polesEnabled =
+            settings->value("polesEnabled", false).toBool();
     properties->mBool()->setValue(appearanceSettings->polesEnabledProperty,
                                   appearanceSettings->polesEnabled);
-    appearanceSettings->dropMode = settings->value("dropMode").toInt();
+    appearanceSettings->dropMode = settings->value("dropMode", 3).toInt();
     properties->mEnum()->setValue(appearanceSettings->dropModeProperty,
                                   appearanceSettings->dropMode);
 
     tubeThicknessSettings->mappedVariableIndex = settings->value(
-            "tubeThicknessVariableIndex").toInt();
+                "tubeThicknessVariableIndex", -1).toInt();
     properties->mEnum()->setValue(tubeThicknessSettings->mappedVariableProperty,
                                   tubeThicknessSettings->mappedVariableIndex);
     tubeThicknessSettings->valueRange.setX(
-            settings->value("tubeThicknessMinValue").toDouble());
+                settings->value("tubeThicknessMinValue", 50.).toDouble());
     tubeThicknessSettings->valueRange.setY(
-            settings->value("tubeThicknessMaxValue").toDouble());
+                settings->value("tubeThicknessMaxValue", 85.).toDouble());
     tubeThicknessSettings->thicknessRange.setX(
-            settings->value("tubeThicknessMin").toDouble());
+                settings->value("tubeThicknessMin", 0.01).toDouble());
     tubeThicknessSettings->thicknessRange.setY(
-            settings->value("tubeThicknessMax").toDouble());
+                settings->value("tubeThicknessMax", 0.5).toDouble());
     properties->mDouble()->setValue(tubeThicknessSettings->minValueProp,
                                     tubeThicknessSettings->valueRange.x());
     properties->mDouble()->setValue(tubeThicknessSettings->maxValueProp,
@@ -550,52 +527,34 @@ void MIsosurfaceIntersectionActor::loadConfiguration(QSettings *settings)
                                     tubeThicknessSettings->thicknessRange.y());
 
     tubeThicknessSettings->groupProp->setEnabled(
-            appearanceSettings->thicknessMode == 1);
+                appearanceSettings->thicknessMode == 1);
 
     ensembleSelectionSettings->syncModeEnabled = settings->value(
-            "syncMode").toBool();
+                "syncMode", false).toBool();
     properties->mBool()->setValue(
-            ensembleSelectionSettings->syncModeEnabledProperty,
-            ensembleSelectionSettings->syncModeEnabled);
+                ensembleSelectionSettings->syncModeEnabledProperty,
+                ensembleSelectionSettings->syncModeEnabled);
 
-    ensembleSelectionSettings->selectedEnsembleMembers = MDataRequestHelper::uintSetFromString(
-            settings->value("ensembleMultiMemberProperty").toString());
+    ensembleSelectionSettings->selectedEnsembleMembers =
+            MDataRequestHelper::uintSetFromString(
+                settings->value("ensembleMultiMemberProperty", "0").toString());
     properties->mString()->setValue(
-            ensembleSelectionSettings->ensembleMultiMemberProperty,
-            settings->value("ensembleMultiMemberProperty").toString());
+                ensembleSelectionSettings->ensembleMultiMemberProperty,
+                settings->value("ensembleMultiMemberProperty").toString());
 
-    enableAutoComputation = settings->value("enableAutoComputation").toBool();
+    enableAutoComputation = settings->value("enableAutoComputation",
+                                            true).toBool();
     properties->mBool()->setValue(enableAutoComputationProperty,
                                   enableAutoComputation);
 
     computeClickProperty->setEnabled(!enableAutoComputation);
 
+    // bounding box settings
+    // =====================
+
+    MBoundingBoxInterface::loadConfiguration(settings);
     properties->mBool()->setValue(boundingBoxSettings->enabledProperty,
-                                  settings->value("enabled", true).toBool());
-
-    boundingBoxSettings->enabled =
-            properties->mBool()->value(boundingBoxSettings->enabledProperty);
-    boundingBoxSettings->llcrnLat = settings->value("llcrnLat").toFloat();
-    boundingBoxSettings->llcrnLon = settings->value("llcrnLon").toFloat();
-    boundingBoxSettings->urcrnLat = settings->value("urcrnLat").toFloat();
-    boundingBoxSettings->urcrnLon = settings->value("urcrnLon").toFloat();
-
-    properties->mRectF()->setValue(
-            boundingBoxSettings->boxCornersProp,
-            QRectF(boundingBoxSettings->llcrnLon,
-                   boundingBoxSettings->llcrnLat,
-                   boundingBoxSettings->urcrnLon -
-                   boundingBoxSettings->llcrnLon,
-                   boundingBoxSettings->urcrnLat -
-                   boundingBoxSettings->llcrnLat));
-
-    boundingBoxSettings->pBot_hPa = settings->value("p_bot_hPa").toFloat();
-    boundingBoxSettings->pTop_hPa = settings->value("p_top_hPa").toFloat();
-    properties->mDouble()->setValue(boundingBoxSettings->pBotProp,
-                                    boundingBoxSettings->pBot_hPa);
-    properties->mDouble()->setValue(boundingBoxSettings->pTopProp,
-                                    boundingBoxSettings->pTop_hPa);
-
+                                  settings->value("drawBBox", true).toBool());
 
     poleActor->loadConfiguration(settings);
 
@@ -631,8 +590,8 @@ MNWPActorVariable *MIsosurfaceIntersectionActor::createActorVariable(
 }
 
 
-void
-MIsosurfaceIntersectionActor::setDataSource(MIsosurfaceIntersectionSource *ds)
+void MIsosurfaceIntersectionActor::setDataSource(
+        MIsosurfaceIntersectionSource *ds)
 {
     if (isosurfaceSource != nullptr)
     {
@@ -653,12 +612,11 @@ MIsosurfaceIntersectionActor::setDataSource(MIsosurfaceIntersectionSource *ds)
 ***                             PUBLIC SLOTS                                ***
 *******************************************************************************/
 
-// Emit an actor changed signal if pole actor has been modified by the user.
-// This causes both, the jetcore and pole actor to redraw on the current scene.
 void MIsosurfaceIntersectionActor::onPoleActorChanged()
 {
     emit actorChanged();
 }
+
 
 void MIsosurfaceIntersectionActor::onActorCreated(MActor *actor)
 {
@@ -670,15 +628,15 @@ void MIsosurfaceIntersectionActor::onActorCreated(MActor *actor)
         enableEmissionOfActorChangedSignal(false);
 
         int index = properties->mEnum()->value(
-                appearanceSettings->transferFunctionProperty);
+                    appearanceSettings->transferFunctionProperty);
         QStringList availableTFs = properties->mEnum()->enumNames(
-                appearanceSettings->transferFunctionProperty);
+                    appearanceSettings->transferFunctionProperty);
         availableTFs << tf->transferFunctionName();
         properties->mEnum()->setEnumNames(
-                appearanceSettings->transferFunctionProperty,
-                availableTFs);
+                    appearanceSettings->transferFunctionProperty,
+                    availableTFs);
         properties->mEnum()->setValue(
-                appearanceSettings->transferFunctionProperty, index);
+                    appearanceSettings->transferFunctionProperty, index);
 
         enableEmissionOfActorChangedSignal(true);
     }
@@ -694,28 +652,31 @@ void MIsosurfaceIntersectionActor::onActorDeleted(MActor *actor)
         enableEmissionOfActorChangedSignal(false);
 
         int index = properties->mEnum()->value(
-                appearanceSettings->transferFunctionProperty);
+                    appearanceSettings->transferFunctionProperty);
         QStringList availableTFs = properties->mEnum()->enumNames(
-                appearanceSettings->transferFunctionProperty);
+                    appearanceSettings->transferFunctionProperty);
 
         // If the deleted transfer function is currently connected to this
         // variable, set current transfer function to "None" (index 0).
-        if (availableTFs.at(index) == tf->getName()) index = 0;
+        if (availableTFs.at(index) == tf->getName())
+        {
+            index = 0;
+        }
 
         availableTFs.removeOne(tf->getName());
         properties->mEnum()->setEnumNames(
-                appearanceSettings->transferFunctionProperty,
-                availableTFs);
+                    appearanceSettings->transferFunctionProperty,
+                    availableTFs);
         properties->mEnum()->setValue(
-                appearanceSettings->transferFunctionProperty, index);
+                    appearanceSettings->transferFunctionProperty, index);
 
         enableEmissionOfActorChangedSignal(true);
     }
 }
 
 
-void
-MIsosurfaceIntersectionActor::onActorRenamed(MActor *actor, QString oldName)
+void MIsosurfaceIntersectionActor::onActorRenamed(MActor *actor,
+                                                  QString oldName)
 {
     // If the renamed actor is a transfer function, change its name in the list
     // of available transfer functions.
@@ -725,18 +686,18 @@ MIsosurfaceIntersectionActor::onActorRenamed(MActor *actor, QString oldName)
         enableEmissionOfActorChangedSignal(false);
 
         int index = properties->mEnum()->value(
-                appearanceSettings->transferFunctionProperty);
+                    appearanceSettings->transferFunctionProperty);
         QStringList availableTFs = properties->mEnum()->enumNames(
-                appearanceSettings->transferFunctionProperty);
+                    appearanceSettings->transferFunctionProperty);
 
         // Replace affected entry.
         availableTFs[availableTFs.indexOf(oldName)] = tf->getName();
 
         properties->mEnum()->setEnumNames(
-                appearanceSettings->transferFunctionProperty,
-                availableTFs);
+                    appearanceSettings->transferFunctionProperty,
+                    availableTFs);
         properties->mEnum()->setValue(
-                appearanceSettings->transferFunctionProperty, index);
+                    appearanceSettings->transferFunctionProperty, index);
 
         enableEmissionOfActorChangedSignal(true);
     }
@@ -753,96 +714,85 @@ void MIsosurfaceIntersectionActor::onQtPropertyChanged(QtProperty *property)
     if (property == variableSettings->varsProperty[0])
     {
         variableSettings->varsIndex[0] = properties->mEnum()->value(
-                variableSettings->varsProperty[0]);
-    } else if (property == variableSettings->varsProperty[1])
+                    variableSettings->varsProperty[0]);
+    }
+    else if (property == variableSettings->varsProperty[1])
     {
         variableSettings->varsIndex[1] = properties->mEnum()->value(
-                variableSettings->varsProperty[1]);
-    } else if (property == variableSettings->varsProperty[2])
+                    variableSettings->varsProperty[1]);
+    }
+    else if (property == variableSettings->varsProperty[2])
     {
         variableSettings->varsIndex[2] = properties->mEnum()->value(
-                variableSettings->varsProperty[2]);
-    } else if (property == boundingBoxSettings->boxCornersProp ||
-               property == boundingBoxSettings->pBotProp ||
-               property == boundingBoxSettings->pTopProp)
-    {
-        generateVolumeBoxGeometry();
-        updateShadowImage = true;
-
-        QRectF cornerRect = properties->mRectF()->value(
-                boundingBoxSettings->boxCornersProp);
-
-        boundingBoxSettings->llcrnLat = static_cast<float>(cornerRect.y());
-        boundingBoxSettings->llcrnLon = static_cast<float>(cornerRect.x());
-        boundingBoxSettings->urcrnLat = static_cast<float>(cornerRect.y() +
-                                                           cornerRect.height());
-        boundingBoxSettings->urcrnLon = static_cast<float>(cornerRect.x() +
-                                                           cornerRect.width());
-
-        boundingBoxSettings->pBot_hPa = static_cast<float>(
-                properties->mDouble()->value(boundingBoxSettings->pBotProp));
-        boundingBoxSettings->pTop_hPa = static_cast<float>(
-                properties->mDouble()->value(boundingBoxSettings->pTopProp));
-
-        if (enableAutoComputation)
-        {
-            requestIsoSurfaceIntersectionLines();
-        }
-
-        emitActorChangedSignal();
-    } else if (property == boundingBoxSettings->enabledProperty)
+                    variableSettings->varsProperty[2]);
+    }
+    else if (property == boundingBoxSettings->enabledProperty)
     {
         boundingBoxSettings->enabled =
                 properties->mBool()->value(
-                        boundingBoxSettings->enabledProperty);
+                    boundingBoxSettings->enabledProperty);
 
         emitActorChangedSignal();
     }
-
-
-        // Auto-computation check box.
+    // Auto-computation check box.
     else if (property == enableAutoComputationProperty)
     {
         enableAutoComputation = properties->mBool()
                 ->value(enableAutoComputationProperty);
 
+        enableActorUpdates(false);
         computeClickProperty->setEnabled(!enableAutoComputation);
+        enableActorUpdates(true);
 
         if (enableAutoComputation)
         {
             requestIsoSurfaceIntersectionLines();
-        }
 
-        emitActorChangedSignal();
+            emitActorChangedSignal();
+        }
     }
 
-        // If enabled, click the compute button to compute the intersection lines.
+    // If enabled, click the compute button to compute the intersection lines.
     else if (property == computeClickProperty)
     {
-        requestIsoSurfaceIntersectionLines();
-        emitActorChangedSignal();
+        if (suppressActorUpdates())
+        {
+            return;
+        }
+        if (bBoxConnection->getBoundingBox() == nullptr)
+        {
+            QMessageBox::information(
+                        nullptr, "Compute intersection",
+                        "You need to select a bounding box to compute"
+                        " intersetions");
+        }
+        else
+        {
+            requestIsoSurfaceIntersectionLines();
+            emitActorChangedSignal();
+        }
     }
 
-        // Changed one of the tube appearance settings.
+    // Changed one of the tube appearance settings.
     else if (property == appearanceSettings->colorModeProperty
              || property == appearanceSettings->colorVariableProperty
              || property == appearanceSettings->thicknessModeProperty
              || property == tubeThicknessSettings->mappedVariableProperty)
     {
         appearanceSettings->colorMode = properties->mEnum()->value(
-                appearanceSettings->colorModeProperty);
+                    appearanceSettings->colorModeProperty);
 
         appearanceSettings->colorVariableIndex = properties->mEnum()->value(
-                appearanceSettings->colorVariableProperty);
+                    appearanceSettings->colorVariableProperty);
 
         appearanceSettings->thicknessMode = properties->mEnum()->value(
-                appearanceSettings->thicknessModeProperty);
+                    appearanceSettings->thicknessModeProperty);
 
         tubeThicknessSettings->mappedVariableIndex = properties->mEnum()->value(
-                tubeThicknessSettings->mappedVariableProperty);
+                    tubeThicknessSettings->mappedVariableProperty);
 
         tubeThicknessSettings->groupProp->setEnabled(
-                appearanceSettings->thicknessMode == 1);
+                    appearanceSettings->thicknessMode == 1);
 
 
         if (enableAutoComputation)
@@ -851,26 +801,28 @@ void MIsosurfaceIntersectionActor::onQtPropertyChanged(QtProperty *property)
         }
 
         emitActorChangedSignal();
-    } else if (property == appearanceSettings->transferFunctionProperty)
+    }
+    else if (property == appearanceSettings->transferFunctionProperty)
     {
         setTransferFunctionFromProperty();
-        if (suppressActorUpdates()) return;
+        if (suppressActorUpdates())
+        {
+            return;
+        }
         emitActorChangedSignal();
     }
-
-        // Basic tube settings (tube radius and color).
+    // Basic tube settings (tube radius and color).
     else if (property == appearanceSettings->tubeColorProperty
              || property == appearanceSettings->tubeRadiusProperty)
     {
         appearanceSettings->tubeColor = properties->mColor()->value(
-                appearanceSettings->tubeColorProperty);
+                    appearanceSettings->tubeColorProperty);
         appearanceSettings->tubeRadius = properties->mDouble()->value(
-                appearanceSettings->tubeRadiusProperty);
+                    appearanceSettings->tubeRadiusProperty);
 
         emitActorChangedSignal();
     }
-
-        // Tube thickness settings.
+    // Tube thickness settings.
     else if (tubeThicknessSettings &&
              (property == tubeThicknessSettings->minProp
               || property == tubeThicknessSettings->maxProp
@@ -878,33 +830,37 @@ void MIsosurfaceIntersectionActor::onQtPropertyChanged(QtProperty *property)
               || property == tubeThicknessSettings->maxValueProp))
     {
         tubeThicknessSettings->valueRange.setX(
-                properties->mDouble()->value(
+                    properties->mDouble()->value(
                         tubeThicknessSettings->minValueProp));
         tubeThicknessSettings->valueRange.setY(
-                properties->mDouble()->value(
+                    properties->mDouble()->value(
                         tubeThicknessSettings->maxValueProp));
 
         tubeThicknessSettings->thicknessRange.setX(
-                properties->mDouble()->value(tubeThicknessSettings->minProp));
+                    properties->mDouble()->value(
+                        tubeThicknessSettings->minProp));
         tubeThicknessSettings->thicknessRange.setY(
-                properties->mDouble()->value(tubeThicknessSettings->maxProp));
+                    properties->mDouble()->value(
+                        tubeThicknessSettings->maxProp));
 
         emitActorChangedSignal();
     }
-
-        // Ensemble member selection.
+    // Ensemble member selection.
     else if (property ==
              ensembleSelectionSettings->ensembleMultiMemberSelectionProperty)
     {
-        if (suppressActorUpdates()) return;
+        if (suppressActorUpdates())
+        {
+            return;
+        }
 
         MMemberSelectionDialog dlg;
         dlg.setAvailableEnsembleMembers(
-                variables.at(0)->dataSource->availableEnsembleMembers(
+                    variables.at(0)->dataSource->availableEnsembleMembers(
                         variables.at(0)->levelType,
                         variables.at(0)->variableName));
         dlg.setSelectedMembers(
-                ensembleSelectionSettings->selectedEnsembleMembers);
+                    ensembleSelectionSettings->selectedEnsembleMembers);
 
         if (dlg.exec() == QDialog::Accepted)
         {
@@ -915,16 +871,17 @@ void MIsosurfaceIntersectionActor::onQtPropertyChanged(QtProperty *property)
             if (!selMembers.isEmpty())
             {
                 ensembleSelectionSettings->selectedEnsembleMembers = selMembers;
-                // Update ensembleMultiMemberProperty to display the currently selected
-                // list of ensemble members.
+                // Update ensembleMultiMemberProperty to display the currently
+                // selected list of ensemble members.
                 QString s = MDataRequestHelper::uintSetToString
                         (ensembleSelectionSettings->selectedEnsembleMembers);
                 properties->mString()->setValue(
-                        ensembleSelectionSettings->ensembleMultiMemberProperty,
-                        s);
+                            ensembleSelectionSettings->ensembleMultiMemberProperty,
+                            s);
                 ensembleSelectionSettings->ensembleMultiMemberProperty->setToolTip(
-                        s);
-            } else
+                            s);
+            }
+            else
             {
                 // The user has selected an emtpy set of members. Display a
                 // warning and do NOT accept the empty set.
@@ -935,30 +892,29 @@ void MIsosurfaceIntersectionActor::onQtPropertyChanged(QtProperty *property)
             }
         }
     }
-        // Enable shadow map.
+    // Enable shadow map.
     else if (property == appearanceSettings->enableShadowsProperty
              || property == appearanceSettings->enableSelfShadowingProperty)
     {
         appearanceSettings->enableShadows =
                 properties->mBool()->value(
-                        appearanceSettings->enableShadowsProperty);
+                    appearanceSettings->enableShadowsProperty);
         appearanceSettings->enableSelfShadowing =
                 properties->mBool()->value(
-                        appearanceSettings->enableSelfShadowingProperty);
+                    appearanceSettings->enableSelfShadowingProperty);
         emitActorChangedSignal();
     }
-
-        // Enable pole placements along intersection lines.
+    // Enable pole placements along intersection lines.
     else if (property == appearanceSettings->polesEnabledProperty
              || property == appearanceSettings->dropModeProperty)
     {
         appearanceSettings->polesEnabled =
                 properties->mBool()->value(
-                        appearanceSettings->polesEnabledProperty);
+                    appearanceSettings->polesEnabledProperty);
 
         appearanceSettings->dropMode =
                 properties->mEnum()->value(
-                        appearanceSettings->dropModeProperty);
+                    appearanceSettings->dropModeProperty);
 
         if (intersectionLines != nullptr && appearanceSettings->polesEnabled)
         {
@@ -968,22 +924,22 @@ void MIsosurfaceIntersectionActor::onQtPropertyChanged(QtProperty *property)
         emitActorChangedSignal();
     }
 
-    // If any of the variables was changed or the ensemble members, filter values
-    // were altered, request new intersection lines.
+    // If any of the variables was changed or the ensemble members, filter
+    // values were altered, request new intersection lines.
     if (property == variableSettings->varsProperty[0] ||
-        property == variableSettings->varsProperty[1] ||
-        property == variableSettings->varsProperty[2] ||
-        property ==
-        ensembleSelectionSettings->ensembleMultiMemberSelectionProperty ||
-        property == lineFilterSettings->valueFilterProperty ||
-        property == lineFilterSettings->lineLengthFilterProperty)
+            property == variableSettings->varsProperty[1] ||
+            property == variableSettings->varsProperty[2] ||
+            property ==
+            ensembleSelectionSettings->ensembleMultiMemberSelectionProperty ||
+            property == lineFilterSettings->valueFilterProperty ||
+            property == lineFilterSettings->lineLengthFilterProperty)
     {
         lineFilterSettings->lineLengthFilter =
                 properties->mInt()->value(
-                        lineFilterSettings->lineLengthFilterProperty);
+                    lineFilterSettings->lineLengthFilterProperty);
         lineFilterSettings->valueFilter =
                 properties->mDouble()->value(
-                        lineFilterSettings->valueFilterProperty);
+                    lineFilterSettings->valueFilterProperty);
 
         if (enableAutoComputation)
         {
@@ -992,22 +948,23 @@ void MIsosurfaceIntersectionActor::onQtPropertyChanged(QtProperty *property)
 
         emitActorChangedSignal();
 
-    } else
+    }
+    else
     {
-        // Automatically compute the intersection lines if two different variables
-        // were selected.
+        // Automatically compute the intersection lines if two different
+        // variables were selected.
         if (variables.size() >= 2)
         {
             MNWPIsolevelActorVariable *var1 =
                     dynamic_cast<MNWPIsolevelActorVariable *>(
-                            variables.at(variableSettings->varsIndex[0]));
+                        variables.at(variableSettings->varsIndex[0]));
             MNWPIsolevelActorVariable *var2 =
-                    dynamic_cast<MNWPIsolevelActorVariable *>(variables.at(
-                            variableSettings->varsIndex[1]));
+                    dynamic_cast<MNWPIsolevelActorVariable *>(
+                        variables.at(variableSettings->varsIndex[1]));
             if ((property == var1->validTimeProperty ||
                  property == var2->validTimeProperty)
-                && var1->getPropertyTime(var1->validTimeProperty)
-                   == var2->getPropertyTime(var2->validTimeProperty))
+                    && var1->getPropertyTime(var1->validTimeProperty)
+                    == var2->getPropertyTime(var2->validTimeProperty))
             {
                 if (enableAutoComputation)
                 {
@@ -1021,8 +978,8 @@ void MIsosurfaceIntersectionActor::onQtPropertyChanged(QtProperty *property)
 }
 
 
-void
-MIsosurfaceIntersectionActor::asynchronousDataAvailable(MDataRequest request)
+void MIsosurfaceIntersectionActor::asynchronousDataAvailable(
+        MDataRequest request)
 {
     if (intersectionLines)
     {
@@ -1039,22 +996,24 @@ MIsosurfaceIntersectionActor::asynchronousDataAvailable(MDataRequest request)
 }
 
 
-void
-MIsosurfaceIntersectionActor::asynchronousFiltersAvailable(MDataRequest request)
+void MIsosurfaceIntersectionActor::asynchronousFiltersAvailable(
+        MDataRequest request)
 {
     if (!intersectionLines)
-    { return; }
+    {
+        return;
+    }
 
     lineSelection = dynamic_cast<MTrajectoryEnsembleSelection *>(
-            currentTrajectoryFilter->getData(request));
+                currentTrajectoryFilter->getData(request));
     requestFilters();
 
     emitActorChangedSignal();
 }
 
 
-void
-MIsosurfaceIntersectionActor::asynchronousValuesAvailable(MDataRequest request)
+void MIsosurfaceIntersectionActor::asynchronousValuesAvailable(
+        MDataRequest request)
 {
     MTrajectoryValues *values = valueTrajectorySource->getData(request);
     const QVector<float> &trajValues = values->getValues();
@@ -1092,7 +1051,9 @@ MIsosurfaceIntersectionActor::asynchronousValuesAvailable(MDataRequest request)
 
     // Place some poles
     if (appearanceSettings->polesEnabled)
-    { placePoleActors(intersectionLines); }
+    {
+        placePoleActors(intersectionLines);
+    }
 
     MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
     glRM->makeCurrent();
@@ -1100,30 +1061,35 @@ MIsosurfaceIntersectionActor::asynchronousValuesAvailable(MDataRequest request)
     const QString vbKey = QString("intersection_lines_VB-%1").arg(myID);
 
     GL::MVertexBuffer *vb = dynamic_cast<GL::MVertexBuffer *>(glRM->getGPUItem(
-            vbKey));
+                                                                  vbKey));
 
     if (vb)
     {
-        GL::MFloat5VertexBuffer *buf = dynamic_cast<GL::MFloat5VertexBuffer *>(vb);
+        GL::MFloat5VertexBuffer *buf =
+                dynamic_cast<GL::MFloat5VertexBuffer *>(vb);
         buf->reallocate(nullptr, static_cast<unsigned int>(linesData.size()), 0,
                         true);
         buf->update(reinterpret_cast<GLfloat *>(linesData.data()),
                     linesData.size());
         linesVertexBuffer = vb;
-    } else
+    }
+    else
     {
-        GL::MFloat5VertexBuffer *newVb = new GL::MFloat5VertexBuffer(vbKey,
-                                                                     linesData.size());
+        GL::MFloat5VertexBuffer *newVb =
+                new GL::MFloat5VertexBuffer(vbKey, linesData.size());
 
         if (glRM->tryStoreGPUItem(newVb))
         {
             newVb->upload(
-                    reinterpret_cast<GLfloat *>(linesData.data()),
-                    linesData.size());
-        } else
-        { delete newVb; }
+                        reinterpret_cast<GLfloat *>(linesData.data()),
+                        linesData.size());
+        }
+        else
+        {
+            delete newVb;
+        }
         linesVertexBuffer = dynamic_cast<GL::MVertexBuffer *>(glRM->getGPUItem(
-                vbKey));
+                                                                  vbKey));
     }
 
     supressActorUpdates = true;
@@ -1134,7 +1100,7 @@ MIsosurfaceIntersectionActor::asynchronousValuesAvailable(MDataRequest request)
     // Re-enable the sync control.
     isCalculating = false;
     MNWPIsolevelActorVariable *var2 = dynamic_cast<MNWPIsolevelActorVariable *>(
-            variables.at(variableSettings->varsIndex[1]));
+                variables.at(variableSettings->varsIndex[1]));
     if (var2->synchronizationControl != nullptr)
     {
         var2->synchronizationControl->setEnabled(true);
@@ -1172,35 +1138,72 @@ void MIsosurfaceIntersectionActor::onChangeActorVariable(MNWPActorVariable *var)
     refreshEnumsProperties(nullptr);
 }
 
+
+void MIsosurfaceIntersectionActor::onBoundingBoxChanged()
+{
+    // Switching to no bounding box only needs a redraw, but no recomputation
+    // because it disables rendering of the actor.
+    if (bBoxConnection->getBoundingBox() == nullptr)
+    {
+        emitActorChangedSignal();
+        return;
+    }
+    updateShadowImage = true;
+
+    boundingBoxSettings->llcrnLat = bBoxConnection->southLat();
+    boundingBoxSettings->urcrnLat = bBoxConnection->northLat();
+
+    boundingBoxSettings->llcrnLon = bBoxConnection->westLon();
+    boundingBoxSettings->urcrnLon = bBoxConnection->eastLon();
+
+    boundingBoxSettings->pBot_hPa = bBoxConnection->bottomPressure_hPa();
+    boundingBoxSettings->pTop_hPa = bBoxConnection->topPressure_hPa();
+
+    generateVolumeBoxGeometry();
+
+    if (enableAutoComputation)
+    {
+        requestIsoSurfaceIntersectionLines();
+    }
+
+    emitActorChangedSignal();
+}
+
 /******************************************************************************
 ***                          PROTECTED METHODS                              ***
 *******************************************************************************/
 
 void MIsosurfaceIntersectionActor::requestIsoSurfaceIntersectionLines()
 {
-    if (getViews().empty())
-    { return; }
+    // Only send request if actor is connected to a bounding box and at least
+    // one scene view.
+    if (getViews().empty() || bBoxConnection->getBoundingBox() == nullptr)
+    {
+        return;
+    }
 
     if (isCalculating
-        || variableSettings->varsIndex[0] == variableSettings->varsIndex[1])
-    { return; }
+            || variableSettings->varsIndex[0] == variableSettings->varsIndex[1])
+    {
+        return;
+    }
 
     isCalculating = true;
 
     // If the user has selected an ensemble member and at least one variable,
     // then obtain all selected ensemble members.
     if (ensembleSelectionSettings->selectedEnsembleMembers.size() == 0
-        && variables.size() > 0
-        && variables.at(0)->dataSource != nullptr)
+            && variables.size() > 0
+            && variables.at(0)->dataSource != nullptr)
     {
         ensembleSelectionSettings->selectedEnsembleMembers = variables.at(0)->
                 dataSource->availableEnsembleMembers(variables.at(0)->levelType,
                                                      variables.at(
-                                                             0)->variableName);
+                                                         0)->variableName);
         QString s = MDataRequestHelper::uintSetToString(
-                ensembleSelectionSettings->selectedEnsembleMembers);
+                    ensembleSelectionSettings->selectedEnsembleMembers);
         properties->mString()->setValue(
-                ensembleSelectionSettings->ensembleMultiMemberProperty, s);
+                    ensembleSelectionSettings->ensembleMultiMemberProperty, s);
     }
 
     // Create a new instance of an iso-surface intersection source if not created.
@@ -1235,10 +1238,12 @@ void MIsosurfaceIntersectionActor::requestIsoSurfaceIntersectionLines()
     supressActorUpdates = false;
 
     // Obtain the two variables that should be intersected.
-    MNWPIsolevelActorVariable *var1st = dynamic_cast<MNWPIsolevelActorVariable *>(
-            variables.at(variableSettings->varsIndex[0]));
-    MNWPIsolevelActorVariable *var2nd = dynamic_cast<MNWPIsolevelActorVariable *>(
-            variables.at(variableSettings->varsIndex[1]));
+    MNWPIsolevelActorVariable *var1st =
+            dynamic_cast<MNWPIsolevelActorVariable *>(
+                variables.at(variableSettings->varsIndex[0]));
+    MNWPIsolevelActorVariable *var2nd =
+            dynamic_cast<MNWPIsolevelActorVariable *>(
+                variables.at(variableSettings->varsIndex[1]));
 
     isosurfaceSource->setInputSourceFirstVar(var1st->dataSource);
     isosurfaceSource->setInputSourceSecondVar(var2nd->dataSource);
@@ -1247,7 +1252,8 @@ void MIsosurfaceIntersectionActor::requestIsoSurfaceIntersectionLines()
     if (var2nd->synchronizationControl != nullptr)
     {
         var2nd->synchronizationControl->setEnabled(false);
-    } else
+    }
+    else
     {
         if (var1st->synchronizationControl != nullptr)
         {
@@ -1266,13 +1272,14 @@ void MIsosurfaceIntersectionActor::requestIsoSurfaceIntersectionLines()
     // However, it is not used in the intersection source.
     rh.insert("MEMBER", 0);
     rh.insert("MEMBERS", MDataRequestHelper
-    ::uintSetToString(ensembleSelectionSettings->selectedEnsembleMembers));
+              ::uintSetToString(ensembleSelectionSettings
+                                ->selectedEnsembleMembers));
 
     // Set the variables and iso-values.
     rh.insert("ISOX_VARIABLES", var1st->variableName + "/"
-                                + var2nd->variableName);
+              + var2nd->variableName);
     rh.insert("ISOX_VALUES", QString::number(var1st->getIsoValue())
-                             + "/" + QString::number(var2nd->getIsoValue()));
+              + "/" + QString::number(var2nd->getIsoValue()));
     rh.insert("VARIABLE", var1st->variableName);
 
     rh.insert("ISOX_BOUNDING_BOX",
@@ -1299,7 +1306,7 @@ void MIsosurfaceIntersectionActor::buildFilterChain(MDataRequestHelper &rh)
     if (variableSettings->varsIndex[2] > 0)
     {
         varSource = dynamic_cast<MNWPIsolevelActorVariable *>(
-                variables.at(variableSettings->varsIndex[2] - 1));
+                    variables.at(variableSettings->varsIndex[2] - 1));
     }
 
     MNWPIsolevelActorVariable *varMapped = nullptr;
@@ -1307,15 +1314,17 @@ void MIsosurfaceIntersectionActor::buildFilterChain(MDataRequestHelper &rh)
     if (appearanceSettings->colorVariableIndex > 0)
     {
         varMapped = dynamic_cast<MNWPIsolevelActorVariable *>(
-                variables.at(appearanceSettings->colorVariableIndex - 1));
+                    variables.at(appearanceSettings->colorVariableIndex - 1));
     }
 
     MNWPIsolevelActorVariable *varThickness = nullptr;
 
     if (tubeThicknessSettings->mappedVariableIndex > 0)
     {
-        varThickness = dynamic_cast<MNWPIsolevelActorVariable *>(
-                variables.at(tubeThicknessSettings->mappedVariableIndex - 1));
+        varThickness =
+                dynamic_cast<MNWPIsolevelActorVariable *>(
+                    variables.at(tubeThicknessSettings->mappedVariableIndex - 1)
+                    );
     }
 
     // If the user has selected a variable to filter by, set the filter variable
@@ -1330,11 +1339,11 @@ void MIsosurfaceIntersectionActor::buildFilterChain(MDataRequestHelper &rh)
 
         varTrajectoryFilter->setIsosurfaceSource(isosurfaceSource);
         varTrajectoryFilter->setFilterVariableInputSource(
-                varSource->dataSource);
+                    varSource->dataSource);
         varTrajectoryFilter->setLineRequest(lineRequest);
 
         filterRequests.push_back(
-                {varTrajectoryFilter, inputSource, rh.request()});
+        {varTrajectoryFilter, inputSource, rh.request()});
         inputSource = varTrajectoryFilter.get();
     }
 
@@ -1347,7 +1356,7 @@ void MIsosurfaceIntersectionActor::buildFilterChain(MDataRequestHelper &rh)
     rh.insert("GEOLENFILTER_OP", "GREATER_OR_EQUAL");
 
     filterRequests.push_back(
-            {geomLengthTrajectoryFilter, inputSource, rh.request()});
+    {geomLengthTrajectoryFilter, inputSource, rh.request()});
 
     inputSource = geomLengthTrajectoryFilter.get();
 
@@ -1358,16 +1367,22 @@ void MIsosurfaceIntersectionActor::buildFilterChain(MDataRequestHelper &rh)
     valueTrajectorySource->setLineRequest(lineRequest);
     valueTrajectorySource->setInputSelectionSource(inputSource);
     if (varMapped)
-    { valueTrajectorySource->setInputSourceValueVar(varMapped->dataSource); }
+    {
+        valueTrajectorySource->setInputSourceValueVar(varMapped->dataSource);
+    }
     else
-    { valueTrajectorySource->setInputSourceValueVar(nullptr); }
+    {
+        valueTrajectorySource->setInputSourceValueVar(nullptr);
+    }
     if (varThickness)
     {
         valueTrajectorySource->setInputSourceThicknessVar(
-                varThickness->dataSource);
+                    varThickness->dataSource);
     }
     else
-    { valueTrajectorySource->setInputSourceThicknessVar(nullptr); }
+    {
+        valueTrajectorySource->setInputSourceThicknessVar(nullptr);
+    }
 
     rh.insert("TRAJECTORYVALUES_MEMBERS", rh.value("MEMBERS"));
     rh.insert("TRAJECTORYVALUES_VARIABLE",
@@ -1382,7 +1397,9 @@ void MIsosurfaceIntersectionActor::buildFilterChain(MDataRequestHelper &rh)
 void MIsosurfaceIntersectionActor::requestFilters()
 {
     if (!intersectionLines)
-    { return; }
+    {
+        return;
+    }
 
     if (!filterRequests.empty())
     {
@@ -1392,7 +1409,8 @@ void MIsosurfaceIntersectionActor::requestFilters()
         currentTrajectoryFilter = filter.filter;
         filter.filter->setInputSelectionSource(filter.inputSelectionSource);
         filter.filter->requestData(filter.request);
-    } else
+    }
+    else
     {
         onFilterChainEnd();
     }
@@ -1436,7 +1454,7 @@ void MIsosurfaceIntersectionActor::placePoleActors(
     if (appearanceSettings->colorVariableIndex > 0)
     {
         varSource = dynamic_cast<MNWPIsolevelActorVariable *>(
-                variables.at(appearanceSettings->colorVariableIndex - 1));
+                    variables.at(appearanceSettings->colorVariableIndex - 1));
     }
 
     for (int i = 0; i < lineSelection->getNumTrajectories(); ++i)
@@ -1445,14 +1463,14 @@ void MIsosurfaceIntersectionActor::placePoleActors(
         const int indexCount = lineSelection->getIndexCount()[i];
         const int endIndex = startIndex + indexCount;
 
-        // Obtain start / middle / and endpoint of each intersection line.
+        // Obtain start, middle and endpoint of each intersection line.
         const QVector3D &startPoint = intersectionLines->getVertices().at(
-                startIndex);
+                    startIndex);
         const QVector3D &endPoint = intersectionLines->getVertices().at(
-                endIndex - 1);
+                    endIndex - 1);
         const int midIndex = (endIndex + startIndex) / 2;
         const QVector3D &midPoint = intersectionLines->getVertices().at(
-                midIndex);
+                    midIndex);
 
         QVector3D maxPoint = midPoint;
 
@@ -1461,7 +1479,7 @@ void MIsosurfaceIntersectionActor::placePoleActors(
         if (varSource)
         {
             QVector3D point = intersectionLines->getVertices().at(
-                    startIndex + 1);
+                        startIndex + 1);
             float maxValue = varSource->grid->interpolateValue(point);
             int maxIndex = startIndex + 1;
 
@@ -1482,41 +1500,39 @@ void MIsosurfaceIntersectionActor::placePoleActors(
 
         switch (appearanceSettings->dropMode)
         {
-            case 0:
-                poleActor->addPole(startPoint);
-                break;
+        case 0:
+            poleActor->addPole(startPoint);
+            break;
 
-            case 1:
-                poleActor->addPole(endPoint);
-                break;
+        case 1:
+            poleActor->addPole(endPoint);
+            break;
 
-            case 2:
-                poleActor->addPole(startPoint);
-                poleActor->addPole(endPoint);
-                break;
+        case 2:
+            poleActor->addPole(startPoint);
+            poleActor->addPole(endPoint);
+            break;
 
-            case 3:
-                poleActor->addPole(midPoint);
-                break;
+        case 3:
+            poleActor->addPole(midPoint);
+            break;
 
-            case 4:
-                poleActor->addPole(maxPoint);
-                break;
+        case 4:
+            poleActor->addPole(maxPoint);
+            break;
 
-            case 5:
-                poleActor->addPole(startPoint);
-                poleActor->addPole(endPoint);
-                poleActor->addPole(midPoint);
-                break;
+        case 5:
+            poleActor->addPole(startPoint);
+            poleActor->addPole(endPoint);
+            poleActor->addPole(midPoint);
+            break;
 
-            case 6:
-                poleActor->addPole(startPoint);
-                poleActor->addPole(endPoint);
-                poleActor->addPole(maxPoint);
-                break;
+        case 6:
+            poleActor->addPole(startPoint);
+            poleActor->addPole(endPoint);
+            poleActor->addPole(maxPoint);
+            break;
         }
-
-
     }
 }
 
@@ -1538,7 +1554,10 @@ void MIsosurfaceIntersectionActor::initializeActorResources()
     loadShaders |= glRM->generateEffectProgram("trajectory_line_tubes",
                                                lineTubeShader);
 
-    if (loadShaders) reloadShaderEffects();
+    if (loadShaders)
+    {
+        reloadShaderEffects();
+    }
 
     // create vertex shader of bounding box
     generateVolumeBoxGeometry();
@@ -1546,7 +1565,8 @@ void MIsosurfaceIntersectionActor::initializeActorResources()
     varTrajectoryFilter = std::make_shared<MVariableTrajectoryFilter>();
     addFilter(varTrajectoryFilter);
 
-    geomLengthTrajectoryFilter = std::make_shared<MGeometricLengthTrajectoryFilter>();
+    geomLengthTrajectoryFilter =
+            std::make_shared<MGeometricLengthTrajectoryFilter>();
     addFilter(geomLengthTrajectoryFilter);
 
     valueTrajectorySource = std::make_shared<MTrajectoryValueSource>();
@@ -1575,76 +1595,74 @@ void MIsosurfaceIntersectionActor::initializeActorResources()
 
 void MIsosurfaceIntersectionActor::generateVolumeBoxGeometry()
 {
-    // Define geometry for bounding box
+    // Define geometry for bounding box.
     MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
 
     const int numVertices = 8;
     float vertexData[] =
-            {
-                    0, 0, 0, // node 0
-                    0, 1, 0, // node 1
-                    1, 1, 0, // node 2
-                    1, 0, 0, // node 3
-                    0, 0, 1, // node 4
-                    0, 1, 1, // node 5
-                    1, 1, 1, // node 6
-                    1, 0, 1  // node 7
-            };
+    {
+        0, 0, 0, // node 0
+        0, 1, 0, // node 1
+        1, 1, 0, // node 2
+        1, 0, 0, // node 3
+        0, 0, 1, // node 4
+        0, 1, 1, // node 5
+        1, 1, 1, // node 6
+        1, 0, 1  // node 7
+    };
 
     const int numIndices = 16 + 36;
     GLushort indexData[] =
-            {
-                    // volume box lines
-                    0, 1, 2, 3, 0,
-                    4, 7, 3,
-                    7, 6, 2,
-                    6, 5, 1,
-                    5, 4,
+    {
+        // volume box lines
+        0, 1, 2, 3, 0,
+        4, 7, 3,
+        7, 6, 2,
+        6, 5, 1,
+        5, 4,
 
-                    // bottom
-                    0, 3, 1,
-                    3, 2, 1,
-                    // front
-                    0, 4, 7,
-                    0, 7, 3,
-                    // left
-                    0, 1, 4,
-                    1, 5, 4,
-                    // right
-                    3, 7, 2,
-                    7, 6, 2,
-                    // back
-                    1, 2, 6,
-                    1, 6, 5,
-                    // top
-                    5, 6, 7,
-                    5, 7, 4
-            };
+        // bottom
+        0, 3, 1,
+        3, 2, 1,
+        // front
+        0, 4, 7,
+        0, 7, 3,
+        // left
+        0, 1, 4,
+        1, 5, 4,
+        // right
+        3, 7, 2,
+        7, 6, 2,
+        // back
+        1, 2, 6,
+        1, 6, 5,
+        // top
+        5, 6, 7,
+        5, 7, 4
+    };
 
     // convert vertices to lat/lon/p space
     for (int i = 0; i < numVertices; i++)
     {
         vertexData[i * 3 + 0] =
                 boundingBoxSettings->llcrnLon + vertexData[i * 3 + 0]
-                                                *
-                                                (boundingBoxSettings->urcrnLon -
-                                                 boundingBoxSettings->llcrnLon);
+                * (boundingBoxSettings->urcrnLon
+                   - boundingBoxSettings->llcrnLon);
         vertexData[i * 3 + 1] =
                 boundingBoxSettings->urcrnLat - vertexData[i * 3 + 1]
-                                                *
-                                                (boundingBoxSettings->urcrnLat -
-                                                 boundingBoxSettings->llcrnLat);
+                * (boundingBoxSettings->urcrnLat
+                   - boundingBoxSettings->llcrnLat);
         vertexData[i * 3 + 2] = (vertexData[i * 3 + 2] == 0)
-                                ? boundingBoxSettings->pBot_hPa
-                                : boundingBoxSettings->pTop_hPa;
+                ? boundingBoxSettings->pBot_hPa : boundingBoxSettings->pTop_hPa;
     }
 
     if (vboBoundingBox)
     {
         GL::MFloat3VertexBuffer *buf = dynamic_cast<GL::MFloat3VertexBuffer *>(
-                vboBoundingBox);
+                    vboBoundingBox);
         buf->update(vertexData, numVertices);
-    } else
+    }
+    else
     {
         const QString vboID = QString("vbo_bbox_actor#%1").arg(myID);
 
@@ -1655,11 +1673,12 @@ void MIsosurfaceIntersectionActor::generateVolumeBoxGeometry()
         {
             buf->upload(vertexData, numVertices);
             vboBoundingBox = static_cast<GL::MVertexBuffer *>(
-                    glRM->getGPUItem(vboID));
-        } else
+                        glRM->getGPUItem(vboID));
+        }
+        else
         {
             LOG4CPLUS_WARN(mlog, "WARNING: cannot store buffer for volume"
-                    " bbox in GPU memory.");
+                                 " bbox in GPU memory.");
             delete buf;
             return;
         }
@@ -1681,18 +1700,18 @@ void MIsosurfaceIntersectionActor::generateVolumeBoxGeometry()
 }
 
 
-void
-MIsosurfaceIntersectionActor::renderToDepthMap(MSceneViewGLWidget *sceneView)
+void MIsosurfaceIntersectionActor::renderToDepthMap(
+        MSceneViewGLWidget *sceneView)
 {
     const QVector3D llbottomCrnr(boundingBoxSettings->llcrnLon,
                                  boundingBoxSettings->llcrnLat,
                                  sceneView->worldZfromPressure(
-                                         boundingBoxSettings->pBot_hPa));
+                                     boundingBoxSettings->pBot_hPa));
 
     const QVector3D urtopCrnr(boundingBoxSettings->urcrnLon,
                               boundingBoxSettings->urcrnLat,
                               sceneView->worldZfromPressure(
-                                      boundingBoxSettings->pTop_hPa));
+                                  boundingBoxSettings->pTop_hPa));
 
     // Set up light space transformation.
     QMatrix4x4 lightView;
@@ -1723,16 +1742,21 @@ MIsosurfaceIntersectionActor::renderToDepthMap(MSceneViewGLWidget *sceneView)
     lineTubeShader->setUniformValue("colorMode", appearanceSettings->colorMode);
 
     if (appearanceSettings->colorVariableIndex > 0 &&
-        appearanceSettings->transferFunction != 0)
+            appearanceSettings->transferFunction != 0)
     {
         appearanceSettings->transferFunction->getTexture()->bindToTextureUnit(
-                static_cast<GLuint>(appearanceSettings->textureUnitTransferFunction));
-        lineTubeShader->setUniformValue("transferFunction",
-                                        appearanceSettings->textureUnitTransferFunction);
-        lineTubeShader->setUniformValue("tfMinimum",
-                                        appearanceSettings->transferFunction->getMinimumValue());
-        lineTubeShader->setUniformValue("tfMaximum",
-                                        appearanceSettings->transferFunction->getMaximumValue());
+                    static_cast<GLuint>(
+                        appearanceSettings->textureUnitTransferFunction));
+
+        lineTubeShader->setUniformValue(
+                    "transferFunction",
+                    appearanceSettings->textureUnitTransferFunction);
+        lineTubeShader->setUniformValue(
+                    "tfMinimum",
+                    appearanceSettings->transferFunction->getMinimumValue());
+        lineTubeShader->setUniformValue(
+                    "tfMaximum",
+                    appearanceSettings->transferFunction->getMaximumValue());
         lineTubeShader->setUniformValue("normalized", false);
     }
 
@@ -1747,9 +1771,9 @@ MIsosurfaceIntersectionActor::renderToDepthMap(MSceneViewGLWidget *sceneView)
                                     sceneView->pressureToWorldZParameters());
 
     lineTubeShader->setUniformValue(
-            "lightDirection", sceneView->getLightDirection());
+                "lightDirection", sceneView->getLightDirection());
     lineTubeShader->setUniformValue(
-            "cameraPosition", sceneView->getCamera()->getOrigin());
+                "cameraPosition", sceneView->getCamera()->getOrigin());
     lineTubeShader->setUniformValue("shadowColor", QColor(100, 100, 100, 155));
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
@@ -1790,21 +1814,21 @@ void MIsosurfaceIntersectionActor::renderShadows(MSceneViewGLWidget *sceneView)
         //glRM->makeCurrent();
 
         float quadData[] =
-                {
-                        boundingBoxSettings->llcrnLon,
-                        boundingBoxSettings->llcrnLat, 0.1, 0, 0,
-                        boundingBoxSettings->llcrnLon,
-                        boundingBoxSettings->urcrnLat, 0.1, 0, 1,
-                        boundingBoxSettings->urcrnLon,
-                        boundingBoxSettings->llcrnLat, 0.1, 1, 0,
-                        boundingBoxSettings->urcrnLon,
-                        boundingBoxSettings->urcrnLat, 0.1, 1, 1
-                };
+        {
+            boundingBoxSettings->llcrnLon,
+            boundingBoxSettings->llcrnLat, 0.1, 0, 0,
+            boundingBoxSettings->llcrnLon,
+            boundingBoxSettings->urcrnLat, 0.1, 0, 1,
+            boundingBoxSettings->urcrnLon,
+            boundingBoxSettings->llcrnLat, 0.1, 1, 0,
+            boundingBoxSettings->urcrnLon,
+            boundingBoxSettings->urcrnLat, 0.1, 1, 1
+        };
 
         if (!shadowImageVBO)
         {
             const QString vboID = QString(
-                    "trajectory_shadowmap_image_actor_#%1").arg(myID);
+                        "trajectory_shadowmap_image_actor_#%1").arg(myID);
 
             GL::MFloatVertexBuffer *newVB =
                     new GL::MFloatVertexBuffer(vboID, 20);
@@ -1812,15 +1836,18 @@ void MIsosurfaceIntersectionActor::renderShadows(MSceneViewGLWidget *sceneView)
             if (glRM->tryStoreGPUItem(newVB))
             {
                 newVB->upload(quadData, 20, sceneView);
-                shadowImageVBO = static_cast<GL::MVertexBuffer *>(glRM->getGPUItem(
-                        vboID));
-            } else
+                shadowImageVBO = static_cast<GL::MVertexBuffer *>(
+                            glRM->getGPUItem(vboID));
+            }
+            else
             {
                 delete newVB;
             }
-        } else
+        }
+        else
         {
-            GL::MFloatVertexBuffer *buf = dynamic_cast<GL::MFloatVertexBuffer *>(shadowImageVBO);
+            GL::MFloatVertexBuffer *buf =
+                    dynamic_cast<GL::MFloatVertexBuffer *>(shadowImageVBO);
             buf->update(quadData, 20, 0, 0, sceneView);
         }
     }
@@ -1828,8 +1855,8 @@ void MIsosurfaceIntersectionActor::renderShadows(MSceneViewGLWidget *sceneView)
     lineTubeShader->bindProgram("ShadowGroundMap");
     CHECK_GL_ERROR;
 
-    lineTubeShader->setUniformValue("mvpMatrix",
-                                    *(sceneView->getModelViewProjectionMatrix()));
+    lineTubeShader->setUniformValue(
+                "mvpMatrix", *(sceneView->getModelViewProjectionMatrix()));
 
     shadowMap->bindToTextureUnit(static_cast<GLuint>(shadowMapTexUnit));
     lineTubeShader->setUniformValue("shadowMap", shadowMapTexUnit);
@@ -1850,16 +1877,16 @@ void MIsosurfaceIntersectionActor::renderShadows(MSceneViewGLWidget *sceneView)
 }
 
 
-void
-MIsosurfaceIntersectionActor::renderBoundingBox(MSceneViewGLWidget *sceneView)
+void MIsosurfaceIntersectionActor::renderBoundingBox(
+        MSceneViewGLWidget *sceneView)
 {
     boundingBoxShader->bindProgram("Pressure");
     boundingBoxShader->setUniformValue(
-            "mvpMatrix", *(sceneView->getModelViewProjectionMatrix()));
+                "mvpMatrix", *(sceneView->getModelViewProjectionMatrix()));
     boundingBoxShader->setUniformValue(
-            "pToWorldZParams", sceneView->pressureToWorldZParameters());
+                "pToWorldZParams", sceneView->pressureToWorldZParameters());
     boundingBoxShader->setUniformValue(
-            "colour", QColor(Qt::black));
+                "colour", QColor(Qt::black));
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, iboBoundingBox);
     CHECK_GL_ERROR;
@@ -1880,14 +1907,19 @@ MIsosurfaceIntersectionActor::renderBoundingBox(MSceneViewGLWidget *sceneView)
 void MIsosurfaceIntersectionActor::renderToCurrentContext(
         MSceneViewGLWidget *sceneView)
 {
+    if (bBoxConnection->getBoundingBox() == nullptr)
+    {
+        return;
+    }
+
     if (boundingBoxSettings->enabled)
     {
         renderBoundingBox(sceneView);
     }
 
     if (intersectionLines != nullptr &&
-        linesVertexBuffer != nullptr &&
-        variableSettings->varsIndex[0] != variableSettings->varsIndex[1])
+            linesVertexBuffer != nullptr &&
+            variableSettings->varsIndex[0] != variableSettings->varsIndex[1])
     {
         if (!shadowMap)
         {
@@ -1906,8 +1938,9 @@ void MIsosurfaceIntersectionActor::renderToCurrentContext(
             if (glRM->tryStoreGPUItem(shadowMap))
             {
                 shadowMap = dynamic_cast<GL::MTexture *>(glRM->getGPUItem(
-                        shadowMapID));
-            } else
+                                                             shadowMapID));
+            }
+            else
             {
                 delete shadowMap;
                 shadowMap = nullptr;
@@ -1966,13 +1999,15 @@ void MIsosurfaceIntersectionActor::renderToCurrentContext(
         CHECK_GL_ERROR;
 
         if (appearanceSettings->enableShadows)
-        { renderShadows(sceneView); }
+        {
+            renderShadows(sceneView);
+        }
 
         lineTubeShader->bindProgram("Trajectory");
         CHECK_GL_ERROR;
 
-        lineTubeShader->setUniformValue("mvpMatrix",
-                                        *(sceneView->getModelViewProjectionMatrix()));
+        lineTubeShader->setUniformValue(
+                    "mvpMatrix", *(sceneView->getModelViewProjectionMatrix()));
 
         lineTubeShader->setUniformValue("lightMVPMatrix", lightMVP);
         CHECK_GL_ERROR;
@@ -1985,16 +2020,21 @@ void MIsosurfaceIntersectionActor::renderToCurrentContext(
                                         appearanceSettings->colorMode);
 
         if (appearanceSettings->colorVariableIndex > 0 &&
-            appearanceSettings->transferFunction != 0)
+                appearanceSettings->transferFunction != 0)
         {
             appearanceSettings->transferFunction->getTexture()->bindToTextureUnit(
-                    static_cast<GLuint>(appearanceSettings->textureUnitTransferFunction));
-            lineTubeShader->setUniformValue("transferFunction",
-                                            appearanceSettings->textureUnitTransferFunction);
-            lineTubeShader->setUniformValue("tfMinimum",
-                                            appearanceSettings->transferFunction->getMinimumValue());
-            lineTubeShader->setUniformValue("tfMaximum",
-                                            appearanceSettings->transferFunction->getMaximumValue());
+                        static_cast<GLuint>(
+                            appearanceSettings->textureUnitTransferFunction));
+
+            lineTubeShader->setUniformValue(
+                        "transferFunction",
+                        appearanceSettings->textureUnitTransferFunction);
+            lineTubeShader->setUniformValue(
+                        "tfMinimum",
+                        appearanceSettings->transferFunction->getMinimumValue());
+            lineTubeShader->setUniformValue(
+                        "tfMaximum",
+                        appearanceSettings->transferFunction->getMaximumValue());
             lineTubeShader->setUniformValue("normalized", false);
         }
 
@@ -2009,9 +2049,9 @@ void MIsosurfaceIntersectionActor::renderToCurrentContext(
                                         sceneView->pressureToWorldZParameters());
 
         lineTubeShader->setUniformValue(
-                "lightDirection", sceneView->getLightDirection());
+                    "lightDirection", sceneView->getLightDirection());
         lineTubeShader->setUniformValue(
-                "cameraPosition", sceneView->getCamera()->getOrigin());
+                    "cameraPosition", sceneView->getCamera()->getOrigin());
         lineTubeShader->setUniformValue("shadowColor",
                                         QColor(100, 100, 100, 155));
 
@@ -2049,7 +2089,8 @@ void MIsosurfaceIntersectionActor::renderToCurrentContext(
         CHECK_GL_ERROR;
 
         glBindBuffer(GL_ARRAY_BUFFER, 0);
-    } else
+    }
+    else
     {
         if (enableAutoComputation)
         {
@@ -2069,8 +2110,8 @@ void MIsosurfaceIntersectionActor::renderToCurrentContext(
 }
 
 
-void
-MIsosurfaceIntersectionActor::refreshEnumsProperties(MNWPActorVariable *var)
+void MIsosurfaceIntersectionActor::refreshEnumsProperties(
+        MNWPActorVariable *var)
 {
     QStringList names;
 
@@ -2096,12 +2137,12 @@ MIsosurfaceIntersectionActor::refreshEnumsProperties(MNWPActorVariable *var)
     varNamesWithNone.prepend("None");
 
     properties->mEnum()->setEnumNames(variableSettings->varsProperty[2],
-                                      varNamesWithNone);
+            varNamesWithNone);
     properties->mEnum()->setEnumNames(appearanceSettings->colorVariableProperty,
                                       varNamesWithNone);
     properties->mEnum()->setEnumNames(
-            tubeThicknessSettings->mappedVariableProperty,
-            varNamesWithNone);
+                tubeThicknessSettings->mappedVariableProperty,
+                varNamesWithNone);
 
     enableActorUpdates(true);
 }
@@ -2112,7 +2153,7 @@ void MIsosurfaceIntersectionActor::setTransferFunctionFromProperty()
     MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
 
     QString tfName = properties->getEnumItem(
-            appearanceSettings->transferFunctionProperty);
+                appearanceSettings->transferFunctionProperty);
 
     if (tfName == "None")
     {
@@ -2141,13 +2182,13 @@ void MIsosurfaceIntersectionActor::setTransferFunctionFromProperty()
 bool MIsosurfaceIntersectionActor::setTransferFunction(const QString &tfName)
 {
     QStringList tfNames = properties->mEnum()->enumNames(
-            appearanceSettings->transferFunctionProperty);
+                appearanceSettings->transferFunctionProperty);
     int tfIndex = tfNames.indexOf(tfName);
 
     if (tfIndex >= 0)
     {
         properties->mEnum()->setValue(
-                appearanceSettings->transferFunctionProperty, tfIndex);
+                    appearanceSettings->transferFunctionProperty, tfIndex);
         return true;
     }
 
@@ -2155,9 +2196,12 @@ bool MIsosurfaceIntersectionActor::setTransferFunction(const QString &tfName)
     properties->mEnum()->setValue(appearanceSettings->transferFunctionProperty,
                                   0);
 
-    return false; // the given tf name could not be found
+    return false; // The given tf name could not be found.
 }
 
 /******************************************************************************
 ***                           PRIVATE METHODS                               ***
 *******************************************************************************/
+
+
+} // namespace Met3D

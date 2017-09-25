@@ -24,21 +24,38 @@
 **  along with Met.3D.  If not, see <http://www.gnu.org/licenses/>.
 **
 *******************************************************************************/
-
 #include "multivarpartialderivativefilter.h"
 
+// standard library imports
 #include <bitset>
-#include <log4cplus/loggingmacros.h>
 #include <fstream>
+
+// related third party imports
+#include <log4cplus/loggingmacros.h>
 #include <omp.h>
 
-using namespace Met3D;
+// local application imports
+
+
+namespace Met3D
+{
+
+/******************************************************************************
+***                             MMultiVarFilter                             ***
+*******************************************************************************/
+/******************************************************************************
+***                     CONSTRUCTOR / DESTRUCTOR                            ***
+*******************************************************************************/
 
 MMultiVarFilter::MMultiVarFilter()
     : MStructuredGridEnsembleFilter()
 {
-
 }
+
+
+/******************************************************************************
+***                            PUBLIC METHODS                               ***
+*******************************************************************************/
 
 MTask* MMultiVarFilter::createTaskGraph(MDataRequest request)
 {
@@ -52,7 +69,7 @@ MTask* MMultiVarFilter::createTaskGraph(MDataRequest request)
     rh.removeAll(locallyRequiredKeys());
 
     // Before proceeding with this task, obtain all required variables.
-    for (const auto& var : vars)
+    foreach (const QString var, vars)
     {
         rh.insert("VARIABLE", var);
         task->addParent(inputSource->getTaskGraph(rh.request()));
@@ -61,11 +78,21 @@ MTask* MMultiVarFilter::createTaskGraph(MDataRequest request)
     return task;
 }
 
+
+/******************************************************************************
+***                          PROTECTED METHODS                              ***
+*******************************************************************************/
+
+
 const QStringList MMultiVarFilter::locallyRequiredKeys()
 {
     return (QStringList() << "MULTI_VARIABLES");
 }
 
+
+/******************************************************************************
+***                    MMultiVarPartialDerivativeFilter                     ***
+*******************************************************************************/
 /******************************************************************************
 ***                     CONSTRUCTOR / DESTRUCTOR                            ***
 *******************************************************************************/
@@ -73,8 +100,8 @@ const QStringList MMultiVarFilter::locallyRequiredKeys()
 MMultiVarPartialDerivativeFilter::MMultiVarPartialDerivativeFilter()
     : MMultiVarFilter()
 {
-
 }
+
 
 /******************************************************************************
 ***                            PUBLIC METHODS                               ***
@@ -97,11 +124,14 @@ MStructuredGrid* MMultiVarPartialDerivativeFilter::produceData(
 
     //const int levelType = rh.value("LEVELTYPE").toInt();
 
-    // Obtain the name of the variable representing the actual geometric height (z).
+    // Obtain the name of the variable representing the actual geometric height
+    // (z).
     QString varGeoP = rh.value("MULTI_GEOPOTENTIAL");
 
-    // Geopotential height: type = 0 | geopotential: type = 1 (requires dividing by 9.81)
-    double geoPotScale = (rh.value("MULTI_GEOPOTENTIAL_TYPE").toInt() == 1) ? 9.81 : 1;
+    // Geopotential height: type = 0 | geopotential: type = 1 (requires
+    // dividing by 9.81)
+    double geoPotScale =
+            (rh.value("MULTI_GEOPOTENTIAL_TYPE").toInt() == 1) ? 9.81 : 1;
 
     // Remove all keys required for this filter.
     rh.removeAll(locallyRequiredKeys());
@@ -125,15 +155,21 @@ MStructuredGrid* MMultiVarPartialDerivativeFilter::produceData(
     }
 
     // If the grids are not available, return a nullptr.
-    if (!gridU || !gridV) { return nullptr; }
+    if (!gridU || !gridV)
+    {
+        return nullptr;
+    }
 
     // Create a new grid with the same topology as the input grid.
     result = createAndInitializeResultGrid(gridU);
     //result->setGeneratingRequest(request);
 
-    // Compute the distances between two grid points in longitude and latitude direction.
-    const float dx = static_cast<float>(gridU->getLons()[1] - gridU->getLons()[0]);
-    const float dy = static_cast<float>(gridU->getLats()[1] - gridU->getLats()[0]);
+    // Compute the distances between two grid points in longitude and latitude
+    // direction.
+    const float dx =
+            static_cast<float>(gridU->getLons()[1] - gridU->getLons()[0]);
+    const float dy =
+            static_cast<float>(gridU->getLats()[1] - gridU->getLats()[0]);
 
     // Actual geometric distance between two grids in latitudinal direction
     // ~111km.
@@ -157,7 +193,7 @@ MStructuredGrid* MMultiVarPartialDerivativeFilter::produceData(
                     V.setX(gridU->getValue(k, j, i));
                     V.setY(gridV->getValue(k, j, i));
 
-                    // The current velocity
+                    // The current velocity.
                     float Vs = V.length();
 
                     // The vector normal to V = s.
@@ -180,15 +216,16 @@ MStructuredGrid* MMultiVarPartialDerivativeFilter::produceData(
 
                     // Get the velocities of the 4 surrounding points and
                     // resolve the velocities into the positive direction of s.
-                    // Compute V_s at all surround points.
+                    // Compute V_s at all surrounding points.
                     double VsPrevLon = computeVs(gridU, gridV, k, j, iPrev, s);
                     double VsNextLon = computeVs(gridU, gridV, k, j, iNext, s);
                     double VsPrevLat = computeVs(gridU, gridV, k, jPrev, i, s);
                     double VsNextLat = computeVs(gridU, gridV, k, jNext, i, s);
 
-                    // Compute the first derivatives d/dx, d/dy
+                    // Compute the first derivatives d/dx and d/dy.
                     double deltaX = dx * (iNext - iPrev)
-                                    * cos(gridU->getLats()[j] / 180.0 * M_PI) * deltaLat;
+                                    * cos(gridU->getLats()[j] / 180.0 * M_PI)
+                            * deltaLat;
                     double deltaY = dy * (jNext - jPrev) * deltaLat;
 
                     double dVsdx = (VsNextLon - VsPrevLon) / deltaX;
@@ -206,17 +243,24 @@ MStructuredGrid* MMultiVarPartialDerivativeFilter::produceData(
 
                     else if (method == "d2dn2")
                     {
-                        // Get the velocities of the 4 surrounding points along the
-                        // diagonal (X-neighbours) and resolve the velocities into
-                        // the positive direction of s.
-                        double VsINJN = computeVs(gridU, gridV, k, jNext, iNext, s);
-                        double VsIPJN = computeVs(gridU, gridV, k, jNext, iPrev, s);
-                        double VsINJP = computeVs(gridU, gridV, k, jPrev, iNext, s);
-                        double VsIPJP = computeVs(gridU, gridV, k, jPrev, iPrev, s);
+                        // Get the velocities of the 4 surrounding points along
+                        // the diagonal (X-neighbours) and resolve the
+                        // velocities into the positive direction of s.
+                        double VsINJN =
+                                computeVs(gridU, gridV, k, jNext, iNext, s);
+                        double VsIPJN =
+                                computeVs(gridU, gridV, k, jNext, iPrev, s);
+                        double VsINJP =
+                                computeVs(gridU, gridV, k, jPrev, iNext, s);
+                        double VsIPJP =
+                                computeVs(gridU, gridV, k, jPrev, iPrev, s);
 
-                        double dVs2dx2 = (VsNextLon - 2 * Vs + VsPrevLon) / (deltaX * deltaX / 4);
-                        double dVs2dy2 = (VsNextLat - 2 * Vs + VsPrevLat) / (deltaY * deltaY / 4);
-                        double dVs2dxdy = (VsINJN - VsIPJN - VsINJP + VsIPJP) / (deltaX * deltaY);
+                        double dVs2dx2 = (VsNextLon - 2 * Vs + VsPrevLon)
+                                / (deltaX * deltaX / 4);
+                        double dVs2dy2 = (VsNextLat - 2 * Vs + VsPrevLat)
+                                / (deltaY * deltaY / 4);
+                        double dVs2dxdy = (VsINJN - VsIPJN - VsINJP + VsIPJP)
+                                / (deltaX * deltaY);
 
                         // Compute the second derivative in direction n.
                         deriv = n.x() * n.x() * dVs2dx2
@@ -226,41 +270,58 @@ MStructuredGrid* MMultiVarPartialDerivativeFilter::produceData(
                     // Mixed-partial derivative.
                     else if (method == "d2dndp" || method == "d2dndz")
                     {
-                        int kNext = std::min(k + 1, int(gridU->getNumLevels() - 1));
+                        int kNext = std::min(k + 1,
+                                             int(gridU->getNumLevels() - 1));
                         int kPrev = std::max(k - 1, 0);
 
                         double dp = 0;
 
                         if (gridGeoP && method == "d2dndz")
                         {
-                            const double geoHeightPrev = gridGeoP->getValue(kPrev, j, i) / geoPotScale;
-                            const double geoHeightNext = gridGeoP->getValue(kNext, j, i) / geoPotScale;
+                            const double geoHeightPrev = gridGeoP->getValue(
+                                        kPrev, j, i) / geoPotScale;
+                            const double geoHeightNext = gridGeoP->getValue(
+                                        kNext, j, i) / geoPotScale;
 
                             dp = geoHeightNext - geoHeightPrev;
                         }
                         else
                         {
-                            dp = gridU->getPressure(kNext, j, i) - gridU->getPressure(kPrev, j, i);
+                            dp = gridU->getPressure(kNext, j, i)
+                                    - gridU->getPressure(kPrev, j, i);
                         }
 
-                        // Get the velocities of the 8 surrounding points along the
-                        // diagonal (X-neighbours) for the adjacent model level and
-                        // resolve the velocities into the positive direction of s.
-                        double vsKPJIP = computeVs(gridU, gridV, kPrev, j, iPrev, s);
-                        double vsKNJIP = computeVs(gridU, gridV, kNext, j, iPrev, s);
+                        // Get the velocities of the 8 surrounding points along
+                        // the diagonal (X-neighbours) for the adjacent model
+                        // level and resolve the velocities into the positive
+                        // direction of s.
+                        double vsKPJIP =
+                                computeVs(gridU, gridV, kPrev, j, iPrev, s);
+                        double vsKNJIP =
+                                computeVs(gridU, gridV, kNext, j, iPrev, s);
 
-                        double vsKPJIN = computeVs(gridU, gridV, kPrev, j, iNext, s);
-                        double vsKNJIN = computeVs(gridU, gridV, kNext, j, iNext, s);
+                        double vsKPJIN =
+                                computeVs(gridU, gridV, kPrev, j, iNext, s);
+                        double vsKNJIN =
+                                computeVs(gridU, gridV, kNext, j, iNext, s);
 
-                        double vsKPJPI = computeVs(gridU, gridV, kPrev, jPrev, i, s);
-                        double vsKNJPI = computeVs(gridU, gridV, kNext, jPrev, i, s);
+                        double vsKPJPI =
+                                computeVs(gridU, gridV, kPrev, jPrev, i, s);
+                        double vsKNJPI =
+                                computeVs(gridU, gridV, kNext, jPrev, i, s);
 
-                        double vsKPJNI = computeVs(gridU, gridV, kPrev, jNext, i, s);
-                        double vsKNJNI = computeVs(gridU, gridV, kNext, jNext, i, s);
+                        double vsKPJNI =
+                                computeVs(gridU, gridV, kPrev, jNext, i, s);
+                        double vsKNJNI =
+                                computeVs(gridU, gridV, kNext, jNext, i, s);
 
                         // Compute the mixed partial derivative.
-                        double d2Vsdpdx = (vsKNJIN - vsKPJIN - vsKNJIP + vsKPJIP) / (deltaX * dp);
-                        double d2Vsdpdy = (vsKNJNI - vsKPJNI - vsKNJPI + vsKPJPI) / (deltaY * dp);
+                        double d2Vsdpdx =
+                                (vsKNJIN - vsKPJIN - vsKNJIP + vsKPJIP)
+                                / (deltaX * dp);
+                        double d2Vsdpdy =
+                                (vsKNJNI - vsKPJNI - vsKNJPI + vsKPJPI)
+                                / (deltaY * dp);
 
                         deriv = n.x() * d2Vsdpdx + n.y() * d2Vsdpdy;
                     }
@@ -286,8 +347,11 @@ MStructuredGrid* MMultiVarPartialDerivativeFilter::produceData(
             {
                 for (unsigned int k = 0; k < result->getNumLevels(); ++k)
                 {
-                    const unsigned int kNext = std::min(k + 1, result->getNumLevels() - 1);
-                    const unsigned int kPrev = static_cast<unsigned int>(std::max(static_cast<int>(k - 1), 0));
+                    const unsigned int kNext =
+                            std::min(k + 1, result->getNumLevels() - 1);
+                    const unsigned int kPrev =
+                            static_cast<unsigned int>(
+                                std::max(static_cast<int>(k - 1), 0));
 
                     // Current wind vector at sample grid point (k, j, i).
                     QVector2D V;
@@ -303,15 +367,17 @@ MStructuredGrid* MMultiVarPartialDerivativeFilter::produceData(
                     QVector2D s = V;
                     s.normalize();
 
-                    // Get the velocities of the 2 surrounding points along the model
-                    // levels and resolve the velocities into the positive
-                    // direction of s.
+                    // Get the velocities of the 2 surrounding points along the
+                    // model levels and resolve the velocities into the
+                    // positive direction of s.
                     double VsPrevLev = computeVs(gridU, gridV, kPrev, j, i, s);
                     double VsNextLev = computeVs(gridU, gridV, kNext, j, i, s);
 
                     // Obtain geopotential height in m/s for every grid point.
-                    double geoHeightPrev = gridGeoP->getValue(kPrev, j, i) / geoPotScale;
-                    double geoHeightNext = gridGeoP->getValue(kNext, j, i) / geoPotScale;
+                    double geoHeightPrev =
+                            gridGeoP->getValue(kPrev, j, i) / geoPotScale;
+                    double geoHeightNext =
+                            gridGeoP->getValue(kNext, j, i) / geoPotScale;
 
                     // Compute the height distance between the two grid points.
                     float deltaZ = geoHeightNext - geoHeightPrev;
@@ -324,7 +390,8 @@ MStructuredGrid* MMultiVarPartialDerivativeFilter::produceData(
                     else if (method == "d2dz2")
                     {
                         // Compute the second derivative.
-                        deriv = (VsNextLev - 2 * Vs + VsPrevLev) / (deltaZ * deltaZ / 4);
+                        deriv = (VsNextLev - 2 * Vs + VsPrevLev)
+                                / (deltaZ * deltaZ / 4);
                     }
 
                     result->setValue(k, j, i, deriv);
@@ -346,9 +413,11 @@ MStructuredGrid* MMultiVarPartialDerivativeFilter::produceData(
             {
                 for (unsigned int k = 0; k < result->getNumLevels(); ++k)
                 {
-                    const unsigned int kNext = std::min(k + 1, result->getNumLevels() - 1);
+                    const unsigned int kNext =
+                            std::min(k + 1, result->getNumLevels() - 1);
                     const unsigned int kPrev =
-                            static_cast<unsigned int>(std::max(static_cast<int>(k - 1), 0));
+                            static_cast<unsigned int>(
+                                std::max(static_cast<int>(k - 1), 0));
 
                     // Current wind vector at sample grid point (k, j, i).
                     QVector2D V;
@@ -364,8 +433,8 @@ MStructuredGrid* MMultiVarPartialDerivativeFilter::produceData(
                     QVector2D s = V;
                     s.normalize();
 
-                    // Get the velocities of the 2 surrounding points along the model
-                    // levels and resolve the velocities into the positive
+                    // Get the velocities of the 2 surrounding points along the
+                    // model levels and resolve the velocities into the positive
                     // direction of s.
                     double VsPrevLev = computeVs(gridU, gridV, kPrev, j, i, s);
                     double VsNextLev = computeVs(gridU, gridV, kNext, j, i, s);
@@ -394,12 +463,18 @@ MStructuredGrid* MMultiVarPartialDerivativeFilter::produceData(
 
     const QString& op = ops[0];
 
-    if (op.contains("dn")) { derivativeWrtNormal(op, result); }
+    if (op.contains("dn"))
+    {
+        derivativeWrtNormal(op, result);
+    }
     else if (op.contains("dz"))
     {
         derivativeWrtHeight(op, result);
     }
-    else if (op.contains("dp")) { derivativeWrtPressure(op, result); }
+    else if (op.contains("dp"))
+    {
+        derivativeWrtPressure(op, result);
+    }
 
     // Release the recently created grids to reduce memory consumption.
     inputSource->releaseData(gridU);
@@ -409,6 +484,7 @@ MStructuredGrid* MMultiVarPartialDerivativeFilter::produceData(
 
     return result;
 }
+
 
 MTask* MMultiVarPartialDerivativeFilter::createTaskGraph(MDataRequest request)
 {
@@ -441,8 +517,7 @@ MTask* MMultiVarPartialDerivativeFilter::createTaskGraph(MDataRequest request)
     return task;
 }
 
-// Lambda function to compute the velocity projected onto vector s
-// at a grid point.
+
 double MMultiVarPartialDerivativeFilter::computeVs(
         MStructuredGrid* gridU,
         MStructuredGrid* gridV,
@@ -452,7 +527,8 @@ double MMultiVarPartialDerivativeFilter::computeVs(
                 gridV->getValue(k, j, i));
 
     return QVector2D::dotProduct(v, s);
-};
+}
+
 
 /******************************************************************************
 ***                          PROTECTED METHODS                              ***
@@ -466,21 +542,23 @@ const QStringList MMultiVarPartialDerivativeFilter::locallyRequiredKeys()
                           << "MULTI_GEOPOTENTIAL_TYPE");
 }
 
-/******************************************************************************/
-/******************************************************************************/
-/******************************************************************************/
+
+/******************************************************************************
+***                               MBlurFilter                               ***
+*******************************************************************************/
+/******************************************************************************
+***                     CONSTRUCTOR / DESTRUCTOR                            ***
+*******************************************************************************/
 
 MBlurFilter::MBlurFilter()
         : MStructuredGridEnsembleFilter()
 {
-
 }
 
-const QStringList MBlurFilter::locallyRequiredKeys()
-{
-    return (QStringList() << "BLUR_FILTERTYPE" << "BLUR_KERNEL_SIZE"
-                          << "BLUR_SIGMA");
-}
+
+/******************************************************************************
+***                            PUBLIC METHODS                               ***
+*******************************************************************************/
 
 MStructuredGrid* MBlurFilter::produceData(MDataRequest request)
 {
@@ -490,13 +568,16 @@ MStructuredGrid* MBlurFilter::produceData(MDataRequest request)
     const unsigned int kernelSize = rh.value("BLUR_KERNEL_SIZE").toUInt();
     const float sigma = rh.value("BLUR_SIGMA").toFloat();
 
-    // Remove all keys required for this filter
+    // Remove all keys required for this filter.
     rh.removeAll(locallyRequiredKeys());
 
     MStructuredGrid* inputGrid = inputSource->getData(rh.request());
 
     // If we haven't found the variables, then return a nullptr.
-    if (!inputGrid) { return nullptr; }
+    if (!inputGrid)
+    {
+        return nullptr;
+    }
 
     // Create a new grid with the same topology as the input grid.
     MStructuredGrid* result = createAndInitializeResultGrid(inputGrid);
@@ -554,8 +635,8 @@ MStructuredGrid* MBlurFilter::produceData(MDataRequest request)
     {
         for (unsigned int j = 0; j < inputGrid->getNumLats(); ++j)
         {
-            // Since the gauss filter is separable
-            // first apply the filter in x-direction (in 1D)
+            // Since the gauss filter is separable, first apply the filter in
+            // x-direction (in 1D)...
             for (unsigned int i = 0; i < inputGrid->getNumLons(); ++i)
             {
                 double kernelSum = 0;
@@ -565,19 +646,24 @@ MStructuredGrid* MBlurFilter::produceData(MDataRequest request)
                 {
                     int iN = i + offsetX;
 
-                    if (iN < 0 || iN >= static_cast<int>(inputGrid->getNumLons()))
-                    { continue; }
+                    if (iN < 0
+                            || iN >= static_cast<int>(inputGrid->getNumLons()))
+                    {
+                        continue;
+                    }
 
                     double weight = kernel[offsetX + offset];
                     value += weight * inputGrid->getValue(k, j, iN);
                     kernelSum += weight;
                 }
 
-                setIntermediateValue(k, j, i, static_cast<float>(value / kernelSum));
+                setIntermediateValue(k, j, i,
+                                     static_cast<float>(value / kernelSum));
             }
         }
 
-        // And then apply the filter in y-direction to the intermediate result
+        // ...and then apply the filter in y-direction to the intermediate
+        // result.
         for (unsigned int j = 0; j < inputGrid->getNumLats(); ++j)
         {
             for (unsigned int i = 0; i < inputGrid->getNumLons(); ++i)
@@ -589,7 +675,8 @@ MStructuredGrid* MBlurFilter::produceData(MDataRequest request)
                 {
                     int jN = j + offsetY;
 
-                    if (jN < 0 || jN >= static_cast<int>(inputGrid->getNumLats()))
+                    if (jN < 0
+                            || jN >= static_cast<int>(inputGrid->getNumLats()))
                     { continue; }
 
                     double weight = kernel[offsetY + offset];
@@ -597,7 +684,8 @@ MStructuredGrid* MBlurFilter::produceData(MDataRequest request)
                     kernelSum += weight;
                 }
 
-                result->setValue(k, j, i, static_cast<float>(value / kernelSum));
+                result->setValue(k, j, i,
+                                 static_cast<float>(value / kernelSum));
             }
         }
     }
@@ -606,6 +694,7 @@ MStructuredGrid* MBlurFilter::produceData(MDataRequest request)
 
     return result;
 }
+
 
 MTask* MBlurFilter::createTaskGraph(MDataRequest request)
 {
@@ -618,3 +707,16 @@ MTask* MBlurFilter::createTaskGraph(MDataRequest request)
 
     return task;
 }
+
+
+/******************************************************************************
+***                          PROTECTED METHODS                              ***
+*******************************************************************************/
+
+const QStringList MBlurFilter::locallyRequiredKeys()
+{
+    return (QStringList() << "BLUR_FILTERTYPE" << "BLUR_KERNEL_SIZE"
+                          << "BLUR_SIGMA");
+}
+
+} // namespace Met3D

@@ -27,6 +27,11 @@
 #ifndef MET_3D_MPROJECTEDVELOCITIESFILTER_H
 #define MET_3D_MPROJECTEDVELOCITIESFILTER_H
 
+// standard library imports
+
+// related third party imports
+
+// local application imports
 #include "structuredgridensemblefilter.h"
 #include "structuredgrid.h"
 #include "datarequest.h"
@@ -34,18 +39,20 @@
 
 namespace Met3D
 {
-    class MProjectedVelocitiesFilter : public MStructuredGridEnsembleFilter
-    {
-    public:
-        explicit MProjectedVelocitiesFilter();
 
-        MStructuredGrid* produceData(MDataRequest request) override;
-        MTask* createTaskGraph(MDataRequest request) override;
+class MProjectedVelocitiesFilter : public MStructuredGridEnsembleFilter
+{
+public:
+    explicit MProjectedVelocitiesFilter();
 
-    protected:
-        const QStringList locallyRequiredKeys() override;
-    };
-}
+    MStructuredGrid* produceData(MDataRequest request) override;
+    MTask* createTaskGraph(MDataRequest request) override;
 
+protected:
+    const QStringList locallyRequiredKeys() override;
+};
+
+
+} // namespace Met3D
 
 #endif //MET_3D_MPROJECTEDVELOCITIESFILTER_H

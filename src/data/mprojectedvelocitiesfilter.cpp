@@ -1,11 +1,41 @@
-//
-// Created by kerninator on 13.03.17.
-//
-
+/******************************************************************************
+**
+**  This file is part of Met.3D -- a research environment for the
+**  three-dimensional visual exploration of numerical ensemble weather
+**  prediction data.
+**
+**  Copyright 2017 Marc Rautenhaus
+**  Copyright 2017 Michael Kern
+**
+**  Computer Graphics and Visualization Group
+**  Technische Universitaet Muenchen, Garching, Germany
+**
+**  Met.3D is free software: you can redistribute it and/or modify
+**  it under the terms of the GNU General Public License as published by
+**  the Free Software Foundation, either version 3 of the License, or
+**  (at your option) any later version.
+**
+**  Met.3D is distributed in the hope that it will be useful,
+**  but WITHOUT ANY WARRANTY; without even the implied warranty of
+**  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+**  GNU General Public License for more details.
+**
+**  You should have received a copy of the GNU General Public License
+**  along with Met.3D.  If not, see <http://www.gnu.org/licenses/>.
+**
+*******************************************************************************/
 #include "mprojectedvelocitiesfilter.h"
+
+// standard library imports
+
+// related third party imports
 #include <log4cplus/loggingmacros.h>
 
-using namespace Met3D;
+// local application imports
+
+
+namespace Met3D
+{
 
 /******************************************************************************
 ***                     CONSTRUCTOR / DESTRUCTOR                            ***
@@ -14,8 +44,8 @@ using namespace Met3D;
 MProjectedVelocitiesFilter::MProjectedVelocitiesFilter()
         : MStructuredGridEnsembleFilter()
 {
-
 }
+
 
 /******************************************************************************
 ***                            PUBLIC METHODS                               ***
@@ -32,8 +62,8 @@ MTask* MProjectedVelocitiesFilter::createTaskGraph(MDataRequest request)
 
     rh.removeAll(locallyRequiredKeys());
 
-    // before proceeding with this task, obtain all required variables
-    for (const auto& var : vars)
+    // Before proceeding with this task, obtain all required variables.
+    foreach (const QString var, vars)
     {
         rh.insert("VARIABLE", var);
         LOG4CPLUS_DEBUG(mlog, rh.request().toStdString());
@@ -43,10 +73,6 @@ MTask* MProjectedVelocitiesFilter::createTaskGraph(MDataRequest request)
     return task;
 }
 
-const QStringList MProjectedVelocitiesFilter::locallyRequiredKeys()
-{
-    return (QStringList() << "VS_UV_VARIABLES" << "VS_SDIRECTION");
-}
 
 MStructuredGrid* MProjectedVelocitiesFilter::produceData(
         MDataRequest request)
@@ -58,7 +84,7 @@ MStructuredGrid* MProjectedVelocitiesFilter::produceData(
     const QStringList sDirs = rh.value("VS_SDIRECTION").split("/");
     rh.removeAll(locallyRequiredKeys());
 
-    // before proceeding with this task, obtain all required variables
+    // Before proceeding with this task, obtain all required variables.
     rh.insert("VARIABLE", vars[0]);
     MStructuredGrid *gridU = inputSource->getData(rh.request());
     rh.insert("VARIABLE", vars[1]);
@@ -68,7 +94,7 @@ MStructuredGrid* MProjectedVelocitiesFilter::produceData(
     QVector2D s(sDirs[0].toFloat(), sDirs[1].toFloat());
     s.normalize();
 
-    // Create a new grid with the same topology as the input grid
+    // Create a new grid with the same topology as the input grid.
     result = createAndInitializeResultGrid(gridU);
     //result->setGeneratingRequest(request);
 
@@ -89,9 +115,21 @@ MStructuredGrid* MProjectedVelocitiesFilter::produceData(
         }
     }
 
-    // release the recently created grids to reduce memory consumption
+    // Release the recently created grids to reduce memory consumption.
     inputSource->releaseData(gridU);
     inputSource->releaseData(gridV);
 
     return result;
 }
+
+
+/******************************************************************************
+***                           PROTECTED METHODS                             ***
+*******************************************************************************/
+
+const QStringList MProjectedVelocitiesFilter::locallyRequiredKeys()
+{
+    return (QStringList() << "VS_UV_VARIABLES" << "VS_SDIRECTION");
+}
+
+} // namespace Met3D

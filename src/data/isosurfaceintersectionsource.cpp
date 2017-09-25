@@ -4,8 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2016 Marc Rautenhaus
-**  Copyright 2016 Christoph Heidelmann
+**  Copyright 2017 Marc Rautenhaus
+**  Copyright 2017 Michael Kern
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -24,17 +24,23 @@
 **  along with Met.3D.  If not, see <http://www.gnu.org/licenses/>.
 **
 *******************************************************************************/
-
 #include "isosurfaceintersectionsource.h"
-#include "data/lines.h"
-#include "util/metroutines.h"
 
+// standard library imports
+
+// related third party imports
 #include <omp.h>
 #include <chrono>
 
+// local application imports
+#include "data/lines.h"
+#include "util/metroutines.h"
+
 //#define TIME_MEASUREMENT
 
-using namespace Met3D;
+
+namespace Met3D
+{
 
 /******************************************************************************
 ***                     CONSTRUCTOR / DESTRUCTOR                            ***
@@ -94,7 +100,8 @@ MIsosurfaceIntersectionSource::produceData(MDataRequest request)
     float isovalueA = isovalues[0].toFloat();
     float isovalueB = isovalues[1].toFloat();
 
-    MIsosurfaceIntersectionLines *intersectionLines = new MIsosurfaceIntersectionLines();
+    MIsosurfaceIntersectionLines *intersectionLines =
+            new MIsosurfaceIntersectionLines();
     intersectionLines->lines = new QVector<QVector<QVector3D> *>();
 
     const uint8_t lowerLineThreshold = 1;
@@ -105,7 +112,6 @@ MIsosurfaceIntersectionSource::produceData(MDataRequest request)
     //rh.insert("LINES","");
 
     QStringList bboxList = rh.value("ISOX_BOUNDING_BOX").split("/");
-    //QStringList bboxList = bbox.split("/");
     const float llcrnlon = bboxList[0].toFloat();
     const float llcrnlat = bboxList[1].toFloat();
     const float pBot_hPa = bboxList[2].toFloat();
@@ -120,8 +126,8 @@ MIsosurfaceIntersectionSource::produceData(MDataRequest request)
         int m = member.toInt();
         rh.insert("MEMBER", QString::number(m));
 
-        Lines *linesStored = static_cast<Lines *>(memoryManager->getData(this,
-                                                                         rh.request()));
+        Lines *linesStored =
+                static_cast<Lines *>(memoryManager->getData(this, rh.request()));
         QVector<QVector<QVector3D> *> *lines = nullptr;
 
         // Obtain the scalar field of the first variable.
@@ -150,7 +156,8 @@ MIsosurfaceIntersectionSource::produceData(MDataRequest request)
             {
                 delete l;
             }
-        } else
+        }
+        else
         {
             // Append the stored lines to the current array of intersection
             // lines.
@@ -158,7 +165,9 @@ MIsosurfaceIntersectionSource::produceData(MDataRequest request)
             for (int lc = 0; lc < lines->size(); lc++)
             {
                 if (lines->at(lc)->size() <= lowerLineThreshold)
-                { continue; }
+                {
+                    continue;
+                }
 
                 intersectionLines->lines->append(lines->at(lc));
             }
@@ -173,7 +182,9 @@ MIsosurfaceIntersectionSource::produceData(MDataRequest request)
         {
             // this is the filter to remove small lines < threshold
             if (lines->at(lc)->size() <= lowerLineThreshold)
-            { continue; }
+            {
+                continue;
+            }
 
             if (!linesStored)
             {
@@ -205,7 +216,8 @@ MIsosurfaceIntersectionSource::produceData(MDataRequest request)
                     && point.z() >= pTop_hPa && point.z() <= pBot_hPa)
                 {
                     newIndexCount++;
-                } else
+                }
+                else
                 {
                     if (newIndexCount > 0)
                     {
@@ -237,8 +249,8 @@ MIsosurfaceIntersectionSource::produceData(MDataRequest request)
     }
 
 
-    // Build the instance of a intersections lines class,
-    // with all its help arrays.
+    // Build the instance of a intersections lines class, with all its help
+    // arrays.
     intersectionLines->vertices = points;
     QVector<GLboolean> firstVerticesOfLines = QVector<GLboolean>(points.size());
     for (int i = 0; i < starts->size(); i++)
@@ -246,25 +258,32 @@ MIsosurfaceIntersectionSource::produceData(MDataRequest request)
         firstVerticesOfLines[starts->at(i)] = GL_TRUE;
     }
     intersectionLines->firstVerticesOfLines = firstVerticesOfLines;
-    // ?
+
     if (intersectionLines->startIndices)
-    { delete intersectionLines->startIndices; }
+    {
+        delete intersectionLines->startIndices;
+    }
     intersectionLines->startIndices = starts->data();
-    // ?
+
     if (intersectionLines->indexCount)
-    { delete intersectionLines->indexCount; }
+    {
+        delete intersectionLines->indexCount;
+    }
     intersectionLines->indexCount = sizes->data();
     intersectionLines->numTrajectories = linesCounter;
     intersectionLines->ensembleStartIndices = ensembleStartIndices;
     intersectionLines->ensembleIndexCount = ensembleLengths;
     intersectionLines->numEnsembleMembers = members.size();
+
     //if (this->lines) { delete this->lines; }
     this->lines = intersectionLines->lines;
 
 #ifdef TIME_MEASUREMENT
     auto endIsoX = std::chrono::system_clock::now();
-    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(endIsoX - startIsoX);
-    LOG4CPLUS_DEBUG(mlog, "intersection total computation time: " << elapsed.count());
+    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                endIsoX - startIsoX);
+    LOG4CPLUS_DEBUG(mlog, "intersection total computation time: "
+                    << elapsed.count());
 #endif
 
     return intersectionLines;
@@ -312,7 +331,8 @@ MTask *MIsosurfaceIntersectionSource::createTaskGraph(MDataRequest request)
                 rh.insert("MULTI_VARIABLES", vars[0] + "/" + vars[1]);
                 rh.insert("MULTI_DERIVATIVE_OPS", derivSettings[i]);
                 rh.insert("VARIABLE", vars[i]);
-            } else
+            }
+            else
             {
                 rh.removeAll(tempRequiredKeys);
                 rh.insert("VARIABLE", vars[i]);
@@ -345,7 +365,10 @@ MIsosurfaceIntersectionSource::getIntersectionLineForMember(
         MStructuredGrid *gridA, float isovalueA, MStructuredGrid *gridB,
         float isovalueB)
 {
-    if (gridA == nullptr || gridB == nullptr) return nullptr;
+    if (gridA == nullptr || gridB == nullptr)
+    {
+        return nullptr;
+    }
 
     nextCellInScanLoop = 0;
     lines = new QVector<QVector<QVector3D> *>();
@@ -470,42 +493,44 @@ void MIsosurfaceIntersectionSource::traceLine(
         CellInformation *startingCell, MStructuredGrid *gridA,
         float isovalueA, MStructuredGrid *gridB, float isovalueB)
 {
-    // Take last cell line segment and build new line from it
+    // Take last cell line segment and build new line from it.
     lines->append(startingCell->segments.last());
 
-    // Face of first point of starting segment => will be used when tracing backwards
-    int currentSegmentFaceWhenTracingBackwards = startingCell->pointFaceRelation.at(
-            startingCell->segments.size() / 2);
-    // Face of second point of starting segment
+    // Face of first point of starting segment => will be used when tracing
+    // backwards.
+    int currentSegmentFaceWhenTracingBackwards =
+            startingCell->pointFaceRelation.at(startingCell->segments.size()
+                                               / 2);
+    // Face of second point of starting segment.
     currentSegmentFace = startingCell->pointFaceRelation.at(
             startingCell->segments.size() / 2 + 1);
-    // current 3D direction of the line
+    // Current 3D direction of the line.
     direction = getDirection(secondLastPointOfLastLine(),
                              lastPointOfLastLine());
-    // Remove last segment from cell
+    // Remove last segment from cell.
     startingCell->removeLastSegment();
 
-    // tracing forwards
+    // Tracing forwards.
     CellInformation *next = addCellToLastLine(
-            getNextCell(startingCell, gridA, isovalueA, gridB, isovalueB));
+            getNextCell(startingCell, gridA));
     while (next != nullptr)
     {
         next = addCellToLastLine(
-                getNextCell(next, gridA, isovalueA, gridB, isovalueB));
+                getNextCell(next, gridA));
     }
 
-    // tracing backwards
+    // Tracing backwards.
     currentSegmentFace = currentSegmentFaceWhenTracingBackwards;
     direction = getDirection(firstPointOfLastLine(), secondPointOfLastLine());
     next = prependCellToLastLine(
-            getNextCell(startingCell, gridA, isovalueA, gridB, isovalueB));
+            getNextCell(startingCell, gridA));
     while (next != nullptr)
     {
         next = prependCellToLastLine(
-                getNextCell(next, gridA, isovalueA, gridB, isovalueB));
+                getNextCell(next, gridA));
     }
 
-    // if the line is closable, close it
+    // If the line is closable, close it.
     if (lines->last()->size() > 3 &&
         isClose(lastPointOfLastLine(), firstPointOfLastLine()))
     {
@@ -513,7 +538,8 @@ void MIsosurfaceIntersectionSource::traceLine(
         lines->last()->append(lines->last()->at(2));
     }
 
-    // if the line is shorter then 2 remove it, because otherwise the normals can not be calculated
+    // If the line is shorter, then 2 remove it, because otherwise the normals
+    // can not be calculated.
     if (lines->last()->size() < 2)
     {
         lines->pop_back();
@@ -523,8 +549,7 @@ void MIsosurfaceIntersectionSource::traceLine(
 
 MIsosurfaceIntersectionSource::CellInformation *
 MIsosurfaceIntersectionSource::getNextCell(
-        CellInformation *actCell, MStructuredGrid *gridA,
-        float isovalueA, MStructuredGrid *gridB, float isovalueB)
+        CellInformation *actCell, MStructuredGrid *gridA)
 {
     const int numCellsLatLon =
             (gridA->getNumLons() - 1) * (gridA->getNumLats() - 1);
@@ -534,7 +559,9 @@ MIsosurfaceIntersectionSource::getNextCell(
     {
         int posIndex = actCell->index - 1;
         if (posIndex < 0)
-        { return nullptr; }
+        {
+            return nullptr;
+        }
 
         CellInformation *cell = cells[posIndex];
         if (((cell->faces1 & cell->faces2) & pow2[RIGHT_FACE]) ==
@@ -543,13 +570,18 @@ MIsosurfaceIntersectionSource::getNextCell(
             cellsVisited[posIndex] = true;
             return cell;
         }
-    } else if (currentSegmentFace == BACK_FACE)
+    }
+    else if (currentSegmentFace == BACK_FACE)
     {
         int posIndex = actCell->index + (gridA->getNumLons() - 1);
         if (posIndex < 0)
-        { return nullptr; }
+        {
+            return nullptr;
+        }
         if (posIndex > numCells - 1)
-        { return nullptr; }
+        {
+            return nullptr;
+        }
 
         CellInformation *cell = cells[posIndex];
         if (((cell->faces1 & cell->faces2) & pow2[FRONT_FACE]) ==
@@ -558,24 +590,32 @@ MIsosurfaceIntersectionSource::getNextCell(
             cellsVisited[posIndex] = true;
             return cell;
         }
-    } else if (currentSegmentFace == BOTTOM_FACE)
+    }
+    else if (currentSegmentFace == BOTTOM_FACE)
     {
         int posIndex = actCell->index - numCellsLatLon;
         if (posIndex < 0)
-        { return nullptr; }
+        {
+            return nullptr;
+        }
         CellInformation *cell = cells[posIndex];
         if (((cell->faces1 & cell->faces2) & pow2[TOP_FACE]) == pow2[TOP_FACE])
         {
             cellsVisited[posIndex] = true;
             return cell;
         }
-    } else if (currentSegmentFace == RIGHT_FACE)
+    }
+    else if (currentSegmentFace == RIGHT_FACE)
     {
         int posIndex = actCell->index + 1;
         if (posIndex > numCells - 1)
-        { return nullptr; }
+        {
+            return nullptr;
+        }
         if (posIndex < 0)
-        { return nullptr; }
+        {
+            return nullptr;
+        }
         CellInformation *cell = cells[posIndex];
         if (((cell->faces1 & cell->faces2) & pow2[LEFT_FACE]) ==
             pow2[LEFT_FACE])
@@ -583,13 +623,18 @@ MIsosurfaceIntersectionSource::getNextCell(
             cellsVisited[posIndex] = true;
             return cell;
         }
-    } else if (currentSegmentFace == FRONT_FACE)
+    }
+    else if (currentSegmentFace == FRONT_FACE)
     {
         int posIndex = actCell->index - (gridA->getNumLons() - 1);
         if (posIndex > numCells - 1)
-        { return nullptr; }
+        {
+            return nullptr;
+        }
         if (posIndex < 0)
-        { return nullptr; }
+        {
+            return nullptr;
+        }
         CellInformation *cell = cells[posIndex];
         if (((cell->faces1 & cell->faces2) & pow2[BACK_FACE]) ==
             pow2[BACK_FACE])
@@ -597,11 +642,14 @@ MIsosurfaceIntersectionSource::getNextCell(
             cellsVisited[posIndex] = true;
             return cell;
         }
-    } else if (currentSegmentFace == TOP_FACE)
+    }
+    else if (currentSegmentFace == TOP_FACE)
     {
         int posIndex = actCell->index + numCellsLatLon;
         if (posIndex > numCells - 1)
-        { return nullptr; }
+        {
+            return nullptr;
+        }
         CellInformation *cell = cells[posIndex];
         if (((cell->faces1 & cell->faces2) & pow2[BOTTOM_FACE]) ==
             pow2[BOTTOM_FACE])
@@ -619,7 +667,9 @@ MIsosurfaceIntersectionSource::addCellToLastLine(
         CellInformation *cell)
 {
     if (cell == nullptr)
-    { return nullptr; }
+    {
+        return nullptr;
+    }
     const QVector3D *toAdd = nullptr;
     bool matched = false;
     int indexToAdd = -1;
@@ -635,8 +685,9 @@ MIsosurfaceIntersectionSource::addCellToLastLine(
             pointToAdd = 0;
             matched = true;
             indexToAdd = i;
-        } else if (cell->pointFaceRelation[(i * 2)] ==
-                   opposite(currentSegmentFace))
+        }
+        else if (cell->pointFaceRelation[(i * 2)]
+                 == opposite(currentSegmentFace))
         {
             toAdd = &lastOuterPoint;
             pointToAdd = 1;
@@ -664,7 +715,9 @@ MIsosurfaceIntersectionSource::prependCellToLastLine(
         CellInformation *cell)
 {
     if (cell == nullptr)
-    { return nullptr; }
+    {
+        return nullptr;
+    }
     const QVector3D *toAdd = nullptr;
     bool matched = false;
     int indexToAdd = -1;
@@ -679,7 +732,8 @@ MIsosurfaceIntersectionSource::prependCellToLastLine(
             matched = true;
             indexToAdd = i;
             pointToAdd = 1;
-        } else if (cell->pointFaceRelation[(i * 2) + 1] ==
+        }
+        else if (cell->pointFaceRelation[(i * 2) + 1] ==
                    opposite(currentSegmentFace))
         {
             toAdd = &firstOuterPoint;
@@ -706,7 +760,9 @@ MIsosurfaceIntersectionSource::prependCellToLastLine(
 int MIsosurfaceIntersectionSource::dequeueNextCellIndex(MStructuredGrid *grid)
 {
     if (nextCellInScanLoop++ >= static_cast<int>(grid->getNumValues()))
-    { return -1; }
+    {
+        return -1;
+    }
     return nextCellInScanLoop;
 }
 
@@ -746,7 +802,9 @@ MIsosurfaceIntersectionSource::getCellInformation(
     // are abbreviated by isP.
     getCellSegments(input.isovalueA, input.isovalueB, cellInformation);
     if (cellInformation->segments.size() == 0)
-    { cellInformation->isEmpty = true; }
+    {
+        cellInformation->isEmpty = true;
+    }
 
     return cellInformation;
 }
@@ -755,13 +813,11 @@ MIsosurfaceIntersectionSource::getCellInformation(
 void MIsosurfaceIntersectionSource::getCellSegments(
         const float isovalueA, const float isovalueB, CellInformation *cell)
 {
-    // isP = intersection points
-    QVector<QVector3D> isP;
+    QVector<QVector3D> intersectionPoints;
     QVector<int> pointFaceRelation;
     QVector<int> facePointRelation = QVector<int>({-1, -1, -1, -1, -1, -1});
 
-    // These two variables are used when
-    // three intersections where found.
+    // These two variables are used when three intersections where found.
     // The description of this is written under the face loop.
     int faceWithTwoIntersects = -1, faceWithOneIntersect = -1;
 
@@ -774,9 +830,8 @@ void MIsosurfaceIntersectionSource::getCellSegments(
     // Loop over the faces of the cell.
     for (int i = 0; i < 6; i++)
     {
-        // These two variables store the
-        // interpolated points for each variable
-        interp1.resize(0); // trick to shrink QVector without releasing memory
+        // These two variables store the interpolated points for each variable.
+        interp1.resize(0); // Trick to shrink QVector without releasing memory.
         interp2.resize(0);
 
         // When both cubes have an intersecting face?
@@ -784,8 +839,8 @@ void MIsosurfaceIntersectionSource::getCellSegments(
             (cell->faces2 & pow2[i]) == pow2[i])
         {
 
-            // Get the points in that face that are smaller then the
-            // isolevel, then get the cutten edges with lineArrangements[]
+            // Get the points in that face that are smaller then the isolevel,
+            // then get the cut edges with lineArrangements[].
             const int facePoint0 = facePoints[i * 4];
             const int facePoint1 = facePoints[i * 4 + 1];
             const int facePoint2 = facePoints[i * 4 + 2];
@@ -815,14 +870,16 @@ void MIsosurfaceIntersectionSource::getCellSegments(
                 (lines1 == 6 && lines2 == 9) ||
                 (lines1 == 9 && lines2 == 6) ||
                 (lines1 == 12 && lines2 == 3))
-            { continue; }
+            {
+                continue;
+            }
 
 //                auto start = std::chrono::system_clock::now();
 
             // Loop over the face edges.
             for (int l = 0; l < 4; l++)
             {
-                // Is the edge cut in the cube of the first variable?
+                // Is the edge cutting in the cube of the first variable?
                 if ((lines1 & pow2[l]) == pow2[l])
                 {
                     const int edgePointPrev = edgePoints[(i * 8 + l * 2)];
@@ -836,7 +893,7 @@ void MIsosurfaceIntersectionSource::getCellSegments(
                     interp1.append(VertexInterp(isovalueA, point1, point2, val1,
                                                 val2));
                 }
-                // Is the edge cut in the cube of the second variable?
+                // Is the edge cutting in the cube of the second variable?
                 if ((lines2 & pow2[l]) == pow2[l])
                 {
                     const int edgePointPrev = edgePoints[(i * 8 + l * 2)];
@@ -852,11 +909,13 @@ void MIsosurfaceIntersectionSource::getCellSegments(
                 }
             }
 
-            // When we have a bifurcation this counter is used to detect the face with two points
+            // When we have a bifurcation this counter is used to detect the
+            // face with two points.
             int countOfIntersectsFace = 0;
 
             // When there are four points in one face two ambiguous cases occur.
-            // The decision between these cases is done by the isovalue of one point of the face.
+            // The decision between these cases is done by the isovalue of one
+            // point of the face.
             if (interp1.size() == 4)
             {
                 if (cell->values1[1] < isovalueA)
@@ -882,8 +941,9 @@ void MIsosurfaceIntersectionSource::getCellSegments(
                 }
             }
 
-            // Test the found lines for intersection and
-            // store the intersection points in the variable isP
+            // Test the lines found for intersection and store the intersection
+            // points in the variable intersectionPoints.
+
             for (int lc1 = 0; lc1 < interp1.size() - 1; lc1 += 2)
             {
                 const QVector3D &a1 = interp1.at(lc1);
@@ -894,9 +954,10 @@ void MIsosurfaceIntersectionSource::getCellSegments(
                     const QVector3D &b1 = interp2.at(lc2);
                     const QVector3D &b2 = interp2.at(lc2 + 1);
                     QVector3D intersection(0, 0, 0);
-                    // Due to the fact that intersection in 3D is heavy to compute,
-                    // we use the information of the current face to calculate the
-                    // intersection in the 2D space.
+
+                    // Due to the fact that intersection in 3D is difficult to
+                    // compute, we use the information of the current face to
+                    // calculate the intersection in the 2D space.
                     if (i == TOP_FACE || i == BOTTOM_FACE)
                     {
                         QVector2D p(a1.x(), a1.y());
@@ -909,7 +970,8 @@ void MIsosurfaceIntersectionSource::getCellSegments(
                         {
                             intersection = QVector3D(out.x(), out.y(), a1.z());
                         }
-                    } else if (i == LEFT_FACE || i == RIGHT_FACE)
+                    }
+                    else if (i == LEFT_FACE || i == RIGHT_FACE)
                     {
                         QVector2D p(a1.y(), a1.z());
                         QVector2D p2(a2.y(), a2.z());
@@ -921,7 +983,8 @@ void MIsosurfaceIntersectionSource::getCellSegments(
                         {
                             intersection = QVector3D(a1.x(), out.x(), out.y());
                         }
-                    } else if (i == BACK_FACE || i == FRONT_FACE)
+                    }
+                    else if (i == BACK_FACE || i == FRONT_FACE)
                     {
                         QVector2D p(a1.x(), a1.z());
                         QVector2D p2(a2.x(), a2.z());
@@ -935,20 +998,20 @@ void MIsosurfaceIntersectionSource::getCellSegments(
                         }
                     }
 
-                    // if an intersection was found
+                    // If an intersection was found.
                     if (intersection != QVector3D(0, 0, 0))
                     {
                         pointFaceRelation.append(i);
-                        facePointRelation.replace(i, isP.size());
-                        isP.append(intersection);
+                        facePointRelation.replace(i, intersectionPoints.size());
+                        intersectionPoints.append(intersection);
                         countOfIntersectsFace++;
                     }
                 }
             }
 
-            // The following lines checking if the last face or
-            // the first face have an intersection this is used
-            // for detection of the direction of a bifurcation.
+            // The following lines check if the last face or the first face
+            // have an intersection this is used for detection of the direction
+            // of a bifurcation.
             if (countOfIntersectsFace == 1)
             {
                 faceWithOneIntersect++;
@@ -960,42 +1023,42 @@ void MIsosurfaceIntersectionSource::getCellSegments(
         }
     }
 
-    // We decide which points get connected regarding on the
-    // point count and if the first or the last face
-    // has two intersects.
+    // We decide which points are connected regarding on the point count and if
+    // the first or the last face has two intersection points.
+
     // This variable stores the found lines.
     //QVector<QVector<QVector3D>*> newSegments;
     QVector<int> retPointFaceRelation;
     QVector<int> retFacePointRelation;
 
-    // Easy case: two points -> one line
-    if (isP.size() == 2)
+    // Easy case: two points -> one line.
+    if (intersectionPoints.size() == 2)
     {
         cell->segments.append(new QVector<QVector3D>());
         cell->segments.at(0)->reserve(2);
 
-        // When the two points at the same position,
-        // move one a little to not to break the calculation
-        // of the normals.
-        if (isP.at(0) != isP.at(1))
+        // If the two points are at the same position, move one a little to not
+        // to break the calculation of the normals.
+        if (intersectionPoints.at(0) != intersectionPoints.at(1))
         {
-            cell->segments.at(0)->append(isP.at(0));
-        } else
-        {
-            cell->segments.at(0)->append(isP.at(0) + QVector3D(0, 0, 0.1));
+            cell->segments.at(0)->append(intersectionPoints.at(0));
         }
-        cell->segments.at(0)->append(isP.at(1));
+        else
+        {
+            cell->segments.at(0)->append(intersectionPoints.at(0)
+                                         + QVector3D(0, 0, 0.1));
+        }
+        cell->segments.at(0)->append(intersectionPoints.at(1));
         cell->pointFaceRelation = pointFaceRelation;
         cell->facePointRelation = facePointRelation;
 
 
     }
-        // When three points are found, this cube is
-        // a bifurcation.
-        // Then we have to decide how to build the lines.
-        // What we do is build two lines from the face that
-        // has one intersection to the one with two intersections.
-    else if (isP.size() == 3)
+    // When three points are found, this cube is a bifurcation.
+    // Then we have to decide how to build the lines.
+    // What we do is build two lines from the face that
+    // has one intersection to the one with two intersections.
+    else if (intersectionPoints.size() == 3)
     {
         retFacePointRelation = QVector<int>({-1, -1, -1, -1, -1, -1});
         cell->segments.reserve(2);
@@ -1007,23 +1070,24 @@ void MIsosurfaceIntersectionSource::getCellSegments(
 
         if (faceWithOneIntersect < faceWithTwoIntersects)
         {
-            cell->segments.at(0)->append(isP.first());
+            cell->segments.at(0)->append(intersectionPoints.first());
             retPointFaceRelation.append(pointFaceRelation.first());
-            cell->segments.at(0)->append(isP.at(1));
+            cell->segments.at(0)->append(intersectionPoints.at(1));
             retPointFaceRelation.append(pointFaceRelation.at(1));
-            cell->segments.at(1)->append(isP.first());
+            cell->segments.at(1)->append(intersectionPoints.first());
             retPointFaceRelation.append(pointFaceRelation.first());
-            cell->segments.at(1)->append(isP.at(2));
+            cell->segments.at(1)->append(intersectionPoints.at(2));
             retPointFaceRelation.append(pointFaceRelation.at(2));
-        } else
+        }
+        else
         {
-            cell->segments.at(0)->append(isP.last());
+            cell->segments.at(0)->append(intersectionPoints.last());
             retPointFaceRelation.append(pointFaceRelation.last());
-            cell->segments.at(0)->append(isP.at(1));
+            cell->segments.at(0)->append(intersectionPoints.at(1));
             retPointFaceRelation.append(pointFaceRelation.at(0));
-            cell->segments.at(1)->append(isP.last());
+            cell->segments.at(1)->append(intersectionPoints.last());
             retPointFaceRelation.append(pointFaceRelation.last());
-            cell->segments.at(1)->append(isP.at(1));
+            cell->segments.at(1)->append(intersectionPoints.at(1));
             retPointFaceRelation.append(pointFaceRelation.at(1));
         }
 
@@ -1035,9 +1099,9 @@ void MIsosurfaceIntersectionSource::getCellSegments(
         cell->pointFaceRelation = retPointFaceRelation;
         cell->facePointRelation = retFacePointRelation;
     }
-        // In this case 4 intersection points are found.
-        // We resort the the points to build the lines.
-    else if (isP.size() == 4)
+    // In this case 4 intersection points are found.
+    // We resort the points to build the lines.
+    else if (intersectionPoints.size() == 4)
     {
         retFacePointRelation = QVector<int>({-1, -1, -1, -1, -1, -1});
         cell->segments.reserve(2);
@@ -1047,22 +1111,24 @@ void MIsosurfaceIntersectionSource::getCellSegments(
         cell->segments.at(1)->reserve(2);
         retPointFaceRelation.reserve(4);
 
-        // if we have a next face we use the current direction of the line to get the
-        // the fitting line segment, if the line segments then cross, swap the segments end points
+        // If we have a next face, we use the current direction of the line to
+        // get the the fitting line segment, if the line segments then cross,
+        // swap the segments end points.
         if (currentSegmentFace != -1)
         {
             float closestDistance = 180;
             int closestIndex = facePointRelation.at(
                     opposite(currentSegmentFace));
             if (closestIndex == -1) closestIndex = 0;
-            const QVector3D &closestPoint = isP.at(closestIndex);
+            const QVector3D &closestPoint = intersectionPoints.at(closestIndex);
             int closestIndex2 = -1;
-            // Find the segment with the least agle between current direction and it
+            // Find the segment with the least agle between current direction
+            // and it.
             for (int l = 0; l < 4; l++)
             {
                 if (closestIndex != l)
                 {
-                    QVector3D directionTemp = (isP.at(l) -
+                    QVector3D directionTemp = (intersectionPoints.at(l) -
                                                closestPoint).normalized();
                     float angle = acos(
                             QVector3D::dotProduct(directionTemp, direction));
@@ -1090,65 +1156,73 @@ void MIsosurfaceIntersectionSource::getCellSegments(
                 }
             }
 
-            // if the line segments then intersect, switch the order
+            // If the line segments then intersects, switch the order.
             if (getLineSegmentsIntersectionPoint(
-                    isP.at(closestIndex).toVector2D(),
-                    isP.at(closestIndex2).toVector2D(),
-                    isP.at(next1).toVector2D(),
-                    isP.at(next2).toVector2D())
+                    intersectionPoints.at(closestIndex).toVector2D(),
+                    intersectionPoints.at(closestIndex2).toVector2D(),
+                    intersectionPoints.at(next1).toVector2D(),
+                    intersectionPoints.at(next2).toVector2D())
                 != QVector2D(0, 0))
             {
-                cell->segments.at(0)->append(isP.at(next1));
+                cell->segments.at(0)->append(intersectionPoints.at(next1));
                 retPointFaceRelation.append(pointFaceRelation.at(next1));
-                cell->segments.at(0)->append(isP.at(next2));
+                cell->segments.at(0)->append(intersectionPoints.at(next2));
                 retPointFaceRelation.append(pointFaceRelation.at(next2));
 
-                cell->segments.at(1)->append(isP.at(closestIndex));
+                cell->segments.at(1)->append(
+                            intersectionPoints.at(closestIndex));
                 retPointFaceRelation.append(pointFaceRelation.at(closestIndex));
-                cell->segments.at(1)->append(isP.at(closestIndex2));
+                cell->segments.at(1)->append(
+                            intersectionPoints.at(closestIndex2));
                 retPointFaceRelation.append(
                         pointFaceRelation.at(closestIndex2));
-            } else
+            }
+            else
             {
-                cell->segments.at(0)->append(isP.at(closestIndex));
+                cell->segments.at(0)->append(
+                            intersectionPoints.at(closestIndex));
                 retPointFaceRelation.append(pointFaceRelation.at(closestIndex));
-                cell->segments.at(0)->append(isP.at(closestIndex2));
+                cell->segments.at(0)->append(
+                            intersectionPoints.at(closestIndex2));
                 retPointFaceRelation.append(
                         pointFaceRelation.at(closestIndex2));
 
-                cell->segments.at(1)->append(isP.at(next1));
+                cell->segments.at(1)->append(intersectionPoints.at(next1));
                 retPointFaceRelation.append(pointFaceRelation.at(next1));
-                cell->segments.at(1)->append(isP.at(next2));
+                cell->segments.at(1)->append(intersectionPoints.at(next2));
                 retPointFaceRelation.append(pointFaceRelation.at(next2));
             }
-        } else
+        }
+        else
         {
-            if (getLineSegmentsIntersectionPoint(isP.at(0).toVector2D(),
-                                                 isP.at(1).toVector2D(),
-                                                 isP.at(2).toVector2D(),
-                                                 isP.at(3).toVector2D())
+            if (getLineSegmentsIntersectionPoint(
+                        intersectionPoints.at(0).toVector2D(),
+                        intersectionPoints.at(1).toVector2D(),
+                        intersectionPoints.at(2).toVector2D(),
+                        intersectionPoints.at(3).toVector2D())
                 != QVector2D(0, 0))
             {
 
-                cell->segments.at(0)->append(isP.at(1));
+                cell->segments.at(0)->append(intersectionPoints.at(1));
                 retPointFaceRelation.append(pointFaceRelation.at(1));
-                cell->segments.at(0)->append(isP.at(2));
+                cell->segments.at(0)->append(intersectionPoints.at(2));
                 retPointFaceRelation.append(pointFaceRelation.at(2));
 
-                cell->segments.at(1)->append(isP.at(0));
+                cell->segments.at(1)->append(intersectionPoints.at(0));
                 retPointFaceRelation.append(pointFaceRelation.at(0));
-                cell->segments.at(1)->append(isP.at(3));
+                cell->segments.at(1)->append(intersectionPoints.at(3));
                 retPointFaceRelation.append(pointFaceRelation.at(3));
-            } else
+            }
+            else
             {
-                cell->segments.at(0)->append(isP.at(0));
+                cell->segments.at(0)->append(intersectionPoints.at(0));
                 retPointFaceRelation.append(pointFaceRelation.at(0));
-                cell->segments.at(0)->append(isP.at(1));
+                cell->segments.at(0)->append(intersectionPoints.at(1));
                 retPointFaceRelation.append(pointFaceRelation.at(1));
 
-                cell->segments.at(1)->append(isP.at(2));
+                cell->segments.at(1)->append(intersectionPoints.at(2));
                 retPointFaceRelation.append(pointFaceRelation.at(2));
-                cell->segments.at(1)->append(isP.at(3));
+                cell->segments.at(1)->append(intersectionPoints.at(3));
                 retPointFaceRelation.append(pointFaceRelation.at(3));
             }
         }
@@ -1167,11 +1241,148 @@ void MIsosurfaceIntersectionSource::getCellSegments(
 bool
 MIsosurfaceIntersectionSource::isClose(const QVector3D &a, const QVector3D &b)
 {
-    // Arbitrary value chosen by Christoph! Think about a generic value to decide
-    // whether two points are closely located
+    // Arbitrary value chosen by Christoph! Think about a generic value to
+    // decide whether two points are closely located.
     if (abs(a.x() - b.x()) <= 5 &&
         abs(a.y() - b.y()) <= 5 &&
         abs(a.z() - b.z()) <= 5)
+    {
         return true;
+    }
     return false;
 }
+
+
+/*******************************************************************************
+***                             CellInformation                              ***
+********************************************************************************/
+/******************************************************************************
+***                     CONSTRUCTOR / DESTRUCTOR                            ***
+*******************************************************************************/
+
+MIsosurfaceIntersectionSource::CellInformation::CellInformation()
+{
+    index = -1;
+}
+
+
+MIsosurfaceIntersectionSource::CellInformation::CellInformation(
+        MStructuredGrid *gridA, MStructuredGrid *gridB,
+        int cellIndex, int dataIndex, const QVector<float> &pressures)
+{
+    index = cellIndex;
+    lon = dataIndex % gridA->nlons;
+    lat = (dataIndex / gridA->nlons) % gridA->nlats;
+    lev = dataIndex / (gridA->nlats * gridA->nlons);
+
+    fillCellPoints(gridA, pressures);
+    fillCellValues(values1, gridA);
+    fillCellValues(values2, gridB);
+}
+
+
+/******************************************************************************
+***                             PUBLIC METHODS                              ***
+*******************************************************************************/
+
+int MIsosurfaceIntersectionSource::CellInformation::getCubeIndexes1(
+        float isovalue)
+{
+    int cubeindex = 0;
+    if (values1[0] < isovalue) cubeindex |= 1;
+    if (values1[1] < isovalue) cubeindex |= 2;
+    if (values1[2] < isovalue) cubeindex |= 4;
+    if (values1[3] < isovalue) cubeindex |= 8;
+    if (values1[4] < isovalue) cubeindex |= 16;
+    if (values1[5] < isovalue) cubeindex |= 32;
+    if (values1[6] < isovalue) cubeindex |= 64;
+    if (values1[7] < isovalue) cubeindex |= 128;
+    return cubeindex;
+}
+
+
+int MIsosurfaceIntersectionSource::CellInformation::getCubeIndexes2(
+        float isovalue)
+{
+    int cubeindex = 0;
+    if (values2[0] < isovalue) cubeindex |= 1;
+    if (values2[1] < isovalue) cubeindex |= 2;
+    if (values2[2] < isovalue) cubeindex |= 4;
+    if (values2[3] < isovalue) cubeindex |= 8;
+    if (values2[4] < isovalue) cubeindex |= 16;
+    if (values2[5] < isovalue) cubeindex |= 32;
+    if (values2[6] < isovalue) cubeindex |= 64;
+    if (values2[7] < isovalue) cubeindex |= 128;
+    return cubeindex;
+}
+
+
+void MIsosurfaceIntersectionSource::CellInformation::removeSegment(int i)
+{
+    segments.remove(i);
+    pointFaceRelation.remove(i);
+    pointFaceRelation.remove(i);
+    segments.size() == 0 ? isEmpty = true : isEmpty = false;
+}
+
+
+/******************************************************************************
+***                             PRIVATE METHODS                             ***
+*******************************************************************************/
+
+void MIsosurfaceIntersectionSource::CellInformation::fillCellPoints(
+        MStructuredGrid *grid, const QVector<float> &pressures)
+{
+    // The following lines store the actual lat, lons and
+    // the sizes in lat and long direction
+    float actLon = grid->lons[lon];
+    float actLat = grid->lats[lat];
+    float lonDiv = grid->lons[lon + 1] - actLon;
+    float latDiv = grid->lats[lat + 1] - actLat;
+
+    // The following lines set the 8 corner points positions.
+    int counter = 0;
+    const int numLatLons = grid->getNumLons() * grid->getNumLats();
+    for (int k = 0; k <= 1; ++k)
+    {
+        for (int j = 0; j <= 1; ++j)
+        {
+            for (int i = 0; i <= 1; ++i)
+            {
+                int pressureIndex =
+                        lon + i + (lat + j) * grid->getNumLons()
+                        + (lev + k) * numLatLons;
+
+                cellPoints[counter++] = QVector3D(
+                        actLon + lonDiv * i,
+                        actLat + latDiv * j,
+                        pressures[pressureIndex]);
+            }
+        }
+    }
+}
+
+
+void MIsosurfaceIntersectionSource::CellInformation::fillCellValues(
+        float cellValues[], MStructuredGrid *grid)
+{
+    // The following lines set the 8 corner points values
+    // for the second variable.
+
+    int counter = 0;
+    for (int k = 0; k <= 1; ++k)
+    {
+        for (int j = 0; j <= 1; ++j)
+        {
+            for (int i = 0; i <= 1; ++i)
+            {
+                cellValues[counter++] = grid->getValue(lev + k,
+                                                       lat + j,
+                                                       lon + i);
+            }
+        }
+    }
+}
+
+
+} // namespace Met3D

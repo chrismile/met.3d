@@ -4,8 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
-**  Copyright 2015 Michael Kern
+**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2015-2017 Michael Kern
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -202,8 +202,8 @@ void getBlinnPhongColor(in vec3 worldPos, in vec3 normalDir, in vec3 ambientColo
     const vec3 l = normalize(-lightDirection); // specialCase
     const vec3 h = normalize(v + l);
 
-    vec3 diffuse = kD * clamp(abs(dot(n,l)),0.0,1.0) * diffuseColor;
-    vec3 specular = kS * pow(clamp(abs(dot(n,h)),0.0,1.0), s) * lightColor;
+    vec3 diffuse = kD * clamp(abs(dot(n, l)), 0.0, 1.0) * diffuseColor;
+    vec3 specular = kS * pow(clamp(abs(dot(n, h)), 0.0, 1.0), s) * lightColor;
 
     color = kA + diffuse + specular;
 }
@@ -257,8 +257,8 @@ shader VSTrajectoryShadow(in vec3 worldPos : 0, in float value : 1,
 
 // -----------------------------------------------------------------------------
 
-shader VSArrowHeads(in vec3 worldPos : 0, in vec3 direction : 1, in float value : 2,
-                    out VStoGSArrowHeads Output)
+shader VSArrowHeads(in vec3 worldPos : 0, in vec3 direction : 1,
+                    in float value : 2, out VStoGSArrowHeads Output)
 {
     float worldZ = (log(worldPos.z) - pToWorldZParams.x) * pToWorldZParams.y;
 
@@ -268,13 +268,12 @@ shader VSArrowHeads(in vec3 worldPos : 0, in vec3 direction : 1, in float value 
 }
 
 shader VSArrowHeadsShadow(in vec3 worldPos : 0, in vec3 direction : 1,
-                            in float value : 2, out VStoGSArrowHeads Output)
+                          in float value : 2, out VStoGSArrowHeads Output)
 {
     Output.worldPos = vec3(worldPos.xy, 0.1);
     Output.direction = direction;
     Output.value = value;
 }
-
 
 // -----------------------------------------------------------------------------
 
@@ -386,7 +385,8 @@ void generateTubeEnd(in TubeGeometryInfo end, in float endOffset,
         cosi = cos(angle);
         sini = sin(angle);
 
-        worldPos = end.pos + (cosi * end.normal + sini * end.binormal) * end.radius;
+        worldPos =
+                end.pos + (cosi * end.normal + sini * end.binormal) * end.radius;
 
         tubeValues[cc] = end.value;
         tubeNormals[cc] = normalize(worldPos - end.pos);
@@ -398,7 +398,8 @@ void generateTubeEnd(in TubeGeometryInfo end, in float endOffset,
 
 // -----------------------------------------------------------------------------
 
-shader GSTrajectoryTube(in VStoGSTrajectory Input[], out GStoFSTrajectory Output)
+shader GSTrajectoryTube(in VStoGSTrajectory Input[],
+                        out GStoFSTrajectory Output)
 {
 
     Output.value = 0;
@@ -433,7 +434,10 @@ shader GSTrajectoryTube(in VStoGSTrajectory Input[], out GStoFSTrajectory Output
     float tubeValues[numVertices];
 
     vec2 tubeRadii = vec2(tubeRadius);
-    if (thicknessMapping) { computeTubeRadii(valueT1, valueT2, tubeRadii); }
+    if (thicknessMapping)
+    {
+        computeTubeRadii(valueT1, valueT2, tubeRadii);
+    }
 
 
     TubeGeometryInfo prevInfo = {   pos1, normalPrev, binormalPrev,
@@ -479,8 +483,9 @@ shader GSTrajectoryTube(in VStoGSTrajectory Input[], out GStoFSTrajectory Output
         endInfo = TubeGeometryInfo(pos1, normalPrev, binormalPrev,
                     startTangent, tubeRadii.x, value1);
 
-        // Generate the ends of each tube
-        generateTubeEnd(endInfo, TUBE_END_OFFSET, tubeWorldsEnd, tubeNormalsEnd, tubeValuesEnd);
+        // Generate the ends of each tube.
+        generateTubeEnd(endInfo, TUBE_END_OFFSET, tubeWorldsEnd, tubeNormalsEnd,
+                        tubeValuesEnd);
         Output.value = endInfo.value;
 
         for (int t = 0; t < numVerticesEnd; ++t)
@@ -500,8 +505,9 @@ shader GSTrajectoryTube(in VStoGSTrajectory Input[], out GStoFSTrajectory Output
         endInfo = TubeGeometryInfo(pos2, normalNext, binormalNext,
                     endTangent, tubeRadii.y, value2);
 
-        // Generate the ends of each tube
-        generateTubeEnd(endInfo, TUBE_END_OFFSET, tubeWorldsEnd, tubeNormalsEnd, tubeValuesEnd);
+        // Generate the ends of each tube.
+        generateTubeEnd(endInfo, TUBE_END_OFFSET, tubeWorldsEnd, tubeNormalsEnd,
+                        tubeValuesEnd);
         Output.value = endInfo.value;
 
         for (int t = 0; t < numVerticesEnd; ++t)
@@ -517,7 +523,8 @@ shader GSTrajectoryTube(in VStoGSTrajectory Input[], out GStoFSTrajectory Output
 
 // -----------------------------------------------------------------------------
 
-shader GSTrajectoryTubeShadow(in VStoGSTrajectory Input[], out GStoFSTrajectory Output)
+shader GSTrajectoryTubeShadow(in VStoGSTrajectory Input[],
+                              out GStoFSTrajectory Output)
 {
     // set value of all to zero
     Output.value = 0;
@@ -555,7 +562,10 @@ shader GSTrajectoryTubeShadow(in VStoGSTrajectory Input[], out GStoFSTrajectory 
     Output.normal = normalize(vec3(0,0,0));
 
     vec2 tubeRadii = vec2(tubeRadius);
-    if (thicknessMapping) { computeTubeRadii(valueT1, valueT2, tubeRadii); }
+    if (thicknessMapping)
+    {
+        computeTubeRadii(valueT1, valueT2, tubeRadii);
+    }
 
     // and calculate the boundaries of the projected quad in x/y plane
     Output.worldPos = pos1 - normalPrev * tubeRadii.x;
@@ -626,7 +636,7 @@ shader GSSimpleTube(in VStoGSWorld Input[], out GStoFSSimple Output)
     TubeGeometryInfo endInfo = TubeGeometryInfo(prevPos, normal, binormal,
                                                 tangent, tubeRadius, 0);
 
-    // Generate the ends of each tube
+    // Generate the ends of each tube.
     generateTubeEnd(endInfo, endSegmentOffset, tubeWorldsEnd,
                     tubeNormalsEnd, tubeValuesEnd);
 
@@ -642,7 +652,7 @@ shader GSSimpleTube(in VStoGSWorld Input[], out GStoFSSimple Output)
     endInfo.pos = nextPos;
     endInfo.tangent = tangent;
 
-    // Generate the ends of each tube
+    // Generate the ends of each tube.
     generateTubeEnd(endInfo, endSegmentOffset, tubeWorldsEnd,
                     tubeNormalsEnd, tubeValuesEnd);
 
@@ -659,18 +669,22 @@ shader GSSimpleTube(in VStoGSWorld Input[], out GStoFSSimple Output)
 
 // -----------------------------------------------------------------------------
 
-shader GSSimpleArrowHead(in VStoGSArrowHeads Input[], out GStoFSTrajectory Output)
+shader GSSimpleArrowHead(in VStoGSArrowHeads Input[],
+                         out GStoFSTrajectory Output)
 {
     vec3 normal, binormal;
     vec3 tangent = Input[0].direction;
     calculateRayBasisTangent(Input[0].direction, vec3(0), normal, binormal);
 
     float radius = tubeRadius;
-    if (thicknessMapping) { computeTubeRadius(Input[0].value, radius); }
+    if (thicknessMapping)
+    {
+        computeTubeRadius(Input[0].value, radius);
+    }
     radius *= 2.5;
 
-    TubeGeometryInfo endInfo = TubeGeometryInfo(Input[0].worldPos, normal, binormal,
-                                                    tangent, radius, 0);
+    TubeGeometryInfo endInfo = TubeGeometryInfo(
+                Input[0].worldPos, normal, binormal, tangent, radius, 0);
 
     Output.value = Input[0].value;
 
@@ -679,7 +693,7 @@ shader GSSimpleArrowHead(in VStoGSArrowHeads Input[], out GStoFSTrajectory Outpu
     vec3 tubeWorldsEnd[numVerticesEnd]; vec3 tubeNormalsEnd[numVerticesEnd];
     float tubeValuesEnd[numVerticesEnd];
 
-    // Generate the ends of each tube
+    // Generate the ends of each tube.
     generateTubeEnd(endInfo, radius, tubeWorldsEnd,
                     tubeNormalsEnd, tubeValuesEnd);
 
@@ -694,7 +708,7 @@ shader GSSimpleArrowHead(in VStoGSArrowHeads Input[], out GStoFSTrajectory Outpu
 
     EndPrimitive();
 
-    // Generate the ends of each tube
+    // Generate the ends of each tube.
     generateTubeEnd(endInfo, 0, tubeWorldsEnd,
                     tubeNormalsEnd, tubeValuesEnd);
 
@@ -710,13 +724,17 @@ shader GSSimpleArrowHead(in VStoGSArrowHeads Input[], out GStoFSTrajectory Outpu
     EndPrimitive();
 }
 
-shader GSSimpleArrowShadow(in VStoGSArrowHeads Input[], out GStoFSTrajectory Output)
+shader GSSimpleArrowShadow(in VStoGSArrowHeads Input[],
+                           out GStoFSTrajectory Output)
 {
     vec3 tangent = Input[0].direction;
     vec3 normal = vec3(-tangent.y, tangent.x, 0);
 
     float radius = tubeRadius;
-    if (thicknessMapping) { computeTubeRadius(Input[0].value, radius); }
+    if (thicknessMapping)
+    {
+        computeTubeRadius(Input[0].value, radius);
+    }
     radius *= 2.5;
 
     vec3 arrowBase = Input[0].worldPos;
@@ -804,7 +822,7 @@ shader GSTickTube(in VStoGSWorld Input[], out GStoFSSimple Output)
     TubeGeometryInfo endInfo = TubeGeometryInfo(nextPos, normal, binormal,
                                 tangent, tubeRadius, 0);
 
-    // Generate the ends of each tube
+    // Generate the ends of each tube.
     generateTubeEnd(endInfo, endSegmentOffset, tubeWorldsEnd,
                     tubeNormalsEnd, tubeValuesEnd);
 
@@ -849,7 +867,8 @@ shader FSSurfaceColor(in GStoFSSimple Input, out vec4 fragColor)
     vec3 surfaceColor = vec3(0);
     vec3 ambientColor = geometryColor;
     vec3 diffuseColor = vec3(1, 1, 1);
-    getBlinnPhongColor(Input.worldPos, Input.normal, ambientColor, diffuseColor, surfaceColor);
+    getBlinnPhongColor(Input.worldPos, Input.normal, ambientColor, diffuseColor,
+                       surfaceColor);
 
     fragColor = vec4(surfaceColor, 1);
 }
@@ -882,7 +901,8 @@ shader FSJetcores(in GStoFSTrajectory Input, out vec4 fragColor)
         {
             for(int y = -kernelSize; y <= kernelSize; ++y)
             {
-                float depth = texture(shadowMap, lightPosNDC.xy + vec2(x, y) * texelSize).r;
+                float depth = texture(shadowMap,
+                                      lightPosNDC.xy + vec2(x, y) * texelSize).r;
                 shadowFactor += (currentDepth - bias < depth) ? 1.0 : 0.0;
             }
         }
@@ -902,14 +922,14 @@ shader FSJetcores(in GStoFSTrajectory Input, out vec4 fragColor)
 
     switch (colorMode)
     {
-        // Default tube color mode
+        // Default tube color mode.
         case 0:
             ambientColor = geometryColor;
             break;
 
-        // Pressure height color mode
+        // Pressure height color mode.
         case 1:
-        // Variable color mode
+        // Variable color mode.
         case 2:
             ambientColor = texture(transferFunction, t).rgb;
             break;
@@ -917,7 +937,8 @@ shader FSJetcores(in GStoFSTrajectory Input, out vec4 fragColor)
 
     vec3 surfaceColor;
     vec3 diffuseColor = vec3(1) * shadowFactor;
-    getBlinnPhongColor(Input.worldPos, Input.normal, ambientColor, diffuseColor, surfaceColor);
+    getBlinnPhongColor(Input.worldPos, Input.normal, ambientColor, diffuseColor,
+                       surfaceColor);
 
     fragColor = vec4(surfaceColor, 1);
 }
@@ -936,6 +957,8 @@ shader FSShadowMap(in GStoFSTrajectory Input, out vec4 fragColor)
     // gl_FragDepth = gl_FragCoord.z;
 }
 
+// -----------------------------------------------------------------------------
+
 shader FSShadowGroundImage(in VStoFSShadowMap Input, out vec4 fragColor)
 {
     float depthValue = texture(shadowMap, Input.texCoords).r;
@@ -947,7 +970,8 @@ shader FSShadowGroundImage(in VStoFSShadowMap Input, out vec4 fragColor)
     {
         for(int y = -1; y <= 1; ++y)
         {
-            float depth = texture(shadowMap, Input.texCoords + vec2(x, y) * texelSize).r;
+            float depth = texture(shadowMap,
+                                  Input.texCoords + vec2(x, y) * texelSize).r;
             shadowFactor += (depth < 1) ? 1.0 : 0.0;
         }
     }
@@ -997,21 +1021,24 @@ program TrajectoryShadowMap
 program ArrowHeads
 {
     vs(420)=VSArrowHeads();
-    gs(420)=GSSimpleArrowHead() : in(points), out(triangle_strip, max_vertices = 64);
+    gs(420)=GSSimpleArrowHead() : in(points), out(triangle_strip,
+                                                  max_vertices = 64);
     fs(420)=FSJetcores();
 };
 
 program ArrowHeadsShadow
 {
     vs(420)=VSArrowHeadsShadow();
-    gs(420)=GSSimpleArrowShadow() : in(points), out(triangle_strip, max_vertices = 128);
+    gs(420)=GSSimpleArrowShadow() : in(points), out(triangle_strip,
+                                                    max_vertices = 128);
     fs(420)=FSShadow();
 };
 
 program ArrowHeadsShadowMap
 {
     vs(420)=VSArrowHeads();
-    gs(420)=GSSimpleArrowHead() : in(points), out(triangle_strip, max_vertices = 64);
+    gs(420)=GSSimpleArrowHead() : in(points), out(triangle_strip,
+                                                  max_vertices = 64);
     fs(420)=FSShadowMap();
 };
 

@@ -1,44 +1,86 @@
-//
-// Created by kerninator on 04.05.17.
-//
-
+/******************************************************************************
+**
+**  This file is part of Met.3D -- a research environment for the
+**  three-dimensional visual exploration of numerical ensemble weather
+**  prediction data.
+**
+**  Copyright 2017 Marc Rautenhaus
+**  Copyright 2017 Michael Kern
+**
+**  Computer Graphics and Visualization Group
+**  Technische Universitaet Muenchen, Garching, Germany
+**
+**  Met.3D is free software: you can redistribute it and/or modify
+**  it under the terms of the GNU General Public License as published by
+**  the Free Software Foundation, either version 3 of the License, or
+**  (at your option) any later version.
+**
+**  Met.3D is distributed in the hope that it will be useful,
+**  but WITHOUT ANY WARRANTY; without even the implied warranty of
+**  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+**  GNU General Public License for more details.
+**
+**  You should have received a copy of the GNU General Public License
+**  along with Met.3D.  If not, see <http://www.gnu.org/licenses/>.
+**
+*******************************************************************************/
 #include "endpressuredifferencetrajectoryfilter.h"
 
-using namespace Met3D;
+// standard library imports
+
+// related third party imports
+
+// local application imports
+
+
+namespace Met3D
+{
+/******************************************************************************
+***                     CONSTRUCTOR / DESTRUCTOR                            ***
+*******************************************************************************/
 
 MEndPressureDifferenceTrajectoryFilter::MEndPressureDifferenceTrajectoryFilter()
-        : MTrajectoryFilter()
+    : MTrajectoryFilter()
 {
-
 }
 
-void MEndPressureDifferenceTrajectoryFilter::setIsosurfaceSource(MIsosurfaceIntersectionSource* s)
+
+/******************************************************************************
+***                            PUBLIC METHODS                               ***
+*******************************************************************************/
+
+void MEndPressureDifferenceTrajectoryFilter::setIsosurfaceSource(
+        MIsosurfaceIntersectionSource* s)
 {
     isoSurfaceIntersectionSource = s;
     registerInputSource(isoSurfaceIntersectionSource);
     enablePassThrough(isoSurfaceIntersectionSource);
 }
 
-MTrajectoryEnsembleSelection* MEndPressureDifferenceTrajectoryFilter::produceData(MDataRequest request)
+
+MTrajectoryEnsembleSelection*
+MEndPressureDifferenceTrajectoryFilter::produceData(MDataRequest request)
 {
     assert(isoSurfaceIntersectionSource != nullptr);
     assert(inputSelectionSource != nullptr);
 
     MDataRequestHelper rh(request);
 
-    float pressureDiffThreshold = rh.value("ENDPRESSUREDIFFFILTER_VALUE").toFloat();
-    float angleThreshold        = rh.value("ENDPRESSUREDIFFFILTER_ANGLE").toFloat();
-    const QStringList members   = rh.value("ENDPRESSUREDIFFFILTER_MEMBERS").split("/");
+    float pressureDiffThreshold =
+            rh.value("ENDPRESSUREDIFFFILTER_VALUE").toFloat();
+    float angleThreshold = rh.value("ENDPRESSUREDIFFFILTER_ANGLE").toFloat();
+    const QStringList members =
+            rh.value("ENDPRESSUREDIFFFILTER_MEMBERS").split("/");
 
-    MIsosurfaceIntersectionLines *lineSource = isoSurfaceIntersectionSource->getData(
-            lineRequest);
+    MIsosurfaceIntersectionLines *lineSource =
+            isoSurfaceIntersectionSource->getData(lineRequest);
 
     rh.removeAll(locallyRequiredKeys());
     MTrajectoryEnsembleSelection *lineSelection =
-            static_cast<MTrajectoryEnsembleSelection *>(inputSelectionSource->getData(
-                    rh.request()));
+            static_cast<MTrajectoryEnsembleSelection *>(
+                inputSelectionSource->getData(rh.request()));
 
-    // Counts the number of new trajectories
+    // Counts the number of new trajectories.
     int newNumTrajectories = 0;
 
     QVector<GLint> newStartIndices;
@@ -50,9 +92,10 @@ MTrajectoryEnsembleSelection* MEndPressureDifferenceTrajectoryFilter::produceDat
     QVector<GLint> ensStartIndices = lineSelection->getEnsembleStartIndices();
     QVector<GLsizei> ensIndexCounts = lineSelection->getEnsembleIndexCount();
 
-     const int numEnsembles = lineSelection->getNumEnsembleMembers();
+    const int numEnsembles = lineSelection->getNumEnsembleMembers();
 
-    // Loop through each member and filter the lines corresponding to that member.
+    // Loop through each member and filter the lines corresponding to that
+    // member.
     for (uint ee = 0; ee < static_cast<uint>(numEnsembles); ++ee)
     {
         // Obtain the start and end line index for the current member.
@@ -108,21 +151,25 @@ MTrajectoryEnsembleSelection* MEndPressureDifferenceTrajectoryFilter::produceDat
                 nextTangent.normalize();
 
                 // Compute the angles between the current and the next tangent.
-                double angleSegments = std::acos(QVector2D::dotProduct(prevTangent, nextTangent));
+                double angleSegments =
+                        std::acos(QVector2D::dotProduct(prevTangent,
+                                                        nextTangent));
                 angleSegments *= 180.0f / M_PI;
 
-                // Calculate the pressure difference between the end and the second /
-                // second-last point.
+                // Compute the pressure difference between the end and the
+                // second / second-last point.
                 double pressureDiff = std::abs(p1.z() - p0.z());
 
-                // Filter out lines that do not exceed the angle and pressure differnce
-                // thresholds.
-                bool isFulfilled = angleSegments <= angleThreshold && pressureDiff <= pressureDiffThreshold;
+                // Filter out lines that exceed the angle and pressure
+                // differnce thresholds.
+                bool isFulfilled = ((angleSegments <= angleThreshold)
+                                    && (pressureDiff <= pressureDiffThreshold));
 
                 if (isFulfilled)
                 {
                     newIndexCount++;
-                } else
+                }
+                else
                 {
                     if (newIndexCount > 0)
                     {
@@ -136,7 +183,8 @@ MTrajectoryEnsembleSelection* MEndPressureDifferenceTrajectoryFilter::produceDat
                 }
             }
 
-            // If the remaining vertices fulfill the filter criterion, push them to the next index
+            // If the remaining vertices fulfill the filter criterion, push them
+            // to the next index
             if (newIndexCount > 1)
             {
                 newStartIndices.push_back(startIndex);
@@ -153,11 +201,12 @@ MTrajectoryEnsembleSelection* MEndPressureDifferenceTrajectoryFilter::produceDat
 
     // Create the new result for each ensemble member.
     MWritableTrajectoryEnsembleSelection *filterResult =
-            new MWritableTrajectoryEnsembleSelection(lineSelection->refersTo(),
-                                                     newNumTrajectories,
-                                                     lineSelection->getTimes(),
-                                                     lineSelection->getStartGridStride(),
-                                                     numEnsembles);
+            new MWritableTrajectoryEnsembleSelection(
+                lineSelection->refersTo(),
+                newNumTrajectories,
+                lineSelection->getTimes(),
+                lineSelection->getStartGridStride(),
+                numEnsembles);
 
     for (int k = 0; k < newStartIndices.size(); ++k)
     {
@@ -178,7 +227,8 @@ MTrajectoryEnsembleSelection* MEndPressureDifferenceTrajectoryFilter::produceDat
 }
 
 
-MTask *MEndPressureDifferenceTrajectoryFilter::createTaskGraph(MDataRequest request)
+MTask *MEndPressureDifferenceTrajectoryFilter::createTaskGraph(
+        MDataRequest request)
 {
     assert(isoSurfaceIntersectionSource != nullptr);
     assert(inputSelectionSource         != nullptr);
@@ -189,14 +239,19 @@ MTask *MEndPressureDifferenceTrajectoryFilter::createTaskGraph(MDataRequest requ
 
     rh.removeAll(locallyRequiredKeys());
 
-    // Get previous line selection
+    // Get previous line selection.
     task->addParent(inputSelectionSource->getTaskGraph(rh.request()));
-    // Get original trajectory lines
+    // Get original trajectory lines.
     task->addParent(isoSurfaceIntersectionSource
-                            ->getTaskGraph(lineRequest));
+                    ->getTaskGraph(lineRequest));
 
     return task;
 }
+
+
+/******************************************************************************
+***                           PROTECTED METHODS                             ***
+*******************************************************************************/
 
 const QStringList MEndPressureDifferenceTrajectoryFilter::locallyRequiredKeys()
 {
@@ -204,5 +259,7 @@ const QStringList MEndPressureDifferenceTrajectoryFilter::locallyRequiredKeys()
             << "ENDPRESSUREDIFFFILTER_VALUE"
             << "ENDPRESSUREDIFFFILTER_ANGLE"
             << "ENDPRESSUREDIFFFILTER_MEMBERS"
-    );
+            );
 }
+
+} // namespace Met3D

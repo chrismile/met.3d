@@ -6,6 +6,7 @@
 **
 **  Copyright 2015-2017 Marc Rautenhaus
 **  Copyright 2016-2017 Bianca Tost
+**  Copyright 2017      Michael Kern
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -86,7 +87,8 @@ public:
      */
     void synchronizeWith(MSyncControl *sync, bool updateGUIProperties=true);
 
-    bool synchronizationEvent(MSynchronizationType syncType, QVector<QVariant> data);
+    bool synchronizationEvent(MSynchronizationType syncType,
+                              QVector<QVariant> data);
 
     /**
       Updates colour hints for synchronization (green property background
@@ -584,10 +586,10 @@ public:
             ContourSettings *contourSet = nullptr);
 
     /**
-     * Returns the contour labels of each variable that can be rendered on the screen.
-     * @p noOverlapping determines if these labels may overlap. Otherwise the pixel
-     * size of each label is computed according to the current @p sceneView and
-     * overlap tests are performed.
+     * Returns the contour labels of each variable that can be rendered on the
+     * screen. @p noOverlapping determines if these labels may overlap.
+     * Otherwise the pixel size of each label is computed according to the
+     * current @p sceneView and overlap tests are performed.
      */
     QList<MLabel*> getContourLabels(bool noOverlapping = false,
                                     MSceneViewGLWidget* sceneView = nullptr);
@@ -754,7 +756,7 @@ public:
 signals:
 
     /**
-    * @brief This signal is fired when the isolevel of the variable was
+    * @brief This signal is emitted when the isolevel of the variable has been
     * changed.
     */
     void isoValueChanged();

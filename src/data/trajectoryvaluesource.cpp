@@ -1,16 +1,54 @@
-//
-// Created by kerninator on 09.06.17.
-//
-
+/******************************************************************************
+**
+**  This file is part of Met.3D -- a research environment for the
+**  three-dimensional visual exploration of numerical ensemble weather
+**  prediction data.
+**
+**  Copyright 2017 Marc Rautenhaus
+**  Copyright 2017 Michael Kern
+**
+**  Computer Graphics and Visualization Group
+**  Technische Universitaet Muenchen, Garching, Germany
+**
+**  Met.3D is free software: you can redistribute it and/or modify
+**  it under the terms of the GNU General Public License as published by
+**  the Free Software Foundation, either version 3 of the License, or
+**  (at your option) any later version.
+**
+**  Met.3D is distributed in the hope that it will be useful,
+**  but WITHOUT ANY WARRANTY; without even the implied warranty of
+**  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+**  GNU General Public License for more details.
+**
+**  You should have received a copy of the GNU General Public License
+**  along with Met.3D.  If not, see <http://www.gnu.org/licenses/>.
+**
+*******************************************************************************/
 #include "trajectoryvaluesource.h"
 
-using namespace Met3D;
+// standard library imports
+
+// related third party imports
+
+// local application imports
+
+
+namespace Met3D
+{
+
+/******************************************************************************
+***                     CONSTRUCTOR / DESTRUCTOR                            ***
+*******************************************************************************/
 
 MTrajectoryValueSource::MTrajectoryValueSource()
         : MScheduledDataSource(), valueSource(nullptr), thicknessSource(nullptr)
 {
-
 }
+
+
+/******************************************************************************
+***                            PUBLIC METHODS                               ***
+*******************************************************************************/
 
 void MTrajectoryValueSource::setIsosurfaceSource(
         MIsosurfaceIntersectionSource* s)
@@ -20,7 +58,9 @@ void MTrajectoryValueSource::setIsosurfaceSource(
     enablePassThrough(isoSurfaceIntersectionSource);
 }
 
-void MTrajectoryValueSource::setInputSelectionSource(MTrajectorySelectionSource *s)
+
+void MTrajectoryValueSource::setInputSelectionSource(
+        MTrajectorySelectionSource *s)
 {
     inputSelectionSource = s;
     registerInputSource(inputSelectionSource);
@@ -33,7 +73,10 @@ void MTrajectoryValueSource::setInputSourceValueVar(
 {
     valueSource = inputSource;
 
-    if (!valueSource) { return; }
+    if (!valueSource)
+    {
+        return;
+    }
     registerInputSource(valueSource);
     enablePassThrough(valueSource);
 }
@@ -44,7 +87,10 @@ void MTrajectoryValueSource::setInputSourceThicknessVar(
 {
     thicknessSource = inputSource;
 
-    if (!thicknessSource) { return; }
+    if (!thicknessSource)
+    {
+        return;
+    }
     registerInputSource(thicknessSource);
     enablePassThrough(thicknessSource);
 }
@@ -87,10 +133,9 @@ MTrajectoryValues* MTrajectoryValueSource::produceData(MDataRequest request)
 
     int counter = 0;
 
-    // Loop through each member and filter the lines corresponding to that member.
+    // Iterate over all members and filter the lines corresponding to that member.
     for (uint ee = 0; ee < static_cast<uint>(members.size()); ++ee)
     {
-        const QString member = members[ee];
         // Obtain the start and end line index for the current member.
         const int ensStartIndex = ensStartIndices[ee];
         const int ensIndexCount = ensIndexCounts[ee];
@@ -98,7 +143,7 @@ MTrajectoryValues* MTrajectoryValueSource::produceData(MDataRequest request)
 
         QString varRequest = "";
 
-        // Obtain the grid of the chosen variable for value-sampling.
+        // Obtain the grid of the variable chosen for value-sampling.
         if (valueSource)
         {
             varRequest = varRequests[0];
@@ -124,14 +169,16 @@ MTrajectoryValues* MTrajectoryValueSource::produceData(MDataRequest request)
             {
                 const QVector3D& point = lineSource->getVertices()[j];
 
-                // Obtain the value at the line vertex if any variable was selected.
+                // Obtain the value at the line vertex if any variable was
+                // selected.
                 const float sourceVal = (gridSource) ?
                                         gridSource->interpolateValue(point) : 0;
 
                 // Obtain the value for thickness mapping at the line vertex if
                 // any variable was selected.
-                const float thicknessVal = (gridThickness) ?
-                                           gridThickness->interpolateValue(point) : 0;
+                const float thicknessVal =
+                        (gridThickness) ?
+                            gridThickness->interpolateValue(point) : 0;
 
                 // Add both values to the result array.
                 result->setVertex(counter++, sourceVal);
@@ -184,7 +231,7 @@ MTask *MTrajectoryValueSource::createTaskGraph(MDataRequest request)
 
     rh.removeAll(locallyRequiredKeys());
 
-    // Get previous line selection
+    // Get previous line selection.
     task->addParent(inputSelectionSource->getTaskGraph(rh.request()));
 
     task->addParent(isoSurfaceIntersectionSource
@@ -193,6 +240,11 @@ MTask *MTrajectoryValueSource::createTaskGraph(MDataRequest request)
     return task;
 }
 
+
+/******************************************************************************
+***                          PROTECTED METHODS                              ***
+*******************************************************************************/
+
 const QStringList MTrajectoryValueSource::locallyRequiredKeys()
 {
     return (QStringList()
@@ -200,3 +252,5 @@ const QStringList MTrajectoryValueSource::locallyRequiredKeys()
             << "TRAJECTORYVALUES_THICKNESSVAR"
     );
 }
+
+} // namespace Met3D

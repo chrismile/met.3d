@@ -332,12 +332,12 @@ void MBaseMapActor::loadMap(std::string filename)
     if (filename.empty())
     {
         LOG4CPLUS_ERROR(mlog, "Given GeoTiff filename is empty. "
-                        "Cannot read file.");
+                              "Cannot read file.");
         return;
     }
 
     LOG4CPLUS_DEBUG(mlog, "Reading world map image from GeoTiff file <" <<
-                           filename << ">..." << flush);
+                    filename << ">..." << flush);
 
     // open the raster dataset and store it in a GDALDataset object
     GDALDataset* tiffData = static_cast<GDALDataset*>(
@@ -416,8 +416,8 @@ void MBaseMapActor::loadMap(std::string filename)
     const int32_t imgSize = imgSizeX * latitudeDim;
 
     std::vector<GLbyte> tiffImg;
-	// changed reserve to resize because of "vector subscript out of range" 
-	// error on windows
+    // changed reserve to resize because of "vector subscript out of range"
+    // error on windows
     tiffImg.resize(imgSize * sizeof(GLbyte));
     //GLbyte* tiffImg = new GLbyte[imgSize * sizeof(GLbyte)];
 

@@ -191,7 +191,9 @@ void bisectionCorrection(inout vec3 position,
         {
             position = centerPosition;
             scalar = scalarCenter;
-        } else {
+        }
+        else
+        {
             prevPosition = centerPosition;
             prevScalar = scalarCenter;
         }

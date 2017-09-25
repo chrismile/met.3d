@@ -708,8 +708,8 @@ MStructuredGrid *MClimateForecastReader::readGrid(
         throw;
     }
 
-//    LOG4CPLUS_DEBUG(mlog, "reading NetCDF data from file "
-//                    << filename.toStdString());
+    LOG4CPLUS_DEBUG(mlog, "reading NetCDF data from file "
+                    << filename.toStdString());
 
     // Is this file opened for the first time? First access to a variable?
     openFilesMutex.lock();

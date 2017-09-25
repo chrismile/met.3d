@@ -4,8 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
-**  Copyright 2015 Michael Kern
+**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2015-2017 Michael Kern
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -72,7 +72,8 @@ uniform sampler2D distortTex;
 uniform sampler3D dataVolume;
 uniform sampler1D lonLatLevAxes;
 // Denotes an imaginary grid along the bounding box, indicating if there has
-// been found an init point at a certain grid cell. Can also be used as voxelized model.
+// been found an init point at a certain grid cell. Can also be used as
+// voxelized model.
 layout(r32i) uniform iimage3D ghostGrid;
 
 uniform bool    isoEnables[MAX_ISOSURFACES];
@@ -200,7 +201,10 @@ shader CSmain()
 
     // Make sure that there are no rays outside the defined ray grid.
     // So, the indices must not exceed the maximum number of rays.
-    if (indexX >= maxNumRays.x || indexY >= maxNumRays.y) { return; }
+    if (indexX >= maxNumRays.x || indexY >= maxNumRays.y)
+    {
+        return;
+    }
 
     // Compute the texture coordinates of the distortion texture in range [0;1].
     const vec2 distortTexCoords = vec2(indexX / float(maxNumRays.x - 1),
@@ -208,7 +212,8 @@ shader CSmain()
 
     // Obtain the random values in x/y direction.
     const vec2 distortVec = textureLod(distortTex, distortTexCoords, 0).rg;
-    // Compute world position by using the current indices and grid cell distances.
+    // Compute world position by using the current indices and grid cell
+    // distances.
     vec3 worldPos = initWorldPos + indexX * deltaGridX + indexY * deltaGridY;
     // Distort the original world position.
     worldPos += deltaGridX * distortVec.x + deltaGridY * distortVec.y;
@@ -237,9 +242,16 @@ shader CSmain()
     {
         float scalar = sampleDataAtPos(rayPosition);
 
-        // Check depends on if the ray position is inside/outside the iso-surface.
-        if (invertCondition) { condition = scalar <= isoValue; }
-        else { condition = scalar >= isoValue; }
+        // Check depends on if the ray position is inside/outside the
+        // iso-surface.
+        if (invertCondition)
+        {
+            condition = scalar <= isoValue;
+        }
+        else
+        {
+            condition = scalar >= isoValue;
+        }
 
         // If test passes then one intersection point is detected.
         if (condition)
@@ -247,32 +259,41 @@ shader CSmain()
             numCurrentCrossings++;
 
             // Search for an exact intersection point along the surface.
-            bisectionCorrection(rayPosition, lambda, prevRayPosition, prevLambda, invertCondition);
+            bisectionCorrection(rayPosition, lambda, prevRayPosition,
+                                prevLambda, invertCondition);
 
             scalar = sampleDataAtPos(rayPosition);
 
-            // Use the ghost grid to check if there has been detected an intersection point
-            // at the current position belonging to a cell of the ghost grid.
-            // If the index is 1, then we've already found an intersection point and do not update
-            // the init points buffer. Otherwise, increment the counter and add the current position
-            // and scalar value.
+            // Use the ghost grid to check if there has been detected an
+            // intersection point at the current position belonging to a cell
+            // of the ghost grid.
+            // If the index is 1, then we've already found an intersection
+            // point and do not update the init points buffer. Otherwise,
+            // increment the counter and add the current position and scalar
+            // value.
             const ivec3 ghostGridSize = imageSize(ghostGrid) - ivec3(1,1,1);
 
             const vec3 boxExtent = abs(bboxMax - bboxMin);
-            const vec3 ghostGridNormTexCoords = abs(rayPosition - bboxMin) / boxExtent;
+            const vec3 ghostGridNormTexCoords =
+                    abs(rayPosition - bboxMin) / boxExtent;
 
             // Calculate the indices within the ghost grid
             ivec3 ghostGridTexCoords = ivec3(0,0,0);
-            ghostGridTexCoords.x = int(ghostGridNormTexCoords.x * ghostGridSize.x);
-            ghostGridTexCoords.y = int(ghostGridNormTexCoords.y * ghostGridSize.y);
-            ghostGridTexCoords.z = int(ghostGridNormTexCoords.z * ghostGridSize.z);
+            ghostGridTexCoords.x =
+                    int(ghostGridNormTexCoords.x * ghostGridSize.x);
+            ghostGridTexCoords.y =
+                    int(ghostGridNormTexCoords.y * ghostGridSize.y);
+            ghostGridTexCoords.z =
+                    int(ghostGridNormTexCoords.z * ghostGridSize.z);
 
             // Obtain the old value and only exchange the current value with 1
             // if the value was zero before.
-            int ghostCount = imageAtomicCompSwap(ghostGrid, ghostGridTexCoords, 0, 1);
+            int ghostCount =
+                    imageAtomicCompSwap(ghostGrid, ghostGridTexCoords, 0, 1);
 
-            // If there is no currently detected init point at the grid cell, add the current position
-            // to the init points and set the cell as marked.
+            // If there is no currently detected init point at the grid cell,
+            // add the current position to the init points and set the cell as
+            // marked.
             if (ghostCount == 0)
             {
                 if(rayPosition.z <= bboxMin.z) return;
@@ -288,7 +309,8 @@ shader CSmain()
                 initPoints[index].position = rayPosition;
                 initPoints[index].value = scalar;
 
-                // If we are in double integration mode, add another entry to the list.
+                // If we are in double integration mode, add another entry to
+                // the list.
                 if (doubleIntegration)
                 {
                     index = atomicCounterIncrement(counter);
@@ -316,5 +338,5 @@ shader CSmain()
 
 program Standard
 {
-    cs(430)=CSmain()  : in(local_size_x = 64, local_size_y = 2, local_size_z = 1);
+    cs(430)=CSmain() : in(local_size_x = 64, local_size_y = 2, local_size_z = 1);
 };

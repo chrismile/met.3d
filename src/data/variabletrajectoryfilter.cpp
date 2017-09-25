@@ -1,18 +1,58 @@
-
+/******************************************************************************
+**
+**  This file is part of Met.3D -- a research environment for the
+**  three-dimensional visual exploration of numerical ensemble weather
+**  prediction data.
+**
+**  Copyright 2017 Marc Rautenhaus
+**  Copyright 2017 Michael Kern
+**
+**  Computer Graphics and Visualization Group
+**  Technische Universitaet Muenchen, Garching, Germany
+**
+**  Met.3D is free software: you can redistribute it and/or modify
+**  it under the terms of the GNU General Public License as published by
+**  the Free Software Foundation, either version 3 of the License, or
+**  (at your option) any later version.
+**
+**  Met.3D is distributed in the hope that it will be useful,
+**  but WITHOUT ANY WARRANTY; without even the implied warranty of
+**  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+**  GNU General Public License for more details.
+**
+**  You should have received a copy of the GNU General Public License
+**  along with Met.3D.  If not, see <http://www.gnu.org/licenses/>.
+**
+*******************************************************************************/
 #include "variabletrajectoryfilter.h"
 
-using namespace Met3D;
+// standard library imports
+
+// related third party imports
+
+// local application imports
+
+
+namespace Met3D
+{
+
+/******************************************************************************
+***                     CONSTRUCTOR / DESTRUCTOR                            ***
+*******************************************************************************/
 
 MVariableTrajectoryFilter::MVariableTrajectoryFilter() :
         MTrajectoryFilter(),
         isoSurfaceIntersectionSource(nullptr),
         filterVariableInputSource(nullptr)
-{
-
-}
+{}
 
 
-void MVariableTrajectoryFilter::setIsosurfaceSource(MIsosurfaceIntersectionSource* s)
+/******************************************************************************
+***                            PUBLIC METHODS                               ***
+*******************************************************************************/
+
+void MVariableTrajectoryFilter::setIsosurfaceSource(
+        MIsosurfaceIntersectionSource* s)
 {
     isoSurfaceIntersectionSource = s;
     registerInputSource(isoSurfaceIntersectionSource);
@@ -20,7 +60,8 @@ void MVariableTrajectoryFilter::setIsosurfaceSource(MIsosurfaceIntersectionSourc
 }
 
 
-void MVariableTrajectoryFilter::setFilterVariableInputSource(MWeatherPredictionDataSource* s)
+void MVariableTrajectoryFilter::setFilterVariableInputSource(
+        MWeatherPredictionDataSource* s)
 {
     filterVariableInputSource = s;
     registerInputSource(filterVariableInputSource);
@@ -28,7 +69,8 @@ void MVariableTrajectoryFilter::setFilterVariableInputSource(MWeatherPredictionD
 }
 
 
-MTrajectoryEnsembleSelection* MVariableTrajectoryFilter::produceData(MDataRequest request)
+MTrajectoryEnsembleSelection* MVariableTrajectoryFilter::produceData(
+        MDataRequest request)
 {
     assert(isoSurfaceIntersectionSource != nullptr);
     assert(inputSelectionSource         != nullptr);
@@ -48,7 +90,7 @@ MTrajectoryEnsembleSelection* MVariableTrajectoryFilter::produceData(MDataReques
             static_cast<MTrajectoryEnsembleSelection*>(
                     inputSelectionSource->getData(rh.request()));
 
-    // Counts the number of new trajectories
+    // Counts the number of new trajectories.
     int newNumTrajectories = 0;
 
     QVector<GLint>  newStartIndices;
@@ -60,10 +102,9 @@ MTrajectoryEnsembleSelection* MVariableTrajectoryFilter::produceData(MDataReques
     QVector<GLint> ensStartIndices = lineSelection->getEnsembleStartIndices();
     QVector<GLsizei> ensIndexCounts = lineSelection->getEnsembleIndexCount();
 
-    // Loop through each member and filter the lines corresponding to that member.
+    // Iterate over all member and filter the lines corresponding to that member.
     for (uint ee = 0; ee < static_cast<uint>(members.size()); ++ee)
     {
-        const QString member = members[ee];
         // Obtain the start and end line index for the current member.
         const int ensStartIndex = ensStartIndices[ee];
         const int ensIndexCount = ensIndexCounts[ee];
@@ -74,7 +115,8 @@ MTrajectoryEnsembleSelection* MVariableTrajectoryFilter::produceData(MDataReques
         const int ensNewStartIndex = newStartIndices.size();
         int ensNewIndexCount = 0;
 
-        MStructuredGrid *varGrid = filterVariableInputSource->getData(varRequest);
+        MStructuredGrid *varGrid =
+                filterVariableInputSource->getData(varRequest);
 
         for (int i = ensStartIndex; i < ensEndIndex; ++i)
         {
@@ -129,11 +171,12 @@ MTrajectoryEnsembleSelection* MVariableTrajectoryFilter::produceData(MDataReques
     }
 
     MWritableTrajectoryEnsembleSelection *filterResult =
-            new MWritableTrajectoryEnsembleSelection(lineSelection->refersTo(),
-                                                     newNumTrajectories,
-                                                     lineSelection->getTimes(),
-                                                     lineSelection->getStartGridStride(),
-                                                     members.size());
+            new MWritableTrajectoryEnsembleSelection(
+                lineSelection->refersTo(),
+                newNumTrajectories,
+                lineSelection->getTimes(),
+                lineSelection->getStartGridStride(),
+                members.size());
 
     for (int k = 0; k < newStartIndices.size(); ++k)
     {
@@ -191,6 +234,10 @@ MTask *MVariableTrajectoryFilter::createTaskGraph(MDataRequest request)
 }
 
 
+/******************************************************************************
+***                           PROTECTED METHODS                             ***
+*******************************************************************************/
+
 const QStringList MVariableTrajectoryFilter::locallyRequiredKeys()
 {
     return (QStringList()
@@ -198,3 +245,5 @@ const QStringList MVariableTrajectoryFilter::locallyRequiredKeys()
             << "VARFILTER_OP" << "VARFILTER_VALUE"
     );
 }
+
+} // namespace Met3D

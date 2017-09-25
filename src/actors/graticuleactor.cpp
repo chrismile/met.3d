@@ -896,7 +896,7 @@ void MGraticuleActor::generateGeometry()
 
     // generate data item key for every vertex buffer object wrt the actor
     const QString graticuleRequestKey = QString("graticule_vertices_actor#")
-                                        + QString::number(getID());
+            + QString::number(getID());
     uploadVec2ToVertexBuffer(verticesGraticule, graticuleRequestKey,
                              &graticuleVertexBuffer);
 
@@ -943,7 +943,7 @@ void MGraticuleActor::generateGeometry()
     }
 
     const QString coastRequestKey = "graticule_coastlines_actor#"
-                                    + QString::number(getID());
+            + QString::number(getID());
     uploadVec2ToVertexBuffer(verticesCoastlines, coastRequestKey,
                              &coastlineVertexBuffer);
 
@@ -953,14 +953,14 @@ void MGraticuleActor::generateGeometry()
     {
         if (rotateBBox)
         {
-        naturalEarthDataLoader->loadAndRotateLineGeometry(
-                    MNaturalEarthDataLoader::BORDERLINES,
-                    cornerRect,
-                    &verticesBorderlines,
-                    &borderlineStartIndices,
-                    &borderlineVertexCount,
-                    false, rotatedNorthPole.y(),
-                    rotatedNorthPole.x());  // clear vectors
+            naturalEarthDataLoader->loadAndRotateLineGeometry(
+                        MNaturalEarthDataLoader::BORDERLINES,
+                        cornerRect,
+                        &verticesBorderlines,
+                        &borderlineStartIndices,
+                        &borderlineVertexCount,
+                        false, rotatedNorthPole.y(),
+                        rotatedNorthPole.x());  // clear vectors
         }
         else
         {
@@ -987,7 +987,7 @@ void MGraticuleActor::generateGeometry()
 
 
     const QString borderRequestKey = "graticule_borderlines_actor#"
-                                     + QString::number(getID());
+            + QString::number(getID());
     uploadVec2ToVertexBuffer(verticesBorderlines, borderRequestKey,
                              &borderlineVertexBuffer);
 

@@ -123,10 +123,6 @@ HEADERS += \
     src/data/bboxtrajectoryfilter.h \
     src/gxfw/mresizewindowdialog.h \
     src/actors/spatial1dtransferfunction.h \
-    src/data/partialderivativefilter.h \
-    src/data/multivarpartialderivativefilter.h \
-    src/data/lines.h \
-    src/data/linegeometryfilter.h \
     src/actors/transferfunctioneditor/transferfunctioneditor.h \
     src/actors/transferfunctioneditor/colour.h \
     src/actors/transferfunctioneditor/colourpicker.h \
@@ -134,7 +130,21 @@ HEADERS += \
     src/gxfw/rotatedgridsupportingactor.h \
     src/gxfw/boundingbox/bboxdockwidget.h \
     src/gxfw/boundingbox/boundingbox.h \
-    src/gxfw/sessionmanagerdialog.h
+    src/gxfw/sessionmanagerdialog.h \
+    src/actors/isosurfaceintersectionactor.h \
+    src/actors/jetcoredetectionactor.h \
+    src/data/angletrajectoryfilter.h \
+    src/data/endpressuredifferencetrajectoryfilter.h \
+    src/data/geometriclengthtrajectoryfilter.h \
+    src/data/hessiantrajectoryfilter.h \
+    src/data/isosurfaceintersectionsource.h \
+    src/data/lines.h \
+    src/data/mprojectedvelocitiesfilter.h \
+    src/data/multivarpartialderivativefilter.h \
+    src/data/partialderivativefilter.h \
+    src/data/trajectoryarrowheadssource.h \
+    src/data/trajectoryvaluesource.h \
+    src/data/variabletrajectoryfilter.h
 
 SOURCES += \
     src/main.cpp \
@@ -225,10 +235,6 @@ SOURCES += \
     src/data/bboxtrajectoryfilter.cpp \
     src/gxfw/mresizewindowdialog.cpp \
     src/actors/spatial1dtransferfunction.cpp \
-    src/data/partialderivativefilter.cpp \
-    src/data/multivarpartialderivativefilter.cpp \
-    src/data/lines.cpp \
-    src/data/linegeometryfilter.cpp \
     src/actors/transferfunctioneditor/transferfunctioneditor.cpp \
     src/actors/transferfunctioneditor/colourpicker.cpp \
     src/actors/transferfunctioneditor/colour.cpp \
@@ -236,7 +242,21 @@ SOURCES += \
     src/gxfw/rotatedgridsupportingactor.cpp \
     src/gxfw/boundingbox/bboxdockwidget.cpp \
     src/gxfw/boundingbox/boundingbox.cpp \
-    src/gxfw/sessionmanagerdialog.cpp
+    src/gxfw/sessionmanagerdialog.cpp \
+    src/actors/isosurfaceintersectionactor.cpp \
+    src/actors/jetcoredetectionactor.cpp \
+    src/data/angletrajectoryfilter.cpp \
+    src/data/endpressuredifferencetrajectoryfilter.cpp \
+    src/data/geometriclengthtrajectoryfilter.cpp \
+    src/data/hessiantrajectoryfilter.cpp \
+    src/data/isosurfaceintersectionsource.cpp \
+    src/data/lines.cpp \
+    src/data/mprojectedvelocitiesfilter.cpp \
+    src/data/multivarpartialderivativefilter.cpp \
+    src/data/partialderivativefilter.cpp \
+    src/data/trajectoryarrowheadssource.cpp \
+    src/data/trajectoryvaluesource.cpp \
+    src/data/variabletrajectoryfilter.cpp
 
 FORMS += \
     src/mainwindow.ui \

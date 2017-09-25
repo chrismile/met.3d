@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2017 Marc Rautenhaus
+**  Copyright 2017 Michael Kern
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -35,6 +36,7 @@
 // local application imports
 #include "util/mutil.h"
 
+
 using namespace std;
 
 namespace Met3D
@@ -46,8 +48,7 @@ namespace Met3D
 
 MPartialDerivativeFilter::MPartialDerivativeFilter()
     : MStructuredGridEnsembleFilter()
-{
-}
+{}
 
 
 /******************************************************************************
@@ -81,8 +82,8 @@ MStructuredGrid* MPartialDerivativeFilter::produceData(MDataRequest request)
         // Compute the first partial derivative.
         // =====================================
 
-        // Loop over all grid points: Compute first partial derivative
-        // ith central differences.
+        // Loop over all grid points: Compute first partial derivative ith
+        // central differences.
 
         if (params[1] == "DLON")
         {
@@ -91,20 +92,27 @@ MStructuredGrid* MPartialDerivativeFilter::produceData(MDataRequest request)
                 for (unsigned int j = 0; j < result->getNumLats(); j++)
                 {
                     // Forward/backward differences for boundary grid points.
-                    float dinput_dlon = (inputGrid->getValue(k, j, 1) - inputGrid->getValue(k, j, 0)) /
+                    float dinput_dlon = (inputGrid->getValue(k, j, 1)
+                                         - inputGrid->getValue(k, j, 0)) /
                             (inputGrid->getLons()[1] - inputGrid->getLons()[0]);
                     result->setValue(k, j, 0, dinput_dlon);
 
                     unsigned int nlons = result->getNumLons();
-                    dinput_dlon = (inputGrid->getValue(k, j, nlons - 1) - inputGrid->getValue(k, j, nlons - 2)) /
-                            (inputGrid->getLons()[nlons - 1] - inputGrid->getLons()[nlons - 2]);
+                    dinput_dlon =
+                            (inputGrid->getValue(k, j, nlons - 1)
+                             - inputGrid->getValue(k, j, nlons - 2))
+                            / (inputGrid->getLons()[nlons - 1]
+                            - inputGrid->getLons()[nlons - 2]);
                     result->setValue(k, j, nlons - 1, dinput_dlon);
 
                     // Central differences for all other grid points.
                     for (unsigned int i = 1; i < nlons - 1; i++)
                     {
-                        dinput_dlon = (inputGrid->getValue(k, j, i + 1) - inputGrid->getValue(k, j, i - 1)) /
-                                (inputGrid->getLons()[i + 1] - inputGrid->getLons()[i - 1]);
+                        dinput_dlon =
+                                (inputGrid->getValue(k, j, i + 1)
+                                 - inputGrid->getValue(k, j, i - 1))
+                                / (inputGrid->getLons()[i + 1]
+                                - inputGrid->getLons()[i - 1]);
                         result->setValue(k, j, i, dinput_dlon);
                     }
                 }
@@ -118,20 +126,29 @@ MStructuredGrid* MPartialDerivativeFilter::produceData(MDataRequest request)
                 for (unsigned int i = 0; i < result->getNumLons(); i++)
                 {
                     // Forward/backward differences for boundary grid points.
-                    float dinput_dlat = (inputGrid->getValue(k, 1, i) - inputGrid->getValue(k, 0, i)) /
-                            (inputGrid->getLats()[1] - inputGrid->getLats()[0]);
+                    float dinput_dlat =
+                            (inputGrid->getValue(k, 1, i)
+                             - inputGrid->getValue(k, 0, i))
+                            / (inputGrid->getLats()[1]
+                            - inputGrid->getLats()[0]);
                     result->setValue(k, 0, i, dinput_dlat);
 
                     unsigned int nlats = result->getNumLats();
-                    dinput_dlat = (inputGrid->getValue(k, nlats - 1, i) - inputGrid->getValue(k, nlats - 2, i)) /
-                            (inputGrid->getLats()[nlats - 1] - inputGrid->getLats()[nlats - 2]);
+                    dinput_dlat =
+                            (inputGrid->getValue(k, nlats - 1, i)
+                             - inputGrid->getValue(k, nlats - 2, i))
+                            / (inputGrid->getLats()[nlats - 1]
+                            - inputGrid->getLats()[nlats - 2]);
                     result->setValue(k, nlats - 1, i, dinput_dlat);
 
                     // Central differences for all other grid points.
                     for (unsigned int j = 1; j < nlats - 1; j++)
                     {
-                        dinput_dlat = (inputGrid->getValue(k, j + 1, i) - inputGrid->getValue(k, j - 1, i)) /
-                                (inputGrid->getLats()[j + 1] - inputGrid->getLats()[j - 1]);
+                        dinput_dlat =
+                                (inputGrid->getValue(k, j + 1, i)
+                                 - inputGrid->getValue(k, j - 1, i))
+                                / (inputGrid->getLats()[j + 1]
+                                - inputGrid->getLats()[j - 1]);
                         result->setValue(k, j, i, dinput_dlat);
                     }
                 }
@@ -145,20 +162,29 @@ MStructuredGrid* MPartialDerivativeFilter::produceData(MDataRequest request)
                 for (unsigned int i = 0; i < result->getNumLons(); i++)
                 {
                     // Forward/backward differences for boundary grid points.
-                    float dinput_dp = (inputGrid->getValue(1, j, i) - inputGrid->getValue(0, j, i)) /
-                            (inputGrid->getPressure(1, j, i) - inputGrid->getPressure(0, j, i));
+                    float dinput_dp =
+                            (inputGrid->getValue(1, j, i)
+                             - inputGrid->getValue(0, j, i))
+                            / (inputGrid->getPressure(1, j, i)
+                               - inputGrid->getPressure(0, j, i));
                     result->setValue(0, j, i, dinput_dp);
 
                     unsigned int nlevs = result->getNumLevels();
-                    dinput_dp = (inputGrid->getValue(nlevs - 1, j, i) - inputGrid->getValue(nlevs - 2, j, i)) /
-                            (inputGrid->getPressure(nlevs - 1, j, i) - inputGrid->getPressure(nlevs - 2, j, i));
+                    dinput_dp =
+                            (inputGrid->getValue(nlevs - 1, j, i)
+                             - inputGrid->getValue(nlevs - 2, j, i))
+                            / (inputGrid->getPressure(nlevs - 1, j, i)
+                               - inputGrid->getPressure(nlevs - 2, j, i));
                     result->setValue(nlevs - 1, j, i, dinput_dp);
 
                     // Central differences for all other grid points.
                     for (unsigned int k = 1; k < nlevs - 1; k++)
                     {
-                        dinput_dp = (inputGrid->getValue(k + 1, j, i) - inputGrid->getValue(k - 1, j, i)) /
-                                (inputGrid->getPressure(k + 1, j, i) - inputGrid->getPressure(k - 1, j, i));
+                        dinput_dp =
+                                (inputGrid->getValue(k + 1, j, i)
+                                 - inputGrid->getValue(k - 1, j, i))
+                                / (inputGrid->getPressure(k + 1, j, i)
+                                   - inputGrid->getPressure(k - 1, j, i));
                         result->setValue(k, j, i, dinput_dp);
                     }
                 }
@@ -174,31 +200,38 @@ MStructuredGrid* MPartialDerivativeFilter::produceData(MDataRequest request)
         if (params[1] == "DLON2")
         {
             for (unsigned int k = 0; k < result->getNumLevels(); k++)
+            {
                 for (unsigned int j = 0; j < result->getNumLats(); j++)
                 {
                     // Central differences for all grid points except boundary
                     // grid points.
                     for (unsigned int i = 1; i < result->getNumLons()-1; i++)
                     {
-                        float dlon = (inputGrid->getLons()[i+1] - inputGrid->getLons()[i]);
-                        float dinput2_dlon2 = (inputGrid->getValue(k, j, i+1) - 2. * inputGrid->getValue(k, j, i)
+                        float dlon =
+                                (inputGrid->getLons()[i+1]
+                                - inputGrid->getLons()[i]);
+                        float dinput2_dlon2 =
+                                (inputGrid->getValue(k, j, i+1)
+                                 - 2. * inputGrid->getValue(k, j, i)
                                  + inputGrid->getValue(k, j, i-1)) / (dlon*dlon);
                         result->setValue(k, j, i, dinput2_dlon2);
                     }
 
                     // Boundary conditions:
-//TODO (mr, 23Nov2014) -- which bc should we use?
+                    //TODO (mr, 23Nov2014) -- which bc should we use?
                     result->setValue(k, j, 0,
                                      result->getValue(k, j, 1));
                     int nlons = result->getNumLons();
                     result->setValue(k, j, nlons-1,
                                      result->getValue(k, j, nlons-2));
                 }
+            }
         }
 
         else if (params[1] == "DLAT2")
         {
             for (unsigned int k = 0; k < result->getNumLevels(); k++)
+            {
                 for (unsigned int i = 0; i < result->getNumLons(); i++)
                 {
                     // Central differences for all grid points except boundary
@@ -207,24 +240,28 @@ MStructuredGrid* MPartialDerivativeFilter::produceData(MDataRequest request)
                     {
                         float dlat = (inputGrid->getLats()[j+1]
                                 - inputGrid->getLats()[j]);
-                        float dinput2_dlat2 = (inputGrid->getValue(k, j+1, i) - 2. * inputGrid->getValue(k, j, i)
+                        float dinput2_dlat2 =
+                                (inputGrid->getValue(k, j+1, i)
+                                 - 2. * inputGrid->getValue(k, j, i)
                                  + inputGrid->getValue(k, j-1, i)) / (dlat*dlat);
                         result->setValue(k, j, i, dinput2_dlat2);
                     }
 
                     // Boundary conditions:
-//TODO (mr, 23Nov2014) -- which bc should we use?
+                    //TODO (mr, 23Nov2014) -- which bc should we use?
                     result->setValue(k, 0, i,
                                      result->getValue(k, 1, i));
                     int nlats = result->getNumLats();
                     result->setValue(k, nlats-1, i,
                                      result->getValue(k, nlats-2, i));
                 }
+            }
         }
 
         else if (params[1] == "DP2")
         {
             for (unsigned int j = 0; j < result->getNumLats(); j++)
+            {
                 for (unsigned int i = 0; i < result->getNumLons(); i++)
                 {
                     // Central differences for all grid points except boundary
@@ -232,20 +269,23 @@ MStructuredGrid* MPartialDerivativeFilter::produceData(MDataRequest request)
                     for (unsigned int k = 1; k < result->getNumLevels()-1; k++)
                     {
                         float dp = (inputGrid->getPressure(k+1, j, i)
-                                - inputGrid->getPressure(k, j, i));
-                        float dinput2_dp2 = (inputGrid->getValue(k+1, j, i) - 2. * inputGrid->getValue(k, j, i)
+                                    - inputGrid->getPressure(k, j, i));
+                        float dinput2_dp2 =
+                                (inputGrid->getValue(k+1, j, i)
+                                 - 2. * inputGrid->getValue(k, j, i)
                                  + inputGrid->getValue(k-1, j, i)) / (dp*dp);
                         result->setValue(k, j, i, dinput2_dp2);
                     }
 
                     // Boundary conditions:
-//TODO (mr, 23Nov2014) -- which bc should we use?
+                    //TODO (mr, 23Nov2014) -- which bc should we use?
                     result->setValue(0, j, i,
                                      result->getValue(1, j, i));
                     int nlevs = result->getNumLevels();
                     result->setValue(nlevs-1, j, i,
                                      result->getValue(nlevs-2, j, i));
                 }
+            }
         }
 
         else if (params[1] == "DLONLAT")

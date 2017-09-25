@@ -88,7 +88,7 @@ MSceneViewGLWidget::MSceneViewGLWidget()
     // Obtain a "personal" identification number.
     this->myID = MSceneViewGLWidget::idCounter++;
 
-    backgroundColour = QColor(240, 240, 255);
+    backgroundColour = QColor(255, 255, 255);
 
     pbot    = 1050.; // hPa
     ptop    = 20.;
@@ -1853,7 +1853,9 @@ void MSceneViewGLWidget::wheelEvent(QWheelEvent *event)
 //        // Alt + mouse wheel: time navigation for scene.
 //        if (event->delta() > 0) {
 //            scene->timeForward();
-//        } else {
+//        }
+//        else
+//        {
 //            scene->timeBackward();
 //        }
     }

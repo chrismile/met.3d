@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2017      Michael Kern
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -255,7 +256,9 @@ protected:
     QtProperty *probabilityRegionIsovalueProperty;
 };
 
-
+// tag2017 Werden diese Klassen noch benutzt oder sind sie Relikte?
+// Falls sie benutzt werden sollten, wäre eine saubere Implementierung noch
+// notwenig (z.B. load/saveConfig). -> Marc fragen.
 /**
   Partial derivative filter.
  */
@@ -275,6 +278,7 @@ protected:
     QStringList derivativeOptions;
     QtProperty *partialDerivativeProperty;
 };
+
 
 class MMultiVarPartialDerivativeProperties : public MRequestProperties
 {
@@ -300,6 +304,7 @@ protected:
     QtProperty* blurSigmaProperty;
     QtProperty* deltaNormalStepProperty;
 };
+
 
 class MProjectedVelocitiesProperties : public MRequestProperties
 {

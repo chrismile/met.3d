@@ -4,8 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2016 Marc Rautenhaus
-**  Copyright 2016 Michael Kern
+**  Copyright 2017 Marc Rautenhaus
+**  Copyright 2017 Michael Kern
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -24,9 +24,10 @@
 **  along with Met.3D.  If not, see <http://www.gnu.org/licenses/>.
 **
 *******************************************************************************/
-
 #ifndef MULTIVARPARTIALDERIVATIVEFILTER_H
 #define MULTIVARPARTIALDERIVATIVEFILTER_H
+
+// standard library imports
 
 // related third party imports
 
@@ -35,64 +36,67 @@
 #include "structuredgrid.h"
 #include "datarequest.h"
 
+
 namespace Met3D
 {
+/**
+ * Represents the family of filters that requires more than one variable to
+ * generate a result.
+ */
+class MMultiVarFilter : public MStructuredGridEnsembleFilter
+{
+public:
+    explicit MMultiVarFilter();
+
+    virtual MTask* createTaskGraph(MDataRequest request) override;
+
+protected:
+    const QStringList locallyRequiredKeys() override;
+};
+
+
+/**
+ * Partially derives a variable by using the information of at least two other
+ * variables. In example, derive each wind-component by the normal to the local
+ * wind vector (u,v).
+ */
+class MMultiVarPartialDerivativeFilter : public MMultiVarFilter
+{
+public:
+    explicit MMultiVarPartialDerivativeFilter();
+
     /**
-     * Represents the family of filters that requires more than one
-     * variable to generate a result.
+     * Computes the partial derivatives of a variable based on the
+     * user-specified request (d/dn, d/dz, d/dp, d²/dn², ...).
      */
-    class MMultiVarFilter : public MStructuredGridEnsembleFilter
-    {
-    public:
-        explicit MMultiVarFilter();
+    MStructuredGrid* produceData(MDataRequest request) override;
+    MTask* createTaskGraph(MDataRequest request) override;
 
-        virtual MTask* createTaskGraph(MDataRequest request) override;
-
-    protected:
-        const QStringList locallyRequiredKeys() override;
-    };
-
-
+protected:
+    const QStringList locallyRequiredKeys() override;
     /**
-     * Partially derives a variable by using the information of at least two other variables.
-     * In example, derive each wind-component by the normal to the local wind vector (u,v).
+     * Lambda function to compute the velocity projected onto vector s at a
+     * grid point.
+     *
+     * Computes the velocity projected onto the local wind vector direction s.
      */
-    class MMultiVarPartialDerivativeFilter : public MMultiVarFilter
-    {
-    public:
-        explicit MMultiVarPartialDerivativeFilter();
+    inline double computeVs(MStructuredGrid* gridU, MStructuredGrid* gridV,
+                            int k, int j, int i, const QVector2D& s) const;
+};
 
-        /**
-         * Computes the partial derivatives of a variable based on the user-specified
-         * request (d/dn, d/dz, d/dp, d²/dn², ...)
-         * @param request
-         * @return
-         */
-        MStructuredGrid* produceData(MDataRequest request) override;
-        MTask* createTaskGraph(MDataRequest request) override;
+class MBlurFilter : public MStructuredGridEnsembleFilter
+{
+public:
+    explicit MBlurFilter();
 
-    protected:
-        const QStringList locallyRequiredKeys() override;
-        /**
-         * Computes the velocity projected onto the local wind vector direction s.
-         */
-        inline double computeVs(MStructuredGrid* gridU, MStructuredGrid* gridV,
-                                int k, int j, int i, const QVector2D& s) const;
-    };
+    MStructuredGrid* produceData(MDataRequest request) override;
+    MTask* createTaskGraph(MDataRequest request) override;
 
-    class MBlurFilter : public MStructuredGridEnsembleFilter
-    {
-    public:
-        explicit MBlurFilter();
+protected:
+    const QStringList locallyRequiredKeys() override;
+};
 
-        MStructuredGrid* produceData(MDataRequest request) override;
-        MTask* createTaskGraph(MDataRequest request) override;
-
-    protected:
-        const QStringList locallyRequiredKeys() override;
-    };
 
 } // namespace Met3D
-
 
 #endif //MULTIVARPARTIALDERIVATIVEFILTER_H

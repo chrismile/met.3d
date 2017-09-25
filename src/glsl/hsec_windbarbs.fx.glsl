@@ -4,8 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
-**  Copyright 2015 Michael Kern
+**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2015-2107 Michael Kern
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -183,9 +183,11 @@ float sampleDataAtPos(  in vec3 pos,
 
         // Fetch coefficients at klower and kupper.
         float aklower = texelFetch(hybridCoefficients, klower, 0).a;
-        float bklower = texelFetch(hybridCoefficients, klower+numberOfLevels, 0).a;
+        float bklower = texelFetch(hybridCoefficients,
+                                   klower + numberOfLevels, 0).a;
         float akupper = texelFetch(hybridCoefficients, kupper, 0).a;
-        float bkupper = texelFetch(hybridCoefficients, kupper+numberOfLevels, 0).a;
+        float bkupper = texelFetch(hybridCoefficients,
+                                   kupper+numberOfLevels, 0).a;
 
         // Compute the log of the pressure values.
         ln_plower = log(aklower + bklower * psfc_hPa);
@@ -312,8 +314,10 @@ shader GSmain(in vec3 worldPos[], out GStoFS Output)
     vec3 posWorld = worldPos[0];
 
     // sample both wind textures, obtain wind speed in u and v direction
-    float windU = sampleDataAtPos(posWorld, dataUComp, surfacePressureU, hybridCoefficientsU);
-    float windV = sampleDataAtPos(posWorld, dataVComp, surfacePressureV, hybridCoefficientsV);
+    float windU = sampleDataAtPos(posWorld, dataUComp, surfacePressureU,
+                                  hybridCoefficientsU);
+    float windV = sampleDataAtPos(posWorld, dataVComp, surfacePressureV,
+                                  hybridCoefficientsV);
 
     // if no data is available, do not draw any glyphs
     if (windU == MISSING_VALUE || windV == MISSING_VALUE)
@@ -372,14 +376,14 @@ shader GSmain(in vec3 worldPos[], out GStoFS Output)
     //const float pennantDist = (offset  + pennantOffset);
     //const float flagDist = offset * 1    * scaleDistFactor;
 
-    // ------------------------------------------------------------------------------------
-    // Create the base line of the wind barb glyph
+// -----------------------------------------------------------------------------
+    // Create the base line of the wind barb glyph.
 
-    //! NOTE (Kern, 2016-11-03): Using EmitVertex() and EndPrimitve() in local functions
-    // is not possible after NVidia driver 340 since the latest driver do not allow
-    // to use stage-specific functions in all shaders. GLFX always includes
-    // local functions into all shader stage programs (VS/FS) which leads to
-    // compilation errors for all stages except the geometry shader.
+    //! NOTE (Kern, 2016-11-03): Using EmitVertex() and EndPrimitve() in local
+    //functions is not possible after NVidia driver 340 since the latest driver
+    //do not allow to use stage-specific functions in all shaders. GLFX always
+    //includes local functions into all shader stage programs (VS/FS) which
+    //leads to compilation errors for all stages except the geometry shader.
 
     if (knots >= 5.0)
     {
@@ -397,13 +401,17 @@ shader GSmain(in vec3 worldPos[], out GStoFS Output)
             pos3 = pos                    + normal * adaptedLineWidth / 2.0;
         #else
             // left bottom
-            pos0 = pos - dir * barbLength / 2.0 - normal * adaptedLineWidth / 2.0;
+            pos0 = pos - dir * barbLength / 2.0
+                    - normal * adaptedLineWidth / 2.0;
             // left top
-            pos1 = pos + dir * barbLength / 2.0 - normal * adaptedLineWidth / 2.0;
+            pos1 = pos + dir * barbLength / 2.0
+                    - normal * adaptedLineWidth / 2.0;
             // right bottom
-            pos2 = pos - dir * barbLength / 2.0 + normal * adaptedLineWidth / 2.0;
+            pos2 = pos - dir * barbLength / 2.0
+                    + normal * adaptedLineWidth / 2.0;
             // right top
-            pos3 = pos + dir * barbLength / 2.0 + normal * adaptedLineWidth / 2.0;
+            pos3 = pos + dir * barbLength / 2.0
+                    + normal * adaptedLineWidth / 2.0;
         #endif
 
             gl_Position = mvpMatrix * vec4(pos0, 1);
@@ -419,11 +427,12 @@ shader GSmain(in vec3 worldPos[], out GStoFS Output)
 #ifdef PIVOT_TIP
         vec3 elemPos = posWorld - dir * barbLength + dir * (posOffset / 2.0);
 #else
-        vec3 elemPos = posWorld - dir * (barbLength / 2.0 * 0.9) + dir * (posOffset / 2.0);
+        vec3 elemPos = posWorld - dir * (barbLength / 2.0 * 0.9)
+                + dir * (posOffset / 2.0);
 #endif
 
-        // ------------------------------------------------------------------------------------
-        // Create the pennants at the current wind barb position
+// -----------------------------------------------------------------------------
+        // Create the pennants at the current wind barb position.
 
         for(int i = 0; i < floor(knots / 50); ++i)
         {
@@ -434,8 +443,10 @@ shader GSmain(in vec3 worldPos[], out GStoFS Output)
             pos += normal * adaptedLineWidth / 2.0;
 
             pos0 = pos - posOffset / 2.0 * dir;
-            pos1 = pos0 - dir * posOffset / 2.0 + dir * pennantPeakOffset + normal * largeWidth;
-            pos2 = pos0 - dir * posOffset / 2.0 + dir * (pennantOffset + pennantPeakOffset);
+            pos1 = pos0 - dir * posOffset / 2.0
+                    + dir * pennantPeakOffset + normal * largeWidth;
+            pos2 = pos0 - dir * posOffset / 2.0
+                    + dir * (pennantOffset + pennantPeakOffset);
 
             gl_Position = mvpMatrix * vec4(pos0, 1);
             EmitVertex();
@@ -452,8 +463,8 @@ shader GSmain(in vec3 worldPos[], out GStoFS Output)
 
         //elemPos += flagDist * 0.001 * dir;
 
-        // ------------------------------------------------------------------------------------
-        // Create the full flag triangle at the current wind barb position
+// -----------------------------------------------------------------------------
+    // Create the full flag triangle at the current wind barb position.
 
         for(int j = 0; j < floor(knots / 10); ++j)
         {
@@ -487,8 +498,8 @@ shader GSmain(in vec3 worldPos[], out GStoFS Output)
 
         knots = mod(knots,10);
 
-        // ------------------------------------------------------------------------------------
-        // Create the half flag triangle at the current wind barb position
+// -----------------------------------------------------------------------------
+        // Create the half flag triangle at the current wind barb position.
 
         for(int k = 0; k < floor(knots / 5); ++k)
         {
@@ -523,8 +534,9 @@ shader GSmain(in vec3 worldPos[], out GStoFS Output)
    }
    else
    {
-        // ------------------------------------------------------------------------------------
-	// Create the glyph for calm wind with 2 circles consiting of 128 vertices each
+// -----------------------------------------------------------------------------
+        // Create the glyph for calm wind with 2 circles consiting of 128.
+        // vertices each
         
 	if (showCalmGlyph)
         {
@@ -603,7 +615,7 @@ shader GSmain(in vec3 worldPos[], out GStoFS Output)
             }
         }
 
-        // ------------------------------------------------------------------------------------
+// -----------------------------------------------------------------------------
    }
 }
 

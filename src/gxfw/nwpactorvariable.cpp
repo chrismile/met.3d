@@ -6,6 +6,7 @@
 **
 **  Copyright 2015-2017 Marc Rautenhaus
 **  Copyright 2016-2017 Bianca Tost
+**  Copyright 2017      Michael Kern
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -3682,45 +3683,49 @@ bool MNWP3DVolumeActorVariable::setTransferFunctionFromProperty()
     return returnValue;
 }
 
-    /******************************************************************************
+/******************************************************************************
 ***                     MNWPIsolevelActorVariable                           ***
 *******************************************************************************/
 /******************************************************************************
 ***                     CONSTRUCTOR / DESTRUCTOR                            ***
 *******************************************************************************/
 
-    MNWPIsolevelActorVariable::MNWPIsolevelActorVariable(MNWPMultiVarActor *actor)
-            : MNWPActorVariable(actor),
-              isoValue(0.0)
+MNWPIsolevelActorVariable::MNWPIsolevelActorVariable(
+        MNWPMultiVarActor *actor)
+    : MNWPActorVariable(actor),
+      isoValue(0.f)
+{
+
+    MNWPMultiVarActor *a = actor;
+
+    MQtProperties *properties = actor->getQtProperties();
+
+    a->beginInitialiseQtProperties();
+
+    isoValueProperty = a->addProperty(DOUBLE_PROPERTY, "Isovalue",
+                                      varRenderingPropertyGroup);
+
+    properties->mDouble()->setValue(isoValueProperty,
+                                    static_cast<double>(isoValue));
+
+    properties->mDouble()->setDecimals(isoValueProperty, 6);
+
+    varPropertyGroup->removeSubProperty(ensembleModeProperty);
+    varPropertyGroup->removeSubProperty(ensembleSingleMemberProperty);
+    varPropertyGroup->removeSubProperty(ensembleMultiMemberProperty);
+    varPropertyGroup->removeSubProperty(
+                ensembleMultiMemberSelectionProperty);
+    varPropertyGroup->removeSubProperty(ensembleThresholdProperty);
+
+    a->endInitialiseQtProperties();
+
+    if(MNWPMultiVarIsolevelActor *isolevelActor =
+            dynamic_cast<MNWPMultiVarIsolevelActor*>(a))
     {
-
-        MNWPMultiVarActor *a = actor;
-
-        MQtProperties *properties = actor->getQtProperties();
-
-        a->beginInitialiseQtProperties();
-
-        isoValueProperty = a->addProperty(DOUBLE_PROPERTY, "Isovalue", varRenderingPropertyGroup);
-
-        properties->mDouble()->setValue(isoValueProperty, isoValue);
-
-        properties->mDouble()->setDecimals(isoValueProperty, 6);
-
-        varPropertyGroup->removeSubProperty(ensembleModeProperty);
-        varPropertyGroup->removeSubProperty(ensembleSingleMemberProperty);
-        varPropertyGroup->removeSubProperty(ensembleMultiMemberProperty);
-        varPropertyGroup->removeSubProperty(ensembleMultiMemberSelectionProperty);
-        varPropertyGroup->removeSubProperty(ensembleThresholdProperty);
-
-        a->endInitialiseQtProperties();
-
-        if(MNWPMultiVarIsolevelActor *isolevelActor =
-                dynamic_cast<MNWPMultiVarIsolevelActor*>(a))
-        {
-            QObject::connect(this, SIGNAL(isoValueChanged()),
-                             isolevelActor, SLOT(isoValueOfVariableChanged()));
-        }
+        QObject::connect(this, SIGNAL(isoValueChanged()),
+                         isolevelActor, SLOT(isoValueOfVariableChanged()));
     }
+}
 
 
 /******************************************************************************
@@ -3729,29 +3734,37 @@ bool MNWP3DVolumeActorVariable::setTransferFunctionFromProperty()
 
 bool MNWPIsolevelActorVariable::onQtPropertyChanged(QtProperty *property)
 {
-    if (MNWPActorVariable::onQtPropertyChanged(property)) return true;
+    if (MNWPActorVariable::onQtPropertyChanged(property))
+    {
+        return true;
+    }
 
     MQtProperties *properties = actor->getQtProperties();
 
     if (property == isoValueProperty)
     {
-        isoValue = properties->mDouble()->value(isoValueProperty);
+        isoValue = static_cast<float>(
+                    properties->mDouble()->value(isoValueProperty));
         emit isoValueChanged();
         return true;
     }
     return false;
 }
 
+
 float MNWPIsolevelActorVariable::getIsoValue()
 {
     return isoValue;
 }
 
+
 void MNWPIsolevelActorVariable::loadConfiguration(QSettings *settings)
 {
     MNWPActorVariable::loadConfiguration(settings);
-    actor->getQtProperties()->mDouble()->setValue(isoValueProperty,settings->value("isoLevel").toFloat());
+    actor->getQtProperties()->mDouble()->setValue(
+                isoValueProperty, settings->value("isoLevel").toFloat());
 }
+
 
 void MNWPIsolevelActorVariable::saveConfiguration(QSettings *settings)
 {

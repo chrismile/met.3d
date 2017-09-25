@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2017      Michael Kern
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -267,8 +268,9 @@ inline double crossProduct(const QVector2D& a, const QVector2D& b)
 
   @return intersection point
  */
-QVector2D getLineSegmentsIntersectionPoint(const QVector2D& p, const QVector2D& p2,
-                                          const QVector2D& q, const QVector2D& q2);
+QVector2D getLineSegmentsIntersectionPoint(
+        const QVector2D& p, const QVector2D& p2,
+        const QVector2D& q, const QVector2D& q2);
 
 
 } // namespace Met3D

@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2017 Marc Rautenhaus
+**  Copyright 2017 Michael Kern
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -39,9 +40,6 @@
 namespace Met3D
 {
 
-/**
-  @brief
-  */
 class MPartialDerivativeFilter
         : public MStructuredGridEnsembleFilter
 {
@@ -56,6 +54,7 @@ protected:
     const QStringList locallyRequiredKeys() override;
 
 };
+
 
 } // namespace Met3D
 

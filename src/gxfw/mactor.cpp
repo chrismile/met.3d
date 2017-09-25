@@ -873,7 +873,9 @@ void MActor::uploadVec3ToVertexBuffer(const QVector<QVector3D>& data,
         buf->reallocate(nullptr, data.size(), 0, false, currentGLContext);
         buf->update(data, 0, 0, currentGLContext);
 
-    } else {
+    }
+    else
+    {
 
         GL::MVector3DVertexBuffer* newVB = nullptr;
         newVB = new GL::MVector3DVertexBuffer(requestKey, data.size());
@@ -902,7 +904,9 @@ void MActor::uploadVec2ToVertexBuffer(const QVector<QVector2D>& data,
         buf->reallocate(nullptr, data.size(), 0, false, currentGLContext);
         buf->update(data, 0, 0, currentGLContext);
 
-    } else {
+    }
+    else
+    {
 
         GL::MVector2DVertexBuffer* newVB = nullptr;
         newVB = new GL::MVector2DVertexBuffer(requestKey, data.size());

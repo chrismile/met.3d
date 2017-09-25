@@ -1,26 +1,62 @@
-//
-// Created by kerninator on 03.05.17.
-//
-
+/******************************************************************************
+**
+**  This file is part of Met.3D -- a research environment for the
+**  three-dimensional visual exploration of numerical ensemble weather
+**  prediction data.
+**
+**  Copyright 2017 Marc Rautenhaus
+**  Copyright 2017 Michael Kern
+**
+**  Computer Graphics and Visualization Group
+**  Technische Universitaet Muenchen, Garching, Germany
+**
+**  Met.3D is free software: you can redistribute it and/or modify
+**  it under the terms of the GNU General Public License as published by
+**  the Free Software Foundation, either version 3 of the License, or
+**  (at your option) any later version.
+**
+**  Met.3D is distributed in the hope that it will be useful,
+**  but WITHOUT ANY WARRANTY; without even the implied warranty of
+**  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+**  GNU General Public License for more details.
+**
+**  You should have received a copy of the GNU General Public License
+**  along with Met.3D.  If not, see <http://www.gnu.org/licenses/>.
+**
+*******************************************************************************/
 #include "hessiantrajectoryfilter.h"
 
+// standard library imports
 #include <fstream>
 #include <iomanip>
+
+// related third party imports
 #include <omp.h>
+
+// local application imports
 
 // Enables the output of eigenvalues per line vertex into a text file.
 //#define DEBUG_HESSIAN
 
-using namespace Met3D;
 
-MHessianTrajectoryFilter::MHessianTrajectoryFilter()
-        : MTrajectoryFilter(),
-          isoSurfaceIntersectionSource(nullptr),
-          multiVarInputSource(nullptr)
+namespace Met3D
 {
 
+/******************************************************************************
+***                     CONSTRUCTOR / DESTRUCTOR                            ***
+*******************************************************************************/
+
+MHessianTrajectoryFilter::MHessianTrajectoryFilter()
+    : MTrajectoryFilter(),
+      isoSurfaceIntersectionSource(nullptr),
+      multiVarInputSource(nullptr)
+{
 }
 
+
+/******************************************************************************
+***                            PUBLIC METHODS                               ***
+*******************************************************************************/
 
 void MHessianTrajectoryFilter::
 setIsosurfaceSource(MIsosurfaceIntersectionSource* s)
@@ -40,7 +76,8 @@ setMultiVarParialDerivSource(MMultiVarPartialDerivativeFilter *multiVarFilter)
 }
 
 
-MTrajectoryEnsembleSelection* MHessianTrajectoryFilter::produceData(MDataRequest request)
+MTrajectoryEnsembleSelection* MHessianTrajectoryFilter::produceData(
+        MDataRequest request)
 {
     assert(isoSurfaceIntersectionSource != nullptr);
     assert(multiVarInputSource != nullptr);
@@ -51,19 +88,21 @@ MTrajectoryEnsembleSelection* MHessianTrajectoryFilter::produceData(MDataRequest
 
     MDataRequestHelper rh(request);
 
-    QString initTime = rh.value("INIT_TIME");
-    QString validTime = rh.value("VALID_TIME");
+//    QString initTime = rh.value("INIT_TIME");
+//    QString validTime = rh.value("VALID_TIME");
 
     double lambdaThreshold = rh.value("HESSIANFILTER_VALUE").toDouble();
     const QStringList members = rh.value("HESSIANFILTER_MEMBERS").split("/");
 
-    MIsosurfaceIntersectionLines* lineSource = isoSurfaceIntersectionSource->getData(lineRequest);
+    MIsosurfaceIntersectionLines* lineSource =
+            isoSurfaceIntersectionSource->getData(lineRequest);
 
     rh.removeAll(locallyRequiredKeys());
     MTrajectoryEnsembleSelection* lineSelection =
-            static_cast<MTrajectoryEnsembleSelection*>(inputSelectionSource->getData(rh.request()));
+            static_cast<MTrajectoryEnsembleSelection*>(
+                inputSelectionSource->getData(rh.request()));
 
-    // Counts the number of new trajectories
+    // Counts the number of new trajectories.
     int newNumTrajectories = 0;
 
     QVector<GLint>  newStartIndices;
@@ -75,10 +114,11 @@ MTrajectoryEnsembleSelection* MHessianTrajectoryFilter::produceData(MDataRequest
     QVector<GLint> ensStartIndices = lineSelection->getEnsembleStartIndices();
     QVector<GLsizei> ensIndexCounts = lineSelection->getEnsembleIndexCount();
 
-    // Loop through each member and filter the lines corresponding to that member.
+    // Loop through each member and filter the lines corresponding to that
+    // member.
     for (uint ee = 0; ee < static_cast<uint>(members.size()); ++ee)
     {
-        const QString member = members[ee];
+//        const QString member = members[ee];
         // Obtain the start and end line index for the current member.
         const int ensStartIndex = ensStartIndices[ee];
         const int ensIndexCount = ensIndexCounts[ee];
@@ -94,7 +134,8 @@ MTrajectoryEnsembleSelection* MHessianTrajectoryFilter::produceData(MDataRequest
         varRequests.pop_front();
         MStructuredGrid *gridDDZ = multiVarInputSource->getData(varRequest);
 
-        // Obtain grid containing the mixed partial derivative along n and z (d²/dndz)
+        // Obtain grid containing the mixed partial derivative along n and z
+        // (d²/dndz)
         varRequest = varRequests[0];
         varRequests.pop_front();
         MStructuredGrid *gridDNDZ = multiVarInputSource->getData(varRequest);
@@ -102,8 +143,9 @@ MTrajectoryEnsembleSelection* MHessianTrajectoryFilter::produceData(MDataRequest
 
 #ifdef DEBUG_HESSIAN
         debugFile = std::ofstream("data/hessian_"
-                      + initTime.toStdString() + "-" + validTime.toStdString()
-                      + "_member" + member.toStdString() + ".txt");
+                                  + initTime.toStdString() + "-"
+                                  + validTime.toStdString()
+                                  + "_member" + member.toStdString() + ".txt");
 #endif
 
         const int ensNewStartIndex = newStartIndices.size();
@@ -142,16 +184,17 @@ MTrajectoryEnsembleSelection* MHessianTrajectoryFilter::produceData(MDataRequest
 
 #ifdef DEBUG_HESSIAN
                 debugFile << std::fixed << std::setprecision(12);
-                debugFile << "Point(" << p.x() << "," << p.y() << "," << p.z() << "): \t"
-                          << "\t | dnn=" << dnn << "\t | dzz=" << dzz << "\t | dndz=" << dndz << "\t"
-                          << "\t | lambdaN=" << lambdaN << "\t | lambdaZ=" << lambdaZ << "\n";
+                debugFile << "Point(" << p.x() << "," << p.y() << "," << p.z()
+                          << "): \t" << "\t | dnn=" << dnn << "\t | dzz=" << dzz
+                          << "\t | dndz=" << dndz << "\t" << "\t | lambdaN="
+                          << lambdaN << "\t | lambdaZ=" << lambdaZ << "\n";
 #endif
 
                 // Check if the eigenvalues are below the user-defined threshold.
                 // Save the results in a temporary array. This array is used to
                 // fill line gaps if present caused by numerical issues.
 //                fulfilledArr[endIndex - 1 - j] = lambdaN <= lambdaThreshold
-//                              && lambdaZ <= lambdaThreshold;
+//                        && lambdaZ <= lambdaThreshold;
 
 
 
@@ -170,7 +213,7 @@ MTrajectoryEnsembleSelection* MHessianTrajectoryFilter::produceData(MDataRequest
                 // or minimum / saddle point, then this point was probably
                 // falsely rejected / accepted.
                 if (fulfilledArr[prevJ] != isFulfilled &&
-                    fulfilledArr[nextJ] != isFulfilled)
+                        fulfilledArr[nextJ] != isFulfilled)
                 {
                     isFulfilled = fulfilledArr[prevJ];
                 }
@@ -193,7 +236,8 @@ MTrajectoryEnsembleSelection* MHessianTrajectoryFilter::produceData(MDataRequest
                 }
             }
 
-            // If the remaining vertices fulfill the filter criterion, push them to the next index
+            // If the remaining vertices fulfill the filter criterion, push them
+            // to the next index
             if (newIndexCount > 1)
             {
                 newStartIndices.push_back(startIndex);
@@ -219,11 +263,12 @@ MTrajectoryEnsembleSelection* MHessianTrajectoryFilter::produceData(MDataRequest
     // Create the result of line selection and compute the new start indices /
     // index counts.
     MWritableTrajectoryEnsembleSelection *filterResult =
-            new MWritableTrajectoryEnsembleSelection(lineSelection->refersTo(),
-                                                     newNumTrajectories,
-                                                     lineSelection->getTimes(),
-                                                     lineSelection->getStartGridStride(),
-                                                     members.size());
+            new MWritableTrajectoryEnsembleSelection(
+                lineSelection->refersTo(),
+                newNumTrajectories,
+                lineSelection->getTimes(),
+                lineSelection->getStartGridStride(),
+                members.size());
 
     for (int k = 0; k < newStartIndices.size(); ++k)
     {
@@ -282,15 +327,32 @@ MTask *MHessianTrajectoryFilter::createTaskGraph(MDataRequest request)
 
     rh.removeAll(locallyRequiredKeys());
 
-    // Get previous line selection
+    // Get previous line selection.
     task->addParent(inputSelectionSource->getTaskGraph(rh.request()));
 
     task->addParent(isoSurfaceIntersectionSource
-                            ->getTaskGraph(lineRequest));
+                    ->getTaskGraph(lineRequest));
 
     return task;
 }
 
+
+/******************************************************************************
+***                          PROTECTED METHODS                              ***
+*******************************************************************************/
+
+const QStringList MHessianTrajectoryFilter::locallyRequiredKeys()
+{
+    return (QStringList()
+            << "HESSIANFILTER_VALUE" << "HESSIANFILTER_VARIABLES"
+            << "HESSIANFILTER_MEMBERS" << "HESSIANFILTER_DERIVOPS"
+            << "HESSIANFILTER_GEOPOTENTIAL" << "HESSIANFILTER_GEOPOTENTIAL_TYPE"
+            );
+}
+
+/******************************************************************************
+***                           PRIVATE METHODS                               ***
+*******************************************************************************/
 
 bool MHessianTrajectoryFilter::computeEigenvalues(const float dnn,
                                                   const float dzz,
@@ -321,12 +383,4 @@ bool MHessianTrajectoryFilter::computeEigenvalues(const float dnn,
     }
 }
 
-
-const QStringList MHessianTrajectoryFilter::locallyRequiredKeys()
-{
-    return (QStringList()
-            << "HESSIANFILTER_VALUE" << "HESSIANFILTER_VARIABLES"
-            << "HESSIANFILTER_MEMBERS" << "HESSIANFILTER_DERIVOPS"
-            << "HESSIANFILTER_GEOPOTENTIAL" << "HESSIANFILTER_GEOPOTENTIAL_TYPE"
-    );
-}
+} // namespace Met3D
