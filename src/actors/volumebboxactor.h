@@ -76,6 +76,12 @@ public:
 
     void loadConfiguration(QSettings *settings);
 
+    QRectF getHorizontalBBox() { return bBoxConnection->horizontal2DCoords(); }
+
+    double getBottomPressure() { return bBoxConnection->bottomPressure_hPa(); }
+
+    double getTopPressure() { return bBoxConnection->topPressure_hPa(); }
+
     void onBoundingBoxChanged();
 
 protected:

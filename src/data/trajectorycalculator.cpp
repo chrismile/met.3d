@@ -230,7 +230,8 @@ MTask* MTrajectoryCalculator::createTaskGraph(MDataRequest request)
     // request for calculation needed resources
     for(QString variable : variables)
     {
-        for (int i = min(startIndex, endIndex); i <= max(startIndex, endIndex); i++)
+        for (int i = min(startIndex, endIndex);
+             i <= max(startIndex, endIndex); i++)
         {
             rh.insert("VALID_TIME", validTimes.at(i));
             rh.insert("VARIABLE", variable);

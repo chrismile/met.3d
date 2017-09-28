@@ -110,9 +110,11 @@ public:
 
     void onBoundingBoxChanged() override;
 
-    const QRectF getHorizontalBBox();
 
-    const double getSlicePosition();
+    const QRectF getHorizontalBBox()
+    { return bBoxConnection->horizontal2DCoords(); }
+
+    const double getSlicePosition() { return slicePosition_hPa; }
 
 public slots:
     /**

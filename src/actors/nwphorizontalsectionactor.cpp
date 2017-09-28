@@ -712,18 +712,6 @@ void MNWPHorizontalSectionActor::onBoundingBoxChanged()
 }
 
 
-const QRectF MNWPHorizontalSectionActor::getHorizontalBBox()
-{
-    return horizontalBBox;
-}
-
-
-const double MNWPHorizontalSectionActor::getSlicePosition()
-{
-    return slicePosition_hPa;
-}
-
-
 /******************************************************************************
 ***                             PUBLIC SLOTS                                ***
 *******************************************************************************/

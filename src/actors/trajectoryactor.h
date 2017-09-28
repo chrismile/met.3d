@@ -456,7 +456,7 @@ private:
 
     void openSeedActorDialog();
 
-    void addSeedActor(QString name, float deltaLon, float deltaLat, QVector<float> presLvls);
+    void addSeedActor(QString name, double deltaLon, double deltaLat, QVector<float> presLvls);
 
     void clearSeedActor();
 
