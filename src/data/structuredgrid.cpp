@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2015-2017 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -70,6 +71,7 @@ MStructuredGrid::MStructuredGrid(MVerticalLevelType leveltype,
       flagsCanBeEnabled(true),
       contributingMembers(0),
       availableMembers(0),
+      horizontalGridType(REGULAR_LONLAT),
       leveltype(leveltype),
       minMaxAccel(nullptr)
 {

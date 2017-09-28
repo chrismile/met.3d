@@ -1,3 +1,21 @@
+# Configure session manager.
+# =============================================================================
+
+[SessionManager]
+# Directory in which Met.3D stores session configuration files.
+pathToSessionConfigurations=$MET3D_BASE/sessions
+# Met.3D can load a session on startup -- specify the name of the session or
+# set to "None" to disable loading a session. If set to "None", the frontend
+# configuration specified below is loaded instead.
+loadSessionOnStart=None
+# Met.3D can automatically save the current system configuration (i.e.,
+# session). Specify the "auto save session interval" in seconds (maximum:
+# 86400 sec == 24 h); set interval to 0 to disable auto save session.
+autoSaveSessionIntervalInSeconds=0
+# Set to true to save current session automatically on application exit.
+saveSessionOnApplicationExit=false
+
+
 # Configure synchronization controls.
 # =============================================================================
 
@@ -70,6 +88,13 @@ size=1
 
 1\name=Waypoints
 1\datafile=$MET3D_HOME/config/default_waypoints.ftml
+
+
+# Configure bounding boxes.
+# =============================================================================
+
+[BoundingBoxes]
+config=$MET3D_HOME/config/default_boundingboxes.bbox.conf
 
 
 # Configure text rendering.

@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2017      Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -163,6 +164,19 @@ QList<QString> MSelectDataSourceDialog::getSelectedDataSourceIDs()
     }
 
     return dataSources;
+}
+
+
+MSelectableDataSource MSelectDataSourceDialog::
+checkIfSingleDataSourceWithSingleVariableIsPresent(bool *ok)
+{
+    if (ui->dataFieldTable->rowCount() != 1)
+    {
+        *ok = false;
+        return MSelectableDataSource();
+    }
+    *ok = true;
+    return getDataSourceFromRow(0);
 }
 
 

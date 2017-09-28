@@ -5,7 +5,7 @@
 **  prediction data.
 **
 **  Copyright 2015-2017 Marc Rautenhaus
-**  Copyright 2015-2017 Bianca Tost
+**  Copyright 2016-2017 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -55,7 +55,7 @@ using namespace std;
 
 unsigned int abs(unsigned int a)
 {
-	return a;
+    return a;
 }
 
 #endif
@@ -92,7 +92,6 @@ MNWPActorVariable::MNWPActorVariable(MNWPMultiVarActor *actor)
       textureUnitUnusedTextures(-1),
       transferFunction(nullptr),
       textureUnitTransferFunction(-1),
-      synchronizationControl(nullptr),
       actor(actor),
       synchronizeInitTime(true),
       synchronizeValidTime(true),
@@ -1126,6 +1125,14 @@ bool MNWPActorVariable::setTransferFunction(QString tfName)
 }
 
 
+void MNWPActorVariable::setTransferFunctionToFirstAvailable()
+{
+    MQtProperties *properties = actor->getQtProperties();
+    // Set transfer function property to first entry below "None" if present.
+    properties->mEnum()->setValue(transferFunctionProperty, 1);
+}
+
+
 void MNWPActorVariable::useFlags(bool b)
 {
     useFlagsIfAvailable = b;
@@ -1322,15 +1329,17 @@ void MNWPActorVariable::onActorDeleted(MActor *actor)
         this->actor->enableEmissionOfActorChangedSignal(false);
 
         MQtProperties *properties = actor->getQtProperties();
-        int index = properties->mEnum()->value(transferFunctionProperty);
+        QString tFName = properties->getEnumItem(transferFunctionProperty);
         QStringList availableTFs = properties->mEnum()->enumNames(
                     transferFunctionProperty);
 
-        // If the deleted transfer function is currently connected to this
-        // variable, set current transfer function to "None" (index 0).
-        if (availableTFs.at(index) == tf->getName()) index = 0;
-
         availableTFs.removeOne(tf->getName());
+
+        // Get the current index of the transfer function selected. If the
+        // transfer function is the one to be deleted, the selection is set to
+        // 'None'.
+        int index = availableTFs.indexOf(tFName);
+
         properties->mEnum()->setEnumNames(transferFunctionProperty, availableTFs);
         properties->mEnum()->setValue(transferFunctionProperty, index);
 
@@ -1347,17 +1356,18 @@ void MNWPActorVariable::onActorDeleted(MActor *actor)
             this->actor->enableEmissionOfActorChangedSignal(false);
 
             MQtProperties *properties = actor->getQtProperties();
-            int index =
-                    properties->mEnum()->value(spatialTransferFunctionProperty);
-
+            QString sTFName =
+                    properties->getEnumItem(spatialTransferFunctionProperty);
             QStringList availableSTFs = properties->mEnum()->enumNames(
                         spatialTransferFunctionProperty);
 
-            // If the deleted transfer function is currently connected to this
-            // variable, set current transfer function to "None" (index 0).
-            if (availableSTFs.at(index) == stf->getName()) index = 0;
-
             availableSTFs.removeOne(stf->getName());
+
+            // Get the current index of the spatial transfer function selected.
+            // If the transfer function is the one to be deleted, the selection
+            // is set to 'None'.
+            int index = availableSTFs.indexOf(sTFName);
+
             properties->mEnum()->setEnumNames(spatialTransferFunctionProperty,
                                               availableSTFs);
             properties->mEnum()->setValue(spatialTransferFunctionProperty,
@@ -2159,15 +2169,6 @@ void MNWP2DSectionActorVariable::initialize()
     textureUnitTargetGrid = actor->assignTextureUnit();
 
     MNWPActorVariable::initialize();
-
-    MQtProperties *properties = actor->getQtProperties();
-    for (int i = 0; i < contourSetList.size(); i++)
-    {
-        ContourSettings *contours = &(contourSetList[i]);
-        parseContourLevelString(
-                    properties->mString()->value(contours->levelsProperty),
-                    contours);
-    }
 }
 
 
@@ -2531,6 +2532,7 @@ void MNWP2DSectionActorVariable::addContourSet(
     contourSetList.append(contourSet);
     renderSettings.contourSetGroupProperty->addSubProperty(
                 contourSetList.back().groupProperty);
+    parseContourLevelString(levelString, &(contourSetList.back()));
 
 }
 
@@ -2541,16 +2543,20 @@ bool MNWP2DSectionActorVariable::removeContourSet(int index)
     // Avoid removing all contour sets.
     if (contourSetList.size() > 1)
     {
-        QMessageBox yesNoBox;
-        yesNoBox.setWindowTitle("Delete contour set");
-        yesNoBox.setText(QString("Do you really want to delete "
-                                 "contour set #%1").arg(index + 1));
-        yesNoBox.setStandardButtons(QMessageBox::Yes | QMessageBox::No);
-        yesNoBox.setDefaultButton(QMessageBox::No);
-
-        if (yesNoBox.exec() != QMessageBox::Yes)
+        // Don't ask for confirmation during application start.
+        if (MSystemManagerAndControl::getInstance()->applicationIsInitialized())
         {
-            return false;
+            QMessageBox yesNoBox;
+            yesNoBox.setWindowTitle("Delete contour set");
+            yesNoBox.setText(QString("Do you really want to delete "
+                                     "contour set #%1").arg(index + 1));
+            yesNoBox.setStandardButtons(QMessageBox::Yes | QMessageBox::No);
+            yesNoBox.setDefaultButton(QMessageBox::No);
+
+            if (yesNoBox.exec() != QMessageBox::Yes)
+            {
+                return false;
+            }
         }
 
         ContourSettings *contourSet = &contourSetList[index];
@@ -2671,10 +2677,11 @@ MNWP2DHorizontalActorVariable::MNWP2DHorizontalActorVariable(
     : MNWP2DSectionActorVariable(actor),
       spatialTransferFunction(nullptr),
       textureUnitSpatialTransferFunction(-1),
-      llcrnrlon(0),
-      llcrnrlat(0),
-      urcrnrlon(0),
-      urcrnrlat(0),
+      llcrnrlon(0.),
+      llcrnrlat(0.),
+      urcrnrlon(0.),
+      urcrnrlat(0.),
+      shiftForWesternLon(0.f),
       contourLabelSuffix("")
 {
     assert(actor != nullptr);
@@ -2850,24 +2857,22 @@ void MNWP2DHorizontalActorVariable::computeRenderRegionParameters(
         double llcrnrlon, double llcrnrlat,
         double urcrnrlon, double urcrnrlat)
 {
+    // Copy bbox coordinates to member variables.
     this->llcrnrlon = llcrnrlon;
     this->llcrnrlat = llcrnrlat;
     this->urcrnrlon = urcrnrlon;
     this->urcrnrlat = urcrnrlat;
 
-    // Longitudes stored in ascending order.
-
-//FIXME (notes 18Apr2012)
-    // Still unsolved:
-    // -- If a grid falls apart into two disjunct regions, e.g. the grid is
-    //    defined from -90 to 90 and we want to render from 0 to 360.
-    // -- Repeating parts of a grid, e.g. the grid is defined from 0 to 360,
-    //    we want to render from -180 to 300.
-
     bool gridIsCyclic = grid->gridIsCyclicInLongitude();
 
+    // 1A) Find longitudinal index "i0" in data grid that corresponds to
+    //     the WESTmost rendered grid point.
+    // ================================================================
+
+    // Longitudes stored in ascending order.
     double shiftLon = grid->lons[0];
-    if (!gridIsCyclic) shiftLon = min(shiftLon, llcrnrlon);
+    float westBBoxBorderRelativeToWestDataBorder = llcrnrlon - shiftLon;
+    float eastBBoxBorderRelativeToWestDataBorder = urcrnrlon - shiftLon;
 
 //WORKAROUND -- Usage of M_LONLAT_RESOLUTION defined in mutil.h
     // NOTE (mr, Dec2013): Workaround to fix a float accuracy problem
@@ -2889,36 +2894,133 @@ void MNWP2DHorizontalActorVariable::computeRenderRegionParameters(
 //                            i0, grid->lons[i0], float(grid->lons[i0]),
 //                            NMOD(grid->lons[i0]-shiftLon, 360.),
 //                            NMOD(llcrnrlon-shiftLon, 360.));
-        if (MMOD(grid->lons[i0]-shiftLon, 360.) + M_LONLAT_RESOLUTION
-                >= MMOD(llcrnrlon-shiftLon, 360.)) break;
+        if (MMOD(grid->lons[i0] - shiftLon, 360.) + M_LONLAT_RESOLUTION
+                >= MMOD(westBBoxBorderRelativeToWestDataBorder, 360.)) break;
     }
     // Handle overshooting for non-cyclic grids (otherwise i0 = grid->nlons
     // if the bounding box is east of the grid domain).
     if (!gridIsCyclic) i0 = min(i0, grid->nlons-1);
 
+    // 1B) Find longitudinal index "i1" in data grid that corresponds to
+    //     the EASTmost rendered grid point.
+    // ================================================================
+
     // Find the last lon index smaller than urcrnrlon.
-    int i1;
-    for (i1 = grid->nlons-1; i1 > 0; i1--)
+    unsigned int i1;
+    for (i1 = grid->nlons - 1; i1 > 0; i1--)
     {
-        if (MMOD(grid->lons[i1]-shiftLon, 360.)
-                <= MMOD(urcrnrlon-shiftLon, 360.)) break;
+        if (MMOD(grid->lons[i1] - shiftLon, 360.)
+                <= MMOD(eastBBoxBorderRelativeToWestDataBorder, 360.)) break;
     }
 
-    // Latitude won't be cyclic, hence no modulo is required here.
+    // 2) Find lat indices "j0"/"j1" that corresponds to SOUTHmost/NORTHmost
+    //    grid points.
+    // =====================================================================
+
+    // Latitude is never cyclic, hence no modulo is required here.
     for (j0 = 0; j0 < grid->nlats; j0++)
     {
         if (grid->lats[j0] <= urcrnrlat) break;
     }
     int j1;
-    for (j1 = grid->nlats-1; j1 > 0; j1--)
+    for (j1 = grid->nlats - 1; j1 > 0; j1--)
     {
         if (grid->lats[j1] >= llcrnrlat) break;
     }
 
-    nlons = i1 - i0 + 1;
-    if (nlons < 0) nlons = grid->nlons + nlons; // handle cyclic grids
+    // 3) Determine the number "nlons" of longitudes to be rendered. Special
+    // care has to be taken as data grid may need to be rendered multiple
+    // times or can fall apart into disjoint regions, depending on bbox.
+    // =====================================================================
+
+    // Possible cases:
+    //  a) data region is completely contained in bbox
+    //     --> nlons = num. grid points of data grid
+    //  b) bbox cuts out part of data region
+    //     --> nlons = num. grid points in displayed region
+    //  c) bbox is large enough in lon so that data region falls apart into
+    //     disjoint regions
+    //     --> nlons = num. grid points in western region + num. grid points
+    //         in eastern region
+    //  d) bbox is >360deg in lon and (parts) of the data region are repeated
+    //     --> nlons = sum of grid points in all regions
+
+    // Mapped to longitudes in the range [0..360), eastern bbox border is
+    // east of western bbox border...
+    if (MMOD(westBBoxBorderRelativeToWestDataBorder, 360.)
+            <= MMOD(eastBBoxBorderRelativeToWestDataBorder, 360.))
+    {
+        // One region, no disjoint parts.
+        nlons = i1 - i0 + 1;
+    }
+    // ... or eastern bbox border is WEST of western bbox border.
+    else
+    {
+        // Treat west and east subregions separately. Eastern subregion goes
+        // from i0 to nlons (nlons = grid->nlons - i0), western subregion from
+        // 0 to i1 (nlons = i1 + 1).
+        nlons = i1 + grid->nlons - i0 + 1;
+    }
+
+    // Since the modulo operation maps to a domain of width 360, it is necessary
+    // to add the missing width if the domain is larger than 360.
+    nlons += floor((urcrnrlon - llcrnrlon) / 360.) * grid->nlons;
+
+    // Compute initial shift to place the grid at the correct position during
+    // rendering. It contains a multiple of 360.
+    shiftForWesternLon = float(floor((llcrnrlon - grid->lons[0]) / 360.) * 360.f);
+
+
+    // Bianca's explanation for the above equations (sorry, only in German...):
+    // ------------------------------------------------------------------------
+    // Dies funktioniert auch, falls die westlichste und oestlichste Teilregionen
+    // fuer sich genommen jeweils nur ein Ausschnitt der Gitterregion sind
+    // (eine Teilregion ergibt sich hierbei aus der Begrenzung durch die
+    // Boundingbox und einer Aufteilung des gesamten Raums in disjunkte
+    // Teilregionen mit einer Breite von 360deg und einer westlichen Grenze
+    // entsprechend der westlichen Grenze plus ein (positives/negatives)
+    // Vielfaches von 360deg). Grundsaetzlich laesst berechnet sich nlons in diesem
+    // Fall nach folgender Formel:
+    //    nlonsWestPart + nlonsEastPart + nlonsGrid * numSubregions
+    //  mit (nlonsWestPart = grid->nlons - i0) und (nlonsEastPart = i1 + 1) folgt:
+    //   (i1 + 1 + grid->nlons - i0) + (grid->nlons * numSubregions)
+    // Wobei numSubregions die Anzahl der disjunkten Teilregionen angibt, die
+    // vollstaendig in der Boundingbox enthalten sind.
+    // Wird die oestliche Grenze westlich der westlichen Grenze abgebildet, so
+    // gilt:
+    //   (i1 < i0) -> (i1 - i0 <= -1) -> (i1 - i0 + grid->nlons) < grid->nlons
+    // Da wiederum gilt, dass in einer Boundingboxregion von 360deg Breite, die
+    // Gitterregion ein Mal enthalten ist, muss der Abstand zwischen der
+    // westlichen und oestlichen Boundingboxgrenze (abzueglich 360deg fuer jede
+    // vollstaendig enthaltenen Teilregion) in diesem Fall kleiner als 360deg sein.
+    // Wiederrum gilt:
+    //   (i1 >= i0) -> (i1 - i0 >= 0) -> (i1 - i0 + grid->nlons) >= grid->nlons
+    // Der Umkehrschluss zeigt, dass, wenn die oestliche Boundingboxgrenze
+    // oestlich der westlichen abgebildet wird, der Abstand zwischen den
+    // Boundingboxgrenzen (abzueglich der vollstaendig enthaltenen Teilregion)
+    // groesser als 360deg sein muss (ausgenommen Boundingbox mit einer
+    // Gesammtbreite unter 360deg). Da die Boundingbox abzueglich der Teilregionen
+    // groesser als 360deg ist, ergibt sich:
+    //    factor = floor((urcrnrlon - llcrnrlon) / 360.) = numSubregions + 1
+    // Ausserdem laesst sich die Formel fuer nlons folgendermassen umstellen:
+    //    (i1 - i0 + 1) + nlonsGrid * (numSubregions + 1)
+    // Da wir factor fuer die Abschaetzung von numSubregions nutzen, koennen wir
+    // also fuer den Fall, dass die oestliche Boundingboxgrenze oestlich der
+    // westlichen Boundingboxgrenze abgebildet wird, stets (i1 - i0 + 1) zur
+    // Berechnung von nlons in einem ersten Schritt nutzen.
+    // Fuer Boundingboxbreiten unter 360deg koennen nur dann seperate Teilregionen
+    // entstehen, wenn die oestliche Boundingboxgrenze westlich der westlichen
+    // Boundingboxgrenze abgebildet wird.
+
+    // 4) Determine the number "nlats" of latitudes to be rendered.
+    // ============================================================
+
     nlats = j1 - j0 + 1;
     if (nlats < 0) nlats = 0;
+
+
+    // DEBUG output.
+    // =============
 
     LOG4CPLUS_DEBUG(mlog, "(grid is " << (gridIsCyclic ? "" : "not")
                     << " cyclic; shiftLon = " << shiftLon << ") "
@@ -2941,9 +3043,18 @@ void MNWP2DHorizontalActorVariable::updateContourIndicesFromTargetGrid(
     // Set the current isovalue to the target grid's vertical coordinate.
     targetGrid2D->levels[0] = slicePosition_hPa;
 
+    // Number of longitudinal grid points required for rendering.
+    int numRequiredDataLons = nlons - 1;
+    // Use the sub grid but don't overshoot the grid's nlons (nlons can contain
+    // a number larger than grid->nlons). maskRectangularRegion() does not
+    // mark the outside region correctly if the provided nlons is larger than
+    // the grid's nlons.
+    numRequiredDataLons = min(numRequiredDataLons, int(grid->nlons - 1));
+
     // Set the target grid points outside the render domain to
     // MISSING_VALUE, so that min() and max() work correctly.
-    targetGrid2D->maskRectangularRegion(i0, j0, 0, nlons-1, nlats-1, 1);
+    targetGrid2D->maskRectangularRegion(
+                i0, j0, 0, numRequiredDataLons, nlats-1, 1);
 
     float tgmin = targetGrid2D->min();
     float tgmax = targetGrid2D->max();

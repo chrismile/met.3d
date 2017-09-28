@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2017 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -48,9 +49,18 @@ namespace Met3D
 ***                     CONSTRUCTOR / DESTRUCTOR                            ***
 *******************************************************************************/
 
-MGribReader::MGribReader(QString identifier)
-    : MWeatherPredictionReader(identifier)
+MGribReader::MGribReader(QString identifier, QString surfacePressureFieldType)
+    : MWeatherPredictionReader(identifier),
+      surfacePressureFieldType(surfacePressureFieldType)
 {
+    // Name of surface pressure field to reconstruct pressure for hybrid
+    // coordinates. If set to "auto" set the string to empty here (will trigger
+    // search of GRIB messages for sp/lnsp field in
+    // detectSurfacePressureFieldType().
+    if (surfacePressureFieldType == "auto")
+    {
+        this->surfacePressureFieldType = "";
+    }
 }
 
 
@@ -223,6 +233,63 @@ QString MGribReader::variableSurfacePressureName(
 }
 
 
+MHorizontalGridType MGribReader::variableHorizontalGridType(MVerticalLevelType levelType,
+                                   const QString&     variableName)
+{
+    QReadLocker availableItemsReadLocker(&availableItemsLock);
+    if (!availableDataFields.keys().contains(levelType))
+        throw MBadDataFieldRequest(
+                "unkown level type requested: " +
+                MStructuredGrid::verticalLevelTypeToString(levelType).toStdString(),
+                __FILE__, __LINE__);
+    if (!availableDataFields[levelType].keys().contains(variableName))
+        throw MBadDataFieldRequest(
+                "unkown variable requested: " + variableName.toStdString(),
+                __FILE__, __LINE__);
+    return availableDataFields[levelType][variableName]->horizontalGridType;
+}
+
+
+QVector2D MGribReader::variableRotatedNorthPoleCoordinates(
+        MVerticalLevelType levelType, const QString& variableName)
+{
+    QReadLocker availableItemsReadLocker(&availableItemsLock);
+    if (!availableDataFields.keys().contains(levelType))
+    {
+        throw MBadDataFieldRequest(
+                    "unkown level type requested: " +
+                    MStructuredGrid::verticalLevelTypeToString(levelType).toStdString(),
+                    __FILE__, __LINE__);
+    }
+    if (!availableDataFields[levelType].keys().contains(variableName))
+    {
+        throw MBadDataFieldRequest(
+                    "unkown variable requested: " + variableName.toStdString(),
+                    __FILE__, __LINE__);
+    }
+    if (availableDataFields[levelType][variableName]->horizontalGridType
+            != ROTATED_LONLAT)
+    {
+        throw MBadDataFieldRequest(
+                    "Rotated north pole coordinates requested for grid not "
+                    "rotated", __FILE__, __LINE__);
+    }
+    // TODO (bt, 09Feb2017): Adapt to get rotated north pole coordinates
+    // read from grib file. Reading rotated north pole coordinates from grib
+    // file isn't implemented yet. If done, coordinates could be read like this:
+
+    //    QVector2D coordinates;
+    //    coordinates.setX(
+    //                availableDataFields[levelType][variableName]
+    //                ->rotatedNorthPoleLon);
+    //    coordinates.setY(
+    //                availableDataFields[levelType][variableName]
+    //                ->rotatedNorthPoleLat);
+    QVector2D coordinates(0.f, 0.f);
+    return coordinates;
+}
+
+
 MStructuredGrid *MGribReader::readGrid(
         MVerticalLevelType levelType,
         const QString &variableName,
@@ -336,7 +403,23 @@ MStructuredGrid *MGribReader::readGrid(
                                              &nGribValues), 0);
 
             // Copy double data to MStructuredGrid float array.
-            for (uint n = 0; n < nGribValues; n++) grid->data[n] = values[n];
+            if (dinfo.applyExp)
+            {
+                // If surface pressure is specified as lnsp, apply exponential
+                // function to reconstruct surface pressure "sp".
+                for (uint n = 0; n < nGribValues; n++)
+                {
+                    grid->data[n] = exp(values[n]);
+                }
+            }
+            else
+            {
+                for (uint n = 0; n < nGribValues; n++)
+                {
+                    grid->data[n] = values[n];
+                }
+            }
+
             delete[] values;
 
             grib_handle_delete(gribHandle);
@@ -628,6 +711,8 @@ void MGribReader::scanDataRoot()
                     // Fill lat/lon arrays.
                     vinfo->lons = gmiInfo.lons;
                     vinfo->lats = gmiInfo.lats;
+                    // TODO (bt, 08FEB2017) Adapt to set type according to the data read.
+                    vinfo->horizontalGridType = MHorizontalGridType::REGULAR_LONLAT;
 
                     if (levelType == HYBRID_SIGMA_PRESSURE_3D)
                     {
@@ -678,6 +763,29 @@ void MGribReader::scanDataRoot()
 
                 // Get vertical level.
                 long level = gmiInfo.level;
+
+                // Distinguish between ln surface pressure fields and surface
+                // pressure fields (in index files both are stored as
+                // surface_2D).
+                if (levelType == SURFACE_2D)
+                {
+                    if (vinfo->variablename.startsWith("lnsp"))
+                    {
+                        setSurfacePressureFieldType("lnsp");
+                        level = 0;
+                        info->applyExp = true;
+                    }
+                    else if (vinfo->variablename.startsWith("sp"))
+                    {
+                        setSurfacePressureFieldType("sp");
+                        info->applyExp = false;
+                    }
+                }
+                else
+                {
+                    info->applyExp = false;
+                }
+
                 info->offsetForLevel[level] = gmiInfo.filePosition;
 
                 // Insert level into list of vertical levels for this
@@ -711,6 +819,10 @@ void MGribReader::scanDataRoot()
             indexDataStream << (qint32)2;
             indexDataStream.setVersion(QDataStream::Qt_4_8);
 
+            // lnsp model level fix (ECMWF inconsistency: lnsp is stored on
+            // a single model level, not as a surface field...).
+            bool fixLNSPmodelLevel = false;
+
             // Loop over grib messages contained in the file.
             grib_handle* gribHandle = NULL;
             int err = 0;
@@ -724,6 +836,7 @@ void MGribReader::scanDataRoot()
             while ((gribHandle =
                     grib_handle_new_from_file(0, gribfile, &err)) != NULL)
             {
+                fixLNSPmodelLevel = false;
                 // LOG4CPLUS_DEBUG(mlog, "=========> Indexing message "
                 //                 << messageCount);
 
@@ -777,6 +890,22 @@ void MGribReader::scanDataRoot()
                 QString shortName = getGribStringKey(gribHandle, "parameter.shortName");
                 // LOG4CPLUS_DEBUG(mlog, "parameter.shortName: " << shortName.toStdString());
                 QString varName = QString("%1 (%2)").arg(shortName).arg(dataType);
+
+                // Handly special case "lnsp". "lnsp" fields at ECMWF are
+                // stored on model level 1 (not as a surface field). In Met.3D,
+                // we re-cast as a surface field (which it is...).
+                if (shortName == "lnsp" && levelType == HYBRID_SIGMA_PRESSURE_3D)
+                {
+                    levelType = SURFACE_2D;
+                    gmiInfo.levelType = levelType;
+                    fixLNSPmodelLevel = true;
+                    setSurfacePressureFieldType("lnsp");
+
+                }
+                else if (shortName == "sp")
+                {
+                    setSurfacePressureFieldType("sp");
+                }
 
                 // Create a new MVariableInfo struct and store availabe
                 // variable information in this field.
@@ -865,10 +994,12 @@ void MGribReader::scanDataRoot()
 
                     if (levelType == HYBRID_SIGMA_PRESSURE_3D)
                     {
-//TODO (mr, 29Sep2014): how to find sp name? There might be either sp or lnsp...
+                        detectSurfacePressureFieldType(&availableFiles);
+
                         vinfo->surfacePressureName =
                                 gmiInfo.surfacePressureName =
-                                QString("%1 (%2)").arg("sp").arg(dataType);
+                                QString("%1 (%2)").arg(surfacePressureFieldType)
+                                .arg(dataType);
 
                         // Read hybrid level coefficients.
                         double *akbk = new double[300];
@@ -981,6 +1112,12 @@ void MGribReader::scanDataRoot()
                 // Get vertical level.
                 long level = gmiInfo.level = getGribLongKey(
                             gribHandle, "vertical.level");
+                if (fixLNSPmodelLevel)
+                {
+                    level = 0;
+                }
+                info->applyExp = fixLNSPmodelLevel;
+
                 // LOG4CPLUS_DEBUG(mlog, "vertical.level: " << level);
 
                 if (info->offsetForLevel.keys().contains(level))
@@ -1474,6 +1611,90 @@ template<typename T> QString MGribReader::keyListToString(QList<T> keyList)
     for (int n = 0; n < keyList.size(); n++)
         str += QString("%1/").arg(keyList[n]);
     return str;
+}
+
+
+void MGribReader::detectSurfacePressureFieldType(QStringList *availableFiles)
+{
+    if (surfacePressureFieldType == "")
+    {
+#ifdef ENABLE_MET3D_STOPWATCH
+    MStopwatch stopwatch;
+#endif
+
+        // Scan all grib files contained in the directory and search for
+        // a surface pressure field. (Only use grib files directly
+        // since there is no speed up when using index files.)
+        foreach (QString gribFileName, *availableFiles)
+        {
+            // (Skip index files.)
+            if (gribFileName.endsWith("met3d_grib_index")) continue;
+            QString filePath = dataRoot.filePath(gribFileName);
+            // Open the file.
+            FILE* gribfile = NULL;
+            QByteArray ba = filePath.toLocal8Bit();
+            gribfile = fopen(ba.data(), "r");
+            if (!gribfile)
+            {
+                continue;
+            }
+            // Loop over grib messages contained in the file.
+            grib_handle* gribHandle = NULL;
+            int err = 0;
+            while ((gribHandle =
+                    grib_handle_new_from_file(0, gribfile, &err)) != NULL)
+            {
+                QString shortName = getGribStringKey(gribHandle,
+                                                     "parameter.shortName");
+                if (shortName == "lnsp")
+                {
+                    setSurfacePressureFieldType("lnsp");
+                    break;
+                }
+                else if (shortName == "sp")
+                {
+                    setSurfacePressureFieldType("sp");
+                    break;
+                }
+                grib_handle_delete(gribHandle);
+            } // while loop grib handles.
+            if (surfacePressureFieldType != "")
+            {
+                break;
+            }
+            fclose(gribfile);
+        } // foreach loop grib files
+
+        // No surface pressure field found.
+        if (surfacePressureFieldType == "")
+        {
+            LOG4CPLUS_DEBUG(mlog, "Could not find surface pressure field."
+                            << flush);
+            // Avoid another search for the surface pressure field type by
+            // setting surfacePressureFieldType to "none".
+            surfacePressureFieldType = "none";
+        }
+
+#ifdef ENABLE_MET3D_STOPWATCH
+        stopwatch.split();
+        LOG4CPLUS_DEBUG(mlog, "Surface pressure field type detected in "
+                        << stopwatch.getElapsedTime(MStopwatch::SECONDS)
+                        << " seconds.\n" << flush);
+#endif
+    } // if Surface pressure field type empty.
+}
+
+
+void MGribReader::setSurfacePressureFieldType(QString surfacePressureFieldType)
+{
+    // Set surface pressure field type once only.
+    if (this->surfacePressureFieldType == "")
+    {
+        this->surfacePressureFieldType = surfacePressureFieldType;
+        LOG4CPLUS_DEBUG(mlog, "Surface pressure field type detected as '"
+                        << surfacePressureFieldType.toStdString() << "'"
+                        << flush);
+    }
 }
 
 

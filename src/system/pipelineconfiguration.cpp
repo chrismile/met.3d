@@ -5,8 +5,8 @@
 **  prediction data.
 **
 **  Copyright 2015-2017 Marc Rautenhaus
-**  Copyright 2015-2017 Bianca Tost
-**  Copyright 2015-2017 Philipp Kaiser
+**  Copyright 2017      Bianca Tost
+**  Copyright 2017      Philipp Kaiser
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -88,8 +88,6 @@ void MPipelineConfiguration::configure()
 //    initializeDevelopmentDataPipeline();
 //    return;
 
-    // Indicates whether Met.3D was called by Metview.
-    bool metviewConnection = false;
     QString filename = "";
 
     // Scan global application command line arguments for pipeline definitions.
@@ -101,19 +99,13 @@ void MPipelineConfiguration::configure()
             filename = arg.remove("--pipeline=");
             filename = expandEnvironmentVariables(filename);
         }
-        if (arg.startsWith("--metview"))
-        {
-            metviewConnection = true;
-            QString msg = QString("Starting in Metview mode. ");
-            LOG4CPLUS_INFO(mlog, msg.toStdString());
-        }
     }
 
     QString errMsg = "";
     // If Met.3D is called by Metview and no configuration files are given,
     // use default configuration files stored at
     // $MET3D_HOME/config/metview/default_pipeline.cfg .
-    if (metviewConnection && filename.isEmpty())
+    if (sysMC->isConnectedToMetview() && filename.isEmpty())
     {
         filename = "$MET3D_HOME/config/metview/default_pipeline.cfg";
         filename = expandEnvironmentVariables(filename);
@@ -132,7 +124,7 @@ void MPipelineConfiguration::configure()
         // Production build: Read pipeline configuration from file.
         // Disadvantage: Can only read parameters for the predefined
         // pipelines.
-        initializeDataPipelineFromConfigFile(filename, metviewConnection);
+        initializeDataPipelineFromConfigFile(filename);
         return;
     }
     else
@@ -160,7 +152,7 @@ void MPipelineConfiguration::initializeScheduler()
 
 
 void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
-        QString filename, bool metviewConnection)
+        QString filename)
 {
     LOG4CPLUS_INFO(mlog, "Loading data pipeline configuration from file "
                    << filename.toStdString() << "...");
@@ -216,7 +208,7 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
     // Get directories and file filters specified by path command line argument
     // if present.
     QList<MetviewGribFilePath> filePathList;
-    if (metviewConnection)
+    if (sysMC->isConnectedToMetview())
     {
         getMetviewGribFilePaths(&filePathList);
         // For Metview integration use directories and file filters specified by
@@ -234,7 +226,7 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
 
         // If Met.3D is called from Metview use only the first entry in the
         // pipeline configuration file to initialise each data source.
-        if (metviewConnection)
+        if (sysMC->isConnectedToMetview())
         {
             // Use name of first NWPPipeline entry in pipeline configuration as
             // name and append index for each new data source.
@@ -257,6 +249,10 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
         bool enableRegridding = config.value("enableRegridding", false).toBool();
         bool enableProbRegionFilter = config.value("enableProbabilityRegionFilter",
                                                    false).toBool();
+        bool treatRotatedGridAsRegularGrid =
+                config.value("treatRotatedGridAsRegularGrid", false).toBool();
+        QString gribSurfacePressureFieldType =
+                config.value("surfacePressureFieldType", "auto").toString();
 
 //TODO (mr, 16Dec2015) -- compatibility code; remove in Met.3D version 2.0
         // If no fileFilter is specified but a domainID is specified use
@@ -278,6 +274,10 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
                         << (enableRegridding ? "enabled" : "disabled"));
         LOG4CPLUS_DEBUG(mlog, "  probability region="
                         << (enableProbRegionFilter ? "enabled" : "disabled"));
+        LOG4CPLUS_DEBUG(mlog, "  treat rotated grid as regular grid="
+                        << (treatRotatedGridAsRegularGrid ? "enabled" : "disabled"));
+        LOG4CPLUS_DEBUG(mlog, "  surfacePressureFieldType="
+                        << gribSurfacePressureFieldType.toStdString());
 
         MNWPReaderFileFormat fileFormat = INVALID_FORMAT;
         if (fileFormatStr == "CF_NETCDF") fileFormat = CF_NETCDF;
@@ -285,12 +285,17 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
         else if (fileFormatStr == "ECMWF_CF_NETCDF") fileFormat = CF_NETCDF;
         else if (fileFormatStr == "ECMWF_GRIB") fileFormat = ECMWF_GRIB;
 
+        QStringList validGribSurfacePressureFieldTypes;
+        validGribSurfacePressureFieldTypes << "auto" << "sp" << "lnsp";
+
         // Check parameter validity.
         if ( name.isEmpty()
              || path.isEmpty()
              || schedulerID.isEmpty()
              || memoryManagerID.isEmpty()
-             || (fileFormat == INVALID_FORMAT) )
+             || (fileFormat == INVALID_FORMAT)
+             || (fileFormat == ECMWF_GRIB && !validGribSurfacePressureFieldTypes
+                 .contains(gribSurfacePressureFieldType)))
         {
             LOG4CPLUS_WARN(mlog, "invalid parameters encountered; skipping.");
             continue;
@@ -300,7 +305,8 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
         initializeNWPPipeline(
                     name, path, fileFilter, schedulerID,
                     memoryManagerID, fileFormat, enableRegridding,
-                    enableProbRegionFilter);
+                    enableProbRegionFilter, treatRotatedGridAsRegularGrid,
+                    gribSurfacePressureFieldType);
     }
 
     config.endArray();
@@ -418,7 +424,9 @@ void MPipelineConfiguration::initializeNWPPipeline(
         QString memoryManagerID,
         MNWPReaderFileFormat dataFormat,
         bool enableRegridding,
-        bool enableProbabiltyRegionFilter)
+        bool enableProbabiltyRegionFilter,
+        bool treatRotatedGridAsRegularGrid,
+        QString surfacePressureFieldType)
 {
     MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
     MAbstractScheduler* scheduler = sysMC->getScheduler(schedulerID);
@@ -434,11 +442,13 @@ void MPipelineConfiguration::initializeNWPPipeline(
     MWeatherPredictionReader *nwpReaderENS = nullptr;
     if (dataFormat == CF_NETCDF)
     {
-        nwpReaderENS = new MClimateForecastReader(dataSourceId);
+        nwpReaderENS = new MClimateForecastReader(dataSourceId,
+                                                  treatRotatedGridAsRegularGrid);
     }
     else if (dataFormat == ECMWF_GRIB)
     {
-        nwpReaderENS = new MGribReader(dataSourceId);
+        nwpReaderENS = new MGribReader(dataSourceId,
+                                       surfacePressureFieldType);
     }
     nwpReaderENS->setMemoryManager(memoryManager);
     nwpReaderENS->setScheduler(scheduler);
@@ -555,7 +565,8 @@ void MPipelineConfiguration::initializeLagrantoEnsemblePipeline(
 {
     MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
     MAbstractScheduler* scheduler = sysMC->getScheduler(schedulerID);
-    MAbstractMemoryManager* memoryManager = sysMC->getMemoryManager(memoryManagerID);
+    MAbstractMemoryManager* memoryManager =
+            sysMC->getMemoryManager(memoryManagerID);
 
     const QString dataSourceId = name;
     LOG4CPLUS_DEBUG(mlog, "Initializing LAGRANTO ensemble pipeline ''"
@@ -725,7 +736,9 @@ void MPipelineConfiguration::initializeDevelopmentDataPipeline()
                 "NWP",
                 CF_NETCDF,
                 false,
-                true);
+                true,
+                false,
+                "auto");
 
     initializeNWPPipeline(
                 "ECMWF ENS EUR_LL10",
@@ -735,7 +748,9 @@ void MPipelineConfiguration::initializeDevelopmentDataPipeline()
                 "NWP",
                 CF_NETCDF,
                 false,
-                true);
+                true,
+                false,
+                "auto");
 
     sysMC->registerMemoryManager("Trajectories DF-T psfc_1000hPa_L62",
                new MLRUMemoryManager("Trajectories DF-T psfc_1000hPa_L62",

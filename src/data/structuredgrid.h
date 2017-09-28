@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2017      Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -58,6 +59,15 @@ enum MVerticalLevelType {
     LOG_PRESSURE_LEVELS_3D   = 4,
     AUXILIARY_PRESSURE_3D    = 5,   // pressure in auxiliary variable
     SIZE_LEVELTYPES
+};
+
+enum MHorizontalGridType
+{
+    REGULAR_LONLAT = 0,
+    // Rotated north pole coordinates as used by COSMO.
+    // (cf. http://www.cosmo-model.org/content/model/documentation/core/cosmoDyncsNumcs.pdf ,
+    //  chapter 3.3)
+    ROTATED_LONLAT = 1
 };
 
 
@@ -216,6 +226,13 @@ public:
     inline void setLat(unsigned int j, double v) { lats[j] = v; }
     inline void setLevel(unsigned int k, double v) { levels[k] = v; }
 
+    inline void setHorizontalGridType(MHorizontalGridType horizontalGridType)
+    { this->horizontalGridType = horizontalGridType; }
+
+    inline void setRotatedNorthPoleCoordinates(QVector2D coordinates)
+    { this->rotatedNorthPoleLon = coordinates.x();
+        this->rotatedNorthPoleLat = coordinates.y(); }
+
     inline unsigned int getNumLevels() const { return nlevs; }
     inline unsigned int getNumLats() const { return nlats; }
     inline unsigned int getNumLons() const { return nlons; }
@@ -224,6 +241,11 @@ public:
     inline const double* getLevels() const { return levels; }
     inline const double* getLats() const { return lats; }
     inline const double* getLons() const { return lons; }
+
+    inline MHorizontalGridType getHorizontalGridType()
+    { return horizontalGridType; }
+    inline float getRotatedNorthPoleLon() { return rotatedNorthPoleLon; }
+    inline float getRotatedNorthPoleLat() { return rotatedNorthPoleLat; }
 
     /**
       Returns the pressure (hPa) of grid point at indices @p i, @p j, @p k.
@@ -546,6 +568,10 @@ protected:
     bool     flagsCanBeEnabled;
     quint64  contributingMembers;
     quint64  availableMembers;
+    MHorizontalGridType horizontalGridType;
+    float rotatedNorthPoleLon;
+    float rotatedNorthPoleLat;
+
 
     /** Texture parameters. **/
     GLint  textureInternalFormat;

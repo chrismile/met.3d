@@ -5,8 +5,8 @@
 **  prediction data.
 **
 **  Copyright 2015-2017 Marc Rautenhaus
-**  Copyright 2015-2017 Michael Kern
-**  Copyright 2015-2017 Bianca Tost
+**  Copyright 2015      Michael Kern
+**  Copyright 2016-2017 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -167,11 +167,22 @@ void MSceneManagementDialog::deleteScene()
         return;
     }
 
-    const int index = ui->scenePoolListWidget->currentRow();
-    const QString name = ui->scenePoolListWidget->currentItem()->text();
+    // Reject request for deletion if no item is selected.
+    if (ui->scenePoolListWidget->currentItem() == nullptr)
+    {
+        QMessageBox msgBox;
+        msgBox.setText("Please select scene to delete.");
+        msgBox.setStandardButtons(QMessageBox::Ok);
+        msgBox.setDefaultButton(QMessageBox::Ok);
+        msgBox.setIcon(QMessageBox::Information);
+        msgBox.exec();
+        return;
+    }
+
+    const QString sceneName = ui->scenePoolListWidget->currentItem()->text();
 
     QMessageBox msgBox;
-    msgBox.setText(QString("Scene \"%1\" will be deleted.").arg(name));
+    msgBox.setText(QString("Scene \"%1\" will be deleted.").arg(sceneName));
     msgBox.setInformativeText("Please confirm.");
     msgBox.setStandardButtons(QMessageBox::Ok | QMessageBox::Cancel);
     msgBox.setDefaultButton(QMessageBox::Cancel);
@@ -180,14 +191,18 @@ void MSceneManagementDialog::deleteScene()
 
     if (ret == QMessageBox::Ok)
     {
-        LOG4CPLUS_DEBUG(mlog, "deleting scene " << name.toStdString());
+        LOG4CPLUS_DEBUG(mlog, "deleting scene " << sceneName.toStdString());
+
+        const int index = ui->scenePoolListWidget->currentRow();
 
         // Remove scene name from UI elements.
         ui->scenePoolListWidget->takeItem(index);
         ui->actorScenesListWidget->takeItem(index);
 
-        MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
-        QVector<MSceneViewGLWidget*> glWidgets = sysMC->getMainWindow()->getGLWidgets();
+        MSystemManagerAndControl *sysMC =
+                MSystemManagerAndControl::getInstance();
+        QVector<MSceneViewGLWidget*> glWidgets =
+                sysMC->getMainWindow()->getGLWidgets();
 
         for (int j = 0; j < ui_sceneViewComboBoxes.size(); j++)
         {
@@ -200,7 +215,7 @@ void MSceneManagementDialog::deleteScene()
             // view's scene via changeScene().
             ui_sceneViewComboBoxes[j]->removeItem(index);
 
-            if(name == oldSceneName)
+            if(sceneName == oldSceneName)
             {
                 // update the scene view gl widgets
                 const QString newSceneName = ui_sceneViewComboBoxes[j]->currentText();
@@ -210,10 +225,10 @@ void MSceneManagementDialog::deleteScene()
         }
 
         // Remove dock widget.
-        sysMC->getMainWindow()->removeControl(glRM->getScene(name));
+        sysMC->getMainWindow()->removeSceneControl(glRM->getScene(sceneName));
 
         // Remove scene from pool of managed scenes.
-        glRM->deleteScene(name);
+        glRM->deleteScene(sceneName);
     }
 }
 
@@ -366,6 +381,31 @@ void MSceneManagementDialog::createActor()
     }
 
     MActor* actor = actorCreationDialog.createActorInstance();
+
+    // if no actor was created then return;
+    if (!actor) return;
+
+    // initialize all shaders and graphical resources of actor
+    actor->initialize();
+
+    // register actor in resource manager
+    glRM->registerActor(actor);
+
+    // update GUI elements
+    QListWidgetItem* item = new QListWidgetItem(actorName, ui->actorPoolListWidget);
+    // and select it in actor pool list
+    ui->actorPoolListWidget->setCurrentItem(item);
+}
+
+
+void MSceneManagementDialog::createActorFromSession(QString actorName,
+                                                    QString actorType)
+{
+    MGLResourcesManager* glRM = MGLResourcesManager::getInstance();
+
+    MAbstractActorFactory *factory = glRM->getActorFactory(actorType);
+    MActor* actor = factory->create();
+    actor->setEnabled(true);
 
     // if no actor was created then return;
     if (!actor) return;
@@ -614,7 +654,7 @@ void MSceneManagementDialog::deleteActor()
     QList<MSceneControl*> actorScenes = actor->getScenes();
 
     // remove actor from its current scenes
-    for (auto& scene : actorScenes)
+    foreach (MSceneControl *scene, actorScenes)
     {
         // remove actor from render queue table
         QListWidgetItem* curSceneItem = ui->scenePoolListWidget->currentItem();

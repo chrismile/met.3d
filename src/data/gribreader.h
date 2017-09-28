@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2017 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -55,6 +56,8 @@ struct MGribDatafieldInfo
     QString filename;                // file in which the variable is stored
     QMap<long, long> offsetForLevel; // byte offset at which the grib message
                                      // for a given vertical level is stored
+    bool applyExp;                   // indicates whether to apply exponatial
+                                     // function to data field or not.
 };
 
 // Define a hierarchy of dictionaries that provide fast access to where a
@@ -80,6 +83,7 @@ struct MGribVariableInfo
     QString surfacePressureName; // for variables on hybrid model levels
                                  // the name of the var containing the
                                  // corresponding sfc pressure field
+    MHorizontalGridType horizontalGridType;  // Enum representing the type of the grid.
 
     long nlons, nlats;
     double lon0, lat0, lon1, lat1, dlon, dlat;
@@ -138,16 +142,25 @@ struct MGribMessageIndexInfo
 
 /**
   @brief Reader for ECMWF Grib files that are retrieved from the ECMWF MARS
-  system (e.g. from Metview or for input into the DLR Mission Support System).
+  system (or passed from Metview).
 
-  The grib files currently (still) need to follow a specific formatting.
+  For 3D fields, Met.3D checks if all required model levels are available for
+  all time steps.
+  If levels are missing, the corresponding variable is discarded.
 
   @todo Move availableXYZ methods up in class hierarchy.
   */
 class MGribReader : public MWeatherPredictionReader
 {
 public:
-    MGribReader(QString identifier);
+    /**
+      The GRIB reader takes an argument @p surfacePressureFieldType that
+      specified which surface pressure field is used for reconstruction
+      of pressure from hybrid coordinated. Can be "sp", "lnsp" or "auto".
+      If set to "auto", the reader tries to detect the available field--this
+      unfortunately currently requires scanning through all messages: SLOW...
+     */
+    MGribReader(QString identifier, QString surfacePressureFieldType);
     ~MGribReader();
 
     QList<MVerticalLevelType> availableLevelTypes();
@@ -176,6 +189,12 @@ public:
 protected:
     QString variableSurfacePressureName(MVerticalLevelType levelType,
                                         const QString&     variableName);
+
+    MHorizontalGridType variableHorizontalGridType(MVerticalLevelType levelType,
+                                       const QString&     variableName);
+
+    QVector2D variableRotatedNorthPoleCoordinates(MVerticalLevelType levelType,
+                                                  const QString& variableName);
 
     MStructuredGrid* readGrid(MVerticalLevelType levelType,
                               const QString&     variableName,
@@ -207,12 +226,39 @@ protected:
 
     QString forecastTypeToString(MECMWFForecastType type);
 
+    /**
+     Detect type of surface pressure field used for reconstruction of pressure
+     for hybrid sigma-pressure levels. Possible options: surface pressure is
+     stored in Pa in a field "sp", or as the logarithm of sp in a field "lnsp".
+     To make things complicated, the latter is stored at ECMWF as a single
+     model level, sp is stored as a surface field.
+
+     Detection is currently implemented by searching all grib messages for
+     either "sp" or "lnsp" fields.
+
+     We need the sp/lnsp information to correctly set the "surfacePressureName"
+     variable of hybrid sigma pressure grids. The information is stored in
+     the internal variable->grib message mapping as well as in the index files.
+     Hence, sp/lnsp currently needs to be detected BEFORE any hybrid grids
+     are scanned in @ref scanDataRoot().
+     */
+    void detectSurfacePressureFieldType(QStringList *availableFiles);
+
+    /**
+     Sets @ref surfacePressureFieldType to @p surfacePressureFieldType.
+     If @ref surfacePressureFieldType has not been set before, print which
+     type was detected.
+     */
+    void setSurfacePressureFieldType(QString surfacePressureFieldType);
+
     MGribLevelTypeMap availableDataFields;
     MGribLevelTypeMap availableDataFieldsByStdName;
     QReadWriteLock availableItemsLock;
 
     MGribOpenFileMap openFiles;
     QMutex openFilesMutex;
+
+    QString surfacePressureFieldType; // for hybrid grids: sp, lnsp, <empty>
 };
 
 

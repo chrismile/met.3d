@@ -41,7 +41,7 @@
 ***                      VERSION INFORMATION                                ***
 *******************************************************************************/
 
-const QString met3dVersionString = "1.2.0-devel";
+const QString met3dVersionString = "1.2.0-RC1";
 // String containing default value for missing version number in config.
 const QString defaultConfigVersion = "1.0.0";
 const QString met3dBuildDate = QString("built on %1 %2").arg(__DATE__).arg(__TIME__);
@@ -125,7 +125,7 @@ QStringList readConfigVersionID(QSettings *settings);
 /**
   Expands environment variables of format $VARIABLE in the string @p path.
   Example: If the envrionment variable "MET3D_HOME" is set to "/home/user/m3d",
-  the path "$MET_3D_HOME/config/data" would be expaned to
+  the path "$MET3D_HOME/config/data" would be expaned to
   "/home/user/m3d/config/data".
  */
 QString expandEnvironmentVariables(QString path);

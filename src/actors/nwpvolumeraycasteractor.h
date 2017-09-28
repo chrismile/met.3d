@@ -4,8 +4,9 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
-**  Copyright 2015 Michael Kern
+**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2015      Michael Kern
+**  Copyright 2017      Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -61,7 +62,8 @@ namespace Met3D
   plug-ins (@ref MAnalysisControl) are supported; for example, for the region
   contribution module (@ref MRegionContributionAnalysisControl).
  */
-class MNWPVolumeRaycasterActor : public MNWPMultiVarActor
+class MNWPVolumeRaycasterActor : public MNWPMultiVarActor,
+        public MBoundingBoxInterface
 {
     Q_OBJECT
 
@@ -77,8 +79,6 @@ public:
     void saveConfiguration(QSettings *settings) override;
 
     void loadConfiguration(QSettings *settings) override;
-
-    void setBoundingBox(QRectF corners, float pbot, float ptop);
 
     /**
       Isosurface "picking". Identifies the isosurface "object" that intersects
@@ -107,6 +107,8 @@ public:
      */
     const MNWPActorVariable* getCurrentShadingVariable() const
     { return shadingVar; }
+
+    void onBoundingBoxChanged();
 
 public slots:
     /**
@@ -332,35 +334,6 @@ private:
         std::vector<QList<QString>> normalInitSubroutines;
     };
 
-
-    /**
-      Properties for volume bounding box.
-     */
-    struct BoundingBoxSettings
-    {
-        BoundingBoxSettings(MNWPVolumeRaycasterActor *hostActor);
-
-        bool                enabled;
-
-        // coordinates of bounding box
-        GLfloat             llcrnLat;
-        GLfloat             llcrnLon;
-        GLfloat             urcrnLat;
-        GLfloat             urcrnLon;
-        // top and bottom pressure for bounding box
-        GLfloat             pBot_hPa;
-        GLfloat             pTop_hPa;
-
-        // properties
-        QtProperty*         groupProp;
-
-        QtProperty*         enabledProperty;
-
-        QtProperty*         boxCornersProp;
-        QtProperty*         pBotProp;
-        QtProperty*         pTopProp;
-    };
-
     /**
       Properties for isosurface lighting.
      */
@@ -564,7 +537,8 @@ private:
     MNWP3DVolumeActorVariable* shadingVar;
 
     OpenGL                  gl;
-    BoundingBoxSettings     *bbSettings;
+    QtProperty*             bBoxEnabledProperty;
+    bool                    bBoxEnabled;
     LightingSettings        *lightingSettings;
     RayCasterSettings       *rayCasterSettings;
     NormalCurveSettings     *normalCurveSettings;

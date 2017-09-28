@@ -5,8 +5,8 @@
 **  prediction data.
 **
 **  Copyright 2015-2017 Marc Rautenhaus
-**  Copyright 2015-2017 Bianca Tost
-**  Copyright 2015-2017 Philipp Kaiser
+**  Copyright 2016-2017 Bianca Tost
+**  Copyright 2017      Philipp Kaiser
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -60,6 +60,7 @@ namespace Met3D
 
 MTrajectoryActor::MTrajectoryActor()
     : MActor(),
+      MBoundingBoxInterface(this),
       trajectorySource(nullptr),
       normalsSource(nullptr),
       trajectoryFilter(nullptr),
@@ -81,11 +82,15 @@ MTrajectoryActor::MTrajectoryActor()
       shadowEnabled(true),
       shadowColoured(false)
 {
+    bBoxConnection =
+            new MBoundingBoxConnection(this, MBoundingBoxConnection::HORIZONTAL);
+
     // Create and initialise QtProperties for the GUI.
     // ===============================================
     beginInitialiseQtProperties();
 
-    setName("Trajectories");
+    setActorType("Trajectories");
+    setName(getActorType());
 
     // Remove labels property group since it is not used for trajectory actors
     // yet.
@@ -202,9 +207,7 @@ MTrajectoryActor::MTrajectoryActor()
                                     actorPropertiesSupGroup);
     properties->setDDouble(deltaTimeFilterProperty, 48, 1, 48, 0, 1, " hrs");
 
-    bboxProperty = addProperty(RECTF_LONLAT_PROPERTY, "bounding box",
-                               actorPropertiesSupGroup);
-    properties->setRectF(bboxProperty, bbox, 2);
+    actorPropertiesSupGroup->addSubProperty(bBoxConnection->getProperty());
 
     // Transfer function.
     // Scan currently available actors for transfer functions. Add TFs to
@@ -325,7 +328,7 @@ void MTrajectoryActor::saveConfiguration(QSettings *settings)
     settings->setValue("deltaTime",
                        properties->mDDouble()->value(deltaTimeFilterProperty));
 
-    settings->setValue("boundingBox", bbox);
+    MBoundingBoxInterface::saveConfiguration(settings);
 
     settings->setValue("transferFunction",
                        properties->getEnumItem(transferFunctionProperty));
@@ -479,8 +482,7 @@ void MTrajectoryActor::loadConfiguration(QSettings *settings)
                 deltaTimeFilterProperty,
                 settings->value("deltaTime").toFloat());
 
-    bbox = settings->value("boundingBox").toRectF();
-    properties->mRectF()->setValue(bboxProperty, bbox);
+    MBoundingBoxInterface::loadConfiguration(settings);
 
     QString tfName = settings->value("transferFunction").toString();
     while (!setTransferFunction(tfName))
@@ -558,6 +560,20 @@ void MTrajectoryActor::loadConfiguration(QSettings *settings)
         asynchronousDataRequest();
     }
     enableProperties(dataSourceAvailable);
+}
+
+
+void MTrajectoryActor::onBoundingBoxChanged()
+{
+    labels.clear();
+    if (dataSourceID == "" || suppressActorUpdates())
+    {
+        return;
+    }
+    // Different from other actors the trajectory actor needs a recomputation
+    // of its trajectories if swichting to no bounding box since this switch
+    // disables the bounding box filter.
+    asynchronousSelectionRequest();
 }
 
 
@@ -1324,15 +1340,17 @@ void MTrajectoryActor::onActorDeleted(MActor *actor)
     {
         enableEmissionOfActorChangedSignal(false);
 
-        int index = properties->mEnum()->value(transferFunctionProperty);
+        QString tFName = properties->getEnumItem(transferFunctionProperty);
         QStringList availableTFs = properties->mEnum()->enumNames(
                     transferFunctionProperty);
 
-        // If the deleted transfer function is currently connected to this
-        // variable, set current transfer function to "None" (index 0).
-        if (availableTFs.at(index) == tf->getName()) index = 0;
-
         availableTFs.removeOne(tf->getName());
+
+        // Get the current index of the transfer function selected. If the
+        // transfer function is the one to be deleted, the selection is set to
+        // 'None'.
+        int index = availableTFs.indexOf(tFName);
+
         properties->mEnum()->setEnumNames(transferFunctionProperty,
                                           availableTFs);
         properties->mEnum()->setValue(transferFunctionProperty, index);
@@ -1403,6 +1421,17 @@ void MTrajectoryActor::registerScene(MSceneControl *scene)
 }
 
 
+void MTrajectoryActor::onSceneViewAdded()
+{
+    // Only send data request if data source exists, but for each scene since
+    // they have different scene views and thus different normals.
+    if (dataSourceID != "")
+    {
+        asynchronousDataRequest();
+    }
+}
+
+
 bool MTrajectoryActor::isConnectedTo(MActor *actor)
 {
     if (MActor::isConnectedTo(actor))
@@ -1439,27 +1468,36 @@ void MTrajectoryActor::onSeedActorChanged()
 
 void MTrajectoryActor::initializeActorResources()
 {
+    // Initialise texture unit.
+    if (textureUnitTransferFunction >= 0)
+    {
+        releaseTextureUnit(textureUnitTransferFunction);
+    }
+    textureUnitTransferFunction = assignImageUnit();
+
     // Since no data source was selected disable actor properties since they
     // have no use without a data source.
     if (dataSourceID == "" && !selectDataSource())
     {
-        // User has selected no data source. Display a warning and disable
-        // all trajectory properties.
-        QMessageBox msgBox;
-        msgBox.setIcon(QMessageBox::Warning);
-        msgBox.setText("No data source selected. Disabling all properties.");
-        msgBox.exec();
+        // TODO (bt, May2017): Why does the program crash when calling a message
+        // boxes or dialogs during initialisation of GL?
+        bool appInitialized =
+                MSystemManagerAndControl::getInstance()->applicationIsInitialized();
+        if (appInitialized)
+        {
+            // User has selected no data source. Display a warning and disable
+            // all trajectory properties.
+            QMessageBox msgBox;
+            msgBox.setIcon(QMessageBox::Warning);
+            msgBox.setWindowTitle(getName());
+            msgBox.setText("No data source selected. Disabling all properties.");
+            msgBox.exec();
+        }
         enableProperties(false);
     }
     else
     {
         enableProperties(true);
-
-        if (textureUnitTransferFunction >= 0)
-        {
-            releaseTextureUnit(textureUnitTransferFunction);
-        }
-        textureUnitTransferFunction = assignImageUnit();
 
         updateInitTimeProperty();
         updateStartTimeProperty();
@@ -1537,6 +1575,13 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
     else if (property == utilizedDataSourceProperty)
     {
         dataSourceID = properties->mString()->value(utilizedDataSourceProperty);
+        bool validDataSource =
+                MSelectDataSourceDialog::checkForTrajectoryDataSource(
+                    dataSourceID);
+        if (!validDataSource)
+        {
+            dataSourceID = "";
+        }
         return;
     }
 
@@ -1741,13 +1786,6 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
         asynchronousSelectionRequest();
     }
 
-    else if (property == bboxProperty)
-    {
-        bbox = properties->mRectF()->value(bboxProperty);
-        if (suppressActorUpdates()) return;
-        asynchronousSelectionRequest();
-    }
-
     else if (property == calculationLineTypeProperty)
     {
         TRAJ_CALC_LINE_TYPE lineType = TRAJ_CALC_LINE_TYPE(properties->mEnum()->value(calculationLineTypeProperty));
@@ -1840,7 +1878,7 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
 
 
 void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
-{    
+{
     // Only render if transfer function is available.
     if (transferFunction == nullptr)
     {
@@ -2155,7 +2193,8 @@ void MTrajectoryActor::updateTimeProperties()
 
     initTimeProperty->setEnabled(!(enableSync && synchronizeInitTime));
     startTimeProperty->setEnabled(!(enableSync && synchronizeStartTime));
-    particlePosTimeProperty->setEnabled(!(enableSync && synchronizeParticlePosTime));
+    particlePosTimeProperty->setEnabled(
+                !(enableSync && synchronizeParticlePosTime));
 
     updateSyncPropertyColourHints();
 
@@ -2451,25 +2490,24 @@ void MTrajectoryActor::asynchronousDataRequest(bool synchronizationRequest)
         }
         rh.remove("NORMALS_LOGP_SCALED");
 
-        // Request 3: Pressure/Time selection filter.
-        // ==========================================
-
-        //TODO: add property
-        rh.insert("TRY_PRECOMPUTED", 1);
-
         bool filteringEnabled = properties->mBool()->value(enableFilterProperty);
         if (filteringEnabled)
         {
             float deltaPressure_hPa = properties->mDDouble()->value(
-                    deltaPressureFilterProperty);
-            int deltaTime_hrs = properties->mDDouble()->value(deltaTimeFilterProperty);
+                        deltaPressureProperty);
+            int deltaTime_hrs = properties->mDDouble()->value(deltaTimeProperty);
             // Request is e.g. 500/48 for 500 hPa in 48 hours.
             rh.insert("FILTER_PRESSURE_TIME",
                       QString("%1/%2").arg(deltaPressure_hPa).arg(deltaTime_hrs));
             // Request bounding box filtering.
-            rh.insert("FILTER_BBOX", QString("%1/%2/%3/%4")
-                    .arg(bbox.x()).arg(bbox.y())
-                    .arg(bbox.width() + bbox.x()).arg(bbox.height() + bbox.y()));
+            if (bBoxConnection->getBoundingBox() != nullptr)
+            {
+                rh.insert("FILTER_BBOX", QString("%1/%2/%3/%4")
+                          .arg(bBoxConnection->westLon()).arg(
+                              bBoxConnection->southLat())
+                          .arg(bBoxConnection->eastLon()).arg(
+                              bBoxConnection->northLat()));
+            }
         }
         else
         {
@@ -2603,9 +2641,14 @@ void MTrajectoryActor::asynchronousSelectionRequest()
             rh.insert("FILTER_PRESSURE_TIME",
                       QString("%1/%2").arg(deltaPressure_hPa).arg(deltaTime_hrs));
             // Request bounding box filtering.
-            rh.insert("FILTER_BBOX", QString("%1/%2/%3/%4")
-                    .arg(bbox.x()).arg(bbox.y())
-                    .arg(bbox.width() + bbox.x()).arg(bbox.height() + bbox.y()));
+            if (bBoxConnection->getBoundingBox() != nullptr)
+            {
+                rh.insert("FILTER_BBOX", QString("%1/%2/%3/%4")
+                      .arg(bBoxConnection->westLon()).arg(
+                              bBoxConnection->southLat())
+                      .arg(bBoxConnection->eastLon()).arg(
+                              bBoxConnection->northLat()));
+            }
         }
         else
         {
@@ -2906,7 +2949,6 @@ void MTrajectoryActor::debugPrintPendingRequestsQueue()
         }
     }
 
-
     str += QString("\n==================\n");
 
     LOG4CPLUS_DEBUG(mlog, str.toStdString());
@@ -2915,6 +2957,14 @@ void MTrajectoryActor::debugPrintPendingRequestsQueue()
 
 bool MTrajectoryActor::selectDataSource()
 {
+    // TODO (bt, May2017): Why does the program crash when calling a message
+    // boxes or dialogs during initialisation of GL?
+    bool appInitialized =
+            MSystemManagerAndControl::getInstance()->applicationIsInitialized();
+    if (!appInitialized)
+    {
+        return false;
+    }
     // Ask the user for data sources to which times and ensemble members the
     // sync control should be restricted to.
     MSelectDataSourceDialog dialog(MSelectDataSourceDialogType::TRAJECTORIES, 0);
@@ -3100,11 +3150,14 @@ void MTrajectoryActor::enableProperties(bool enable)
     enableShadowProperty->setEnabled(enable);
     colourShadowProperty->setEnabled(enable);
 
-    initTimeProperty->setEnabled(enable && !(enableSync && synchronizeInitTime));
-    startTimeProperty->setEnabled(enable && !(enableSync && synchronizeStartTime));
-    particlePosTimeProperty->setEnabled(enable && !(enableSync && synchronizeParticlePosTime));
+    initTimeProperty->setEnabled(
+                enable && !(enableSync && synchronizeInitTime));
+    startTimeProperty->setEnabled(
+                enable && !(enableSync && synchronizeStartTime));
+    particlePosTimeProperty->setEnabled(
+                enable && !(enableSync && synchronizeParticlePosTime));
 
-    bboxProperty->setEnabled(enable);
+    bBoxConnection->getProperty()->setEnabled(enable);
     ensembleMemberProperty->setEnabled(enable && !synchronizeEnsemble);
 
     // Calculation Properties

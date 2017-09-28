@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2017      Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -48,32 +49,23 @@ namespace Met3D
 
 MVolumeBoundingBoxActor::MVolumeBoundingBoxActor()
     : MActor(),
+      MBoundingBoxInterface(this),
       coordinateVertexBuffer(nullptr),
       axisVertexBuffer(nullptr),
       tickLength(0.8),
       lineColour(QColor(0, 104, 139, 255))
 {
+    bBoxConnection =
+            new MBoundingBoxConnection(this, MBoundingBoxConnection::VOLUME);
     // Create and initialise QtProperties for the GUI.
     // ===============================================
     beginInitialiseQtProperties();
 
-    setName("Volume bounding box");
+    setActorType("Volume bounding box");
+    setName(getActorType());
 
-    boxCornersProperty = addProperty(RECTF_LONLAT_PROPERTY, "corners",
-                                     actorPropertiesSupGroup);
-    properties->setRectF(boxCornersProperty, QRectF(-50.1, 30., 100.2, 40.05), 2);
-
-    bottomPressureProperty = addProperty(DECORATEDDOUBLE_PROPERTY,
-                                         "bottom pressure",
-                                         actorPropertiesSupGroup);
-    properties->setDDouble(bottomPressureProperty, 1045.,
-                           1050., 0.01, 1, 10., " hPa");
-
-    topPressureProperty = addProperty(DECORATEDDOUBLE_PROPERTY,
-                                      "top pressure",
-                                      actorPropertiesSupGroup);
-    properties->setDDouble(topPressureProperty, 20.,
-                           1050., 0.01, 1, 10., " hPa");
+    // Bounding box of the actor.
+    actorPropertiesSupGroup->addSubProperty(bBoxConnection->getProperty());
 
     tickLengthProperty = addProperty(DECORATEDDOUBLE_PROPERTY,
                                      "tick length",
@@ -107,12 +99,6 @@ void MVolumeBoundingBoxActor::reloadShaderEffects()
 }
 
 
-void MVolumeBoundingBoxActor::setBBox(QRectF bbox)
-{
-    properties->mRectF()->setValue(boxCornersProperty, bbox);
-}
-
-
 void MVolumeBoundingBoxActor::setColour(QColor c)
 {
     properties->mColor()->setValue(colourProperty, c);
@@ -123,14 +109,7 @@ void MVolumeBoundingBoxActor::saveConfiguration(QSettings *settings)
 {
     settings->beginGroup(MVolumeBoundingBoxActor::getSettingsID());
 
-    settings->setValue("boxCorners",
-                       properties->mRectF()->value(boxCornersProperty));
-
-    settings->setValue("bottomPressure",
-                       properties->mDDouble()->value(bottomPressureProperty));
-
-    settings->setValue("topPressure",
-                       properties->mDDouble()->value(topPressureProperty));
+    MBoundingBoxInterface::saveConfiguration(settings);
 
     settings->setValue("tickLength",
                        properties->mDDouble()->value(tickLengthProperty));
@@ -146,17 +125,7 @@ void MVolumeBoundingBoxActor::loadConfiguration(QSettings *settings)
 {
     settings->beginGroup(MVolumeBoundingBoxActor::getSettingsID());
 
-    properties->mRectF()->setValue(
-                boxCornersProperty,
-                settings->value("boxCorners").toRectF());
-
-    properties->mDDouble()->setValue(
-                bottomPressureProperty,
-                settings->value("bottomPressure").toDouble());
-
-    properties->mDDouble()->setValue(
-                topPressureProperty,
-                settings->value("topPressure").toDouble());
+    MBoundingBoxInterface::loadConfiguration(settings);
 
     properties->mDDouble()->setValue(
                 tickLengthProperty,
@@ -184,6 +153,25 @@ double MVolumeBoundingBoxActor::getTopPressure()
     return properties->mDDouble()->value(topPressureProperty);
 }
 
+void MVolumeBoundingBoxActor::onBoundingBoxChanged()
+{
+    labels.clear();
+    if (suppressActorUpdates())
+    {
+        return;
+    }
+    // Switching to no bounding box only needs a redraw, but no recomputation
+    // because it disables rendering of the actor.
+    if (bBoxConnection->getBoundingBox() == nullptr)
+    {
+        emitActorChangedSignal();
+        return;
+    }
+    generateGeometry();
+    emitActorChangedSignal();
+}
+
+
 /******************************************************************************
 ***                          PROTECTED METHODS                              ***
 *******************************************************************************/
@@ -204,10 +192,7 @@ void MVolumeBoundingBoxActor::initializeActorResources()
 void MVolumeBoundingBoxActor::onQtPropertyChanged(QtProperty *property)
 {
     // The slice position has been changed.
-    if ( (property == boxCornersProperty)
-         || (property == bottomPressureProperty)
-         || (property == topPressureProperty)
-         || (property == labelSizeProperty)
+    if ( (property == labelSizeProperty)
          || (property == labelColourProperty)
          || (property == labelBBoxProperty)
          || (property == labelBBoxColourProperty) )
@@ -233,6 +218,10 @@ void MVolumeBoundingBoxActor::onQtPropertyChanged(QtProperty *property)
 
 void MVolumeBoundingBoxActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
 {
+    if (bBoxConnection->getBoundingBox() == nullptr)
+    {
+        return;
+    }
     // A) Render volume box.
     // =====================
 
@@ -298,6 +287,10 @@ void MVolumeBoundingBoxActor::renderToCurrentContext(MSceneViewGLWidget *sceneVi
 
 void MVolumeBoundingBoxActor::generateGeometry()
 {
+    if (bBoxConnection->getBoundingBox() == nullptr)
+    {
+        return;
+    }
     // A) Generate geometry.
     // =====================
 
@@ -320,15 +313,13 @@ void MVolumeBoundingBoxActor::generateGeometry()
                                                     {0, 1, 1},
                                                     {0, 0, 1}};
 
-    QRectF cornerRect = properties->mRectF()->value(boxCornersProperty);
+    float llcrnrlat = bBoxConnection->southLat();
+    float llcrnrlon = bBoxConnection->westLon();
+    float urcrnrlat = bBoxConnection->northLat();
+    float urcrnrlon = bBoxConnection->eastLon();
 
-    float llcrnrlat = cornerRect.y();
-    float llcrnrlon = cornerRect.x();
-    float urcrnrlat = cornerRect.y() + cornerRect.height();
-    float urcrnrlon = cornerRect.x() + cornerRect.width();
-
-    float pbot_hPa = properties->mDDouble()->value(bottomPressureProperty);
-    float ptop_hPa = properties->mDDouble()->value(topPressureProperty);
+    float pbot_hPa = bBoxConnection->bottomPressure_hPa();
+    float ptop_hPa = bBoxConnection->topPressure_hPa();
 
     // Create coordinate system geometry.
     coordinateSystemVertices.clear();

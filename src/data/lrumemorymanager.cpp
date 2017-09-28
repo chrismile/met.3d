@@ -60,7 +60,7 @@ MLRUMemoryManager::MLRUMemoryManager(QString identifier,
     MSystemManagerAndControl *sc = MSystemManagerAndControl::getInstance();
 
     QtProperty *propertyGroup = sc->getGroupPropertyManager()
-            ->addProperty(QString("Memory Manager (%1)").arg(identifier));
+            ->addProperty(QString("Memory manager (%1)").arg(identifier));
 
     updateProperty = sc->getClickPropertyManager()
             ->addProperty("update");

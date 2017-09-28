@@ -126,7 +126,11 @@ HEADERS += \
     src/actors/transferfunctioneditor/transferfunctioneditor.h \
     src/actors/transferfunctioneditor/colour.h \
     src/actors/transferfunctioneditor/colourpicker.h \
-    src/actors/transferfunctioneditor/editortransferfunction.h
+    src/actors/transferfunctioneditor/editortransferfunction.h \
+    src/gxfw/rotatedgridsupportingactor.h \
+    src/gxfw/boundingbox/bboxdockwidget.h \
+    src/gxfw/boundingbox/boundingbox.h \
+    src/gxfw/sessionmanagerdialog.h
 
 SOURCES += \
     src/main.cpp \
@@ -220,7 +224,11 @@ SOURCES += \
     src/actors/transferfunctioneditor/transferfunctioneditor.cpp \
     src/actors/transferfunctioneditor/colourpicker.cpp \
     src/actors/transferfunctioneditor/colour.cpp \
-    src/actors/transferfunctioneditor/editortransferfunction.cpp
+    src/actors/transferfunctioneditor/editortransferfunction.cpp \
+    src/gxfw/rotatedgridsupportingactor.cpp \
+    src/gxfw/boundingbox/bboxdockwidget.cpp \
+    src/gxfw/boundingbox/boundingbox.cpp \
+    src/gxfw/sessionmanagerdialog.cpp
 
 FORMS += \
     src/mainwindow.ui \
@@ -233,7 +241,9 @@ FORMS += \
     src/gxfw/synccontrol.ui \
     src/gxfw/memberselectiondialog.ui \
     src/gxfw/adddatasetdialog.ui \
-    src/gxfw/resizewindowdialog.ui
+    src/gxfw/resizewindowdialog.ui \
+    src/gxfw/boundingbox/bboxdockwidget.ui \
+    src/gxfw/sessionmanagerdialog.ui
 
 OTHER_FILES += \
     data/log4cplus.properties \
@@ -280,7 +290,9 @@ OTHER_FILES += \
     src/glsl/hsec_texturedcontours.fx.glsl \
     config/cf_stdnames.dat \
     config/log4cplus.properties \
-    src/glsl/north_arrow.fx.glsl
+    src/glsl/north_arrow.fx.glsl \
+    config/metview/default_frontend.cfg \
+    config/metview/default_pipeline.cfg
 
 
 DEFINES += \

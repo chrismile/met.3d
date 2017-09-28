@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2017      Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -44,6 +45,7 @@
 #include "data/trajectorydatasource.h"
 #include "data/trajectorynormalssource.h"
 #include "data/pressuretimetrajectoryfilter.h"
+#include "gxfw/boundingbox/boundingbox.h"
 #include "data/trajectorycalculator.h"
 
 
@@ -60,7 +62,8 @@ namespace Met3D
   marking the positions of the airparcels. Spheres can be restricted to a
   single time of the trajectory.
   */
-class MTrajectoryActor : public MActor, public MSynchronizedObject
+class MTrajectoryActor : public MActor, public MBoundingBoxInterface,
+        public MSynchronizedObject
 {
     Q_OBJECT
 
@@ -125,6 +128,8 @@ public:
     void saveConfiguration(QSettings *settings) override;
 
     void loadConfiguration(QSettings *settings) override;
+
+    void onBoundingBoxChanged() override;
 
 public slots:
     /**
@@ -193,6 +198,13 @@ public slots:
     void onActorRenamed(MActor *actor, QString oldName);
 
     void registerScene(MSceneControl *scene) override;
+
+    /**
+      Since normals of trajectories depend on the scene view the trajectory
+      actor is rendered in, it is necessary to trigger a data request if a scene
+      view is added to a scene the trajectory actor is connected to.
+     */
+    void onSceneViewAdded();
 
     bool isConnectedTo(MActor *actor) override;
 
@@ -405,10 +417,6 @@ private:
                                        // criterion
     QtProperty *deltaTimeFilterProperty;
 
-    // Bounding box.
-    QRectF      bbox;
-    QtProperty* bboxProperty;
-
     /** GLSL shader objects. */
     std::shared_ptr<GL::MShaderEffect> tubeShader;
     std::shared_ptr<GL::MShaderEffect> tubeShadowShader;
@@ -456,7 +464,7 @@ private:
 
     /**
       @brief enableProperties changes the enabled status of all properties to
-      @param enable exept for @ref selectDataSourceProperty and
+      @p enable exept for @ref selectDataSourceProperty and
       @ref utilizedDataSourceProperty.
 
       enableProperties is used to disable all properties if the user selects no

@@ -5,7 +5,7 @@
 **  prediction data.
 **
 **  Copyright 2015-2017 Marc Rautenhaus
-**  Copyright 2015-2017 Bianca Tost
+**  Copyright 2016-2017 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -225,6 +225,26 @@ public:
 
     void setSceneRotationCentre(QVector3D centre);
 
+    /**
+     Save the scene view configuration to the file @p filename.
+     */
+    void saveConfigurationToFile(QString filename = "");
+    /**
+     Load the scene view configuration from the file @p filename.
+     */
+    void loadConfigurationFromFile(QString filename = "");
+
+    /**
+     Save scene view-specific configuration to the @ref QSettings object @p
+     settings.
+     */
+    void saveConfiguration(QSettings *settings);
+    /**
+     Load scene view-specific configuration from the @ref QSettings object @p
+     settings.
+     */
+    void loadConfiguration(QSettings *settings);
+
     void setOverwriteImageSerie(bool overwriteImageSerie)
     { this->overwriteImageSerie = overwriteImageSerie; }
 
@@ -264,6 +284,8 @@ public slots:
 
 protected:
     void initializeGL();
+
+    void updateGL();
 
     void paintGL();
 
@@ -312,13 +334,13 @@ protected slots:
 
 private:
     /**
-     * Handels opening of file dialog and letting the user choose where to save
+     * Handles opening of file dialog and letting the user choose where to save
      * the screenshot, how to call it and as which image file type.
      */
     void saveScreenshot();
 
     /**
-     * Handels taking and saving a screenshot of the scene to @param filename.
+     * Handles taking and saving a screenshot of the scene to @p filename.
      */
     void saveScreenshotToFileName(QString filename);
 
@@ -397,6 +419,10 @@ private:
 
     QtProperty *propertyGroup;
 
+    QtProperty *configurationSupGroup;
+    QtProperty *saveConfigProperty;
+    QtProperty *loadConfigProperty;
+
     QtProperty *cameraPositionProperty;
     QtProperty *cameraGroupProperty;
     QtProperty *cameraSetNorthUpProperty;
@@ -426,7 +452,9 @@ private:
     QtProperty *renderingGroupProperty;
     QtProperty *backgroundColourProperty;
     QtProperty *multisamplingProperty;
+    bool        multisamplingEnabled;
     QtProperty *antialiasingProperty;
+    bool        antialiasingEnabled;
     QtProperty *labelDepthTestProperty;
     QtProperty *lightingProperty;
     QtProperty *verticalScalingProperty;
@@ -478,7 +506,7 @@ private:
 
     /**
      * If this variable is set to true, Met.3D will write the files of a time
-     * series without checking if the file name allready exists.
+     * series without checking if the file name already exists.
      */
     bool overwriteImageSerie;
 };

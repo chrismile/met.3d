@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2016-2017 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -136,6 +137,16 @@ public:
     QString getName();
 
     /**
+      Sets the name of the factory the actor belongs to.
+      */
+    void setActorType(const QString name) { actorType = name; }
+
+    /**
+      Returns the name of the factory the actor belongs to.
+    */
+    QString getActorType() { return actorType; }
+
+    /**
       Returns a @ref QtProperty instance acting as parent to all the properties
       of this actor (i.e. representing the properties "group"). This instance
       can be added to a @ref QtAbstractPropertyBrowser.
@@ -159,6 +170,8 @@ public:
 
     virtual void deregisterScene(MSceneControl *scene);
 
+    void onSceneViewAdded() {}
+
     /**
      Provides information of how many elements (e.g. NWP variables) of this
      actor are connected to a MSyncControl. Needs to be reimplemented in
@@ -174,6 +187,11 @@ public:
       Returns a list of the scenes in which this actor has been registered.
      */
     const QList<MSceneControl*>& getScenes() { return scenes; }
+
+    /**
+      Clears list of the scenes in which this actor has been registered.
+     */
+    void clearScenes() { scenes.clear(); }
 
     /**
       Returns a list of the views in which this actor appears.
@@ -291,6 +309,21 @@ public:
     void saveConfigurationToFile(QString filename = "");
 
     void loadConfigurationFromFile(QString filename = "");
+
+    /**
+     Save actor-specific configuration to the @ref QSettings object @p
+     settings.
+
+     @note Override this function if your derived class needs to store
+     configuration.
+     */
+    void saveActorConfiguration(QSettings *settings);
+
+    /**
+     Load actor-specific configuration from the @ref QSettings object @p
+     settings.
+     */
+    void loadActorConfiguration(QSettings *settings);
 
     /**
      Save actor-specific configuration to the @ref QSettings object @p
@@ -448,6 +481,7 @@ protected:
 
     // Define friends for suppressActorUpdates().
     friend class MVerticalRegridProperties;
+    friend class MSessionManagerDialog;
 
     /**
       Query this method in implementations of @ref onQtPropertyChanged() to
@@ -618,6 +652,7 @@ private:
     static unsigned int idCounter;
 
     QString actorName;
+    QString actorType;
 
     int addPropertiesCounter;
     QSet<QtAbstractPropertyManager*> connectedPropertyManagers;

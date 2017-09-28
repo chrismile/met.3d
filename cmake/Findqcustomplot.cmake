@@ -61,6 +61,16 @@ find_library(${PKG_NAME}_LIBRARY_DEBUG
             ${COMMON_INSTALL_DIRS}
         )
 
+if (NOT ${PKG_NAME}_LIBRARY_DEBUG)
+    message("Debug library for ${PKG_NAME} was not found")
+    set(${PKG_NAME}_LIBRARY_DEBUG "${${PKG_NAME}_LIBRARY_RELEASE}")
+endif()
+
+if (NOT ${PKG_NAME}_LIBRARY_RELEASE)
+    message("Release library for ${PKG_NAME} was not found")
+    set(${PKG_NAME}_LIBRARY_RELEASE "${${PKG_NAME}_LIBRARY_DEBUG}")
+endif()
+
 if (${PKG_NAME}_LIBRARY_DEBUG AND ${PKG_NAME}_LIBRARY_RELEASE)
     # use different libraries for different configurations
     set (${PKG_NAME}_LIBRARIES
