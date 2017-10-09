@@ -204,8 +204,8 @@ void MFrontendConfiguration::initializeFrontendFromConfigFile(
         msgBox.setWindowTitle("Error");
         msgBox.setText("No write access to '" + sessionDirectory
                        + "'.\nTry to set '"
-                       + QDir(expandEnvironmentVariables("$MET3D_BASE"))
-                       .absoluteFilePath("sessions")
+                       + QDir::home()
+                       .absoluteFilePath(".met3d/sessions")
                        +  "' as default.\nPlease change value in frontend"
                           " configuration.");
         msgBox.exec();
@@ -213,12 +213,10 @@ void MFrontendConfiguration::initializeFrontendFromConfigFile(
     }
     if (sessionDirectory == "")
     {
-        sessionDirectory =
-                QDir(expandEnvironmentVariables("$MET3D_BASE"))
-                .absoluteFilePath("sessions");
+        sessionDirectory = QDir::home().absoluteFilePath(".met3d/sessions");
         if (!QDir().exists(sessionDirectory))
         {
-            if (QDir().mkdir(sessionDirectory))
+            if (QDir().mkpath(sessionDirectory))
             {
                 LOG4CPLUS_WARN(mlog, "No directory to load session files from"
                                      " specified in frontend configuration."
