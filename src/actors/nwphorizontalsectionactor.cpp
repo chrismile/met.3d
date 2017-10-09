@@ -1021,6 +1021,14 @@ void MNWPHorizontalSectionActor::renderToCurrentContext(MSceneViewGLWidget *scen
 
         if ( !var->hasData() ) continue;
 
+        // If the slice position is outside the model grid domain, there is
+        // nothing to render.
+        if (var->grid->getBottomDataVolumePressure() < slicePosition_hPa
+                || var->grid->getTopDataVolumePressure() > slicePosition_hPa)
+        {
+            continue;
+        }
+
         // If the bounding box is outside the model grid domain, there is
         // nothing to render (see computeRenderRegionParameters()).
         if (var->nlons == 0 || var->nlats == 0) continue;
@@ -1035,10 +1043,23 @@ void MNWPHorizontalSectionActor::renderToCurrentContext(MSceneViewGLWidget *scen
                 // DIFFERENCE MODE: Render difference between 1st & 2nd variable
                 MNWP2DHorizontalActorVariable* varDiff =
                         static_cast<MNWP2DHorizontalActorVariable*> (variables.at(1));
+
+
+                // If the slice position is outside the model grid domain of the
+                // 2nd variable, there is nothing to render.
+                if ((varDiff->grid->getBottomDataVolumePressure()
+                     < slicePosition_hPa)
+                        || (varDiff->grid->getTopDataVolumePressure()
+                            > slicePosition_hPa))
+                {
+                    continue;
+                }
                 renderVerticalInterpolationDifference(var, varDiff);
             }
             else
+            {
                 renderVerticalInterpolation(var);
+            }
 
             // If line contours are enabled re-compute the contour indices
             // (i.e. which isovalues actually will be visible, the others
@@ -2306,6 +2327,14 @@ void MNWPHorizontalSectionActor::renderShadow(MSceneViewGLWidget* sceneView)
 
 void MNWPHorizontalSectionActor::renderContourLabels(MSceneViewGLWidget *sceneView, MNWP2DHorizontalActorVariable *var)
 {
+    // Don't draw horizontal cross-section actor if its slice position is
+    // outside the data domain.
+    if (var->grid->getBottomDataVolumePressure() < slicePosition_hPa
+            || var->grid->getTopDataVolumePressure() > slicePosition_hPa)
+    {
+        return;
+    }
+
 //TODO (mr, Feb2015): Labels should not be rendered here but inserted into
 //                    actor label pool -- however, that shouldn't be updated
 //                    on each render cycle.
