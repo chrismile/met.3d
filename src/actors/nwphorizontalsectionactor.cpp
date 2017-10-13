@@ -1021,8 +1021,8 @@ void MNWPHorizontalSectionActor::renderToCurrentContext(MSceneViewGLWidget *scen
 
         if ( !var->hasData() ) continue;
 
-        // If the slice position is outside the model grid domain, there is
-        // nothing to render.
+        // If the slice position is outside the data domain of this variable,
+        // there is nothing to render.
         if (var->grid->getBottomDataVolumePressure() < slicePosition_hPa
                 || var->grid->getTopDataVolumePressure() > slicePosition_hPa)
         {
@@ -2069,6 +2069,13 @@ void MNWPHorizontalSectionActor::renderWindBarbs(MSceneViewGLWidget *sceneView)
         return;
     }
 
+    // Don't render wind barbs if horizontal slice position is
+    // outside the data domain (assuming u/v are on the same grid).
+    if (varWindV->grid->getBottomDataVolumePressure() < slicePosition_hPa
+            || varWindV->grid->getTopDataVolumePressure() > slicePosition_hPa)
+    {
+        return;
+    }
 
     glWindBarbsShader->bind();
 
@@ -2325,9 +2332,10 @@ void MNWPHorizontalSectionActor::renderShadow(MSceneViewGLWidget* sceneView)
 }
 
 
-void MNWPHorizontalSectionActor::renderContourLabels(MSceneViewGLWidget *sceneView, MNWP2DHorizontalActorVariable *var)
+void MNWPHorizontalSectionActor::renderContourLabels(
+        MSceneViewGLWidget *sceneView, MNWP2DHorizontalActorVariable *var)
 {
-    // Don't draw horizontal cross-section actor if its slice position is
+    // Don't render contour labels if horizontal slice position is
     // outside the data domain.
     if (var->grid->getBottomDataVolumePressure() < slicePosition_hPa
             || var->grid->getTopDataVolumePressure() > slicePosition_hPa)
