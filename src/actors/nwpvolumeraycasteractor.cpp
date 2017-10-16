@@ -316,7 +316,7 @@ MNWPVolumeRaycasterActor::RayCasterSettings::RayCasterSettings(
     groupShadowSettings = a->addProperty(
                 GROUP_PROPERTY, "shadow", groupProp);
 
-    QStringList shadowModesList;
+    QStringList shadowModesList;    
     shadowModesList << "off" << "shadow map" << "shadow ray";
     shadowModeProp = a->addProperty(ENUM_PROPERTY, "shadows", groupShadowSettings);
     properties->mEnum()->setEnumNames(shadowModeProp, shadowModesList);
@@ -516,7 +516,6 @@ MNWPVolumeRaycasterActor::~MNWPVolumeRaycasterActor()
     if (gl.texUnitShadowImage >=0) releaseTextureUnit(gl.texUnitShadowImage);
     if (gl.texUnitDepthBuffer >=0) releaseTextureUnit(gl.texUnitDepthBuffer);
 
-    delete bbSettings;
     delete lightingSettings;
     delete rayCasterSettings;
     delete normalCurveSettings;
@@ -809,7 +808,7 @@ void MNWPVolumeRaycasterActor::loadConfiguration(QSettings *settings)
 
     normalCurveSettings->tubeRadius = settings->value("tubeRadius").toFloat();
     properties->mDouble()->setValue(normalCurveSettings->tubeRadiusProp,
-                                    normalCurveSettings->tubeRadius);
+                                  normalCurveSettings->tubeRadius);
 
 
     normalCurveSettings->integrationDir =
@@ -961,7 +960,7 @@ bool MNWPVolumeRaycasterActor::triggerAnalysisOfObjectAtPos(
             lonLatP.setZ(sceneView->pressureFromWorldZ(rayPosition.z()));
 
             LOG4CPLUS_DEBUG_FMT(mlog, "isosurface hit at position %.2f "
-                                      "deg/%.2f deg/%.2f hPa",
+                                "deg/%.2f deg/%.2f hPa",
                                 lonLatP.x(), lonLatP.y(), lonLatP.z());
 
             updatePositionCrossGeometry(lonLatP);
@@ -1169,10 +1168,10 @@ void MNWPVolumeRaycasterActor::onQtPropertyChanged(QtProperty* property)
     MNWPMultiVarActor::onQtPropertyChanged(property);
 
     if (property == lightingSettings->lightingModeProp ||
-            property == lightingSettings->ambientProp ||
-            property == lightingSettings->diffuseProp ||
-            property == lightingSettings->specularProp ||
-            property == lightingSettings->shininessProp)
+             property == lightingSettings->ambientProp ||
+             property == lightingSettings->diffuseProp ||
+             property == lightingSettings->specularProp ||
+             property == lightingSettings->shininessProp)
     {
         lightingSettings->lightingMode = properties->mEnum()
                 ->value(lightingSettings->lightingModeProp);
@@ -1296,8 +1295,8 @@ void MNWPVolumeRaycasterActor::onQtPropertyChanged(QtProperty* property)
         if (normalCurveSettings->threshold == NormalCurveSettings::Threshold::Steps)
         {
             normalCurveSettings->integrationDir =
-                    static_cast<NormalCurveSettings::IntegrationDir>(
-                        properties->mEnum()->value(normalCurveSettings->integrationDirProp));
+                            static_cast<NormalCurveSettings::IntegrationDir>(
+                                properties->mEnum()->value(normalCurveSettings->integrationDirProp));
         }
         else
         {
@@ -1343,8 +1342,8 @@ void MNWPVolumeRaycasterActor::onQtPropertyChanged(QtProperty* property)
         if (normalCurveSettings->threshold == NormalCurveSettings::Threshold::Steps)
         {
             normalCurveSettings->integrationDir =
-                    static_cast<NormalCurveSettings::IntegrationDir>(
-                        properties->mEnum()->value(normalCurveSettings->integrationDirProp));
+                            static_cast<NormalCurveSettings::IntegrationDir>(
+                                properties->mEnum()->value(normalCurveSettings->integrationDirProp));
         }
         else
         {
@@ -1561,11 +1560,11 @@ void MNWPVolumeRaycasterActor::onQtPropertyChanged(QtProperty* property)
                 if (rayCasterSettings->isoValueSetList.size() == 1) break;
                 properties->mBool()->setValue(it->enabledProp, false);
                 rayCasterSettings->isoValuesProp->removeSubProperty(
-                            it->groupProp);
+                          it->groupProp);
                 QString oldDisplayText  = it->groupProp->propertyName();
                 int hashStringPosition  = oldDisplayText.indexOf("#");
                 int oldIndex            =
-                        oldDisplayText.mid(hashStringPosition + 1).toInt();
+                      oldDisplayText.mid(hashStringPosition + 1).toInt();
                 removedIsoValueIndex    = oldIndex;
                 counter                 = oldIndex - 1;
                 enableEmissionOfActorChangedSignal(false);
@@ -1576,25 +1575,25 @@ void MNWPVolumeRaycasterActor::onQtPropertyChanged(QtProperty* property)
                 else
                 {
                     auto begin =
-                            rayCasterSettings->isoValueSetList.begin();
+                          rayCasterSettings->isoValueSetList.begin();
                     QString oldDisplayText  = begin->groupProp->propertyName();
                     int hashStringPosition  = oldDisplayText.indexOf("#");
                     QString oldTextFront    =
-                            oldDisplayText.mid(0, hashStringPosition + 1);
+                          oldDisplayText.mid(0, hashStringPosition + 1);
                     int oldIndex            =
-                            oldDisplayText.mid(hashStringPosition + 1).toInt();
+                          oldDisplayText.mid(hashStringPosition + 1).toInt();
                     counter = oldIndex;
                     begin->groupProp->setPropertyName(
-                                oldTextFront + QString::number(oldIndex - 1));
+                              oldTextFront + QString::number(oldIndex - 1));
                 }
                 enableEmissionOfActorChangedSignal(true);
-                // erase value only after iterator is not used anymore
-                rayCasterSettings->isoValueSetList.erase(it);
-                return;
+				// erase value only after iterator is not used anymore
+				rayCasterSettings->isoValueSetList.erase(it);
+				return;
             }
 
             else if ( property == it->enabledProp ||
-                      property == it->isoValueProp )
+                 property == it->isoValueProp )
             {
                 it->enabled = properties->mBool()->value(it->enabledProp);
                 it->isoValue = properties->mDouble()->value(it->isoValueProp);
@@ -2082,7 +2081,7 @@ void MNWPVolumeRaycasterActor::generateVolumeBoxGeometry()
         else
         {
             LOG4CPLUS_WARN(mlog, "WARNING: cannot store buffer for volume"
-                                 " bbox in GPU memory.");
+                           " bbox in GPU memory.");
             delete buf;
             return;
         }
@@ -2493,6 +2492,7 @@ void MNWPVolumeRaycasterActor::renderBoundingBox(
 }
 
 
+
 void MNWPVolumeRaycasterActor::renderPositionCross(
         MSceneViewGLWidget *sceneView)
 {
@@ -2609,7 +2609,7 @@ void MNWPVolumeRaycasterActor::createShadowImage(
         else
         {
             LOG4CPLUS_WARN(mlog, "WARNING: cannot store buffer for shadow"
-                                 " image bbox in GPU memory.");
+                           " image bbox in GPU memory.");
             delete newVB;
             return;
         }
@@ -2659,7 +2659,7 @@ void MNWPVolumeRaycasterActor::createShadowImage(
             else
             {
                 LOG4CPLUS_WARN(mlog, "WARNING: cannot store texture for shadow"
-                                     " image in GPU memory.");
+                               " image in GPU memory.");
                 delete gl.tex2DShadowImage;
                 gl.tex2DShadowImage = nullptr;
                 return;
@@ -2843,7 +2843,7 @@ void MNWPVolumeRaycasterActor::renderShadows(
         else
         {
             LOG4CPLUS_WARN(mlog, "WARNING: cannot store buffer for shadow"
-                                 " image bbox in GPU memory.");
+                           " image bbox in GPU memory.");
             delete newVB;
             return;
         }
@@ -2854,25 +2854,21 @@ void MNWPVolumeRaycasterActor::renderShadows(
 
     gl.shadowImageRenderShader->bind();
 
-    gl.shadowImageRenderShader->setUniformValue(
-                "mvpMatrix",*(sceneView->getModelViewProjectionMatrix()));
+    gl.shadowImageRenderShader->setUniformValue("mvpMatrix",*(sceneView->getModelViewProjectionMatrix()));
 
     gl.tex2DShadowImage->bindToTextureUnit(gl.texUnitShadowImage);
-    gl.shadowImageRenderShader->setUniformValue(
-                "texImage", GLint(gl.texUnitShadowImage));
+    gl.shadowImageRenderShader->setUniformValue("texImage", GLint(gl.texUnitShadowImage));
 
     {
-        gl.vboShadowImageRender->attachToVertexAttribute(
-                    SHADER_VERTEX_ATTRIBUTE,
-                    3, false,
-                    5 * sizeof(float),
-                    (const GLvoid*)(0 * sizeof(float)));
+        gl.vboShadowImageRender->attachToVertexAttribute(SHADER_VERTEX_ATTRIBUTE,
+                                                         3, false,
+                                                         5 * sizeof(float),
+                                                         (const GLvoid*)(0 * sizeof(float)));
 
-        gl.vboShadowImageRender->attachToVertexAttribute(
-                    SHADER_TEXCOORD_ATTRIBUTE,
-                    2, false,
-                    5 * sizeof(float),
-                    (const GLvoid*)(3 * sizeof(float)));
+        gl.vboShadowImageRender->attachToVertexAttribute(SHADER_TEXCOORD_ATTRIBUTE,
+                                                         2, false,
+                                                         5 * sizeof(float),
+                                                         (const GLvoid*)(3 * sizeof(float)));
 
         glAlphaFunc(GL_GREATER, 0.01);
         glEnable(GL_ALPHA_TEST);
@@ -2919,8 +2915,8 @@ void MNWPVolumeRaycasterActor::computeNormalCurveInitialPoints(
     const uint16_t numRaysHeight = dataExtentHeight / gridSpaceHeight + 1;
 
     const uint32_t numRays = numRaysLon * numRaysLat
-            + numRaysLon * numRaysHeight
-            + numRaysLat * numRaysHeight;
+                             + numRaysLon * numRaysHeight
+                             + numRaysLat * numRaysHeight;
 
     // Make resource manager to the current context.
     glRM->makeCurrent();
@@ -2940,8 +2936,8 @@ void MNWPVolumeRaycasterActor::computeNormalCurveInitialPoints(
         if (!glRM->tryStoreGPUItem(ghostGridTex3D))
         {
             LOG4CPLUS_WARN(mlog, "WARNING: cannot store texture for normal curves"
-                                 " ghost grid in GPU memory, skipping normal curves"
-                                 " computation.");
+                           " ghost grid in GPU memory, skipping normal curves"
+                           " computation.");
             delete ghostGridTex3D;
             return;
         }
@@ -2955,9 +2951,8 @@ void MNWPVolumeRaycasterActor::computeNormalCurveInitialPoints(
     ghostGridTex3D->bindToLastTextureUnit(); CHECK_GL_ERROR;
     QVector<GLint> nullData(numRaysLon * numRaysLat * numRaysHeight, 0);
 
-    glTexImage3D(GL_TEXTURE_3D, 0, GL_R32I, numRaysLon, numRaysLat,
-                 numRaysHeight, 0, GL_RED_INTEGER, GL_INT,
-                 nullData.data()); CHECK_GL_ERROR;
+    glTexImage3D(GL_TEXTURE_3D, 0, GL_R32I, numRaysLon, numRaysLat, numRaysHeight, 0,
+                 GL_RED_INTEGER, GL_INT, nullData.data()); CHECK_GL_ERROR;
 
     const GLint ghostGridImageUnit = assignImageUnit();
 
@@ -2985,8 +2980,8 @@ void MNWPVolumeRaycasterActor::computeNormalCurveInitialPoints(
         else
         {
             LOG4CPLUS_WARN(mlog, "WARNING: cannot store buffer for normal curves"
-                                 " init points in GPU memory, skipping normal curves"
-                                 " computation.");
+                           " init points in GPU memory, skipping normal curves"
+                           " computation.");
             delete gl.ssboInitPoints;
             gl.ssboInitPoints = nullptr;
             return;
@@ -3013,8 +3008,7 @@ void MNWPVolumeRaycasterActor::computeNormalCurveInitialPoints(
     setCommonShaderVars(gl.normalCurveInitPointsShader, sceneView);
 
     gl.normalCurveInitPointsShader->setUniformSubroutineByName(
-                GL_COMPUTE_SHADER, gl.normalInitSubroutines[var->grid
-            ->getLevelType()]);
+                GL_COMPUTE_SHADER, gl.normalInitSubroutines[var->grid->getLevelType()]);
 
     // Bind the atomic counter to the binding index 0.
     glBindBufferBase(GL_ATOMIC_COUNTER_BUFFER, 0, atomicBuffer);
@@ -3022,7 +3016,7 @@ void MNWPVolumeRaycasterActor::computeNormalCurveInitialPoints(
     gl.ssboInitPoints->bindToIndex(0);
 
     gl.normalCurveInitPointsShader->setUniformValue(
-                "isoValue", normalCurveSettings->startIsoValue);
+                    "isoValue", normalCurveSettings->startIsoValue);
 
     gl.normalCurveInitPointsShader->setUniformValue(
                 "stepSize", rayCasterSettings->stepSize);
@@ -3089,8 +3083,8 @@ void MNWPVolumeRaycasterActor::computeNormalCurveInitialPoints(
         if (!glRM->tryStoreGPUItem(distortTex2D))
         {
             LOG4CPLUS_WARN(mlog, "WARNING: cannot store texture for normal curves"
-                                 " displacement grid in GPU memory, skipping normal curves"
-                                 " computation.");
+                           " displacement grid in GPU memory, skipping normal curves"
+                           " computation.");
             delete distortTex2D;
             return;
         }
@@ -3102,8 +3096,8 @@ void MNWPVolumeRaycasterActor::computeNormalCurveInitialPoints(
 
     std::default_random_engine engine;
     std::uniform_real_distribution<float> distribution(
-                -normalCurveSettings->initPointVariance,
-                normalCurveSettings->initPointVariance);
+                    -normalCurveSettings->initPointVariance,
+                     normalCurveSettings->initPointVariance);
 
     // Compute random distortion values.
     QVector<float> texels(maxRes * maxRes * 2);
@@ -3124,9 +3118,8 @@ void MNWPVolumeRaycasterActor::computeNormalCurveInitialPoints(
     // Bind to texture unit.
     distortTex2D->bindToTextureUnit(distortTexUnit);
     gl.normalCurveInitPointsShader->setUniformValue("distortTex", distortTexUnit);
-    gl.normalCurveInitPointsShader->setUniformValue(
-                "doubleIntegration",
-                (normalCurveSettings->integrationDir == NormalCurveSettings::Both));
+    gl.normalCurveInitPointsShader->setUniformValue("doubleIntegration",
+                    (normalCurveSettings->integrationDir == NormalCurveSettings::Both));
 
     // Bind ghost grid as image3D to the shader.
     gl.normalCurveInitPointsShader->setUniformValue(
@@ -3244,7 +3237,7 @@ void MNWPVolumeRaycasterActor::computeNormalCurves(MSceneViewGLWidget* sceneView
     if (numNormalCurveInitPoints == 0)
     {
         LOG4CPLUS_ERROR(mlog, "Warning: could not find any normal curve init "
-                              "points");
+                        "points");
         return;
     }
 
@@ -3252,7 +3245,7 @@ void MNWPVolumeRaycasterActor::computeNormalCurves(MSceneViewGLWidget* sceneView
     glRM->makeCurrent();
 
     normalCurveNumVertices = (normalCurveSettings->numLineSegments + 2)
-            * numNormalCurveInitPoints;
+                             * numNormalCurveInitPoints;
 
     // Create the normal curve line buffer for every init point.
     if (gl.ssboNormalCurves == nullptr)
@@ -3272,7 +3265,7 @@ void MNWPVolumeRaycasterActor::computeNormalCurves(MSceneViewGLWidget* sceneView
         else
         {
             LOG4CPLUS_WARN(mlog, "WARNING: cannot store buffer for normal curves"
-                                 " in GPU memory, skipping normal curves computation.");
+                           " in GPU memory, skipping normal curves computation.");
             delete gl.ssboNormalCurves;
             gl.ssboNormalCurves = nullptr;
             return;
@@ -3291,9 +3284,7 @@ void MNWPVolumeRaycasterActor::computeNormalCurves(MSceneViewGLWidget* sceneView
     if (normalCurveSettings->integrationDir == NormalCurveSettings::Both)
     {
         gl.normalCurveLineComputeShader->bindProgram("DoubleIntegration");
-    }
-    else
-    {
+    } else {
         gl.normalCurveLineComputeShader->bindProgram("SingleIntegration");
     }
 
@@ -3308,15 +3299,13 @@ void MNWPVolumeRaycasterActor::computeNormalCurves(MSceneViewGLWidget* sceneView
     switch(normalCurveSettings->integrationDir)
     {
     case NormalCurveSettings::IntegrationDir::Backwards:
-        gl.normalCurveLineComputeShader->setUniformValue(
-                    "integrationMode", int(-1)); CHECK_GL_ERROR;
+        gl.normalCurveLineComputeShader->setUniformValue("integrationMode", int(-1)); CHECK_GL_ERROR;
         glDispatchCompute(dispatchX, 1, 1);
         glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
         break;
 
     case NormalCurveSettings::IntegrationDir::Forwards:
-        gl.normalCurveLineComputeShader->setUniformValue(
-                    "integrationMode", int(1)); CHECK_GL_ERROR;
+        gl.normalCurveLineComputeShader->setUniformValue("integrationMode", int(1)); CHECK_GL_ERROR;
         glDispatchCompute(dispatchX, 1, 1);
         glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
         break;
@@ -3354,8 +3343,8 @@ void MNWPVolumeRaycasterActor::computeNormalCurves(MSceneViewGLWidget* sceneView
 void MNWPVolumeRaycasterActor::renderNormalCurves(
         MSceneViewGLWidget* sceneView, bool toDepth, bool shadow)
 {
-    if (normalCurveNumVertices == 0
-            || rayCasterSettings->isoValueSetList.size() == 0)
+    if (normalCurveNumVertices                    == 0 ||
+        rayCasterSettings->isoValueSetList.size() == 0)
     {
         return;
     }
@@ -3449,7 +3438,7 @@ void MNWPVolumeRaycasterActor::renderToDepthTexture(
         else
         {
             LOG4CPLUS_WARN(mlog, "WARNING: cannot store texture for depth map"
-                                 " in GPU memory.");
+                           " in GPU memory.");
             delete gl.tex2DDepthBuffer;
             gl.tex2DDepthBuffer = nullptr;
             return;

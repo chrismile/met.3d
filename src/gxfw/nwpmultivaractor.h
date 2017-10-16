@@ -196,6 +196,23 @@ protected:
     QtProperty *variablePropertiesGroup;
 };
 
+/**
+  @brief MNWPMultiVarIsolevelActor serves as base class for actors
+  that use the isolevel property of the variables.
+ */
+class MNWPMultiVarIsolevelActor : public MNWPMultiVarActor
+{
+Q_OBJECT
+public slots:
+
+    /**
+      @brief isoValueOfVariableChanged is triggered when the isolevel property
+      of a connected variable has been changed.
+     */
+    virtual void isoValueOfVariableChanged() = 0;
+};
+
+
 } // namespace Met3D
 
 #endif // NWPMULTIVARACTOR_H

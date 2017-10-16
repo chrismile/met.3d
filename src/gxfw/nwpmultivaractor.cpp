@@ -6,7 +6,6 @@
 **
 **  Copyright 2015-2017 Marc Rautenhaus
 **  Copyright 2017      Bianca Tost
-**  Copyright 2017      Michael Kern
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -52,8 +51,7 @@ namespace Met3D
 
 MNWPMultiVarActor::MNWPMultiVarActor()
     : MActor(),
-      analysisControl(nullptr),
-      supportedFilters({"all"})
+      analysisControl(nullptr)
 {
     // Create and initialise QtProperties for the GUI.
     // ===============================================

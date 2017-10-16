@@ -26,6 +26,7 @@
 ******************************************************************************/
 
 
+
 /*****************************************************************************
  ***                             INTERFACES
  *****************************************************************************/
@@ -112,7 +113,7 @@ shader GSLine(in VStoGS Input[], out GStoFSLine Output)
 
 /*****************************************************************************/
 
-// Calculate new basis.
+// calculate new basis
 void calculateRayBasis( in vec3 prevPos,
                         in vec3 pos,
                         out vec3 normal,
@@ -121,9 +122,6 @@ void calculateRayBasis( in vec3 prevPos,
     vec3 lineDir = normalize(pos - prevPos);
 
     normal = cross(lineDir, vec3(0, 0, 1));
-    //normal = normalize(normal);
-    //if (abs(normal.x) < 0.01)
-    //    normal = cross(lineDir, vec3(0, 1, 0));
     if (length(normal) <= 0.01)
     {
         normal = cross(lineDir, vec3(1, 0, 0));
@@ -147,18 +145,13 @@ void calculateRayBasis( in vec3 prevPos,
 shader GSBox(in VStoGS Input[], out GStoFS Output)
 {
     if (Input[1].value == -1 || Input[2].value == -1)
-    {
         return;
-    }
 
     vec3 start_position = vec3(-1,-1,-1);
     if (Input[0].value == -1)
-    {
         start_position = Input[1].worldSpaceCoordinate;
-    }
 
-    vec3 gradient =
-            Input[1].worldSpaceCoordinate - Input[2].worldSpaceCoordinate;
+    vec3 gradient = Input[1].worldSpaceCoordinate - Input[2].worldSpaceCoordinate;
 
     vec3 prev_ray_position = Input[1].worldSpaceCoordinate;
     vec3 ray_position = Input[2].worldSpaceCoordinate;
@@ -179,14 +172,10 @@ shader GSBox(in VStoGS Input[], out GStoFS Output)
     else
         magnifier = 3.0;
 
-    vec3 prev_ray_pos_ll = prev_ray_position + tubeRadius * magnifier
-            * (-normal - binormal);
-    vec3 prev_ray_pos_ul = prev_ray_position + tubeRadius * magnifier
-            * (-normal + binormal);
-    vec3 prev_ray_pos_lr = prev_ray_position + tubeRadius * magnifier
-            * ( normal - binormal);
-    vec3 prev_ray_pos_ur = prev_ray_position + tubeRadius * magnifier
-            * ( normal + binormal);
+    vec3 prev_ray_pos_ll = prev_ray_position + tubeRadius * magnifier * (-normal - binormal);
+    vec3 prev_ray_pos_ul = prev_ray_position + tubeRadius * magnifier * (-normal + binormal);
+    vec3 prev_ray_pos_lr = prev_ray_position + tubeRadius * magnifier * ( normal - binormal);
+    vec3 prev_ray_pos_ur = prev_ray_position + tubeRadius * magnifier * ( normal + binormal);
 
     Output.normalPS = gradient;
 
@@ -424,7 +413,7 @@ shader GSTube(in VStoGS Input[], out GStoFS Output)
 
 shader GSTubeShadow(in VStoGS Input[], out GStoFS Output)
 {
-    // Set value of all to zero.
+    // set value of all to zero
     Output.valuePS = 0;
 
     if (Input[1].value == -1 || Input[2].value == -1)
@@ -436,11 +425,11 @@ shader GSTubeShadow(in VStoGS Input[], out GStoFS Output)
 
     float value1, value2;
 
-    // The scalar values at points pos1 and pos2.
+    // the scalar values at points pos1 and pos2
     value1 = Input[1].value;
     value2 = Input[2].value;
 
-    // Determine the positions that have to be used.
+    // determine the positions that have to be used
     if (Input[0].value == -1 && Input[3].value == -1)
     {
         pos0 = pos1 = Input[1].worldSpaceCoordinate;
@@ -466,21 +455,21 @@ shader GSTubeShadow(in VStoGS Input[], out GStoFS Output)
         pos3 = Input[3].worldSpaceCoordinate;
     }
 
-    // We only need the normal parallel to the x/y plane.
+    // we only need the normal parallel to the x/y plane
     vec3 normalPrev, normalNext;
-    // Approximated tangent of pos1.
+    // approximated tangent of pos1
     const vec3 prevDir = normalize(pos2 - pos0);
-    // Approximated tangent of pos2.
+    // approximated tangent of pos2
     const vec3 nextDir = normalize(pos3 - pos1);
 
-    // Compute normals of tangents.
+    // compute normals of tangents
     normalPrev = cross(prevDir, vec3(0,0,1));
     normalNext = cross(nextDir, vec3(0,0,1));
 
-    // Set all normals of output to zero...
+    // set all normals of output to zero
     Output.normalPS = normalize(vec3(0,0,0));
 
-    // ...and calculate the boundaries of the projected quad in x/y plane.
+    // and calculate the boundaries of the projected quad in x/y plane
     Output.worldPos = pos1 - normalPrev * tubeRadius;
     gl_Position = mvpMatrix * vec4(Output.worldPos, 1);
     EmitVertex();
@@ -547,7 +536,7 @@ void getBlinnPhongColor(in vec3 worldPos, in vec3 normalDir,
 
     const vec3 n = normalize(normalDir);
     const vec3 v = normalize(cameraPosition - worldPos);
-    const vec3 l = normalize(-lightDirection); // special case
+    const vec3 l = normalize(-lightDirection); // specialCase
     const vec3 h = normalize(v + l);
 
     vec3 diffuse = kD * clamp(abs(dot(n,l)),0.0,1.0) * lightColor;
@@ -559,10 +548,7 @@ void getBlinnPhongColor(in vec3 worldPos, in vec3 normalDir,
 
 shader FSGeom(in GStoFS Input, out vec4 fragColor)
 {
-    if (Input.valuePS == -1)
-    {
-        discard;
-    }
+    if (Input.valuePS == -1) { discard; }
 
     vec3 color;
     float t = Input.valuePS;
@@ -637,8 +623,7 @@ program Line
 program Box
 {
     vs(420)=VSmain();
-    gs(420)=GSBox() : in(lines_adjacency), out(triangle_strip,
-                                               max_vertices = 128);
+    gs(420)=GSBox() : in(lines_adjacency), out(triangle_strip, max_vertices = 128);
     fs(420)=FSGeom();
 };
 
@@ -646,8 +631,7 @@ program Box
 program Tube
 {
     vs(420)=VSmain();
-    gs(420)=GSTube() : in(lines_adjacency), out(triangle_strip,
-                                                max_vertices = 128);
+    gs(420)=GSTube() : in(lines_adjacency), out(triangle_strip, max_vertices = 128);
     fs(420)=FSGeom();
 };
 
@@ -655,10 +639,10 @@ program Tube
 program TubeShadow
 {
     vs(420)=VSShadow();
-    gs(420)=GSTubeShadow() : in(lines_adjacency), out(triangle_strip,
-                                                      max_vertices = 128);
+    gs(420)=GSTubeShadow() : in(lines_adjacency), out(triangle_strip, max_vertices = 128);
     fs(420)=FSShadow();
 };
+
 
 program Trajectory
 {

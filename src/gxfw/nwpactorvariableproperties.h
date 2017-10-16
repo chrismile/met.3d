@@ -4,8 +4,7 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2017 Marc Rautenhaus
-**  Copyright 2017      Michael Kern
+**  Copyright 2015 Marc Rautenhaus
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -254,75 +253,6 @@ public:
 
 protected:
     QtProperty *probabilityRegionIsovalueProperty;
-};
-
-// tag2017 Werden diese Klassen noch benutzt oder sind sie Relikte?
-// Falls sie benutzt werden sollten, wäre eine saubere Implementierung noch
-// notwenig (z.B. load/saveConfig). -> Marc fragen.
-/**
-  Partial derivative filter.
- */
-class MPartialDerivativeProperties : public MRequestProperties
-{
-public:
-    MPartialDerivativeProperties(MNWPActorVariable *actorVar);
-    bool onQtPropertyChanged(QtProperty *property,
-                             bool *redrawWithoutDataRequest);
-    void addToRequest(MDataRequestHelper *rh);
-
-    void saveConfiguration(QSettings *settings);
-
-    void loadConfiguration(QSettings *settings);
-
-protected:
-    QStringList derivativeOptions;
-    QtProperty *partialDerivativeProperty;
-};
-
-
-class MMultiVarPartialDerivativeProperties : public MRequestProperties
-{
-public:
-    MMultiVarPartialDerivativeProperties(MNWPActorVariable *actorVar);
-    bool onQtPropertyChanged(QtProperty *property,
-                             bool *redrawWithoutDataRequest);
-    void addToRequest(MDataRequestHelper *rh);
-
-    void saveConfiguration(QSettings *settings);
-
-    void loadConfiguration(QSettings *settings);
-
-protected:
-    QStringList derivativeOptions;
-    QtProperty *partialDerivativeProperty;
-
-    QStringList compatibleVars;
-    QtProperty* compatibleVarsProperty;
-    QtProperty* sourceVarsProperty;
-    QtProperty* blurEnabledProperty;
-    QtProperty* blurKernelProperty;
-    QtProperty* blurSigmaProperty;
-    QtProperty* deltaNormalStepProperty;
-};
-
-
-class MProjectedVelocitiesProperties : public MRequestProperties
-{
-public:
-    MProjectedVelocitiesProperties(MNWPActorVariable *actorVar);
-    bool onQtPropertyChanged(QtProperty *property,
-                             bool *redrawWithoutDataRequest);
-    void addToRequest(MDataRequestHelper *rh);
-
-    void saveConfiguration(QSettings *settings);
-
-    void loadConfiguration(QSettings *settings);
-
-protected:
-    QStringList compatibleVars;
-    QtProperty* compatibleVarsProperty;
-    QtProperty* sdirectionXProperty;
-    QtProperty* sdirectionYProperty;
 };
 
 } // namespace Met3D

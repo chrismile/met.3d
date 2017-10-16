@@ -66,7 +66,6 @@ protected:
 
 };
 
-
 } // namespace Met3D
 
 #endif // FLOATPERTRAJECTORYSOURCE_H

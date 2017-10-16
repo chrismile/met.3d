@@ -220,7 +220,7 @@ MNWPHorizontalSectionActor::WindBarbsSettings::WindBarbsSettings(
                 "than the grid point spacing of the wind field.");
 
     automaticScalingEnabledProperty = a->addProperty(BOOL_PROPERTY, "automatic scaling",
-                                                     groupProperty);
+                                              groupProperty);
     properties->mBool()->setValue(automaticScalingEnabledProperty, automaticScalingEnabled);
 
     scalingGroupProperty = a->addProperty(GROUP_PROPERTY, "scaling",
@@ -345,24 +345,24 @@ void MNWPHorizontalSectionActor::loadConfiguration(QSettings *settings)
     if (variables.size() == 0
             && MSystemManagerAndControl::getInstance()->isConnectedToMetview())
     {
-        MSelectDataSourceDialog dialog(this->supportedLevelTypes());
-        bool ok = false;
+         MSelectDataSourceDialog dialog(this->supportedLevelTypes());
+         bool ok = false;
 
-        MSelectableDataSource dataSource =
-                dialog.checkIfSingleDataSourceWithSingleVariableIsPresent(&ok);
-        if (ok)
-        {
-            // Create new actor variable.
-            MNWP2DHorizontalActorVariable *var =
-                    static_cast<MNWP2DHorizontalActorVariable*>(
-                        createActorVariable(dataSource));
+         MSelectableDataSource dataSource =
+                 dialog.checkIfSingleDataSourceWithSingleVariableIsPresent(&ok);
+         if (ok)
+         {
+             // Create new actor variable.
+             MNWP2DHorizontalActorVariable *var =
+                     static_cast<MNWP2DHorizontalActorVariable*>(
+                         createActorVariable(dataSource));
 
-            // Add the variable to the actor.
-            addActorVariable(var, QString());
-            var->setTransferFunctionToFirstAvailable();
-            var->setRenderMode(
-                        MNWP2DSectionActorVariable::RenderMode::FilledContours);
-        }
+             // Add the variable to the actor.
+             addActorVariable(var, QString());
+             var->setTransferFunctionToFirstAvailable();
+             var->setRenderMode(
+                         MNWP2DSectionActorVariable::RenderMode::FilledContours);
+         }
     }
 
     settings->beginGroup(MNWPHorizontalSectionActor::getSettingsID());
@@ -626,7 +626,7 @@ void MNWPHorizontalSectionActor::dragEvent(
                     labelbbox, labelBBoxColour);
 
         double dist = computePositionLabelDistanceWeight(sceneView->getCamera(),
-                                                         mousePosWorldSpace);
+                                                 mousePosWorldSpace);
         QVector3D anchorOffset = dist * sceneView->getCamera()->getXAxis();
         positionLabel->anchorOffset = -anchorOffset;
     }
@@ -766,21 +766,21 @@ void MNWPHorizontalSectionActor::initializeActorResources()
     bool loadShaders = false;
 
     loadShaders |= glRM->generateEffectProgram("hsec_marchingsquares",
-                                               glMarchingSquaresShader);
+                                                glMarchingSquaresShader);
     loadShaders |= glRM->generateEffectProgram("hsec_filledcountours",
-                                               glFilledContoursShader);
+                                                glFilledContoursShader);
     loadShaders |= glRM->generateEffectProgram("hsec_texturedcountours",
-                                               glTexturedContoursShader);
+                                                glTexturedContoursShader);
     loadShaders |= glRM->generateEffectProgram("hsec_interpolation",
-                                               glVerticalInterpolationEffect);
+                                                glVerticalInterpolationEffect);
     loadShaders |= glRM->generateEffectProgram("hsec_pseudocolor",
-                                               glPseudoColourShader);
+                                                glPseudoColourShader);
     loadShaders |= glRM->generateEffectProgram("hsec_windbarbs",
-                                               glWindBarbsShader);
+                                                glWindBarbsShader);
     loadShaders |= glRM->generateEffectProgram("hsec_shadow",
-                                               glShadowQuad);
+                                                glShadowQuad);
     loadShaders |= glRM->generateEffectProgram("vsec_positionsphere",
-                                               positionSpheresShader);
+                                                positionSpheresShader);
 
     if (loadShaders) reloadShaderEffects();
 
@@ -1213,10 +1213,10 @@ void MNWPHorizontalSectionActor::renderToCurrentContext(MSceneViewGLWidget *scen
         if (selectedMouseHandle >= 0)
         {
             positionSpheresShader->setUniformValue(
-                        "constColour", QColor(Qt::red));
+                    "constColour", QColor(Qt::red));
 
             positionSpheresShader->setUniformValue(
-                        "radius", GLfloat(0.51));
+                    "radius", GLfloat(0.51));
         }
 
         vbMouseHandlePoints->attachToVertexAttribute(SHADER_VERTEX_ATTRIBUTE);
@@ -1311,21 +1311,21 @@ void MNWPHorizontalSectionActor::updateMouseHandlePositions()
     }
 
     mouseHandlePoints.append(
-                QVector3D(bBoxConnection->westLon(),
-                          bBoxConnection->southLat(),
-                          slicePosition_hPa));
+            QVector3D(bBoxConnection->westLon(),
+                      bBoxConnection->southLat(),
+                      slicePosition_hPa));
     mouseHandlePoints.append(
-                QVector3D(bBoxConnection->eastLon(),
-                          bBoxConnection->southLat(),
-                          slicePosition_hPa));
+            QVector3D(bBoxConnection->eastLon(),
+                      bBoxConnection->southLat(),
+                      slicePosition_hPa));
     mouseHandlePoints.append(
-                QVector3D(bBoxConnection->eastLon(),
-                          bBoxConnection->northLat(),
-                          slicePosition_hPa));
+            QVector3D(bBoxConnection->eastLon(),
+                      bBoxConnection->northLat(),
+                      slicePosition_hPa));
     mouseHandlePoints.append(
-                QVector3D(bBoxConnection->westLon(),
-                          bBoxConnection->northLat(),
-                          slicePosition_hPa));
+            QVector3D(bBoxConnection->westLon(),
+                      bBoxConnection->northLat(),
+                      slicePosition_hPa));
 
     // Send vertices of drag handle positions to video memory.
     if (!vbMouseHandlePoints)
@@ -1973,17 +1973,17 @@ void MNWPHorizontalSectionActor::renderTexturedContours(
                                       slicePosition_hPa))); CHECK_GL_ERROR;
 
     glTexturedContoursShader->setUniformValue("alphaBlendingMode",
-                                              GLenum(var->spatialTransferFunction
-                                                     ->getAlphaBlendingMode()));
+                                     GLenum(var->spatialTransferFunction
+                                           ->getAlphaBlendingMode()));
     glTexturedContoursShader->setUniformValue("invertAlpha",
-                                              GLboolean(var->spatialTransferFunction
-                                                        ->getInvertAlpha()));
+                                     GLboolean(var->spatialTransferFunction
+                                               ->getInvertAlpha()));
     glTexturedContoursShader->setUniformValue("useConstantColour",
-                                              GLboolean(var->spatialTransferFunction
-                                                        ->getUseConstantColour()));
+                                     GLboolean(var->spatialTransferFunction
+                                               ->getUseConstantColour()));
     glTexturedContoursShader->setUniformValue("constantColour",
-                                              var->spatialTransferFunction
-                                              ->getConstantColour());
+                                     var->spatialTransferFunction
+                                     ->getConstantColour());
 
     glTexturedContoursShader->setUniformValue(
                 "height", GLfloat(bBoxConnection->northSouthExtent())); CHECK_GL_ERROR;
@@ -2058,14 +2058,14 @@ void MNWPHorizontalSectionActor::renderWindBarbs(MSceneViewGLWidget *sceneView)
     if (varWindV->grid->getLevelType() != varWindU->grid->getLevelType())
     {
         LOG4CPLUS_WARN(mlog, "WARNING: Wind barbs u and v variables must have "
-                             "the same vertical level type. Disabling wind barbs.");
+                       "the same vertical level type. Disabling wind barbs.");
         return;
     }
 
     if (varWindV->grid->getLevelType() == SURFACE_2D)
     {
         LOG4CPLUS_WARN(mlog, "WARNING: Wind barbs have not been implemented for "
-                             "2D surface fields. Disabling wind barbs.");
+                       "2D surface fields. Disabling wind barbs.");
         return;
     }
 
@@ -2151,14 +2151,14 @@ void MNWPHorizontalSectionActor::renderWindBarbs(MSceneViewGLWidget *sceneView)
                 "cameraPosition", cameraPos); CHECK_GL_ERROR;
 
     QVector2D dataSECrnr(varWindU->grid->lons[varWindU->grid->nlons - 1],
-            varWindU->grid->lats[varWindU->grid->nlats - 1]);
+                         varWindU->grid->lats[varWindU->grid->nlats - 1]);
     glWindBarbsShader->setUniformValue(
-                "dataSECrnr", dataSECrnr); CHECK_GL_ERROR;
+                        "dataSECrnr", dataSECrnr); CHECK_GL_ERROR;
 
     QVector2D dataNWCrnr(varWindU->grid->lons[0],
-            varWindU->grid->lats[0]);
+                         varWindU->grid->lats[0]);
     glWindBarbsShader->setUniformValue(
-                "dataNWCrnr", dataNWCrnr); CHECK_GL_ERROR;
+                        "dataNWCrnr", dataNWCrnr); CHECK_GL_ERROR;
 
     // Texture bindings for Lat/Lon axes (1D textures).
     varWindU->textureLonLatLevAxes->bindToTextureUnit(

@@ -64,10 +64,10 @@ MNWPSurfaceTopographyActor::MNWPSurfaceTopographyActor()
     setName(getActorType());
 
     topographyVariableIndexProp = addProperty(ENUM_PROPERTY, "topography variable",
-                                              actorPropertiesSupGroup);
+                                            actorPropertiesSupGroup);
 
     shadingVariableIndexProp = addProperty(ENUM_PROPERTY, "shading variable",
-                                           actorPropertiesSupGroup);
+                                    actorPropertiesSupGroup);
 
     endInitialiseQtProperties();
 }
@@ -156,8 +156,8 @@ void MNWPSurfaceTopographyActor::onQtPropertyChanged(QtProperty* property)
     // Parent signal processing.
     MNWPMultiVarActor::onQtPropertyChanged(property);
 
-    if (property == topographyVariableIndexProp
-            || property == shadingVariableIndexProp)
+    if (property == topographyVariableIndexProp ||
+        property == shadingVariableIndexProp)
     {
         topographyVariableIndex = properties->mEnum()->value(
                     topographyVariableIndexProp);

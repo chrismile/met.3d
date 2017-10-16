@@ -6,7 +6,6 @@
 **
 **  Copyright 2015-2017 Marc Rautenhaus
 **  Copyright 2017      Bianca Tost
-**  Copyright 2017      Michael Kern
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -92,8 +91,7 @@ MSelectDataSourceDialog::MSelectDataSourceDialog(
 
 
 MSelectDataSourceDialog::MSelectDataSourceDialog(
-        const QList<MVerticalLevelType>& supportedList,
-        QWidget *parent)
+        const QList<MVerticalLevelType>& supportList, QWidget *parent)
     : QDialog(parent),
       ui(new Ui::MSelectDataSourceDialog),
       variableAvailable(false),
@@ -103,7 +101,7 @@ MSelectDataSourceDialog::MSelectDataSourceDialog(
 
     ui->label->setText("Please select a variable and confirm with \"OK\":");
 
-    createDataSourceEntries(supportedList);
+    createDataSourceEntries(supportList);
 }
 
 
@@ -317,7 +315,7 @@ int MSelectDataSourceDialog::exec()
 *******************************************************************************/
 
 void MSelectDataSourceDialog::createDataSourceEntries(
-        const QList<MVerticalLevelType> supportedTypes)
+        QList<MVerticalLevelType> supportedTypes)
 {
     // Set the data field table's header.
     QTableWidget *table = ui->dataFieldTable;
@@ -351,7 +349,7 @@ void MSelectDataSourceDialog::createDataSourceEntries(
             MVerticalLevelType lvl = levelTypes.at(ilvl);
 
             // do not list data sources of not supported level types
-            if (!supportedTypes.contains(lvl)) { continue; }
+            if (!supportedTypes.contains(lvl)) continue;
 
             // .. and all variables for the current level type ..
             QStringList variables = source->availableVariables(lvl);

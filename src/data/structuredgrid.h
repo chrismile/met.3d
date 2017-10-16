@@ -330,6 +330,8 @@ public:
 
     bool gridIsCyclicInLongitude();
 
+    void applyBlur(const double sigma, unsigned int kernelSize);
+
     /**
       Allows a number of texture parameters to be modified. Call this function
       before you call @ref getTexture().

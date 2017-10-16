@@ -89,8 +89,7 @@ public:
      */
     void synchronizeWith(MSyncControl *sync, bool updateGUIProperties=true);
 
-    bool synchronizationEvent(MSynchronizationType syncType,
-                              QVector<QVariant> data);
+    bool synchronizationEvent(MSynchronizationType syncType, QVector<QVariant> data);
 
     /**
       Updates colour hints for synchronization (green property background
@@ -345,7 +344,7 @@ private:
     std::shared_ptr<GL::MShaderEffect> positionSphereShadowShader;
 
     QtProperty *transferFunctionProperty;
-    /** Pointer to transfer function object and corresponding texture unit. */
+    /** Pointer to transfer function object and cooresponding texture unit. */
     MTransferFunction1D *transferFunction;
     int                 textureUnitTransferFunction;
 

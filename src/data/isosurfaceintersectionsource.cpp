@@ -48,7 +48,6 @@ namespace Met3D
 
 MIsosurfaceIntersectionSource::MIsosurfaceIntersectionSource() :
         inputSources({nullptr, nullptr}),
-        //inputSourceB(nullptr),
         currentSegmentFace(-1),
         nextCellInScanLoop(0)
 {
@@ -109,7 +108,6 @@ MIsosurfaceIntersectionSource::produceData(MDataRequest request)
     QStringList members = rh.value("MEMBERS").split("/");
     rh.remove("MEMBERS");
     rh.remove("ENS_OPERATION");
-    //rh.insert("LINES","");
 
     QStringList bboxList = rh.value("ISOX_BOUNDING_BOX").split("/");
     const float llcrnlon = bboxList[0].toFloat();
@@ -141,7 +139,6 @@ MIsosurfaceIntersectionSource::produceData(MDataRequest request)
         MStructuredGrid *gridB = inputSources[1]->getData(rhLocal.request());
 
         float dx = std::abs(gridA->getLons()[0] - gridA->getLons()[1]);
-        //float dy = std::abs(gridA->getLats()[0] - gridA->getLats()[1]);
 
         if (linesStored == nullptr)
         {
@@ -180,7 +177,7 @@ MIsosurfaceIntersectionSource::produceData(MDataRequest request)
 
         for (int lc = 0; lc < lines->size(); lc++)
         {
-            // this is the filter to remove small lines < threshold
+            // This is the filter to remove small lines < threshold .
             if (lines->at(lc)->size() <= lowerLineThreshold)
             {
                 continue;
@@ -202,8 +199,6 @@ MIsosurfaceIntersectionSource::produceData(MDataRequest request)
                 {
                     float mixI0 = MMOD(llcrnlon - gridA->lons[0], 360.) / dx;
                     float mixI = MMOD(point.x() - gridA->lons[0], 360.) / dx;
-                    //int i0 = int(ceil(mixI0));
-                    //int i = int(mixI);
 
                     float iprime = MMOD(mixI - mixI0, gridA->nlons);
                     point.setX(llcrnlon + iprime * dx);

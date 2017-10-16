@@ -34,6 +34,7 @@
 
 // local application imports
 #include "gxfw/memberselectiondialog.h"
+#include "mainwindow.h"
 
 
 using namespace std;
@@ -470,15 +471,36 @@ void MIsosurfaceIntersectionActor::loadConfiguration(QSettings *settings)
                                    appearanceSettings->tubeColor);
 
     QString tfName = settings->value("transferFunction", "None").toString();
-    if (!setTransferFunction(tfName))
+    while (!setTransferFunction(tfName))
     {
         QMessageBox msgBox;
         msgBox.setIcon(QMessageBox::Warning);
-        msgBox.setText(QString("Trajectory actor '%1':\n"
-                               "Transfer function '%2' does not exist.\n"
-                               "Setting transfer function to 'None'.")
+        msgBox.setWindowTitle(getName());
+        msgBox.setText(QString("Actor '%1' requires a transfer function "
+                               "'%2' that does not exist.\n"
+                               "Would you like to load the transfer function "
+                               "from file?")
                        .arg(getName()).arg(tfName));
+        msgBox.setStandardButtons(QMessageBox::Yes | QMessageBox::No);
+        msgBox.button(QMessageBox::Yes)->setText("Load transfer function");
+        msgBox.button(QMessageBox::No)->setText("Discard dependency");
         msgBox.exec();
+        if (msgBox.clickedButton() == msgBox.button(QMessageBox::Yes))
+        {
+            MSystemManagerAndControl *sysMC =
+                    MSystemManagerAndControl::getInstance();
+            // Create default actor to get name of actor factory.
+            MTransferFunction1D *defaultActor = new MTransferFunction1D();
+            sysMC->getMainWindow()->getSceneManagementDialog()
+                    ->loadRequiredActorFromFile(defaultActor->getName(),
+                                                tfName,
+                                                settings->fileName());
+            delete defaultActor;
+        }
+        else
+        {
+            break;
+        }
     }
 
     appearanceSettings->thicknessMode = settings->value(
@@ -559,13 +581,15 @@ void MIsosurfaceIntersectionActor::loadConfiguration(QSettings *settings)
     poleActor->loadConfiguration(settings);
 
     if (isInitialized())
-    { generateVolumeBoxGeometry(); }
+    {
+        generateVolumeBoxGeometry();
+    }
 
     supressActorUpdates = false;
 
     settings->endGroup();
 
-    emit emitActorChangedSignal();
+    emitActorChangedSignal();
 }
 
 
@@ -614,7 +638,7 @@ void MIsosurfaceIntersectionActor::setDataSource(
 
 void MIsosurfaceIntersectionActor::onPoleActorChanged()
 {
-    emit actorChanged();
+    emitActorChangedSignal();
 }
 
 
@@ -651,17 +675,15 @@ void MIsosurfaceIntersectionActor::onActorDeleted(MActor *actor)
     {
         enableEmissionOfActorChangedSignal(false);
 
-        int index = properties->mEnum()->value(
+        QString tfName = properties->getEnumItem(
                     appearanceSettings->transferFunctionProperty);
         QStringList availableTFs = properties->mEnum()->enumNames(
                     appearanceSettings->transferFunctionProperty);
 
-        // If the deleted transfer function is currently connected to this
-        // variable, set current transfer function to "None" (index 0).
-        if (availableTFs.at(index) == tf->getName())
-        {
-            index = 0;
-        }
+        // Get the current index of the transfer function selected. If the
+        // transfer function is the one to be deleted, the selection is set to
+        // 'None'.
+        int index = availableTFs.indexOf(tfName);
 
         availableTFs.removeOne(tf->getName());
         properties->mEnum()->setEnumNames(
@@ -706,7 +728,10 @@ void MIsosurfaceIntersectionActor::onActorRenamed(MActor *actor,
 
 void MIsosurfaceIntersectionActor::onQtPropertyChanged(QtProperty *property)
 {
-    if (supressActorUpdates) return;
+    if (supressActorUpdates)
+    {
+        return;
+    }
     // Parent signal processing.
     MNWPMultiVarActor::onQtPropertyChanged(property);
 
@@ -1559,7 +1584,7 @@ void MIsosurfaceIntersectionActor::initializeActorResources()
         reloadShaderEffects();
     }
 
-    // create vertex shader of bounding box
+    // Create vertex shader of bounding box.
     generateVolumeBoxGeometry();
 
     varTrajectoryFilter = std::make_shared<MVariableTrajectoryFilter>();
@@ -1641,7 +1666,7 @@ void MIsosurfaceIntersectionActor::generateVolumeBoxGeometry()
         5, 7, 4
     };
 
-    // convert vertices to lat/lon/p space
+    // Convert vertices to lat/lon/p space.
     for (int i = 0; i < numVertices; i++)
     {
         vertexData[i * 3 + 0] =
@@ -2100,10 +2125,10 @@ void MIsosurfaceIntersectionActor::renderToCurrentContext(
 
     if (appearanceSettings->polesEnabled)
     {
-        // Render all placed poles
+        // Render all placed poles.
         poleActor->render(sceneView);
 
-        // And render the labels of all poles
+        // And render the labels of all poles.
         MTextManager *tm = MGLResourcesManager::getInstance()->getTextManager();
         tm->renderLabelList(sceneView, poleActor->getLabelsToRender());
     }

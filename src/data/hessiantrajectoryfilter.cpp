@@ -88,9 +88,6 @@ MTrajectoryEnsembleSelection* MHessianTrajectoryFilter::produceData(
 
     MDataRequestHelper rh(request);
 
-//    QString initTime = rh.value("INIT_TIME");
-//    QString validTime = rh.value("VALID_TIME");
-
     double lambdaThreshold = rh.value("HESSIANFILTER_VALUE").toDouble();
     const QStringList members = rh.value("HESSIANFILTER_MEMBERS").split("/");
 
@@ -118,7 +115,6 @@ MTrajectoryEnsembleSelection* MHessianTrajectoryFilter::produceData(
     // member.
     for (uint ee = 0; ee < static_cast<uint>(members.size()); ++ee)
     {
-//        const QString member = members[ee];
         // Obtain the start and end line index for the current member.
         const int ensStartIndex = ensStartIndices[ee];
         const int ensIndexCount = ensIndexCounts[ee];

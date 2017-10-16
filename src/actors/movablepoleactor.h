@@ -44,7 +44,7 @@ class MGLResourcesManager;
 
 namespace Met3D
 {
-class MSceneViewGLWidget;
+	class MSceneViewGLWidget;
 
 class MovablePole
 {

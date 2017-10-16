@@ -86,10 +86,10 @@ public:
       i_filtered in the @ref MTrajectories vertex field (@see
       MTrajectories::getVertices()).
 
-      @note Index i_filtered is not equal to trajectory i_full in the "full",
-      unfiltered field of trajectories returned by @ref
-      MTrajectories::getVertices(). Use i_full =
-      ceil(float(startIndex)/numTimes) to get this index.
+     @note Index i_filtered is not equal to trajectory i_full in the "full",
+     unfiltered field of trajectories returned by @ref
+     MTrajectories::getVertices(). Use i_full =
+     ceil(float(startIndex)/numTimes) to get this index.
      */
     inline const GLint* getStartIndices() const { return startIndices; }
 
@@ -119,7 +119,7 @@ protected:
     QVector<QDateTime> times;
 
     QVector3D startGridStride; // this is 1 for each coordinate unless
-    // trajectories have been thinned out
+                               // trajectories have been thinned out
 };
 
 /**
@@ -329,18 +329,17 @@ public:
      */
     void setStartGrid(std::shared_ptr<MStructuredGrid> sg) { startGrid = sg; }
 
-    const std::shared_ptr<MStructuredGrid> getStartGrid() const
-    { return startGrid; }
+    const std::shared_ptr<MStructuredGrid> getStartGrid() const { return startGrid; }
 
     /**
       Return a vertex buffer object that contains the trajectory data. The
       vertex buffer is created (and data uploaded) on the first call to this
       method.
 
-      The @p currentGLContext argument is necessary as a GPU upload can
-      switch the currently active OpenGL context. As this method is usually
-      called from a render method, it should switch back to the current
-      render context (given by @p currentGLContext).
+      The @p currentGLContext argument is necessary as a GPU upload can switch
+      the currently active OpenGL context. As this method is usually called
+      from a render method, it should switch back to the current render context
+      (given by @p currentGLContext).
      */
     GL::MVertexBuffer *getVertexBuffer(QGLWidget *currentGLContext = 0);
 

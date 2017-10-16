@@ -70,10 +70,11 @@ MJetcoreDetectionActor::MJetcoreDetectionActor()
     endInitialiseQtProperties();
 }
 
+
 MJetcoreDetectionActor::~MJetcoreDetectionActor()
 {
-
 }
+
 
 /******************************************************************************
 ***                        SETTINGS CONSTRUCTORS                            ***
@@ -95,6 +96,7 @@ MJetcoreDetectionActor::VariableSettingsJetcores::VariableSettingsJetcores(
 
     properties->mBool()->setValue(geoPotOnlyProperty, geoPotOnly);
 }
+
 
 MJetcoreDetectionActor::FilterSettingsJetcores::FilterSettingsJetcores(
         MJetcoreDetectionActor *hostActor, QtProperty *groupProp)
@@ -208,10 +210,12 @@ void MJetcoreDetectionActor::loadConfiguration(QSettings *settings)
 ***                               PUBLIC SLOTS                              ***
 *******************************************************************************/
 
-
 void MJetcoreDetectionActor::onQtPropertyChanged(QtProperty *property)
 {
-    if (supressActorUpdates) return;
+    if (supressActorUpdates)
+    {
+        return;
+    }
 
     MIsosurfaceIntersectionActor::onQtPropertyChanged(property);
 
@@ -257,7 +261,6 @@ void MJetcoreDetectionActor::onQtPropertyChanged(QtProperty *property)
 /******************************************************************************
 ***                            PROTECTED METHODS                            ***
 *******************************************************************************/
-
 
 void MJetcoreDetectionActor::initializeActorResources()
 {
@@ -561,9 +564,13 @@ void MJetcoreDetectionActor::buildFilterChain(MDataRequestHelper &rh)
     arrowHeadsSource->setInputSourceUVar(var1st->dataSource);
     arrowHeadsSource->setInputSourceVVar(var2nd->dataSource);
     if (varMapped)
-    { arrowHeadsSource->setInputSourceVar(varMapped->dataSource); }
+    {
+        arrowHeadsSource->setInputSourceVar(varMapped->dataSource);
+    }
     else
-    { arrowHeadsSource->setInputSourceVar(nullptr); }
+    {
+        arrowHeadsSource->setInputSourceVar(nullptr);
+    }
 
     rh.insert("ARROWHEADS_MEMBERS", rh.value("MEMBERS"));
     rh.insert("ARROWHEADS_UV_VARIABLES", var1st->variableName + "/"
@@ -642,14 +649,12 @@ void MJetcoreDetectionActor::renderToDepthMap(MSceneViewGLWidget *sceneView)
 
         lineTubeShader->setUniformValue("tubeRadius",
                                         appearanceSettings->tubeRadius);
-        //appearanceSettings->arrowRadius);
         lineTubeShader->setUniformValue("geometryColor",
                                         appearanceSettings->tubeColor);
         CHECK_GL_ERROR;
         lineTubeShader->setUniformValue("colorMode",
                                         appearanceSettings->colorMode);
         CHECK_GL_ERROR;
-
 
         if (appearanceSettings->colorVariableIndex > 0 &&
                 appearanceSettings->transferFunction != 0)
@@ -668,7 +673,6 @@ void MJetcoreDetectionActor::renderToDepthMap(MSceneViewGLWidget *sceneView)
                         appearanceSettings->transferFunction->getMaximumValue());
             lineTubeShader->setUniformValue("normalized", false);
         }
-
 
         lineTubeShader->setUniformValue("thicknessRange",
                                         tubeThicknessSettings->thicknessRange);
@@ -717,6 +721,7 @@ void MJetcoreDetectionActor::renderToDepthMap(MSceneViewGLWidget *sceneView)
     }
 }
 
+
 void MJetcoreDetectionActor::renderToCurrentContext(
         MSceneViewGLWidget *sceneView)
 {
@@ -724,6 +729,7 @@ void MJetcoreDetectionActor::renderToCurrentContext(
     {
         return;
     }
+
     MIsosurfaceIntersectionActor::renderToCurrentContext(sceneView);
 
     // Draw the arrow heads at the end of each jet core line.
@@ -843,6 +849,7 @@ void MJetcoreDetectionActor::refreshEnumsProperties(MNWPActorVariable *var)
 
     enableActorUpdates(true);
 }
+
 
 /******************************************************************************
 ***                           PRIVATE METHODS                               ***

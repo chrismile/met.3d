@@ -9,7 +9,6 @@ qrc_*
 .gitignore~
 Makefile
 met3D
-config
 config/*.cfg
 config/*.actor.conf
 config/*.camera.conf

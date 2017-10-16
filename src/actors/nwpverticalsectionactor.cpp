@@ -85,7 +85,7 @@ MNWPVerticalSectionActor::MNWPVerticalSectionActor()
 
 
     labelDistanceProperty = addProperty(INT_PROPERTY, "distance (in tick marks)",
-                                        labelPropertiesSupGroup);
+                                         labelPropertiesSupGroup);
     properties->mInt()->setValue(labelDistanceProperty, labelDistance);
     properties->mInt()->setMinimum(labelDistanceProperty, 0);
     labelDistanceProperty->setToolTip("Depends on order in pressure levels list.");
@@ -99,11 +99,11 @@ MNWPVerticalSectionActor::MNWPVerticalSectionActor()
     actorPropertiesSupGroup->addSubProperty(bBoxConnection->getProperty());
 
     QString defaultPressureLineLevel = QString("1000.,900.,800.,700.,600.,500.")
-            + QString(",400.,300.,200.,100.,90.,80.")
-            + QString(",70.,60.,50.,40.,30.,20.");
+                                       + QString(",400.,300.,200.,100.,90.,80.")
+                                       + QString(",70.,60.,50.,40.,30.,20.");
 
     pressureLineLevelsProperty = addProperty(STRING_PROPERTY, "pressure levels",
-                                             actorPropertiesSupGroup);
+                                                actorPropertiesSupGroup);
     properties->mString()->setValue(pressureLineLevelsProperty,
                                     defaultPressureLineLevel);
     parseIsoPressureLevelString(defaultPressureLineLevel);
@@ -207,8 +207,8 @@ void MNWPVerticalSectionActor::loadConfiguration(QSettings *settings)
     MBoundingBoxInterface::loadConfiguration(settings);
 
     QString defaultPressureLineLevel = QString("1000.,900.,800.,700.,600.,500.")
-            + QString(",400.,300.,200.,100.,90.,80.")
-            + QString(",70.,60.,50.,40.,30.,20.");
+                                       + QString(",400.,300.,200.,100.,90.,80.")
+                                       + QString(",70.,60.,50.,40.,30.,20.");
     const QString pressureLevels =
             settings->value("pressureLevels",
                             defaultPressureLineLevel).toString();
@@ -258,11 +258,11 @@ int MNWPVerticalSectionActor::checkIntersectionWithHandle(
         // Transform the waypoint coordinates to clip space. As only lat/lon
         // of the waypoint is stored, assume a worldZ = 0.
         QVector3D wpPositionBottom = QVector3D(
-                    waypointsModel->positionLonLatIncludingMidpoints(i),
-                    sceneView->worldZfromPressure(p_bot_hPa));
+                waypointsModel->positionLonLatIncludingMidpoints(i),
+                sceneView->worldZfromPressure(p_bot_hPa));
         QVector3D wpPositionTop = QVector3D(
-                    waypointsModel->positionLonLatIncludingMidpoints(i),
-                    sceneView->worldZfromPressure(p_top_hPa));
+                waypointsModel->positionLonLatIncludingMidpoints(i),
+                sceneView->worldZfromPressure(p_top_hPa));
 
         // Obtain the camera position and the view direction
         const QVector3D& cameraPos = sceneView->getCamera()->getOrigin();
@@ -387,7 +387,7 @@ void MNWPVerticalSectionActor::addPositionLabel(MSceneViewGLWidget *sceneView,
 
 
 void MNWPVerticalSectionActor::dragEvent(MSceneViewGLWidget *sceneView,
-                                         int handleID, float clipX, float clipY)
+                                    int handleID, float clipX, float clipY)
 {
     // http://stackoverflow.com/questions/2093096/implementing-ray-picking
 
@@ -626,7 +626,7 @@ void MNWPVerticalSectionActor::onQtPropertyChanged(QtProperty *property)
     }
 
     else if (property == waypointsModelProperty)
-    {
+    {        
         if (suppressActorUpdates()) return;
 
         QString wpID = properties->getEnumItem(waypointsModelProperty);
@@ -699,14 +699,10 @@ void MNWPVerticalSectionActor::generatePathFromWaypoints(
     float gridLonStart = v0->grid->lons[0]; // lon and lat of the grid at
     float gridLatStart = v0->grid->lats[0]; // index 0/0.
 
-    float gridLonMin   = min(v0->grid->lons[0],
-            v0->grid->lons[v0->grid->nlons - 1]);
-    float gridLonMax   = max(v0->grid->lons[0],
-            v0->grid->lons[v0->grid->nlons - 1]);
-    float gridLatMin   = min(v0->grid->lats[0],
-            v0->grid->lats[v0->grid->nlats - 1]);
-    float gridLatMax   = max(v0->grid->lats[0],
-            v0->grid->lats[v0->grid->nlats - 1]);
+    float gridLonMin   = min(v0->grid->lons[0], v0->grid->lons[v0->grid->nlons-1]);
+    float gridLonMax   = max(v0->grid->lons[0], v0->grid->lons[v0->grid->nlons-1]);
+    float gridLatMin   = min(v0->grid->lats[0], v0->grid->lats[v0->grid->nlats-1]);
+    float gridLatMax   = max(v0->grid->lats[0], v0->grid->lats[v0->grid->nlats-1]);
 
     // If the grid is cyclic in longitude (e.g. hemispheric grids), adjust
     // gridLonMax to avoid a gap at the grid boundary (cf. notes 16Apr2012).
@@ -758,10 +754,10 @@ void MNWPVerticalSectionActor::generatePathFromWaypoints(
     {
         // Add intermediate points between p1=wp[i] and p2=wp[i+1].
 
-        QVector2D p1 = waypointsModel->positionLonLat(  i  );
-        QVector2D p2 = waypointsModel->positionLonLat(i + 1);
+        QVector2D p1 = waypointsModel->positionLonLat(i  );
+        QVector2D p2 = waypointsModel->positionLonLat(i+1);
 
-        float lengthOfSegment = (p2 - p1).length();
+        float lengthOfSegment = (p2-p1).length();
         int   numPoints = int(round(lengthOfSegment / deltaS));
         float deltaLon = (p2.x()-p1.x()) / numPoints;
         float deltaLat = (p2.y()-p1.y()) / numPoints;
@@ -770,8 +766,7 @@ void MNWPVerticalSectionActor::generatePathFromWaypoints(
         for (int n = 1; n < numPoints; n++)
         {
             // !! See above comments for the intial point!
-            QVector4D p = QVector4D(p1.x()+n * deltaLon, p1.y() + n * deltaLat,
-                                    0, 0);
+            QVector4D p = QVector4D(p1.x()+n*deltaLon, p1.y()+n*deltaLat, 0, 0);
             float px = p.x();
             if (px < gridLonMin) px += 360.; // see above
             if (px > gridLonMax) px -= 360.;
@@ -846,8 +841,8 @@ void MNWPVerticalSectionActor::generatePathFromWaypoints(
         delete textureVerticalSectionPath;
     }
     textureVerticalSectionPath = new GL::MTexture(QString("vpath_%1").arg(myID),
-                                                  GL_TEXTURE_1D, GL_ALPHA32F_ARB,
-                                                  4 * path.size());
+                                                 GL_TEXTURE_1D, GL_ALPHA32F_ARB,
+                                                 4 * path.size());
     textureVerticalSectionPath->bindToTextureUnit(textureUnitVerticalSectionPath);
 
     // Set texture parameters: wrap mode and filtering.
@@ -957,15 +952,15 @@ void MNWPVerticalSectionActor::initializeActorResources()
     bool loadShaders = false;
 
     loadShaders |= glRM->generateEffectProgram("vsec_sectiongrid",
-                                               sectionGridShader);
+                                                sectionGridShader);
     loadShaders |= glRM->generateEffectProgram("vsec_marchingsquares",
-                                               marchingSquaresShader);
+                                                marchingSquaresShader);
     loadShaders |= glRM->generateEffectProgram("vsec_pressurelines",
-                                               pressureLinesShader);
+                                                pressureLinesShader);
     loadShaders |= glRM->generateEffectProgram("vsec_simplegeometry",
-                                               simpleGeometryShader);
+                                                simpleGeometryShader);
     loadShaders |= glRM->generateEffectProgram("vsec_positionsphere",
-                                               positionSpheresShader);
+                                                positionSpheresShader);
 
     if (loadShaders) reloadShaderEffects();
 }
@@ -1449,8 +1444,8 @@ void MNWPVerticalSectionActor::generateIsoPressureLines()
 
 //TODO: Register this texture with the glRM memory management?
     texturePressureLevels = new GL::MTexture(QString("prlevs_%1").arg(myID),
-                                             GL_TEXTURE_1D, GL_ALPHA32F_ARB,
-                                             pressureLineLevels.size());
+                                            GL_TEXTURE_1D, GL_ALPHA32F_ARB,
+                                            pressureLineLevels.size());
     texturePressureLevels->bindToLastTextureUnit();
 
     // Set texture parameters: wrap mode and filtering.

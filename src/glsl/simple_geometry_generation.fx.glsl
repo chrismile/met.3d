@@ -385,8 +385,7 @@ void generateTubeEnd(in TubeGeometryInfo end, in float endOffset,
         cosi = cos(angle);
         sini = sin(angle);
 
-        worldPos =
-                end.pos + (cosi * end.normal + sini * end.binormal) * end.radius;
+        worldPos = end.pos + (cosi * end.normal + sini * end.binormal) * end.radius;
 
         tubeValues[cc] = end.value;
         tubeNormals[cc] = normalize(worldPos - end.pos);
@@ -398,8 +397,7 @@ void generateTubeEnd(in TubeGeometryInfo end, in float endOffset,
 
 // -----------------------------------------------------------------------------
 
-shader GSTrajectoryTube(in VStoGSTrajectory Input[],
-                        out GStoFSTrajectory Output)
+shader GSTrajectoryTube(in VStoGSTrajectory Input[], out GStoFSTrajectory Output)
 {
 
     Output.value = 0;
@@ -483,9 +481,8 @@ shader GSTrajectoryTube(in VStoGSTrajectory Input[],
         endInfo = TubeGeometryInfo(pos1, normalPrev, binormalPrev,
                     startTangent, tubeRadii.x, value1);
 
-        // Generate the ends of each tube.
-        generateTubeEnd(endInfo, TUBE_END_OFFSET, tubeWorldsEnd, tubeNormalsEnd,
-                        tubeValuesEnd);
+        // Generate the ends of each tube
+        generateTubeEnd(endInfo, TUBE_END_OFFSET, tubeWorldsEnd, tubeNormalsEnd, tubeValuesEnd);
         Output.value = endInfo.value;
 
         for (int t = 0; t < numVerticesEnd; ++t)
@@ -505,9 +502,8 @@ shader GSTrajectoryTube(in VStoGSTrajectory Input[],
         endInfo = TubeGeometryInfo(pos2, normalNext, binormalNext,
                     endTangent, tubeRadii.y, value2);
 
-        // Generate the ends of each tube.
-        generateTubeEnd(endInfo, TUBE_END_OFFSET, tubeWorldsEnd, tubeNormalsEnd,
-                        tubeValuesEnd);
+        // Generate the ends of each tube
+        generateTubeEnd(endInfo, TUBE_END_OFFSET, tubeWorldsEnd, tubeNormalsEnd, tubeValuesEnd);
         Output.value = endInfo.value;
 
         for (int t = 0; t < numVerticesEnd; ++t)
@@ -523,8 +519,7 @@ shader GSTrajectoryTube(in VStoGSTrajectory Input[],
 
 // -----------------------------------------------------------------------------
 
-shader GSTrajectoryTubeShadow(in VStoGSTrajectory Input[],
-                              out GStoFSTrajectory Output)
+shader GSTrajectoryTubeShadow(in VStoGSTrajectory Input[], out GStoFSTrajectory Output)
 {
     // set value of all to zero
     Output.value = 0;
@@ -636,7 +631,7 @@ shader GSSimpleTube(in VStoGSWorld Input[], out GStoFSSimple Output)
     TubeGeometryInfo endInfo = TubeGeometryInfo(prevPos, normal, binormal,
                                                 tangent, tubeRadius, 0);
 
-    // Generate the ends of each tube.
+    // Generate the ends of each tube
     generateTubeEnd(endInfo, endSegmentOffset, tubeWorldsEnd,
                     tubeNormalsEnd, tubeValuesEnd);
 
@@ -652,7 +647,7 @@ shader GSSimpleTube(in VStoGSWorld Input[], out GStoFSSimple Output)
     endInfo.pos = nextPos;
     endInfo.tangent = tangent;
 
-    // Generate the ends of each tube.
+    // Generate the ends of each tube
     generateTubeEnd(endInfo, endSegmentOffset, tubeWorldsEnd,
                     tubeNormalsEnd, tubeValuesEnd);
 
@@ -922,14 +917,14 @@ shader FSJetcores(in GStoFSTrajectory Input, out vec4 fragColor)
 
     switch (colorMode)
     {
-        // Default tube color mode.
+        // Default tube color mode
         case 0:
             ambientColor = geometryColor;
             break;
 
         // Pressure height color mode.
         case 1:
-        // Variable color mode.
+        // Variable color mode
         case 2:
             ambientColor = texture(transferFunction, t).rgb;
             break;

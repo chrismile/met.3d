@@ -151,7 +151,7 @@ private:
       Creates table entries for variable selection dialog restricted to
       @p supportedTypes.
       */
-    void createDataSourceEntries(const QList<MVerticalLevelType> supportedTypes);
+    void createDataSourceEntries(QList<MVerticalLevelType> supportedTypes);
     /**
       Creates table entries for data source selection dialog.
       */

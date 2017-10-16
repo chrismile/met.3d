@@ -86,8 +86,7 @@ public:
       order of a few pixels; set in the scene view.)
       */
     virtual int checkIntersectionWithHandle(MSceneViewGLWidget *sceneView,
-                                            float clipX, float clipY,
-                                            float clipRadius);
+                                  float clipX, float clipY, float clipRadius);
 
     void addPositionLabel(MSceneViewGLWidget *sceneView, int handleID,
                           float clipX, float clipY);

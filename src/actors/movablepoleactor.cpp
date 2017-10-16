@@ -37,11 +37,8 @@
 #include "gxfw/mglresourcesmanager.h"
 #include "gxfw/msceneviewglwidget.h"
 
-
 using namespace std;
-
-namespace Met3D
-{
+using namespace Met3D;
 
 /******************************************************************************
 ***                     CONSTRUCTOR / DESTRUCTOR                            ***
@@ -299,17 +296,17 @@ void MMovablePoleActor::loadConfiguration(QSettings *settings)
     settings->beginGroup(MMovablePoleActor::getSettingsID());
 
     properties->mDDouble()->setValue(tickLengthProperty,
-                                     settings->value("tickLength", 0.8).toDouble());
+                settings->value("tickLength", 0.8).toDouble());
 
     properties->mColor()->setValue(
                 colourProperty,
                 settings->value("lineColour", QColor(Qt::black)).value<QColor>());
 
     properties->mEnum()->setValue(renderModeProperty,
-                                  settings->value("renderMode", int(RenderModes::TUBES)).toInt());
+                settings->value("renderMode", int(RenderModes::TUBES)).toInt());
 
     properties->mDouble()->setValue(tubeRadiusProperty,
-                                    settings->value("tubeRadius", 0.1).toDouble());
+                settings->value("tubeRadius", 0.1).toDouble());
 
     individualPoleHeightsEnabled = settings->value("individualPoleHeightsEnabled").toBool();
     properties->mBool()->setValue(individualPoleHeightsProperty, individualPoleHeightsEnabled);
@@ -387,27 +384,27 @@ void MMovablePoleActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
     // Bind shader program.
     switch (renderMode)
     {
-    case RenderModes::LINES:
-        tubeRadius = 0;
-        simpleGeometryEffect->bindProgram("LonLatPLines");
-        break;
-    case RenderModes::TUBES:
-        simpleGeometryEffect->bindProgram("LonLatPTubes");
-        break;
+        case RenderModes::LINES:
+            tubeRadius = 0;
+            simpleGeometryEffect->bindProgram("LonLatPLines");
+            break;
+        case RenderModes::TUBES:
+            simpleGeometryEffect->bindProgram("LonLatPTubes");
+            break;
     }
 
     const float tubeRadiusTick = tubeRadius * 0.5f;
 
     // Set uniform and attribute values.
     simpleGeometryEffect->setUniformValue(
-                "mvpMatrix", *(sceneView->getModelViewProjectionMatrix()));
+            "mvpMatrix", *(sceneView->getModelViewProjectionMatrix()));
     simpleGeometryEffect->setUniformValue(
-                "pToWorldZParams", sceneView->pressureToWorldZParameters());
+            "pToWorldZParams", sceneView->pressureToWorldZParameters());
     simpleGeometryEffect->setUniformValue("tubeRadius", tubeRadius);
     simpleGeometryEffect->setUniformValue(
-                "lightDirection", sceneView->getLightDirection());
+            "lightDirection", sceneView->getLightDirection());
     simpleGeometryEffect->setUniformValue(
-                "cameraPosition", sceneView->getCamera()->getOrigin());
+            "cameraPosition", sceneView->getCamera()->getOrigin());
     simpleGeometryEffect->setUniformValue("endSegmentOffset", tubeRadius);
     simpleGeometryEffect->setUniformValue("geometryColor", lineColour);
 
@@ -423,27 +420,27 @@ void MMovablePoleActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
     // Bind shader program.
     switch (renderMode)
     {
-    case RenderModes::LINES:
-        simpleGeometryEffect->bindProgram("TickLines");
-        break;
-    case RenderModes::TUBES:
-        simpleGeometryEffect->bindProgram("TickTubes");
-        break;
+        case RenderModes::LINES:
+            simpleGeometryEffect->bindProgram("TickLines");
+            break;
+        case RenderModes::TUBES:
+            simpleGeometryEffect->bindProgram("TickTubes");
+            break;
     }
 
     // Set uniform and attribute values.
     simpleGeometryEffect->setUniformValue(
-                "pToWorldZParams", sceneView->pressureToWorldZParameters());
+            "pToWorldZParams", sceneView->pressureToWorldZParameters());
     simpleGeometryEffect->setUniformValue(
-                "mvpMatrix", *(sceneView->getModelViewProjectionMatrix()));
+            "mvpMatrix", *(sceneView->getModelViewProjectionMatrix()));
     simpleGeometryEffect->setUniformValue("geometryColor", lineColour);
     simpleGeometryEffect->setUniformValue(
-                "pToWorldZParams", sceneView->pressureToWorldZParameters());
+            "pToWorldZParams", sceneView->pressureToWorldZParameters());
     simpleGeometryEffect->setUniformValue("tubeRadius", tubeRadiusTick);
     simpleGeometryEffect->setUniformValue(
-                "lightDirection", sceneView->getLightDirection());
+            "lightDirection", sceneView->getLightDirection());
     simpleGeometryEffect->setUniformValue(
-                "cameraPosition", sceneView->getCamera()->getOrigin());
+            "cameraPosition", sceneView->getCamera()->getOrigin());
     simpleGeometryEffect->setUniformValue("endSegmentOffset", 0.1f);
 
 
@@ -452,7 +449,7 @@ void MMovablePoleActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
     QVector3D anchorOffset = tickLength * sceneView->getCamera()->getXAxis();
 
     simpleGeometryEffect->setUniformValue(
-                "offsetDirection", anchorOffset);
+            "offsetDirection", anchorOffset);
 
     // Set label offset; the labels are rendered by the text manager.
     for (int i = 0; i < labels.size(); i++)
@@ -485,35 +482,35 @@ void MMovablePoleActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
         // Set MVP-matrix and parameters to map pressure to world space in the
         // vertex shader.
         positionSpheresShader->setUniformValue(
-                    "mvpMatrix",
-                    *(sceneView->getModelViewProjectionMatrix()));
+                "mvpMatrix",
+                *(sceneView->getModelViewProjectionMatrix()));
         positionSpheresShader->setUniformValue(
-                    "pToWorldZParams",
-                    sceneView->pressureToWorldZParameters());
+                "pToWorldZParams",
+                sceneView->pressureToWorldZParameters());
         positionSpheresShader->setUniformValue(
-                    "lightDirection",
-                    sceneView->getLightDirection());
+                "lightDirection",
+                sceneView->getLightDirection());
         positionSpheresShader->setUniformValue(
-                    "cameraPosition",
-                    sceneView->getCamera()->getOrigin());
+                "cameraPosition",
+                sceneView->getCamera()->getOrigin());
         positionSpheresShader->setUniformValue(
-                    "cameraUpDir",
-                    sceneView->getCamera()->getYAxis());
+                "cameraUpDir",
+                sceneView->getCamera()->getYAxis());
         positionSpheresShader->setUniformValue(
-                    "radius",
-                    GLfloat(0.5));
+                "radius",
+                GLfloat(0.5));
         positionSpheresShader->setUniformValue(
-                    "scaleRadius",
-                    GLboolean(true));
+                "scaleRadius",
+                GLboolean(true));
 
 
         // Texture bindings for transfer function for data scalar (1D texture from
         // transfer function class). The data scalar is stored in the vertex.w
         // component passed to the vertex shader.
         positionSpheresShader->setUniformValue(
-                    "useTransferFunction", GLboolean(false));
+                "useTransferFunction", GLboolean(false));
         positionSpheresShader->setUniformValue(
-                    "constColour", QColor(Qt::white));
+                "constColour", QColor(Qt::white));
 
         // Bind vertex buffer object.
 
@@ -528,8 +525,8 @@ void MMovablePoleActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
         if (highlightPole >= 0)
         {
             positionSpheresShader->setUniformValue(
-                        "radius",
-                        GLfloat(0.51));
+                    "radius",
+                    GLfloat(0.51));
             positionSpheresShader->setUniformValue(
                         "constColour", QColor(Qt::red));
             glDrawArrays(GL_POINTS, highlightPole, 1); CHECK_GL_ERROR;
@@ -657,7 +654,7 @@ void MMovablePoleActor::addPositionLabel(MSceneViewGLWidget *sceneView,
     // space is lcoated on the plane.
     QVector3D n = QVector3D(0, 0, 1);
     QVector3D p0 = QVector3D(0, 0, sceneView->worldZfromPressure(
-                                 poleVertices[handleID].z()));
+            poleVertices[handleID].z()));
 
     // Compute the mouse position in world space.
     float d = static_cast<float>(QVector3D::dotProduct(p0 - l0, n)
@@ -667,7 +664,7 @@ void MMovablePoleActor::addPositionLabel(MSceneViewGLWidget *sceneView,
     double weight = computePositionLabelDistanceWeight(sceneView->getCamera(),
                                                        mousePosWorldSpace);
     positionLabel->anchorOffset = -((weight + tubeRadius)
-                                    * sceneView->getCamera()->getXAxis());
+            * sceneView->getCamera()->getXAxis());
 
     emitActorChangedSignal();
 }
@@ -709,7 +706,7 @@ void MMovablePoleActor::dragEvent(MSceneViewGLWidget *sceneView,
     // space is lcoated on the plane.
     QVector3D n = QVector3D(0, 0, 1);
     QVector3D p0 = QVector3D(0, 0, sceneView->worldZfromPressure(
-                                 poleVertices[handleID].z()));
+            poleVertices[handleID].z()));
 
     // Compute the mouse position in world space.
     float d = static_cast<float>(QVector3D::dotProduct(p0 - l0, n) / QVector3D::dotProduct(l, n));
@@ -736,11 +733,11 @@ void MMovablePoleActor::dragEvent(MSceneViewGLWidget *sceneView,
     }
 
     const QString poleRequestKey = "pole_vertices_actor#"
-            + QString::number(getID());
+                                   + QString::number(getID());
     uploadVec3ToVertexBuffer(poleVertices, poleRequestKey, &poleVertexBuffer, sceneView);
 
     const QString axisRequestKey = "axis_vertices_actor#"
-            + QString::number(getID());
+                                   + QString::number(getID());
     uploadVec3ToVertexBuffer(axisTicks, axisRequestKey, &axisVertexBuffer, sceneView);
 
     // Update label positions.
@@ -776,13 +773,13 @@ void MMovablePoleActor::dragEvent(MSceneViewGLWidget *sceneView,
         double weight = computePositionLabelDistanceWeight(sceneView->getCamera(),
                                                            mousePosWorldSpace);
         positionLabel->anchorOffset = -((weight + tubeRadius)
-                                        * sceneView->getCamera()->getXAxis());
+                * sceneView->getCamera()->getXAxis());
     }
 
     // Update GUI properties.
     properties->mPointF()->setValue(
-                poles[pole]->positionProperty,
-                QPointF(mousePosWorldSpace.x(), mousePosWorldSpace.y()));
+            poles[pole]->positionProperty,
+            QPointF(mousePosWorldSpace.x(), mousePosWorldSpace.y()));
 
     emitActorChangedSignal();
 }
@@ -1023,14 +1020,13 @@ void MMovablePoleActor::generateGeometry()
             // Generate labels for every ith tick mark
             if (counter % labelIteration == 0)
             {
-                labels.append(
-                            tm->addText(
-                                QString("%1").arg(p),
-                                MTextManager::LONLATP,
-                                polePos.x(), polePos.y(), p,
-                                labelsize, labelColour, MTextManager::MIDDLELEFT,
-                                labelbbox, labelBBoxColour)
-                            );
+                labels.append(tm->addText(
+                        QString("%1").arg(p),
+                        MTextManager::LONLATP,
+                        polePos.x(), polePos.y(), p,
+                        labelsize, labelColour, MTextManager::MIDDLELEFT,
+                        labelbbox, labelBBoxColour)
+                );
             }
 
             counter++;
@@ -1042,13 +1038,11 @@ void MMovablePoleActor::generateGeometry()
     // ===============================
 
     const QString poleRequestKey = "pole_vertices_actor#"
-            + QString::number(getID());
+                                   + QString::number(getID());
     uploadVec3ToVertexBuffer(poleVertices, poleRequestKey, &poleVertexBuffer);
 
     const QString axisRequestKey = "axis_vertices_actor#"
-            + QString::number(getID());
+                                   + QString::number(getID());
     uploadVec3ToVertexBuffer(axisTicks, axisRequestKey, &axisVertexBuffer);
 }
 
-
-} // namespace Met3D

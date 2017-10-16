@@ -627,10 +627,8 @@ GL::MTexture* MStructuredGrid::getTexture(QGLWidget *currentGLContext,
                         gridIsCyclicInLongitude() ? GL_REPEAT : textureWrap);
         glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, textureWrap);
         glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, textureWrap);
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER,
-                        textureMinMaxFilter);
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER,
-                        textureMinMaxFilter);
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, textureMinMaxFilter);
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, textureMinMaxFilter);
 
         if (nullTexture)
             glTexImage3D(GL_TEXTURE_3D, 0, textureInternalFormat,
@@ -950,8 +948,7 @@ GL::MTexture *MStructuredGrid::getMinMaxAccelTexture3D(
     MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
 
     // Check if a texture with this item's data already exists in GPU memory.
-    GL::MTexture *t =
-            static_cast<GL::MTexture*>(glRM->getGPUItem(minMaxAccelID));
+    GL::MTexture *t = static_cast<GL::MTexture*>(glRM->getGPUItem(minMaxAccelID));
     if (t) return t;
 
     // Texture does not exist in GPU memory. If the acceleration structure has
@@ -976,8 +973,7 @@ GL::MTexture *MStructuredGrid::getMinMaxAccelTexture3D(
         LOG4CPLUS_DEBUG(mlog, "Creating new acceleration structure ...");
 #endif
 
-        minMaxAccel =
-                new MMemoryManagedArray<float>(2 * nAccLon * nAccLat * nAccLnP);
+        minMaxAccel = new MMemoryManagedArray<float>(2 * nAccLon * nAccLat * nAccLnP);
         MDataRequestHelper rh(getGeneratingRequest());
         rh.insert("AUXDATA", "MINMAXACCEL");
         minMaxAccel->setGeneratingRequest(rh.request());

@@ -1853,9 +1853,7 @@ void MSceneViewGLWidget::wheelEvent(QWheelEvent *event)
 //        // Alt + mouse wheel: time navigation for scene.
 //        if (event->delta() > 0) {
 //            scene->timeForward();
-//        }
-//        else
-//        {
+//        } else {
 //            scene->timeBackward();
 //        }
     }

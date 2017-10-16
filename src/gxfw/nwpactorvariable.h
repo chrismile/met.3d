@@ -87,8 +87,7 @@ public:
      */
     void synchronizeWith(MSyncControl *sync, bool updateGUIProperties=true);
 
-    bool synchronizationEvent(MSynchronizationType syncType,
-                              QVector<QVariant> data);
+    bool synchronizationEvent(MSynchronizationType syncType, QVector<QVariant> data);
 
     /**
       Updates colour hints for synchronization (green property background
@@ -586,10 +585,10 @@ public:
             ContourSettings *contourSet = nullptr);
 
     /**
-     * Returns the contour labels of each variable that can be rendered on the
-     * screen. @p noOverlapping determines if these labels may overlap.
-     * Otherwise the pixel size of each label is computed according to the
-     * current @p sceneView and overlap tests are performed.
+     * Returns the contour labels of each variable that can be rendered on the screen.
+     * @p noOverlapping determines if these labels may overlap. Otherwise the pixel
+     * size of each label is computed according to the current @p sceneView and
+     * overlap tests are performed.
      */
     QList<MLabel*> getContourLabels(bool noOverlapping = false,
                                     MSceneViewGLWidget* sceneView = nullptr);

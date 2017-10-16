@@ -122,7 +122,6 @@ MGeometricLengthTrajectoryFilter::produceData(MDataRequest request)
             const float deltaLat = 111.2;
 
             QVector3D p1 = lineSource->getVertices()[startIndex];
-            //QVector3D& p0;
 
             for (int j = startIndex + 1; j < endIndex; ++j)
             {

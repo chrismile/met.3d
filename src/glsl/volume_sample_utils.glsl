@@ -333,9 +333,7 @@ void bisectionCorrectionDepth(inout vec3 rayPosition,
 
         if (depth > depthValue) {
             rayPosition = rayCenterPosition;
-        }
-        else
-        {
+        } else {
             prevRayPosition = rayCenterPosition;
         }
     }

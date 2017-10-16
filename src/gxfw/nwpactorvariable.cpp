@@ -1030,7 +1030,7 @@ void MNWPActorVariable::loadConfiguration(QSettings *settings)
 
     // Load rendering properties.
     // ==========================
-    QString tfName = settings->value("transferFunction").toString();
+    QString tfName = settings->value("transferFunction", "None").toString();
     while (!setTransferFunction(tfName))
     {
         QMessageBox msgBox;

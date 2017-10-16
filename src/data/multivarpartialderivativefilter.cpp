@@ -447,7 +447,7 @@ MStructuredGrid* MMultiVarPartialDerivativeFilter::produceData(
                     {
                         deriv = (VsNextLev - VsPrevLev) / dp;
                     }
-                        // Assume that deltaPressure = h / 2
+                    // Assume that deltaPressure = h / 2
                     else if (method == "d2dp2")
                     {
                         deriv = (VsNextLev - 2 * Vs + VsPrevLev) / (dp * dp / 4);
@@ -507,7 +507,7 @@ MTask* MMultiVarPartialDerivativeFilter::createTaskGraph(MDataRequest request)
         task->addParent(inputSource->getTaskGraph(rh.request()));
     }
 
-    // before proceeding with this task, obtain all required variables
+    // Before proceeding with this task, obtain all required variables.
     for (const auto& var : vars)
     {
         rh.insert("VARIABLE", var);

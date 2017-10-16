@@ -158,8 +158,8 @@ private:
     void renderVerticalInterpolation(MNWP2DHorizontalActorVariable* var);
 
     void renderVerticalInterpolationDifference(
-            MNWP2DHorizontalActorVariable* var,
-            MNWP2DHorizontalActorVariable* varDiff);
+                                MNWP2DHorizontalActorVariable* var,
+                                MNWP2DHorizontalActorVariable* varDiff);
 
     void renderFilledContours(MSceneViewGLWidget *sceneView,
                               MNWP2DHorizontalActorVariable* var);
@@ -171,7 +171,7 @@ private:
                              MNWP2DHorizontalActorVariable* var);
 
     void renderTexturedContours(MSceneViewGLWidget *sceneView,
-                                MNWP2DHorizontalActorVariable* var);
+                             MNWP2DHorizontalActorVariable* var);
 
     void renderWindBarbs(MSceneViewGLWidget *sceneView);
 

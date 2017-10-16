@@ -74,8 +74,6 @@ MTrajectorySelection::MTrajectorySelection(MDataRequest requestToReferTo,
       times(timeValues),
       startGridStride(startGridStride)
 {
-    //        startIndices = 0;
-    //        indexCount = 0;
 }
 
 
