@@ -516,6 +516,7 @@ MNWPVolumeRaycasterActor::~MNWPVolumeRaycasterActor()
     if (gl.texUnitShadowImage >=0) releaseTextureUnit(gl.texUnitShadowImage);
     if (gl.texUnitDepthBuffer >=0) releaseTextureUnit(gl.texUnitDepthBuffer);
 
+    delete bbSettings;
     delete lightingSettings;
     delete rayCasterSettings;
     delete normalCurveSettings;
@@ -2492,7 +2493,6 @@ void MNWPVolumeRaycasterActor::renderBoundingBox(
 }
 
 
-
 void MNWPVolumeRaycasterActor::renderPositionCross(
         MSceneViewGLWidget *sceneView)
 {
@@ -2740,7 +2740,7 @@ void MNWPVolumeRaycasterActor::createShadowImage(
     pEffect->setUniformValue("stepSize", rayCasterSettings->stepSize);
 
     // set indices of subroutines
-//   pEffect->printSubroutineInformation(GL_FRAGMENT_SHADER);
+ //   pEffect->printSubroutineInformation(GL_FRAGMENT_SHADER);
 
     switch(renderMode)
     {

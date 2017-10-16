@@ -1050,4 +1050,5 @@ void MMovablePoleActor::generateGeometry()
     uploadVec3ToVertexBuffer(axisTicks, axisRequestKey, &axisVertexBuffer);
 }
 
+
 } // namespace Met3D
