@@ -222,6 +222,11 @@ void MNWPVerticalSectionActor::loadConfiguration(QSettings *settings)
                 settings->value("interpolationNodeSpacing", 0.15).toFloat());
 
     settings->endGroup();
+
+    if (this->isInitialized())
+    {
+        generateIsoPressureLines();
+    }
 }
 
 
