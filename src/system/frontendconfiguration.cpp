@@ -195,6 +195,9 @@ void MFrontendConfiguration::initializeFrontendFromConfigFile(
     QString sessionDirectory =
             expandEnvironmentVariables(
                 config.value("pathToSessionConfigurations", "").toString());
+
+    // User specified a directory but the user has no writing access or Met.3D
+    // failed to create the directory.
     if (sessionDirectory != ""
             && !(QDir().mkpath(sessionDirectory)
                  && QFileInfo(sessionDirectory).isWritable()))
@@ -203,7 +206,7 @@ void MFrontendConfiguration::initializeFrontendFromConfigFile(
         msgBox.setIcon(QMessageBox::Warning);
         msgBox.setWindowTitle("Error");
         msgBox.setText("No write access to '" + sessionDirectory
-                       + "'.\nTry to set '"
+                       + "'.\nSetting '"
                        + QDir::home()
                        .absoluteFilePath(".met3d/sessions")
                        +  "' as default.\nPlease change value in frontend"
@@ -211,56 +214,58 @@ void MFrontendConfiguration::initializeFrontendFromConfigFile(
         msgBox.exec();
         sessionDirectory.clear();
     }
+    // User specified no directory.
+    else
+    {
+        LOG4CPLUS_WARN(mlog, "No directory to load session files from"
+                             " specified in frontend configuration."
+                             " Using '"
+                       << QDir::home().absoluteFilePath(".met3d/sessions")
+                       .toStdString() << "' as default.");
+        sessionWasSet = false;
+    }
+
+    // Handle setting session directory to default.
     if (sessionDirectory == "")
     {
         sessionDirectory = QDir::home().absoluteFilePath(".met3d/sessions");
-        if (!QDir().exists(sessionDirectory))
+        if (!QDir().mkpath(sessionDirectory))
         {
-            if (QDir().mkpath(sessionDirectory))
+            QMessageBox msgBox;
+            msgBox.setIcon(QMessageBox::Warning);
+            msgBox.setWindowTitle("Error");
+            msgBox.setText("Could not create '" + sessionDirectory + "'.\n"
+                           + "Please select a different directory to load"
+                             " sessions from and save sessions to.");
+            msgBox.exec();
+            sessionDirectory.clear();
+            while (sessionDirectory.isEmpty())
             {
-                LOG4CPLUS_WARN(mlog, "No directory to load session files from"
-                                     " specified in frontend configuration."
-                                     " Using '" << sessionDirectory.toStdString()
-                               << "' as default.");
-                sessionWasSet = false;
-            }
-            else
-            {
-                QMessageBox msgBox;
-                msgBox.setIcon(QMessageBox::Warning);
-                msgBox.setWindowTitle("Error");
-                msgBox.setText("Could not create '" + sessionDirectory + "'.\n"
-                               + "Please select a different directory to load"
-                                 " sessions from and save sessions to.");
-                msgBox.exec();
-                sessionDirectory.clear();
-                while (sessionDirectory.isEmpty())
+                sessionDirectory =
+                        QFileDialog::getExistingDirectory(
+                            nullptr, "Select directory to store sessions",
+                            "", QFileDialog::ShowDirsOnly
+                            | QFileDialog::DontResolveSymlinks);
+                // Ask user again if no directory has been chosen.
+                if (sessionDirectory.isEmpty())
                 {
-                    sessionDirectory =
-                            QFileDialog::getExistingDirectory(
-                                nullptr, "Select directory to store sessions",
-                                "", QFileDialog::ShowDirsOnly
-                                | QFileDialog::DontResolveSymlinks);
-                    // Ask user again if no directory has been chosen.
-                    if (sessionDirectory.isEmpty())
-                    {
-                        QMessageBox msgBox;
-                        msgBox.setIcon(QMessageBox::Warning);
-                        msgBox.setWindowTitle("Error");
-                        msgBox.setText("Please select a directory.");
-                        msgBox.exec();
-                        continue;
-                    }
-                    if (!QFileInfo(sessionDirectory).isWritable())
-                    {
-                        QMessageBox msgBox;
-                        msgBox.setIcon(QMessageBox::Warning);
-                        msgBox.setWindowTitle("Error");
-                        msgBox.setText("No write access to this directory.\n"
-                                       "Failed to change directory.");
-                        msgBox.exec();
-                        sessionDirectory.clear();
-                    }
+                    QMessageBox msgBox;
+                    msgBox.setIcon(QMessageBox::Warning);
+                    msgBox.setWindowTitle("Error");
+                    msgBox.setText("Please select a directory.");
+                    msgBox.exec();
+                    continue;
+                }
+                // Ask user again if no directory is not writeable.
+                if (!QFileInfo(sessionDirectory).isWritable())
+                {
+                    QMessageBox msgBox;
+                    msgBox.setIcon(QMessageBox::Warning);
+                    msgBox.setWindowTitle("Error");
+                    msgBox.setText("No write access to this directory.\n"
+                                   "Failed to change directory.");
+                    msgBox.exec();
+                    sessionDirectory.clear();
                 }
             }
         }
