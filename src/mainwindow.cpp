@@ -201,8 +201,6 @@ MMainWindow::MMainWindow(QStringList commandLineArguments, QWidget *parent)
             this, SLOT(sceneManagement()));
     connect(ui->actionAddDataset, SIGNAL(triggered()),
             this, SLOT(addDataset()));
-    connect(ui->actionSessionManager, SIGNAL(triggered()),
-            this, SLOT(openSessionManager()));
     connect(ui->actionResizeWindow, SIGNAL(triggered()),
             this, SLOT(resizeWindow()));
 
@@ -241,6 +239,10 @@ MMainWindow::MMainWindow(QStringList commandLineArguments, QWidget *parent)
     connect(ui->actionAboutMet3D, SIGNAL(triggered()),
             this, SLOT(showAboutDialog()));
 
+    connect(ui->actionSessionManager, SIGNAL(triggered()),
+            this, SLOT(openSessionManager()));
+    connect(ui->actionSaveSession, SIGNAL(triggered()),
+            sessionManagerDialog, SLOT(saveSession()));
     connect(ui->menuSessions, SIGNAL(triggered(QAction*)),
             this, SLOT(switchSession(QAction*)));
     connect(sessionAutoSaveTimer, SIGNAL(timeout()),
