@@ -106,11 +106,11 @@ QString expandEnvironmentVariables(QString path)
     while ((i = regExpEnvVar.indexIn(path)) != -1)
     {
         QString envVar = regExpEnvVar.cap(1);
-        QString expansion = "";
-        // Use QDir::homePath() in the case of "$HOME" eviroment variable to
-        // handle home directory on Windows and non Windows systems.
+        QString expansion;
         if (envVar == "$HOME")
         {
+            // Special case "$HOME" environment variable: use QDir::homePath()
+            // to obtain correct home directory on all platforms.
             expansion = QDir::homePath();
         }
         else

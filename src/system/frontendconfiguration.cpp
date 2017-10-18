@@ -196,8 +196,8 @@ void MFrontendConfiguration::initializeFrontendFromConfigFile(
             expandEnvironmentVariables(
                 config.value("pathToSessionConfigurations", "").toString());
 
-    // User specified a directory but the user has no writing access or Met.3D
-    // failed to create the directory.
+    // If session directory has been specified by user, check if write access
+    // is available.
     if (sessionDirectory != ""
             && !(QDir().mkpath(sessionDirectory)
                  && QFileInfo(sessionDirectory).isWritable()))
@@ -206,28 +206,28 @@ void MFrontendConfiguration::initializeFrontendFromConfigFile(
         msgBox.setIcon(QMessageBox::Warning);
         msgBox.setWindowTitle("Error");
         msgBox.setText("No write access to '" + sessionDirectory
-                       + "'.\nSetting '"
+                       + "'.\nUsing default path '"
                        + QDir::home()
                        .absoluteFilePath(".met3d/sessions")
-                       +  "' as default.\nPlease change value in frontend"
-                          " configuration.");
+                       +  "' instead.\nPlease check setting in frontend"
+                          " configuration file.");
         msgBox.exec();
         sessionDirectory.clear();
     }
-    // User specified no directory.
     else
     {
-        LOG4CPLUS_WARN(mlog, "No directory to load session files from"
-                             " specified in frontend configuration."
+        // No session directory has been specified.
+        LOG4CPLUS_WARN(mlog, "No directory to store session files has been"
+                             " specified in frontend configuration file."
                              " Using '"
                        << QDir::home().absoluteFilePath(".met3d/sessions")
                        .toStdString() << "' as default.");
         sessionWasSet = false;
     }
 
-    // Handle setting session directory to default.
     if (sessionDirectory == "")
     {
+        // Set session configuration directory to default ($HOME/.met3d/sessions).
         sessionDirectory = QDir::home().absoluteFilePath(".met3d/sessions");
         if (!QDir().mkpath(sessionDirectory))
         {
@@ -235,18 +235,21 @@ void MFrontendConfiguration::initializeFrontendFromConfigFile(
             msgBox.setIcon(QMessageBox::Warning);
             msgBox.setWindowTitle("Error");
             msgBox.setText("Could not create '" + sessionDirectory + "'.\n"
-                           + "Please select a different directory to load"
-                             " sessions from and save sessions to.");
+                           + "Please set a different directory to store"
+                             " session configurations in frontend"
+                             " configuration file.");
             msgBox.exec();
             sessionDirectory.clear();
             while (sessionDirectory.isEmpty())
             {
                 sessionDirectory =
                         QFileDialog::getExistingDirectory(
-                            nullptr, "Select directory to store sessions",
+                            nullptr, "Select directory to store session"
+                                     " configurations",
                             "", QFileDialog::ShowDirsOnly
                             | QFileDialog::DontResolveSymlinks);
-                // Ask user again if no directory has been chosen.
+
+                // Insist on choosing a suitable writable directory. ;-)
                 if (sessionDirectory.isEmpty())
                 {
                     QMessageBox msgBox;
@@ -256,7 +259,6 @@ void MFrontendConfiguration::initializeFrontendFromConfigFile(
                     msgBox.exec();
                     continue;
                 }
-                // Ask user again if no directory is not writeable.
                 if (!QFileInfo(sessionDirectory).isWritable())
                 {
                     QMessageBox msgBox;
@@ -281,8 +283,9 @@ void MFrontendConfiguration::initializeFrontendFromConfigFile(
 
     if (sessionName == "None")
     {
-        LOG4CPLUS_DEBUG(mlog, "No session specified to be loaded at start."
-                              " Load frontend configuration instead.");
+        LOG4CPLUS_DEBUG(mlog, "No start-up session configuration has been"
+                              " specified. Loading frontend configuration"
+                              " instead.");
         sessionWasSet = false;
         loadSessionOnStart = false;
         sessionName = "";
@@ -305,7 +308,7 @@ void MFrontendConfiguration::initializeFrontendFromConfigFile(
             {
                 QMessageBox msg;
                 msg.setWindowTitle("Error");
-                msg.setText(QString("Unable to load session file '%1'.\n"
+                msg.setText(QString("Unable to load session configuration '%1'.\n"
                                     "Using configuration defined by the frontend"
                                     " configuration file instead.")
                             .arg(sessionFilename));
