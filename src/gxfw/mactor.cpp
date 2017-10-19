@@ -313,13 +313,22 @@ void MActor::setLabelsEnabled(bool enabled)
 void MActor::saveConfigurationToFile(QString filename)
 {
     if (filename.isEmpty())
+    {
+        QString directory =
+                MSystemManagerAndControl::getInstance()
+                ->getMet3DWorkingDirectory().absoluteFilePath("config/actors");
+        QDir().mkpath(directory);
         filename = QFileDialog::getSaveFileName(
                     MGLResourcesManager::getInstance(),
                     "Save actor configuration",
-                    "data/actorconfig",
+                    QDir(directory).absoluteFilePath(getName() + ".actor.conf"),
                     "Actor configuration files (*.actor.conf)");
 
-    if (filename.isEmpty()) return;
+        if (filename.isEmpty())
+        {
+            return;
+        }
+    }
 
     LOG4CPLUS_DEBUG(mlog, "Saving configuration to " << filename.toStdString());
 
@@ -366,13 +375,19 @@ void MActor::saveConfigurationToFile(QString filename)
 void MActor::loadConfigurationFromFile(QString filename)
 {
     if (filename.isEmpty())
+    {
         filename = QFileDialog::getOpenFileName(
                     MGLResourcesManager::getInstance(),
                     "Load actor configuration",
-                    "data/actorconfig",
+                    MSystemManagerAndControl::getInstance()
+                    ->getMet3DWorkingDirectory().absoluteFilePath("config/actors"),
                     "Actor configuration files (*.actor.conf)");
 
-    if (filename.isEmpty()) return;
+        if (filename.isEmpty())
+        {
+            return;
+        }
+    }
 
     LOG4CPLUS_DEBUG(mlog, "Loading configuration from "
                     << filename.toStdString());

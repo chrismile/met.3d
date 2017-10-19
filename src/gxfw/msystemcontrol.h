@@ -88,6 +88,9 @@ public:
 
     const QDir& getMet3DHomeDir() const;
 
+    QDir& getMet3DWorkingDirectory() { return met3DWorkingDirectory; }
+    void setMet3DWorkingDirectory(QString workingDir);
+
     QtTreePropertyBrowser* getSystemPropertiesBrowser()
     { return systemPropertiesBrowser; }
 
@@ -222,6 +225,8 @@ private:
 
     QStringList commandLineArguments;
     QDir met3DHomeDir;
+
+    QDir met3DWorkingDirectory;
 
     QtTreePropertyBrowser *systemPropertiesBrowser;
 

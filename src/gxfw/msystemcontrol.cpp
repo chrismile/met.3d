@@ -246,6 +246,12 @@ const QDir& MSystemManagerAndControl::getMet3DHomeDir() const
 }
 
 
+void MSystemManagerAndControl::setMet3DWorkingDirectory(QString workingDir)
+{
+    this->met3DWorkingDirectory = QDir(workingDir);
+}
+
+
 void MSystemManagerAndControl::registerSceneView(MSceneViewGLWidget *view)
 {
     // Add the view's properties to the property browser.

@@ -555,13 +555,23 @@ void MMainWindow::resizeSceneView(int newWidth, int newHeight,
 void MMainWindow::saveConfigurationToFile(QString filename)
 {
     if (filename.isEmpty())
+    {
+        QString directory =
+                MSystemManagerAndControl::getInstance()
+                ->getMet3DWorkingDirectory().absoluteFilePath("config/winlayout");
+        QDir().mkpath(directory);
         filename = QFileDialog::getSaveFileName(
                     MGLResourcesManager::getInstance(),
                     "Save window layout configuration",
-                    "data/windowLayout.winlayout.conf",
+                    MSystemManagerAndControl::getInstance()
+                    ->getMet3DWorkingDirectory().absoluteFilePath("default.winlayout.conf"),
                     "Window layout configuration files (*.winlayout.conf)");
 
-    if (filename.isEmpty()) return;
+        if (filename.isEmpty())
+        {
+            return;
+        }
+    }
 
     LOG4CPLUS_DEBUG(mlog, "Saving configuration to " << filename.toStdString());
 
@@ -605,13 +615,19 @@ void MMainWindow::saveConfigurationToFile(QString filename)
 void MMainWindow::loadConfigurationFromFile(QString filename)
 {
     if (filename.isEmpty())
+    {
         filename = QFileDialog::getOpenFileName(
                     MGLResourcesManager::getInstance(),
                     "Load window layout configuration",
-                    "data/config",
+                    MSystemManagerAndControl::getInstance()
+                    ->getMet3DWorkingDirectory().absoluteFilePath("config/winlayout"),
                     "Window layout configuration files (*.winlayout.conf)");
 
-    if (filename.isEmpty()) return;
+        if (filename.isEmpty())
+        {
+            return;
+        }
+    }
 
     LOG4CPLUS_DEBUG(mlog, "Loading configuration from "
                     << filename.toStdString());

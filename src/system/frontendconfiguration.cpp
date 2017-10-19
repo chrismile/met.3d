@@ -183,6 +183,35 @@ void MFrontendConfiguration::initializeFrontendFromConfigFile(
 
     config.endGroup();
 
+    // Initialize application.
+    // ===========================
+    config.beginGroup("ApplicationSettings");
+
+    QString met3DWorkingDirectory =
+            expandEnvironmentVariables(
+                config.value("workingDirectory", "").toString());
+    // If working directory has been specified by user, check if write access
+    // is available.
+    if (met3DWorkingDirectory != ""
+            && !(QDir().mkpath(met3DWorkingDirectory)
+                 && QFileInfo(met3DWorkingDirectory).isWritable()))
+    {
+        QMessageBox msgBox;
+        msgBox.setIcon(QMessageBox::Warning);
+        msgBox.setWindowTitle("Error");
+        msgBox.setText("No write access to '" + met3DWorkingDirectory
+                       + "'.\nUsing default path '"
+                       + QDir::home().absoluteFilePath("met3d")
+                       +  "'.\nPlease check setting in frontend"
+                          " configuration file.");
+        msgBox.exec();
+        met3DWorkingDirectory = QDir::home().absoluteFilePath("met3d");
+    }
+
+    sysMC->setMet3DWorkingDirectory(met3DWorkingDirectory);
+
+    config.endGroup();
+
     // Initialize session manager.
     // ===========================
     config.beginGroup("SessionManager");
@@ -209,7 +238,7 @@ void MFrontendConfiguration::initializeFrontendFromConfigFile(
                        + "'.\nUsing default path '"
                        + QDir::home()
                        .absoluteFilePath(".met3d/sessions")
-                       +  "' instead.\nPlease check setting in frontend"
+                       +  "'.\nPlease check setting in frontend"
                           " configuration file.");
         msgBox.exec();
         sessionDirectory.clear();
