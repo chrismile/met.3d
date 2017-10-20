@@ -955,7 +955,7 @@ shader FSmain(in VStoFS Input, out vec4 fragColor : 0)
     }
 
     // Compute correct depth value.
-    computeDepthFromWorld(depthPosition);
+    gl_FragDepth = computeDepthFromWorld(depthPosition);
 
     fragColor = rayColor;
 }
