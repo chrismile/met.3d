@@ -57,20 +57,24 @@ uniform float     isoValue;       // iso value of the contour line
 uniform sampler1D path;           // points along the vertical section path
 
 /**
-  Emit a vertex between the two edge points p1 and p2 of the currently
-  processed grid cell. This function needs to be called twice for each line
-  segment to be generated.
+  Computes the interpolated clip space coordinate of the vertex between the two
+  edge points p1 and p2 of the currently processed grid cell. This function
+  needs to be called twice for each line segment to be generated.
 
   Parameters are the world space position of p1 and p2, their intensities,
   and the iso value of the current contour line.
+
+  The function uses the parameter worldZ to pass the z coordinate of the
+  computed vertex in world coordinates.
  */
-float emit(vec3 p1_worldposition, vec3 p2_worldposition,
-           float p1_intensity, float p2_intensity, float isoValue)
+vec4 computeVertexClipSpaceCoordinates(
+        vec3 p1_worldposition, vec3 p2_worldposition, float p1_intensity,
+        float p2_intensity, float isoValue, out float worldZ)
 {
   float fraction = (isoValue - p1_intensity) / (p2_intensity - p1_intensity);
   vec3 vertex_worldposition = mix(p1_worldposition, p2_worldposition, fraction);
-  gl_Position = mvpMatrix * vec4(vertex_worldposition, 1.0);
-  return vertex_worldposition.z;
+  worldZ = vertex_worldposition.z;
+  return mvpMatrix * vec4(vertex_worldposition, 1.0);
 }
 
 
@@ -128,22 +132,6 @@ shader GSmain(out GStoFS Output)
     vec3 ll_worldposition = vec3(lon_l, lat_l, ll_sectionGrid.g);
     vec3 lr_worldposition = vec3(lon_r, lat_r, lr_sectionGrid.g);
 
-    // ---- DEBUG statements -----
-    //    gl_Position = mvpMatrix * vec4(lon_l, lat_l, 10., 1.0);
-    //    EmitVertex();
-    //    gl_Position = mvpMatrix * vec4(lon_r, lat_r, 10., 1.0);
-    //    EmitVertex();
-    //    gl_Position = mvpMatrix * vec4(ul_worldposition.xy, ul.y, 1.0);
-    //    EmitVertex();
-    //    gl_Position = mvpMatrix * vec4(ur_worldposition.xy, ul.y, 1.0);
-    //    EmitVertex();
-    //    gl_Position = mvpMatrix * vec4(ul_worldposition, 1.0);
-    //    EmitVertex();
-    //    gl_Position = mvpMatrix * vec4(ur_worldposition, 1.0);
-    //    EmitVertex();
-    //    EndPrimitive();
-    //    return;
-
     // Determine the marching squares case we are handling..
     int bitfield = 0;
     bitfield += int(ll_intensity < isoValue) * 1;
@@ -163,63 +151,79 @@ shader GSmain(out GStoFS Output)
     }
     else if (bitfield == 1)
     {
-        Output.worldZ = emit(ll_worldposition, ul_worldposition,
-                             ll_intensity, ul_intensity, isoValue); EmitVertex();
-        Output.worldZ = emit(ll_worldposition, lr_worldposition,
-                             ll_intensity, lr_intensity, isoValue); EmitVertex();
+        gl_Position = computeVertexClipSpaceCoordinates(
+                    ll_worldposition, ul_worldposition, ll_intensity,
+                    ul_intensity, isoValue, Output.worldZ); EmitVertex();
+        gl_Position = computeVertexClipSpaceCoordinates(
+                    ll_worldposition, lr_worldposition, ll_intensity,
+                    lr_intensity, isoValue, Output.worldZ); EmitVertex();
         EndPrimitive();
     }
     else if (bitfield == 2)
     {
-        Output.worldZ = emit(ll_worldposition, lr_worldposition,
-                             ll_intensity, lr_intensity, isoValue); EmitVertex();
-        Output.worldZ = emit(lr_worldposition, ur_worldposition,
-                             lr_intensity, ur_intensity, isoValue); EmitVertex();
+        gl_Position = computeVertexClipSpaceCoordinates(
+                    ll_worldposition, lr_worldposition, ll_intensity,
+                    lr_intensity, isoValue, Output.worldZ); EmitVertex();
+        gl_Position = computeVertexClipSpaceCoordinates(
+                    lr_worldposition, ur_worldposition, lr_intensity,
+                    ur_intensity, isoValue, Output.worldZ); EmitVertex();
         EndPrimitive();
     }
     else if (bitfield == 3)
     {
-        Output.worldZ = emit(ll_worldposition, ul_worldposition,
-                             ll_intensity, ul_intensity, isoValue); EmitVertex();
-        Output.worldZ = emit(lr_worldposition, ur_worldposition,
-                             lr_intensity, ur_intensity, isoValue); EmitVertex();
+        gl_Position = computeVertexClipSpaceCoordinates(
+                    ll_worldposition, ul_worldposition, ll_intensity,
+                    ul_intensity, isoValue, Output.worldZ); EmitVertex();
+        gl_Position = computeVertexClipSpaceCoordinates(
+                    lr_worldposition, ur_worldposition, lr_intensity,
+                    ur_intensity, isoValue, Output.worldZ); EmitVertex();
         EndPrimitive();
     }
     else if (bitfield == 4)
     {
-        Output.worldZ = emit(ll_worldposition, ul_worldposition,
-                             ll_intensity, ul_intensity, isoValue); EmitVertex();
-        Output.worldZ = emit(ul_worldposition, ur_worldposition,
-                             ul_intensity, ur_intensity, isoValue); EmitVertex();
+        gl_Position = computeVertexClipSpaceCoordinates(
+                    ll_worldposition, ul_worldposition, ll_intensity,
+                    ul_intensity, isoValue, Output.worldZ); EmitVertex();
+        gl_Position = computeVertexClipSpaceCoordinates(
+                    ul_worldposition, ur_worldposition, ul_intensity,
+                    ur_intensity, isoValue, Output.worldZ); EmitVertex();
         EndPrimitive();
     }
     else if (bitfield == 5)
     {
-        Output.worldZ = emit(ll_worldposition, lr_worldposition,
-                             ll_intensity, lr_intensity, isoValue); EmitVertex();
-        Output.worldZ = emit(ul_worldposition, ur_worldposition,
-                             ul_intensity, ur_intensity, isoValue); EmitVertex();
+        gl_Position = computeVertexClipSpaceCoordinates(
+                    ll_worldposition, lr_worldposition, ll_intensity,
+                    lr_intensity, isoValue, Output.worldZ); EmitVertex();
+        gl_Position = computeVertexClipSpaceCoordinates(
+                    ul_worldposition, ur_worldposition, ul_intensity,
+                    ur_intensity, isoValue, Output.worldZ); EmitVertex();
         EndPrimitive();
     }
     else if (bitfield == 6)
     {
-        Output.worldZ = emit(ll_worldposition, ul_worldposition,
-                             ll_intensity, ul_intensity, isoValue); EmitVertex();
-        Output.worldZ = emit(ll_worldposition, lr_worldposition,
-                             ll_intensity, lr_intensity, isoValue); EmitVertex();
+        gl_Position = computeVertexClipSpaceCoordinates(
+                    ll_worldposition, ul_worldposition, ll_intensity,
+                    ul_intensity, isoValue, Output.worldZ); EmitVertex();
+        gl_Position = computeVertexClipSpaceCoordinates(
+                    ll_worldposition, lr_worldposition, ll_intensity,
+                    lr_intensity, isoValue, Output.worldZ); EmitVertex();
         EndPrimitive();
-        Output.worldZ = emit(ul_worldposition, ur_worldposition,
-                             ul_intensity, ur_intensity, isoValue); EmitVertex();
-        Output.worldZ = emit(lr_worldposition, ur_worldposition,
-                             lr_intensity, ur_intensity, isoValue); EmitVertex();
+        gl_Position = computeVertexClipSpaceCoordinates(
+                    ul_worldposition, ur_worldposition, ul_intensity,
+                    ur_intensity, isoValue, Output.worldZ); EmitVertex();
+        gl_Position = computeVertexClipSpaceCoordinates(
+                    lr_worldposition, ur_worldposition, lr_intensity,
+                    ur_intensity, isoValue, Output.worldZ); EmitVertex();
         EndPrimitive();
     }
     else if (bitfield == 7)
     {
-        Output.worldZ = emit(ul_worldposition, ur_worldposition,
-                             ul_intensity, ur_intensity, isoValue); EmitVertex();
-        Output.worldZ = emit(lr_worldposition, ur_worldposition,
-                             lr_intensity, ur_intensity, isoValue); EmitVertex();
+        gl_Position = computeVertexClipSpaceCoordinates(
+                    ul_worldposition, ur_worldposition, ul_intensity,
+                    ur_intensity, isoValue, Output.worldZ); EmitVertex();
+        gl_Position = computeVertexClipSpaceCoordinates(
+                    lr_worldposition, ur_worldposition, lr_intensity,
+                    ur_intensity, isoValue, Output.worldZ); EmitVertex();
         EndPrimitive();
     }
 }
