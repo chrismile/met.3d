@@ -355,15 +355,17 @@ void MSessionManagerDialog::saveSession(bool autoSave)
                     "Please select a different directory.");
         return;
     }
+
     if (currentSession != "")
     {
         saveSessionToFile(currentSession, autoSave);
-        return;
     }
-    QMessageBox::warning(
-                this, "Unable to save session.",
-                "No session name is given.\n"
-                "Please create a new session before saving the session.");
+    // If no current session is set, ask the user to choose a name to create
+    // a new session.
+    else
+    {
+        createNewSession();
+    }
 }
 
 
