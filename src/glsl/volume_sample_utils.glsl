@@ -343,7 +343,7 @@ void bisectionCorrectionDepth(inout vec3 rayPosition,
 
 
 // depth computation
-void computeDepthFromWorld(in vec3 rayPosition)
+float computeDepthFromWorld(in vec3 rayPosition)
 {
     // first convert position to clip space
     vec4 clipSpacePos = mvpMatrix * vec4(rayPosition,1);
@@ -351,7 +351,7 @@ void computeDepthFromWorld(in vec3 rayPosition)
     clipSpacePos.z /= clipSpacePos.w;
     // -> z = OPENGL ? [-1;1] : [0;1]
     // calculate depth value -> convert to [0,1]
-    gl_FragDepth = clipSpacePos.z * 0.5 + 0.5;
+    return clipSpacePos.z * 0.5 + 0.5;
 }
 
 

@@ -33,10 +33,8 @@
 
 using namespace std;
 
-
 namespace Met3D
 {
-
 
 /******************************************************************************
 ***                     CONSTRUCTOR / DESTRUCTOR                            ***

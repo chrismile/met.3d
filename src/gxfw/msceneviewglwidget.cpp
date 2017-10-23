@@ -2000,7 +2000,10 @@ void MSceneViewGLWidget::keyPressEvent(QKeyEvent *event)
         }
         break;
     case Qt::Key_S:
-        saveScreenshot();
+        if (QApplication::keyboardModifiers() == Qt::NoModifier)
+        {
+            saveScreenshot();
+        }
         break;
     default:
         // If we do not act upon the key, pass event to base class

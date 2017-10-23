@@ -43,7 +43,6 @@
 #include "util/mexception.h"
 #include "util/mutil.h"
 
-
 using namespace std;
 
 namespace Met3D
@@ -56,7 +55,6 @@ namespace Met3D
 #define GL_GPU_MEM_INFO_CURRENT_AVAILABLE_MEM_NVX  0x9049
 #define GPU_MEMORY_INFO_EVICTION_COUNT_NVX         0x904A
 #define GPU_MEMORY_INFO_EVICTED_MEMORY_NVX         0x904B
-
 
 // Initially set the single GL resources manager pointer to null.
 MGLResourcesManager* MGLResourcesManager::instance = 0;

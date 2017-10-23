@@ -3,7 +3,7 @@
 
 [SessionManager]
 # Directory in which Met.3D stores session configuration files.
-pathToSessionConfigurations=$MET3D_BASE/sessions
+pathToSessionConfigurations=$HOME/.met3d/sessions
 # Met.3D can load a session on startup -- specify the name of the session or
 # set to "None" to disable loading a session. If set to "None", the frontend
 # configuration specified below is loaded instead.
