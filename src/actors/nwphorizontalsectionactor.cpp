@@ -1034,7 +1034,10 @@ void MNWPHorizontalSectionActor::renderToCurrentContext(MSceneViewGLWidget *scen
 
         // If the bounding box is outside the model grid domain, there is
         // nothing to render (see computeRenderRegionParameters()).
-        if (var->nlons == 0 || var->nlats == 0) continue;
+        if (var->nlons == 0 || var->nlats == 0)
+        {
+            continue;
+        }
 
         // Vertically interpolate and update this variable's cross-section grid
         // (for example, when the isopressure value changes or the data field
