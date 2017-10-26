@@ -287,7 +287,7 @@ private:
     QtProperty *utilizedDataSourceProperty;
     QString dataSourceID;
 
-    bool initialDataSourceLoading; // inidactor whether the actor loads for the
+    bool initialDataRequest; // inidactor whether the actor loads for the
                                    // first time a data source.
 
     bool suppressUpdate;

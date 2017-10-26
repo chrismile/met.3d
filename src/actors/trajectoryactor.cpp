@@ -61,7 +61,7 @@ MTrajectoryActor::MTrajectoryActor()
       trajectorySelection(nullptr),
       trajectorySingleTimeSelection(nullptr),
       dataSourceID(""),
-      initialDataSourceLoading(true),
+      initialDataRequest(true),
       suppressUpdate(false),
       normalsToBeComputed(true),
       renderMode(TRAJECTORY_TUBES),
@@ -1232,17 +1232,20 @@ void MTrajectoryActor::prepareAvailableDataForRendering()
             synchronizationControl->synchronizationCompleted(this);
 #endif
 
-        // Since the we data to be available to select a particle position time,
-        // it is necessary to start a selection request after for the first time
-        // a data source has been loaded.
-        if (initialDataSourceLoading)
+        // Special case:
+        // Since the particle position times depend on the data requested,
+        // we need to call asynchronousSelectionRequest() after data request is
+        // complete when requesting data from a data source for the first time.
+        if (initialDataRequest)
         {
-            initialDataSourceLoading = false;
+            initialDataRequest = false;
             asynchronousSelectionRequest();
         }
-
-        emitActorChangedSignal();
-        updateSyncPropertyColourHints();
+        else
+        {
+            emitActorChangedSignal();
+            updateSyncPropertyColourHints();
+        }
     }
 }
 

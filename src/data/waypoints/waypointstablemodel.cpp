@@ -377,7 +377,7 @@ void MWaypointsTableModel::saveToFile(QString fileName)
 
     int i = 0;
     MWaypoint * wp;
-    for(i = 0; i < this->waypoints.count(); i++)
+    for (i = 0; i < this->waypoints.count(); i++)
     {
         wp = this->waypoints.at(i);
 
@@ -473,10 +473,12 @@ void MWaypointsTableModel::loadFromFile(QString fn)
 
 void MWaypointsTableModel::saveToSettings(QSettings *settings)
 {
+    // Code taken from MWaypointsTableModel::saveToFile(QString fn) .
+
     settings->setValue("flightTrackName", flightTrackName);
     settings->beginWriteArray("waypoints");
     MWaypoint *wp;
-    for(int i = 0; i < this->waypoints.count(); ++i)
+    for (int i = 0; i < this->waypoints.count(); ++i)
     {
         settings->setArrayIndex(i);
 
@@ -493,6 +495,8 @@ void MWaypointsTableModel::saveToSettings(QSettings *settings)
 
 void MWaypointsTableModel::loadFromSettings(QSettings *settings)
 {
+    // Code taken from MWaypointsTableModel::loadFromFile(QString fn) .
+
     flightTrackName = settings->value("flightTrackName",
                                       "Met.3D vertical section path").toString();
 
@@ -618,7 +622,7 @@ void MWaypointsTableModel::updateDistances(int index, int count)
     // 1. Update "distances to previous waypoint" for the wps from "index"
     // to (and including) "index+count" (hence if count == 1, the waypoint at
     // position index and the following waypoint will be updated).
-    for(int i = index; i <= min(index+count, waypoints.size()-1); i++)
+    for (int i = index; i <= min(index+count, waypoints.size()-1); i++)
     {
         wp_i = waypoints.at(i);
 
@@ -644,7 +648,7 @@ void MWaypointsTableModel::updateDistances(int index, int count)
 
     // 2. Update the total cumulative distance for all waypoints starting
     // at "index".
-    for(int i = index; i < waypoints.size(); i++)
+    for (int i = index; i < waypoints.size(); i++)
     {
         wp_i = waypoints.at(i);
 
