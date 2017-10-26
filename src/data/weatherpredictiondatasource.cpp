@@ -32,8 +32,9 @@
 // local application imports
 
 using namespace std;
-using namespace Met3D;
 
+namespace Met3D
+{
 
 /******************************************************************************
 ***                     CONSTRUCTOR / DESTRUCTOR                            ***
@@ -54,3 +55,6 @@ MWeatherPredictionDataSource::MWeatherPredictionDataSource()
 /******************************************************************************
 ***                          PROTECTED METHODS                              ***
 *******************************************************************************/
+
+
+} // namespace Met3D

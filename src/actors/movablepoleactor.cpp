@@ -37,7 +37,9 @@
 #include "gxfw/msceneviewglwidget.h"
 
 using namespace std;
-using namespace Met3D;
+
+namespace Met3D
+{
 
 /******************************************************************************
 ***                     CONSTRUCTOR / DESTRUCTOR                            ***
@@ -1039,3 +1041,5 @@ void MMovablePoleActor::generateGeometry()
     uploadVec3ToVertexBuffer(axisTicks, axisRequestKey, &axisVertexBuffer);
 }
 
+
+} // namespace Met3D

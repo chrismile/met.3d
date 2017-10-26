@@ -111,9 +111,15 @@ public slots:
     void reloadSession();
 
     /**
+      autoSaveSession is called by @ref MMainWindow to trigger an auto save
+      event.
+     */
+    void autoSaveSession();
+
+    /**
       saveSession saves the current active session.
      */
-    void saveSession();
+    void saveSession(bool autoSave = false);
 
     /**
       cloneSession clones the selected session by asking the user to enter a
@@ -180,7 +186,7 @@ private:
 
     void setSessionToCurrent(QString session);
 
-    void saveSessionToFile(QString sessionName);
+    void saveSessionToFile(QString sessionName, bool autoSave = false);
 
     void loadSessionFromFile(QString sessionName);
 

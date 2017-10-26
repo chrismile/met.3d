@@ -424,7 +424,7 @@ private:
     std::shared_ptr<GL::MShaderEffect> positionSphereShadowShader;
 
     QtProperty *transferFunctionProperty;
-    /** Pointer to transfer function object and cooresponding texture unit. */
+    /** Pointer to transfer function object and corresponding texture unit. */
     MTransferFunction1D *transferFunction;
     int                 textureUnitTransferFunction;
 

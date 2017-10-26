@@ -122,13 +122,8 @@ void MSessionManagerDialog::initialize(
     // Session:
     // ========
     this->loadOnStart = loadOnStart;
-    currentSession = sessionName;
-    if (currentSession == "")
-    {
-        ui->reloadButton->setEnabled(false);
-        ui->saveButton->setEnabled(false);
-    }
-    updateSessionLabel();
+
+    setSessionToCurrent(sessionName);
 
     // Auto save:
     // ==========
@@ -304,7 +299,7 @@ void MSessionManagerDialog::createNewSession()
     QStringList sessions =
             directory.entryList(QStringList("*" + fileExtension),
                                 QDir::Files);
-    if (sessions.contains(sessionName))
+    if (sessions.contains(sessionName + fileExtension))
     {
         int index = getSmallestIndexForUniqueName(sessionName);
         sessionName = sessionName + QString(" (%1)").arg(index);
@@ -343,7 +338,13 @@ void MSessionManagerDialog::reloadSession()
 }
 
 
-void MSessionManagerDialog::saveSession()
+void MSessionManagerDialog::autoSaveSession()
+{
+    saveSession(true);
+}
+
+
+void MSessionManagerDialog::saveSession(bool autoSave)
 {
     // Don't save session if Met.3D hat no write access to the directory.
     if (!QFileInfo(path).isWritable())
@@ -354,15 +355,17 @@ void MSessionManagerDialog::saveSession()
                     "Please select a different directory.");
         return;
     }
+
     if (currentSession != "")
     {
-        saveSessionToFile(currentSession);
-        return;
+        saveSessionToFile(currentSession, autoSave);
     }
-    QMessageBox::warning(
-                this, "Unable to save session.",
-                "No session name is given.\n"
-                "Please create a new session before saving the session.");
+    // If no current session is set, ask the user to choose a name to create
+    // a new session.
+    else
+    {
+        createNewSession();
+    }
 }
 
 
@@ -731,11 +734,11 @@ void MSessionManagerDialog::setSessionToCurrent(QString session)
 }
 
 
-void MSessionManagerDialog::saveSessionToFile(QString sessionName)
+void MSessionManagerDialog::saveSessionToFile(QString sessionName, bool autoSave)
 {
     QString filename = QDir(path).absoluteFilePath(sessionName + fileExtension);
 
-    if (ui->autoSaveCheckBox)
+    if (autoSave)
     {
         LOG4CPLUS_DEBUG(mlog,
                         "Auto-saving session [auto-save interval "
@@ -918,6 +921,7 @@ void MSessionManagerDialog::loadSessionFromFile(QString sessionName)
     // ==========================================
     settings->beginGroup("MSession");
 
+    // Create and initialise progress bar.
     QProgressDialog *progressDialog = new QProgressDialog(
                 "Loading session...", "",
                 0, settings->childGroups().size() * 2);

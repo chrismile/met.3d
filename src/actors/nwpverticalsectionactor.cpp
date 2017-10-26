@@ -223,6 +223,11 @@ void MNWPVerticalSectionActor::loadConfiguration(QSettings *settings)
                 settings->value("interpolationNodeSpacing", 0.15).toFloat());
 
     settings->endGroup();
+
+    if (this->isInitialized())
+    {
+        generateIsoPressureLines();
+    }
 }
 
 
@@ -850,7 +855,10 @@ void MNWPVerticalSectionActor::generatePathFromWaypoints(
 //    }
 
 //TODO: Register this texture with the glRM memory management?
-    if (textureVerticalSectionPath) delete textureVerticalSectionPath;
+    if (textureVerticalSectionPath)
+    {
+        delete textureVerticalSectionPath;
+    }
     textureVerticalSectionPath = new GL::MTexture(QString("vpath_%1").arg(myID),
                                                  GL_TEXTURE_1D, GL_ALPHA32F_ARB,
                                                  4 * path.size());
