@@ -61,6 +61,7 @@ MTrajectoryActor::MTrajectoryActor()
       trajectorySelection(nullptr),
       trajectorySingleTimeSelection(nullptr),
       dataSourceID(""),
+      initialDataSourceLoading(true),
       suppressUpdate(false),
       normalsToBeComputed(true),
       renderMode(TRAJECTORY_TUBES),
@@ -367,8 +368,7 @@ void MTrajectoryActor::loadConfiguration(QSettings *settings)
                 }
             }
         }
-
-        if (dataSourceAvailable)
+        else
         {
             properties->mString()->setValue(utilizedDataSourceProperty,
                                             dataSourceID);
@@ -379,7 +379,6 @@ void MTrajectoryActor::loadConfiguration(QSettings *settings)
 
             updateInitTimeProperty();
             updateStartTimeProperty();
-            updateParticlePosTimeProperty();
         }
     }
 
@@ -541,7 +540,6 @@ bool MTrajectoryActor::setTransferFunction(QString tfName)
 
 void MTrajectoryActor::synchronizeWith(
         MSyncControl *sync, bool updateGUIProperties)
-
 {
     if (synchronizationControl == sync)
     {
@@ -1234,6 +1232,15 @@ void MTrajectoryActor::prepareAvailableDataForRendering()
             synchronizationControl->synchronizationCompleted(this);
 #endif
 
+        // Since the we data to be available to select a particle position time,
+        // it is necessary to start a selection request after for the first time
+        // a data source has been loaded.
+        if (initialDataSourceLoading)
+        {
+            initialDataSourceLoading = false;
+            asynchronousSelectionRequest();
+        }
+
         emitActorChangedSignal();
         updateSyncPropertyColourHints();
     }
@@ -1693,7 +1700,10 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
         // If any required data item is missing we cannot render.
         if ( (trajectories == nullptr)
              || (normals[sceneView] == nullptr)
-             || (trajectorySelection == nullptr) ) return;
+             || (trajectorySelection == nullptr))
+        {
+            return;
+        }
 
         // If the vertical scaling of the view has changed, a recomputation of
         // the normals is necessary, as they are based on worldZ coordinates.
@@ -1843,7 +1853,10 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
          || (renderMode == TUBES_AND_SINGLETIME)
          || (renderMode == BACKWARDTUBES_AND_SINGLETIME))
     {
-        if (trajectories == nullptr) return;
+        if (trajectories == nullptr)
+        {
+            return;
+        }
 
         if (renderMode == ALL_POSITION_SPHERES)
         {
@@ -2323,6 +2336,10 @@ void MTrajectoryActor::updateInitTimeProperty()
 
         int newIndex = max(0, availableInitTimes.indexOf(initTime));
         properties->mEnum()->setValue(initTimeProperty, newIndex);
+        if (synchronizeInitTime && synchronizationControl != nullptr)
+        {
+            setInitDateTime(synchronizationControl->initDateTime());
+        }
     }
 
     suppressUpdate = false;
@@ -2354,6 +2371,10 @@ void MTrajectoryActor::updateStartTimeProperty()
 
         int newIndex = max(0, availableStartTimes.indexOf(startTime));
         properties->mEnum()->setValue(startTimeProperty, newIndex);
+        if (synchronizeStartTime && synchronizationControl != nullptr)
+        {
+            setStartDateTime(synchronizationControl->validDateTime());
+        }
     }
 
     suppressUpdate = false;
@@ -2403,6 +2424,10 @@ void MTrajectoryActor::updateParticlePosTimeProperty()
         case BACKWARDTUBES_AND_SINGLETIME:
             particlePosTimeProperty->setEnabled(!synchronizeParticlePosTime);
             break;
+        }
+        if (synchronizeParticlePosTime && synchronizationControl != nullptr)
+        {
+            setParticleDateTime(synchronizationControl->validDateTime());
         }
     }
 
