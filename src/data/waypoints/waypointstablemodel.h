@@ -143,6 +143,10 @@ public:
 
     void loadFromFile(QString fileName);
 
+    void saveToSettings(QSettings *settings);
+
+    void loadFromSettings(QSettings *settings);
+
     /**
      Returns the horizontal position (lon/lat) of the waypoint at @p index.
      */

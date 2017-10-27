@@ -317,8 +317,16 @@ private:
     QVector<MTrajectoryRequestBuffer> trajectoryRequests;
 
     MTrajectoryDataSource *trajectorySource;
+    MTrajectories *trajectories;
+    GL::MVertexBuffer *trajectoriesVertexBuffer;
+
     MTrajectoryNormalsSource *normalsSource;
+    QHash<MSceneViewGLWidget*, MTrajectoryNormals*> normals;
+    QHash<MSceneViewGLWidget*, GL::MVertexBuffer*> normalsVertexBuffer;
+
     MTrajectoryFilter *trajectoryFilter;
+    MTrajectorySelection *trajectorySelection;
+    MTrajectorySelection *trajectorySingleTimeSelection;
 
     QtProperty *selectDataSourceProperty;
     QtProperty *utilizedDataSourceProperty;
@@ -326,9 +334,10 @@ private:
 
     bool precomputedDataSource; // indicate whether a precomputed dataSource is used
 
+    bool initialDataRequest; // inidactor whether the actor loads for the
+                             // first time a data source.
+
     bool suppressUpdate;
-    bool normalsToBeComputed; // true if the z-scaling of the scene view has
-                              // changed: normals need to be recomputed
 
     /** Render mode (tubes, spheres, etc.). */
     enum TrajectoryRenderType {

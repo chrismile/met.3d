@@ -2291,8 +2291,6 @@ void MSceneViewGLWidget::loadConfiguration(QSettings *settings)
 {
     MSystemManagerAndControl* sysMC = MSystemManagerAndControl::getInstance();
 
-    camera.loadConfiguration(settings);
-
     // Load interaction properties.
     settings->beginGroup("Interaction");
     // Since scene navigation mode is stored as a string, get the corresponding
@@ -2391,6 +2389,8 @@ void MSceneViewGLWidget::loadConfiguration(QSettings *settings)
                 northArrow.colourProperty,
                 settings->value("colour", QColor(222, 46, 30)).value<QColor>());
     settings->endGroup(); // arrow pointing north
+
+    camera.loadConfiguration(settings);
 }
 
 

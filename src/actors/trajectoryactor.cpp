@@ -66,8 +66,8 @@ MTrajectoryActor::MTrajectoryActor()
       trajectoryFilter(nullptr),
       dataSourceID(""),
       precomputedDataSource(false),
+      initialDataRequest(true),
       suppressUpdate(false),
-      normalsToBeComputed(true),
       renderMode(TRAJECTORY_TUBES),
       synchronizationControl(nullptr),
       synchronizeInitTime(true),
@@ -157,7 +157,7 @@ MTrajectoryActor::MTrajectoryActor()
     particlePosTimeProperty->setToolTip("Not selectable for 'tubes' and 'all"
                                         " positions' render mode");
 
-    // Property: Trajectory calculation?
+    // Property: Trajectory calculation
     calculationPropertyGroup = addProperty(GROUP_PROPERTY, "calculation",
                                            actorPropertiesSupGroup);
     calculationLineTypeProperty = addProperty(ENUM_PROPERTY, "line type",
@@ -217,8 +217,9 @@ MTrajectoryActor::MTrajectoryActor()
     properties->setDDouble(deltaPressureFilterProperty, 500., 1., 1050., 2, 5.,
                            " hPa");
 
-    deltaTimeFilterProperty = addProperty(DECORATEDDOUBLE_PROPERTY, "time interval",
-                                    actorPropertiesSupGroup);
+    deltaTimeFilterProperty = addProperty(DECORATEDDOUBLE_PROPERTY,
+                                          "time interval",
+                                          actorPropertiesSupGroup);
     properties->setDDouble(deltaTimeFilterProperty, 48, 1, 48, 0, 1, " hrs");
 
     actorPropertiesSupGroup->addSubProperty(bBoxConnection->getProperty());
@@ -453,7 +454,6 @@ void MTrajectoryActor::loadConfiguration(QSettings *settings)
 
             updateInitTimeProperty();
             updateStartTimeProperty();
-            updateParticlePosTimeProperty();
         }
     }
 
@@ -659,9 +659,11 @@ bool MTrajectoryActor::setTransferFunction(QString tfName)
 
 void MTrajectoryActor::synchronizeWith(
         MSyncControl *sync, bool updateGUIProperties)
-
 {
-    if (synchronizationControl == sync) return;
+    if (synchronizationControl == sync)
+    {
+        return;
+    }
 
     // Reset connection to current synchronization control.
     // ====================================================
@@ -1359,7 +1361,19 @@ void MTrajectoryActor::prepareAvailableDataForRendering(uint slot)
         if (trqi.syncchronizationRequest)
             synchronizationControl->synchronizationCompleted(this);
 #endif
+    }
 
+    // Special case:
+    // Since the particle position times depend on the data requested,
+    // we need to call asynchronousSelectionRequest() after data request is
+    // complete when requesting data from a data source for the first time.
+    if (initialDataRequest)
+    {
+        initialDataRequest = false;
+        asynchronousSelectionRequest();
+    }
+    else
+    {
         emitActorChangedSignal();
         updateSyncPropertyColourHints();
     }
@@ -1662,7 +1676,7 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
 
         if (suppressActorUpdates()) return;
 
-        if (synchronizeInitTime)
+        if (synchronizeInitTime && synchronizationControl != nullptr)
         {
             if (setInitDateTime(synchronizationControl->initDateTime()))
             {
@@ -1681,7 +1695,7 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
 
         if (suppressActorUpdates()) return;
 
-        if (synchronizeStartTime)
+        if (synchronizeStartTime && synchronizationControl != nullptr)
         {
             if (setStartDateTime(synchronizationControl->validDateTime()))
             {
@@ -1700,7 +1714,7 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
 
         if (suppressActorUpdates()) return;
 
-        if (synchronizeParticlePosTime)
+        if (synchronizeParticlePosTime && synchronizationControl != nullptr)
         {
             if (setParticleDateTime(synchronizationControl->validDateTime()))
             {
@@ -1720,7 +1734,7 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
 
         if (suppressActorUpdates()) return;
 
-        if (synchronizeEnsemble)
+        if (synchronizeEnsemble && synchronizationControl != nullptr)
         {
             if (setEnsembleMember(synchronizationControl->ensembleMember()))
             {
@@ -2808,6 +2822,10 @@ void MTrajectoryActor::updateInitTimeProperty()
 
         int newIndex = max(0, availableInitTimes.indexOf(initTime));
         properties->mEnum()->setValue(initTimeProperty, newIndex);
+        if (synchronizeInitTime && synchronizationControl != nullptr)
+        {
+            setInitDateTime(synchronizationControl->initDateTime());
+        }
     }
 
     suppressUpdate = false;
@@ -2839,6 +2857,10 @@ void MTrajectoryActor::updateStartTimeProperty()
 
         int newIndex = max(0, availableStartTimes.indexOf(startTime));
         properties->mEnum()->setValue(startTimeProperty, newIndex);
+        if (synchronizeStartTime && synchronizationControl != nullptr)
+        {
+            setStartDateTime(synchronizationControl->validDateTime());
+        }
     }
 
     updateDeltaTimeProperty();
@@ -2901,6 +2923,10 @@ void MTrajectoryActor::updateParticlePosTimeProperty()
         case BACKWARDTUBES_AND_SINGLETIME:
             particlePosTimeProperty->setEnabled(!synchronizeParticlePosTime);
             break;
+        }
+        if (synchronizeParticlePosTime && synchronizationControl != nullptr)
+        {
+            setParticleDateTime(synchronizationControl->validDateTime());
         }
     }
 
@@ -3090,7 +3116,6 @@ bool MTrajectoryActor::selectDataSource()
 
         updateInitTimeProperty();
         updateStartTimeProperty();
-        updateParticlePosTimeProperty();
 
         return true;
     }
