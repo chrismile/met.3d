@@ -322,27 +322,37 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
         // Read settings from file.
         QString name = config.value("name").toString();
         bool isEnsemble = config.value("ensemble").toBool();
-        QString path = expandEnvironmentVariables(config.value("path").toString());
+        QString path =
+                expandEnvironmentVariables(config.value("path").toString());
         bool ablTrajectories = config.value("ABLTrajectories").toBool();
         QString schedulerID = config.value("schedulerID").toString();
         QString memoryManagerID = config.value("memoryManagerID").toString();
         bool precomputed = config.value("precomputed").toBool();
-        QString computationResource = config.value("computationResourceName").toString();
-        QString computationVariableU = config.value("computationVariableU").toString();
-        QString computationVariableV = config.value("computationVariableV").toString();
-        QString computationVariableP = config.value("computationVariableP").toString();
+        QString computationResource =
+                config.value("computationResourceName").toString();
+        QString computationVariableU =
+                config.value("computationVariableU").toString();
+        QString computationVariableV =
+                config.value("computationVariableV").toString();
+        QString computationVariableP =
+                config.value("computationVariableP").toString();
         QString computationVerticalLvlType =
                 config.value("computationVerticalLvlType").toString();
 
-        if(precomputed)
+        if (precomputed)
         {
-            LOG4CPLUS_DEBUG(mlog, "initializing precomputed LAGRANTO pipeline #" << i << ": ");
+            LOG4CPLUS_DEBUG(mlog, "initializing precomputed LAGRANTO pipeline #"
+                            << i << ": ");
             LOG4CPLUS_DEBUG(mlog, "  name = " << name.toStdString());
-            LOG4CPLUS_DEBUG(mlog, "  " << (isEnsemble ? "ensemble" : "deterministic"));
+            LOG4CPLUS_DEBUG(mlog, "  "
+                            << (isEnsemble ? "ensemble" : "deterministic"));
             LOG4CPLUS_DEBUG(mlog, "  path = " << path.toStdString());
-            LOG4CPLUS_DEBUG(mlog, "  type = " << (ablTrajectories ? "ABL-T" : "DF-T"));
-            LOG4CPLUS_DEBUG(mlog, "  schedulerID = " << schedulerID.toStdString());
-            LOG4CPLUS_DEBUG(mlog, "  memoryManagerID = " << memoryManagerID.toStdString());
+            LOG4CPLUS_DEBUG(mlog, "  type = "
+                            << (ablTrajectories ? "ABL-T" : "DF-T"));
+            LOG4CPLUS_DEBUG(mlog, "  schedulerID = "
+                            << schedulerID.toStdString());
+            LOG4CPLUS_DEBUG(mlog, "  memoryManagerID = "
+                            << memoryManagerID.toStdString());
 
             // Check parameter validity.
             if ( name.isEmpty()
@@ -356,20 +366,29 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
 
             // Create new pipeline.
             if (isEnsemble)
+            {
                 initializeLagrantoEnsemblePipeline(
                         name, path, ablTrajectories, schedulerID,
                         memoryManagerID);
+            }
             else
-                LOG4CPLUS_WARN(mlog, "deterministic precomputed LAGRANTO pipeline has not"
-                        "been implemented yet; skipping.");
+            {
+                LOG4CPLUS_WARN(mlog, "deterministic precomputed LAGRANTO"
+                                     " pipeline has not been implemented yet;"
+                                     " skipping.");
+            }
         }
         else
         {
-            LOG4CPLUS_DEBUG(mlog, "initializing computed LAGRANTO pipeline #" << i << ": ");
+            LOG4CPLUS_DEBUG(mlog, "initializing computed LAGRANTO pipeline #"
+                            << i << ": ");
             LOG4CPLUS_DEBUG(mlog, "  name = " << name.toStdString());
-            LOG4CPLUS_DEBUG(mlog, "  " << (isEnsemble ? "ensemble" : "deterministic"));
-            LOG4CPLUS_DEBUG(mlog, "  type = " << (ablTrajectories ? "ABL-T" : "DF-T"));
-            LOG4CPLUS_DEBUG(mlog, "  schedulerID = " << schedulerID.toStdString());
+            LOG4CPLUS_DEBUG(mlog, "  "
+                            << (isEnsemble ? "ensemble" : "deterministic"));
+            LOG4CPLUS_DEBUG(mlog, "  type = "
+                            << (ablTrajectories ? "ABL-T" : "DF-T"));
+            LOG4CPLUS_DEBUG(mlog, "  schedulerID = "
+                            << schedulerID.toStdString());
             LOG4CPLUS_DEBUG(mlog, "  memoryManagerID = "
                             << memoryManagerID.toStdString());
             LOG4CPLUS_DEBUG(mlog, "  computationResourceName = "
@@ -393,20 +412,26 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
                  || schedulerID.isEmpty()
                  || memoryManagerID.isEmpty() )
             {
-                LOG4CPLUS_WARN(mlog, "invalid parameters encountered; skipping.");
+                LOG4CPLUS_WARN(mlog, "invalid parameters encountered;"
+                                     " skipping.");
                 continue;
             }
 
             // Create new pipeline.
             if (isEnsemble)
+            {
                 initializeComputationEnsemblePipeline(
                         name, ablTrajectories, schedulerID,
                         memoryManagerID, computationResource,
                         computationVariableU, computationVariableV,
                         computationVariableP, computationVerticalLvlType);
+            }
             else
-                LOG4CPLUS_WARN(mlog, "deterministic computed LAGRANTO pipeline has not"
-                        "been implemented yet; skipping.");
+            {
+                LOG4CPLUS_WARN(mlog, "deterministic computed LAGRANTO pipeline"
+                                     " has not been implemented yet;"
+                                     " skipping.");
+            }
         }
     }
 
@@ -453,7 +478,8 @@ void MPipelineConfiguration::initializeNWPPipeline(
     nwpReaderENS->setMemoryManager(memoryManager);
     nwpReaderENS->setScheduler(scheduler);
     nwpReaderENS->setDataRoot(fileDir, fileFilter);
-    // (Should the "raw" data reader be selectable as a data source?) Yes it should, for computed trajectories
+    // (Should the "raw" data reader be selectable as a data source?)
+    // Yes it should, for computed trajectories
     sysMC->registerDataSource(dataSourceId, nwpReaderENS);
 
     MStructuredGridEnsembleFilter *ensFilter =
@@ -582,7 +608,8 @@ void MPipelineConfiguration::initializeLagrantoEnsemblePipeline(
                               trajectoryReader);
 
     // initialize trajectory pipeline
-    initializeEnsemblePipeline(dataSourceId, boundaryLayerTrajectories, trajectoryReader, scheduler, memoryManager);
+    initializeEnsemblePipeline(dataSourceId, boundaryLayerTrajectories,
+                               trajectoryReader, scheduler, memoryManager);
 
     LOG4CPLUS_DEBUG(mlog, "Pipeline ''" << dataSourceId.toStdString()
                     << "'' has been initialized.");
@@ -602,30 +629,40 @@ void MPipelineConfiguration::initializeComputationEnsemblePipeline(
 {
     MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
     MAbstractScheduler* scheduler = sysMC->getScheduler(schedulerID);
-    MAbstractMemoryManager* memoryManager = sysMC->getMemoryManager(memoryManagerID);
+    MAbstractMemoryManager* memoryManager =
+            sysMC->getMemoryManager(memoryManagerID);
 
     const QString dataSourceId = name;
-    LOG4CPLUS_DEBUG(mlog, "Initializing COMPUTATION pipeline ''" << dataSourceId.toStdString() << "'' ...");
+    LOG4CPLUS_DEBUG(mlog, "Initializing COMPUTATION pipeline ''"
+                          "" << dataSourceId.toStdString() << "'' ...");
 
-    MWeatherPredictionDataSource* mwpResource = dynamic_cast<MWeatherPredictionDataSource*>(sysMC->getDataSource(resourceID));
-    if(!mwpResource)
+    MWeatherPredictionDataSource* mwpResource =
+            dynamic_cast<MWeatherPredictionDataSource*>(
+                sysMC->getDataSource(resourceID));
+    if (!mwpResource)
     {
-        LOG4CPLUS_WARN(mlog, "MWeatherPredictionDataSource ''" << resourceID.toStdString() << "'' is invalid; skipping.");
+        LOG4CPLUS_WARN(mlog, "MWeatherPredictionDataSource ''"
+                       << resourceID.toStdString()
+                       << "'' is invalid; skipping.");
         return;
     }
 
-    MTrajectoryCalculator* trajectoryCalculator = new MTrajectoryCalculator(dataSourceId);
+    MTrajectoryCalculator* trajectoryCalculator =
+            new MTrajectoryCalculator(dataSourceId);
     trajectoryCalculator->setMemoryManager(memoryManager);
     trajectoryCalculator->setScheduler(scheduler);
     trajectoryCalculator->setUVPVariables(variableU, variableV, variableP);
     trajectoryCalculator->setVericalLevelType(verticalLvlType);
     trajectoryCalculator->setInputSource(mwpResource);
-    sysMC->registerDataSource(dataSourceId + QString(" Reader"), trajectoryCalculator);
+    sysMC->registerDataSource(dataSourceId + QString(" Reader"),
+                              trajectoryCalculator);
 
     // initialize trajectory pipeline
-    initializeEnsemblePipeline(dataSourceId, boundaryLayerTrajectories, trajectoryCalculator, scheduler, memoryManager);
+    initializeEnsemblePipeline(dataSourceId, boundaryLayerTrajectories,
+                               trajectoryCalculator, scheduler, memoryManager);
 
-    LOG4CPLUS_DEBUG(mlog, "Pipeline ''" << dataSourceId.toStdString() << "'' has been initialized.");
+    LOG4CPLUS_DEBUG(mlog, "Pipeline ''" << dataSourceId.toStdString()
+                    << "'' has been initialized.");
 }
 
 

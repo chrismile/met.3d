@@ -372,7 +372,7 @@ void MTrajectoryActor::saveConfiguration(QSettings *settings)
     settings->setValue(
                 "calculationSeedActorSize",
                 calculationSeedActorProperties.size());
-    for(int i = 0; i <  calculationSeedActorProperties.size(); i++)
+    for (int i = 0; i <  calculationSeedActorProperties.size(); i++)
     {
         const SeedActorSettings& sas = calculationSeedActorProperties.at(i);
         settings->setValue(QString("calculationSeedActorName%1").arg(i),
@@ -597,7 +597,7 @@ void MTrajectoryActor::loadConfiguration(QSettings *settings)
 
     const int actorCount =
             settings->value("calculationSeedActorSize", 0).toInt();
-    for(int i = 0; i < actorCount; i++)
+    for (int i = 0; i < actorCount; i++)
     {
         QString actorName = settings->value(
                     QString("calculationSeedActorName%1").arg(i)).toString();
@@ -1165,7 +1165,7 @@ void MTrajectoryActor::asynchronousDataAvailable(MDataRequest request)
     // See NWPActorVariabe::asynchronousDataAvailable() for explanations
     // on request queue handling.
     // Iterate over all trajectory requests
-    for(int t = 0; t < trajectoryRequests.size(); t++)
+    for (int t = 0; t < trajectoryRequests.size(); t++)
     {
         bool queueContainsEntryWithNoPendingRequests = false;
         for (int i = 0; i < trajectoryRequests[t].pendingRequestsQueue.size(); i++)
@@ -1198,7 +1198,7 @@ void MTrajectoryActor::asynchronousDataAvailable(MDataRequest request)
 
 void MTrajectoryActor::asynchronousNormalsAvailable(MDataRequest request)
 {
-    for(int t = 0; t < trajectoryRequests.size(); t++)
+    for (int t = 0; t < trajectoryRequests.size(); t++)
     {
         bool queueContainsEntryWithNoPendingRequests = false;
         for (int i = 0; i < trajectoryRequests[t].pendingRequestsQueue.size(); i++)
@@ -1231,7 +1231,7 @@ void MTrajectoryActor::asynchronousNormalsAvailable(MDataRequest request)
 
 void MTrajectoryActor::asynchronousSelectionAvailable(MDataRequest request)
 {
-    for(int t = 0; t < trajectoryRequests.size(); t++)
+    for (int t = 0; t < trajectoryRequests.size(); t++)
     {
         bool queueContainsEntryWithNoPendingRequests = false;
         for (int i = 0; i < trajectoryRequests[t].pendingRequestsQueue.size(); i++)
@@ -1261,7 +1261,7 @@ void MTrajectoryActor::asynchronousSelectionAvailable(MDataRequest request)
 
 void MTrajectoryActor::asynchronousSingleTimeSelectionAvailable(MDataRequest request)
 {
-    for(int t = 0; t < trajectoryRequests.size(); t++)
+    for (int t = 0; t < trajectoryRequests.size(); t++)
     {
         bool queueContainsEntryWithNoPendingRequests = false;
         for (int i = 0; i < trajectoryRequests[t].pendingRequestsQueue.size(); i++)
@@ -1439,9 +1439,9 @@ void MTrajectoryActor::onActorDeleted(MActor *actor)
     // check whether the actor is in our seed list
     else
     {
-        for(SeedActorSettings& sas : calculationSeedActorProperties)
+        for (SeedActorSettings& sas : calculationSeedActorProperties)
         {
-            if(sas.actor == actor)
+            if (sas.actor == actor)
             {
                 removeSeedActor(sas.actor->getName());
             }
@@ -1476,9 +1476,9 @@ void MTrajectoryActor::onActorRenamed(MActor *actor, QString oldName)
     // check whether the actor is in our seed list
     else
     {
-        for(SeedActorSettings& sas : calculationSeedActorProperties)
+        for (SeedActorSettings& sas : calculationSeedActorProperties)
         {
-            if(sas.actor == actor)
+            if (sas.actor == actor)
             {
                 sas.propertyGroup->setPropertyName(sas.actor->getName());
             }
@@ -1530,7 +1530,7 @@ bool MTrajectoryActor::isConnectedTo(MActor *actor)
 
 void MTrajectoryActor::onSeedActorChanged()
 {
-    if(suppressActorUpdates()) return;
+    if (suppressActorUpdates()) return;
 
     releaseData();
     updateActorData();
@@ -1933,9 +1933,9 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
     }
     else
     {
-        for(SeedActorSettings& sas : calculationSeedActorProperties)
+        for (SeedActorSettings& sas : calculationSeedActorProperties)
         {
-            if( property == sas.removeProperty)
+            if ( property == sas.removeProperty)
             {
                 if (suppressActorUpdates()) return;
                 removeSeedActor(sas.actor->getName());
@@ -1948,7 +1948,7 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
             }
             else if (property == sas.stepSizeLon || property == sas.stepSizeLat || property == sas.pressureLevels)
             {
-                if(suppressActorUpdates()) return;
+                if (suppressActorUpdates()) return;
 
                 updateActorData();
 
@@ -1971,7 +1971,7 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
          || (renderMode == TUBES_AND_SINGLETIME)
          || (renderMode == BACKWARDTUBES_AND_SINGLETIME))
     {
-        for(int t = 0; t < (precomputedDataSource ? 1 : seedActorData.size()); t++)
+        for (int t = 0; t < (precomputedDataSource ? 1 : seedActorData.size()); t++)
         {
             // If any required data item is missing we cannot render.
             if ( (trajectoryRequests[t].trajectories == nullptr)
@@ -2125,7 +2125,7 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
          || (renderMode == TUBES_AND_SINGLETIME)
          || (renderMode == BACKWARDTUBES_AND_SINGLETIME))
     {
-        for(int t = 0; t < (precomputedDataSource ? 1 : seedActorData.size()); t++)
+        for (int t = 0; t < (precomputedDataSource ? 1 : seedActorData.size()); t++)
         {
             if (trajectoryRequests[t].trajectories == nullptr) continue;
 
@@ -2303,9 +2303,9 @@ void MTrajectoryActor::updateEnsembleProperties()
 void MTrajectoryActor::updateActorData()
 {
     seedActorData.clear();
-    for(SeedActorSettings& sas : calculationSeedActorProperties)
+    for (SeedActorSettings& sas : calculationSeedActorProperties)
     {
-        if(!sas.actor->isEnabled())
+        if (!sas.actor->isEnabled())
             continue;
 
         double stepSizeLon = properties->mDouble()->value(sas.stepSizeLon);
@@ -2320,7 +2320,7 @@ void MTrajectoryActor::updateActorData()
                     dynamic_cast<MMovablePoleActor *>(sas.actor);
 
             // every pole has 2 vertices for bot and top
-            for(int i = 0; i < actor->getPoleVertices().size(); i += 2)
+            for (int i = 0; i < actor->getPoleVertices().size(); i += 2)
             {
                 QVector3D bot = actor->getPoleVertices().at(i);
                 QVector3D top = actor->getPoleVertices().at(i + 1);
@@ -2331,9 +2331,9 @@ void MTrajectoryActor::updateActorData()
                 data.maxPosition = QVector3D(bot.x(), bot.y(), bot.z());
                 data.stepSize = QVector2D(stepSizeLon, stepSizeLat);
                 data.pressureLevels.clear();
-                for(float f : pressureLevels)
+                for (float f : pressureLevels)
                 {
-                    if(bot.z() >= f && f >= top.z())
+                    if (bot.z() >= f && f >= top.z())
                         data.pressureLevels << f;
                 }
                 seedActorData.push_back(data);
@@ -2373,10 +2373,10 @@ void MTrajectoryActor::updateActorData()
                 continue;
             }
 
-            if(!actor->getWaypointsModel())
+            if (!actor->getWaypointsModel())
                 continue;
 
-            for(int i = 0; i < actor->getWaypointsModel()->size() - 1; i++)
+            for (int i = 0; i < actor->getWaypointsModel()->size() - 1; i++)
             {
                 QVector2D point1 = actor->getWaypointsModel()->positionLonLat(i);
                 QVector2D point2 = actor->getWaypointsModel()->positionLonLat(i + 1);
@@ -2389,9 +2389,9 @@ void MTrajectoryActor::updateActorData()
                 data.maxPosition = QVector3D(point2.x(), point2.y(), pbot);
                 data.stepSize = QVector2D(stepSizeLon, stepSizeLat);
                 data.pressureLevels.clear();
-                for(float f : pressureLevels)
+                for (float f : pressureLevels)
                 {
-                    if(pbot >= f && f >= ptop)
+                    if (pbot >= f && f >= ptop)
                         data.pressureLevels << f;
                 }
 
@@ -2419,9 +2419,9 @@ void MTrajectoryActor::updateActorData()
             data.maxPosition = QVector3D(hor.x() + hor.width(), hor.y() + hor.width(), pbot);
             data.stepSize = QVector2D(stepSizeLon, stepSizeLat);
             data.pressureLevels.clear();
-            for(float f : pressureLevels)
+            for (float f : pressureLevels)
             {
-                if(pbot >= f && f >= ptop)
+                if (pbot >= f && f >= ptop)
                     data.pressureLevels << f;
             }
             seedActorData.push_back(data);
@@ -2509,7 +2509,7 @@ void MTrajectoryActor::asynchronousDataRequest(bool synchronizationRequest)
     Q_UNUSED(synchronizationRequest);
 #endif
 
-    for(int t = 0; t < (precomputedDataSource ? 1 : seedActorData.size()); t++)
+    for (int t = 0; t < (precomputedDataSource ? 1 : seedActorData.size()); t++)
     {
         // Initialize empty MTrajectoryRequestQueueInfo.
         MTrajectoryRequestQueueInfo trqi;
@@ -2537,7 +2537,7 @@ void MTrajectoryActor::asynchronousDataRequest(bool synchronizationRequest)
         rh.insert("TIME_SPAN", "ALL");
 
         // if computed dataSource is used, additional information is needed
-        if(!precomputedDataSource)
+        if (!precomputedDataSource)
         {
             QDateTime endTime = availableStartTimes.at(properties->mEnum()->value(calculationDeltaTimeProperty));
             unsigned int lineType = properties->mEnum()->value(calculationLineTypeProperty);
@@ -2672,7 +2672,7 @@ void MTrajectoryActor::asynchronousDataRequest(bool synchronizationRequest)
 
 void MTrajectoryActor::asynchronousSelectionRequest()
 {
-    for(int t = 0; t < (precomputedDataSource ? 1 : seedActorData.size()); t++)
+    for (int t = 0; t < (precomputedDataSource ? 1 : seedActorData.size()); t++)
     {
         MTrajectoryRequestQueueInfo trqi;
         trqi.dataRequest.request = "NULL";
@@ -2701,7 +2701,7 @@ void MTrajectoryActor::asynchronousSelectionRequest()
         rh.insert("TRY_PRECOMPUTED", 1);
 
         // if computed dataSource is used, additional information is needed
-        if(!precomputedDataSource)
+        if (!precomputedDataSource)
         {
             int endTimeIndex =
                     properties->mEnum()->value(calculationDeltaTimeProperty);
@@ -2950,7 +2950,7 @@ void MTrajectoryActor::updateDeltaTimeProperty()
 {
     suppressUpdate = true;
 
-    if(trajectorySource == nullptr || precomputedDataSource)
+    if (trajectorySource == nullptr || precomputedDataSource)
     {
         properties->mEnum()->setEnumNames(calculationDeltaTimeProperty, QStringList());
     }
@@ -2962,7 +2962,7 @@ void MTrajectoryActor::updateDeltaTimeProperty()
 
         // get available timesteps and add time delta to list (ignore currently selected start Time)
         QStringList endTimes;
-        for(QDateTime& time : availableStartTimes)
+        for (QDateTime& time : availableStartTimes)
         {
            endTimes << QString("%1 hrs").arg(startTime.secsTo(time) / 3600.0);
         }
@@ -3055,9 +3055,9 @@ void MTrajectoryActor::debugPrintPendingRequestsQueue()
 
     QString str = QString("\n==================\nPending requests queue:\n");
 
-    for(int t = 0; t < (precomputedDataSource ? 1 : seedActorData.size()); t++)
+    for (int t = 0; t < (precomputedDataSource ? 1 : seedActorData.size()); t++)
     {
-        if(!precomputedDataSource)
+        if (!precomputedDataSource)
             str += QString("Seed position #%1").arg(t);
 
         for (int i = 0; i < trajectoryRequests[t].pendingRequestsQueue.size(); i++)
@@ -3157,15 +3157,15 @@ void MTrajectoryActor::addSeedActor(QString actorName, double lon, double lat, Q
     MActor* actor = glRM->getActorByName(actorName);
 
     // actor does not exist
-    if(!actor)
+    if (!actor)
     {
         return;
     }
 
     // check if entry already exists
-    for(SeedActorSettings& sas : calculationSeedActorProperties)
+    for (SeedActorSettings& sas : calculationSeedActorProperties)
     {
-        if(sas.actor->getName().compare(actorName) == 0)
+        if (sas.actor->getName().compare(actorName) == 0)
             return;
     }
 
@@ -3189,28 +3189,28 @@ void MTrajectoryActor::addSeedActor(QString actorName, double lon, double lat, Q
 
     // fill data with corresponding
     bool enableX = false, enableY = false, enableZ = false;
-    if(dynamic_cast<MMovablePoleActor*>(actor))
+    if (dynamic_cast<MMovablePoleActor*>(actor))
     {
         actorSettings.type = POLE_ACTOR;
         enableX = false;
         enableY = false;
         enableZ = true;
     }
-    else if(dynamic_cast<MNWPHorizontalSectionActor*>(actor))
+    else if (dynamic_cast<MNWPHorizontalSectionActor*>(actor))
     {
         actorSettings.type = HORIZONTAL_ACTOR;
         enableX = true;
         enableY = true;
         enableZ = false;
     }
-    else if(dynamic_cast<MNWPVerticalSectionActor*>(actor))
+    else if (dynamic_cast<MNWPVerticalSectionActor*>(actor))
     {
         actorSettings.type = VERTICAL_ACTOR;
         enableX = true;
         enableY = false;
         enableZ = true;
     }
-    else if(dynamic_cast<MVolumeBoundingBoxActor*>(actor))
+    else if (dynamic_cast<MVolumeBoundingBoxActor*>(actor))
     {
         actorSettings.type = BOX_ACTOR;
         enableX = true;
@@ -3236,7 +3236,7 @@ void MTrajectoryActor::addSeedActor(QString actorName, double lon, double lat, Q
 
 void MTrajectoryActor::clearSeedActor()
 {
-    for(SeedActorSettings& sas : calculationSeedActorProperties)
+    for (SeedActorSettings& sas : calculationSeedActorProperties)
     {
         // disconnect signal before deletion
         disconnect(sas.actor, SIGNAL(actorChanged()), this, SLOT(onSeedActorChanged()));
@@ -3253,9 +3253,9 @@ void MTrajectoryActor::clearSeedActor()
 void MTrajectoryActor::removeSeedActor(QString name)
 {
     // delete actor with given name
-    for(int i = 0; i < calculationSeedActorProperties.size(); i++)
+    for (int i = 0; i < calculationSeedActorProperties.size(); i++)
     {
-        if(calculationSeedActorProperties.at(i).actor->getName().compare(name) == 0)
+        if (calculationSeedActorProperties.at(i).actor->getName().compare(name) == 0)
         {
             // disconnect signal before deletion
             disconnect(calculationSeedActorProperties.at(i).actor, SIGNAL(actorChanged()), this, SLOT(onSeedActorChanged()));
@@ -3314,7 +3314,7 @@ void MTrajectoryActor::enableProperties(bool enable)
 void MTrajectoryActor::releaseData()
 {
     // Release for all seed points or for single precomputed trajectories
-    for(int t = 0; t < (precomputedDataSource ? 1 : seedActorData.size()); t++)
+    for (int t = 0; t < (precomputedDataSource ? 1 : seedActorData.size()); t++)
     {
         releaseData(t);
     }

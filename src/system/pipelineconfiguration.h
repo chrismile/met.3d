@@ -128,7 +128,8 @@ protected:
             QString schedulerID,
             QString memoryManagerID);
 
-    void initializeComputationEnsemblePipeline(QString name,
+    void initializeComputationEnsemblePipeline(
+            QString name,
             bool boundaryLayerTrajectories,
             QString schedulerID,
             QString memoryManagerID,

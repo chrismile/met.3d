@@ -89,7 +89,7 @@ MTrajectoryNormals *MTrajectoryNormalsSource::produceData(
 
         // Prevent "out of bound exception" ("vertices" are access at
         // "baseIndex+1").
-        if ((baseIndex + 1) >= vertices.size())
+        if (baseIndex+1 >= vertices.size())
         {
             continue;
         }

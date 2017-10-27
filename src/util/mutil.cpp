@@ -136,6 +136,7 @@ QString expandEnvironmentVariables(QString path)
     return path;
 }
 
+
 QVector<float> parsePressureLevelString(QString lvlString)
 {
     // Clear the current list of pressure line levels; if pLevelStr does not
@@ -143,7 +144,10 @@ QVector<float> parsePressureLevelString(QString lvlString)
     QVector<float> pressureLevels;
 
     // Empty strings, i.e. no pressure lines, are accepted.
-    if (lvlString.isEmpty()) return pressureLevels;
+    if (lvlString.isEmpty())
+    {
+        return pressureLevels;
+    }
 
     // Match strings of format "[0,100,10]" or "[0.5,10,0.5]".
     QRegExp rxRange("^\\[([\\-|\\+]*\\d+\\.*\\d*),([\\-|\\+]*\\d+\\.*\\d*),"
@@ -190,19 +194,23 @@ QVector<float> parsePressureLevelString(QString lvlString)
     return pressureLevels;
 }
 
+
 QString encodePressureLevels(QVector<float> lvls, QString delimiter)
 {
     // create empty string
     QString stringValue = QString("");
 
     // add values to string with given delimiter
-    for(int i = 0; i < lvls.size(); i++)
+    for (int i = 0; i < lvls.size(); i++)
     {
-        if(i == 0)
+        if (i == 0)
+        {
             stringValue.append(QString("%1").arg(lvls.at(i)));
+        }
         else
+        {
             stringValue.append(QString("%1%2").arg(delimiter).arg(lvls.at(i)));
-        cout << lvls.at(i) << ",";
+        }
     }
 
     return stringValue;
