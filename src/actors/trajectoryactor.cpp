@@ -1660,6 +1660,10 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
         {
             dataSourceID = "";
         }
+        else
+        {
+            initialDataRequest = true;
+        }
         return;
     }
 
