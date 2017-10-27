@@ -508,6 +508,14 @@ void MTrajectoryActor::loadConfiguration(QSettings *settings)
                 deltaPressureFilterProperty,
                 settings->value("deltaPressure", 500.).toDouble());
 
+    // The range is adapted to the data source thus when changing sessions it
+    // might appear the value can't be set correctly due to the property is
+    // still restricted to the range of the data sourc of the previous session.
+    // Therefore we set the range to a range which covers all possible value.
+    properties->mDDouble()->setRange(
+                deltaTimeFilterProperty, 0.,
+                std::numeric_limits<double>::max());
+
     properties->mDDouble()->setValue(
                 deltaTimeFilterProperty,
                 settings->value("deltaTime", 48.).toDouble());
@@ -2875,9 +2883,9 @@ void MTrajectoryActor::updateParticlePosTimeProperty()
 
     // all trajectories have the exact same type, find any initialized source
     int index = -1;
-    for(int t = 0; t < (precomputedDataSource ? 1 : seedActorData.size()); t++)
+    for (int t = 0; t < (precomputedDataSource ? 1 : seedActorData.size()); t++)
     {
-        if(trajectoryRequests[t].trajectories != nullptr)
+        if (trajectoryRequests[t].trajectories != nullptr)
         {
             index = t;
             break;
