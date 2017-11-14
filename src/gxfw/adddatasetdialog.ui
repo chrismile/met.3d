@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>734</width>
-    <height>464</height>
+    <height>492</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -170,6 +170,13 @@
        <widget class="QCheckBox" name="treatRotatedAsRegularCheckBox">
         <property name="text">
          <string>treat rotated grid as regular grid</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QCheckBox" name="convertGeometricHeightToPressureICAOStandardCheckBox">
+        <property name="text">
+         <string>convert geometric height to pressure using the ICAO standard atmosphere</string>
         </property>
        </widget>
       </item>

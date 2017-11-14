@@ -64,6 +64,7 @@ struct MNWPPipelineConfigurationInfo
     bool enableProbabiltyRegionFilter;
     bool treatRotatedGridAsRegularGrid;
     QString surfacePressureFieldType;
+    bool convertGeometricHeightToPressure_ICAOStandard;
 };
 
 

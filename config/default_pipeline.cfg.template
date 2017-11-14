@@ -53,6 +53,11 @@ size=2
 # "auto" (Met.3D tries to detect the surface pressure field
 # (NOTE: this can be slow!)).
 1\gribSurfacePressureFieldType=sp
+# Set "convertGeometricHeightToPressure_ICAOStandard" to "true" to load data
+# using geometric height as vertical coordinate. Metres are converted to
+# pressure using the ICAO standard atmosphere. (NOTE: the resulting pressure is
+# hence approximate!)
+1\convertGeometricHeightToPressure_ICAOStandard=false
 
 # Example configuration for an ensemble ECMWF CF-NetCDF dataset.
 2\name=ECMWF ENS EUR_LL10

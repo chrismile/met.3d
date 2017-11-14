@@ -88,7 +88,8 @@ MNWPPipelineConfigurationInfo MAddDatasetDialog::getNWPPipelineConfigurationInfo
     d.treatRotatedGridAsRegularGrid =
             ui->treatRotatedAsRegularCheckBox->isChecked();
     d.surfacePressureFieldType = ui->surfacePressureTypeComboBox->currentText();
-
+    d.convertGeometricHeightToPressure_ICAOStandard =
+            ui->convertGeometricHeightToPressureICAOStandardCheckBox->isChecked();
 
     return d;
 }
