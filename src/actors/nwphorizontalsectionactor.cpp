@@ -1022,16 +1022,22 @@ void MNWPHorizontalSectionActor::renderToCurrentContext(MSceneViewGLWidget *scen
         if ( !var->hasData() ) continue;
 
         // If the slice position is outside the data domain of this variable,
-        // there is nothing to render.
-        if (var->grid->getBottomDataVolumePressure() < slicePosition_hPa
-                || var->grid->getTopDataVolumePressure() > slicePosition_hPa)
+        // there is nothing to render. Special case: Don't restrict Surface
+        // fields to there data volume pressure since this is zero and thus
+        // surface fields won't be drawn anymore.
+        if (var->grid->getLevelType() != MVerticalLevelType::SURFACE_2D
+                && (var->grid->getBottomDataVolumePressure() < slicePosition_hPa
+                    || var->grid->getTopDataVolumePressure() > slicePosition_hPa))
         {
             continue;
         }
 
         // If the bounding box is outside the model grid domain, there is
         // nothing to render (see computeRenderRegionParameters()).
-        if (var->nlons == 0 || var->nlats == 0) continue;
+        if (var->nlons == 0 || var->nlats == 0)
+        {
+            continue;
+        }
 
         // Vertically interpolate and update this variable's cross-section grid
         // (for example, when the isopressure value changes or the data field
@@ -2336,9 +2342,12 @@ void MNWPHorizontalSectionActor::renderContourLabels(
         MSceneViewGLWidget *sceneView, MNWP2DHorizontalActorVariable *var)
 {
     // Don't render contour labels if horizontal slice position is
-    // outside the data domain.
-    if (var->grid->getBottomDataVolumePressure() < slicePosition_hPa
-            || var->grid->getTopDataVolumePressure() > slicePosition_hPa)
+    // outside the data domain. Special case: Don't restrict Surface fields
+    // to there data volume pressure since this is zero and thus surface
+    // fields won't be drawn anymore.
+    if (var->grid->getLevelType() != MVerticalLevelType::SURFACE_2D
+            && (var->grid->getBottomDataVolumePressure() < slicePosition_hPa
+                || var->grid->getTopDataVolumePressure() > slicePosition_hPa))
     {
         return;
     }

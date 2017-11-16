@@ -380,7 +380,10 @@ void MNWPActorVariable::synchronizeWith(
         MSyncControl *sync, bool updateGUIProperties)
 
 {
-    if (synchronizationControl == sync) return;
+    if (synchronizationControl == sync)
+    {
+        return;
+    }
 
     // Reset connection to current synchronization control.
     // ====================================================

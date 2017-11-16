@@ -789,6 +789,24 @@ void MSessionManagerDialog::saveSessionToFile(QString sessionName, bool autoSave
     settings->endGroup();
     // ==========================================
 
+    // Waypoints.
+    // ==========================================
+    QStringList waypointsModelIDList = sysMC->getWaypointsModelsIdentifiers();
+    waypointsModelIDList.removeAll("None");
+    settings->beginGroup("WaypointsModels");
+    settings->beginWriteArray("model");
+    int waypointModelCount = 0;
+    foreach (QString waypointsModelID, waypointsModelIDList)
+    {
+        settings->setArrayIndex(waypointModelCount);
+        settings->setValue("name", waypointsModelID);
+        sysMC->getWaypointsModel(waypointsModelID)->saveToSettings(settings);
+        waypointModelCount++;
+    }
+    settings->endArray();
+    settings->endGroup();
+    // ==========================================
+
     // Bounding Boxes.
     // ==========================================
     sysMC->getBoundingBoxDock()->saveConfiguration(settings);
@@ -998,6 +1016,27 @@ void MSessionManagerDialog::loadSessionFromFile(QString sessionName)
     settings->endGroup();
     progressDialog->setValue(++loadingProgress);
     progressDialog->update();
+    // ==========================================
+
+    // TODO (bt, 26Oct2017): Implement replacing way points model as soon as it
+    // is possible to have more than one way point model in Met.3D.
+
+    // Waypoints.
+    // ==========================================
+    settings->beginGroup("WaypointsModels");
+    int numWaypointModels = settings->beginReadArray("model");
+    for (int i = 0; i < numWaypointModels; ++i)
+    {
+        settings->setArrayIndex(i);
+        QString waypointsModelID = settings->value("name", "").toString();
+        if (waypointsModelID != "")
+        {
+            sysMC->getWaypointsModel(waypointsModelID)->loadFromSettings(
+                        settings);
+        }
+    }
+    settings->endArray();
+    settings->endGroup();
     // ==========================================
 
     // Bounding Boxes.

@@ -798,6 +798,10 @@ void MSyncControl::loadConfigurationFromFile()
 void MSyncControl::saveConfiguration(QSettings *settings)
 {
     settings->beginGroup("General");
+    settings->setValue("initTime",
+                       ui->initTimeEdit->dateTime());
+    settings->setValue("validTime",
+                       ui->validTimeEdit->dateTime());
     settings->setValue("stepChooseVtIt",
                       ui->stepChooseVTITComboBox->currentText());
     settings->setValue("timeStep", ui->timeStepComboBox->currentText());
@@ -834,6 +838,13 @@ void MSyncControl::saveConfiguration(QSettings *settings)
 void MSyncControl::loadConfiguration(QSettings *settings)
 {
     settings->beginGroup("General");
+
+    ui->initTimeEdit->setDateTime(
+                settings->value("initTime", QDateTime()).value<QDateTime>());
+
+    ui->validTimeEdit->setDateTime(
+                settings->value("validTime", QDateTime()).value<QDateTime>());
+
     ui->stepChooseVTITComboBox->setCurrentIndex(
                 ui->stepChooseVTITComboBox->findText(
                     settings->value("stepChooseVtIt", "valid").toString()));

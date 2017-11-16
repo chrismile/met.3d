@@ -377,7 +377,7 @@ void MWaypointsTableModel::saveToFile(QString fileName)
 
     int i = 0;
     MWaypoint * wp;
-    for(i = 0; i < this->waypoints.count(); i++)
+    for (i = 0; i < this->waypoints.count(); i++)
     {
         wp = this->waypoints.at(i);
 
@@ -471,6 +471,70 @@ void MWaypointsTableModel::loadFromFile(QString fn)
 }
 
 
+void MWaypointsTableModel::saveToSettings(QSettings *settings)
+{
+    // Code taken from MWaypointsTableModel::saveToFile(QString fn) .
+
+    settings->setValue("flightTrackName", flightTrackName);
+    settings->beginWriteArray("waypoints");
+    MWaypoint *wp;
+    for (int i = 0; i < this->waypoints.count(); ++i)
+    {
+        settings->setArrayIndex(i);
+
+        wp = this->waypoints.at(i);
+
+        settings->setValue("location", wp->locationName);
+        settings->setValue("lat", wp->positionLonLat.y());
+        settings->setValue("lon", wp->positionLonLat.x());
+        settings->setValue("flightlevel", wp->flightLevel);
+    }
+    settings->endArray();
+}
+
+
+void MWaypointsTableModel::loadFromSettings(QSettings *settings)
+{
+    // Code taken from MWaypointsTableModel::loadFromFile(QString fn) .
+
+    flightTrackName = settings->value("flightTrackName",
+                                      "Met.3D vertical section path").toString();
+
+    QList<MWaypoint*> *waypoints_list = new QList<MWaypoint*>;
+    int waypointsCount = settings->beginReadArray("waypoints");
+
+    for (int i = 0; i < waypointsCount; i++)
+    {
+        settings->setArrayIndex(i);
+
+        MWaypoint *wp = new MWaypoint;
+        float lat = settings->value("lat", 0.f).toFloat();
+        float lon = settings->value("lon", 0.f).toFloat();
+        wp->positionLonLat = QVector2D(lon, lat);
+        wp->flightLevel    = settings->value("flightlevel", 0.f).toFloat();
+//TODO: flight level to pressure conversion
+        wp->pressure       = 0.f;
+        wp->locationName   = settings->value("location", "").toString();
+
+        waypoints_list->append(wp);
+    }
+
+    settings->endArray();
+
+    // Clear the old list of waypoints ..
+    // crashes on windows if waypointsvector is empty
+    if (this->waypoints.size() > 0)
+    {
+        beginRemoveRows(QModelIndex(), 0, this->waypoints.length() - 1);
+        this->waypoints.clear();
+        endRemoveRows();
+    }
+
+    // .. and replace it with the new list.
+    insertRows(0, waypoints_list->count(), QModelIndex(), waypoints_list);
+}
+
+
 const QList<MWaypoint*>& MWaypointsTableModel::getWaypointsList()
 {
     return waypoints;
@@ -558,7 +622,7 @@ void MWaypointsTableModel::updateDistances(int index, int count)
     // 1. Update "distances to previous waypoint" for the wps from "index"
     // to (and including) "index+count" (hence if count == 1, the waypoint at
     // position index and the following waypoint will be updated).
-    for(int i = index; i <= min(index+count, waypoints.size()-1); i++)
+    for (int i = index; i <= min(index+count, waypoints.size()-1); i++)
     {
         wp_i = waypoints.at(i);
 
@@ -584,7 +648,7 @@ void MWaypointsTableModel::updateDistances(int index, int count)
 
     // 2. Update the total cumulative distance for all waypoints starting
     // at "index".
-    for(int i = index; i < waypoints.size(); i++)
+    for (int i = index; i < waypoints.size(); i++)
     {
         wp_i = waypoints.at(i);
 

@@ -61,6 +61,7 @@ MTrajectoryActor::MTrajectoryActor()
       trajectorySelection(nullptr),
       trajectorySingleTimeSelection(nullptr),
       dataSourceID(""),
+      initialDataRequest(true),
       suppressUpdate(false),
       normalsToBeComputed(true),
       renderMode(TRAJECTORY_TUBES),
@@ -367,8 +368,7 @@ void MTrajectoryActor::loadConfiguration(QSettings *settings)
                 }
             }
         }
-
-        if (dataSourceAvailable)
+        else
         {
             properties->mString()->setValue(utilizedDataSourceProperty,
                                             dataSourceID);
@@ -379,7 +379,6 @@ void MTrajectoryActor::loadConfiguration(QSettings *settings)
 
             updateInitTimeProperty();
             updateStartTimeProperty();
-            updateParticlePosTimeProperty();
         }
     }
 
@@ -541,9 +540,11 @@ bool MTrajectoryActor::setTransferFunction(QString tfName)
 
 void MTrajectoryActor::synchronizeWith(
         MSyncControl *sync, bool updateGUIProperties)
-
 {
-    if (synchronizationControl == sync) return;
+    if (synchronizationControl == sync)
+    {
+        return;
+    }
 
     // Reset connection to current synchronization control.
     // ====================================================
@@ -1231,8 +1232,20 @@ void MTrajectoryActor::prepareAvailableDataForRendering()
             synchronizationControl->synchronizationCompleted(this);
 #endif
 
-        emitActorChangedSignal();
-        updateSyncPropertyColourHints();
+        // Special case:
+        // Since the particle position times depend on the data requested,
+        // we need to call asynchronousSelectionRequest() after data request is
+        // complete when requesting data from a data source for the first time.
+        if (initialDataRequest)
+        {
+            initialDataRequest = false;
+            asynchronousSelectionRequest();
+        }
+        else
+        {
+            emitActorChangedSignal();
+            updateSyncPropertyColourHints();
+        }
     }
 }
 
@@ -1690,7 +1703,10 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
         // If any required data item is missing we cannot render.
         if ( (trajectories == nullptr)
              || (normals[sceneView] == nullptr)
-             || (trajectorySelection == nullptr) ) return;
+             || (trajectorySelection == nullptr))
+        {
+            return;
+        }
 
         // If the vertical scaling of the view has changed, a recomputation of
         // the normals is necessary, as they are based on worldZ coordinates.
@@ -1840,7 +1856,10 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
          || (renderMode == TUBES_AND_SINGLETIME)
          || (renderMode == BACKWARDTUBES_AND_SINGLETIME))
     {
-        if (trajectories == nullptr) return;
+        if (trajectories == nullptr)
+        {
+            return;
+        }
 
         if (renderMode == ALL_POSITION_SPHERES)
         {
@@ -2320,6 +2339,10 @@ void MTrajectoryActor::updateInitTimeProperty()
 
         int newIndex = max(0, availableInitTimes.indexOf(initTime));
         properties->mEnum()->setValue(initTimeProperty, newIndex);
+        if (synchronizeInitTime && synchronizationControl != nullptr)
+        {
+            setInitDateTime(synchronizationControl->initDateTime());
+        }
     }
 
     suppressUpdate = false;
@@ -2351,6 +2374,10 @@ void MTrajectoryActor::updateStartTimeProperty()
 
         int newIndex = max(0, availableStartTimes.indexOf(startTime));
         properties->mEnum()->setValue(startTimeProperty, newIndex);
+        if (synchronizeStartTime && synchronizationControl != nullptr)
+        {
+            setStartDateTime(synchronizationControl->validDateTime());
+        }
     }
 
     suppressUpdate = false;
@@ -2400,6 +2427,10 @@ void MTrajectoryActor::updateParticlePosTimeProperty()
         case BACKWARDTUBES_AND_SINGLETIME:
             particlePosTimeProperty->setEnabled(!synchronizeParticlePosTime);
             break;
+        }
+        if (synchronizeParticlePosTime && synchronizationControl != nullptr)
+        {
+            setParticleDateTime(synchronizationControl->validDateTime());
         }
     }
 
