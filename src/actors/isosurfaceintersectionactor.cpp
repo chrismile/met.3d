@@ -276,8 +276,8 @@ MIsosurfaceIntersectionActor::AppearanceSettings::AppearanceSettings(
     properties->mBool()->setValue(polesEnabledProperty, polesEnabled);
 
     QStringList dropModes;
-    dropModes << "Start" << "End" << "Start / End" << "Center" << "Maximum"
-              << "Start / Center / End" << "Start / Max / End";
+    dropModes << "Start" << "End" << "Start / End" << "Centre" << "Maximum"
+              << "Start / Centre / End" << "Start / Max / End";
     dropModeProperty = a->addProperty(ENUM_PROPERTY, "drop mode",
                                       groupProp);
     properties->mEnum()->setEnumNames(dropModeProperty, dropModes);
@@ -319,7 +319,7 @@ MIsosurfaceIntersectionActor::EnsembleSelectionSettings
     MActor *a = hostActor;
     MQtProperties *properties = a->getQtProperties();
 
-    groupProp = a->addProperty(GROUP_PROPERTY, "ensemble selection");
+    groupProp = a->addProperty(GROUP_PROPERTY, "spaghetti plot");
 
     ensembleMultiMemberSelectionProperty = a->addProperty(
                 CLICK_PROPERTY, "select members", groupProp);
@@ -499,12 +499,22 @@ void MIsosurfaceIntersectionActor::loadConfiguration(QSettings *settings)
                     ->loadRequiredActorFromFile(defaultActor->getName(),
                                                 tfName,
                                                 settings->fileName());
+
+            auto tfList = properties->getEnumItems(appearanceSettings->transferFunctionProperty);
+            auto tfIndex = tfList.indexOf(tfName);
+
+            properties->mEnum()->setValue(
+                    appearanceSettings->transferFunctionProperty, tfIndex);
+            setTransferFunctionFromProperty();
+
             delete defaultActor;
         }
         else
         {
             break;
         }
+
+
     }
 
     thicknessMode = settings->value("thicknessMode", 0).toInt();
