@@ -55,6 +55,7 @@ MIsosurfaceIntersectionActor::MIsosurfaceIntersectionActor()
       geomLengthTrajectoryFilter(nullptr),
       valueTrajectorySource(nullptr),
       linesVertexBuffer(nullptr),
+      thicknessMode(0),
       enableAutoComputation(true),
       supressActorUpdates(false),
       isCalculating(false),
@@ -94,6 +95,13 @@ MIsosurfaceIntersectionActor::MIsosurfaceIntersectionActor()
 
     appearanceSettings = std::make_shared<AppearanceSettings>(this);
     actorPropertiesSupGroup->addSubProperty(appearanceSettings->groupProp);
+
+    QStringList thicknessModes;
+    thicknessModes << "Constant" << "Map variable";
+    thicknessModeProperty = addProperty(ENUM_PROPERTY, "thickness mode",
+                                        appearanceSettings->groupProp);
+    properties->mEnum()->setEnumNames(thicknessModeProperty, thicknessModes);
+    properties->mEnum()->setValue(thicknessModeProperty, thicknessMode);
 
     tubeThicknessSettings = std::make_shared<TubeThicknessSettings>(this);
     appearanceSettings->groupProp->addSubProperty(
@@ -157,40 +165,42 @@ MIsosurfaceIntersectionActor::~MIsosurfaceIntersectionActor()
 
 MIsosurfaceIntersectionActor::VariableSettings::VariableSettings(
         MIsosurfaceIntersectionActor *hostActor)
-    : varsIndex({{-1, -1, -1}})
+    : varsIndex({{-1, -1 }})
 {
     MActor *a = hostActor;
 
-    groupProp = a->addProperty(GROUP_PROPERTY, "variable settings");
+    groupProp = a->addProperty(GROUP_PROPERTY, "intersection variables");
 
-    varsProperty[0] = a->addProperty(ENUM_PROPERTY, "1st source variable",
+    varsProperty[0] = a->addProperty(ENUM_PROPERTY, "variable A",
                                      groupProp);
-    varsProperty[1] = a->addProperty(ENUM_PROPERTY, "2nd source variable",
-                                     groupProp);
-    varsProperty[2] = a->addProperty(ENUM_PROPERTY, "filter variable",
+    varsProperty[1] = a->addProperty(ENUM_PROPERTY, "variable B",
                                      groupProp);
 }
 
 
 MIsosurfaceIntersectionActor::LineFilterSettings::LineFilterSettings(
         MIsosurfaceIntersectionActor *hostActor)
-    : valueFilter(40.0f),
-      lineLengthFilter(500)
+    : filterVarIndex(0),
+      valueFilter(0),
+      lineLengthFilter(0)
 {
     MActor *a = hostActor;
     MQtProperties *properties = a->getQtProperties();
 
-    groupProp = a->addProperty(GROUP_PROPERTY, "line filters");
+    groupProp = a->addProperty(GROUP_PROPERTY, "filtering");
 
-    valueFilterProperty = a->addProperty(DOUBLE_PROPERTY, "min. value",
+    filterVarProperty = a->addProperty(ENUM_PROPERTY, "variable",
+                                     groupProp);
+
+    valueFilterProperty = a->addProperty(DOUBLE_PROPERTY, "min. value (filter variable)",
                                          groupProp);
     properties->setDouble(valueFilterProperty, valueFilter,
-                          0, 1000, 1, 1);
+                          0, 10E12, 1, 1);
 
-    lineLengthFilterProperty = a->addProperty(INT_PROPERTY,
-                                              "min. line length (km)",
+    lineLengthFilterProperty = a->addProperty(DECORATEDDOUBLE_PROPERTY,
+                                              "min. line length",
                                               groupProp);
-    properties->setInt(lineLengthFilterProperty, lineLengthFilter, 1, 70000, 1);
+    properties->setDDouble(lineLengthFilterProperty, lineLengthFilter, 0, 70000, 0, 1, " km");
 }
 
 
@@ -204,7 +214,6 @@ MIsosurfaceIntersectionActor::AppearanceSettings::AppearanceSettings(
     textureUnitTransferFunction(-1),
     enableShadows(true),
     enableSelfShadowing(true),
-    thicknessMode(0),
     polesEnabled(false),
     dropMode(3)
 {
@@ -214,18 +223,18 @@ MIsosurfaceIntersectionActor::AppearanceSettings::AppearanceSettings(
     groupProp = a->addProperty(GROUP_PROPERTY, "line appearance");
 
     QStringList colorModes;
-    colorModes << "Solid" << "Pressure" << "Mapped variable";
+    colorModes << "Constant" << "Map pressure (hPa)" << "Map variable";
     colorModeProperty = a->addProperty(ENUM_PROPERTY, "colour mode",
                                        groupProp);
     properties->mEnum()->setEnumNames(colorModeProperty, colorModes);
     properties->mEnum()->setValue(colorModeProperty, 0);
 
-    colorVariableProperty = a->addProperty(ENUM_PROPERTY, "mapped variable",
-                                           groupProp);
-
-    tubeColorProperty = a->addProperty(COLOR_PROPERTY, "solid colour",
+    tubeColorProperty = a->addProperty(COLOR_PROPERTY, "constant colour",
                                        groupProp);
     properties->mColor()->setValue(tubeColorProperty, tubeColor);
+
+    colorVariableProperty = a->addProperty(ENUM_PROPERTY, "mapped variable",
+                                           groupProp);
 
     // Transfer function.
     // Scan currently available actors for transfer functions. Add TFs to
@@ -252,13 +261,6 @@ MIsosurfaceIntersectionActor::AppearanceSettings::AppearanceSettings(
                                         groupProp);
     properties->setDouble(tubeRadiusProperty, tubeRadius, 0.01, 10, 2, 0.01);
 
-    QStringList thicknessModes;
-    thicknessModes << "Constant" << "Mapped variable";
-    thicknessModeProperty = a->addProperty(ENUM_PROPERTY, "thickness mode",
-                                           groupProp);
-    properties->mEnum()->setEnumNames(thicknessModeProperty, thicknessModes);
-    properties->mEnum()->setValue(thicknessModeProperty, 0);
-
     enableShadowsProperty = a->addProperty(BOOL_PROPERTY, "render shadows",
                                            groupProp);
     properties->mBool()->setValue(enableShadowsProperty, enableShadows);
@@ -269,7 +271,7 @@ MIsosurfaceIntersectionActor::AppearanceSettings::AppearanceSettings(
     properties->mBool()->setValue(enableSelfShadowingProperty,
                                   enableSelfShadowing);
 
-    polesEnabledProperty = a->addProperty(BOOL_PROPERTY, "droplines",
+    polesEnabledProperty = a->addProperty(BOOL_PROPERTY, "render droplines",
                                           groupProp);
     properties->mBool()->setValue(polesEnabledProperty, polesEnabled);
 
@@ -285,7 +287,8 @@ MIsosurfaceIntersectionActor::AppearanceSettings::AppearanceSettings(
 
 MIsosurfaceIntersectionActor::TubeThicknessSettings::TubeThicknessSettings(
         MIsosurfaceIntersectionActor *hostActor)
-    : mappedVariableIndex(-1),
+    :
+      mappedVariableIndex(-1),
       valueRange(50.0, 85.0),
       thicknessRange(0.01, 0.5)
 {
@@ -327,8 +330,9 @@ MIsosurfaceIntersectionActor::EnsembleSelectionSettings
                 STRING_PROPERTY, "utilized members", groupProp);
     ensembleMultiMemberProperty->setEnabled(false);
 
-    syncModeEnabledProperty = a->addProperty(BOOL_PROPERTY, "sync mode",
+    syncModeEnabledProperty = a->addProperty(BOOL_PROPERTY, "enable spaghetti plot",
                                              groupProp);
+    syncModeEnabledProperty->setEnabled(false);
     properties->mBool()->setValue(syncModeEnabledProperty, syncModeEnabled);
 
     selectedEnsembleMembers.clear();
@@ -373,7 +377,7 @@ void MIsosurfaceIntersectionActor::saveConfiguration(QSettings *settings)
     settings->beginGroup(getSettingsID());
     settings->setValue("var1stIndex", variableSettings->varsIndex[0]);
     settings->setValue("var2ndIndex", variableSettings->varsIndex[1]);
-    settings->setValue("varSourceIndex", variableSettings->varsIndex[2]);
+    settings->setValue("varFilterIndex", lineFilterSettings->filterVarIndex);
 
     settings->setValue("filterValue", lineFilterSettings->valueFilter);
     settings->setValue("filterLineLength",
@@ -389,7 +393,7 @@ void MIsosurfaceIntersectionActor::saveConfiguration(QSettings *settings)
 
     settings->setValue("tubeColor", appearanceSettings->tubeColor);
 
-    settings->setValue("thicknessMode", appearanceSettings->thicknessMode);
+    settings->setValue("thicknessMode", thicknessMode);
 
     settings->setValue("enableShadows", appearanceSettings->enableShadows);
     settings->setValue("enableSelfShadowing",
@@ -437,18 +441,18 @@ void MIsosurfaceIntersectionActor::loadConfiguration(QSettings *settings)
     variableSettings->varsIndex[1] = settings->value("var2ndIndex", -1).toInt();
     properties->mEnum()->setValue(variableSettings->varsProperty[1],
             variableSettings->varsIndex[1]);
-    variableSettings->varsIndex[2] = settings->value("varSourceIndex",
+    lineFilterSettings->filterVarIndex = settings->value("varFilterIndex",
                                                      -1).toInt();
-    properties->mEnum()->setValue(variableSettings->varsProperty[2],
-            variableSettings->varsIndex[2]);
+    properties->mEnum()->setValue(lineFilterSettings->filterVarProperty,
+                                  lineFilterSettings->filterVarIndex);
 
     lineFilterSettings->valueFilter = settings->value("filterValue",
-                                                      40.f).toFloat();
+                                                      0.f).toFloat();
     properties->mDouble()->setValue(lineFilterSettings->valueFilterProperty,
                                     lineFilterSettings->valueFilter);
     lineFilterSettings->lineLengthFilter = settings->value(
-                "filterLineLength", 500).toInt();
-    properties->mInt()->setValue(lineFilterSettings->lineLengthFilterProperty,
+                "filterLineLength", 0.f).toInt();
+    properties->mDDouble()->setValue(lineFilterSettings->lineLengthFilterProperty,
                                  lineFilterSettings->lineLengthFilter);
 
     appearanceSettings->colorMode = settings->value("colorMode", 0).toInt();
@@ -503,10 +507,8 @@ void MIsosurfaceIntersectionActor::loadConfiguration(QSettings *settings)
         }
     }
 
-    appearanceSettings->thicknessMode = settings->value(
-                "thicknessMode", 0).toInt();
-    properties->mEnum()->setValue(appearanceSettings->thicknessModeProperty,
-                                  appearanceSettings->thicknessMode);
+    thicknessMode = settings->value("thicknessMode", 0).toInt();
+    properties->mEnum()->setValue(thicknessModeProperty, thicknessMode);
 
     appearanceSettings->enableShadows = settings->value(
                 "enableShadows", true).toBool();
@@ -548,8 +550,7 @@ void MIsosurfaceIntersectionActor::loadConfiguration(QSettings *settings)
     properties->mDouble()->setValue(tubeThicknessSettings->maxProp,
                                     tubeThicknessSettings->thicknessRange.y());
 
-    tubeThicknessSettings->groupProp->setEnabled(
-                appearanceSettings->thicknessMode == 1);
+    tubeThicknessSettings->groupProp->setEnabled(thicknessMode == 1);
 
     ensembleSelectionSettings->syncModeEnabled = settings->value(
                 "syncMode", false).toBool();
@@ -746,10 +747,10 @@ void MIsosurfaceIntersectionActor::onQtPropertyChanged(QtProperty *property)
         variableSettings->varsIndex[1] = properties->mEnum()->value(
                     variableSettings->varsProperty[1]);
     }
-    else if (property == variableSettings->varsProperty[2])
+    else if (property == lineFilterSettings->filterVarProperty)
     {
-        variableSettings->varsIndex[2] = properties->mEnum()->value(
-                    variableSettings->varsProperty[2]);
+        lineFilterSettings->filterVarIndex = properties->mEnum()->value(
+                lineFilterSettings->filterVarProperty);
     }
     else if (property == boundingBoxSettings->enabledProperty)
     {
@@ -801,7 +802,7 @@ void MIsosurfaceIntersectionActor::onQtPropertyChanged(QtProperty *property)
     // Changed one of the tube appearance settings.
     else if (property == appearanceSettings->colorModeProperty
              || property == appearanceSettings->colorVariableProperty
-             || property == appearanceSettings->thicknessModeProperty
+             || property == thicknessModeProperty
              || property == tubeThicknessSettings->mappedVariableProperty)
     {
         appearanceSettings->colorMode = properties->mEnum()->value(
@@ -810,14 +811,12 @@ void MIsosurfaceIntersectionActor::onQtPropertyChanged(QtProperty *property)
         appearanceSettings->colorVariableIndex = properties->mEnum()->value(
                     appearanceSettings->colorVariableProperty);
 
-        appearanceSettings->thicknessMode = properties->mEnum()->value(
-                    appearanceSettings->thicknessModeProperty);
+        thicknessMode = properties->mEnum()->value(thicknessModeProperty);
 
         tubeThicknessSettings->mappedVariableIndex = properties->mEnum()->value(
                     tubeThicknessSettings->mappedVariableProperty);
 
-        tubeThicknessSettings->groupProp->setEnabled(
-                    appearanceSettings->thicknessMode == 1);
+        tubeThicknessSettings->groupProp->setEnabled(thicknessMode == 1);
 
 
         if (enableAutoComputation)
@@ -953,15 +952,15 @@ void MIsosurfaceIntersectionActor::onQtPropertyChanged(QtProperty *property)
     // values were altered, request new intersection lines.
     if (property == variableSettings->varsProperty[0] ||
             property == variableSettings->varsProperty[1] ||
-            property == variableSettings->varsProperty[2] ||
+            property == lineFilterSettings->filterVarProperty ||
             property ==
             ensembleSelectionSettings->ensembleMultiMemberSelectionProperty ||
             property == lineFilterSettings->valueFilterProperty ||
             property == lineFilterSettings->lineLengthFilterProperty)
     {
         lineFilterSettings->lineLengthFilter =
-                properties->mInt()->value(
-                    lineFilterSettings->lineLengthFilterProperty);
+                static_cast<int>(properties->mDDouble()->value(
+                    lineFilterSettings->lineLengthFilterProperty));
         lineFilterSettings->valueFilter =
                 properties->mDouble()->value(
                     lineFilterSettings->valueFilterProperty);
@@ -1328,10 +1327,10 @@ void MIsosurfaceIntersectionActor::buildFilterChain(MDataRequestHelper &rh)
 
     MNWPIsolevelActorVariable *varSource = nullptr;
 
-    if (variableSettings->varsIndex[2] > 0)
+    if (lineFilterSettings->filterVarIndex > 0)
     {
         varSource = dynamic_cast<MNWPIsolevelActorVariable *>(
-                    variables.at(variableSettings->varsIndex[2] - 1));
+                    variables.at(lineFilterSettings->filterVarIndex - 1));
     }
 
     MNWPIsolevelActorVariable *varMapped = nullptr;
@@ -1766,8 +1765,7 @@ void MIsosurfaceIntersectionActor::renderToDepthMap(
                                     appearanceSettings->tubeColor);
     lineTubeShader->setUniformValue("colorMode", appearanceSettings->colorMode);
 
-    if (appearanceSettings->colorVariableIndex > 0 &&
-            appearanceSettings->transferFunction != 0)
+    if (appearanceSettings->transferFunction != 0)
     {
         appearanceSettings->transferFunction->getTexture()->bindToTextureUnit(
                     static_cast<GLuint>(
@@ -1785,8 +1783,7 @@ void MIsosurfaceIntersectionActor::renderToDepthMap(
         lineTubeShader->setUniformValue("normalized", false);
     }
 
-    lineTubeShader->setUniformValue("thicknessMapping",
-                                    appearanceSettings->thicknessMode == 1);
+    lineTubeShader->setUniformValue("thicknessMapping", thicknessMode == 1);
     lineTubeShader->setUniformValue("thicknessRange",
                                     tubeThicknessSettings->thicknessRange);
     lineTubeShader->setUniformValue("thicknessValueRange",
@@ -2044,8 +2041,7 @@ void MIsosurfaceIntersectionActor::renderToCurrentContext(
         lineTubeShader->setUniformValue("colorMode",
                                         appearanceSettings->colorMode);
 
-        if (appearanceSettings->colorVariableIndex > 0 &&
-                appearanceSettings->transferFunction != 0)
+        if (appearanceSettings->transferFunction != 0)
         {
             appearanceSettings->transferFunction->getTexture()->bindToTextureUnit(
                         static_cast<GLuint>(
@@ -2063,8 +2059,7 @@ void MIsosurfaceIntersectionActor::renderToCurrentContext(
             lineTubeShader->setUniformValue("normalized", false);
         }
 
-        lineTubeShader->setUniformValue("thicknessMapping",
-                                        appearanceSettings->thicknessMode == 1);
+        lineTubeShader->setUniformValue("thicknessMapping", thicknessMode == 1);
         lineTubeShader->setUniformValue("thicknessRange",
                                         tubeThicknessSettings->thicknessRange);
         lineTubeShader->setUniformValue("thicknessValueRange",
@@ -2150,7 +2145,7 @@ void MIsosurfaceIntersectionActor::refreshEnumsProperties(
 
     variableSettings->varsIndex[0] = 0;
     variableSettings->varsIndex[1] = 0;
-    variableSettings->varsIndex[2] = 0;
+    lineFilterSettings->filterVarIndex = 0;
     appearanceSettings->colorVariableIndex = 0;
     tubeThicknessSettings->mappedVariableIndex = 0;
 
@@ -2161,7 +2156,7 @@ void MIsosurfaceIntersectionActor::refreshEnumsProperties(
     QStringList varNamesWithNone = names;
     varNamesWithNone.prepend("None");
 
-    properties->mEnum()->setEnumNames(variableSettings->varsProperty[2],
+    properties->mEnum()->setEnumNames(lineFilterSettings->filterVarProperty,
             varNamesWithNone);
     properties->mEnum()->setEnumNames(appearanceSettings->colorVariableProperty,
                                       varNamesWithNone);

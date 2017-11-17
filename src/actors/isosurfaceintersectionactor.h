@@ -264,8 +264,8 @@ protected:
         QtProperty *groupProp;
 
         /** 1st and 2nd variable, value variable. */
-        std::array<QtProperty*, 3> varsProperty;
-        std::array<int, 3> varsIndex;
+        std::array<QtProperty*, 2> varsProperty;
+        std::array<int, 2> varsIndex;
     };
 
     /** Settings to filter the lines by value and geometric length. */
@@ -275,6 +275,8 @@ protected:
 
         QtProperty *groupProp;
 
+        QtProperty* filterVarProperty;
+        int         filterVarIndex;
         QtProperty* valueFilterProperty;
         float       valueFilter;
         QtProperty* lineLengthFilterProperty;
@@ -311,14 +313,14 @@ protected:
         QtProperty* enableSelfShadowingProperty;
         bool        enableSelfShadowing;
 
-        QtProperty* thicknessModeProperty;
-        int         thicknessMode;
-
         QtProperty* polesEnabledProperty;
         bool        polesEnabled;
         QtProperty* dropModeProperty;
         int         dropMode;
     };
+
+    QtProperty* thicknessModeProperty;
+    int         thicknessMode;
 
     /** Settings to map variable values to tube thickness at each line vertex. */
     struct TubeThicknessSettings

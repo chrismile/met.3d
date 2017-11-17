@@ -52,6 +52,8 @@ MJetcoreDetectionActor::MJetcoreDetectionActor()
     setActorType("Jetcore Detection Actor (experimental)");
     setName(getActorType());
 
+    variableSettings->groupProp->setPropertyName("detection variables");
+
     variableSettings->varsProperty[0]->setPropertyName("u-component of wind");
     variableSettings->varsProperty[1]->setPropertyName("v-component of wind");
 
@@ -88,10 +90,10 @@ MJetcoreDetectionActor::VariableSettingsJetcores::VariableSettingsJetcores(
     MActor *a = hostActor;
     MQtProperties *properties = a->getQtProperties();
 
-    geoPotVarProperty = a->addProperty(ENUM_PROPERTY, "geopotential variable",
+    geoPotVarProperty = a->addProperty(ENUM_PROPERTY, "geopotential height",
                                        groupProp);
 
-    geoPotOnlyProperty = a->addProperty(BOOL_PROPERTY, "geopotential only",
+    geoPotOnlyProperty = a->addProperty(BOOL_PROPERTY, "convert geopotential to geopot. height",
                                         groupProp);
 
     properties->mBool()->setValue(geoPotOnlyProperty, geoPotOnly);
@@ -101,25 +103,25 @@ MJetcoreDetectionActor::VariableSettingsJetcores::VariableSettingsJetcores(
 MJetcoreDetectionActor::FilterSettingsJetcores::FilterSettingsJetcores(
         MJetcoreDetectionActor *hostActor, QtProperty *groupProp)
     : lambdaThreshold(0.f),
-      angleThreshold(50.f),
-      pressureDiffThreshold(10.0f)
+      angleThreshold(180.f),
+      pressureDiffThreshold(1000.0f)
 {
     MActor *a = hostActor;
     MQtProperties *properties = a->getQtProperties();
 
     lambdaThresholdProperty = a->addProperty(DOUBLE_PROPERTY,
-                                             "lambda threshold",
+                                             "max. lambda (* 10e-9)",
                                              groupProp);
-    properties->setDouble(lambdaThresholdProperty, lambdaThreshold, -2, 2, 20,
-                          0.1E-8);
-
-    angleThresholdProperty = a->addProperty(DOUBLE_PROPERTY, "angle threshold",
-                                            groupProp);
-    properties->setDouble(angleThresholdProperty, angleThreshold, 0, 180, 2,
+    properties->setDouble(lambdaThresholdProperty, lambdaThreshold, -100000, 100000, 6,
                           0.1);
 
+    angleThresholdProperty = a->addProperty(DOUBLE_PROPERTY, "max. angle",
+                                            groupProp);
+    properties->setDouble(angleThresholdProperty, angleThreshold, 0, 180, 2,
+                          1);
+
     pressureDiffThresholdProperty = a->addProperty(
-                DECORATEDDOUBLE_PROPERTY, "pressure difference threshold",
+                DECORATEDDOUBLE_PROPERTY, "max. pressure difference",
                 groupProp);
     properties->setDDouble(pressureDiffThresholdProperty, pressureDiffThreshold,
                            0, 1000, 2, 1, " hPa");
@@ -133,7 +135,7 @@ MJetcoreDetectionActor::AppearanceSettingsJetcores::AppearanceSettingsJetcores(
     MActor *a = hostActor;
     MQtProperties *properties = a->getQtProperties();
 
-    arrowsEnabledProperty = a->addProperty(BOOL_PROPERTY, "arrows enabled",
+    arrowsEnabledProperty = a->addProperty(BOOL_PROPERTY, "render arrow heads",
                                            groupProp);
     properties->mBool()->setValue(arrowsEnabledProperty, arrowsEnabled);
 }
@@ -444,11 +446,11 @@ void MJetcoreDetectionActor::buildFilterChain(MDataRequestHelper &rh)
 
     MNWPIsolevelActorVariable *varSource = nullptr;
 
-    if (variableSettings->varsIndex[2] > 0)
+    if (lineFilterSettings->filterVarIndex > 0)
     {
         varSource =
                 dynamic_cast<MNWPIsolevelActorVariable *>(
-                    variables.at(variableSettings->varsIndex[2] - 1));
+                    variables.at(lineFilterSettings->filterVarIndex - 1));
     }
 
     MNWPIsolevelActorVariable *varThickness = nullptr;
@@ -502,7 +504,7 @@ void MJetcoreDetectionActor::buildFilterChain(MDataRequestHelper &rh)
     // Set the Hessian eigenvalue filter.
     rh.insert("HESSIANFILTER_MEMBERS", rh.value("MEMBERS"));
     rh.insert("HESSIANFILTER_VALUE",
-              QString::number(lineFilterSettingsCores->lambdaThreshold));
+              QString::number(lineFilterSettingsCores->lambdaThreshold * 10E-9));
     rh.insert("HESSIANFILTER_GEOPOTENTIAL", varGeoPot->variableName);
     rh.insert("HESSIANFILTER_GEOPOTENTIAL_TYPE",
               static_cast<int>(variableSettingsCores->geoPotOnly));

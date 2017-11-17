@@ -905,12 +905,6 @@ shader FSJetcores(in GStoFSTrajectory Input, out vec4 fragColor)
         shadowFactor /= (kernelSize * 2.0 + 1) * (kernelSize * 2.0 + 1);
     }
 
-    if (colorMode == 1)
-    {
-        // Compute pressure values from the world z-coordinate
-        value = exp(Input.worldPos.z / pToWorldZParams.y + pToWorldZParams.x);
-    }
-
     float t = (value - tfMinimum) / (tfMaximum - tfMinimum);
 
     vec3 ambientColor = vec3(0);
