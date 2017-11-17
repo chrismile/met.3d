@@ -139,7 +139,6 @@ HEADERS += \
     src/data/hessiantrajectoryfilter.h \
     src/data/isosurfaceintersectionsource.h \
     src/data/lines.h \
-    src/data/mprojectedvelocitiesfilter.h \
     src/data/multivarpartialderivativefilter.h \
     src/data/partialderivativefilter.h \
     src/data/trajectoryarrowheadssource.h \
@@ -251,7 +250,6 @@ SOURCES += \
     src/data/hessiantrajectoryfilter.cpp \
     src/data/isosurfaceintersectionsource.cpp \
     src/data/lines.cpp \
-    src/data/mprojectedvelocitiesfilter.cpp \
     src/data/multivarpartialderivativefilter.cpp \
     src/data/partialderivativefilter.cpp \
     src/data/trajectoryarrowheadssource.cpp \
