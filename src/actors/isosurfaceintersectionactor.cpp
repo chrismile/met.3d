@@ -72,7 +72,7 @@ MIsosurfaceIntersectionActor::MIsosurfaceIntersectionActor()
     // ===============================================
     beginInitialiseQtProperties();
 
-    setActorType("Isosurface Intersection Actor");
+    setActorType("Isosurface Intersection Actor (experimental)");
     setName(getActorType());
 
     computeClickProperty = addProperty(CLICK_PROPERTY,

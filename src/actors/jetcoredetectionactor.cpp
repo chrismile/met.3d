@@ -49,7 +49,7 @@ MJetcoreDetectionActor::MJetcoreDetectionActor()
 {
     beginInitialiseQtProperties();
 
-    setActorType("Jetcore Detection Actor");
+    setActorType("Jetcore Detection Actor (experimental)");
     setName(getActorType());
 
     variableSettings->varsProperty[0]->setPropertyName("u-component of wind");
