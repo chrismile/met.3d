@@ -546,17 +546,19 @@ MIsosurfaceIntersectionSource::CellInformation *
 MIsosurfaceIntersectionSource::getNextCell(
         CellInformation *actCell, MStructuredGrid *gridA)
 {
-    const int numCellsLatLon =
-            (gridA->getNumLons() - 1) * (gridA->getNumLats() - 1);
-    const int numCells = numCellsLatLon * (gridA->getNumLevels() - 1);
+    const int numCellsLat = gridA->getNumLats() - 1;
+    const int numCellsLon = gridA->getNumLons() - 1;
+    const int numCellsLev = gridA->getNumLevels() - 1;
+
+    const int lon = actCell->lon;
+    const int lat = actCell->lat;
+    const int lev = actCell->lev;
 
     if (currentSegmentFace == LEFT_FACE)
     {
-        int posIndex = actCell->index - 1;
-        if (posIndex < 0)
-        {
-            return nullptr;
-        }
+        const int curLon = lon - 1;
+        if (curLon < 0) { return nullptr; }
+        const int posIndex = INDEX3zyx(lev, lat, curLon, numCellsLat, numCellsLon);
 
         CellInformation *cell = cells[posIndex];
         if (((cell->faces1 & cell->faces2) & pow2[RIGHT_FACE]) ==
@@ -568,15 +570,9 @@ MIsosurfaceIntersectionSource::getNextCell(
     }
     else if (currentSegmentFace == BACK_FACE)
     {
-        int posIndex = actCell->index + (gridA->getNumLons() - 1);
-        if (posIndex < 0)
-        {
-            return nullptr;
-        }
-        if (posIndex > numCells - 1)
-        {
-            return nullptr;
-        }
+        const int curLat = lat + 1;
+        if (curLat >= numCellsLat) { return nullptr; }
+        const int posIndex = INDEX3zyx(lev, curLat, lon, numCellsLat, numCellsLon);
 
         CellInformation *cell = cells[posIndex];
         if (((cell->faces1 & cell->faces2) & pow2[FRONT_FACE]) ==
@@ -588,11 +584,10 @@ MIsosurfaceIntersectionSource::getNextCell(
     }
     else if (currentSegmentFace == BOTTOM_FACE)
     {
-        int posIndex = actCell->index - numCellsLatLon;
-        if (posIndex < 0)
-        {
-            return nullptr;
-        }
+        const int curLev = lev - 1;
+        if (curLev < 0) { return nullptr; }
+        const int posIndex = INDEX3zyx(curLev, lat, lon, numCellsLat, numCellsLon);
+
         CellInformation *cell = cells[posIndex];
         if (((cell->faces1 & cell->faces2) & pow2[TOP_FACE]) == pow2[TOP_FACE])
         {
@@ -602,15 +597,10 @@ MIsosurfaceIntersectionSource::getNextCell(
     }
     else if (currentSegmentFace == RIGHT_FACE)
     {
-        int posIndex = actCell->index + 1;
-        if (posIndex > numCells - 1)
-        {
-            return nullptr;
-        }
-        if (posIndex < 0)
-        {
-            return nullptr;
-        }
+        const int curLon = lon + 1;
+        if (curLon >= numCellsLon) { return nullptr; }
+        const int posIndex = INDEX3zyx(lev, lat, curLon, numCellsLat, numCellsLon);
+
         CellInformation *cell = cells[posIndex];
         if (((cell->faces1 & cell->faces2) & pow2[LEFT_FACE]) ==
             pow2[LEFT_FACE])
@@ -621,15 +611,10 @@ MIsosurfaceIntersectionSource::getNextCell(
     }
     else if (currentSegmentFace == FRONT_FACE)
     {
-        int posIndex = actCell->index - (gridA->getNumLons() - 1);
-        if (posIndex > numCells - 1)
-        {
-            return nullptr;
-        }
-        if (posIndex < 0)
-        {
-            return nullptr;
-        }
+        const int curLat = lat - 1;
+        if (curLat < 0) { return nullptr; }
+        const int posIndex = INDEX3zyx(lev, curLat, lon, numCellsLat, numCellsLon);
+
         CellInformation *cell = cells[posIndex];
         if (((cell->faces1 & cell->faces2) & pow2[BACK_FACE]) ==
             pow2[BACK_FACE])
@@ -640,11 +625,10 @@ MIsosurfaceIntersectionSource::getNextCell(
     }
     else if (currentSegmentFace == TOP_FACE)
     {
-        int posIndex = actCell->index + numCellsLatLon;
-        if (posIndex > numCells - 1)
-        {
-            return nullptr;
-        }
+        const int curLev = lev + 1;
+        if (curLev >= numCellsLev) { return nullptr; }
+        const int posIndex = INDEX3zyx(curLev, lat, lon, numCellsLat, numCellsLon);
+
         CellInformation *cell = cells[posIndex];
         if (((cell->faces1 & cell->faces2) & pow2[BOTTOM_FACE]) ==
             pow2[BOTTOM_FACE])

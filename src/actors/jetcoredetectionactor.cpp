@@ -57,6 +57,9 @@ MJetcoreDetectionActor::MJetcoreDetectionActor()
     variableSettings->varsProperty[0]->setPropertyName("u-component of wind");
     variableSettings->varsProperty[1]->setPropertyName("v-component of wind");
 
+    variableSettings->groupProp->removeSubProperty(variableSettings->varsIsovalueProperty[0]);
+    variableSettings->groupProp->removeSubProperty(variableSettings->varsIsovalueProperty[1]);
+
     variableSettingsCores =
             std::make_shared<VariableSettingsJetcores>(
                 this, variableSettings->groupProp);
@@ -104,7 +107,7 @@ MJetcoreDetectionActor::FilterSettingsJetcores::FilterSettingsJetcores(
         MJetcoreDetectionActor *hostActor, QtProperty *groupProp)
     : lambdaThreshold(0.f),
       angleThreshold(180.f),
-      pressureDiffThreshold(1000.0f)
+      pressureDiffThreshold(10000.0f)
 {
     MActor *a = hostActor;
     MQtProperties *properties = a->getQtProperties();
@@ -112,8 +115,9 @@ MJetcoreDetectionActor::FilterSettingsJetcores::FilterSettingsJetcores(
     lambdaThresholdProperty = a->addProperty(DOUBLE_PROPERTY,
                                              "max. lambda (* 10e-9)",
                                              groupProp);
-    properties->setDouble(lambdaThresholdProperty, lambdaThreshold, -100000, 100000, 6,
-                          0.1);
+    properties->setDouble(lambdaThresholdProperty, lambdaThreshold,
+                          -std::numeric_limits<double>::min(),
+                          std::numeric_limits<double>::max(), 6, 0.1);
 
     angleThresholdProperty = a->addProperty(DOUBLE_PROPERTY, "max. angle",
                                             groupProp);
@@ -124,7 +128,7 @@ MJetcoreDetectionActor::FilterSettingsJetcores::FilterSettingsJetcores(
                 DECORATEDDOUBLE_PROPERTY, "max. pressure difference",
                 groupProp);
     properties->setDDouble(pressureDiffThresholdProperty, pressureDiffThreshold,
-                           0, 1000, 2, 1, " hPa");
+                           0, 10000, 2, 1, " hPa");
 }
 
 
@@ -169,7 +173,7 @@ void MJetcoreDetectionActor::loadConfiguration(QSettings *settings)
 {
     MIsosurfaceIntersectionActor::loadConfiguration(settings);
 
-    supressActorUpdates = true;
+    enableActorUpdates(false);
     settings->beginGroup(getSettingsID());
 
     variableSettingsCores->geoPotVarIndex = settings->value(
@@ -204,7 +208,7 @@ void MJetcoreDetectionActor::loadConfiguration(QSettings *settings)
                 appearanceSettingsCores->arrowsEnabled);
 
     settings->endGroup();
-    supressActorUpdates = false;
+    enableActorUpdates(true);
 }
 
 
@@ -214,12 +218,9 @@ void MJetcoreDetectionActor::loadConfiguration(QSettings *settings)
 
 void MJetcoreDetectionActor::onQtPropertyChanged(QtProperty *property)
 {
-    if (supressActorUpdates)
-    {
-        return;
-    }
-
     MIsosurfaceIntersectionActor::onQtPropertyChanged(property);
+
+    if (suppressActorUpdates()) { return; }
 
     if (property == variableSettingsCores->geoPotVarProperty
             || property == variableSettingsCores->geoPotOnlyProperty
@@ -366,22 +367,19 @@ void MJetcoreDetectionActor::requestIsoSurfaceIntersectionLines()
                                   partialDerivFilters[i]);
     }
 
-    supressActorUpdates = true;
+    enableActorUpdates(false);
     variableSettings->groupProp->setEnabled(false);
     ensembleSelectionSettings->groupProp->setEnabled(false);
-    supressActorUpdates = false;
+    enableActorUpdates(true);
 
     // Obtain the two variables that should be intersected.
-    MNWPIsolevelActorVariable *var1st =
-            dynamic_cast<MNWPIsolevelActorVariable *>(
+    auto var1st = dynamic_cast<MNWPActorVariable *>(
                 variables.at(variableSettings->varsIndex[0]));
-    MNWPIsolevelActorVariable *var2nd =
-            dynamic_cast<MNWPIsolevelActorVariable *>(
+    auto var2nd = dynamic_cast<MNWPActorVariable *>(
                 variables.at(variableSettings->varsIndex[1]));
 
     // Obtain the variable for geopotential height.
-    MNWPIsolevelActorVariable *varGeoPot =
-            dynamic_cast<MNWPIsolevelActorVariable *>(
+    auto varGeoPot = dynamic_cast<MNWPActorVariable *>(
                 variables.at(variableSettingsCores->geoPotVarIndex));
 
     partialDerivFilters[0]->setInputSource(var1st->dataSource);
@@ -416,8 +414,8 @@ void MJetcoreDetectionActor::requestIsoSurfaceIntersectionLines()
 //    rh.insert("ENS_OPERATION", ""); // ensembleSelectionSettings->ensembleFilterOperation);
     rh.insert("ISOX_VARIABLES", var1st->variableName + "/"
               + var2nd->variableName);
-    rh.insert("ISOX_VALUES", QString::number(var1st->getIsoValue())
-              + "/" + QString::number(var2nd->getIsoValue()));
+    rh.insert("ISOX_VALUES", QString::number(0)
+              + "/" + QString::number(0));
     rh.insert("VARIABLE", var1st->variableName);
 
     rh.insert("MULTI_DERIVATIVE_SETTINGS", "ddn/ddz");
@@ -444,29 +442,29 @@ void MJetcoreDetectionActor::buildFilterChain(MDataRequestHelper &rh)
 {
     MTrajectorySelectionSource *inputSource = isosurfaceSource;
 
-    MNWPIsolevelActorVariable *varSource = nullptr;
+    MNWPActorVariable *varSource = nullptr;
 
     if (lineFilterSettings->filterVarIndex > 0)
     {
         varSource =
-                dynamic_cast<MNWPIsolevelActorVariable *>(
+                dynamic_cast<MNWPActorVariable *>(
                     variables.at(lineFilterSettings->filterVarIndex - 1));
     }
 
-    MNWPIsolevelActorVariable *varThickness = nullptr;
+    MNWPActorVariable *varThickness = nullptr;
 
     if (tubeThicknessSettings->mappedVariableIndex > 0)
     {
-        varThickness = dynamic_cast<MNWPIsolevelActorVariable *>(
+        varThickness = dynamic_cast<MNWPActorVariable *>(
                     variables.at(tubeThicknessSettings->mappedVariableIndex - 1)
                     );
     }
 
-    MNWPIsolevelActorVariable *varMapped = nullptr;
+    MNWPActorVariable *varMapped = nullptr;
 
     if (appearanceSettings->colorVariableIndex > 0)
     {
-        varMapped = dynamic_cast<MNWPIsolevelActorVariable *>(
+        varMapped = dynamic_cast<MNWPActorVariable *>(
                     variables.at(appearanceSettings->colorVariableIndex - 1));
     }
 
@@ -490,15 +488,12 @@ void MJetcoreDetectionActor::buildFilterChain(MDataRequestHelper &rh)
         inputSource = varTrajectoryFilter.get();
     }
 
-    MNWPIsolevelActorVariable *var1st =
-            dynamic_cast<MNWPIsolevelActorVariable *>(
+    auto var1st = dynamic_cast<MNWPActorVariable *>(
                 variables.at(variableSettings->varsIndex[0]));
-    MNWPIsolevelActorVariable *var2nd =
-            dynamic_cast<MNWPIsolevelActorVariable *>(
+    auto var2nd = dynamic_cast<MNWPActorVariable *>(
                 variables.at(variableSettings->varsIndex[1]));
 
-    MNWPIsolevelActorVariable *varGeoPot =
-            dynamic_cast<MNWPIsolevelActorVariable *>(
+    auto varGeoPot = dynamic_cast<MNWPActorVariable *>(
                 variables.at(variableSettingsCores->geoPotVarIndex));
 
     // Set the Hessian eigenvalue filter.
@@ -831,6 +826,8 @@ void MJetcoreDetectionActor::renderToCurrentContext(
 
 void MJetcoreDetectionActor::refreshEnumsProperties(MNWPActorVariable *var)
 {
+    enableActorUpdates(false);
+
     MIsosurfaceIntersectionActor::refreshEnumsProperties(var);
 
     QStringList names;
@@ -842,14 +839,19 @@ void MJetcoreDetectionActor::refreshEnumsProperties(MNWPActorVariable *var)
         }
     }
 
-    variableSettingsCores->geoPotVarIndex = 0;
-
-    enableActorUpdates(false);
+    const QString varNameGeoPot = properties->getEnumItem(variableSettingsCores->geoPotVarProperty);
 
     properties->mEnum()->setEnumNames(variableSettingsCores->geoPotVarProperty,
                                       names);
 
+    setVariableIndexFromEnumProperty(varNameGeoPot, variableSettingsCores->geoPotVarProperty, variableSettingsCores->geoPotVarIndex);
+
     enableActorUpdates(true);
+
+    if (enableAutoComputation)
+    {
+        requestIsoSurfaceIntersectionLines();
+    }
 }
 
 

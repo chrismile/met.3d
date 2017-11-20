@@ -51,12 +51,11 @@
 #include "gxfw/gl/texture.h"
 #include "gxfw/gl/shadereffect.h"
 
+namespace Met3D
+{
 class MGLResourcesManager;
 class MSceneViewGLWidget;
 
-
-namespace Met3D
-{
 /**
  * @brief MIsosurfaceIntersectionActor displays intersection lines of two
  * crossed iso-surfaces co-located on the same grid.
@@ -68,25 +67,23 @@ class MIsosurfaceIntersectionActor : public MNWPMultiVarIsolevelActor,
 
 public:
     explicit MIsosurfaceIntersectionActor();
-    virtual ~MIsosurfaceIntersectionActor() override;
+    ~MIsosurfaceIntersectionActor() override;
 
-    void reloadShaderEffects();
+    void reloadShaderEffects() override;
 
-    virtual QString getSettingsID() override
-    { return "IsosurfaceIntersectionActor"; }
+    QString getSettingsID() override { return "IsosurfaceIntersectionActor"; }
 
-    virtual void saveConfiguration(QSettings *settings) override;
+    void saveConfiguration(QSettings *settings) override;
 
-    virtual void loadConfiguration(QSettings *settings) override;
+    void loadConfiguration(QSettings *settings) override;
 
-    MNWPActorVariable* createActorVariable(
-            const MSelectableDataSource& dataSource);
+    MNWPActorVariable* createActorVariable(const MSelectableDataSource& dataSource) override;
 
     /**
       Returns a list of the vertical level types that can be handled by this
       actor.
      */
-    const QList<MVerticalLevelType> supportedLevelTypes();
+    const QList<MVerticalLevelType> supportedLevelTypes() override;
 
     /**
      * Set the input source that computes the intersection of two iso-surfaces.
@@ -113,13 +110,13 @@ public slots:
      */
     void asynchronousValuesAvailable(MDataRequest request);
 
-    void isoValueOfVariableChanged();
+    void isoValueOfVariableChanged() override;
 
-    void onAddActorVariable(MNWPActorVariable *var);
+    void onAddActorVariable(MNWPActorVariable *var) override;
 
-    void onDeleteActorVariable(MNWPActorVariable *var);
+    void onDeleteActorVariable(MNWPActorVariable *var) override;
 
-    void onChangeActorVariable(MNWPActorVariable *var);
+    void onChangeActorVariable(MNWPActorVariable *var) override;
 
     /**
      Emit an actor changed signal if pole actor has been modified by the user.
@@ -138,7 +135,7 @@ public slots:
 
     void onActorRenamed(MActor *actor, QString oldName);
 
-    void onBoundingBoxChanged();
+    void onBoundingBoxChanged() override;
 
 protected:
 
@@ -146,11 +143,11 @@ protected:
       Loads the shader programs and generates the graticule geometry. The
       geometry is uploaded to the GPU into a vertex buffer object.
      */
-    virtual void initializeActorResources() override;
+    void initializeActorResources() override;
 
-    void onQtPropertyChanged(QtProperty *property);
+    void onQtPropertyChanged(QtProperty *property) override;
 
-    virtual void renderToCurrentContext(MSceneViewGLWidget *sceneView) override;
+    void renderToCurrentContext(MSceneViewGLWidget *sceneView) override;
 
     /**
      * Add a new filter to the intersection line filter pipeline.
@@ -193,8 +190,9 @@ protected:
     virtual void refreshEnumsProperties(MNWPActorVariable *var);
 
     void setTransferFunctionFromProperty();
-
     bool setTransferFunction(const QString& tfName);
+
+    void setVariableIndexFromEnumProperty(const QString& varName, QtProperty* prop, int& index);
 
     void renderBoundingBox(MSceneViewGLWidget *sceneView);
     virtual void renderToDepthMap(MSceneViewGLWidget *sceneView);
@@ -266,6 +264,8 @@ protected:
         /** 1st and 2nd variable, value variable. */
         std::array<QtProperty*, 2> varsProperty;
         std::array<int, 2> varsIndex;
+        std::array<QtProperty*, 2> varsIsovalueProperty;
+        std::array<float, 2> varsIsovalue;
     };
 
     /** Settings to filter the lines by value and geometric length. */
@@ -397,7 +397,6 @@ protected:
     std::shared_ptr<BoundingBoxSettings>        boundingBoxSettings;
 
     /** Suppress any actor updates until all properties are initialized. */
-    bool supressActorUpdates;
     bool isCalculating;
 
     /** Pole actor to relate jetstream cores to their actual height in pressure. */

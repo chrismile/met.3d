@@ -735,36 +735,6 @@ protected:
 private:
 };
 
-/**
-  @brief Variable properties specific to isolevel rendering.
- */
-class MNWPIsolevelActorVariable : public MNWPActorVariable
-{
-Q_OBJECT
-public:
-    MNWPIsolevelActorVariable(MNWPMultiVarActor *actor);
-
-    bool onQtPropertyChanged(QtProperty *property) override;
-
-    float getIsoValue();
-
-    void loadConfiguration(QSettings *settings) override;
-
-    void saveConfiguration(QSettings *settings) override;
-
-signals:
-
-    /**
-    * @brief This signal is emitted when the isolevel of the variable has been
-    * changed.
-    */
-    void isoValueChanged();
-
-protected:
-    QtProperty* isoValueProperty;
-    float isoValue;
-};
-
 } // namespace Met3D
 
 #endif // NWPACTORVARIABLE_H

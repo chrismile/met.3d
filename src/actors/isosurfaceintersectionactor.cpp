@@ -57,7 +57,6 @@ MIsosurfaceIntersectionActor::MIsosurfaceIntersectionActor()
       linesVertexBuffer(nullptr),
       thicknessMode(0),
       enableAutoComputation(true),
-      supressActorUpdates(false),
       isCalculating(false),
       poleActor(nullptr),
       shadowMap(nullptr),
@@ -165,16 +164,26 @@ MIsosurfaceIntersectionActor::~MIsosurfaceIntersectionActor()
 
 MIsosurfaceIntersectionActor::VariableSettings::VariableSettings(
         MIsosurfaceIntersectionActor *hostActor)
-    : varsIndex({{-1, -1 }})
+    : varsIndex({{ -1, -1 }}), varsIsovalue({{ 0.f, 0.f }})
 {
     MActor *a = hostActor;
 
     groupProp = a->addProperty(GROUP_PROPERTY, "intersection variables");
+    MQtProperties *properties = a->getQtProperties();
 
     varsProperty[0] = a->addProperty(ENUM_PROPERTY, "variable A",
                                      groupProp);
+
+    varsIsovalueProperty[0] = a->addProperty(DOUBLE_PROPERTY, "isovalue A", groupProp);
+    properties->setDouble(varsIsovalueProperty[0], varsIsovalue[0], 0,
+                          std::numeric_limits<double>::max(), 5, 1);
+
     varsProperty[1] = a->addProperty(ENUM_PROPERTY, "variable B",
                                      groupProp);
+
+    varsIsovalueProperty[1] = a->addProperty(DOUBLE_PROPERTY, "isovalue B", groupProp);
+    properties->setDouble(varsIsovalueProperty[1], varsIsovalue[1], 0,
+                          std::numeric_limits<double>::max(), 5, 1);
 }
 
 
@@ -195,12 +204,13 @@ MIsosurfaceIntersectionActor::LineFilterSettings::LineFilterSettings(
     valueFilterProperty = a->addProperty(DOUBLE_PROPERTY, "min. value (filter variable)",
                                          groupProp);
     properties->setDouble(valueFilterProperty, valueFilter,
-                          0, 10E12, 1, 1);
+                          0, std::numeric_limits<double>::max(), 5, 1);
 
     lineLengthFilterProperty = a->addProperty(DECORATEDDOUBLE_PROPERTY,
                                               "min. line length",
                                               groupProp);
-    properties->setDDouble(lineLengthFilterProperty, lineLengthFilter, 0, 70000, 0, 1, " km");
+    properties->setDDouble(lineLengthFilterProperty, lineLengthFilter, 0,
+                           std::numeric_limits<double>::max(), 0, 1, " km");
 }
 
 
@@ -377,6 +387,8 @@ void MIsosurfaceIntersectionActor::saveConfiguration(QSettings *settings)
     settings->beginGroup(getSettingsID());
     settings->setValue("var1stIndex", variableSettings->varsIndex[0]);
     settings->setValue("var2ndIndex", variableSettings->varsIndex[1]);
+    settings->setValue("var1stIsovalue", variableSettings->varsIsovalue[0]);
+    settings->setValue("var2ndIsovalue", variableSettings->varsIsovalue[1]);
     settings->setValue("varFilterIndex", lineFilterSettings->filterVarIndex);
 
     settings->setValue("filterValue", lineFilterSettings->valueFilter);
@@ -433,7 +445,7 @@ void MIsosurfaceIntersectionActor::loadConfiguration(QSettings *settings)
 {
     MNWPMultiVarActor::loadConfiguration(settings);
 
-    supressActorUpdates = true;
+    enableActorUpdates(false);
     settings->beginGroup(getSettingsID());
     variableSettings->varsIndex[0] = settings->value("var1stIndex", -1).toInt();
     properties->mEnum()->setValue(variableSettings->varsProperty[0],
@@ -441,6 +453,14 @@ void MIsosurfaceIntersectionActor::loadConfiguration(QSettings *settings)
     variableSettings->varsIndex[1] = settings->value("var2ndIndex", -1).toInt();
     properties->mEnum()->setValue(variableSettings->varsProperty[1],
             variableSettings->varsIndex[1]);
+
+    variableSettings->varsIsovalue[0] = settings->value("var1stIsovalue", 0).toFloat();
+    properties->mDouble()->setValue(variableSettings->varsIsovalueProperty[0],
+                                    variableSettings->varsIsovalue[0]);
+    variableSettings->varsIsovalue[1] = settings->value("var2ndIsovalue", 0).toFloat();
+    properties->mDouble()->setValue(variableSettings->varsIsovalueProperty[1],
+                                    variableSettings->varsIsovalue[1]);
+
     lineFilterSettings->filterVarIndex = settings->value("varFilterIndex",
                                                      -1).toInt();
     properties->mEnum()->setValue(lineFilterSettings->filterVarProperty,
@@ -596,7 +616,7 @@ void MIsosurfaceIntersectionActor::loadConfiguration(QSettings *settings)
         generateVolumeBoxGeometry();
     }
 
-    supressActorUpdates = false;
+    enableActorUpdates(true);
 
     settings->endGroup();
 
@@ -615,7 +635,7 @@ MIsosurfaceIntersectionActor::supportedLevelTypes()
 MNWPActorVariable *MIsosurfaceIntersectionActor::createActorVariable(
         const MSelectableDataSource &dataSource)
 {
-    MNWPIsolevelActorVariable *newVar = new MNWPIsolevelActorVariable(this);
+    auto newVar = new MNWPActorVariable(this);
 
     newVar->dataSourceID = dataSource.dataSourceID;
     newVar->levelType = dataSource.levelType;
@@ -739,30 +759,35 @@ void MIsosurfaceIntersectionActor::onActorRenamed(MActor *actor,
 
 void MIsosurfaceIntersectionActor::onQtPropertyChanged(QtProperty *property)
 {
-    if (supressActorUpdates)
+    // Automatically compute the new intersection lines if valid or init time
+    // of the two selected variables was changed.
+    if (variables.size() >= 2)
     {
-        return;
+        auto var1 = dynamic_cast<MNWPActorVariable *>(
+                variables.at(variableSettings->varsIndex[0]));
+        auto var2 = dynamic_cast<MNWPActorVariable *>(
+                variables.at(variableSettings->varsIndex[1]));
+
+        if ((property == var1->validTimeProperty
+             || property == var1->initTimeProperty
+             || property == var2->validTimeProperty)
+             || property == var2->initTimeProperty)
+        {
+            if (enableAutoComputation)
+            {
+                requestIsoSurfaceIntersectionLines();
+            }
+
+            emitActorChangedSignal();
+        }
     }
+
+
+    if (suppressActorUpdates()) { return; }
     // Parent signal processing.
     MNWPMultiVarActor::onQtPropertyChanged(property);
 
-    // Variable settings.
-    if (property == variableSettings->varsProperty[0])
-    {
-        variableSettings->varsIndex[0] = properties->mEnum()->value(
-                    variableSettings->varsProperty[0]);
-    }
-    else if (property == variableSettings->varsProperty[1])
-    {
-        variableSettings->varsIndex[1] = properties->mEnum()->value(
-                    variableSettings->varsProperty[1]);
-    }
-    else if (property == lineFilterSettings->filterVarProperty)
-    {
-        lineFilterSettings->filterVarIndex = properties->mEnum()->value(
-                lineFilterSettings->filterVarProperty);
-    }
-    else if (property == boundingBoxSettings->enabledProperty)
+    if (property == boundingBoxSettings->enabledProperty)
     {
         boundingBoxSettings->enabled =
                 properties->mBool()->value(
@@ -791,10 +816,6 @@ void MIsosurfaceIntersectionActor::onQtPropertyChanged(QtProperty *property)
     // If enabled, click the compute button to compute the intersection lines.
     else if (property == computeClickProperty)
     {
-        if (suppressActorUpdates())
-        {
-            return;
-        }
         if (bBoxConnection->getBoundingBox() == nullptr)
         {
             QMessageBox::information(
@@ -960,14 +981,28 @@ void MIsosurfaceIntersectionActor::onQtPropertyChanged(QtProperty *property)
 
     // If any of the variables was changed or the ensemble members, filter
     // values were altered, request new intersection lines.
-    if (property == variableSettings->varsProperty[0] ||
-            property == variableSettings->varsProperty[1] ||
-            property == lineFilterSettings->filterVarProperty ||
-            property ==
-            ensembleSelectionSettings->ensembleMultiMemberSelectionProperty ||
-            property == lineFilterSettings->valueFilterProperty ||
-            property == lineFilterSettings->lineLengthFilterProperty)
+    else if (property == variableSettings->varsProperty[0]
+        || property == variableSettings->varsProperty[1]
+        || property == variableSettings->varsIsovalueProperty[0]
+        || property == variableSettings->varsIsovalueProperty[1]
+        || property == lineFilterSettings->filterVarProperty
+        || property == lineFilterSettings->valueFilterProperty
+        || property == lineFilterSettings->lineLengthFilterProperty
+        || property == ensembleSelectionSettings->ensembleMultiMemberSelectionProperty)
     {
+        variableSettings->varsIndex[0] = properties->mEnum()->value(
+                variableSettings->varsProperty[0]);
+        variableSettings->varsIndex[1] = properties->mEnum()->value(
+                variableSettings->varsProperty[1]);
+
+        variableSettings->varsIsovalue[0] = properties->mDouble()
+                ->value(variableSettings->varsIsovalueProperty[0]);
+        variableSettings->varsIsovalue[1] = properties->mDouble()
+                ->value(variableSettings->varsIsovalueProperty[1]);
+
+        lineFilterSettings->filterVarIndex = properties->mEnum()->value(
+                lineFilterSettings->filterVarProperty);
+
         lineFilterSettings->lineLengthFilter =
                 static_cast<int>(properties->mDDouble()->value(
                     lineFilterSettings->lineLengthFilterProperty));
@@ -982,32 +1017,6 @@ void MIsosurfaceIntersectionActor::onQtPropertyChanged(QtProperty *property)
 
         emitActorChangedSignal();
 
-    }
-    else
-    {
-        // Automatically compute the intersection lines if two different
-        // variables were selected.
-        if (variables.size() >= 2)
-        {
-            MNWPIsolevelActorVariable *var1 =
-                    dynamic_cast<MNWPIsolevelActorVariable *>(
-                        variables.at(variableSettings->varsIndex[0]));
-            MNWPIsolevelActorVariable *var2 =
-                    dynamic_cast<MNWPIsolevelActorVariable *>(
-                        variables.at(variableSettings->varsIndex[1]));
-            if ((property == var1->validTimeProperty ||
-                 property == var2->validTimeProperty)
-                    && var1->getPropertyTime(var1->validTimeProperty)
-                    == var2->getPropertyTime(var2->validTimeProperty))
-            {
-                if (enableAutoComputation)
-                {
-                    requestIsoSurfaceIntersectionLines();
-                }
-
-                emitActorChangedSignal();
-            }
-        }
     }
 }
 
@@ -1126,19 +1135,20 @@ void MIsosurfaceIntersectionActor::asynchronousValuesAvailable(
                                                                   vbKey));
     }
 
-    supressActorUpdates = true;
+    enableActorUpdates(false);
     variableSettings->groupProp->setEnabled(true);
     ensembleSelectionSettings->groupProp->setEnabled(true);
-    supressActorUpdates = false;
 
     // Re-enable the sync control.
     isCalculating = false;
-    MNWPIsolevelActorVariable *var2 = dynamic_cast<MNWPIsolevelActorVariable *>(
+    auto var2 = dynamic_cast<MNWPActorVariable *>(
                 variables.at(variableSettings->varsIndex[1]));
     if (var2->synchronizationControl != nullptr)
     {
         var2->synchronizationControl->setEnabled(true);
     }
+
+    enableActorUpdates(true);
 
     emitActorChangedSignal();
 }
@@ -1266,17 +1276,17 @@ void MIsosurfaceIntersectionActor::requestIsoSurfaceIntersectionLines()
         //lineGeometryFilter->releaseData(intersectionLines);
     }
 
-    supressActorUpdates = true;
+    enableActorUpdates(false);
     variableSettings->groupProp->setEnabled(false);
     ensembleSelectionSettings->groupProp->setEnabled(false);
-    supressActorUpdates = false;
+    enableActorUpdates(true);
 
     // Obtain the two variables that should be intersected.
-    MNWPIsolevelActorVariable *var1st =
-            dynamic_cast<MNWPIsolevelActorVariable *>(
+    auto var1st =
+            dynamic_cast<MNWPActorVariable *>(
                 variables.at(variableSettings->varsIndex[0]));
-    MNWPIsolevelActorVariable *var2nd =
-            dynamic_cast<MNWPIsolevelActorVariable *>(
+    auto var2nd =
+            dynamic_cast<MNWPActorVariable *>(
                 variables.at(variableSettings->varsIndex[1]));
 
     isosurfaceSource->setInputSourceFirstVar(var1st->dataSource);
@@ -1312,8 +1322,8 @@ void MIsosurfaceIntersectionActor::requestIsoSurfaceIntersectionLines()
     // Set the variables and iso-values.
     rh.insert("ISOX_VARIABLES", var1st->variableName + "/"
               + var2nd->variableName);
-    rh.insert("ISOX_VALUES", QString::number(var1st->getIsoValue())
-              + "/" + QString::number(var2nd->getIsoValue()));
+    rh.insert("ISOX_VALUES", QString::number(variableSettings->varsIsovalue[0])
+              + "/" + QString::number(variableSettings->varsIsovalue[1]));
     rh.insert("VARIABLE", var1st->variableName);
 
     rh.insert("ISOX_BOUNDING_BOX",
@@ -1335,28 +1345,27 @@ void MIsosurfaceIntersectionActor::buildFilterChain(MDataRequestHelper &rh)
 {
     MTrajectorySelectionSource *inputSource = isosurfaceSource;
 
-    MNWPIsolevelActorVariable *varSource = nullptr;
+    MNWPActorVariable *varSource = nullptr;
 
     if (lineFilterSettings->filterVarIndex > 0)
     {
-        varSource = dynamic_cast<MNWPIsolevelActorVariable *>(
+        varSource = dynamic_cast<MNWPActorVariable *>(
                     variables.at(lineFilterSettings->filterVarIndex - 1));
     }
 
-    MNWPIsolevelActorVariable *varMapped = nullptr;
+    MNWPActorVariable *varMapped = nullptr;
 
     if (appearanceSettings->colorVariableIndex > 0)
     {
-        varMapped = dynamic_cast<MNWPIsolevelActorVariable *>(
+        varMapped = dynamic_cast<MNWPActorVariable *>(
                     variables.at(appearanceSettings->colorVariableIndex - 1));
     }
 
-    MNWPIsolevelActorVariable *varThickness = nullptr;
+    MNWPActorVariable *varThickness = nullptr;
 
     if (tubeThicknessSettings->mappedVariableIndex > 0)
     {
-        varThickness =
-                dynamic_cast<MNWPIsolevelActorVariable *>(
+        varThickness = dynamic_cast<MNWPActorVariable *>(
                     variables.at(tubeThicknessSettings->mappedVariableIndex - 1)
                     );
     }
@@ -1483,11 +1492,11 @@ void MIsosurfaceIntersectionActor::placePoleActors(
 {
     poleActor->removeAllPoles();
 
-    MNWPIsolevelActorVariable *varSource = nullptr;
+    MNWPActorVariable *varSource = nullptr;
 
     if (appearanceSettings->colorVariableIndex > 0)
     {
-        varSource = dynamic_cast<MNWPIsolevelActorVariable *>(
+        varSource = dynamic_cast<MNWPActorVariable *>(
                     variables.at(appearanceSettings->colorVariableIndex - 1));
     }
 
@@ -1939,15 +1948,9 @@ void MIsosurfaceIntersectionActor::renderBoundingBox(
 void MIsosurfaceIntersectionActor::renderToCurrentContext(
         MSceneViewGLWidget *sceneView)
 {
-    if (bBoxConnection->getBoundingBox() == nullptr)
-    {
-        return;
-    }
+    if (bBoxConnection->getBoundingBox() == nullptr) { return; }
 
-    if (boundingBoxSettings->enabled)
-    {
-        renderBoundingBox(sceneView);
-    }
+    if (boundingBoxSettings->enabled) { renderBoundingBox(sceneView); }
 
     if (intersectionLines != nullptr &&
             linesVertexBuffer != nullptr &&
@@ -2153,13 +2156,14 @@ void MIsosurfaceIntersectionActor::refreshEnumsProperties(
         }
     }
 
-    variableSettings->varsIndex[0] = 0;
-    variableSettings->varsIndex[1] = 0;
-    lineFilterSettings->filterVarIndex = 0;
-    appearanceSettings->colorVariableIndex = 0;
-    tubeThicknessSettings->mappedVariableIndex = 0;
-
     enableActorUpdates(false);
+
+    const QString varNameA = properties->getEnumItem(variableSettings->varsProperty[0]);
+    const QString varNameB = properties->getEnumItem(variableSettings->varsProperty[1]);
+    const QString varNameFilter = properties->getEnumItem(lineFilterSettings->filterVarProperty);
+    const QString varNameColor = properties->getEnumItem(appearanceSettings->colorVariableProperty);
+    const QString varNameThickness = properties->getEnumItem(tubeThicknessSettings->mappedVariableProperty);
+
     properties->mEnum()->setEnumNames(variableSettings->varsProperty[0], names);
     properties->mEnum()->setEnumNames(variableSettings->varsProperty[1], names);
 
@@ -2174,7 +2178,18 @@ void MIsosurfaceIntersectionActor::refreshEnumsProperties(
                 tubeThicknessSettings->mappedVariableProperty,
                 varNamesWithNone);
 
+    setVariableIndexFromEnumProperty(varNameA, variableSettings->varsProperty[0], variableSettings->varsIndex[0]);
+    setVariableIndexFromEnumProperty(varNameB, variableSettings->varsProperty[1], variableSettings->varsIndex[1]);
+    setVariableIndexFromEnumProperty(varNameFilter, lineFilterSettings->filterVarProperty, lineFilterSettings->filterVarIndex);
+    setVariableIndexFromEnumProperty(varNameColor, appearanceSettings->colorVariableProperty, appearanceSettings->colorVariableIndex);
+    setVariableIndexFromEnumProperty(varNameThickness, tubeThicknessSettings->mappedVariableProperty, tubeThicknessSettings->mappedVariableIndex);
+
     enableActorUpdates(true);
+
+    if (enableAutoComputation)
+    {
+        requestIsoSurfaceIntersectionLines();
+    }
 }
 
 
@@ -2229,6 +2244,16 @@ bool MIsosurfaceIntersectionActor::setTransferFunction(const QString &tfName)
     return false; // The given tf name could not be found.
 }
 
+
+void MIsosurfaceIntersectionActor::setVariableIndexFromEnumProperty(const QString& varName, QtProperty* prop,
+                                                                    int& index)
+{
+    const QStringList enums = properties->mEnum()->enumNames(prop);
+    const int varIndex = enums.indexOf(varName);
+
+    index = std::max(varIndex, 0);
+    properties->mEnum()->setValue(prop, index);
+}
 /******************************************************************************
 ***                           PRIVATE METHODS                               ***
 *******************************************************************************/
