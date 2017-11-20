@@ -89,6 +89,12 @@ protected:
      */
     void refreshEnumsProperties(MNWPActorVariable *var) override;
 
+    /**
+      Implements MNWPActor::dataFieldChangedEvent() to update the target grid
+      if the data field has changed.
+      */
+    void dataFieldChangedEvent() override;
+
     /** Settings to select the geopotential height variable. */
     struct VariableSettingsJetcores
     {

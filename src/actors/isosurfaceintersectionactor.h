@@ -199,6 +199,12 @@ protected:
     void renderShadows(MSceneViewGLWidget *sceneView);
     void generateVolumeBoxGeometry();
 
+    /**
+      Implements MNWPActor::dataFieldChangedEvent() to update the target grid
+      if the data field has changed.
+      */
+    void dataFieldChangedEvent() override;
+
     /** Points to the current iso-surface intersection source. */
     MIsosurfaceIntersectionSource       *isosurfaceSource;
 
@@ -355,8 +361,8 @@ protected:
 
         QtProperty* groupProp;
 
-        QtProperty* syncModeEnabledProperty;
-        bool        syncModeEnabled;
+        QtProperty* spaghettiPlotProperty;
+        bool        spaghettiPlotEnabled;
         QtProperty* ensembleMultiMemberProperty;
         QSet<unsigned int> selectedEnsembleMembers;
         QtProperty* ensembleMultiMemberSelectionProperty;

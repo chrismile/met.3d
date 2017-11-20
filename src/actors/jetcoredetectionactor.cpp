@@ -408,10 +408,20 @@ void MJetcoreDetectionActor::requestIsoSurfaceIntersectionLines()
     rh.insert("VALID_TIME", var1st->getPropertyTime(var1st->validTimeProperty));
     rh.insert("LEVELTYPE", var1st->levelType);
     rh.insert("MEMBER", 0);
-    rh.insert("MEMBERS", MDataRequestHelper::uintSetToString(
-                  ensembleSelectionSettings->selectedEnsembleMembers));
 
-//    rh.insert("ENS_OPERATION", ""); // ensembleSelectionSettings->ensembleFilterOperation);
+    QString memberList = "";
+    if (ensembleSelectionSettings->spaghettiPlotEnabled)
+    {
+        memberList = MDataRequestHelper
+        ::uintSetToString(ensembleSelectionSettings->selectedEnsembleMembers);
+    }
+    else
+    {
+        memberList = QString::number(var1st->getEnsembleMember());
+    }
+
+    rh.insert("MEMBERS", memberList);
+
     rh.insert("ISOX_VARIABLES", var1st->variableName + "/"
               + var2nd->variableName);
     rh.insert("ISOX_VALUES", QString::number(0)
@@ -628,6 +638,15 @@ void MJetcoreDetectionActor::asynchronousArrowsAvailable(MDataRequest request)
     arrowsVertexBuffer = arrowHeads->getVertexBuffer();
 
     buildGPUResources();
+}
+
+
+void MJetcoreDetectionActor::dataFieldChangedEvent()
+{
+    if (enableAutoComputation && variables.size() >= 3)
+    {
+        requestIsoSurfaceIntersectionLines();
+    }
 }
 
 

@@ -324,7 +324,7 @@ MIsosurfaceIntersectionActor::TubeThicknessSettings::TubeThicknessSettings(
 
 MIsosurfaceIntersectionActor::EnsembleSelectionSettings
 ::EnsembleSelectionSettings(MIsosurfaceIntersectionActor *hostActor)
-    : syncModeEnabled(false)
+    : spaghettiPlotEnabled(false)
 {
     MActor *a = hostActor;
     MQtProperties *properties = a->getQtProperties();
@@ -340,10 +340,10 @@ MIsosurfaceIntersectionActor::EnsembleSelectionSettings
                 STRING_PROPERTY, "utilized members", groupProp);
     ensembleMultiMemberProperty->setEnabled(false);
 
-    syncModeEnabledProperty = a->addProperty(BOOL_PROPERTY, "enable spaghetti plot",
+    spaghettiPlotProperty = a->addProperty(BOOL_PROPERTY, "enable spaghetti plot",
                                              groupProp);
-    syncModeEnabledProperty->setEnabled(false);
-    properties->mBool()->setValue(syncModeEnabledProperty, syncModeEnabled);
+    properties->mBool()->setValue(spaghettiPlotProperty, spaghettiPlotEnabled);
+    ensembleMultiMemberSelectionProperty->setEnabled(spaghettiPlotEnabled);
 
     selectedEnsembleMembers.clear();
     selectedEnsembleMembers << 0;
@@ -424,7 +424,7 @@ void MIsosurfaceIntersectionActor::saveConfiguration(QSettings *settings)
     settings->setValue("tubeThicknessMax",
                        tubeThicknessSettings->thicknessRange.y());
 
-    settings->setValue("syncMode", ensembleSelectionSettings->syncModeEnabled);
+    settings->setValue("spaghettiPlotEnabled", ensembleSelectionSettings->spaghettiPlotEnabled);
     settings->setValue("ensembleMultiMemberProperty",
                        MDataRequestHelper::uintSetToString(
                            ensembleSelectionSettings->selectedEnsembleMembers));
@@ -582,11 +582,11 @@ void MIsosurfaceIntersectionActor::loadConfiguration(QSettings *settings)
 
     tubeThicknessSettings->groupProp->setEnabled(thicknessMode == 1);
 
-    ensembleSelectionSettings->syncModeEnabled = settings->value(
-                "syncMode", false).toBool();
+    ensembleSelectionSettings->spaghettiPlotEnabled = settings->value(
+                "spaghettiPlotEnabled", false).toBool();
     properties->mBool()->setValue(
-                ensembleSelectionSettings->syncModeEnabledProperty,
-                ensembleSelectionSettings->syncModeEnabled);
+                ensembleSelectionSettings->spaghettiPlotProperty,
+                ensembleSelectionSettings->spaghettiPlotEnabled);
 
     ensembleSelectionSettings->selectedEnsembleMembers =
             MDataRequestHelper::uintSetFromString(
@@ -594,6 +594,9 @@ void MIsosurfaceIntersectionActor::loadConfiguration(QSettings *settings)
     properties->mString()->setValue(
                 ensembleSelectionSettings->ensembleMultiMemberProperty,
                 settings->value("ensembleMultiMemberProperty").toString());
+
+    ensembleSelectionSettings->ensembleMultiMemberSelectionProperty
+            ->setEnabled(ensembleSelectionSettings->spaghettiPlotEnabled);
 
     enableAutoComputation = settings->value("enableAutoComputation",
                                             true).toBool();
@@ -759,31 +762,9 @@ void MIsosurfaceIntersectionActor::onActorRenamed(MActor *actor,
 
 void MIsosurfaceIntersectionActor::onQtPropertyChanged(QtProperty *property)
 {
-    // Automatically compute the new intersection lines if valid or init time
-    // of the two selected variables was changed.
-    if (variables.size() >= 2)
-    {
-        auto var1 = dynamic_cast<MNWPActorVariable *>(
-                variables.at(variableSettings->varsIndex[0]));
-        auto var2 = dynamic_cast<MNWPActorVariable *>(
-                variables.at(variableSettings->varsIndex[1]));
-
-        if ((property == var1->validTimeProperty
-             || property == var1->initTimeProperty
-             || property == var2->validTimeProperty)
-             || property == var2->initTimeProperty)
-        {
-            if (enableAutoComputation)
-            {
-                requestIsoSurfaceIntersectionLines();
-            }
-
-            emitActorChangedSignal();
-        }
-    }
-
 
     if (suppressActorUpdates()) { return; }
+
     // Parent signal processing.
     MNWPMultiVarActor::onQtPropertyChanged(property);
 
@@ -904,7 +885,7 @@ void MIsosurfaceIntersectionActor::onQtPropertyChanged(QtProperty *property)
     else if (property ==
              ensembleSelectionSettings->ensembleMultiMemberSelectionProperty)
     {
-        if (suppressActorUpdates())
+        if (suppressActorUpdates() || !ensembleSelectionSettings->spaghettiPlotEnabled)
         {
             return;
         }
@@ -931,10 +912,13 @@ void MIsosurfaceIntersectionActor::onQtPropertyChanged(QtProperty *property)
                 QString s = MDataRequestHelper::uintSetToString
                         (ensembleSelectionSettings->selectedEnsembleMembers);
                 properties->mString()->setValue(
-                            ensembleSelectionSettings->ensembleMultiMemberProperty,
-                            s);
-                ensembleSelectionSettings->ensembleMultiMemberProperty->setToolTip(
-                            s);
+                            ensembleSelectionSettings->ensembleMultiMemberProperty, s);
+                ensembleSelectionSettings->ensembleMultiMemberProperty->setToolTip(s);
+
+                if (enableAutoComputation)
+                {
+                    requestIsoSurfaceIntersectionLines();
+                }
             }
             else
             {
@@ -988,7 +972,7 @@ void MIsosurfaceIntersectionActor::onQtPropertyChanged(QtProperty *property)
         || property == lineFilterSettings->filterVarProperty
         || property == lineFilterSettings->valueFilterProperty
         || property == lineFilterSettings->lineLengthFilterProperty
-        || property == ensembleSelectionSettings->ensembleMultiMemberSelectionProperty)
+        || property == ensembleSelectionSettings->spaghettiPlotProperty)
     {
         variableSettings->varsIndex[0] = properties->mEnum()->value(
                 variableSettings->varsProperty[0]);
@@ -1009,6 +993,14 @@ void MIsosurfaceIntersectionActor::onQtPropertyChanged(QtProperty *property)
         lineFilterSettings->valueFilter =
                 properties->mDouble()->value(
                     lineFilterSettings->valueFilterProperty);
+
+        ensembleSelectionSettings->spaghettiPlotEnabled = properties->mBool()
+                ->value(ensembleSelectionSettings->spaghettiPlotProperty);
+
+        enableActorUpdates(false);
+        ensembleSelectionSettings->ensembleMultiMemberSelectionProperty
+                ->setEnabled(ensembleSelectionSettings->spaghettiPlotEnabled);
+        enableActorUpdates(true);
 
         if (enableAutoComputation)
         {
@@ -1315,9 +1307,19 @@ void MIsosurfaceIntersectionActor::requestIsoSurfaceIntersectionLines()
     // This variable is mandatory as the filter source requires to have it.
     // However, it is not used in the intersection source.
     rh.insert("MEMBER", 0);
-    rh.insert("MEMBERS", MDataRequestHelper
-              ::uintSetToString(ensembleSelectionSettings
-                                ->selectedEnsembleMembers));
+
+    QString memberList = "";
+    if (ensembleSelectionSettings->spaghettiPlotEnabled)
+    {
+        memberList = MDataRequestHelper
+        ::uintSetToString(ensembleSelectionSettings->selectedEnsembleMembers);
+    }
+    else
+    {
+        memberList = QString::number(var1st->getEnsembleMember());
+    }
+
+    rh.insert("MEMBERS", memberList);
 
     // Set the variables and iso-values.
     rh.insert("ISOX_VARIABLES", var1st->variableName + "/"
@@ -1469,6 +1471,15 @@ void MIsosurfaceIntersectionActor::buildGPUResources()
 void MIsosurfaceIntersectionActor::onFilterChainEnd()
 {
     buildGPUResources();
+}
+
+
+void MIsosurfaceIntersectionActor::dataFieldChangedEvent()
+{
+    if (enableAutoComputation && variables.size() >= 2)
+    {
+        requestIsoSurfaceIntersectionLines();
+    }
 }
 
 
