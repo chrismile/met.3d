@@ -924,7 +924,8 @@ void MSyncControl::loadConfiguration(QSettings *settings)
         QMessageBox::warning(this, this->getID(),
                              "'" + dir
                              + "' either no directory or not writable.\n"
-                               "Setting directory to '" + defaultDir + "'.");
+                               "Setting image series save directory to '"
+                             + defaultDir + "'.");
         dir = defaultDir;
         // Create default directory to save screenshots to if it does not exist
         // already.
