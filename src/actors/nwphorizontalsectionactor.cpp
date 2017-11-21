@@ -368,7 +368,13 @@ void MNWPHorizontalSectionActor::loadConfiguration(QSettings *settings)
     settings->beginGroup(MNWPHorizontalSectionActor::getSettingsID());
 
     setSlicePosition(settings->value("slicePosition_hPa", 500.).toDouble());
+
+    // Suppress actor updates when loading bounding box to avoid
+    // computeRenderRegionParameters() method being called when no grid is
+    // available.
+    enableActorUpdates(false);
     MBoundingBoxInterface::loadConfiguration(settings);
+    enableActorUpdates(true);
 
     properties->mInt()->setValue(
                 differenceModeProperty,
