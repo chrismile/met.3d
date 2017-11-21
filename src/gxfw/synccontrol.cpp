@@ -305,8 +305,11 @@ MSyncControl::MSyncControl(QString id, QWidget *parent) :
     saveTAAction->setDefaultWidget(saveTAWidget);
     timeAnimationDropdownMenu->addAction(saveTAAction);
 
-    saveTADirectoryLabel = new QLabel(MSystemManagerAndControl::getInstance()
-                                      ->getMet3DHomeDir().absolutePath());
+    saveTADirectoryLabel = new QLabel(QDir::home().absoluteFilePath(
+                                          "met3d/screenshots"));
+    // Create default directory to save screenshots to if it does not exist
+    // already.
+    QDir().mkpath(saveTADirectoryLabel->text());
     saveTADirectoryLabel->setFixedWidth(175);
     // Set fixed size so the label won't expand the menu.
     saveTADirectoryLabel->setToolTip(saveTADirectoryLabel->text());
@@ -913,8 +916,7 @@ void MSyncControl::loadConfiguration(QSettings *settings)
     }
     saveTASceneViewsComboBox->setCurrentIndex(index);
 
-    QString defaultDir = MSystemManagerAndControl::getInstance()
-            ->getMet3DHomeDir().absolutePath();
+    QString defaultDir = QDir::home().absoluteFilePath("met3d/screenshots");
     QString dir = settings->value("directory", defaultDir).toString();
     QFileInfo info(dir);
     if (!(info.isDir() && info.isWritable()))
@@ -924,6 +926,9 @@ void MSyncControl::loadConfiguration(QSettings *settings)
                              + "' either no directory or not writable.\n"
                                "Setting directory to '" + defaultDir + "'.");
         dir = defaultDir;
+        // Create default directory to save screenshots to if it does not exist
+        // already.
+        QDir().mkpath(defaultDir);
     }
     saveTADirectoryLabel->setToolTip(dir);
     saveTADirectoryLabel->setText(dir);
