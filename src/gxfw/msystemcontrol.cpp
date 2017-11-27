@@ -57,9 +57,9 @@ MSystemManagerAndControl::MSystemManagerAndControl(QWidget *parent) :
     ui(new Ui::MSystemControl),
     met3dAppIsInitialized(false),
     connectedToMetview(false),
+    handlesScale(1.),
     mainWindow(nullptr),
     naturalEarthDataLoader(nullptr)
-
 {
     LOG4CPLUS_DEBUG(mlog, "Initialising system manager...");
     ui->setupUi(this);
@@ -67,6 +67,7 @@ MSystemManagerAndControl::MSystemManagerAndControl(QWidget *parent) :
     groupPropertyManager           = new QtGroupPropertyManager(this);
     boolPropertyManager            = new QtBoolPropertyManager(this);
     decoratedDoublePropertyManager = new QtDecoratedDoublePropertyManager(this);
+    doublePropertyManager          = new QtDoublePropertyManager(this);
     enumPropertyManager            = new QtEnumPropertyManager(this);
     stringPropertyManager          = new QtStringPropertyManager(this);
     clickPropertyManager           = new QtClickPropertyManager(this);
@@ -79,6 +80,8 @@ MSystemManagerAndControl::MSystemManagerAndControl(QWidget *parent) :
     QtCheckBoxFactory *checkBoxFactory = new QtCheckBoxFactory(this);
     QtDecoratedDoubleSpinBoxFactory *decoratedDoubleSpinBoxFactory =
             new QtDecoratedDoubleSpinBoxFactory(this);
+    QtDoubleSpinBoxFactory *doubleSpinBoxFactory =
+            new QtDoubleSpinBoxFactory(this);
     QtEnumEditorFactory *enumEditorFactory = new QtEnumEditorFactory(this);
     QtToolButtonFactory *toolButtonFactory = new QtToolButtonFactory(this);
     QtColorEditorFactory *colorEditorFactory = new QtColorEditorFactory(this);
@@ -91,6 +94,8 @@ MSystemManagerAndControl::MSystemManagerAndControl(QWidget *parent) :
                 boolPropertyManager, checkBoxFactory);
     systemPropertiesBrowser->setFactoryForManager(
                 decoratedDoublePropertyManager, decoratedDoubleSpinBoxFactory);
+    systemPropertiesBrowser->setFactoryForManager(doublePropertyManager,
+                                                  doubleSpinBoxFactory);
     systemPropertiesBrowser->setFactoryForManager(
                 enumPropertyManager, enumEditorFactory);
     systemPropertiesBrowser->setFactoryForManager(
@@ -111,21 +116,33 @@ MSystemManagerAndControl::MSystemManagerAndControl(QWidget *parent) :
     addProperty(windowLayoutGroupProperty);
     collapsePropertyTree(windowLayoutGroupProperty);
 
-    // Insert a dummy "None" entry into the list of waypoints models.
-    waypointsTableModelPool.insert("None", nullptr);
-    syncControlPool.insert("None", nullptr);
-    boundingBoxPool.insert(QString("None"), nullptr);
-
     loadWindowLayoutProperty = clickPropertyManager->addProperty("load");
     windowLayoutGroupProperty->addSubProperty(loadWindowLayoutProperty);
     saveWindowLayoutProperty = clickPropertyManager->addProperty("save");
     windowLayoutGroupProperty->addSubProperty(saveWindowLayoutProperty);
 
+    handlesScaleProperty =
+            doublePropertyManager->addProperty("Handles scale");
+    doublePropertyManager->setMinimum(handlesScaleProperty, 0.01);
+    doublePropertyManager->setValue(handlesScaleProperty, handlesScale);
+    doublePropertyManager->setSingleStep(handlesScaleProperty, 0.1);
+    addProperty(handlesScaleProperty);
+
+    // Connect double property to actOnQtPropertyChange to handle user
+    // interaction with the double properties added.
+    connect(doublePropertyManager,
+            SIGNAL(propertyChanged(QtProperty*)),
+            SLOT(actOnQtPropertyChanged(QtProperty*)));
     // Connect click property to actOnQtPropertyChange to handle user
     // interaction with the click properties added.
     connect(clickPropertyManager,
             SIGNAL(propertyChanged(QtProperty*)),
             SLOT(actOnQtPropertyChanged(QtProperty*)));
+
+    // Insert a dummy "None" entry into the list of waypoints models.
+    waypointsTableModelPool.insert("None", nullptr);
+    syncControlPool.insert("None", nullptr);
+    boundingBoxPool.insert(QString("None"), nullptr);
 
     // Determine the Met.3D home directory (the base directory to find
     // shader files and data files that do not change).
@@ -518,6 +535,15 @@ void MSystemManagerAndControl::actOnQtPropertyChanged(QtProperty *property)
     else if (property == saveWindowLayoutProperty)
     {
         mainWindow->saveConfigurationToFile("");
+    }
+    else if (property == handlesScaleProperty)
+    {
+        handlesScale = doublePropertyManager->value(handlesScaleProperty);
+        foreach (MSceneViewGLWidget *sceneView, registeredViews)
+        {
+            sceneView->actOnHandlesScaleChanged();
+        }
+
     }
 }
 

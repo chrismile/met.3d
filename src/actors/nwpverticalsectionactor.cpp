@@ -239,6 +239,8 @@ int MNWPVerticalSectionActor::checkIntersectionWithHandle(
 
     if (waypointsModel == nullptr) return -1;
 
+    clipRadius *= MSystemManagerAndControl::getInstance()->getHandlesScale();
+
     // cout << "checkIntersection(" << clipX << ", " << clipY << " / "
     //      << clipRadius << ")\n" << flush;
 
@@ -1325,7 +1327,8 @@ void MNWPVerticalSectionActor::renderToCurrentContext(MSceneViewGLWidget *sceneV
                     sceneView->getCamera()->getYAxis());
         positionSpheresShader->setUniformValue(
                     "radius",
-                    GLfloat(0.5));
+                    GLfloat(0.5 * MSystemManagerAndControl::getInstance()
+                            ->getHandlesScale()));
         positionSpheresShader->setUniformValue(
                     "scaleRadius",
                     GLboolean(true));
@@ -1347,7 +1350,8 @@ void MNWPVerticalSectionActor::renderToCurrentContext(MSceneViewGLWidget *sceneV
         {
             positionSpheresShader->setUniformValue(
                         "radius",
-                        GLfloat(0.51));
+                        GLfloat(0.51 * MSystemManagerAndControl::getInstance()
+                                ->getHandlesScale()));
             positionSpheresShader->setUniformValue(
                         "constColour", QColor(Qt::red));
             glDrawArrays(GL_POINTS, 2*modifyWaypoint, 2); CHECK_GL_ERROR;

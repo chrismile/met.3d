@@ -443,6 +443,8 @@ int MNWPHorizontalSectionActor::checkIntersectionWithHandle(
 
     selectedMouseHandle = -1;
 
+    clipRadius *= MSystemManagerAndControl::getInstance()->getHandlesScale();
+
     // Loop over all corner points and check whether the mouse cursor is inside
     // a circle with radius "clipRadius" around the corner point (in clip space).
     for (int i = 0; i < mouseHandlePoints.size(); i++)
@@ -1206,7 +1208,8 @@ void MNWPHorizontalSectionActor::renderToCurrentContext(MSceneViewGLWidget *scen
                     sceneView->getCamera()->getYAxis());
         positionSpheresShader->setUniformValue(
                     "radius",
-                    GLfloat(0.5));
+                    GLfloat(0.5 * MSystemManagerAndControl::getInstance()
+                            ->getHandlesScale()));
         positionSpheresShader->setUniformValue(
                     "scaleRadius",
                     GLboolean(true));
@@ -1222,7 +1225,9 @@ void MNWPHorizontalSectionActor::renderToCurrentContext(MSceneViewGLWidget *scen
                     "constColour", QColor(Qt::red));
 
             positionSpheresShader->setUniformValue(
-                    "radius", GLfloat(0.51));
+                    "radius",
+                    GLfloat(0.51 * MSystemManagerAndControl::getInstance()
+                            ->getHandlesScale()));
         }
 
         vbMouseHandlePoints->attachToVertexAttribute(SHADER_VERTEX_ATTRIBUTE);

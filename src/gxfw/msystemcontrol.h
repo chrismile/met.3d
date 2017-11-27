@@ -178,6 +178,10 @@ public:
 
     bool isConnectedToMetview() { return connectedToMetview; }
 
+    double getHandlesScale() { return handlesScale; }
+    void setHandlesScale(double handlesScale)
+    { doublePropertyManager->setValue(handlesScaleProperty, handlesScale); }
+
 signals:
     void boundingBoxCreated();
     void boundingBoxDeleted(QString name);
@@ -229,6 +233,7 @@ private:
     QtBoolPropertyManager                *boolPropertyManager;
     QtExtensions::QtDecoratedDoublePropertyManager
                                          *decoratedDoublePropertyManager;
+    QtDoublePropertyManager              *doublePropertyManager;
     QtEnumPropertyManager                *enumPropertyManager;
     QtStringPropertyManager              *stringPropertyManager;
     QtExtensions::QtClickPropertyManager *clickPropertyManager;
@@ -237,6 +242,9 @@ private:
     QtProperty *windowLayoutGroupProperty;
     QtProperty *loadWindowLayoutProperty;
     QtProperty *saveWindowLayoutProperty;
+
+    QtProperty *handlesScaleProperty;
+    double handlesScale;
 
     QList<MSceneViewGLWidget*> registeredViews;
 

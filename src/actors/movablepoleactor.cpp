@@ -499,7 +499,8 @@ void MMovablePoleActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
                 sceneView->getCamera()->getYAxis());
         positionSpheresShader->setUniformValue(
                 "radius",
-                GLfloat(0.5));
+                GLfloat(0.5 * MSystemManagerAndControl::getInstance()
+                        ->getHandlesScale()));
         positionSpheresShader->setUniformValue(
                 "scaleRadius",
                 GLboolean(true));
@@ -527,7 +528,8 @@ void MMovablePoleActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
         {
             positionSpheresShader->setUniformValue(
                     "radius",
-                    GLfloat(0.51));
+                    GLfloat(0.51 * MSystemManagerAndControl::getInstance()
+                            ->getHandlesScale()));
             positionSpheresShader->setUniformValue(
                         "constColour", QColor(Qt::red));
             glDrawArrays(GL_POINTS, highlightPole, 1); CHECK_GL_ERROR;
@@ -555,6 +557,7 @@ int MMovablePoleActor::checkIntersectionWithHandle(MSceneViewGLWidget *sceneView
 
     //! TODO: HACK for pole actor. Should be changed for all movable actors!
     clipRadius = 0.5f;
+    clipRadius *= MSystemManagerAndControl::getInstance()->getHandlesScale();
 
     // Loop over all poles and check whether the mouse cursor is inside a
     // circle with radius "clipRadius" around the bottom pole point (in clip

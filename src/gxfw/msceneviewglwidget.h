@@ -248,6 +248,8 @@ public:
     void setOverwriteImageSerie(bool overwriteImageSerie)
     { this->overwriteImageSerie = overwriteImageSerie; }
 
+    void actOnHandlesScaleChanged();
+
 signals:
     /**
       Emitted when a mouse button is released on the GL canvas.

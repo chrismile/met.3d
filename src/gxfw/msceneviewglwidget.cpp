@@ -2394,6 +2394,14 @@ void MSceneViewGLWidget::loadConfiguration(QSettings *settings)
 }
 
 
+void MSceneViewGLWidget::actOnHandlesScaleChanged()
+{
+#ifndef CONTINUOUS_GL_UPDATE
+    updateGL();
+#endif
+}
+
+
 /******************************************************************************
 ***                           PRIVATE METHODS                               ***
 *******************************************************************************/
