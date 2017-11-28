@@ -70,7 +70,8 @@ MNWPVerticalSectionActor::MNWPVerticalSectionActor()
       p_bot_hPa(1050.),
       opacity(1.),
       interpolationNodeSpacing(0.15),
-      updatePath(false)
+      updatePath(false),
+      offsetPickPositionToHandleCentre(QVector2D(0., 0.))
 {
     bBoxConnection =
             new MBoundingBoxConnection(this, MBoundingBoxConnection::VERTICAL);
@@ -232,14 +233,13 @@ void MNWPVerticalSectionActor::loadConfiguration(QSettings *settings)
 
 int MNWPVerticalSectionActor::checkIntersectionWithHandle(
         MSceneViewGLWidget *sceneView,
-        float clipX, float clipY,
-        float clipRadius)
+        float clipX, float clipY)
 {
     // See notes 22-23Feb2012 and 21Nov2012.
 
     if (waypointsModel == nullptr) return -1;
 
-    clipRadius *= MSystemManagerAndControl::getInstance()->getHandlesScale();
+    float clipRadius = MSystemManagerAndControl::getInstance()->getHandleSize();
 
     // cout << "checkIntersection(" << clipX << ", " << clipY << " / "
     //      << clipRadius << ")\n" << flush;
@@ -306,12 +306,20 @@ int MNWPVerticalSectionActor::checkIntersectionWithHandle(
         {
             modifyWaypoint = i;
             modifyWaypoint_worldZ = wpPositionBottom.z();
+            mvpMatrix = sceneView->getModelViewProjectionMatrix();
+            QVector3D posPoleClip = *mvpMatrix * wpPositionBottom;
+            offsetPickPositionToHandleCentre = QVector2D(posPoleClip.x() - clipX,
+                                     posPoleClip.y() - clipY);
             break;
         }
         else if (rootTop >= 0)
         {
             modifyWaypoint = i;
             modifyWaypoint_worldZ = wpPositionTop.z();
+            mvpMatrix = sceneView->getModelViewProjectionMatrix();
+            QVector3D posCentreClip = *mvpMatrix * wpPositionTop;
+            offsetPickPositionToHandleCentre = QVector2D(posCentreClip.x() - clipX,
+                                     posCentreClip.y() - clipY);
             break;
         }
 
@@ -399,7 +407,9 @@ void MNWPVerticalSectionActor::dragEvent(MSceneViewGLWidget *sceneView,
     // transformed to world space, lies on the ray passing through the camera
     // and the location on the worldZ==0 plane "picked" by the mouse.
     // (See notes 22-23Feb2012).
-    QVector3D mousePosClipSpace = QVector3D(clipX, clipY, modifyWaypoint_worldZ);
+    QVector3D mousePosClipSpace = QVector3D(clipX + offsetPickPositionToHandleCentre.x(),
+                                            clipY + offsetPickPositionToHandleCentre.y(),
+                                            modifyWaypoint_worldZ);
 
     // The point p at which the ray intersects the worldZ==0 plane is found by
     // computing the value d in p=d*l+l0, where l0 is a point on the ray and l
@@ -1326,17 +1336,14 @@ void MNWPVerticalSectionActor::renderToCurrentContext(MSceneViewGLWidget *sceneV
                     "cameraUpDir",
                     sceneView->getCamera()->getYAxis());
         positionSpheresShader->setUniformValue(
-                    "radius",
-                    GLfloat(0.5 * MSystemManagerAndControl::getInstance()
-                            ->getHandlesScale()));
+                    "radius", GLfloat(MSystemManagerAndControl::getInstance()
+                                      ->getHandleSize()));
         positionSpheresShader->setUniformValue(
                     "scaleRadius",
                     GLboolean(true));
 
         positionSpheresShader->setUniformValue(
                     "useTransferFunction", GLboolean(false));
-        positionSpheresShader->setUniformValue(
-                    "constColour", QColor(Qt::white));
 
         vbInteractionHandlePositions->attachToVertexAttribute(SHADER_VERTEX_ATTRIBUTE);
 
@@ -1344,18 +1351,17 @@ void MNWPVerticalSectionActor::renderToCurrentContext(MSceneViewGLWidget *sceneV
                       renderAsWireFrame ? GL_LINE : GL_FILL); CHECK_GL_ERROR;
         glLineWidth(1); CHECK_GL_ERROR;
 
-        glDrawArrays(GL_POINTS, 0, numInteractionHandlePositions); CHECK_GL_ERROR;
-
         if (modifyWaypoint >= 0)
         {
-            positionSpheresShader->setUniformValue(
-                        "radius",
-                        GLfloat(0.51 * MSystemManagerAndControl::getInstance()
-                                ->getHandlesScale()));
             positionSpheresShader->setUniformValue(
                         "constColour", QColor(Qt::red));
             glDrawArrays(GL_POINTS, 2*modifyWaypoint, 2); CHECK_GL_ERROR;
         }
+
+        positionSpheresShader->setUniformValue(
+                    "constColour", QColor(Qt::white));
+        glDrawArrays(GL_POINTS, 0, numInteractionHandlePositions); CHECK_GL_ERROR;
+
 
         // Unbind VBO.
         glBindBuffer(GL_ARRAY_BUFFER, 0); CHECK_GL_ERROR;

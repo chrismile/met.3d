@@ -773,8 +773,8 @@ void MSessionManagerDialog::saveSessionToFile(QString sessionName, bool autoSave
 
     // General.
     // ==========================================
-    settings->beginGroup("General");
-    settings->setValue("handlesScale", sysMC->getHandlesScale());
+    settings->beginGroup("AllSceneViews");
+    settings->setValue("handleSize", sysMC->getHandleSize());
     settings->endGroup();
 
     QList<MSceneViewGLWidget*> sceneViews = sysMC->getRegisteredViews();
@@ -976,8 +976,8 @@ void MSessionManagerDialog::loadSessionFromFile(QString sessionName)
 
     // General.
     // ==========================================
-    settings->beginGroup("General");
-    sysMC->setHandlesScale(settings->value("handlesScale", 1.).toDouble());
+    settings->beginGroup("AllSceneViews");
+    sysMC->setHandleSize(settings->value("handleSize", .5).toDouble());
     progressDialog->setValue(++loadingProgress);
     progressDialog->update();
     progressDialog->setValue(++loadingProgress);

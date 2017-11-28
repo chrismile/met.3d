@@ -248,7 +248,7 @@ public:
     void setOverwriteImageSerie(bool overwriteImageSerie)
     { this->overwriteImageSerie = overwriteImageSerie; }
 
-    void actOnHandlesScaleChanged();
+    void onHandleSizeChanged();
 
 signals:
     /**

@@ -57,7 +57,7 @@ MSystemManagerAndControl::MSystemManagerAndControl(QWidget *parent) :
     ui(new Ui::MSystemControl),
     met3dAppIsInitialized(false),
     connectedToMetview(false),
-    handlesScale(1.),
+    handleSize(.5),
     mainWindow(nullptr),
     naturalEarthDataLoader(nullptr)
 {
@@ -110,23 +110,39 @@ MSystemManagerAndControl::MSystemManagerAndControl(QWidget *parent) :
 
     ui->sceneViewPropertiesLayout->addWidget(systemPropertiesBrowser);
 
+    // Insert a dummy "None" entry into the list of waypoints models.
+    waypointsTableModelPool.insert("None", nullptr);
+    syncControlPool.insert("None", nullptr);
+    boundingBoxPool.insert(QString("None"), nullptr);
+
+    // Add group containing general application configurations.
+    appConfigGroupProperty =
+            groupPropertyManager->addProperty("Application configuration");
+    addProperty(appConfigGroupProperty);
+    collapsePropertyTree(appConfigGroupProperty);
+
     // Add group containing click properties to load and save the window layout.
     windowLayoutGroupProperty =
-            groupPropertyManager->addProperty("Window layout");
-    addProperty(windowLayoutGroupProperty);
-    collapsePropertyTree(windowLayoutGroupProperty);
+            groupPropertyManager->addProperty("window layout");
+    appConfigGroupProperty->addSubProperty(windowLayoutGroupProperty);
 
     loadWindowLayoutProperty = clickPropertyManager->addProperty("load");
     windowLayoutGroupProperty->addSubProperty(loadWindowLayoutProperty);
     saveWindowLayoutProperty = clickPropertyManager->addProperty("save");
     windowLayoutGroupProperty->addSubProperty(saveWindowLayoutProperty);
 
-    handlesScaleProperty =
-            doublePropertyManager->addProperty("Handles scale");
-    doublePropertyManager->setMinimum(handlesScaleProperty, 0.01);
-    doublePropertyManager->setValue(handlesScaleProperty, handlesScale);
-    doublePropertyManager->setSingleStep(handlesScaleProperty, 0.1);
-    addProperty(handlesScaleProperty);
+    // Add group containing .
+    allSceneViewsGroupProperty =
+            groupPropertyManager->addProperty("All scene views");
+    addProperty(allSceneViewsGroupProperty);
+    collapsePropertyTree(allSceneViewsGroupProperty);
+
+    handleSizeProperty =
+            doublePropertyManager->addProperty("handle size");
+    doublePropertyManager->setMinimum(handleSizeProperty, 0.01);
+    doublePropertyManager->setValue(handleSizeProperty, handleSize);
+    doublePropertyManager->setSingleStep(handleSizeProperty, 0.1);
+    allSceneViewsGroupProperty->addSubProperty(handleSizeProperty);
 
     // Connect double property to actOnQtPropertyChange to handle user
     // interaction with the double properties added.
@@ -138,11 +154,6 @@ MSystemManagerAndControl::MSystemManagerAndControl(QWidget *parent) :
     connect(clickPropertyManager,
             SIGNAL(propertyChanged(QtProperty*)),
             SLOT(actOnQtPropertyChanged(QtProperty*)));
-
-    // Insert a dummy "None" entry into the list of waypoints models.
-    waypointsTableModelPool.insert("None", nullptr);
-    syncControlPool.insert("None", nullptr);
-    boundingBoxPool.insert(QString("None"), nullptr);
 
     // Determine the Met.3D home directory (the base directory to find
     // shader files and data files that do not change).
@@ -536,12 +547,12 @@ void MSystemManagerAndControl::actOnQtPropertyChanged(QtProperty *property)
     {
         mainWindow->saveConfigurationToFile("");
     }
-    else if (property == handlesScaleProperty)
+    else if (property == handleSizeProperty)
     {
-        handlesScale = doublePropertyManager->value(handlesScaleProperty);
+        handleSize = doublePropertyManager->value(handleSizeProperty);
         foreach (MSceneViewGLWidget *sceneView, registeredViews)
         {
-            sceneView->actOnHandlesScaleChanged();
+            sceneView->onHandleSizeChanged();
         }
 
     }

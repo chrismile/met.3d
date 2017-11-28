@@ -69,7 +69,8 @@ MNWPHorizontalSectionActor::MNWPHorizontalSectionActor()
       windBarbsSettings(),
       renderShadowQuad(true),
       shadowColor(QColor(60, 60, 60, 70)),
-      shadowHeight(0.01f)
+      shadowHeight(0.01f),
+      offsetPickPositionToHandleCentre(QVector2D(0., 0.))
 {
     enablePicking(true);
     bBoxConnection =
@@ -435,15 +436,14 @@ void MNWPHorizontalSectionActor::loadConfiguration(QSettings *settings)
 
 int MNWPHorizontalSectionActor::checkIntersectionWithHandle(
         MSceneViewGLWidget *sceneView,
-        float clipX, float clipY,
-        float clipRadius)
+        float clipX, float clipY)
 {
     // First call? Generate positions of corner points.
     if (mouseHandlePoints.size() == 0) updateMouseHandlePositions();
 
     selectedMouseHandle = -1;
 
-    clipRadius *= MSystemManagerAndControl::getInstance()->getHandlesScale();
+    float clipRadius = MSystemManagerAndControl::getInstance()->getHandleSize();
 
     // Loop over all corner points and check whether the mouse cursor is inside
     // a circle with radius "clipRadius" around the corner point (in clip space).
@@ -485,6 +485,10 @@ int MNWPHorizontalSectionActor::checkIntersectionWithHandle(
         if (root >= 0)
         {
             selectedMouseHandle = i;
+            mvpMatrix = sceneView->getModelViewProjectionMatrix();
+            QVector3D posCentreClip = *mvpMatrix * posPole;
+            offsetPickPositionToHandleCentre = QVector2D(posCentreClip.x() - clipX,
+                                     posCentreClip.y() - clipY);
             break;
         }
     }
@@ -570,7 +574,9 @@ void MNWPHorizontalSectionActor::dragEvent(
     // transformed to world space, lies on the ray passing through the camera
     // and the location on the worldZ==0 plane "picked" by the mouse.
     // (See notes 22-23Feb2012).
-    QVector3D mousePosClipSpace = QVector3D(clipX, clipY, 0.);
+    QVector3D mousePosClipSpace = QVector3D(clipX + offsetPickPositionToHandleCentre.x(),
+                                            clipY + offsetPickPositionToHandleCentre.y(),
+                                            0.);
 
     // The point p at which the ray intersects the worldZ==0 plane is found by
     // computing the value d in p=d*l+l0, where l0 is a point on the ray and l
@@ -1207,9 +1213,8 @@ void MNWPHorizontalSectionActor::renderToCurrentContext(MSceneViewGLWidget *scen
                     "cameraUpDir",
                     sceneView->getCamera()->getYAxis());
         positionSpheresShader->setUniformValue(
-                    "radius",
-                    GLfloat(0.5 * MSystemManagerAndControl::getInstance()
-                            ->getHandlesScale()));
+                    "radius", GLfloat(MSystemManagerAndControl::getInstance()
+                                      ->getHandleSize()));
         positionSpheresShader->setUniformValue(
                     "scaleRadius",
                     GLboolean(true));
@@ -1223,11 +1228,6 @@ void MNWPHorizontalSectionActor::renderToCurrentContext(MSceneViewGLWidget *scen
         {
             positionSpheresShader->setUniformValue(
                     "constColour", QColor(Qt::red));
-
-            positionSpheresShader->setUniformValue(
-                    "radius",
-                    GLfloat(0.51 * MSystemManagerAndControl::getInstance()
-                            ->getHandlesScale()));
         }
 
         vbMouseHandlePoints->attachToVertexAttribute(SHADER_VERTEX_ATTRIBUTE);

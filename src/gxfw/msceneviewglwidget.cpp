@@ -1658,7 +1658,7 @@ void MSceneViewGLWidget::mouseMoveEvent(QMouseEvent *event)
                            singleInteractionActor->getName() == actor->getName())
                     {
                         pickedActor.handleID = actor->checkIntersectionWithHandle(
-                                    this, clipX, clipY, 0.5f);
+                                    this, clipX, clipY);
                         // If the test returned a valid handle ID, store the actor
                         // and its handle as the currently picked actor.
                         if (pickedActor.handleID >= 0)
@@ -2394,7 +2394,7 @@ void MSceneViewGLWidget::loadConfiguration(QSettings *settings)
 }
 
 
-void MSceneViewGLWidget::actOnHandlesScaleChanged()
+void MSceneViewGLWidget::onHandleSizeChanged()
 {
 #ifndef CONTINUOUS_GL_UPDATE
     updateGL();
