@@ -34,6 +34,7 @@
 #include <QDialog>
 #include <QListWidgetItem>
 #include <QComboBox>
+#include <QFileDialog>
 
 #include "gxfw/actorcreationdialog.h"
 

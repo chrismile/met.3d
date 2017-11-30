@@ -34,6 +34,7 @@
 #include <QTableView>
 #include <QVector2D>
 #include <QtXml/QDomDocument>
+#include <QSettings>
 
 // local application imports
 

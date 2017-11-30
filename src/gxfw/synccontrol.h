@@ -40,6 +40,7 @@
 #include <QComboBox>
 #include <QLabel>
 #include <QCheckBox>
+#include <QSettings>
 
 // local application imports
 #include "util/mstopwatch.h"

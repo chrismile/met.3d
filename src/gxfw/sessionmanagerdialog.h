@@ -31,7 +31,8 @@
 
 // related third party imports
 #include <QDialog>
-#include <QtGui>
+#include <QFileSystemModel>
+#include <QStyledItemDelegate>
 
 // local application imports
 

@@ -32,6 +32,8 @@
 
 // related third party imports
 #include <QtCore>
+#include <QInputDialog>
+#include <QToolTip>
 #include <log4cplus/loggingmacros.h>
 
 // local application imports

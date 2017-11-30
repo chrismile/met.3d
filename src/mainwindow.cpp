@@ -34,6 +34,7 @@
 #include <QDockWidget>
 #include <QDesktopServices>
 #include <QDesktopWidget>
+#include <QCloseEvent>
 
 #include <log4cplus/loggingmacros.h>
 
