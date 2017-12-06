@@ -84,6 +84,8 @@ public:
      */
     bool increaseReferenceCounter();
 
+    MAbstractMemoryManager* getMemoryManager() { return memoryManager; }
+
 protected:
     friend class MLRUMemoryManager;
 
