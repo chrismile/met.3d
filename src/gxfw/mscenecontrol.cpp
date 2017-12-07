@@ -4,8 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2017 Marc Rautenhaus
-**  Copyright 2017      Bianca Tost
+**  Copyright 2015-2018 Marc Rautenhaus
+**  Copyright 2017-2018 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -79,6 +79,8 @@ MSceneControl::MSceneControl(QString name, QWidget *parent)
             = new QtDoubleSpinBoxFactory(this);
     QtExtensions::QtDecoratedDoubleSpinBoxFactory *decoratedDoubleSpinBoxFactory
             = new QtExtensions::QtDecoratedDoubleSpinBoxFactory(this);
+    QtExtensions::QtScientificDoubleSpinBoxFactory *scientificDoubleSpinBoxFactory
+            = new QtExtensions::QtScientificDoubleSpinBoxFactory(this);
     QtDateTimeEditFactory *dateTimeEditFactory
             = new QtDateTimeEditFactory(this);
     QtEnumEditorFactory *enumEditorFactory
@@ -94,6 +96,7 @@ MSceneControl::MSceneControl(QString name, QWidget *parent)
     factories.append(spinBoxFactory);
     factories.append(doubleSpinBoxFactory);
     factories.append(decoratedDoubleSpinBoxFactory);
+    factories.append(scientificDoubleSpinBoxFactory);
     factories.append(dateTimeEditFactory);
     factories.append(enumEditorFactory);
     factories.append(colorEditorFactory);
@@ -119,6 +122,19 @@ MSceneControl::MSceneControl(QString name, QWidget *parent)
     actorPropertiesBrowser->setFactoryForManager(
                 qtProperties->mDecoratedDouble(),
                 decoratedDoubleSpinBoxFactory);
+    actorPropertiesBrowser->setFactoryForManager(
+                qtProperties->mScientificDouble(),
+                scientificDoubleSpinBoxFactory);
+    // TODO (bt 19Jan2018): Create factory for configurable SDManager and set it here.
+//    actorPropertiesBrowser->setFactoryForManager(
+//                qtProperties->mConfigScientificDouble(),
+//                scientificDoubleSpinBoxFactory);
+//    actorPropertiesBrowser->setFactoryForManager(
+//                qtProperties->mConfigScientificDouble()->subIntPropertyManager(),
+//                spinBoxFactory);
+//    actorPropertiesBrowser->setFactoryForManager(
+//                qtProperties->mConfigScientificDouble()->subSciDoublePropertyManager(),
+//                scientificDoubleSpinBoxFactory);
     actorPropertiesBrowser->setFactoryForManager(
                 qtProperties->mDateTime(),
                 dateTimeEditFactory);

@@ -4,8 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2017 Marc Rautenhaus
-**  Copyright 2017 Bianca Tost
+**  Copyright 2017-2018 Marc Rautenhaus
+**  Copyright 2017-2018 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -81,7 +81,9 @@ public:
 
     void setMaximumValue(float value);
 
-    void setValueDecimals(int decimals);
+    void setValueSignificantDigits(int significantDigits);
+
+    void setValueStep(double step);
 
     void setPosition(QRectF position);
 
@@ -123,9 +125,11 @@ protected:
 
     // Properties related to value range.
     QtProperty *rangePropertiesSubGroup;
-    QtProperty *valueDecimalsProperty;
     QtProperty *minimumValueProperty;
     QtProperty *maximumValueProperty;
+    QtProperty *valueOptionsPropertiesSubGroup;
+    QtProperty *valueSignificantDigitsProperty;
+    QtProperty *valueStepProperty;
     float       minimumValue;
     float       maximumValue;
     

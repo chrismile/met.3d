@@ -4,8 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2017 Marc Rautenhaus
-**  Copyright 2017      Bianca Tost
+**  Copyright 2015-2018 Marc Rautenhaus
+**  Copyright 2017-2018 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -101,6 +101,8 @@ public:
     QtBoolPropertyManager* getBoolPropertyManager();
 
     QtExtensions::QtDecoratedDoublePropertyManager* getDecoratedDoublePropertyManager();
+
+    QtExtensions::QtScientificDoublePropertyManager* getScientificDoublePropertyManager();
 
     QtEnumPropertyManager* getEnumPropertyManager();
 
@@ -239,6 +241,8 @@ private:
     QtExtensions::QtDecoratedDoublePropertyManager
                                          *decoratedDoublePropertyManager;
     QtDoublePropertyManager              *doublePropertyManager;
+    QtExtensions::QtScientificDoublePropertyManager
+                                         *scientificDoublePropertyManager;
     QtEnumPropertyManager                *enumPropertyManager;
     QtStringPropertyManager              *stringPropertyManager;
     QtExtensions::QtClickPropertyManager *clickPropertyManager;

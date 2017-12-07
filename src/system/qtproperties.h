@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015-2018 Marc Rautenhaus
+**  Copyright 2017-2018 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -45,6 +46,7 @@ enum MQtPropertyType
     INT_PROPERTY,
     DOUBLE_PROPERTY,
     DECORATEDDOUBLE_PROPERTY,
+    SCIENTIFICDOUBLE_PROPERTY,
     DATETIME_PROPERTY,
     ENUM_PROPERTY,
     RECTF_LONLAT_PROPERTY,
@@ -82,6 +84,18 @@ public:
 
     QtExtensions::QtDecoratedDoublePropertyManager* mDDouble();
 
+    QtExtensions::QtScientificDoublePropertyManager* mScientificDouble();
+
+    QtExtensions::QtScientificDoublePropertyManager* mSciDouble();
+
+// TODO (bt, 19Jan2018): Add property manager to handle configurable SDProperties.
+//  Idea: Use subproperties to provide the feature to change singleStep,
+//    switchNotationExponent, etc. via GUI elements.
+//     QtExtensions::QtConfigurableScientificDoublePropertyManager*
+//     mConfigScientificDouble();
+
+//     QtExtensions::QtConfigurableScientificDoublePropertyManager* mCSciDouble();
+
     QtDateTimePropertyManager* mDateTime();
 
     QtEnumPropertyManager* mEnum();
@@ -105,6 +119,23 @@ public:
     void setDDouble(QtProperty* prop, double value, double min, double max,
                     int decimals, double singlestep, QString suffix);
 
+    void setSciDouble(QtProperty* prop, double value, int significantDigits,
+                    double singlestep, int switchNotationExponent=3);
+
+    void setSciDouble(QtProperty* prop, double value, int significantDigits,
+                    int minimumExponent, double singlestep,
+                    int switchNotationExponent=3);
+
+    void setSciDouble(QtProperty *prop, double value, double min, double max,
+                    int significantDigits, double singlestep,
+                    int switchNotationExponent=3, QString suffix="",
+                    QString prefix="");
+
+    void setSciDouble(QtProperty *prop, double value, double min, double max,
+                    int significantDigits, int minimumExponent,
+                    double singlestep, int switchNotationExponent=3,
+                    QString suffix="", QString prefix="");
+
     void setInt(QtProperty* prop, int value = 0,
                 int min = -100, int max = 100, int step = 1);
 
@@ -125,6 +156,8 @@ private:
     QtDoublePropertyManager   *doublePropertyManager;
     QtExtensions::QtDecoratedDoublePropertyManager
                               *decoratedDoublePropertyManager;
+    QtExtensions::QtScientificDoublePropertyManager
+                              *scientificDoublePropertyManager;
     QtDateTimePropertyManager *dateTimePropertyManager;
     QtEnumPropertyManager     *enumPropertyManager;
     QtRectFPropertyManager    *rectFPropertyManager;
@@ -133,6 +166,10 @@ private:
     QtStringPropertyManager   *stringPropertyManager;
     QtExtensions::QtClickPropertyManager
                               *clickPropertyManager;
+// TODO (bt, 19Jan2018): Add property manager to handle configurable SDProperties.
+//  Idea: cf. previous comment concerning this issue.
+//    QtExtensions::QtConfigurableScientificDoublePropertyManager
+//                              *configurableScientificDoublePropertyManager;
 };
 
 } // namespace Met3D
