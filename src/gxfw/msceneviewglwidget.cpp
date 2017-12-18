@@ -2414,7 +2414,7 @@ void MSceneViewGLWidget::saveScreenshot()
     QString filename = QFileDialog::getSaveFileName(
                 MGLResourcesManager::getInstance(),
                 "Save screenshot",
-                "../screenshots",
+                QDir::home().absoluteFilePath("met3d/screenshots"),
                 filter,
                 &filetype);
     if (!filename.isEmpty())
