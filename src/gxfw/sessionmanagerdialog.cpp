@@ -1136,11 +1136,7 @@ void MSessionManagerDialog::loadSessionFromFile(QString sessionName)
     {
         settings->beginGroup(
                     QString("MActor_%1").arg(actorsToConfigure.value(actor)));
-        // Suppress actor updates to avoid system crash due to actor trying to
-        // compute render region parameters to early.
-//        actor->enableActorUpdates(false);
         actor->loadActorConfiguration(settings);
-//        actor->enableActorUpdates(true);
         settings->endGroup();
     }
     settings->endGroup();
