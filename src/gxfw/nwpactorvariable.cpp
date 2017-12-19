@@ -240,6 +240,11 @@ MNWPActorVariable::~MNWPActorVariable()
     if (textureUnitUnusedTextures >=0)
         actor->releaseTextureUnit(textureUnitUnusedTextures);
 
+    foreach (MRequestProperties *requestProperty, propertiesList)
+    {
+        delete requestProperty;
+    }
+
     delete requestPropertiesFactory;
     if (textureDummy1D) delete textureDummy1D;
     if (textureDummy2D) delete textureDummy2D;

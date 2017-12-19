@@ -63,6 +63,7 @@ class MRequestProperties
 {
 public:
     MRequestProperties(MNWPActorVariable *actorVar);
+    virtual ~MRequestProperties() {}
 
     /**
      Called by @ref MNWPActorVariable::onQtPropertyChanged(). Returns true if
@@ -130,6 +131,7 @@ class MVerticalRegridProperties : public MRequestProperties
 {
 public:
     MVerticalRegridProperties(MNWPActorVariable *actorVar);
+    ~MVerticalRegridProperties();
     bool onQtPropertyChanged(QtProperty *property,
                              bool *redrawWithoutDataRequest);
     void addToRequest(MDataRequestHelper *rh);
@@ -157,6 +159,7 @@ class MTrajectoryFilterProperties : public MRequestProperties
 {
 public:
     MTrajectoryFilterProperties(MNWPActorVariable *actorVar);
+    ~MTrajectoryFilterProperties();
     bool onQtPropertyChanged(QtProperty *property,
                              bool *redrawWithoutDataRequest);
     void addToRequest(MDataRequestHelper *rh);
@@ -181,6 +184,7 @@ class MTrajectoryGriddingProperties : public MRequestProperties
 {
 public:
     MTrajectoryGriddingProperties(MNWPActorVariable *actorVar);
+    ~MTrajectoryGriddingProperties();
     bool onQtPropertyChanged(QtProperty *property,
                              bool *redrawWithoutDataRequest);
     void addToRequest(MDataRequestHelper *rh);
@@ -215,6 +219,7 @@ class MTrajectoryThinOutProperties : public MRequestProperties
 {
 public:
     MTrajectoryThinOutProperties(MNWPActorVariable *actorVar);
+    ~MTrajectoryThinOutProperties();
     bool onQtPropertyChanged(QtProperty *property,
                              bool *redrawWithoutDataRequest);
     void addToRequest(MDataRequestHelper *rh);
@@ -240,6 +245,7 @@ class MProbabilityRegionProperties : public MRequestProperties
 {
 public:
     MProbabilityRegionProperties(MNWPActorVariable *actorVar);
+    ~MProbabilityRegionProperties();
     bool onQtPropertyChanged(QtProperty *property,
                              bool *redrawWithoutDataRequest);
     void addToRequest(MDataRequestHelper *rh);
