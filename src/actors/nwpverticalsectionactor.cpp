@@ -1010,6 +1010,10 @@ void MNWPVerticalSectionActor::renderToCurrentContext(MSceneViewGLWidget *sceneV
     targetGridToBeUpdated = targetGridToBeUpdated
             || sceneView->visualisationParametersHaveChanged();
 
+    // 1D texture that stores the horizontal coordinates of the section points.
+    textureVerticalSectionPath->bindToTextureUnit(
+                textureUnitVerticalSectionPath);
+
     // Rendering for all data variables:
     for (int vi = 0; vi < variables.size(); vi++)
     {
@@ -1103,8 +1107,7 @@ void MNWPVerticalSectionActor::renderToCurrentContext(MSceneViewGLWidget *sceneV
             sectionGridShader->setUniformValue(
                         "pToWorldZParams", sceneView->pressureToWorldZParameters());
 
-            // 1D texture that stores the horizontal coordinates of the section points.
-            textureVerticalSectionPath->bindToTextureUnit(textureUnitVerticalSectionPath);
+            // (Texture object is already bound to this unit, see above).
             sectionGridShader->setUniformValue(
                         "path", textureUnitVerticalSectionPath);
 
@@ -1163,8 +1166,7 @@ void MNWPVerticalSectionActor::renderToCurrentContext(MSceneViewGLWidget *sceneV
             marchingSquaresShader->setUniformValue(
                         "pToWorldZParams", sceneView->pressureToWorldZParameters()); CHECK_GL_ERROR;
 
-            // 1D texture that stores the horizontal coordinates of the section points.
-            textureVerticalSectionPath->bindToTextureUnit(textureUnitVerticalSectionPath);
+            // (Texture object is already bound to this unit, see above).
             marchingSquaresShader->setUniformValue(
                         "path", textureUnitVerticalSectionPath); CHECK_GL_ERROR;
 
