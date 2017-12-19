@@ -1,3 +1,11 @@
+# Application settings.
+# =============================================================================
+
+[ApplicationSettings]
+# Default working directory (for configuration files, screenshots, etc.).
+workingDirectory=$HOME/met3d
+
+
 # Configure session manager.
 # =============================================================================
 
