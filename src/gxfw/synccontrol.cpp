@@ -725,15 +725,26 @@ void MSyncControl::selectDataSources()
 }
 
 
-void MSyncControl::saveConfigurationToFile()
+void MSyncControl::saveConfigurationToFile(QString filename)
 {
-    QString filename = QFileDialog::getSaveFileName(
-                MGLResourcesManager::getInstance(),
-                "Save sync control configuration",
-                "data/synchronisation.synccontrol.conf",
-                "Sync control configuration files (*.synccontrol.conf)");
+    if (filename.isEmpty())
+    {
+        QString directory =
+                MSystemManagerAndControl::getInstance()
+                ->getMet3DWorkingDirectory().absoluteFilePath("config/synccontrol");
+        QDir().mkpath(directory);
+        filename = QFileDialog::getSaveFileName(
+                    MGLResourcesManager::getInstance(),
+                    "Save sync control configuration",
+                    QDir(directory).absoluteFilePath(getID()
+                                                     + ".synccontrol.conf"),
+                    "Sync control configuration files (*.synccontrol.conf)");
 
-    if (filename.isEmpty()) return;
+        if (filename.isEmpty())
+        {
+            return;
+        }
+    }
 
     LOG4CPLUS_DEBUG(mlog, "Saving configuration to " << filename.toStdString());
 
@@ -761,14 +772,22 @@ void MSyncControl::saveConfigurationToFile()
 }
 
 
-void MSyncControl::loadConfigurationFromFile()
+void MSyncControl::loadConfigurationFromFile(QString filename)
 {
-    QString filename = QFileDialog::getOpenFileName(
-                MGLResourcesManager::getInstance(),
-                "Load sync control configuration",
-                "data/config",
-                "Sync control configuration files (*.synccontrol.conf)");
-    if (filename.isEmpty()) return;
+    if (filename.isEmpty())
+    {
+        QString filename = QFileDialog::getOpenFileName(
+                    MGLResourcesManager::getInstance(),
+                    "Load sync control configuration",
+                    MSystemManagerAndControl::getInstance()
+                    ->getMet3DWorkingDirectory().absoluteFilePath("config/synccontrol"),
+                    "Sync control configuration files (*.synccontrol.conf)");
+
+        if (filename.isEmpty())
+        {
+            return;
+        }
+    }
 
     LOG4CPLUS_DEBUG(mlog, "Loading configuration from "
                     << filename.toStdString());

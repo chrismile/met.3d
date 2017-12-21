@@ -54,7 +54,8 @@ MMovablePoleActor::MMovablePoleActor()
       tubeRadius(0.06f),
       individualPoleHeightsEnabled(false),
       movementEnabled(true),
-      highlightPole(-1)
+      highlightPole(-1),
+      offsetPickPositionToHandleCentre(QVector2D(0., 0.))
 {
     enablePicking(true);
 
@@ -475,7 +476,6 @@ void MMovablePoleActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
     // If the index "highlightPole" is < 0, no waypoint should be highlighted.
     if (sceneView->interactionModeEnabled() && movementEnabled)
     {
-
         // Bind shader program.
         positionSpheresShader->bind();
 
@@ -497,8 +497,8 @@ void MMovablePoleActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
                 "cameraUpDir",
                 sceneView->getCamera()->getYAxis());
         positionSpheresShader->setUniformValue(
-                "radius",
-                GLfloat(0.5));
+                "radius", GLfloat(MSystemManagerAndControl::getInstance()
+                                  ->getHandleSize()));
         positionSpheresShader->setUniformValue(
                 "scaleRadius",
                 GLboolean(true));
@@ -509,8 +509,6 @@ void MMovablePoleActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
         // component passed to the vertex shader.
         positionSpheresShader->setUniformValue(
                 "useTransferFunction", GLboolean(false));
-        positionSpheresShader->setUniformValue(
-                "constColour", QColor(Qt::white));
 
         // Bind vertex buffer object.
 
@@ -520,17 +518,17 @@ void MMovablePoleActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
                       renderAsWireFrame ? GL_LINE : GL_FILL); CHECK_GL_ERROR;
         glLineWidth(1); CHECK_GL_ERROR;
 
-        glDrawArrays(GL_POINTS, 0, poleVertices.size()); CHECK_GL_ERROR;
-
         if (highlightPole >= 0)
         {
-            positionSpheresShader->setUniformValue(
-                    "radius",
-                    GLfloat(0.51));
             positionSpheresShader->setUniformValue(
                         "constColour", QColor(Qt::red));
             glDrawArrays(GL_POINTS, highlightPole, 1); CHECK_GL_ERROR;
         }
+
+        positionSpheresShader->setUniformValue(
+                "constColour", QColor(Qt::white));
+        glDrawArrays(GL_POINTS, 0, poleVertices.size()); CHECK_GL_ERROR;
+
 
         // Unbind VBO.
         glBindBuffer(GL_ARRAY_BUFFER, 0); CHECK_GL_ERROR;
@@ -539,8 +537,7 @@ void MMovablePoleActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
 
 
 int MMovablePoleActor::checkIntersectionWithHandle(MSceneViewGLWidget *sceneView,
-                                                   float clipX, float clipY,
-                                                   float clipRadius)
+                                                   float clipX, float clipY)
 {
     if (!movementEnabled)
     {
@@ -553,7 +550,7 @@ int MMovablePoleActor::checkIntersectionWithHandle(MSceneViewGLWidget *sceneView
     highlightPole = -1;
 
     //! TODO: HACK for pole actor. Should be changed for all movable actors!
-    clipRadius = 0.5f;
+    float clipRadius = MSystemManagerAndControl::getInstance()->getHandleSize();
 
     // Loop over all poles and check whether the mouse cursor is inside a
     // circle with radius "clipRadius" around the bottom pole point (in clip
@@ -596,6 +593,10 @@ int MMovablePoleActor::checkIntersectionWithHandle(MSceneViewGLWidget *sceneView
         if (root >= 0)
         {
             highlightPole = i;
+            mvpMatrix = sceneView->getModelViewProjectionMatrix();
+            QVector3D posPoleClip = *mvpMatrix * posPole;
+            offsetPickPositionToHandleCentre = QVector2D(posPoleClip.x() - clipX,
+                                     posPoleClip.y() - clipY);
             break;
         }
     } // for (poles)
@@ -682,7 +683,9 @@ void MMovablePoleActor::dragEvent(MSceneViewGLWidget *sceneView,
     // transformed to world space, lies on the ray passing through the camera
     // and the location on the worldZ==0 plane "picked" by the mouse.
     // (See notes 22-23Feb2012).
-    QVector3D mousePosClipSpace = QVector3D(clipX, clipY, 0.);
+    QVector3D mousePosClipSpace = QVector3D(clipX + offsetPickPositionToHandleCentre.x(),
+                                            clipY + offsetPickPositionToHandleCentre.y(),
+                                            0.);
 
     // The point p at which the ray intersects the worldZ==0 plane is found by
     // computing the value d in p=d*l+l0, where l0 is a point on the ray and l

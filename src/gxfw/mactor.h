@@ -214,13 +214,11 @@ public:
       Called by a @ref MSceneViewGLWidget in modification mode.
       */
     virtual int checkIntersectionWithHandle(MSceneViewGLWidget *sceneView,
-                                            float clipX, float clipY,
-                                            float clipRadius)
+                                            float clipX, float clipY)
     {
         Q_UNUSED(sceneView);
         Q_UNUSED(clipX);
         Q_UNUSED(clipY);
-        Q_UNUSED(clipRadius);
         return -1;
     }
 

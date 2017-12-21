@@ -463,16 +463,24 @@ void MBoundingBoxDockWidget::onDeleteBBox()
 }
 
 
-void MBoundingBoxDockWidget::saveConfigurationToFile()
+void MBoundingBoxDockWidget::saveConfigurationToFile(QString filename)
 {
-    QString filename = QFileDialog::getSaveFileName(
-                this, "Save bounding boxes configuration",
-                "data/bboxconfig/bboxes.bbox.conf",
-                "Bounding Boxes configuration files (*.bbox.conf)");
 
     if (filename.isEmpty())
     {
-        return;
+        QString directory =
+                MSystemManagerAndControl::getInstance()
+                ->getMet3DWorkingDirectory().absoluteFilePath("config/bboxes");
+        QDir().mkpath(directory);
+        filename = QFileDialog::getSaveFileName(
+                    this, "Save bounding boxes configuration",
+                    QDir(directory).absoluteFilePath("default.bbox.conf"),
+                    "Bounding boxes configuration files (*.bbox.conf)");
+
+        if (filename.isEmpty())
+        {
+            return;
+        }
     }
 
     // Overwrite if the file exists.
@@ -495,8 +503,9 @@ void MBoundingBoxDockWidget::loadConfigurationFromFile(QString filename)
     {
         filename = QFileDialog::getOpenFileName(
                     this, "Load bounding boxes configuration",
-                    "data/bboxconfig/bboxes.bbox.conf",
-                    "Bounding Boxes configuration files (*.bbox.conf)");
+                    MSystemManagerAndControl::getInstance()
+                    ->getMet3DWorkingDirectory().absoluteFilePath("config/bboxes"),
+                    "Bounding boxes configuration files (*.bbox.conf)");
 
         if (filename.isEmpty())
         {

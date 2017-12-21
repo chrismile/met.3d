@@ -241,6 +241,11 @@ MNWPActorVariable::~MNWPActorVariable()
     if (textureUnitUnusedTextures >=0)
         actor->releaseTextureUnit(textureUnitUnusedTextures);
 
+    foreach (MRequestProperties *requestProperty, propertiesList)
+    {
+        delete requestProperty;
+    }
+
     delete requestPropertiesFactory;
     if (textureDummy1D) delete textureDummy1D;
     if (textureDummy2D) delete textureDummy2D;
@@ -2064,6 +2069,14 @@ MNWP2DSectionActorVariable::MNWP2DSectionActorVariable(
     // 2D render settings.
     renderSettings.groupProperty = getPropertyGroup("rendering");
 
+    // Place render mode property at the top of all entries in the "rendering"
+    // group.
+    QList<QtProperty *> subPropertiesList =
+            renderSettings.groupProperty->subProperties();
+    foreach(QtProperty *subProperty, subPropertiesList)
+    {
+        renderSettings.groupProperty->removeSubProperty(subProperty);
+    }
     renderSettings.renderMode = RenderMode::Disabled;
     QStringList renderModeNames;
     renderModeNames << "disabled" << "filled contours" << "pseudo colour"
@@ -2073,14 +2086,18 @@ MNWP2DSectionActorVariable::MNWP2DSectionActorVariable(
                 ENUM_PROPERTY, "render mode", renderSettings.groupProperty);
     properties->mEnum()->setEnumNames(
                 renderSettings.renderModeProperty, renderModeNames);
-
-    renderSettings.addContourSetProperty = a->addProperty(
-                CLICK_PROPERTY, "add contour set",
-                renderSettings.groupProperty);
+    foreach(QtProperty *subProperty, subPropertiesList)
+    {
+        renderSettings.groupProperty->addSubProperty(subProperty);
+    }
 
     renderSettings.contourSetGroupProperty = a->addProperty(
                 GROUP_PROPERTY, "contour sets",
                 renderSettings.groupProperty);
+
+    renderSettings.addContourSetProperty = a->addProperty(
+                CLICK_PROPERTY, "add contour set",
+                renderSettings.contourSetGroupProperty);
 
     renderSettings.contoursUseTF = false;
     renderSettings.contoursUseTFProperty = a->addProperty(
@@ -2698,8 +2715,6 @@ MNWP2DHorizontalActorVariable::MNWP2DHorizontalActorVariable(
     assert(renderGroup != nullptr);
     // Remove properties to place spatial transfer function selection propery
     // above them.
-    renderGroup->removeSubProperty(renderSettings.renderModeProperty);
-    renderGroup->removeSubProperty(renderSettings.addContourSetProperty);
     renderGroup->removeSubProperty(renderSettings.contourSetGroupProperty);
 
     QStringList renderModeNames =
@@ -2735,8 +2750,6 @@ MNWP2DHorizontalActorVariable::MNWP2DHorizontalActorVariable(
                                       availableSTFs);
 
     // Re-add properties after spatial transfer function selection property.
-    renderGroup->addSubProperty(renderSettings.renderModeProperty);
-    renderGroup->addSubProperty(renderSettings.addContourSetProperty);
     renderGroup->addSubProperty(renderSettings.contourSetGroupProperty);
 
     contourLabelSuffixProperty = a->addProperty(

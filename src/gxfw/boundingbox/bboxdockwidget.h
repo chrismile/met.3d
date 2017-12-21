@@ -108,7 +108,7 @@ public slots:
     void onSpinBoxUpdate(double value);
     void onCreateBBox();
     void onDeleteBBox();
-    void saveConfigurationToFile();
+    void saveConfigurationToFile(QString filename = "");
     void loadConfigurationFromFile(QString filename = "");
 
 protected:
