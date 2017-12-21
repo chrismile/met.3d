@@ -32,6 +32,11 @@
 
 // related third party imports
 #include <log4cplus/loggingmacros.h>
+#include <log4cplus/version.h>
+#include <grib_api.h>
+#include <gsl/gsl_version.h>
+#include <hdf5.h>
+#include <netcdf_meta.h>
 
 // local application imports
 #include "gxfw/msystemcontrol.h"
@@ -557,13 +562,23 @@ void MMainWindow::resizeSceneView(int newWidth, int newHeight,
 void MMainWindow::saveConfigurationToFile(QString filename)
 {
     if (filename.isEmpty())
+    {
+        QString directory =
+                MSystemManagerAndControl::getInstance()
+                ->getMet3DWorkingDirectory().absoluteFilePath("config/winlayout");
+        QDir().mkpath(directory);
         filename = QFileDialog::getSaveFileName(
                     MGLResourcesManager::getInstance(),
                     "Save window layout configuration",
-                    "data/windowLayout.winlayout.conf",
+                    MSystemManagerAndControl::getInstance()
+                    ->getMet3DWorkingDirectory().absoluteFilePath("default.winlayout.conf"),
                     "Window layout configuration files (*.winlayout.conf)");
 
-    if (filename.isEmpty()) return;
+        if (filename.isEmpty())
+        {
+            return;
+        }
+    }
 
     LOG4CPLUS_DEBUG(mlog, "Saving configuration to " << filename.toStdString());
 
@@ -607,13 +622,19 @@ void MMainWindow::saveConfigurationToFile(QString filename)
 void MMainWindow::loadConfigurationFromFile(QString filename)
 {
     if (filename.isEmpty())
+    {
         filename = QFileDialog::getOpenFileName(
                     MGLResourcesManager::getInstance(),
                     "Load window layout configuration",
-                    "data/config",
+                    MSystemManagerAndControl::getInstance()
+                    ->getMet3DWorkingDirectory().absoluteFilePath("config/winlayout"),
                     "Window layout configuration files (*.winlayout.conf)");
 
-    if (filename.isEmpty()) return;
+        if (filename.isEmpty())
+        {
+            return;
+        }
+    }
 
     LOG4CPLUS_DEBUG(mlog, "Loading configuration from "
                     << filename.toStdString());
@@ -1141,8 +1162,59 @@ void MMainWindow::showAboutDialog()
             "(1) <a href='https://wwwcg.in.tum.de/'>Computer Graphics and "
             "Visualization Group</a>, "
             "Technical University of Munich, Garching, Germany<br><br>"
-            "See Met.3D source files for license details.<br>"
-                ).arg(met3dVersionString).arg(met3dBuildDate);
+            "See Met.3D source files for license details.<br><hr>"
+            "Versions of libraries used to compile Met.3D:<br>"
+            "<table> "
+            "<tr> "
+            "<td> freetype: %3.%4.%5 </td> <td> GDAL: %6 </td>"
+            " <td> GLEW: %7 </td>"
+            "</tr>"
+            "<tr> "
+            "<td> GLFX: %8.%9.%10 </td> <td> GLU: %11 </td>"
+            " <td> grib_api: %12 </td>"
+            "</tr>"
+            "<tr> "
+            "<td> GSL: %13 </td> <td> HDF5: %14.%15.%16 </td>"
+            " <td> LOG4CPLUS: %17 </td>"
+            "</tr>"
+            "<tr> "
+            "<td> NetCDF: %18 </td> <td> NetCDF-4 C++: %19.%20.%21 </td>"
+            " <td> QCustomPlot: %22.%23.%24 </td>"
+            "</tr>"
+            "</table>"
+            "Note: If a version is listed as x.x.x, Met.3D wasn't able to find"
+            " a version tag for this library."
+                ).arg(met3dVersionString).arg(met3dBuildDate)
+            .arg(FREETYPE_MAJOR).arg(FREETYPE_MINOR).arg(FREETYPE_PATCH)
+            .arg(GDAL_RELEASE_NAME)
+            .arg(QString(reinterpret_cast<const char *>(glewGetString(GLEW_VERSION))))
+#if defined(GLFX_VERSION_MAJOR) && defined(GLFX_VERSION_MINOR) \
+    && defined(GLFX_VERSION_PATCH)
+            .arg(GLFX_VERSION_MAJOR).arg(GLFX_VERSION_MINOR)
+            .arg(GLFX_VERSION_PATCH)
+#else
+            .arg("x").arg("x").arg("x")
+#endif
+            .arg(QString(reinterpret_cast<const char *>(gluGetString(GLU_VERSION))))
+            .arg(GRIB_API_VERSION_STR)
+            .arg(GSL_VERSION)
+            .arg(H5_VERS_MAJOR).arg(H5_VERS_MINOR).arg(H5_VERS_RELEASE)
+            .arg(LOG4CPLUS_VERSION_STR)
+            .arg(NC_VERSION)
+#if defined(NetCDFCXX4_VERSION_MAJOR) && defined(NetCDFCXX4_VERSION_MINOR) \
+    && defined(NetCDFCXX4_VERSION_PATCH)
+            .arg(NetCDFCXX4_VERSION_MAJOR).arg(NetCDFCXX4_VERSION_MINOR)
+            .arg(NetCDFCXX4_VERSION_PATCH)
+#else
+            .arg("x").arg("x").arg("x")
+#endif
+#if defined(QCPLOT_MAJOR_VERSION) && defined(QCPLOT_MINOR_VERSION) \
+    && defined(QCPLOT_PATCH_VERSION)
+            .arg(QCPLOT_MAJOR_VERSION).arg(QCPLOT_MINOR_VERSION)
+            .arg(QCPLOT_PATCH_VERSION);
+#else
+    .arg("x").arg("x").arg("x");
+#endif
 
     QMessageBox::about(this, "About Met.3D", aboutString);
 }

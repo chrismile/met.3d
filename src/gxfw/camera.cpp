@@ -30,9 +30,11 @@
 
 // related third party imports
 #include <QMessageBox>
+#include <QFileInfo>
 
 // local application imports
 #include "util/mutil.h"
+#include "mglresourcesmanager.h"
 
 
 namespace Met3D
@@ -143,9 +145,25 @@ void MCamera::rotateWorldSpace(float angle, float x, float y, float z)
 }
 
 
-void MCamera::saveToFile(QString filename)
+void MCamera::saveConfigurationToFile(QString filename)
 {
-    if (filename.isEmpty()) return;
+    if (filename.isEmpty())
+    {
+        QString directory =
+                MSystemManagerAndControl::getInstance()
+                ->getMet3DWorkingDirectory().absoluteFilePath("config/camera");
+        QDir().mkpath(directory);
+        filename = QFileDialog::getSaveFileName(
+                    MGLResourcesManager::getInstance(),
+                    "Save current camera",
+                    QDir(directory).absoluteFilePath("default.camera.conf"),
+                    "Camera configuration files (*.camera.conf)");
+
+        if (filename.isEmpty())
+        {
+            return;
+        }
+    }
 
     QSettings *settings = new QSettings(filename, QSettings::IniFormat);
 
@@ -183,9 +201,22 @@ void MCamera::saveToFile(QString filename)
 }
 
 
-void MCamera::loadFromFile(QString filename)
+void MCamera::loadConfigurationFromFile(QString filename)
 {
-    if (filename.isEmpty()) return;
+    if (filename.isEmpty())
+    {
+        filename = QFileDialog::getOpenFileName(
+                    MGLResourcesManager::getInstance(),
+                    "Load camera",
+                    MSystemManagerAndControl::getInstance()
+                    ->getMet3DWorkingDirectory().absoluteFilePath("config/camera"),
+                    "Camera configuration files (*.camera.conf)");
+
+        if (filename.isEmpty())
+        {
+            return;
+        }
+    }
 
     QSettings *settings = new QSettings(filename, QSettings::IniFormat);
 

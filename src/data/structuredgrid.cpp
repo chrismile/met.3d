@@ -1445,19 +1445,15 @@ MLonLatHybridSigmaPressureGrid::MLonLatHybridSigmaPressureGrid(
 
 MLonLatHybridSigmaPressureGrid::~MLonLatHybridSigmaPressureGrid()
 {
-    // If the surface pressure field was set by the friend class
-    // MWeatherPredictionReader, the field was stored in the same memory
-    // manager as this item. If this item is deleted from the memory manager,
-    // release the surface pressure field.
-    // If this grid is not registered with any memory manager simply delete
-    // the surface pressure grid.
     if (surfacePressure)
     {
-        if (memoryManager)
+        // Release surface pressure field if it has been registered to a memory
+        // manager otherwise delete it.
+        if (surfacePressure->getMemoryManager())
         {
             LOG4CPLUS_TRACE(mlog, "Releasing psfc of request "
                             << getGeneratingRequest().toStdString());
-            memoryManager->releaseData(surfacePressure);
+            surfacePressure->getMemoryManager()->releaseData(surfacePressure);
         }
         else
         {

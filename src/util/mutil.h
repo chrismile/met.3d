@@ -41,7 +41,7 @@
 ***                      VERSION INFORMATION                                ***
 *******************************************************************************/
 
-const QString met3dVersionString = "1.2.2";
+const QString met3dVersionString = "1.3-devel";
 // String containing default value for missing version number in config.
 const QString defaultConfigVersion = "1.0.0";
 const QString met3dBuildDate = QString("built on %1 %2").arg(__DATE__).arg(__TIME__);

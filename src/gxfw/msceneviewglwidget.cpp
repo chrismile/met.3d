@@ -36,7 +36,6 @@
 #include <QtGui>
 #include <QtOpenGL>
 #include <log4cplus/loggingmacros.h>
-#include <QFileInfo>
 
 // local application imports
 #include "util/mutil.h"
@@ -721,18 +720,10 @@ void MSceneViewGLWidget::executeCameraAction(int action,
                             QVector3D(0, 0, 1.), camera.getXAxis()));
         break;
     case CAMERA_SAVETOFILE:
-        camera.saveToFile(QFileDialog::getSaveFileName(
-                              MGLResourcesManager::getInstance(),
-                              "Save current camera",
-                              "data/camera",
-                              "Camera configuration files (*.camera.conf)"));
+        camera.saveConfigurationToFile();
         break;
     case CAMERA_LOADFROMFILE:
-        camera.loadFromFile(QFileDialog::getOpenFileName(
-                                MGLResourcesManager::getInstance(),
-                                "Open camera",
-                                "data/camera",
-                                "Camera configuration files (*.camera.conf)"));
+        camera.loadConfigurationFromFile();
         break;
     }
 
@@ -1658,7 +1649,7 @@ void MSceneViewGLWidget::mouseMoveEvent(QMouseEvent *event)
                            singleInteractionActor->getName() == actor->getName())
                     {
                         pickedActor.handleID = actor->checkIntersectionWithHandle(
-                                    this, clipX, clipY, 0.5f);
+                                    this, clipX, clipY);
                         // If the test returned a valid handle ID, store the actor
                         // and its handle as the currently picked actor.
                         if (pickedActor.handleID >= 0)
@@ -2138,13 +2129,23 @@ void MSceneViewGLWidget::setSceneRotationCentre(QVector3D centre)
 void MSceneViewGLWidget::saveConfigurationToFile(QString filename)
 {
     if (filename.isEmpty())
+    {
+        QString directory =
+                MSystemManagerAndControl::getInstance()
+                ->getMet3DWorkingDirectory().absoluteFilePath("config/sceneviews");
+        QDir().mkpath(directory);
         filename = QFileDialog::getSaveFileName(
                     MGLResourcesManager::getInstance(),
                     "Save scene view configuration",
-                    QString("data/sceneview%1.sceneview.conf").arg(myID + 1),
+                    QDir(directory).absoluteFilePath(
+                        QString("sceneview%1.sceneview.conf").arg(myID + 1)),
                     "Scene view configuration files (*.sceneview.conf)");
 
-    if (filename.isEmpty()) return;
+        if (filename.isEmpty())
+        {
+            return;
+        }
+    }
 
     LOG4CPLUS_DEBUG(mlog, "Saving configuration to " << filename.toStdString());
 
@@ -2191,13 +2192,19 @@ void MSceneViewGLWidget::saveConfigurationToFile(QString filename)
 void MSceneViewGLWidget::loadConfigurationFromFile(QString filename)
 {
     if (filename.isEmpty())
+    {
         filename = QFileDialog::getOpenFileName(
                     MGLResourcesManager::getInstance(),
                     "Load scene view configuration",
-                    "data/config",
+                    MSystemManagerAndControl::getInstance()
+                    ->getMet3DWorkingDirectory().absoluteFilePath("config/sceneviews"),
                     "Scene view configuration files (*.sceneview.conf)");
 
-    if (filename.isEmpty()) return;
+        if (filename.isEmpty())
+        {
+            return;
+        }
+    }
 
     QSettings *settings = new QSettings(filename, QSettings::IniFormat);
 
@@ -2394,6 +2401,14 @@ void MSceneViewGLWidget::loadConfiguration(QSettings *settings)
 }
 
 
+void MSceneViewGLWidget::onHandleSizeChanged()
+{
+#ifndef CONTINUOUS_GL_UPDATE
+    updateGL();
+#endif
+}
+
+
 /******************************************************************************
 ***                           PRIVATE METHODS                               ***
 *******************************************************************************/
@@ -2414,7 +2429,7 @@ void MSceneViewGLWidget::saveScreenshot()
     QString filename = QFileDialog::getSaveFileName(
                 MGLResourcesManager::getInstance(),
                 "Save screenshot",
-                "../screenshots",
+                QDir::home().absoluteFilePath("met3d/screenshots"),
                 filter,
                 &filetype);
     if (!filename.isEmpty())

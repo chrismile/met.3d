@@ -72,8 +72,7 @@ public:
       corner point is matched, its index is returned.
       */
     int checkIntersectionWithHandle(MSceneViewGLWidget *sceneView,
-                                    float clipX, float clipY,
-                                    float clipRadius) override;
+                                    float clipX, float clipY) override;
 
     void addPositionLabel(MSceneViewGLWidget *sceneView, int handleID,
                           float clipX, float clipY);
@@ -290,6 +289,11 @@ private:
 
     GLfloat     shadowHeight;
     QtProperty* shadowHeightProp;
+
+    // If the user picks the handle not in its centre, we cannot move the handle
+    // by setting the centre point to the mouse position so we need this offset
+    // to place the handle relative to the mouse position.
+    QVector2D offsetPickPositionToHandleCentre;
 };
 
 
