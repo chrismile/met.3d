@@ -17,7 +17,7 @@ LIBS += \
     -L/home/local/sw/unidata/lib64 -lnetcdf_c++4 \
     -lnetcdf -lhdf5_hl -lhdf5 -lz -lcurl \
     -lgsl -lgslcblas -lfreetype -lgdal -lGLU \
-    -llog4cplus -lGLEW -lgrib_api \
+    -llog4cplus -lGLEW -leccodes \
 # Path to the manually installed glfx library.
     -L/home/local/sw/gl/lib -lglfx \
 # Path to the manually installed QCustomPlot library.
