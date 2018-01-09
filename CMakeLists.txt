@@ -178,9 +178,9 @@ include_directories(${GDAL_INCLUDE_DIR})
 find_package(GSL REQUIRED)
 include_directories(${GSL_INCLUDE_DIRS})
 
-# Grib-API
-find_package(grib_api REQUIRED)
-include_directories(${grib_api_INCLUDE_DIR})
+# eccodes
+find_package(eccodes REQUIRED)
+include_directories(${eccodes_INCLUDE_DIR})
 
 # Netcdf
 find_package(netcdf_cxx4 REQUIRED)
@@ -286,7 +286,7 @@ target_link_libraries(Met3D
                         ${GDAL_LIBRARY}
                         ${GSL_LIBRARIES}
                         ${log4cplus_LIBRARIES}
-                        ${grib_api_LIBRARIES}
+                        ${eccodes_LIBRARIES}
                         ${netcdf_cxx4_LIBRARIES}
                         ${netcdf_cxx4_C_LIBRARIES}
                         ${qcustomplot_LIBRARIES}

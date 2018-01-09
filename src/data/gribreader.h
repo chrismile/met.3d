@@ -31,7 +31,7 @@
 
 // related third party imports
 #include <QtCore>
-#include "grib_api.h"
+#include "eccodes.h"
 
 // local application imports
 #include "data/weatherpredictionreader.h"

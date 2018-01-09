@@ -33,7 +33,7 @@
 // related third party imports
 #include <log4cplus/loggingmacros.h>
 #include <log4cplus/version.h>
-#include <grib_api.h>
+#include <eccodes.h>
 #include <gsl/gsl_version.h>
 #include <hdf5.h>
 #include <netcdf_meta.h>
@@ -1171,7 +1171,7 @@ void MMainWindow::showAboutDialog()
             "</tr>"
             "<tr> "
             "<td> GLFX: %8.%9.%10 </td> <td> GLU: %11 </td>"
-            " <td> grib_api: %12 </td>"
+            " <td> eccodes: %12 </td>"
             "</tr>"
             "<tr> "
             "<td> GSL: %13 </td> <td> HDF5: %14.%15.%16 </td>"
@@ -1196,7 +1196,7 @@ void MMainWindow::showAboutDialog()
             .arg("x").arg("x").arg("x")
 #endif
             .arg(QString(reinterpret_cast<const char *>(gluGetString(GLU_VERSION))))
-            .arg(GRIB_API_VERSION_STR)
+            .arg(ECCODES_VERSION_STR)
             .arg(GSL_VERSION)
             .arg(H5_VERS_MAJOR).arg(H5_VERS_MINOR).arg(H5_VERS_RELEASE)
             .arg(LOG4CPLUS_VERSION_STR)
