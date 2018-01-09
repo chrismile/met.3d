@@ -773,6 +773,12 @@ void MSessionManagerDialog::saveSessionToFile(QString sessionName, bool autoSave
     // ==========================================
     settings->beginGroup("MSession");
 
+    // General.
+    // ==========================================
+    settings->beginGroup("AllSceneViews");
+    settings->setValue("handleSize", sysMC->getHandleSize());
+    settings->endGroup();
+
     QList<MSceneViewGLWidget*> sceneViews = sysMC->getRegisteredViews();
 
     // Sync controls.
@@ -955,7 +961,7 @@ void MSessionManagerDialog::loadSessionFromFile(QString sessionName)
     // Block access to active widget while progress dialog is active.
     // NOTE: This only works if the main window has already been shown; hence
     // only after the application has been fully initialized.
-    if (MSystemManagerAndControl::getInstance()->applicationIsInitialized())
+    if (sysMC->applicationIsInitialized())
     {
         progressDialog->setWindowModality(Qt::ApplicationModal);
     }
@@ -969,6 +975,16 @@ void MSessionManagerDialog::loadSessionFromFile(QString sessionName)
     progressDialog->setValue(0);
     progressDialog->update();
     qApp->processEvents();
+
+    // General.
+    // ==========================================
+    settings->beginGroup("AllSceneViews");
+    sysMC->setHandleSize(settings->value("handleSize", .5).toDouble());
+    progressDialog->setValue(++loadingProgress);
+    progressDialog->update();
+    progressDialog->setValue(++loadingProgress);
+    progressDialog->update();
+    settings->endGroup();
 
     // Sync controls.
     // ==========================================
@@ -1138,11 +1154,7 @@ void MSessionManagerDialog::loadSessionFromFile(QString sessionName)
     {
         settings->beginGroup(
                     QString("MActor_%1").arg(actorsToConfigure.value(actor)));
-        // Suppress actor updates to avoid system crash due to actor trying to
-        // compute render region parameters to early.
-//        actor->enableActorUpdates(false);
         actor->loadActorConfiguration(settings);
-//        actor->enableActorUpdates(true);
         settings->endGroup();
     }
     settings->endGroup();

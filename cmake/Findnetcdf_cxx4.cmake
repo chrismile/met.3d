@@ -9,8 +9,9 @@
 #       - netcdf_cxx4_C_INCLUDE_DIR  - Dependant package include directory
 #       - netcdf_cxx4_C_LIBRARIES    - Dependant package static libraries
 #
-#  Copyright 2016 Marc Rautenhaus
-#  Copyright 2016 Michael Kern
+#  Copyright 2016-2017 Marc Rautenhaus
+#  Copyright 2016      Michael Kern
+#  Copyright 2017      Bianca Tost
 #
 ####################################################################################################
 
@@ -172,16 +173,17 @@ elseif (${PKG_NAME}_LIBRARY_RELEASE)
 endif ()
 
 if(WIN32)
+  # TODO This settings file contains informations about NetCDF not NetCDF-4 C++ - Is there a way to get the version number of the netCDF-4 C++ library under Windows?
   # Parse .settings file
   file(STRINGS ${${PKG_NAME}_SETTINGS_FILE} SETTINGS)
   foreach(SETTING ${SETTINGS})
     string(REPLACE ":" ";" SETTING ${SETTING})
     list(GET SETTING 0 LABEL)
     string(STRIP ${LABEL} LABEL)
-    
+
     if(${LABEL} STREQUAL "NetCDF Version")
       list(GET SETTING 1 ${PKG_NAME}_VERSION)
-      string(STRIP ${${PKG_NAME}_VERSION} ${PKG_NAME}_VERSION)      
+      string(STRIP ${${PKG_NAME}_VERSION} ${PKG_NAME}_VERSION)
     endif()
   endforeach()
 else()
@@ -199,7 +201,7 @@ include(FindPackageHandleStandardArgs)
 find_package_handle_standard_args(${PKG_NAME} REQUIRED_VARS ${PKG_NAME}_VERSION ${PKG_NAME}_LIBRARIES ${PKG_NAME}_C_LIBRARIES ${PKG_NAME}_C_INCLUDE_DIR ${PKG_NAME}_INCLUDE_DIR)
 
 
-# Extract major and minor version from version string.
+# Extract major, minor and patch version from version string.
 string(REPLACE "." ";" ${PKG_NAME}_VERSION ${${PKG_NAME}_VERSION})
 list(GET ${PKG_NAME}_VERSION 0 ${PKG_NAME}_VERSION_MAJOR)
 list(GET ${PKG_NAME}_VERSION 1 ${PKG_NAME}_VERSION_MINOR)

@@ -47,6 +47,9 @@ namespace Met3D
 /******************************************************************************
 ***                       MRequestPropertiesGroup                           ***
 *******************************************************************************/
+/******************************************************************************
+***                     CONSTRUCTOR / DESTRUCTOR                            ***
+*******************************************************************************/
 
 MRequestProperties::MRequestProperties(MNWPActorVariable *actorVar)
     : actorVariable(actorVar)
@@ -57,12 +60,19 @@ MRequestProperties::MRequestProperties(MNWPActorVariable *actorVar)
 /******************************************************************************
 ***                      MRequestPropertiesFactory                          ***
 *******************************************************************************/
+/******************************************************************************
+***                     CONSTRUCTOR / DESTRUCTOR                            ***
+*******************************************************************************/
 
 MRequestPropertiesFactory::MRequestPropertiesFactory(MNWPActorVariable *actorVar)
     : actorVariable(actorVar)
 {
 }
 
+
+/******************************************************************************
+***                            PUBLIC METHODS                               ***
+*******************************************************************************/
 
 void MRequestPropertiesFactory::updateProperties(
         QList<MRequestProperties*> *propertiesList,
@@ -96,6 +106,10 @@ void MRequestPropertiesFactory::updateProperties(
 }
 
 
+/******************************************************************************
+***                          PROTECTED METHODS                              ***
+*******************************************************************************/
+
 template<typename T> void MRequestPropertiesFactory::updateTypedProperties(
         const QStringList& keysHandledByType,
         QList<MRequestProperties*> *propertiesList,
@@ -104,12 +118,33 @@ template<typename T> void MRequestPropertiesFactory::updateTypedProperties(
     // Does the list of keys required by the pipeline contain all keys
     // provided by property type T?
     for (int i = 0; i < keysHandledByType.size(); i++)
-        if (!keysRequiredByPipeline.contains(keysHandledByType[i])) return;
+    {
+        if (!keysRequiredByPipeline.contains(keysHandledByType[i]))
+        {
+
+            // Keys required by pipeline are not present. Check if properties
+            // exist from earlier pipeline connection. If yes, delete.
+            for (int i = 0; i < propertiesList->size(); i++)
+            {
+                if (dynamic_cast<T*>(propertiesList->at(i)))
+                {
+                    delete propertiesList->takeAt(i);
+                    return;
+                }
+            }
+            return;
+        }
+    }
 
     // All provided keys are contained. Check if an instance of T is already
     // contained in the actor variables' properties list.
     for (int i = 0; i < propertiesList->size(); i++)
-        if (dynamic_cast<T*>(propertiesList->at(i))) return;
+    {
+        if (dynamic_cast<T*>(propertiesList->at(i)))
+        {
+            return;
+        }
+    }
 
     // This is not the case, hence add a new one.
     propertiesList->append(new T(actorVariable));
@@ -122,6 +157,9 @@ template<typename T> void MRequestPropertiesFactory::updateTypedProperties(
 
 /******************************************************************************
 ***                      MVerticalRegridProperties                          ***
+*******************************************************************************/
+/******************************************************************************
+***                     CONSTRUCTOR / DESTRUCTOR                            ***
 *******************************************************************************/
 
 MVerticalRegridProperties::MVerticalRegridProperties(
@@ -161,6 +199,15 @@ MVerticalRegridProperties::MVerticalRegridProperties(
     a->endInitialiseQtProperties();
 }
 
+
+MVerticalRegridProperties::~MVerticalRegridProperties()
+{
+}
+
+
+/******************************************************************************
+***                            PUBLIC METHODS                               ***
+*******************************************************************************/
 
 bool MVerticalRegridProperties::onQtPropertyChanged(
         QtProperty *property, bool *redrawWithoutDataRequest)
@@ -276,6 +323,9 @@ void MVerticalRegridProperties::loadConfiguration(QSettings *settings)
 /******************************************************************************
 ***                     MTrajectoryFilterProperties                         ***
 *******************************************************************************/
+/******************************************************************************
+***                     CONSTRUCTOR / DESTRUCTOR                            ***
+*******************************************************************************/
 
 MTrajectoryFilterProperties::MTrajectoryFilterProperties(
         MNWPActorVariable *actorVar)
@@ -315,6 +365,15 @@ MTrajectoryFilterProperties::MTrajectoryFilterProperties(
     a->endInitialiseQtProperties();
 }
 
+
+MTrajectoryFilterProperties::~MTrajectoryFilterProperties()
+{
+}
+
+
+/******************************************************************************
+***                            PUBLIC METHODS                               ***
+*******************************************************************************/
 
 bool MTrajectoryFilterProperties::onQtPropertyChanged(
         QtProperty *property, bool *redrawWithoutDataRequest)
@@ -422,6 +481,9 @@ void MTrajectoryFilterProperties::loadConfiguration(QSettings *settings)
 /******************************************************************************
 ***                    MTrajectoryGriddingProperties                        ***
 *******************************************************************************/
+/******************************************************************************
+***                     CONSTRUCTOR / DESTRUCTOR                            ***
+*******************************************************************************/
 
 MTrajectoryGriddingProperties::MTrajectoryGriddingProperties(
         MNWPActorVariable *actorVar)
@@ -494,6 +556,15 @@ MTrajectoryGriddingProperties::MTrajectoryGriddingProperties(
     a->endInitialiseQtProperties();
 }
 
+
+MTrajectoryGriddingProperties::~MTrajectoryGriddingProperties()
+{
+}
+
+
+/******************************************************************************
+***                            PUBLIC METHODS                               ***
+*******************************************************************************/
 
 bool MTrajectoryGriddingProperties::onQtPropertyChanged(
         QtProperty *property, bool *redrawWithoutDataRequest)
@@ -614,6 +685,9 @@ void MTrajectoryGriddingProperties::loadConfiguration(QSettings *settings)
 /******************************************************************************
 ***                     MTrajectoryThinOutProperties                        ***
 *******************************************************************************/
+/******************************************************************************
+***                     CONSTRUCTOR / DESTRUCTOR                            ***
+*******************************************************************************/
 
 MTrajectoryThinOutProperties::MTrajectoryThinOutProperties(
         MNWPActorVariable *actorVar)
@@ -654,6 +728,15 @@ MTrajectoryThinOutProperties::MTrajectoryThinOutProperties(
     a->endInitialiseQtProperties();
 }
 
+
+MTrajectoryThinOutProperties::~MTrajectoryThinOutProperties()
+{
+}
+
+
+/******************************************************************************
+***                            PUBLIC METHODS                               ***
+*******************************************************************************/
 
 bool MTrajectoryThinOutProperties::onQtPropertyChanged(
         QtProperty *property, bool *redrawWithoutDataRequest)
@@ -727,6 +810,9 @@ void MTrajectoryThinOutProperties::loadConfiguration(QSettings *settings)
 /******************************************************************************
 ***                     MProbabilityRegionProperties                        ***
 *******************************************************************************/
+/******************************************************************************
+***                     CONSTRUCTOR / DESTRUCTOR                            ***
+*******************************************************************************/
 
 MProbabilityRegionProperties::MProbabilityRegionProperties(
         MNWPActorVariable *actorVar)
@@ -750,6 +836,15 @@ MProbabilityRegionProperties::MProbabilityRegionProperties(
     a->endInitialiseQtProperties();
 }
 
+
+MProbabilityRegionProperties::~MProbabilityRegionProperties()
+{
+}
+
+
+/******************************************************************************
+***                            PUBLIC METHODS                               ***
+*******************************************************************************/
 
 bool MProbabilityRegionProperties::onQtPropertyChanged(
         QtProperty *property, bool *redrawWithoutDataRequest)

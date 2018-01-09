@@ -57,9 +57,9 @@ MSystemManagerAndControl::MSystemManagerAndControl(QWidget *parent) :
     ui(new Ui::MSystemControl),
     met3dAppIsInitialized(false),
     connectedToMetview(false),
+    handleSize(.5),
     mainWindow(nullptr),
     naturalEarthDataLoader(nullptr)
-
 {
     LOG4CPLUS_DEBUG(mlog, "Initialising system manager...");
     ui->setupUi(this);
@@ -67,6 +67,7 @@ MSystemManagerAndControl::MSystemManagerAndControl(QWidget *parent) :
     groupPropertyManager           = new QtGroupPropertyManager(this);
     boolPropertyManager            = new QtBoolPropertyManager(this);
     decoratedDoublePropertyManager = new QtDecoratedDoublePropertyManager(this);
+    doublePropertyManager          = new QtDoublePropertyManager(this);
     enumPropertyManager            = new QtEnumPropertyManager(this);
     stringPropertyManager          = new QtStringPropertyManager(this);
     clickPropertyManager           = new QtClickPropertyManager(this);
@@ -79,6 +80,8 @@ MSystemManagerAndControl::MSystemManagerAndControl(QWidget *parent) :
     QtCheckBoxFactory *checkBoxFactory = new QtCheckBoxFactory(this);
     QtDecoratedDoubleSpinBoxFactory *decoratedDoubleSpinBoxFactory =
             new QtDecoratedDoubleSpinBoxFactory(this);
+    QtDoubleSpinBoxFactory *doubleSpinBoxFactory =
+            new QtDoubleSpinBoxFactory(this);
     QtEnumEditorFactory *enumEditorFactory = new QtEnumEditorFactory(this);
     QtToolButtonFactory *toolButtonFactory = new QtToolButtonFactory(this);
     QtColorEditorFactory *colorEditorFactory = new QtColorEditorFactory(this);
@@ -91,6 +94,8 @@ MSystemManagerAndControl::MSystemManagerAndControl(QWidget *parent) :
                 boolPropertyManager, checkBoxFactory);
     systemPropertiesBrowser->setFactoryForManager(
                 decoratedDoublePropertyManager, decoratedDoubleSpinBoxFactory);
+    systemPropertiesBrowser->setFactoryForManager(doublePropertyManager,
+                                                  doubleSpinBoxFactory);
     systemPropertiesBrowser->setFactoryForManager(
                 enumPropertyManager, enumEditorFactory);
     systemPropertiesBrowser->setFactoryForManager(
@@ -105,22 +110,45 @@ MSystemManagerAndControl::MSystemManagerAndControl(QWidget *parent) :
 
     ui->sceneViewPropertiesLayout->addWidget(systemPropertiesBrowser);
 
-    // Add group containing click properties to load and save the window layout.
-    windowLayoutGroupProperty =
-            groupPropertyManager->addProperty("Window layout");
-    addProperty(windowLayoutGroupProperty);
-    collapsePropertyTree(windowLayoutGroupProperty);
-
     // Insert a dummy "None" entry into the list of waypoints models.
     waypointsTableModelPool.insert("None", nullptr);
     syncControlPool.insert("None", nullptr);
     boundingBoxPool.insert(QString("None"), nullptr);
+
+    // Add group containing general application configurations.
+    appConfigGroupProperty =
+            groupPropertyManager->addProperty("Application configuration");
+    addProperty(appConfigGroupProperty);
+    collapsePropertyTree(appConfigGroupProperty);
+
+    // Add group containing click properties to load and save the window layout.
+    windowLayoutGroupProperty =
+            groupPropertyManager->addProperty("window layout");
+    appConfigGroupProperty->addSubProperty(windowLayoutGroupProperty);
 
     loadWindowLayoutProperty = clickPropertyManager->addProperty("load");
     windowLayoutGroupProperty->addSubProperty(loadWindowLayoutProperty);
     saveWindowLayoutProperty = clickPropertyManager->addProperty("save");
     windowLayoutGroupProperty->addSubProperty(saveWindowLayoutProperty);
 
+    // Add group containing .
+    allSceneViewsGroupProperty =
+            groupPropertyManager->addProperty("All scene views");
+    addProperty(allSceneViewsGroupProperty);
+    collapsePropertyTree(allSceneViewsGroupProperty);
+
+    handleSizeProperty =
+            doublePropertyManager->addProperty("handle size");
+    doublePropertyManager->setMinimum(handleSizeProperty, 0.01);
+    doublePropertyManager->setValue(handleSizeProperty, handleSize);
+    doublePropertyManager->setSingleStep(handleSizeProperty, 0.1);
+    allSceneViewsGroupProperty->addSubProperty(handleSizeProperty);
+
+    // Connect double property to actOnQtPropertyChange to handle user
+    // interaction with the double properties added.
+    connect(doublePropertyManager,
+            SIGNAL(propertyChanged(QtProperty*)),
+            SLOT(actOnQtPropertyChanged(QtProperty*)));
     // Connect click property to actOnQtPropertyChange to handle user
     // interaction with the click properties added.
     connect(clickPropertyManager,
@@ -243,6 +271,12 @@ const QStringList &MSystemManagerAndControl::getApplicationCommandLineArguments(
 const QDir& MSystemManagerAndControl::getMet3DHomeDir() const
 {
     return met3DHomeDir;
+}
+
+
+void MSystemManagerAndControl::setMet3DWorkingDirectory(QString workingDir)
+{
+    this->met3DWorkingDirectory = QDir(workingDir);
 }
 
 
@@ -518,6 +552,15 @@ void MSystemManagerAndControl::actOnQtPropertyChanged(QtProperty *property)
     else if (property == saveWindowLayoutProperty)
     {
         mainWindow->saveConfigurationToFile("");
+    }
+    else if (property == handleSizeProperty)
+    {
+        handleSize = doublePropertyManager->value(handleSizeProperty);
+        foreach (MSceneViewGLWidget *sceneView, registeredViews)
+        {
+            sceneView->onHandleSizeChanged();
+        }
+
     }
 }
 

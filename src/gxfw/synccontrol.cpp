@@ -307,8 +307,11 @@ MSyncControl::MSyncControl(QString id, QWidget *parent) :
     saveTAAction->setDefaultWidget(saveTAWidget);
     timeAnimationDropdownMenu->addAction(saveTAAction);
 
-    saveTADirectoryLabel = new QLabel(MSystemManagerAndControl::getInstance()
-                                      ->getMet3DHomeDir().absolutePath());
+    saveTADirectoryLabel = new QLabel(QDir::home().absoluteFilePath(
+                                          "met3d/screenshots"));
+    // Create default directory to save screenshots to if it does not exist
+    // already.
+    QDir().mkpath(saveTADirectoryLabel->text());
     saveTADirectoryLabel->setFixedWidth(175);
     // Set fixed size so the label won't expand the menu.
     saveTADirectoryLabel->setToolTip(saveTADirectoryLabel->text());
@@ -724,15 +727,26 @@ void MSyncControl::selectDataSources()
 }
 
 
-void MSyncControl::saveConfigurationToFile()
+void MSyncControl::saveConfigurationToFile(QString filename)
 {
-    QString filename = QFileDialog::getSaveFileName(
-                MGLResourcesManager::getInstance(),
-                "Save sync control configuration",
-                "data/synchronisation.synccontrol.conf",
-                "Sync control configuration files (*.synccontrol.conf)");
+    if (filename.isEmpty())
+    {
+        QString directory =
+                MSystemManagerAndControl::getInstance()
+                ->getMet3DWorkingDirectory().absoluteFilePath("config/synccontrol");
+        QDir().mkpath(directory);
+        filename = QFileDialog::getSaveFileName(
+                    MGLResourcesManager::getInstance(),
+                    "Save sync control configuration",
+                    QDir(directory).absoluteFilePath(getID()
+                                                     + ".synccontrol.conf"),
+                    "Sync control configuration files (*.synccontrol.conf)");
 
-    if (filename.isEmpty()) return;
+        if (filename.isEmpty())
+        {
+            return;
+        }
+    }
 
     LOG4CPLUS_DEBUG(mlog, "Saving configuration to " << filename.toStdString());
 
@@ -760,14 +774,22 @@ void MSyncControl::saveConfigurationToFile()
 }
 
 
-void MSyncControl::loadConfigurationFromFile()
+void MSyncControl::loadConfigurationFromFile(QString filename)
 {
-    QString filename = QFileDialog::getOpenFileName(
-                MGLResourcesManager::getInstance(),
-                "Load sync control configuration",
-                "data/config",
-                "Sync control configuration files (*.synccontrol.conf)");
-    if (filename.isEmpty()) return;
+    if (filename.isEmpty())
+    {
+        QString filename = QFileDialog::getOpenFileName(
+                    MGLResourcesManager::getInstance(),
+                    "Load sync control configuration",
+                    MSystemManagerAndControl::getInstance()
+                    ->getMet3DWorkingDirectory().absoluteFilePath("config/synccontrol"),
+                    "Sync control configuration files (*.synccontrol.conf)");
+
+        if (filename.isEmpty())
+        {
+            return;
+        }
+    }
 
     LOG4CPLUS_DEBUG(mlog, "Loading configuration from "
                     << filename.toStdString());
@@ -915,8 +937,7 @@ void MSyncControl::loadConfiguration(QSettings *settings)
     }
     saveTASceneViewsComboBox->setCurrentIndex(index);
 
-    QString defaultDir = MSystemManagerAndControl::getInstance()
-            ->getMet3DHomeDir().absolutePath();
+    QString defaultDir = QDir::home().absoluteFilePath("met3d/screenshots");
     QString dir = settings->value("directory", defaultDir).toString();
     QFileInfo info(dir);
     if (!(info.isDir() && info.isWritable()))
@@ -924,8 +945,12 @@ void MSyncControl::loadConfiguration(QSettings *settings)
         QMessageBox::warning(this, this->getID(),
                              "'" + dir
                              + "' either no directory or not writable.\n"
-                               "Setting directory to '" + defaultDir + "'.");
+                               "Setting image series save directory to '"
+                             + defaultDir + "'.");
         dir = defaultDir;
+        // Create default directory to save screenshots to if it does not exist
+        // already.
+        QDir().mkpath(defaultDir);
     }
     saveTADirectoryLabel->setToolTip(dir);
     saveTADirectoryLabel->setText(dir);

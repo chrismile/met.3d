@@ -86,6 +86,9 @@ public:
 
     const QDir& getMet3DHomeDir() const;
 
+    QDir& getMet3DWorkingDirectory() { return met3DWorkingDirectory; }
+    void setMet3DWorkingDirectory(QString workingDir);
+
     QtTreePropertyBrowser* getSystemPropertiesBrowser()
     { return systemPropertiesBrowser; }
 
@@ -176,6 +179,10 @@ public:
 
     bool isConnectedToMetview() { return connectedToMetview; }
 
+    double getHandleSize() { return handleSize; }
+    void setHandleSize(double handleSize)
+    { doublePropertyManager->setValue(handleSizeProperty, handleSize); }
+
 signals:
     void boundingBoxCreated();
     void boundingBoxDeleted(QString name);
@@ -221,20 +228,28 @@ private:
     QStringList commandLineArguments;
     QDir met3DHomeDir;
 
+    QDir met3DWorkingDirectory;
+
     QtTreePropertyBrowser *systemPropertiesBrowser;
 
     QtGroupPropertyManager               *groupPropertyManager;
     QtBoolPropertyManager                *boolPropertyManager;
     QtExtensions::QtDecoratedDoublePropertyManager
                                          *decoratedDoublePropertyManager;
+    QtDoublePropertyManager              *doublePropertyManager;
     QtEnumPropertyManager                *enumPropertyManager;
     QtStringPropertyManager              *stringPropertyManager;
     QtExtensions::QtClickPropertyManager *clickPropertyManager;
     QtColorPropertyManager               *colorPropertyManager;
 
+    QtProperty *appConfigGroupProperty;
     QtProperty *windowLayoutGroupProperty;
     QtProperty *loadWindowLayoutProperty;
     QtProperty *saveWindowLayoutProperty;
+
+    QtProperty *allSceneViewsGroupProperty;
+    QtProperty *handleSizeProperty;
+    double handleSize;
 
     QList<MSceneViewGLWidget*> registeredViews;
 

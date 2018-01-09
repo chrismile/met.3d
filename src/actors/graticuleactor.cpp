@@ -490,7 +490,8 @@ void MGraticuleActor::generateGeometry()
         // dividable by "deltalat". Thus, if llcrnrlat == 28.1 and deltalat == 5,
         // parallels will be drawn at 30, 35, .. etc.
         bool label = true;
-        float latstart = llcrnrlat - fmod(llcrnrlat, deltalat);
+        float latstart = ceil(llcrnrlat / deltalat) * deltalat;
+
         for (float lat = latstart; lat <= urcrnrlat; lat += deltalat)
         {
             verticesGraticule.append(QVector2D(llcrnrlon, lat));
@@ -512,7 +513,8 @@ void MGraticuleActor::generateGeometry()
         // Generate meridians (lines of constant longitude) and labels. NOTE that
         // meridians are also offset so that their position is dividable by
         // deltalon (see above).
-        float lonstart = llcrnrlon - fmod(llcrnrlon, deltalon);
+        float lonstart = ceil(llcrnrlon / deltalon) * deltalon;
+
         label = false;
         for (float lon = lonstart; lon <= urcrnrlon; lon += deltalon)
         {

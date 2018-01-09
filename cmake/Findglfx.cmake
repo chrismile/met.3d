@@ -7,8 +7,9 @@
 #       - GLFX_INCLUDE_DIR  - Package include directory
 #       - GLFX_LIBRARIES    - Package static libraries
 #
-#  Copyright 2016 Marc Rautenhaus
-#  Copyright 2016 Michael Kern
+#  Copyright 2016-2017 Marc Rautenhaus
+#  Copyright 2016      Michael Kern
+#  Copyright 2017      Bianca Tost
 #
 ####################################################################################################
 
@@ -47,6 +48,7 @@ find_library(${PKG_NAME}_LIBRARY_RELEASE
     PATHS
         ${COMMON_INSTALL_DIRS}
 )
+
 find_library(${PKG_NAME}_LIBRARY_DEBUG
     NAMES
         glfxd GLFXD
@@ -59,6 +61,19 @@ find_library(${PKG_NAME}_LIBRARY_DEBUG
     PATHS
         ${COMMON_INSTALL_DIRS}
 )
+
+find_file(${PKG_NAME}_PC_FILE
+        NAMES
+            glfx.pc
+        HINTS
+            $ENV{${PKG_NAME}_DIR}
+            ${PKG_LIBRARY_DIRS}
+        PATH_SUFFIXES
+            lib64/pkgconfig
+            lib/pkgconfig
+        PATHS
+            ${COMMON_INSTALL_DIRS}
+        )
 
 if (NOT ${PKG_NAME}_LIBRARY_DEBUG)
     message("Debug library for ${PKG_NAME} was not found")
@@ -81,9 +96,25 @@ elseif (${PKG_NAME}_LIBRARY_RELEASE)
             ${${PKG_NAME}_LIBRARY_RELEASE})
 endif ()
 
+if(WIN32)
+    # TODO Is there a way to get the version number of the glfx library under Windows?
+    # Mark library version as not found.
+    SET(${PKG_NAME}_VERSION "x.x.x")
+else()
+    # Parse .pc file to get used version of glfx.
+    pkg_check_modules(${PKG_NAME} REQUIRED ${${PKG_NAME}_PC_FILE})
+endif()
+
 include(FindPackageHandleStandardArgs)
 # handle the QUIETLY and REQUIRED arguments and set ${PGK_NAME}_FOUND to TRUE if
 # all listed variables are TRUE
 find_package_handle_standard_args(${PKG_NAME} REQUIRED_VARS ${PKG_NAME}_LIBRARIES ${PKG_NAME}_INCLUDE_DIR)
+
+# Extract major, minor and patch version from version string.
+string(REPLACE "." ";" ${PKG_NAME}_VERSION ${${PKG_NAME}_VERSION})
+list(GET ${PKG_NAME}_VERSION 0 ${PKG_NAME}_VERSION_MAJOR)
+list(GET ${PKG_NAME}_VERSION 1 ${PKG_NAME}_VERSION_MINOR)
+list(GET ${PKG_NAME}_VERSION 2 ${PKG_NAME}_VERSION_PATCH)
+
 # Marks cmake cached variables as advanced
 mark_as_advanced(${PKG_NAME}_INCLUDE_DIR ${PKG_NAME}_LIBRARIES)

@@ -159,12 +159,12 @@ public slots:
     /**
       Opens dialog to save configuration of sync control.
       */
-    void saveConfigurationToFile();
+    void saveConfigurationToFile(QString filename = "");
 
     /**
       Opens dialog to load configuration of sync control.
       */
-    void loadConfigurationFromFile();
+    void loadConfigurationFromFile(QString filename = "");
 
     /**
      Save sync control-specific configuration to the @ref QSettings object @p

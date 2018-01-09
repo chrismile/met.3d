@@ -43,11 +43,12 @@ namespace netCDF
 {
 
 /**
-  Inline function defined depending on the version of NetCDF library since the
-  signatur of @ref NcException() changed from version 4.2 to 4.3.
+  Inline function defined depending on the version of NetCDF-4 C++ library since
+  the signatur of @ref NcException() changed from version 4.2 to 4.3.
 */
-#if NetCDFCXX4_VERSION_MAJOR >= 4 && NetCDFCXX4_VERSION_MINOR >= 3
-// Newer version of netCDF
+#if NetCDFCXX4_VERSION_MAJOR > 4 || (NetCDFCXX4_VERSION_MAJOR == 4 \
+    && NetCDFCXX4_VERSION_MINOR >= 3)
+// Newer version of NetCDF-4 C++
 inline netCDF::exceptions::NcException MNcException(
         const std::string& exceptionName, const std::string& complaint,
         const char* fileName, int lineNumber)
@@ -57,7 +58,7 @@ inline netCDF::exceptions::NcException MNcException(
                                            lineNumber);
 }
 #else
-// Older version of netCDF
+// Older version of NetCDF-4 C++
 inline netCDF::exceptions::NcException MNcException(
         const std::string& exceptionName, const std::string& complaint,
         const char* fileName, int lineNumber)

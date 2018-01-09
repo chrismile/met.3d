@@ -193,28 +193,35 @@ include_directories(${GDAL_INCLUDE_DIR})
 find_package(GSL REQUIRED)
 include_directories(${GSL_INCLUDE_DIRS})
 
-# Grib-API
-find_package(grib_api REQUIRED)
-include_directories(${grib_api_INCLUDE_DIR})
+# eccodes
+find_package(eccodes REQUIRED)
+include_directories(${eccodes_INCLUDE_DIR})
 
 # Netcdf
 find_package(netcdf_cxx4 REQUIRED)
 include_directories(${netcdf_cxx4_INCLUDE_DIR})
 include_directories(${netcdf_cxx4_C_INCLUDE_DIR})
 
-# Add global defines for netcdf cxx4 library version checking.
+# Add netcdf cxx4 library version as preprocessor definitions.
 add_definitions(-DNetCDFCXX4_VERSION_MAJOR=${netcdf_cxx4_VERSION_MAJOR}
-                -DNetCDFCXX4_VERSION_MINOR=${netcdf_cxx4_VERSION_MINOR})
+                -DNetCDFCXX4_VERSION_MINOR=${netcdf_cxx4_VERSION_MINOR}
+                -DNetCDFCXX4_VERSION_PATCH=${netcdf_cxx4_VERSION_PATCH})
 
 # QCustomPlot
 find_package(qcustomplot REQUIRED)
 include_directories(${qcustomplot_INCLUDE_DIR})
-# Add major version as preprocessor definition.
+# Add QCustomPlot library version as preprocessor definitions.
 add_definitions(-DQCPLOT_MAJOR_VERSION=${qcustomplot_MAJOR_VERSION})
+add_definitions(-DQCPLOT_MINOR_VERSION=${qcustomplot_MINOR_VERSION})
+add_definitions(-DQCPLOT_PATCH_VERSION=${qcustomplot_PATCH_VERSION})
 
 # GLFX
 find_package(glfx REQUIRED)
 include_directories(${glfx_INCLUDE_DIR})
+# Add glfx library version as preprocessor definitions.
+add_definitions(-DGLFX_VERSION_MAJOR=${glfx_VERSION_MAJOR}
+                -DGLFX_VERSION_MINOR=${glfx_VERSION_MINOR}
+                -DGLFX_VERSION_PATCH=${glfx_VERSION_PATCH})
 
 # Eigen3
 #find_package(Eigen3 REQUIRED)
@@ -290,7 +297,7 @@ target_link_libraries(Met3D
                         ${GDAL_LIBRARY}
                         ${GSL_LIBRARIES}
                         ${log4cplus_LIBRARIES}
-                        ${grib_api_LIBRARIES}
+                        ${eccodes_LIBRARIES}
                         ${netcdf_cxx4_LIBRARIES}
                         ${netcdf_cxx4_C_LIBRARIES}
                         ${qcustomplot_LIBRARIES}

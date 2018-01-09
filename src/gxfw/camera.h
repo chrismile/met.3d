@@ -144,8 +144,8 @@ public:
       */
     void rotateWorldSpace(float angle, float x, float y, float z);
 
-    void saveToFile(QString filename);
-    void loadFromFile(QString filename);
+    void saveConfigurationToFile(QString filename = "");
+    void loadConfigurationFromFile(QString filename  = "");
 
     void saveConfiguration(QSettings *settings);
     void loadConfiguration(QSettings *settings);
