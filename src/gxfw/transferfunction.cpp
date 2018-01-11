@@ -159,11 +159,7 @@ void MTransferFunction::loadConfiguration(QSettings *settings)
 {
     // For compatibilty with versions < 1.2.
     QStringList versionString = readConfigVersionID(settings);
-    if (versionString[0].toInt() >= 1 && versionString[1].toInt() >= 2)
-    {
-        settings->beginGroup(MTransferFunction::getSettingsID());
-    }
-    else
+    if (versionString[0].toInt() <= 1  && versionString[1].toInt() < 2)
     {
         if (MTransferFunction1D *tf = dynamic_cast<MTransferFunction1D*>(this))
         {
@@ -174,6 +170,10 @@ void MTransferFunction::loadConfiguration(QSettings *settings)
         {
             settings->beginGroup(tf->getSettingsID());
         }
+    }
+    else
+    {
+        settings->beginGroup(MTransferFunction::getSettingsID());
     }
 
     // Properties related to labelling the colour bar.
