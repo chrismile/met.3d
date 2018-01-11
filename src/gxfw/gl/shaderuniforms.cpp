@@ -532,10 +532,13 @@ void MShaderEffect
 
 void MShaderEffect
 ::setUniformMatrixXY(const QString name, const int8_t count,
-                        const int8_t cols, const int8_t rows,
-                        const GLenum type, const qreal* data)
+                     const int8_t cols, const int8_t rows,
+                     const GLenum type, const qreal* data)
 {
-    if (currentProgram.second == -1) { return; }
+    if (currentProgram.second == -1)
+    {
+        return;
+    }
 
     // QMatrix must not be transposed! --> GL_FALSE
     std::shared_ptr<Uniform>& uniform = getUniform(name);
@@ -567,10 +570,13 @@ void MShaderEffect
 
 void MShaderEffect
 ::setUniformMatrixXY(const QString name, const int8_t count,
-                        const int8_t cols, const int8_t rows,
-                        const GLenum type, const float* data)
+                     const int8_t cols, const int8_t rows,
+                     const GLenum type, const float* data)
 {
-    if (currentProgram.second == -1) { return; }
+    if (currentProgram.second == -1)
+    {
+        return;
+    }
 
     // QMatrix must not be transposed! --> GL_FALSE
     std::shared_ptr<Uniform>& uniform = getUniform(name);

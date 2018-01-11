@@ -110,7 +110,7 @@ endif(UNIX)
 
 
 ##############################################################################
-#                      Required Qt4 Libraries                                #
+#                      Required Qt Libraries                                #
 ##############################################################################
 
 # TODO! does not work with cmake command in terminal
@@ -127,13 +127,13 @@ set(CMAKE_AUTOMOC ON) # instead of using the macro QT4_WRAP_CPP
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 cmake_policy(SET CMP0020 NEW)
 
-option(MET3D_FORCE_QT4 "Build with Qt4 even if Qt5 could be found." OFF)
+option(FORCE_USE_QT4 "Build with Qt4 even if Qt5 is available." OFF)
 
-if(NOT MET3D_FORCE_QT4)
+if(NOT FORCE_USE_QT4)
     find_package(Qt5 COMPONENTS Core Widgets Gui OpenGL Xml Network Concurrent)
 endif()
 
-if(MET3D_FORCE_QT4
+if(FORCE_USE_QT4
         OR NOT Qt5_FOUND)
     find_package(Qt4 4.8 REQUIRED QTCORE QTGUI QTOPENGL QTXML QTNETWORK)
     include(${QT_USE_FILE})
@@ -142,12 +142,10 @@ else()
     set(USE_QT4 FALSE)
 endif()
 
-
-# Qt4 forms / designer forms
+# Qt forms / designer forms
 file (GLOB_RECURSE  MET3D_UIS 	src/*.ui)
-# Qt4 resources
-file (GLOB_RECURSE  MET3D_RCS   "../third-party/*.qrc"
-								"src/*.qrc")
+# Qt resources
+file (GLOB_RECURSE  MET3D_RCS   "../third-party/*.qrc"  "src/*.qrc")
 
 if(USE_QT4)
     # Build cpp and header from UI forms

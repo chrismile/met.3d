@@ -32,6 +32,7 @@
 // related third party imports
 #include <GL/glew.h>
 #include <QtCore>
+#include <QVector2D>
 #include <QtProperty>
 
 // local application imports

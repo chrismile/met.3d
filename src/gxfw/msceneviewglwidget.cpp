@@ -1240,12 +1240,15 @@ void MSceneViewGLWidget::initializeGL()
     glEnable(GL_BLEND);
 
     // Initialise the not shared OpenGL resources of the scene's actors.
-    if (scene) {
-        LOG4CPLUS_DEBUG(mlog, "initialising not shared OpenGL resources of "
+    if (scene)
+    {
+        LOG4CPLUS_DEBUG(mlog, "initialising not-shared OpenGL resources of "
                         << "the scene's actors..");
         const QVector<MActor*>& renderQueue = scene->getRenderQueue();
         for (int i = 0; i < renderQueue.size(); i++)
+        {
             renderQueue[i]->initializePerGLContextResources(this);
+        }
 
         updateSceneLabel();
     }
@@ -2013,13 +2016,16 @@ void MSceneViewGLWidget::updateSceneLabel()
     {
         return;
     }
+
     // Remove the old scene description label from the list of static labels.
     for (int i = 0; i < staticLabels.size(); i++)
+    {
         if (staticLabels[i] == sceneNameLabel)
         {
             staticLabels.removeAt(i);
             MGLResourcesManager::getInstance()->getTextManager()->removeText(sceneNameLabel);
         }
+    }
 
     // Create a new scene description label (view number and scene name in
     // lower left corner of the view).
