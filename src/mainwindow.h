@@ -32,6 +32,7 @@
 // related third party imports
 #include <QMainWindow>
 #include <QVector>
+#include <QSplitter>
 
 // local application imports
 #include "util/mutil.h"

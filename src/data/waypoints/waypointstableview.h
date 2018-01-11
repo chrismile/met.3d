@@ -30,10 +30,8 @@
 // standard library imports
 
 // related third party imports
-#include <QtGui>
-#include <QtCore>
 #include <QMessageBox>
-#include <QtGui/QFileDialog>
+#include <QFileDialog>
 
 // local application imports
 #include <data/waypoints/waypointstablemodel.h>

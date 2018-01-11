@@ -27,9 +27,6 @@
 #ifndef SHADEREFFECT_H
 #define SHADEREFFECT_H
 
-#include "GL/glfx.h"
-#include "GL/glew.h"
-
 #include <string>
 #include <iostream>
 #include <unordered_map>
@@ -37,8 +34,11 @@
 #include <assert.h>
 #include <memory>
 
-#include <QtCore>
-#include <QtGui>
+#include <QMatrix2x2>
+#include <QMatrix3x3>
+
+#include "GL/glfx.h"
+#include "GL/glew.h"
 
 //! TODO
 //! o simplify / delete some hashmaps?
@@ -443,6 +443,10 @@ protected:
     void setUniformMatrixXY(const QString name, const int8_t count,
                             const int8_t cols, const int8_t rows,
                             const GLenum type, const qreal* data);
+
+    void setUniformMatrixXY(const QString name, const int8_t count,
+                            const int8_t cols, const int8_t rows,
+                            const GLenum type, const float* data);
 
 };
 

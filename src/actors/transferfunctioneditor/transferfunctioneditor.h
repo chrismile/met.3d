@@ -49,12 +49,16 @@
 #include <QComboBox>
 #include <QLinearGradient>
 #include <QMouseEvent>
-#include <qcustomplot.h>
 
 // local application imports
 #include "colour.h"
 #include "editortransferfunction.h"
 #include "colourpicker.h"
+
+// forward declarations
+class QCustomPlot;
+class QCPGraph;
+
 
 namespace Met3D
 {
@@ -423,7 +427,6 @@ protected:
 private:
     MColourFunction *colourFunction;
 };
-
 
 class MChannelsWidget : public QWidget
 {

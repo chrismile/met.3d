@@ -30,7 +30,9 @@
 #include <limits>
 
 // related third party imports
-#include <QtConcurrentRun>
+#include <QThread>
+#include <QString>
+#include <qtconcurrentrun.h>
 #include <log4cplus/loggingmacros.h>
 
 // local application imports

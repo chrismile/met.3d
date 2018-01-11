@@ -31,6 +31,7 @@
 // related third party imports
 #include <QMessageBox>
 #include <QFileInfo>
+#include <QFileDialog>
 
 // local application imports
 #include "util/mutil.h"

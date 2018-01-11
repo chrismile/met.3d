@@ -1,4 +1,5 @@
 *.o
+*.swp
 Debug
 Release
 *.moc
@@ -18,3 +19,5 @@ Met3D_automoc.cpp
 cmake_install.cmake
 __
 build
+.idea
+cmake-build-*

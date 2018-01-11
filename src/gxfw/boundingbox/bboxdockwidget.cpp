@@ -34,6 +34,9 @@
 // related third party imports
 #include <log4cplus/loggingmacros.h>
 #include <QDoubleSpinBox>
+#include <QInputDialog>
+#include <QFileDialog>
+#include <QKeyEvent>
 
 // local application imports
 #include "util/mutil.h"

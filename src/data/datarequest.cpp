@@ -28,6 +28,7 @@
 // standard library imports
 
 // related third party imports
+#include <QStringList>
 
 // local application imports
 

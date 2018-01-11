@@ -31,6 +31,11 @@
 #include <iostream>
 
 // related third party imports
+#include <QDockWidget>
+#include <QDesktopServices>
+#include <QDesktopWidget>
+#include <QCloseEvent>
+
 #include <log4cplus/loggingmacros.h>
 #include <log4cplus/version.h>
 #include <eccodes.h>

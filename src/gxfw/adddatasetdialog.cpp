@@ -30,6 +30,7 @@
 // standard library imports
 
 // related third party imports
+#include <QFileDialog>
 
 // local application imports
 #include "mglresourcesmanager.h"

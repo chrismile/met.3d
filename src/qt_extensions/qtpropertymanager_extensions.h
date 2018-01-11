@@ -76,10 +76,10 @@
 // standard library imports
 
 // related third party imports
-#include <QtGui/QApplication>
+#include <QApplication>
 #include <QtCore/QMap>
-#include <QtGui/QDoubleSpinBox>
-#include <QtGui/QToolButton>
+#include <QDoubleSpinBox>
+#include <QToolButton>
 #include "qtpropertybrowser.h"
 #include "qteditorfactory.h"
 #include "qttreepropertybrowser.h"
@@ -88,6 +88,9 @@
 
 // local application imports
 
+#ifndef Q_TYPENAME
+#define Q_TYPENAME typename
+#endif
 
 namespace QtExtensions
 {

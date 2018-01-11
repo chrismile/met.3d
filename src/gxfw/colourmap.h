@@ -34,8 +34,11 @@
 
 
 // related third party imports
-#include <QtGui>
 #include <gsl/gsl_interp.h>
+#include <QColor>
+#include <QString>
+#include <QStringList>
+#include <QMap>
 
 // local application imports
 

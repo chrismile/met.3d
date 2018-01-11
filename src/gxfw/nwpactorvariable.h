@@ -33,6 +33,7 @@
 #include <GL/glew.h>
 #include <QtCore>
 #include <QtProperty>
+#include <QSpinBox>
 
 // local application imports
 #include "gxfw/gl/texture.h"

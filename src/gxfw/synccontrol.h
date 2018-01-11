@@ -30,8 +30,17 @@
 // standard library imports
 
 // related third party imports
-#include <QtCore>
-#include <QtGui>
+#include <QHBoxLayout>
+#include <QPushButton>
+#include <QActionGroup>
+#include <QWidgetAction>
+#include <QDateTimeEdit>
+#include <QSpinBox>
+#include <QSet>
+#include <QComboBox>
+#include <QLabel>
+#include <QCheckBox>
+#include <QSettings>
 
 // local application imports
 #include "util/mstopwatch.h"
