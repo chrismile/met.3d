@@ -40,7 +40,6 @@
 #include <log4cplus/version.h>
 #include <eccodes.h>
 #include <gsl/gsl_version.h>
-#include <hdf5.h>
 #include <netcdf_meta.h>
 
 // local application imports
@@ -1179,12 +1178,12 @@ void MMainWindow::showAboutDialog()
             " <td> eccodes: %12 </td>"
             "</tr>"
             "<tr> "
-            "<td> GSL: %13 </td> <td> HDF5: %14.%15.%16 </td>"
-            " <td> LOG4CPLUS: %17 </td>"
+            "<td> GSL: %13 </td> <td> LOG4CPLUS: %14 </td>"
+            " <td> NetCDF: %15 </td>"
             "</tr>"
             "<tr> "
-            "<td> NetCDF: %18 </td> <td> NetCDF-4 C++: %19.%20.%21 </td>"
-            " <td> QCustomPlot: %22.%23.%24 </td>"
+            "<td> NetCDF-4 C++: %16.%17.%18 </td>"
+            " <td> QCustomPlot: %19.%20.%21 </td>"
             "</tr>"
             "</table>"
             "Note: If a version is listed as x.x.x, Met.3D wasn't able to find"
@@ -1203,7 +1202,6 @@ void MMainWindow::showAboutDialog()
             .arg(QString(reinterpret_cast<const char *>(gluGetString(GLU_VERSION))))
             .arg(ECCODES_VERSION_STR)
             .arg(GSL_VERSION)
-            .arg(H5_VERS_MAJOR).arg(H5_VERS_MINOR).arg(H5_VERS_RELEASE)
             .arg(LOG4CPLUS_VERSION_STR)
             .arg(NC_VERSION)
 #if defined(NetCDFCXX4_VERSION_MAJOR) && defined(NetCDFCXX4_VERSION_MINOR) \
