@@ -71,9 +71,10 @@ void checkOpenGLError(const char* file, int line)
 
 QStringList readConfigVersionID(QSettings *settings)
 {
-    QStringList groupList = settings->group().split("/");
+    QStringList groupList = settings->group().split("/",
+                                                    QString::SkipEmptyParts);
     // To get to FileFormat group end all current groups.
-    for (int i = 0; i < groupList.size(); i ++)
+    for (int i = 0; i < groupList.size(); i++)
     {
         settings->endGroup();
     }
@@ -83,10 +84,9 @@ QStringList readConfigVersionID(QSettings *settings)
                                              defaultConfigVersion).toString());
     settings->endGroup();
 
-    QStringList versionList = versionString.split(".");
-
-    // remove -devel from patch-id.
-    versionList[2] = (versionList[2].split("-"))[0];
+    // Remove appendix.
+    QStringList versionList = versionString.split("-");
+    versionList = versionList.first().split(".");
 
     // Restore group state from before entering this function.
     foreach (QString groupName, groupList)
