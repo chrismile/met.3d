@@ -106,7 +106,9 @@ void MNaturalEarthDataLoader::loadLineGeometry(GeometryType        type,
                                                QVector<QVector2D> *vertices,
                                                QVector<int>       *startIndices,
                                                QVector<int>       *count,
-                                               bool                append)
+                                               bool                append,
+                                               double              offset,
+                                               int                 shiftedCopies)
 {
     if (gdalDataSet.size() < 2)
     {
@@ -125,6 +127,12 @@ void MNaturalEarthDataLoader::loadLineGeometry(GeometryType        type,
         startIndices->clear();;
         count->clear();
     }
+
+    // Starting points of the arrays which might be copied later. (Since the
+    // startIndices array is not copied but filled with new values, we don't
+    // need its starting point.)
+    int verticesStart = vertices->size();
+    int countStart = count->size();
 
     // NaturalEarth shapefiles only contain one layer. (Do shapefiles in
     // general contain only one layer?)
@@ -170,7 +178,7 @@ void MNaturalEarthDataLoader::loadLineGeometry(GeometryType        type,
                 iLine->getPoints(v);
                 for (int i = 0; i < numLinePoints; i++)
                 {
-                    vertices->append(QVector2D(v[i].x, v[i].y));
+                    vertices->append(QVector2D(v[i].x + offset, v[i].y));
                 }
                 delete[] v;
             }
@@ -190,7 +198,7 @@ void MNaturalEarthDataLoader::loadLineGeometry(GeometryType        type,
                     iLine->getPoints(v);
                     for (int i = 0; i < numLinePoints; i++)
                     {
-                        vertices->append(QVector2D(v[i].x, v[i].y));
+                        vertices->append(QVector2D(v[i].x + offset, v[i].y));
                     }
                     delete[] v;
                 }
@@ -202,6 +210,27 @@ void MNaturalEarthDataLoader::loadLineGeometry(GeometryType        type,
         count->append(vertices->size() - startIndices->last());
     }
 
+    int countSize = count->size();
+    int bound = count->size();
+    // Offset of the copy with regard to the geometry loaded in the first step.
+    double localOffset = 360.;
+    for (int i = 0; i < shiftedCopies; ++i)
+    {
+        // Reset vertex index to the starting position for each copy.
+        int v = verticesStart;
+        for (int c = countStart; c < countSize; ++c)
+        {
+            count->append(count->at(c));
+            bound = v + count->at(c);
+            startIndices->append(vertices->size());
+            for (; v < bound; ++v)
+            {
+                vertices->append(QVector2D(vertices->at(v).x() + localOffset,
+                                           vertices->at(v).y()));
+            }
+        }
+        localOffset += 360.;
+    }
     // Clean up.
 	OGRGeometryFactory::destroyGeometry(bboxPolygon);
 }
@@ -235,7 +264,15 @@ void MNaturalEarthDataLoader::loadAndRotateLineGeometry(
     OGRLayer *layer;
     layer = gdalDataSet[type]->GetLayer(0);
 
-    OGRPolygon *bboxPolygon = getBBoxPolygon(&bbox);
+    // Create bounding box with coordinates mapped to the range [-180, 180] in
+    // longitude without "wrapping" the bounding box around (i.e. the east
+    // border must not be smaller than the west border). We apply this mapping
+    // since the rotation maps all values to this range and the line geometries
+    // are only defined on this range.
+    QRectF bboxTransformed = bbox;
+    bboxTransformed.setX(MMOD(bbox.x() + 180., 360.) - 180.);
+    bboxTransformed.setWidth(min(bbox.width(), 180. - bboxTransformed.x()));
+    OGRPolygon *bboxPolygon = getBBoxPolygon(&bboxTransformed);
 
     // Variables used to get rid of lines crossing the whole domain.
     // (Conntection of the right most and the left most vertex)
@@ -344,6 +381,22 @@ void MNaturalEarthDataLoader::loadAndRotateLineGeometry(
     // Clean up.
     OGRGeometryFactory::destroyGeometry(bboxPolygon);
     delete point;
+
+    // If we have loaded only a part of the line geometry, load the missing
+    // geometry by calling the method again with an adapted bounding box.
+    // This might happen if the bounding box "falls appart" into two segments
+    // when mapped to the range [-180, 180] in longitude with regard to sphere
+    // coordinates.
+    if (bbox.width() > bboxTransformed.width())
+    {
+        double width = bboxTransformed.width();
+        bboxTransformed.setX(-180.);
+        bboxTransformed.setWidth(min(bbox.width(), 360.) - width);
+        loadAndRotateLineGeometry(
+                type, bboxTransformed, vertices, startIndices, count, true,
+                poleLat, poleLon);
+
+    }
 }
 
 
