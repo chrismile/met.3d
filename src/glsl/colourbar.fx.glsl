@@ -209,7 +209,7 @@ shader FSspatialTF(in VStoFS Input, out vec4 fragColour)
  ***                             PROGRAMS
  *****************************************************************************/
 
-program Standard
+program colourbarTF
 {
     vs(330)=VSmain();
     fs(330)=FSmain();

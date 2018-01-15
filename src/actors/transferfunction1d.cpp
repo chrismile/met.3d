@@ -1001,7 +1001,7 @@ void MTransferFunction1D::renderToCurrentContext(MSceneViewGLWidget *sceneView)
     // First draw the colourbar itself. glPolygonOffset is used to displace
     // the colourbar's z-value slightly to the back, to that the frame drawn
     // afterwards is rendered correctly.
-    colourbarShader->bind();
+    colourbarShader->bindProgram("colourbarTF");
     colourbarShader->setUniformValue("transferTexture", textureUnit);
     colourbarShader->setUniformValue("enableAlpha", GLboolean(enableAlpha));
 
