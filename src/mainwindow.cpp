@@ -1240,7 +1240,17 @@ void MMainWindow::resizeWindow()
 
 void MMainWindow::switchSession(QAction *sessionAction)
 {
-    sessionManagerDialog->switchToSession(sessionAction->text());
+    QString sessionName = sessionAction->text();
+
+    // Issue that appeared with Qt5: The session names under Linux start
+    // with an "&" that shouldn't be there. Workaround: Remove a preceding
+    // "&" character.
+    if (sessionName.startsWith("&"))
+    {
+        sessionName.remove(0, 1);
+    }
+
+    sessionManagerDialog->switchToSession(sessionName);
 }
 
 
