@@ -98,8 +98,10 @@ typedef QHash<QString, MFileInfo*> MOpenFileMap;
 class MClimateForecastReader : public MWeatherPredictionReader
 {
 public:
-    MClimateForecastReader(QString identifier,
-                           bool treatRotatedGridAsRegularGrid=false);
+    MClimateForecastReader(
+            QString identifier,
+            bool treatRotatedGridAsRegularGrid=false,
+            bool convertGeometricHeightToPressure_ICAOStandard=false);
     ~MClimateForecastReader();
 
     QList<MVerticalLevelType> availableLevelTypes();
@@ -171,6 +173,7 @@ protected:
     bool parseCfStandardNameFile(const QString& filename);
 
     bool treatRotatedGridAsRegularGrid;
+    bool convertGeometricHeightToPressure_ICAOStandard;
 };
 
 

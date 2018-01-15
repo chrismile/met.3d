@@ -1106,7 +1106,8 @@ void MMainWindow::addDataset()
                     pipelineConfig.enableRegridding,
                     pipelineConfig.enableProbabiltyRegionFilter,
                     pipelineConfig.treatRotatedGridAsRegularGrid,
-                    pipelineConfig.surfacePressureFieldType);
+                    pipelineConfig.surfacePressureFieldType,
+                    pipelineConfig.convertGeometricHeightToPressure_ICAOStandard);
     }
 }
 
