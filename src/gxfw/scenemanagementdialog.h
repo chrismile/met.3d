@@ -35,6 +35,7 @@
 #include <QListWidgetItem>
 #include <QComboBox>
 #include <QFileDialog>
+#include <QSortFilterProxyModel>
 
 #include "gxfw/actorcreationdialog.h"
 
