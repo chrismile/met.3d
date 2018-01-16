@@ -155,10 +155,16 @@ shader GSmain(out float lon)
     }
 
     // Emit vertices according to the case determined above.
+    //         ___
+    // case:  |   |
+    //        |___|
     if (bitfield == 0)
     {
         EndPrimitive();
     }
+    //         ___
+    // case:  |   |
+    //        |\__|
     else if (bitfield == 1)
     {
         gl_Position = computeVertexClipSpaceCoordinates(
@@ -171,6 +177,9 @@ shader GSmain(out float lon)
         EmitVertex();
         EndPrimitive();
     }
+    //         ___
+    // case:  |   |
+    //        |__/|
     else if (bitfield == 2)
     {
         gl_Position = computeVertexClipSpaceCoordinates(
@@ -183,6 +192,9 @@ shader GSmain(out float lon)
         EmitVertex();
         EndPrimitive();
     }
+    //         ___
+    // case:  |___|
+    //        |___|
     else if (bitfield == 3)
     {
         gl_Position = computeVertexClipSpaceCoordinates(
@@ -195,6 +207,9 @@ shader GSmain(out float lon)
         EmitVertex();
         EndPrimitive();
     }
+    //         ___
+    // case:  |/  |
+    //        |___|
     else if (bitfield == 4)
     {
         gl_Position = computeVertexClipSpaceCoordinates(
@@ -207,6 +222,9 @@ shader GSmain(out float lon)
         EmitVertex();
         EndPrimitive();
     }
+    //         ___
+    // case:  | | |
+    //        |_|_|
     else if (bitfield == 5)
     {
         gl_Position = computeVertexClipSpaceCoordinates(
@@ -219,27 +237,69 @@ shader GSmain(out float lon)
         EmitVertex();
         EndPrimitive();
     }
+    //         ___        ___
+    // case:  |  \|  or  |/  |
+    //        |\__|      |__/|
     else if (bitfield == 6)
     {
-        gl_Position = computeVertexClipSpaceCoordinates(
-                    ll_worldposition, ul_worldposition, ll_intensity,
-                    ul_intensity, isoValue, lon);
-        EmitVertex();
-        gl_Position = computeVertexClipSpaceCoordinates(
-                    ll_worldposition, lr_worldposition, ll_intensity,
-                    lr_intensity, isoValue, lon);
-        EmitVertex();
-        EndPrimitive();
-        gl_Position = computeVertexClipSpaceCoordinates(
-                    ul_worldposition, ur_worldposition, ul_intensity,
-                    ur_intensity, isoValue, lon);
-        EmitVertex();
-        gl_Position = computeVertexClipSpaceCoordinates(
-                    lr_worldposition, ur_worldposition, lr_intensity,
-                    ur_intensity, isoValue, lon);
-        EmitVertex();
-        EndPrimitive();
+        float midValue = (ll_intensity + ul_intensity + lr_intensity + ur_intensity) / 4.0;
+
+        bool mid_sign = midValue > isoValue;
+        bool ll_sign = ll_intensity > isoValue;
+        bool ur_sign = ur_intensity > isoValue;
+
+        //         ___
+        // case:  |/  |
+        //        |__/|
+        if (ll_sign == mid_sign)
+        {
+            gl_Position = computeVertexClipSpaceCoordinates(
+                        ll_worldposition, ul_worldposition,
+                        ll_intensity, ul_intensity, isoValue, lon);
+            EmitVertex();
+            gl_Position = computeVertexClipSpaceCoordinates(
+                        ul_worldposition, ur_worldposition,
+                        ul_intensity, ur_intensity, isoValue, lon);
+            EmitVertex();
+            EndPrimitive();
+            gl_Position = computeVertexClipSpaceCoordinates(
+                        ur_worldposition, lr_worldposition,
+                        ur_intensity, lr_intensity, isoValue, lon);
+            EmitVertex();
+            gl_Position = computeVertexClipSpaceCoordinates(
+                        ll_worldposition, lr_worldposition,
+                        ll_intensity, lr_intensity, isoValue, lon);
+            EmitVertex();
+            EndPrimitive();
+        }
+        //         ___
+        // case:  |  \|
+        //        |\__|
+        else
+        {
+            gl_Position = computeVertexClipSpaceCoordinates(
+                        ll_worldposition, ul_worldposition, ll_intensity,
+                        ul_intensity, isoValue, lon);
+            EmitVertex();
+            gl_Position = computeVertexClipSpaceCoordinates(
+                        ll_worldposition, lr_worldposition, ll_intensity,
+                        lr_intensity, isoValue, lon);
+            EmitVertex();
+            EndPrimitive();
+            gl_Position = computeVertexClipSpaceCoordinates(
+                        ul_worldposition, ur_worldposition, ul_intensity,
+                        ur_intensity, isoValue, lon);
+            EmitVertex();
+            gl_Position = computeVertexClipSpaceCoordinates(
+                        lr_worldposition, ur_worldposition, lr_intensity,
+                        ur_intensity, isoValue, lon);
+            EmitVertex();
+            EndPrimitive();
+        }
     }
+    //         ___
+    // case:  |  \|
+    //        |___|
     else if (bitfield == 7)
     {
         gl_Position = computeVertexClipSpaceCoordinates(
