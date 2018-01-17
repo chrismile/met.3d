@@ -420,7 +420,7 @@ void MStructuredGridStatisticsAnalysisControl::adaptToPlotAxesChange()
     // text written in one line.
     if (histogramDisplayMode == RELATIVE_FREQUENCY_DISTRIBUTION)
     {
-        QString axisLabel = "relative frequency";
+        QString axisLabel = "relative frequency (%)";
         QFontMetrics fontMetrics(histogram->yAxis->labelFont());
         int axisLabelWidth = fontMetrics.width(axisLabel);
         if (histogram->yAxis->axisRect()->height() >= axisLabelWidth)
@@ -429,7 +429,7 @@ void MStructuredGridStatisticsAnalysisControl::adaptToPlotAxesChange()
         }
         else
         {
-            histogram->yAxis->setLabel("relative\nfrequency");
+            histogram->yAxis->setLabel("relative\nfrequency (%)");
         }
     }
     else
