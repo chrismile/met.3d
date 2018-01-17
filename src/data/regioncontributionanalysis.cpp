@@ -578,7 +578,7 @@ void MRegionContributionAnalysisControl::plotHistogram(
     QList<QCPBars*> featureOverlapBars;
     for (int i = 0; i < cresult->maxMemberFeatures; i++)
     {
-        // Crate bars that represent the features' size.
+        // Create bars that represent the features' size.
         QCPBars *bars = new QCPBars(plot->xAxis, plot->yAxis);
         featureBars.append(bars);
 // addPlottable method was removed from qcustomplot library with version 2.0.0.

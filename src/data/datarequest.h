@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2017      Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -79,6 +80,8 @@ public:
     bool containsAll(const QList<QString> &keys) const;
 
     float floatValue(const QString &key) const;
+
+    double doubleValue(const QString &key) const;
 
     int intValue(const QString &key) const;
 
