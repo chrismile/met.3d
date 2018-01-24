@@ -94,7 +94,9 @@ public:
         // 2D regular lat/lon grid with hybrid model level as third dimension
         LAT_LON_HYBRID = 4,
         // 2D regular lat/lon grid with potential vorticity as third dimension
-        LAT_LON_PVU    = 5
+        LAT_LON_PVU    = 5,
+        // 2D regular lat/lon grid with geometric height as third dimension
+        LAT_LON_Z      = 6
     };
 
     /**
@@ -161,6 +163,14 @@ public:
       PVU variable. If no PVU dimension exists, an @ref NcException is thrown.
       */
     NcVar getVerticalCoordinatePotVort();
+
+    /**
+      If the CF variable represented by this object has a geometric height
+      dimension, getVerticalCoordinateGeometricHeight() returns the
+      corresponding geometric height variable. If no geometric height dimension
+      exists, an @ref NcException is thrown.
+      */
+    NcVar getVerticalCoordinateGeometricHeight();
 
     /**
       Returns TRUE if this CF variable has an ensemble dimension.

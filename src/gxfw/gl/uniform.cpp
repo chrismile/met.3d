@@ -92,7 +92,6 @@ GLenum MShaderEffect::Uniform::getType() const
     return type;
 }
 
-
 bool MShaderEffect::Uniform::setUniform(const GLenum inputType,
                                         const void* data,
                                         const GLuint count,
@@ -153,42 +152,42 @@ bool MShaderEffect::Uniform::setUniform(const GLenum inputType,
 
 
     case GL_FLOAT_MAT2:
-        glUniformMatrix2fv(location, count, FALSE, static_cast<const GLfloat*>(data)); break;
+        glUniformMatrix2fv(location, count, GL_FALSE, static_cast<const GLfloat*>(data)); break;
     case GL_FLOAT_MAT3:
-        glUniformMatrix3fv(location, count, FALSE, static_cast<const GLfloat*>(data)); break;
+        glUniformMatrix3fv(location, count, GL_FALSE, static_cast<const GLfloat*>(data)); break;
     case GL_FLOAT_MAT4:
-        glUniformMatrix4fv(location, count, FALSE, static_cast<const GLfloat*>(data)); break;
+        glUniformMatrix4fv(location, count, GL_FALSE, static_cast<const GLfloat*>(data)); break;
     case GL_FLOAT_MAT2x3:
-        glUniformMatrix2x3fv(location, count, FALSE, static_cast<const GLfloat*>(data)); break;
+        glUniformMatrix2x3fv(location, count, GL_FALSE, static_cast<const GLfloat*>(data)); break;
     case GL_FLOAT_MAT2x4:
-        glUniformMatrix2x4fv(location, count, FALSE, static_cast<const GLfloat*>(data)); break;
+        glUniformMatrix2x4fv(location, count, GL_FALSE, static_cast<const GLfloat*>(data)); break;
     case GL_FLOAT_MAT3x2:
-        glUniformMatrix3x2fv(location, count, FALSE, static_cast<const GLfloat*>(data)); break;
+        glUniformMatrix3x2fv(location, count, GL_FALSE, static_cast<const GLfloat*>(data)); break;
     case GL_FLOAT_MAT3x4:
-        glUniformMatrix3x4fv(location, count, FALSE, static_cast<const GLfloat*>(data)); break;
+        glUniformMatrix3x4fv(location, count, GL_FALSE, static_cast<const GLfloat*>(data)); break;
     case GL_FLOAT_MAT4x2:
-        glUniformMatrix4x2fv(location, count, FALSE, static_cast<const GLfloat*>(data)); break;
+        glUniformMatrix4x2fv(location, count, GL_FALSE, static_cast<const GLfloat*>(data)); break;
     case GL_FLOAT_MAT4x3:
-        glUniformMatrix4x3fv(location, count, FALSE, static_cast<const GLfloat*>(data)); break;
+        glUniformMatrix4x3fv(location, count, GL_FALSE, static_cast<const GLfloat*>(data)); break;
 
     case GL_DOUBLE_MAT2:
-        glUniformMatrix2dv(location, count, FALSE, static_cast<const GLdouble*>(data)); break;
+        glUniformMatrix2dv(location, count, GL_FALSE, static_cast<const GLdouble*>(data)); break;
     case GL_DOUBLE_MAT3:
-        glUniformMatrix3dv(location, count, FALSE, static_cast<const GLdouble*>(data)); break;
+        glUniformMatrix3dv(location, count, GL_FALSE, static_cast<const GLdouble*>(data)); break;
     case GL_DOUBLE_MAT4:
-        glUniformMatrix4dv(location, count, FALSE, static_cast<const GLdouble*>(data)); break;
+        glUniformMatrix4dv(location, count, GL_FALSE, static_cast<const GLdouble*>(data)); break;
     case GL_DOUBLE_MAT2x3:
-        glUniformMatrix2x3dv(location, count, FALSE, static_cast<const GLdouble*>(data)); break;
+        glUniformMatrix2x3dv(location, count, GL_FALSE, static_cast<const GLdouble*>(data)); break;
     case GL_DOUBLE_MAT2x4:
-        glUniformMatrix2x4dv(location, count, FALSE, static_cast<const GLdouble*>(data)); break;
+        glUniformMatrix2x4dv(location, count, GL_FALSE, static_cast<const GLdouble*>(data)); break;
     case GL_DOUBLE_MAT3x2:
-        glUniformMatrix3x2dv(location, count, FALSE, static_cast<const GLdouble*>(data)); break;
+        glUniformMatrix3x2dv(location, count, GL_FALSE, static_cast<const GLdouble*>(data)); break;
     case GL_DOUBLE_MAT3x4:
-        glUniformMatrix3x4dv(location, count, FALSE, static_cast<const GLdouble*>(data)); break;
+        glUniformMatrix3x4dv(location, count, GL_FALSE, static_cast<const GLdouble*>(data)); break;
     case GL_DOUBLE_MAT4x2:
-        glUniformMatrix4x2dv(location, count, FALSE, static_cast<const GLdouble*>(data)); break;
+        glUniformMatrix4x2dv(location, count, GL_FALSE, static_cast<const GLdouble*>(data)); break;
     case GL_DOUBLE_MAT4x3:
-        glUniformMatrix4x3dv(location, count, FALSE, static_cast<const GLdouble*>(data)); break;
+        glUniformMatrix4x3dv(location, count, GL_FALSE, static_cast<const GLdouble*>(data)); break;
 
     case GL_SAMPLER_1D:
     case GL_SAMPLER_2D:

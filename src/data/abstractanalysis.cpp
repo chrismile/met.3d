@@ -124,7 +124,15 @@ MAnalysisControl::MAnalysisControl(MNWPMultiVarActor *actor)
 
 MAnalysisControl::~MAnalysisControl()
 {
-    if (analysisSource) delete analysisSource;
+    if (analysisSource)
+    {
+        delete analysisSource;
+    }
+
+    if (dock)
+    {
+        delete dock;
+    }
 }
 
 

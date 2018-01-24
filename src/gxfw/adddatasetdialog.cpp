@@ -30,6 +30,7 @@
 // standard library imports
 
 // related third party imports
+#include <QFileDialog>
 
 // local application imports
 #include "mglresourcesmanager.h"
@@ -88,7 +89,8 @@ MNWPPipelineConfigurationInfo MAddDatasetDialog::getNWPPipelineConfigurationInfo
     d.treatRotatedGridAsRegularGrid =
             ui->treatRotatedAsRegularCheckBox->isChecked();
     d.surfacePressureFieldType = ui->surfacePressureTypeComboBox->currentText();
-
+    d.convertGeometricHeightToPressure_ICAOStandard =
+            ui->convertGeometricHeightToPressureICAOStandardCheckBox->isChecked();
 
     return d;
 }

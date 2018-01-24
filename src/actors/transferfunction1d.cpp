@@ -31,6 +31,7 @@
 
 // related third party imports
 #include <log4cplus/loggingmacros.h>
+#include <QFileDialog>
 
 // local application imports
 #include "gxfw/mglresourcesmanager.h"
@@ -564,7 +565,7 @@ void MTransferFunction1D::loadConfiguration(QSettings *settings)
         {
             settings->setArrayIndex(i);
             float pos = settings->value("position", 0).toFloat();
-            float alpha = settings->value("alpha", Qt::black).toFloat();
+            float alpha = settings->value("alpha", 0.0f).toFloat();
 
             alphaNodes->push_back(pos, alpha);
         }
@@ -1000,7 +1001,7 @@ void MTransferFunction1D::renderToCurrentContext(MSceneViewGLWidget *sceneView)
     // First draw the colourbar itself. glPolygonOffset is used to displace
     // the colourbar's z-value slightly to the back, to that the frame drawn
     // afterwards is rendered correctly.
-    colourbarShader->bind();
+    colourbarShader->bindProgram("colourbarTF");
     colourbarShader->setUniformValue("transferTexture", textureUnit);
     colourbarShader->setUniformValue("enableAlpha", GLboolean(enableAlpha));
 

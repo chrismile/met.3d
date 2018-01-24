@@ -119,7 +119,8 @@ protected:
                                bool enableRegridding,
                                bool enableProbabiltyRegionFilter,
                                bool treatRotatedGridAsRegularGrid,
-                               QString surfacePressureFieldType);
+                               QString surfacePressureFieldType,
+                               bool convertGeometricHeightToPressure_ICAOStandard);
 
     void initializeLagrantoEnsemblePipeline(
             QString name,

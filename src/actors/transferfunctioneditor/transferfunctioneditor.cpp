@@ -713,7 +713,7 @@ void MTransferFunctionEditor::openChannelDialog()
         this->setMinimumWidth(700 + channelsWidgetWidth);
     }
 
-    channelsWidget->setShown(channelsWidget->isHidden());
+    channelsWidget->setVisible(channelsWidget->isHidden());
 }
 
 

@@ -32,6 +32,9 @@
 
 // related third party imports
 #include <log4cplus/loggingmacros.h>
+#include <QFileDialog>
+#include <QListWidget>
+#include <QListWidgetItem>
 
 // local application imports
 #include "gxfw/mglresourcesmanager.h"

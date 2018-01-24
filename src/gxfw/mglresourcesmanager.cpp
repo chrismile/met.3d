@@ -34,8 +34,6 @@
 #include <limits>
 
 // related third party imports
-#include <QtGui>
-#include <QtOpenGL>
 #include <log4cplus/loggingmacros.h>
 
 // local application imports

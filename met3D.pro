@@ -33,7 +33,7 @@ include(../third-party/qt-solutions/qtpropertybrowser/src/qtpropertybrowser.pri)
 CONFIG += console
 
 QT += opengl core gui network xml
-greaterThan(QT_MAJOR_VERSION, 4): QT += widgets printsupport
+greaterThan(QT_MAJOR_VERSION, 4): QT += widgets printsupport concurrent
 
 HEADERS += \
     src/util/mstopwatch.h \
@@ -130,7 +130,9 @@ HEADERS += \
     src/gxfw/rotatedgridsupportingactor.h \
     src/gxfw/boundingbox/bboxdockwidget.h \
     src/gxfw/boundingbox/boundingbox.h \
-    src/gxfw/sessionmanagerdialog.h
+    src/gxfw/sessionmanagerdialog.h \
+    src/data/singlevariableanalysis.h \
+    src/data/structuredgridstatisticsanalysis.h
 
 SOURCES += \
     src/main.cpp \
@@ -228,7 +230,9 @@ SOURCES += \
     src/gxfw/rotatedgridsupportingactor.cpp \
     src/gxfw/boundingbox/bboxdockwidget.cpp \
     src/gxfw/boundingbox/boundingbox.cpp \
-    src/gxfw/sessionmanagerdialog.cpp
+    src/gxfw/sessionmanagerdialog.cpp \
+    src/data/singlevariableanalysis.cpp \
+    src/data/structuredgridstatisticsanalysis.cpp
 
 FORMS += \
     src/mainwindow.ui \

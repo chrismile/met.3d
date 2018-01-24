@@ -90,6 +90,10 @@ if (${PKG_NAME}_LIBRARY_DEBUG AND ${PKG_NAME}_LIBRARY_RELEASE)
     set (${PKG_NAME}_LIBRARIES
             optimized ${${PKG_NAME}_LIBRARY_RELEASE}
             debug ${${PKG_NAME}_LIBRARY_DEBUG})
+elseif (${PKG_NAME}_LIBRARY_RELEASE)
+    # if only release has been found, use that
+    set (${PKG_NAME}_LIBRARIES
+            ${${PKG_NAME}_LIBRARY_RELEASE})
 endif ()
 
 if(WIN32)

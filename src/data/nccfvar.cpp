@@ -307,6 +307,15 @@ NcVar NcCFVar::getVerticalCoordinatePotVort()
 }
 
 
+NcVar NcCFVar::getVerticalCoordinateGeometricHeight()
+{
+    // The vertical z coordinate is identifyable by units of geometric height,
+    // cf. http://cfconventions.org/cf-conventions/v1.6.0/cf-conventions.html#vertical-coordinate
+    vector<string> units = {"m", "metre"};
+    return getCFCoordinateVar(units, {""}, true);
+}
+
+
 bool NcCFVar::hasEnsembleDimension()
 {
     try
@@ -571,6 +580,7 @@ NcCFVar::NcVariableGridType NcCFVar::getGridType()
     if      (isCFDataVariable(*this, LAT_LON_PVU))    varGridType = LAT_LON_PVU;
     else if (isCFDataVariable(*this, LAT_LON_HYBRID)) varGridType = LAT_LON_HYBRID;
     else if (isCFDataVariable(*this, LAT_LON_P))      varGridType = LAT_LON_P;
+    else if (isCFDataVariable(*this, LAT_LON_Z))      varGridType = LAT_LON_Z;
     else if (isCFDataVariable(*this, LAT_LON))        varGridType = LAT_LON;
     return varGridType;
 }
@@ -625,6 +635,14 @@ bool NcCFVar::isCFDataVariable(const NcVar& var, NcVariableGridType type)
         break;
     case LAT_LON_PVU:
         try { NcVar dummy = cfvar.getVerticalCoordinatePotVort(); }
+        catch (NcException) { return false; }
+        try { NcVar dummy = cfvar.getLongitudeVar(); }
+        catch (NcException) { return false; }
+        try { NcVar dummy = cfvar.getLatitudeVar(); }
+        catch (NcException) { return false; }
+        break;
+    case LAT_LON_Z:
+        try { NcVar dummy = cfvar.getVerticalCoordinateGeometricHeight(); }
         catch (NcException) { return false; }
         try { NcVar dummy = cfvar.getLongitudeVar(); }
         catch (NcException) { return false; }

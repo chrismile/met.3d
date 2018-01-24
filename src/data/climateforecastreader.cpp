@@ -37,6 +37,7 @@
 
 // local application imports
 #include "util/mutil.h"
+#include "util/metroutines.h"
 #include "util/mexception.h"
 #include "util/mstopwatch.h"
 #include "gxfw/mglresourcesmanager.h"
@@ -57,9 +58,12 @@ namespace Met3D
 *******************************************************************************/
 
 MClimateForecastReader::MClimateForecastReader(
-        QString identifier, bool treatRotatedGridAsRegularGrid)
+        QString identifier, bool treatRotatedGridAsRegularGrid,
+        bool convertGeometricHeightToPressure_ICAOStandard)
     : MWeatherPredictionReader(identifier),
-      treatRotatedGridAsRegularGrid(treatRotatedGridAsRegularGrid)
+      treatRotatedGridAsRegularGrid(treatRotatedGridAsRegularGrid),
+      convertGeometricHeightToPressure_ICAOStandard(
+          convertGeometricHeightToPressure_ICAOStandard)
 
 {
     // Read mapping "variable name to CF standard name", specific to ECMWF
@@ -559,6 +563,23 @@ void MClimateForecastReader::scanDataRoot()
                     break;
                 case NcCFVar::LAT_LON_P:
                     levelType = PRESSURE_LEVELS_3D;
+                    if (convertGeometricHeightToPressure_ICAOStandard)
+                    {
+                        LOG4CPLUS_WARN(
+                                    mlog,
+                                    "WARNING: identified variable <"
+                                    << varName.toStdString()
+                                    << "> is defined on a grid using vertical"
+                                       " pressure levels, and conversion of"
+                                       " geometric height to pressure"
+                                       " coordinates is enabled  -- skipping"
+                                       " variable.");
+                        continue;
+                    }
+                    else
+                    {
+                        levelType = PRESSURE_LEVELS_3D;
+                    }
                     break;
                 case NcCFVar::LAT_LON_HYBRID:
                     levelType = HYBRID_SIGMA_PRESSURE_3D;
@@ -566,13 +587,30 @@ void MClimateForecastReader::scanDataRoot()
                 case NcCFVar::LAT_LON_PVU:
                     levelType = POTENTIAL_VORTICITY_2D;
                     break;
+                case NcCFVar::LAT_LON_Z:
+                    if (convertGeometricHeightToPressure_ICAOStandard)
+                    {
+                        levelType = PRESSURE_LEVELS_3D;
+                    }
+                    else
+                    {
+                        LOG4CPLUS_WARN(
+                                    mlog,
+                                    "WARNING: identified variable <"
+                                    << varName.toStdString()
+                                    << "> is defined on a grid using vertical"
+                                       " geometric height levels, and"
+                                       " conversion to pressure coordinates is"
+                                       " disabled  -- skipping variable.");
+                        continue;
+                    }
+                    break;
                 default:
                     // If neither of the above choices could be matched,
                     // discard this variable and continue.
                     continue;
                     break;
                 }
-
                 // Create a new MVariableInfo struct and store availabe
                 // variable information in this field.
                 MVariableInfo* vinfo;
@@ -819,7 +857,19 @@ MStructuredGrid *MClimateForecastReader::readGrid(
 
         else if (levelType == PRESSURE_LEVELS_3D)
         {
-            shared->vertVar = shared->cfVar.getVerticalCoordinatePressure();
+            if (convertGeometricHeightToPressure_ICAOStandard)
+            {
+                // Special case: If conversion of vertical geometric height
+                // levels to pressure levels is enabled, the grid will appear
+                // in Met.3D as a regular pressure level grid.
+                shared->vertVar =
+                        shared->cfVar.getVerticalCoordinateGeometricHeight();
+            }
+            else
+            {
+                shared->vertVar = shared->cfVar.getVerticalCoordinatePressure();
+            }
+
         }
 
         else if (levelType == HYBRID_SIGMA_PRESSURE_3D)
@@ -929,22 +979,6 @@ MStructuredGrid *MClimateForecastReader::readGrid(
             shared->levels.resize(shared->vertVar.getDim(0).getSize());
             shared->vertVar.getVar(shared->levels.data());
 
-            // Determine whether the grid's vertical levels must be reversed.
-            double lev_bot = shared->levels[0];
-            double lev_top = shared->levels[shared->levels.size()-1];
-            if (lev_bot > lev_top)
-            {
-                LOG4CPLUS_DEBUG(mlog, "\tReversing levels.");
-                shared->reverseLevels = true;
-                QVector<double> tmpLevs(shared->levels);
-                int size = shared->levels.size();
-                for (int i = 0; i < size; i++) shared->levels[i] = tmpLevs[size-1-i];
-            }
-            else
-            {
-                shared->reverseLevels = false;
-            }
-
             if (levelType == PRESSURE_LEVELS_3D)
             {
                 // If vertical levels are specified in Pa, convert to hPa.
@@ -961,11 +995,46 @@ MStructuredGrid *MClimateForecastReader::readGrid(
                 }
                 else if (units != "hPa")
                 {
-                    throw MNcException(
-                            "NcException",
-                            "invalid units for pressure levels (must be Pa or hPa)",
-                            __FILE__, __LINE__);
+                    // If vertical levels are specified in metre and convertion
+                    // flag is set, convert metre to pressure with standard ICAO
+                    // field.
+                    if ((units == "m" || units == "metre")
+                            && convertGeometricHeightToPressure_ICAOStandard)
+                    {
+                        for (int i = 0; i < shared->levels.size(); i++)
+                        {
+                            shared->levels[i] = metre2pressure_standardICAO(
+                                        shared->levels[i]) / 100.;
+                        }
+                    }
+                    else
+                    {
+                        throw MNcException(
+                                    "NcException",
+                                    "invalid units for pressure levels (must be"
+                                    " Pa or hPa)",
+                                    __FILE__, __LINE__);
+                    }
                 }
+            }
+
+            // Determine whether the grid's vertical levels must be reversed.
+            double lev_bot = shared->levels[0];
+            double lev_top = shared->levels[shared->levels.size()-1];
+            if (lev_bot > lev_top)
+            {
+                LOG4CPLUS_DEBUG(mlog, "\tReversing levels.");
+                shared->reverseLevels = true;
+                QVector<double> tmpLevs(shared->levels);
+                int size = shared->levels.size();
+                for (int i = 0; i < size; i++)
+                {
+                    shared->levels[i] = tmpLevs[size-1-i];
+                }
+            }
+            else
+            {
+                shared->reverseLevels = false;
             }
         }
         else

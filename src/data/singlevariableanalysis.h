@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2017 Marc Rautenhaus
+**  Copyright 2017 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -23,68 +24,66 @@
 **  along with Met.3D.  If not, see <http://www.gnu.org/licenses/>.
 **
 *******************************************************************************/
-#ifndef VALUEEXTRACTIONANALYSIS_H
-#define VALUEEXTRACTIONANALYSIS_H
+#ifndef SINGLEVARIABLEANALYSIS_H
+#define SINGLEVARIABLEANALYSIS_H
 
 // standard library imports
 
 // related third party imports
 #include <QtCore>
-#include <QTextBrowser>
 
 // local application imports
-#include "datarequest.h"
 #include "abstractanalysis.h"
+
 
 namespace Met3D
 {
 
-/**
-  @brief Implements an analysis source that extracts the data values of all
-  connected data sources at a specified position.
-  */
-class MValueExtractionAnalysis
-        : public MAnalysisDataSource
-{
-public:
-    MValueExtractionAnalysis();
-
-    MAnalysisResult* produceData(MDataRequest request);
-
-    MTask* createTaskGraph(MDataRequest request);
-
-protected:
-    const QStringList locallyRequiredKeys();
-
-};
+class MNWPActorVariable;
 
 
 /**
-  @brief Control associated with @ref MValueExtractionAnalysis. Creates an
-  @ref MValueExtractionAnalysis instance with the same data sources currently
-  used by the attached actor's actor variables.
-  */
-class MValueExtractionAnalysisControl
+ @brief Abstract base class for modules acting as a broker between a variable
+ and an @ref MAnalysisDataSource().
+ */
+class MSingleVariableAnalysisControl
         : public MAnalysisControl
 {
-public:
-    MValueExtractionAnalysisControl(MNWPMultiVarActor *actor);
-    ~MValueExtractionAnalysisControl();
+    Q_OBJECT
 
-    void displayResult(MAnalysisResult *result);
+public:
+    MSingleVariableAnalysisControl(MNWPActorVariable *variable);
+    ~MSingleVariableAnalysisControl();
+
+    /**
+      Implement this method with a suitable way to display the result of
+      the analysis.
+     */
+    virtual void displayResult(MAnalysisResult *result) = 0;
 
 protected:
-    MDataRequest prepareRequest(MDataRequest analysisRequest);
+    /**
+      Implement this method to create a full pipeline request for
+      @ref MAnalysisDataSource::requestData().
+     */
+    virtual MDataRequest prepareRequest(MDataRequest analysisRequest) = 0;
 
-    MAnalysisDataSource* createAnalysisSource()
-    { return new MValueExtractionAnalysis(); }
+    /**
+      Implement this method to create a new instance of the @ref
+      MAnalysisDataSource attached to this control.
+     */
+    virtual MAnalysisDataSource* createAnalysisSource() = 0;
 
-    void updateAnalysisSourceInputs();
+    /**
+      Implement this method to update the @ref MAnalysisDataSource s data
+      inputs from the actor variables.
+     */
+    virtual void updateAnalysisSourceInputs() = 0;
 
-    QTextBrowser *resultsTextBrowser;
+    MNWPActorVariable *variable;
 };
 
 
 } // namespace Met3D
 
-#endif // VALUEEXTRACTIONANALYSIS_H
+#endif // SINGLEVARIABLEANALYSIS_H

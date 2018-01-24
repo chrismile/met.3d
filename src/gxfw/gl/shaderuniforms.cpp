@@ -31,6 +31,11 @@
 // related third party imports
 #include <log4cplus/loggingmacros.h>
 #include <stdexcept>
+#include <QVector2D>
+#include <QVector3D>
+#include <QVector4D>
+#include <QColor>
+#include <QMatrix4x4>
 
 // local application imports
 #include "util/mutil.h"
@@ -527,10 +532,13 @@ void MShaderEffect
 
 void MShaderEffect
 ::setUniformMatrixXY(const QString name, const int8_t count,
-                        const int8_t cols, const int8_t rows,
-                        const GLenum type, const qreal* data)
+                     const int8_t cols, const int8_t rows,
+                     const GLenum type, const qreal* data)
 {
-    if (currentProgram.second == -1) { return; }
+    if (currentProgram.second == -1)
+    {
+        return;
+    }
 
     // QMatrix must not be transposed! --> GL_FALSE
     std::shared_ptr<Uniform>& uniform = getUniform(name);
@@ -558,6 +566,22 @@ void MShaderEffect
 
 		delete[] mat;
     }
+}
+
+void MShaderEffect
+::setUniformMatrixXY(const QString name, const int8_t count,
+                     const int8_t cols, const int8_t rows,
+                     const GLenum type, const float* data)
+{
+    if (currentProgram.second == -1)
+    {
+        return;
+    }
+
+    // QMatrix must not be transposed! --> GL_FALSE
+    std::shared_ptr<Uniform>& uniform = getUniform(name);
+    const GLfloat* mat = reinterpret_cast<const GLfloat*>(data);
+    uniform->setUniform(type, mat, count, 1);
 }
 
 

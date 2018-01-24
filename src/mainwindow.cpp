@@ -31,11 +31,15 @@
 #include <iostream>
 
 // related third party imports
+#include <QDockWidget>
+#include <QDesktopServices>
+#include <QDesktopWidget>
+#include <QCloseEvent>
+
 #include <log4cplus/loggingmacros.h>
 #include <log4cplus/version.h>
-#include <grib_api.h>
+#include <eccodes.h>
 #include <gsl/gsl_version.h>
-#include <hdf5.h>
 #include <netcdf_meta.h>
 
 // local application imports
@@ -1102,7 +1106,8 @@ void MMainWindow::addDataset()
                     pipelineConfig.enableRegridding,
                     pipelineConfig.enableProbabiltyRegionFilter,
                     pipelineConfig.treatRotatedGridAsRegularGrid,
-                    pipelineConfig.surfacePressureFieldType);
+                    pipelineConfig.surfacePressureFieldType,
+                    pipelineConfig.convertGeometricHeightToPressure_ICAOStandard);
     }
 }
 
@@ -1171,15 +1176,15 @@ void MMainWindow::showAboutDialog()
             "</tr>"
             "<tr> "
             "<td> GLFX: %8.%9.%10 </td> <td> GLU: %11 </td>"
-            " <td> grib_api: %12 </td>"
+            " <td> eccodes: %12 </td>"
             "</tr>"
             "<tr> "
-            "<td> GSL: %13 </td> <td> HDF5: %14.%15.%16 </td>"
-            " <td> LOG4CPLUS: %17 </td>"
+            "<td> GSL: %13 </td> <td> LOG4CPLUS: %14 </td>"
+            " <td> NetCDF: %15 </td>"
             "</tr>"
             "<tr> "
-            "<td> NetCDF: %18 </td> <td> NetCDF-4 C++: %19.%20.%21 </td>"
-            " <td> QCustomPlot: %22.%23.%24 </td>"
+            "<td> NetCDF-4 C++: %16.%17.%18 </td>"
+            " <td> QCustomPlot: %19.%20.%21 </td>"
             "</tr>"
             "</table>"
             "Note: If a version is listed as x.x.x, Met.3D wasn't able to find"
@@ -1196,9 +1201,8 @@ void MMainWindow::showAboutDialog()
             .arg("x").arg("x").arg("x")
 #endif
             .arg(QString(reinterpret_cast<const char *>(gluGetString(GLU_VERSION))))
-            .arg(GRIB_API_VERSION_STR)
+            .arg(ECCODES_VERSION_STR)
             .arg(GSL_VERSION)
-            .arg(H5_VERS_MAJOR).arg(H5_VERS_MINOR).arg(H5_VERS_RELEASE)
             .arg(LOG4CPLUS_VERSION_STR)
             .arg(NC_VERSION)
 #if defined(NetCDFCXX4_VERSION_MAJOR) && defined(NetCDFCXX4_VERSION_MINOR) \
@@ -1237,7 +1241,17 @@ void MMainWindow::resizeWindow()
 
 void MMainWindow::switchSession(QAction *sessionAction)
 {
-    sessionManagerDialog->switchToSession(sessionAction->text());
+    QString sessionName = sessionAction->text();
+
+    // Issue that appeared with Qt5: The session names under Linux start
+    // with an "&" that shouldn't be there. Workaround: Remove a preceding
+    // "&" character.
+    if (sessionName.startsWith("&"))
+    {
+        sessionName.remove(0, 1);
+    }
+
+    sessionManagerDialog->switchToSession(sessionName);
 }
 
 

@@ -28,11 +28,13 @@
 #define MACTOR_H
 
 // standard library imports
+#include <memory>
 
 // related third party imports
 #include <QtCore>
 #include <QtProperty>
-#include <memory>
+#include <QWidgetAction>
+#include <QProgressDialog>
 
 // local application imports
 #include "gxfw/mtypes.h"
