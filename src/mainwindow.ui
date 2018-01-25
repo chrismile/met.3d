@@ -39,7 +39,7 @@
      <x>0</x>
      <y>0</y>
      <width>800</width>
-     <height>22</height>
+     <height>18</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -51,9 +51,15 @@
       <string>Sess&amp;ions</string>
      </property>
     </widget>
+    <widget class="QMenu" name="menuRevertCurrentSession">
+     <property name="title">
+      <string>&amp;Revert Current Session</string>
+     </property>
+    </widget>
     <addaction name="actionAddDataset"/>
     <addaction name="separator"/>
     <addaction name="menuSessions"/>
+    <addaction name="menuRevertCurrentSession"/>
     <addaction name="actionSessionManager"/>
     <addaction name="actionSaveSession"/>
     <addaction name="separator"/>

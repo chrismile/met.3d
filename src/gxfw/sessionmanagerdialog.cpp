@@ -94,10 +94,13 @@ MSessionManagerDialog::MSessionManagerDialog(QWidget *parent) :
     // the item.
     connect(ui->sessionsListView, SIGNAL(doubleClicked(QModelIndex)),
             this, SLOT(renameItem(QModelIndex)));
+
     // directoryLoaded() is triggered everytime when the root directory or its
     // content change.
     connect(sessionFileSystemModel, SIGNAL(directoryLoaded(QString)),
             this, SLOT(fillSessionsList()));
+    connect(sessionFileSystemModel, SIGNAL(directoryLoaded(QString)),
+            this, SLOT(fillCurrentSessionHistoryList()));
 
     connect(ui->autoSaveSpinBox, SIGNAL(valueChanged(int)),
             this, SLOT(changeAutoSaveInterval(int)));    
@@ -232,6 +235,15 @@ void MSessionManagerDialog::switchToSession(QString sessionName)
         loadSessionFromFile(sessionName);
         setSessionToCurrent(sessionName);
     }
+}
+
+
+void MSessionManagerDialog::revertCurrentSessionToRevision(QString revisionNumber)
+{
+    QString filename = "." + currentSession
+            + MSessionManagerDialog::fileExtension  + "." + revisionNumber;
+
+    loadSessionFromFile(filename, false);
 }
 
 
@@ -491,6 +503,61 @@ void MSessionManagerDialog::fillSessionsList()
 }
 
 
+void MSessionManagerDialog::fillCurrentSessionHistoryList()
+{
+    sessionsList.clear();
+
+    QDir directory(path);
+
+    // Get all files in the current directory especially the hidden ones.
+    QStringList fileList = directory.entryList(QDir::Files | QDir::Hidden);
+
+    if (!fileList.isEmpty())
+    {
+        QString regExpString = QString("." + currentSession + fileExtension
+                                       + ".\\d+");
+        regExpString.replace(QString("."), QString("\\."));
+
+        fileList = fileList.filter(QRegExp(regExpString));
+
+        foreach (QString sessionRevision, fileList)
+        {
+            // Extract index of the file name and start current session history
+            // entry with it.
+            QString entry = sessionRevision.split(".",
+                                                QString::SkipEmptyParts).last();
+
+            QSettings *settings = new QSettings(
+                        QDir(path).absoluteFilePath(sessionRevision),
+                        QSettings::IniFormat);
+
+            QStringList groups = settings->childGroups();
+            if ( groups.contains("MSession")  )
+            {
+                settings->beginGroup("MSession");
+                groups = settings->childGroups();
+                if ( groups.contains("SessionDetails")  )
+                {
+                    settings->beginGroup("SessionDetails");
+                    entry += ": " + settings->value("time", "").toTime()
+                            .toString(Qt::SystemLocaleLongDate);
+                    entry += ", " + settings->value("date", "").toDate()
+                            .toString(Qt::SystemLocaleShortDate);
+                    entry += " (" + settings->value("name", "").toString() + ")";
+                    settings->endGroup();
+                    settings->endGroup();
+                }
+                sessionsList << entry;
+            }
+            delete settings;
+        }
+        qSort(sessionsList);
+    }
+    MSystemManagerAndControl::getInstance()->getMainWindow()
+            ->onCurrentSessionHistoryChanged(&sessionsList);
+}
+
+
 void MSessionManagerDialog::changeAutoSaveInterval(int autoSaveInterval)
 {
     // Use tool tip to show time interval splitted up to [h min sec].
@@ -733,6 +800,8 @@ void MSessionManagerDialog::setSessionToCurrent(QString session)
 
     MSystemManagerAndControl::getInstance()->getMainWindow()->onSessionSwitch(
                 currentSession);
+
+    fillCurrentSessionHistoryList();
 }
 
 
@@ -756,6 +825,7 @@ void MSessionManagerDialog::saveSessionToFile(QString sessionName, bool autoSave
     // Overwrite if the file exists.
     if (QFile::exists(filename))
     {
+        updateSessionFileHistory(filename);
         QFile::remove(filename);
     }
 
@@ -773,11 +843,22 @@ void MSessionManagerDialog::saveSessionToFile(QString sessionName, bool autoSave
     // ==========================================
     settings->beginGroup("MSession");
 
+    // Session Details.
+    // ==========================================
+    settings->beginGroup("SessionDetails");
+    settings->setValue("name", currentSession);
+    settings->setValue("time", QTime::currentTime());
+    settings->setValue("date", QDate::currentDate());
+    settings->endGroup();
+    // ==========================================
+
+
     // General.
     // ==========================================
     settings->beginGroup("AllSceneViews");
     settings->setValue("handleSize", sysMC->getHandleSize());
     settings->endGroup();
+    // ==========================================
 
     QList<MSceneViewGLWidget*> sceneViews = sysMC->getRegisteredViews();
 
@@ -902,12 +983,24 @@ void MSessionManagerDialog::saveSessionToFile(QString sessionName, bool autoSave
 }
 
 
-void MSessionManagerDialog::loadSessionFromFile(QString sessionName)
+void MSessionManagerDialog::loadSessionFromFile(QString sessionName,
+                                                bool appendFileExtension)
 {
     blockGUIElements();
-    QString filename = QDir(path).absoluteFilePath(sessionName + fileExtension);
+    QString filename = "";
+    if (appendFileExtension)
+    {
+        filename = QDir(path).absoluteFilePath(sessionName + fileExtension);
+    }
+    else
+    {
+        filename = QDir(path).absoluteFilePath(sessionName);
+    }
+
     // File has been removed. Display warning and refuse to load session.
-    if (!QFile::exists(filename))
+    // Special case: Hidden files are marked as not existing so test for
+    // hidden flag as well.
+    if (!QFileInfo(filename).isHidden() && !QFileInfo(filename).exists())
     {
         QMessageBox msg;
         msg.setWindowTitle("Error");
@@ -985,6 +1078,7 @@ void MSessionManagerDialog::loadSessionFromFile(QString sessionName)
     progressDialog->setValue(++loadingProgress);
     progressDialog->update();
     settings->endGroup();
+    // ==========================================
 
     // Sync controls.
     // ==========================================
@@ -1481,6 +1575,45 @@ int MSessionManagerDialog::getSmallestIndexForUniqueName(QString sessionName)
         }
     }
     return index;
+}
+
+
+void MSessionManagerDialog::updateSessionFileHistory(QString filename)
+{
+    QDir directory(path);
+    QStringList fileList = directory.entryList(QDir::Files | QDir::Hidden);
+    QString regExpString = QString("." + currentSession + fileExtension + ".\\d+");
+    regExpString.replace(QString("."), QString("\\."));
+    fileList = fileList.filter(QRegExp(regExpString));
+
+    int fileIndex = 0;
+    if (!fileList.isEmpty())
+    {
+        // Since string sorting would lead to ".10" being sorted before ".2",
+        // it is necessary to extract the index number from the filename and
+        // use it for sorting.
+        std::sort(fileList.begin(), fileList.end(),
+                  [](QString x, QString y)
+        { return x.split(".", QString::SkipEmptyParts).last().toInt()
+                    < y.split(".", QString::SkipEmptyParts).last().toInt(); }
+        );
+
+        // TODO (bt, 30Jan2018) Make length of file history customisable.
+        // Store at most 5 "shadow" files for one session and remove all others
+        // starting from the smallest index.
+        while (fileList.size() >= 5)
+        {
+            QFile(directory.absoluteFilePath(fileList.takeFirst())).remove();
+        }
+
+        fileIndex = fileList.last().split(
+                    ".", QString::SkipEmptyParts).last().toInt() + 1;
+    }
+
+    QFile file(filename);
+    file.copy(QDir(path).absoluteFilePath(
+                  "." + currentSession + fileExtension
+                  + "." + QString::number(fileIndex)));
 }
 
 
