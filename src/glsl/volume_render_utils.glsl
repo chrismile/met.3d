@@ -159,10 +159,12 @@ vec4 getSurfaceColor(in vec3 rayPosition,
         return vec4(0);
     }
 
-    // if shadow image mode activated, return the shadow color
+    // Shadow mode: Alpha of shadow is determined by alpha of isosurface colour,
+    // multiplied by alpha value of shadow colour to enable user to control
+    // lightness of shadow.
     if (shadowRay)
     {
-        return vec4(shadowColor.rgb, isoColors[i].a);
+        return vec4(shadowColor.rgb, isoColors[i].a * shadowColor.a);
     }
 
     if (isoColorModes[i] == TRANSFER_FUNC_COLOUR)
