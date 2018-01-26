@@ -72,6 +72,7 @@ MSystemManagerAndControl::MSystemManagerAndControl(QWidget *parent) :
     stringPropertyManager          = new QtStringPropertyManager(this);
     clickPropertyManager           = new QtClickPropertyManager(this);
     colorPropertyManager           = new QtColorPropertyManager(this);
+    pointFPropertyManager          = new QtPointFPropertyManager(this);
 
     // The sceneViewPropertiesBrowser needs "GUI editor factories" that provide
     // the required GUI elements (spin boxes, line edits, combo boxes, ...) for
@@ -102,6 +103,9 @@ MSystemManagerAndControl::MSystemManagerAndControl(QWidget *parent) :
                 clickPropertyManager, toolButtonFactory);
     systemPropertiesBrowser->setFactoryForManager(
                 colorPropertyManager, colorEditorFactory);
+    systemPropertiesBrowser->setFactoryForManager(
+                pointFPropertyManager->subDoublePropertyManager(),
+                doubleSpinBoxFactory);
 
     // Mode for resizing the columns. Useful are QtTreePropertyBrowser::
     // ::ResizeToContents and ::Interactive
@@ -338,6 +342,12 @@ QtColorPropertyManager* MSystemManagerAndControl::getColorPropertyManager()
 }
 
 
+QtPointFPropertyManager* MSystemManagerAndControl::getPointFPropertyManager()
+{
+    return pointFPropertyManager;
+}
+
+
 void MSystemManagerAndControl::addProperty(QtProperty *property)
 {
     QtBrowserItem *item = systemPropertiesBrowser->addProperty(property);
@@ -419,6 +429,11 @@ MAbstractDataSource* MSystemManagerAndControl::getDataSource(
 void MSystemManagerAndControl::registerSyncControl(MSyncControl *syncControl)
 {
     syncControlPool.insert(syncControl->getID(), syncControl);
+
+    foreach (MSceneViewGLWidget *sceneview, registeredViews)
+    {
+        sceneview->updateSyncControlProperty();
+    }
 }
 
 
@@ -446,6 +461,11 @@ void MSystemManagerAndControl::removeSyncControl(MSyncControl *syncControl)
 {
     syncControlPool.remove(syncControl->getID());
     delete syncControl;
+
+    foreach (MSceneViewGLWidget *sceneview, registeredViews)
+    {
+        sceneview->updateSyncControlProperty();
+    }
 }
 
 

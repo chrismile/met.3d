@@ -64,7 +64,7 @@ struct PickActor {
   @brief MSceneViewGLWidget implements a view on a given scene (which is
   represented by an @ref MSceneControl instance).
   */
-class MSceneViewGLWidget : public QGLWidget
+class MSceneViewGLWidget : public QGLWidget, public MSynchronizedObject
 {
     Q_OBJECT
 
@@ -248,6 +248,11 @@ public:
 
     void onHandleSizeChanged();
 
+    virtual void synchronizeWith(
+            MSyncControl *sync, bool updateGUIProperties=true);
+
+    virtual bool synchronizationEvent(MSynchronizationType, QVector<QVariant>);
+
 signals:
     /**
       Emitted when a mouse button is released on the GL canvas.
@@ -266,11 +271,11 @@ public slots:
       */
     void onPropertyChanged(QtProperty *property);
 
-//    /**
-//      Sets the valid and init time displayed in the upper left corner of the
-//      view.
-//      */
-//    void updateDisplayTime();
+    /**
+      Sets the valid and init time displayed in the upper left corner of the
+      view.
+      */
+    void updateDisplayTime();
 
     /**
       */
@@ -281,6 +286,8 @@ public slots:
     void updateSceneLabel();
 
     void saveTimeAnimationImage(QString path, QString filename);
+
+    void updateSyncControlProperty();
 
 protected:
     void initializeGL();
@@ -459,6 +466,23 @@ private:
     QtProperty *lightingProperty;
     QtProperty *verticalScalingProperty;
 
+    QtProperty *annotationsGroupProperty;
+
+    QtProperty *displayDateTimeGroupProperty;
+    QtProperty *displayDateTimeSyncControlProperty;
+    QtProperty *displayDateTimeFontSizeProperty;
+    QtProperty *displayDateTimeColourProperty;
+    QtProperty *displayDateTimeBBoxProperty;
+    QtProperty *displayDateTimeBBoxColourProperty;
+    QtProperty *displayDateTimePositionProperty;
+
+    /** Synchronisation with MSyncControl. */
+    MSyncControl *synchronizationControl;
+
+    MLabel       *displayDateTimeLabel;
+    float         displayDateTimeFontSize;
+    QColor        displayDateTimeColour;
+
     struct NorthArrow
     {
       NorthArrow() {}
@@ -482,17 +506,20 @@ private:
     };
     NorthArrow northArrow;
 
+    QtProperty *sceneViewLabelGroupProperty;
+    QtProperty *sceneViewLabelEnableProperty;
+
+    /** List of static labels to display in this view. */
+    MLabel *sceneNameLabel;
+
     bool measureFPS;
     uint measureFPSFrameCount;
     QtProperty *measureFPSProperty;
 
-    /** List of static labels to display in this view. */
-    MLabel* sceneNameLabel;
-
     bool visualizationParameterChange;
 
     QSet<MSceneViewGLWidget*> syncCameras;
-    MSceneViewGLWidget* cameraSyncronizedWith;
+    MSceneViewGLWidget *cameraSyncronizedWith;
 
     MActor *singleInteractionActor;
 
