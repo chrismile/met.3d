@@ -124,14 +124,25 @@ MAnalysisResult* MStructuredGridStatisticsAnalysis::produceData(
 
     MStructuredGrid *grid = source->getData(varRH.request());
 
+    double valuesCount = 0.;
+
     // Loop over all grid points and compute statistics.
     for (unsigned int i = 0; i < grid->getNumValues(); i++)
     {
         double value = double(grid->getValue(i));
+
+        // Skip missing values.
+        if (value == M_MISSING_VALUE)
+        {
+            continue;
+        }
+
+        ++valuesCount;
+
         result->minValue = min(value, result->minValue);
         result->maxValue = max(value, result->maxValue);
         result->meanValue = result->meanValue
-                + (1. / static_cast<double>(i + 1)) * (value - result->meanValue);
+                + (1. / valuesCount) * (value - result->meanValue);
         value = round(value * histogramAccuracyAdjustValue);
         value = value / histogramAccuracyAdjustValue;
         result->histogramData.insert(
