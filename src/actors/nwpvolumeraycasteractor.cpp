@@ -577,6 +577,7 @@ void MNWPVolumeRaycasterActor::saveConfiguration(QSettings *settings)
     settings->setValue("renderMode", properties->getEnumItem(renderModeProp));
     settings->setValue("varIndex", variableIndex);
     settings->setValue("shadingVarIndex", shadingVariableIndex);
+    settings->setValue("bBoxEnabled", bBoxEnabled);
 
     // bounding box settings
     // =====================
@@ -678,6 +679,8 @@ void MNWPVolumeRaycasterActor::loadConfiguration(QSettings *settings)
     shadingVariableIndex = settings->value("shadingVarIndex").toInt();
     properties->mInt()->setValue(shadingVariableIndexProp,
                                  shadingVariableIndex);
+    properties->mBool()->setValue(bBoxEnabledProperty,
+                                  settings->value("bBoxEnabled", true).toBool());
 
     // bounding box settings
     // =====================
