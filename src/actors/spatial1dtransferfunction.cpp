@@ -270,12 +270,7 @@ void MSpatial1DTransferFunction::loadConfiguration(QSettings *settings)
 
     if (isInitialized())
     {
-        generateTransferTexture(0, true);
-        for (int level = 1; level < loadedImages.size(); level++)
-        {
-            generateTransferTexture(level, false);
-        }
-        loadedImages.clear();
+        generateTransferTexture();
         generateBarGeometry();
     }
 
