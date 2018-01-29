@@ -260,7 +260,7 @@ void MNWPHorizontalSectionActor::reloadShaderEffects()
 {
     LOG4CPLUS_DEBUG(mlog, "loading shader programs" << flush);
 
-    beginCompileShaders(7);
+    beginCompileShaders(8);
 
     compileShadersFromFileWithProgressDialog(
                 glVerticalInterpolationEffect,

@@ -30,8 +30,8 @@
 #include <iostream>
 
 // related third party imports
-#include <QtCore>
-#include <QtGui>
+//#include <QtCore>
+//#include <QtGui>
 
 // local application imports
 #include "gxfw/mglresourcesmanager.h"
