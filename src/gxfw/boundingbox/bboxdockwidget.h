@@ -107,6 +107,7 @@ public slots:
     void onCellChanged(int row, int col);
     void onSpinBoxUpdate(double value);
     void onCreateBBox();
+    void onCloneBBox();
     void onDeleteBBox();
     void saveConfigurationToFile(QString filename = "");
     void loadConfigurationFromFile(QString filename = "");
@@ -116,17 +117,24 @@ protected:
 
 private:
     /**
+      @brief Handles creation of new bounding boxes.
+
+      If @p name is an empty string or contains a name which already exists,
+      it asks the user to enter a (different) name.
+
+      @return The name of the new bounding box or "None" if user cancels
+      entering a name.
+     */
+    QString createBoundingBox(QString name, double lon = -60., double lat = 30.,
+                              double width = 100., double height = 40.,
+                              double bottom = 1045., double top = 20.);
+    /**
       @brief Handles creation of new bounding boxes and inserting the according
       row into the bounding box table.
 
-      If @p name is an empty string, no bounding box will be created, and if
-      @p name contains a name which already exists, it displays an error
-      message and asks the user to select a different name.
-
-      @return Name of the new bounding box if created successfully, "None"
-      otherwise.
+      Caution: @p name needs to be a valid bounding box name (unique and not empty).
      */
-    QString insertRow(QString name, double lon = -60., double lat = 30.,
+    void insertRow(QString name, double lon = -60., double lat = 30.,
                       double width = 100., double height = 40.,
                       double bottom = 1045., double top = 20.);
 
@@ -134,6 +142,9 @@ private:
                    double height, double bottom, double top);
 
     QString getBBoxNameInRow(int row);
+
+    bool isValidBoundingBoxName(QString boundingBoxName, QStringList &bBoxes,
+                                bool printMessage=true);
 
     Ui::MBoundingBoxDockWidget *ui;
 
