@@ -192,7 +192,7 @@ MNWPVolumeRaycasterActor::LightingSettings::LightingSettings(
     shininessProp = a->addProperty(DOUBLE_PROPERTY, "shininess", groupProp);
     properties->setDouble(shininessProp, shininess, 0.0, 100.0, 3, 1.);
 
-    shadowColorProp = a->addProperty(COLOR_PROPERTY, "shadow color", groupProp);
+    shadowColorProp = a->addProperty(COLOR_PROPERTY, "shadow colour", groupProp);
     properties->mColor()->setValue(shadowColorProp, shadowColor);
 }
 
