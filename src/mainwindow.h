@@ -124,6 +124,8 @@ public:
 
     void onSessionsListChanged(QStringList *sessionsList, QString currentSession);
 
+    void onCurrentSessionHistoryChanged(QStringList *sessionHistory);
+
     void onSessionSwitch(QString currentSession);
 
     void updateSessionTimerInterval(int interval);
@@ -157,6 +159,8 @@ public slots:
     void resizeWindow();
 
     void switchSession(QAction *sessionAction);
+
+    void revertCurrentSession(QAction *sessionAction);
 
 private:
     Ui::MainWindow *ui;

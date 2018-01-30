@@ -254,6 +254,8 @@ MMainWindow::MMainWindow(QStringList commandLineArguments, QWidget *parent)
             sessionManagerDialog, SLOT(saveSession()));
     connect(ui->menuSessions, SIGNAL(triggered(QAction*)),
             this, SLOT(switchSession(QAction*)));
+    connect(ui->menuRevertCurrentSession, SIGNAL(triggered(QAction*)),
+            this, SLOT(revertCurrentSession(QAction*)));
     connect(sessionAutoSaveTimer, SIGNAL(timeout()),
             sessionManagerDialog, SLOT(autoSaveSession()));
 }
@@ -833,6 +835,22 @@ void MMainWindow::onSessionsListChanged(QStringList *sessionsList,
 }
 
 
+void MMainWindow::onCurrentSessionHistoryChanged(QStringList *sessionHistory)
+{
+    // Clear actions.
+    foreach(QAction *action, ui->menuRevertCurrentSession->actions())
+    {
+        ui->menuRevertCurrentSession->removeAction(action);
+        delete action;
+    }
+    // Add new actions.
+    foreach(QString sessionRevision, *sessionHistory)
+    {
+        ui->menuRevertCurrentSession->addAction(sessionRevision);
+    }
+}
+
+
 void MMainWindow::onSessionSwitch(QString currentSession)
 {
     // Change font of previous currentSession back to normal and emphasise
@@ -1252,6 +1270,24 @@ void MMainWindow::switchSession(QAction *sessionAction)
     }
 
     sessionManagerDialog->switchToSession(sessionName);
+}
+
+
+void MMainWindow::revertCurrentSession(QAction *sessionAction)
+{
+    QString sessionNumber = sessionAction->text();
+
+    // Issue that appeared with Qt5: The session names under Linux start
+    // with an "&" that shouldn't be there. Workaround: Remove a preceding
+    // "&" character.
+    if (sessionNumber.startsWith("&"))
+    {
+        sessionNumber.remove(0, 1);
+    }
+
+    sessionNumber = sessionNumber.split(":").first();
+
+    sessionManagerDialog->revertCurrentSessionToRevision(sessionNumber);
 }
 
 
