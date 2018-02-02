@@ -189,23 +189,25 @@ if(WIN32)
 else()
   # Parse .pc file to get used version of netcdf.
   if(${PKG_NAME}_PC_FILE)
-	  pkg_check_modules(${PKG_NAME} REQUIRED ${${PKG_NAME}_PC_FILE})
+	  pkg_check_modules(${PKG_NAME}_MOD REQUIRED ${${PKG_NAME}_PC_FILE})
   else()
-	  pkg_check_modules(${PKG_NAME} REQUIRED netcdf-cxx4)
+	  pkg_check_modules(${PKG_NAME}_MOD REQUIRED netcdf-cxx4)
   endif()
+endif()
+
+if(${PKG_NAME}_MOD_VERSION)
+  # Extract major, minor and patch version from version string.
+  string(REPLACE "." ";" ${PKG_NAME}_TMP_VERSION ${${PKG_NAME}_MOD_VERSION})
+  SET(${PKG_NAME}_VERSION ${${PKG_NAME}_MOD_VERSION})
+  list(GET ${PKG_NAME}_TMP_VERSION 0 ${PKG_NAME}_VERSION_MAJOR)
+  list(GET ${PKG_NAME}_TMP_VERSION 1 ${PKG_NAME}_VERSION_MINOR)
+  list(GET ${PKG_NAME}_TMP_VERSION 2 ${PKG_NAME}_VERSION_PATCH)
 endif()
 
 include(FindPackageHandleStandardArgs)
 # handle the QUIETLY and REQUIRED arguments and set ${PGK_NAME}_FOUND to TRUE if
 # all listed variables are TRUE
 find_package_handle_standard_args(${PKG_NAME} REQUIRED_VARS ${PKG_NAME}_VERSION ${PKG_NAME}_LIBRARIES ${PKG_NAME}_C_LIBRARIES ${PKG_NAME}_C_INCLUDE_DIR ${PKG_NAME}_INCLUDE_DIR)
-
-
-# Extract major, minor and patch version from version string.
-string(REPLACE "." ";" ${PKG_NAME}_VERSION ${${PKG_NAME}_VERSION})
-list(GET ${PKG_NAME}_VERSION 0 ${PKG_NAME}_VERSION_MAJOR)
-list(GET ${PKG_NAME}_VERSION 1 ${PKG_NAME}_VERSION_MINOR)
-list(GET ${PKG_NAME}_VERSION 2 ${PKG_NAME}_VERSION_PATCH)
 
 
 # Marks cmake cached variables as advanced
