@@ -7,8 +7,9 @@
 #       - qcustomplot_INCLUDE_DIR  - Package include directory
 #       - qcustomplot_LIBRARIES    - Package static libraries
 #
-#  Copyright 2016 Marc Rautenhaus
-#  Copyright 2016 Michael Kern
+#  Copyright 2016-2018 Marc Rautenhaus
+#  Copyright 2016      Michael Kern
+#  Copyright 2017-2018 Bianca Tost
 #
 ####################################################################################################
 
@@ -85,15 +86,20 @@ find_package_handle_standard_args(${PKG_NAME} REQUIRED_VARS ${PKG_NAME}_LIBRARIE
 
 # Extract version number of QCustomPlot library from header-file:
 # Get content of header-file.
-file(STRINGS "${qcustomplot_INCLUDE_DIR}/qcustomplot.h" ${PKG_NAME}_VERSION
+file(STRINGS "${${PKG_NAME}_INCLUDE_DIR}/qcustomplot.h" ${PKG_NAME}_VERSION
      NEWLINE_CONSUME)
 # Extract version from content by matching string: "Version: major.minor.patch".
-string(REGEX MATCH "Version: [0-9][.][0-9][.][0-9]"
+string(REGEX MATCH "Version: [0-9]+([.][0-9]+)?([.][0-9]+)?"
        ${PKG_NAME}_VERSION ${${PKG_NAME}_VERSION})
 # Extract version from matched string by using the white space to create list and
 # choosing the secong argument of the list.
 string(REPLACE " " ";" ${PKG_NAME}_VERSION ${${PKG_NAME}_VERSION})
 list(GET ${PKG_NAME}_VERSION 1 ${PKG_NAME}_VERSION)
+
+if(${PKG_NAME}_VERSION VERSION_LESS "2.0")
+    message(FATAL_ERROR "QCustomPlot library version " ${PKG_NAME}_VERSION " is not supported by Met.3D. Please update QCustomPlot library to version 2.0 or later.")
+endif()
+
 # Split version into major, minor and patch part.
 string(REPLACE "." ";" ${PKG_NAME}_VERSION ${${PKG_NAME}_VERSION})
 # Set major version.
