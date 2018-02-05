@@ -514,9 +514,9 @@ void MSessionManagerDialog::fillCurrentSessionHistoryList()
 
     if (!fileList.isEmpty())
     {
-        QString regExpString = QString("." + currentSession + fileExtension
-                                       + ".\\d+");
-        regExpString.replace(QString("."), QString("\\."));
+        QString regExpString =
+                QRegExp::escape("." + currentSession + fileExtension + ".")
+                + "\\d+";
 
         fileList = fileList.filter(QRegExp(regExpString));
 
@@ -1582,8 +1582,9 @@ void MSessionManagerDialog::updateSessionFileHistory(QString filename)
 {
     QDir directory(path);
     QStringList fileList = directory.entryList(QDir::Files | QDir::Hidden);
-    QString regExpString = QString("." + currentSession + fileExtension + ".\\d+");
-    regExpString.replace(QString("."), QString("\\."));
+    QString regExpString =
+            QRegExp::escape("." + currentSession + fileExtension + ".")
+            + "\\d+";
     fileList = fileList.filter(QRegExp(regExpString));
 
     int fileIndex = 0;
