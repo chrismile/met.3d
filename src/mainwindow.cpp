@@ -254,6 +254,8 @@ MMainWindow::MMainWindow(QStringList commandLineArguments, QWidget *parent)
             sessionManagerDialog, SLOT(saveSession()));
     connect(ui->menuSessions, SIGNAL(triggered(QAction*)),
             this, SLOT(switchSession(QAction*)));
+    connect(ui->menuRevertCurrentSession, SIGNAL(triggered(QAction*)),
+            this, SLOT(revertCurrentSession(QAction*)));
     connect(sessionAutoSaveTimer, SIGNAL(timeout()),
             sessionManagerDialog, SLOT(autoSaveSession()));
 }
@@ -822,6 +824,7 @@ void MMainWindow::onSessionsListChanged(QStringList *sessionsList,
     foreach(QString session, *sessionsList)
     {
         QAction *action = ui->menuSessions->addAction(session);
+        action->setData(session);
         if (session == currentSession)
         {
             QFont actionFont = action->font();
@@ -833,6 +836,24 @@ void MMainWindow::onSessionsListChanged(QStringList *sessionsList,
 }
 
 
+void MMainWindow::onCurrentSessionHistoryChanged(QStringList *sessionHistory)
+{
+    // Clear actions.
+    foreach(QAction *action, ui->menuRevertCurrentSession->actions())
+    {
+        ui->menuRevertCurrentSession->removeAction(action);
+        delete action;
+    }
+    // Add new actions.
+    foreach(QString sessionRevision, *sessionHistory)
+    {
+        QAction *action = ui->menuRevertCurrentSession->addAction(sessionRevision);
+        action->setData(sessionRevision);
+
+    }
+}
+
+
 void MMainWindow::onSessionSwitch(QString currentSession)
 {
     // Change font of previous currentSession back to normal and emphasise
@@ -840,7 +861,7 @@ void MMainWindow::onSessionSwitch(QString currentSession)
     foreach(QAction *action, ui->menuSessions->actions())
     {
         QFont actionFont = action->font();
-        QString session = action->text();
+        QString session = action->data().toString();
         // Emphasise the entry which represents the current session.
         if (session == currentSession)
         {
@@ -1235,23 +1256,20 @@ void MMainWindow::resizeWindow()
     int newHeight = resizeWindowDialog->getHeight();
     // TODO (bt, 25Oct2016) At the moment only resize in one monitor possible
     this->resize(newWidth, newHeight);
-
 }
 
 
 void MMainWindow::switchSession(QAction *sessionAction)
 {
-    QString sessionName = sessionAction->text();
+    sessionManagerDialog->switchToSession(sessionAction->data().toString());
+}
 
-    // Issue that appeared with Qt5: The session names under Linux start
-    // with an "&" that shouldn't be there. Workaround: Remove a preceding
-    // "&" character.
-    if (sessionName.startsWith("&"))
-    {
-        sessionName.remove(0, 1);
-    }
 
-    sessionManagerDialog->switchToSession(sessionName);
+void MMainWindow::revertCurrentSession(QAction *sessionAction)
+{
+    QString sessionNumber = sessionAction->data().toString();
+    sessionNumber = sessionNumber.split(":").first();
+    sessionManagerDialog->revertCurrentSessionToRevision(sessionNumber);
 }
 
 

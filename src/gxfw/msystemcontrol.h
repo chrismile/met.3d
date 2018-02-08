@@ -110,6 +110,8 @@ public:
 
     QtColorPropertyManager* getColorPropertyManager();
 
+    QtPointFPropertyManager* getPointFPropertyManager();
+
     /**
       Returns a pointer to the label that displays render performances.
      */
@@ -241,6 +243,7 @@ private:
     QtStringPropertyManager              *stringPropertyManager;
     QtExtensions::QtClickPropertyManager *clickPropertyManager;
     QtColorPropertyManager               *colorPropertyManager;
+    QtPointFPropertyManager              *pointFPropertyManager;
 
     QtProperty *appConfigGroupProperty;
     QtProperty *windowLayoutGroupProperty;

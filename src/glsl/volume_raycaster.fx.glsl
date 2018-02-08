@@ -324,9 +324,14 @@ bool traverseSectionOfDataVolume_DVR(
                         / (dataExtent.tfMaximum - dataExtent.tfMinimum);
             vec4 blendColor = texture(transferFunction, t).rgba;
             
-            // If we're in shadow mode we're only using the alpha value of
-            // the transfer function.
-            if (shadowRay) blendColor.rgb = shadowColor.rgb;
+            // Shadow mode: Alpha of shadow is determined by alpha of transfer
+            // function colour, multiplied by alpha value of shadow colour to
+            // enable user to control lightness of shadow.
+            if (shadowRay)
+            {
+                blendColor = vec4(shadowColor.rgb,
+                                  blendColor.a * shadowColor.a);
+            }
 
             // Opacity correction.
             // Reference: Engel et al. (Real-time volume graphics, 2006), Eq. 1.17

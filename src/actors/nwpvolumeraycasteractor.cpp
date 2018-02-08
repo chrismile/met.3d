@@ -192,7 +192,7 @@ MNWPVolumeRaycasterActor::LightingSettings::LightingSettings(
     shininessProp = a->addProperty(DOUBLE_PROPERTY, "shininess", groupProp);
     properties->setDouble(shininessProp, shininess, 0.0, 100.0, 3, 1.);
 
-    shadowColorProp = a->addProperty(COLOR_PROPERTY, "shadow color", groupProp);
+    shadowColorProp = a->addProperty(COLOR_PROPERTY, "shadow colour", groupProp);
     properties->mColor()->setValue(shadowColorProp, shadowColor);
 }
 
@@ -577,6 +577,7 @@ void MNWPVolumeRaycasterActor::saveConfiguration(QSettings *settings)
     settings->setValue("renderMode", properties->getEnumItem(renderModeProp));
     settings->setValue("varIndex", variableIndex);
     settings->setValue("shadingVarIndex", shadingVariableIndex);
+    settings->setValue("bBoxEnabled", bBoxEnabled);
 
     // bounding box settings
     // =====================
@@ -678,6 +679,8 @@ void MNWPVolumeRaycasterActor::loadConfiguration(QSettings *settings)
     shadingVariableIndex = settings->value("shadingVarIndex").toInt();
     properties->mInt()->setValue(shadingVariableIndexProp,
                                  shadingVariableIndex);
+    properties->mBool()->setValue(bBoxEnabledProperty,
+                                  settings->value("bBoxEnabled", true).toBool());
 
     // bounding box settings
     // =====================

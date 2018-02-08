@@ -72,9 +72,13 @@ MSceneViewGLWidget::MSceneViewGLWidget()
       posLabelIsEnabled(true),
       multisamplingEnabled(true),
       antialiasingEnabled(false),
+      synchronizationControl(nullptr),
+      displayDateTimeLabel(nullptr),
+      displayDateTimeFontSize(24.),
+      displayDateTimeColour(QColor(0, 0, 0)),
+      sceneNameLabel(nullptr),
       measureFPS(false),
       measureFPSFrameCount(0),
-      sceneNameLabel(nullptr),
       visualizationParameterChange(false),
       cameraSyncronizedWith(nullptr),
       singleInteractionActor(nullptr),
@@ -349,6 +353,59 @@ MSceneViewGLWidget::MSceneViewGLWidget()
             ->addProperty("30s FPS measurement");
     renderingGroupProperty->addSubProperty(measureFPSProperty);
 #endif
+    // Annotations.
+    annotationsGroupProperty = systemControl->getGroupPropertyManager()
+            ->addProperty("annotations");
+    propertyGroup->addSubProperty(annotationsGroupProperty);
+
+    // Display date time.
+    displayDateTimeGroupProperty = systemControl->getGroupPropertyManager()
+            ->addProperty("time");
+    annotationsGroupProperty->addSubProperty(displayDateTimeGroupProperty);
+
+    displayDateTimeSyncControlProperty = systemControl->getEnumPropertyManager()
+            ->addProperty("synchronise with");
+    systemControl->getEnumPropertyManager()
+            ->setEnumNames(displayDateTimeSyncControlProperty,
+                           systemControl->getSyncControlIdentifiers());
+    displayDateTimeGroupProperty->addSubProperty(displayDateTimeSyncControlProperty);
+
+    displayDateTimeFontSizeProperty = systemControl
+            ->getDecoratedDoublePropertyManager()->addProperty("font size");
+    systemControl->getDecoratedDoublePropertyManager()
+            ->setValue(displayDateTimeFontSizeProperty, displayDateTimeFontSize);
+    displayDateTimeGroupProperty->addSubProperty(displayDateTimeFontSizeProperty);
+
+    displayDateTimeColourProperty = systemControl->getColorPropertyManager()
+            ->addProperty("font colour");
+    systemControl->getColorPropertyManager()
+            ->setValue(displayDateTimeColourProperty, displayDateTimeColour);
+    displayDateTimeGroupProperty->addSubProperty(displayDateTimeColourProperty);
+
+    displayDateTimeBBoxProperty = systemControl->getBoolPropertyManager()
+            ->addProperty("bounding box");
+    systemControl->getBoolPropertyManager()
+            ->setValue(displayDateTimeBBoxProperty, "true");
+    displayDateTimeGroupProperty->addSubProperty(displayDateTimeBBoxProperty);
+
+    displayDateTimeBBoxColourProperty = systemControl->getColorPropertyManager()
+            ->addProperty("bbox colour");
+    systemControl->getColorPropertyManager()
+            ->setValue(displayDateTimeBBoxColourProperty,
+                       QColor(255, 255, 255, 200));
+    displayDateTimeGroupProperty->addSubProperty(displayDateTimeBBoxColourProperty);
+
+    displayDateTimePositionProperty = systemControl->getPointFPropertyManager()
+            ->addProperty("position");
+    systemControl->getPointFPropertyManager()
+            ->setValue(displayDateTimePositionProperty, QPointF(-0.99, 0.99));
+    systemControl->getPointFPropertyManager()
+            ->subDoublePropertyManager()->setSingleStep(
+                displayDateTimePositionProperty->subProperties().at(0), 0.1);
+    systemControl->getPointFPropertyManager()
+            ->subDoublePropertyManager()->setSingleStep(
+                displayDateTimePositionProperty->subProperties().at(1), 0.1);
+    displayDateTimeGroupProperty->addSubProperty(displayDateTimePositionProperty);
 
     // North arrow.
     northArrow.enabled = false;
@@ -360,7 +417,7 @@ MSceneViewGLWidget::MSceneViewGLWidget()
     northArrow.worldZ = 1.;
     northArrow.groupProperty = systemControl->getGroupPropertyManager()
             ->addProperty("arrow pointing north");
-    propertyGroup->addSubProperty(northArrow.groupProperty);
+    annotationsGroupProperty->addSubProperty(northArrow.groupProperty);
 
     northArrow.enabledProperty = systemControl->getBoolPropertyManager()
             ->addProperty("enabled");
@@ -433,6 +490,17 @@ MSceneViewGLWidget::MSceneViewGLWidget()
             ->setValue(northArrow.colourProperty, northArrow.colour);
     northArrow.groupProperty->addSubProperty(northArrow.colourProperty);
 
+    // Scene view label.
+    sceneViewLabelGroupProperty = systemControl->getGroupPropertyManager()
+            ->addProperty("scene view label");
+    annotationsGroupProperty->addSubProperty(sceneViewLabelGroupProperty);
+
+    sceneViewLabelEnableProperty = systemControl->getBoolPropertyManager()
+            ->addProperty("enable");
+    systemControl->getBoolPropertyManager()->setValue(
+                sceneViewLabelEnableProperty, true);
+    sceneViewLabelGroupProperty->addSubProperty(sceneViewLabelEnableProperty);
+
 
     // Inform the scene view control about this scene view and connect to its
     // propertyChanged() signal.
@@ -450,6 +518,9 @@ MSceneViewGLWidget::MSceneViewGLWidget()
             SIGNAL(propertyChanged(QtProperty*)),
             SLOT(onPropertyChanged(QtProperty*)));
     connect(systemControl->getColorPropertyManager(),
+            SIGNAL(propertyChanged(QtProperty*)),
+            SLOT(onPropertyChanged(QtProperty*)));
+    connect(systemControl->getPointFPropertyManager(),
             SIGNAL(propertyChanged(QtProperty*)),
             SLOT(onPropertyChanged(QtProperty*)));
 
@@ -473,6 +544,11 @@ MSceneViewGLWidget::~MSceneViewGLWidget()
             s += QString("%1 ").arg(fpsTimeseries[i]);
         LOG4CPLUS_DEBUG(mlog, s.toStdString());
         delete[] fpsTimeseries;
+    }
+
+    if (synchronizationControl != nullptr)
+    {
+        synchronizeWith(nullptr);
     }
 }
 
@@ -499,7 +575,6 @@ void MSceneViewGLWidget::setScene(MSceneControl *scene)
     if (!viewIsInitialised) return;
 
     updateSceneLabel();
-//    updateDisplayTime();
 
 #ifndef CONTINUOUS_GL_UPDATE
     updateGL();
@@ -1058,6 +1133,63 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
     }
 #endif
 
+    else if (property == displayDateTimeSyncControlProperty)
+    {
+        if (!updatesEnabled())
+        {
+            return;
+        }
+
+        MSystemManagerAndControl *sysMC =
+                MSystemManagerAndControl::getInstance();
+        int index = sysMC->getEnumPropertyManager()
+                ->value(displayDateTimeSyncControlProperty);
+        synchronizeWith(sysMC->getSyncControl(
+                            sysMC->getSyncControlIdentifiers().at(index)));
+
+        updateDisplayTime();
+    }
+
+    else if (property == displayDateTimeFontSizeProperty)
+    {
+        MSystemManagerAndControl *sysMC =
+                MSystemManagerAndControl::getInstance();
+        displayDateTimeFontSize = sysMC->getDecoratedDoublePropertyManager()
+                ->value(displayDateTimeFontSizeProperty);
+
+        if (!updatesEnabled())
+        {
+            return;
+        }
+
+        updateDisplayTime();
+    }
+
+    else if (property == displayDateTimeColourProperty)
+    {
+        MSystemManagerAndControl *sysMC =
+                MSystemManagerAndControl::getInstance();
+        displayDateTimeColour = sysMC->getColorPropertyManager()
+                ->value(displayDateTimeColourProperty);
+
+        if (!updatesEnabled())
+        {
+            return;
+        }
+
+        updateDisplayTime();
+    }
+
+    else if (property == displayDateTimeBBoxProperty
+             || property == displayDateTimeBBoxColourProperty
+             || property == displayDateTimePositionProperty)
+    {
+        if (updatesEnabled())
+        {
+            updateDisplayTime();
+        }
+    }
+
     else if (property == northArrow.enabledProperty)
     {
         northArrow.enabled = MSystemManagerAndControl::getInstance()
@@ -1125,36 +1257,67 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
         updateGL();
 #endif
     }
+
+    else if (property == sceneViewLabelEnableProperty)
+    {
+        updateSceneLabel();
+#ifndef CONTINUOUS_GL_UPDATE
+        updateGL();
+#endif
+    }
 }
 
 
-//void MSceneViewGLWidget::updateDisplayTime()
-//{
-//    MTextManager* tm = MGLResourcesManager::getInstance()->getTextManager();
+void MSceneViewGLWidget::updateDisplayTime()
+{
+    MTextManager* tm = MGLResourcesManager::getInstance()->getTextManager();
 
-//    for (int i = 0; i < staticLabels.size(); i++)
-//        if (staticLabels[i] == sceneTimeLabel) {
-//            staticLabels.removeAt(i);
-//            tm->removeText(sceneTimeLabel);
-//            break;
-//        }
+    int i = staticLabels.indexOf(displayDateTimeLabel);
+    if (i >= 0)
+    {
+        staticLabels.removeAt(i);
+        tm->removeText(displayDateTimeLabel);
+    }
 
-//    QDateTime validTime = scene->validDateTimeEdit()->dateTime();
-//    QDateTime initTime  = scene->initDateTimeEdit()->dateTime();
+    if (synchronizationControl == nullptr)
+    {
+        return;
+    }
 
-//    QString str = QString("Valid: %1 (step %2 hrs from %3)")
-//            .arg(validTime.toString("ddd yyyy-MM-dd hh:mm UTC"))
-//            .arg(int(initTime.secsTo(validTime) / 3600.))
-//            .arg(initTime.toString("ddd yyyy-MM-dd hh:mm UTC"));
+    QDateTime validTime = synchronizationControl->validDateTime();
+    QDateTime initTime  = synchronizationControl->initDateTime();
 
-//    sceneTimeLabel = tm->addText(
-//                str,
-//                MTextManager::CLIPSPACE, -0.99, 0.99, -0.99, 24,
-//                QColor(0, 0, 0),
-//                MTextManager::UPPERLEFT,
-//                true, QColor(255, 255, 255, 200));
-//    staticLabels.append(sceneTimeLabel);
-//}
+    QString str = QString("Valid: %1 (step %2 hrs from %3)")
+            .arg(validTime.toString("ddd yyyy-MM-dd hh:mm UTC"))
+            .arg(int(initTime.secsTo(validTime) / 3600.))
+            .arg(initTime.toString("ddd yyyy-MM-dd hh:mm UTC"));
+
+    MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
+
+    QPointF position = sysMC->getPointFPropertyManager()
+            ->value(displayDateTimePositionProperty);
+
+    displayDateTimeLabel = tm->addText(
+                str,
+                MTextManager::CLIPSPACE,
+                position.x(), position.y(), -0.99,
+                displayDateTimeFontSize,
+                displayDateTimeColour,
+                MTextManager::UPPERLEFT,
+                sysMC->getBoolPropertyManager()->value(
+                    displayDateTimeBBoxProperty),
+                sysMC->getColorPropertyManager()->value(
+                    displayDateTimeBBoxColourProperty));
+
+    staticLabels.append(displayDateTimeLabel);
+
+#ifndef CONTINUOUS_GL_UPDATE
+    if (viewIsInitialised)
+    {
+        updateGL();
+    }
+#endif
+}
 
 
 void MSceneViewGLWidget::updateFPSTimer()
@@ -1254,7 +1417,7 @@ void MSceneViewGLWidget::initializeGL()
     }
 
     // Show scene time.
-//    updateDisplayTime();
+    updateDisplayTime();
     updateCameraPositionDisplay();
 
     viewIsInitialised = true;
@@ -2023,8 +2186,18 @@ void MSceneViewGLWidget::updateSceneLabel()
         if (staticLabels[i] == sceneNameLabel)
         {
             staticLabels.removeAt(i);
-            MGLResourcesManager::getInstance()->getTextManager()->removeText(sceneNameLabel);
+            MGLResourcesManager::getInstance()->getTextManager()->removeText(
+                        sceneNameLabel);
         }
+    }
+
+    bool labelEnabled =
+            MSystemManagerAndControl::getInstance()->getBoolPropertyManager()
+            ->value(sceneViewLabelEnableProperty);
+
+    if (!labelEnabled)
+    {
+        return;
     }
 
     // Create a new scene description label (view number and scene name in
@@ -2068,6 +2241,32 @@ void MSceneViewGLWidget::saveTimeAnimationImage(QString path, QString filename)
         }
     }
     saveScreenshotToFileName(filename);
+}
+
+
+void MSceneViewGLWidget::updateSyncControlProperty()
+{
+    MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
+
+    QString syncControlName = "None";
+    int currentIndex = sysMC->getEnumPropertyManager()
+            ->value(displayDateTimeSyncControlProperty);
+
+    if (currentIndex > 0)
+    {
+        syncControlName = sysMC->getEnumPropertyManager()
+                ->enumNames(displayDateTimeSyncControlProperty).at(currentIndex);
+    }
+
+    sysMC->getEnumPropertyManager()
+            ->setEnumNames(displayDateTimeSyncControlProperty,
+                           sysMC->getSyncControlIdentifiers());
+
+    currentIndex =
+            max(0, sysMC->getSyncControlIdentifiers().indexOf(syncControlName));
+
+    sysMC->getEnumPropertyManager()->setValue(displayDateTimeSyncControlProperty,
+                                              currentIndex);
 }
 
 
@@ -2269,7 +2468,25 @@ void MSceneViewGLWidget::saveConfiguration(QSettings *settings)
     settings->setValue("verticalScaling", ztop);
     settings->endGroup(); // rendering
 
-    // Load arrow pointing north properties.
+    // Save display date time properties.
+    settings->beginGroup("DisplayDateTime");
+    QString syncControlName = "None";
+    if (synchronizationControl != nullptr)
+    {
+        syncControlName = synchronizationControl->getID();
+    }
+    settings->setValue("syncControl", syncControlName);
+    settings->setValue("fontSize", displayDateTimeFontSize);
+    settings->setValue("fontColour", displayDateTimeColour);
+    settings->setValue("bBox", sysMC->getBoolPropertyManager()
+                       ->value(displayDateTimeBBoxProperty));
+    settings->setValue("bBoxColour", sysMC->getColorPropertyManager()
+                       ->value(displayDateTimeBBoxColourProperty));
+    settings->setValue("position", sysMC->getPointFPropertyManager()
+                       ->value(displayDateTimePositionProperty));
+    settings->endGroup(); // display date time
+
+    // Save arrow pointing north properties.
     settings->beginGroup("ArrowPointingNorth");
     settings->setValue("enabled",  sysMC->getBoolPropertyManager()->value(
                            northArrow.enabledProperty));
@@ -2284,6 +2501,12 @@ void MSceneViewGLWidget::saveConfiguration(QSettings *settings)
     settings->setValue("colour",  sysMC->getColorPropertyManager()
                        ->value(northArrow.colourProperty));
     settings->endGroup(); // arrow pointing north
+
+    // Save scene view label properties.
+    settings->beginGroup("SceneViewLabel");
+    settings->setValue("enabled", sysMC->getBoolPropertyManager()->value(
+                           sceneViewLabelEnableProperty));
+    settings->endGroup(); // scene view label
 }
 
 
@@ -2363,6 +2586,28 @@ void MSceneViewGLWidget::loadConfiguration(QSettings *settings)
                 settings->value("verticalScaling", 36.).toDouble());
     settings->endGroup(); // rendering
 
+    // Load display date time properties.
+    settings->beginGroup("DisplayDateTime");
+    QString syncControlName = settings->value("syncControl", "None").toString();
+    sysMC->getDecoratedDoublePropertyManager()->setValue(
+                displayDateTimeFontSizeProperty,
+                settings->value("fontSize", 24.).toDouble());
+    sysMC->getColorPropertyManager()->setValue(
+                displayDateTimeColourProperty,
+                settings->value("fontColour", QColor(0, 0, 0)).value<QColor>());
+    sysMC->getBoolPropertyManager()->setValue(
+                displayDateTimeBBoxProperty,
+                settings->value("bBox", true).toBool());
+    sysMC->getColorPropertyManager()->setValue(
+                displayDateTimeBBoxColourProperty,
+                settings->value("bBoxColour", QColor(255, 255, 255, 200))
+                .value<QColor>());
+    sysMC->getPointFPropertyManager()->setValue(
+                displayDateTimePositionProperty,
+                settings->value("position", QPointF(-0.99, 0.99)).toPointF());
+    settings->endGroup(); // display date time
+    synchronizeWith(sysMC->getSyncControl(syncControlName));
+
     // Load arrow pointing north properties.
     settings->beginGroup("ArrowPointingNorth");
     sysMC->getBoolPropertyManager()->setValue(
@@ -2390,6 +2635,13 @@ void MSceneViewGLWidget::loadConfiguration(QSettings *settings)
                 settings->value("colour", QColor(222, 46, 30)).value<QColor>());
     settings->endGroup(); // arrow pointing north
 
+    // Load scene view label properties.
+    settings->beginGroup("SceneViewLabel");
+    sysMC->getBoolPropertyManager()->setValue(
+                sceneViewLabelEnableProperty,
+                settings->value("enabled", true).toBool());
+    settings->endGroup(); // scene view label
+
     camera.loadConfiguration(settings);
 }
 
@@ -2399,6 +2651,73 @@ void MSceneViewGLWidget::onHandleSizeChanged()
 #ifndef CONTINUOUS_GL_UPDATE
     updateGL();
 #endif
+}
+
+
+void MSceneViewGLWidget::synchronizeWith(
+        MSyncControl *sync, bool updateGUIProperties)
+{
+    if (synchronizationControl == sync)
+    {
+        return;
+    }
+
+    // Reset connection to current synchronization control.
+    // ====================================================
+
+    // If the view is currently connected to a sync control, disconnect the
+    // signals.
+    if (synchronizationControl != nullptr)
+    {
+#ifdef DIRECT_SYNCHRONIZATION
+        synchronizationControl->deregisterSynchronizedClass(this);
+#else
+        disconnect(synchronizationControl, SIGNAL(initDateTimeChanged(QDateTime)),
+                   this, SLOT(updateDisplayTime()));
+        disconnect(synchronizationControl, SIGNAL(validDateTimeChanged(QDateTime)),
+                   this, SLOT(updateDisplayTime()));
+#endif
+    }
+
+    MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
+
+    // Connect to new sync control and try to switch to its current times.
+    synchronizationControl = sync;
+
+    // Update "synchronizationProperty".
+    // =================================
+    setUpdatesEnabled(false);
+    QString newSyncID =
+            (sync == nullptr) ? "None" : synchronizationControl->getID();
+    int index =
+            sysMC->getEnumPropertyManager()->enumNames(
+                displayDateTimeSyncControlProperty).indexOf(newSyncID);
+    sysMC->getEnumPropertyManager()->setValue(
+                displayDateTimeSyncControlProperty, index);
+    setUpdatesEnabled(true);
+
+    // Connect to new sync control and synchronize.
+    // ============================================
+    if (sync != nullptr)
+    {
+#ifdef DIRECT_SYNCHRONIZATION
+        synchronizationControl->registerSynchronizedClass(this);
+#else
+        connect(synchronizationControl, SIGNAL(initDateTimeChanged(QDateTime)),
+                this, SLOT(updateDisplayTime()));
+        connect(synchronizationControl, SIGNAL(validDateTimeChanged(QDateTime)),
+                this, SLOT(updateDisplayTime()));
+#endif
+    }
+}
+
+
+bool MSceneViewGLWidget::synchronizationEvent(
+        MSynchronizationType, QVector<QVariant>)
+{
+    updateDisplayTime();
+
+    return false;
 }
 
 

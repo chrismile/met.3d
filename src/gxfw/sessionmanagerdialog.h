@@ -84,6 +84,13 @@ public:
      */
     void switchToSession(QString sessionName);
 
+    /**
+      Reverts current session to its revision with number @p revisionNumber.
+
+      Builds the filename of the revision file and tries to load it.
+     */
+    void revertCurrentSessionToRevision(QString revisionNumber);
+
     bool getAutoSaveSession();
 
     bool getLoadSessionOnStart() { return loadOnStart; }
@@ -153,6 +160,8 @@ public slots:
      */
     void fillSessionsList();
 
+    void fillCurrentSessionHistoryList();
+
     /**
       Propagates changes of auto save interval.
      */
@@ -189,7 +198,7 @@ private:
 
     void saveSessionToFile(QString sessionName, bool autoSave = false);
 
-    void loadSessionFromFile(QString sessionName);
+    void loadSessionFromFile(QString sessionName, bool appendFileExtension=true);
 
     MActor *createActor(QString actorType);
 
@@ -208,6 +217,14 @@ private:
       @p sessionName.
      */
     int getSmallestIndexForUniqueName(QString sessionName);
+
+    /**
+      Updates history of a session by coping the file given by @p filename
+      (path + filename + file extension) to
+      ".[currentSessionName].[sessionFileExtension].[revisionNumber]" and by
+      removing files with smallest indices if too many revision files exist.
+     */
+    void updateSessionFileHistory(QString filename);
 
     Ui::MSessionManagerDialog *ui;
 
