@@ -157,42 +157,45 @@ MTrajectoryActor::MTrajectoryActor()
     particlePosTimeProperty->setToolTip("Not selectable for 'tubes' and 'all"
                                         " positions' render mode");
 
-    // Property: Trajectory calculation
-    calculationPropertyGroup = addProperty(GROUP_PROPERTY, "calculation",
+    // Property: Trajectory computation.
+    computationPropertyGroup = addProperty(GROUP_PROPERTY,
+                                           "trajectory computation",
                                            actorPropertiesSupGroup);
-    calculationLineTypeProperty = addProperty(ENUM_PROPERTY, "line type",
-                                              calculationPropertyGroup);
-    properties->mEnum()->setEnumNames(calculationLineTypeProperty,
-                                      QStringList() << "Path" << "Stream");
+    computationLineTypeProperty = addProperty(ENUM_PROPERTY, "line type",
+                                              computationPropertyGroup);
+    properties->mEnum()->setEnumNames(computationLineTypeProperty,
+                                      QStringList()
+                                      << "trajectories (path lines)"
+                                      << "stream lines");
 
-    calculationIterationMethodProperty = addProperty(ENUM_PROPERTY, "method",
-                                                     calculationPropertyGroup);
-    properties->mEnum()->setEnumNames(calculationIterationMethodProperty,
+    computationIntegrationMethodProperty = addProperty(
+                ENUM_PROPERTY, "integration", computationPropertyGroup);
+    properties->mEnum()->setEnumNames(computationIntegrationMethodProperty,
                                       QStringList() << "Euler"
                                       << "Runge-Kutta");
 
-    calculationInterpolationMethodProperty = addProperty(
-                ENUM_PROPERTY, "interpolation", calculationPropertyGroup);
-    properties->mEnum()->setEnumNames(calculationInterpolationMethodProperty,
-                                      QStringList() << "Lagranto" << "Met3D");
+    computationInterpolationMethodProperty = addProperty(
+                ENUM_PROPERTY, "interpolation", computationPropertyGroup);
+    properties->mEnum()->setEnumNames(computationInterpolationMethodProperty,
+                                      QStringList()
+                                      << "Lagranto"
+                                      << "trilinear (lon-lat-lnp)");
 
-    calculationIterationCountProperty = addProperty(INT_PROPERTY,
+    computationIterationCountProperty = addProperty(INT_PROPERTY,
                                                     "iteration per timestep",
-                                                    calculationPropertyGroup);
-    properties->setInt(calculationIterationCountProperty, 5, 1, 1000);
+                                                    computationPropertyGroup);
+    properties->setInt(computationIterationCountProperty, 5, 1, 1000);
 
-    calculationDeltaTimeProperty = addProperty(ENUM_PROPERTY, "delta time",
-                                               calculationPropertyGroup);
-    calculationDeltaTimeProperty->setToolTip(
-                "Not selectable for precomputed datasource");
+    computationIntegrationTimeProperty = addProperty(
+                ENUM_PROPERTY, "integration time", computationPropertyGroup);
+    computationIntegrationTimeProperty->setToolTip(
+                "integration time from \"trajectory start\" time specified above");
 
-    calculationSeedPropertyGroup = addProperty(GROUP_PROPERTY, "seeding",
-                                               calculationPropertyGroup);
-    calculationSeedAddActorProperty = addProperty(CLICK_PROPERTY, "Add",
-                                                  calculationSeedPropertyGroup);
-    calculationSeedClearActorProperty = addProperty(
-                CLICK_PROPERTY, "Clear", calculationSeedPropertyGroup);
-
+    computationSeedPropertyGroup = addProperty(
+                GROUP_PROPERTY, "seed points (start positions)",
+                computationPropertyGroup);
+    computationSeedAddActorProperty = addProperty(CLICK_PROPERTY, "add",
+                                                  computationSeedPropertyGroup);
 
     // Ensemble.
     QStringList ensembleModeNames;
@@ -207,22 +210,28 @@ MTrajectoryActor::MTrajectoryActor()
     properties->setInt(ensembleMemberProperty, 0, 0, 50, 1);
 
     // Trajectory filtering.
-    enableFilterProperty = addProperty(BOOL_PROPERTY, "filter trajectories",
-                                       actorPropertiesSupGroup);
-    properties->mBool()->setValue(enableFilterProperty, true);
+    filtersGroupProperty =  addProperty(
+                GROUP_PROPERTY, "trajectory filters",
+                actorPropertiesSupGroup);
+    enableAscentFilterProperty = addProperty(BOOL_PROPERTY, "ascent",
+                                       filtersGroupProperty);
+    properties->mBool()->setValue(enableAscentFilterProperty, true);
 
     deltaPressureFilterProperty = addProperty(DECORATEDDOUBLE_PROPERTY,
-                                        "pressure difference",
-                                        actorPropertiesSupGroup);
+                                              "pressure difference",
+                                              enableAscentFilterProperty);
     properties->setDDouble(deltaPressureFilterProperty, 500., 1., 1050., 2, 5.,
                            " hPa");
 
     deltaTimeFilterProperty = addProperty(DECORATEDDOUBLE_PROPERTY,
                                           "time interval",
-                                          actorPropertiesSupGroup);
+                                          enableAscentFilterProperty);
     properties->setDDouble(deltaTimeFilterProperty, 48, 1, 48, 0, 1, " hrs");
 
-    actorPropertiesSupGroup->addSubProperty(bBoxConnection->getProperty());
+    filtersGroupProperty->addSubProperty(bBoxConnection->getProperty());
+
+    renderingGroupProperty = addProperty(GROUP_PROPERTY, "rendering",
+                                         actorPropertiesSupGroup);
 
     // Transfer function.
     // Scan currently available actors for transfer functions. Add TFs to
@@ -237,27 +246,28 @@ MTrajectoryActor::MTrajectoryActor()
             availableTFs << tf->transferFunctionName();
         }
     }
-    transferFunctionProperty = addProperty(ENUM_PROPERTY, "transfer function",
-                                           actorPropertiesSupGroup);
+    transferFunctionProperty = addProperty(ENUM_PROPERTY,
+                                           "transfer function pressure",
+                                           renderingGroupProperty);
     properties->mEnum()->setEnumNames(transferFunctionProperty, availableTFs);
 
     // Render mode and parameters.
     tubeRadiusProperty = addProperty(DECORATEDDOUBLE_PROPERTY, "tube radius",
-                                     actorPropertiesSupGroup);
+                                     renderingGroupProperty);
     properties->setDDouble(tubeRadiusProperty, tubeRadius,
                            0.01, 1., 2, 0.1, " (world space)");
 
     sphereRadiusProperty = addProperty(DECORATEDDOUBLE_PROPERTY, "sphere radius",
-                                       actorPropertiesSupGroup);
+                                       renderingGroupProperty);
     properties->setDDouble(sphereRadiusProperty, sphereRadius,
                            0.01, 1., 2, 0.1, " (world space)");
 
     enableShadowProperty = addProperty(BOOL_PROPERTY, "render shadows",
-                                       actorPropertiesSupGroup);
+                                       renderingGroupProperty);
     properties->mBool()->setValue(enableShadowProperty, shadowEnabled);
 
     colourShadowProperty = addProperty(BOOL_PROPERTY, "colour shadows",
-                                       actorPropertiesSupGroup);
+                                       renderingGroupProperty);
     properties->mBool()->setValue(colourShadowProperty, shadowColoured);
 
     // Observe the creation/deletion of other actors
@@ -336,7 +346,7 @@ void MTrajectoryActor::saveConfiguration(QSettings *settings)
                        properties->mBool()->value(synchronizeEnsembleProperty));
 
     settings->setValue("enableFilter",
-                       properties->mBool()->value(enableFilterProperty));
+                       properties->mBool()->value(enableAscentFilterProperty));
 
     settings->setValue("deltaPressure",
                        properties->mDDouble()->value(deltaPressureFilterProperty));
@@ -353,36 +363,36 @@ void MTrajectoryActor::saveConfiguration(QSettings *settings)
     settings->setValue("shadowEnabled", shadowEnabled);
     settings->setValue("shadowColoured", shadowColoured);
 
-    // Save calculation properties.
+    // Save computation properties.
     settings->setValue(
-                "calculationLineTypeProperty",
-                properties->mEnum()->value(calculationLineTypeProperty));
+                "computationLineTypeProperty",
+                properties->mEnum()->value(computationLineTypeProperty));
     settings->setValue(
-                "calculationIterationMethodProperty",
-                properties->mEnum()->value(calculationLineTypeProperty));
-    settings->setValue("calculationInterpolationMethodProperty",
+                "computationIterationMethodProperty",
+                properties->mEnum()->value(computationLineTypeProperty));
+    settings->setValue("computationInterpolationMethodProperty",
                        properties->mEnum()->value(
-                           calculationInterpolationMethodProperty));
+                           computationInterpolationMethodProperty));
     settings->setValue(
-                "calculationIterationCountProperty",
-                properties->mInt()->value(calculationIterationCountProperty));
+                "computationIterationCountProperty",
+                properties->mInt()->value(computationIterationCountProperty));
     settings->setValue(
-                "calculationDeltaTimeProperty",
-                properties->mEnum()->value(calculationDeltaTimeProperty));
+                "computationDeltaTimeProperty",
+                properties->mEnum()->value(computationIntegrationTimeProperty));
     settings->setValue(
-                "calculationSeedActorSize",
-                calculationSeedActorProperties.size());
-    for (int i = 0; i <  calculationSeedActorProperties.size(); i++)
+                "computationSeedActorSize",
+                computationSeedActorProperties.size());
+    for (int i = 0; i <  computationSeedActorProperties.size(); i++)
     {
-        const SeedActorSettings& sas = calculationSeedActorProperties.at(i);
-        settings->setValue(QString("calculationSeedActorName%1").arg(i),
+        const SeedActorSettings& sas = computationSeedActorProperties.at(i);
+        settings->setValue(QString("computationSeedActorName%1").arg(i),
                            sas.propertyGroup->propertyName());
-        settings->setValue(QString("calculationSeedActorStepSizeLon%1").arg(i),
-                           properties->mDouble()->value(sas.stepSizeLon));
-        settings->setValue(QString("calculationSeedActorStepSizeLat%1").arg(i),
-                           properties->mDouble()->value(sas.stepSizeLat));
+        settings->setValue(QString("computationSeedActorStepSizeLon%1").arg(i),
+                           properties->mDouble()->value(sas.lonSpacing));
+        settings->setValue(QString("computationSeedActorStepSizeLat%1").arg(i),
+                           properties->mDouble()->value(sas.latSpacing));
         settings->setValue(
-                    QString("calculationSeedActorPressureLevels%1").arg(i),
+                    QString("computationSeedActorPressureLevels%1").arg(i),
                     properties->mString()->value(sas.pressureLevels));
     }
 
@@ -501,7 +511,7 @@ void MTrajectoryActor::loadConfiguration(QSettings *settings)
     }
 
     properties->mBool()->setValue(
-                enableFilterProperty,
+                enableAscentFilterProperty,
                 settings->value("enableFilter", true).toBool());
 
     properties->mDDouble()->setValue(
@@ -572,43 +582,43 @@ void MTrajectoryActor::loadConfiguration(QSettings *settings)
                 settings->value("shadowColoured", false).toBool());
 
 
-    // Load calculation properties (The saved actors should already be initialized)
+    // Load computation properties (The saved actors should already be initialized)
     properties->mEnum()->setValue(
-                calculationLineTypeProperty,
-                settings->value("calculationLineTypeProperty", 0).toInt());
+                computationLineTypeProperty,
+                settings->value("computationLineTypeProperty", 0).toInt());
     properties->mEnum()->setValue(
-                calculationIterationMethodProperty,
-                settings->value("calculationIterationMethodProperty",
+                computationIntegrationMethodProperty,
+                settings->value("computationIterationMethodProperty",
                                 0).toInt());
     properties->mEnum()->setValue(
-                calculationInterpolationMethodProperty,
-                settings->value("calculationInterpolationMethodProperty",
+                computationInterpolationMethodProperty,
+                settings->value("computationInterpolationMethodProperty",
                                 0).toInt());
     properties->mInt()->setValue(
-                calculationIterationCountProperty,
-                settings->value("calculationIterationCountProperty",
+                computationIterationCountProperty,
+                settings->value("computationIterationCountProperty",
                                 5).toInt());
     properties->mEnum()->setValue(
-                calculationDeltaTimeProperty,
-                settings->value("calculationDeltaTimeProperty", 0).toInt());
+                computationIntegrationTimeProperty,
+                settings->value("computationDeltaTimeProperty", 0).toInt());
 
     // Remove current seed actors.
     clearSeedActor();
 
     const int actorCount =
-            settings->value("calculationSeedActorSize", 0).toInt();
+            settings->value("computationSeedActorSize", 0).toInt();
     for (int i = 0; i < actorCount; i++)
     {
         QString actorName = settings->value(
-                    QString("calculationSeedActorName%1").arg(i)).toString();
+                    QString("computationSeedActorName%1").arg(i)).toString();
         double deltaLon =
-                settings->value(QString("calculationSeedActorStepSizeLon%1")
+                settings->value(QString("computationSeedActorStepSizeLon%1")
                                 .arg(i)).toDouble();
         double deltaLat =
-                settings->value(QString("calculationSeedActorStepSizeLat%1")
+                settings->value(QString("computationSeedActorStepSizeLat%1")
                                 .arg(i)).toDouble();
         QString presLvls =
-                settings->value(QString("calculationSeedActorPressureLevels%1")
+                settings->value(QString("computationSeedActorPressureLevels%1")
                                 .arg(i)).toString();
         addSeedActor(actorName, deltaLon, deltaLat,
                      parsePressureLevelString(presLvls));
@@ -1439,7 +1449,7 @@ void MTrajectoryActor::onActorDeleted(MActor *actor)
     // check whether the actor is in our seed list
     else
     {
-        for (SeedActorSettings& sas : calculationSeedActorProperties)
+        for (SeedActorSettings& sas : computationSeedActorProperties)
         {
             if (sas.actor == actor)
             {
@@ -1476,7 +1486,7 @@ void MTrajectoryActor::onActorRenamed(MActor *actor, QString oldName)
     // check whether the actor is in our seed list
     else
     {
-        for (SeedActorSettings& sas : calculationSeedActorProperties)
+        for (SeedActorSettings& sas : computationSeedActorProperties)
         {
             if (sas.actor == actor)
             {
@@ -1764,7 +1774,7 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
         asynchronousDataRequest();
     }
 
-    else if (property == enableFilterProperty)
+    else if (property == enableAscentFilterProperty)
     {
         if (suppressActorUpdates()) return;
         asynchronousSelectionRequest();
@@ -1868,48 +1878,48 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
         asynchronousSelectionRequest();
     }
 
-    else if (property == calculationLineTypeProperty)
+    else if (property == computationLineTypeProperty)
     {
-        TRAJ_CALC_LINE_TYPE lineType = TRAJ_CALC_LINE_TYPE(properties->mEnum()->value(calculationLineTypeProperty));
+        TRAJ_CALC_LINE_TYPE lineType = TRAJ_CALC_LINE_TYPE(properties->mEnum()->value(computationLineTypeProperty));
         switch (lineType)
         {
             case PATH_LINE:
-                calculationDeltaTimeProperty->setEnabled(true);
+                computationIntegrationTimeProperty->setEnabled(true);
                 break;
             case STREAM_LINE:
-                calculationDeltaTimeProperty->setEnabled(false);
+                computationIntegrationTimeProperty->setEnabled(false);
                 break;
         }
         if (suppressActorUpdates()) return;
         asynchronousDataRequest();
     }
 
-    else if (property == calculationDeltaTimeProperty)
+    else if (property == computationIntegrationTimeProperty)
     {
         if (suppressUpdate) return; // ignore if init times are being updated
         if (suppressActorUpdates()) return;
         asynchronousDataRequest();
     }
 
-    else if (property == calculationIterationCountProperty)
+    else if (property == computationIterationCountProperty)
     {
         if (suppressActorUpdates()) return;
         asynchronousDataRequest();
     }
 
-    else if (property == calculationIterationMethodProperty)
+    else if (property == computationIntegrationMethodProperty)
     {
         if (suppressActorUpdates()) return;
         asynchronousDataRequest();
     }
 
-    else if (property == calculationInterpolationMethodProperty)
+    else if (property == computationInterpolationMethodProperty)
     {
         if (suppressActorUpdates()) return;
         asynchronousDataRequest();
     }
 
-    else if (property == calculationSeedAddActorProperty)
+    else if (property == computationSeedAddActorProperty)
     {
         if (suppressActorUpdates()) return;
         openSeedActorDialog();
@@ -1920,33 +1930,38 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
         asynchronousDataRequest();
         emitActorChangedSignal();
     }
-    else if (property == calculationSeedClearActorProperty)
-    {
-        if (suppressActorUpdates()) return;
-        clearSeedActor();
-
-        releaseData();
-        updateActorData();
-
-        asynchronousDataRequest();
-        emitActorChangedSignal();
-    }
     else
     {
-        for (SeedActorSettings& sas : calculationSeedActorProperties)
+        for (SeedActorSettings& sas : computationSeedActorProperties)
         {
             if ( property == sas.removeProperty)
             {
-                if (suppressActorUpdates()) return;
-                removeSeedActor(sas.actor->getName());
+                if (suppressActorUpdates())
+                {
+                    return;
+                }
 
-                releaseData();
-                updateActorData();
+                QMessageBox::StandardButton reply = QMessageBox::question(
+                            nullptr,
+                            "Trajectory Actor",
+                            "Are you sure you want to remove '"
+                            + sas.actor->getName() + "'?",
+                            QMessageBox::Yes|QMessageBox::No,
+                            QMessageBox::No);
 
-                asynchronousDataRequest();
-                emitActorChangedSignal();
+                if (reply == QMessageBox::Yes)
+                {
+                    removeSeedActor(sas.actor->getName());
+
+                    releaseData();
+                    updateActorData();
+
+                    asynchronousDataRequest();
+                    emitActorChangedSignal();
+                }
             }
-            else if (property == sas.stepSizeLon || property == sas.stepSizeLat || property == sas.pressureLevels)
+            else if (property == sas.lonSpacing || property == sas.latSpacing
+                     || property == sas.pressureLevels)
             {
                 if (suppressActorUpdates()) return;
 
@@ -2303,13 +2318,13 @@ void MTrajectoryActor::updateEnsembleProperties()
 void MTrajectoryActor::updateActorData()
 {
     seedActorData.clear();
-    for (SeedActorSettings& sas : calculationSeedActorProperties)
+    for (SeedActorSettings& sas : computationSeedActorProperties)
     {
         if (!sas.actor->isEnabled())
             continue;
 
-        double stepSizeLon = properties->mDouble()->value(sas.stepSizeLon);
-        double stepSizeLat = properties->mDouble()->value(sas.stepSizeLat);
+        double stepSizeLon = properties->mDouble()->value(sas.lonSpacing);
+        double stepSizeLat = properties->mDouble()->value(sas.latSpacing);
         QVector<float> pressureLevels = parsePressureLevelString(properties->mString()->value(sas.pressureLevels));
 
         switch (sas.type)
@@ -2496,7 +2511,7 @@ void MTrajectoryActor::setTransferFunctionFromProperty()
 
 void MTrajectoryActor::asynchronousDataRequest(bool synchronizationRequest)
 {
-    // No calculations necessary if trajectories are not displayed. (Besides
+    // No computations necessary if trajectories are not displayed. (Besides
     // data requests not needed lead to predefined trajectory actor not being
     // displayed and system crash due to waiting for a unfinished thread at
     // program end.)
@@ -2539,11 +2554,11 @@ void MTrajectoryActor::asynchronousDataRequest(bool synchronizationRequest)
         // if computed dataSource is used, additional information is needed
         if (!precomputedDataSource)
         {
-            QDateTime endTime = availableStartTimes.at(properties->mEnum()->value(calculationDeltaTimeProperty));
-            unsigned int lineType = properties->mEnum()->value(calculationLineTypeProperty);
-            unsigned int iterationMethod = properties->mEnum()->value(calculationIterationMethodProperty);
-            unsigned int interpolationMethod = properties->mEnum()->value(calculationInterpolationMethodProperty);
-            unsigned int iterationCount = properties->mInt()->value(calculationIterationCountProperty);
+            QDateTime endTime = availableStartTimes.at(properties->mEnum()->value(computationIntegrationTimeProperty));
+            unsigned int lineType = properties->mEnum()->value(computationLineTypeProperty);
+            unsigned int iterationMethod = properties->mEnum()->value(computationIntegrationMethodProperty);
+            unsigned int interpolationMethod = properties->mEnum()->value(computationInterpolationMethodProperty);
+            unsigned int iterationCount = properties->mInt()->value(computationIterationCountProperty);
             unsigned int seedType = seedActorData[t].type;
             QString seedMinPosition = QString("%1/%2/%3")
                     .arg(seedActorData[t].minPosition.x())
@@ -2597,7 +2612,7 @@ void MTrajectoryActor::asynchronousDataRequest(bool synchronizationRequest)
         //TODO: add property
         rh.insert("TRY_PRECOMPUTED", 1);
 
-        bool filteringEnabled = properties->mBool()->value(enableFilterProperty);
+        bool filteringEnabled = properties->mBool()->value(enableAscentFilterProperty);
         if (filteringEnabled)
         {
             float deltaPressure_hPa = properties->mDDouble()->value(
@@ -2704,20 +2719,20 @@ void MTrajectoryActor::asynchronousSelectionRequest()
         if (!precomputedDataSource)
         {
             int endTimeIndex =
-                    properties->mEnum()->value(calculationDeltaTimeProperty);
+                    properties->mEnum()->value(computationIntegrationTimeProperty);
             if (endTimeIndex < 0)
             {
                 continue;
             }
             QDateTime endTime = availableStartTimes.at(max(0, endTimeIndex));
             unsigned int lineType =
-                    properties->mEnum()->value(calculationLineTypeProperty);
+                    properties->mEnum()->value(computationLineTypeProperty);
             unsigned int iterationMethod = properties->mEnum()->value(
-                        calculationIterationMethodProperty);
+                        computationIntegrationMethodProperty);
             unsigned int interpolatonMethod = properties->mEnum()->value(
-                        calculationInterpolationMethodProperty);
+                        computationInterpolationMethodProperty);
             unsigned int iterationCount = properties->mInt()->value(
-                        calculationIterationCountProperty);
+                        computationIterationCountProperty);
             unsigned int seedType = seedActorData[t].type;
             QString seedMinPosition = QString("%1/%2/%3")
                     .arg(seedActorData[t].minPosition.x())
@@ -2750,7 +2765,7 @@ void MTrajectoryActor::asynchronousSelectionRequest()
         // pressure interval (xx hPa over the "lifetime" of the trajectories;
         // e.g. for T-NAWDEX over 48 hours).
 
-        bool filteringEnabled = properties->mBool()->value(enableFilterProperty);
+        bool filteringEnabled = properties->mBool()->value(enableAscentFilterProperty);
         if (filteringEnabled)
         {
             float deltaPressure_hPa = properties->mDDouble()->value(
@@ -2952,7 +2967,7 @@ void MTrajectoryActor::updateDeltaTimeProperty()
 
     if (trajectorySource == nullptr || precomputedDataSource)
     {
-        properties->mEnum()->setEnumNames(calculationDeltaTimeProperty, QStringList());
+        properties->mEnum()->setEnumNames(computationIntegrationTimeProperty, QStringList());
     }
     else
     {
@@ -2968,11 +2983,11 @@ void MTrajectoryActor::updateDeltaTimeProperty()
         }
 
         // set new list to property
-        int currentIndex = properties->mEnum()->value(calculationDeltaTimeProperty);
-        properties->mEnum()->setEnumNames(calculationDeltaTimeProperty, endTimes);
+        int currentIndex = properties->mEnum()->value(computationIntegrationTimeProperty);
+        properties->mEnum()->setEnumNames(computationIntegrationTimeProperty, endTimes);
 
         currentIndex = currentIndex < 0 ? (availableStartTimes.size() - 1) : currentIndex;
-        properties->mEnum()->setValue(calculationDeltaTimeProperty, currentIndex);
+        properties->mEnum()->setValue(computationIntegrationTimeProperty, currentIndex);
     }
 
     suppressUpdate = false;
@@ -3163,7 +3178,7 @@ void MTrajectoryActor::addSeedActor(QString actorName, double lon, double lat, Q
     }
 
     // check if entry already exists
-    for (SeedActorSettings& sas : calculationSeedActorProperties)
+    for (SeedActorSettings& sas : computationSeedActorProperties)
     {
         if (sas.actor->getName().compare(actorName) == 0)
             return;
@@ -3176,15 +3191,15 @@ void MTrajectoryActor::addSeedActor(QString actorName, double lon, double lat, Q
     SeedActorSettings actorSettings;
     actorSettings.actor = actor;
     actorSettings.propertyGroup = addProperty(GROUP_PROPERTY, actorName,
-                                              calculationSeedPropertyGroup);
+                                              computationSeedPropertyGroup);
     actorSettings.removeProperty = addProperty(CLICK_PROPERTY, "remove",
                                                actorSettings.propertyGroup);
 
-    actorSettings.stepSizeLon = addProperty(DOUBLE_PROPERTY, "lon",
-                                            actorSettings.propertyGroup);
-    actorSettings.stepSizeLat = addProperty(DOUBLE_PROPERTY, "lat",
-                                            actorSettings.propertyGroup);
-    actorSettings.pressureLevels = addProperty(STRING_PROPERTY, "pressures",
+    actorSettings.lonSpacing = addProperty(DOUBLE_PROPERTY, "lon spacing",
+                                           actorSettings.propertyGroup);
+    actorSettings.latSpacing = addProperty(DOUBLE_PROPERTY, "lat spacing",
+                                           actorSettings.propertyGroup);
+    actorSettings.pressureLevels = addProperty(STRING_PROPERTY, "pressure leves",
                                                actorSettings.propertyGroup);
 
     // fill data with corresponding
@@ -3219,50 +3234,50 @@ void MTrajectoryActor::addSeedActor(QString actorName, double lon, double lat, Q
     }
 
     // fill property
-    properties->setDouble(actorSettings.stepSizeLon,
+    properties->setDouble(actorSettings.lonSpacing,
                           enableX ? lon : NC_MAX_DOUBLE, 0.01, 999999.99, 2, 1.0);
-    properties->setDouble(actorSettings.stepSizeLat,
+    properties->setDouble(actorSettings.latSpacing,
                           enableY ? lat : NC_MAX_DOUBLE, 0.01, 999999.99, 2, 1.0);
     properties->mString()->setValue(actorSettings.pressureLevels,
                                     encodePressureLevels(levels, QString(",")));
-    actorSettings.stepSizeLon->setEnabled(enableX);
-    actorSettings.stepSizeLat->setEnabled(enableY);
+    actorSettings.lonSpacing->setEnabled(enableX);
+    actorSettings.latSpacing->setEnabled(enableY);
     actorSettings.pressureLevels->setEnabled(enableZ);
 
     // store settings to list
-    calculationSeedActorProperties.push_back(actorSettings);
+    computationSeedActorProperties.push_back(actorSettings);
 }
 
 
 void MTrajectoryActor::clearSeedActor()
 {
-    for (SeedActorSettings& sas : calculationSeedActorProperties)
+    for (SeedActorSettings& sas : computationSeedActorProperties)
     {
         // disconnect signal before deletion
         disconnect(sas.actor, SIGNAL(actorChanged()), this, SLOT(onSeedActorChanged()));
 
         // delete property
-        calculationSeedPropertyGroup->removeSubProperty(sas.propertyGroup);
+        computationSeedPropertyGroup->removeSubProperty(sas.propertyGroup);
     }
 
     // clear list
-    calculationSeedActorProperties.clear();
+    computationSeedActorProperties.clear();
 }
 
 
 void MTrajectoryActor::removeSeedActor(QString name)
 {
     // delete actor with given name
-    for (int i = 0; i < calculationSeedActorProperties.size(); i++)
+    for (int i = 0; i < computationSeedActorProperties.size(); i++)
     {
-        if (calculationSeedActorProperties.at(i).actor->getName().compare(name) == 0)
+        if (computationSeedActorProperties.at(i).actor->getName().compare(name) == 0)
         {
             // disconnect signal before deletion
-            disconnect(calculationSeedActorProperties.at(i).actor, SIGNAL(actorChanged()), this, SLOT(onSeedActorChanged()));
+            disconnect(computationSeedActorProperties.at(i).actor, SIGNAL(actorChanged()), this, SLOT(onSeedActorChanged()));
 
             // remove from properties and list
-            calculationSeedPropertyGroup->removeSubProperty(calculationSeedActorProperties.at(i).propertyGroup);
-            calculationSeedActorProperties.removeAt(i);
+            computationSeedPropertyGroup->removeSubProperty(computationSeedActorProperties.at(i).propertyGroup);
+            computationSeedActorProperties.removeAt(i);
             break;
         }
     }
@@ -3273,7 +3288,7 @@ void MTrajectoryActor::enableProperties(bool enable)
 {
     enableActorUpdates(false);
 //    ensembleModeProperty->setEnabled(enable);
-    enableFilterProperty->setEnabled(enable);
+    enableAscentFilterProperty->setEnabled(enable);
     deltaPressureFilterProperty->setEnabled(enable);
     deltaTimeFilterProperty->setEnabled(enable);
     renderModeProperty->setEnabled(enable);
@@ -3303,9 +3318,9 @@ void MTrajectoryActor::enableProperties(bool enable)
     bBoxConnection->getProperty()->setEnabled(enable);
     ensembleMemberProperty->setEnabled(enable && !synchronizeEnsemble);
 
-    // Calculation Properties
+    // Computation Properties
     bool enableCalc = enable && !precomputedDataSource;
-    calculationPropertyGroup->setEnabled(enableCalc);
+    computationPropertyGroup->setEnabled(enableCalc);
 
     enableActorUpdates(true);
 }

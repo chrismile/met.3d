@@ -45,8 +45,8 @@ namespace Met3D
 /**
   @brief MPipelineConfiguration initializes the Met.3D data pipeline. A number
   of predefined pipelines are available (currently for NetCDF-CF and GRIB data,
-  and for LAGRANTO trajectory data. Pipeline parameters are read from a
-  configuration file.
+  and for TRAJECTORY data. Pipeline parameters are read from a configuration
+  file.
 
   Special case: If Met.3D is called with command line argument "--metview",
   it uses directory paths and file filters given by the command line argument

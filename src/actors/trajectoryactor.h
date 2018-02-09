@@ -366,16 +366,15 @@ private:
     bool        synchronizeEnsemble;
     QtProperty *synchronizeEnsembleProperty;
 
-    /** Trajectory Calculation properties */
-    QtProperty *calculationPropertyGroup;
-    QtProperty *calculationDeltaTimeProperty;
-    QtProperty *calculationInterpolationMethodProperty;
-    QtProperty *calculationLineTypeProperty;
-    QtProperty* calculationIterationMethodProperty;
-    QtProperty *calculationIterationCountProperty;
-    QtProperty* calculationSeedPropertyGroup;
-    QtProperty* calculationSeedAddActorProperty;
-    QtProperty* calculationSeedClearActorProperty;
+    /** Trajectory Computation properties */
+    QtProperty *computationPropertyGroup;
+    QtProperty *computationIntegrationTimeProperty;
+    QtProperty *computationInterpolationMethodProperty;
+    QtProperty *computationLineTypeProperty;
+    QtProperty* computationIntegrationMethodProperty;
+    QtProperty *computationIterationCountProperty;
+    QtProperty* computationSeedPropertyGroup;
+    QtProperty* computationSeedAddActorProperty;
 
     enum SeedActorType
     {
@@ -390,13 +389,13 @@ private:
         MActor* actor;
         SeedActorType type;
         QtProperty* propertyGroup;
-        QtProperty *stepSizeLon;
-        QtProperty *stepSizeLat;
+        QtProperty *lonSpacing;
+        QtProperty *latSpacing;
         QtProperty *pressureLevels;
         QtProperty *removeProperty;
 
     };
-    QList<SeedActorSettings> calculationSeedActorProperties;
+    QList<SeedActorSettings> computationSeedActorProperties;
 
     struct SeedActorData
     {
@@ -421,10 +420,14 @@ private:
     QtProperty *ensembleModeProperty;
     QtProperty *ensembleMemberProperty;
     /** Trajectory filtering. */
-    QtProperty *enableFilterProperty;
-    QtProperty *deltaPressureFilterProperty; // filter trajectories according to this
-                                       // criterion
+    QtProperty *filtersGroupProperty;
+    QtProperty *enableAscentFilterProperty;
+    QtProperty *deltaPressureFilterProperty; // filter trajectories according
+                                             // to this criterion
     QtProperty *deltaTimeFilterProperty;
+
+    /** Rendering. */
+    QtProperty *renderingGroupProperty;
 
     /** GLSL shader objects. */
     std::shared_ptr<GL::MShaderEffect> tubeShader;
