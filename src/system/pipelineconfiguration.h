@@ -134,10 +134,10 @@ protected:
             bool boundaryLayerTrajectories,
             QString schedulerID,
             QString memoryManagerID,
-            QString resourceID,
+            QString NWPDataset,
             QString variableU,
             QString variableV,
-            QString variableP,
+            QString variableW,
             QString verticalLvlType);
 
     void initializeEnsemblePipeline(

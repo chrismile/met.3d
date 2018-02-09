@@ -321,7 +321,7 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
 
     // Lagranto trajectory pipeline(s).
     // ================================
-    size = config.beginReadArray("LagrantoPipeline");
+    size = config.beginReadArray("TrajectoriesPipeline");
 
     for (int i = 0; i < size; i++)
     {
@@ -336,14 +336,14 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
         QString schedulerID = config.value("schedulerID").toString();
         QString memoryManagerID = config.value("memoryManagerID").toString();
         bool precomputed = config.value("precomputed").toBool();
-        QString computationResource =
-                config.value("computationResourceName").toString();
-        QString computationVariableU =
-                config.value("computationVariableU").toString();
-        QString computationVariableV =
-                config.value("computationVariableV").toString();
-        QString computationVariableP =
-                config.value("computationVariableP").toString();
+        QString NWPDataset =
+                config.value("NWPDataset").toString();
+        QString windUVariable =
+                config.value("wind_uVariable").toString();
+        QString windVVariable =
+                config.value("wind_vVariable").toString();
+        QString windOmegaVariable =
+                config.value("wind_omegaVariable").toString();
         QString computationVerticalLvlType =
                 config.value("computationVerticalLvlType").toString();
 
@@ -399,23 +399,23 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
                             << schedulerID.toStdString());
             LOG4CPLUS_DEBUG(mlog, "  memoryManagerID = "
                             << memoryManagerID.toStdString());
-            LOG4CPLUS_DEBUG(mlog, "  computationResourceName = "
-                            << computationResource.toStdString());
-            LOG4CPLUS_DEBUG(mlog, "  computation U-Variable = "
-                            << computationVariableU.toStdString());
-            LOG4CPLUS_DEBUG(mlog, "  computation V-Variable = "
-                            << computationVariableV.toStdString());
-            LOG4CPLUS_DEBUG(mlog, "  computation P-Variable = "
-                            << computationVariableP.toStdString());
-            LOG4CPLUS_DEBUG(mlog, "  computation vertical level type  = "
+            LOG4CPLUS_DEBUG(mlog, "  NWPDataset = "
+                            << NWPDataset.toStdString());
+            LOG4CPLUS_DEBUG(mlog, "  wind U-Variable = "
+                            << windUVariable.toStdString());
+            LOG4CPLUS_DEBUG(mlog, "  wind V-Variable = "
+                            << windVVariable.toStdString());
+            LOG4CPLUS_DEBUG(mlog, "  wind Omega-Variable = "
+                            << windOmegaVariable.toStdString());
+            LOG4CPLUS_DEBUG(mlog, "  wind vertical level type  = "
                             << computationVerticalLvlType.toStdString());
 
             // Check parameter validity.
             if ( name.isEmpty()
-                 || computationResource.isEmpty()
-                 || computationVariableU.isEmpty()
-                 || computationVariableV.isEmpty()
-                 || computationVariableP.isEmpty()
+                 || NWPDataset.isEmpty()
+                 || windUVariable.isEmpty()
+                 || windVVariable.isEmpty()
+                 || windOmegaVariable.isEmpty()
                  || computationVerticalLvlType.isEmpty()
                  || schedulerID.isEmpty()
                  || memoryManagerID.isEmpty() )
@@ -430,9 +430,9 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
             {
                 initializeComputationEnsemblePipeline(
                         name, ablTrajectories, schedulerID,
-                        memoryManagerID, computationResource,
-                        computationVariableU, computationVariableV,
-                        computationVariableP, computationVerticalLvlType);
+                        memoryManagerID, NWPDataset,
+                        windUVariable, windVVariable,
+                        windOmegaVariable, computationVerticalLvlType);
             }
             else
             {
@@ -631,10 +631,10 @@ void MPipelineConfiguration::initializeComputationEnsemblePipeline(
         bool boundaryLayerTrajectories,
         QString schedulerID,
         QString memoryManagerID,
-        QString resourceID,
+        QString NWPDataset,
         QString variableU,
         QString variableV,
-        QString variableP,
+        QString variableW,
         QString verticalLvlType)
 {
     MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
@@ -646,13 +646,13 @@ void MPipelineConfiguration::initializeComputationEnsemblePipeline(
     LOG4CPLUS_DEBUG(mlog, "Initializing COMPUTATION pipeline ''"
                           "" << dataSourceId.toStdString() << "'' ...");
 
-    MWeatherPredictionDataSource* mwpResource =
+    MWeatherPredictionDataSource* NWPDataSource =
             dynamic_cast<MWeatherPredictionDataSource*>(
-                sysMC->getDataSource(resourceID));
-    if (!mwpResource)
+                sysMC->getDataSource(NWPDataset));
+    if (!NWPDataSource)
     {
         LOG4CPLUS_WARN(mlog, "MWeatherPredictionDataSource ''"
-                       << resourceID.toStdString()
+                       << NWPDataset.toStdString()
                        << "'' is invalid; skipping.");
         return;
     }
@@ -661,9 +661,9 @@ void MPipelineConfiguration::initializeComputationEnsemblePipeline(
             new MTrajectoryCalculator(dataSourceId);
     trajectoryCalculator->setMemoryManager(memoryManager);
     trajectoryCalculator->setScheduler(scheduler);
-    trajectoryCalculator->setUVPVariables(variableU, variableV, variableP);
+    trajectoryCalculator->setUVPVariables(variableU, variableV, variableW);
     trajectoryCalculator->setVericalLevelType(verticalLvlType);
-    trajectoryCalculator->setInputSource(mwpResource);
+    trajectoryCalculator->setInputSource(NWPDataSource);
     sysMC->registerDataSource(dataSourceId + QString(" Reader"),
                               trajectoryCalculator);
 
