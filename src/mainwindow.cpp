@@ -1269,6 +1269,7 @@ void MMainWindow::revertCurrentSession(QAction *sessionAction)
 {
     QString sessionNumber = sessionAction->data().toString();
     sessionNumber = sessionNumber.split(":").first();
+    sessionNumber.replace(QRegExp("\\D*"), "");
     sessionManagerDialog->revertCurrentSessionToRevision(sessionNumber);
 }
 
