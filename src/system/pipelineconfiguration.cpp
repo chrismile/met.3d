@@ -416,7 +416,7 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
                  || windUVariable.isEmpty()
                  || windVVariable.isEmpty()
                  || windOmegaVariable.isEmpty()
-                 || computationVerticalLvlType.isEmpty()
+//                 || computationVerticalLvlType.isEmpty()
                  || schedulerID.isEmpty()
                  || memoryManagerID.isEmpty() )
             {
@@ -662,6 +662,23 @@ void MPipelineConfiguration::initializeTrajectoriesComputationPipeline(
     trajectoryCalculator->setMemoryManager(memoryManager);
     trajectoryCalculator->setScheduler(scheduler);
     trajectoryCalculator->setUVPVariables(variableU, variableV, variableW);
+
+    // If verical level type is not given, search for it.
+    if (verticalLvlType == "")
+    {
+        QList<MVerticalLevelType> levelTypes = NWPDataSource->availableLevelTypes();
+        foreach (MVerticalLevelType level, levelTypes)
+        {
+            QStringList variables = NWPDataSource->availableVariables(level);
+            if (variables.contains(variableU) && variables.contains(variableV)
+                    && variables.contains(variableW))
+            {
+                verticalLvlType =
+                        MStructuredGrid::verticalLevelTypeToString(level);
+            }
+        }
+    }
+
     trajectoryCalculator->setVericalLevelType(verticalLvlType);
     trajectoryCalculator->setInputSource(NWPDataSource);
     sysMC->registerDataSource(dataSourceId + QString(" Reader"),
