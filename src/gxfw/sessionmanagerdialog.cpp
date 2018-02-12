@@ -524,8 +524,8 @@ void MSessionManagerDialog::fillCurrentSessionHistoryList()
         {
             // Extract index of the file name and start current session history
             // entry with it.
-            QString entry = sessionRevision.split(".",
-                                                QString::SkipEmptyParts).last();
+            QString entry = "Rev. "
+                    + sessionRevision.split(".", QString::SkipEmptyParts).last();
 
             QSettings *settings = new QSettings(
                         QDir(path).absoluteFilePath(sessionRevision),
@@ -539,10 +539,9 @@ void MSessionManagerDialog::fillCurrentSessionHistoryList()
                 if ( groups.contains("SessionDetails")  )
                 {
                     settings->beginGroup("SessionDetails");
-                    entry += ": " + settings->value("time", "").toTime()
-                            .toString(Qt::SystemLocaleLongDate);
-                    entry += ", " + settings->value("date", "").toDate()
-                            .toString(Qt::SystemLocaleShortDate);
+
+                    entry += ": " + settings->value("dateTime", "").toDateTime()
+                            .toString(Qt::ISODate);
                     entry += " (" + settings->value("name", "").toString() + ")";
                     settings->endGroup();
                     settings->endGroup();
@@ -551,7 +550,8 @@ void MSessionManagerDialog::fillCurrentSessionHistoryList()
             }
             delete settings;
         }
-        qSort(sessionsList);
+        std::sort(sessionsList.begin(), sessionsList.end(),
+                  std::greater<QString>());
     }
     MSystemManagerAndControl::getInstance()->getMainWindow()
             ->onCurrentSessionHistoryChanged(&sessionsList);
@@ -847,8 +847,7 @@ void MSessionManagerDialog::saveSessionToFile(QString sessionName, bool autoSave
     // ==========================================
     settings->beginGroup("SessionDetails");
     settings->setValue("name", currentSession);
-    settings->setValue("time", QTime::currentTime());
-    settings->setValue("date", QDate::currentDate());
+    settings->setValue("dateTime", QDateTime::currentDateTime());
     settings->endGroup();
     // ==========================================
 
