@@ -4,8 +4,9 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2016 Marc Rautenhaus
-**  Copyright 2016 Christoph Heidelmann
+**  Copyright 2016-2018 Marc Rautenhaus
+**  Copyright 2016      Christoph Heidelmann
+**  Copyright 2018      Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -51,6 +52,13 @@ enum MNWPReaderFileFormat
     ECMWF_GRIB      = 2
 };
 
+enum PipelineType
+{
+    INVALID_PIPELINE_TYPE  = 0,
+    NWP_PIPELINE           = 1,
+    TRAJECTORIES_PIPELINE  = 2
+};
+
 
 struct MNWPPipelineConfigurationInfo
 {
@@ -68,6 +76,22 @@ struct MNWPPipelineConfigurationInfo
 };
 
 
+struct MTrajectoriesPipelineConfigurationInfo
+{
+    QString name;
+    bool precomputed;
+    QString fileDir;
+    QString schedulerID;
+    QString memoryManagerID;
+    bool boundaryLayerTrajectories;
+    QString NWPDataset;
+    QString windUVariable;
+    QString windVVariable;
+    QString windWVariable;
+    QString verticalLvlType;
+};
+
+
 /**
 
  */
@@ -79,11 +103,17 @@ public:
     explicit MAddDatasetDialog(QWidget *parent = 0);
     ~MAddDatasetDialog();
 
+    PipelineType getSelectedPipelineType();
+
     MNWPPipelineConfigurationInfo getNWPPipelineConfigurationInfo();
+
+    MTrajectoriesPipelineConfigurationInfo
+    getTrajectoriesPipelineConfigurationInfo();
 
 private slots:
     void browsePath();
     void inputFieldChanged();
+    void selectedNWPDatasetChanged(QString dataset);
 
 protected:
     /**

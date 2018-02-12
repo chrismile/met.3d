@@ -122,14 +122,14 @@ protected:
                                QString surfacePressureFieldType,
                                bool convertGeometricHeightToPressure_ICAOStandard);
 
-    void initializeLagrantoEnsemblePipeline(
+    void initializePrecomputedTrajectoriesPipeline(
             QString name,
             QString fileDir,
             bool boundaryLayerTrajectories,
             QString schedulerID,
             QString memoryManagerID);
 
-    void initializeComputationEnsemblePipeline(
+    void initializeTrajectoriesComputationPipeline(
             QString name,
             bool boundaryLayerTrajectories,
             QString schedulerID,

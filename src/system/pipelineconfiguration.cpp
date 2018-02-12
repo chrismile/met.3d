@@ -375,7 +375,7 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
             // Create new pipeline.
             if (isEnsemble)
             {
-                initializeLagrantoEnsemblePipeline(
+                initializePrecomputedTrajectoriesPipeline(
                         name, path, ablTrajectories, schedulerID,
                         memoryManagerID);
             }
@@ -428,7 +428,7 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
             // Create new pipeline.
             if (isEnsemble)
             {
-                initializeComputationEnsemblePipeline(
+                initializeTrajectoriesComputationPipeline(
                         name, ablTrajectories, schedulerID,
                         memoryManagerID, NWPDataset,
                         windUVariable, windVVariable,
@@ -592,7 +592,7 @@ void MPipelineConfiguration::initializeNWPPipeline(
 }
 
 
-void MPipelineConfiguration::initializeLagrantoEnsemblePipeline(
+void MPipelineConfiguration::initializePrecomputedTrajectoriesPipeline(
         QString name,
         QString fileDir,
         bool boundaryLayerTrajectories,
@@ -626,7 +626,7 @@ void MPipelineConfiguration::initializeLagrantoEnsemblePipeline(
 }
 
 
-void MPipelineConfiguration::initializeComputationEnsemblePipeline(
+void MPipelineConfiguration::initializeTrajectoriesComputationPipeline(
         QString name,
         bool boundaryLayerTrajectories,
         QString schedulerID,
@@ -805,7 +805,7 @@ void MPipelineConfiguration::initializeDevelopmentDataPipeline()
                new MLRUMemoryManager("Trajectories DF-T psfc_1000hPa_L62",
                                      10.*1024.*1024.));
 
-    initializeLagrantoEnsemblePipeline(
+    initializePrecomputedTrajectoriesPipeline(
                 "Lagranto ENS EUR_LL10 DF-T psfc_1000hPa_L62",
                 "/mnt/ssd/data/trajectories/EUR_LL10/psfc_1000hPa_L62",
                 false,
@@ -816,7 +816,7 @@ void MPipelineConfiguration::initializeDevelopmentDataPipeline()
                new MLRUMemoryManager("Trajectories  DF-T psfc_min_L62",
                                      12.*1024.*1024.));
 
-    initializeLagrantoEnsemblePipeline(
+    initializePrecomputedTrajectoriesPipeline(
                 "Lagranto ENS EUR_LL10 DF-T psfc_min_L62",
                 "/mnt/ssd/data/trajectories/EUR_LL10/psfc_min_L62",
                 false,
@@ -836,7 +836,7 @@ void MPipelineConfiguration::initializeDevelopmentDataPipeline()
     sysMC->registerMemoryManager("Trajectories ABL-T psfc_min_L62_abl",
                new MLRUMemoryManager("Trajectories ABL-T psfc_min_L62_abl",
                                      10.*1024.*1024.));
-    initializeLagrantoEnsemblePipeline(
+    initializePrecomputedTrajectoriesPipeline(
                 "Lagranto ENS EUR_LL10 ABL-T psfc_min_L62_abl",
                 "/mnt/ssd/data/trajectories/EUR_LL10/psfc_min_L62_abl",
                 true,
@@ -846,7 +846,7 @@ void MPipelineConfiguration::initializeDevelopmentDataPipeline()
     sysMC->registerMemoryManager("Trajectories ABL-T 10hPa",
                new MLRUMemoryManager("Trajectories ABL-T 10hPa",
                                      10.*1024.*1024.));
-    initializeLagrantoEnsemblePipeline(
+    initializePrecomputedTrajectoriesPipeline(
                 "Lagranto ENS EUR_LL10 ABL-T 10hPa",
                 "/mnt/ssd/data/trajectories/EUR_LL10/blt_PL10hPa",
                 true,
