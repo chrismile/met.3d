@@ -498,6 +498,7 @@ void MSessionManagerDialog::fillSessionsList()
                 sessionFileSystemModel->index(row, 0, rootIndex);
         sessionsList << sessionFileSystemModel->fileName(rowIndex);
     }
+    qSort(sessionsList);
     MSystemManagerAndControl::getInstance()->getMainWindow()
             ->onSessionsListChanged(&sessionsList, currentSession);
 }
@@ -1449,37 +1450,48 @@ MActor* MSessionManagerDialog::createActor(QString actorType)
 
 void MSessionManagerDialog::blockGUIElements()
 {
-    ui->changeFolderButton->setEnabled(false);
-    ui->newButton->setEnabled(false);
-    ui->cloneButton->setEnabled(false);
-    ui->switchToButton->setEnabled(false);
-    ui->deleteButton->setEnabled(false);
-    ui->reloadButton->setEnabled(false);
-    ui->saveButton->setEnabled(false);
-    ui->sessionsListView->setEnabled(false);
-    ui->autoSaveCheckBox->setEnabled(false);
-    ui->buttonBox->setEnabled(false);
+    // Don't block GUI Elements if the GUI is invisible since processEvents()
+    // when unblocking the GUI-Element might cause the application to crash when
+    // session is loaded on start.
+    if (this->isVisible())
+    {
+        ui->changeFolderButton->setEnabled(false);
+        ui->newButton->setEnabled(false);
+        ui->cloneButton->setEnabled(false);
+        ui->switchToButton->setEnabled(false);
+        ui->deleteButton->setEnabled(false);
+        ui->reloadButton->setEnabled(false);
+        ui->saveButton->setEnabled(false);
+        ui->sessionsListView->setEnabled(false);
+        ui->autoSaveCheckBox->setEnabled(false);
+        ui->buttonBox->setEnabled(false);
+    }
 }
 
 
 void MSessionManagerDialog::unblockGUIElements()
 {
-    // Get rid of waiting events before reseting the attribute since otherwise
-    // the button click events will be handled after loading has finished.
-    // (Waiting time is mandatory since otherwise the events will be processed
-    // to the buttons nevertheless.)
-    qApp->processEvents(QEventLoop::AllEvents, 1000);
+    // Don't block GUI Elements if the GUI is invisible since processEvents()
+    // might cause the application to crash when session is loaded on start.
+    if (this->isVisible())
+    {
+        // Get rid of waiting events before reseting the attribute since
+        // otherwise the button click events will be handled after loading has
+        // finished. (Waiting time is mandatory since otherwise the events will
+        // be processed to the buttons nevertheless.)
+        qApp->processEvents(QEventLoop::AllEvents, 1000);
 
-    ui->changeFolderButton->setEnabled((true));
-    ui->newButton->setEnabled((true));
-    ui->cloneButton->setEnabled((true));
-    ui->switchToButton->setEnabled((true));
-    ui->deleteButton->setEnabled(true);
-    ui->reloadButton->setEnabled(true);
-    ui->saveButton->setEnabled((true));
-    ui->sessionsListView->setEnabled((true));
-    ui->autoSaveCheckBox->setEnabled((true));
-    ui->buttonBox->setEnabled((true));
+        ui->changeFolderButton->setEnabled((true));
+        ui->newButton->setEnabled((true));
+        ui->cloneButton->setEnabled((true));
+        ui->switchToButton->setEnabled((true));
+        ui->deleteButton->setEnabled(true);
+        ui->reloadButton->setEnabled(true);
+        ui->saveButton->setEnabled((true));
+        ui->sessionsListView->setEnabled((true));
+        ui->autoSaveCheckBox->setEnabled((true));
+        ui->buttonBox->setEnabled((true));
+    }
 }
 
 
