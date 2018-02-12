@@ -859,6 +859,7 @@ void MGribReader::scanDataRoot()
                 {
                     LOG4CPLUS_WARN(mlog, "Met.3D can only handle 'regular_ll' "
                                    "grid, skipping this field.");
+                    grib_handle_delete(gribHandle);
                     continue;
                 }
 
@@ -882,6 +883,7 @@ void MGribReader::scanDataRoot()
                     LOG4CPLUS_WARN(mlog, "cannot recognize level type '"
                                    << typeOfLevel.toStdString()
                                    << "', skipping this field.");
+                    grib_handle_delete(gribHandle);
                     continue;
                 }
                 gmiInfo.levelType = levelType;
@@ -934,6 +936,7 @@ void MGribReader::scanDataRoot()
                         LOG4CPLUS_ERROR(mlog, "found different geographical "
                                         "region than previously used for this "
                                         "variable; skipping grib message");
+                        grib_handle_delete(gribHandle);
                         continue;
                     }
 
@@ -1100,6 +1103,7 @@ void MGribReader::scanDataRoot()
                         LOG4CPLUS_ERROR(mlog, "found levels of the same "
                                         "3D data field in different files"
                                         "; skipping grib message");
+                        grib_handle_delete(gribHandle);
                         continue;
                     }
                 }
@@ -1125,6 +1129,7 @@ void MGribReader::scanDataRoot()
                     LOG4CPLUS_ERROR(mlog, "level " << level <<
                                     " of data field " << varName.toStdString()
                                     << "already exists; skipping grib message");
+                    grib_handle_delete(gribHandle);
                     continue;
                 }
                 info->offsetForLevel[level] = gmiInfo.filePosition =
