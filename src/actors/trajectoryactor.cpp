@@ -2622,19 +2622,19 @@ void MTrajectoryActor::asynchronousDataRequest(bool synchronizationRequest)
             // Request is e.g. 500/48 for 500 hPa in 48 hours.
             rh.insert("FILTER_PRESSURE_TIME",
                       QString("%1/%2").arg(deltaPressure_hPa).arg(deltaTime_hrs));
-            // Request bounding box filtering.
-            if (bBoxConnection->getBoundingBox() != nullptr)
-            {
-                rh.insert("FILTER_BBOX", QString("%1/%2/%3/%4")
-                          .arg(bBoxConnection->westLon()).arg(
-                              bBoxConnection->southLat())
-                          .arg(bBoxConnection->eastLon()).arg(
-                              bBoxConnection->northLat()));
-            }
         }
         else
         {
             rh.insert("FILTER_PRESSURE_TIME", "ALL");
+        }
+        // Request bounding box filtering.
+        if (bBoxConnection->getBoundingBox() != nullptr)
+        {
+            rh.insert("FILTER_BBOX", QString("%1/%2/%3/%4")
+                      .arg(bBoxConnection->westLon()).arg(
+                          bBoxConnection->southLat())
+                      .arg(bBoxConnection->eastLon()).arg(
+                          bBoxConnection->northLat()));
         }
 
         if ((renderMode == SINGLETIME_POSITIONS)
@@ -2775,19 +2775,19 @@ void MTrajectoryActor::asynchronousSelectionRequest()
             // Request is e.g. 500/48 for 500 hPa in 48 hours.
             rh.insert("FILTER_PRESSURE_TIME",
                       QString("%1/%2").arg(deltaPressure_hPa).arg(deltaTime_hrs));
-            // Request bounding box filtering.
-            if (bBoxConnection->getBoundingBox() != nullptr)
-            {
-                rh.insert("FILTER_BBOX", QString("%1/%2/%3/%4")
-                      .arg(bBoxConnection->westLon()).arg(
-                              bBoxConnection->southLat())
-                      .arg(bBoxConnection->eastLon()).arg(
-                              bBoxConnection->northLat()));
-            }
         }
         else
         {
             rh.insert("FILTER_PRESSURE_TIME", "ALL");
+        }
+        // Request bounding box filtering.
+        if (bBoxConnection->getBoundingBox() != nullptr)
+        {
+            rh.insert("FILTER_BBOX", QString("%1/%2/%3/%4")
+                  .arg(bBoxConnection->westLon()).arg(
+                          bBoxConnection->southLat())
+                  .arg(bBoxConnection->eastLon()).arg(
+                          bBoxConnection->northLat()));
         }
 
         if ((renderMode == SINGLETIME_POSITIONS)
