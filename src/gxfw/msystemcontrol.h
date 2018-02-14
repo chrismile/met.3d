@@ -185,6 +185,9 @@ public:
     void setHandleSize(double handleSize)
     { doublePropertyManager->setValue(handleSizeProperty, handleSize); }
 
+    QMap<QString, QString> *getDefaultMemoryManagers()
+    { return &defaultMemoryManagers; }
+
 signals:
     void boundingBoxCreated();
     void boundingBoxDeleted(QString name);
@@ -268,6 +271,8 @@ private:
 
     MStopwatch systemStopwatch;
     MNaturalEarthDataLoader *naturalEarthDataLoader;
+
+    QMap<QString, QString>                 defaultMemoryManagers;
 };
 
 } // namespace Met3D

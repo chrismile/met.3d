@@ -73,6 +73,9 @@ MAddDatasetDialog::MAddDatasetDialog(QWidget *parent) :
     connect(ui->trajectoriesTypeTabWidget , SIGNAL(currentChanged(int)) ,
             this, SLOT(inputFieldChanged()));
 
+    connect(ui->pipelineTypeTabWidget , SIGNAL(currentChanged(int)) ,
+            this, SLOT(setDefaultMemoryManager()));
+
     connect(ui->trajectoriesNWPDatasetCombo, SIGNAL(currentIndexChanged(QString)),
             this, SLOT(selectedNWPDatasetChanged(QString)));
 }
@@ -257,6 +260,28 @@ void MAddDatasetDialog::selectedNWPDatasetChanged(QString dataset)
 }
 
 
+void MAddDatasetDialog::setDefaultMemoryManager()
+{
+    MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
+    if (ui->pipelineTypeTabWidget->currentWidget() == ui->nwpTab)
+    {
+        if (sysMC->getDefaultMemoryManagers()->value("NWP") != "")
+        {
+            ui->memoryMCombo->setCurrentText(
+                        sysMC->getDefaultMemoryManagers()->value("NWP"));
+        }
+    }
+    else if (ui->pipelineTypeTabWidget->currentWidget() == ui->trajectoriesTab)
+    {
+        if (sysMC->getDefaultMemoryManagers()->value("Trajectories") != "")
+        {
+            ui->memoryMCombo->setCurrentText(
+                        sysMC->getDefaultMemoryManagers()->value("Trajectories"));
+        }
+    }
+}
+
+
 /******************************************************************************
 ***                          PROTECTED METHODS                              ***
 *******************************************************************************/
@@ -289,6 +314,8 @@ void MAddDatasetDialog::showEvent(QShowEvent *event)
     {
         selectedNWPDatasetChanged(ui->trajectoriesNWPDatasetCombo->currentText());
     }
+
+    setDefaultMemoryManager();
 }
 
 

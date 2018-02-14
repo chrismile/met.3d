@@ -31,7 +31,7 @@
    <item>
     <widget class="QTabWidget" name="pipelineTypeTabWidget">
      <property name="currentIndex">
-      <number>1</number>
+      <number>0</number>
      </property>
      <widget class="QWidget" name="nwpTab">
       <attribute name="title">
@@ -299,7 +299,7 @@
           <item>
            <widget class="QTabWidget" name="trajectoriesTypeTabWidget">
             <property name="currentIndex">
-             <number>1</number>
+             <number>0</number>
             </property>
             <widget class="QWidget" name="trajectoriesPrecomputedTab">
              <attribute name="title">

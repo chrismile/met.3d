@@ -114,6 +114,7 @@ private slots:
     void browsePath();
     void inputFieldChanged();
     void selectedNWPDatasetChanged(QString dataset);
+    void setDefaultMemoryManager();
 
 protected:
     /**

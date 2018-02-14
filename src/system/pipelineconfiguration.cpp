@@ -168,6 +168,8 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
     initializeScheduler();
 
     MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
+    QMap<QString, QString> *defaultMemoryManagers =
+            sysMC->getDefaultMemoryManagers();
     QSettings config(filename, QSettings::IniFormat);
 
     // Initialize memory manager(s).
@@ -181,10 +183,16 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
         // Read settings from file.
         QString name = config.value("name").toString();
         int size_MB = config.value("size_MB").toInt();
+        QString defaultFor = config.value("default", "").toString();
 
         LOG4CPLUS_DEBUG(mlog, "initializing memory manager #" << i << ": ");
         LOG4CPLUS_DEBUG(mlog, "  name = " << name.toStdString());
         LOG4CPLUS_DEBUG(mlog, "  size = " << size_MB << " MB");
+        if (defaultFor != "")
+        {
+            LOG4CPLUS_DEBUG(mlog, "  default memory manager for '"
+                            << defaultFor.toStdString() << "' pipeline");
+        }
 
         // Check parameter validity.
         if ( name.isEmpty()
@@ -192,6 +200,32 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
         {
             LOG4CPLUS_WARN(mlog, "invalid parameters encountered; skipping.");
             continue;
+        }
+
+        if (defaultFor != "")
+        {
+            if (!defaultMemoryManagers->contains(defaultFor))
+            {
+                LOG4CPLUS_WARN(mlog, "Pipeline '" << defaultFor.toStdString()
+                               << "' does not exist. Memory manager '"
+                               << name.toStdString()
+                               << "' won't be used as a default for any"
+                                  " pipeline.");
+            }
+            else if (defaultMemoryManagers->value(defaultFor, "") != "")
+            {
+                LOG4CPLUS_WARN(mlog,
+                               "Memory manager '" << name.toStdString()
+                               << "' is set as default for pipeline '"
+                               << defaultFor.toStdString()
+                               << "' but default of this pipeline is already"
+                                  " set. This memory manager won't be used as"
+                                  " a default.");
+            }
+            else
+            {
+                defaultMemoryManagers->insert(defaultFor, name);
+            }
         }
 
         // Create new memory manager.
