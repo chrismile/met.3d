@@ -208,8 +208,10 @@ MMainWindow::MMainWindow(QStringList commandLineArguments, QWidget *parent)
             this, SLOT(showBoundingBoxTable(bool)));
     connect(ui->actionSceneManagement, SIGNAL(triggered()),
             this, SLOT(sceneManagement()));
-    connect(ui->actionAddDataset, SIGNAL(triggered()),
+    connect(ui->actionNewDataset, SIGNAL(triggered()),
             this, SLOT(addDataset()));
+    connect(ui->actionOpenDatasetConfiguration, SIGNAL(triggered()),
+            this, SLOT(openDatasetConfiguration()));
     connect(ui->actionResizeWindow, SIGNAL(triggered()),
             this, SLOT(resizeWindow()));
 
@@ -1108,77 +1110,17 @@ void MMainWindow::addDataset()
 {
     MAddDatasetDialog addDatasetDialog;
 
-    if ( addDatasetDialog.exec() == QDialog::Accepted )
+    openDatasetDialog(addDatasetDialog);
+}
+
+
+void MMainWindow::openDatasetConfiguration()
+{
+    MAddDatasetDialog addDatasetDialog;
+
+    if (addDatasetDialog.loadConfigurationFromFile())
     {
-        PipelineType pipelineType = addDatasetDialog.getSelectedPipelineType();
-
-        switch (pipelineType)
-        {
-        case NWP_PIPELINE:
-        {
-            MNWPPipelineConfigurationInfo pipelineConfig =
-                    addDatasetDialog.getNWPPipelineConfigurationInfo();
-
-            LOG4CPLUS_DEBUG(mlog, "adding new dataset: "
-                            << pipelineConfig.name.toStdString());
-
-            MPipelineConfiguration newPipelineConfig;
-            newPipelineConfig.initializeNWPPipeline(
-                        pipelineConfig.name,
-                        pipelineConfig.fileDir,
-                        pipelineConfig.fileFilter,
-                        pipelineConfig.schedulerID,
-                        pipelineConfig.memoryManagerID,
-                        (MPipelineConfiguration
-                         ::MNWPReaderFileFormat)pipelineConfig.dataFormat,
-                        pipelineConfig.enableRegridding,
-                        pipelineConfig.enableProbabiltyRegionFilter,
-                        pipelineConfig.treatRotatedGridAsRegularGrid,
-                        pipelineConfig.surfacePressureFieldType,
-                        pipelineConfig
-                        .convertGeometricHeightToPressure_ICAOStandard);
-            break;
-        }
-        case TRAJECTORIES_PIPELINE:
-        {
-            MTrajectoriesPipelineConfigurationInfo pipelineConfig =
-                    addDatasetDialog.getTrajectoriesPipelineConfigurationInfo();
-
-            LOG4CPLUS_DEBUG(mlog, "adding new dataset: "
-                            << pipelineConfig.name.toStdString());
-
-            MPipelineConfiguration newPipelineConfig;
-
-            if (pipelineConfig.precomputed)
-            {
-                newPipelineConfig.initializePrecomputedTrajectoriesPipeline(
-                            pipelineConfig.name,
-                            pipelineConfig.fileDir,
-                            pipelineConfig.boundaryLayerTrajectories,
-                            pipelineConfig.schedulerID,
-                            pipelineConfig.memoryManagerID);
-
-            }
-            else
-            {
-                newPipelineConfig.initializeTrajectoriesComputationPipeline(
-                            pipelineConfig.name,
-                            pipelineConfig.boundaryLayerTrajectories,
-                            pipelineConfig.schedulerID,
-                            pipelineConfig.memoryManagerID,
-                            pipelineConfig.NWPDataset,
-                            pipelineConfig.windUVariable,
-                            pipelineConfig.windVVariable,
-                            pipelineConfig.windWVariable,
-                            pipelineConfig.verticalLvlType);
-            }
-            break;
-        }
-        default:
-        {
-            break;
-        }
-        }
+        openDatasetDialog(addDatasetDialog);
     }
 }
 
@@ -1326,6 +1268,82 @@ void MMainWindow::revertCurrentSession(QAction *sessionAction)
 /******************************************************************************
 ***                           PRIVATE METHODS                               ***
 *******************************************************************************/
+
+void MMainWindow::openDatasetDialog(MAddDatasetDialog &addDatasetDialog)
+{
+    if ( addDatasetDialog.exec() == QDialog::Accepted )
+    {
+        PipelineType pipelineType = addDatasetDialog.getSelectedPipelineType();
+
+        switch (pipelineType)
+        {
+        case NWP_PIPELINE:
+        {
+            MNWPPipelineConfigurationInfo pipelineConfig =
+                    addDatasetDialog.getNWPPipelineConfigurationInfo();
+
+            LOG4CPLUS_DEBUG(mlog, "adding new dataset: "
+                            << pipelineConfig.name.toStdString());
+
+            MPipelineConfiguration newPipelineConfig;
+            newPipelineConfig.initializeNWPPipeline(
+                        pipelineConfig.name,
+                        pipelineConfig.fileDir,
+                        pipelineConfig.fileFilter,
+                        pipelineConfig.schedulerID,
+                        pipelineConfig.memoryManagerID,
+                        (MPipelineConfiguration
+                         ::MNWPReaderFileFormat)pipelineConfig.dataFormat,
+                        pipelineConfig.enableRegridding,
+                        pipelineConfig.enableProbabiltyRegionFilter,
+                        pipelineConfig.treatRotatedGridAsRegularGrid,
+                        pipelineConfig.surfacePressureFieldType,
+                        pipelineConfig
+                        .convertGeometricHeightToPressure_ICAOStandard);
+            break;
+        }
+        case TRAJECTORIES_PIPELINE:
+        {
+            MTrajectoriesPipelineConfigurationInfo pipelineConfig =
+                    addDatasetDialog.getTrajectoriesPipelineConfigurationInfo();
+
+            LOG4CPLUS_DEBUG(mlog, "adding new dataset: "
+                            << pipelineConfig.name.toStdString());
+
+            MPipelineConfiguration newPipelineConfig;
+
+            if (pipelineConfig.precomputed)
+            {
+                newPipelineConfig.initializePrecomputedTrajectoriesPipeline(
+                            pipelineConfig.name,
+                            pipelineConfig.fileDir,
+                            pipelineConfig.boundaryLayerTrajectories,
+                            pipelineConfig.schedulerID,
+                            pipelineConfig.memoryManagerID);
+
+            }
+            else
+            {
+                newPipelineConfig.initializeTrajectoriesComputationPipeline(
+                            pipelineConfig.name,
+                            pipelineConfig.boundaryLayerTrajectories,
+                            pipelineConfig.schedulerID,
+                            pipelineConfig.memoryManagerID,
+                            pipelineConfig.NWPDataset,
+                            pipelineConfig.windUVariable,
+                            pipelineConfig.windVVariable,
+                            pipelineConfig.windWVariable,
+                            pipelineConfig.verticalLvlType);
+            }
+            break;
+        }
+        default:
+        {
+            break;
+        }
+        }
+    }
+}
 
 
 } // namespace Met3D

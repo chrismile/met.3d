@@ -146,6 +146,8 @@ public slots:
 
     void addDataset();
 
+    void openDatasetConfiguration();
+
     void openSessionManager();
 
     void openOnlineManual();
@@ -163,6 +165,8 @@ public slots:
     void revertCurrentSession(QAction *sessionAction);
 
 private:
+    void openDatasetDialog(MAddDatasetDialog &addDatasetDialog);
+
     Ui::MainWindow *ui;
     QSplitter *mainSplitter;
     QSplitter *rightSplitter;

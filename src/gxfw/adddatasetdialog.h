@@ -33,6 +33,7 @@
 // related third party imports
 #include <QDialog>
 #include <QAbstractButton>
+#include <QSettings>
 
 // local application imports
 
@@ -109,6 +110,15 @@ public:
 
     MTrajectoriesPipelineConfigurationInfo
     getTrajectoriesPipelineConfigurationInfo();
+
+    void resetAddDatasetGUI();
+
+    void saveConfiguration(QSettings *settings);
+    void loadConfiguration(QSettings *settings);
+
+public slots:
+    void saveConfigurationToFile(QString filename = "");
+    bool loadConfigurationFromFile(QString filename = "");
 
 private slots:
     void browsePath();
