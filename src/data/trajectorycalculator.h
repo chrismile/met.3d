@@ -104,7 +104,7 @@ public:
 
     ~MTrajectoryCalculator();
 
-    void setUVPVariables(QString u, QString v, QString p);
+    void setUVWVariables(QString u, QString v, QString p);
     void setVericalLevelType(QString levelTypeString);
 
     /**

@@ -127,11 +127,12 @@ public:
     QString variableUnits(MVerticalLevelType levelType,
                           const QString&     variableName);
 
+    MHorizontalGridType variableHorizontalGridType(MVerticalLevelType levelType,
+                                                   const QString& variableName);
+
 protected:
     QString variableSurfacePressureName(MVerticalLevelType levelType,
                                         const QString&     variableName);
-    MHorizontalGridType variableHorizontalGridType(MVerticalLevelType levelType,
-                                       const QString& variableName);
     QVector2D variableRotatedNorthPoleCoordinates( MVerticalLevelType levelType,
                                                    const QString& variableName);
 

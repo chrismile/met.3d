@@ -63,7 +63,7 @@ MTrajectoryCalculator::~MTrajectoryCalculator()
 ***                            PUBLIC METHODS                               ***
 *******************************************************************************/
 
-void MTrajectoryCalculator::setUVPVariables(QString u, QString v, QString p)
+void MTrajectoryCalculator::setUVWVariables(QString u, QString v, QString p)
 {
     uVariableName = u;
     vVariableName = v;

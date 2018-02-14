@@ -114,9 +114,13 @@ PipelineType MAddDatasetDialog::getSelectedPipelineType()
                     ->currentText().split(" || Level type: ").last();
             if (levelTypeU != levelTypeV || levelTypeV != levelTypeW)
             {
-                // todo Warnung ausgeben.
+                QMessageBox::warning(nullptr, "Add New Dataset",
+                                     "wind u, v and omega variable do NOT have"
+                                     " the same vertical level type. Failed to"
+                                     " add new data set.");
                 return PipelineType::INVALID_PIPELINE_TYPE;
             }
+
         }
         return PipelineType::TRAJECTORIES_PIPELINE;
     }

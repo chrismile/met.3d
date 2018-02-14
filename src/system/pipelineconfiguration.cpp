@@ -691,12 +691,6 @@ void MPipelineConfiguration::initializeTrajectoriesComputationPipeline(
         return;
     }
 
-    MTrajectoryCalculator* trajectoryCalculator =
-            new MTrajectoryCalculator(dataSourceId);
-    trajectoryCalculator->setMemoryManager(memoryManager);
-    trajectoryCalculator->setScheduler(scheduler);
-    trajectoryCalculator->setUVPVariables(variableU, variableV, variableW);
-
     // If verical level type is not given, search for it.
     if (verticalLvlType == "")
     {
@@ -712,6 +706,36 @@ void MPipelineConfiguration::initializeTrajectoriesComputationPipeline(
             }
         }
     }
+
+    if (MClimateForecastReader *netCDFDataSource =
+            dynamic_cast<MClimateForecastReader*>(NWPDataSource))
+    {
+        MVerticalLevelType levelType =
+                MStructuredGrid::verticalLevelTypeFromString(verticalLvlType);
+        MHorizontalGridType hGridTypU =
+                netCDFDataSource->variableHorizontalGridType(
+                    levelType, variableU);
+        MHorizontalGridType hGridTypV =
+                netCDFDataSource->variableHorizontalGridType(
+                    levelType, variableV);
+        MHorizontalGridType hGridTypW =
+                netCDFDataSource->variableHorizontalGridType(
+                    levelType, variableW);
+        if (hGridTypU == MHorizontalGridType::ROTATED_LONLAT
+                || hGridTypV == MHorizontalGridType::ROTATED_LONLAT
+                || hGridTypW == MHorizontalGridType::ROTATED_LONLAT)
+        {
+            LOG4CPLUS_WARN(mlog, "One or more wind variables are defined on"
+                                 " a rotated grid coordinates; skipping.");
+            return;
+        }
+    }
+
+    MTrajectoryCalculator* trajectoryCalculator =
+            new MTrajectoryCalculator(dataSourceId);
+    trajectoryCalculator->setMemoryManager(memoryManager);
+    trajectoryCalculator->setScheduler(scheduler);
+    trajectoryCalculator->setUVWVariables(variableU, variableV, variableW);
 
     trajectoryCalculator->setVericalLevelType(verticalLvlType);
     trajectoryCalculator->setInputSource(NWPDataSource);
