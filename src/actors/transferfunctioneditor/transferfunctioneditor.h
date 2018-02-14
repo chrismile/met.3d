@@ -4,9 +4,9 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2017 Marc Rautenhaus
-**  Copyright 2017 Fabian Schöttl
-**  Copyright 2017 Bianca Tost
+**  Copyright 2017-2018 Marc Rautenhaus
+**  Copyright 2017      Fabian Schöttl
+**  Copyright 2017-2018 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -54,6 +54,7 @@
 #include "colour.h"
 #include "editortransferfunction.h"
 #include "colourpicker.h"
+#include "qt_extensions/scientificdoublespinbox.h"
 
 // forward declarations
 class QCustomPlot;
@@ -89,7 +90,8 @@ public:
 
     void setRange(float min, float max, float scaleFactor,
                   int maxNumTicks, int maxNumLabels,
-                  int numSteps, int decimals);
+                  int numSteps, int significantDigits, int minimumExponent,
+                  int switchNotationExponent);
 
     void updateNumSteps(int numSteps);
     void resetUI();
@@ -139,11 +141,11 @@ private:
     QPushButton *alphaNextButton;
     QPushButton *alphaDelButton;
 
-    QDoubleSpinBox *alphaPosBox;
+    QtExtensions::MScientificDoubleSpinBox *alphaPosBox;
     QDoubleSpinBox *alphaNormPosBox;
     QDoubleSpinBox *alphaValueBox;
 
-    QDoubleSpinBox *colourPosBox;
+    QtExtensions::MScientificDoubleSpinBox *colourPosBox;
     QDoubleSpinBox *colourNormPosBox;
     QComboBox *colourTypeComboBox;
     MColourBox *colourValueBox;
@@ -358,13 +360,14 @@ public:
     void updateTicks() override;
 
     void setRange(float min, float max, float scale,
-                  int maxTicks, int maxLabels, int steps, int dec);
+                  int maxTicks, int maxLabels, int steps,
+                  QtExtensions::MScientificDoubleSpinBox *colourPosBox);
 
     float scaleFactor;
     int maxNumTicks;
     int maxNumLables;
     int numSteps;
-    int decimals;
+    QtExtensions::MScientificDoubleSpinBox *colourPosBox;
 
 protected:
     void paintEvent(QPaintEvent *event) override;

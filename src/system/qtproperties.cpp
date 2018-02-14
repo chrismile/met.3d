@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015-2018 Marc Rautenhaus
+**  Copyright 2017-2018 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -48,6 +49,7 @@ MQtProperties::MQtProperties()
     intPropertyManager             = new QtIntPropertyManager();
     doublePropertyManager          = new QtDoublePropertyManager();
     decoratedDoublePropertyManager = new QtDecoratedDoublePropertyManager();
+    scientificDoublePropertyManager= new QtScientificDoublePropertyManager();
     dateTimePropertyManager        = new QtDateTimePropertyManager();
     enumPropertyManager            = new QtEnumPropertyManager();
     rectFPropertyManager           = new QtRectFPropertyManager();
@@ -55,6 +57,10 @@ MQtProperties::MQtProperties()
     colorPropertyManager           = new QtColorPropertyManager();
     stringPropertyManager          = new QtStringPropertyManager();
     clickPropertyManager           = new QtClickPropertyManager();
+// TODO (bt, 19Jan2018): Add property manager to handle configurable SDProperties.
+//   Idea: cf. system/qtproperties.h
+//    configurableScientificDoublePropertyManager =
+//            new QtConfigurableScientificDoublePropertyManager();
 }
 
 
@@ -65,6 +71,7 @@ MQtProperties::~MQtProperties()
     delete intPropertyManager;
     delete doublePropertyManager;
     delete decoratedDoublePropertyManager;
+    delete scientificDoublePropertyManager;
     delete dateTimePropertyManager;
     delete enumPropertyManager;
     delete rectFPropertyManager;
@@ -72,6 +79,7 @@ MQtProperties::~MQtProperties()
     delete colorPropertyManager;
     delete stringPropertyManager;
     delete clickPropertyManager;
+//    delete configurableScientificDoublePropertyManager;
 }
 
 
@@ -113,6 +121,32 @@ QtDecoratedDoublePropertyManager *MQtProperties::mDDouble()
 {
     return decoratedDoublePropertyManager;
 }
+
+
+QtScientificDoublePropertyManager* MQtProperties::mScientificDouble()
+{
+    return scientificDoublePropertyManager;
+}
+
+
+QtScientificDoublePropertyManager *MQtProperties::mSciDouble()
+{
+    return scientificDoublePropertyManager;
+}
+
+
+// TODO (bt, 19Jan2018): Add property manager to handle configurable SDProperties.
+//   Idea: cf. system/qtproperties.h
+// QtConfigurableScientificDoublePropertyManager* MQtProperties::mConfigScientificDouble()
+// {
+//     return configurableScientificDoublePropertyManager;
+// }
+
+
+// QtConfigurableScientificDoublePropertyManager *MQtProperties::mCSciDouble()
+// {
+//     return configurableScientificDoublePropertyManager;
+// }
 
 
 QtDateTimePropertyManager* MQtProperties::mDateTime()
@@ -187,6 +221,60 @@ void MQtProperties::setDDouble(
     mDecoratedDouble()->setSingleStep(prop, singlestep);
     mDecoratedDouble()->setValue(prop, value);
     mDecoratedDouble()->setSuffix(prop, suffix);
+}
+
+
+void MQtProperties::setSciDouble(QtProperty *prop, double value,
+                               int significantDigits, double singlestep,
+                               int switchNotationExponent)
+{
+    mScientificDouble()->setSignificantDigits(prop, significantDigits);
+    mScientificDouble()->setSingleStep(prop, singlestep);
+    mScientificDouble()->setSwitchNotationExponent(prop, switchNotationExponent);
+    mScientificDouble()->setValue(prop, value);
+}
+
+
+void MQtProperties::setSciDouble(
+        QtProperty *prop, double value, int significantDigits,
+        int minimumExponent, double singlestep, int switchNotationExponent)
+{
+    mScientificDouble()->setSignificantDigits(prop, significantDigits);
+    mScientificDouble()->setMinimumExponent(prop, minimumExponent);
+    mScientificDouble()->setSingleStep(prop, singlestep);
+    mScientificDouble()->setSwitchNotationExponent(prop, switchNotationExponent);
+    mScientificDouble()->setValue(prop, value);
+}
+
+
+void MQtProperties::setSciDouble(
+        QtProperty *prop, double value, double min, double max,
+        int significantDigits, double singlestep,
+        int switchNotationExponent, QString suffix, QString prefix)
+{
+    mScientificDouble()->setRange(prop, min, max);
+    mScientificDouble()->setSignificantDigits(prop, significantDigits);
+    mScientificDouble()->setSingleStep(prop, singlestep);
+    mScientificDouble()->setSwitchNotationExponent(prop, switchNotationExponent);
+    mScientificDouble()->setValue(prop, value);
+    mScientificDouble()->setPrefix(prop, prefix);
+    mScientificDouble()->setSuffix(prop, suffix);
+}
+
+
+void MQtProperties::setSciDouble(
+        QtProperty *prop, double value, double min, double max,
+        int significantDigits, int minimumExponent, double singlestep,
+        int switchNotationExponent, QString suffix, QString prefix)
+{
+    mScientificDouble()->setRange(prop, min, max);
+    mScientificDouble()->setSignificantDigits(prop, significantDigits);
+    mScientificDouble()->setMinimumExponent(prop, minimumExponent);
+    mScientificDouble()->setSingleStep(prop, singlestep);
+    mScientificDouble()->setSwitchNotationExponent(prop, switchNotationExponent);
+    mScientificDouble()->setValue(prop, value);
+    mScientificDouble()->setPrefix(prop, prefix);
+    mScientificDouble()->setSuffix(prop, suffix);
 }
 
 

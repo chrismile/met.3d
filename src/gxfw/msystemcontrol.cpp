@@ -4,8 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2017 Marc Rautenhaus
-**  Copyright 2017      Bianca Tost
+**  Copyright 2015-2018 Marc Rautenhaus
+**  Copyright 2017-2018 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -68,6 +68,7 @@ MSystemManagerAndControl::MSystemManagerAndControl(QWidget *parent) :
     boolPropertyManager            = new QtBoolPropertyManager(this);
     decoratedDoublePropertyManager = new QtDecoratedDoublePropertyManager(this);
     doublePropertyManager          = new QtDoublePropertyManager(this);
+    scientificDoublePropertyManager= new QtScientificDoublePropertyManager(this);
     enumPropertyManager            = new QtEnumPropertyManager(this);
     stringPropertyManager          = new QtStringPropertyManager(this);
     clickPropertyManager           = new QtClickPropertyManager(this);
@@ -83,6 +84,8 @@ MSystemManagerAndControl::MSystemManagerAndControl(QWidget *parent) :
             new QtDecoratedDoubleSpinBoxFactory(this);
     QtDoubleSpinBoxFactory *doubleSpinBoxFactory =
             new QtDoubleSpinBoxFactory(this);
+    QtScientificDoubleSpinBoxFactory *scientificDoubleSpinBoxFactory =
+            new QtScientificDoubleSpinBoxFactory(this);
     QtEnumEditorFactory *enumEditorFactory = new QtEnumEditorFactory(this);
     QtToolButtonFactory *toolButtonFactory = new QtToolButtonFactory(this);
     QtColorEditorFactory *colorEditorFactory = new QtColorEditorFactory(this);
@@ -97,6 +100,8 @@ MSystemManagerAndControl::MSystemManagerAndControl(QWidget *parent) :
                 decoratedDoublePropertyManager, decoratedDoubleSpinBoxFactory);
     systemPropertiesBrowser->setFactoryForManager(doublePropertyManager,
                                                   doubleSpinBoxFactory);
+    systemPropertiesBrowser->setFactoryForManager(
+                scientificDoublePropertyManager, scientificDoubleSpinBoxFactory);
     systemPropertiesBrowser->setFactoryForManager(
                 enumPropertyManager, enumEditorFactory);
     systemPropertiesBrowser->setFactoryForManager(
@@ -319,6 +324,13 @@ QtBoolPropertyManager* MSystemManagerAndControl::getBoolPropertyManager()
 QtDecoratedDoublePropertyManager* MSystemManagerAndControl::getDecoratedDoublePropertyManager()
 {
     return decoratedDoublePropertyManager;
+}
+
+
+QtScientificDoublePropertyManager*
+MSystemManagerAndControl::getScientificDoublePropertyManager()
+{
+    return scientificDoublePropertyManager;
 }
 
 
@@ -584,7 +596,6 @@ void MSystemManagerAndControl::actOnQtPropertyChanged(QtProperty *property)
         {
             sceneView->onHandleSizeChanged();
         }
-
     }
 }
 

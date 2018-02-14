@@ -5,7 +5,8 @@
 #   three-dimensional visual exploration of numerical ensemble weather
 #   prediction data.
 #
-#   Copyright 2015 Marc Rautenhaus
+#   Copyright 2015-2018 Marc Rautenhaus
+#   Copyright 2016-2018 Bianca Tost
 #
 #   Computer Graphics and Visualization Group
 #   Technische Universitaet Muenchen, Garching, Germany
@@ -132,7 +133,8 @@ HEADERS += \
     src/gxfw/boundingbox/boundingbox.h \
     src/gxfw/sessionmanagerdialog.h \
     src/data/singlevariableanalysis.h \
-    src/data/structuredgridstatisticsanalysis.h
+    src/data/structuredgridstatisticsanalysis.h \
+    src/qt_extensions/scientificdoublespinbox.h
 
 SOURCES += \
     src/main.cpp \
@@ -232,7 +234,8 @@ SOURCES += \
     src/gxfw/boundingbox/boundingbox.cpp \
     src/gxfw/sessionmanagerdialog.cpp \
     src/data/singlevariableanalysis.cpp \
-    src/data/structuredgridstatisticsanalysis.cpp
+    src/data/structuredgridstatisticsanalysis.cpp \
+    src/qt_extensions/scientificdoublespinbox.cpp
 
 FORMS += \
     src/mainwindow.ui \

@@ -498,6 +498,7 @@ void MSessionManagerDialog::fillSessionsList()
                 sessionFileSystemModel->index(row, 0, rootIndex);
         sessionsList << sessionFileSystemModel->fileName(rowIndex);
     }
+    qSort(sessionsList);
     MSystemManagerAndControl::getInstance()->getMainWindow()
             ->onSessionsListChanged(&sessionsList, currentSession);
 }
@@ -524,8 +525,8 @@ void MSessionManagerDialog::fillCurrentSessionHistoryList()
         {
             // Extract index of the file name and start current session history
             // entry with it.
-            QString entry = sessionRevision.split(".",
-                                                QString::SkipEmptyParts).last();
+            QString entry = "Rev. "
+                    + sessionRevision.split(".", QString::SkipEmptyParts).last();
 
             QSettings *settings = new QSettings(
                         QDir(path).absoluteFilePath(sessionRevision),
@@ -539,10 +540,9 @@ void MSessionManagerDialog::fillCurrentSessionHistoryList()
                 if ( groups.contains("SessionDetails")  )
                 {
                     settings->beginGroup("SessionDetails");
-                    entry += ": " + settings->value("time", "").toTime()
-                            .toString(Qt::SystemLocaleLongDate);
-                    entry += ", " + settings->value("date", "").toDate()
-                            .toString(Qt::SystemLocaleShortDate);
+
+                    entry += ": " + settings->value("dateTime", "").toDateTime()
+                            .toString(Qt::ISODate);
                     entry += " (" + settings->value("name", "").toString() + ")";
                     settings->endGroup();
                     settings->endGroup();
@@ -551,7 +551,8 @@ void MSessionManagerDialog::fillCurrentSessionHistoryList()
             }
             delete settings;
         }
-        qSort(sessionsList);
+        std::sort(sessionsList.begin(), sessionsList.end(),
+                  std::greater<QString>());
     }
     MSystemManagerAndControl::getInstance()->getMainWindow()
             ->onCurrentSessionHistoryChanged(&sessionsList);
@@ -847,8 +848,7 @@ void MSessionManagerDialog::saveSessionToFile(QString sessionName, bool autoSave
     // ==========================================
     settings->beginGroup("SessionDetails");
     settings->setValue("name", currentSession);
-    settings->setValue("time", QTime::currentTime());
-    settings->setValue("date", QDate::currentDate());
+    settings->setValue("dateTime", QDateTime::currentDateTime());
     settings->endGroup();
     // ==========================================
 
@@ -1450,37 +1450,48 @@ MActor* MSessionManagerDialog::createActor(QString actorType)
 
 void MSessionManagerDialog::blockGUIElements()
 {
-    ui->changeFolderButton->setEnabled(false);
-    ui->newButton->setEnabled(false);
-    ui->cloneButton->setEnabled(false);
-    ui->switchToButton->setEnabled(false);
-    ui->deleteButton->setEnabled(false);
-    ui->reloadButton->setEnabled(false);
-    ui->saveButton->setEnabled(false);
-    ui->sessionsListView->setEnabled(false);
-    ui->autoSaveCheckBox->setEnabled(false);
-    ui->buttonBox->setEnabled(false);
+    // Don't block GUI Elements if the GUI is invisible since processEvents()
+    // when unblocking the GUI-Element might cause the application to crash when
+    // session is loaded on start.
+    if (this->isVisible())
+    {
+        ui->changeFolderButton->setEnabled(false);
+        ui->newButton->setEnabled(false);
+        ui->cloneButton->setEnabled(false);
+        ui->switchToButton->setEnabled(false);
+        ui->deleteButton->setEnabled(false);
+        ui->reloadButton->setEnabled(false);
+        ui->saveButton->setEnabled(false);
+        ui->sessionsListView->setEnabled(false);
+        ui->autoSaveCheckBox->setEnabled(false);
+        ui->buttonBox->setEnabled(false);
+    }
 }
 
 
 void MSessionManagerDialog::unblockGUIElements()
 {
-    // Get rid of waiting events before reseting the attribute since otherwise
-    // the button click events will be handled after loading has finished.
-    // (Waiting time is mandatory since otherwise the events will be processed
-    // to the buttons nevertheless.)
-    qApp->processEvents(QEventLoop::AllEvents, 1000);
+    // Don't block GUI Elements if the GUI is invisible since processEvents()
+    // might cause the application to crash when session is loaded on start.
+    if (this->isVisible())
+    {
+        // Get rid of waiting events before reseting the attribute since
+        // otherwise the button click events will be handled after loading has
+        // finished. (Waiting time is mandatory since otherwise the events will
+        // be processed to the buttons nevertheless.)
+        qApp->processEvents(QEventLoop::AllEvents, 1000);
 
-    ui->changeFolderButton->setEnabled((true));
-    ui->newButton->setEnabled((true));
-    ui->cloneButton->setEnabled((true));
-    ui->switchToButton->setEnabled((true));
-    ui->deleteButton->setEnabled(true);
-    ui->reloadButton->setEnabled(true);
-    ui->saveButton->setEnabled((true));
-    ui->sessionsListView->setEnabled((true));
-    ui->autoSaveCheckBox->setEnabled((true));
-    ui->buttonBox->setEnabled((true));
+        ui->changeFolderButton->setEnabled((true));
+        ui->newButton->setEnabled((true));
+        ui->cloneButton->setEnabled((true));
+        ui->switchToButton->setEnabled((true));
+        ui->deleteButton->setEnabled(true);
+        ui->reloadButton->setEnabled(true);
+        ui->saveButton->setEnabled((true));
+        ui->sessionsListView->setEnabled((true));
+        ui->autoSaveCheckBox->setEnabled((true));
+        ui->buttonBox->setEnabled((true));
+    }
 }
 
 

@@ -4,9 +4,9 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2015-2018 Marc Rautenhaus
 **  Copyright 2015      Michael Kern
-**  Copyright 2017      Bianca Tost
+**  Copyright 2017-2018      Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -372,7 +372,7 @@ private:
                          const uint8_t index = 0,
                          bool _enabled = true,
                          float _isoValue = 0.5,
-                         int decimals = 1,
+                         int significantDigits = 1,
                          double singleStep = 0.1,
                          QColor _color = QColor(255,0,0,255),
                          ColorType _colorType = ColorType::ConstColor);
@@ -385,7 +385,7 @@ private:
         QtProperty *groupProp;
         QtProperty *enabledProp;
         QtProperty *isoValueProp;
-        QtProperty *isoValueDecimalsProperty;
+        QtProperty *isoValueSignificantDigitsProperty;
         QtProperty *isoValueSingleStepProperty;
         QtProperty *isoColourProp;
         QtProperty *isoColourTypeProp;

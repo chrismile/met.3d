@@ -4,8 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2017 Marc Rautenhaus
-**  Copyright 2017 Bianca Tost
+**  Copyright 2017-2018 Marc Rautenhaus
+**  Copyright 2017-2018 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -86,21 +86,29 @@ MTransferFunction::MTransferFunction(QObject *parent) :
     rangePropertiesSubGroup = addProperty(GROUP_PROPERTY, "range",
                                           actorPropertiesSupGroup);
 
-    int decimals = 3;
-    valueDecimalsProperty = addProperty(INT_PROPERTY, "decimals",
-                                        rangePropertiesSubGroup);
-    properties->setInt(valueDecimalsProperty, decimals, 0, 9);
+    int significantDigits = 3;
+    double step = 1.;
 
-    minimumValueProperty = addProperty(DOUBLE_PROPERTY, "minimum value",
+    minimumValueProperty = addProperty(SCIENTIFICDOUBLE_PROPERTY, "minimum value",
                                        rangePropertiesSubGroup);
-    properties->setDouble(minimumValueProperty, minimumValue,
-                          decimals, pow(10., -decimals));
+    properties->setSciDouble(minimumValueProperty, minimumValue,
+                           significantDigits, step);
 
-    maximumValueProperty = addProperty(DOUBLE_PROPERTY, "maximum value",
+    maximumValueProperty = addProperty(SCIENTIFICDOUBLE_PROPERTY, "maximum value",
                                        rangePropertiesSubGroup);
-    properties->setDouble(maximumValueProperty, maximumValue,
-                          decimals, pow(10., -decimals));
+    properties->setSciDouble(maximumValueProperty, maximumValue,
+                           significantDigits, step);
 
+    valueOptionsPropertiesSubGroup = addProperty(
+                GROUP_PROPERTY, "min/max options", rangePropertiesSubGroup);
+
+    valueSignificantDigitsProperty = addProperty(
+                INT_PROPERTY, "significant digits", valueOptionsPropertiesSubGroup);
+    properties->setInt(valueSignificantDigitsProperty, significantDigits, 0, 9);
+
+    valueStepProperty = addProperty(SCIENTIFICDOUBLE_PROPERTY, "step",
+                                    valueOptionsPropertiesSubGroup);
+    properties->setSciDouble(valueStepProperty, step, significantDigits, 0.1);
 
     // General properties.
     // ===================
@@ -139,12 +147,14 @@ void MTransferFunction::saveConfiguration(QSettings *settings)
 
     // Properties related to data range.
     // =================================
-    settings->setValue("valueDecimals",
-                       properties->mInt()->value(valueDecimalsProperty));
     settings->setValue("minimumValue",
-                       properties->mDouble()->value(minimumValueProperty));
+                       properties->mSciDouble()->value(minimumValueProperty));
     settings->setValue("maximumValue",
-                       properties->mDouble()->value(maximumValueProperty));
+                       properties->mSciDouble()->value(maximumValueProperty));
+    settings->setValue("valueSignificantDigits",
+                       properties->mInt()->value(valueSignificantDigitsProperty));
+    settings->setValue("valueStep",
+                       properties->mInt()->value(valueSignificantDigitsProperty));
 
     // General properties.
     // ===================
@@ -192,9 +202,22 @@ void MTransferFunction::loadConfiguration(QSettings *settings)
 
     // Properties related to data range.
     // =================================
-    setValueDecimals(settings->value("valueDecimals", 3).toInt());
-    setMinimumValue(settings->value("minimumValue", 203.15f).toDouble());
-    setMaximumValue(settings->value("maximumValue", 303.15f).toDouble());
+    int significantDigits = 3;
+
+    // Support of old configuration files.
+    if (settings->contains("valueDecimals"))
+    {
+        significantDigits = settings->value("valueDecimals", 3).toInt();
+    }
+    else
+    {
+        significantDigits = settings->value("valueSignificantDigits", 3).toInt();
+    }
+
+    setValueSignificantDigits(significantDigits);
+    setValueStep(settings->value("valueStep", 1.).toDouble());
+    setMinimumValue(settings->value("minimumValue", 0.).toDouble());
+    setMaximumValue(settings->value("maximumValue", 100.).toDouble());
 
     // General properties.
     // ===================
@@ -224,23 +247,34 @@ void MTransferFunction::reloadShaderEffects()
 
 void MTransferFunction::setMinimumValue(float value)
 {
-    properties->mDouble()->setValue(minimumValueProperty, value);
+    properties->mSciDouble()->setValue(minimumValueProperty, value);
 }
 
 
 void MTransferFunction::setMaximumValue(float value)
 {
-    properties->mDouble()->setValue(maximumValueProperty, value);
+    properties->mSciDouble()->setValue(maximumValueProperty, value);
 }
 
 
-void MTransferFunction::setValueDecimals(int decimals)
+void MTransferFunction::setValueSignificantDigits(int significantDigits)
 {
-    properties->mInt()->setValue(valueDecimalsProperty, decimals);
-    properties->mDouble()->setDecimals(minimumValueProperty, decimals);
-    properties->mDouble()->setSingleStep(minimumValueProperty, pow(10.,-decimals));
-    properties->mDouble()->setDecimals(maximumValueProperty, decimals);
-    properties->mDouble()->setSingleStep(maximumValueProperty, pow(10.,-decimals));
+    properties->mInt()->setValue(valueSignificantDigitsProperty,
+                                 significantDigits);
+    properties->mSciDouble()->setSignificantDigits(minimumValueProperty,
+                                                 significantDigits);
+    properties->mSciDouble()->setSignificantDigits(maximumValueProperty,
+                                                 significantDigits);
+    properties->mSciDouble()->setSignificantDigits(valueStepProperty,
+                                                 significantDigits);
+}
+
+
+void MTransferFunction::setValueStep(double step)
+{
+    properties->mSciDouble()->setValue(valueSignificantDigitsProperty, step);
+    properties->mSciDouble()->setSingleStep(minimumValueProperty, step);
+    properties->mSciDouble()->setSingleStep(maximumValueProperty, step);
 }
 
 

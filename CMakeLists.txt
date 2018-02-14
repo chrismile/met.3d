@@ -5,8 +5,9 @@
 #   three-dimensional visual exploration of numerical ensemble weather
 #   prediction data.
 #
-#   Copyright (c) 2016 Marc Rautenhaus
-#   Copyright (c) 2016 Michael Kern <kernm@in.tum.de>
+#   Copyright (c) 2016-2018 Marc Rautenhaus
+#   Copyright (c) 2016-2017 Michael Kern <kernm@in.tum.de>
+#   Copyright (c) 2017-2018 Bianca Tost
 #
 #   Computer Graphics and Visualization Group
 #   Technische Universitaet Muenchen, Garching, Germany
@@ -184,8 +185,7 @@ find_package(log4cplus REQUIRED)
 include_directories(${log4cplus_INCLUDE_DIR})
 
 # GDAL
-find_package(GDAL REQUIRED)
-include_directories(${GDAL_INCLUDE_DIR})
+find_package(gdal REQUIRED)
 
 # GSL
 find_package(GSL REQUIRED)
