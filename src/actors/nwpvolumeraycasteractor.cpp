@@ -4,9 +4,9 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2015-2018 Marc Rautenhaus
 **  Copyright 2015      Michael Kern
-**  Copyright 2016-2017 Bianca Tost
+**  Copyright 2016-2018 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -202,7 +202,7 @@ MNWPVolumeRaycasterActor::IsoValueSettings::IsoValueSettings(
         const uint8_t index,
         bool _enabled,
         float _isoValue,
-        int decimals,
+        int significantDigits,
         double singleStep,
         QColor _isoColor,
         IsoValueSettings::ColorType _colorType)
@@ -222,14 +222,20 @@ MNWPVolumeRaycasterActor::IsoValueSettings::IsoValueSettings(
     enabledProp = a->addProperty(BOOL_PROPERTY, "enabled", groupProp);
     properties->mBool()->setValue(enabledProp, enabled);
 
-    isoValueProp = a->addProperty(DOUBLE_PROPERTY, "isovalue", groupProp);
-    properties->setDouble(isoValueProp, isoValue, decimals, singleStep);
+    isoValueProp = a->addProperty(SCIENTIFICDOUBLE_PROPERTY, "isovalue",
+                                  groupProp);
+    properties->setSciDouble(isoValueProp, isoValue, significantDigits,
+                           singleStep);
 
-    isoValueDecimalsProperty = a->addProperty(INT_PROPERTY, "isovalue decimals", groupProp);
-    properties->setInt(isoValueDecimalsProperty, decimals, 0, 10, 1);
+    isoValueSignificantDigitsProperty = a->addProperty(
+                INT_PROPERTY, "isovalue significant digits", groupProp);
+    properties->setInt(isoValueSignificantDigitsProperty,
+                       significantDigits, 1, 9, 1);
 
-    isoValueSingleStepProperty = a->addProperty(DOUBLE_PROPERTY, "isovalue step", groupProp);
-    properties->setDouble(isoValueSingleStepProperty, singleStep, decimals, singleStep);
+    isoValueSingleStepProperty = a->addProperty(
+                SCIENTIFICDOUBLE_PROPERTY, "isovalue step", groupProp);
+    properties->setSciDouble(isoValueSingleStepProperty, singleStep,
+                          significantDigits, singleStep);
 
     QStringList modesLst;
     modesLst.clear();
@@ -296,13 +302,14 @@ MNWPVolumeRaycasterActor::RayCasterSettings::RayCasterSettings(
                 GROUP_PROPERTY, "sampling step size", groupProp);
 
     stepSizeProp = a->addProperty(
-                DOUBLE_PROPERTY, "step size", groupRaycasterSettings);
-    properties->setDouble(stepSizeProp, stepSize, 0.001, 10.0, 3, 0.01);
+                SCIENTIFICDOUBLE_PROPERTY, "step size", groupRaycasterSettings);
+    properties->setSciDouble(stepSizeProp, stepSize, 0.001, 10.0, 3, 3, 0.01);
 
     interactionStepSizeProp = a->addProperty(
-                DOUBLE_PROPERTY, "interaction step size", groupRaycasterSettings);
-    properties->setDouble(interactionStepSizeProp, interactionStepSize,
-                          0.001, 10.0, 3, 0.1);
+                SCIENTIFICDOUBLE_PROPERTY, "interaction step size",
+                groupRaycasterSettings);
+    properties->setSciDouble(interactionStepSizeProp, interactionStepSize,
+                           0.001, 10.0, 3, 3, 0.1);
 
     bisectionStepsProp = a->addProperty(
                 INT_PROPERTY, "bisection steps", groupRaycasterSettings);
@@ -623,11 +630,11 @@ void MNWPVolumeRaycasterActor::saveConfiguration(QSettings *settings)
         settings->setValue("enabled", setting.enabled);
         settings->setValue("isoValue", setting.isoValue);
         settings->setValue(
-                    "isoValueDecimals",
-                    properties->mInt()->value(setting.isoValueDecimalsProperty));
+                    "isoValueSignificantDigits",
+                    properties->mInt()->value(setting.isoValueSignificantDigitsProperty));
         settings->setValue(
                     "isoValueSingleStep",
-                    properties->mDouble()->value(setting.isoValueSingleStepProperty));
+                    properties->mSciDouble()->value(setting.isoValueSingleStepProperty));
         settings->setValue("colourMode", setting.isoColourType);
         settings->setValue("colour", setting.isoColour);
 
@@ -741,11 +748,22 @@ void MNWPVolumeRaycasterActor::loadConfiguration(QSettings *settings)
                     settings->value("colourMode").toInt());
         QColor isoColor = settings->value("colour").value<QColor>();
 
-        int decimals = settings->value("isoValueDecimals", 6).toInt();
+        int significantDigits = 2;
+
+        // Support old version of configuration.
+        if (settings->contains("isoValueDecimals"))
+        {
+            significantDigits = settings->value("isoValueDecimals", 2).toInt();
+        }
+        else
+        {
+            significantDigits = settings->value("isoValueSignificantDigits",
+                                                2).toInt();
+        }
         double singleStep = settings->value("isoValueSingleStep", 0.01).toFloat();
 
         rayCasterSettings->addIsoValue(enabled, false,
-                                       isoValue, decimals, singleStep,
+                                       isoValue, significantDigits, singleStep,
                                        isoColor, isoColorType);
 
         settings->endGroup();
@@ -765,11 +783,11 @@ void MNWPVolumeRaycasterActor::loadConfiguration(QSettings *settings)
     settings->endGroup(); // isoValueSettings
 
     rayCasterSettings->stepSize = settings->value("stepSize").toFloat();
-    properties->mDouble()->setValue(rayCasterSettings->stepSizeProp,
+    properties->mSciDouble()->setValue(rayCasterSettings->stepSizeProp,
                                     rayCasterSettings->stepSize);
     rayCasterSettings->interactionStepSize =
             settings->value("interactionStepSize").toFloat();
-    properties->mDouble()->setValue( rayCasterSettings->interactionStepSizeProp,
+    properties->mSciDouble()->setValue( rayCasterSettings->interactionStepSizeProp,
                                      rayCasterSettings->interactionStepSize);
     rayCasterSettings->bisectionSteps =
             settings->value("bisectionSteps").toUInt();
@@ -1221,7 +1239,7 @@ void MNWPVolumeRaycasterActor::onQtPropertyChanged(QtProperty* property)
              property == rayCasterSettings->bisectionStepsProp ||
              property == rayCasterSettings->shadowModeProp)
     {
-        rayCasterSettings->stepSize = properties->mDouble()
+        rayCasterSettings->stepSize = properties->mSciDouble()
                 ->value(rayCasterSettings->stepSizeProp);
         rayCasterSettings->bisectionSteps = properties->mInt()
                 ->value(rayCasterSettings->bisectionStepsProp);
@@ -1235,7 +1253,7 @@ void MNWPVolumeRaycasterActor::onQtPropertyChanged(QtProperty* property)
     else if (property == rayCasterSettings->interactionStepSizeProp ||
              property == rayCasterSettings->interactionBisectionStepsProp)
     {
-        rayCasterSettings->interactionStepSize = properties->mDouble()
+        rayCasterSettings->interactionStepSize = properties->mSciDouble()
                 ->value(rayCasterSettings->interactionStepSizeProp);
         rayCasterSettings->interactionBisectionSteps = properties->mInt()
                 ->value(rayCasterSettings->interactionBisectionStepsProp);
@@ -1602,7 +1620,7 @@ void MNWPVolumeRaycasterActor::onQtPropertyChanged(QtProperty* property)
                  property == it->isoValueProp )
             {
                 it->enabled = properties->mBool()->value(it->enabledProp);
-                it->isoValue = properties->mDouble()->value(it->isoValueProp);
+                it->isoValue = properties->mSciDouble()->value(it->isoValueProp);
                 int startIsoIndex = properties->mEnum()->value(
                             normalCurveSettings->startIsoSurfaceProp);
                 int stopIsoIndex = properties->mEnum()->value(
@@ -1655,15 +1673,15 @@ void MNWPVolumeRaycasterActor::onQtPropertyChanged(QtProperty* property)
 
                 return;
             }
-            else if ( property == it->isoValueDecimalsProperty
+            else if ( property == it->isoValueSignificantDigitsProperty
                       || property == it->isoValueSingleStepProperty)
             {
-                int decimals = properties->mInt()->value(it->isoValueDecimalsProperty);
-                properties->mDouble()->setDecimals(it->isoValueProp, decimals);
-                properties->mDouble()->setDecimals(it->isoValueSingleStepProperty, decimals);
-
-                double singleStep = properties->mDouble()->value(it->isoValueSingleStepProperty);
-                properties->mDouble()->setSingleStep(it->isoValueProp, singleStep);
+                int significantDigits = properties->mInt()->value(
+                            it->isoValueSignificantDigitsProperty);
+                properties->mSciDouble()->setSignificantDigits(
+                            it->isoValueProp, significantDigits);
+                properties->mSciDouble()->setSignificantDigits(
+                            it->isoValueSingleStepProperty, significantDigits);
             }
         } // isovalues
 

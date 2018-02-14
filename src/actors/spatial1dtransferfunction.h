@@ -4,8 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2016-2017 Marc Rautenhaus
-**  Copyright 2016-2017 Bianca Tost
+**  Copyright 2016-2018 Marc Rautenhaus
+**  Copyright 2016-2018 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -75,6 +75,10 @@ public:
     void saveConfiguration(QSettings *settings);
 
     void loadConfiguration(QSettings *settings);
+
+    void setValueSignificantDigits(int significantDigits);
+
+    void setValueStep(double step);
 
     QString getSettingsID() override { return "TransferFunction1DSpatialTexture"; }
 

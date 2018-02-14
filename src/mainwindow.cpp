@@ -4,8 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2017 Marc Rautenhaus
-**  Copyright 2016-2017 Bianca Tost
+**  Copyright 2015-2018 Marc Rautenhaus
+**  Copyright 2016-2018 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -29,6 +29,7 @@
 
 // standard library imports
 #include <iostream>
+#include <float.h>
 
 // related third party imports
 #include <QDockWidget>
@@ -1271,6 +1272,16 @@ void MMainWindow::revertCurrentSession(QAction *sessionAction)
     sessionNumber = sessionNumber.split(":").first();
     sessionNumber.replace(QRegExp("\\D*"), "");
     sessionManagerDialog->revertCurrentSessionToRevision(sessionNumber);
+}
+
+
+void MMainWindow::keyPressEvent(QKeyEvent *key)
+{
+    switch (key->key())
+    {
+    default:
+        return;
+    }
 }
 
 

@@ -4,8 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2017 Marc Rautenhaus
-**  Copyright 2016-2017 Bianca Tost
+**  Copyright 2015-2018 Marc Rautenhaus
+**  Copyright 2016-2018 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -532,6 +532,9 @@ QtProperty* MActor::addProperty(
         break;
     case (DECORATEDDOUBLE_PROPERTY):
         manager = properties->mDecoratedDouble();
+        break;
+    case (SCIENTIFICDOUBLE_PROPERTY):
+        manager = properties->mScientificDouble();
         break;
     case (DATETIME_PROPERTY):
         manager = properties->mDateTime();
