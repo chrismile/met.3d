@@ -535,7 +535,16 @@ void MBoundingBoxDockWidget::saveConfigurationToFile(QString filename)
 
     QSettings *settings = new QSettings(filename, QSettings::IniFormat);
 
+    settings->beginGroup("FileFormat");
+    // Save version id of Met.3D.
+    settings->setValue("met3dVersion", met3dVersionString);
+    settings->endGroup();
+
     saveConfiguration(settings);
+
+    delete settings;
+
+    LOG4CPLUS_DEBUG(mlog, "... configuration has been saved.");
 }
 
 
@@ -605,6 +614,10 @@ void MBoundingBoxDockWidget::loadConfigurationFromFile(QString filename)
     }
 
     loadConfiguration(settings);
+
+    delete settings;
+
+    LOG4CPLUS_DEBUG(mlog, "... configuration has been loaded.");
 }
 
 
