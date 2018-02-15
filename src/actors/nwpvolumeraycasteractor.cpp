@@ -303,13 +303,13 @@ MNWPVolumeRaycasterActor::RayCasterSettings::RayCasterSettings(
 
     stepSizeProp = a->addProperty(
                 SCIENTIFICDOUBLE_PROPERTY, "step size", groupRaycasterSettings);
-    properties->setSciDouble(stepSizeProp, stepSize, 0.001, 10.0, 3, 3, 0.01);
+    properties->setSciDouble(stepSizeProp, stepSize, 1e-9, 10.0, 3, 9, 0.01);
 
     interactionStepSizeProp = a->addProperty(
                 SCIENTIFICDOUBLE_PROPERTY, "interaction step size",
                 groupRaycasterSettings);
     properties->setSciDouble(interactionStepSizeProp, interactionStepSize,
-                           0.001, 10.0, 3, 3, 0.1);
+                           1e-9, 10.0, 3, 9, 0.1);
 
     bisectionStepsProp = a->addProperty(
                 INT_PROPERTY, "bisection steps", groupRaycasterSettings);
