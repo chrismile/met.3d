@@ -404,6 +404,10 @@ void MAddDatasetDialog::saveConfigurationToFile(QString filename)
     QSettings *settings = new QSettings(filename, QSettings::IniFormat);
 
     saveConfiguration(settings);
+
+    delete settings;
+
+    LOG4CPLUS_DEBUG(mlog, "... configuration has been saved.");
 }
 
 
@@ -455,6 +459,10 @@ bool MAddDatasetDialog::loadConfigurationFromFile(QString filename)
     }
 
     loadConfiguration(settings);
+
+    delete settings;
+
+    LOG4CPLUS_DEBUG(mlog, "... configuration has been loaded.");
 
     return true;
 }
