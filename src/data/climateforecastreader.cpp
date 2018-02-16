@@ -4,8 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2017 Marc Rautenhaus
-**  Copyright 2015-2017 Bianca Tost
+**  Copyright 2015-2018 Marc Rautenhaus
+**  Copyright 2017-2018 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -429,12 +429,23 @@ void MClimateForecastReader::scanDataRoot()
     QStringList availableFiles = dataRoot.entryList(
                 QStringList(fileFilter), QDir::Files);
 
+    // Contains shared data per level type and variable which must be the same
+    // in all files (lons, lats, etc.).
+    MSharedDataLevelTypeMap sharedVariableInfos;
+
+    // Stores the variables which have been already checked for consistency in
+    // the current file and connects them to the result of this check. Must be
+    // cleared when starting to read a new file.
+    QMap<MVerticalLevelType, QMap<QString, bool>> checkedVariables;
+
     // For each file, open the file and extract information about the contained
     // variables and forecast valid times.
     foreach (QString fileName, availableFiles)
     {
         LOG4CPLUS_DEBUG(mlog, "\tParsing file "
                         << fileName.toStdString() << " .." << flush);
+
+        checkedVariables.clear();
 
         // NetCDF library is not thread-safe (at least the regular C/C++
         // interface is not; hence all NetCDF calls need to be serialized
@@ -611,11 +622,41 @@ void MClimateForecastReader::scanDataRoot()
                     continue;
                     break;
                 }
-                // Create a new MVariableInfo struct and store availabe
+                // Create a new MVariableInfo struct and store available
                 // variable information in this field.
                 MVariableInfo* vinfo;
                 if (availableDataFields[levelType].contains(varName))
                 {
+                    // We need to check a variable for consistency only once per
+                    // file since the geographical region parameters are shared
+                    // in one file. Thus use the result of a previous check if
+                    // present.
+                    if (checkedVariables[levelType].contains(varName))
+                    {
+                        if (!checkedVariables[levelType][varName])
+                        {
+                            continue;
+                        }
+                    }
+                    else
+                    {
+                        bool consistent = checkSharedVariableDataConsistency(
+                                    &sharedVariableInfos[levelType][varName],
+                                    &currCFVar, levelType, false);
+                        checkedVariables[levelType][varName] = consistent;
+                        if (!consistent)
+                        {
+                            LOG4CPLUS_ERROR(
+                                        mlog,
+                                        "found different geographical region "
+                                        "than previously used for this "
+                                        "variable; skipping grids of variable '"
+                                        + varName.toStdString()
+                                        + "' found in file '"
+                                        + fileName.toStdString() + "'.");
+                            continue;
+                        }
+                    }
                     vinfo = availableDataFields[levelType].value(varName);
                 }
                 else
@@ -682,6 +723,11 @@ void MClimateForecastReader::scanDataRoot()
                             continue;
                         }
                     }
+                    // Initialise shared data of variable for consistency check.
+                    checkSharedVariableDataConsistency(
+                                &sharedVariableInfos[levelType][varName],
+                                &currCFVar, levelType, true);
+                    checkedVariables[levelType][varName] = true;
                 }
 
                 foreach (QDateTime validTime, currTimeCoordValues) // in UTC!
@@ -941,7 +987,7 @@ MStructuredGrid *MClimateForecastReader::readGrid(
 
         // Check if longitudes are cyclic (0..360 or -180..180 etc) and OVERLAP
         // (e.g. starts with -180 and ends with +180). In these cases we don't
-        // need the redundant lonitude.
+        // need the redundant longitude.
         // NOTE: Using M_LONLAT_RESOLUTION workaround, see mutil.h
         double lon_west = MMOD(shared->lons[0], 360.);
         double lon_east = MMOD(shared->lons[shared->lons.size()-1], 360.);
@@ -995,9 +1041,10 @@ MStructuredGrid *MClimateForecastReader::readGrid(
                 }
                 else if (units != "hPa")
                 {
-                    // If vertical levels are specified in metre and convertion
-                    // flag is set, convert metre to pressure with standard ICAO
-                    // field.
+
+                    // If vertical levels are specified in metres and
+                    // convertion flag is set, convert metres to pressure with
+                    // standard ICAO field.
                     if ((units == "m" || units == "metre")
                             && convertGeometricHeightToPressure_ICAOStandard)
                     {
@@ -1508,6 +1555,217 @@ bool MClimateForecastReader::parseCfStandardNameFile(const QString &filename)
     }
 
     file.close();
+
+    return true;
+}
+
+
+bool MClimateForecastReader::checkSharedVariableDataConsistency(
+        MVariableDataSharedPerFile *shared,
+        netCDF::NcCFVar *cfVar,
+        MVerticalLevelType levelType,
+        bool initialiseConsistencyData)
+{
+    MVariableDataSharedPerFile current;
+
+    // Query latitude, longitude and time coordinate system variables.
+    current.latVar = cfVar->getLatitudeVar();
+    current.lonVar = cfVar->getLongitudeVar();
+    current.timeVar = cfVar->getTimeVar();
+
+    // Query scale and offset, if provided.
+    try { cfVar->getAtt("scale_factor").getValues(&(current.scale_factor)); }
+    catch (NcException) { current.scale_factor = 1.; }
+    try { cfVar->getAtt("add_offset").getValues(&(current.add_offset)); }
+    catch (NcException) { current.add_offset = 0.; }
+
+    // Have scale and offset been provided? If not, they are not applied.
+    current.scaleAndOffsetProvided =
+            (current.scale_factor != 1.) && (current.add_offset != 0.);
+
+    if (!initialiseConsistencyData
+            && (current.scale_factor != shared->scale_factor)
+            && (current.add_offset != shared->add_offset))
+    {
+        return false;
+    }
+
+    switch (levelType)
+    {
+    case PRESSURE_LEVELS_3D:
+    {
+        if (convertGeometricHeightToPressure_ICAOStandard)
+        {
+            // Special case: If conversion of vertical geometric height
+            // levels to pressure levels is enabled, the grid will appear
+            // in Met.3D as a regular pressure level grid.
+            current.vertVar = cfVar->getVerticalCoordinateGeometricHeight();
+        }
+        else
+        {
+            current.vertVar = cfVar->getVerticalCoordinatePressure();
+        }
+        break;
+    }
+    case HYBRID_SIGMA_PRESSURE_3D:
+    {
+        NcVar apVar, bVar;
+        QString psName;
+        current.vertVar =
+                cfVar->getVerticalCoordinateHybridSigmaPressure(
+                    &apVar, &bVar, &psName);
+
+        // Read hybrid coefficients, if available
+        if ( !apVar.isNull() )
+        {
+            current.ak.resize(apVar.getDim(0).getSize());
+            apVar.getVar(current.ak.data());
+
+            // Check the units of the ak coefficients: Pa or hPa? We need hPa!
+            string units = "";
+            try { apVar.getAtt("units").getValues(units); }
+            catch (NcException) {}
+
+            if (units == "Pa")
+            {
+                // .. hence, if the ak are given in Pa, convert to hPa.
+                for (int i = 0; i < current.ak.size(); i++)
+                {
+                    current.ak[i] /= 100.;
+                }
+            }
+
+            // QVector operator != compares QVectors componentwise:
+            // https://doc.qt.io/qt-5/qvector.html#operator-not-eq (Qt 5.10)
+            if (!initialiseConsistencyData && (current.ak != shared->ak))
+            {
+                return false;
+            }
+        }
+
+        if ( !bVar.isNull() )
+        {
+            current.bk.resize(bVar.getDim(0).getSize());
+            bVar.getVar(current.bk.data());
+
+            if (!initialiseConsistencyData && (current.bk != shared->bk))
+            {
+                return false;
+            }
+        }
+        break;
+    }
+    case POTENTIAL_VORTICITY_2D:
+    {
+        current.vertVar = cfVar->getVerticalCoordinatePotVort();
+        break;
+    }
+    case SURFACE_2D:
+    case LOG_PRESSURE_LEVELS_3D:
+    case AUXILIARY_PRESSURE_3D:
+    default:
+        break;
+    }
+
+    // Read coordinate variables.
+    current.lons.resize(current.lonVar.getDim(0).getSize());
+    current.lonVar.getVar(current.lons.data());
+    current.lats.resize(current.latVar.getDim(0).getSize());
+    current.latVar.getVar(current.lats.data());
+
+    // Check if longitudes are cyclic (0..360 or -180..180 etc) and OVERLAP
+    // (e.g. starts with -180 and ends with +180). In these cases we don't
+    // need the redundant lognitude.
+    // NOTE: Using M_LONLAT_RESOLUTION workaround, see mutil.h
+    double lon_west = MMOD(current.lons[0], 360.);
+    double lon_east = MMOD(current.lons[current.lons.size()-1], 360.);
+    if ( fabs(lon_west - lon_east) < M_LONLAT_RESOLUTION )
+    {
+        current.lons.pop_back();
+    }
+
+
+    if (!initialiseConsistencyData && (current.lons != shared->lons))
+    {
+        return false;
+    }
+
+    if (!initialiseConsistencyData && (current.lats != shared->lats))
+    {
+        return false;
+    }
+
+
+    if ( !current.vertVar.isNull() )
+    {
+        current.levels.resize(current.vertVar.getDim(0).getSize());
+        current.vertVar.getVar(current.levels.data());
+
+        if (levelType == PRESSURE_LEVELS_3D)
+        {
+            // If vertical levels are specified in Pa, convert to hPa.
+            string units = "";
+            try { current.vertVar.getAtt("units").getValues(units); }
+            catch (NcException) {}
+
+            if (units == "Pa")
+            {
+                for (int i = 0; i < current.levels.size(); i++)
+                {
+                    current.levels[i] /= 100.;
+                }
+            }
+            else if (units != "hPa")
+            {
+                // If vertical levels are specified in metres and convertion
+                // flag is set, convert metres to pressure with standard ICAO
+                // field.
+                if ((units == "m" || units == "metre")
+                        && convertGeometricHeightToPressure_ICAOStandard)
+                {
+                    for (int i = 0; i < current.levels.size(); i++)
+                    {
+                        current.levels[i] = metre2pressure_standardICAO(
+                                    current.levels[i]) / 100.;
+                    }
+                }
+            }
+        }
+    }
+
+    if (!initialiseConsistencyData && (current.levels != shared->levels))
+    {
+        return false;
+    }
+
+    // Query ensemble dimension.
+    try
+    {
+        current.ensembleVar = cfVar->getEnsembleVar();
+        current.availableMembers = cfVar->getEnsembleMembers(
+                    &(current.memberToFileIndexMap));
+    }
+    catch (NcException)
+    {
+    }
+
+    if (!initialiseConsistencyData
+            && (current.availableMembers != shared->availableMembers))
+    {
+        return false;
+    }
+
+    if (initialiseConsistencyData)
+    {
+        shared->levels = current.levels;
+        shared->lats = current.lats;
+        shared->lons = current.lons;
+        shared->ak = current.ak;
+        shared->bk = current.bk;
+        shared->availableMembers = current.availableMembers;
+        shared->scale_factor = current.scale_factor;
+        shared->add_offset = current.add_offset;
+    }
 
     return true;
 }

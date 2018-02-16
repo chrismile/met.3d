@@ -4,8 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2017 Marc Rautenhaus
-**  Copyright 2015-2017 Bianca Tost
+**  Copyright 2015-2018 Marc Rautenhaus
+**  Copyright 2017-2018 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -171,6 +171,30 @@ protected:
       an attribute in the NetCDF file.
      */
     bool parseCfStandardNameFile(const QString& filename);
+
+    /**
+      Checks consistency of shared data associated with the NetCDF variable @p
+      cfVar of the vertical level type @p levelType. Shared data includes
+      longitudes, latitudes, levels, etc., that are read only once and re-used
+      for all time steps of a variable. This function ensures that all time
+      steps are defined on, e.g., the same grid.
+
+      If @p initialiseConsistencyData is true @p shared is initialised with the
+      shared data data obtained from @p cfVar. This is the data that subsequent
+      calls to this method will be checked against for consistency.
+
+      If @p initialiseConsistencyData is false the shared data of @p cfVar are
+      compared to the corresponding data stored in @p shared.
+
+      @return false if @p initialiseConsistencyData is false and the shared
+      data of @p cfVar does not match the corresponding data in @p shared; true
+      otherwise.
+     */
+    bool checkSharedVariableDataConsistency(
+            MVariableDataSharedPerFile *shared,
+            netCDF::NcCFVar *cfVar,
+            MVerticalLevelType levelType,
+            bool initialiseConsistencyData);
 
     bool treatRotatedGridAsRegularGrid;
     bool convertGeometricHeightToPressure_ICAOStandard;
