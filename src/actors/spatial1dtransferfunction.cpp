@@ -74,7 +74,7 @@ MSpatial1DTransferFunction::MSpatial1DTransferFunction(QObject *parent)
     // ===============================================
     beginInitialiseQtProperties();
 
-    setActorType("Transfer function scalar to texture");
+    setActorType(staticActorType());
     setName(getActorType());
 
     // Properties related to texture levels.

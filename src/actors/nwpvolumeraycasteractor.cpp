@@ -78,7 +78,7 @@ MNWPVolumeRaycasterActor::MNWPVolumeRaycasterActor()
     // ===============================================
     beginInitialiseQtProperties();
 
-    setActorType("Volume raycaster");
+    setActorType(staticActorType());
     setName(getActorType());
 
     QStringList modesLst;

@@ -1104,31 +1104,9 @@ void MNWPActorVariable::loadConfiguration(QSettings *settings)
     QString tfName = settings->value("transferFunction").toString();
     while (!setTransferFunction(tfName))
     {
-        QMessageBox msgBox;
-        msgBox.setIcon(QMessageBox::Warning);
-        msgBox.setWindowTitle(actor->getName());
-        msgBox.setText(QString("Variable '%1' requires a transfer function "
-                               "'%2' that does not exist.\n"
-                               "Would you like to load the transfer function "
-                               "from file?")
-                       .arg(variableName).arg(tfName));
-        msgBox.setStandardButtons(QMessageBox::Yes | QMessageBox::No);
-        msgBox.button(QMessageBox::Yes)->setText("Load transfer function");
-        msgBox.button(QMessageBox::No)->setText("Discard dependency");
-        msgBox.exec();
-        if (msgBox.clickedButton() == msgBox.button(QMessageBox::Yes))
-        {
-            MSystemManagerAndControl *sysMC =
-                    MSystemManagerAndControl::getInstance();
-            // Create default actor to get name of actor factory.
-            MTransferFunction1D *defaultActor = new MTransferFunction1D();
-            sysMC->getMainWindow()->getSceneManagementDialog()
-                    ->loadRequiredActorFromFile(defaultActor->getName(),
-                                                tfName,
-                                                settings->fileName());
-            delete defaultActor;
-        }
-        else
+        if (!MTransferFunction::loadMissingTransferFunction(
+                    tfName, MTransferFunction1D::staticActorType(),
+                    "Variable ", variableName, settings))
         {
             break;
         }
@@ -2902,31 +2880,9 @@ void MNWP2DHorizontalActorVariable::loadConfiguration(QSettings *settings)
     QString stfName = settings->value("spatialTransferFunction", "None").toString();
     while (!setSpatialTransferFunction(stfName))
     {
-        QMessageBox msgBox;
-        msgBox.setIcon(QMessageBox::Warning);
-        msgBox.setWindowTitle(actor->getName());
-        msgBox.setText(QString("Variable '%1' requires a transfer function "
-                               "'%2' that does not exist.\n"
-                               "Would you like to load the transfer function "
-                               "from file?")
-                       .arg(variableName).arg(stfName));
-        msgBox.setStandardButtons(QMessageBox::Yes | QMessageBox::No);
-        msgBox.button(QMessageBox::Yes)->setText("Load transfer function");
-        msgBox.button(QMessageBox::No)->setText("Discard dependency");
-        msgBox.exec();
-        if (msgBox.clickedButton() == msgBox.button(QMessageBox::Yes))
-        {
-            MSystemManagerAndControl *sysMC =
-                    MSystemManagerAndControl::getInstance();
-            // Create default actor to get name of actor factory.
-            MSpatial1DTransferFunction *defaultActor =
-                    new MSpatial1DTransferFunction();
-            sysMC->getMainWindow()->getSceneManagementDialog()
-                    ->loadRequiredActorFromFile(defaultActor->getName(),
-                                                stfName, settings->fileName());
-            delete defaultActor;
-        }
-        else
+        if (!MTransferFunction::loadMissingTransferFunction(
+                    stfName, MSpatial1DTransferFunction::staticActorType(),
+                    "Variable ", variableName, settings))
         {
             break;
         }

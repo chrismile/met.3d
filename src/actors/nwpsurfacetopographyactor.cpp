@@ -60,7 +60,7 @@ MNWPSurfaceTopographyActor::MNWPSurfaceTopographyActor()
     // ===============================================
     beginInitialiseQtProperties();
 
-    setActorType("Surface topography");
+    setActorType(staticActorType());
     setName(getActorType());
 
     topographyVariableIndexProp = addProperty(ENUM_PROPERTY, "topography variable",

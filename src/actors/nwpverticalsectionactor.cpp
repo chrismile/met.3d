@@ -81,7 +81,7 @@ MNWPVerticalSectionActor::MNWPVerticalSectionActor()
     // ===============================================
     beginInitialiseQtProperties();
 
-    setActorType("Vertical cross-section");
+    setActorType(staticActorType());
     setName(getActorType());
 
 

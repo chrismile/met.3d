@@ -66,6 +66,8 @@ public:
 
     ~MNWPVerticalSectionActor();
 
+    static QString staticActorType() { return "Vertical cross-section"; }
+
     void reloadShaderEffects();
 
     /**

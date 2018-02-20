@@ -84,7 +84,7 @@ MTrajectoryActor::MTrajectoryActor()
     // ===============================================
     beginInitialiseQtProperties();
 
-    setActorType("Trajectories");
+    setActorType(staticActorType());
     setName(getActorType());
 
     // Remove labels property group since it is not used for trajectory actors
@@ -442,31 +442,9 @@ void MTrajectoryActor::loadConfiguration(QSettings *settings)
     QString tfName = settings->value("transferFunction").toString();
     while (!setTransferFunction(tfName))
     {
-        QMessageBox msgBox;
-        msgBox.setIcon(QMessageBox::Warning);
-        msgBox.setWindowTitle(this->getName());
-        msgBox.setText(QString("Variable '%1' requires a transfer function "
-                               "'%2' that does not exist.\n"
-                               "Would you like to load the transfer function "
-                               "from file?")
-                       .arg(getName()).arg(tfName));
-        msgBox.setStandardButtons(QMessageBox::Yes | QMessageBox::No);
-        msgBox.button(QMessageBox::Yes)->setText("Load transfer function");
-        msgBox.button(QMessageBox::No)->setText("Discard dependency");
-        msgBox.exec();
-        if (msgBox.clickedButton() == msgBox.button(QMessageBox::Yes))
-        {
-            MSystemManagerAndControl *sysMC =
-                    MSystemManagerAndControl::getInstance();
-            // Create default actor to get name of actor factory.
-            MTransferFunction1D *defaultActor = new MTransferFunction1D();
-            sysMC->getMainWindow()->getSceneManagementDialog()
-                    ->loadRequiredActorFromFile(defaultActor->getName(),
-                                                tfName,
-                                                settings->fileName());
-            delete defaultActor;
-        }
-        else
+        if (!MTransferFunction::loadMissingTransferFunction(
+                    tfName, MTransferFunction1D::staticActorType(),
+                    "Trajectories Actor ", getName(), settings))
         {
             break;
         }
