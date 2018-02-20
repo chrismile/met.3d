@@ -67,6 +67,8 @@ public:
     MMovablePoleActor();
     ~MMovablePoleActor();
 
+    static QString staticActorType() { return "Movable poles"; }
+
     void reloadShaderEffects();
 
     void addPole(QPointF pos);

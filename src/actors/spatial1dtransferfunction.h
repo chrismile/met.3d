@@ -72,6 +72,9 @@ public:
     MSpatial1DTransferFunction(QObject *parent = 0);
     ~MSpatial1DTransferFunction();
 
+    static QString staticActorType()
+    { return "Transfer function scalar to texture"; }
+
     void saveConfiguration(QSettings *settings);
 
     void loadConfiguration(QSettings *settings);

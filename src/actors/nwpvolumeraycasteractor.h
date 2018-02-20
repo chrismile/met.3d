@@ -72,6 +72,8 @@ public:
 
     ~MNWPVolumeRaycasterActor();
 
+    static QString staticActorType() { return "Volume raycaster"; }
+
     void reloadShaderEffects();
 
     QString getSettingsID() override { return "NWPVolumeRaycasterActor"; }

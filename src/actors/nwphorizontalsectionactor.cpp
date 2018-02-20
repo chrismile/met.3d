@@ -80,7 +80,7 @@ MNWPHorizontalSectionActor::MNWPHorizontalSectionActor()
     // ===============================================
     beginInitialiseQtProperties();
 
-    setActorType("Horizontal cross-section");
+    setActorType(staticActorType());
     setName(getActorType());
 
     slicePosProperty = addProperty(DECORATEDDOUBLE_PROPERTY, "slice position",

@@ -71,7 +71,7 @@ MBaseMapActor::MBaseMapActor()
     // ===============================================
     beginInitialiseQtProperties();
 
-    setActorType("Base map");
+    setActorType(staticActorType());
     setName(getActorType());
 
     loadMapProperty = addProperty(CLICK_PROPERTY, "load map",

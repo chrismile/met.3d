@@ -92,7 +92,28 @@ public:
     void setNumLabels(int num);
 
     QString transferFunctionName();
-    
+
+    /**
+      @brief Static method which can be called if an object misses the transfer
+      function it should be connected to when loading a configuration file.
+
+      Tells the user that the transfer function in the configuration file
+      does not exist and asks the user whether he/she wants to load a transfer
+      function from a configuration file.
+
+      @p callerName should contain the name of the object missing the transfer
+      function while @p callerDescriptor can contain a description of the
+      object (e.g. "Variable") to give further information about the object to
+      the user. The descriptor can be defined with or without a trailed space
+      (The method will append a space if not present).
+
+      @p settings contains the settings object from which the configuration of
+      the object is loaded.
+     */
+    static bool loadMissingTransferFunction(
+            QString tfName, QString tfActorType, QString callerDescriptor,
+            QString callerName, QSettings *settings);
+
 signals:
     
 public slots:

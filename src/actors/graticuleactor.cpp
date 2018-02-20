@@ -85,7 +85,7 @@ MGraticuleActor::MGraticuleActor(MBoundingBoxConnection *boundingBoxConnection)
     // ===============================================
     beginInitialiseQtProperties();
 
-    setActorType("Graticule");
+    setActorType(staticActorType());
     setName(getActorType());
 
     // Only add property group if graticule is not part of a horizontal cross
