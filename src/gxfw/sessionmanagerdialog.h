@@ -235,7 +235,9 @@ private:
     bool loadOnStart;
     MSessionItemDelegate *sessionItemDelegate;
     MSessionFileSystemModel *sessionFileSystemModel;
-};
+    /** Revision number the current session would get as a revision file. */
+    int currentRevisionNumber;
+}; // MSessionManagerDialog
 
 
 /**
@@ -253,7 +255,7 @@ public:
     ~MSessionFileSystemModel() {}
 
     QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override;
-};
+}; // MSessionFileSystemModel
 
 
 /**
@@ -279,7 +281,7 @@ public:
 private:
     QString currentSessionName;
 
-};
+}; // MSessionItemDelegate
 
 } // namespace Met3D
 
