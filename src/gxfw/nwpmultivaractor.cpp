@@ -120,13 +120,17 @@ MNWPActorVariable* MNWPMultiVarActor::addActorVariable()
     MSelectDataSourceDialog dialog(this->supportedLevelTypes());
     if (dialog.exec() == QDialog::Rejected) return nullptr;
 
+    QStringList sysControlIdentifiers = MSystemManagerAndControl::getInstance()
+            ->getSyncControlIdentifiers();
+
     bool accepted = false;
     // ask user which sync control should be synchronized with variable
     QString syncName = QInputDialog::getItem(
                 nullptr, "Choose Sync Control",
                 "Please select a sync control to synchronize with: ",
-                MSystemManagerAndControl::getInstance()->getSyncControlIdentifiers(),
-                0, false, &accepted);
+                sysControlIdentifiers,
+                min(1, sysControlIdentifiers.size() - 1), false,
+                &accepted);
     // if user has aborted do not add any variable
     if (!accepted) return nullptr;
 

@@ -91,11 +91,20 @@ MNWPVerticalSectionActor::MNWPVerticalSectionActor()
     properties->mInt()->setMinimum(labelDistanceProperty, 0);
     labelDistanceProperty->setToolTip("Depends on order in pressure levels list.");
 
+    QStringList waypointsList =  MSystemManagerAndControl::getInstance()
+            ->getWaypointsModelsIdentifiers();
     waypointsModelProperty = addProperty(ENUM_PROPERTY, "waypoints model",
                                          actorPropertiesSupGroup);
-    properties->mEnum()->setEnumNames(waypointsModelProperty,
-                                      MSystemManagerAndControl::getInstance()
-                                      ->getWaypointsModelsIdentifiers());
+    // Set default waypoints to second entry if there exists a second entry.
+    properties->mEnum()->setEnumNames(waypointsModelProperty, waypointsList);
+    if (waypointsList.size() > 1)
+    {
+        enableActorUpdates(false);
+        properties->setEnumItem(waypointsModelProperty, waypointsList.at(1));
+        setWaypointsModel(MSystemManagerAndControl::getInstance()
+                          ->getWaypointsModel(waypointsList.at(1)));
+        enableActorUpdates(true);
+    }
 
     actorPropertiesSupGroup->addSubProperty(bBoxConnection->getProperty());
 
