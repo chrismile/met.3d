@@ -873,6 +873,10 @@ void MSessionManagerDialog::saveSessionToFile(QString sessionName, bool autoSave
         updateSessionFileHistory(filename);
         QFile::remove(filename);
     }
+    else
+    {
+        currentRevisionNumber = 0;
+    }
 
     // File Format.
     // ==========================================
@@ -1024,6 +1028,8 @@ void MSessionManagerDialog::saveSessionToFile(QString sessionName, bool autoSave
     delete settings;
 
     LOG4CPLUS_DEBUG(mlog, "... session has been saved.");
+    LOG4CPLUS_DEBUG(mlog, "Created session revision number "
+                    << currentRevisionNumber);
 }
 
 
@@ -1671,7 +1677,8 @@ void MSessionManagerDialog::updateSessionFileHistory(QString filename)
                   "." + currentSession + fileExtension
                   + "." + QString::number(fileIndex)));
 
-    LOG4CPLUS_DEBUG(mlog, "Created session revision number " << fileIndex);
+    // Revision Number of current session.
+    currentRevisionNumber = fileIndex + 1;
 }
 
 
