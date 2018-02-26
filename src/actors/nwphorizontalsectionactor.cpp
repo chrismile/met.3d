@@ -377,7 +377,7 @@ void MNWPHorizontalSectionActor::loadConfiguration(QSettings *settings)
     MBoundingBoxInterface::loadConfiguration(settings);
     enableActorUpdates(true);
 
-    properties->mInt()->setValue(
+    properties->mEnum()->setValue(
                 differenceModeProperty,
                 settings->value("differenceMode", 0).toInt());
 
