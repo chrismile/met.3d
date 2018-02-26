@@ -837,7 +837,8 @@ void MMainWindow::onSessionsListChanged(QStringList *sessionsList,
 }
 
 
-void MMainWindow::onCurrentSessionHistoryChanged(QStringList *sessionHistory)
+void MMainWindow::onCurrentSessionHistoryChanged(QStringList *sessionHistory,
+                                                 QString sessionName)
 {
     // Clear actions.
     foreach(QAction *action, ui->menuRevertCurrentSession->actions())
@@ -845,6 +846,7 @@ void MMainWindow::onCurrentSessionHistoryChanged(QStringList *sessionHistory)
         ui->menuRevertCurrentSession->removeAction(action);
         delete action;
     }
+    ui->menuRevertCurrentSession->addSeparator()->setText(sessionName);
     // Add new actions.
     foreach(QString sessionRevision, *sessionHistory)
     {
