@@ -5,6 +5,7 @@
 **  prediction data.
 **
 **  Copyright 2018 Marc Rautenhaus
+**  Copyright 2018 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -98,13 +99,22 @@ MStructuredGrid* MDifferenceDataSource::produceData(MDataRequest request)
         for (unsigned int j = 0; j < differenceGrid->getNumLats() ; j++)
             for (unsigned int i = 0; i < differenceGrid->getNumLons() ; i++)
             {
-                float diff = inputGrids.at(0)->getValue(k, j, i)
-                        - inputGrids.at(1)->interpolateValue(
+                float valueGrid0 = inputGrids.at(0)->getValue(k, j, i);
+                if (valueGrid0 == M_MISSING_VALUE)
+                {
+                    differenceGrid->setValue(k, j, i, M_MISSING_VALUE);
+                    continue;
+                }
+                float valueGrid1 = inputGrids.at(1)->interpolateValue(
                             differenceGrid->getLons()[i],
                             differenceGrid->getLats()[j],
                             differenceGrid->getPressure(k, j, i));
-
-                differenceGrid->setValue(k, j, i, diff);
+                if (valueGrid1 != M_MISSING_VALUE)
+                {
+                    differenceGrid->setValue(k, j, i, valueGrid0 - valueGrid1);
+                    continue;
+                }
+                differenceGrid->setValue(k, j, i, M_MISSING_VALUE);
             }
 
     // Release input fields.
@@ -178,6 +188,32 @@ QList<QDateTime> MDifferenceDataSource::availableValidTimes(
     return inputSource[0]->availableValidTimes(levelType, variableName, initTime);
 }
 
+
+QString MDifferenceDataSource::variableLongName(
+        MVerticalLevelType levelType,
+        const QString& variableName)
+{
+    assert(inputSource[0] != nullptr);
+    return inputSource[0]->variableLongName(levelType, variableName);
+}
+
+
+QString MDifferenceDataSource::variableStandardName(
+        MVerticalLevelType levelType,
+        const QString& variableName)
+{
+    assert(inputSource[0] != nullptr);
+    return inputSource[0]->variableStandardName(levelType, variableName);
+}
+
+
+QString MDifferenceDataSource::variableUnits(
+        MVerticalLevelType levelType,
+        const QString& variableName)
+{
+    assert(inputSource[0] != nullptr);
+    return inputSource[0]->variableUnits(levelType, variableName);
+}
 
 
 /******************************************************************************

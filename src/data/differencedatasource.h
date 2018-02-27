@@ -70,6 +70,15 @@ public:
                                          const QString& variableName,
                                          const QDateTime& initTime);
 
+    QString variableLongName(MVerticalLevelType levelType,
+                             const QString&     variableName);
+
+    QString variableStandardName(MVerticalLevelType levelType,
+                             const QString&     variableName);
+
+    QString variableUnits(MVerticalLevelType levelType,
+                             const QString&     variableName);
+
 
 protected:
     const QStringList locallyRequiredKeys();
