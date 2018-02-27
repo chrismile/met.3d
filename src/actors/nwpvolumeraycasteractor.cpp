@@ -1673,8 +1673,7 @@ void MNWPVolumeRaycasterActor::onQtPropertyChanged(QtProperty* property)
 
                 return;
             }
-            else if ( property == it->isoValueSignificantDigitsProperty
-                      || property == it->isoValueSingleStepProperty)
+            else if ( property == it->isoValueSignificantDigitsProperty )
             {
                 int significantDigits = properties->mInt()->value(
                             it->isoValueSignificantDigitsProperty);
@@ -1682,6 +1681,13 @@ void MNWPVolumeRaycasterActor::onQtPropertyChanged(QtProperty* property)
                             it->isoValueProp, significantDigits);
                 properties->mSciDouble()->setSignificantDigits(
                             it->isoValueSingleStepProperty, significantDigits);
+            }
+            else if ( property == it->isoValueSingleStepProperty)
+            {
+                double singleStep = properties->mSciDouble()->value(
+                            it->isoValueSingleStepProperty);
+                properties->mSciDouble()->setSingleStep(
+                            it->isoValueProp, singleStep);
             }
         } // isovalues
 
