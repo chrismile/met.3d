@@ -124,7 +124,8 @@ public:
 
     void onSessionsListChanged(QStringList *sessionsList, QString currentSession);
 
-    void onCurrentSessionHistoryChanged(QStringList *sessionHistory);
+    void onCurrentSessionHistoryChanged(QStringList *sessionHistory,
+                                        QString sessionName);
 
     void onSessionSwitch(QString currentSession);
 

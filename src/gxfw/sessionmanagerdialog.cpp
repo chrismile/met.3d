@@ -68,8 +68,6 @@ MSessionManagerDialog::MSessionManagerDialog(QWidget *parent) :
 {
     ui->setupUi(this);
 
-    sessionsList.clear();
-
     // Setup list view.
     //=================
     sessionItemDelegate = new MSessionItemDelegate(this);
@@ -123,7 +121,8 @@ MSessionManagerDialog::~MSessionManagerDialog()
 
 void MSessionManagerDialog::initialize(
         QString sessionName, QString path, int autoSaveInterval,
-        bool loadOnStart, bool saveOnApplicationExit)
+        bool loadOnStart, bool saveOnApplicationExit,
+        int maximumNumberOfSavedRevisions)
 {
     // Session:
     // ========
@@ -131,6 +130,8 @@ void MSessionManagerDialog::initialize(
 
     setSessionToCurrent(sessionName);
 
+    // Max auto save interval = 86400 sec == 24 h.
+    autoSaveInterval = min(autoSaveInterval, 86400);
     // Auto save:
     // ==========
     ui->saveOnAppCheckBox->setChecked(saveOnApplicationExit);
@@ -163,6 +164,10 @@ void MSessionManagerDialog::initialize(
     {
         ui->autoSaveCheckBox->setChecked(false);
     }
+
+    // Don't save negative values for maximumNumberOfSavedRevisions.
+    maximumNumberOfSavedRevisions = max(maximumNumberOfSavedRevisions, 0);
+    this->maximumNumberOfSavedRevisions = maximumNumberOfSavedRevisions;
 
     // Directory:
     // ==========
@@ -492,12 +497,28 @@ void MSessionManagerDialog::renameItem(QModelIndex item)
     // Rename file.
     QFile file(QDir(path).absoluteFilePath(currentName + fileExtension));
     file.rename(QDir(path).absoluteFilePath(newName + fileExtension));
+
+    // Rename revision files.
+    QStringList revisionSplit;
+    QStringList revertSessionFileNameList;
+
+    getCurrentSessionFileHistoryFileNameList(revertSessionFileNameList,
+                                             currentName);
+
+    foreach (QString sessionRevision, revertSessionFileNameList)
+    {
+        QFile file(QDir(path).absoluteFilePath(sessionRevision));
+        revisionSplit = sessionRevision.split(".");
+        QString newRevisionName = "." + newName + fileExtension + "."
+                + revisionSplit.last();
+        file.rename(QDir(path).absoluteFilePath(newRevisionName));
+    }
 }
 
 
 void MSessionManagerDialog::fillSessionsList()
 {
-    sessionsList.clear();
+    QStringList sessionsList;
     QModelIndex rootIndex = sessionFileSystemModel->index(path);
     int rowCount = sessionFileSystemModel->rowCount(rootIndex);
     for (int row = 0; row < rowCount; row++)
@@ -515,66 +536,29 @@ void MSessionManagerDialog::fillSessionsList()
 void MSessionManagerDialog::fillCurrentSessionHistoryList()
 {
     // Reset session list and currentRevisionNumber.
-    sessionsList.clear();
+    QStringList sessionsList;
     currentRevisionNumber = -1;
 
-    QDir directory(path);
+    QStringList fileNameList;
+    getCurrentSessionFileHistoryFileNameList(fileNameList, currentSession);
 
-    // Get all files in the current directory especially the hidden ones.
-    QStringList fileList = directory.entryList(QDir::Files | QDir::Hidden);
-
-    if (!fileList.isEmpty())
+    foreach (QString sessionRevision, fileNameList)
     {
-        QString regExpString =
-                QRegExp::escape("." + currentSession + fileExtension + ".")
-                + "\\d+";
+        int revisionNumber = sessionRevision
+                .split(".", QString::SkipEmptyParts).last().toInt();
+        currentRevisionNumber = max(currentRevisionNumber, revisionNumber);
 
-        fileList = fileList.filter(QRegExp(regExpString));
+        // Extract index of the file name and start current session history
+        // entry with it.
+        QString entry = "Rev. " + QString::number(revisionNumber);
 
-        foreach (QString sessionRevision, fileList)
-        {
-            int revisionNumber = sessionRevision
-                    .split(".", QString::SkipEmptyParts).last().toInt();
-            currentRevisionNumber = max(currentRevisionNumber, revisionNumber);
-
-            // Extract index of the file name and start current session history
-            // entry with it.
-            QString entry = "Rev. " + QString::number(revisionNumber);
-
-            QSettings *settings = new QSettings(
-                        QDir(path).absoluteFilePath(sessionRevision),
-                        QSettings::IniFormat);
-
-            QStringList groups = settings->childGroups();
-            if ( groups.contains("MSession")  )
-            {
-                settings->beginGroup("MSession");
-                groups = settings->childGroups();
-                if ( groups.contains("SessionDetails")  )
-                {
-                    settings->beginGroup("SessionDetails");
-
-                    entry += ": " + settings->value("dateTime", "").toDateTime()
-                            .toString(Qt::ISODate);
-                    entry += " (" + settings->value("name", "").toString() + ")";
-                    settings->endGroup();
-                    settings->endGroup();
-                }
-                sessionsList << entry;
-            }
-            delete settings;
-        }
-        // Increase to get the number the current session would get if it was a 
-        // revision file. (1 greater than the maximum revision number present.)
-        currentRevisionNumber++;
-        // Prepend current session to list.
         QSettings *settings = new QSettings(
-                    QDir(path).absoluteFilePath(currentSession + fileExtension),
+                    QDir(path).absoluteFilePath(sessionRevision),
                     QSettings::IniFormat);
+
         QStringList groups = settings->childGroups();
         if ( groups.contains("MSession")  )
         {
-            QString entry = "Rev. " + QString::number(currentRevisionNumber);
             settings->beginGroup("MSession");
             groups = settings->childGroups();
             if ( groups.contains("SessionDetails")  )
@@ -583,23 +567,48 @@ void MSessionManagerDialog::fillCurrentSessionHistoryList()
 
                 entry += ": " + settings->value("dateTime", "").toDateTime()
                         .toString(Qt::ISODate);
-                entry += " (" + settings->value("name", "").toString() + ")";
                 settings->endGroup();
                 settings->endGroup();
             }
-            sessionsList.prepend(entry);
-            delete settings;
+            sessionsList << entry;
         }
-
-        // Sort list from greates revision number to smallest.
-        std::sort(sessionsList.begin(), sessionsList.end(), [](QString a, QString b)
-        {
-            return a.split(" ").at(1).split(":").first().toInt()
-                    >= b.split(" ").at(1).split(":").first().toInt();
-        });
+        delete settings;
     }
+    // Increase to get the number the current session would get if it was a
+    // revision file. (1 greater than the maximum revision number present.)
+    currentRevisionNumber++;
+    // Prepend current session to list.
+    QSettings *settings = new QSettings(
+                QDir(path).absoluteFilePath(currentSession + fileExtension),
+                QSettings::IniFormat);
+    QStringList groups = settings->childGroups();
+    if ( groups.contains("MSession")  )
+    {
+        QString entry = "Rev. " + QString::number(currentRevisionNumber);
+        settings->beginGroup("MSession");
+        groups = settings->childGroups();
+        if ( groups.contains("SessionDetails")  )
+        {
+            settings->beginGroup("SessionDetails");
+
+            entry += ": " + settings->value("dateTime", "").toDateTime()
+                    .toString(Qt::ISODate);
+            settings->endGroup();
+            settings->endGroup();
+        }
+        sessionsList.prepend(entry);
+        delete settings;
+    }
+
+    // Sort list from greatest revision number to smallest.
+    std::sort(sessionsList.begin(), sessionsList.end(), [](QString a, QString b)
+    {
+        return a.split(" ").at(1).split(":").first().toInt()
+                >= b.split(" ").at(1).split(":").first().toInt();
+    });
+
     MSystemManagerAndControl::getInstance()->getMainWindow()
-            ->onCurrentSessionHistoryChanged(&sessionsList);
+            ->onCurrentSessionHistoryChanged(&sessionsList, currentSession);
 }
 
 
@@ -679,6 +688,17 @@ void MSessionManagerDialog::deleteSession()
         {
             QFile file(QDir(path).absoluteFilePath(sessionName + fileExtension));
             file.remove();
+
+            // Delete revision files.
+            QStringList revertSessionFileList;
+            getCurrentSessionFileHistoryFileNameList(revertSessionFileList,
+                                                     sessionName);
+
+            foreach (QString sessionRevision, revertSessionFileList)
+            {
+                QFile file(QDir(path).absoluteFilePath(sessionRevision));
+                file.remove();
+            }
         }
     }
 }
@@ -1660,10 +1680,10 @@ void MSessionManagerDialog::updateSessionFileHistory(QString filename)
                     < y.split(".", QString::SkipEmptyParts).last().toInt(); }
         );
 
-        // TODO (bt, 30Jan2018) Make length of file history customisable.
-        // Store at most 12 "shadow" files for one session and remove all others
-        // starting from the smallest index.
-        while (fileList.size() >= 12)
+        // Store at most maximumNumberOfSavedRevisions revision files for one
+        // session and remove all others starting from the smallest index.
+        while (!fileList.isEmpty()
+               && fileList.size() >= maximumNumberOfSavedRevisions)
         {
             QFile(directory.absoluteFilePath(fileList.takeFirst())).remove();
         }
@@ -1672,13 +1692,35 @@ void MSessionManagerDialog::updateSessionFileHistory(QString filename)
                     ".", QString::SkipEmptyParts).last().toInt() + 1;
     }
 
-    QFile file(filename);
-    file.copy(QDir(path).absoluteFilePath(
-                  "." + currentSession + fileExtension
-                  + "." + QString::number(fileIndex)));
+    // Only generate revision file if user wants to save revisions.
+    if (maximumNumberOfSavedRevisions > 0)
+    {
+        QFile file(filename);
+        file.copy(QDir(path).absoluteFilePath(
+                      "." + currentSession + fileExtension
+                      + "." + QString::number(fileIndex)));
+    }
 
     // Revision Number of current session.
     currentRevisionNumber = fileIndex + 1;
+}
+
+
+void MSessionManagerDialog::getCurrentSessionFileHistoryFileNameList(
+        QStringList &fileNameList, QString &sessionName)
+{
+    QDir directory(path);
+
+    fileNameList = directory.entryList(QDir::Files | QDir::Hidden);
+
+    if (!fileNameList.isEmpty())
+    {
+        QString regExpString =
+                QRegExp::escape("." + sessionName + fileExtension + ".")
+                + "\\d+";
+
+        fileNameList = fileNameList.filter(QRegExp(regExpString));
+    }
 }
 
 
