@@ -237,7 +237,7 @@ void MFrontendConfiguration::initializeFrontendFromConfigFile(
         msgBox.setText("No write access to '" + sessionDirectory
                        + "'.\nUsing default path '"
                        + QDir::home()
-                       .absoluteFilePath(".met3d/sessions")
+                       .absoluteFilePath("met3d/sessions")
                        +  "'.\nPlease check setting in frontend"
                           " configuration file.");
         msgBox.exec();
@@ -249,15 +249,15 @@ void MFrontendConfiguration::initializeFrontendFromConfigFile(
         LOG4CPLUS_WARN(mlog, "No directory to store session files has been"
                              " specified in frontend configuration file."
                              " Using '"
-                       << QDir::home().absoluteFilePath(".met3d/sessions")
+                       << QDir::home().absoluteFilePath("met3d/sessions")
                        .toStdString() << "' as default.");
         sessionWasSet = false;
     }
 
     if (sessionDirectory == "")
     {
-        // Set session configuration directory to default ($HOME/.met3d/sessions).
-        sessionDirectory = QDir::home().absoluteFilePath(".met3d/sessions");
+        // Set session configuration directory to default ($HOME/met3d/sessions).
+        sessionDirectory = QDir::home().absoluteFilePath("met3d/sessions");
         if (!QDir().mkpath(sessionDirectory))
         {
             QMessageBox msgBox;
@@ -353,9 +353,10 @@ void MFrontendConfiguration::initializeFrontendFromConfigFile(
 
     sysMC->getMainWindow()->getSessionManagerDialog()->initialize(
                 sessionName, sessionDirectory,
-                config.value("autoSaveSessionIntervalInSeconds", "0").toInt(),
+                config.value("autoSaveSessionIntervalInSeconds", 0).toInt(),
                 loadSessionOnStart,
-                config.value("saveSessionOnApplicationExit", false).toBool());
+                config.value("saveSessionOnApplicationExit", false).toBool(),
+                config.value("maximumNumberOfSavedRevisions", 12).toInt());
 
     config.endGroup();
     // =========================================================================
