@@ -733,8 +733,6 @@ void MNWPHorizontalSectionActor::onBoundingBoxChanged()
 void MNWPHorizontalSectionActor::setSlicePosition(double pressure_hPa)
 {
     properties->mDDouble()->setValue(slicePosProperty, pressure_hPa);
-
-    emit slicePositionChanged(pressure_hPa);
 }
 
 
@@ -822,6 +820,8 @@ void MNWPHorizontalSectionActor::onQtPropertyChanged(QtProperty *property)
         // Interpolate to target grid in next render cycle.
         crossSectionGridsNeedUpdate = true;
 
+        emit slicePositionChanged(slicePosition_hPa);
+
         if (suppressActorUpdates()
                 || bBoxConnection->getBoundingBox() == nullptr)
         {
@@ -849,9 +849,11 @@ void MNWPHorizontalSectionActor::onQtPropertyChanged(QtProperty *property)
 
         // Disconnect from previous synchronization actor.
         if (slicePosSynchronizationActor != nullptr)
+        {
             disconnect(slicePosSynchronizationActor,
                        SIGNAL(slicePositionChanged(double)),
                        this, SLOT(setSlicePosition(double)));
+        }
 
         // Get pointer to new synchronization actor and connect to signal.
         MGLResourcesManager* glRM = MGLResourcesManager::getInstance();
@@ -859,9 +861,11 @@ void MNWPHorizontalSectionActor::onQtPropertyChanged(QtProperty *property)
                     glRM->getActorByName(hsecName));
 
         if (slicePosSynchronizationActor != nullptr)
+        {
             connect(slicePosSynchronizationActor,
                     SIGNAL(slicePositionChanged(double)),
                     this, SLOT(setSlicePosition(double)));
+        }
     }
 
     else if ( (property == labelSizeProperty)
