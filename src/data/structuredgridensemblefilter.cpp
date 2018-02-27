@@ -521,6 +521,33 @@ QList<QDateTime> MStructuredGridEnsembleFilter::availableValidTimes(
 }
 
 
+QString MStructuredGridEnsembleFilter::variableLongName(
+        MVerticalLevelType levelType,
+        const QString& variableName)
+{
+    assert(inputSource != nullptr);
+    return inputSource->variableLongName(levelType, variableName);
+}
+
+
+QString MStructuredGridEnsembleFilter::variableStandardName(
+        MVerticalLevelType levelType,
+        const QString& variableName)
+{
+    assert(inputSource != nullptr);
+    return inputSource->variableStandardName(levelType, variableName);
+}
+
+
+QString MStructuredGridEnsembleFilter::variableUnits(
+        MVerticalLevelType levelType,
+        const QString& variableName)
+{
+    assert(inputSource != nullptr);
+    return inputSource->variableUnits(levelType, variableName);
+}
+
+
 
 /******************************************************************************
 ***                          PROTECTED METHODS                              ***
