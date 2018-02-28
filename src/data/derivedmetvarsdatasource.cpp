@@ -253,6 +253,33 @@ QList<QDateTime> MDerivedMetVarsDataSource::availableValidTimes(
 }
 
 
+QString MDerivedMetVarsDataSource::variableLongName(
+        MVerticalLevelType levelType,
+        const QString& variableName)
+{
+    Q_UNUSED(levelType); Q_UNUSED(variableName);
+    return QString();
+}
+
+
+QString MDerivedMetVarsDataSource::variableStandardName(
+        MVerticalLevelType levelType,
+        const QString& variableName)
+{
+    Q_UNUSED(levelType); Q_UNUSED(variableName);
+    return QString();
+}
+
+
+QString MDerivedMetVarsDataSource::variableUnits(
+        MVerticalLevelType levelType,
+        const QString& variableName)
+{
+    Q_UNUSED(levelType); Q_UNUSED(variableName);
+    return QString();
+}
+
+
 
 /******************************************************************************
 ***                          PROTECTED METHODS                              ***
