@@ -550,6 +550,7 @@ protected:
     friend class MStructuredGridEnsembleFilter;
     friend class MVerticalRegridder;
     friend class MGribReader;
+    friend class MDifferenceDataSource;
 
     /** Sizes of the dimensions. */
     unsigned int nlevs, nlats, nlons;
@@ -740,6 +741,7 @@ protected:
     friend class MProbDFTrajectoriesSource;
     friend class MProbABLTrajectoriesSource;
     friend class MGribReader;
+    friend class MDifferenceDataSource;
 
     void allocateInterfaceCoefficients();
 

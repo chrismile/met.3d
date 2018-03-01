@@ -83,6 +83,12 @@ protected:
         ECMWF_GRIB      = 2
     };
 
+    enum MConfigurablePipelineType
+    {
+        INVALID_PIPELINE_TYPE  = 0,
+        DIFFERENCE       = 1
+    };
+
     /**
      Represents one directory path and file filter passed to Met.3D by Metview
      via path command line argument.
@@ -130,6 +136,16 @@ protected:
             QString schedulerID,
             QString memoryManagerID);
 
+    void initializeConfigurablePipeline(MConfigurablePipelineType pipelineType,
+                                        QString name,
+                                        QString inputSource0,
+                                        QString inputSource1,
+                                        QString baseRequest0,
+                                        QString baseRequest1,
+                                        QString schedulerID,
+                                        QString memoryManagerID,
+                                        bool enableRegridding);
+
     /**
      Initializes hard-coded pipelines. Use this method for development
      purposes.
@@ -141,6 +157,8 @@ protected:
      argument and stores them in @p gribFilePaths.
      */
     void getMetviewGribFilePaths(QList<MetviewGribFilePath> *gribFilePaths);
+
+    MConfigurablePipelineType configurablePipelineTypeFromString(QString typeName);
 };
 
 } // namespace Met3D
