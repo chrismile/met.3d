@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015-2018 Marc Rautenhaus
+**  Copyright 2017-2018 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -54,6 +55,7 @@ uniform sampler2D dataField2D;       // 2D texture holding the scalar data
                                      // in case of surface fields
 uniform sampler2D surfacePressure;   // surface pressure field in Pa
 uniform sampler1D hybridCoefficients;// hybrid sigma pressure coefficients
+uniform sampler3D auxPressureField_hPa; // 3D pressure field in hPa
 
 uniform float     pressure_hPa;      // isopressure of this cross section
 uniform int       iOffset;           // grid index offsets if only a subregion
@@ -210,6 +212,61 @@ shader VSmain()
         return;
     }
 
+    // Supported grid type 5: AUXILIARY PRESSURE 3D
+    // ============================================
+    else if (levelType == AUXILIARY_PRESSURE_3D)
+    {
+        // Now we need to determine the indices of the two model levels that
+        // enclose the requested iso-pressure value "pressure_hPa". A binary
+        // search is performed: Two indices klower and kupper at first point to
+        // the first and last available model levels, depending on the value of
+        // the element midway between both, the interval is cut in half until
+        // it consists of two adjacent levels.
+
+        // Initial position of klower and kupper.
+        klower = 0;
+        kupper = textureSize(auxPressureField_hPa, 0).z - 1;
+
+        // Perform the binary search.
+        while ((kupper - klower) > 1)
+        {
+            // Element midway between klower and kupper.
+            int kmid  = (kupper + klower) / 2;
+            // Look up pressure at (i, j, kmid). Since the pressure is stored in
+            // Pa, we might need to convert the received value to hPa.
+            float pressureAt_kmid_hPa =
+                    texelFetch(auxPressureField_hPa, ivec3(i, j, kmid), 0).a;
+            // Cut interval in half.
+            if (pressure_hPa >= pressureAt_kmid_hPa)
+            {
+                klower = kmid;
+            }
+            else
+            {
+                kupper = kmid;
+            }
+        }
+
+        // The model level pressures at klower and kupper now enclose the
+        // requested value pressure_hPa. Next, we fetch the scalar value at
+        // these two levels and interpolate lineraly int ln(p) between the two
+        // to get the scalar value at the vertex position.
+
+        // Compute the log of the pressure values.
+        ln_plower =
+                log(texelFetch(auxPressureField_hPa, ivec3(i, j, klower), 0).a);
+        ln_pupper =
+                log(texelFetch(auxPressureField_hPa, ivec3(i, j, kupper), 0).a);
+        //ln_p      = log(pressure_hPa);
+
+        // Alternative: Interpolate linerarly in p.
+        //     float ln_plower =
+        //             log(texelFetch(auxPressureField_hPa, ivec3(i, j, klower), 0).a);
+        //     float ln_pupper =
+        //             log(texelFetch(auxPressureField_hPa, ivec3(i, j, kupper), 0).a);
+        //     float ln_p      = (pressure_hPa);
+    } // levelType == AUXILIARY_PRESSURE_3D
+
 
     // Interpolated scalar value.
     float scalar;
@@ -261,6 +318,7 @@ uniform sampler3D dataField1;         // 3D texture holding the scalar data
 uniform sampler2D dataField2D1;       // 2D texture holding surface scalar data
 uniform sampler2D surfacePressure1;   // surface pressure field in Pa
 uniform sampler1D hybridCoefficients1;// hybrid sigma pressure coefficients
+uniform sampler3D auxPressureField1_hPa; // 3D pressure field in hPa
 
 uniform int       levelType2;         // vertical level type of the data grid
 uniform sampler1D latLonAxesData2;    // 1D texture that holds both lon and lat
@@ -269,6 +327,7 @@ uniform sampler3D dataField2;         // 3D texture holding the scalar data
 uniform sampler2D dataField2D2;       // 2D texture holding surface scalar data
 uniform sampler2D surfacePressure2;   // surface pressure field in Pa
 uniform sampler1D hybridCoefficients2;// hybrid sigma pressure coefficients
+uniform sampler3D auxPressureField2_hPa; // 3D pressure field in hPa
 
 uniform int       mode;               // 1 = absolute difference, 2 = relative
 
@@ -413,7 +472,61 @@ shader VSmainDiff()
         ln_pupper = texelFetch(latLonAxesData1, verticalOffset1+kupper, 0).a;
     }
 
-    // Supported grid type 4: 2D SURFACE FIELDS
+    // Supported grid type 4: AUXILIARY PRESSURE 3D
+    // ============================================
+    else if (levelType1 == AUXILIARY_PRESSURE_3D)
+    {
+        // Now we need to determine the indices of the two model levels that
+        // enclose the requested iso-pressure value "pressure_hPa". A binary
+        // search is performed: Two indices klower and kupper at first point to
+        // the first and last available model levels, depending on the value of
+        // the element midway between both, the interval is cut in half until
+        // it consists of two adjacent levels.
+
+        // Initial position of klower and kupper.
+        klower = 0;
+        kupper = textureSize(auxPressureField1_hPa, 0).z - 1;
+
+        // Perform the binary search.
+        while ((kupper - klower) > 1)
+        {
+            // Element midway between klower and kupper.
+            int kmid  = (kupper + klower) / 2;
+            // Look up pressure at (i, j, kmid). Since the pressure is stored in
+            // Pa, we need to convert the received value to hPa.
+            float pressureAt_kmid_hPa =
+                    texelFetch(auxPressureField1_hPa, ivec3(i, j, kmid), 0).a;
+            // Cut interval in half.
+            if (pressure_hPa >= pressureAt_kmid_hPa)
+            {
+                klower = kmid;
+            }
+            else
+            {
+                kupper = kmid;
+            }
+        }
+
+        // The model level pressures at klower and kupper now enclose the
+        // requested value pressure_hPa. Next, we fetch the scalar value at
+        // these two levels and interpolate lineraly int ln(p) between the two
+        // to get the scalar value at the vertex position.
+
+        // Compute the log of the pressure values.
+        ln_plower =
+                log(texelFetch(auxPressureField1_hPa, ivec3(i, j, klower), 0).a);
+        ln_pupper =
+                log(texelFetch(auxPressureField1_hPa, ivec3(i, j, kupper), 0).a);
+        //ln_p      = log(pressure_hPa);
+
+        // Alternative: Interpolate linerarly in p.
+        //    float ln_plower =
+        //        log(texelFetch(auxPressureField1_hPa, ivec3(i, j, klower), 0).a);
+        //    float ln_pupper =
+        //        log(texelFetch(auxPressureField1_hPa, ivec3(i, j, kupper), 0).a);
+    } // levelType == AUXILIARY_PRESSURE_3D
+
+    // Supported grid type 5: 2D SURFACE FIELDS
     // ========================================
     if (levelType1 == SURFACE_2D)
     {
@@ -532,6 +645,39 @@ shader VSmainDiff()
         ln_plower = texelFetch(latLonAxesData2, verticalOffset2+klower, 0).a;
         ln_pupper = texelFetch(latLonAxesData2, verticalOffset2+kupper, 0).a;
     }
+
+    else if (levelType == AUXILIARY_PRESSURE_3D)
+    {
+        klower = 0;
+        kupper = textureSize(auxPressureField2_hPa, 0).z - 1;
+
+        while ((kupper - klower) > 1)
+        {
+            int kmid  = (kupper + klower) / 2;
+            float pressureAt_kmid_hPa =
+                    texelFetch(auxPressureField2_hPa, ivec3(i, j, kmid), 0).a;
+            if (pressure_hPa >= pressureAt_kmid_hPa)
+            {
+                klower = kmid;
+            }
+            else
+            {
+                kupper = kmid;
+            }
+        }
+
+        ln_plower =
+                log(texelFetch(auxPressureField2_hPa, ivec3(i, j, klower), 0).a);
+        ln_pupper =
+                log(texelFetch(auxPressureField2_hPa, ivec3(i, j, kupper), 0).a);
+        //ln_p      = log(pressure_hPa);
+
+        //    float ln_plower =
+        //        log(texelFetch(auxPressureField2_hPa, ivec3(i, j, klower), 0).a);
+        //    float ln_pupper =
+        //        log(texelFetch(auxPressureField2_hPa, ivec3(i, j, kupper), 0).a);
+        //    float ln_p      = (pressure_hPa);
+    } // levelType == AUXILIARY_PRESSURE_3D
 
     float scalar2 = MISSING_VALUE;
 

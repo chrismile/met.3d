@@ -4,9 +4,9 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2015-2018 Marc Rautenhaus
 **  Copyright 2015      Michael Kern
-**  Copyright 2016-2017 Bianca Tost
+**  Copyright 2016-2018 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -654,6 +654,7 @@ const QList<MVerticalLevelType> MNWPHorizontalSectionActor::supportedLevelTypes(
 {
     return (QList<MVerticalLevelType>()
             << HYBRID_SIGMA_PRESSURE_3D
+            << AUXILIARY_PRESSURE_3D
             << PRESSURE_LEVELS_3D
             << LOG_PRESSURE_LEVELS_3D
             << SURFACE_2D);
@@ -1453,6 +1454,8 @@ void MNWPHorizontalSectionActor::renderVerticalInterpolation(
     var->textureDummy3D->bindToTextureUnit(var->textureUnitUnusedTextures);
     glVerticalInterpolationEffect->setUniformValue(
                 "dataField", var->textureUnitUnusedTextures); CHECK_GL_ERROR;
+    glVerticalInterpolationEffect->setUniformValue(
+                "auxPressureField_hPa", var->textureUnitUnusedTextures); CHECK_GL_ERROR;
 
     // Set shader variables.
     // =====================
@@ -1494,6 +1497,15 @@ void MNWPHorizontalSectionActor::renderVerticalInterpolation(
                     "surfacePressure", var->textureUnitSurfacePressure);
         glVerticalInterpolationEffect->setUniformValue(
                     "hybridCoefficients", var->textureUnitHybridCoefficients);
+    }
+
+    if (var->grid->getLevelType() == AUXILIARY_PRESSURE_3D)
+    {
+        // Texture binding for pressure field (3D texture).
+        var->textureAuxiliaryPressure->bindToTextureUnit(
+                    var->textureUnitAuxiliaryPressure);
+        glVerticalInterpolationEffect->setUniformValue(
+                    "auxPressureField_hPa", var->textureUnitAuxiliaryPressure);
     }
 
     // Pressure value and world z coordinate of the slice.
@@ -1564,6 +1576,10 @@ void MNWPHorizontalSectionActor::renderVerticalInterpolationDifference(
                 "dataField1", var->textureUnitUnusedTextures); CHECK_GL_ERROR;
     glVerticalInterpolationEffect->setUniformValue(
                 "dataField2", var->textureUnitUnusedTextures); CHECK_GL_ERROR;
+    glVerticalInterpolationEffect->setUniformValue(
+                "auxPressureField1_hPa", var->textureUnitUnusedTextures); CHECK_GL_ERROR;
+    glVerticalInterpolationEffect->setUniformValue(
+                "auxPressureField2_hPa", var->textureUnitUnusedTextures); CHECK_GL_ERROR;
 
     // Texture bindings for Lat/Lon axes (1D textures).
     var->textureLonLatLevAxes->bindToTextureUnit(
@@ -1628,6 +1644,15 @@ void MNWPHorizontalSectionActor::renderVerticalInterpolationDifference(
                     "hybridCoefficients1", var->textureUnitHybridCoefficients);
     }
 
+    if (var->grid->getLevelType() == AUXILIARY_PRESSURE_3D)
+    {
+        // Texture binding for pressure field (3D texture).
+        var->textureAuxiliaryPressure->bindToTextureUnit(
+                    var->textureUnitAuxiliaryPressure); CHECK_GL_ERROR;
+        glVerticalInterpolationEffect->setUniformValue(
+                    "auxPressureField1_hPa", var->textureUnitAuxiliaryPressure); CHECK_GL_ERROR;
+    }
+
     glVerticalInterpolationEffect->setUniformValue(
                 "levelType2", int(varDiff->grid->getLevelType()));
 
@@ -1642,6 +1667,15 @@ void MNWPHorizontalSectionActor::renderVerticalInterpolationDifference(
         glVerticalInterpolationEffect->setUniformValue(
                     "hybridCoefficients2", varDiff->textureUnitHybridCoefficients);
     }
+
+    if (varDiff->grid->getLevelType() == AUXILIARY_PRESSURE_3D)
+    {
+        varDiff->textureAuxiliaryPressure->bindToTextureUnit(
+                    varDiff->textureUnitAuxiliaryPressure); CHECK_GL_ERROR;
+        glVerticalInterpolationEffect->setUniformValue(
+                    "auxPressureField2_hPa", varDiff->textureUnitAuxiliaryPressure); CHECK_GL_ERROR;
+    }
+
 
     // Pressure value and world z coordinate of the slice.
     glVerticalInterpolationEffect->setUniformValue(
@@ -2156,6 +2190,19 @@ void MNWPHorizontalSectionActor::renderWindBarbs(MSceneViewGLWidget *sceneView)
                     varWindV->textureUnitHybridCoefficients);
         glWindBarbsShader->setUniformValue(
                     "hybridCoefficientsV",varWindV->textureUnitHybridCoefficients);CHECK_GL_ERROR;
+    }
+
+    if (varWindU->grid->getLevelType() == AUXILIARY_PRESSURE_3D)
+    {
+        varWindU->textureAuxiliaryPressure->bindToTextureUnit(
+                    varWindU->textureUnitAuxiliaryPressure); CHECK_GL_ERROR;
+        glWindBarbsShader->setUniformValue(
+                    "auxPressureFieldU_hPa", varWindU->textureUnitAuxiliaryPressure); CHECK_GL_ERROR;
+
+        varWindV->textureAuxiliaryPressure->bindToTextureUnit(
+                    varWindV->textureUnitAuxiliaryPressure); CHECK_GL_ERROR;
+        glWindBarbsShader->setUniformValue(
+                    "auxPressureFieldV_hPa", varWindV->textureUnitAuxiliaryPressure); CHECK_GL_ERROR;
     }
 
     glWindBarbsShader->setUniformValue(

@@ -4,8 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2017 Marc Rautenhaus
-**  Copyright 2017      Bianca Tost
+**  Copyright 2015-2018 Marc Rautenhaus
+**  Copyright 2017-2018 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -249,10 +249,14 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
         bool treatRotatedGridAsRegularGrid =
                 config.value("treatRotatedGridAsRegularGrid", false).toBool();
         QString gribSurfacePressureFieldType =
-                config.value("surfacePressureFieldType", "auto").toString();
+                config.value("gribSurfacePressureFieldType", "auto").toString();
         bool convertGeometricHeightToPressure_ICAOStandard =
                 config.value("convertGeometricHeightToPressure_ICAOStandard",
                              false).toBool();
+        QString auxiliary3DPressureField =
+                config.value("auxiliary3DPressureField", "").toString();
+        bool disableGridConsistencyCheck =
+                config.value("disableGridConsistencyCheck", "").toBool();
 
 //TODO (mr, 16Dec2015) -- compatibility code; remove in Met.3D version 2.0
         // If no fileFilter is specified but a domainID is specified use
@@ -281,6 +285,13 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
         LOG4CPLUS_DEBUG(mlog, "  convert geometric height to pressure (using"
                               " standard ICAO)="
                         << (convertGeometricHeightToPressure_ICAOStandard
+                            ? "enabled" : "disabled"));
+        LOG4CPLUS_DEBUG(mlog, "  use auxiliary 3D pressure field="
+                        << (auxiliary3DPressureField != "" ?
+                    "enabled (name= " + (auxiliary3DPressureField.toStdString())
+                    + ")" : "disabled"));
+        LOG4CPLUS_DEBUG(mlog, "  grid consistency check="
+                        << (!disableGridConsistencyCheck
                             ? "enabled" : "disabled"));
 
         MNWPReaderFileFormat fileFormat = INVALID_FORMAT;
@@ -311,7 +322,8 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
                     memoryManagerID, fileFormat, enableRegridding,
                     enableProbRegionFilter, treatRotatedGridAsRegularGrid,
                     gribSurfacePressureFieldType,
-                    convertGeometricHeightToPressure_ICAOStandard);
+                    convertGeometricHeightToPressure_ICAOStandard,
+                    auxiliary3DPressureField, disableGridConsistencyCheck);
     }
 
     config.endArray();
@@ -377,7 +389,9 @@ void MPipelineConfiguration::initializeNWPPipeline(
         bool enableProbabiltyRegionFilter,
         bool treatRotatedGridAsRegularGrid,
         QString surfacePressureFieldType,
-        bool convertGeometricHeightToPressure_ICAOStandard)
+        bool convertGeometricHeightToPressure_ICAOStandard,
+        QString auxiliary3DPressureField,
+        bool disableGridConsistencyCheck)
 {
     MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
     MAbstractScheduler* scheduler = sysMC->getScheduler(schedulerID);
@@ -395,12 +409,14 @@ void MPipelineConfiguration::initializeNWPPipeline(
     {
         nwpReaderENS = new MClimateForecastReader(
                     dataSourceId, treatRotatedGridAsRegularGrid,
-                    convertGeometricHeightToPressure_ICAOStandard);
+                    convertGeometricHeightToPressure_ICAOStandard,
+                    auxiliary3DPressureField, disableGridConsistencyCheck);
     }
     else if (dataFormat == ECMWF_GRIB)
     {
         nwpReaderENS = new MGribReader(dataSourceId,
-                                       surfacePressureFieldType);
+                                       surfacePressureFieldType,
+                                       disableGridConsistencyCheck);
     }
     nwpReaderENS->setMemoryManager(memoryManager);
     nwpReaderENS->setScheduler(scheduler);
@@ -638,6 +654,8 @@ void MPipelineConfiguration::initializeDevelopmentDataPipeline()
                 true,
                 false,
                 "auto",
+                false,
+                "",
                 false);
 
     initializeNWPPipeline(
@@ -651,6 +669,8 @@ void MPipelineConfiguration::initializeDevelopmentDataPipeline()
                 true,
                 false,
                 "auto",
+                false,
+                "",
                 false);
 
     sysMC->registerMemoryManager("Trajectories DF-T psfc_1000hPa_L62",

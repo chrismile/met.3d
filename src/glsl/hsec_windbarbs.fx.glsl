@@ -4,8 +4,9 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
-**  Copyright 2015 Michael Kern
+**  Copyright 2015-2018 Marc Rautenhaus
+**  Copyright 2015      Michael Kern
+**  Copyright 2017-2018 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -73,6 +74,8 @@ uniform sampler2D   surfacePressureU;    // surface pressure field in Pa
 uniform sampler1D   hybridCoefficientsU; // hybrid sigma pressure coefficients
 uniform sampler2D   surfacePressureV;    // surface pressure field in Pa
 uniform sampler1D   hybridCoefficientsV; // hybrid sigma pressure coefficients
+uniform sampler3D   auxPressureFieldU_hPa; // 3D pressure field in hPa
+uniform sampler3D   auxPressureFieldV_hPa; // 3D pressure field in hPa
 
 uniform float       deltaLon;
 uniform float       deltaLat;
@@ -113,7 +116,8 @@ float computeKnots(in float velMeterPerSecond)
 float sampleDataAtPos(  in vec3 pos,
                         in sampler3D volume,
                         in sampler2D surfacePressure,
-                        in sampler1D hybridCoefficients)
+                        in sampler1D hybridCoefficients,
+                        in sampler3D auxPressureField_hPa)
 {
     float mixI = mod(pos.x - dataNWCrnr.x, 360.) / deltaLon;
     float mixJ = (dataNWCrnr.y - pos.y) / deltaLat;
@@ -252,6 +256,61 @@ float sampleDataAtPos(  in vec3 pos,
         ln_pupper = texelFetch(latLonAxesData, verticalOffset+kupper, 0).a;
     }
 
+    // Supported grid type 5: AUXILIARY PRESSURE 3D
+    // ============================================
+    else if (levelType == AUXILIARY_PRESSURE_3D)
+    {
+        // Now we need to determine the indices of the two model levels that
+        // enclose the requested iso-pressure value "pressure_hPa". A binary
+        // search is performed: Two indices klower and kupper at first point to
+        // the first and last available model levels, depending on the value of
+        // the element midway between both, the interval is cut in half until
+        // it consists of two adjacent levels.
+
+        // Initial position of klower and kupper.
+        klower = 0;
+        kupper = textureSize(auxPressureField_hPa, 0).z - 1;
+
+        // Perform the binary search.
+        while ((kupper - klower) > 1)
+        {
+            // Element midway between klower and kupper.
+            int kmid  = (kupper + klower) / 2;
+            // Look up pressure at (i, j, kmid). Since the pressure is stored in
+            // Pa, we need to convert the received value to hPa.
+            float pressureAt_kmid_hPa =
+                    texelFetch(auxPressureField_hPa, ivec3(i, j, kmid), 0).a;
+            // Cut interval in half.
+            if (pressure_hPa >= pressureAt_kmid_hPa)
+            {
+                klower = kmid;
+            }
+            else
+            {
+                kupper = kmid;
+            }
+        }
+
+        // The model level pressures at klower and kupper now enclose the
+        // requested value pressure_hPa. Next, we fetch the scalar value at
+        // these two levels and interpolate lineraly int ln(p) between the two
+        // to get the scalar value at the vertex position.
+
+        // Compute the log of the pressure values.
+        ln_plower =
+                log(texelFetch(auxPressureField_hPa, ivec3(i, j, klower), 0).a);
+        ln_pupper =
+                log(texelFetch(auxPressureField_hPa, ivec3(i, j, kupper), 0).a);
+        //ln_p      = log(pressure_hPa);
+
+        // Alternative: Interpolate linerarly in p.
+        //    float ln_plower =
+        //        log(texelFetch(auxPressureField_hPa, ivec3(i, j, klower), 0).a);
+        //    float ln_pupper =
+        //        log(texelFetch(auxPressureField_hPa, ivec3(i, j, kupper), 0).a);
+        //    float ln_p      = (pressure_hPa);
+    } // levelType == AUXILIARY_PRESSURE_3D
+
 
     // Interpolated scalar value.
     float scalar;
@@ -312,8 +371,12 @@ shader GSmain(in vec3 worldPos[], out GStoFS Output)
     vec3 posWorld = worldPos[0];
 
     // sample both wind textures, obtain wind speed in u and v direction
-    float windU = sampleDataAtPos(posWorld, dataUComp, surfacePressureU, hybridCoefficientsU);
-    float windV = sampleDataAtPos(posWorld, dataVComp, surfacePressureV, hybridCoefficientsV);
+    float windU = sampleDataAtPos(
+                posWorld, dataUComp, surfacePressureU, hybridCoefficientsU,
+                auxPressureFieldU_hPa);
+    float windV = sampleDataAtPos(
+                posWorld, dataVComp, surfacePressureV, hybridCoefficientsV,
+                auxPressureFieldV_hPa);
 
     // if no data is available, do not draw any glyphs
     if (windU == MISSING_VALUE || windV == MISSING_VALUE)

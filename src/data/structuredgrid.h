@@ -4,8 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2017 Marc Rautenhaus
-**  Copyright 2017      Bianca Tost
+**  Copyright 2015-2018 Marc Rautenhaus
+**  Copyright 2017-2018 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -759,6 +759,56 @@ protected:
 
 private:
     QString pressureTexCoordID;
+};
+
+
+class MLonLatAuxiliaryPressureGrid : public MStructuredGrid
+{
+public:
+    MLonLatAuxiliaryPressureGrid(unsigned int nlevs, unsigned int nlats,
+                                 unsigned int nlons, bool reverseLevels);
+
+    ~MLonLatAuxiliaryPressureGrid();
+
+    MLonLatAuxiliaryPressureGrid* getAuxiliaryPressureFieldGrid()
+    { return auxPressureField_hPa; }
+
+    float interpolateGridColumnToPressure(unsigned int j, unsigned int i,
+                                          float p_hPa);
+
+    int findLevel(unsigned int j, unsigned int i, float p_hPa);
+
+    float getPressure(unsigned int k, unsigned int j, unsigned int i);
+
+    float getBottomInterfacePressure(
+            unsigned int k, unsigned int j, unsigned int i);
+
+    float getTopInterfacePressure(
+            unsigned int k, unsigned int j, unsigned int i);
+
+    float getTopDataVolumePressure() override;
+
+    float getBottomDataVolumePressure() override;
+
+    /**
+      Returns the reverseLevels-Flag.
+
+      Since the structured grid is used to obtain the informations about the
+      auxiliary pressure field if it is not stored in the same file, this
+      method can be used to get the reverseLevels-Flag.
+      */
+    bool getReverseLevels() { return reverseLevels; }
+
+    void dumpGridData();
+
+protected:
+    friend class MWeatherPredictionReader;
+    friend class MClimateForecastReader;
+    friend class MStructuredGridEnsembleFilter;
+
+    MLonLatAuxiliaryPressureGrid *auxPressureField_hPa;
+
+    bool reverseLevels;
 };
 
 

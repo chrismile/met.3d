@@ -277,6 +277,7 @@ OTHER_FILES += \
     src/glsl/basemap.fx.glsl \
     src/glsl/volume_pressure_utils.glsl \
     src/glsl/volume_hybrid_utils.glsl \
+    src/glsl/volume_auxiliarypressure_utils.glsl \
     src/glsl/volume_global_structs_utils.glsl \
     src/glsl/volume_defines.glsl \
     config/default_pipeline.cfg.template \

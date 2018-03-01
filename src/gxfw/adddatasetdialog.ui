@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>734</width>
-    <height>492</height>
+    <height>504</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -234,6 +234,30 @@
          </spacer>
         </item>
        </layout>
+      </item>
+      <item>
+       <layout class="QHBoxLayout" name="horizontalLayout_8">
+        <item>
+         <widget class="QLabel" name="label_1">
+          <property name="toolTip">
+           <string>Leave empty for not using an auxiliary 3D pressure field.</string>
+          </property>
+          <property name="text">
+           <string>Auxiliary 3D pressure field name:</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QLineEdit" name="useAuxiliary3DPressureLineEdit"/>
+        </item>
+       </layout>
+      </item>
+      <item>
+       <widget class="QCheckBox" name="disableGridConsistencyCheckCheckBox">
+        <property name="text">
+         <string>disable grid consistency check</string>
+        </property>
+       </widget>
       </item>
      </layout>
     </widget>

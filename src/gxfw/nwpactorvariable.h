@@ -4,8 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2017 Marc Rautenhaus
-**  Copyright 2016-2017 Bianca Tost
+**  Copyright 2015-2018 Marc Rautenhaus
+**  Copyright 2016-2018 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -192,6 +192,8 @@ public:
     int          textureUnitDataFlags;
     GL::MTexture *texturePressureTexCoordTable;  // grids on PL & ML lev
     int          textureUnitPressureTexCoordTable;
+    GL::MTexture *textureAuxiliaryPressure;        // grids on hyb-sig-pres lev
+    int          textureUnitAuxiliaryPressure;
 
     /* Dummy textures that can be bound to texture units not used for the
        current grid (i.e. bind these to textureHybridCoefficients if grids
