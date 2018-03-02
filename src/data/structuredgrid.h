@@ -551,6 +551,7 @@ protected:
     friend class MVerticalRegridder;
     friend class MGribReader;
     friend class MDifferenceDataSource;
+    friend class MProcessingWeatherPredictionDataSource;
 
     /** Sizes of the dimensions. */
     unsigned int nlevs, nlats, nlons;
@@ -742,6 +743,7 @@ protected:
     friend class MProbABLTrajectoriesSource;
     friend class MGribReader;
     friend class MDifferenceDataSource;
+    friend class MProcessingWeatherPredictionDataSource;
 
     void allocateInterfaceCoefficients();
 
@@ -807,6 +809,7 @@ protected:
     friend class MWeatherPredictionReader;
     friend class MClimateForecastReader;
     friend class MStructuredGridEnsembleFilter;
+    friend class MProcessingWeatherPredictionDataSource;
 
     MLonLatAuxiliaryPressureGrid *auxPressureField_hPa;
 
