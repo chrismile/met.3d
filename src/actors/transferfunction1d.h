@@ -64,6 +64,9 @@ public:
     MTransferFunction1D(QObject *parent = 0);
     ~MTransferFunction1D();
 
+    static QString staticActorType()
+    { return "Transfer function scalar to colour (colour map)"; }
+
     /**
       Select a predefined colourmap. @p name must be the name of a colourmap
       available from the colourmap pool.

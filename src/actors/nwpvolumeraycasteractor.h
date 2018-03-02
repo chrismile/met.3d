@@ -72,6 +72,8 @@ public:
 
     ~MNWPVolumeRaycasterActor();
 
+    static QString staticActorType() { return "Volume raycaster"; }
+
     void reloadShaderEffects();
 
     QString getSettingsID() override { return "NWPVolumeRaycasterActor"; }
@@ -217,7 +219,8 @@ private:
             const QString& lonLatLevAxesName,
             const QString& pressureTexCoordTable2DName,
             const QString& minMaxAccelStructure3DName,
-            const QString &dataFlagsVolumeName);
+            const QString& dataFlagsVolumeName,
+            const QString& auxPressureField3DName);
 
     void setRayCasterShaderVars(
             std::shared_ptr<GL::MShaderEffect>& shader,

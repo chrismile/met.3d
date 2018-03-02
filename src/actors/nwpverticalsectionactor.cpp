@@ -4,8 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2017 Marc Rautenhaus
-**  Copyright 2016-2017 Bianca Tost
+**  Copyright 2015-2018 Marc Rautenhaus
+**  Copyright 2016-2018 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -81,7 +81,7 @@ MNWPVerticalSectionActor::MNWPVerticalSectionActor()
     // ===============================================
     beginInitialiseQtProperties();
 
-    setActorType("Vertical cross-section");
+    setActorType(staticActorType());
     setName(getActorType());
 
 
@@ -91,11 +91,20 @@ MNWPVerticalSectionActor::MNWPVerticalSectionActor()
     properties->mInt()->setMinimum(labelDistanceProperty, 0);
     labelDistanceProperty->setToolTip("Depends on order in pressure levels list.");
 
+    QStringList waypointsList =  MSystemManagerAndControl::getInstance()
+            ->getWaypointsModelsIdentifiers();
     waypointsModelProperty = addProperty(ENUM_PROPERTY, "waypoints model",
                                          actorPropertiesSupGroup);
-    properties->mEnum()->setEnumNames(waypointsModelProperty,
-                                      MSystemManagerAndControl::getInstance()
-                                      ->getWaypointsModelsIdentifiers());
+    // Set default waypoints to second entry if there exists a second entry.
+    properties->mEnum()->setEnumNames(waypointsModelProperty, waypointsList);
+    if (waypointsList.size() > 1)
+    {
+        enableActorUpdates(false);
+        properties->setEnumItem(waypointsModelProperty, waypointsList.at(1));
+        setWaypointsModel(MSystemManagerAndControl::getInstance()
+                          ->getWaypointsModel(waypointsList.at(1)));
+        enableActorUpdates(true);
+    }
 
     actorPropertiesSupGroup->addSubProperty(bBoxConnection->getProperty());
 
@@ -564,7 +573,8 @@ double MNWPVerticalSectionActor::getTopPressure()
 const QList<MVerticalLevelType> MNWPVerticalSectionActor::supportedLevelTypes()
 {
     return (QList<MVerticalLevelType>()
-            << HYBRID_SIGMA_PRESSURE_3D << PRESSURE_LEVELS_3D);
+            << HYBRID_SIGMA_PRESSURE_3D << PRESSURE_LEVELS_3D
+            << AUXILIARY_PRESSURE_3D);
 }
 
 
@@ -1093,6 +1103,8 @@ void MNWPVerticalSectionActor::renderToCurrentContext(MSceneViewGLWidget *sceneV
             var->textureDataField->bindToTextureUnit(var->textureUnitDataField);
             sectionGridShader->setUniformValue(
                         "dataField", var->textureUnitDataField);
+            sectionGridShader->setUniformValue(
+                        "auxPressureField_hPa", var->textureUnitDataField);
 
             // Texture bindings for transfer function for data field (1D texture from
             // transfer function class). Variables that are only rendered as
@@ -1119,6 +1131,15 @@ void MNWPVerticalSectionActor::renderToCurrentContext(MSceneViewGLWidget *sceneV
                 var->textureHybridCoefficients->bindToTextureUnit(var->textureUnitHybridCoefficients);
                 sectionGridShader->setUniformValue(
                             "hybridCoefficients", var->textureUnitHybridCoefficients);
+            }
+
+            if (var->grid->getLevelType() == AUXILIARY_PRESSURE_3D)
+            {
+                // Texture binding for pressure field (3D texture).
+                var->textureAuxiliaryPressure->bindToTextureUnit(
+                            var->textureUnitAuxiliaryPressure);
+                sectionGridShader->setUniformValue(
+                            "auxPressureField_hPa", var->textureUnitAuxiliaryPressure);
             }
 
             // Scene view specific parameters to compute worldZ from pressure in

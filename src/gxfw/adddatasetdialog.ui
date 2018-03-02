@@ -31,7 +31,7 @@
    <item>
     <widget class="QTabWidget" name="pipelineTypeTabWidget">
      <property name="currentIndex">
-      <number>1</number>
+      <number>0</number>
      </property>
      <widget class="QWidget" name="nwpTab">
       <attribute name="title">
@@ -249,6 +249,30 @@
             </item>
            </layout>
           </item>
+          <item>
+           <layout class="QHBoxLayout" name="horizontalLayout_8">
+            <item>
+             <widget class="QLabel" name="label_6">
+              <property name="toolTip">
+               <string>Leave empty for not using an auxiliary 3D pressure field.</string>
+              </property>
+              <property name="text">
+               <string>Auxiliary 3D pressure field name:</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QLineEdit" name="useAuxiliary3DPressureLineEdit"/>
+            </item>
+           </layout>
+          </item>
+          <item>
+           <widget class="QCheckBox" name="disableGridConsistencyCheckCheckBox">
+            <property name="text">
+             <string>disable grid consistency check</string>
+            </property>
+           </widget>
+          </item>
          </layout>
         </widget>
        </item>
@@ -299,7 +323,7 @@
           <item>
            <widget class="QTabWidget" name="trajectoriesTypeTabWidget">
             <property name="currentIndex">
-             <number>1</number>
+             <number>0</number>
             </property>
             <widget class="QWidget" name="trajectoriesPrecomputedTab">
              <attribute name="title">

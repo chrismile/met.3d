@@ -6,7 +6,7 @@
 **
 **  Copyright 2016-2018 Marc Rautenhaus
 **  Copyright 2016      Christoph Heidelmann
-**  Copyright 2018      Bianca Tost
+**  Copyright 2017-2018 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -147,6 +147,9 @@ MNWPPipelineConfigurationInfo MAddDatasetDialog::getNWPPipelineConfigurationInfo
     d.surfacePressureFieldType = ui->surfacePressureTypeComboBox->currentText();
     d.convertGeometricHeightToPressure_ICAOStandard =
             ui->convertGeometricHeightToPressureICAOStandardCheckBox->isChecked();
+    d.auxiliary3DPressureField = ui->useAuxiliary3DPressureLineEdit->text();
+    d.disableGridConsistencyCheck =
+            ui->disableGridConsistencyCheckCheckBox->isChecked();
 
     return d;
 }

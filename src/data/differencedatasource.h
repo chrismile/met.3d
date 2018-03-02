@@ -4,7 +4,7 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2018 Marc Rautenhaus
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -23,8 +23,8 @@
 **  along with Met.3D.  If not, see <http://www.gnu.org/licenses/>.
 **
 *******************************************************************************/
-#ifndef STRUCTUREDGRIDENSEMBLEFILTER_H
-#define STRUCTUREDGRIDENSEMBLEFILTER_H
+#ifndef DIFFERENCEDATASOURCE_H
+#define DIFFERENCEDATASOURCE_H
 
 // standard library imports
 
@@ -40,20 +40,21 @@ namespace Met3D
 {
 
 /**
-  @brief Computes per-gridpoint statistical quantities from the ensemble,
-  e.g. mean, standard deviation, probabilities.
+  @brief MDifferenceDataSource derives meteorological variables from basic
+  forecast parameters.
   */
-class MStructuredGridEnsembleFilter
+class MDifferenceDataSource
         : public MWeatherPredictionDataSource
 {
 public:
-    MStructuredGridEnsembleFilter();
+    MDifferenceDataSource();
+
+    void setInputSource(int id, MWeatherPredictionDataSource* s);
+    void setBaseRequest(int id, MDataRequest request);
 
     MStructuredGrid* produceData(MDataRequest request);
 
     MTask* createTaskGraph(MDataRequest request);
-
-    void setInputSource(MWeatherPredictionDataSource* s);
 
     QList<MVerticalLevelType> availableLevelTypes();
 
@@ -82,14 +83,15 @@ public:
 protected:
     const QStringList locallyRequiredKeys();
 
-    MWeatherPredictionDataSource* inputSource;
+    MDataRequest constructInputSourceRequestFromRequest(int id,
+                                                        MDataRequest request);
 
-    MStructuredGrid* createAndInitializeResultGrid(
-            MStructuredGrid *firstMemberGrid,
-            const QSet<unsigned int> &selectedMembers=QSet<unsigned int>());
+    MStructuredGrid *createAndInitializeResultGrid(MStructuredGrid *templateGrid);
 
+    QVector<MWeatherPredictionDataSource*> inputSource;
+    QVector<MDataRequest> baseRequest;
 };
 
 } // namespace Met3D
 
-#endif // STRUCTUREDGRIDENSEMBLEFILTER_H
+#endif // DIFFERENCEDATASOURCE_H

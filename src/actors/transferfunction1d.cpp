@@ -61,7 +61,7 @@ MTransferFunction1D::MTransferFunction1D(QObject *parent)
     // ===============================================
     beginInitialiseQtProperties();
 
-    setActorType("Transfer function scalar to colour (colour map)");
+    setActorType(staticActorType());
     setName(getActorType());
 
     // Properties related to labelling the colour bar.

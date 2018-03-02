@@ -4,8 +4,9 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
-**  Copyright 2015 Michael Kern
+**  Copyright 2015-2018 Marc Rautenhaus
+**  Copyright 2015      Michael Kern
+**  Copyright 2017-2018 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -72,6 +73,14 @@ float sampleHybridLevel(in vec3 pos)
                                         pos);
 }
 #endif
+
+
+subroutine(sampleDataAtPosType)
+float sampleAuxiliaryPressure(in vec3 pos)
+{
+    return sampleAuxiliaryPressureVolumeAtPos(dataVolume, dataExtent,
+                                              auxPressureField3D_hPa, pos);
+}
 
 
 /******************************************************************************
@@ -187,6 +196,23 @@ vec3 hybridLevelGradient(in vec3 pos, in vec3 h)
                                                        hybridCoefficients, pos);
     vec3 h_ = vec3(h.x, h.y, hz);
                                                        
+    return gradientAtPos(pos, h_, ztop, zbot);
+}
+
+
+subroutine(computeGradientType)
+vec3 auxiliaryPressureGradient(in vec3 pos, in vec3 h)
+{
+    // Determine the approximate distance between the model levels above and
+    // below the current position ("hz").
+    float zbot, ztop;
+    getAuxiliaryPressureBotTopLevelAtPos(dataExtent, auxPressureField3D_hPa,
+                                         pos, zbot, ztop);
+
+    float hz = getAuxiliaryPressureApproxWorldZLevelDistanceAtPos(
+                dataExtent, auxPressureField3D_hPa, pos);
+    vec3 h_ = vec3(h.x, h.y, hz);
+
     return gradientAtPos(pos, h_, ztop, zbot);
 }
 

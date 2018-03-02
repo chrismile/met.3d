@@ -839,7 +839,8 @@ void MMainWindow::onSessionsListChanged(QStringList *sessionsList,
 }
 
 
-void MMainWindow::onCurrentSessionHistoryChanged(QStringList *sessionHistory)
+void MMainWindow::onCurrentSessionHistoryChanged(QStringList *sessionHistory,
+                                                 QString sessionName)
 {
     // Clear actions.
     foreach(QAction *action, ui->menuRevertCurrentSession->actions())
@@ -847,6 +848,7 @@ void MMainWindow::onCurrentSessionHistoryChanged(QStringList *sessionHistory)
         ui->menuRevertCurrentSession->removeAction(action);
         delete action;
     }
+    ui->menuRevertCurrentSession->addSeparator()->setText(sessionName);
     // Add new actions.
     foreach(QString sessionRevision, *sessionHistory)
     {
@@ -1311,7 +1313,9 @@ void MMainWindow::openDatasetDialog(MAddDatasetDialog &addDatasetDialog)
                         pipelineConfig.treatRotatedGridAsRegularGrid,
                         pipelineConfig.surfacePressureFieldType,
                         pipelineConfig
-                        .convertGeometricHeightToPressure_ICAOStandard);
+                        .convertGeometricHeightToPressure_ICAOStandard,
+                        pipelineConfig.auxiliary3DPressureField,
+                        pipelineConfig.disableGridConsistencyCheck);
             break;
         }
         case TRAJECTORIES_PIPELINE:

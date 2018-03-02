@@ -63,7 +63,7 @@ MActor::MActor(QObject *parent)
       shaderCompilationProgress(0),
       positionLabel(nullptr),
       actorName("Default actor"),
-      actorType("Default actor"),
+      actorType(staticActorType()),
       addPropertiesCounter(0),
       actorIsInitialized(false),
       actorChangedSignalDisabledCounter(0),
@@ -997,12 +997,12 @@ MAbstractActorFactory::~MAbstractActorFactory()
 
 void MAbstractActorFactory::initialize()
 {
-    // Determine the actor default name and settings ID by instantiating
+    // Determine the actor type and settings ID by instantiating
     // a default actor instance.
     MActor* actor = createInstance();
     if (actor)
     {
-        name = actor->getName();
+        name = actor->getActorType();
         settingsID = actor->getSettingsID();
         delete actor;
     }

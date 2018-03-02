@@ -65,6 +65,8 @@ public:
 
     ~MGraticuleActor();
 
+    static QString staticActorType() { return "Graticule"; }
+
     void reloadShaderEffects();
 
     /**

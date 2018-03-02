@@ -78,7 +78,7 @@ MNWPVolumeRaycasterActor::MNWPVolumeRaycasterActor()
     // ===============================================
     beginInitialiseQtProperties();
 
-    setActorType("Volume raycaster");
+    setActorType(staticActorType());
     setName(getActorType());
 
     QStringList modesLst;
@@ -303,13 +303,13 @@ MNWPVolumeRaycasterActor::RayCasterSettings::RayCasterSettings(
 
     stepSizeProp = a->addProperty(
                 SCIENTIFICDOUBLE_PROPERTY, "step size", groupRaycasterSettings);
-    properties->setSciDouble(stepSizeProp, stepSize, 0.001, 10.0, 3, 3, 0.01);
+    properties->setSciDouble(stepSizeProp, stepSize, 1e-9, 10.0, 3, 9, 0.01);
 
     interactionStepSizeProp = a->addProperty(
                 SCIENTIFICDOUBLE_PROPERTY, "interaction step size",
                 groupRaycasterSettings);
     properties->setSciDouble(interactionStepSizeProp, interactionStepSize,
-                           0.001, 10.0, 3, 3, 0.1);
+                           1e-9, 10.0, 3, 9, 0.1);
 
     bisectionStepsProp = a->addProperty(
                 INT_PROPERTY, "bisection steps", groupRaycasterSettings);
@@ -1024,7 +1024,8 @@ const QList<MVerticalLevelType> MNWPVolumeRaycasterActor::supportedLevelTypes()
     return (QList<MVerticalLevelType>()
             << HYBRID_SIGMA_PRESSURE_3D
             << PRESSURE_LEVELS_3D
-            << LOG_PRESSURE_LEVELS_3D);
+            << LOG_PRESSURE_LEVELS_3D
+            << AUXILIARY_PRESSURE_3D);
 }
 
 
@@ -1155,6 +1156,10 @@ void MNWPVolumeRaycasterActor::initializeRenderInformation()
             << "sampleHybridLevel"
             << "hybridLevelGradient";
 
+    gl.rayCasterSubroutines[AUXILIARY_PRESSURE_3D]
+            << "sampleAuxiliaryPressure"
+            << "auxiliaryPressureGradient";
+
     gl.bitfieldRayCasterSubroutines[PRESSURE_LEVELS_3D]
             << "samplePressureLevelVolumeBitfield"
             << "samplePressureVolumeAllBits"
@@ -1165,6 +1170,11 @@ void MNWPVolumeRaycasterActor::initializeRenderInformation()
             << "sampleHybridVolumeAllBits"
             << "hybridLevelGradientBitfield";
 
+    gl.bitfieldRayCasterSubroutines[AUXILIARY_PRESSURE_3D]
+            << "sampleAuxiliaryPressureVolumeBitfield"
+            << "sampleAuxiliaryPressureVolumeAllBits"
+            << "auxiliaryPressureGradientBitfield";
+
     gl.normalCompSubroutines[PRESSURE_LEVELS_3D]
             << "samplePressureLevel"
             << "pressureLevelGradient";
@@ -1173,11 +1183,18 @@ void MNWPVolumeRaycasterActor::initializeRenderInformation()
             << "sampleHybridLevel"
             << "hybridLevelGradient";
 
+    gl.normalCompSubroutines[AUXILIARY_PRESSURE_3D]
+            << "sampleAuxiliaryPressure"
+            << "auxiliaryPressureGradient";
+
     gl.normalInitSubroutines[PRESSURE_LEVELS_3D]
             << "samplePressureLevel";
 
     gl.normalInitSubroutines[HYBRID_SIGMA_PRESSURE_3D]
             << "sampleHybridLevel";
+
+    gl.normalInitSubroutines[AUXILIARY_PRESSURE_3D]
+            << "sampleAuxiliaryPressure";
 
     // Re-compute normal curves and shadow image on next frame.
     updateNextRenderFrame.set(ComputeNCInitPoints);
@@ -1673,8 +1690,7 @@ void MNWPVolumeRaycasterActor::onQtPropertyChanged(QtProperty* property)
 
                 return;
             }
-            else if ( property == it->isoValueSignificantDigitsProperty
-                      || property == it->isoValueSingleStepProperty)
+            else if ( property == it->isoValueSignificantDigitsProperty )
             {
                 int significantDigits = properties->mInt()->value(
                             it->isoValueSignificantDigitsProperty);
@@ -1682,6 +1698,13 @@ void MNWPVolumeRaycasterActor::onQtPropertyChanged(QtProperty* property)
                             it->isoValueProp, significantDigits);
                 properties->mSciDouble()->setSignificantDigits(
                             it->isoValueSingleStepProperty, significantDigits);
+            }
+            else if ( property == it->isoValueSingleStepProperty)
+            {
+                double singleStep = properties->mSciDouble()->value(
+                            it->isoValueSingleStepProperty);
+                properties->mSciDouble()->setSingleStep(
+                            it->isoValueProp, singleStep);
             }
         } // isovalues
 
@@ -2168,7 +2191,9 @@ void MNWPVolumeRaycasterActor::setVarSpecificShaderVars(
         const QString& lonLatLevAxesName,
         const QString& pressureTexCoordTable2DName,
         const QString& minMaxAccelStructure3DName,
-        const QString& dataFlagsVolumeName)
+        const QString& dataFlagsVolumeName,
+        const QString& auxPressureField3DName
+        )
 {
     // Reset optional textures to avoid draw errors.
     // =============================================
@@ -2189,6 +2214,8 @@ void MNWPVolumeRaycasterActor::setVarSpecificShaderVars(
     // 3D textures...
     var->textureDummy3D->bindToTextureUnit(var->textureUnitUnusedTextures);
     shader->setUniformValue(dataFlagsVolumeName, var->textureUnitUnusedTextures); CHECK_GL_ERROR;
+    shader->setUniformValue(auxPressureField3DName, var->textureUnitUnusedTextures); CHECK_GL_ERROR;
+
 
     // Bind textures and set uniforms.
     // ===============================
@@ -2305,6 +2332,18 @@ void MNWPVolumeRaycasterActor::setVarSpecificShaderVars(
 #endif
     }
 
+    else if (var->grid->getLevelType() == AUXILIARY_PRESSURE_3D)
+    {
+        shader->setUniformValue(structName + ".levelType", GLint(2)); CHECK_GL_ERROR;
+
+        // Bind pressure field.
+        var->textureAuxiliaryPressure
+                ->bindToTextureUnit(var->textureUnitAuxiliaryPressure);
+        shader->setUniformValue(
+                    auxPressureField3DName,
+                    var->textureUnitAuxiliaryPressure); CHECK_GL_ERROR;
+    }
+
     // Precompute data extent variables and store in uniform struct.
     // =============================================================
     const GLfloat westernBoundary = dataNWCrnr.x() - var->grid->getDeltaLon() / 2.0f;
@@ -2384,14 +2423,14 @@ void MNWPVolumeRaycasterActor::setCommonShaderVars(
                              "pressureTable", "surfacePressure",
                              "hybridCoefficients", "lonLatLevAxes",
                              "pressureTexCoordTable2D", "minMaxAccel3D",
-                             "flagsVolume");
+                             "flagsVolume", "auxPressureField3D_hPa");
 
     setVarSpecificShaderVars(shader, sceneView, shadingVar, "dataExtentShV",
                              "dataVolumeShV","transferFunctionShV",
                              "pressureTableShV", "surfacePressureShV",
                              "hybridCoefficientsShV", "lonLatLevAxesShV",
                              "pressureTexCoordTable2DShV", "minMaxAccel3DShV",
-                             "flagsVolumeShV");
+                             "flagsVolumeShV", "auxPressureField3DShV_hPa");
 }
 
 

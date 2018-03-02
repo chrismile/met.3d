@@ -38,6 +38,7 @@
 #include "util/mutil.h"
 #include "actors/transferfunction1d.h"
 #include "actors/spatial1dtransferfunction.h"
+#include "mainwindow.h"
 
 using namespace std;
 
@@ -299,6 +300,46 @@ void MTransferFunction::setNumLabels(int num)
 QString MTransferFunction::transferFunctionName()
 {
     return getName();
+}
+
+
+bool MTransferFunction::loadMissingTransferFunction(
+        QString tfName, QString tfActorType, QString callerDescriptor,
+        QString callerName, QSettings *settings)
+{
+    // Append space to caller descriptor if missing.
+    if (!callerDescriptor.isEmpty() && !callerDescriptor.endsWith(" "))
+    {
+        callerDescriptor.append(" ");
+    }
+
+    QMessageBox msgBox;
+    msgBox.setIcon(QMessageBox::Warning);
+    msgBox.setWindowTitle(callerName);
+    msgBox.setText(QString("%1'%2' requires a transfer function "
+                           "'%3' that does not exist.\n"
+                           "Would you like to load the transfer function "
+                           "from file?")
+                   .arg(callerDescriptor).arg(callerName).arg(tfName));
+    msgBox.setStandardButtons(QMessageBox::Yes | QMessageBox::No);
+    msgBox.button(QMessageBox::Yes)->setText("Load transfer function");
+    msgBox.button(QMessageBox::No)->setText("Discard dependency");
+    msgBox.exec();
+    if (msgBox.clickedButton() == msgBox.button(QMessageBox::Yes))
+    {
+        MSystemManagerAndControl *sysMC =
+                MSystemManagerAndControl::getInstance();
+        // Create default actor to get name of actor factory.
+        sysMC->getMainWindow()->getSceneManagementDialog()
+                ->loadRequiredActorFromFile(tfActorType,
+                                            tfName,
+                                            settings->fileName());
+    }
+    else
+    {
+        return false;
+    }
+    return true;
 }
 
 

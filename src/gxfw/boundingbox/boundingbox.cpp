@@ -516,6 +516,15 @@ MBoundingBoxConnection::MBoundingBoxConnection(MBoundingBoxInterface *actor,
             ->getSortedBoundingBoxesList();
     properties->mEnum()->setEnumNames(bBoxProperty, bBoxList);
 
+    // Set default bounding box to second entry if there exists a second entry.
+    if (bBoxList.length() > 1)
+    {
+        suppressUpdates = true;
+        properties->setEnumItem(bBoxProperty, bBoxList.at(1));
+        setBoundingBox(bBoxList.at(1));
+        suppressUpdates = false;
+    }
+
     mactor->endInitialiseQtProperties();
 
     connect(properties->mEnum(), SIGNAL(propertyChanged(QtProperty*)),

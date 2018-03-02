@@ -63,6 +63,8 @@ public:
 
     ~MVolumeBoundingBoxActor();
 
+    static QString staticActorType() { return "Volume bounding box"; }
+
     void reloadShaderEffects();
 
     /**

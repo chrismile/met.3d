@@ -61,7 +61,7 @@ MVolumeBoundingBoxActor::MVolumeBoundingBoxActor()
     // ===============================================
     beginInitialiseQtProperties();
 
-    setActorType("Volume bounding box");
+    setActorType(staticActorType());
     setName(getActorType());
 
     // Bounding box of the actor.

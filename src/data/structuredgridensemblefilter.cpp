@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015-2018 Marc Rautenhaus
+**  Copyright 2017-2018 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -521,6 +522,32 @@ QList<QDateTime> MStructuredGridEnsembleFilter::availableValidTimes(
 }
 
 
+QString MStructuredGridEnsembleFilter::variableLongName(
+        MVerticalLevelType levelType,
+        const QString& variableName)
+{
+    assert(inputSource != nullptr);
+    return inputSource->variableLongName(levelType, variableName);
+}
+
+
+QString MStructuredGridEnsembleFilter::variableStandardName(
+        MVerticalLevelType levelType,
+        const QString& variableName)
+{
+    assert(inputSource != nullptr);
+    return inputSource->variableStandardName(levelType, variableName);
+}
+
+
+QString MStructuredGridEnsembleFilter::variableUnits(
+        MVerticalLevelType levelType,
+        const QString& variableName)
+{
+    assert(inputSource != nullptr);
+    return inputSource->variableUnits(levelType, variableName);
+}
+
 
 /******************************************************************************
 ***                          PROTECTED METHODS                              ***
@@ -553,7 +580,14 @@ MStructuredGrid *MStructuredGridEnsembleFilter::createAndInitializeResultGrid(
                     firstMemberGrid->nlons);
         break;
     case AUXILIARY_PRESSURE_3D:
+    {
+        MLonLatAuxiliaryPressureGrid *firstMemberGridAux =
+                dynamic_cast<MLonLatAuxiliaryPressureGrid*>(firstMemberGrid);
+        result = new MLonLatAuxiliaryPressureGrid(
+                    firstMemberGrid->nlevs, firstMemberGrid->nlats,
+                    firstMemberGrid->nlons, firstMemberGridAux->reverseLevels);
         break;
+    }
     case POTENTIAL_VORTICITY_2D:
         break;
     case SURFACE_2D:
@@ -675,6 +709,98 @@ MStructuredGrid *MStructuredGridEnsembleFilter::createAndInitializeResultGrid(
             }
         } // copy hybmember surface pressure field
     } // grid is hybrid sigma pressure
+
+    else if (firstMemberGrid->leveltype == AUXILIARY_PRESSURE_3D)
+    {
+        // Special treatment for auxiliary pressure levels: Get 3D pressure
+        // field.
+        MLonLatAuxiliaryPressureGrid *auxmember =
+                dynamic_cast<MLonLatAuxiliaryPressureGrid*>(firstMemberGrid);
+        MLonLatAuxiliaryPressureGrid *auxresult =
+                dynamic_cast<MLonLatAuxiliaryPressureGrid*>(result);
+
+        // For the pressure field itself, no request is needed since it is its
+        // own pressure field.
+        if (firstMemberGrid->variableName
+                == auxmember->auxPressureField_hPa->variableName)
+        {
+            return result;
+        }
+
+        MDataRequestHelper rh_pfield(auxmember->getAuxiliaryPressureFieldGrid()
+                                   ->getGeneratingRequest());
+
+        // If the keyword "MEMBER" is contained in the pfield request of the
+        // first member grid, it is assumed that all input grids are defined on
+        // different pressure grids. If "MEMBER" is not present in the request
+        // (e.g. the input members are regridded to a common grid), simply take
+        // the pressure grid of the first member grid.
+//TODO: This only works if input source and this ensemble filter share the same
+//      memory manager. A possible solution might be to give MAbstractDataItem a
+//      "getMemoryManager()" method and use that mem.mgr. here.
+        MDataRequest pfieldRequest;
+        if (!selectedMembers.isEmpty() && rh_pfield.contains("MEMBER"))
+        {
+            rh_pfield.remove("MEMBER");
+            rh_pfield.insert("SELECTED_MEMBERS", selectedMembers);
+//TODO: Is it correct to reference all ensemble filter results to the mean 3D
+//      pressure field?
+            rh_pfield.insert("ENS_OPERATION", "MEAN");
+            pfieldRequest = rh_pfield.request();
+
+            if ( !memoryManager->containsData(this, pfieldRequest) )
+            {
+                // 3D pressure mean field is not available in cache --
+                // call produceData() to compute it.
+
+                // NOTE: This is a special case, as produceData() should
+                // usually only be called from task graph processing in
+                // processRequest(). produceData() only calls the memory
+                // manager's getData() methods; the reference counter of the
+                // corresponding fields is increased from processRequest().
+                // However, data fields are released in produceData(). Hence,
+                // if we call produceData() directly the data fields do NOT
+                // have to be released! Otherwise we'd be missing a few
+                // afterwards --> crash.
+                rh_pfield.insert("DO_NOT_RELEASE_INPUT_DATAFIELDS", "");
+
+                MLonLatAuxiliaryPressureGrid *pfield =
+                        static_cast<MLonLatAuxiliaryPressureGrid*>(
+                            produceData(rh_pfield.request()) );
+
+                pfield->setGeneratingRequest(pfieldRequest);
+                if ( !memoryManager->storeData(this, pfield) )
+                {
+                    // In the unlikely event that another thread has stored
+                    // the same field in the mean time delete this one.
+                    delete pfield;
+                }
+            }
+
+            // Get a pointer to the 3D pressure field from the memory manager.
+            auxresult->auxPressureField_hPa =
+                    static_cast<MLonLatAuxiliaryPressureGrid*>(
+                        memoryManager->getData(this, pfieldRequest) );
+        } // get or create new ensemble mean 3D pressure field
+        else
+        {
+            auxresult->auxPressureField_hPa = auxmember->getAuxiliaryPressureFieldGrid();
+
+            // Increase the reference counter for this field (as done above by
+            // containsData() or storeData()). NOTE: The field is released in
+            // the destructor of "result" -- the reference is kept for the
+            // entire lifetime of "result" to make sure the pressure field is
+            // not deleted while "result" is still in memory.
+            if ( !auxresult->auxPressureField_hPa->increaseReferenceCounter() )
+            {
+                // This should not happen.
+                QString msg = QString("This is embarrassing: The data item "
+                                      "for request %1 should have been in "
+                                      "cache.").arg(pfieldRequest);
+                throw MMemoryError(msg.toStdString(), __FILE__, __LINE__);
+            }
+        } // copy auxiliary 3d pressure field
+    } // grid is auxiliary pressure 3D
 
     return result;
 }

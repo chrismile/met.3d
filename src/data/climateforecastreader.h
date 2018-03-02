@@ -4,8 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2017 Marc Rautenhaus
-**  Copyright 2015-2017 Bianca Tost
+**  Copyright 2015-2018 Marc Rautenhaus
+**  Copyright 2017-2018 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -63,6 +63,12 @@ struct MVariableDataSharedPerFile
     bool reverseLevels;
 };
 
+struct MNcVarDimensionInfo
+{
+    QList<QString> names;
+    QList<int>     sizes;
+};
+
 typedef QHash<QString, MVariableDataSharedPerFile> MSharedDataVariableNameMap;
 typedef QHash<MVerticalLevelType, MSharedDataVariableNameMap> MSharedDataLevelTypeMap;
 
@@ -89,6 +95,19 @@ typedef QHash<QString, MFileInfo*> MOpenFileMap;
   @brief Data reader for NetCDF files that follow (a subset of the) the CF
   (climate & forecast) conventions.
 
+  @ref convertGeometricHeightToPressure_ICAOStandard specifies whether Met.3D
+  should handle data fields defined on geometric height by converting the height
+  to pressure levels using the ICAO standard atmosphere.
+
+  @ref auxiliary3DPressureField contains the name of the auxiliary pressure
+  field variable if one should be used for the data set. If it is empty, no auxiliary
+  pressure field is used.
+
+  @ref disableGridConsistencyCheck specifies whether Met.3D should disable the
+  consistency check which is performed to make sure that all variables in one
+  data set are defined on the same grid (exception: different vertical level
+  types are allowed in one data set).
+
   @note While a number of CF keywords are understood this module does not
   implement the entire conventions. If something is missing that you require,
   please consider contributing to the software by implementing it!
@@ -101,7 +120,9 @@ public:
     MClimateForecastReader(
             QString identifier,
             bool treatRotatedGridAsRegularGrid=false,
-            bool convertGeometricHeightToPressure_ICAOStandard=false);
+            bool convertGeometricHeightToPressure_ICAOStandard=false,
+            QString auxiliary3DPressureField="",
+            bool disableGridConsistencyCheck=false);
     ~MClimateForecastReader();
 
     QList<MVerticalLevelType> availableLevelTypes();
@@ -133,6 +154,8 @@ public:
 protected:
     QString variableSurfacePressureName(MVerticalLevelType levelType,
                                         const QString&     variableName);
+    QString variableAuxiliaryPressureName(MVerticalLevelType levelType,
+                                          const QString&     variableName);
     QVector2D variableRotatedNorthPoleCoordinates( MVerticalLevelType levelType,
                                                    const QString& variableName);
 
@@ -173,8 +196,38 @@ protected:
      */
     bool parseCfStandardNameFile(const QString& filename);
 
+    /**
+      Checks consistency of shared data associated with the NetCDF variable @p
+      cfVar of the vertical level type @p levelType. Shared data includes
+      longitudes, latitudes, levels, etc., that are read only once and re-used
+      for all time steps of a variable. This function ensures that all time
+      steps are defined on, e.g., the same grid.
+
+      If @p initialiseConsistencyData is true @p shared is initialised with the
+      shared data data obtained from @p cfVar. This is the data that subsequent
+      calls to this method will be checked against for consistency.
+
+      If @p initialiseConsistencyData is false the shared data of @p cfVar are
+      compared to the corresponding data stored in @p shared.
+
+      Set @p testEnsembleMemberConsistency to true to also test consistency in
+      ensemble members (consistency of one variable) and to false to disable
+      the ensemble members check (consistency of dataset).
+
+      @return false if @p initialiseConsistencyData is false and the shared
+      data of @p cfVar does not match the corresponding data in @p shared; true
+      otherwise.
+     */
+    bool checkSharedVariableDataConsistency(
+            MVariableDataSharedPerFile *shared,
+            netCDF::NcCFVar *cfVar,
+            MVerticalLevelType levelType,
+            bool initialiseConsistencyData,
+            bool testEnsembleMemberConsistency);
+
     bool treatRotatedGridAsRegularGrid;
     bool convertGeometricHeightToPressure_ICAOStandard;
+    bool disableGridConsistencyCheck;
 };
 
 

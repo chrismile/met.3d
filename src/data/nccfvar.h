@@ -4,8 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2017 Marc Rautenhaus
-**  Copyright 2015-2017 Bianca Tost
+**  Copyright 2015-2018 Marc Rautenhaus
+**  Copyright 2017-2018  Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -96,7 +96,10 @@ public:
         // 2D regular lat/lon grid with potential vorticity as third dimension
         LAT_LON_PVU    = 5,
         // 2D regular lat/lon grid with geometric height as third dimension
-        LAT_LON_Z      = 6
+        LAT_LON_Z      = 6,
+        // 2D regular lat/lon grid with hybrid model level as third dimension
+        // stored as 3D pressure field
+        LAT_LON_AUXP3D  = 7
     };
 
     /**
@@ -156,6 +159,27 @@ public:
     NcVar getVerticalCoordinateHybridSigmaPressure(NcVar* ap,
                                                    NcVar* b,
                                                    QString* psfcName);
+
+    /**
+      If the CF variable represented by this object has a model level dimension
+      stored as a 3D pressure field, getVerticalCoordinateAuxiliaryPressure()
+      returns the corresponding vertical pressure field variable. If no such
+      model level dimension exists or @p auxiliary3DPressureField is an empty
+      string, an @ref NcException is thrown.
+
+      If the auxiliary pressure variable is stored in the same file, it is
+      checked whether the number of dimensions of the auxiliary pressure field
+      variable matches the number of dimensions of this variable. If @p
+      disableGridConsistencyCheck is false, it is also checked that the names
+      of the dimensions match.
+
+      If the auxiliary pressure variable is not stored in the same file, the
+      variable is assumed to be an auxiliary pressure variable without the
+      dimension checks previously mentioned and an empty NcVar is returned.
+      */
+    NcVar getVerticalCoordinateAuxiliaryPressure(
+            QString auxiliary3DPressureField, QString *pressureName,
+            int *levelIndex, bool disableGridConsistencyCheck);
 
     /**
       If the CF variable represented by this object has a potential vorticity
@@ -234,14 +258,28 @@ public:
 
     /**
       Returns the grid type of this variable.
+
+      @p auxiliary3DPressureField contains the name of the auxiliary pressure
+      field variable if one should be used otherwise it is empty.
+
+      @p disableGridConsistencyCheck specifies if consistency checks should be
+      disabled or not. If the check is not disabled, it is checked whether the
+      names of the dimensions of the auxiliary pressure field match the names
+      of the dimensions of a variable which could be detected as auxiliary
+      pressure variable. But the check is only performed here if the auxiliary
+      pressure field variable is stored in the same file as the variable for
+      which the grid type should be detected.
       */
-    NcVariableGridType getGridType();
+    NcVariableGridType getGridType(QString auxiliary3DPressureField,
+                                   bool disableGridConsistencyCheck);
 
     /**
       Static function that checks if the specified @p var is a CF variable of
       one of the types defined in @ref NcVariableGridType.
       */
-    static bool isCFDataVariable(const NcVar& var, NcVariableGridType type);
+    static bool isCFDataVariable(const NcVar& var, NcVariableGridType type,
+                                 QString auxiliary3DPressureField="",
+                                 bool disableGridConsistencyCheck=false);
 
     /**
       Static function that checks if the specified @p var is a CF variable of

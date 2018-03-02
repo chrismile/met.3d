@@ -55,6 +55,8 @@ MDerivedMetVarsDataSource::MDerivedMetVarsDataSource()
             (QStringList() << "u (fc)" << "v (fc)");
     requiredInputVariablesList["windspeed (ens)"] =
             (QStringList() << "u (ens)" << "v (ens)");
+    requiredInputVariablesList["Windspeed"] =
+            (QStringList() << "U" << "V");
 }
 
 
@@ -250,6 +252,33 @@ QList<QDateTime> MDerivedMetVarsDataSource::availableValidTimes(
     }
 
     return times;
+}
+
+
+QString MDerivedMetVarsDataSource::variableLongName(
+        MVerticalLevelType levelType,
+        const QString& variableName)
+{
+    Q_UNUSED(levelType); Q_UNUSED(variableName);
+    return QString();
+}
+
+
+QString MDerivedMetVarsDataSource::variableStandardName(
+        MVerticalLevelType levelType,
+        const QString& variableName)
+{
+    Q_UNUSED(levelType); Q_UNUSED(variableName);
+    return QString();
+}
+
+
+QString MDerivedMetVarsDataSource::variableUnits(
+        MVerticalLevelType levelType,
+        const QString& variableName)
+{
+    Q_UNUSED(levelType); Q_UNUSED(variableName);
+    return QString();
 }
 
 

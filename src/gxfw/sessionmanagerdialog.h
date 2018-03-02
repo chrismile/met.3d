@@ -72,7 +72,8 @@ public:
     ~MSessionManagerDialog();
 
     void initialize(QString sessionName, QString path, int autoSaveInterval,
-                    bool loadOnStart, bool saveOnApplicationExit);
+                    bool loadOnStart, bool saveOnApplicationExit,
+                    int maximumNumberOfSavedRevisions);
 
     void loadSessionOnStart();
 
@@ -226,16 +227,25 @@ private:
      */
     void updateSessionFileHistory(QString filename);
 
+    /**
+      Gets list of revision file names of session called @p sessionName and
+      stores the list int @p fileNameList.
+      */
+    void getCurrentSessionFileHistoryFileNameList(QStringList &fileNameList,
+                                                  QString &sessionName);
+
     Ui::MSessionManagerDialog *ui;
 
     /** Name of the current active session. */
     QString currentSession;
     QString path;
-    QStringList sessionsList;
     bool loadOnStart;
     MSessionItemDelegate *sessionItemDelegate;
     MSessionFileSystemModel *sessionFileSystemModel;
-};
+    /** Revision number the current session would get as a revision file. */
+    int currentRevisionNumber;
+    int maximumNumberOfSavedRevisions;
+}; // MSessionManagerDialog
 
 
 /**
@@ -253,7 +263,7 @@ public:
     ~MSessionFileSystemModel() {}
 
     QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override;
-};
+}; // MSessionFileSystemModel
 
 
 /**
@@ -279,7 +289,7 @@ public:
 private:
     QString currentSessionName;
 
-};
+}; // MSessionItemDelegate
 
 } // namespace Met3D
 

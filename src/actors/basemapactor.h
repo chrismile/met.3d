@@ -60,6 +60,8 @@ public:
     MBaseMapActor();
     ~MBaseMapActor();
 
+    static QString staticActorType() { return "Base map"; }
+
     void reloadShaderEffects();
 
     /**

@@ -62,6 +62,8 @@ public:
     MNWPHorizontalSectionActor();
     ~MNWPHorizontalSectionActor();
 
+    static QString staticActorType() { return "Horizontal cross-section"; }
+
     void reloadShaderEffects();
 
     /**

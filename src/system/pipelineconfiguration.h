@@ -4,8 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2017 Marc Rautenhaus
-**  Copyright 2017      Bianca Tost
+**  Copyright 2015-2018 Marc Rautenhaus
+**  Copyright 2017-2018 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -84,6 +84,12 @@ protected:
         ECMWF_GRIB      = 2
     };
 
+    enum MConfigurablePipelineType
+    {
+        INVALID_PIPELINE_TYPE  = 0,
+        DIFFERENCE       = 1
+    };
+
     /**
      Represents one directory path and file filter passed to Met.3D by Metview
      via path command line argument.
@@ -120,7 +126,9 @@ protected:
                                bool enableProbabiltyRegionFilter,
                                bool treatRotatedGridAsRegularGrid,
                                QString surfacePressureFieldType,
-                               bool convertGeometricHeightToPressure_ICAOStandard);
+                               bool convertGeometricHeightToPressure_ICAOStandard,
+                               QString auxiliary3DPressureField,
+                               bool disableGridConsistencyCheck);
 
     void initializePrecomputedTrajectoriesPipeline(
             QString name,
@@ -128,6 +136,16 @@ protected:
             bool boundaryLayerTrajectories,
             QString schedulerID,
             QString memoryManagerID);
+
+    void initializeConfigurablePipeline(MConfigurablePipelineType pipelineType,
+                                        QString name,
+                                        QString inputSource0,
+                                        QString inputSource1,
+                                        QString baseRequest0,
+                                        QString baseRequest1,
+                                        QString schedulerID,
+                                        QString memoryManagerID,
+                                        bool enableRegridding);
 
     void initializeTrajectoriesComputationPipeline(
             QString name,
@@ -158,6 +176,8 @@ protected:
      argument and stores them in @p gribFilePaths.
      */
     void getMetviewGribFilePaths(QList<MetviewGribFilePath> *gribFilePaths);
+
+    MConfigurablePipelineType configurablePipelineTypeFromString(QString typeName);
 };
 
 } // namespace Met3D

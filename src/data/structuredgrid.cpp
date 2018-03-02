@@ -4,8 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2017 Marc Rautenhaus
-**  Copyright 2015-2017 Bianca Tost
+**  Copyright 2015-2018 Marc Rautenhaus
+**  Copyright 2017-2018  Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -50,6 +50,9 @@ using namespace netCDF::exceptions;
 namespace Met3D
 {
 
+/******************************************************************************
+***                             MStructuredGrid                             ***
+*******************************************************************************/
 /******************************************************************************
 ***                     CONSTRUCTOR / DESTRUCTOR                            ***
 *******************************************************************************/
@@ -152,7 +155,7 @@ QString MStructuredGrid::verticalLevelTypeToString(MVerticalLevelType type)
     case LOG_PRESSURE_LEVELS_3D:
         return QString("Log(Pressure) Levels");
     case AUXILIARY_PRESSURE_3D:
-        return QString("Hybrid Model Levels with Auxiliary Pressure");
+        return QString("Model Levels with Auxiliary Pressure");
     default:
         return QString("UNDEFINED");
     }
@@ -167,7 +170,7 @@ MVerticalLevelType MStructuredGrid::verticalLevelTypeFromString(
     if (str == "Hybrid Sigma Pressure Model Levels") return HYBRID_SIGMA_PRESSURE_3D;
     if (str == "Potential Vorticity Levels") return POTENTIAL_VORTICITY_2D;
     if (str == "Log(Pressure) Levels") return LOG_PRESSURE_LEVELS_3D;
-    if (str == "Hybrid Model Levels with Auxiliary Pressure") return AUXILIARY_PRESSURE_3D;
+    if (str == "Model Levels with Auxiliary Pressure") return AUXILIARY_PRESSURE_3D;
 
     return SIZE_LEVELTYPES;
 }
@@ -1051,6 +1054,14 @@ void MStructuredGrid::releaseMinMaxAccelTexture3D()
 
 
 /******************************************************************************
+*******************************************************************************/
+/******************************************************************************
+*******************************************************************************/
+
+/******************************************************************************
+***                          MRegularLonLatLnPGrid                          ***
+*******************************************************************************/
+/******************************************************************************
 ***                     CONSTRUCTOR / DESTRUCTOR                            ***
 *******************************************************************************/
 
@@ -1060,6 +1071,10 @@ MRegularLonLatLnPGrid::MRegularLonLatLnPGrid(
 {
 }
 
+
+/******************************************************************************
+***                            PUBLIC METHODS                               ***
+*******************************************************************************/
 
 float MRegularLonLatLnPGrid::interpolateGridColumnToPressure(
         unsigned int j, unsigned int i, float p_hPa)
@@ -1130,6 +1145,14 @@ float MRegularLonLatLnPGrid::getTopInterfacePressure(
 
 
 /******************************************************************************
+*******************************************************************************/
+/******************************************************************************
+*******************************************************************************/
+
+/******************************************************************************
+***                   MRegularLonLatStructuredPressureGrid                  ***
+*******************************************************************************/
+/******************************************************************************
 ***                     CONSTRUCTOR / DESTRUCTOR                            ***
 *******************************************************************************/
 
@@ -1140,6 +1163,10 @@ MRegularLonLatStructuredPressureGrid::MRegularLonLatStructuredPressureGrid(
     pressureTableID = getID() + "ptbl";
 }
 
+
+/******************************************************************************
+***                            PUBLIC METHODS                               ***
+*******************************************************************************/
 
 GL::MTexture *MRegularLonLatStructuredPressureGrid::getPressureTexCoordTexture1D(
         QGLWidget *currentGLContext)
@@ -1328,6 +1355,14 @@ float MRegularLonLatStructuredPressureGrid::getTopInterfacePressure(
 
 
 /******************************************************************************
+*******************************************************************************/
+/******************************************************************************
+*******************************************************************************/
+
+/******************************************************************************
+***                            MRegularLonLatGrid                           ***
+*******************************************************************************/
+/******************************************************************************
 ***                     CONSTRUCTOR / DESTRUCTOR                            ***
 *******************************************************************************/
 
@@ -1337,6 +1372,10 @@ MRegularLonLatGrid::MRegularLonLatGrid(
 {
 }
 
+
+/******************************************************************************
+***                            PUBLIC METHODS                               ***
+*******************************************************************************/
 
 GL::MTexture *MRegularLonLatGrid::getTexture(QGLWidget *currentGLContext,
                                             bool nullTexture)
@@ -1427,6 +1466,14 @@ GL::MTexture *MRegularLonLatGrid::getFlagsTexture(QGLWidget *currentGLContext)
 
 
 /******************************************************************************
+*******************************************************************************/
+/******************************************************************************
+*******************************************************************************/
+
+/******************************************************************************
+***                      MLonLatHybridSigmaPressureGrid                     ***
+*******************************************************************************/
+/******************************************************************************
 ***                     CONSTRUCTOR / DESTRUCTOR                            ***
 *******************************************************************************/
 
@@ -1469,6 +1516,10 @@ MLonLatHybridSigmaPressureGrid::~MLonLatHybridSigmaPressureGrid()
     if (bki) delete[] bki;
 }
 
+
+/******************************************************************************
+***                            PUBLIC METHODS                               ***
+*******************************************************************************/
 
 unsigned int MLonLatHybridSigmaPressureGrid::getMemorySize_kb()
 {
@@ -1902,6 +1953,10 @@ void MLonLatHybridSigmaPressureGrid::dumpGridData()
 }
 
 
+/******************************************************************************
+***                          PROTECTED METHODS                              ***
+*******************************************************************************/
+
 void MLonLatHybridSigmaPressureGrid::allocateInterfaceCoefficients()
 {
     if (aki_hPa) delete[] aki_hPa;
@@ -1934,6 +1989,208 @@ QString MLonLatHybridSigmaPressureGrid::getPressureTexCoordID()
     }
 
     return pressureTexCoordID;
+}
+
+
+/******************************************************************************
+*******************************************************************************/
+/******************************************************************************
+*******************************************************************************/
+
+/******************************************************************************
+***                       MLonLatAuxiliaryPressureGrid                      ***
+*******************************************************************************/
+/******************************************************************************
+***                     CONSTRUCTOR / DESTRUCTOR                            ***
+*******************************************************************************/
+
+MLonLatAuxiliaryPressureGrid::MLonLatAuxiliaryPressureGrid(
+        unsigned int nlevs, unsigned int nlats, unsigned int nlons,
+        bool reverseLevels)
+    : MStructuredGrid(AUXILIARY_PRESSURE_3D, nlevs, nlats, nlons),
+      auxPressureField_hPa(nullptr),
+      reverseLevels(reverseLevels)
+{}
+
+
+MLonLatAuxiliaryPressureGrid::~MLonLatAuxiliaryPressureGrid()
+{
+    // If the pressure field was set by the friend class
+    // MWeatherPredictionReader, the field was stored in the same memory
+    // manager as this item. If this item is deleted from the memory manager,
+    // release the pressure field.
+    // If this grid is not registered with any memory manager simply delete
+    // the pressure field grid.
+    // Special case: Since the pressure field is connected to itself, don't
+    // release it again.
+    if (auxPressureField_hPa && auxPressureField_hPa != this)
+    {
+        if (auxPressureField_hPa->getMemoryManager())
+        {
+            LOG4CPLUS_TRACE(mlog, "Releasing pressure field of request "
+                            << getGeneratingRequest().toStdString());
+            auxPressureField_hPa->getMemoryManager()->releaseData(auxPressureField_hPa);
+        }
+        else
+        {
+            delete auxPressureField_hPa;
+        }
+    }
+}
+
+
+/******************************************************************************
+***                            PUBLIC METHODS                               ***
+*******************************************************************************/
+
+float MLonLatAuxiliaryPressureGrid::interpolateGridColumnToPressure(
+        unsigned int j, unsigned int i, float p_hPa)
+{
+    // Initial position of klower and kupper.
+    int klower = 0;
+    int kupper = nlevs - 1;
+
+    // Perform the binary search.
+    while ((kupper - klower) > 1)
+    {
+        // Element midway between klower and kupper.
+        int kmid = (kupper + klower) / 2;
+        // Compute pressure at kmid.
+        float pressureAt_kmid_hPa = auxPressureField_hPa->getValue(kmid, j, i);
+
+        // Cut interval in half.
+        if (p_hPa >= pressureAt_kmid_hPa)
+        {
+            klower = kmid;
+        }
+        else
+        {
+            kupper = kmid;
+        }
+    }
+
+    float plower_hPa = auxPressureField_hPa->getValue(klower, j, i);
+    float pupper_hPa = auxPressureField_hPa->getValue(kupper, j, i);
+
+    float ln_plower  = log(plower_hPa);
+    float ln_pupper  = log(pupper_hPa);
+    float ln_p       = log(p_hPa);
+
+    float scalar_klower = getValue(klower, j, i);
+    float scalar_kupper = getValue(kupper, j, i);
+
+    // If the requested pressure value is below the upper pressure limit or
+    // above the lower pressure limit, return M_MISSING_VALUE.
+    if (ln_plower < ln_pupper)
+    {
+        if ((ln_p > ln_pupper) || (ln_p < ln_plower))
+        {
+            return M_MISSING_VALUE;
+        }
+    }
+    else
+    {
+        if ((ln_p < ln_pupper) || (ln_p > ln_plower))
+        {
+            return M_MISSING_VALUE;
+        }
+    }
+
+    // Linearly interpolate in ln(p) between the scalar values at level
+    // kupper and level klower.
+    float a = (ln_p - ln_pupper) / (ln_plower - ln_pupper);
+    // return mix(scalar_kupper, scalar_klower, a);
+    // GLSL mix(x,y,a) = x * (1.-a) + y*a
+    return (scalar_kupper * (1. - a) + scalar_klower * a);
+}
+
+
+int MLonLatAuxiliaryPressureGrid::findLevel(
+        unsigned int j, unsigned int i, float p_hPa)
+{
+    // Binary search to find model levels k, k1 that enclose pressure level p.
+    int k = 0;
+    int k1 = nlevs - 1;
+
+    while (abs(k1 - k) > 1)
+    {
+        // Element midway between k and k1.
+        int kmid = (k1 + k) / 2;
+        // Compute pressure at kmid.
+        float pressureAt_kmid_hPa = auxPressureField_hPa->getValue(kmid, j, i);
+
+        // Cut interval in half.
+        if (p_hPa >= pressureAt_kmid_hPa)
+        {
+            k = kmid;
+        }
+        else
+        {
+            k1 = kmid;
+        }
+    }
+
+    return k;
+}
+
+
+float MLonLatAuxiliaryPressureGrid::getPressure(
+         unsigned int k, unsigned int j, unsigned int i)
+{
+        return auxPressureField_hPa->getValue(k, j, i);
+}
+
+
+float MLonLatAuxiliaryPressureGrid::getBottomInterfacePressure(
+        unsigned int k, unsigned int j, unsigned int i)
+{
+    return auxPressureField_hPa->getValue(k + 1, j, i);
+}
+
+
+float MLonLatAuxiliaryPressureGrid::getTopInterfacePressure(
+        unsigned int k, unsigned int j, unsigned int i)
+{
+    return auxPressureField_hPa->getValue(k, j, i);
+}
+
+
+float MLonLatAuxiliaryPressureGrid::getTopDataVolumePressure()
+{
+    return auxPressureField_hPa->min();
+}
+
+
+float MLonLatAuxiliaryPressureGrid::getBottomDataVolumePressure()
+{
+    return auxPressureField_hPa->max();
+}
+
+
+void MLonLatAuxiliaryPressureGrid::dumpGridData()
+{
+    QString str = "LonLatAuxiliaryPressureGrid Grid Data\n====================";
+    str += QString("\nVariable name: %1").arg(variableName);
+    str += QString("\nInit time: %1").arg(initTime.toString(Qt::ISODate));
+    str += QString("\nValid time: %1").arg(validTime.toString(Qt::ISODate));
+    str += QString("\nEnsemble member: %1").arg(ensembleMember);
+
+    str += "\n\nlon: ";
+    for (uint i = 0; i < nlons; i++) str += QString("%1/").arg(lons[i]);
+    str += "\n\nlat: ";
+    for (uint i = 0; i < nlats; i++) str += QString("%1/").arg(lats[i]);
+    str += "\n\nlev: ";
+    for (uint i = 0; i < nlons * nlats * nlevs; i++)
+    {
+        str += QString("%1/").arg(auxPressureField_hPa->getValue(i));
+    }
+
+    str += "\n\ndata: ";
+    for (uint i = 0; i < nvalues; i++) str += QString("%1/").arg(data[i]);
+
+    str += "\n\nend data\n====================\n";
+
+    LOG4CPLUS_INFO(mlog, str.toStdString());
 }
 
 
