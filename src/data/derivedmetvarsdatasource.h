@@ -32,7 +32,7 @@
 #include <QtCore>
 
 // local application imports
-#include "structuredgridensemblefilter.h"
+#include "processingwpdatasource.h"
 #include "structuredgrid.h"
 #include "datarequest.h"
 
@@ -44,7 +44,7 @@ namespace Met3D
   forecast parameters.
   */
 class MDerivedMetVarsDataSource
-        : public MStructuredGridEnsembleFilter
+        : public MProcessingWeatherPredictionDataSource
 {
 public:
     MDerivedMetVarsDataSource();

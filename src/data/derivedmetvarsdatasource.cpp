@@ -45,7 +45,7 @@ namespace Met3D
 *******************************************************************************/
 
 MDerivedMetVarsDataSource::MDerivedMetVarsDataSource()
-    : MStructuredGridEnsembleFilter(),
+    : MProcessingWeatherPredictionDataSource(),
       inputSource(nullptr)
 {
 //TODO (mr, 2016May17) -- this table should be put into a configuration file

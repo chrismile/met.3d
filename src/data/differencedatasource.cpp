@@ -48,7 +48,7 @@ namespace Met3D
 *******************************************************************************/
 
 MDifferenceDataSource::MDifferenceDataSource()
-    : MWeatherPredictionDataSource()
+    : MProcessingWeatherPredictionDataSource()
 {
     inputSource.resize(2);
     baseRequest.resize(2);
@@ -247,97 +247,6 @@ MDataRequest MDifferenceDataSource::constructInputSourceRequestFromRequest(
     }
 
     return rhInp.request();
-}
-
-
-MStructuredGrid* MDifferenceDataSource::createAndInitializeResultGrid(
-        MStructuredGrid *templateGrid)
-{
-    MStructuredGrid *result = nullptr;
-
-    switch (templateGrid->leveltype)
-    {
-    case PRESSURE_LEVELS_3D:
-        result = new MRegularLonLatStructuredPressureGrid(
-                    templateGrid->nlevs, templateGrid->nlats,
-                    templateGrid->nlons);
-        break;
-    case HYBRID_SIGMA_PRESSURE_3D:
-        result = new MLonLatHybridSigmaPressureGrid(
-                    templateGrid->nlevs, templateGrid->nlats,
-                    templateGrid->nlons);
-        break;
-    case AUXILIARY_PRESSURE_3D:
-        break;
-    case POTENTIAL_VORTICITY_2D:
-        break;
-    case SURFACE_2D:
-        result = new MRegularLonLatGrid(templateGrid->nlats,
-                                        templateGrid->nlons);
-        break;
-    case LOG_PRESSURE_LEVELS_3D:
-        result = new MRegularLonLatLnPGrid(
-                    templateGrid->nlevs, templateGrid->nlats,
-                    templateGrid->nlons);
-        break;
-    default:
-        break;
-    }
-
-    if (result == nullptr)
-    {
-        QString msg = QString("ERROR: Cannot intialize result grid. Level "
-                              "type %1 not implemented.")
-                .arg(MStructuredGrid::verticalLevelTypeToString(
-                         templateGrid->leveltype));
-        LOG4CPLUS_ERROR(mlog, msg.toStdString());
-        throw MInitialisationError(msg.toStdString(), __FILE__, __LINE__);
-    }
-
-    // Copy coordinate axes.
-    for (unsigned int i = 0; i < templateGrid->nlons; i++)
-        result->lons[i] = templateGrid->lons[i];
-    for (unsigned int j = 0; j < templateGrid->nlats; j++)
-        result->lats[j] = templateGrid->lats[j];
-    for (unsigned int i = 0; i < templateGrid->nlevs; i++)
-        result->levels[i] = templateGrid->levels[i];
-
-    result->setAvailableMembers(templateGrid->getAvailableMembers());
-
-    if (templateGrid->leveltype == HYBRID_SIGMA_PRESSURE_3D)
-    {
-        // Special treatment for hybrid model levels: copy ak/bk coeffs.
-        MLonLatHybridSigmaPressureGrid *hybtemplate =
-                dynamic_cast<MLonLatHybridSigmaPressureGrid*>(templateGrid);
-        MLonLatHybridSigmaPressureGrid *hybresult =
-                dynamic_cast<MLonLatHybridSigmaPressureGrid*>(result);
-        for (unsigned int i = 0; i < hybtemplate->nlevs; i++)
-        {
-            hybresult->ak_hPa[i] = hybtemplate->ak_hPa[i];
-            hybresult->bk[i] = hybtemplate->bk[i];
-        }
-
-        // Take care of the surface grid: take the surface grid of the template
-        // grid.
-        hybresult->surfacePressure = hybtemplate->getSurfacePressureGrid();
-
-        // Increase the reference counter for this field (as done above by
-        // containsData() or storeData()). NOTE: The field is released in
-        // the destructor of "result" -- the reference is kept for the
-        // entire lifetime of "result" to make sure the psfc field is not
-        // deleted while "result" is still in memory.
-        if ( !hybresult->surfacePressure->increaseReferenceCounter() )
-        {
-            // This should not happen.
-            QString msg = QString("This is embarrassing: The data item "
-                                  "for request %1 should have been in "
-                                  "cache.").arg(
-                        hybresult->surfacePressure->getGeneratingRequest());
-            throw MMemoryError(msg.toStdString(), __FILE__, __LINE__);
-        }
-    } // grid is hybrid sigma pressure
-
-    return result;
 }
 
 
