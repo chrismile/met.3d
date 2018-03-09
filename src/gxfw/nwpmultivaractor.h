@@ -177,6 +177,13 @@ protected:
     virtual void onAddActorVariable(MNWPActorVariable* var)
     { Q_UNUSED(var); }
 
+    /**
+      Same as @ref onDeleteActorVariable() but called just after a variable has
+      been changed.
+     */
+    virtual void onChangeActorVariable(MNWPActorVariable *var)
+    { Q_UNUSED(var); }
+
     /** List of NWP variables that are rendered in this actor. */
     QList<MNWPActorVariable*> variables;
 

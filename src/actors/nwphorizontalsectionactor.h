@@ -154,6 +154,8 @@ protected:
 
     void onAddActorVariable(MNWPActorVariable* var) override;
 
+    void onChangeActorVariable(MNWPActorVariable *var) override;
+
 private:
     /** Methods to render the horizontal section. */
     void renderVerticalInterpolation(MNWP2DHorizontalActorVariable* var);

@@ -211,9 +211,10 @@ public:
     QtProperty *varPropertyGroup;
     QtProperty *varRenderingPropertyGroup;
 
-    /* Button to remove this variable from its actor. Signal is handled by
-       MNWPMultiVarActor and derived classes. */
-    QtProperty* removeVariableProperty;
+    /* Buttons to remove/change this variable from its actor. Signal is handled
+    by MNWPMultiVarActor and derived classes. */
+    QtProperty *removeVariableProperty;
+    QtProperty *changeVariableProperty;
 
 public slots:
     /**
@@ -357,7 +358,6 @@ protected:
 
     QtProperty *datasourceNameProperty;
     QtProperty *changeVariablePropertyGroup;
-    QtProperty *changeVariableProperty;
 
     QtProperty *transferFunctionProperty;
     QtProperty *spatialTransferFunctionProperty;
