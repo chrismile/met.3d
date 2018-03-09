@@ -223,6 +223,11 @@ MNWPActorVariable::MNWPActorVariable(MNWPMultiVarActor *actor)
                                               varRenderingPropertyGroup);
     properties->mEnum()->setEnumNames(transferFunctionProperty, availableTFs);
 
+    // Debug properties.
+    QtProperty* debugGroup = getPropertyGroup("debug");
+    dumpGridDataProperty = a->addProperty(CLICK_PROPERTY, "dump grid data",
+                                          debugGroup);
+
     // Observe the creation/deletion of other actors -- if these are transfer
     // functions, add to the list displayed in the transfer function property.
     connect(glRM, SIGNAL(actorCreated(MActor*)), SLOT(onActorCreated(MActor*)));
@@ -956,6 +961,16 @@ bool MNWPActorVariable::onQtPropertyChanged(QtProperty *property)
     else if (property == transferFunctionProperty)
     {
         return setTransferFunctionFromProperty();
+    }
+
+    else if (property == dumpGridDataProperty)
+    {
+        if (grid)
+        {
+            // Dump raw grid data to console, printing first 200 data values.
+            grid->dumpGridData(200);
+        }
+        return false;
     }
 
     else

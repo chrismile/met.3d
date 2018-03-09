@@ -360,7 +360,7 @@ public:
     /** Writes coordinate axis data to the LOG. */
     void dumpCoordinateAxes();
 
-    virtual void dumpGridData();
+    virtual void dumpGridData(unsigned int maxValues=50);
 
     /** Saves the data field in text file @p filename. */
     void saveAsNetCDF(QString filename);
@@ -730,7 +730,7 @@ public:
 
     float getBottomDataVolumePressure() override;
 
-    void dumpGridData();
+    void dumpGridData(unsigned int maxValues=50);
 
 protected:
     friend class MWeatherPredictionReader;
@@ -803,7 +803,7 @@ public:
       */
     bool getReverseLevels() { return reverseLevels; }
 
-    void dumpGridData();
+    void dumpGridData(unsigned int maxValues=50);
 
 protected:
     friend class MWeatherPredictionReader;

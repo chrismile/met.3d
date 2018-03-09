@@ -41,7 +41,8 @@ namespace Met3D
 {
 
 /**
-  @brief Super class for data sources processing data of input sources.
+  @brief Super class for data sources processing data of one ore multiple
+  @p MWeatherPredictionDataSource.
   */
 class MProcessingWeatherPredictionDataSource
         : public MWeatherPredictionDataSource
@@ -50,6 +51,13 @@ public:
     MProcessingWeatherPredictionDataSource();
 
 protected:
+    /**
+      Creates and initializes a new MStructuredGrid-subclass of the same type
+      as @p templateGrid. Coordinate values etc. will be copied from @p
+      templateGrid. If the new result grid is a hybrid sigma-pressure level
+      grid or an auxiliary pressure field grid, the corresponding surface
+      pressure or auxiliary pressure field will be copied as well.
+     */
     virtual MStructuredGrid *createAndInitializeResultGrid(
             MStructuredGrid *templateGrid);
 

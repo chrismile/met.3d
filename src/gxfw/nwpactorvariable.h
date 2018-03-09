@@ -346,6 +346,9 @@ protected:
     QList<unsigned int> selectedEnsembleMembersAsSortedList;
     int         ensembleMemberLoadedFromConfiguration;
 
+    /* Debug properties. */
+    QtProperty *dumpGridDataProperty;
+
     /** If true, load the grid's "flag" data field to the GPU, if available. */
     bool useFlagsIfAvailable;
 
@@ -551,7 +554,6 @@ protected:
     QVector<ContourSettings> contourSetList;
 
 private:
-    QtProperty *varDebugPropertyGroup;
     QtProperty *saveXSecGridProperty;
 
 };

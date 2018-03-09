@@ -137,7 +137,7 @@ MProcessingWeatherPredictionDataSource::createAndInitializeResultGrid(
             hybresult->bk[i] = hybtemplate->bk[i];
         }
 
-        // Take care of the surface grid: take the surface grid of the template
+        // Take care of the surface grid: use the surface grid of the template
         // grid.
         hybresult->surfacePressure = hybtemplate->getSurfacePressureGrid();
 
@@ -156,6 +156,33 @@ MProcessingWeatherPredictionDataSource::createAndInitializeResultGrid(
             throw MMemoryError(msg.toStdString(), __FILE__, __LINE__);
         }
     } // grid is hybrid sigma pressure
+
+    else if (templateGrid->leveltype == AUXILIARY_PRESSURE_3D)
+    {
+        // Special treatment for auxiliary pressure levels: copy pointer to
+        // auxiliary 3D pressure field.
+        MLonLatAuxiliaryPressureGrid *auxptemplate =
+                dynamic_cast<MLonLatAuxiliaryPressureGrid*>(templateGrid);
+        MLonLatAuxiliaryPressureGrid *auxresult =
+                dynamic_cast<MLonLatAuxiliaryPressureGrid*>(result);
+        auxresult->auxPressureField_hPa =
+                auxptemplate->getAuxiliaryPressureFieldGrid();
+
+        // Increase the reference counter for this field (as done above by
+        // containsData() or storeData()). NOTE: The field is released in
+        // the destructor of "result" -- the reference is kept for the
+        // entire lifetime of "result" to make sure the pressure field is
+        // not deleted while "result" is still in memory.
+        if ( !auxresult->auxPressureField_hPa->increaseReferenceCounter() )
+        {
+            // This should not happen.
+            QString msg = QString("This is embarrassing: The data item "
+                                  "for request %1 should have been in "
+                                  "cache.").arg(
+                        auxresult->auxPressureField_hPa->getGeneratingRequest());
+            throw MMemoryError(msg.toStdString(), __FILE__, __LINE__);
+        }
+    } // grid is auxiliary pressure 3D
 
     return result;
 }
