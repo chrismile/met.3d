@@ -134,7 +134,9 @@ HEADERS += \
     src/gxfw/sessionmanagerdialog.h \
     src/data/singlevariableanalysis.h \
     src/data/structuredgridstatisticsanalysis.h \
-    src/qt_extensions/scientificdoublespinbox.h
+    src/qt_extensions/scientificdoublespinbox.h \
+    src/data/differencedatasource.h \
+    src/data/processingwpdatasource.h
 
 SOURCES += \
     src/main.cpp \
@@ -235,7 +237,9 @@ SOURCES += \
     src/gxfw/sessionmanagerdialog.cpp \
     src/data/singlevariableanalysis.cpp \
     src/data/structuredgridstatisticsanalysis.cpp \
-    src/qt_extensions/scientificdoublespinbox.cpp
+    src/qt_extensions/scientificdoublespinbox.cpp \
+    src/data/differencedatasource.cpp \
+    src/data/processingwpdatasource.cpp
 
 FORMS += \
     src/mainwindow.ui \
