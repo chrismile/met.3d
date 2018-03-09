@@ -1189,7 +1189,7 @@ void MMainWindow::showAboutDialog()
             "ANY WARRANTY; without even the implied warranty of MERCHANTABILITY "
             "or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public "
             "License for more details.<br><br>"
-            "Copyright 2015-2017 Met.3D authors:<br>"
+            "Copyright 2015-2018 Met.3D authors:<br>"
             "Marc Rautenhaus(1), Bianca Tost(1), Michael Kern(1), Alexander "
             "Kumpf(1), Fabian Sch&ouml;ttl(1), Christoph Heidelmann(1).<br><br>"
             "(1) <a href='https://wwwcg.in.tum.de/'>Computer Graphics and "

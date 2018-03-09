@@ -70,20 +70,6 @@ MStructuredGrid* MStructuredGridEnsembleFilter::produceData(MDataRequest request
 
     MDataRequestHelper rh(request);
 
-    bool doNotReleaseInputDatafields = false;
-    if ( rh.contains("DO_NOT_RELEASE_INPUT_DATAFIELDS") )
-    {
-        // If this is true: Special case if produceData() is called from
-        // createAndInitializeResultGrid(). Do NOT release data fields in this
-        // case; see comments below in createAndInitializeResultGrid().
-        doNotReleaseInputDatafields = true;
-        rh.remove("DO_NOT_RELEASE_INPUT_DATAFIELDS");
-
-        // Correct the request string, as it is used below to derive request
-        // keys for storing additional mean/stddev/min/max/etc fields.
-        request = rh.request();
-    }
-
     // Parse request.
     QSet<unsigned int> selectedMembers = rh.uintSetValue("SELECTED_MEMBERS");
     QString operation = rh.value("ENS_OPERATION");
@@ -162,6 +148,9 @@ MStructuredGrid* MStructuredGridEnsembleFilter::produceData(MDataRequest request
             else
             {
                 // Iteration k.
+                updateAuxDataInResultGrid(mean, memberGrid);
+                updateAuxDataInResultGrid(stddev, memberGrid);
+
                 for (unsigned int v = 0; v < mean->nvalues; v++)
                     if (memberGrid->data[v] != M_MISSING_VALUE)
                     {
@@ -175,8 +164,7 @@ MStructuredGrid* MStructuredGridEnsembleFilter::produceData(MDataRequest request
                     }
             }
 
-            if ( !doNotReleaseInputDatafields )
-                inputSource->releaseData(memberGrid);
+            inputSource->releaseData(memberGrid);
         }
 
         // Divide each summed value by the number of members.
@@ -197,6 +185,9 @@ MStructuredGrid* MStructuredGridEnsembleFilter::produceData(MDataRequest request
                     mean->data[v] = M_MISSING_VALUE;
             }
         }
+
+        finalizeAuxDataInResultGrid(mean);
+        finalizeAuxDataInResultGrid(stddev);
 
         // The requested field is returned as the result. However, we also
         // store the other field (mean or stddev) in the memory manager cache,
@@ -260,6 +251,12 @@ MStructuredGrid* MStructuredGridEnsembleFilter::produceData(MDataRequest request
                 dmaxminGrid->enableFlags();
                 dmaxminGrid->setToValue(M_MISSING_VALUE);
             }
+            else
+            {
+                updateAuxDataInResultGrid(minGrid, memberGrid);
+                updateAuxDataInResultGrid(maxGrid, memberGrid);
+                updateAuxDataInResultGrid(dmaxminGrid, memberGrid);
+            }
 
             for (unsigned int v = 0; v < memberGrid->nvalues; v++)
                 if (memberGrid->data[v] != M_MISSING_VALUE)
@@ -285,8 +282,7 @@ MStructuredGrid* MStructuredGridEnsembleFilter::produceData(MDataRequest request
             maxGrid->setContributingMember(m);
             dmaxminGrid->setContributingMember(m);
 
-            if ( !doNotReleaseInputDatafields )
-                inputSource->releaseData(memberGrid);
+            inputSource->releaseData(memberGrid);
         } // loop over member
 
         // Compute max-min.
@@ -298,6 +294,9 @@ MStructuredGrid* MStructuredGridEnsembleFilter::produceData(MDataRequest request
                 dmaxminGrid->setFlags(v, maxGrid->getFlags(v) & minGrid->getFlags(v));
             }
 
+        finalizeAuxDataInResultGrid(minGrid);
+        finalizeAuxDataInResultGrid(maxGrid);
+        finalizeAuxDataInResultGrid(dmaxminGrid);
 
         if (operation == "MIN")
         {
@@ -385,6 +384,10 @@ MStructuredGrid* MStructuredGridEnsembleFilter::produceData(MDataRequest request
                                 memberGrid->nlons);
                     validMembersCounter->setToZero();
                 }
+                else
+                {
+                    updateAuxDataInResultGrid(result, memberGrid);
+                }
 
                 for (unsigned int v = 0; v < result->nvalues; v++)
                     if (memberGrid->data[v] != M_MISSING_VALUE)
@@ -400,8 +403,7 @@ MStructuredGrid* MStructuredGridEnsembleFilter::produceData(MDataRequest request
                 // Store that member m contributed to the result.
                 result->setContributingMember(m);
 
-                if ( !doNotReleaseInputDatafields )
-                    inputSource->releaseData(memberGrid);
+                inputSource->releaseData(memberGrid);
             }
 
         else if (op == "<")
@@ -423,6 +425,10 @@ MStructuredGrid* MStructuredGridEnsembleFilter::produceData(MDataRequest request
                                 memberGrid->nlons);
                     validMembersCounter->setToZero();
                 }
+                else
+                {
+                    updateAuxDataInResultGrid(result, memberGrid);
+                }
 
                 for (unsigned int v = 0; v < result->nvalues; v++)
                     if (memberGrid->data[v] != M_MISSING_VALUE)
@@ -438,8 +444,7 @@ MStructuredGrid* MStructuredGridEnsembleFilter::produceData(MDataRequest request
                 // Store that member m contributed to the result.
                 result->setContributingMember(m);
 
-                if ( !doNotReleaseInputDatafields )
-                    inputSource->releaseData(memberGrid);
+                inputSource->releaseData(memberGrid);
             }
 
         else
@@ -455,6 +460,7 @@ MStructuredGrid* MStructuredGridEnsembleFilter::produceData(MDataRequest request
                 //result->data[v] *= 100.; // to %
             }
 
+        finalizeAuxDataInResultGrid(result);
     } // PROBABILITY THRESHOLD
 
     if (validMembersCounter) delete validMembersCounter;
@@ -559,45 +565,43 @@ const QStringList MStructuredGridEnsembleFilter::locallyRequiredKeys()
 }
 
 
-MStructuredGrid *MStructuredGridEnsembleFilter::createAndInitializeResultGrid(
-        MStructuredGrid *firstMemberGrid,
+MStructuredGrid *MStructuredGridEnsembleFilter::createAndInitializeResultGrid(MStructuredGrid *templateGrid,
         const QSet<unsigned int> &selectedMembers)
 {
     MStructuredGrid *result = nullptr;
 
-    // Initialize the result grid when the first member grid is
-    // available.
-    switch (firstMemberGrid->leveltype)
+    // Initialize the result grid from the template grid.
+    switch (templateGrid->leveltype)
     {
     case PRESSURE_LEVELS_3D:
         result = new MRegularLonLatStructuredPressureGrid(
-                    firstMemberGrid->nlevs, firstMemberGrid->nlats,
-                    firstMemberGrid->nlons);
+                    templateGrid->nlevs, templateGrid->nlats,
+                    templateGrid->nlons);
         break;
     case HYBRID_SIGMA_PRESSURE_3D:
         result = new MLonLatHybridSigmaPressureGrid(
-                    firstMemberGrid->nlevs, firstMemberGrid->nlats,
-                    firstMemberGrid->nlons);
+                    templateGrid->nlevs, templateGrid->nlats,
+                    templateGrid->nlons);
         break;
     case AUXILIARY_PRESSURE_3D:
     {
-        MLonLatAuxiliaryPressureGrid *firstMemberGridAux =
-                dynamic_cast<MLonLatAuxiliaryPressureGrid*>(firstMemberGrid);
+        MLonLatAuxiliaryPressureGrid *templateGridAuxCast =
+                dynamic_cast<MLonLatAuxiliaryPressureGrid*>(templateGrid);
         result = new MLonLatAuxiliaryPressureGrid(
-                    firstMemberGrid->nlevs, firstMemberGrid->nlats,
-                    firstMemberGrid->nlons, firstMemberGridAux->reverseLevels);
+                    templateGrid->nlevs, templateGrid->nlats,
+                    templateGrid->nlons, templateGridAuxCast->reverseLevels);
         break;
     }
     case POTENTIAL_VORTICITY_2D:
         break;
     case SURFACE_2D:
-        result = new MRegularLonLatGrid(firstMemberGrid->nlats,
-                                        firstMemberGrid->nlons);
+        result = new MRegularLonLatGrid(templateGrid->nlats,
+                                        templateGrid->nlons);
         break;
     case LOG_PRESSURE_LEVELS_3D:
         result = new MRegularLonLatLnPGrid(
-                    firstMemberGrid->nlevs, firstMemberGrid->nlats,
-                    firstMemberGrid->nlons);
+                    templateGrid->nlevs, templateGrid->nlats,
+                    templateGrid->nlons);
         break;
     default:
         break;
@@ -608,98 +612,139 @@ MStructuredGrid *MStructuredGridEnsembleFilter::createAndInitializeResultGrid(
         QString msg = QString("ERROR: Cannot intialize result grid. Level "
                               "type %1 not implemented.")
                 .arg(MStructuredGrid::verticalLevelTypeToString(
-                         firstMemberGrid->leveltype));
+                         templateGrid->leveltype));
         LOG4CPLUS_ERROR(mlog, msg.toStdString());
         throw MInitialisationError(msg.toStdString(), __FILE__, __LINE__);
     }
 
     // Copy coordinate axes.
-    for (unsigned int i = 0; i < firstMemberGrid->nlons; i++)
-        result->lons[i] = firstMemberGrid->lons[i];
-    for (unsigned int j = 0; j < firstMemberGrid->nlats; j++)
-        result->lats[j] = firstMemberGrid->lats[j];
-    for (unsigned int i = 0; i < firstMemberGrid->nlevs; i++)
-        result->levels[i] = firstMemberGrid->levels[i];
+    for (unsigned int i = 0; i < templateGrid->nlons; i++)
+        result->lons[i] = templateGrid->lons[i];
+    for (unsigned int j = 0; j < templateGrid->nlats; j++)
+        result->lats[j] = templateGrid->lats[j];
+    for (unsigned int i = 0; i < templateGrid->nlevs; i++)
+        result->levels[i] = templateGrid->levels[i];
 
-    result->setAvailableMembers(firstMemberGrid->getAvailableMembers());
+    result->setAvailableMembers(templateGrid->getAvailableMembers());
 
-    if (firstMemberGrid->leveltype == HYBRID_SIGMA_PRESSURE_3D)
+    // Special case: HYBRID_SIGMA_PRESSURE_3D
+    // ======================================
+
+    if (templateGrid->leveltype == HYBRID_SIGMA_PRESSURE_3D)
     {
         // Special treatment for hybrid model levels: copy ak/bk coeffs.
-        MLonLatHybridSigmaPressureGrid *hybmember =
-                dynamic_cast<MLonLatHybridSigmaPressureGrid*>(firstMemberGrid);
-        MLonLatHybridSigmaPressureGrid *hybresult =
+        MLonLatHybridSigmaPressureGrid *hybTemplate =
+                dynamic_cast<MLonLatHybridSigmaPressureGrid*>(templateGrid);
+        MLonLatHybridSigmaPressureGrid *hybResult =
                 dynamic_cast<MLonLatHybridSigmaPressureGrid*>(result);
-        for (unsigned int i = 0; i < hybmember->nlevs; i++)
+        for (unsigned int i = 0; i < hybTemplate->nlevs; i++)
         {
-            hybresult->ak_hPa[i] = hybmember->ak_hPa[i];
-            hybresult->bk[i] = hybmember->bk[i];
+            hybResult->ak_hPa[i] = hybTemplate->ak_hPa[i];
+            hybResult->bk[i] = hybTemplate->bk[i];
         }
 
-        // ..and take care of the surface grid.
-        MDataRequestHelper rh_psfc(hybmember->getSurfacePressureGrid()
-                                   ->getGeneratingRequest());
+        // ..and take care of the surface grid:
+        // If a list of ensemble members is specified in "selectedMembers" and
+        // the keyword "MEMBER" is contained in the psfc request of the
+        // template member grid, it is assumed that all input grids are defined
+        // on different surface grids. If "selectedMembers" is empty, or if
+        // "MEMBER" is not present in the request (e.g. the input members are
+        // regridded to a common grid), simply take the surface grid of the
+        // template grid.
 
-        // If the keyword "MEMBER" is contained in the psfc request of the
-        // first member grid, it is assumed that all input grids are defined on
-        // different surface grids. If "MEMBER" is not present in the request
-        // (e.g. the input members are regridded to a common grid), simply take
-        // the surface grid of the first member grid.
-//TODO: This only works if input source and this ensemble filter share the same
-//      memory manager. A possible solution might be to give MAbstractDataItem a
-//      "getMemoryManager()" method and use that mem.mgr. here.
-        MDataRequest psfcRequest;
+        MDataRequest psfcRequest = hybTemplate->getSurfacePressureGrid()
+                ->getGeneratingRequest();
+        MDataRequestHelper rh_psfc(psfcRequest);
+
         if (!selectedMembers.isEmpty() && rh_psfc.contains("MEMBER"))
         {
             rh_psfc.remove("MEMBER");
             rh_psfc.insert("SELECTED_MEMBERS", selectedMembers);
-//TODO: Is it correct to reference all ensemble filter results to the mean
-//      surface pressure field?
-            rh_psfc.insert("ENS_OPERATION", "MEAN");
+            rh_psfc.insert("ENS_OPERATION", "MULTIMEMBER_AUX_REFERENCE");
             psfcRequest = rh_psfc.request();
 
-            if ( !memoryManager->containsData(this, psfcRequest) )
+            if (memoryManager->containsData(this, psfcRequest))
             {
-                // Surface pressure mean field is not available in cache --
-                // call produceData() to compute it.
+                // Multimember reference computation (currently the ensemble
+                // mean) of the surface pressure field is already available
+                // in the memory manager. Simply use this field.
 
-                // NOTE: This is a special case, as produceData() should
-                // usually only be called from task graph processing in
-                // processRequest(). produceData() only calls the memory
-                // manager's getData() methods; the reference counter of the
-                // corresponding fields is increased from processRequest().
-                // However, data fields are released in produceData(). Hence,
-                // if we call produceData() directly the data fields do NOT
-                // have to be released! Otherwise we'd be missing a few
-                // afterwards --> crash.
-                rh_psfc.insert("DO_NOT_RELEASE_INPUT_DATAFIELDS", "");
+                // Get a pointer to the surface pressure field from the
+                // memory manager.
+                hybResult->surfacePressure = static_cast<MRegularLonLatGrid*>(
+                            memoryManager->getData(this, psfcRequest) );
 
-                MRegularLonLatGrid *psfc = static_cast<MRegularLonLatGrid*>(
-                            produceData(rh_psfc.request()) );
+                // NOTE: If this already existing field is used the two methods
+                // updateAuxDataInResultGrid() and finalizeAuxDataInResultGrid()
+                // will recognize that the surface pressure grid is already
+                // memory managed and do nothing.
+            }
+            else
+            {
+                // The multimember reference needs to be computed. Initialize
+                // the corresponding fields. In this case, the additional
+                // methods updateAuxDataInResultGrid() and
+                // finalizeAuxDataInResultGrid() should carry out the required
+                // computations.
+
+                // Initialize new surface pressure field from the surface
+                // pressure field of the current template grid.
+                MRegularLonLatGrid *psfcTemplate =
+                        hybTemplate->getSurfacePressureGrid();
+                MRegularLonLatGrid *psfc = dynamic_cast<MRegularLonLatGrid*>(
+                            createAndInitializeResultGrid(psfcTemplate));
 
                 psfc->setGeneratingRequest(psfcRequest);
-                if ( !memoryManager->storeData(this, psfc) )
+                hybResult->surfacePressure = psfc;
+
+                // NOTE: The grid is not yet stored in the memory manager!
+                // This is done in finalizeAuxDataInResultGrid().
+
+                // Initialize field to store the number of valid members
+                // that contribute to the ensemble mean computation (see
+                // updateAuxDataInResultGrid() and
+                // finalizeAuxDataInResultGrid() ).
+                MStructuredGrid *validMembersCounter = new MRegularLonLatGrid(
+                            result->nlats, result->nlons);
+                resultAuxComputationValidMembersCounter.insert(
+                            psfc, validMembersCounter);
+                validMembersCounter->setToZero();
+
+//TODO (mr): Is it correct to reference all ensemble filter results to the mean
+//      surface pressure field?
+
+                // Initial iteration of computation of surface pressure mean.
+                for (unsigned int v = 0; v < psfc->nvalues; v++)
                 {
-                    // In the unlikely event that another thread has stored
-                    // the same field in the mean time delete this one.
-                    delete psfc;
+                    if (psfcTemplate->data[v] != M_MISSING_VALUE)
+                    {
+                        validMembersCounter->data[v] += 1;
+                        // M(1)         =   x(1)
+                        psfc->data[v]   = psfcTemplate->data[v];
+                    }
+                    else
+                    {
+                        psfc->data[v]   = 0.;
+                    }
                 }
             }
+        } // get or create new multimember reference surface pressure field
 
-            // Get a pointer to the surface pressure field from the memory manager.
-            hybresult->surfacePressure = static_cast<MRegularLonLatGrid*>(
-                        memoryManager->getData(this, psfcRequest) );
-        } // get or create new ensemble mean surface pressure field
         else
         {
-            hybresult->surfacePressure = hybmember->getSurfacePressureGrid();
+            // Use the surface grid of the template grid.
+            hybResult->surfacePressure = hybTemplate->getSurfacePressureGrid();
 
-            // Increase the reference counter for this field (as done above by
-            // containsData() or storeData()). NOTE: The field is released in
-            // the destructor of "result" -- the reference is kept for the
-            // entire lifetime of "result" to make sure the psfc field is not
-            // deleted while "result" is still in memory.
-            if ( !hybresult->surfacePressure->increaseReferenceCounter() )
+            // NOTE: If this already existing field is used the two methods
+            // updateAuxDataInResultGrid() and finalizeAuxDataInResultGrid()
+            // will recognize that the surface pressure grid is already
+            // memory managed and do nothing.
+
+            // Increase the reference counter for this field. NOTE: The field
+            // is released in the destructor of "result" -- the reference is
+            // kept for the entire lifetime of "result" to make sure the psfc
+            // field is not deleted while "result" is still in memory.
+            if ( !hybResult->surfacePressure->increaseReferenceCounter() )
             {
                 // This should not happen.
                 QString msg = QString("This is embarrassing: The data item "
@@ -707,102 +752,241 @@ MStructuredGrid *MStructuredGridEnsembleFilter::createAndInitializeResultGrid(
                                       "cache.").arg(psfcRequest);
                 throw MMemoryError(msg.toStdString(), __FILE__, __LINE__);
             }
-        } // copy hybmember surface pressure field
+        } // copy pointer to template surface pressure field
+
     } // grid is hybrid sigma pressure
 
-    else if (firstMemberGrid->leveltype == AUXILIARY_PRESSURE_3D)
+
+    // Special case: AUXILIARY_PRESSURE_3D
+    // ===================================
+
+    else if (templateGrid->leveltype == AUXILIARY_PRESSURE_3D)
     {
-        // Special treatment for auxiliary pressure levels: Get 3D pressure
-        // field.
-        MLonLatAuxiliaryPressureGrid *auxmember =
-                dynamic_cast<MLonLatAuxiliaryPressureGrid*>(firstMemberGrid);
-        MLonLatAuxiliaryPressureGrid *auxresult =
+        // Special treatment for auxiliary pressure levels: copy pointer to
+        // auxiliary 3D pressure field.
+
+        MLonLatAuxiliaryPressureGrid *auxPTemplate =
+                dynamic_cast<MLonLatAuxiliaryPressureGrid*>(templateGrid);
+        MLonLatAuxiliaryPressureGrid *auxPResult =
                 dynamic_cast<MLonLatAuxiliaryPressureGrid*>(result);
 
-        // For the pressure field itself, no request is needed since it is its
-        // own pressure field.
-        if (firstMemberGrid->variableName
-                == auxmember->auxPressureField_hPa->variableName)
+        // The following is similar to the surface pressure field above.
+
+        MDataRequest auxPRequest = auxPTemplate->getAuxiliaryPressureFieldGrid()
+                ->getGeneratingRequest();
+        MDataRequestHelper rh_auxP(auxPRequest);
+
+        if (!selectedMembers.isEmpty() && rh_auxP.contains("MEMBER"))
         {
-            return result;
-        }
+            rh_auxP.remove("MEMBER");
+            rh_auxP.insert("SELECTED_MEMBERS", selectedMembers);
+            rh_auxP.insert("ENS_OPERATION", "MULTIMEMBER_AUX_REFERENCE");
+            auxPRequest = rh_auxP.request();
 
-        MDataRequestHelper rh_pfield(auxmember->getAuxiliaryPressureFieldGrid()
-                                   ->getGeneratingRequest());
-
-        // If the keyword "MEMBER" is contained in the pfield request of the
-        // first member grid, it is assumed that all input grids are defined on
-        // different pressure grids. If "MEMBER" is not present in the request
-        // (e.g. the input members are regridded to a common grid), simply take
-        // the pressure grid of the first member grid.
-//TODO: This only works if input source and this ensemble filter share the same
-//      memory manager. A possible solution might be to give MAbstractDataItem a
-//      "getMemoryManager()" method and use that mem.mgr. here.
-        MDataRequest pfieldRequest;
-        if (!selectedMembers.isEmpty() && rh_pfield.contains("MEMBER"))
-        {
-            rh_pfield.remove("MEMBER");
-            rh_pfield.insert("SELECTED_MEMBERS", selectedMembers);
-//TODO: Is it correct to reference all ensemble filter results to the mean 3D
-//      pressure field?
-            rh_pfield.insert("ENS_OPERATION", "MEAN");
-            pfieldRequest = rh_pfield.request();
-
-            if ( !memoryManager->containsData(this, pfieldRequest) )
+            if (memoryManager->containsData(this, auxPRequest))
             {
-                // 3D pressure mean field is not available in cache --
-                // call produceData() to compute it.
-
-                // NOTE: This is a special case, as produceData() should
-                // usually only be called from task graph processing in
-                // processRequest(). produceData() only calls the memory
-                // manager's getData() methods; the reference counter of the
-                // corresponding fields is increased from processRequest().
-                // However, data fields are released in produceData(). Hence,
-                // if we call produceData() directly the data fields do NOT
-                // have to be released! Otherwise we'd be missing a few
-                // afterwards --> crash.
-                rh_pfield.insert("DO_NOT_RELEASE_INPUT_DATAFIELDS", "");
-
-                MLonLatAuxiliaryPressureGrid *pfield =
+                // See comments for surface pressure above.
+                auxPResult->auxPressureField_hPa =
                         static_cast<MLonLatAuxiliaryPressureGrid*>(
-                            produceData(rh_pfield.request()) );
+                            memoryManager->getData(this, auxPRequest) );
+            }
+            else
+            {
+                // See comments for surface pressure above.
+                MLonLatAuxiliaryPressureGrid *auxPOfTemplateGrid =
+                        auxPTemplate->getAuxiliaryPressureFieldGrid();
+                MLonLatAuxiliaryPressureGrid *auxP =
+                        dynamic_cast<MLonLatAuxiliaryPressureGrid*>(
+                            createAndInitializeResultGrid(auxPOfTemplateGrid));
 
-                pfield->setGeneratingRequest(pfieldRequest);
-                if ( !memoryManager->storeData(this, pfield) )
+                auxP->setGeneratingRequest(auxPRequest);
+                auxP->auxPressureField_hPa = auxP; // self-reference
+                auxPResult->auxPressureField_hPa = auxP;
+
+                MStructuredGrid *validMembersCounter =
+                        new MLonLatHybridSigmaPressureGrid(
+                            result->nlevs, result->nlats, result->nlons);
+                resultAuxComputationValidMembersCounter.insert(
+                            auxP, validMembersCounter);
+                validMembersCounter->setToZero();
+
+                // Initial iteration of computation of aux pressure mean.
+                for (unsigned int v = 0; v < auxP->nvalues; v++)
                 {
-                    // In the unlikely event that another thread has stored
-                    // the same field in the mean time delete this one.
-                    delete pfield;
+                    if (auxPOfTemplateGrid->data[v] != M_MISSING_VALUE)
+                    {
+                        validMembersCounter->data[v] += 1;
+                        // M(1)         =   x(1)
+                        auxP->data[v]   = auxPOfTemplateGrid->data[v];
+                    }
+                    else
+                    {
+                        auxP->data[v]   = 0.;
+                    }
                 }
             }
+        } // get or create new multimember reference aux pressure field
 
-            // Get a pointer to the 3D pressure field from the memory manager.
-            auxresult->auxPressureField_hPa =
-                    static_cast<MLonLatAuxiliaryPressureGrid*>(
-                        memoryManager->getData(this, pfieldRequest) );
-        } // get or create new ensemble mean 3D pressure field
         else
         {
-            auxresult->auxPressureField_hPa = auxmember->getAuxiliaryPressureFieldGrid();
+            // See comments for surface pressure above.
+            auxPResult->auxPressureField_hPa =
+                    auxPTemplate->getAuxiliaryPressureFieldGrid();
 
-            // Increase the reference counter for this field (as done above by
-            // containsData() or storeData()). NOTE: The field is released in
-            // the destructor of "result" -- the reference is kept for the
-            // entire lifetime of "result" to make sure the pressure field is
-            // not deleted while "result" is still in memory.
-            if ( !auxresult->auxPressureField_hPa->increaseReferenceCounter() )
+            if ( !auxPResult->auxPressureField_hPa->increaseReferenceCounter() )
             {
-                // This should not happen.
                 QString msg = QString("This is embarrassing: The data item "
                                       "for request %1 should have been in "
-                                      "cache.").arg(pfieldRequest);
+                                      "cache.").arg(auxPRequest);
                 throw MMemoryError(msg.toStdString(), __FILE__, __LINE__);
             }
-        } // copy auxiliary 3d pressure field
-    } // grid is auxiliary pressure 3D
+        } // copy pointer to template aux pressure field
+
+   } // grid is auxiliary pressure 3D
 
     return result;
+}
+
+
+void MStructuredGridEnsembleFilter::updateAuxDataInResultGrid(
+        MStructuredGrid *resultGrid, MStructuredGrid *currentMemberGrid)
+{
+    MStructuredGrid *resultAuxGrid = nullptr;
+    MStructuredGrid *memberAuxGrid = nullptr;
+
+    // Iteratively compute the mean of either ...
+
+    if (MLonLatHybridSigmaPressureGrid *hybridResult =
+            dynamic_cast<MLonLatHybridSigmaPressureGrid*>(resultGrid))
+    {
+        if (MLonLatHybridSigmaPressureGrid *hybridMember =
+                dynamic_cast<MLonLatHybridSigmaPressureGrid*>(currentMemberGrid))
+        {
+            // ... surface pressure for hybrid grids ...
+            resultAuxGrid = hybridResult->getSurfacePressureGrid();
+            memberAuxGrid = hybridMember->getSurfacePressureGrid();
+        }
+    }
+    else if (MLonLatAuxiliaryPressureGrid *auxPResult =
+             dynamic_cast<MLonLatAuxiliaryPressureGrid*>(resultGrid))
+    {
+        if (MLonLatAuxiliaryPressureGrid *auxPMember =
+                dynamic_cast<MLonLatAuxiliaryPressureGrid*>(currentMemberGrid))
+        {
+            // ... or auxiliary pressure for aux-p grids.
+            resultAuxGrid = auxPResult->getAuxiliaryPressureFieldGrid();
+            memberAuxGrid = auxPMember->getAuxiliaryPressureFieldGrid();
+        }
+    }
+
+    // If the result grid is either hybrid or aux-p, add the increment to the
+    // ensemble mean. If the grid is of another type, nothing will be done here.
+    if (resultAuxGrid != nullptr && memberAuxGrid != nullptr)
+    {
+        if (resultAuxGrid->getMemoryManager() != nullptr)
+        {
+            // The auxiliary grid is already memory-managed, i.e., the grid
+            // corresponding to the required aux-request was already computed
+            // when createAndInitializeResultGrid() was
+            // called. We don't need to carry out any operations
+            // here anymore and can safely skip.
+            return;
+        }
+
+        MStructuredGrid *validMembersCounter =
+                resultAuxComputationValidMembersCounter[resultAuxGrid];
+        for (unsigned int v = 0; v < resultAuxGrid->nvalues; v++)
+        {
+            if (memberAuxGrid->data[v] != M_MISSING_VALUE)
+            {
+                validMembersCounter->data[v] += 1;
+                float prev_mean = resultAuxGrid->data[v];
+                float curr_data = memberAuxGrid->data[v];
+                //  M(k)                 =   M(k-1)  + (   x(k)   -  M(k-1)  ) / k
+                resultAuxGrid->data[v]   = prev_mean + (curr_data - prev_mean) /
+                        validMembersCounter->data[v];
+            }
+        }
+    }
+}
+
+
+void MStructuredGridEnsembleFilter::finalizeAuxDataInResultGrid(
+        MStructuredGrid *resultGrid)
+{
+    // Finalize computation of ensemble mean of either surface pressure
+    // field or auxiliary pressure field by checking for missing values.
+    MStructuredGrid *resultAuxGrid = nullptr;
+
+    if (MLonLatHybridSigmaPressureGrid *hybridResult =
+            dynamic_cast<MLonLatHybridSigmaPressureGrid*>(resultGrid))
+    {
+        resultAuxGrid = hybridResult->getSurfacePressureGrid();
+    }
+    else if (MLonLatAuxiliaryPressureGrid *auxPResult =
+             dynamic_cast<MLonLatAuxiliaryPressureGrid*>(resultGrid))
+    {
+        resultAuxGrid = auxPResult->getAuxiliaryPressureFieldGrid();
+    }
+
+    // If the result grid is neither hybrid sigma pressure nor auxiliary
+    // pressure, resultAuxGrid is still a nullptr at this time.
+    if (resultAuxGrid != nullptr)
+    {
+        if (resultAuxGrid->getMemoryManager() != nullptr)
+        {
+            // See comment in updateAuxDataInResultGrid(); handling for grids
+            // that were already computed when createAndInitializeResultGrid()
+            // was called.
+            return;
+        }
+
+        // Correct missing values (set missing value for those grid points at
+        // which no member has contributed).
+        MStructuredGrid *validMembersCounter =
+                resultAuxComputationValidMembersCounter[resultAuxGrid];
+        for (unsigned int v = 0; v < resultAuxGrid->nvalues; v++)
+        {
+            if (validMembersCounter->data[v] == 0)
+            {
+                resultAuxGrid->data[v] = M_MISSING_VALUE;
+            }
+        }
+
+        // Free valid members counter.
+        if (resultAuxComputationValidMembersCounter.contains(resultAuxGrid))
+        {
+            MStructuredGrid* counter =
+                    resultAuxComputationValidMembersCounter.take(resultAuxGrid);
+            delete counter;
+        }
+
+        // Store aux grid in memory manager. The call to "storeData()" will
+        // place an initial reference of "1" on the item, hence upon success
+        // everything is fine. In case "storeData()" fails (e.g. in the
+        // unlikely event that another thread has stored a field with the same
+        // request in the mean time, this one needs to be deleted and a
+        // reference to the already stored field needs to be obtained.
+        if ( !memoryManager->storeData(this, resultAuxGrid) )
+        {
+            MDataRequest auxRequest = resultAuxGrid->getGeneratingRequest();
+            delete resultAuxGrid;
+
+            if (MLonLatHybridSigmaPressureGrid *hybridResult =
+                    dynamic_cast<MLonLatHybridSigmaPressureGrid*>(resultGrid))
+            {
+                hybridResult->surfacePressure = static_cast<MRegularLonLatGrid*>(
+                            memoryManager->getData(this, auxRequest) );
+            }
+            else if (MLonLatAuxiliaryPressureGrid *auxPResult =
+                     dynamic_cast<MLonLatAuxiliaryPressureGrid*>(resultGrid))
+            {
+                auxPResult->auxPressureField_hPa =
+                        static_cast<MLonLatAuxiliaryPressureGrid*>(
+                            memoryManager->getData(this, auxRequest) );
+            }
+        }
+    } // resultAuxGrid != nullptr
 }
 
 

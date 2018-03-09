@@ -640,13 +640,14 @@ void MStructuredGrid::dumpCoordinateAxes()
 }
 
 
-void MStructuredGrid::dumpGridData()
+void MStructuredGrid::dumpGridData(unsigned int maxValues)
 {
-    QString str = "\nStructured Grid Data\n====================";
+    QString str = "\n\nStructured Grid Data\n====================";
     str += QString("\nVariable name: %1").arg(variableName);
     str += QString("\nInit time: %1").arg(initTime.toString(Qt::ISODate));
     str += QString("\nValid time: %1").arg(validTime.toString(Qt::ISODate));
     str += QString("\nEnsemble member: %1").arg(ensembleMember);
+    str += QString("\nGenerating request: %1").arg(getGeneratingRequest());
 
     str += "\n\nlon: ";
     for (uint i = 0; i < nlons; i++) str += QString("%1/").arg(lons[i]);
@@ -655,8 +656,9 @@ void MStructuredGrid::dumpGridData()
     str += "\n\nlev: ";
     for (uint i = 0; i < nlevs; i++) str += QString("%1/").arg(levels[i]);
 
-    str += "\n\ndata: ";
-    for (uint i = 0; i < nvalues; i++) str += QString("%1/").arg(data[i]);
+    unsigned int nv = std::min(nvalues, maxValues);
+    str += QString("\n\ndata (first %1 values): ").arg(nv);
+    for (uint i = 0; i < nv; i++) str += QString("%1/").arg(data[i]);
 
     str += "\n\nend data\n====================\n";
 
@@ -1918,13 +1920,14 @@ float MLonLatHybridSigmaPressureGrid::getBottomDataVolumePressure()
 }
 
 
-void MLonLatHybridSigmaPressureGrid::dumpGridData()
+void MLonLatHybridSigmaPressureGrid::dumpGridData(unsigned int maxValues)
 {
-    QString str = "LonLatHybridSigmaPressure Grid Data\n====================";
+    QString str = "\n\nLonLatHybridSigmaPressure Grid Data\n====================";
     str += QString("\nVariable name: %1").arg(variableName);
     str += QString("\nInit time: %1").arg(initTime.toString(Qt::ISODate));
     str += QString("\nValid time: %1").arg(validTime.toString(Qt::ISODate));
     str += QString("\nEnsemble member: %1").arg(ensembleMember);
+    str += QString("\nGenerating request: %1").arg(getGeneratingRequest());
 
     str += "\n\nlon: ";
     for (uint i = 0; i < nlons; i++) str += QString("%1/").arg(lons[i]);
@@ -1944,8 +1947,14 @@ void MLonLatHybridSigmaPressureGrid::dumpGridData()
     str += "\n\nbki: ";
     for (uint i = 0; i <= nlevs; i++) str += QString("%1/").arg(bki[i]);
 
-    str += "\n\ndata: ";
-    for (uint i = 0; i < nvalues; i++) str += QString("%1/").arg(data[i]);
+    unsigned int nv = std::min(nvalues, maxValues);
+    str += QString("\n\ndata (first %1 values): ").arg(nv);
+    for (uint i = 0; i < nv; i++) str += QString("%1/").arg(data[i]);
+
+    MStructuredGrid* psfc = surfacePressure;
+    nv = std::min(psfc->getNumValues(), maxValues);
+    str += QString("\n\npsfc data (first %1 values): ").arg(nv);
+    for (uint i = 0; i < nv; i++) str += QString("%1/").arg(psfc->getValue(i));
 
     str += "\n\nend data\n====================\n";
 
@@ -2167,26 +2176,29 @@ float MLonLatAuxiliaryPressureGrid::getBottomDataVolumePressure()
 }
 
 
-void MLonLatAuxiliaryPressureGrid::dumpGridData()
+void MLonLatAuxiliaryPressureGrid::dumpGridData(unsigned int maxValues)
 {
-    QString str = "LonLatAuxiliaryPressureGrid Grid Data\n====================";
+    QString str = "\n\nLonLatAuxiliaryPressureGrid Grid Data\n====================";
     str += QString("\nVariable name: %1").arg(variableName);
     str += QString("\nInit time: %1").arg(initTime.toString(Qt::ISODate));
     str += QString("\nValid time: %1").arg(validTime.toString(Qt::ISODate));
     str += QString("\nEnsemble member: %1").arg(ensembleMember);
+    str += QString("\nGenerating request: %1").arg(getGeneratingRequest());
 
     str += "\n\nlon: ";
     for (uint i = 0; i < nlons; i++) str += QString("%1/").arg(lons[i]);
     str += "\n\nlat: ";
     for (uint i = 0; i < nlats; i++) str += QString("%1/").arg(lats[i]);
     str += "\n\nlev: ";
-    for (uint i = 0; i < nlons * nlats * nlevs; i++)
-    {
-        str += QString("%1/").arg(auxPressureField_hPa->getValue(i));
-    }
+    for (uint i = 0; i < nlevs; i++) str += QString("%1/").arg(levels[i]);
 
-    str += "\n\ndata: ";
-    for (uint i = 0; i < nvalues; i++) str += QString("%1/").arg(data[i]);
+    unsigned int nv = std::min(nvalues, maxValues);
+    str += QString("\n\ndata (first %1 values): ").arg(nv);
+    for (uint i = 0; i < nv; i++) str += QString("%1/").arg(data[i]);
+
+    nv = std::min(auxPressureField_hPa->getNumValues(), maxValues);
+    str += QString("\n\naux-p data (first %1 values): ").arg(nv);
+    for (uint i = 0; i < nv; i++) str += QString("%1/").arg(auxPressureField_hPa->getValue(i));
 
     str += "\n\nend data\n====================\n";
 
