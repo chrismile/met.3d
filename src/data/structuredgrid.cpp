@@ -660,6 +660,9 @@ void MStructuredGrid::dumpGridData(unsigned int maxValues)
     str += QString("\n\ndata (first %1 values): ").arg(nv);
     for (uint i = 0; i < nv; i++) str += QString("%1/").arg(data[i]);
 
+    str += QString("\n\ndata (column at i=0,j=0): ");
+    for (uint k = 0; k < nlevs; k++) str += QString("%1/").arg(getValue(k, 0, 0));
+
     str += "\n\nend data\n====================\n";
 
     LOG4CPLUS_INFO(mlog, str.toStdString());
@@ -1951,6 +1954,9 @@ void MLonLatHybridSigmaPressureGrid::dumpGridData(unsigned int maxValues)
     str += QString("\n\ndata (first %1 values): ").arg(nv);
     for (uint i = 0; i < nv; i++) str += QString("%1/").arg(data[i]);
 
+    str += QString("\n\ndata (column at i=0,j=0): ");
+    for (uint k = 0; k < nlevs; k++) str += QString("%1/").arg(getValue(k, 0, 0));
+
     MStructuredGrid* psfc = surfacePressure;
     nv = std::min(psfc->getNumValues(), maxValues);
     str += QString("\n\npsfc data (first %1 values): ").arg(nv);
@@ -2195,6 +2201,9 @@ void MLonLatAuxiliaryPressureGrid::dumpGridData(unsigned int maxValues)
     unsigned int nv = std::min(nvalues, maxValues);
     str += QString("\n\ndata (first %1 values): ").arg(nv);
     for (uint i = 0; i < nv; i++) str += QString("%1/").arg(data[i]);
+
+    str += QString("\n\ndata (column at i=0,j=0): ");
+    for (uint k = 0; k < nlevs; k++) str += QString("%1/").arg(getValue(k, 0, 0));
 
     nv = std::min(auxPressureField_hPa->getNumValues(), maxValues);
     str += QString("\n\naux-p data (first %1 values): ").arg(nv);
