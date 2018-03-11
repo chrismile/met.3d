@@ -62,6 +62,7 @@ MDerivedMetVarsDataSource::MDerivedMetVarsDataSource()
 
     registerDerivedDataFieldProcessor(new MHorizontalWindSpeedProcessor());
     registerDerivedDataFieldProcessor(new MPotentialTemperatureProcessor());
+    registerDerivedDataFieldProcessor(new MGeopotentialHeightProcessor());
 }
 
 
@@ -109,20 +110,31 @@ void MDerivedMetVarsDataSource::registerDerivedDataFieldProcessor(
 
 MStructuredGrid* MDerivedMetVarsDataSource::produceData(MDataRequest request)
 {
+#ifdef ENABLE_MET3D_STOPWATCH
+    MStopwatch stopwatch;
+#endif
+
     assert(inputSource != nullptr);
 
     // Parse request.
     MDataRequestHelper rh(request);
     QString derivedVarName = rh.value("VARIABLE");
-    rh.removeAll(locallyRequiredKeys());
+    MVerticalLevelType levelType = MVerticalLevelType(rh.intValue("LEVELTYPE"));
+    rh.removeAll(locallyRequiredKeys()); // removes "VARIABLE"
 
     // Get input fields.
     QList<MStructuredGrid*> inputGrids;
     foreach (QString requiredVarStdName,
              requiredInputVariablesList[derivedVarName])
     {
+        // Handle enforced level types (cf. updateStdNameAndLevelType()).
+        MVerticalLevelType ltype = levelType;
+        updateStdNameAndLevelType(&requiredVarStdName, &ltype);
+
         rh.insert("VARIABLE", getInputVariableNameFromStdName(
                       requiredVarStdName));
+        rh.insert("LEVELTYPE", ltype); // update requested level type
+
         inputGrids << inputSource->getData(rh.request());
     }
 
@@ -151,6 +163,14 @@ MStructuredGrid* MDerivedMetVarsDataSource::produceData(MDataRequest request)
         inputSource->releaseData(inputGrid);
     }
 
+#ifdef ENABLE_MET3D_STOPWATCH
+    stopwatch.split();
+    LOG4CPLUS_DEBUG(mlog, "computed derived data field "
+                    << derivedVarName.toStdString()
+                    << " in " << stopwatch.getLastSplitTime(MStopwatch::SECONDS)
+                    << " seconds.\n" << flush);
+#endif
+
     return derivedGrid;
 }
 
@@ -163,13 +183,19 @@ MTask* MDerivedMetVarsDataSource::createTaskGraph(MDataRequest request)
 
     MDataRequestHelper rh(request);
     QString derivedVarName = rh.value("VARIABLE");
-    rh.removeAll(locallyRequiredKeys());
+    MVerticalLevelType levelType = MVerticalLevelType(rh.intValue("LEVELTYPE"));
+    rh.removeAll(locallyRequiredKeys()); // removes "VARIABLE"
 
     foreach (QString requiredVarStdName,
              requiredInputVariablesList[derivedVarName])
     {
+        // Handle enforced level types (cf. updateStdNameAndLevelType()).
+        MVerticalLevelType ltype = levelType;
+        updateStdNameAndLevelType(&requiredVarStdName, &ltype);
+
         rh.insert("VARIABLE", getInputVariableNameFromStdName(
                       requiredVarStdName));
+        rh.insert("LEVELTYPE", ltype); // update requested level type
         task->addParent(inputSource->getTaskGraph(rh.request()));
     }
 
@@ -201,9 +227,13 @@ QStringList MDerivedMetVarsDataSource::availableVariables(
         foreach (QString requiredVarStdName,
                  requiredInputVariablesList[derivedVarName])
         {
+            // Handle enforced level types.
+            MVerticalLevelType ltype = levelType;
+            updateStdNameAndLevelType(&requiredVarStdName, &ltype);
+
             // If one of the required variables is not available from the
             // input source, skip.
-            if ( !inputSource->availableVariables(levelType).contains(
+            if ( !inputSource->availableVariables(ltype).contains(
                      getInputVariableNameFromStdName(requiredVarStdName)) )
             {
                 requiredInputVarsAvailable = false;
@@ -227,17 +257,21 @@ QSet<unsigned int> MDerivedMetVarsDataSource::availableEnsembleMembers(
     QSet<unsigned int> members;
     foreach (QString inputVarStdName, requiredInputVariablesList[variableName])
     {
+        // Handle enforced level types.
+        MVerticalLevelType ltype = levelType;
+        updateStdNameAndLevelType(&inputVarStdName, &ltype);
+
         if (members.isEmpty())
         {
             members = inputSource->availableEnsembleMembers(
-                        levelType,
+                        ltype,
                         getInputVariableNameFromStdName(inputVarStdName));
         }
         else
         {
             members = members.intersect(
                         inputSource->availableEnsembleMembers(
-                            levelType,
+                            ltype,
                             getInputVariableNameFromStdName(inputVarStdName)));
         }
     }
@@ -257,16 +291,20 @@ QList<QDateTime> MDerivedMetVarsDataSource::availableInitTimes(
     QList<QDateTime> times;
     foreach (QString inputVarStdName, requiredInputVariablesList[variableName])
     {
+        // Handle enforced level types.
+        MVerticalLevelType ltype = levelType;
+        updateStdNameAndLevelType(&inputVarStdName, &ltype);
+
         if (times.isEmpty())
         {
             times = inputSource->availableInitTimes(
-                        levelType,
+                        ltype,
                         getInputVariableNameFromStdName(inputVarStdName));
         }
         else
         {
             QList<QDateTime> inputTimes = inputSource->availableInitTimes(
-                        levelType,
+                        ltype,
                         getInputVariableNameFromStdName(inputVarStdName));
 
             foreach (QDateTime dt, times)
@@ -292,17 +330,21 @@ QList<QDateTime> MDerivedMetVarsDataSource::availableValidTimes(
     QList<QDateTime> times;
     foreach (QString inputVarStdName, requiredInputVariablesList[variableName])
     {
+        // Handle enforced level types.
+        MVerticalLevelType ltype = levelType;
+        updateStdNameAndLevelType(&inputVarStdName, &ltype);
+
         if (times.isEmpty())
         {
             times = inputSource->availableValidTimes(
-                        levelType,
+                        ltype,
                         getInputVariableNameFromStdName(inputVarStdName),
                         initTime);
         }
         else
         {
             QList<QDateTime> inputTimes = inputSource->availableValidTimes(
-                        levelType,
+                        ltype,
                         getInputVariableNameFromStdName(inputVarStdName),
                         initTime);
 
@@ -330,6 +372,10 @@ QString MDerivedMetVarsDataSource::variableLongName(
 
     foreach (QString inputVarStdName, requiredInputVariablesList[variableName])
     {
+        // Handle enforced level types.
+        MVerticalLevelType ltype = levelType;
+        updateStdNameAndLevelType(&inputVarStdName, &ltype);
+
         longName += QString("%1/").arg(
                     getInputVariableNameFromStdName(inputVarStdName));
     }
@@ -384,10 +430,41 @@ QString MDerivedMetVarsDataSource::getInputVariableNameFromStdName(
 }
 
 
+bool MDerivedMetVarsDataSource::updateStdNameAndLevelType(
+        QString *stdName, MVerticalLevelType *levelType)
+{
+    // Assume somthing like "surface_geopotential/SURFACE_2D" passed in stdName.
+    // If only a variable name is passed (e.g., ""surface_geopotential"),
+    // nothing is changed.
+    bool changedLevel = false;
+
+    QStringList definitionsList = stdName->split("/");
+    if (definitionsList.size() == 2)
+    {
+        MVerticalLevelType newLevelType =
+                MStructuredGrid::verticalLevelTypeFromConfigString(
+                    definitionsList.at(1));
+
+        // If a valid leveltype has been defined, update the passed variables.
+        if (newLevelType != SIZE_LEVELTYPES)
+        {
+            *levelType = newLevelType;
+            *stdName = definitionsList.at(0);
+            changedLevel = true;
+        }
+    }
+
+    return changedLevel;
+}
+
+
 
 /******************************************************************************
 ***                            DATA PROCESSORS                              ***
 *******************************************************************************/
+
+// Wind Speed
+// ==========
 
 MHorizontalWindSpeedProcessor::MHorizontalWindSpeedProcessor()
     : MDerivedDataFieldProcessor(
@@ -397,8 +474,7 @@ MHorizontalWindSpeedProcessor::MHorizontalWindSpeedProcessor()
 
 
 void MHorizontalWindSpeedProcessor::compute(
-        QList<MStructuredGrid *> &inputGrids,
-        MStructuredGrid *derivedGrid)
+        QList<MStructuredGrid *> &inputGrids, MStructuredGrid *derivedGrid)
 {
     // input 0 = "eastward_wind"
     // input 1 = "northward_wind"
@@ -429,9 +505,11 @@ MPotentialTemperatureProcessor::MPotentialTemperatureProcessor()
 }
 
 
+// Potential temperature
+// =====================
+
 void MPotentialTemperatureProcessor::compute(
-        QList<MStructuredGrid *> &inputGrids,
-        MStructuredGrid *derivedGrid)
+        QList<MStructuredGrid *> &inputGrids, MStructuredGrid *derivedGrid)
 {
     // input 0 = "air_temperature"
 
@@ -453,6 +531,148 @@ void MPotentialTemperatureProcessor::compute(
                                 inputGrids.at(0)->getPressure(k, j, i) * 100.);
                     derivedGrid->setValue(k, j, i, theta_K);
                 }
+            }
+}
+
+
+// Geopotential height
+// ===================
+
+MGeopotentialHeightProcessor::MGeopotentialHeightProcessor()
+    : MDerivedDataFieldProcessor(
+          "geopotential_height",
+          QStringList() << "air_temperature" << "specific_humidity"
+                        << "surface_geopotential/SURFACE_2D"
+                        << "surface_air_pressure/SURFACE_2D"
+                        << "surface_temperature/SURFACE_2D")
+{
+}
+
+
+void MGeopotentialHeightProcessor::compute(
+        QList<MStructuredGrid *> &inputGrids, MStructuredGrid *derivedGrid)
+{
+    // input 0 = "air_temperature"
+    // input 1 = "specific_humidity"
+    // input 2 = "surface_geopotential"
+    // input 3 = "surface_air_pressure"
+    // input 4 = "surface_temperature"
+
+    MStructuredGrid *airTemperatureGrid = inputGrids.at(0);
+    MStructuredGrid *specificHumidityGrid = inputGrids.at(1);
+
+    // Cast surface grids to get access to 2D getValue() method.
+    MRegularLonLatGrid *surfaceGeopotentialGrid =
+            dynamic_cast<MRegularLonLatGrid*>(inputGrids.at(2));
+    MRegularLonLatGrid *surfaceAirPressureGrid =
+            dynamic_cast<MRegularLonLatGrid*>(inputGrids.at(3));
+    MRegularLonLatGrid *surfaceTemperatureGrid =
+            dynamic_cast<MRegularLonLatGrid*>(inputGrids.at(4));
+
+    // Integrate geopotential height from surface to top. k = 0 denotes the
+    // uppermost level, k = nlev-1 the lowest model level.
+
+    // Start by computing the thickness of the layer between the surface and
+    // the lowest model level.
+    for (unsigned int j = 0; j < derivedGrid->getNumLats(); j++)
+        for (unsigned int i = 0; i < derivedGrid->getNumLons(); i++)
+        {
+            unsigned int k_lowest = airTemperatureGrid->getNumLevels() - 1;
+            float p_bot_hPa = surfaceAirPressureGrid->getValue(j, i) / 100.;
+            float p_top_hPa = airTemperatureGrid->getPressure(k_lowest, j, i);
+
+            // If pressure level data are used, the lower levels can be BELOW
+            // the surface. Here we cannot compute geopotential height, the
+            // corresponding values need to be set to M_MISSING_VALUE.
+            while (p_top_hPa > p_bot_hPa)
+            {
+                derivedGrid->setValue(k_lowest, j, i, M_MISSING_VALUE);
+                // Decrement k; pay attention to staying in the valid range.
+                if (k_lowest == 0) continue; else k_lowest--;
+                // Update current p_top_hPa.
+                p_top_hPa = airTemperatureGrid->getPressure(k_lowest, j, i);
+            }
+
+//!TODO (mr, 11Mar2018) We're currently assuming specific humidity to be
+//! constant in the lowermost layer. This needs to be replaced by an
+//! implementation that uses surface dew point to compute virtual temperature.
+//! The impact should be small at least for hybrid levels, though, as the
+//! lowest layer usually is fairly thin.
+            float virtualTemperature_bot_K = virtualTemperature_K(
+                        surfaceTemperatureGrid->getValue(j, i),
+                        specificHumidityGrid->getValue(k_lowest, j, i));
+
+            float virtualTemperature_top_K = virtualTemperature_K(
+                        airTemperatureGrid->getValue(k_lowest, j, i),
+                        specificHumidityGrid->getValue(k_lowest, j, i));
+
+            float layerMeanVirtualTemperature_K =
+                    (virtualTemperature_bot_K + virtualTemperature_top_K) / 2.;
+
+            float surfaceGeopotentialHeight_m =
+                    surfaceGeopotentialGrid->getValue(j, i) /
+                    MetConstants::GRAVITY_ACCELERATION;
+
+            float geopotentialHeight_m = surfaceGeopotentialHeight_m +
+                    geopotentialThicknessOfLayer_m(
+                        layerMeanVirtualTemperature_K,
+                        p_bot_hPa, p_top_hPa);
+
+            derivedGrid->setValue(k_lowest, j, i, geopotentialHeight_m);
+        }
+
+    // Add thicknesses of all layers above.
+    for (int k = int(derivedGrid->getNumLevels()) - 2; k >= 0; k--)
+        for (unsigned int j = 0; j < derivedGrid->getNumLats(); j++)
+            for (unsigned int i = 0; i < derivedGrid->getNumLons(); i++)
+            {
+                // Check if the current grid point has already been flagged
+                // as missing value (.. pressure levels .., see above).
+                if (derivedGrid->getValue(k, j, i) == M_MISSING_VALUE)
+                {
+                    continue;
+                }
+
+                float p_bot_hPa = airTemperatureGrid->getPressure(k+1, j, i);
+                float p_top_hPa = airTemperatureGrid->getPressure(k  , j, i);
+
+                float virtualTemperature_bot_K = virtualTemperature_K(
+                            airTemperatureGrid->getValue(k+1, j, i),
+                            specificHumidityGrid->getValue(k+1, j, i));
+
+                float virtualTemperature_top_K = virtualTemperature_K(
+                            airTemperatureGrid->getValue(k, j, i),
+                            specificHumidityGrid->getValue(k, j, i));
+
+                float layerMeanVirtualTemperature_K =
+                        (virtualTemperature_bot_K + virtualTemperature_top_K) / 2.;
+
+                float geopotentialHeight_m =
+                        derivedGrid->getValue(k+1, j, i) + // z of bot level
+                        geopotentialThicknessOfLayer_m(
+                            layerMeanVirtualTemperature_K,
+                            p_bot_hPa, p_top_hPa);
+
+                derivedGrid->setValue(k, j, i, geopotentialHeight_m);
+
+//                // Debug output.
+//                if (j == 0 && i == 0)
+//                {
+//                    LOG4CPLUS_DEBUG(mlog, "GEOP HEIGHT DBG: k=" << k
+//                                    << " lev=" << derivedGrid->getLevels()[k]
+//                                    << " p_bot=" << p_bot_hPa
+//                                    << " p_top=" << p_top_hPa
+//                                    << " T_bot=" << airTemperatureGrid->getValue(k+1, j, i)
+//                                    << " q_bot=" << specificHumidityGrid->getValue(k+1, j, i)
+//                                    << " T_top=" << airTemperatureGrid->getValue(k, j, i)
+//                                    << " q_top=" << specificHumidityGrid->getValue(k, j, i)
+//                                    << " Tv_bot=" << virtualTemperature_bot_K
+//                                    << " Tv_top=" << virtualTemperature_top_K
+//                                    << " Tv_mean=" << layerMeanVirtualTemperature_K
+//                                    << " z(-1)=" << derivedGrid->getValue(k+1, j, i)
+//                                    << " z=" << geopotentialHeight_m
+//                                    << " \n" << flush);
+//                }
             }
 }
 

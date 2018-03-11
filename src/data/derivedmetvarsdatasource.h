@@ -151,6 +151,20 @@ protected:
      */
     QString getInputVariableNameFromStdName(QString stdName);
 
+    /**
+      Updates a passed standard name and level type according to an enforced
+      level type being encoded in the standard name.
+
+      Examples:
+      Passing a standard name of "air_temperature" and a leveltype of
+      "HYBRID_SIGMA_PRESSURE_3D" will not change anything.
+      Passing a standard name of "surface_geopotential/SURFACE_2D" and a
+      leveltype of "HYBRID_SIGMA_PRESSURE_3D" will result in a standard name
+      of "surface_geopotential" and a leveltype of "SURFACE_2D".
+     */
+    bool updateStdNameAndLevelType(QString *stdName,
+                                   MVerticalLevelType *levelType);
+
     MWeatherPredictionDataSource* inputSource;
 
     QMap<QString, MDerivedDataFieldProcessor*> registeredDerivedDataProcessors;
@@ -179,6 +193,17 @@ class MPotentialTemperatureProcessor
 {
 public:
     MPotentialTemperatureProcessor();
+
+    void compute(QList<MStructuredGrid*>& inputGrids,
+                 MStructuredGrid *derivedGrid);
+};
+
+
+class MGeopotentialHeightProcessor
+        : public MDerivedDataFieldProcessor
+{
+public:
+    MGeopotentialHeightProcessor();
 
     void compute(QList<MStructuredGrid*>& inputGrids,
                  MStructuredGrid *derivedGrid);

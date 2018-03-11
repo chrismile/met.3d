@@ -543,6 +543,14 @@ void MPipelineConfiguration::initializeNWPPipeline(
                 "northward_wind", "v-component_of_wind_hybrid");
     derivedMetVarsSource->setInputVariable(
                 "air_temperature", "Temperature_hybrid");
+    derivedMetVarsSource->setInputVariable(
+                "specific_humidity", "Specific_humidity_hybrid");
+    derivedMetVarsSource->setInputVariable(
+                "surface_geopotential", "Geopotential_surface");
+    derivedMetVarsSource->setInputVariable(
+                "surface_air_pressure", "Surface_pressure_surface");
+    derivedMetVarsSource->setInputVariable(
+                "surface_temperature", "2_metre_temperature_surface");
 
     MStructuredGridEnsembleFilter *ensFilterDerived =
             new MStructuredGridEnsembleFilter();
