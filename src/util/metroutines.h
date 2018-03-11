@@ -49,6 +49,7 @@ namespace MetConstants
 
 // Air
 const double GAS_CONSTANT_DRY_AIR = 287.058; // J K^-1 kg^-1
+const double SPECIFIC_HEAT_DRYAIR_CONST_PRESSURE = 1004.; // J K^-1 kg^-1
 
 // Water substance
 
@@ -252,10 +253,21 @@ double boxVolume_dry(double northWestLon, double northWestLat,
                      double temp_K = M_MISSING_VALUE);
 
 /**
-  Computes wind speed in m.s-1 from eastward wind (@p u_ms) and northward
+  Computes wind speed in [m.s-1] from eastward wind (@p u_ms) and northward
   wind (@p v_ms).
  */
 double windSpeed_ms(double u_ms, double v_ms);
+
+
+/**
+  Computes potential temperature in [K] from temperature @p T_K in [K] and
+  pressure @p p_Pa in [Pa].
+
+  Method:
+                            theta = T * (p0/p)^(R/cp)
+      with p0 = 100000. Pa, R = 287.058 JK-1kg-1, cp = 1004 JK-1kg-1.
+ */
+double potentialTemperature_K(double T_K, double p_Pa);
 
 
 } // namespace Met3D

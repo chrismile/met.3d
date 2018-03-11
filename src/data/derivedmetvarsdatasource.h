@@ -174,6 +174,17 @@ public:
 };
 
 
+class MPotentialTemperatureProcessor
+        : public MDerivedDataFieldProcessor
+{
+public:
+    MPotentialTemperatureProcessor();
+
+    void compute(QList<MStructuredGrid*>& inputGrids,
+                 MStructuredGrid *derivedGrid);
+};
+
+
 } // namespace Met3D
 
 #endif // DERIVEDMETVARSDATASOURCE_H

@@ -61,6 +61,7 @@ MDerivedMetVarsDataSource::MDerivedMetVarsDataSource()
 //! and be done outside of the class as a configuration/plug-in mechanism.
 
     registerDerivedDataFieldProcessor(new MHorizontalWindSpeedProcessor());
+    registerDerivedDataFieldProcessor(new MPotentialTemperatureProcessor());
 }
 
 
@@ -404,10 +405,55 @@ void MHorizontalWindSpeedProcessor::compute(
 
     for (unsigned int n = 0; n < derivedGrid->getNumValues(); n++)
     {
-        float windspeed = windSpeed_ms(inputGrids.at(0)->getValue(n),
-                                       inputGrids.at(1)->getValue(n));
-        derivedGrid->setValue(n, windspeed);
+        float u_ms = inputGrids.at(0)->getValue(n);
+        float v_ms = inputGrids.at(1)->getValue(n);
+
+        if (u_ms == M_MISSING_VALUE || v_ms == M_MISSING_VALUE)
+        {
+            derivedGrid->setValue(n, M_MISSING_VALUE);
+        }
+        else
+        {
+            float windspeed = windSpeed_ms(u_ms, v_ms);
+            derivedGrid->setValue(n, windspeed);
+        }
     }
+}
+
+
+MPotentialTemperatureProcessor::MPotentialTemperatureProcessor()
+    : MDerivedDataFieldProcessor(
+          "air_potential_temperature",
+          QStringList() << "air_temperature")
+{
+}
+
+
+void MPotentialTemperatureProcessor::compute(
+        QList<MStructuredGrid *> &inputGrids,
+        MStructuredGrid *derivedGrid)
+{
+    // input 0 = "air_temperature"
+
+    // Requires nested k/j/i loops to access pressure at grid point.
+    for (unsigned int k = 0; k < derivedGrid->getNumLevels(); k++)
+        for (unsigned int j = 0; j < derivedGrid->getNumLats(); j++)
+            for (unsigned int i = 0; i < derivedGrid->getNumLons(); i++)
+            {
+                float T_K = inputGrids.at(0)->getValue(k, j, i);
+
+                if (T_K == M_MISSING_VALUE)
+                {
+                    derivedGrid->setValue(k, j, i, M_MISSING_VALUE);
+                }
+                else
+                {
+                    float theta_K = potentialTemperature_K(
+                                T_K,
+                                inputGrids.at(0)->getPressure(k, j, i) * 100.);
+                    derivedGrid->setValue(k, j, i, theta_K);
+                }
+            }
 }
 
 

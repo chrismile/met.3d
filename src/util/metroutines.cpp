@@ -440,4 +440,12 @@ double windSpeed_ms(double u_ms, double v_ms)
 }
 
 
+double potentialTemperature_K(double T_K, double p_Pa)
+{
+    return T_K * pow( 100000. / p_Pa,
+                      MetConstants::GAS_CONSTANT_DRY_AIR /
+                      MetConstants::SPECIFIC_HEAT_DRYAIR_CONST_PRESSURE );
+}
+
+
 } // namespace Met3D
