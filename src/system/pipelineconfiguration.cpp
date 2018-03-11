@@ -551,6 +551,8 @@ void MPipelineConfiguration::initializeNWPPipeline(
                 "surface_air_pressure", "Surface_pressure_surface");
     derivedMetVarsSource->setInputVariable(
                 "surface_temperature", "2_metre_temperature_surface");
+    derivedMetVarsSource->setInputVariable(
+                "lwe_thickness_of_precipitation_amount", "Total_precipitation_surface");
 
     MStructuredGridEnsembleFilter *ensFilterDerived =
             new MStructuredGridEnsembleFilter();

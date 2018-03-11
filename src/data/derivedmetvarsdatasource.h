@@ -152,18 +152,26 @@ protected:
     QString getInputVariableNameFromStdName(QString stdName);
 
     /**
-      Updates a passed standard name and level type according to an enforced
-      level type being encoded in the standard name.
+      Updates a passed standard name, and level type according to an enforced
+      level type being encoded in the standard name, and init and valid times
+      if a time difference is required.
 
       Examples:
       Passing a standard name of "air_temperature" and a leveltype of
       "HYBRID_SIGMA_PRESSURE_3D" will not change anything.
+
       Passing a standard name of "surface_geopotential/SURFACE_2D" and a
       leveltype of "HYBRID_SIGMA_PRESSURE_3D" will result in a standard name
       of "surface_geopotential" and a leveltype of "SURFACE_2D".
+
+      Passing "lwe_thickness_of_precipitation_amount///-21600" will result
+      in a standard name of "lwe_thickness_of_precipitation_amount" and a
+      valid time shifted by -21600 seconds = 6 hours.
      */
-    bool updateStdNameAndLevelType(QString *stdName,
-                                   MVerticalLevelType *levelType);
+    bool updateStdNameAndArguments(QString *stdName,
+                                   MVerticalLevelType *levelType,
+                                   QDateTime *initTime=nullptr,
+                                   QDateTime *validTime=nullptr);
 
     MWeatherPredictionDataSource* inputSource;
 
@@ -209,6 +217,16 @@ public:
                  MStructuredGrid *derivedGrid);
 };
 
+
+class MTHourlyTotalPrecipitationProcessor
+        : public MDerivedDataFieldProcessor
+{
+public:
+    MTHourlyTotalPrecipitationProcessor(int hours);
+
+    void compute(QList<MStructuredGrid*>& inputGrids,
+                 MStructuredGrid *derivedGrid);
+};
 
 } // namespace Met3D
 

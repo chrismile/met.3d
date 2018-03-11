@@ -63,6 +63,12 @@ MDerivedMetVarsDataSource::MDerivedMetVarsDataSource()
     registerDerivedDataFieldProcessor(new MHorizontalWindSpeedProcessor());
     registerDerivedDataFieldProcessor(new MPotentialTemperatureProcessor());
     registerDerivedDataFieldProcessor(new MGeopotentialHeightProcessor());
+
+    registerDerivedDataFieldProcessor(new MTHourlyTotalPrecipitationProcessor(1));
+    registerDerivedDataFieldProcessor(new MTHourlyTotalPrecipitationProcessor(3));
+    registerDerivedDataFieldProcessor(new MTHourlyTotalPrecipitationProcessor(6));
+    registerDerivedDataFieldProcessor(new MTHourlyTotalPrecipitationProcessor(12));
+    registerDerivedDataFieldProcessor(new MTHourlyTotalPrecipitationProcessor(24));
 }
 
 
@@ -120,6 +126,8 @@ MStructuredGrid* MDerivedMetVarsDataSource::produceData(MDataRequest request)
     MDataRequestHelper rh(request);
     QString derivedVarName = rh.value("VARIABLE");
     MVerticalLevelType levelType = MVerticalLevelType(rh.intValue("LEVELTYPE"));
+    QDateTime initTime  = rh.timeValue("INIT_TIME");
+    QDateTime validTime = rh.timeValue("VALID_TIME");
     rh.removeAll(locallyRequiredKeys()); // removes "VARIABLE"
 
     // Get input fields.
@@ -129,13 +137,42 @@ MStructuredGrid* MDerivedMetVarsDataSource::produceData(MDataRequest request)
     {
         // Handle enforced level types (cf. updateStdNameAndLevelType()).
         MVerticalLevelType ltype = levelType;
-        updateStdNameAndLevelType(&requiredVarStdName, &ltype);
+        bool argsChanged = updateStdNameAndArguments(
+                    &requiredVarStdName, &ltype, &initTime, &validTime);
 
-        rh.insert("VARIABLE", getInputVariableNameFromStdName(
-                      requiredVarStdName));
-        rh.insert("LEVELTYPE", ltype); // update requested level type
+        QString inputVarName = getInputVariableNameFromStdName(
+                    requiredVarStdName);
+        rh.insert("VARIABLE", inputVarName);
+        rh.insert("LEVELTYPE", ltype); // update if changed
+        rh.insert("INIT_TIME", initTime); // update if changed
+        rh.insert("VALID_TIME", validTime); // update if changed
 
-        inputGrids << inputSource->getData(rh.request());
+        // Check if if times have been changed the requested data fields are
+        // available.
+        bool everythingAvailable = true;
+        if ( argsChanged && !inputSource->availableInitTimes(
+                 ltype, inputVarName).contains(initTime) )
+        {
+            everythingAvailable = false;
+        }
+        else if ( argsChanged && !inputSource->availableValidTimes(
+                      ltype, inputVarName, initTime).contains(validTime) )
+        {
+            everythingAvailable = false;
+        }
+
+        if (everythingAvailable)
+        {
+            inputGrids << inputSource->getData(rh.request());
+        }
+        else
+        {
+            // If an input request fails (e.g. if the field 6-h earlier is
+            // also requested but not available), add a nullptr so that
+            // the number of entries in the list is consistent. It is the
+            // responsibility of the processor module to check...
+            inputGrids << nullptr;
+        }
     }
 
     // Initialize result grid.
@@ -160,6 +197,7 @@ MStructuredGrid* MDerivedMetVarsDataSource::produceData(MDataRequest request)
     // Release input fields.
     foreach (MStructuredGrid *inputGrid, inputGrids)
     {
+        if (inputGrid == nullptr) continue;
         inputSource->releaseData(inputGrid);
     }
 
@@ -184,6 +222,8 @@ MTask* MDerivedMetVarsDataSource::createTaskGraph(MDataRequest request)
     MDataRequestHelper rh(request);
     QString derivedVarName = rh.value("VARIABLE");
     MVerticalLevelType levelType = MVerticalLevelType(rh.intValue("LEVELTYPE"));
+    QDateTime initTime  = rh.timeValue("INIT_TIME");
+    QDateTime validTime = rh.timeValue("VALID_TIME");
     rh.removeAll(locallyRequiredKeys()); // removes "VARIABLE"
 
     foreach (QString requiredVarStdName,
@@ -191,12 +231,34 @@ MTask* MDerivedMetVarsDataSource::createTaskGraph(MDataRequest request)
     {
         // Handle enforced level types (cf. updateStdNameAndLevelType()).
         MVerticalLevelType ltype = levelType;
-        updateStdNameAndLevelType(&requiredVarStdName, &ltype);
+        bool argsChanged = updateStdNameAndArguments(
+                    &requiredVarStdName, &ltype, &initTime, &validTime);
 
-        rh.insert("VARIABLE", getInputVariableNameFromStdName(
-                      requiredVarStdName));
-        rh.insert("LEVELTYPE", ltype); // update requested level type
-        task->addParent(inputSource->getTaskGraph(rh.request()));
+        QString inputVarName = getInputVariableNameFromStdName(
+                    requiredVarStdName);
+        rh.insert("VARIABLE", inputVarName);
+        rh.insert("LEVELTYPE", ltype); // update if changed
+        rh.insert("INIT_TIME", initTime); // update if changed
+        rh.insert("VALID_TIME", validTime); // update if changed
+
+        // Check if if times have been changed the requested data fields are
+        // available.
+        bool everythingAvailable = true;
+        if ( argsChanged && !inputSource->availableInitTimes(
+                 ltype, inputVarName).contains(initTime) )
+        {
+            everythingAvailable = false;
+        }
+        else if ( argsChanged && !inputSource->availableValidTimes(
+                      ltype, inputVarName, initTime).contains(validTime) )
+        {
+            everythingAvailable = false;
+        }
+
+        if (everythingAvailable)
+        {
+            task->addParent(inputSource->getTaskGraph(rh.request()));
+        }
     }
 
     return task;
@@ -229,7 +291,7 @@ QStringList MDerivedMetVarsDataSource::availableVariables(
         {
             // Handle enforced level types.
             MVerticalLevelType ltype = levelType;
-            updateStdNameAndLevelType(&requiredVarStdName, &ltype);
+            updateStdNameAndArguments(&requiredVarStdName, &ltype);
 
             // If one of the required variables is not available from the
             // input source, skip.
@@ -259,7 +321,7 @@ QSet<unsigned int> MDerivedMetVarsDataSource::availableEnsembleMembers(
     {
         // Handle enforced level types.
         MVerticalLevelType ltype = levelType;
-        updateStdNameAndLevelType(&inputVarStdName, &ltype);
+        updateStdNameAndArguments(&inputVarStdName, &ltype);
 
         if (members.isEmpty())
         {
@@ -293,7 +355,7 @@ QList<QDateTime> MDerivedMetVarsDataSource::availableInitTimes(
     {
         // Handle enforced level types.
         MVerticalLevelType ltype = levelType;
-        updateStdNameAndLevelType(&inputVarStdName, &ltype);
+        updateStdNameAndArguments(&inputVarStdName, &ltype);
 
         if (times.isEmpty())
         {
@@ -332,7 +394,7 @@ QList<QDateTime> MDerivedMetVarsDataSource::availableValidTimes(
     {
         // Handle enforced level types.
         MVerticalLevelType ltype = levelType;
-        updateStdNameAndLevelType(&inputVarStdName, &ltype);
+        updateStdNameAndArguments(&inputVarStdName, &ltype);
 
         if (times.isEmpty())
         {
@@ -374,7 +436,7 @@ QString MDerivedMetVarsDataSource::variableLongName(
     {
         // Handle enforced level types.
         MVerticalLevelType ltype = levelType;
-        updateStdNameAndLevelType(&inputVarStdName, &ltype);
+        updateStdNameAndArguments(&inputVarStdName, &ltype);
 
         longName += QString("%1/").arg(
                     getInputVariableNameFromStdName(inputVarStdName));
@@ -414,7 +476,8 @@ QString MDerivedMetVarsDataSource::variableUnits(
 
 const QStringList MDerivedMetVarsDataSource::locallyRequiredKeys()
 {
-    return (QStringList() << "VARIABLE");
+    return (QStringList() << "LEVELTYPE" << "VARIABLE" << "INIT_TIME"
+            << "VALID_TIME");
 }
 
 
@@ -430,17 +493,20 @@ QString MDerivedMetVarsDataSource::getInputVariableNameFromStdName(
 }
 
 
-bool MDerivedMetVarsDataSource::updateStdNameAndLevelType(
-        QString *stdName, MVerticalLevelType *levelType)
+bool MDerivedMetVarsDataSource::updateStdNameAndArguments(
+        QString *stdName, MVerticalLevelType *levelType,
+        QDateTime *initTime, QDateTime *validTime)
 {
+    bool changedArguments = false;
+
     // Assume somthing like "surface_geopotential/SURFACE_2D" passed in stdName.
     // If only a variable name is passed (e.g., ""surface_geopotential"),
     // nothing is changed.
-    bool changedLevel = false;
-
     QStringList definitionsList = stdName->split("/");
-    if (definitionsList.size() == 2)
+    if (definitionsList.size() >= 2)
     {
+        *stdName = definitionsList.at(0);
+
         MVerticalLevelType newLevelType =
                 MStructuredGrid::verticalLevelTypeFromConfigString(
                     definitionsList.at(1));
@@ -449,12 +515,39 @@ bool MDerivedMetVarsDataSource::updateStdNameAndLevelType(
         if (newLevelType != SIZE_LEVELTYPES)
         {
             *levelType = newLevelType;
-            *stdName = definitionsList.at(0);
-            changedLevel = true;
+            changedArguments = true;
         }
     }
 
-    return changedLevel;
+    // Assume something like "lwe_thickness_of_precipitation_amount//-43200"
+    // is passed. This will substract 43200 seconds = 12 hours from the
+    // INIT_TIME.
+    if (definitionsList.size() >= 3 && initTime != nullptr)
+    {
+        bool ok;
+        int timeDifference_sec = definitionsList.at(2).toInt(&ok);
+        if (ok)
+        {
+            *initTime = initTime->addSecs(timeDifference_sec);
+            changedArguments = true;
+        }
+    }
+
+    // Assume something like "lwe_thickness_of_precipitation_amount///-21600"
+    // is passed. This will substract 21600 seconds = 6 hours from the
+    // VALID_TIME.
+    if (definitionsList.size() == 4 && validTime != nullptr)
+    {
+        bool ok;
+        int timeDifference_sec = definitionsList.at(3).toInt(&ok);
+        if (ok)
+        {
+            *validTime = validTime->addSecs(timeDifference_sec);
+            changedArguments = true;
+        }
+    }
+
+    return changedArguments;
 }
 
 
@@ -674,6 +767,45 @@ void MGeopotentialHeightProcessor::compute(
 //                                    << " \n" << flush);
 //                }
             }
+}
+
+
+// Total precipitation per time interval
+// =====================================
+
+MTHourlyTotalPrecipitationProcessor::MTHourlyTotalPrecipitationProcessor(
+        int hours)
+    : MDerivedDataFieldProcessor(
+          QString("lwe_thickness_of_precipitation_amount_%1h").arg(hours),
+          QStringList() << "lwe_thickness_of_precipitation_amount"
+                        << QString(
+                               "lwe_thickness_of_precipitation_amount///-%1")
+                           .arg(hours*3600))
+{
+}
+
+
+void MTHourlyTotalPrecipitationProcessor::compute(
+        QList<MStructuredGrid *> &inputGrids, MStructuredGrid *derivedGrid)
+{
+    // input 0 = "lwe_thickness_of_precipitation_amount"
+    // input 1 = "lwe_thickness_of_precipitation_amount", valid - T hours
+
+    if (inputGrids.at(0) == nullptr || inputGrids.at(1) == nullptr)
+    {
+        // In case the previous timestep is not available, a nullptr will be
+        // passed as input. In this case, simply return a field of missing
+        // values.
+        derivedGrid->setToValue(M_MISSING_VALUE);
+    }
+    else for (unsigned int n = 0; n < derivedGrid->getNumValues(); n++)
+    {
+        float precip_VT = inputGrids.at(0)->getValue(n);
+        float precip_VT_minus_Th = inputGrids.at(1)->getValue(n);
+
+        float precip_difference = precip_VT - precip_VT_minus_Th;
+        derivedGrid->setValue(n, precip_difference);
+    }
 }
 
 
