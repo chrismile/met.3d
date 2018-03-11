@@ -359,6 +359,7 @@ protected:
     virtual bool changeVariable();
 
     QtProperty *datasourceNameProperty;
+    QtProperty *variableLongNameProperty;
     QtProperty *changeVariablePropertyGroup;
     QtProperty *changeVariableProperty;
 

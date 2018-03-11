@@ -119,6 +119,9 @@ MNWPActorVariable::MNWPActorVariable(MNWPMultiVarActor *actor)
     datasourceNameProperty = a->addProperty(
                 STRING_PROPERTY, "data source", varPropertyGroup);
     datasourceNameProperty->setEnabled(false);
+    variableLongNameProperty = a->addProperty(
+                STRING_PROPERTY, "long name", varPropertyGroup);
+    variableLongNameProperty->setEnabled(false);
 
     changeVariablePropertyGroup = a->addProperty(
                 GROUP_PROPERTY, "change/remove", varPropertyGroup);
@@ -363,8 +366,12 @@ void MNWPActorVariable::initialize()
 
     gridTopologyMayHaveChanged = true;
 
-    actor->getQtProperties()->mString()->setValue(datasourceNameProperty,
-                                                  dataSourceID);
+    actor->getQtProperties()->mString()->setValue(
+                datasourceNameProperty,
+                dataSourceID);
+    actor->getQtProperties()->mString()->setValue(
+                variableLongNameProperty,
+                dataSource->variableLongName(levelType, variableName));
 
     requestPropertiesFactory->updateProperties(&propertiesList,
                                                dataSource->requiredKeys());
