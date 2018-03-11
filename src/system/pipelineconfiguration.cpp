@@ -537,6 +537,11 @@ void MPipelineConfiguration::initializeNWPPipeline(
     derivedMetVarsSource->setScheduler(scheduler);
     derivedMetVarsSource->setInputSource(nwpReaderENS);
 
+    derivedMetVarsSource->setInputVariable(
+                "eastward_wind", "u-component_of_wind_hybrid");
+    derivedMetVarsSource->setInputVariable(
+                "northward_wind", "v-component_of_wind_hybrid");
+
     MStructuredGridEnsembleFilter *ensFilterDerived =
             new MStructuredGridEnsembleFilter();
     ensFilterDerived->setMemoryManager(memoryManager);

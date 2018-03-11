@@ -4,7 +4,7 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015-2018 Marc Rautenhaus
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -34,6 +34,7 @@
 
 // local application imports
 #include "util/mutil.h"
+#include "util/metroutines.h"
 
 using namespace std;
 
@@ -44,19 +45,31 @@ namespace Met3D
 ***                     CONSTRUCTOR / DESTRUCTOR                            ***
 *******************************************************************************/
 
+MDerivedDataFieldProcessor::MDerivedDataFieldProcessor(
+        QString standardName, QStringList requiredInputVariables)
+    : standardName(standardName),
+      requiredInputVariables(requiredInputVariables)
+{
+}
+
 MDerivedMetVarsDataSource::MDerivedMetVarsDataSource()
     : MProcessingWeatherPredictionDataSource(),
       inputSource(nullptr)
 {
-//TODO (mr, 2016May17) -- this table should be put into a configuration file
-    requiredInputVariablesList["windspeed (an)"] =
-            (QStringList() << "u (an)" << "v (an)");
-    requiredInputVariablesList["windspeed (fc)"] =
-            (QStringList() << "u (fc)" << "v (fc)");
-    requiredInputVariablesList["windspeed (ens)"] =
-            (QStringList() << "u (ens)" << "v (ens)");
-    requiredInputVariablesList["Windspeed"] =
-            (QStringList() << "U" << "V");
+    // Register data field processors.
+//!Todo (mr, 11Mar2018). This could possibly be moved out of this constructor
+//! and be done outside of the class as a configuration/plug-in mechanism.
+
+    registerDerivedDataFieldProcessor(new MHorizontalWindSpeedProcessor());
+}
+
+
+MDerivedMetVarsDataSource::~MDerivedMetVarsDataSource()
+{
+    foreach (MDerivedDataFieldProcessor* p, registeredDerivedDataProcessors)
+    {
+        delete p;
+    }
 }
 
 
@@ -68,7 +81,28 @@ void MDerivedMetVarsDataSource::setInputSource(MWeatherPredictionDataSource* s)
 {
     inputSource = s;
     registerInputSource(inputSource);
-//    enablePassThrough(s);
+    //    enablePassThrough(s);
+}
+
+
+void MDerivedMetVarsDataSource::setInputVariable(
+        QString standardName, QString inputVariableName)
+{
+    variableStandardNameToInputNameMapping[standardName] = inputVariableName;
+}
+
+
+void MDerivedMetVarsDataSource::registerDerivedDataFieldProcessor(
+        MDerivedDataFieldProcessor *processor)
+{
+    if (processor != nullptr)
+    {
+        registeredDerivedDataProcessors.insert(
+                    processor->getStandardName(), processor);
+
+        requiredInputVariablesList[processor->getStandardName()] =
+                processor->getRequiredInputVariables();
+    }
 }
 
 
@@ -83,9 +117,11 @@ MStructuredGrid* MDerivedMetVarsDataSource::produceData(MDataRequest request)
 
     // Get input fields.
     QList<MStructuredGrid*> inputGrids;
-    foreach (QString requiredVar, requiredInputVariablesList[derivedVarName])
+    foreach (QString requiredVarStdName,
+             requiredInputVariablesList[derivedVarName])
     {
-        rh.insert("VARIABLE", requiredVar);
+        rh.insert("VARIABLE", getInputVariableNameFromStdName(
+                      requiredVarStdName));
         inputGrids << inputSource->getData(rh.request());
     }
 
@@ -94,25 +130,25 @@ MStructuredGrid* MDerivedMetVarsDataSource::produceData(MDataRequest request)
     if ( !inputGrids.isEmpty() && inputGrids.at(0) != nullptr )
     {
         derivedGrid = createAndInitializeResultGrid(inputGrids.at(0));
+        derivedGrid->setMetaData(inputGrids.at(0)->getInitTime(),
+                                 inputGrids.at(0)->getValidTime(),
+                                 derivedVarName,
+                                 inputGrids.at(0)->getEnsembleMember());
     }
-    else return nullptr;
 
     // Compute derived grid.
-    if ( (derivedVarName == "windspeed (an)")
-         || (derivedVarName == "windspeed (fc)")
-         || (derivedVarName == "windspeed (ens)") )
+    if ((derivedGrid != nullptr) &&
+            registeredDerivedDataProcessors.contains(derivedVarName))
     {
-        for (unsigned int n = 0; n < derivedGrid->getNumValues(); n++)
-        {
-            float windspeed = sqrt(pow(inputGrids.at(0)->getValue(n), 2)
-                                   + pow(inputGrids.at(1)->getValue(n), 2));
-            derivedGrid->setValue(n, windspeed);
-        }
+        registeredDerivedDataProcessors[derivedVarName]->compute(
+                    inputGrids, derivedGrid);
     }
 
     // Release input fields.
     foreach (MStructuredGrid *inputGrid, inputGrids)
+    {
         inputSource->releaseData(inputGrid);
+    }
 
     return derivedGrid;
 }
@@ -128,9 +164,11 @@ MTask* MDerivedMetVarsDataSource::createTaskGraph(MDataRequest request)
     QString derivedVarName = rh.value("VARIABLE");
     rh.removeAll(locallyRequiredKeys());
 
-    foreach (QString requiredVar, requiredInputVariablesList[derivedVarName])
+    foreach (QString requiredVarStdName,
+             requiredInputVariablesList[derivedVarName])
     {
-        rh.insert("VARIABLE", requiredVar);
+        rh.insert("VARIABLE", getInputVariableNameFromStdName(
+                      requiredVarStdName));
         task->addParent(inputSource->getTaskGraph(rh.request()));
     }
 
@@ -157,15 +195,20 @@ QStringList MDerivedMetVarsDataSource::availableVariables(
     // variables.
     foreach (QString derivedVarName, requiredInputVariablesList.keys())
     {
-        // If one of the required variables is not available from the input
-        // source, skip.
         bool requiredInputVarsAvailable = true;
-        foreach (QString requiredVar, requiredInputVariablesList[derivedVarName])
-            if ( !inputSource->availableVariables(levelType).contains(requiredVar) )
+
+        foreach (QString requiredVarStdName,
+                 requiredInputVariablesList[derivedVarName])
+        {
+            // If one of the required variables is not available from the
+            // input source, skip.
+            if ( !inputSource->availableVariables(levelType).contains(
+                     getInputVariableNameFromStdName(requiredVarStdName)) )
             {
                 requiredInputVarsAvailable = false;
                 break;
             }
+        }
 
         if (requiredInputVarsAvailable)
             availableVars << derivedVarName;
@@ -181,17 +224,20 @@ QSet<unsigned int> MDerivedMetVarsDataSource::availableEnsembleMembers(
     assert(inputSource != nullptr);
 
     QSet<unsigned int> members;
-    foreach (QString inputVar, requiredInputVariablesList[variableName])
+    foreach (QString inputVarStdName, requiredInputVariablesList[variableName])
     {
         if (members.isEmpty())
         {
             members = inputSource->availableEnsembleMembers(
-                        levelType, inputVar);
+                        levelType,
+                        getInputVariableNameFromStdName(inputVarStdName));
         }
         else
         {
-            members = members.intersect(inputSource->availableEnsembleMembers(
-                                            levelType, inputVar));
+            members = members.intersect(
+                        inputSource->availableEnsembleMembers(
+                            levelType,
+                            getInputVariableNameFromStdName(inputVarStdName)));
         }
     }
 
@@ -208,19 +254,27 @@ QList<QDateTime> MDerivedMetVarsDataSource::availableInitTimes(
 // method (qHash doesn't support QDateTime types).
 //TODO (mr, 2016May17) -- Change this to QSet when switching to Qt 5.X.
     QList<QDateTime> times;
-    foreach (QString inputVar, requiredInputVariablesList[variableName])
+    foreach (QString inputVarStdName, requiredInputVariablesList[variableName])
     {
         if (times.isEmpty())
         {
-            times = inputSource->availableInitTimes(levelType, inputVar);
+            times = inputSource->availableInitTimes(
+                        levelType,
+                        getInputVariableNameFromStdName(inputVarStdName));
         }
         else
         {
             QList<QDateTime> inputTimes = inputSource->availableInitTimes(
-                        levelType, inputVar);
+                        levelType,
+                        getInputVariableNameFromStdName(inputVarStdName));
 
             foreach (QDateTime dt, times)
-                if ( !inputTimes.contains(dt) ) times.removeOne(dt);
+            {
+                if ( !inputTimes.contains(dt) )
+                {
+                    times.removeOne(dt);
+                }
+            }
         }
     }
 
@@ -235,19 +289,29 @@ QList<QDateTime> MDerivedMetVarsDataSource::availableValidTimes(
     assert(inputSource != nullptr);
 
     QList<QDateTime> times;
-    foreach (QString inputVar, requiredInputVariablesList[variableName])
+    foreach (QString inputVarStdName, requiredInputVariablesList[variableName])
     {
         if (times.isEmpty())
         {
-            times = inputSource->availableValidTimes(levelType, inputVar, initTime);
+            times = inputSource->availableValidTimes(
+                        levelType,
+                        getInputVariableNameFromStdName(inputVarStdName),
+                        initTime);
         }
         else
         {
             QList<QDateTime> inputTimes = inputSource->availableValidTimes(
-                        levelType, inputVar, initTime);
+                        levelType,
+                        getInputVariableNameFromStdName(inputVarStdName),
+                        initTime);
 
             foreach (QDateTime dt, times)
-                if ( !inputTimes.contains(dt) ) times.removeOne(dt);
+            {
+                if ( !inputTimes.contains(dt) )
+                {
+                    times.removeOne(dt);
+                }
+            }
         }
     }
 
@@ -259,8 +323,19 @@ QString MDerivedMetVarsDataSource::variableLongName(
         MVerticalLevelType levelType,
         const QString& variableName)
 {
-    Q_UNUSED(levelType); Q_UNUSED(variableName);
-    return QString();
+    Q_UNUSED(levelType);
+
+    QString longName = QString("%1, computed from ").arg(variableName);
+
+    foreach (QString inputVarStdName, requiredInputVariablesList[variableName])
+    {
+        longName += QString("%1/").arg(
+                    getInputVariableNameFromStdName(inputVarStdName));
+    }
+    // Remove last "/" character.
+    longName.resize(longName.length()-1);
+
+    return longName;
 }
 
 
@@ -268,8 +343,11 @@ QString MDerivedMetVarsDataSource::variableStandardName(
         MVerticalLevelType levelType,
         const QString& variableName)
 {
-    Q_UNUSED(levelType); Q_UNUSED(variableName);
-    return QString();
+    Q_UNUSED(levelType);
+
+    // Special property of this data source: variable names equal CF standard
+    // names.
+    return variableName;
 }
 
 
@@ -291,5 +369,46 @@ const QStringList MDerivedMetVarsDataSource::locallyRequiredKeys()
 {
     return (QStringList() << "VARIABLE");
 }
+
+
+QString MDerivedMetVarsDataSource::getInputVariableNameFromStdName(
+        QString stdName)
+{
+    QString inputVariableName;
+    if (variableStandardNameToInputNameMapping.contains(stdName))
+    {
+        inputVariableName = variableStandardNameToInputNameMapping[stdName];
+    }
+    return inputVariableName;
+}
+
+
+
+/******************************************************************************
+***                            DATA PROCESSORS                              ***
+*******************************************************************************/
+
+MHorizontalWindSpeedProcessor::MHorizontalWindSpeedProcessor()
+    : MDerivedDataFieldProcessor(
+          "wind_speed",
+          QStringList() << "eastward_wind" << "northward_wind")
+{}
+
+
+void MHorizontalWindSpeedProcessor::compute(
+        QList<MStructuredGrid *> &inputGrids,
+        MStructuredGrid *derivedGrid)
+{
+    // input 0 = "eastward_wind"
+    // input 1 = "northward_wind"
+
+    for (unsigned int n = 0; n < derivedGrid->getNumValues(); n++)
+    {
+        float windspeed = windSpeed_ms(inputGrids.at(0)->getValue(n),
+                                       inputGrids.at(1)->getValue(n));
+        derivedGrid->setValue(n, windspeed);
+    }
+}
+
 
 } // namespace Met3D

@@ -434,4 +434,10 @@ double boxVolume_dry(double northWestLon, double northWestLat,
 }
 
 
+double windSpeed_ms(double u_ms, double v_ms)
+{
+    return sqrt(pow(u_ms, 2) + pow(v_ms, 2));
+}
+
+
 } // namespace Met3D

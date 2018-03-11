@@ -251,6 +251,12 @@ double boxVolume_dry(double northWestLon, double northWestLat,
                      double pmid_Pa, double pbot_Pa, double ptop_Pa,
                      double temp_K = M_MISSING_VALUE);
 
+/**
+  Computes wind speed in m.s-1 from eastward wind (@p u_ms) and northward
+  wind (@p v_ms).
+ */
+double windSpeed_ms(double u_ms, double v_ms);
+
 
 } // namespace Met3D
 
