@@ -1787,7 +1787,7 @@ bool MGribReader::checkConsistencyOfVariable(MGribVariableInfo *referenceVInfo,
         LOG4CPLUS_ERROR(mlog, "detected inconsistency in 'number of longitudes'");
         return false;
     }
-    if ( referenceVInfo->lon0 != currentVInfo->lon0 )
+    if ( MMOD(referenceVInfo->lon0, 360.) != MMOD(currentVInfo->lon0, 360.) )
     {
         LOG4CPLUS_ERROR(mlog,
                         "detected inconsistency in 'longitude of first grid"
@@ -1801,7 +1801,7 @@ bool MGribReader::checkConsistencyOfVariable(MGribVariableInfo *referenceVInfo,
                         " point'");
         return false;
     }
-    if ( referenceVInfo->lon1 != currentVInfo->lon1 )
+    if ( MMOD(referenceVInfo->lon1, 360.) != MMOD(currentVInfo->lon1, 360.) )
     {
         LOG4CPLUS_ERROR(mlog,
                         "detected inconsistency in 'longitude of last grid"
