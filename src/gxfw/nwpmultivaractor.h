@@ -63,13 +63,6 @@ public:
     ~MNWPMultiVarActor();
 
     /**
-     Synchronize time, ensemble of all variables of this actor with the
-     synchronization control @p sync. Calls @ref
-     NWPActorVariable::synchronizeWith() of the registered variables.
-     */
-    void synchronizeAllVariablesWith(MSyncControl *sync);
-
-    /**
      Tells every variable that is connected to an @ref MSyncControl instance to
      call the scene's variableSynchronizesWith() method. This is necessary if
      the actor is added to a scene during program runtime (that is, the

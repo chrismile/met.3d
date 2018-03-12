@@ -80,13 +80,6 @@ MNWPMultiVarActor::~MNWPMultiVarActor()
 ***                            PUBLIC METHODS                               ***
 *******************************************************************************/
 
-void MNWPMultiVarActor::synchronizeAllVariablesWith(MSyncControl *sync)
-
-{
-    foreach (MNWPActorVariable* var, variables) var->synchronizeWith(sync);
-}
-
-
 void MNWPMultiVarActor::provideSynchronizationInfoToScene(
         MSceneControl *scene)
 {

@@ -32,7 +32,7 @@
 #include <QtCore>
 
 // local application imports
-#include "weatherpredictiondatasource.h"
+#include "processingwpdatasource.h"
 #include "structuredgrid.h"
 #include "datarequest.h"
 
@@ -44,7 +44,7 @@ namespace Met3D
   forecast parameters.
   */
 class MDifferenceDataSource
-        : public MWeatherPredictionDataSource
+        : public MProcessingWeatherPredictionDataSource
 {
 public:
     MDifferenceDataSource();
@@ -85,8 +85,6 @@ protected:
 
     MDataRequest constructInputSourceRequestFromRequest(int id,
                                                         MDataRequest request);
-
-    MStructuredGrid *createAndInitializeResultGrid(MStructuredGrid *templateGrid);
 
     QVector<MWeatherPredictionDataSource*> inputSource;
     QVector<MDataRequest> baseRequest;

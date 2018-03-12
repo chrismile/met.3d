@@ -360,7 +360,7 @@ public:
     /** Writes coordinate axis data to the LOG. */
     void dumpCoordinateAxes();
 
-    virtual void dumpGridData();
+    virtual void dumpGridData(unsigned int maxValues=50);
 
     /** Saves the data field in text file @p filename. */
     void saveAsNetCDF(QString filename);
@@ -552,6 +552,7 @@ protected:
     friend class MVerticalRegridder;
     friend class MGribReader;
     friend class MDifferenceDataSource;
+    friend class MProcessingWeatherPredictionDataSource;
 
     /** Sizes of the dimensions. */
     unsigned int nlevs, nlats, nlons;
@@ -730,7 +731,7 @@ public:
 
     float getBottomDataVolumePressure() override;
 
-    void dumpGridData();
+    void dumpGridData(unsigned int maxValues=50);
 
 protected:
     friend class MWeatherPredictionReader;
@@ -743,6 +744,7 @@ protected:
     friend class MProbABLTrajectoriesSource;
     friend class MGribReader;
     friend class MDifferenceDataSource;
+    friend class MProcessingWeatherPredictionDataSource;
 
     void allocateInterfaceCoefficients();
 
@@ -802,12 +804,13 @@ public:
       */
     bool getReverseLevels() { return reverseLevels; }
 
-    void dumpGridData();
+    void dumpGridData(unsigned int maxValues=50);
 
 protected:
     friend class MWeatherPredictionReader;
     friend class MClimateForecastReader;
     friend class MStructuredGridEnsembleFilter;
+    friend class MProcessingWeatherPredictionDataSource;
 
     MLonLatAuxiliaryPressureGrid *auxPressureField_hPa;
 

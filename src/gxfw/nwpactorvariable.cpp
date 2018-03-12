@@ -119,6 +119,9 @@ MNWPActorVariable::MNWPActorVariable(MNWPMultiVarActor *actor)
     datasourceNameProperty = a->addProperty(
                 STRING_PROPERTY, "data source", varPropertyGroup);
     datasourceNameProperty->setEnabled(false);
+    variableLongNameProperty = a->addProperty(
+                STRING_PROPERTY, "long name", varPropertyGroup);
+    variableLongNameProperty->setEnabled(false);
 
     changeVariablePropertyGroup = a->addProperty(
                 GROUP_PROPERTY, "change/remove", varPropertyGroup);
@@ -222,6 +225,11 @@ MNWPActorVariable::MNWPActorVariable(MNWPMultiVarActor *actor)
     transferFunctionProperty = a->addProperty(ENUM_PROPERTY, "transfer function",
                                               varRenderingPropertyGroup);
     properties->mEnum()->setEnumNames(transferFunctionProperty, availableTFs);
+
+    // Debug properties.
+    QtProperty* debugGroup = getPropertyGroup("debug");
+    dumpGridDataProperty = a->addProperty(CLICK_PROPERTY, "dump grid data",
+                                          debugGroup);
 
     // Observe the creation/deletion of other actors -- if these are transfer
     // functions, add to the list displayed in the transfer function property.
@@ -358,8 +366,12 @@ void MNWPActorVariable::initialize()
 
     gridTopologyMayHaveChanged = true;
 
-    actor->getQtProperties()->mString()->setValue(datasourceNameProperty,
-                                                  dataSourceID);
+    actor->getQtProperties()->mString()->setValue(
+                datasourceNameProperty,
+                dataSourceID);
+    actor->getQtProperties()->mString()->setValue(
+                variableLongNameProperty,
+                dataSource->variableLongName(levelType, variableName));
 
     requestPropertiesFactory->updateProperties(&propertiesList,
                                                dataSource->requiredKeys());
@@ -507,6 +519,10 @@ void MNWPActorVariable::synchronizeWith(
             actor->enableActorUpdates(true);
         }
 
+        // Disable actor updates to avoid asynchonous data requests being
+        // triggered from the individual time/ensemble updates before all
+        // properties have been updated.
+        actor->enableActorUpdates(false);
         if (synchronizeInitTime)
         {
             setInitDateTime(sync->initDateTime());
@@ -518,6 +534,14 @@ void MNWPActorVariable::synchronizeWith(
         if (synchronizeEnsemble)
         {
             setEnsembleMember(sync->ensembleMember());
+        }
+        actor->enableActorUpdates(true);
+
+        // Trigger data request manually after all properties have been
+        // synchronised.
+        if (actor->isInitialized())
+        {
+            asynchronousDataRequest();
         }
     }
     else
@@ -956,6 +980,16 @@ bool MNWPActorVariable::onQtPropertyChanged(QtProperty *property)
     else if (property == transferFunctionProperty)
     {
         return setTransferFunctionFromProperty();
+    }
+
+    else if (property == dumpGridDataProperty)
+    {
+        if (grid)
+        {
+            // Dump raw grid data to console, printing first 200 data values.
+            grid->dumpGridData(200);
+        }
+        return false;
     }
 
     else

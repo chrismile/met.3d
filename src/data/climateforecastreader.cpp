@@ -2123,19 +2123,19 @@ bool MClimateForecastReader::checkSharedVariableDataConsistency(
         return false;
     }
 
+    // Query ensemble dimension.
+    try
+    {
+        current.ensembleVar = cfVar->getEnsembleVar();
+        current.availableMembers = cfVar->getEnsembleMembers(
+                    &(current.memberToFileIndexMap));
+    }
+    catch (NcException)
+    {
+    }
+
     if (testEnsembleMemberConsistency)
     {
-        // Query ensemble dimension.
-        try
-        {
-            current.ensembleVar = cfVar->getEnsembleVar();
-            current.availableMembers = cfVar->getEnsembleMembers(
-                        &(current.memberToFileIndexMap));
-        }
-        catch (NcException)
-        {
-        }
-
         if (!initialiseConsistencyData
                 && (current.availableMembers != shared->availableMembers))
         {
