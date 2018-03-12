@@ -258,6 +258,8 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
                 config.value("auxiliary3DPressureField", "").toString();
         bool disableGridConsistencyCheck =
                 config.value("disableGridConsistencyCheck", "").toBool();
+        QString inputVarsForDerivedVars =
+                config.value("inputVarsForDerivedVars", "").toString();
 
 //TODO (mr, 16Dec2015) -- compatibility code; remove in Met.3D version 2.0
         // If no fileFilter is specified but a domainID is specified use
@@ -294,6 +296,8 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
         LOG4CPLUS_DEBUG(mlog, "  grid consistency check="
                         << (!disableGridConsistencyCheck
                             ? "enabled" : "disabled"));
+        LOG4CPLUS_DEBUG(mlog, "  input variables for derived variables="
+                        << inputVarsForDerivedVars.toStdString());
 
         MNWPReaderFileFormat fileFormat = INVALID_FORMAT;
         if (fileFormatStr == "CF_NETCDF") fileFormat = CF_NETCDF;
@@ -324,7 +328,8 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
                     enableProbRegionFilter, treatRotatedGridAsRegularGrid,
                     gribSurfacePressureFieldType,
                     convertGeometricHeightToPressure_ICAOStandard,
-                    auxiliary3DPressureField, disableGridConsistencyCheck);
+                    auxiliary3DPressureField, disableGridConsistencyCheck,
+                    inputVarsForDerivedVars);
     }
 
     config.endArray();
@@ -449,7 +454,8 @@ void MPipelineConfiguration::initializeNWPPipeline(
         QString surfacePressureFieldType,
         bool convertGeometricHeightToPressure_ICAOStandard,
         QString auxiliary3DPressureField,
-        bool disableGridConsistencyCheck)
+        bool disableGridConsistencyCheck,
+        QString inputVarsForDerivedVars)
 {
     MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
     MAbstractScheduler* scheduler = sysMC->getScheduler(schedulerID);
@@ -537,22 +543,19 @@ void MPipelineConfiguration::initializeNWPPipeline(
     derivedMetVarsSource->setScheduler(scheduler);
     derivedMetVarsSource->setInputSource(nwpReaderENS);
 
-    derivedMetVarsSource->setInputVariable(
-                "eastward_wind", "u-component_of_wind_hybrid");
-    derivedMetVarsSource->setInputVariable(
-                "northward_wind", "v-component_of_wind_hybrid");
-    derivedMetVarsSource->setInputVariable(
-                "air_temperature", "Temperature_hybrid");
-    derivedMetVarsSource->setInputVariable(
-                "specific_humidity", "Specific_humidity_hybrid");
-    derivedMetVarsSource->setInputVariable(
-                "surface_geopotential", "Geopotential_surface");
-    derivedMetVarsSource->setInputVariable(
-                "surface_air_pressure", "Surface_pressure_surface");
-    derivedMetVarsSource->setInputVariable(
-                "surface_temperature", "2_metre_temperature_surface");
-    derivedMetVarsSource->setInputVariable(
-                "lwe_thickness_of_precipitation_amount", "Total_precipitation_surface");
+    QStringList derivedVarsMappingList =
+            inputVarsForDerivedVars.split("/", QString::SkipEmptyParts);
+
+    foreach (QString derivedVarsMappingString, derivedVarsMappingList)
+    {
+        QStringList derivedVarsMapping =
+                derivedVarsMappingString.split(":", QString::SkipEmptyParts);
+        if (derivedVarsMapping.size() == 2)
+        {
+            derivedMetVarsSource->setInputVariable(
+                        derivedVarsMapping.at(0), derivedVarsMapping.at(1));
+        }
+    }
 
     MStructuredGridEnsembleFilter *ensFilterDerived =
             new MStructuredGridEnsembleFilter();
@@ -817,7 +820,8 @@ void MPipelineConfiguration::initializeDevelopmentDataPipeline()
                 "auto",
                 false,
                 "",
-                false);
+                false,
+                "");
 
     initializeNWPPipeline(
                 "ECMWF ENS EUR_LL10",
@@ -832,7 +836,8 @@ void MPipelineConfiguration::initializeDevelopmentDataPipeline()
                 "auto",
                 false,
                 "",
-                false);
+                false,
+                "");
 
     sysMC->registerMemoryManager("Trajectories DF-T psfc_1000hPa_L62",
                new MLRUMemoryManager("Trajectories DF-T psfc_1000hPa_L62",

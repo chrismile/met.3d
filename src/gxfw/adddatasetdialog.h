@@ -68,6 +68,7 @@ struct MNWPPipelineConfigurationInfo
     bool convertGeometricHeightToPressure_ICAOStandard;
     QString auxiliary3DPressureField;
     bool disableGridConsistencyCheck;
+    QString inputVarsForDerivedVars;
 };
 
 
