@@ -4,7 +4,7 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015-2018 Marc Rautenhaus
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -40,6 +40,43 @@ namespace Met3D
 {
 
 /**
+ @brief The MDerivedDataFieldProcessor class is the abstract base class for all
+ classes that derive a data field, e.g., wind speed or potential temperature.
+ */
+class MDerivedDataFieldProcessor
+{
+public:
+    MDerivedDataFieldProcessor(QString standardName,
+                               QStringList requiredInputVariables);
+
+    virtual ~MDerivedDataFieldProcessor() {}
+
+    QString getStandardName() { return standardName; }
+
+    QStringList getRequiredInputVariables() { return requiredInputVariables; }
+
+    /**
+      This method computes the derived data field and needs to be implemented
+      in any derived class.
+
+      It is called from @ref MDerivedMetVarsDataSource::produceData() if the
+      corresponding variable is requested.
+
+      @p inputGrids contains the required input data fields in the order
+      specified in @ref requiredInputVariables. @p derivedGrid contains
+      a pre-initialized result grid that already contains lon/lat/lev etc.
+      information copied from the first grid in @p inputGrids.
+     */
+    virtual void compute(QList<MStructuredGrid*>& inputGrids,
+                         MStructuredGrid *derivedGrid) = 0;
+
+private:
+    QString standardName;
+    QStringList requiredInputVariables;
+};
+
+
+/**
   @brief MDerivedMetVarsDataSource derives meteorological variables from basic
   forecast parameters.
   */
@@ -48,12 +85,37 @@ class MDerivedMetVarsDataSource
 {
 public:
     MDerivedMetVarsDataSource();
+    ~MDerivedMetVarsDataSource();
 
     MStructuredGrid* produceData(MDataRequest request);
 
     MTask* createTaskGraph(MDataRequest request);
 
     void setInputSource(MWeatherPredictionDataSource* s);
+
+    /**
+      Defines a mapping from a CF standard name to an input variable name,
+      e.g., "eastward_wind" to "u (an)". This is required to obtain a
+      unique mapping of which input variables are used to derive new variables.
+      (Otherwise, a case can easily occur in which the input source provides
+      two variables with identical standard name. Then, the variable that
+      would be used would be random.)
+
+      This function needs to be called for all input variables that shall
+      be used.
+     */
+    void setInputVariable(QString standardName, QString inputVariableName);
+
+    /**
+      Registers a data field processor. Needs to be called for each variable
+      that shall be derived.
+
+      Ownership of the object that is passed is assumed to be handed over to
+      this object; it is deleted when this object is deleted.
+
+      @note Currently, data sources are registered in the constructor.
+     */
+    void registerDerivedDataFieldProcessor(MDerivedDataFieldProcessor *processor);
 
     QList<MVerticalLevelType> availableLevelTypes();
 
@@ -82,9 +144,88 @@ public:
 protected:
     const QStringList locallyRequiredKeys();
 
+    /**
+      Returns the defined input variable name for a given standard name,
+      if this has been set with @ref setInputVariable(). Otherwise, returns
+      an empty string.
+     */
+    QString getInputVariableNameFromStdName(QString stdName);
+
+    /**
+      Updates a passed standard name, and level type according to an enforced
+      level type being encoded in the standard name, and init and valid times
+      if a time difference is required.
+
+      Examples:
+      Passing a standard name of "air_temperature" and a leveltype of
+      "HYBRID_SIGMA_PRESSURE_3D" will not change anything.
+
+      Passing a standard name of "surface_geopotential/SURFACE_2D" and a
+      leveltype of "HYBRID_SIGMA_PRESSURE_3D" will result in a standard name
+      of "surface_geopotential" and a leveltype of "SURFACE_2D".
+
+      Passing "lwe_thickness_of_precipitation_amount///-21600" will result
+      in a standard name of "lwe_thickness_of_precipitation_amount" and a
+      valid time shifted by -21600 seconds = 6 hours.
+     */
+    bool updateStdNameAndArguments(QString *stdName,
+                                   MVerticalLevelType *levelType,
+                                   QDateTime *initTime=nullptr,
+                                   QDateTime *validTime=nullptr);
+
     MWeatherPredictionDataSource* inputSource;
 
+    QMap<QString, MDerivedDataFieldProcessor*> registeredDerivedDataProcessors;
     QMap<QString, QStringList> requiredInputVariablesList;
+    QMap<QString, QString> variableStandardNameToInputNameMapping;
+};
+
+
+/******************************************************************************
+***                            DATA PROCESSORS                              ***
+*******************************************************************************/
+
+class MHorizontalWindSpeedProcessor
+        : public MDerivedDataFieldProcessor
+{
+public:
+    MHorizontalWindSpeedProcessor();
+
+    void compute(QList<MStructuredGrid*>& inputGrids,
+                 MStructuredGrid *derivedGrid);
+};
+
+
+class MPotentialTemperatureProcessor
+        : public MDerivedDataFieldProcessor
+{
+public:
+    MPotentialTemperatureProcessor();
+
+    void compute(QList<MStructuredGrid*>& inputGrids,
+                 MStructuredGrid *derivedGrid);
+};
+
+
+class MGeopotentialHeightProcessor
+        : public MDerivedDataFieldProcessor
+{
+public:
+    MGeopotentialHeightProcessor();
+
+    void compute(QList<MStructuredGrid*>& inputGrids,
+                 MStructuredGrid *derivedGrid);
+};
+
+
+class MTHourlyTotalPrecipitationProcessor
+        : public MDerivedDataFieldProcessor
+{
+public:
+    MTHourlyTotalPrecipitationProcessor(int hours);
+
+    void compute(QList<MStructuredGrid*>& inputGrids,
+                 MStructuredGrid *derivedGrid);
 };
 
 } // namespace Met3D

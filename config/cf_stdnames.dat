@@ -156,6 +156,9 @@ variable_name Snow_depth_surface
 standard_name surface_albedo
 variable_name Albedo_surface
 
+standard_name lwe_thickness_of_precipitation_amount
+variable_name Total_precipitation_surface
+
 
 ############## trajectory vars ###############
 

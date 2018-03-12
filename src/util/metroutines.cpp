@@ -434,4 +434,41 @@ double boxVolume_dry(double northWestLon, double northWestLat,
 }
 
 
+double windSpeed_ms(double u_ms, double v_ms)
+{
+    return sqrt(pow(u_ms, 2) + pow(v_ms, 2));
+}
+
+
+double potentialTemperature_K(double T_K, double p_Pa)
+{
+    return T_K * pow( 100000. / p_Pa,
+                      MetConstants::GAS_CONSTANT_DRY_AIR /
+                      MetConstants::SPECIFIC_HEAT_DRYAIR_CONST_PRESSURE );
+}
+
+
+double virtualTemperature_K(double T_K, double q_kgkg)
+{
+    return T_K * (q_kgkg + 0.622*(1.-q_kgkg)) / 0.622;
+}
+
+
+double geopotentialThicknessOfLayer_m(
+        double layerMeanVirtualTemperature_K, double p_bot, double p_top)
+{
+    // Layer mean scale height; Holten 3rd ed. p. 21 (before eq. 1.19):
+    //   H = R <Tv> / g0, with <Tv> being the layer mean temperature.
+    double layerMeanScaleHeight =
+            (MetConstants::GAS_CONSTANT_DRY_AIR
+             * layerMeanVirtualTemperature_K) /
+            MetConstants::GRAVITY_ACCELERATION;
+
+    // Holton eq. 1.19: Z_T = H * ln(p1/p2)
+    return layerMeanScaleHeight * log(p_bot / p_top);
+}
+
+
+
+
 } // namespace Met3D

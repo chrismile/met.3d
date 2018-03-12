@@ -49,6 +49,7 @@ namespace MetConstants
 
 // Air
 const double GAS_CONSTANT_DRY_AIR = 287.058; // J K^-1 kg^-1
+const double SPECIFIC_HEAT_DRYAIR_CONST_PRESSURE = 1004.; // J K^-1 kg^-1
 
 // Water substance
 
@@ -250,6 +251,52 @@ double boxVolume_dry(double northWestLon, double northWestLat,
                      double southEastLon, double southEastLat,
                      double pmid_Pa, double pbot_Pa, double ptop_Pa,
                      double temp_K = M_MISSING_VALUE);
+
+/**
+  Computes wind speed in [m.s-1] from eastward wind (@p u_ms) and northward
+  wind (@p v_ms).
+ */
+double windSpeed_ms(double u_ms, double v_ms);
+
+
+/**
+  Computes potential temperature in [K] from temperature @p T_K in [K] and
+  pressure @p p_Pa in [Pa].
+
+  Method:
+                            theta = T * (p0/p)^(R/cp)
+      with p0 = 100000. Pa, R = 287.058 JK-1kg-1, cp = 1004 JK-1kg-1.
+ */
+double potentialTemperature_K(double T_K, double p_Pa);
+
+
+/**
+  Computes the virtual temperature in [K] from temperature @p T_K in [K] and
+  specific humidity @p q in [kg/kg].
+
+  Method:
+                  Tv = T * (q + 0.622(1-q)) / 0.622
+
+  Reference: Wallace&Hobbs 2nd ed., eq. 3.16, 3.59, and 3.60
+             (substitute w=q/(1-q) in 3.16 and 3.59 to obtain the exact
+             formula).
+ */
+double virtualTemperature_K(double T_K, double q_kgkg);
+
+
+/**
+  Computes the thickness of an atmospheric layer in terms of geopotential
+  height in [m], using the hypsometric question (equation (1.17) from Holton,
+  "An Introduction to Dynamic Meteorology", 3rd edition, 1992) in its
+  geopotential height formulation (equation (1.18 and 1.19) from Holton).
+
+  @p layerMeanVirtualTemperature_K specifies the layer mean (virtual)
+  temperature (use the virtual temperature to account for humidity) in [K],
+  @p p_bot and @p p_top the bounding pressure heights (can be either both in
+  [Pa] or both in [hPa]; only their ratio is used).
+ */
+double geopotentialThicknessOfLayer_m(double layerMeanVirtualTemperature_K,
+                                      double p_bot, double p_top);
 
 
 } // namespace Met3D
