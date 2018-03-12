@@ -512,8 +512,9 @@ void MNWPActorVariable::synchronizeWith(
             actor->enableActorUpdates(true);
         }
 
-        // Disable actor updates to avoid asynchonous data request being sent
-        // before all properties have been updated.
+        // Disable actor updates to avoid asynchonous data requests being
+        // triggered from the individual time/ensemble updates before all
+        // properties have been updated.
         actor->enableActorUpdates(false);
         if (synchronizeInitTime)
         {
@@ -529,9 +530,12 @@ void MNWPActorVariable::synchronizeWith(
         }
         actor->enableActorUpdates(true);
 
-        // Send data request manually after all properties have been
+        // Trigger data request manually after all properties have been
         // synchronised.
-        asynchronousDataRequest();
+        if (actor->isInitialized())
+        {
+            asynchronousDataRequest();
+        }
     }
     else
     {
