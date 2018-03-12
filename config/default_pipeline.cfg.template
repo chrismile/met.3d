@@ -74,6 +74,9 @@ size=2
 # staggered grids, however, in this case, the staggering will be ignored.
 # Hence, only disable if you know what you are doing.
 1\disableGridConsistencyCheck=false
+# List containing mappings for derived variables. Change the variable names
+# (right from ":") to adapt the mapping for your data set.
+1\inputVarsForDerivedVars=eastward_wind:u-component_of_wind_hybrid/northward_wind:v-component_of_wind_hybrid/air_temperature:Temperature_hybrid/specific_humidity:Specific_humidity_hybrid/surface_geopotential:Geopotential_surface/surface_air_pressure:Surface_pressure_surface/surface_temperature:2_metre_temperature_surface/lwe_thickness_of_precipitation_amount:Total_precipitation_surface
 
 # Example configuration for an ensemble ECMWF CF-NetCDF dataset.
 2\name=ECMWF ENS EUR_LL10

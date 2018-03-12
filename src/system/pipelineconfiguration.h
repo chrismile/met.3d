@@ -127,7 +127,8 @@ protected:
                                QString surfacePressureFieldType,
                                bool convertGeometricHeightToPressure_ICAOStandard,
                                QString auxiliary3DPressureField,
-                               bool disableGridConsistencyCheck);
+                               bool disableGridConsistencyCheck,
+                               QString inputVarsForDerivedVars);
 
     void initializeLagrantoEnsemblePipeline(
             QString name,

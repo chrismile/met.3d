@@ -95,6 +95,7 @@ MNWPPipelineConfigurationInfo MAddDatasetDialog::getNWPPipelineConfigurationInfo
     d.auxiliary3DPressureField = ui->useAuxiliary3DPressureLineEdit->text();
     d.disableGridConsistencyCheck =
             ui->disableGridConsistencyCheckCheckBox->isChecked();
+    d.inputVarsForDerivedVars = ui->inputVarsForDerivedVarsLineEdit->text();
 
     return d;
 }
