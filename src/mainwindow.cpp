@@ -1315,7 +1315,8 @@ void MMainWindow::openDatasetDialog(MAddDatasetDialog &addDatasetDialog)
                         pipelineConfig
                         .convertGeometricHeightToPressure_ICAOStandard,
                         pipelineConfig.auxiliary3DPressureField,
-                        pipelineConfig.disableGridConsistencyCheck);
+                        pipelineConfig.disableGridConsistencyCheck,
+                        pipelineConfig.inputVarsForDerivedVars);
             break;
         }
         case TRAJECTORIES_PIPELINE:
