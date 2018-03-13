@@ -4,8 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
-**  Copyright 2015 Michael Kern
+**  Copyright 2015-2018 Marc Rautenhaus
+**  Copyright 2015-2018 Michael Kern
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -469,6 +469,53 @@ double geopotentialThicknessOfLayer_m(
 }
 
 
+double mixingRatio_kgkg(double q_kgkg)
+{
+    return q_kgkg / (1.-q_kgkg);
+}
+
+
+double dewPointTemperature_K_Bolton(double p_Pa, double q_kgkg)
+{
+    // Compute mixing ratio w from specific humidiy q.
+    double w = mixingRatio_kgkg(q_kgkg);
+
+    // Compute vapour pressure from pressure and mixing ratio
+    // (Wallace and Hobbs 2nd ed. eq. 3.59).
+    double eq = w / (w + 0.622) * p_Pa;
+
+    double td = 243.5 / (17.67 / log(eq / 100. / 6.112) - 1.) + 273.15;
+
+    return td;
+}
+
+
+double equivalentPotentialTemperature_K_Bolton(
+        double T_K, double p_Pa, double q_kgkg)
+{
+    // Compute dewpoint Td in [K].
+    const double Td_K = dewPointTemperature_K_Bolton(p_Pa, q_kgkg);
+
+    // Mixing ratio in [kg/kg].
+    double r = mixingRatio_kgkg(q_kgkg);
+    // Convert r from kg/kg to g/kg.
+    r *= 1000;
+
+    // Computation based on Bolton's paper:
+
+    // Eq. 15: temperature at lifting condensation level.
+    const double Tl = 1.0 / (1.0 / (Td_K - 56.0) +
+                             std::log(T_K / Td_K) / 800.0) + 56.;
+
+    // Eq. 43: equivalent potential temperature (as recommended by Bolton).
+    const double thetaW_K = T_K * std::pow(100000. / p_Pa,
+                                           0.2854 * (1 - 0.28E-3 * r));
+
+    const double thetaE_K = thetaW_K * std::exp((3.376 / Tl - 2.54E-3) *
+                                                r * (1 + 0.81E-3 * r));
+
+    return thetaE_K;
+}
 
 
 } // namespace Met3D

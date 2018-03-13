@@ -52,6 +52,7 @@ MDerivedDataFieldProcessor::MDerivedDataFieldProcessor(
 {
 }
 
+
 MDerivedMetVarsDataSource::MDerivedMetVarsDataSource()
     : MProcessingWeatherPredictionDataSource(),
       inputSource(nullptr)
@@ -62,7 +63,22 @@ MDerivedMetVarsDataSource::MDerivedMetVarsDataSource()
 
     registerDerivedDataFieldProcessor(new MHorizontalWindSpeedProcessor());
     registerDerivedDataFieldProcessor(new MPotentialTemperatureProcessor());
+    registerDerivedDataFieldProcessor(new MEquivalentPotentialTemperatureProcessor());
     registerDerivedDataFieldProcessor(new MGeopotentialHeightProcessor());
+
+    registerDerivedDataFieldProcessor(
+                new MMagnitudeOfVerticallyIntegratedMoistureFluxProcessor(
+                    "HYBRID_SIGMA_PRESSURE_3D"));
+//!TODO (mr, 13Mar2018) -- there needs to be a more elegant way to handle
+//! cases in which the returned data field is of different type than all
+//! required input fields. Issue here is that we can only register one
+//! level type at a time...
+//    registerDerivedDataFieldProcessor(
+//                new MMagnitudeOfVerticallyIntegratedMoistureFluxProcessor(
+//                    "PRESSURE_LEVELS_3D"));
+//    registerDerivedDataFieldProcessor(
+//                new MMagnitudeOfVerticallyIntegratedMoistureFluxProcessor(
+//                    "AUXILIARY_PRESSURE_3D"));
 
     registerDerivedDataFieldProcessor(new MTHourlyTotalPrecipitationProcessor(1));
     registerDerivedDataFieldProcessor(new MTHourlyTotalPrecipitationProcessor(3));
@@ -628,6 +644,48 @@ void MPotentialTemperatureProcessor::compute(
 }
 
 
+// Equivalent potential temperature
+// ================================
+
+MEquivalentPotentialTemperatureProcessor
+::MEquivalentPotentialTemperatureProcessor()
+    : MDerivedDataFieldProcessor(
+          "equivalent_potential_temperature",
+          QStringList() << "air_temperature" << "specific_humidity")
+{
+}
+
+
+void MEquivalentPotentialTemperatureProcessor::compute(
+        QList<MStructuredGrid *> &inputGrids, MStructuredGrid *derivedGrid)
+{
+    // input 0 = "air_temperature"
+    // input 1 = "specific_humidity"
+
+    // Requires nested k/j/i loops to access pressure at grid point.
+    for (unsigned int k = 0; k < derivedGrid->getNumLevels(); k++)
+        for (unsigned int j = 0; j < derivedGrid->getNumLats(); j++)
+            for (unsigned int i = 0; i < derivedGrid->getNumLons(); i++)
+            {
+                float T_K = inputGrids.at(0)->getValue(k, j, i);
+                float q_kgkg = inputGrids.at(1)->getValue(k, j, i);
+
+                if (T_K == M_MISSING_VALUE || q_kgkg == M_MISSING_VALUE)
+                {
+                    derivedGrid->setValue(k, j, i, M_MISSING_VALUE);
+                }
+                else
+                {
+                    float thetaE_K = equivalentPotentialTemperature_K_Bolton(
+                                T_K,
+                                inputGrids.at(0)->getPressure(k, j, i) * 100.,
+                                q_kgkg);
+                    derivedGrid->setValue(k, j, i, thetaE_K);
+                }
+            }
+}
+
+
 // Geopotential height
 // ===================
 
@@ -806,6 +864,81 @@ void MTHourlyTotalPrecipitationProcessor::compute(
         float precip_difference = precip_VT - precip_VT_minus_Th;
         derivedGrid->setValue(n, precip_difference);
     }
+}
+
+
+// Vertically integrated moisture flux
+// ===================================
+
+// NOTE: surface_air_pressure is requested as a dummy grid to
+// initialize the derived grid as a 2D field.
+MMagnitudeOfVerticallyIntegratedMoistureFluxProcessor
+::MMagnitudeOfVerticallyIntegratedMoistureFluxProcessor(QString levelTypeString)
+    : MDerivedDataFieldProcessor(
+          "magnitude_of_total_column_horizontal_transport_of_moisture",
+          QStringList() << "surface_air_pressure"
+                        << QString("eastward_wind/%1").arg(levelTypeString)
+                        << QString("northward_wind/%1").arg(levelTypeString)
+                        << QString("specific_humidity/%1").arg(levelTypeString))
+{
+}
+
+
+void MMagnitudeOfVerticallyIntegratedMoistureFluxProcessor::compute(
+        QList<MStructuredGrid *> &inputGrids, MStructuredGrid *derivedGrid)
+{
+    // input 0 = "surface_air_pressure" -- never used, just for initialization
+    // input 1 = "eastward_wind"
+    // input 2 = "northward_wind"
+    // input 3 = "specific_humidity"
+    MStructuredGrid *eastwardWindGrid = inputGrids.at(1);
+    MStructuredGrid *northwardWindGrid = inputGrids.at(2);
+    MStructuredGrid *specificHumidityGrid = inputGrids.at(3);
+
+    for (unsigned int j = 0; j < derivedGrid->getNumLats(); j++)
+        for (unsigned int i = 0; i < derivedGrid->getNumLons(); i++)
+        {
+            // For each horizontal grid point, compute the total
+            // horizontal transport of moisture.
+            // See: https://en.wikipedia.org/wiki/Moisture_advection#Moisture_flux
+            // * horizontal moisture flux f = (fu, fv) = (u, v) * mixing ratio
+            // * vertical integral: int(psfc, 0, of: f/g dp)
+
+            float totalEastwardMoistureflux = 0.;
+            float totalNorthwardMoistureflux = 0.;
+
+            for (unsigned int k = 0; k < eastwardWindGrid->getNumLevels(); k++)
+            {
+                float layerDeltaPressure_Pa =
+                        (eastwardWindGrid->getBottomInterfacePressure(k, j, i) -
+                         eastwardWindGrid->getTopInterfacePressure(k, j, i)) * 100.;
+
+                float mixingRatio = mixingRatio_kgkg(
+                            specificHumidityGrid->getValue(k, j, i));
+
+                totalEastwardMoistureflux +=
+                        // eastward moisture flux = r*u
+                        (mixingRatio * eastwardWindGrid->getValue(k, j, i)) *
+                        // * dp
+                        layerDeltaPressure_Pa;
+
+                totalNorthwardMoistureflux +=
+                        // eastward moisture flux = r*v
+                        (mixingRatio * northwardWindGrid->getValue(k, j, i)) *
+                        // * dp
+                        layerDeltaPressure_Pa;
+            }
+
+            totalEastwardMoistureflux /= MetConstants::GRAVITY_ACCELERATION;
+            totalNorthwardMoistureflux /= MetConstants::GRAVITY_ACCELERATION;
+            float totalMoistureFlux = pow(
+                        totalEastwardMoistureflux * totalEastwardMoistureflux +
+                        totalNorthwardMoistureflux * totalNorthwardMoistureflux,
+                        0.5);
+
+            static_cast<MRegularLonLatGrid*>(derivedGrid)->setValue(
+                        j, i, totalMoistureFlux);
+        }
 }
 
 
