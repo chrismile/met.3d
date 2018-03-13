@@ -192,6 +192,8 @@ protected:
 
     void onAddActorVariable(MNWPActorVariable* var) override;
 
+    void onChangeActorVariable(MNWPActorVariable *var) override;
+
 private:
     std::shared_ptr<GL::MShaderEffect> sectionGridShader;
     std::shared_ptr<GL::MShaderEffect> pressureLinesShader;

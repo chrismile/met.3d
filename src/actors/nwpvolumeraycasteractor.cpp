@@ -1518,6 +1518,8 @@ void MNWPVolumeRaycasterActor::onQtPropertyChanged(QtProperty* property)
         updateNextRenderFrame.set(RecomputeNCLines);
         updateNextRenderFrame.set(UpdateShadowImage);
 
+        if (suppressActorUpdates()) return;
+
         emitActorChangedSignal();
     }
 
@@ -1542,6 +1544,8 @@ void MNWPVolumeRaycasterActor::onQtPropertyChanged(QtProperty* property)
         updateNextRenderFrame.set(ComputeNCInitPoints);
         updateNextRenderFrame.set(RecomputeNCLines);
         updateNextRenderFrame.set(UpdateShadowImage);
+
+        if (suppressActorUpdates()) return;
 
         emitActorChangedSignal();
     }
@@ -2035,6 +2039,25 @@ void MNWPVolumeRaycasterActor::onAddActorVariable(MNWPActorVariable *var)
     properties->mEnum()->setEnumNames(shadingVariableIndexProp, varNameList);
     properties->mEnum()->setValue(variableIndexProp, tmpVarIndex);
     properties->mEnum()->setValue(shadingVariableIndexProp, tmpShadingVarIndex);
+}
+
+
+void MNWPVolumeRaycasterActor::onChangeActorVariable(MNWPActorVariable *var)
+{
+    int varIndex = variables.indexOf(var);
+    // Update lists of variable names.
+    varNameList.replace(varIndex, var->variableName);
+
+    // Temporarily save variable indices.
+    int tmpVarIndex = variableIndex;
+    int tmpShadingVarIndex = shadingVariableIndex;
+
+    enableActorUpdates(false);
+    properties->mEnum()->setEnumNames(variableIndexProp, varNameList);
+    properties->mEnum()->setEnumNames(shadingVariableIndexProp, varNameList);
+    properties->mEnum()->setValue(variableIndexProp, tmpVarIndex);
+    properties->mEnum()->setValue(shadingVariableIndexProp, tmpShadingVarIndex);
+    enableActorUpdates(true);
 }
 
 

@@ -1583,6 +1583,14 @@ void MNWPVerticalSectionActor::onAddActorVariable(MNWPActorVariable *var)
 }
 
 
+void MNWPVerticalSectionActor::onChangeActorVariable(MNWPActorVariable *var)
+{
+    Q_UNUSED(var);
+    targetGridToBeUpdated = true;
+    updatePath = true;
+}
+
+
 /******************************************************************************
 ***                           PRIVATE METHODS                               ***
 *******************************************************************************/

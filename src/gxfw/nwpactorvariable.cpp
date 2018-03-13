@@ -2142,6 +2142,21 @@ bool MNWPActorVariable::changeVariable()
 
     MSelectableDataSource dsrc = dialog.getSelectedDataSource();
 
+    if (dynamic_cast<MNWP2DVerticalActorVariable*>(this))
+    {
+        if (actor->getNWPVariables().size() > 1
+                && dataSourceID != dsrc.dataSourceID)
+        {
+            QMessageBox::warning(
+                        nullptr, actor->getName(),
+                        "Vertical cross-section actors cannot handle"
+                        " multiple variables coming from different data"
+                        " sources.\n"
+                        "(Varible was not changed.)");
+            return false;
+        }
+    }
+
     LOG4CPLUS_DEBUG(mlog, "New variable has been selected: "
                     << dsrc.variableName.toStdString());
 
