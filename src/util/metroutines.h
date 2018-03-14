@@ -309,6 +309,14 @@ double mixingRatio_kgkg(double q_kgkg);
 
 
 /**
+  Computes the specific humidity from mixing ratio @p w_kgkg in [kg/kg].
+
+  Method: q = w / (1.+w)
+ */
+double specificHumidity_kgkg(double w_kgkg);
+
+
+/**
   Computes dew point in [K] from pressure @p p_Pa in [Pa] and specific
   humidity @p q_kgkg in [kg/kg].
 
@@ -328,6 +336,15 @@ double dewPointTemperature_K_Bolton(double p_Pa, double q_kgkg);
  */
 double equivalentPotentialTemperature_K_Bolton(double T_K, double p_Pa,
                                                double q_kgkg);
+
+
+// Test functions for meteorological computations.
+namespace MetRoutinesTests
+{
+
+void testEQPT();
+
+}
 
 } // namespace Met3D
 

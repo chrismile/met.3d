@@ -71,14 +71,14 @@ MDerivedMetVarsDataSource::MDerivedMetVarsDataSource()
                     "HYBRID_SIGMA_PRESSURE_3D"));
 //!TODO (mr, 13Mar2018) -- there needs to be a more elegant way to handle
 //! cases in which the returned data field is of different type than all
-//! required input fields. Issue here is that we can only register one
-//! level type at a time...
-//    registerDerivedDataFieldProcessor(
-//                new MMagnitudeOfVerticallyIntegratedMoistureFluxProcessor(
-//                    "PRESSURE_LEVELS_3D"));
-//    registerDerivedDataFieldProcessor(
-//                new MMagnitudeOfVerticallyIntegratedMoistureFluxProcessor(
-//                    "AUXILIARY_PRESSURE_3D"));
+//! required input fields. The current solution appends the input level type
+//! to the variable name, which is not very elegant...
+    registerDerivedDataFieldProcessor(
+                new MMagnitudeOfVerticallyIntegratedMoistureFluxProcessor(
+                    "PRESSURE_LEVELS_3D"));
+    registerDerivedDataFieldProcessor(
+                new MMagnitudeOfVerticallyIntegratedMoistureFluxProcessor(
+                    "AUXILIARY_PRESSURE_3D"));
 
     registerDerivedDataFieldProcessor(new MTHourlyTotalPrecipitationProcessor(1));
     registerDerivedDataFieldProcessor(new MTHourlyTotalPrecipitationProcessor(3));
@@ -310,8 +310,9 @@ QStringList MDerivedMetVarsDataSource::availableVariables(
             updateStdNameAndArguments(&requiredVarStdName, &ltype);
 
             // If one of the required variables is not available from the
-            // input source, skip.
-            if ( !inputSource->availableVariables(ltype).contains(
+            // input source, skip.            
+            if ( !inputSource->availableLevelTypes().contains(ltype) ||
+                 !inputSource->availableVariables(ltype).contains(
                      getInputVariableNameFromStdName(requiredVarStdName)) )
             {
                 requiredInputVarsAvailable = false;
@@ -676,6 +677,9 @@ void MEquivalentPotentialTemperatureProcessor::compute(
                 }
                 else
                 {
+//!TODO (mr, 14Mar2018) -- possibly replace the Bolton equation by a more
+//! recent formula. See Davies-Jones (MWR, 2009), "On Formulas for Equiv.
+//! Potential Temperature".
                     float thetaE_K = equivalentPotentialTemperature_K_Bolton(
                                 T_K,
                                 inputGrids.at(0)->getPressure(k, j, i) * 100.,
@@ -875,7 +879,8 @@ void MTHourlyTotalPrecipitationProcessor::compute(
 MMagnitudeOfVerticallyIntegratedMoistureFluxProcessor
 ::MMagnitudeOfVerticallyIntegratedMoistureFluxProcessor(QString levelTypeString)
     : MDerivedDataFieldProcessor(
-          "magnitude_of_total_column_horizontal_transport_of_moisture",
+          QString("magnitude_of_vertically_integrated_horizontal_"
+                  "transport_of_moisture__from_%1").arg(levelTypeString),
           QStringList() << "surface_air_pressure"
                         << QString("eastward_wind/%1").arg(levelTypeString)
                         << QString("northward_wind/%1").arg(levelTypeString)
@@ -901,8 +906,14 @@ void MMagnitudeOfVerticallyIntegratedMoistureFluxProcessor::compute(
             // For each horizontal grid point, compute the total
             // horizontal transport of moisture.
             // See: https://en.wikipedia.org/wiki/Moisture_advection#Moisture_flux
-            // * horizontal moisture flux f = (fu, fv) = (u, v) * mixing ratio
+            // * horizontal moisture flux f = (fu, fv) = (u, v)
+            //                              * mixing ratio / specific humidity
             // * vertical integral: int(psfc, 0, of: f/g dp)
+            //
+            // NOTE: This implementation used specific humidity; mixing ration
+            //  can also be used.
+            // Also cf. to Eq. (1) and (2) in Zebaze et al. (AtSciLet, 2017),
+            // "Interaction between moisture transport...".
 
             float totalEastwardMoistureflux = 0.;
             float totalNorthwardMoistureflux = 0.;
@@ -913,24 +924,27 @@ void MMagnitudeOfVerticallyIntegratedMoistureFluxProcessor::compute(
                         (eastwardWindGrid->getBottomInterfacePressure(k, j, i) -
                          eastwardWindGrid->getTopInterfacePressure(k, j, i)) * 100.;
 
-                float mixingRatio = mixingRatio_kgkg(
-                            specificHumidityGrid->getValue(k, j, i));
+                //float humidity = mixingRatio_kgkg(
+                //            specificHumidityGrid->getValue(k, j, i));
+                float humidity = specificHumidityGrid->getValue(k, j, i);
 
                 totalEastwardMoistureflux +=
                         // eastward moisture flux = r*u
-                        (mixingRatio * eastwardWindGrid->getValue(k, j, i)) *
+                        (humidity * eastwardWindGrid->getValue(k, j, i)) *
                         // * dp
                         layerDeltaPressure_Pa;
 
                 totalNorthwardMoistureflux +=
                         // eastward moisture flux = r*v
-                        (mixingRatio * northwardWindGrid->getValue(k, j, i)) *
+                        (humidity * northwardWindGrid->getValue(k, j, i)) *
                         // * dp
                         layerDeltaPressure_Pa;
             }
 
             totalEastwardMoistureflux /= MetConstants::GRAVITY_ACCELERATION;
             totalNorthwardMoistureflux /= MetConstants::GRAVITY_ACCELERATION;
+
+            // Computed total moisture flux magnitude is in [kg m-1 s-1].
             float totalMoistureFlux = pow(
                         totalEastwardMoistureflux * totalEastwardMoistureflux +
                         totalNorthwardMoistureflux * totalNorthwardMoistureflux,

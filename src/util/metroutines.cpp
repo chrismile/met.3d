@@ -31,8 +31,10 @@
 #include <cmath>
 
 // related third party imports
+#include <log4cplus/loggingmacros.h>
 
 // local application imports
+#include "util/mutil.h"
 
 using namespace std;
 
@@ -475,6 +477,12 @@ double mixingRatio_kgkg(double q_kgkg)
 }
 
 
+double specificHumidity_kgkg(double w_kgkg)
+{
+    return w_kgkg / (1.+w_kgkg);
+}
+
+
 double dewPointTemperature_K_Bolton(double p_Pa, double q_kgkg)
 {
     // Compute mixing ratio w from specific humidiy q.
@@ -517,5 +525,61 @@ double equivalentPotentialTemperature_K_Bolton(
     return thetaE_K;
 }
 
+
+// Test functions for meteorological computations.
+namespace MetRoutinesTests
+{
+
+void testEQPT()
+{
+    // Test values from https://www.ncl.ucar.edu/Document/Functions/
+    //  Contributed/pot_temp_equiv.shtml.
+    // p in [Pa], T in [K], mixing ratio w in [kg/kg].
+    float values_p_T_w[27][3] = {
+        {97067.80, 291.15, 0.012258},
+        {96040.00, 291.60, 0.012111},
+        {94825.50, 292.05, 0.011914},
+        {93331.30, 292.13, 0.011483},
+        {91371.40, 292.06, 0.010575},
+        {88947.80, 291.17, 0.008992},
+        {86064.70, 289.11, 0.006021},
+        {82495.50, 287.49, 0.002559},
+        {78140.20, 286.25, 0.005169},
+        {73035.40, 282.14, 0.005746},
+        {67383.70, 277.42, 0.001608},
+        {61327.50, 272.91, 0.001645},
+        {54994.70, 266.99, 0.001382},
+        {48897.30, 261.64, 0.000235},
+        {43034.60, 254.40, 0.000094},
+        {37495.20, 246.38, 0.000178},
+        {32555.80, 238.10, 0.000136},
+        {28124.40, 229.76, 0.000079},
+        {24201.00, 220.88, 0.000050},
+        {20693.00, 213.65, 0.000025},
+        {17600.60, 212.42, 0.000023},
+        {14877.30, 212.58, 0.000023},
+        {12477.20, 212.91, 0.000014},
+        {10400.20, 213.34, 0.000010},
+        {8553.98, 213.73, 0.000008},
+        {6984.69, 214.55, 0.000007},
+        {646.18, 216.59, 0.000007}
+    };
+
+    for (int i = 0; i < 27; i++)
+    {
+        float p_Pa = values_p_T_w[i][0];
+        float T_K = values_p_T_w[i][1];
+        float w_kgkg = values_p_T_w[i][2];
+        float q_kgkg = specificHumidity_kgkg(w_kgkg);
+        float eqpt_K = equivalentPotentialTemperature_K_Bolton(T_K, p_Pa, q_kgkg);
+
+        QString s = QString("(%1) p = %2  T = %3  w = %4  q = %5  eqpt = %6")
+                .arg(i).arg(p_Pa).arg(T_K).arg(w_kgkg).arg(q_kgkg).arg(eqpt_K);
+
+        LOG4CPLUS_INFO(mlog, s.toStdString());
+    }
+}
+
+} // namespace MetRoutinesTests
 
 } // namespace Met3D
