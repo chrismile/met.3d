@@ -29,6 +29,7 @@
 // standard library imports
 #include <float.h>
 #include <iostream>
+#include <cmath>
 
 // related third party imports
 

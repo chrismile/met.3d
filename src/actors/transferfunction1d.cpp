@@ -1018,7 +1018,8 @@ void MTransferFunction1D::renderToCurrentContext(MSceneViewGLWidget *sceneView)
     colourbarShader->setUniformValue("enableAlpha", GLboolean(enableAlpha));
 
     vertexBuffer->attachToVertexAttribute(SHADER_VERTEX_ATTRIBUTE, 3, false,
-                                          4 * sizeof(float), 0 * sizeof(float));
+                                          4 * sizeof(float), 
+                                          (const GLvoid*)(0 * sizeof(float)));
     vertexBuffer->attachToVertexAttribute(SHADER_TEXTURE_ATTRIBUTE, 1, false,
                                           4 * sizeof(float),
                                           (const GLvoid*)(3 * sizeof(float)));
