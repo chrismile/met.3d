@@ -35,6 +35,7 @@
 // local application imports
 #include "util/mutil.h"
 #include "util/metroutines.h"
+#include "util/metroutines_experimental.h"
 
 using namespace std;
 
@@ -58,6 +59,7 @@ MDerivedMetVarsDataSource::MDerivedMetVarsDataSource()
       inputSource(nullptr)
 {
     // Register data field processors.
+    // ===============================
 //!Todo (mr, 11Mar2018). This could possibly be moved out of this constructor
 //! and be done outside of the class as a configuration/plug-in mechanism.
 
@@ -65,6 +67,7 @@ MDerivedMetVarsDataSource::MDerivedMetVarsDataSource()
     registerDerivedDataFieldProcessor(new MPotentialTemperatureProcessor());
     registerDerivedDataFieldProcessor(new MEquivalentPotentialTemperatureProcessor());
     registerDerivedDataFieldProcessor(new MGeopotentialHeightProcessor());
+    registerDerivedDataFieldProcessor(new MGeopotentialHeightFromGeopotentialProcessor());
 
     registerDerivedDataFieldProcessor(
                 new MMagnitudeOfVerticallyIntegratedMoistureFluxProcessor(
@@ -85,6 +88,11 @@ MDerivedMetVarsDataSource::MDerivedMetVarsDataSource()
     registerDerivedDataFieldProcessor(new MTHourlyTotalPrecipitationProcessor(6));
     registerDerivedDataFieldProcessor(new MTHourlyTotalPrecipitationProcessor(12));
     registerDerivedDataFieldProcessor(new MTHourlyTotalPrecipitationProcessor(24));
+
+    // Register experimental data field processors.
+    // ============================================
+
+    // ... <add registration commands here> ...
 }
 
 
@@ -781,9 +789,10 @@ void MGeopotentialHeightProcessor::compute(
         for (unsigned int j = 0; j < derivedGrid->getNumLats(); j++)
             for (unsigned int i = 0; i < derivedGrid->getNumLons(); i++)
             {
-                // Check if the current grid point has already been flagged
-                // as missing value (.. pressure levels .., see above).
-                if (derivedGrid->getValue(k, j, i) == M_MISSING_VALUE)
+                // Check if the bottom level of the current grid point has
+                // already been flagged as missing value (.. pressure levels
+                // .., see above).
+                if (derivedGrid->getValue(k+1, j, i) == M_MISSING_VALUE)
                 {
                     continue;
                 }
@@ -829,6 +838,39 @@ void MGeopotentialHeightProcessor::compute(
 //                                    << " \n" << flush);
 //                }
             }
+}
+
+
+// Geopotential height from geopotential
+// =====================================
+
+MGeopotentialHeightFromGeopotentialProcessor
+::MGeopotentialHeightFromGeopotentialProcessor()
+    : MDerivedDataFieldProcessor(
+          "geopotential_height_from_geopotential",
+          QStringList() << "geopotential")
+{
+}
+
+void MGeopotentialHeightFromGeopotentialProcessor::compute(
+        QList<MStructuredGrid *> &inputGrids, MStructuredGrid *derivedGrid)
+{
+    // input 0 = "geopotential"
+
+    for (unsigned int n = 0; n < derivedGrid->getNumValues(); n++)
+    {
+        float geopotential = inputGrids.at(0)->getValue(n);
+
+        if (geopotential == M_MISSING_VALUE)
+        {
+            derivedGrid->setValue(n, M_MISSING_VALUE);
+        }
+        else
+        {
+            derivedGrid->setValue(n, geopotential /
+                                  MetConstants::GRAVITY_ACCELERATION);
+        }
+    }
 }
 
 

@@ -229,6 +229,17 @@ public:
 };
 
 
+class MGeopotentialHeightFromGeopotentialProcessor
+        : public MDerivedDataFieldProcessor
+{
+public:
+    MGeopotentialHeightFromGeopotentialProcessor();
+
+    void compute(QList<MStructuredGrid*>& inputGrids,
+                 MStructuredGrid *derivedGrid);
+};
+
+
 class MTHourlyTotalPrecipitationProcessor
         : public MDerivedDataFieldProcessor
 {
