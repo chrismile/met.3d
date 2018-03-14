@@ -638,7 +638,8 @@ void MSpatial1DTransferFunction::renderToCurrentContext(
         colourbarShader->setUniformValue("spatialTransferTexture", textureUnit);CHECK_GL_ERROR;
 
         vertexBuffer->attachToVertexAttribute(SHADER_VERTEX_ATTRIBUTE, 3, false,
-                                              5 * sizeof(float), 0 * sizeof(float));CHECK_GL_ERROR;
+                                              5 * sizeof(float),  
+                                              (const GLvoid*)(0 * sizeof(float)));CHECK_GL_ERROR;
         vertexBuffer->attachToVertexAttribute(SHADER_TEXTURE_ATTRIBUTE, 2, false,
                                               5 * sizeof(float),
                                               (const GLvoid*)(3 * sizeof(float)));CHECK_GL_ERROR;

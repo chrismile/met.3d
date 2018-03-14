@@ -29,6 +29,7 @@
 
 // standard library imports
 #include <assert.h>
+#include <cmath>
 
 // related third party imports
 
