@@ -6,7 +6,7 @@ Met.3D Installation Guidelines.
          installation guidelines.
 
 This document provides installation guidelines for installing Met.3D on
-OpenSuSE 13.X systems. Met.3D requires a number of libraries to be
+OpenSuSE 42.X systems. Met.3D requires a number of libraries to be
 installed and a few external data packages to be downloaded. Most of these
 packages can be installed via YaST, however, a few have to be downloaded and
 compiled manually.
@@ -31,23 +31,23 @@ OpenGL shading language version string: 4.40 NVIDIA via Cg compiler
 A) Install the following packages via YaST (or your favourite rpm manager):
 ================================================================================
 
-For OpenSuSE 13.X, these repositories are required (similar for other
+For OpenSuSE 42.X, these repositories are required (similar for other
 OpenSuSE versions):
-- http://download.opensuse.org/repositories/Application:/Geo/openSUSE_13.X/
-- http://download.opensuse.org/repositories/home:/SStepke/openSUSE_13.X/
+- http://download.opensuse.org/repositories/home:/SStepke/openSUSE_Leap_42.3/
 
 Packages that need to be installed via YaST (or the system's repository 
 manager):
 
-- libqt4 and libqt4-devel
+- libqt5-qtbase-devel (or, for Met.3D versions < 1.3: libqt4 and libqt4-devel)
+  - and further packages for Qt5 development
 - liblog4cplus and log4cplus-devel
-- gdal, libgdal and libgdal-devel
-- netcdf, netcdf-devel
+- gdal, libgdal20 and libgdal-devel
+- netcdf, netcdf-devel, libnetcdf_c++4-devel, libnetcdf_c++4-1
 - hdf5, libhdf5 and hdf5-devel
 - glew and glew-devel
-- libfreetype and freetype-devel
-- grib_api and grib_api-devel
-- libGLU
+- libfreetype6 and freetype2-devel
+- eccodes and eccodes-devel (or, for Met.3D versions < 1.3: grib_api and grib_api-devel)
+- libGLU1
 - gsl and gsl_devel
 
 - ... and I might have forgotten some. Please tell me!
@@ -74,7 +74,8 @@ Add /your/target/dir to the "met3D_inclib.pri.user" configuration (see below).
 ==============
 
 Get the qcustomplot sources from: http://www.qcustomplot.com/
-You will need the archives QCustomPlot.tar.gz and QCustomPlot-sharedlib.tar.gz.
+You will need the archives QCustomPlot.tar.gz and QCustomPlot-sharedlib.tar.gz
+for version >= 2.0.
 
 Extract the QCustomPlot.tar.gz archive (the /qcustomplot directory)
 and put the contents of QCustomPlot-sharedlib.tar.gz *inside* the
@@ -95,18 +96,18 @@ configuration). These files are required:
 qcustomplot.h
 
 ./lib64:
-libqcustomplotd.so -> libqcustomplotd.so.1.2.1*
-libqcustomplotd.so.1 -> libqcustomplotd.so.1.2.1*
-libqcustomplotd.so.1.2 -> libqcustomplotd.so.1.2.1*
-libqcustomplotd.so.1.2.1*
-libqcustomplot.so -> libqcustomplot.so.1.2.1*
-libqcustomplot.so.1 -> libqcustomplot.so.1.2.1*
-libqcustomplot.so.1.2 -> libqcustomplot.so.1.2.1*
-libqcustomplot.so.1.2.1*
+libqcustomplotd.so -> libqcustomplotd.so.2.0.0*
+libqcustomplotd.so.2 -> libqcustomplotd.so.2.0.0*
+libqcustomplotd.so.2.0 -> libqcustomplotd.so.2.0.0*
+libqcustomplotd.so.2.0.0*
+libqcustomplot.so -> libqcustomplot.so.2.0.0*
+libqcustomplot.so.2 -> libqcustomplot.so.2.0.0*
+libqcustomplot.so.2.0 -> libqcustomplot.so.2.0.0*
+libqcustomplot.so.2.0.0*
 
 
-3) netcdf-cxx4
-==============
+3) netcdf-cxx4 (only old openSuSE systems, available as rpm on 42.X)
+====================================================================
 
 Get the sources of the CURRENT (not the old!) NetCDF C++ interface from
 http://www.unidata.ucar.edu/downloads/netcdf/index.jsp
@@ -226,12 +227,28 @@ The latest version of Met.3D can be checked out from
 Place the repository into the "met.3d-base" base directory:
 
 [in met.3d-base]
-git clone https://bitbucket.org/wxmetvis/met.3d.git
+git clone https://gitlab.com/wxmetvis/met.3d.git
+
+Next, checkout the latest "stable" version by selecting the latest tag:
+
+[in met.3d-base]
+cd met.3d
+git tag -l
+git checkout tags/<latest tag>
+
+For example, if "git tag -l" returns a list in which "1.3.0" is the latest
+tag, checkout this version by entering "git checkout tags/1.3.0"
 
 
 ================================================================================
 E) Configure Met.3D.
 ================================================================================
+
+NOTE: Starting with version 1.2, Met.3D uses the cmake build system. Until
+      version 1.3, both cmake and qmake are supported. Cmake is considerably
+      easier to handle if you are a user. This file only describes building
+      Met.3D with qmake, for the cmake instructions refer to the online
+      documentation at http://met3d.readthedocs.org/.
 
 Modify the software configuration to match your system.
 
