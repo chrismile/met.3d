@@ -35,9 +35,9 @@ your work, too. Please let us know about your experiences.
 Features:
 =========
 
-Met.3D currently runs under Linux (we are working on a Windows version). Its
-only "special" requirement is an OpenGL-4 capable graphics card. A standard
-consumer (i.e. gaming) model works fine. Met.3D's current features include:
+Met.3D runs under Linux and Windows. Its only "special" requirement is an
+OpenGL-4 capable graphics card. A standard consumer (i.e. gaming) model works
+fine. Met.3D's current features include:
 
 * Interactive 2D horizontal sections in a 3D context, including filled and line
   contours, pseudo-colour plots and wind barbs.
@@ -45,18 +45,24 @@ consumer (i.e. gaming) model works fine. Met.3D's current features include:
   including filled and line contours.
 * 3D isosurface volume renderer that supports multiple isosurfaces. Isosurfaces
   can be coloured according to an auxiliary variable.
-* 3D direction volume rendering.
+* 3D direct volume rendering (DVR).
 * Surface shadows and interactive vertical axes to improve spatial perception.
 * Navigation for forecast initialisation and valid time and ensemble member.
 * Interactive computation of ensemble statistical quantities (mean, standard
   deviation, probabilities, ...) of any ensemble data field.
-* 3D trajectory rendering for trajectories computed by the LAGRANTO model
-  (Sprenger and Wernli, Geosci. Model Dev., 2015).
+* 3D trajectory rendering for trajectories computed externally and provided
+  in NetCDF format.
 * On-the-fly gridding of ensemble trajectories into 3D probability volumes.
-* Support for 3D model data that is regular in the horizontal. In the vertical,
-  both pressure levels and in particular sigma-hybrid-pressure-levels (ECMWF
-  model) are natively supported.
+* Support for 3D model data that is regular in longitude and latitude in the
+  horizontal. In the vertical, the following is supported: (a) levels of
+  constant pressure, (b) sigma-hybrid-pressure-levels (ECMWF model), (c) any
+  type of structured grid as long as a 3D field with pressure values is
+  available (this can be used, e.g. for data on geometric height levels).
+* Limited support for COSMO data on rotated grids (data can be displayed but
+  not overlaid with data defined on geographic lon/lat coordinates).
 * Data can be read from CF-compliant NetCDF files and from ECMWF GRIB files.
+* A comprehensive session manager to save the current state of the program
+  and to revert earlier visualization steps.
 * Interactive visual analysis of probability volumes.
 * Multithreaded data pipeline architecture.
 * Modular architecture designed to allow the straightforward implementation
