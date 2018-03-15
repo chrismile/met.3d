@@ -4,8 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
 **  Copyright 2017 Philipp Kaiser
+**  Copyright 2017 Marc Rautenhaus
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -84,7 +84,8 @@ QList<QDateTime> MTrajectoryCalculator::availableInitTimes()
 }
 
 
-QList<QDateTime> MTrajectoryCalculator::availableValidTimes(const QDateTime& initTime)
+QList<QDateTime> MTrajectoryCalculator::availableValidTimes(
+        const QDateTime& initTime)
 {
     QReadLocker availableItemsReadLocker(&availableItemsLock);
     if (!availableTrajectories.keys().contains(initTime))
@@ -96,7 +97,8 @@ QList<QDateTime> MTrajectoryCalculator::availableValidTimes(const QDateTime& ini
 }
 
 
-QList<QDateTime> MTrajectoryCalculator::validTimeOverlap(const QDateTime& initTime, const QDateTime& validTime)
+QList<QDateTime> MTrajectoryCalculator::validTimeOverlap(
+        const QDateTime& initTime, const QDateTime& validTime)
 {
     QReadLocker availableItemsReadLocker(&availableItemsLock);
     if (!availableTrajectories.keys().contains(initTime))
@@ -161,22 +163,40 @@ MTrajectories* MTrajectoryCalculator::produceData(MDataRequest request)
     // Check validity of initTime, startTime and member
     QReadLocker availableItemsReadLocker(&availableItemsLock);
     if (!availableTrajectories.keys().contains(initTime))
-        throw MBadDataFieldRequest("unkown init time requested: " + initTime.toString(Qt::ISODate).toStdString(), __FILE__, __LINE__);
+    {
+        throw MBadDataFieldRequest("unkown init time requested: "
+                                   + initTime.toString(Qt::ISODate).toStdString(),
+                                   __FILE__, __LINE__);
+    }
     else if (!availableTrajectories[initTime].keys().contains(validTime))
-        throw MBadDataFieldRequest("unkown start time requested: " + validTime.toString(Qt::ISODate).toStdString(), __FILE__, __LINE__);
+    {
+        throw MBadDataFieldRequest("unkown start time requested: "
+                                   + validTime.toString(Qt::ISODate).toStdString(),
+                                   __FILE__, __LINE__);
+    }
     else if (!availableTrajectories[initTime].keys().contains(endTime))
-        throw MBadDataFieldRequest("unkown end time requested: " + endTime.toString(Qt::ISODate).toStdString(), __FILE__, __LINE__);
+    {
+        throw MBadDataFieldRequest("unkown end time requested: "
+                                   + endTime.toString(Qt::ISODate).toStdString(),
+                                   __FILE__, __LINE__);
+    }
     else if (!availableMembers.contains(member))
-        throw MBadDataFieldRequest("invalid ensemble member requested",__FILE__, __LINE__);
+    {
+        throw MBadDataFieldRequest("invalid ensemble member requested",__FILE__,
+                                   __LINE__);
+    }
     availableItemsReadLocker.unlock();
 
     // do calculation
     MTrajectoryCalculationInfo cInfo;
     calculateTrajectory(request, cInfo);
 
-    // Create the trajectory data struct and fill content. This value is returned by this function.
-    Met3D::MTrajectories* trajectories = new Met3D::MTrajectories(cInfo.numTrajectories, cInfo.times);
-    trajectories->setMetaData(initTime, validTime, "CALCULATED_trajectories", member);
+    // Create the trajectory data struct and fill content. This value is
+    // returned by this function.
+    Met3D::MTrajectories* trajectories = new Met3D::MTrajectories(
+                cInfo.numTrajectories, cInfo.times);
+    trajectories->setMetaData(initTime, validTime, "CALCULATED_trajectories",
+                              member);
     trajectories->copyVertexDataFrom(cInfo.vertices);
     trajectories->setStartGrid(cInfo.startGrid);
 
@@ -215,7 +235,8 @@ MTask* MTrajectoryCalculator::createTaskGraph(MDataRequest request)
     QDateTime initTime = rh.timeValue("INIT_TIME");
     QDateTime validTime = rh.timeValue("VALID_TIME");
     QDateTime endTime = rh.timeValue("END_TIME");
-    QStringList variables = QStringList() << uVariableName << vVariableName << pVariableName;
+    QStringList variables = QStringList() << uVariableName << vVariableName
+                                          << pVariableName;
 
     // get valid times for given init time
     QReadLocker availableItemsReadLocker(&availableItemsLock);
@@ -227,7 +248,7 @@ MTask* MTrajectoryCalculator::createTaskGraph(MDataRequest request)
     int endIndex = validTimes.indexOf(endTime);
 
     // request for calculation needed resources
-    for(QString variable : variables)
+    for (QString variable : variables)
     {
         for (int i = min(startIndex, endIndex);
              i <= max(startIndex, endIndex); i++)
@@ -252,11 +273,13 @@ void MTrajectoryCalculator::checkDataSource()
     assert(dataSource != nullptr);
 
     // store init and valid times
-    QList<QDateTime> initTimes = dataSource->availableInitTimes(levelType, uVariableName);
-    for(QDateTime& initTime : initTimes)
+    QList<QDateTime> initTimes = dataSource->availableInitTimes(levelType,
+                                                                uVariableName);
+    for (QDateTime& initTime : initTimes)
     {
-        QList<QDateTime> validTimes = dataSource->availableValidTimes(levelType, uVariableName, initTime);
-        for(QDateTime validTime : validTimes)
+        QList<QDateTime> validTimes = dataSource->availableValidTimes(
+                    levelType, uVariableName, initTime);
+        for (QDateTime validTime : validTimes)
         {
             availableTrajectories[initTime][validTime].filename = QString();
             availableTrajectories[initTime][validTime].isStartTime = true;
@@ -264,20 +287,23 @@ void MTrajectoryCalculator::checkDataSource()
     }
 
     // store available ensemble members
-    availableMembers = dataSource->availableEnsembleMembers(levelType, uVariableName);
+    availableMembers = dataSource->availableEnsembleMembers(levelType,
+                                                            uVariableName);
 }
 
 
 const QStringList MTrajectoryCalculator::locallyRequiredKeys()
 {
-    return (QStringList() << "INIT_TIME" << "VALID_TIME" << "END_TIME" << "MEMBER" << "TIME_SPAN"
-        << "ITERATION_PER_TIMESTEP" << "LINE_TYPE" << "ITERATION_METHOD" << "INTERPOLATION_METHOD"
-        << "SEED_TYPE" << "SEED_MIN_POSITION" << "SEED_MAX_POSITION"<< "SEED_STEP_SIZE_LON_LAT"
-        << "SEED_PRESSURE_LEVELS");
+    return (QStringList() << "INIT_TIME" << "VALID_TIME" << "END_TIME"
+            << "MEMBER" << "TIME_SPAN" << "ITERATION_PER_TIMESTEP"
+            << "LINE_TYPE" << "ITERATION_METHOD" << "INTERPOLATION_METHOD"
+            << "SEED_TYPE" << "SEED_MIN_POSITION" << "SEED_MAX_POSITION"
+            << "SEED_STEP_SIZE_LON_LAT" << "SEED_PRESSURE_LEVELS");
 }
 
 
-void MTrajectoryCalculator::calculateTrajectory(MDataRequest request, MTrajectoryCalculationInfo& cInfo)
+void MTrajectoryCalculator::calculateTrajectory(MDataRequest request,
+                                                MTrajectoryCalculationInfo& cInfo)
 {
     /* A) Process request
     ===============================
@@ -290,21 +316,29 @@ void MTrajectoryCalculator::calculateTrajectory(MDataRequest request, MTrajector
     QDateTime initTime = rh.timeValue("INIT_TIME");
     QDateTime validTime = rh.timeValue("VALID_TIME");
     QDateTime endTime = rh.timeValue("END_TIME");
-    TRAJ_CALC_ITERATION_METHOD iterationMethod = TRAJ_CALC_ITERATION_METHOD(rh.intValue("ITERATION_METHOD"));
-    TRAJ_CALC_INTERPOLATION_METHOD  interpolationMethod = TRAJ_CALC_INTERPOLATION_METHOD(rh.intValue("INTERPOLATION_METHOD"));
+    TRAJ_CALC_ITERATION_METHOD iterationMethod = TRAJ_CALC_ITERATION_METHOD(
+                rh.intValue("ITERATION_METHOD"));
+    TRAJ_CALC_INTERPOLATION_METHOD  interpolationMethod =
+            TRAJ_CALC_INTERPOLATION_METHOD(rh.intValue("INTERPOLATION_METHOD"));
     TRAJ_CALC_LINE_TYPE lineType = TRAJ_CALC_LINE_TYPE(rh.intValue("LINE_TYPE"));
     TRAJ_CALC_SEED_TYPE seedType = TRAJ_CALC_SEED_TYPE(rh.intValue("SEED_TYPE"));
     uint iterationPerTimeStep = rh.intValue("ITERATION_PER_TIMESTEP");
     QStringList seedMinPositionList = rh.value("SEED_MIN_POSITION").split("/");
     QStringList seedMaxPositionList = rh.value("SEED_MAX_POSITION").split("/");
     QStringList seedStepSizeList = rh.value("SEED_STEP_SIZE_LON_LAT").split("/");
-    QStringList seedPressureLevelsList = rh.value("SEED_PRESSURE_LEVELS").split("/");
+    QStringList seedPressureLevelsList =
+            rh.value("SEED_PRESSURE_LEVELS").split("/");
 
-    QVector3D seedMinPosition = QVector3D(seedMinPositionList.at(0).toDouble(), seedMinPositionList.at(1).toDouble(), seedMinPositionList.at(2).toDouble());
-    QVector3D seedMaxPosition = QVector3D(seedMaxPositionList.at(0).toDouble(), seedMaxPositionList.at(1).toDouble(), seedMaxPositionList.at(2).toDouble());
-    QVector2D seedStepSize = QVector2D(seedStepSizeList.at(0).toDouble(), seedStepSizeList.at(1).toDouble());
+    QVector3D seedMinPosition = QVector3D(seedMinPositionList.at(0).toDouble(),
+                                          seedMinPositionList.at(1).toDouble(),
+                                          seedMinPositionList.at(2).toDouble());
+    QVector3D seedMaxPosition = QVector3D(seedMaxPositionList.at(0).toDouble(),
+                                          seedMaxPositionList.at(1).toDouble(),
+                                          seedMaxPositionList.at(2).toDouble());
+    QVector2D seedStepSize = QVector2D(seedStepSizeList.at(0).toDouble(),
+                                       seedStepSizeList.at(1).toDouble());
     QVector<double> seedPressureLevels(seedPressureLevelsList.size());
-    for(int i = 0; i < seedPressureLevels.size(); i++)
+    for (int i = 0; i < seedPressureLevels.size(); i++)
     {
         seedPressureLevels[i] = seedPressureLevelsList.at(i).toDouble();
     }
@@ -330,7 +364,8 @@ void MTrajectoryCalculator::calculateTrajectory(MDataRequest request, MTrajector
 
     /* B) Initialization
     ===============================
-     Initialize CalculationHelper with all needed variables for further processing
+     Initialize CalculationHelper with all needed variables for further
+     processing.
     */
 
     CalculationHelper helper;
@@ -355,21 +390,29 @@ void MTrajectoryCalculator::calculateTrajectory(MDataRequest request, MTrajector
         case HORIZONTAL:
         case BOX:
             helper.seedCount = QVector3D(
-                static_cast<uint>(abs(seedMaxPosition.x() - seedMinPosition.x()) / seedStepSize.x() + 1.0),
-                static_cast<uint>(abs(seedMaxPosition.y() - seedMinPosition.y()) / seedStepSize.y() + 1.0),
+                static_cast<uint>(abs(seedMaxPosition.x() - seedMinPosition.x())
+                                  / seedStepSize.x() + 1.0),
+                static_cast<uint>(abs(seedMaxPosition.y() - seedMinPosition.y())
+                                  / seedStepSize.y() + 1.0),
                 seedPressureLevels.size());
 
-            // initialize size and values of the start grid if type is pole, horizontal or box.
-            cInfo.startGrid = std::shared_ptr<MStructuredGrid>(new MRegularLonLatStructuredPressureGrid(helper.seedCount.z(), helper.seedCount.y(), helper.seedCount.x()));
-            for(int lon = 0; lon < helper.seedCount.x(); lon++)
+            // Initialize size and values of the start grid if type is pole,
+            // horizontal or box.
+            cInfo.startGrid = std::shared_ptr<MStructuredGrid>(
+                        new MRegularLonLatStructuredPressureGrid(
+                            helper.seedCount.z(), helper.seedCount.y(),
+                            helper.seedCount.x()));
+            for (int lon = 0; lon < helper.seedCount.x(); lon++)
             {
-                cInfo.startGrid->lons[lon] = seedMinPosition.x() + (seedStepSize.x() * lon);
+                cInfo.startGrid->lons[lon] = seedMinPosition.x()
+                        + (seedStepSize.x() * lon);
             }
-            for(int lat = 0; lat < helper.seedCount.y(); lat++)
+            for (int lat = 0; lat < helper.seedCount.y(); lat++)
             {
-                cInfo.startGrid->lats[lat] = seedMinPosition.y() + (seedStepSize.y() * lat);
+                cInfo.startGrid->lats[lat] = seedMinPosition.y()
+                        + (seedStepSize.y() * lat);
             }
-            for(int p = 0; p < helper.seedCount.z(); p++)
+            for (int p = 0; p < helper.seedCount.z(); p++)
             {
                 cInfo.startGrid->levels[p] = seedPressureLevels.at(p);
             }
@@ -377,19 +420,24 @@ void MTrajectoryCalculator::calculateTrajectory(MDataRequest request, MTrajector
             break;
         case VERTICAL:
             helper.seedCount = QVector3D(
-                static_cast<uint>((seedMaxPosition.toVector2D() - seedMinPosition.toVector2D()).length() / seedStepSize.x() + 1.0),
+                static_cast<uint>((seedMaxPosition.toVector2D()
+                                   - seedMinPosition.toVector2D()).length()
+                                  / seedStepSize.x() + 1.0),
                 1,
                 seedPressureLevels.size());
             break;
     }
-    helper.trajectoryCount = static_cast<uint>(helper.seedCount.x() * helper.seedCount.y() * helper.seedCount.z());
+    helper.trajectoryCount = static_cast<uint>(helper.seedCount.x()
+                                               * helper.seedCount.y()
+                                               * helper.seedCount.z());
 
 
     /* C) Trajectory Calculation
     ===============================
-     Fill needed grid slots with correct time step and calculate trajectory vertices
-     for given trajectory number. Path lines needed adjusted vector field after every
-     processed time step. Stream lines are calculated with a fixed vector field.
+     Fill needed grid slots with correct time step and calculate trajectory
+     vertices for given trajectory number. Path lines needed adjusted vector
+     field after every processed time step. Stream lines are calculated with a
+     fixed vector field.
     */
 
     switch (lineType)
@@ -404,10 +452,12 @@ void MTrajectoryCalculator::calculateTrajectory(MDataRequest request, MTrajector
 }
 
 
-void MTrajectoryCalculator::calculateStreamLine(CalculationHelper& ch, MTrajectoryCalculationInfo& cInfo)
+void MTrajectoryCalculator::calculateStreamLine(
+        CalculationHelper& ch, MTrajectoryCalculationInfo& cInfo)
 {
     // initialize used variables
-    QVector<QVector<MStructuredGrid*>> grids(2, QVector<MStructuredGrid *>(3, nullptr));
+    QVector<QVector<MStructuredGrid*>> grids(
+                2, QVector<MStructuredGrid *>(3, nullptr));
     MDataRequestHelper rh(ch.baseRequest);
 
     // initialize calculation Info
@@ -415,15 +465,18 @@ void MTrajectoryCalculator::calculateStreamLine(CalculationHelper& ch, MTrajecto
     cInfo.numTimeSteps = ch.iterationPerTimeStep;
     cInfo.times.reserve(cInfo.numTimeSteps);
     cInfo.vertices = QVector<QVector<QVector3D>>(cInfo.numTrajectories);
-    for(uint t = 0; t < cInfo.numTrajectories; ++t)
+    for (uint t = 0; t < cInfo.numTrajectories; ++t)
+    {
         cInfo.vertices[t].reserve(cInfo.numTimeSteps);
+    }
 
     // add start time step and seed points
     QVector<bool> validPosition(cInfo.numTrajectories);
     cInfo.times.push_back(ch.validTimes.at(ch.startTimeStep));
     for (uint trajectory = 0; trajectory < ch.trajectoryCount; ++trajectory)
     {
-        cInfo.vertices[trajectory].push_back(calculateSeedPosition(trajectory, ch));
+        cInfo.vertices[trajectory].push_back(calculateSeedPosition(trajectory,
+                                                                   ch));
         validPosition[trajectory] = true;
     }
 
@@ -438,7 +491,8 @@ void MTrajectoryCalculator::calculateStreamLine(CalculationHelper& ch, MTrajecto
         grids[1][v] = grids[0][v];
     }
 
-    // this should be removed in future, find a better way than getting number from times vector
+    // this should be removed in future, find a better way than getting number
+    // from times vector
     for (uint iteration = 1; iteration <= ch.iterationPerTimeStep; ++iteration)
     {
         cInfo.times.push_back(ch.validTimes.at(ch.startTimeStep));
@@ -449,7 +503,8 @@ void MTrajectoryCalculator::calculateStreamLine(CalculationHelper& ch, MTrajecto
     for (uint trajectory = 0; trajectory < ch.trajectoryCount; ++trajectory)
     {
         // do iteration per trajectory
-        for (uint iteration = 1; iteration <= ch.iterationPerTimeStep; ++iteration)
+        for (uint iteration = 1; iteration <= ch.iterationPerTimeStep;
+             ++iteration)
         {
             //get current position from vertex buffer
             QVector3D currentPosition = cInfo.vertices[trajectory].back();
@@ -459,16 +514,21 @@ void MTrajectoryCalculator::calculateStreamLine(CalculationHelper& ch, MTrajecto
             switch (ch.iterationMethod)
             {
                 case EULER:
-                    nextPos = euler(currentPosition, 3600, 0, 0, ch.interpolationMethod, grids, validPosition[trajectory]);
+                    nextPos = euler(currentPosition, 3600, 0, 0,
+                                    ch.interpolationMethod, grids,
+                                    validPosition[trajectory]);
                     break;
                 case RUNGE_KUTTA:
-                    nextPos = rungeKutta(currentPosition, 3600, 0, 0, ch.interpolationMethod, grids, validPosition[trajectory]);
+                    nextPos = rungeKutta(currentPosition, 3600, 0, 0,
+                                         ch.interpolationMethod, grids,
+                                         validPosition[trajectory]);
                     break;
             }
 
             // mark position as invalid
-            if(!validPosition[trajectory])
-                nextPos = QVector3D(M_MISSING_VALUE, M_MISSING_VALUE, M_MISSING_VALUE);
+            if (!validPosition[trajectory])
+                nextPos = QVector3D(M_MISSING_VALUE, M_MISSING_VALUE,
+                                    M_MISSING_VALUE);
 
             // store position in vertex buffer
             cInfo.vertices[trajectory].push_back(nextPos);
@@ -478,17 +538,19 @@ void MTrajectoryCalculator::calculateStreamLine(CalculationHelper& ch, MTrajecto
     // release all data
     for (int v = 0; v < ch.varNames.size(); ++v)
     {
-        if(grids[0][v])
+        if (grids[0][v])
         {
             dataSource->releaseData(grids[0][v]);
         }
     }
 }
 
-void MTrajectoryCalculator::calculatePathLine(CalculationHelper& ch, MTrajectoryCalculationInfo& cInfo)
+void MTrajectoryCalculator::calculatePathLine(CalculationHelper& ch,
+                                              MTrajectoryCalculationInfo& cInfo)
 {
     // initialize used variables
-    QVector<QVector<MStructuredGrid*>> grids(2, QVector<MStructuredGrid *>(3, nullptr));
+    QVector<QVector<MStructuredGrid*>> grids(
+                2, QVector<MStructuredGrid *>(3, nullptr));
     QVector<QDateTime> timeSteps(2);
     MDataRequestHelper rh(ch.baseRequest);
 
@@ -497,8 +559,10 @@ void MTrajectoryCalculator::calculatePathLine(CalculationHelper& ch, MTrajectory
     cInfo.numTrajectories = ch.trajectoryCount;
     cInfo.times.reserve(cInfo.numTimeSteps);
     cInfo.vertices = QVector<QVector<QVector3D>>(cInfo.numTrajectories);
-    for(uint t = 0; t < cInfo.numTrajectories; ++t)
+    for (uint t = 0; t < cInfo.numTrajectories; ++t)
+    {
         cInfo.vertices[t].reserve(cInfo.numTimeSteps);
+    }
 
     // create temporary vector with current positions of trajectories
     QVector<QVector3D> positions(cInfo.numTrajectories);
@@ -517,12 +581,14 @@ void MTrajectoryCalculator::calculatePathLine(CalculationHelper& ch, MTrajectory
     // do calculation for all involved time steps
     // (check if forward or backward calculation is requested)
     bool forward = ch.startTimeStep <= ch.endTimeStep;
-    for(uint step = ch.startTimeStep; step != ch.endTimeStep; forward ? step++ : step--)
+    for (uint step = ch.startTimeStep; step != ch.endTimeStep;
+         forward ? step++ : step--)
     {
         // set low and high times and time between time steps
         timeSteps[0] = ch.validTimes.at(step);
         timeSteps[1] = ch.validTimes.at(step + (forward ? 1 : -1));
-        const float timeStepSeconds = timeSteps[0].secsTo(timeSteps[1]) / static_cast<float>(ch.iterationPerTimeStep);
+        const float timeStepSeconds = timeSteps[0].secsTo(timeSteps[1])
+                / static_cast<float>(ch.iterationPerTimeStep);
 
         // load missing grids
         for (int t = 0; t < timeSteps.size(); ++t)
@@ -531,7 +597,7 @@ void MTrajectoryCalculator::calculatePathLine(CalculationHelper& ch, MTrajectory
             for (int v = 0; v < ch.varNames.size(); ++v)
             {
                 rh.insert("VARIABLE", ch.varNames[v]);
-                if(!grids[t][v])
+                if (!grids[t][v])
                     grids[t][v] = dataSource->getData(rh.request());
             }
         }
@@ -544,26 +610,40 @@ void MTrajectoryCalculator::calculatePathLine(CalculationHelper& ch, MTrajectory
         for (uint trajectory = 0; trajectory < ch.trajectoryCount; ++trajectory)
         {
             // do iteration per trajectory and timestep
-            for (uint iteration = 1; iteration <= ch.iterationPerTimeStep; ++iteration)
+            for (uint iteration = 1; iteration <= ch.iterationPerTimeStep;
+                 ++iteration)
             {
                 // calculate current factor and store current time step
-                const float factor0 = (iteration - 1) / static_cast<float>(ch.iterationPerTimeStep);
-                const float factor1 = iteration / static_cast<float>(ch.iterationPerTimeStep);
+                const float factor0 = (iteration - 1)
+                        / static_cast<float>(ch.iterationPerTimeStep);
+                const float factor1 = iteration
+                        / static_cast<float>(ch.iterationPerTimeStep);
 
                 // calculate next timestep with euler or runge
                 switch (ch.iterationMethod)
                 {
                     case EULER:
-                        positions[trajectory] = euler(positions[trajectory], timeStepSeconds, factor0, factor1, ch.interpolationMethod, grids, validPosition[trajectory]);
+                        positions[trajectory] =
+                                euler(positions[trajectory], timeStepSeconds,
+                                      factor0, factor1, ch.interpolationMethod,
+                                      grids, validPosition[trajectory]);
                         break;
                     case RUNGE_KUTTA:
-                        positions[trajectory] = rungeKutta(positions[trajectory], timeStepSeconds, factor0, factor1, ch.interpolationMethod, grids, validPosition[trajectory]);
+                        positions[trajectory] =
+                                rungeKutta(positions[trajectory],
+                                           timeStepSeconds, factor0, factor1,
+                                           ch.interpolationMethod, grids,
+                                           validPosition[trajectory]);
                         break;
                 }
 
                 // mark position as invalid
-                if(!validPosition[trajectory])
-                    positions[trajectory] = QVector3D(M_MISSING_VALUE, M_MISSING_VALUE, M_MISSING_VALUE);
+                if (!validPosition[trajectory])
+                {
+                    positions[trajectory] = QVector3D(M_MISSING_VALUE,
+                                                      M_MISSING_VALUE,
+                                                      M_MISSING_VALUE);
+                }
             }
 
             // save position for this time step
@@ -581,11 +661,11 @@ void MTrajectoryCalculator::calculatePathLine(CalculationHelper& ch, MTrajectory
     }
 
     // release all data
-    for(int t = 0; t < grids.size(); ++t)
+    for (int t = 0; t < grids.size(); ++t)
     {
-        for(int v = 0; v < grids[t].size(); ++v)
+        for (int v = 0; v < grids[t].size(); ++v)
         {
-            if(grids[t][v])
+            if (grids[t][v])
             {
                 dataSource->releaseData(grids[t][v]);
                 grids[t][v] = nullptr;
@@ -595,13 +675,17 @@ void MTrajectoryCalculator::calculatePathLine(CalculationHelper& ch, MTrajectory
 }
 
 
-QVector3D MTrajectoryCalculator::euler(QVector3D pos, float deltat, float timePos0, float timePos1, TRAJ_CALC_INTERPOLATION_METHOD method, QVector<QVector<MStructuredGrid*>> &grids, bool& valid)
+QVector3D MTrajectoryCalculator::euler(QVector3D pos, float deltat,
+                                       float timePos0, float timePos1,
+                                       TRAJ_CALC_INTERPOLATION_METHOD method,
+                                       QVector<QVector<MStructuredGrid*>> &grids,
+                                       bool& valid)
 {
     QVector3D p0 = pos;
     QVector3D v0 = sampleVelocity(p0, timePos0, method, grids, valid);
     QVector3D p1 = p0;
 
-    for(int i = 0; i < EULER_ITERATION; i++)
+    for (int i = 0; i < EULER_ITERATION; i++)
     {
         QVector3D v1 = sampleVelocity(p1, timePos1, method, grids, valid);
         QVector3D v = (v0 + v1) / 2.0f;
@@ -612,15 +696,18 @@ QVector3D MTrajectoryCalculator::euler(QVector3D pos, float deltat, float timePo
 }
 
 
-QVector3D MTrajectoryCalculator::rungeKutta(QVector3D pos, float deltat, float timePos0, float timePos1, TRAJ_CALC_INTERPOLATION_METHOD method, QVector<QVector<MStructuredGrid*>> &grids, bool& valid)
+QVector3D MTrajectoryCalculator::rungeKutta(
+        QVector3D pos, float deltat, float timePos0, float timePos1,
+        TRAJ_CALC_INTERPOLATION_METHOD method,
+        QVector<QVector<MStructuredGrid*>> &grids, bool& valid)
 {
     QVector3D s;
     QVector<QVector3D> k(4);
     float factor;
 
-    for(int i = 0; i < 4; i++)
+    for (int i = 0; i < 4; i++)
     {
-        if(i == 0)
+        if (i == 0)
         {
             s = QVector3D(0.0f, 0.0f, 0.0f);
             factor = timePos0;
@@ -644,7 +731,9 @@ QVector3D MTrajectoryCalculator::rungeKutta(QVector3D pos, float deltat, float t
 }
 
 
-QVector3D MTrajectoryCalculator::sampleVelocity(QVector3D pos, float factor, TRAJ_CALC_INTERPOLATION_METHOD method, QVector<QVector<MStructuredGrid *>> &grids, bool& valid)
+QVector3D MTrajectoryCalculator::sampleVelocity(
+        QVector3D pos, float factor, TRAJ_CALC_INTERPOLATION_METHOD method,
+        QVector<QVector<MStructuredGrid *>> &grids, bool& valid)
 {
     // init velocity
     QVector3D velocity(0, 0, 0);
@@ -654,14 +743,17 @@ QVector3D MTrajectoryCalculator::sampleVelocity(QVector3D pos, float factor, TRA
     {
         case LAGRANTO_INTERPOLATION:
         {
-            QVector3D uIndex = interpolatedIndex(pos, grids[0][0], grids[1][0], factor);
-            QVector3D vIndex = interpolatedIndex(pos, grids[0][1], grids[1][1], factor);
-            QVector3D pIndex = interpolatedIndex(pos, grids[0][2], grids[1][2], factor);
+            QVector3D uIndex = interpolatedIndex(pos, grids[0][0], grids[1][0],
+                    factor);
+            QVector3D vIndex = interpolatedIndex(pos, grids[0][1], grids[1][1],
+                    factor);
+            QVector3D pIndex = interpolatedIndex(pos, grids[0][2], grids[1][2],
+                    factor);
 
             // check if index is valid
-            if( uIndex.x() < 0 || uIndex.y() < 0 || uIndex.z() < 0 ||
-                vIndex.x() < 0 || vIndex.y() < 0 || vIndex.z() < 0 ||
-                pIndex.x() < 0 || pIndex.y() < 0 || pIndex.z() < 0 )
+            if ( uIndex.x() < 0 || uIndex.y() < 0 || uIndex.z() < 0
+                 || vIndex.x() < 0 || vIndex.y() < 0 || vIndex.z() < 0
+                 || pIndex.x() < 0 || pIndex.y() < 0 || pIndex.z() < 0 )
             {
                 valid = false;
                 break;
@@ -685,13 +777,17 @@ QVector3D MTrajectoryCalculator::sampleVelocity(QVector3D pos, float factor, TRA
             float pHigh = grids[1][2]->interpolateValue(pos.x(), pos.y(), pos.z());
 
             // check velocity and interpolate
-            if(IS_MISSING(uLow) || IS_MISSING(vLow) || IS_MISSING(pLow) || IS_MISSING(uHigh) || IS_MISSING(vHigh) || IS_MISSING(pHigh))
+            if (IS_MISSING(uLow) || IS_MISSING(vLow) || IS_MISSING(pLow)
+                    || IS_MISSING(uHigh) || IS_MISSING(vHigh)
+                    || IS_MISSING(pHigh))
             {
                 valid = false;
                 break;
             }
 
-            velocity = QVector3D(MMIX(uLow, uHigh, factor), MMIX(vLow, vHigh, factor), MMIX(pLow, pHigh, factor));
+            velocity = QVector3D(MMIX(uLow, uHigh, factor),
+                                 MMIX(vLow, vHigh, factor),
+                                 MMIX(pLow, pHigh, factor));
             break;
         }
     }
@@ -729,8 +825,10 @@ float MTrajectoryCalculator::pressure(QVector3D index, MStructuredGrid* grid)
     float val110 = grid->getPressure(p1.z(), p1.y(), p0.x());
     float val111 = grid->getPressure(p1.z(), p1.y(), p1.x());
 
-    return MMIX(MMIX(MMIX(val000, val001, fraci), MMIX(val010, val011, fraci), fracj),
-                MMIX(MMIX(val100, val101, fraci), MMIX(val110, val111, fraci), fracj),
+    return MMIX(MMIX(MMIX(val000, val001, fraci), MMIX(val010, val011, fraci),
+                     fracj),
+                MMIX(MMIX(val100, val101, fraci), MMIX(val110, val111, fraci),
+                     fracj),
                 frack);
 }
 
@@ -753,18 +851,24 @@ float MTrajectoryCalculator::value(QVector3D index, MStructuredGrid* grid)
     float val110 = grid->getValue(p1.z(), p1.y(), p0.x());
     float val111 = grid->getValue(p1.z(), p1.y(), p1.x());
 
-    return MMIX(MMIX(MMIX(val000, val001, fraci), MMIX(val010, val011, fraci), fracj),
-                MMIX(MMIX(val100, val101, fraci), MMIX(val110, val111, fraci), fracj),
+    return MMIX(MMIX(MMIX(val000, val001, fraci), MMIX(val010, val011, fraci),
+                     fracj),
+                MMIX(MMIX(val100, val101, fraci), MMIX(val110, val111, fraci),
+                     fracj),
                 frack);
 }
 
 
-QVector3D MTrajectoryCalculator::findGridIndex(QVector3D pos, MStructuredGrid* grid)
+QVector3D MTrajectoryCalculator::findGridIndex(QVector3D pos,
+                                               MStructuredGrid* grid)
 {
-    float i = MMOD(pos.x() - grid->getLons()[0], 360.) / abs(grid->getLons()[1]-grid->getLons()[0]);
-    float j = (grid->getLats()[0] - pos.y()) / abs(grid->getLats()[1]-grid->getLats()[0]);
+    float i = MMOD(pos.x() - grid->getLons()[0], 360.)
+            / abs(grid->getLons()[1]-grid->getLons()[0]);
+    float j = (grid->getLats()[0] - pos.y())
+            / abs(grid->getLats()[1]-grid->getLats()[0]);
 
-    if(i < 0 || i > (grid->getNumLons() - 1) || j < 0 || j > (grid->getNumLats() - 1))
+    if (i < 0 || i > (grid->getNumLons() - 1) || j < 0
+            || j > (grid->getNumLats() - 1))
         return QVector3D(-1, -1, -1);
 
     int kl = 0;
@@ -802,22 +906,30 @@ QVector3D MTrajectoryCalculator::findGridIndex(QVector3D pos, MStructuredGrid* g
 }
 
 
-QVector3D MTrajectoryCalculator::interpolatedIndex(QVector3D pos, MStructuredGrid* grid0, MStructuredGrid* grid1, float factor)
+QVector3D MTrajectoryCalculator::interpolatedIndex(
+        QVector3D pos, MStructuredGrid* grid0, MStructuredGrid* grid1,
+        float factor)
 {
     // get indices for both grids
     QVector3D index0 = findGridIndex(pos, grid0);
     QVector3D index1 = findGridIndex(pos, grid1);
 
-    // check if any of the indices has a missing value (-1) and return interpolated index
+    // Check if any of the indices has a missing value (-1) and return
+    // interpolated index.
     QVector3D mixIndex;
-    mixIndex.setX((index0.x() < 0 || index1.x() < 0) ? - 1 : MMIX(index0.x(), index1.x(), factor));
-    mixIndex.setY((index0.y() < 0 || index1.y() < 0) ? - 1 : MMIX(index0.y(), index1.y(), factor));
-    mixIndex.setZ((index0.z() < 0 || index1.z() < 0) ? - 1 : MMIX(index0.z(), index1.z(), factor));
+    mixIndex.setX((index0.x() < 0 || index1.x() < 0)
+                  ? - 1 : MMIX(index0.x(), index1.x(), factor));
+    mixIndex.setY((index0.y() < 0 || index1.y() < 0)
+                  ? - 1 : MMIX(index0.y(), index1.y(), factor));
+    mixIndex.setZ((index0.z() < 0 || index1.z() < 0)
+                  ? - 1 : MMIX(index0.z(), index1.z(), factor));
     return mixIndex;
 }
 
 
-float MTrajectoryCalculator::interpolatedValue(QVector3D index, MStructuredGrid* grid0, MStructuredGrid* grid1, float factor)
+float MTrajectoryCalculator::interpolatedValue(
+        QVector3D index, MStructuredGrid* grid0, MStructuredGrid* grid1,
+        float factor)
 {
     float v0 = value(index, grid0);
     float v1 = value(index, grid1);
@@ -825,7 +937,8 @@ float MTrajectoryCalculator::interpolatedValue(QVector3D index, MStructuredGrid*
 }
 
 
-QVector3D MTrajectoryCalculator::calculateSeedPosition(int trajectory, CalculationHelper& ch)
+QVector3D MTrajectoryCalculator::calculateSeedPosition(int trajectory,
+                                                       CalculationHelper& ch)
 {
     switch (ch.seedType)
     {
@@ -836,11 +949,17 @@ QVector3D MTrajectoryCalculator::calculateSeedPosition(int trajectory, Calculati
         {
             // calculate grid positions for x,y and z
             int x = trajectory % static_cast<int>(ch.seedCount.x());
-            int y = trajectory / static_cast<int>(ch.seedCount.x()) % static_cast<int>(ch.seedCount.y());
-            int z = trajectory / static_cast<int>(ch.seedCount.x()) / static_cast<int>(ch.seedCount.y());
+            int y = trajectory / static_cast<int>(ch.seedCount.x())
+                    % static_cast<int>(ch.seedCount.y());
+            int z = trajectory / static_cast<int>(ch.seedCount.x())
+                    / static_cast<int>(ch.seedCount.y());
 
             // calculate seed position given by delta and grid position
-            return QVector3D(ch.seedMinPosition.x() + x * ch.seedStepSizeLonLat.x(), ch.seedMinPosition.y() + y * ch.seedStepSizeLonLat.y(), ch.seedPressureLevels.at(z));
+            return QVector3D(ch.seedMinPosition.x()
+                             + x * ch.seedStepSizeLonLat.x(),
+                             ch.seedMinPosition.y()
+                             + y * ch.seedStepSizeLonLat.y(),
+                             ch.seedPressureLevels.at(z));
         }
          // VERTICAL seed type is not axis aligned in x and y, interpolate along x;
         case VERTICAL:
@@ -849,11 +968,15 @@ QVector3D MTrajectoryCalculator::calculateSeedPosition(int trajectory, Calculati
             int x = trajectory % static_cast<int>(ch.seedCount.x());
             int z = trajectory / static_cast<int>(ch.seedCount.x());
 
-            // interpolate horizontal position along with factor given by grid slot x
-            QVector2D dir = (ch.seedMaxPosition.toVector2D() - ch.seedMinPosition.toVector2D()).normalized();
-            QVector2D xyPos = ch.seedMinPosition.toVector2D() + dir * ch.seedStepSizeLonLat.x() * x;
+            // iInterpolate horizontal position along with factor given by grid
+            // slot x.
+            QVector2D dir = (ch.seedMaxPosition.toVector2D()
+                             - ch.seedMinPosition.toVector2D()).normalized();
+            QVector2D xyPos = ch.seedMinPosition.toVector2D()
+                    + dir * ch.seedStepSizeLonLat.x() * x;
 
-            // calculate seed position given by interpolation value for xy and by z delta and z grid position
+            // Calculate seed position given by interpolation value for xy and
+            // by z delta and z grid position.
             return QVector3D(xyPos.x(), xyPos.y(), ch.seedPressureLevels.at(z));
         }
     }

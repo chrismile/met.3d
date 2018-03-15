@@ -157,7 +157,7 @@ shader FSmain(in GStoFS Input, out vec4 fragColour)
     float b = 2.0 * dot(dir, c2p);
     float c = dot(c2p, c2p) - Input.gs_radius * Input.gs_radius;
     float d = b * b - 4.0 * a * c;
-    if(d <= 0.0) discard;
+    if (d <= 0.0) discard;
 
     float t = (-b - sqrt(d)) / (2.0 * a);
     // Position at which the ray from quad pixel to sphere centre intersects

@@ -995,7 +995,8 @@ void MTrajectoryActor::setDataSource(MTrajectoryDataSource *ds)
 
         // check whether this datasource is precomputed
         precomputedDataSource =
-                (dynamic_cast<MTrajectoryCalculator*>(trajectorySource) == nullptr);
+                (dynamic_cast<MTrajectoryCalculator*>(trajectorySource)
+                 == nullptr);
         updateActorData();
     }
 }
@@ -1156,20 +1157,30 @@ void MTrajectoryActor::asynchronousDataAvailable(MDataRequest request)
     for (int t = 0; t < trajectoryRequests.size(); t++)
     {
         bool queueContainsEntryWithNoPendingRequests = false;
-        for (int i = 0; i < trajectoryRequests[t].pendingRequestsQueue.size(); i++)
+        for (int i = 0; i < trajectoryRequests[t].pendingRequestsQueue.size();
+             i++)
         {
-            if (trajectoryRequests[t].pendingRequestsQueue[i].dataRequest.request == request)
+            if (trajectoryRequests[t].pendingRequestsQueue[i]
+                    .dataRequest.request == request)
             {
                 // If this is the first time we are informed about the availability
                 // of the request (available still == false) decrease number of
                 // pending requests.
-                if ( !trajectoryRequests[t].pendingRequestsQueue[i].dataRequest.available )
-                    trajectoryRequests[t].pendingRequestsQueue[i].numPendingRequests--;
+                if ( !trajectoryRequests[t].pendingRequestsQueue[i]
+                     .dataRequest.available )
+                {
+                    trajectoryRequests[t].pendingRequestsQueue[i]
+                            .numPendingRequests--;
+                }
 
-                trajectoryRequests[t].pendingRequestsQueue[i].dataRequest.available = true;
+                trajectoryRequests[t].pendingRequestsQueue[i]
+                        .dataRequest.available = true;
 
-                if (trajectoryRequests[t].pendingRequestsQueue[i].numPendingRequests == 0)
+                if (trajectoryRequests[t].pendingRequestsQueue[i]
+                        .numPendingRequests == 0)
+                {
                     queueContainsEntryWithNoPendingRequests = true;
+                }
 
                 // Do NOT break the loop here; "request" might be relevant to
                 // multiple entries in the queue.
@@ -1189,19 +1200,31 @@ void MTrajectoryActor::asynchronousNormalsAvailable(MDataRequest request)
     for (int t = 0; t < trajectoryRequests.size(); t++)
     {
         bool queueContainsEntryWithNoPendingRequests = false;
-        for (int i = 0; i < trajectoryRequests[t].pendingRequestsQueue.size(); i++)
+        for (int i = 0; i < trajectoryRequests[t].pendingRequestsQueue.size();
+             i++)
         {
-            foreach (MSceneViewGLWidget *view, trajectoryRequests[t].pendingRequestsQueue[i].normalsRequests.keys())
+            foreach (MSceneViewGLWidget *view,
+                     trajectoryRequests[t].pendingRequestsQueue[i]
+                     .normalsRequests.keys())
             {
-                if (trajectoryRequests[t].pendingRequestsQueue[i].normalsRequests[view].request == request)
+                if (trajectoryRequests[t].pendingRequestsQueue[i]
+                        .normalsRequests[view].request == request)
                 {
-                    if ( !trajectoryRequests[t].pendingRequestsQueue[i].normalsRequests[view].available )
-                        trajectoryRequests[t].pendingRequestsQueue[i].numPendingRequests--;
+                    if ( !trajectoryRequests[t].pendingRequestsQueue[i]
+                         .normalsRequests[view].available )
+                    {
+                        trajectoryRequests[t].pendingRequestsQueue[i]
+                                .numPendingRequests--;
+                    }
 
-                    trajectoryRequests[t].pendingRequestsQueue[i].normalsRequests[view].available = true;
+                    trajectoryRequests[t].pendingRequestsQueue[i]
+                            .normalsRequests[view].available = true;
 
-                    if (trajectoryRequests[t].pendingRequestsQueue[i].numPendingRequests == 0)
+                    if (trajectoryRequests[t].pendingRequestsQueue[i]
+                            .numPendingRequests == 0)
+                    {
                         queueContainsEntryWithNoPendingRequests = true;
+                    }
 
                     // Do NOT break the loop here; "request" might be relevant to
                     // multiple entries in the queue.
@@ -1222,17 +1245,27 @@ void MTrajectoryActor::asynchronousSelectionAvailable(MDataRequest request)
     for (int t = 0; t < trajectoryRequests.size(); t++)
     {
         bool queueContainsEntryWithNoPendingRequests = false;
-        for (int i = 0; i < trajectoryRequests[t].pendingRequestsQueue.size(); i++)
+        for (int i = 0; i < trajectoryRequests[t].pendingRequestsQueue.size();
+             i++)
         {
-            if (trajectoryRequests[t].pendingRequestsQueue[i].filterRequest.request == request)
+            if (trajectoryRequests[t].pendingRequestsQueue[i].filterRequest
+                    .request == request)
             {
-                if (!trajectoryRequests[t].pendingRequestsQueue[i].filterRequest.available)
-                    trajectoryRequests[t].pendingRequestsQueue[i].numPendingRequests--;
+                if (!trajectoryRequests[t].pendingRequestsQueue[i]
+                        .filterRequest.available)
+                {
+                    trajectoryRequests[t].pendingRequestsQueue[i]
+                            .numPendingRequests--;
+                }
 
-                trajectoryRequests[t].pendingRequestsQueue[i].filterRequest.available = true;
+                trajectoryRequests[t].pendingRequestsQueue[i]
+                        .filterRequest.available = true;
 
-                if (trajectoryRequests[t].pendingRequestsQueue[i].numPendingRequests == 0)
+                if (trajectoryRequests[t].pendingRequestsQueue[i]
+                        .numPendingRequests == 0)
+                {
                     queueContainsEntryWithNoPendingRequests = true;
+                }
 
                 // Do NOT break the loop here; "request" might be relevant to
                 // multiple entries in the queue.
@@ -1252,17 +1285,27 @@ void MTrajectoryActor::asynchronousSingleTimeSelectionAvailable(MDataRequest req
     for (int t = 0; t < trajectoryRequests.size(); t++)
     {
         bool queueContainsEntryWithNoPendingRequests = false;
-        for (int i = 0; i < trajectoryRequests[t].pendingRequestsQueue.size(); i++)
+        for (int i = 0; i < trajectoryRequests[t].pendingRequestsQueue.size();
+             i++)
         {
-            if (trajectoryRequests[t].pendingRequestsQueue[i].singleTimeFilterRequest.request == request)
+            if (trajectoryRequests[t].pendingRequestsQueue[i]
+                    .singleTimeFilterRequest.request == request)
             {
-                if (!trajectoryRequests[t].pendingRequestsQueue[i].singleTimeFilterRequest.available)
-                    trajectoryRequests[t].pendingRequestsQueue[i].numPendingRequests--;
+                if (!trajectoryRequests[t].pendingRequestsQueue[i]
+                        .singleTimeFilterRequest.available)
+                {
+                    trajectoryRequests[t].pendingRequestsQueue[i]
+                            .numPendingRequests--;
+                }
 
-                trajectoryRequests[t].pendingRequestsQueue[i].singleTimeFilterRequest.available = true;
+                trajectoryRequests[t].pendingRequestsQueue[i]
+                        .singleTimeFilterRequest.available = true;
 
-                if (trajectoryRequests[t].pendingRequestsQueue[i].numPendingRequests == 0)
+                if (trajectoryRequests[t].pendingRequestsQueue[i]
+                        .numPendingRequests == 0)
+                {
                     queueContainsEntryWithNoPendingRequests = true;
+                }
 
                 // Do NOT break the loop here; "request" might be relevant to
                 // multiple entries in the queue.
@@ -1281,10 +1324,12 @@ void MTrajectoryActor::prepareAvailableDataForRendering(uint slot)
 {
     // Prepare datafields for rendering as long as they are available in
     // the order in which they were requested.
-    while ( ( !trajectoryRequests[slot].pendingRequestsQueue.isEmpty() ) &&
-            ( trajectoryRequests[slot].pendingRequestsQueue.head().numPendingRequests == 0 ) )
+    while ( ( !trajectoryRequests[slot].pendingRequestsQueue.isEmpty() )
+            && ( trajectoryRequests[slot].pendingRequestsQueue.head()
+                 .numPendingRequests == 0 ) )
     {
-        MTrajectoryRequestQueueInfo trqi = trajectoryRequests[slot].pendingRequestsQueue.dequeue();
+        MTrajectoryRequestQueueInfo trqi = trajectoryRequests[slot]
+                .pendingRequestsQueue.dequeue();
 
         // 1. Trajectory data.
         // ===================
@@ -1295,19 +1340,24 @@ void MTrajectoryActor::prepareAvailableDataForRendering(uint slot)
             if (trajectoryRequests[slot].trajectories)
             {
                 trajectoryRequests[slot].trajectories->releaseVertexBuffer();
-                trajectorySource->releaseData(trajectoryRequests[slot].trajectories);
+                trajectorySource->releaseData(trajectoryRequests[slot]
+                                              .trajectories);
             }
-            trajectoryRequests[slot].trajectories = trajectorySource->getData(trqi.dataRequest.request);
-            trajectoryRequests[slot].trajectoriesVertexBuffer = trajectoryRequests[slot].trajectories->getVertexBuffer();
+            trajectoryRequests[slot].trajectories = trajectorySource->getData(
+                        trqi.dataRequest.request);
+            trajectoryRequests[slot].trajectoriesVertexBuffer =
+                    trajectoryRequests[slot].trajectories->getVertexBuffer();
 
             // Update displayed information about timestep length.
-            float timeStepLength_hours = trajectoryRequests[slot].trajectories->getTimeStepLength_sec() / 3600.;
+            float timeStepLength_hours = trajectoryRequests[slot].trajectories
+                    ->getTimeStepLength_sec() / 3600.;
 
             properties->mDDouble()->setSingleStep(
                         deltaTimeFilterProperty, timeStepLength_hours);
             properties->mDDouble()->setRange(
                         deltaTimeFilterProperty, timeStepLength_hours,
-                        (trajectoryRequests[slot].trajectories->getNumTimeStepsPerTrajectory() - 1)
+                        (trajectoryRequests[slot].trajectories
+                         ->getNumTimeStepsPerTrajectory() - 1)
                         * timeStepLength_hours);
 
             updateParticlePosTimeProperty();
@@ -1327,7 +1377,8 @@ void MTrajectoryActor::prepareAvailableDataForRendering(uint slot)
                 }
                 trajectoryRequests[slot].normals[view] = normalsSource->getData(
                             trqi.normalsRequests[view].request);
-                trajectoryRequests[slot].normalsVertexBuffer[view] = trajectoryRequests[slot].normals[view]->getVertexBuffer();
+                trajectoryRequests[slot].normalsVertexBuffer[view] =
+                        trajectoryRequests[slot].normals[view]->getVertexBuffer();
             }
         }
 
@@ -1337,8 +1388,12 @@ void MTrajectoryActor::prepareAvailableDataForRendering(uint slot)
         if (trqi.filterRequest.available)
         {
             if (trajectoryRequests[slot].trajectorySelection)
-                trajectoryFilter->releaseData(trajectoryRequests[slot].trajectorySelection);
-            trajectoryRequests[slot].trajectorySelection = trajectoryFilter->getData(trqi.filterRequest.request);
+            {
+                trajectoryFilter->releaseData(trajectoryRequests[slot]
+                                              .trajectorySelection);
+            }
+            trajectoryRequests[slot].trajectorySelection =
+                    trajectoryFilter->getData(trqi.filterRequest.request);
         }
 
         // 4. Single time selection.
@@ -1347,8 +1402,12 @@ void MTrajectoryActor::prepareAvailableDataForRendering(uint slot)
         if (trqi.singleTimeFilterRequest.available)
         {
             if (trajectoryRequests[slot].trajectorySingleTimeSelection)
-                trajectoryFilter->releaseData(trajectoryRequests[slot].trajectorySingleTimeSelection);
-            trajectoryRequests[slot].trajectorySingleTimeSelection = trajectoryFilter->getData(trqi.singleTimeFilterRequest.request);
+            {
+                trajectoryFilter->releaseData(trajectoryRequests[slot]
+                                              .trajectorySingleTimeSelection);
+            }
+            trajectoryRequests[slot].trajectorySingleTimeSelection =
+                    trajectoryFilter->getData(trqi.singleTimeFilterRequest.request);
         }
 
 #ifdef DIRECT_SYNCHRONIZATION
@@ -1858,7 +1917,8 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
 
     else if (property == computationLineTypeProperty)
     {
-        TRAJ_CALC_LINE_TYPE lineType = TRAJ_CALC_LINE_TYPE(properties->mEnum()->value(computationLineTypeProperty));
+        TRAJ_CALC_LINE_TYPE lineType = TRAJ_CALC_LINE_TYPE(
+                    properties->mEnum()->value(computationLineTypeProperty));
         switch (lineType)
         {
             case PATH_LINE:
@@ -1964,20 +2024,28 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
          || (renderMode == TUBES_AND_SINGLETIME)
          || (renderMode == BACKWARDTUBES_AND_SINGLETIME))
     {
-        for (int t = 0; t < (precomputedDataSource ? 1 : seedActorData.size()); t++)
+        for (int t = 0; t < (precomputedDataSource ? 1 : seedActorData.size());
+             t++)
         {
             // If any required data item is missing we cannot render.
             if ( (trajectoryRequests[t].trajectories == nullptr)
                  || (trajectoryRequests[t].normals[sceneView] == nullptr)
-                 || (trajectoryRequests[t].trajectorySelection == nullptr) ) continue;
+                 || (trajectoryRequests[t].trajectorySelection == nullptr) )
+            {
+                continue;
+            }
 
-            // If the vertical scaling of the view has changed, a recomputation of
-            // the normals is necessary, as they are based on worldZ coordinates.
+            // If the vertical scaling of the view has changed, a recomputation
+            // of the normals is necessary, as they are based on worldZ
+            // coordinates.
             if (sceneView->visualisationParametersHaveChanged())
             {
                 // Discard old normals.
                 if (trajectoryRequests[t].normals.value(sceneView, nullptr))
-                    normalsSource->releaseData(trajectoryRequests[t].normals[sceneView]);
+                {
+                    normalsSource->releaseData(trajectoryRequests[t]
+                                               .normals[sceneView]);
+                }
 
                 trajectoryRequests[t].normals[sceneView] = nullptr;
                 continue;
@@ -2002,7 +2070,8 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
                     GLfloat(tubeRadius));
             tubeShader->setUniformValue(
                     "numObsPerTrajectory",
-                    trajectoryRequests[t].trajectories->getNumTimeStepsPerTrajectory());
+                    trajectoryRequests[t]
+                        .trajectories->getNumTimeStepsPerTrajectory());
 
             if (renderMode == BACKWARDTUBES_AND_SINGLETIME)
             {
@@ -2014,7 +2083,8 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
             {
                 tubeShader->setUniformValue(
                         "renderTubesUpToIndex",
-                        trajectoryRequests[t].trajectories->getNumTimeStepsPerTrajectory());
+                        trajectoryRequests[t]
+                            .trajectories->getNumTimeStepsPerTrajectory());
             }
 
             // Texture bindings for transfer function for data scalar (1D texture
@@ -2030,18 +2100,23 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
                     "scalarMaximum", transferFunction->getMaximumValue());
 
             // Bind trajectories and normals vertex buffer objects.
-            trajectoryRequests[t].trajectoriesVertexBuffer->attachToVertexAttribute(SHADER_VERTEX_ATTRIBUTE);
+            trajectoryRequests[t].trajectoriesVertexBuffer
+                    ->attachToVertexAttribute(SHADER_VERTEX_ATTRIBUTE);
 
-            trajectoryRequests[t].normalsVertexBuffer[sceneView]->attachToVertexAttribute(SHADER_NORMAL_ATTRIBUTE);
+            trajectoryRequests[t].normalsVertexBuffer[sceneView]
+                    ->attachToVertexAttribute(SHADER_NORMAL_ATTRIBUTE);
 
             glPolygonMode(GL_FRONT_AND_BACK,
                           renderAsWireFrame ? GL_LINE : GL_FILL); CHECK_GL_ERROR;
             glLineWidth(1); CHECK_GL_ERROR;
 
             glMultiDrawArrays(GL_LINE_STRIP_ADJACENCY,
-                              trajectoryRequests[t].trajectorySelection->getStartIndices(),
-                              trajectoryRequests[t].trajectorySelection->getIndexCount(),
-                              trajectoryRequests[t].trajectorySelection->getNumTrajectories());
+                              trajectoryRequests[t].trajectorySelection
+                              ->getStartIndices(),
+                              trajectoryRequests[t].trajectorySelection
+                              ->getIndexCount(),
+                              trajectoryRequests[t].trajectorySelection
+                              ->getNumTrajectories());
             CHECK_GL_ERROR;
 
 
@@ -2067,7 +2142,8 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
                         GLfloat(tubeRadius));
                 tubeShadowShader->setUniformValue(
                         "numObsPerTrajectory",
-                        trajectoryRequests[t].trajectories->getNumTimeStepsPerTrajectory());
+                        trajectoryRequests[t].trajectories
+                            ->getNumTimeStepsPerTrajectory());
 
                 if (renderMode == BACKWARDTUBES_AND_SINGLETIME)
                 {
@@ -2079,7 +2155,8 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
                 {
                     tubeShadowShader->setUniformValue(
                             "renderTubesUpToIndex",
-                            trajectoryRequests[t].trajectories->getNumTimeStepsPerTrajectory());
+                            trajectoryRequests[t].trajectories
+                                ->getNumTimeStepsPerTrajectory());
                 }
 
                 tubeShadowShader->setUniformValue(
@@ -2101,9 +2178,12 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
                             "constColour", QColor(20, 20, 20, 155));
 
                 glMultiDrawArrays(GL_LINE_STRIP_ADJACENCY,
-                                  trajectoryRequests[t].trajectorySelection->getStartIndices(),
-                                  trajectoryRequests[t].trajectorySelection->getIndexCount(),
-                                  trajectoryRequests[t].trajectorySelection->getNumTrajectories());
+                                  trajectoryRequests[t].trajectorySelection
+                                  ->getStartIndices(),
+                                  trajectoryRequests[t].trajectorySelection
+                                  ->getIndexCount(),
+                                  trajectoryRequests[t].trajectorySelection
+                                  ->getNumTrajectories());
                 CHECK_GL_ERROR;
             }
 
@@ -2118,23 +2198,34 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
          || (renderMode == TUBES_AND_SINGLETIME)
          || (renderMode == BACKWARDTUBES_AND_SINGLETIME))
     {
-        for (int t = 0; t < (precomputedDataSource ? 1 : seedActorData.size()); t++)
+        for (int t = 0; t < (precomputedDataSource ? 1 : seedActorData.size());
+             t++)
         {
-            if (trajectoryRequests[t].trajectories == nullptr) continue;
+            if (trajectoryRequests[t].trajectories == nullptr)
+            {
+                continue;
+            }
 
             if (renderMode == ALL_POSITION_SPHERES)
             {
-                if (trajectoryRequests[t].trajectorySelection == nullptr) continue;
+                if (trajectoryRequests[t].trajectorySelection == nullptr)
+                {
+                    continue;
+                }
             }
             else
             {
-                if (trajectoryRequests[t].trajectorySingleTimeSelection == nullptr) continue;
+                if (trajectoryRequests[t]
+                        .trajectorySingleTimeSelection == nullptr)
+                {
+                    continue;
+                }
             }
 
             positionSphereShader->bindProgram("Normal");
 
-            // Set MVP-matrix and parameters to map pressure to world space in the
-            // vertex shader.
+            // Set MVP-matrix and parameters to map pressure to world space in
+            // the vertex shader.
             positionSphereShader->setUniformValue(
                     "mvpMatrix",
                     *(sceneView->getModelViewProjectionMatrix()));
@@ -2158,9 +2249,9 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
                     GLboolean(false));
 
 
-            // Texture bindings for transfer function for data scalar (1D texture
-            // from transfer function class). The data scalar is stored in the
-            // vertex.w component passed to the vertex shader.
+            // Texture bindings for transfer function for data scalar (1D
+            // texture from transfer function class). The data scalar is stored
+            // in the vertex.w component passed to the vertex shader.
             transferFunction->getTexture()->bindToTextureUnit(
                     textureUnitTransferFunction);
             positionSphereShader->setUniformValue(
@@ -2181,15 +2272,28 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
             glLineWidth(1); CHECK_GL_ERROR;
 
             if (renderMode == ALL_POSITION_SPHERES)
+            {
                 glMultiDrawArrays(GL_POINTS,
-                                  trajectoryRequests[t].trajectorySelection->getStartIndices(),
-                                  trajectoryRequests[t].trajectorySelection->getIndexCount(),
-                                  trajectoryRequests[t].trajectorySelection->getNumTrajectories());
+                                  trajectoryRequests[t]
+                                  .trajectorySelection->getStartIndices(),
+                                  trajectoryRequests[t]
+                                  .trajectorySelection->getIndexCount(),
+                                  trajectoryRequests[t]
+                                  .trajectorySelection->getNumTrajectories());
+            }
             else
+            {
                 glMultiDrawArrays(GL_POINTS,
-                                  trajectoryRequests[t].trajectorySingleTimeSelection->getStartIndices(),
-                                  trajectoryRequests[t].trajectorySingleTimeSelection->getIndexCount(),
-                                  trajectoryRequests[t].trajectorySingleTimeSelection->getNumTrajectories());
+                                  trajectoryRequests[t]
+                                  .trajectorySingleTimeSelection
+                                  ->getStartIndices(),
+                                  trajectoryRequests[t]
+                                  .trajectorySingleTimeSelection
+                                  ->getIndexCount(),
+                                  trajectoryRequests[t]
+                                  .trajectorySingleTimeSelection
+                                  ->getNumTrajectories());
+            }
             CHECK_GL_ERROR;
 
 
@@ -2242,14 +2346,23 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
 
                 if (renderMode == ALL_POSITION_SPHERES)
                     glMultiDrawArrays(GL_POINTS,
-                                      trajectoryRequests[t].trajectorySelection->getStartIndices(),
-                                      trajectoryRequests[t].trajectorySelection->getIndexCount(),
-                                      trajectoryRequests[t].trajectorySelection->getNumTrajectories());
+                                      trajectoryRequests[t]
+                                      .trajectorySelection->getStartIndices(),
+                                      trajectoryRequests[t]
+                                      .trajectorySelection->getIndexCount(),
+                                      trajectoryRequests[t]
+                                      .trajectorySelection->getNumTrajectories());
                 else
                     glMultiDrawArrays(GL_POINTS,
-                                      trajectoryRequests[t].trajectorySingleTimeSelection->getStartIndices(),
-                                      trajectoryRequests[t].trajectorySingleTimeSelection->getIndexCount(),
-                                      trajectoryRequests[t].trajectorySingleTimeSelection->getNumTrajectories());
+                                      trajectoryRequests[t]
+                                      .trajectorySingleTimeSelection
+                                      ->getStartIndices(),
+                                      trajectoryRequests[t]
+                                      .trajectorySingleTimeSelection
+                                      ->getIndexCount(),
+                                      trajectoryRequests[t]
+                                      .trajectorySingleTimeSelection
+                                      ->getNumTrajectories());
                 CHECK_GL_ERROR;
             }
 
@@ -2303,7 +2416,8 @@ void MTrajectoryActor::updateActorData()
 
         double stepSizeLon = properties->mDouble()->value(sas.lonSpacing);
         double stepSizeLat = properties->mDouble()->value(sas.latSpacing);
-        QVector<float> pressureLevels = parsePressureLevelString(properties->mString()->value(sas.pressureLevels));
+        QVector<float> pressureLevels = parsePressureLevelString(
+                    properties->mString()->value(sas.pressureLevels));
 
         switch (sas.type)
         {
@@ -2349,7 +2463,8 @@ void MTrajectoryActor::updateActorData()
             SeedActorData data;
             data.type = HORIZONTAL;
             data.minPosition = QVector3D(hor.x(), hor.y(), p);
-            data.maxPosition = QVector3D(hor.x() + hor.width(), hor.y() + hor.width(), p);
+            data.maxPosition = QVector3D(hor.x() + hor.width(),
+                                         hor.y() + hor.width(), p);
             data.stepSize = QVector2D(stepSizeLon, stepSizeLat);
             data.pressureLevels.clear();
             data.pressureLevels << p;
@@ -2372,7 +2487,8 @@ void MTrajectoryActor::updateActorData()
             for (int i = 0; i < actor->getWaypointsModel()->size() - 1; i++)
             {
                 QVector2D point1 = actor->getWaypointsModel()->positionLonLat(i);
-                QVector2D point2 = actor->getWaypointsModel()->positionLonLat(i + 1);
+                QVector2D point2 =
+                        actor->getWaypointsModel()->positionLonLat(i + 1);
                 double pbot = actor->getBottomPressure();
                 double ptop = actor->getTopPressure();
 
@@ -2409,7 +2525,8 @@ void MTrajectoryActor::updateActorData()
             SeedActorData data;
             data.type = BOX;
             data.minPosition = QVector3D(hor.x(), hor.y(), ptop);
-            data.maxPosition = QVector3D(hor.x() + hor.width(), hor.y() + hor.width(), pbot);
+            data.maxPosition = QVector3D(hor.x() + hor.width(),
+                                         hor.y() + hor.width(), pbot);
             data.stepSize = QVector2D(stepSizeLon, stepSizeLat);
             data.pressureLevels.clear();
             for (float f : pressureLevels)
@@ -2532,11 +2649,17 @@ void MTrajectoryActor::asynchronousDataRequest(bool synchronizationRequest)
         // if computed dataSource is used, additional information is needed
         if (!precomputedDataSource)
         {
-            QDateTime endTime = availableStartTimes.at(properties->mEnum()->value(computationIntegrationTimeProperty));
-            unsigned int lineType = properties->mEnum()->value(computationLineTypeProperty);
-            unsigned int iterationMethod = properties->mEnum()->value(computationIntegrationMethodProperty);
-            unsigned int interpolationMethod = properties->mEnum()->value(computationInterpolationMethodProperty);
-            unsigned int iterationCount = properties->mInt()->value(computationIterationCountProperty);
+            QDateTime endTime = availableStartTimes.at(
+                        properties->mEnum()->value(
+                            computationIntegrationTimeProperty));
+            unsigned int lineType = properties->mEnum()->value(
+                        computationLineTypeProperty);
+            unsigned int iterationMethod = properties->mEnum()->value(
+                        computationIntegrationMethodProperty);
+            unsigned int interpolationMethod = properties->mEnum()->value(
+                        computationInterpolationMethodProperty);
+            unsigned int iterationCount = properties->mInt()->value(
+                        computationIterationCountProperty);
             unsigned int seedType = seedActorData[t].type;
             QString seedMinPosition = QString("%1/%2/%3")
                     .arg(seedActorData[t].minPosition.x())
@@ -2549,7 +2672,8 @@ void MTrajectoryActor::asynchronousDataRequest(bool synchronizationRequest)
             QString seedStepSize = QString("%1/%2")
                     .arg(seedActorData[t].stepSize.x())
                     .arg(seedActorData[t].stepSize.y());
-            QString seedPressureLevels = encodePressureLevels(seedActorData[t].pressureLevels, QString("/"));
+            QString seedPressureLevels = encodePressureLevels(
+                        seedActorData[t].pressureLevels, QString("/"));
 
             // insert additional infos to request
             rh.insert("END_TIME", endTime);
@@ -2590,7 +2714,8 @@ void MTrajectoryActor::asynchronousDataRequest(bool synchronizationRequest)
         //TODO: add property
         rh.insert("TRY_PRECOMPUTED", 1);
 
-        bool filteringEnabled = properties->mBool()->value(enableAscentFilterProperty);
+        bool filteringEnabled = properties->mBool()->value(
+                    enableAscentFilterProperty);
         if (filteringEnabled)
         {
             float deltaPressure_hPa = properties->mDDouble()->value(
@@ -2637,9 +2762,9 @@ void MTrajectoryActor::asynchronousDataRequest(bool synchronizationRequest)
 //        debugPrintPendingRequestsQueue();
 
         // Emit requests AFTER its information has been posted to the queue.
-        // (Otherwise requestData() may trigger a call to asynchronous...Available()
-        // before the request information has been posted; then the incoming
-        // request is not accepted).
+        // (Otherwise requestData() may trigger a call to
+        // asynchronous...Available() before the request information has been
+        // posted; then the incoming request is not accepted).
 
         trajectorySource->requestData(trqi.dataRequest.request);
 
@@ -2743,7 +2868,8 @@ void MTrajectoryActor::asynchronousSelectionRequest()
         // pressure interval (xx hPa over the "lifetime" of the trajectories;
         // e.g. for T-NAWDEX over 48 hours).
 
-        bool filteringEnabled = properties->mBool()->value(enableAscentFilterProperty);
+        bool filteringEnabled = properties->mBool()->value(
+                    enableAscentFilterProperty);
         if (filteringEnabled)
         {
             float deltaPressure_hPa = properties->mDDouble()->value(
@@ -2898,12 +3024,15 @@ void MTrajectoryActor::updateParticlePosTimeProperty()
     {
         QDateTime currentValue = getPropertyTime(particlePosTimeProperty);
 
-        availableParticlePosTimes = trajectoryRequests[index].trajectories->getTimes().toList();
+        availableParticlePosTimes = trajectoryRequests[index].trajectories
+                ->getTimes().toList();
         QStringList particlePosTimeStrings;
-        for (int i = 0; i < trajectoryRequests[index].trajectories->getTimes().size(); i++)
+        for (int i = 0;
+             i < trajectoryRequests[index].trajectories->getTimes().size(); i++)
         {
             particlePosTimeStrings
-                    << trajectoryRequests[index].trajectories->getTimes().at(i).toString(Qt::ISODate);
+                    << trajectoryRequests[index].trajectories
+                       ->getTimes().at(i).toString(Qt::ISODate);
         }
 
         properties->mEnum()->setEnumNames(particlePosTimeProperty,
@@ -2912,7 +3041,8 @@ void MTrajectoryActor::updateParticlePosTimeProperty()
         // Try to restore previous time value. If the previous value is not
         // available for the new trajectories, indexOf() returns -1. This is
         // changed to 0, i.e. the first available time value is selected.
-        int newIndex = max(0, trajectoryRequests[index].trajectories->getTimes().indexOf(currentValue));
+        int newIndex = max(0, trajectoryRequests[index].trajectories
+                           ->getTimes().indexOf(currentValue));
         properties->mEnum()->setValue(particlePosTimeProperty, newIndex);
 
         // The trajectory time property is not needed when the entire
@@ -2945,7 +3075,8 @@ void MTrajectoryActor::updateDeltaTimeProperty()
 
     if (trajectorySource == nullptr || precomputedDataSource)
     {
-        properties->mEnum()->setEnumNames(computationIntegrationTimeProperty, QStringList());
+        properties->mEnum()->setEnumNames(computationIntegrationTimeProperty,
+                                          QStringList());
     }
     else
     {
@@ -2953,7 +3084,8 @@ void MTrajectoryActor::updateDeltaTimeProperty()
         QDateTime initTime  = getPropertyTime(initTimeProperty);
         QDateTime startTime = getPropertyTime(startTimeProperty);
 
-        // get available timesteps and add time delta to list (ignore currently selected start Time)
+        // get available timesteps and add time delta to list (ignore currently
+        // selected start Time)
         QStringList endTimes;
         for (QDateTime& time : availableStartTimes)
         {
@@ -2961,11 +3093,15 @@ void MTrajectoryActor::updateDeltaTimeProperty()
         }
 
         // set new list to property
-        int currentIndex = properties->mEnum()->value(computationIntegrationTimeProperty);
-        properties->mEnum()->setEnumNames(computationIntegrationTimeProperty, endTimes);
+        int currentIndex = properties->mEnum()->value(
+                    computationIntegrationTimeProperty);
+        properties->mEnum()->setEnumNames(computationIntegrationTimeProperty,
+                                          endTimes);
 
-        currentIndex = currentIndex < 0 ? (availableStartTimes.size() - 1) : currentIndex;
-        properties->mEnum()->setValue(computationIntegrationTimeProperty, currentIndex);
+        currentIndex = currentIndex < 0
+                ? (availableStartTimes.size() - 1) : currentIndex;
+        properties->mEnum()->setValue(computationIntegrationTimeProperty,
+                                      currentIndex);
     }
 
     suppressUpdate = false;
@@ -3056,20 +3192,30 @@ void MTrajectoryActor::debugPrintPendingRequestsQueue()
         for (int i = 0; i < trajectoryRequests[t].pendingRequestsQueue.size(); i++)
         {
             str += QString("Entry #%1 [%2]\n[%3] %4\n[%5] %6\n[%7] %8\n")
-                    .arg(i).arg(trajectoryRequests[t].pendingRequestsQueue[i].numPendingRequests)
-                    .arg(trajectoryRequests[t].pendingRequestsQueue[i].dataRequest.available)
-                    .arg(trajectoryRequests[t].pendingRequestsQueue[i].dataRequest.request)
-                    .arg(trajectoryRequests[t].pendingRequestsQueue[i].filterRequest.available)
-                    .arg(trajectoryRequests[t].pendingRequestsQueue[i].filterRequest.request)
-                    .arg(trajectoryRequests[t].pendingRequestsQueue[i].singleTimeFilterRequest.available)
-                    .arg(trajectoryRequests[t].pendingRequestsQueue[i].singleTimeFilterRequest.request);
+                    .arg(i).arg(trajectoryRequests[t].pendingRequestsQueue[i]
+                                .numPendingRequests)
+                    .arg(trajectoryRequests[t].pendingRequestsQueue[i]
+                         .dataRequest.available)
+                    .arg(trajectoryRequests[t].pendingRequestsQueue[i]
+                         .dataRequest.request)
+                    .arg(trajectoryRequests[t].pendingRequestsQueue[i]
+                         .filterRequest.available)
+                    .arg(trajectoryRequests[t].pendingRequestsQueue[i]
+                         .filterRequest.request)
+                    .arg(trajectoryRequests[t].pendingRequestsQueue[i]
+                         .singleTimeFilterRequest.available)
+                    .arg(trajectoryRequests[t].pendingRequestsQueue[i]
+                         .singleTimeFilterRequest.request);
 
                     foreach (MSceneViewGLWidget *view,
-                             trajectoryRequests[t].pendingRequestsQueue[i].normalsRequests.keys())
+                             trajectoryRequests[t].pendingRequestsQueue[i]
+                             .normalsRequests.keys())
                 {
                     str += QString("[%1] %2\n")
-                            .arg(trajectoryRequests[t].pendingRequestsQueue[i].normalsRequests[view].available)
-                            .arg(trajectoryRequests[t].pendingRequestsQueue[i].normalsRequests[view].request);
+                            .arg(trajectoryRequests[t].pendingRequestsQueue[i]
+                                 .normalsRequests[view].available)
+                            .arg(trajectoryRequests[t].pendingRequestsQueue[i]
+                                 .normalsRequests[view].request);
                 }
         }
     }
@@ -3131,7 +3277,10 @@ bool MTrajectoryActor::selectDataSource()
 
 void MTrajectoryActor::openSeedActorDialog()
 {
-    const QList<MSelectActorType> types = {MSelectActorType::POLE_ACTOR, MSelectActorType::HORIZONTAL_ACTOR, MSelectActorType::VERTICAL_ACTOR, MSelectActorType::BOX_ACTOR};
+    const QList<MSelectActorType> types =
+    {MSelectActorType::POLE_ACTOR, MSelectActorType::HORIZONTAL_ACTOR,
+     MSelectActorType::VERTICAL_ACTOR, MSelectActorType::BOX_ACTOR};
+
     MSelectActorDialog dialog(types, 0);
     if (dialog.exec() == QDialog::Rejected)
     {
@@ -3144,7 +3293,8 @@ void MTrajectoryActor::openSeedActorDialog()
 }
 
 
-void MTrajectoryActor::addSeedActor(QString actorName, double lon, double lat, QVector<float> levels)
+void MTrajectoryActor::addSeedActor(QString actorName, double lon, double lat,
+                                    QVector<float> levels)
 {
     MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
     MActor* actor = glRM->getActorByName(actorName);
@@ -3232,7 +3382,8 @@ void MTrajectoryActor::clearSeedActor()
     for (SeedActorSettings& sas : computationSeedActorProperties)
     {
         // disconnect signal before deletion
-        disconnect(sas.actor, SIGNAL(actorChanged()), this, SLOT(onSeedActorChanged()));
+        disconnect(sas.actor, SIGNAL(actorChanged()), this,
+                   SLOT(onSeedActorChanged()));
 
         // delete property
         computationSeedPropertyGroup->removeSubProperty(sas.propertyGroup);
@@ -3248,13 +3399,16 @@ void MTrajectoryActor::removeSeedActor(QString name)
     // delete actor with given name
     for (int i = 0; i < computationSeedActorProperties.size(); i++)
     {
-        if (computationSeedActorProperties.at(i).actor->getName().compare(name) == 0)
+        if (computationSeedActorProperties.at(i).actor->getName()
+                .compare(name) == 0)
         {
             // disconnect signal before deletion
-            disconnect(computationSeedActorProperties.at(i).actor, SIGNAL(actorChanged()), this, SLOT(onSeedActorChanged()));
+            disconnect(computationSeedActorProperties.at(i).actor,
+                       SIGNAL(actorChanged()), this, SLOT(onSeedActorChanged()));
 
             // remove from properties and list
-            computationSeedPropertyGroup->removeSubProperty(computationSeedActorProperties.at(i).propertyGroup);
+            computationSeedPropertyGroup->removeSubProperty(
+                        computationSeedActorProperties.at(i).propertyGroup);
             computationSeedActorProperties.removeAt(i);
             break;
         }
@@ -3313,6 +3467,7 @@ void MTrajectoryActor::releaseData()
     }
 }
 
+
 void MTrajectoryActor::releaseData(int slot)
 {
     // 1. Trajectory data.
@@ -3349,7 +3504,8 @@ void MTrajectoryActor::releaseData(int slot)
     // =========================
     if (trajectoryRequests[slot].trajectorySingleTimeSelection)
     {
-        trajectoryFilter->releaseData(trajectoryRequests[slot].trajectorySingleTimeSelection);
+        trajectoryFilter->releaseData(trajectoryRequests[slot]
+                                      .trajectorySingleTimeSelection);
         trajectoryRequests[slot].trajectorySingleTimeSelection = nullptr;
     }
 }
