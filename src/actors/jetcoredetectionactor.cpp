@@ -4,8 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2017 Marc Rautenhaus
 **  Copyright 2017 Michael Kern
+**  Copyright 2017 Marc Rautenhaus
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -112,12 +112,12 @@ MJetcoreDetectionActor::FilterSettingsJetcores::FilterSettingsJetcores(
     MActor *a = hostActor;
     MQtProperties *properties = a->getQtProperties();
 
-    lambdaThresholdProperty = a->addProperty(DOUBLE_PROPERTY,
+    lambdaThresholdProperty = a->addProperty(SCIENTIFICDOUBLE_PROPERTY,
                                              "max. lambda (* 10e-9)",
                                              groupProp);
-    properties->setDouble(lambdaThresholdProperty, lambdaThreshold,
-                          -std::numeric_limits<double>::min(),
-                          std::numeric_limits<double>::max(), 6, 0.1);
+    properties->setSciDouble(lambdaThresholdProperty, lambdaThreshold,
+                             -std::numeric_limits<double>::min(),
+                             std::numeric_limits<double>::max(), 6, 0.1);
 
     angleThresholdProperty = a->addProperty(DOUBLE_PROPERTY, "max. angle",
                                             groupProp);
@@ -127,8 +127,8 @@ MJetcoreDetectionActor::FilterSettingsJetcores::FilterSettingsJetcores(
     pressureDiffThresholdProperty = a->addProperty(
                 DECORATEDDOUBLE_PROPERTY, "max. pressure difference",
                 groupProp);
-    properties->setDDouble(pressureDiffThresholdProperty, pressureDiffThreshold,
-                           0, 10000, 2, 1, " hPa");
+    properties->setDDouble(pressureDiffThresholdProperty,
+                           pressureDiffThreshold, 0., 10000., 2, 1., " hPa");
 }
 
 
@@ -187,7 +187,7 @@ void MJetcoreDetectionActor::loadConfiguration(QSettings *settings)
 
     lineFilterSettingsCores->lambdaThreshold = settings->value(
                 "lambdaThreshold", 0.f).toFloat();
-    properties->mDouble()->setValue(
+    properties->mSciDouble()->setValue(
                 lineFilterSettingsCores->lambdaThresholdProperty,
                 lineFilterSettingsCores->lambdaThreshold);
     lineFilterSettingsCores->angleThreshold = settings->value(
@@ -234,7 +234,7 @@ void MJetcoreDetectionActor::onQtPropertyChanged(QtProperty *property)
         variableSettingsCores->geoPotOnly = properties->mBool()
                 ->value(variableSettingsCores->geoPotOnlyProperty);
 
-        lineFilterSettingsCores->lambdaThreshold = properties->mDouble()
+        lineFilterSettingsCores->lambdaThreshold = properties->mSciDouble()
                 ->value(lineFilterSettingsCores->lambdaThresholdProperty);
 
         lineFilterSettingsCores->angleThreshold = properties->mDouble()

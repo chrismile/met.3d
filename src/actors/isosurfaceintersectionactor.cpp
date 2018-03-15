@@ -4,8 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2017 Marc Rautenhaus
 **  Copyright 2017 Michael Kern
+**  Copyright 2017 Marc Rautenhaus
 **  Copyright 2017 Christoph Heidelmann
 **  Copyright 2017 Bianca Tost
 **
@@ -174,16 +174,18 @@ MIsosurfaceIntersectionActor::VariableSettings::VariableSettings(
     varsProperty[0] = a->addProperty(ENUM_PROPERTY, "variable A",
                                      groupProp);
 
-    varsIsovalueProperty[0] = a->addProperty(DOUBLE_PROPERTY, "isovalue A", groupProp);
-    properties->setDouble(varsIsovalueProperty[0], varsIsovalue[0], 0,
-                          std::numeric_limits<double>::max(), 5, 1);
+    varsIsovalueProperty[0] = a->addProperty(SCIENTIFICDOUBLE_PROPERTY,
+                                             "isovalue A", groupProp);
+    properties->setSciDouble(varsIsovalueProperty[0], varsIsovalue[0], 0.,
+            std::numeric_limits<double>::max(), 5, 1.);
 
     varsProperty[1] = a->addProperty(ENUM_PROPERTY, "variable B",
                                      groupProp);
 
-    varsIsovalueProperty[1] = a->addProperty(DOUBLE_PROPERTY, "isovalue B", groupProp);
-    properties->setDouble(varsIsovalueProperty[1], varsIsovalue[1], 0,
-                          std::numeric_limits<double>::max(), 5, 1);
+    varsIsovalueProperty[1] = a->addProperty(SCIENTIFICDOUBLE_PROPERTY,
+                                             "isovalue B", groupProp);
+    properties->setSciDouble(varsIsovalueProperty[1], varsIsovalue[1], 0.,
+            std::numeric_limits<double>::max(), 5, 1.);
 }
 
 
@@ -201,10 +203,11 @@ MIsosurfaceIntersectionActor::LineFilterSettings::LineFilterSettings(
     filterVarProperty = a->addProperty(ENUM_PROPERTY, "variable",
                                      groupProp);
 
-    valueFilterProperty = a->addProperty(DOUBLE_PROPERTY, "min. value (filter variable)",
-                                         groupProp);
-    properties->setDouble(valueFilterProperty, valueFilter,
-                          0, std::numeric_limits<double>::max(), 5, 1);
+    valueFilterProperty = a->addProperty(
+                SCIENTIFICDOUBLE_PROPERTY, "min. value (filter variable)",
+                groupProp);
+    properties->setSciDouble(valueFilterProperty, valueFilter,
+                             0., std::numeric_limits<double>::max(), 5, 1.);
 
     lineLengthFilterProperty = a->addProperty(DECORATEDDOUBLE_PROPERTY,
                                               "min. line length",
@@ -455,11 +458,11 @@ void MIsosurfaceIntersectionActor::loadConfiguration(QSettings *settings)
             variableSettings->varsIndex[1]);
 
     variableSettings->varsIsovalue[0] = settings->value("var1stIsovalue", 0).toFloat();
-    properties->mDouble()->setValue(variableSettings->varsIsovalueProperty[0],
-                                    variableSettings->varsIsovalue[0]);
+    properties->mSciDouble()->setValue(variableSettings->varsIsovalueProperty[0],
+            variableSettings->varsIsovalue[0]);
     variableSettings->varsIsovalue[1] = settings->value("var2ndIsovalue", 0).toFloat();
-    properties->mDouble()->setValue(variableSettings->varsIsovalueProperty[1],
-                                    variableSettings->varsIsovalue[1]);
+    properties->mSciDouble()->setValue(variableSettings->varsIsovalueProperty[1],
+            variableSettings->varsIsovalue[1]);
 
     lineFilterSettings->filterVarIndex = settings->value("varFilterIndex",
                                                      -1).toInt();
@@ -468,8 +471,8 @@ void MIsosurfaceIntersectionActor::loadConfiguration(QSettings *settings)
 
     lineFilterSettings->valueFilter = settings->value("filterValue",
                                                       0.f).toFloat();
-    properties->mDouble()->setValue(lineFilterSettings->valueFilterProperty,
-                                    lineFilterSettings->valueFilter);
+    properties->mSciDouble()->setValue(lineFilterSettings->valueFilterProperty,
+                                       lineFilterSettings->valueFilter);
     lineFilterSettings->lineLengthFilter = settings->value(
                 "filterLineLength", 0.f).toInt();
     properties->mDDouble()->setValue(lineFilterSettings->lineLengthFilterProperty,
@@ -979,9 +982,9 @@ void MIsosurfaceIntersectionActor::onQtPropertyChanged(QtProperty *property)
         variableSettings->varsIndex[1] = properties->mEnum()->value(
                 variableSettings->varsProperty[1]);
 
-        variableSettings->varsIsovalue[0] = properties->mDouble()
+        variableSettings->varsIsovalue[0] = properties->mSciDouble()
                 ->value(variableSettings->varsIsovalueProperty[0]);
-        variableSettings->varsIsovalue[1] = properties->mDouble()
+        variableSettings->varsIsovalue[1] = properties->mSciDouble()
                 ->value(variableSettings->varsIsovalueProperty[1]);
 
         lineFilterSettings->filterVarIndex = properties->mEnum()->value(
@@ -991,7 +994,7 @@ void MIsosurfaceIntersectionActor::onQtPropertyChanged(QtProperty *property)
                 static_cast<int>(properties->mDDouble()->value(
                     lineFilterSettings->lineLengthFilterProperty));
         lineFilterSettings->valueFilter =
-                properties->mDouble()->value(
+                properties->mSciDouble()->value(
                     lineFilterSettings->valueFilterProperty);
 
         ensembleSelectionSettings->spaghettiPlotEnabled = properties->mBool()
