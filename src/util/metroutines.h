@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015-2018 Marc Rautenhaus
+**  Copyright 2015-2017 Michael Kern
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -272,7 +273,7 @@ double potentialTemperature_K(double T_K, double p_Pa);
 
 /**
   Computes the virtual temperature in [K] from temperature @p T_K in [K] and
-  specific humidity @p q in [kg/kg].
+  specific humidity @p q_kgkg in [kg/kg].
 
   Method:
                   Tv = T * (q + 0.622(1-q)) / 0.622
@@ -298,6 +299,52 @@ double virtualTemperature_K(double T_K, double q_kgkg);
 double geopotentialThicknessOfLayer_m(double layerMeanVirtualTemperature_K,
                                       double p_bot, double p_top);
 
+
+/**
+  Computes the mixing ratio w from specific humidity @p q_kgkg in [kg/kg].
+
+  Method: w = q / (1.-q)
+ */
+double mixingRatio_kgkg(double q_kgkg);
+
+
+/**
+  Computes the specific humidity from mixing ratio @p w_kgkg in [kg/kg].
+
+  Method: q = w / (1.+w)
+ */
+double specificHumidity_kgkg(double w_kgkg);
+
+
+/**
+  Computes dew point in [K] from pressure @p p_Pa in [Pa] and specific
+  humidity @p q_kgkg in [kg/kg].
+
+  Method: Use the inversion of Bolton (1980), eq. 10, to compute dewpoint.
+  According to Bolton, this is accurate to 0.03 K in the range 238..308 K. See
+  also Emanuel (1994, 'Atmospheric Convection', eq. 4.6.2).
+ */
+double dewPointTemperature_K_Bolton(double p_Pa, double q_kgkg);
+
+
+/**
+  Computes equivalent potential temperature in [K] from temperature @p T_K
+  in [K], pressure @p p_Pa in [Pa] and specific humidity @p q_kgkg in [kg/kg].
+
+  Method: Equation (43) of Bolton (MWR, 1980), "The Computation of Equivalent
+  Potential Temperature".
+ */
+double equivalentPotentialTemperature_K_Bolton(double T_K, double p_Pa,
+                                               double q_kgkg);
+
+
+// Test functions for meteorological computations.
+namespace MetRoutinesTests
+{
+
+void testEQPT();
+
+}
 
 } // namespace Met3D
 

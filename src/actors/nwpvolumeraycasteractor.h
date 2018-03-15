@@ -161,6 +161,8 @@ protected:
 
     void onAddActorVariable(MNWPActorVariable* var) override;
 
+    void onChangeActorVariable(MNWPActorVariable *var) override;
+
 private:
     // Methods that create/compute graphics resources (volume bounding box,
     // shadow image, normal curves).

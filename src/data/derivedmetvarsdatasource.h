@@ -207,6 +207,17 @@ public:
 };
 
 
+class MEquivalentPotentialTemperatureProcessor
+        : public MDerivedDataFieldProcessor
+{
+public:
+    MEquivalentPotentialTemperatureProcessor();
+
+    void compute(QList<MStructuredGrid*>& inputGrids,
+                 MStructuredGrid *derivedGrid);
+};
+
+
 class MGeopotentialHeightProcessor
         : public MDerivedDataFieldProcessor
 {
@@ -218,11 +229,34 @@ public:
 };
 
 
+class MGeopotentialHeightFromGeopotentialProcessor
+        : public MDerivedDataFieldProcessor
+{
+public:
+    MGeopotentialHeightFromGeopotentialProcessor();
+
+    void compute(QList<MStructuredGrid*>& inputGrids,
+                 MStructuredGrid *derivedGrid);
+};
+
+
 class MTHourlyTotalPrecipitationProcessor
         : public MDerivedDataFieldProcessor
 {
 public:
     MTHourlyTotalPrecipitationProcessor(int hours);
+
+    void compute(QList<MStructuredGrid*>& inputGrids,
+                 MStructuredGrid *derivedGrid);
+};
+
+
+class MMagnitudeOfVerticallyIntegratedMoistureFluxProcessor
+        : public MDerivedDataFieldProcessor
+{
+public:
+    MMagnitudeOfVerticallyIntegratedMoistureFluxProcessor(
+            QString levelTypeString);
 
     void compute(QList<MStructuredGrid*>& inputGrids,
                  MStructuredGrid *derivedGrid);

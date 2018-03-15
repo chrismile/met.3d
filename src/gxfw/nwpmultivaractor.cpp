@@ -384,12 +384,20 @@ void MNWPMultiVarActor::onQtPropertyChanged(QtProperty *property)
     // Variable specific properties.
     foreach (MNWPActorVariable* var, variables)
     {
-        if ( var->onQtPropertyChanged(property) )
+        if (property == var->changeVariableProperty)
+        {
+            if ( var->onQtPropertyChanged(property) )
+            {
+                onChangeActorVariable(var);
+                emitActorChangedSignal();
+            }
+            break;
+        }
+        else if ( var->onQtPropertyChanged(property) )
         {
             emitActorChangedSignal();
             break;
         }
-
         else if (property == var->removeVariableProperty)
         {
             // Ask the user if the variable should really be deleted.

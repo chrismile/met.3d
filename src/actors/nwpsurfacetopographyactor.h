@@ -92,6 +92,8 @@ protected:
 
     void onAddActorVariable(MNWPActorVariable* var) override;
 
+    void onChangeActorVariable(MNWPActorVariable *var) override;
+
     uint8_t topographyVariableIndex;
     uint8_t shadingVariableIndex;
 

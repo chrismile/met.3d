@@ -77,6 +77,7 @@
 
 // standard library imports
 #include <cfloat>
+#include <cmath>
 
 // related third party imports
 #include <QApplication>

@@ -2066,8 +2066,16 @@ template<typename T> bool MNWPActorVariable::setEnumPropertyClosest(
 //                        << abs(value - availableValues.at(i-1)) << " "
 //                        << abs(availableValues.at(i) - value) << " ");
 
-        if ( abs(value - availableValues.at(i-1))
-             <= abs(availableValues.at(i) - value) ) i--;
+        T v1;
+        if (value < availableValues.at(i-1)) v1 = availableValues.at(i-1) - value;
+        else v1 = value - availableValues.at(i-1);
+
+        T v2;
+        if (availableValues.at(i) < value) v2 = value - availableValues.at(i);
+        else v2 = availableValues.at(i) - value;
+
+        if ( v1 <= v2 ) i--;
+
         // "i" now contains the index of the closest available value.
         break;
     }
@@ -2141,6 +2149,21 @@ bool MNWPActorVariable::changeVariable()
     }
 
     MSelectableDataSource dsrc = dialog.getSelectedDataSource();
+
+    if (dynamic_cast<MNWP2DVerticalActorVariable*>(this))
+    {
+        if (actor->getNWPVariables().size() > 1
+                && dataSourceID != dsrc.dataSourceID)
+        {
+            QMessageBox::warning(
+                        nullptr, actor->getName(),
+                        "Vertical cross-section actors cannot handle"
+                        " multiple variables coming from different data"
+                        " sources.\n"
+                        "(Varible was not changed.)");
+            return false;
+        }
+    }
 
     LOG4CPLUS_DEBUG(mlog, "New variable has been selected: "
                     << dsrc.variableName.toStdString());

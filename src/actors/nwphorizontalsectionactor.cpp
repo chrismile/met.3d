@@ -928,6 +928,8 @@ void MNWPHorizontalSectionActor::onQtPropertyChanged(QtProperty *property)
         windBarbsSettings->vComponentVarIndex = properties->mEnum()
                 ->value(windBarbsSettings->vComponentVarProperty);
 
+        if (suppressActorUpdates()) return;
+
         emitActorChangedSignal();
     }
 
@@ -1423,6 +1425,36 @@ void MNWPHorizontalSectionActor::onAddActorVariable(MNWPActorVariable *var)
     properties->mEnum()->setValue(
                 windBarbsSettings->vComponentVarProperty,
                 tmpvComponentVarIndex);
+
+    crossSectionGridsNeedUpdate = true;
+    updateRenderRegion = true;
+}
+
+
+void MNWPHorizontalSectionActor::onChangeActorVariable(MNWPActorVariable *var)
+{
+    int varIndex = variables.indexOf(var);
+    // Update lists of variable names.
+    windBarbsSettings->varNameList.replace(varIndex, var->variableName);
+
+    // Temporarily save variable indices.
+    int tmpuComponentVarIndex = windBarbsSettings->uComponentVarIndex;
+    int tmpvComponentVarIndex = windBarbsSettings->vComponentVarIndex;
+
+    enableActorUpdates(false);
+    properties->mEnum()->setEnumNames(windBarbsSettings->uComponentVarProperty,
+                                      windBarbsSettings->varNameList);
+    properties->mEnum()->setEnumNames(windBarbsSettings->vComponentVarProperty,
+                                      windBarbsSettings->varNameList);
+
+    properties->mEnum()->setValue(
+                windBarbsSettings->uComponentVarProperty,
+                tmpuComponentVarIndex);
+
+    properties->mEnum()->setValue(
+                windBarbsSettings->vComponentVarProperty,
+                tmpvComponentVarIndex);
+    enableActorUpdates(true);
 
     crossSectionGridsNeedUpdate = true;
     updateRenderRegion = true;
