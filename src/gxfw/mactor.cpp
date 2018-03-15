@@ -4,8 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2017 Marc Rautenhaus
-**  Copyright 2016-2017 Bianca Tost
+**  Copyright 2015-2018 Marc Rautenhaus
+**  Copyright 2016-2018 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -63,7 +63,7 @@ MActor::MActor(QObject *parent)
       shaderCompilationProgress(0),
       positionLabel(nullptr),
       actorName("Default actor"),
-      actorType("Default actor"),
+      actorType(staticActorType()),
       addPropertiesCounter(0),
       actorIsInitialized(false),
       actorChangedSignalDisabledCounter(0),
@@ -533,6 +533,9 @@ QtProperty* MActor::addProperty(
     case (DECORATEDDOUBLE_PROPERTY):
         manager = properties->mDecoratedDouble();
         break;
+    case (SCIENTIFICDOUBLE_PROPERTY):
+        manager = properties->mScientificDouble();
+        break;
     case (DATETIME_PROPERTY):
         manager = properties->mDateTime();
         break;
@@ -988,12 +991,12 @@ MAbstractActorFactory::~MAbstractActorFactory()
 
 void MAbstractActorFactory::initialize()
 {
-    // Determine the actor default name and settings ID by instantiating
+    // Determine the actor type and settings ID by instantiating
     // a default actor instance.
     MActor* actor = createInstance();
     if (actor)
     {
-        name = actor->getName();
+        name = actor->getActorType();
         settingsID = actor->getSettingsID();
         delete actor;
     }

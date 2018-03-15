@@ -4,8 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2017 Marc Rautenhaus
-**  Copyright 2017      Bianca Tost
+**  Copyright 2015-2018 Marc Rautenhaus
+**  Copyright 2017-2018 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -48,6 +48,7 @@
 #include "data/structuredgridensemblefilter.h"
 #include "data/probabilityregiondetector.h"
 #include "data/derivedmetvarsdatasource.h"
+#include "data/differencedatasource.h"
 
 #include "data/trajectoryreader.h"
 #include "data/trajectorynormalssource.h"
@@ -249,7 +250,16 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
         bool treatRotatedGridAsRegularGrid =
                 config.value("treatRotatedGridAsRegularGrid", false).toBool();
         QString gribSurfacePressureFieldType =
-                config.value("surfacePressureFieldType", "auto").toString();
+                config.value("gribSurfacePressureFieldType", "auto").toString();
+        bool convertGeometricHeightToPressure_ICAOStandard =
+                config.value("convertGeometricHeightToPressure_ICAOStandard",
+                             false).toBool();
+        QString auxiliary3DPressureField =
+                config.value("auxiliary3DPressureField", "").toString();
+        bool disableGridConsistencyCheck =
+                config.value("disableGridConsistencyCheck", "").toBool();
+        QString inputVarsForDerivedVars =
+                config.value("inputVarsForDerivedVars", "").toString();
 
 //TODO (mr, 16Dec2015) -- compatibility code; remove in Met.3D version 2.0
         // If no fileFilter is specified but a domainID is specified use
@@ -275,6 +285,19 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
                         << (treatRotatedGridAsRegularGrid ? "enabled" : "disabled"));
         LOG4CPLUS_DEBUG(mlog, "  surfacePressureFieldType="
                         << gribSurfacePressureFieldType.toStdString());
+        LOG4CPLUS_DEBUG(mlog, "  convert geometric height to pressure (using"
+                              " standard ICAO)="
+                        << (convertGeometricHeightToPressure_ICAOStandard
+                            ? "enabled" : "disabled"));
+        LOG4CPLUS_DEBUG(mlog, "  use auxiliary 3D pressure field="
+                        << (auxiliary3DPressureField != "" ?
+                    "enabled (name= " + (auxiliary3DPressureField.toStdString())
+                    + ")" : "disabled"));
+        LOG4CPLUS_DEBUG(mlog, "  grid consistency check="
+                        << (!disableGridConsistencyCheck
+                            ? "enabled" : "disabled"));
+        LOG4CPLUS_DEBUG(mlog, "  input variables for derived variables="
+                        << inputVarsForDerivedVars.toStdString());
 
         MNWPReaderFileFormat fileFormat = INVALID_FORMAT;
         if (fileFormatStr == "CF_NETCDF") fileFormat = CF_NETCDF;
@@ -303,7 +326,10 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
                     name, path, fileFilter, schedulerID,
                     memoryManagerID, fileFormat, enableRegridding,
                     enableProbRegionFilter, treatRotatedGridAsRegularGrid,
-                    gribSurfacePressureFieldType);
+                    gribSurfacePressureFieldType,
+                    convertGeometricHeightToPressure_ICAOStandard,
+                    auxiliary3DPressureField, disableGridConsistencyCheck,
+                    inputVarsForDerivedVars);
     }
 
     config.endArray();
@@ -354,6 +380,63 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
 
     config.endArray();
 
+    // Configurable pipeline(s).
+    // ================
+    size = config.beginReadArray("ConfigurablePipeline");
+
+    for (int i = 0; i < size; i++)
+    {
+        config.setArrayIndex(i);
+
+        // Read settings from file.
+        QString typeName = config.value("type").toString();
+        QString name = config.value("name").toString();
+        QString inputSource0 = config.value("input1").toString();
+        QString inputSource1 = config.value("input2").toString();
+        QString baseRequest0 = config.value("baseRequest1").toString();
+        QString baseRequest1 = config.value("baseRequest2").toString();
+        QString schedulerID = config.value("schedulerID").toString();
+        QString memoryManagerID = config.value("memoryManagerID").toString();
+        bool enableRegridding = config.value("enableRegridding").toBool();
+
+        LOG4CPLUS_DEBUG(mlog, "initializing configurable pipeline #" << i << ": ");
+        LOG4CPLUS_DEBUG(mlog, "  type = " << typeName.toStdString());
+        LOG4CPLUS_DEBUG(mlog, "  name = " << name.toStdString());
+        LOG4CPLUS_DEBUG(mlog, "  input1 = " << inputSource0.toStdString());
+        LOG4CPLUS_DEBUG(mlog, "  input2 = " << inputSource1.toStdString());
+        LOG4CPLUS_DEBUG(mlog, "  baseRequest1 = " << baseRequest0.toStdString());
+        LOG4CPLUS_DEBUG(mlog, "  baseRequest2 = " << baseRequest1.toStdString());
+        LOG4CPLUS_DEBUG(mlog, "  schedulerID = " << schedulerID.toStdString());
+        LOG4CPLUS_DEBUG(mlog, "  memoryManagerID = " << memoryManagerID.toStdString());
+        LOG4CPLUS_DEBUG(mlog, "  regridding="
+                        << (enableRegridding ? "enabled" : "disabled"));
+
+        MConfigurablePipelineType pipelineType =
+                configurablePipelineTypeFromString(typeName);
+
+        // Check parameter validity.
+        if ( name.isEmpty()
+             || (pipelineType == INVALID_PIPELINE_TYPE)
+             || inputSource0.isEmpty()
+             || inputSource1.isEmpty()
+             || baseRequest0.isEmpty()
+             || baseRequest1.isEmpty()
+             || schedulerID.isEmpty()
+             || memoryManagerID.isEmpty() )
+        {
+            LOG4CPLUS_WARN(mlog, "invalid parameters encountered; skipping.");
+            continue;
+        }
+
+        // Create new pipeline.
+        initializeConfigurablePipeline(
+                    pipelineType, name, inputSource0, inputSource1, baseRequest0,
+                    baseRequest1, schedulerID, memoryManagerID,
+                    enableRegridding);
+    }
+
+    config.endArray();
+
     LOG4CPLUS_INFO(mlog, "Data pipeline has been configured.");
 }
 
@@ -368,7 +451,11 @@ void MPipelineConfiguration::initializeNWPPipeline(
         bool enableRegridding,
         bool enableProbabiltyRegionFilter,
         bool treatRotatedGridAsRegularGrid,
-        QString surfacePressureFieldType)
+        QString surfacePressureFieldType,
+        bool convertGeometricHeightToPressure_ICAOStandard,
+        QString auxiliary3DPressureField,
+        bool disableGridConsistencyCheck,
+        QString inputVarsForDerivedVars)
 {
     MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
     MAbstractScheduler* scheduler = sysMC->getScheduler(schedulerID);
@@ -384,13 +471,16 @@ void MPipelineConfiguration::initializeNWPPipeline(
     MWeatherPredictionReader *nwpReaderENS = nullptr;
     if (dataFormat == CF_NETCDF)
     {
-        nwpReaderENS = new MClimateForecastReader(dataSourceId,
-                                                  treatRotatedGridAsRegularGrid);
+        nwpReaderENS = new MClimateForecastReader(
+                    dataSourceId, treatRotatedGridAsRegularGrid,
+                    convertGeometricHeightToPressure_ICAOStandard,
+                    auxiliary3DPressureField, disableGridConsistencyCheck);
     }
     else if (dataFormat == ECMWF_GRIB)
     {
         nwpReaderENS = new MGribReader(dataSourceId,
-                                       surfacePressureFieldType);
+                                       surfacePressureFieldType,
+                                       disableGridConsistencyCheck);
     }
     nwpReaderENS->setMemoryManager(memoryManager);
     nwpReaderENS->setScheduler(scheduler);
@@ -452,6 +542,20 @@ void MPipelineConfiguration::initializeNWPPipeline(
     derivedMetVarsSource->setMemoryManager(memoryManager);
     derivedMetVarsSource->setScheduler(scheduler);
     derivedMetVarsSource->setInputSource(nwpReaderENS);
+
+    QStringList derivedVarsMappingList =
+            inputVarsForDerivedVars.split("/", QString::SkipEmptyParts);
+
+    foreach (QString derivedVarsMappingString, derivedVarsMappingList)
+    {
+        QStringList derivedVarsMapping =
+                derivedVarsMappingString.split(":", QString::SkipEmptyParts);
+        if (derivedVarsMapping.size() == 2)
+        {
+            derivedMetVarsSource->setInputVariable(
+                        derivedVarsMapping.at(0), derivedVarsMapping.at(1));
+        }
+    }
 
     MStructuredGridEnsembleFilter *ensFilterDerived =
             new MStructuredGridEnsembleFilter();
@@ -606,6 +710,92 @@ void MPipelineConfiguration::initializeLagrantoEnsemblePipeline(
 }
 
 
+void MPipelineConfiguration::initializeConfigurablePipeline(
+        MConfigurablePipelineType pipelineType,
+        QString name,
+        QString inputSource0,
+        QString inputSource1,
+        QString baseRequest0,
+        QString baseRequest1,
+        QString schedulerID,
+        QString memoryManagerID,
+        bool enableRegridding)
+{
+    MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
+    MAbstractScheduler* scheduler = sysMC->getScheduler(schedulerID);
+    MAbstractMemoryManager* memoryManager = sysMC->getMemoryManager(memoryManagerID);
+
+    const QString dataSourceId = name;
+    LOG4CPLUS_DEBUG(mlog, "Initializing configurable pipeline ''"
+                    << dataSourceId.toStdString() << "'' ...");
+
+    switch (pipelineType)
+    {
+    case DIFFERENCE:
+    {
+        // Pipeline for difference variables.
+        // ==================================
+        const QString dataSourceIdDifference = dataSourceId;
+
+        MDifferenceDataSource *differenceSource = new MDifferenceDataSource();
+        differenceSource->setMemoryManager(memoryManager);
+        differenceSource->setScheduler(scheduler);
+
+        differenceSource->setInputSource(
+                    0, dynamic_cast<MWeatherPredictionDataSource*>(
+                        sysMC->getDataSource(inputSource0)));
+        differenceSource->setInputSource(
+                    1, dynamic_cast<MWeatherPredictionDataSource*>(
+                        sysMC->getDataSource(inputSource1)));
+
+        differenceSource->setBaseRequest(0, baseRequest0);
+        differenceSource->setBaseRequest(1, baseRequest1);
+
+        MStructuredGridEnsembleFilter *ensFilterDifference =
+                new MStructuredGridEnsembleFilter();
+        ensFilterDifference->setMemoryManager(memoryManager);
+        ensFilterDifference->setScheduler(scheduler);
+
+        if (!enableRegridding)
+        {
+            ensFilterDifference->setInputSource(differenceSource);
+        }
+        else
+        {
+            MStructuredGridEnsembleFilter *ensFilter1Difference =
+                    new MStructuredGridEnsembleFilter();
+            ensFilter1Difference->setMemoryManager(memoryManager);
+            ensFilter1Difference->setScheduler(scheduler);
+            ensFilter1Difference->setInputSource(differenceSource);
+
+            MVerticalRegridder *regridderEPSDerived =
+                    new MVerticalRegridder();
+            regridderEPSDerived->setMemoryManager(memoryManager);
+            regridderEPSDerived->setScheduler(scheduler);
+            regridderEPSDerived->setInputSource(ensFilter1Difference);
+
+            ensFilterDifference->setInputSource(regridderEPSDerived);
+        }
+
+        sysMC->registerDataSource(dataSourceIdDifference + QString(" ENSFilter"),
+                                  ensFilterDifference);
+        break;
+    }
+    default:
+    {
+        LOG4CPLUS_ERROR(mlog,
+                        "Invalid configurable pipeline type. Could not"
+                        " initialize pipeline ''" << dataSourceId.toStdString()
+                        << "''.");
+        return;
+    }
+    }
+
+    LOG4CPLUS_DEBUG(mlog, "Pipeline ''" << dataSourceId.toStdString()
+                    << "'' has been initialized.");
+}
+
+
 void MPipelineConfiguration::initializeDevelopmentDataPipeline()
 {
     MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
@@ -627,7 +817,11 @@ void MPipelineConfiguration::initializeDevelopmentDataPipeline()
                 false,
                 true,
                 false,
-                "auto");
+                "auto",
+                false,
+                "",
+                false,
+                "");
 
     initializeNWPPipeline(
                 "ECMWF ENS EUR_LL10",
@@ -639,7 +833,11 @@ void MPipelineConfiguration::initializeDevelopmentDataPipeline()
                 false,
                 true,
                 false,
-                "auto");
+                "auto",
+                false,
+                "",
+                false,
+                "");
 
     sysMC->registerMemoryManager("Trajectories DF-T psfc_1000hPa_L62",
                new MLRUMemoryManager("Trajectories DF-T psfc_1000hPa_L62",
@@ -725,6 +923,20 @@ void MPipelineConfiguration::getMetviewGribFilePaths(
             }
             break;
         }
+    }
+}
+
+
+MPipelineConfiguration::MConfigurablePipelineType
+MPipelineConfiguration::configurablePipelineTypeFromString(QString typeName)
+{
+    if (typeName == "DIFFERENCE")
+    {
+        return MConfigurablePipelineType::DIFFERENCE;
+    }
+    else
+    {
+        return MConfigurablePipelineType::INVALID_PIPELINE_TYPE;
     }
 }
 

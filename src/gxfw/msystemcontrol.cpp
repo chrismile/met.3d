@@ -4,8 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2017 Marc Rautenhaus
-**  Copyright 2017      Bianca Tost
+**  Copyright 2015-2018 Marc Rautenhaus
+**  Copyright 2017-2018 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -68,10 +68,12 @@ MSystemManagerAndControl::MSystemManagerAndControl(QWidget *parent) :
     boolPropertyManager            = new QtBoolPropertyManager(this);
     decoratedDoublePropertyManager = new QtDecoratedDoublePropertyManager(this);
     doublePropertyManager          = new QtDoublePropertyManager(this);
+    scientificDoublePropertyManager= new QtScientificDoublePropertyManager(this);
     enumPropertyManager            = new QtEnumPropertyManager(this);
     stringPropertyManager          = new QtStringPropertyManager(this);
     clickPropertyManager           = new QtClickPropertyManager(this);
     colorPropertyManager           = new QtColorPropertyManager(this);
+    pointFPropertyManager          = new QtPointFPropertyManager(this);
 
     // The sceneViewPropertiesBrowser needs "GUI editor factories" that provide
     // the required GUI elements (spin boxes, line edits, combo boxes, ...) for
@@ -82,6 +84,8 @@ MSystemManagerAndControl::MSystemManagerAndControl(QWidget *parent) :
             new QtDecoratedDoubleSpinBoxFactory(this);
     QtDoubleSpinBoxFactory *doubleSpinBoxFactory =
             new QtDoubleSpinBoxFactory(this);
+    QtScientificDoubleSpinBoxFactory *scientificDoubleSpinBoxFactory =
+            new QtScientificDoubleSpinBoxFactory(this);
     QtEnumEditorFactory *enumEditorFactory = new QtEnumEditorFactory(this);
     QtToolButtonFactory *toolButtonFactory = new QtToolButtonFactory(this);
     QtColorEditorFactory *colorEditorFactory = new QtColorEditorFactory(this);
@@ -97,11 +101,16 @@ MSystemManagerAndControl::MSystemManagerAndControl(QWidget *parent) :
     systemPropertiesBrowser->setFactoryForManager(doublePropertyManager,
                                                   doubleSpinBoxFactory);
     systemPropertiesBrowser->setFactoryForManager(
+                scientificDoublePropertyManager, scientificDoubleSpinBoxFactory);
+    systemPropertiesBrowser->setFactoryForManager(
                 enumPropertyManager, enumEditorFactory);
     systemPropertiesBrowser->setFactoryForManager(
                 clickPropertyManager, toolButtonFactory);
     systemPropertiesBrowser->setFactoryForManager(
                 colorPropertyManager, colorEditorFactory);
+    systemPropertiesBrowser->setFactoryForManager(
+                pointFPropertyManager->subDoublePropertyManager(),
+                doubleSpinBoxFactory);
 
     // Mode for resizing the columns. Useful are QtTreePropertyBrowser::
     // ::ResizeToContents and ::Interactive
@@ -314,6 +323,13 @@ QtDecoratedDoublePropertyManager* MSystemManagerAndControl::getDecoratedDoublePr
 }
 
 
+QtScientificDoublePropertyManager*
+MSystemManagerAndControl::getScientificDoublePropertyManager()
+{
+    return scientificDoublePropertyManager;
+}
+
+
 QtEnumPropertyManager* MSystemManagerAndControl::getEnumPropertyManager()
 {
     return enumPropertyManager;
@@ -335,6 +351,12 @@ QtClickPropertyManager* MSystemManagerAndControl::getClickPropertyManager()
 QtColorPropertyManager* MSystemManagerAndControl::getColorPropertyManager()
 {
     return colorPropertyManager;
+}
+
+
+QtPointFPropertyManager* MSystemManagerAndControl::getPointFPropertyManager()
+{
+    return pointFPropertyManager;
 }
 
 
@@ -419,6 +441,11 @@ MAbstractDataSource* MSystemManagerAndControl::getDataSource(
 void MSystemManagerAndControl::registerSyncControl(MSyncControl *syncControl)
 {
     syncControlPool.insert(syncControl->getID(), syncControl);
+
+    foreach (MSceneViewGLWidget *sceneview, registeredViews)
+    {
+        sceneview->updateSyncControlProperty();
+    }
 }
 
 
@@ -446,6 +473,11 @@ void MSystemManagerAndControl::removeSyncControl(MSyncControl *syncControl)
 {
     syncControlPool.remove(syncControl->getID());
     delete syncControl;
+
+    foreach (MSceneViewGLWidget *sceneview, registeredViews)
+    {
+        sceneview->updateSyncControlProperty();
+    }
 }
 
 
@@ -560,7 +592,6 @@ void MSystemManagerAndControl::actOnQtPropertyChanged(QtProperty *property)
         {
             sceneView->onHandleSizeChanged();
         }
-
     }
 }
 

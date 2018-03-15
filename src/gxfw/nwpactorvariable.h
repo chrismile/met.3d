@@ -4,8 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2017 Marc Rautenhaus
-**  Copyright 2016-2017 Bianca Tost
+**  Copyright 2015-2018 Marc Rautenhaus
+**  Copyright 2016-2018 Bianca Tost
 **  Copyright 2017      Michael Kern
 **
 **  Computer Graphics and Visualization Group
@@ -34,6 +34,7 @@
 #include <GL/glew.h>
 #include <QtCore>
 #include <QtProperty>
+#include <QSpinBox>
 
 // local application imports
 #include "gxfw/gl/texture.h"
@@ -41,6 +42,7 @@
 #include "gxfw/nwpactorvariableproperties.h"
 #include "data/structuredgrid.h"
 #include "data/weatherpredictiondatasource.h"
+#include "data/singlevariableanalysis.h"
 #include "actors/transferfunction1d.h"
 #include "actors/spatial1dtransferfunction.h"
 #include "util/mstopwatch.h"
@@ -78,6 +80,13 @@ public:
     virtual void initialize();
 
     MNWPMultiVarActor* getActor() { return actor; }
+
+    /**
+      Connect an analysis control to this variable.
+     */
+    void setSingleVariableAnalysisControl(
+            MSingleVariableAnalysisControl *analysisControl)
+    { this->singleVariableAnalysisControl = analysisControl; }
 
     /**
       Synchronize time, ensemble of this variable with the synchronization
@@ -184,6 +193,8 @@ public:
     int          textureUnitDataFlags;
     GL::MTexture *texturePressureTexCoordTable;  // grids on PL & ML lev
     int          textureUnitPressureTexCoordTable;
+    GL::MTexture *textureAuxiliaryPressure;        // grids on hyb-sig-pres lev
+    int          textureUnitAuxiliaryPressure;
 
     /* Dummy textures that can be bound to texture units not used for the
        current grid (i.e. bind these to textureHybridCoefficients if grids
@@ -201,9 +212,10 @@ public:
     QtProperty *varPropertyGroup;
     QtProperty *varRenderingPropertyGroup;
 
-    /* Button to remove this variable from its actor. Signal is handled by
-       MNWPMultiVarActor and derived classes. */
-    QtProperty* removeVariableProperty;
+    /* Buttons to remove/change this variable from its actor. Signal is handled
+    by MNWPMultiVarActor and derived classes. */
+    QtProperty *removeVariableProperty;
+    QtProperty *changeVariableProperty;
 
 public slots:
     /**
@@ -302,6 +314,15 @@ protected:
     /** Actor that this instance belongs to. */
     MNWPMultiVarActor *actor;
 
+    /** Analysis control this variable is connected to. */
+    MSingleVariableAnalysisControl *singleVariableAnalysisControl;
+
+    /* Data statistics properties */
+    QtProperty *dataStatisticsPropertyGroup;
+    QtProperty *showDataStatisticsProperty;
+    QtProperty *significantDigitsProperty;
+    QtProperty *histogramDisplayModeProperty;
+
     /* Synchronization properties */
     QtProperty *synchronizationPropertyGroup;
     QtProperty *synchronizationProperty;
@@ -329,6 +350,9 @@ protected:
     QList<unsigned int> selectedEnsembleMembersAsSortedList;
     int         ensembleMemberLoadedFromConfiguration;
 
+    /* Debug properties. */
+    QtProperty *dumpGridDataProperty;
+
     /** If true, load the grid's "flag" data field to the GPU, if available. */
     bool useFlagsIfAvailable;
 
@@ -339,8 +363,8 @@ protected:
     virtual bool changeVariable();
 
     QtProperty *datasourceNameProperty;
+    QtProperty *variableLongNameProperty;
     QtProperty *changeVariablePropertyGroup;
-    QtProperty *changeVariableProperty;
 
     QtProperty *transferFunctionProperty;
     QtProperty *spatialTransferFunctionProperty;
@@ -387,6 +411,9 @@ private:
             const T& value,
             QtProperty* property,
             bool setSyncColour=true);
+
+    void runStatisticalAnalysis(double significantDigits,
+                                int histogramDisplayMode);
 
     bool suppressUpdate;
 };
@@ -531,7 +558,6 @@ protected:
     QVector<ContourSettings> contourSetList;
 
 private:
-    QtProperty *varDebugPropertyGroup;
     QtProperty *saveXSecGridProperty;
 
 };

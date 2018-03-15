@@ -5,7 +5,8 @@
 #   three-dimensional visual exploration of numerical ensemble weather
 #   prediction data.
 #
-#   Copyright 2015 Marc Rautenhaus
+#   Copyright 2015-2018 Marc Rautenhaus
+#   Copyright 2016-2018 Bianca Tost
 #
 #   Computer Graphics and Visualization Group
 #   Technische Universitaet Muenchen, Garching, Germany
@@ -33,7 +34,7 @@ include(../third-party/qt-solutions/qtpropertybrowser/src/qtpropertybrowser.pri)
 CONFIG += console
 
 QT += opengl core gui network xml
-greaterThan(QT_MAJOR_VERSION, 4): QT += widgets printsupport
+greaterThan(QT_MAJOR_VERSION, 4): QT += widgets printsupport concurrent
 
 HEADERS += \
     src/util/mstopwatch.h \
@@ -131,6 +132,11 @@ HEADERS += \
     src/gxfw/boundingbox/bboxdockwidget.h \
     src/gxfw/boundingbox/boundingbox.h \
     src/gxfw/sessionmanagerdialog.h \
+    src/data/singlevariableanalysis.h \
+    src/data/structuredgridstatisticsanalysis.h \
+    src/qt_extensions/scientificdoublespinbox.h \
+    src/data/differencedatasource.h \
+    src/data/processingwpdatasource.h \
     src/actors/isosurfaceintersectionactor.h \
     src/actors/jetcoredetectionactor.h \
     src/data/angletrajectoryfilter.h \
@@ -242,6 +248,11 @@ SOURCES += \
     src/gxfw/boundingbox/bboxdockwidget.cpp \
     src/gxfw/boundingbox/boundingbox.cpp \
     src/gxfw/sessionmanagerdialog.cpp \
+    src/data/singlevariableanalysis.cpp \
+    src/data/structuredgridstatisticsanalysis.cpp \
+    src/qt_extensions/scientificdoublespinbox.cpp \
+    src/data/differencedatasource.cpp \
+    src/data/processingwpdatasource.cpp \
     src/actors/isosurfaceintersectionactor.cpp \
     src/actors/jetcoredetectionactor.cpp \
     src/data/angletrajectoryfilter.cpp \
@@ -296,6 +307,7 @@ OTHER_FILES += \
     src/glsl/basemap.fx.glsl \
     src/glsl/volume_pressure_utils.glsl \
     src/glsl/volume_hybrid_utils.glsl \
+    src/glsl/volume_auxiliarypressure_utils.glsl \
     src/glsl/volume_global_structs_utils.glsl \
     src/glsl/volume_defines.glsl \
     config/default_pipeline.cfg.template \

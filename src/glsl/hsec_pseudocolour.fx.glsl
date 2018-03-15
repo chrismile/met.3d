@@ -4,7 +4,7 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2015-2018 Marc Rautenhaus
 **  Copyright 2017 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
@@ -199,7 +199,7 @@ shader FSmain(in GStoFS input, out vec4 fragColour)
 {
 
     // Discard the element if it is outside the model domain (no scalar value).
-    //if (input.flag < 0.) discard;
+    if (input.flag < 0.) discard;
 
     // Scale the scalar range to 0..1.
     float scalar_ = (input.scalar - scalarMinimum) / (scalarMaximum - scalarMinimum);

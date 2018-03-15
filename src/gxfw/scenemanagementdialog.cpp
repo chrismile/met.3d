@@ -32,6 +32,7 @@
 
 // related third party imports
 #include <log4cplus/loggingmacros.h>
+#include <QInputDialog>
 
 // local application imports
 #include "gxfw/mglresourcesmanager.h"

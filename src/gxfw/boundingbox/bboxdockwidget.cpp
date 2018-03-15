@@ -34,6 +34,9 @@
 // related third party imports
 #include <log4cplus/loggingmacros.h>
 #include <QDoubleSpinBox>
+#include <QInputDialog>
+#include <QFileDialog>
+#include <QKeyEvent>
 
 // local application imports
 #include "util/mutil.h"
@@ -97,6 +100,7 @@ MBoundingBoxDockWidget::MBoundingBoxDockWidget(QWidget *parent) :
             this, SLOT(onCellChanged(int, int)));
 
     connect(ui->newButton, SIGNAL(clicked()), this, SLOT(onCreateBBox()));
+    connect(ui->cloneButton, SIGNAL(clicked()), this, SLOT(onCloneBBox()));
     connect(ui->deleteButton, SIGNAL(clicked()), this, SLOT(onDeleteBBox()));
     connect(ui->saveButton, SIGNAL(clicked()),
             this, SLOT(saveConfigurationToFile()));
@@ -134,13 +138,10 @@ QString MBoundingBoxDockWidget::addBoundingBox(
         const QRectF *horizontalCoords2D, double bottomPressure_hPa,
         double topPressure_hPa)
 {
-    QString name = QInputDialog::getText(
-                this, tr("Create new bounding box"), tr("Name: "),
-                QLineEdit::Normal, "Bounding Box");
-
-    return insertRow(name, horizontalCoords2D->x(), horizontalCoords2D->y(),
-                     horizontalCoords2D->width(), horizontalCoords2D->height(),
-                     bottomPressure_hPa, topPressure_hPa);
+    return createBoundingBox(
+                "", horizontalCoords2D->x(), horizontalCoords2D->y(),
+                horizontalCoords2D->width(), horizontalCoords2D->height(),
+                bottomPressure_hPa, topPressure_hPa);
 }
 
 
@@ -148,9 +149,10 @@ QString MBoundingBoxDockWidget::addBoundingBox(
         QString name, const QRectF *horizontalCoords2D,
         double bottomPressure_hPa, double topPressure_hPa)
 {
-    return insertRow(name, horizontalCoords2D->x(), horizontalCoords2D->y(),
-                     horizontalCoords2D->width(), horizontalCoords2D->height(),
-                     bottomPressure_hPa, topPressure_hPa);
+    return createBoundingBox(
+                name, horizontalCoords2D->x(), horizontalCoords2D->y(),
+                horizontalCoords2D->width(), horizontalCoords2D->height(),
+                bottomPressure_hPa, topPressure_hPa);
 }
 
 
@@ -208,7 +210,7 @@ void MBoundingBoxDockWidget::loadConfiguration(QSettings *settings)
         }
         else
         {
-            insertRow(name, lon, lat, width, height, bottom, top);
+            createBoundingBox(name, lon, lat, width, height, bottom, top);
         }
         selectableBBoxes << name;
     }
@@ -410,13 +412,53 @@ void MBoundingBoxDockWidget::onSpinBoxUpdate(double value)
 
 void MBoundingBoxDockWidget::onCreateBBox()
 {
-    // Get the name for the new bounding box to create. No need to check for
-    // empty or already existing string since this is handled by insertRow().
-    QString name = QInputDialog::getText(
-                this, tr("Create new bounding box"), tr("Name: "));
-
     // Create new bounding box.
-    insertRow(name);
+    createBoundingBox("");
+}
+
+
+void MBoundingBoxDockWidget::onCloneBBox()
+{
+    int row = ui->tableWidget->currentRow();
+    // No bounding box is selected to clone thus display error and do nothing.
+    if (row == -1)
+    {
+        QMessageBox::warning(this, "Error",
+                             "Please select a bounding box to be cloned.");
+        return;
+    }
+
+    QString nameOriginBBox = getBBoxNameInRow(row);
+    MBoundingBox *originBBox = MSystemManagerAndControl::getInstance()
+            ->getBoundingBox(getBBoxNameInRow(row));
+
+    bool ok = false;
+    QString name = nameOriginBBox;
+
+    QStringList bBoxes = MSystemManagerAndControl::getInstance()
+            ->getBoundingBoxesIdentifiers();
+
+    while (!ok)
+    {
+        // Get the name for the new bounding box to be created.
+        name = QInputDialog::getText(
+                    this, tr("Clone bounding box '%1'").arg(nameOriginBBox),
+                    tr("Name: "), QLineEdit::Normal, nameOriginBBox, &ok);
+
+        if (!ok)
+        {
+            return;
+        }
+
+        // Check if name is a valid bbox name (not empty and unique).
+        ok = isValidBoundingBoxName(name, bBoxes);
+    }
+
+    // Create a copy of the selected bounding box.
+    insertRow(name, originBBox->getWestLon(), originBBox->getSouthLat(),
+              originBBox->getEastWestExtent(), originBBox->getNorthSouthExtent(),
+              originBBox->getBottomPressure_hPa(),
+              originBBox->getTopPressure_hPa());
 }
 
 
@@ -493,7 +535,16 @@ void MBoundingBoxDockWidget::saveConfigurationToFile(QString filename)
 
     QSettings *settings = new QSettings(filename, QSettings::IniFormat);
 
+    settings->beginGroup("FileFormat");
+    // Save version id of Met.3D.
+    settings->setValue("met3dVersion", met3dVersionString);
+    settings->endGroup();
+
     saveConfiguration(settings);
+
+    delete settings;
+
+    LOG4CPLUS_DEBUG(mlog, "... configuration has been saved.");
 }
 
 
@@ -563,6 +614,10 @@ void MBoundingBoxDockWidget::loadConfigurationFromFile(QString filename)
     }
 
     loadConfiguration(settings);
+
+    delete settings;
+
+    LOG4CPLUS_DEBUG(mlog, "... configuration has been loaded.");
 }
 
 
@@ -584,35 +639,39 @@ void MBoundingBoxDockWidget::keyPressEvent(QKeyEvent *event)
 ***                           PRIVATE METHODS                               ***
 *******************************************************************************/
 
-QString MBoundingBoxDockWidget::insertRow(QString name, double lon, double lat,
-                                          double width, double height,
-                                          double bottom, double top)
+QString MBoundingBoxDockWidget::createBoundingBox(
+        QString name, double lon, double lat, double width, double height,
+        double bottom, double top)
 {
-    // Don't create bounding box with empty name.
-    if (name == "")
-    {
-        return "None";
-    }
-
-    // Check if name already exists.
     QStringList bBoxes = MSystemManagerAndControl::getInstance()
             ->getBoundingBoxesIdentifiers();
-    while (bBoxes.contains(name))
+    bool ok = isValidBoundingBoxName(name, bBoxes, false);
+
+    while (!ok)
     {
-        QMessageBox::warning(
-                    this,
-                    "Error",
-                    "'" + name
-                    + "'' already exists.\nPlease select a different name.");
+        // Get the name for the new bounding box to be created.
         name = QInputDialog::getText(
                     this, tr("Create new bounding box"), tr("Name: "),
-                    QLineEdit::Normal, name);
-        if (name == "")
+                    QLineEdit::Normal, name, &ok);
+
+        if (!ok)
         {
             return "None";
         }
+
+        // Check if name is a valid bbox name (not empty and unique).
+        ok = isValidBoundingBoxName(name, bBoxes);
     }
 
+    insertRow(name, lon, lat, width, height, bottom, top);
+
+    return name;
+}
+
+void MBoundingBoxDockWidget::insertRow(QString name, double lon, double lat,
+                                          double width, double height,
+                                          double bottom, double top)
+{
     int row = ui->tableWidget->rowCount();
     ui->tableWidget->insertRow(row);
 
@@ -641,8 +700,6 @@ QString MBoundingBoxDockWidget::insertRow(QString name, double lon, double lat,
     suppressUpdates = false;
 
     MSystemManagerAndControl::getInstance()->registerBoundingBox(bBox);
-
-    return name;
 }
 
 
@@ -733,6 +790,43 @@ void MBoundingBoxDockWidget::updateRow(QString name, double lon, double lat,
 QString MBoundingBoxDockWidget::getBBoxNameInRow(int row)
 {
     return ui->tableWidget->item(row, 0)->data(Qt::DisplayRole).toString();
+}
+
+
+bool MBoundingBoxDockWidget::isValidBoundingBoxName(QString boundingBoxName,
+                                                    QStringList &bBoxes,
+                                                    bool printMessage)
+{
+    // Reject empty strings as name.
+    if (boundingBoxName == "")
+    {
+        if (printMessage)
+        {
+            QMessageBox msgBox;
+            msgBox.setIcon(QMessageBox::Warning);
+            msgBox.setText("Please enter a name.");
+            msgBox.exec();
+        }
+
+        return false;
+    }
+
+    // Reject already existing names.
+    if (bBoxes.contains(boundingBoxName))
+    {
+        if (printMessage)
+        {
+            QMessageBox msgBox;
+            msgBox.setIcon(QMessageBox::Warning);
+            msgBox.setText("'" + boundingBoxName
+                           + "' already exists.\nPlease enter a different name.");
+            msgBox.exec();
+        }
+
+        return false;
+    }
+
+    return true;
 }
 
 

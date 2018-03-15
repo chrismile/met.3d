@@ -60,7 +60,7 @@ MNWPSurfaceTopographyActor::MNWPSurfaceTopographyActor()
     // ===============================================
     beginInitialiseQtProperties();
 
-    setActorType("Surface topography");
+    setActorType(staticActorType());
     setName(getActorType());
 
     topographyVariableIndexProp = addProperty(ENUM_PROPERTY, "topography variable",
@@ -331,6 +331,28 @@ void MNWPSurfaceTopographyActor::onAddActorVariable(
                                   tmpTopographyVariableIndex);
     properties->mEnum()->setValue(shadingVariableIndexProp,
                                   tmpShadingVariableIndex);
+}
+
+
+void MNWPSurfaceTopographyActor::onChangeActorVariable(MNWPActorVariable *var)
+{
+    int varIndex = variables.indexOf(var);
+    // Update lists of variable names.
+    varNames.replace(varIndex, var->variableName);
+
+    // Temporarily save variable indices.
+    int tmpShadingVariableIndex = shadingVariableIndex;
+    int tmpTopographyVariableIndex = topographyVariableIndex;
+
+    enableActorUpdates(false);
+    properties->mEnum()->setEnumNames(topographyVariableIndexProp, varNames);
+    properties->mEnum()->setEnumNames(shadingVariableIndexProp, varNames);
+
+    properties->mEnum()->setValue(topographyVariableIndexProp,
+                                  tmpTopographyVariableIndex);
+    properties->mEnum()->setValue(shadingVariableIndexProp,
+                                  tmpShadingVariableIndex);
+    enableActorUpdates(true);
 }
 
 

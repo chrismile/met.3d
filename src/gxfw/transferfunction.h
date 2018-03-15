@@ -4,8 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2017 Marc Rautenhaus
-**  Copyright 2017 Bianca Tost
+**  Copyright 2017-2018 Marc Rautenhaus
+**  Copyright 2017-2018 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -81,7 +81,9 @@ public:
 
     void setMaximumValue(float value);
 
-    void setValueDecimals(int decimals);
+    void setValueSignificantDigits(int significantDigits);
+
+    void setValueStep(double step);
 
     void setPosition(QRectF position);
 
@@ -90,7 +92,28 @@ public:
     void setNumLabels(int num);
 
     QString transferFunctionName();
-    
+
+    /**
+      @brief Static method which can be called if an object misses the transfer
+      function it should be connected to when loading a configuration file.
+
+      Tells the user that the transfer function in the configuration file
+      does not exist and asks the user whether he/she wants to load a transfer
+      function from a configuration file.
+
+      @p callerName should contain the name of the object missing the transfer
+      function while @p callerDescriptor can contain a description of the
+      object (e.g. "Variable") to give further information about the object to
+      the user. The descriptor can be defined with or without a trailed space
+      (The method will append a space if not present).
+
+      @p settings contains the settings object from which the configuration of
+      the object is loaded.
+     */
+    static bool loadMissingTransferFunction(
+            QString tfName, QString tfActorType, QString callerDescriptor,
+            QString callerName, QSettings *settings);
+
 signals:
     
 public slots:
@@ -123,9 +146,11 @@ protected:
 
     // Properties related to value range.
     QtProperty *rangePropertiesSubGroup;
-    QtProperty *valueDecimalsProperty;
     QtProperty *minimumValueProperty;
     QtProperty *maximumValueProperty;
+    QtProperty *valueOptionsPropertiesSubGroup;
+    QtProperty *valueSignificantDigitsProperty;
+    QtProperty *valueStepProperty;
     float       minimumValue;
     float       maximumValue;
     

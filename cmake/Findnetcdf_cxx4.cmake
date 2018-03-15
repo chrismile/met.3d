@@ -145,6 +145,10 @@ if (${PKG_NAME}_C_LIBRARY_DEBUG AND ${PKG_NAME}_C_LIBRARY_RELEASE)
     set (${PKG_NAME}_C_LIBRARIES
             optimized ${${PKG_NAME}_C_LIBRARY_RELEASE}
             debug ${${PKG_NAME}_C_LIBRARY_DEBUG})
+elseif (${PKG_NAME}_C_LIBRARY_RELEASE)
+    # if only release has been found, use that
+    set (${PKG_NAME}_C_LIBRARIES
+            ${${PKG_NAME}_C_LIBRARY_RELEASE})
 endif ()
 
 if (NOT ${PKG_NAME}_LIBRARY_DEBUG)
@@ -162,6 +166,10 @@ if (${PKG_NAME}_LIBRARY_DEBUG AND ${PKG_NAME}_LIBRARY_RELEASE)
     set (${PKG_NAME}_LIBRARIES
             optimized ${${PKG_NAME}_LIBRARY_RELEASE}
             debug ${${PKG_NAME}_LIBRARY_DEBUG})
+elseif (${PKG_NAME}_LIBRARY_RELEASE)
+    # if only release has been found, use that
+    set (${PKG_NAME}_LIBRARIES
+            ${${PKG_NAME}_LIBRARY_RELEASE})
 endif ()
 
 if(WIN32)
@@ -180,20 +188,26 @@ if(WIN32)
   endforeach()
 else()
   # Parse .pc file to get used version of netcdf.
-  pkg_check_modules(${PKG_NAME} REQUIRED ${${PKG_NAME}_PC_FILE})
+  if(${PKG_NAME}_PC_FILE)
+	  pkg_check_modules(${PKG_NAME}_MOD REQUIRED ${${PKG_NAME}_PC_FILE})
+  else()
+	  pkg_check_modules(${PKG_NAME}_MOD REQUIRED netcdf-cxx4)
+  endif()
+endif()
+
+if(${PKG_NAME}_MOD_VERSION)
+  # Extract major, minor and patch version from version string.
+  string(REPLACE "." ";" ${PKG_NAME}_TMP_VERSION ${${PKG_NAME}_MOD_VERSION})
+  SET(${PKG_NAME}_VERSION ${${PKG_NAME}_MOD_VERSION})
+  list(GET ${PKG_NAME}_TMP_VERSION 0 ${PKG_NAME}_VERSION_MAJOR)
+  list(GET ${PKG_NAME}_TMP_VERSION 1 ${PKG_NAME}_VERSION_MINOR)
+  list(GET ${PKG_NAME}_TMP_VERSION 2 ${PKG_NAME}_VERSION_PATCH)
 endif()
 
 include(FindPackageHandleStandardArgs)
 # handle the QUIETLY and REQUIRED arguments and set ${PGK_NAME}_FOUND to TRUE if
 # all listed variables are TRUE
 find_package_handle_standard_args(${PKG_NAME} REQUIRED_VARS ${PKG_NAME}_VERSION ${PKG_NAME}_LIBRARIES ${PKG_NAME}_C_LIBRARIES ${PKG_NAME}_C_INCLUDE_DIR ${PKG_NAME}_INCLUDE_DIR)
-
-
-# Extract major, minor and patch version from version string.
-string(REPLACE "." ";" ${PKG_NAME}_VERSION ${${PKG_NAME}_VERSION})
-list(GET ${PKG_NAME}_VERSION 0 ${PKG_NAME}_VERSION_MAJOR)
-list(GET ${PKG_NAME}_VERSION 1 ${PKG_NAME}_VERSION_MINOR)
-list(GET ${PKG_NAME}_VERSION 2 ${PKG_NAME}_VERSION_PATCH)
 
 
 # Marks cmake cached variables as advanced

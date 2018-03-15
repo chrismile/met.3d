@@ -4,8 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2017 Marc Rautenhaus
-**  Copyright 2017      Michael Kern
+**  Copyright 2015-2018 Marc Rautenhaus
+**  Copyright 2015-2017 Michael Kern
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -51,6 +51,7 @@ namespace MetConstants
 
 // Air
 const double GAS_CONSTANT_DRY_AIR = 287.058; // J K^-1 kg^-1
+const double SPECIFIC_HEAT_DRYAIR_CONST_PRESSURE = 1004.; // J K^-1 kg^-1
 
 // Water substance
 
@@ -253,6 +254,99 @@ double boxVolume_dry(double northWestLon, double northWestLat,
                      double pmid_Pa, double pbot_Pa, double ptop_Pa,
                      double temp_K = M_MISSING_VALUE);
 
+/**
+  Computes wind speed in [m.s-1] from eastward wind (@p u_ms) and northward
+  wind (@p v_ms).
+ */
+double windSpeed_ms(double u_ms, double v_ms);
+
+
+/**
+  Computes potential temperature in [K] from temperature @p T_K in [K] and
+  pressure @p p_Pa in [Pa].
+
+  Method:
+                            theta = T * (p0/p)^(R/cp)
+      with p0 = 100000. Pa, R = 287.058 JK-1kg-1, cp = 1004 JK-1kg-1.
+ */
+double potentialTemperature_K(double T_K, double p_Pa);
+
+
+/**
+  Computes the virtual temperature in [K] from temperature @p T_K in [K] and
+  specific humidity @p q_kgkg in [kg/kg].
+
+  Method:
+                  Tv = T * (q + 0.622(1-q)) / 0.622
+
+  Reference: Wallace&Hobbs 2nd ed., eq. 3.16, 3.59, and 3.60
+             (substitute w=q/(1-q) in 3.16 and 3.59 to obtain the exact
+             formula).
+ */
+double virtualTemperature_K(double T_K, double q_kgkg);
+
+
+/**
+  Computes the thickness of an atmospheric layer in terms of geopotential
+  height in [m], using the hypsometric question (equation (1.17) from Holton,
+  "An Introduction to Dynamic Meteorology", 3rd edition, 1992) in its
+  geopotential height formulation (equation (1.18 and 1.19) from Holton).
+
+  @p layerMeanVirtualTemperature_K specifies the layer mean (virtual)
+  temperature (use the virtual temperature to account for humidity) in [K],
+  @p p_bot and @p p_top the bounding pressure heights (can be either both in
+  [Pa] or both in [hPa]; only their ratio is used).
+ */
+double geopotentialThicknessOfLayer_m(double layerMeanVirtualTemperature_K,
+                                      double p_bot, double p_top);
+
+
+/**
+  Computes the mixing ratio w from specific humidity @p q_kgkg in [kg/kg].
+
+  Method: w = q / (1.-q)
+ */
+double mixingRatio_kgkg(double q_kgkg);
+
+
+/**
+  Computes the specific humidity from mixing ratio @p w_kgkg in [kg/kg].
+
+  Method: q = w / (1.+w)
+ */
+double specificHumidity_kgkg(double w_kgkg);
+
+
+/**
+  Computes dew point in [K] from pressure @p p_Pa in [Pa] and specific
+  humidity @p q_kgkg in [kg/kg].
+
+  Method: Use the inversion of Bolton (1980), eq. 10, to compute dewpoint.
+  According to Bolton, this is accurate to 0.03 K in the range 238..308 K. See
+  also Emanuel (1994, 'Atmospheric Convection', eq. 4.6.2).
+ */
+double dewPointTemperature_K_Bolton(double p_Pa, double q_kgkg);
+
+
+/**
+  Computes equivalent potential temperature in [K] from temperature @p T_K
+  in [K], pressure @p p_Pa in [Pa] and specific humidity @p q_kgkg in [kg/kg].
+
+  Method: Equation (43) of Bolton (MWR, 1980), "The Computation of Equivalent
+  Potential Temperature".
+ */
+double equivalentPotentialTemperature_K_Bolton(double T_K, double p_Pa,
+                                               double q_kgkg);
+
+
+// Test functions for meteorological computations.
+namespace MetRoutinesTests
+{
+
+void testEQPT();
+
+}
+
 
 inline double crossProduct(const QVector2D& a, const QVector2D& b)
 {
@@ -271,7 +365,6 @@ inline double crossProduct(const QVector2D& a, const QVector2D& b)
 QVector2D getLineSegmentsIntersectionPoint(
         const QVector2D& p, const QVector2D& p2,
         const QVector2D& q, const QVector2D& q2);
-
 
 } // namespace Met3D
 

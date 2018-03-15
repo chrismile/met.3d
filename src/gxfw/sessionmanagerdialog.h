@@ -31,7 +31,8 @@
 
 // related third party imports
 #include <QDialog>
-#include <QtGui>
+#include <QFileSystemModel>
+#include <QStyledItemDelegate>
 
 // local application imports
 
@@ -71,7 +72,8 @@ public:
     ~MSessionManagerDialog();
 
     void initialize(QString sessionName, QString path, int autoSaveInterval,
-                    bool loadOnStart, bool saveOnApplicationExit);
+                    bool loadOnStart, bool saveOnApplicationExit,
+                    int maximumNumberOfSavedRevisions);
 
     void loadSessionOnStart();
 
@@ -82,6 +84,13 @@ public:
       @ref path if @p sessionName is not equal to @ref currentSession.
      */
     void switchToSession(QString sessionName);
+
+    /**
+      Reverts current session to its revision with number @p revisionNumber.
+
+      Builds the filename of the revision file and tries to load it.
+     */
+    void revertCurrentSessionToRevision(QString revisionNumber);
 
     bool getAutoSaveSession();
 
@@ -152,6 +161,8 @@ public slots:
      */
     void fillSessionsList();
 
+    void fillCurrentSessionHistoryList();
+
     /**
       Propagates changes of auto save interval.
      */
@@ -188,7 +199,7 @@ private:
 
     void saveSessionToFile(QString sessionName, bool autoSave = false);
 
-    void loadSessionFromFile(QString sessionName);
+    void loadSessionFromFile(QString sessionName, bool appendFileExtension=true);
 
     MActor *createActor(QString actorType);
 
@@ -208,16 +219,33 @@ private:
      */
     int getSmallestIndexForUniqueName(QString sessionName);
 
+    /**
+      Updates history of a session by coping the file given by @p filename
+      (path + filename + file extension) to
+      ".[currentSessionName].[sessionFileExtension].[revisionNumber]" and by
+      removing files with smallest indices if too many revision files exist.
+     */
+    void updateSessionFileHistory(QString filename);
+
+    /**
+      Gets list of revision file names of session called @p sessionName and
+      stores the list int @p fileNameList.
+      */
+    void getCurrentSessionFileHistoryFileNameList(QStringList &fileNameList,
+                                                  QString &sessionName);
+
     Ui::MSessionManagerDialog *ui;
 
     /** Name of the current active session. */
     QString currentSession;
     QString path;
-    QStringList sessionsList;
     bool loadOnStart;
     MSessionItemDelegate *sessionItemDelegate;
     MSessionFileSystemModel *sessionFileSystemModel;
-};
+    /** Revision number the current session would get as a revision file. */
+    int currentRevisionNumber;
+    int maximumNumberOfSavedRevisions;
+}; // MSessionManagerDialog
 
 
 /**
@@ -235,7 +263,7 @@ public:
     ~MSessionFileSystemModel() {}
 
     QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override;
-};
+}; // MSessionFileSystemModel
 
 
 /**
@@ -261,7 +289,7 @@ public:
 private:
     QString currentSessionName;
 
-};
+}; // MSessionItemDelegate
 
 } // namespace Met3D
 

@@ -62,6 +62,8 @@ public:
     MNWPHorizontalSectionActor();
     ~MNWPHorizontalSectionActor();
 
+    static QString staticActorType() { return "Horizontal cross-section"; }
+
     void reloadShaderEffects();
 
     /**
@@ -151,6 +153,8 @@ protected:
     void onDeleteActorVariable(MNWPActorVariable* var) override;
 
     void onAddActorVariable(MNWPActorVariable* var) override;
+
+    void onChangeActorVariable(MNWPActorVariable *var) override;
 
 private:
     /** Methods to render the horizontal section. */

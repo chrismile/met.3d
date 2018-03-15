@@ -2,13 +2,14 @@
 #  This file is a find module script for CMake to locate all required headers and
 #  static libraries and to correctly setup Met.3D on every system
 #
-#  Package: grib_api
-#       - grib_api_FOUND        - System has found the package
-#       - grib_api_INCLUDE_DIR  - Package include directory
-#       - grib_api_LIBRARIES    - Package static libraries
+#  Package: eccodes
+#       - eccodes_FOUND        - System has found the package
+#       - eccodes_INCLUDE_DIR  - Package include directory
+#       - eccodes_LIBRARIES    - Package static libraries
 #
-#  Copyright 2016 Marc Rautenhaus
-#  Copyright 2016 Michael Kern
+#  Copyright 2018 Marc Rautenhaus
+#  Copyright 2018 Michael Kern
+#  Copyright 2018 Bianca Tost
 #
 ####################################################################################################
 
@@ -16,7 +17,7 @@
 include("cmake/common_settings.cmake")
 
 # Set the name of the package
-set (PKG_NAME grib_api)
+set (PKG_NAME eccodes)
 
 # If the system is unix, try to use the pkg_config for a custom library
 if (UNIX)
@@ -25,7 +26,7 @@ endif (UNIX)
 
 find_path(${PKG_NAME}_INCLUDE_DIR
         NAMES # Name of all header files
-            grib_api.h
+            eccodes.h
         HINTS # Hints to the directory where the package is currently installed in
             $ENV{${PKG_NAME}_DIR}
             ${PKG_INCLUDE_DIRS}
@@ -37,7 +38,7 @@ find_path(${PKG_NAME}_INCLUDE_DIR
 
 find_library(${PKG_NAME}_LIBRARY_RELEASE
         NAMES
-            grib_api GRIB_API
+            eccodes ECCODES
         HINTS
             $ENV{${PKG_NAME}_DIR}
             ${PKG_LIBRARY_DIRS}
@@ -50,7 +51,7 @@ find_library(${PKG_NAME}_LIBRARY_RELEASE
 
 find_library(${PKG_NAME}_LIBRARY_DEBUG
         NAMES
-            grib_apid GRIB_APID
+            eccodesd ECCODESD
         HINTS
             $ENV{${PKG_NAME}_DIR}
             ${PKG_LIBRARY_DIRS}
@@ -76,6 +77,10 @@ if (${PKG_NAME}_LIBRARY_DEBUG AND ${PKG_NAME}_LIBRARY_RELEASE)
     set (${PKG_NAME}_LIBRARIES
             optimized ${${PKG_NAME}_LIBRARY_RELEASE}
             debug ${${PKG_NAME}_LIBRARY_DEBUG})
+elseif (${PKG_NAME}_LIBRARY_RELEASE)
+    # if only release has been found, use that
+    set (${PKG_NAME}_LIBRARIES
+            ${${PKG_NAME}_LIBRARY_RELEASE})
 endif ()
 
 include(FindPackageHandleStandardArgs)

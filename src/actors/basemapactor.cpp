@@ -34,6 +34,8 @@
 // related third party imports
 #include <log4cplus/loggingmacros.h>
 #include <gdal_priv.h>
+#include <QString>
+#include <QFileDialog>
 
 // local application imports
 #include "util/mstopwatch.h"
@@ -69,7 +71,7 @@ MBaseMapActor::MBaseMapActor()
     // ===============================================
     beginInitialiseQtProperties();
 
-    setActorType("Base map");
+    setActorType(staticActorType());
     setName(getActorType());
 
     loadMapProperty = addProperty(CLICK_PROPERTY, "load map",

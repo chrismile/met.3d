@@ -32,7 +32,7 @@
 
 // related third party imports
 #include <QtCore>
-#include <QtGui>
+#include <QHeaderView>
 
 // local application imports
 #include "gxfw/mglresourcesmanager.h"

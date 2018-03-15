@@ -4,8 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2017 Marc Rautenhaus
-**  Copyright 2016-2017 Bianca Tost
+**  Copyright 2015-2018 Marc Rautenhaus
+**  Copyright 2016-2018 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -32,6 +32,7 @@
 // related third party imports
 #include <QMainWindow>
 #include <QVector>
+#include <QSplitter>
 
 // local application imports
 #include "util/mutil.h"
@@ -123,6 +124,9 @@ public:
 
     void onSessionsListChanged(QStringList *sessionsList, QString currentSession);
 
+    void onCurrentSessionHistoryChanged(QStringList *sessionHistory,
+                                        QString sessionName);
+
     void onSessionSwitch(QString currentSession);
 
     void updateSessionTimerInterval(int interval);
@@ -156,6 +160,11 @@ public slots:
     void resizeWindow();
 
     void switchSession(QAction *sessionAction);
+
+    void revertCurrentSession(QAction *sessionAction);
+
+protected:
+    virtual void keyPressEvent(QKeyEvent *);
 
 private:
     Ui::MainWindow *ui;

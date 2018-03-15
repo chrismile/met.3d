@@ -63,7 +63,7 @@ MMovablePoleActor::MMovablePoleActor()
     // ===============================================
     beginInitialiseQtProperties();
 
-    setActorType("Movable poles");
+    setActorType(staticActorType());
     setName(getActorType());
 
     colourProperty = addProperty(COLOR_PROPERTY, "colour",

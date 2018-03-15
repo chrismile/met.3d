@@ -4,8 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2017 Marc Rautenhaus
-**  Copyright 2017      Bianca Tost
+**  Copyright 2015-2018 Marc Rautenhaus
+**  Copyright 2017-2018 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -237,7 +237,7 @@ void MFrontendConfiguration::initializeFrontendFromConfigFile(
         msgBox.setText("No write access to '" + sessionDirectory
                        + "'.\nUsing default path '"
                        + QDir::home()
-                       .absoluteFilePath(".met3d/sessions")
+                       .absoluteFilePath("met3d/sessions")
                        +  "'.\nPlease check setting in frontend"
                           " configuration file.");
         msgBox.exec();
@@ -249,15 +249,15 @@ void MFrontendConfiguration::initializeFrontendFromConfigFile(
         LOG4CPLUS_WARN(mlog, "No directory to store session files has been"
                              " specified in frontend configuration file."
                              " Using '"
-                       << QDir::home().absoluteFilePath(".met3d/sessions")
+                       << QDir::home().absoluteFilePath("met3d/sessions")
                        .toStdString() << "' as default.");
         sessionWasSet = false;
     }
 
     if (sessionDirectory == "")
     {
-        // Set session configuration directory to default ($HOME/.met3d/sessions).
-        sessionDirectory = QDir::home().absoluteFilePath(".met3d/sessions");
+        // Set session configuration directory to default ($HOME/met3d/sessions).
+        sessionDirectory = QDir::home().absoluteFilePath("met3d/sessions");
         if (!QDir().mkpath(sessionDirectory))
         {
             QMessageBox msgBox;
@@ -353,9 +353,10 @@ void MFrontendConfiguration::initializeFrontendFromConfigFile(
 
     sysMC->getMainWindow()->getSessionManagerDialog()->initialize(
                 sessionName, sessionDirectory,
-                config.value("autoSaveSessionIntervalInSeconds", "0").toInt(),
+                config.value("autoSaveSessionIntervalInSeconds", 0).toInt(),
                 loadSessionOnStart,
-                config.value("saveSessionOnApplicationExit", false).toBool());
+                config.value("saveSessionOnApplicationExit", false).toBool(),
+                config.value("maximumNumberOfSavedRevisions", 12).toInt());
 
     config.endGroup();
     // =========================================================================
@@ -890,7 +891,7 @@ void MFrontendConfiguration::initializeDefaultActors_Surface(
                 0., 90., 80., 5., 29., 86., 0.2, 2., 1., 0.85, 0.01, false);
     transferFunctionTemp->setMinimumValue(250.);
     transferFunctionTemp->setMaximumValue(330.);
-    transferFunctionTemp->setValueDecimals(0);
+    transferFunctionTemp->setValueSignificantDigits(1);
     transferFunctionTemp->setSteps(15);
     transferFunctionTemp->setNumTicks(16);
     transferFunctionTemp->setNumLabels(6);
@@ -940,7 +941,7 @@ void MFrontendConfiguration::initializeDefaultActors_HSec(
                 0., 90., 80., 5., 29., 86., 0.2, 2., 1., 0.85, 0.01, false);
     transferFunctionWind->setMinimumValue(10.);
     transferFunctionWind->setMaximumValue(85.);
-    transferFunctionWind->setValueDecimals(0);
+    transferFunctionWind->setValueSignificantDigits(1);
     transferFunctionWind->setSteps(15);
     transferFunctionWind->setNumTicks(16);
     transferFunctionWind->setNumLabels(6);
@@ -1027,7 +1028,7 @@ void MFrontendConfiguration::initializeDefaultActors_HSec_Difference(
                 0., 90., 80., 5., 29., 86., 0.2, 2., 1., 0.85, 0.01, false);
     transferFunctionDiff->setMinimumValue(0.);
     transferFunctionDiff->setMaximumValue(70.);
-    transferFunctionDiff->setValueDecimals(0);
+    transferFunctionDiff->setValueSignificantDigits(1);
     transferFunctionDiff->setSteps(15);
     transferFunctionDiff->setNumTicks(16);
     transferFunctionDiff->setNumLabels(6);
@@ -1115,7 +1116,7 @@ void MFrontendConfiguration::initializeDefaultActors_VSec_PV(
     transferFunctionPotVort->selectPredefinedColourmap("pv_eth");
     transferFunctionPotVort->setMinimumValue(-2.);
     transferFunctionPotVort->setMaximumValue(8.);
-    transferFunctionPotVort->setValueDecimals(1);
+    transferFunctionPotVort->setValueSignificantDigits(2);
     transferFunctionPotVort->setNumTicks(11);
     transferFunctionPotVort->setPosition(QRectF(0.68, -0.45, 0.05, 0.5));
     glRM->registerActor(transferFunctionPotVort);
@@ -1209,7 +1210,7 @@ void MFrontendConfiguration::initializeDefaultActors_VSec_Clouds(
     transferFunctionClds->selectPredefinedColourmap("mss_clouds");
     transferFunctionClds->setMinimumValue(0.);
     transferFunctionClds->setMaximumValue(1.);
-    transferFunctionClds->setValueDecimals(1);
+    transferFunctionClds->setValueSignificantDigits(2);
     transferFunctionClds->setPosition(QRectF(0.9, -0.45, 0.05, 0.5));
     glRM->registerActor(transferFunctionClds);
     foreach (MSceneControl *scene, scenes)
@@ -1285,7 +1286,7 @@ void MFrontendConfiguration::initializeDefaultActors_Volume(
 
     MTransferFunction1D *transferFunctionPressure = new MTransferFunction1D();
     transferFunctionPressure->setName("Pressure");
-    transferFunctionPressure->setValueDecimals(0);
+    transferFunctionPressure->setValueSignificantDigits(1);
     transferFunctionPressure->selectPredefinedColourmap("gist_rainbow");
     transferFunctionPressure->setMinimumValue(100000.);
     transferFunctionPressure->setMaximumValue(5000.);
@@ -1368,7 +1369,7 @@ void MFrontendConfiguration::initializeDefaultActors_VolumeProbability(
 //    transferFunctionProb->selectPredefinedColourmap("hot_wind_r");
     transferFunctionProb->setMinimumValue(0.);
     transferFunctionProb->setMaximumValue(1.);
-    transferFunctionProb->setValueDecimals(2);
+    transferFunctionProb->setValueSignificantDigits(3);
     transferFunctionProb->setSteps(10);
     transferFunctionProb->setNumTicks(16);
     transferFunctionProb->setNumLabels(6);
@@ -1585,7 +1586,7 @@ void MFrontendConfiguration::initializeDefaultActors_Trajectories(
 
     MTransferFunction1D *transferFunctionPressure = new MTransferFunction1D();
     transferFunctionPressure->setName("Colourbar pressure (trajectories predef)");
-    transferFunctionPressure->setValueDecimals(0);
+    transferFunctionPressure->setValueSignificantDigits(1);
     transferFunctionPressure->selectHCLColourmap(
                 MTransferFunction1D::QUALITATIVE,
                 0., 360., 50., 50., 70., 70., 1., 1., 1., 1., 1., true);

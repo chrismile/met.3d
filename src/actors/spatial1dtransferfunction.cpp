@@ -4,8 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2016-2017 Marc Rautenhaus
-**  Copyright 2016-2017 Bianca Tost
+**  Copyright 2016-2018 Marc Rautenhaus
+**  Copyright 2016-2018 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -32,6 +32,9 @@
 
 // related third party imports
 #include <log4cplus/loggingmacros.h>
+#include <QFileDialog>
+#include <QListWidget>
+#include <QListWidgetItem>
 
 // local application imports
 #include "gxfw/mglresourcesmanager.h"
@@ -71,7 +74,7 @@ MSpatial1DTransferFunction::MSpatial1DTransferFunction(QObject *parent)
     // ===============================================
     beginInitialiseQtProperties();
 
-    setActorType("Transfer function scalar to texture");
+    setActorType(staticActorType());
     setName(getActorType());
 
     // Properties related to texture levels.
@@ -95,15 +98,22 @@ MSpatial1DTransferFunction::MSpatial1DTransferFunction(QObject *parent)
     // Properties related to data range.
     // =================================
 
+    rangePropertiesSubGroup->removeSubProperty(valueOptionsPropertiesSubGroup);
+
     clampMaximumProperty = addProperty(BOOL_PROPERTY, "clamp maximum",
                                        rangePropertiesSubGroup);
     properties->mBool()->setValue(clampMaximumProperty, clampMaximum);
 
-    int decimals = 3;
-    interpolationRangeProperty = addProperty(DOUBLE_PROPERTY, "interpolation range",
-                                       rangePropertiesSubGroup);
-    properties->setDouble(interpolationRangeProperty, interpolationRange,
-                          0.0, DBL_MAX, decimals, pow(10., -decimals));
+    int significantDigits =
+            properties->mInt()->value(valueSignificantDigitsProperty);
+    interpolationRangeProperty = addProperty(
+                SCIENTIFICDOUBLE_PROPERTY, "interpolation range",
+                rangePropertiesSubGroup);
+    properties->setSciDouble(interpolationRangeProperty, interpolationRange,
+                           0.0, DBL_MAX, significantDigits,
+                           pow(10., -significantDigits));
+
+    rangePropertiesSubGroup->addSubProperty(valueOptionsPropertiesSubGroup);
 
     // Properties related to alpha blending.
     // =====================================
@@ -144,7 +154,7 @@ MSpatial1DTransferFunction::MSpatial1DTransferFunction(QObject *parent)
 
     textureScalePropertiesSubGroup = addProperty(GROUP_PROPERTY, "texture scale",
                                           actorPropertiesSupGroup);
-    decimals = 1;
+    int decimals = 1;
     textureScaleDecimalsProperty = addProperty(INT_PROPERTY, "decimals",
                                         textureScalePropertiesSubGroup);
     properties->setInt(textureScaleDecimalsProperty, decimals, 0, 9);
@@ -184,7 +194,7 @@ void MSpatial1DTransferFunction::saveConfiguration(QSettings *settings)
     settings->setValue("clampMaximum",
                        properties->mBool()->value(clampMaximumProperty));
     settings->setValue("interpolationRange",
-                       properties->mDouble()->value(interpolationRangeProperty));
+                       properties->mSciDouble()->value(interpolationRangeProperty));
 
     // Properties related to alpha blending.
     // =====================================
@@ -225,7 +235,7 @@ void MSpatial1DTransferFunction::loadConfiguration(QSettings *settings)
     properties->mBool()->setValue(
                 clampMaximumProperty,
                 settings->value("clampMaximum", true).toBool());
-    properties->mDouble()->setValue(
+    properties->mSciDouble()->setValue(
                 interpolationRangeProperty,
                 settings->value("interpolationRange", 1.0).toDouble());
 
@@ -267,15 +277,25 @@ void MSpatial1DTransferFunction::loadConfiguration(QSettings *settings)
 
     if (isInitialized())
     {
-        generateTransferTexture(0, true);
-        for (int level = 1; level < loadedImages.size(); level++)
-        {
-            generateTransferTexture(level, false);
-        }
-        loadedImages.clear();
+        generateTransferTexture();
         generateBarGeometry();
     }
 
+}
+
+
+void MSpatial1DTransferFunction::setValueSignificantDigits(int significantDigits)
+{
+    MTransferFunction::setValueSignificantDigits(significantDigits);
+    properties->mSciDouble()->setSignificantDigits(interpolationRangeProperty,
+                                                 significantDigits);
+}
+
+
+void MSpatial1DTransferFunction::setValueStep(double step)
+{
+    MTransferFunction::setValueStep(step);
+    properties->mSciDouble()->setSingleStep(interpolationRangeProperty, step);
 }
 
 
@@ -437,18 +457,18 @@ void MSpatial1DTransferFunction::onQtPropertyChanged(QtProperty *property)
         emitActorChangedSignal();
     }
 
-    else if (property == valueDecimalsProperty)
+    else if (property == valueSignificantDigitsProperty)
     {
-        int decimals = properties->mInt()->value(valueDecimalsProperty);
-        properties->mDouble()->setDecimals(minimumValueProperty, decimals);
-        properties->mDouble()->setSingleStep(minimumValueProperty,
-                                             pow(10.,-decimals));
-        properties->mDouble()->setDecimals(maximumValueProperty, decimals);
-        properties->mDouble()->setSingleStep(maximumValueProperty,
-                                             pow(10.,-decimals));
-        properties->mDouble()->setDecimals(interpolationRangeProperty, decimals);
-        properties->mDouble()->setSingleStep(interpolationRangeProperty,
-                                             pow(10.,-decimals));
+        int significantDigits =
+                properties->mInt()->value(valueSignificantDigitsProperty);
+        properties->mSciDouble()->setSignificantDigits(minimumValueProperty,
+                                                     significantDigits);
+        properties->mSciDouble()->setSignificantDigits(maximumValueProperty,
+                                                     significantDigits);
+        properties->mSciDouble()->setSignificantDigits(interpolationRangeProperty,
+                                                     significantDigits);
+        properties->mSciDouble()->setSignificantDigits(valueStepProperty,
+                                                     significantDigits);
 
         if (suppressActorUpdates()) return;
 
@@ -457,10 +477,18 @@ void MSpatial1DTransferFunction::onQtPropertyChanged(QtProperty *property)
         emitActorChangedSignal();
     }
 
+    else if (property == valueStepProperty)
+    {
+        int step = properties->mSciDouble()->value(valueStepProperty);
+        properties->mSciDouble()->setSingleStep(minimumValueProperty, step);
+        properties->mSciDouble()->setSingleStep(maximumValueProperty, step);
+        properties->mSciDouble()->setSingleStep(interpolationRangeProperty, step);
+    }
+
     else if (property == interpolationRangeProperty)
     {
         interpolationRange =
-                properties->mDouble()->value(interpolationRangeProperty);
+                properties->mSciDouble()->value(interpolationRangeProperty);
 
         if (suppressActorUpdates()) return;
 
@@ -610,7 +638,8 @@ void MSpatial1DTransferFunction::renderToCurrentContext(
         colourbarShader->setUniformValue("spatialTransferTexture", textureUnit);CHECK_GL_ERROR;
 
         vertexBuffer->attachToVertexAttribute(SHADER_VERTEX_ATTRIBUTE, 3, false,
-                                              5 * sizeof(float), 0 * sizeof(float));CHECK_GL_ERROR;
+                                              5 * sizeof(float),  
+                                              (const GLvoid*)(0 * sizeof(float)));CHECK_GL_ERROR;
         vertexBuffer->attachToVertexAttribute(SHADER_TEXTURE_ATTRIBUTE, 2, false,
                                               5 * sizeof(float),
                                               (const GLvoid*)(3 * sizeof(float)));CHECK_GL_ERROR;
@@ -888,8 +917,8 @@ void MSpatial1DTransferFunction::generateBarGeometry()
     // ========================================================================
     // Finally, place labels at the tickmarks:
 
-    minimumValue = properties->mDouble()->value(minimumValueProperty);
-    maximumValue = properties->mDouble()->value(maximumValueProperty);
+    minimumValue = properties->mSciDouble()->value(minimumValueProperty);
+    maximumValue = properties->mSciDouble()->value(maximumValueProperty);
     int maxNumLabels = properties->mInt()->value(maxNumLabelsProperty);
 
     // Obtain a shortcut to the application's text manager to register the
@@ -919,9 +948,6 @@ void MSpatial1DTransferFunction::generateBarGeometry()
     // labels.
     float labelSpacing = properties->mDouble()->value(labelSpacingProperty);
 
-    // Number of label decimals to be printed.
-    int decimals = properties->mInt()->value(valueDecimalsProperty);
-
     // Label font size and colour.
     int labelsize = properties->mInt()->value(labelSizeProperty);
     QColor labelColour = properties->mColor()->value(labelColourProperty);
@@ -938,8 +964,11 @@ void MSpatial1DTransferFunction::generateBarGeometry()
         {
             float value = maximumValue - double(i) / double(numTicks - 1)
                     * (maximumValue - minimumValue);
+            QString labelText =
+                    properties->mSciDouble()->valueAsPropertyFormatedText(
+                        minimumValueProperty, value);
             labels.append(tm->addText(
-                              QString("%1").arg(value, 0, 'f', decimals),
+                              labelText,
                               MTextManager::CLIPSPACE,
                               tickmarks[6*i + 3] - labelSpacing,
                           tickmarks[6*i + 4],
@@ -952,8 +981,11 @@ void MSpatial1DTransferFunction::generateBarGeometry()
     }
     else
     {
+        QString labelText =
+                properties->mSciDouble()->valueAsPropertyFormatedText(
+                    maximumValueProperty, maximumValue);
         labels.append(tm->addText(
-                          QString("%1").arg(maximumValue, 0, 'f', decimals),
+                          labelText,
                           MTextManager::CLIPSPACE,
                           tickmarks[3] - labelSpacing,
                           tickmarks[4],

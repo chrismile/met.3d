@@ -5,7 +5,7 @@
 **  prediction data.
 **
 **  Copyright 2015-2017 Marc Rautenhaus
-**  Copyright 2015-2017 Bianca Tost
+**  Copyright 2017-2018  Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -300,9 +300,129 @@ NcVar NcCFVar::getVerticalCoordinateHybridSigmaPressure(NcVar *ap, NcVar *b,
 }
 
 
+NcVar NcCFVar::getVerticalCoordinateAuxiliaryPressure(
+        QString auxiliary3DPressureField, QString *pressureName,
+        int *levelIndex, bool disableGridConsistencyCheck)
+{
+    NcVar auxPressureVar = NcVar();
+
+    // Refuse variables as auxiliary pressure variables if no auxiliary pressure
+    // variable is given.
+    if (auxiliary3DPressureField == "")
+    {
+        throw MNcException("NcException",
+                           "Auxiliary pressure coordinate requested but name of"
+                           " pressure variable not specified.",
+                           __FILE__, __LINE__);
+        return auxPressureVar;
+    }
+
+    // Loop over all coordinate (=dimension) variables of this variable and
+    // search and test if the coordinates match with the auxiliary pressure
+    // field.
+    for (int i = 0; i < getDimCount(); i++)
+    {
+        NcVar var = getParentGroup().getVar(getDim(i).getName());
+
+        QStringList verticalDimensionUnits;
+        verticalDimensionUnits << "Pa" << "hPa" << "bar" << "millibar" << "decibar"
+              << "atmosphere" << "atm" << "m" << "metre" << "sigma";
+        QStringList axises;
+        axises << "Z" << "z";
+
+        // Get the unit of dimension.
+        string units = "";
+        try { var.getAtt("units").getValues(units); }
+        catch (NcException) {}
+
+        string axis = "";
+        try { var.getAtt("axis").getValues(axis); }
+        catch (NcException) {}
+
+        bool isConnectedToAuxiliaryPressureVar = false;
+
+        // The vertical coordinate might be not explicitly present for auxiliary
+        // pressure fields thus the variable can be Null otherwise it must have
+        // a vertical dimenion unit.
+        if (var.isNull()
+                || verticalDimensionUnits.contains(QString::fromStdString(units))
+                || axises.contains(QString::fromStdString(axis)))
+        {
+            isConnectedToAuxiliaryPressureVar = true;
+        }
+
+        // The vertical coordinate might be not explicitly present for auxiliary
+        // pressure fields thus the variable can be Null otherwise it must match
+        // the vertical coordinate variable.
+        if (isConnectedToAuxiliaryPressureVar)
+        {
+            // TODO (bt, 08Sep2017): Also support connection to variables with
+            // different horizontal coordinates, but than it will be necessary
+            // to save the difference and handle it during rendering.
+            // Only connect variables to the auxiliary pressure field if they
+            // share the same dimensions.
+            var = getParentGroup().getVar(
+                        auxiliary3DPressureField.toStdString());
+            // If the pressure field is stored in a different file, it is not
+            // possible to check if the dimensions match without searching for
+            // the file of the pressure field (time consuming!). Thus if a
+            // pressure field name is given but not present, we assume variables
+            // with a vertical dimension as assigned to the pressure field.
+            if (var.isNull())
+            {
+                *pressureName = auxiliary3DPressureField;
+                return var;
+            }
+            if (var.getDimCount() != getDimCount())
+            {
+                break;
+            }
+            if (!disableGridConsistencyCheck)
+            {
+                for (int j = 0; j < var.getDimCount(); j++)
+                {
+                    if (var.getDim(j).getName() != getDim(j).getName())
+                    {
+                        // Difference in coordinate means no connection.
+                        isConnectedToAuxiliaryPressureVar = false;
+                        break;
+                    }
+                }
+            }
+            // Only accept connection between variables with the same dimensions.
+            if (isConnectedToAuxiliaryPressureVar)
+            {
+                auxPressureVar = var;
+                *pressureName = auxiliary3DPressureField;
+                *levelIndex = i;
+                break;
+            }
+        }
+    }
+
+    // Refuse variables as auxiliary pressure variables if they don't suit the
+    // auxiliary pressure variable.
+    if (auxPressureVar.isNull())
+    {
+        throw MNcException("NcException",
+                           "Dimensions don't match.", __FILE__, __LINE__);
+    }
+    return auxPressureVar;
+}
+
+
 NcVar NcCFVar::getVerticalCoordinatePotVort()
 {
     vector<string> units = {"10-6Km2/kgs"};
+    return getCFCoordinateVar(units, {""}, true);
+}
+
+
+NcVar NcCFVar::getVerticalCoordinateGeometricHeight()
+{
+    // The vertical z coordinate is identifyable by units of geometric height,
+    // cf. http://cfconventions.org/cf-conventions/v1.6.0/cf-conventions.html#vertical-coordinate
+    vector<string> units = {"m", "metre"};
     return getCFCoordinateVar(units, {""}, true);
 }
 
@@ -562,21 +682,45 @@ QDateTime NcCFVar::getTimeFromAttribute(QString attributeName)
 }
 
 
-NcCFVar::NcVariableGridType NcCFVar::getGridType()
+NcCFVar::NcVariableGridType NcCFVar::getGridType(QString auxiliary3DPressureField,
+                                                 bool disableGridConsistencyCheck)
 {
     if (varGridType != UNDEFINED) return varGridType;
 
     // Only continue with checks if the variable type is UNDEFINED (i.e. has not
     // yet been defined).
-    if      (isCFDataVariable(*this, LAT_LON_PVU))    varGridType = LAT_LON_PVU;
-    else if (isCFDataVariable(*this, LAT_LON_HYBRID)) varGridType = LAT_LON_HYBRID;
-    else if (isCFDataVariable(*this, LAT_LON_P))      varGridType = LAT_LON_P;
-    else if (isCFDataVariable(*this, LAT_LON))        varGridType = LAT_LON;
+    if      (isCFDataVariable(*this, LAT_LON_PVU))
+    {
+        varGridType = LAT_LON_PVU;
+    }
+    else if (isCFDataVariable(*this, LAT_LON_P))
+    {
+        varGridType = LAT_LON_P;
+    }
+    else if (isCFDataVariable(*this, LAT_LON_AUXP3D, auxiliary3DPressureField,
+                              disableGridConsistencyCheck))
+    {
+        varGridType = LAT_LON_AUXP3D;
+    }
+    else if (isCFDataVariable(*this, LAT_LON_HYBRID))
+    {
+        varGridType = LAT_LON_HYBRID;
+    }
+    else if (isCFDataVariable(*this, LAT_LON_Z))
+    {
+        varGridType = LAT_LON_Z;
+    }
+    else if (isCFDataVariable(*this, LAT_LON))
+    {
+        varGridType = LAT_LON;
+    }
     return varGridType;
 }
 
 
-bool NcCFVar::isCFDataVariable(const NcVar& var, NcVariableGridType type)
+bool NcCFVar::isCFDataVariable(const NcVar& var, NcVariableGridType type,
+                               QString auxiliary3DPressureField,
+                               bool disableGridConsistencyCheck)
 {
     // First test: If the variable has only one dimension and that dimension
     // has the same name as the variable, it is a coordinate variable.
@@ -625,6 +769,25 @@ bool NcCFVar::isCFDataVariable(const NcVar& var, NcVariableGridType type)
         break;
     case LAT_LON_PVU:
         try { NcVar dummy = cfvar.getVerticalCoordinatePotVort(); }
+        catch (NcException) { return false; }
+        try { NcVar dummy = cfvar.getLongitudeVar(); }
+        catch (NcException) { return false; }
+        try { NcVar dummy = cfvar.getLatitudeVar(); }
+        catch (NcException) { return false; }
+        break;
+    case LAT_LON_AUXP3D:
+        try { QString p; int idx; NcVar dummy =
+                cfvar.getVerticalCoordinateAuxiliaryPressure(
+                    auxiliary3DPressureField, &p, &idx,
+                    disableGridConsistencyCheck); }
+        catch (NcException) { return false; }
+        try { NcVar dummy = cfvar.getLongitudeVar(); }
+        catch (NcException) { return false; }
+        try { NcVar dummy = cfvar.getLatitudeVar(); }
+        catch (NcException) { return false; }
+        break;
+    case LAT_LON_Z:
+        try { NcVar dummy = cfvar.getVerticalCoordinateGeometricHeight(); }
         catch (NcException) { return false; }
         try { NcVar dummy = cfvar.getLongitudeVar(); }
         catch (NcException) { return false; }

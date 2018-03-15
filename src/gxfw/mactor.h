@@ -28,11 +28,13 @@
 #define MACTOR_H
 
 // standard library imports
+#include <memory>
 
 // related third party imports
 #include <QtCore>
 #include <QtProperty>
-#include <memory>
+#include <QWidgetAction>
+#include <QProgressDialog>
 
 // local application imports
 #include "gxfw/mtypes.h"
@@ -116,6 +118,18 @@ public:
     virtual void reloadShaderEffects() = 0;
 
     /**
+      Returns actor type.
+    */
+    static QString staticActorType() { return "Default actor"; }
+
+    /**
+      Returns actor type.
+
+      Note: Actor type needs to be set in the constructor.
+    */
+    virtual QString getActorType() { return actorType; }
+
+    /**
       Returns a unique number that identifies the actor.
       */
     unsigned int getID();
@@ -129,16 +143,6 @@ public:
       Returns the name of the actor (set by @ref setName()).
       */
     QString getName();
-
-    /**
-      Sets the name of the factory the actor belongs to.
-      */
-    void setActorType(const QString name) { actorType = name; }
-
-    /**
-      Returns the name of the factory the actor belongs to.
-    */
-    QString getActorType() { return actorType; }
 
     /**
       Returns a @ref QtProperty instance acting as parent to all the properties
@@ -431,6 +435,8 @@ signals:
     void actorNameChanged(MActor *actor, QString oldName);
 
 protected:
+    void setActorType(QString actorType) { this->actorType = actorType; }
+
     /**
       Initialise the actor, e.g. load GLSL shader programs, create GPU OpenGL
       resources that can be shared between OpenGL contexts.

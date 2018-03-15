@@ -4,8 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2017 Marc Rautenhaus
-**  Copyright 2016-2017 Bianca Tost
+**  Copyright 2015-2018 Marc Rautenhaus
+**  Copyright 2016-2018 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -29,13 +29,18 @@
 
 // standard library imports
 #include <iostream>
+#include <float.h>
 
 // related third party imports
+#include <QDockWidget>
+#include <QDesktopServices>
+#include <QDesktopWidget>
+#include <QCloseEvent>
+
 #include <log4cplus/loggingmacros.h>
 #include <log4cplus/version.h>
-#include <grib_api.h>
+#include <eccodes.h>
 #include <gsl/gsl_version.h>
-#include <hdf5.h>
 #include <netcdf_meta.h>
 
 // local application imports
@@ -250,6 +255,8 @@ MMainWindow::MMainWindow(QStringList commandLineArguments, QWidget *parent)
             sessionManagerDialog, SLOT(saveSession()));
     connect(ui->menuSessions, SIGNAL(triggered(QAction*)),
             this, SLOT(switchSession(QAction*)));
+    connect(ui->menuRevertCurrentSession, SIGNAL(triggered(QAction*)),
+            this, SLOT(revertCurrentSession(QAction*)));
     connect(sessionAutoSaveTimer, SIGNAL(timeout()),
             sessionManagerDialog, SLOT(autoSaveSession()));
 }
@@ -818,6 +825,7 @@ void MMainWindow::onSessionsListChanged(QStringList *sessionsList,
     foreach(QString session, *sessionsList)
     {
         QAction *action = ui->menuSessions->addAction(session);
+        action->setData(session);
         if (session == currentSession)
         {
             QFont actionFont = action->font();
@@ -829,6 +837,26 @@ void MMainWindow::onSessionsListChanged(QStringList *sessionsList,
 }
 
 
+void MMainWindow::onCurrentSessionHistoryChanged(QStringList *sessionHistory,
+                                                 QString sessionName)
+{
+    // Clear actions.
+    foreach(QAction *action, ui->menuRevertCurrentSession->actions())
+    {
+        ui->menuRevertCurrentSession->removeAction(action);
+        delete action;
+    }
+    ui->menuRevertCurrentSession->addSeparator()->setText(sessionName);
+    // Add new actions.
+    foreach(QString sessionRevision, *sessionHistory)
+    {
+        QAction *action = ui->menuRevertCurrentSession->addAction(sessionRevision);
+        action->setData(sessionRevision);
+
+    }
+}
+
+
 void MMainWindow::onSessionSwitch(QString currentSession)
 {
     // Change font of previous currentSession back to normal and emphasise
@@ -836,7 +864,7 @@ void MMainWindow::onSessionSwitch(QString currentSession)
     foreach(QAction *action, ui->menuSessions->actions())
     {
         QFont actionFont = action->font();
-        QString session = action->text();
+        QString session = action->data().toString();
         // Emphasise the entry which represents the current session.
         if (session == currentSession)
         {
@@ -1102,7 +1130,11 @@ void MMainWindow::addDataset()
                     pipelineConfig.enableRegridding,
                     pipelineConfig.enableProbabiltyRegionFilter,
                     pipelineConfig.treatRotatedGridAsRegularGrid,
-                    pipelineConfig.surfacePressureFieldType);
+                    pipelineConfig.surfacePressureFieldType,
+                    pipelineConfig.convertGeometricHeightToPressure_ICAOStandard,
+                    pipelineConfig.auxiliary3DPressureField,
+                    pipelineConfig.disableGridConsistencyCheck,
+                    pipelineConfig.inputVarsForDerivedVars);
     }
 }
 
@@ -1156,7 +1188,7 @@ void MMainWindow::showAboutDialog()
             "ANY WARRANTY; without even the implied warranty of MERCHANTABILITY "
             "or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public "
             "License for more details.<br><br>"
-            "Copyright 2015-2017 Met.3D authors:<br>"
+            "Copyright 2015-2018 Met.3D authors:<br>"
             "Marc Rautenhaus(1), Bianca Tost(1), Michael Kern(1), Alexander "
             "Kumpf(1), Fabian Sch&ouml;ttl(1), Christoph Heidelmann(1).<br><br>"
             "(1) <a href='https://wwwcg.in.tum.de/'>Computer Graphics and "
@@ -1171,15 +1203,15 @@ void MMainWindow::showAboutDialog()
             "</tr>"
             "<tr> "
             "<td> GLFX: %8.%9.%10 </td> <td> GLU: %11 </td>"
-            " <td> grib_api: %12 </td>"
+            " <td> eccodes: %12 </td>"
             "</tr>"
             "<tr> "
-            "<td> GSL: %13 </td> <td> HDF5: %14.%15.%16 </td>"
-            " <td> LOG4CPLUS: %17 </td>"
+            "<td> GSL: %13 </td> <td> LOG4CPLUS: %14 </td>"
+            " <td> NetCDF: %15 </td>"
             "</tr>"
             "<tr> "
-            "<td> NetCDF: %18 </td> <td> NetCDF-4 C++: %19.%20.%21 </td>"
-            " <td> QCustomPlot: %22.%23.%24 </td>"
+            "<td> NetCDF-4 C++: %16.%17.%18 </td>"
+            " <td> QCustomPlot: %19.%20.%21 </td>"
             "</tr>"
             "</table>"
             "Note: If a version is listed as x.x.x, Met.3D wasn't able to find"
@@ -1196,9 +1228,8 @@ void MMainWindow::showAboutDialog()
             .arg("x").arg("x").arg("x")
 #endif
             .arg(QString(reinterpret_cast<const char *>(gluGetString(GLU_VERSION))))
-            .arg(GRIB_API_VERSION_STR)
+            .arg(ECCODES_VERSION_STR)
             .arg(GSL_VERSION)
-            .arg(H5_VERS_MAJOR).arg(H5_VERS_MINOR).arg(H5_VERS_RELEASE)
             .arg(LOG4CPLUS_VERSION_STR)
             .arg(NC_VERSION)
 #if defined(NetCDFCXX4_VERSION_MAJOR) && defined(NetCDFCXX4_VERSION_MINOR) \
@@ -1231,13 +1262,31 @@ void MMainWindow::resizeWindow()
     int newHeight = resizeWindowDialog->getHeight();
     // TODO (bt, 25Oct2016) At the moment only resize in one monitor possible
     this->resize(newWidth, newHeight);
-
 }
 
 
 void MMainWindow::switchSession(QAction *sessionAction)
 {
-    sessionManagerDialog->switchToSession(sessionAction->text());
+    sessionManagerDialog->switchToSession(sessionAction->data().toString());
+}
+
+
+void MMainWindow::revertCurrentSession(QAction *sessionAction)
+{
+    QString sessionNumber = sessionAction->data().toString();
+    sessionNumber = sessionNumber.split(":").first();
+    sessionNumber.replace(QRegExp("\\D*"), "");
+    sessionManagerDialog->revertCurrentSessionToRevision(sessionNumber);
+}
+
+
+void MMainWindow::keyPressEvent(QKeyEvent *key)
+{
+    switch (key->key())
+    {
+    default:
+        return;
+    }
 }
 
 

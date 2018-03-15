@@ -31,7 +31,6 @@
 
 // related third party imports
 #include "GL/glew.h"
-#include <QtGui>
 #include <QGLWidget>
 #include <QGLShaderProgram>
 #include "qtpropertymanager.h"

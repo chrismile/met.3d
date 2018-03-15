@@ -4,9 +4,9 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2015-2018 Marc Rautenhaus
 **  Copyright 2015      Michael Kern
-**  Copyright 2016-2017 Bianca Tost
+**  Copyright 2016-2018 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -78,7 +78,7 @@ MNWPVolumeRaycasterActor::MNWPVolumeRaycasterActor()
     // ===============================================
     beginInitialiseQtProperties();
 
-    setActorType("Volume raycaster");
+    setActorType(staticActorType());
     setName(getActorType());
 
     QStringList modesLst;
@@ -192,7 +192,7 @@ MNWPVolumeRaycasterActor::LightingSettings::LightingSettings(
     shininessProp = a->addProperty(DOUBLE_PROPERTY, "shininess", groupProp);
     properties->setDouble(shininessProp, shininess, 0.0, 100.0, 3, 1.);
 
-    shadowColorProp = a->addProperty(COLOR_PROPERTY, "shadow color", groupProp);
+    shadowColorProp = a->addProperty(COLOR_PROPERTY, "shadow colour", groupProp);
     properties->mColor()->setValue(shadowColorProp, shadowColor);
 }
 
@@ -202,7 +202,7 @@ MNWPVolumeRaycasterActor::IsoValueSettings::IsoValueSettings(
         const uint8_t index,
         bool _enabled,
         float _isoValue,
-        int decimals,
+        int significantDigits,
         double singleStep,
         QColor _isoColor,
         IsoValueSettings::ColorType _colorType)
@@ -222,14 +222,20 @@ MNWPVolumeRaycasterActor::IsoValueSettings::IsoValueSettings(
     enabledProp = a->addProperty(BOOL_PROPERTY, "enabled", groupProp);
     properties->mBool()->setValue(enabledProp, enabled);
 
-    isoValueProp = a->addProperty(DOUBLE_PROPERTY, "isovalue", groupProp);
-    properties->setDouble(isoValueProp, isoValue, decimals, singleStep);
+    isoValueProp = a->addProperty(SCIENTIFICDOUBLE_PROPERTY, "isovalue",
+                                  groupProp);
+    properties->setSciDouble(isoValueProp, isoValue, significantDigits,
+                           singleStep);
 
-    isoValueDecimalsProperty = a->addProperty(INT_PROPERTY, "isovalue decimals", groupProp);
-    properties->setInt(isoValueDecimalsProperty, decimals, 0, 10, 1);
+    isoValueSignificantDigitsProperty = a->addProperty(
+                INT_PROPERTY, "isovalue significant digits", groupProp);
+    properties->setInt(isoValueSignificantDigitsProperty,
+                       significantDigits, 1, 9, 1);
 
-    isoValueSingleStepProperty = a->addProperty(DOUBLE_PROPERTY, "isovalue step", groupProp);
-    properties->setDouble(isoValueSingleStepProperty, singleStep, decimals, singleStep);
+    isoValueSingleStepProperty = a->addProperty(
+                SCIENTIFICDOUBLE_PROPERTY, "isovalue step", groupProp);
+    properties->setSciDouble(isoValueSingleStepProperty, singleStep,
+                          significantDigits, singleStep);
 
     QStringList modesLst;
     modesLst.clear();
@@ -296,13 +302,14 @@ MNWPVolumeRaycasterActor::RayCasterSettings::RayCasterSettings(
                 GROUP_PROPERTY, "sampling step size", groupProp);
 
     stepSizeProp = a->addProperty(
-                DOUBLE_PROPERTY, "step size", groupRaycasterSettings);
-    properties->setDouble(stepSizeProp, stepSize, 0.001, 10.0, 3, 0.01);
+                SCIENTIFICDOUBLE_PROPERTY, "step size", groupRaycasterSettings);
+    properties->setSciDouble(stepSizeProp, stepSize, 1e-9, 10.0, 3, 9, 0.01);
 
     interactionStepSizeProp = a->addProperty(
-                DOUBLE_PROPERTY, "interaction step size", groupRaycasterSettings);
-    properties->setDouble(interactionStepSizeProp, interactionStepSize,
-                          0.001, 10.0, 3, 0.1);
+                SCIENTIFICDOUBLE_PROPERTY, "interaction step size",
+                groupRaycasterSettings);
+    properties->setSciDouble(interactionStepSizeProp, interactionStepSize,
+                           1e-9, 10.0, 3, 9, 0.1);
 
     bisectionStepsProp = a->addProperty(
                 INT_PROPERTY, "bisection steps", groupRaycasterSettings);
@@ -577,6 +584,7 @@ void MNWPVolumeRaycasterActor::saveConfiguration(QSettings *settings)
     settings->setValue("renderMode", properties->getEnumItem(renderModeProp));
     settings->setValue("varIndex", variableIndex);
     settings->setValue("shadingVarIndex", shadingVariableIndex);
+    settings->setValue("bBoxEnabled", bBoxEnabled);
 
     // bounding box settings
     // =====================
@@ -622,11 +630,11 @@ void MNWPVolumeRaycasterActor::saveConfiguration(QSettings *settings)
         settings->setValue("enabled", setting.enabled);
         settings->setValue("isoValue", setting.isoValue);
         settings->setValue(
-                    "isoValueDecimals",
-                    properties->mInt()->value(setting.isoValueDecimalsProperty));
+                    "isoValueSignificantDigits",
+                    properties->mInt()->value(setting.isoValueSignificantDigitsProperty));
         settings->setValue(
                     "isoValueSingleStep",
-                    properties->mDouble()->value(setting.isoValueSingleStepProperty));
+                    properties->mSciDouble()->value(setting.isoValueSingleStepProperty));
         settings->setValue("colourMode", setting.isoColourType);
         settings->setValue("colour", setting.isoColour);
 
@@ -678,6 +686,8 @@ void MNWPVolumeRaycasterActor::loadConfiguration(QSettings *settings)
     shadingVariableIndex = settings->value("shadingVarIndex").toInt();
     properties->mInt()->setValue(shadingVariableIndexProp,
                                  shadingVariableIndex);
+    properties->mBool()->setValue(bBoxEnabledProperty,
+                                  settings->value("bBoxEnabled", true).toBool());
 
     // bounding box settings
     // =====================
@@ -738,11 +748,22 @@ void MNWPVolumeRaycasterActor::loadConfiguration(QSettings *settings)
                     settings->value("colourMode").toInt());
         QColor isoColor = settings->value("colour").value<QColor>();
 
-        int decimals = settings->value("isoValueDecimals", 6).toInt();
+        int significantDigits = 2;
+
+        // Support old version of configuration.
+        if (settings->contains("isoValueDecimals"))
+        {
+            significantDigits = settings->value("isoValueDecimals", 2).toInt();
+        }
+        else
+        {
+            significantDigits = settings->value("isoValueSignificantDigits",
+                                                2).toInt();
+        }
         double singleStep = settings->value("isoValueSingleStep", 0.01).toFloat();
 
         rayCasterSettings->addIsoValue(enabled, false,
-                                       isoValue, decimals, singleStep,
+                                       isoValue, significantDigits, singleStep,
                                        isoColor, isoColorType);
 
         settings->endGroup();
@@ -762,11 +783,11 @@ void MNWPVolumeRaycasterActor::loadConfiguration(QSettings *settings)
     settings->endGroup(); // isoValueSettings
 
     rayCasterSettings->stepSize = settings->value("stepSize").toFloat();
-    properties->mDouble()->setValue(rayCasterSettings->stepSizeProp,
+    properties->mSciDouble()->setValue(rayCasterSettings->stepSizeProp,
                                     rayCasterSettings->stepSize);
     rayCasterSettings->interactionStepSize =
             settings->value("interactionStepSize").toFloat();
-    properties->mDouble()->setValue( rayCasterSettings->interactionStepSizeProp,
+    properties->mSciDouble()->setValue( rayCasterSettings->interactionStepSizeProp,
                                      rayCasterSettings->interactionStepSize);
     rayCasterSettings->bisectionSteps =
             settings->value("bisectionSteps").toUInt();
@@ -925,7 +946,10 @@ bool MNWPVolumeRaycasterActor::triggerAnalysisOfObjectAtPos(
     // If the value for lambdaNear is < 0 the camera is located inside the
     // bounding box. It makes no sense to start the ray traversal behind the
     // camera, hence move lambdaNear to 0 to start in front of the camera.
-    lambdaNearFar.setX(max(lambdaNearFar.x(), 0.01));
+    if (lambdaNearFar.x() < 0.01)
+    {
+        lambdaNearFar.setX(0.01);
+    }
 
     float stepSize = rayCasterSettings->stepSize;
     float lambda = lambdaNearFar.x();
@@ -1000,7 +1024,8 @@ const QList<MVerticalLevelType> MNWPVolumeRaycasterActor::supportedLevelTypes()
     return (QList<MVerticalLevelType>()
             << HYBRID_SIGMA_PRESSURE_3D
             << PRESSURE_LEVELS_3D
-            << LOG_PRESSURE_LEVELS_3D);
+            << LOG_PRESSURE_LEVELS_3D
+            << AUXILIARY_PRESSURE_3D);
 }
 
 
@@ -1131,6 +1156,10 @@ void MNWPVolumeRaycasterActor::initializeRenderInformation()
             << "sampleHybridLevel"
             << "hybridLevelGradient";
 
+    gl.rayCasterSubroutines[AUXILIARY_PRESSURE_3D]
+            << "sampleAuxiliaryPressure"
+            << "auxiliaryPressureGradient";
+
     gl.bitfieldRayCasterSubroutines[PRESSURE_LEVELS_3D]
             << "samplePressureLevelVolumeBitfield"
             << "samplePressureVolumeAllBits"
@@ -1141,6 +1170,11 @@ void MNWPVolumeRaycasterActor::initializeRenderInformation()
             << "sampleHybridVolumeAllBits"
             << "hybridLevelGradientBitfield";
 
+    gl.bitfieldRayCasterSubroutines[AUXILIARY_PRESSURE_3D]
+            << "sampleAuxiliaryPressureVolumeBitfield"
+            << "sampleAuxiliaryPressureVolumeAllBits"
+            << "auxiliaryPressureGradientBitfield";
+
     gl.normalCompSubroutines[PRESSURE_LEVELS_3D]
             << "samplePressureLevel"
             << "pressureLevelGradient";
@@ -1149,11 +1183,18 @@ void MNWPVolumeRaycasterActor::initializeRenderInformation()
             << "sampleHybridLevel"
             << "hybridLevelGradient";
 
+    gl.normalCompSubroutines[AUXILIARY_PRESSURE_3D]
+            << "sampleAuxiliaryPressure"
+            << "auxiliaryPressureGradient";
+
     gl.normalInitSubroutines[PRESSURE_LEVELS_3D]
             << "samplePressureLevel";
 
     gl.normalInitSubroutines[HYBRID_SIGMA_PRESSURE_3D]
             << "sampleHybridLevel";
+
+    gl.normalInitSubroutines[AUXILIARY_PRESSURE_3D]
+            << "sampleAuxiliaryPressure";
 
     // Re-compute normal curves and shadow image on next frame.
     updateNextRenderFrame.set(ComputeNCInitPoints);
@@ -1215,7 +1256,7 @@ void MNWPVolumeRaycasterActor::onQtPropertyChanged(QtProperty* property)
              property == rayCasterSettings->bisectionStepsProp ||
              property == rayCasterSettings->shadowModeProp)
     {
-        rayCasterSettings->stepSize = properties->mDouble()
+        rayCasterSettings->stepSize = properties->mSciDouble()
                 ->value(rayCasterSettings->stepSizeProp);
         rayCasterSettings->bisectionSteps = properties->mInt()
                 ->value(rayCasterSettings->bisectionStepsProp);
@@ -1229,7 +1270,7 @@ void MNWPVolumeRaycasterActor::onQtPropertyChanged(QtProperty* property)
     else if (property == rayCasterSettings->interactionStepSizeProp ||
              property == rayCasterSettings->interactionBisectionStepsProp)
     {
-        rayCasterSettings->interactionStepSize = properties->mDouble()
+        rayCasterSettings->interactionStepSize = properties->mSciDouble()
                 ->value(rayCasterSettings->interactionStepSizeProp);
         rayCasterSettings->interactionBisectionSteps = properties->mInt()
                 ->value(rayCasterSettings->interactionBisectionStepsProp);
@@ -1477,6 +1518,8 @@ void MNWPVolumeRaycasterActor::onQtPropertyChanged(QtProperty* property)
         updateNextRenderFrame.set(RecomputeNCLines);
         updateNextRenderFrame.set(UpdateShadowImage);
 
+        if (suppressActorUpdates()) return;
+
         emitActorChangedSignal();
     }
 
@@ -1501,6 +1544,8 @@ void MNWPVolumeRaycasterActor::onQtPropertyChanged(QtProperty* property)
         updateNextRenderFrame.set(ComputeNCInitPoints);
         updateNextRenderFrame.set(RecomputeNCLines);
         updateNextRenderFrame.set(UpdateShadowImage);
+
+        if (suppressActorUpdates()) return;
 
         emitActorChangedSignal();
     }
@@ -1596,7 +1641,7 @@ void MNWPVolumeRaycasterActor::onQtPropertyChanged(QtProperty* property)
                  property == it->isoValueProp )
             {
                 it->enabled = properties->mBool()->value(it->enabledProp);
-                it->isoValue = properties->mDouble()->value(it->isoValueProp);
+                it->isoValue = properties->mSciDouble()->value(it->isoValueProp);
                 int startIsoIndex = properties->mEnum()->value(
                             normalCurveSettings->startIsoSurfaceProp);
                 int stopIsoIndex = properties->mEnum()->value(
@@ -1649,15 +1694,21 @@ void MNWPVolumeRaycasterActor::onQtPropertyChanged(QtProperty* property)
 
                 return;
             }
-            else if ( property == it->isoValueDecimalsProperty
-                      || property == it->isoValueSingleStepProperty)
+            else if ( property == it->isoValueSignificantDigitsProperty )
             {
-                int decimals = properties->mInt()->value(it->isoValueDecimalsProperty);
-                properties->mDouble()->setDecimals(it->isoValueProp, decimals);
-                properties->mDouble()->setDecimals(it->isoValueSingleStepProperty, decimals);
-
-                double singleStep = properties->mDouble()->value(it->isoValueSingleStepProperty);
-                properties->mDouble()->setSingleStep(it->isoValueProp, singleStep);
+                int significantDigits = properties->mInt()->value(
+                            it->isoValueSignificantDigitsProperty);
+                properties->mSciDouble()->setSignificantDigits(
+                            it->isoValueProp, significantDigits);
+                properties->mSciDouble()->setSignificantDigits(
+                            it->isoValueSingleStepProperty, significantDigits);
+            }
+            else if ( property == it->isoValueSingleStepProperty)
+            {
+                double singleStep = properties->mSciDouble()->value(
+                            it->isoValueSingleStepProperty);
+                properties->mSciDouble()->setSingleStep(
+                            it->isoValueProp, singleStep);
             }
         } // isovalues
 
@@ -1991,6 +2042,25 @@ void MNWPVolumeRaycasterActor::onAddActorVariable(MNWPActorVariable *var)
 }
 
 
+void MNWPVolumeRaycasterActor::onChangeActorVariable(MNWPActorVariable *var)
+{
+    int varIndex = variables.indexOf(var);
+    // Update lists of variable names.
+    varNameList.replace(varIndex, var->variableName);
+
+    // Temporarily save variable indices.
+    int tmpVarIndex = variableIndex;
+    int tmpShadingVarIndex = shadingVariableIndex;
+
+    enableActorUpdates(false);
+    properties->mEnum()->setEnumNames(variableIndexProp, varNameList);
+    properties->mEnum()->setEnumNames(shadingVariableIndexProp, varNameList);
+    properties->mEnum()->setValue(variableIndexProp, tmpVarIndex);
+    properties->mEnum()->setValue(shadingVariableIndexProp, tmpShadingVarIndex);
+    enableActorUpdates(true);
+}
+
+
 /******************************************************************************
 ***                           PRIVATE METHODS                               ***
 *******************************************************************************/
@@ -2144,7 +2214,9 @@ void MNWPVolumeRaycasterActor::setVarSpecificShaderVars(
         const QString& lonLatLevAxesName,
         const QString& pressureTexCoordTable2DName,
         const QString& minMaxAccelStructure3DName,
-        const QString& dataFlagsVolumeName)
+        const QString& dataFlagsVolumeName,
+        const QString& auxPressureField3DName
+        )
 {
     // Reset optional textures to avoid draw errors.
     // =============================================
@@ -2165,6 +2237,8 @@ void MNWPVolumeRaycasterActor::setVarSpecificShaderVars(
     // 3D textures...
     var->textureDummy3D->bindToTextureUnit(var->textureUnitUnusedTextures);
     shader->setUniformValue(dataFlagsVolumeName, var->textureUnitUnusedTextures); CHECK_GL_ERROR;
+    shader->setUniformValue(auxPressureField3DName, var->textureUnitUnusedTextures); CHECK_GL_ERROR;
+
 
     // Bind textures and set uniforms.
     // ===============================
@@ -2281,6 +2355,18 @@ void MNWPVolumeRaycasterActor::setVarSpecificShaderVars(
 #endif
     }
 
+    else if (var->grid->getLevelType() == AUXILIARY_PRESSURE_3D)
+    {
+        shader->setUniformValue(structName + ".levelType", GLint(2)); CHECK_GL_ERROR;
+
+        // Bind pressure field.
+        var->textureAuxiliaryPressure
+                ->bindToTextureUnit(var->textureUnitAuxiliaryPressure);
+        shader->setUniformValue(
+                    auxPressureField3DName,
+                    var->textureUnitAuxiliaryPressure); CHECK_GL_ERROR;
+    }
+
     // Precompute data extent variables and store in uniform struct.
     // =============================================================
     const GLfloat westernBoundary = dataNWCrnr.x() - var->grid->getDeltaLon() / 2.0f;
@@ -2360,14 +2446,14 @@ void MNWPVolumeRaycasterActor::setCommonShaderVars(
                              "pressureTable", "surfacePressure",
                              "hybridCoefficients", "lonLatLevAxes",
                              "pressureTexCoordTable2D", "minMaxAccel3D",
-                             "flagsVolume");
+                             "flagsVolume", "auxPressureField3D_hPa");
 
     setVarSpecificShaderVars(shader, sceneView, shadingVar, "dataExtentShV",
                              "dataVolumeShV","transferFunctionShV",
                              "pressureTableShV", "surfacePressureShV",
                              "hybridCoefficientsShV", "lonLatLevAxesShV",
                              "pressureTexCoordTable2DShV", "minMaxAccel3DShV",
-                             "flagsVolumeShV");
+                             "flagsVolumeShV", "auxPressureField3DShV_hPa");
 }
 
 

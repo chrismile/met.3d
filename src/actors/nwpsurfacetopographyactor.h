@@ -60,6 +60,8 @@ public:
     MNWPSurfaceTopographyActor();
     virtual ~MNWPSurfaceTopographyActor();
 
+    static QString staticActorType() { return "Surface topography"; }
+
     void reloadShaderEffects() override;
 
     const QList<MVerticalLevelType> supportedLevelTypes() override;
@@ -89,6 +91,8 @@ protected:
     void onDeleteActorVariable(MNWPActorVariable* var) override;
 
     void onAddActorVariable(MNWPActorVariable* var) override;
+
+    void onChangeActorVariable(MNWPActorVariable *var) override;
 
     uint8_t topographyVariableIndex;
     uint8_t shadingVariableIndex;

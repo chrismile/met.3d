@@ -4,8 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2017 Marc Rautenhaus
-**  Copyright 2017      Bianca Tost
+**  Copyright 2015-2018 Marc Rautenhaus
+**  Copyright 2017-2018 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -30,8 +30,6 @@
 // standard library imports
 
 // related third party imports
-#include <QtCore>
-#include <QtGui>
 #include "qttreepropertybrowser.h"
 #include "qtpropertymanager.h"
 
@@ -104,6 +102,8 @@ public:
 
     QtExtensions::QtDecoratedDoublePropertyManager* getDecoratedDoublePropertyManager();
 
+    QtExtensions::QtScientificDoublePropertyManager* getScientificDoublePropertyManager();
+
     QtEnumPropertyManager* getEnumPropertyManager();
 
     QtStringPropertyManager * getStringPropertyManager();
@@ -111,6 +111,8 @@ public:
     QtExtensions::QtClickPropertyManager* getClickPropertyManager();
 
     QtColorPropertyManager* getColorPropertyManager();
+
+    QtPointFPropertyManager* getPointFPropertyManager();
 
     /**
       Returns a pointer to the label that displays render performances.
@@ -239,10 +241,13 @@ private:
     QtExtensions::QtDecoratedDoublePropertyManager
                                          *decoratedDoublePropertyManager;
     QtDoublePropertyManager              *doublePropertyManager;
+    QtExtensions::QtScientificDoublePropertyManager
+                                         *scientificDoublePropertyManager;
     QtEnumPropertyManager                *enumPropertyManager;
     QtStringPropertyManager              *stringPropertyManager;
     QtExtensions::QtClickPropertyManager *clickPropertyManager;
     QtColorPropertyManager               *colorPropertyManager;
+    QtPointFPropertyManager              *pointFPropertyManager;
 
     QtProperty *appConfigGroupProperty;
     QtProperty *windowLayoutGroupProperty;

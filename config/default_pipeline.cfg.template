@@ -53,6 +53,34 @@ size=2
 # "auto" (Met.3D tries to detect the surface pressure field
 # (NOTE: this can be slow!)).
 1\gribSurfacePressureFieldType=sp
+# Set "convertGeometricHeightToPressure_ICAOStandard" to "true" to load data
+# using geometric height as vertical coordinate. Metres are converted to
+# pressure using the ICAO standard atmosphere. (NOTE: the resulting pressure is
+# hence approximate!)
+1\convertGeometricHeightToPressure_ICAOStandard=false
+# Name of an optional auxiliary 3D pressure field. Use this flag for datasets
+# whose variables require an explicit definition of grid point pressure, e.g.,
+# grids defined on (hybrid) geometric coordinates. Currently only implemented
+# for NetCDF files. Leave empty to not use any auxiliary field. Cannot be used
+# together with convertGeometricHeightToPressure_ICAOStandard.
+1\auxiliary3DPressureField=
+# Grid consistency check ensures that all variables of one dataset are defined
+# on the same grid (lons, lats, levels, etc.). Disabling it might result in
+# wrong behaviour of vertical cross-section actors (using variables defined on
+# different grids in one actor), derived variables (variables used to calculate
+# derived variables defined on different grids) and auxiliary 3D pressure fields
+# (connection to variables defined on different grids than the auxiliary
+# pressure field). Disabling can be necessary to use data that is stored on
+# staggered grids, however, in this case, the staggering will be ignored.
+# Hence, only disable if you know what you are doing.
+1\disableGridConsistencyCheck=false
+# To enable the built-in computation of derived variables (wind speed, potential
+# temperature, etc.), Met.3D needs to know which variables in this dataset
+# denote which quantity. E.g., what is the name of the eastward wind component
+# in the NetCDF files of this dataset? In the following, provide a string
+# of "/"-separated pairs "CF_standard_name:Dataset_variable_name" such as
+# "eastward_wind:u-component_of_wind_hybrid".
+1\inputVarsForDerivedVars=eastward_wind:u-component_of_wind_hybrid/northward_wind:v-component_of_wind_hybrid/air_temperature:Temperature_hybrid/specific_humidity:Specific_humidity_hybrid/surface_geopotential:Geopotential_surface/surface_air_pressure:Surface_pressure_surface/surface_temperature:2_metre_temperature_surface/lwe_thickness_of_precipitation_amount:Total_precipitation_surface
 
 # Example configuration for an ensemble ECMWF CF-NetCDF dataset.
 2\name=ECMWF ENS EUR_LL10

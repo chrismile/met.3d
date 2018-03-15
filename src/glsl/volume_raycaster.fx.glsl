@@ -4,8 +4,9 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
-**  Copyright 2015 Michael Kern
+**  Copyright 2015-2018 Marc Rautenhaus
+**  Copyright 2015      Michael Kern
+**  Copyright 2017-2018 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -85,6 +86,9 @@ uniform sampler1D hybridCoefficientsShV; // HYBRID_SIGMA
 // contains surface pressure at grid point (i, j)
 uniform sampler2D surfacePressure; // HYBRID_SIGMA
 uniform sampler2D surfacePressureShV; // HYBRID_SIGMA
+// contains pressure field
+uniform sampler3D auxPressureField3D_hPa; // AUXILIARY_PRESSURE_3D
+uniform sampler3D auxPressureField3DShV_hPa; // AUXILIARY_PRESSURE_3D
 
 #ifdef ENABLE_HYBRID_PRESSURETEXCOORDTABLE
 // contains precomputed z-coordinates
@@ -159,6 +163,8 @@ uniform bool    isOrthographic;
 #include "volume_global_structs_utils.glsl"
 // include hybrid model volume sampling methods
 #include "volume_hybrid_utils.glsl"
+// include model level volume with auxiliary pressure field sampling methods
+#include "volume_auxiliarypressure_utils.glsl"
 // include pressure levels volume sampling methods
 #include "volume_pressure_utils.glsl"
 // defines subroutines and auxiliary ray-casting functions
@@ -324,9 +330,14 @@ bool traverseSectionOfDataVolume_DVR(
                         / (dataExtent.tfMaximum - dataExtent.tfMinimum);
             vec4 blendColor = texture(transferFunction, t).rgba;
             
-            // If we're in shadow mode we're only using the alpha value of
-            // the transfer function.
-            if (shadowRay) blendColor.rgb = shadowColor.rgb;
+            // Shadow mode: Alpha of shadow is determined by alpha of transfer
+            // function colour, multiplied by alpha value of shadow colour to
+            // enable user to control lightness of shadow.
+            if (shadowRay)
+            {
+                blendColor = vec4(shadowColor.rgb,
+                                  blendColor.a * shadowColor.a);
+            }
 
             // Opacity correction.
             // Reference: Engel et al. (Real-time volume graphics, 2006), Eq. 1.17

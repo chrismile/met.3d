@@ -4,8 +4,9 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2016 Marc Rautenhaus
-**  Copyright 2016 Christoph Heidelmann
+**  Copyright 2016-2018 Marc Rautenhaus
+**  Copyright 2016      Christoph Heidelmann
+**  Copyright 2017-2018 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -30,6 +31,7 @@
 // standard library imports
 
 // related third party imports
+#include <QFileDialog>
 
 // local application imports
 #include "mglresourcesmanager.h"
@@ -88,7 +90,12 @@ MNWPPipelineConfigurationInfo MAddDatasetDialog::getNWPPipelineConfigurationInfo
     d.treatRotatedGridAsRegularGrid =
             ui->treatRotatedAsRegularCheckBox->isChecked();
     d.surfacePressureFieldType = ui->surfacePressureTypeComboBox->currentText();
-
+    d.convertGeometricHeightToPressure_ICAOStandard =
+            ui->convertGeometricHeightToPressureICAOStandardCheckBox->isChecked();
+    d.auxiliary3DPressureField = ui->useAuxiliary3DPressureLineEdit->text();
+    d.disableGridConsistencyCheck =
+            ui->disableGridConsistencyCheckCheckBox->isChecked();
+    d.inputVarsForDerivedVars = ui->inputVarsForDerivedVarsLineEdit->text();
 
     return d;
 }

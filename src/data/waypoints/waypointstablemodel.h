@@ -30,12 +30,11 @@
 
 // related third party imports
 #include <QAbstractTableModel>
-#include <Qt/qmessagebox.h>
+#include <QMessageBox>
 #include <QTableView>
+#include <QVector2D>
 #include <QtXml/QDomDocument>
-#include <QtXml>
-#include <QtCore>
-#include <QtGui>
+#include <QSettings>
 
 // local application imports
 

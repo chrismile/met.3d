@@ -31,6 +31,7 @@
 // standard library imports
 
 // related third party imports
+#include <QInputDialog>
 
 // local application imports
 #include "gxfw/mglresourcesmanager.h"
@@ -96,7 +97,8 @@ MActor* MActorCreationDialog::createActorInstance()
                     nullptr, "Choose Sync Control",
                     "Please select a sync control to synchronize with: ",
                     sysMC->getSyncControlIdentifiers(),
-                    0, false, &accepted);
+                    min(1, sysMC->getSyncControlIdentifiers().size() - 1),
+                    false, &accepted);
         // if user has aborted do not create actor
         if (!accepted)
         {

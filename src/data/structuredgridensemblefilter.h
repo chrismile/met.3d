@@ -69,16 +69,50 @@ public:
                                          const QString& variableName,
                                          const QDateTime& initTime);
 
+    QString variableLongName(MVerticalLevelType levelType,
+                             const QString&     variableName);
+
+    QString variableStandardName(MVerticalLevelType levelType,
+                             const QString&     variableName);
+
+    QString variableUnits(MVerticalLevelType levelType,
+                             const QString&     variableName);
+
 
 protected:
     const QStringList locallyRequiredKeys();
 
     MWeatherPredictionDataSource* inputSource;
 
+    /**
+      Creates and initializes a new MStructuredGrid-subclass of the same type
+      as @p templateGrid. Coordinate values etc. will be copied from
+      @p templateGrid. If @p selectedMembers is not empty AND the new result
+      grid is a hybrid sigma-pressure level grid or an auxiliary pressure field
+      grid, the result grid will be based on the ensemble mean surface pressure
+      or auxiliary pressure field computed from the members specified in
+      @p selectedMembers. In this case, the ensemble processing algorithm in
+      @p produceData() MUST, for each input member, call the incremental
+      update method @p updateAuxDataInResultGrid(), as well as call
+      @p finalizeAuxDataInResultGrid() after all members have been processed
+      and the result grid is returned.
+     */
     MStructuredGrid* createAndInitializeResultGrid(
-            MStructuredGrid *firstMemberGrid,
+            MStructuredGrid *templateGrid,
             const QSet<unsigned int> &selectedMembers=QSet<unsigned int>());
 
+    /**
+      See documentation of @ref createAndInitializeResultGrid().
+     */
+    void updateAuxDataInResultGrid(MStructuredGrid *resultGrid,
+                                   MStructuredGrid *currentMemberGrid);
+
+    /**
+      See documentation of @ref createAndInitializeResultGrid().
+     */
+    void finalizeAuxDataInResultGrid(MStructuredGrid *resultGrid);
+
+    QMap<MStructuredGrid*, MStructuredGrid*> resultAuxComputationValidMembersCounter;
 };
 
 } // namespace Met3D

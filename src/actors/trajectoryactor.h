@@ -71,6 +71,8 @@ public:
 
     ~MTrajectoryActor();
 
+    static QString staticActorType() { return "Trajectories"; }
+
     void reloadShaderEffects();
 
     /**

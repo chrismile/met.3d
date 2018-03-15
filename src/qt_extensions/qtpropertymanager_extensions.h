@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015-2018 Marc Rautenhaus
+**  Copyright 2017-2018 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -76,10 +77,10 @@
 // standard library imports
 
 // related third party imports
-#include <QtGui/QApplication>
+#include <QApplication>
 #include <QtCore/QMap>
-#include <QtGui/QDoubleSpinBox>
-#include <QtGui/QToolButton>
+#include <QDoubleSpinBox>
+#include <QToolButton>
 #include "qtpropertybrowser.h"
 #include "qteditorfactory.h"
 #include "qttreepropertybrowser.h"
@@ -87,7 +88,11 @@
 #include "qtpropertybrowserutils_p.h"
 
 // local application imports
+#include "scientificdoublespinbox.h"
 
+#ifndef Q_TYPENAME
+#define Q_TYPENAME typename
+#endif
 
 namespace QtExtensions
 {
@@ -396,6 +401,236 @@ private:
 
     Q_PRIVATE_SLOT(d_func(), void slotEditorDestroyed(QObject *))
 };
+
+
+/******************************************************************************
+***        Property manager for double values in scientific notation        ***
+*******************************************************************************/
+
+/**
+  @brief QtScientificDoublePropertyManager provides a
+  @ref QtDecoratedDoublePropertyManager whose editor spinbox can handle
+  double values in scientific notation as input as well as as displayed text.
+
+  Additionally, its spinbox can be augmented by a prefix and a suffix, the
+  switch notation exponent (absolute exponent from which on the scientific
+  notation is considered), the minimum exponent and the significant digits
+  can be set.
+ */
+class QT_QTPROPERTYBROWSER_EXPORT QtScientificDoublePropertyManager
+        : public QtDecoratedDoublePropertyManager
+{
+    Q_OBJECT
+public:
+    QtScientificDoublePropertyManager(QObject *parent = 0);
+    ~QtScientificDoublePropertyManager();
+
+    int significantDigits(const QtProperty *property) const;
+    int switchNotationExponent(const QtProperty *property) const;
+    int minimumExponent(const QtProperty *property) const;
+
+    QString valueAsPropertyFormatedText(const QtProperty *property,
+                                        const double value) const;
+
+public Q_SLOTS:
+    void setSignificantDigits(QtProperty *property,
+                              const int &significantDigits);
+    void setSwitchNotationExponent(QtProperty *property,
+                                   const int &switchNotationExponent);
+    void setMinimumExponent(QtProperty *property, const int &minExponent);
+
+Q_SIGNALS:
+    void switchNotationExponentChanged(QtProperty *property,
+                                       const int &switchNotationExponent);
+    void minimumExponentChanged(QtProperty *property,
+                                const int &minimumExponent);
+    void significantDigitsChanged(QtProperty *property,
+                                  const int &significantDigits);
+
+protected:
+    QString valueText(const QtProperty *property) const;
+    QString getTextFromValue(const QtProperty *property, double value) const;
+    virtual void initializeProperty(QtProperty *property);
+    virtual void uninitializeProperty(QtProperty *property);
+
+    struct Data
+    {
+        Data()
+            : switchNotationExponent(1),
+              minimumExponent(120),
+              significantDigits(2) {}
+        int switchNotationExponent;
+        int minimumExponent;
+        int significantDigits;
+    };
+
+    QMap<const QtProperty *, Data> propertyToData;
+};
+
+
+/******************************************************************************
+***          QtScientificDoublePropertyManager with Subproperties           ***
+*******************************************************************************/
+
+/**
+  @brief QtConfigurableScientificDoublePropertyManager extends
+  @ref QtScientificDoublePropertyManager by adding Subproperties to change
+  single step, switch notation exponent and significant digits.
+ */
+class QT_QTPROPERTYBROWSER_EXPORT QtConfigurableScientificDoublePropertyManager
+        : public QtScientificDoublePropertyManager
+{
+    Q_OBJECT
+public:
+    QtConfigurableScientificDoublePropertyManager(QObject *parent = 0);
+    ~QtConfigurableScientificDoublePropertyManager();
+
+    QtIntPropertyManager *subIntPropertyManager() const;
+    QtScientificDoublePropertyManager *subSciDoublePropertyManager() const;
+
+    QString configuration(const QtProperty *property) const;
+
+public Q_SLOTS:
+    void setConfiguration(QtProperty *property, const QString &config);
+    void setSingleStep(QtProperty *property, const double &singleStep);
+    void setSignificantDigits(QtProperty *property, const int &significantDigits);
+    void setSwitchNotationExponent(QtProperty *property,
+                                   const int &switchNotationExponent);
+    void slotIntChanged(QtProperty *property, int value);
+    void slotScientificDoubleChanged(QtProperty *property, double value);
+    void slotPropertyDestroyed(QtProperty *property);
+
+protected:
+    virtual void initializeProperty(QtProperty *property);
+    virtual void uninitializeProperty(QtProperty *property);
+
+private:
+    QtIntPropertyManager *intPropertyManager;
+    QtScientificDoublePropertyManager *sciDoublePropertyManager;
+
+    QMap<const QtProperty *, QtProperty *> propertyToSingleStep;
+    QMap<const QtProperty *, QtProperty *> propertyToSignificantDigits;
+    QMap<const QtProperty *, QtProperty *> propertyToSwitchNotationExponent;
+
+    QMap<const QtProperty *, QtProperty *> singleStepToProperty;
+    QMap<const QtProperty *, QtProperty *> significantDigitsToProperty;
+    QMap<const QtProperty *, QtProperty *> switchNotationExponentToProperty;
+};
+
+// ************
+// The following code has been copied partially from "qteditorfactory.cpp"
+// and "qteditorfactory.h" and adapted to handle spin boxes with scientific
+// notation.
+
+/******************************************************************************
+***        Property factory for double values in scientific notation        ***
+*******************************************************************************/
+
+class QtScientificDoubleSpinBoxFactory;
+
+/**
+  @brief Private class of @ref QtScientificDoubleSpinBoxFactory.
+
+  Most of the slot-methods are copied from @ref QtDoubleSpinBoxFactoryPrivate.
+ */
+class QtScientificDoubleSpinBoxFactoryPrivate :
+        public EditorFactoryPrivate2<MScientificDoubleSpinBox>
+{
+    QtScientificDoubleSpinBoxFactory *q_ptr;
+    Q_DECLARE_PUBLIC(QtScientificDoubleSpinBoxFactory)
+
+public:
+    void slotSetValue(double value);
+    void slotPropertyChanged(QtProperty *property, double value);
+    void slotRangeChanged(QtProperty *property, double min, double max);
+    void slotSingleStepChanged(QtProperty *property, double step);
+    void slotMinimumExponentChanged(QtProperty *property, int prec);
+    void slotSwitchNotationExponentChanged(QtProperty *property, int exponent);
+    void slotSignificantDigitsChanged(QtProperty *property,
+                                      int significantDigits);
+    void slotPrefixChanged(QtProperty *property, const QString &prefix);
+    void slotSuffixChanged(QtProperty *property, const QString &suffix);
+    void slotReadOnlyChanged(QtProperty *property, bool readOnly);
+};
+
+
+/**
+  @brief Factory for the @ref QtScientificDoublePropertyManager class.
+ */
+class QT_QTPROPERTYBROWSER_EXPORT QtScientificDoubleSpinBoxFactory
+        : public QtAbstractEditorFactory<QtScientificDoublePropertyManager>
+{
+    Q_OBJECT
+public:
+    QtScientificDoubleSpinBoxFactory(QObject *parent = 0);
+    ~QtScientificDoubleSpinBoxFactory();
+
+protected:
+    void connectPropertyManager(QtScientificDoublePropertyManager *manager);
+    QWidget *createEditor(QtScientificDoublePropertyManager *manager,
+                          QtProperty *property, QWidget *parent);
+    void disconnectPropertyManager(QtScientificDoublePropertyManager *manager);
+
+private:
+    QtScientificDoubleSpinBoxFactoryPrivate *d_ptr;
+
+    Q_DECLARE_PRIVATE(QtScientificDoubleSpinBoxFactory)
+
+    Q_DISABLE_COPY(QtScientificDoubleSpinBoxFactory)
+
+    Q_PRIVATE_SLOT(d_func(), void slotSetValue(double))
+    Q_PRIVATE_SLOT(d_func(), void slotPropertyChanged(QtProperty *, double))
+    Q_PRIVATE_SLOT(d_func(), void slotRangeChanged(QtProperty *, double, double))
+    Q_PRIVATE_SLOT(d_func(), void slotSingleStepChanged(QtProperty *, double))
+    Q_PRIVATE_SLOT(d_func(), void slotMinimumExponentChanged(QtProperty *, int))
+    Q_PRIVATE_SLOT(d_func(), void slotSwitchNotationExponentChanged(QtProperty *, int))
+    Q_PRIVATE_SLOT(d_func(), void slotSignificantDigitsChanged(QtProperty *, int))
+    Q_PRIVATE_SLOT(d_func(), void slotReadOnlyChanged(QtProperty *, bool))
+    Q_PRIVATE_SLOT(d_func(), void slotPrefixChanged(QtProperty *, const QString &))
+    Q_PRIVATE_SLOT(d_func(), void slotSuffixChanged(QtProperty *, const QString &))
+    Q_PRIVATE_SLOT(d_func(), void slotEditorDestroyed(QObject *))
+};
+// ************
+// ************ end copy.
+
+// TODO (bt, 19Jan2018): Change code to get a factory that can handle configurable SDManager.
+//   Idea: cf. system/qtproperties.h
+///**
+//  @brief Factory for the @ref QtScientificDoublePropertyManager class.
+// */
+//class QT_QTPROPERTYBROWSER_EXPORT QtScientificDoubleSpinBoxFactory
+//        : public QtAbstractEditorFactory<QtConfigurableScientificDoublePropertyManager>
+//{
+//    Q_OBJECT
+//public:
+//    QtScientificDoubleSpinBoxFactory(QObject *parent = 0);
+//    ~QtScientificDoubleSpinBoxFactory();
+
+//protected:
+//    void connectPropertyManager(QtConfigurableScientificDoublePropertyManager *manager);
+//    QWidget *createEditor(QtScientificDoublePropertyManager *manager,
+//                          QtProperty *property, QWidget *parent);
+//    void disconnectPropertyManager(QtScientificDoublePropertyManager *manager);
+
+//private:
+//    QtScientificDoubleSpinBoxFactoryPrivate *d_ptr;
+
+//    Q_DECLARE_PRIVATE(QtScientificDoubleSpinBoxFactory)
+
+//    Q_DISABLE_COPY(QtScientificDoubleSpinBoxFactory)
+
+//    Q_PRIVATE_SLOT(d_func(), void slotSetValue(double))
+//    Q_PRIVATE_SLOT(d_func(), void slotPropertyChanged(QtProperty *, double))
+//    Q_PRIVATE_SLOT(d_func(), void slotRangeChanged(QtProperty *, double, double))
+//    Q_PRIVATE_SLOT(d_func(), void slotSingleStepChanged(QtProperty *, double))
+//    Q_PRIVATE_SLOT(d_func(), void slotDecimalsChanged(QtProperty *, int))
+//    Q_PRIVATE_SLOT(d_func(), void slotSwitchNotationExponentChanged(QtProperty *, int))
+//    Q_PRIVATE_SLOT(d_func(), void slotSignificantDigitsChanged(QtProperty *, int))
+//    Q_PRIVATE_SLOT(d_func(), void slotReadOnlyChanged(QtProperty *, bool))
+//    Q_PRIVATE_SLOT(d_func(), void slotPrefixChanged(QtProperty *, const QString &))
+//    Q_PRIVATE_SLOT(d_func(), void slotSuffixChanged(QtProperty *, const QString &))
+//    Q_PRIVATE_SLOT(d_func(), void slotEditorDestroyed(QObject *))
+//};
 
 } // namespace QtExtensions
 

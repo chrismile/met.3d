@@ -62,7 +62,8 @@ public:
                           QVector<QVector2D> *vertices,
                           QVector<int> *startIndices,
                           QVector<int> *count,
-                          bool append=true);
+                          bool append=true, double offset=0.,
+                          int copies=0);
 
     /**
      @brief loadAndRotateLineGeometry loads the line geometry and rotates it

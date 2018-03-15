@@ -4,8 +4,9 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
-**  Copyright 2015 Michael Kern
+**  Copyright 2015-2018 Marc Rautenhaus
+**  Copyright 2015      Michael Kern
+**  Copyright 2017-2018 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -68,6 +69,7 @@ uniform sampler1D hybridCoefficients; // HYBRID_SIGMA
 // contains surface pressure at grid point (i, j)
 uniform sampler2D surfacePressure; // HYBRID_SIGMA
 uniform sampler2D pressureTexCoordTable2D; // HYBRID_SIGMA
+uniform sampler3D auxPressureField3D_hPa; // AUXILIARY_PRESSURE_3D
 uniform sampler2D distortTex;
 uniform sampler3D dataVolume;
 uniform sampler1D lonLatLevAxes;
@@ -141,6 +143,8 @@ layout (std430, binding=0) buffer InitPointBuffer
 #include "volume_global_structs_utils.glsl"
 // include hybrid model volume sampling methods
 #include "volume_hybrid_utils.glsl"
+// include model level volume with auxiliary pressure field sampling methods
+#include "volume_auxiliarypressure_utils.glsl"
 // include pressure levels volume sampling methods
 #include "volume_pressure_utils.glsl"
 // defines subroutines and auxiliary ray-casting functions

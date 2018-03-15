@@ -4,8 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2017 Marc Rautenhaus
-**  Copyright 2016-2017 Bianca Tost
+**  Copyright 2015-2018 Marc Rautenhaus
+**  Copyright 2016-2018 Bianca Tost
 **  Copyright 2017      Michael Kern
 **
 **  Computer Graphics and Visualization Group
@@ -48,6 +48,7 @@
 #include "actors/nwpvolumeraycasteractor.h"
 #include "actors/nwphorizontalsectionactor.h"
 #include "mainwindow.h"
+#include "data/structuredgridstatisticsanalysis.h"
 
 using namespace std;
 
@@ -87,6 +88,8 @@ MNWPActorVariable::MNWPActorVariable(MNWPMultiVarActor *actor)
       textureUnitDataFlags(-1),
       texturePressureTexCoordTable(nullptr),
       textureUnitPressureTexCoordTable(-1),
+      textureAuxiliaryPressure(nullptr),
+      textureUnitAuxiliaryPressure(-1),
       textureDummy1D(nullptr),
       textureDummy2D(nullptr),
       textureDummy3D(nullptr),
@@ -94,6 +97,7 @@ MNWPActorVariable::MNWPActorVariable(MNWPMultiVarActor *actor)
       transferFunction(nullptr),
       textureUnitTransferFunction(-1),
       actor(actor),
+      singleVariableAnalysisControl(nullptr),
       synchronizeInitTime(true),
       synchronizeValidTime(true),
       synchronizeEnsemble(true),
@@ -116,6 +120,9 @@ MNWPActorVariable::MNWPActorVariable(MNWPMultiVarActor *actor)
     datasourceNameProperty = a->addProperty(
                 STRING_PROPERTY, "data source", varPropertyGroup);
     datasourceNameProperty->setEnabled(false);
+    variableLongNameProperty = a->addProperty(
+                STRING_PROPERTY, "long name", varPropertyGroup);
+    variableLongNameProperty->setEnabled(false);
 
     changeVariablePropertyGroup = a->addProperty(
                 GROUP_PROPERTY, "change/remove", varPropertyGroup);
@@ -125,6 +132,31 @@ MNWPActorVariable::MNWPActorVariable(MNWPMultiVarActor *actor)
 
     removeVariableProperty = a->addProperty(
                 CLICK_PROPERTY, "remove", changeVariablePropertyGroup);
+
+    dataStatisticsPropertyGroup = a->addProperty(
+                GROUP_PROPERTY, "data statistics (entire grid)", varPropertyGroup);
+
+    showDataStatisticsProperty = a->addProperty(
+                CLICK_PROPERTY, "show statistics", dataStatisticsPropertyGroup);
+
+    significantDigitsProperty = a->addProperty(
+                DOUBLE_PROPERTY, "significant digits",
+                dataStatisticsPropertyGroup);
+    properties->setDouble(significantDigitsProperty, 0., 0, 1);
+    significantDigitsProperty->setToolTip(
+                "Digits considered for computation of the data value"
+                " distribution."
+                "\nIf this number is negative, the corresponding digits in"
+                " front of the decimal point will be neglected.");
+
+    histogramDisplayModeProperty = a->addProperty(
+                ENUM_PROPERTY, "histogram display",
+                dataStatisticsPropertyGroup);
+    QStringList histogramDisplayModes;
+    histogramDisplayModes << "relative frequencies"
+                          << "absolute grid point count";
+    properties->mEnum()->setEnumNames(histogramDisplayModeProperty,
+                                      histogramDisplayModes);
 
     // Property: Synchronize time and ensemble with an MSyncControl instance?
     synchronizationPropertyGroup = a->addProperty(
@@ -195,6 +227,11 @@ MNWPActorVariable::MNWPActorVariable(MNWPMultiVarActor *actor)
                                               varRenderingPropertyGroup);
     properties->mEnum()->setEnumNames(transferFunctionProperty, availableTFs);
 
+    // Debug properties.
+    QtProperty* debugGroup = getPropertyGroup("debug");
+    dumpGridDataProperty = a->addProperty(CLICK_PROPERTY, "dump grid data",
+                                          debugGroup);
+
     // Observe the creation/deletion of other actors -- if these are transfer
     // functions, add to the list displayed in the transfer function property.
     connect(glRM, SIGNAL(actorCreated(MActor*)), SLOT(onActorCreated(MActor*)));
@@ -238,7 +275,9 @@ MNWPActorVariable::~MNWPActorVariable()
         actor->releaseTextureUnit(textureUnitDataFlags);
     if (textureUnitPressureTexCoordTable >=0)
         actor->releaseTextureUnit(textureUnitPressureTexCoordTable);
-    if (textureUnitUnusedTextures >=0)
+    if (textureUnitAuxiliaryPressure >= 0)
+        actor->releaseTextureUnit(textureUnitAuxiliaryPressure);
+    if (textureUnitUnusedTextures >= 0)
         actor->releaseTextureUnit(textureUnitUnusedTextures);
 
     foreach (MRequestProperties *requestProperty, propertiesList)
@@ -280,7 +319,9 @@ void MNWPActorVariable::initialize()
         actor->releaseTextureUnit(textureUnitDataFlags);
     if (textureUnitPressureTexCoordTable >=0)
         actor->releaseTextureUnit(textureUnitPressureTexCoordTable);
-    if (textureUnitUnusedTextures >=0)
+    if (textureUnitAuxiliaryPressure >= 0)
+        actor->releaseTextureUnit(textureUnitAuxiliaryPressure);
+    if (textureUnitUnusedTextures >= 0)
         actor->releaseTextureUnit(textureUnitUnusedTextures);
 
     textureUnitDataField             = actor->assignTextureUnit();
@@ -290,6 +331,7 @@ void MNWPActorVariable::initialize()
     textureUnitHybridCoefficients    = actor->assignTextureUnit();
     textureUnitDataFlags             = actor->assignTextureUnit();
     textureUnitPressureTexCoordTable = actor->assignTextureUnit();
+    textureUnitAuxiliaryPressure     = actor->assignTextureUnit();
     textureUnitUnusedTextures        = actor->assignTextureUnit();
 
     // This method is called on variable creation and when the datafield it
@@ -320,12 +362,17 @@ void MNWPActorVariable::initialize()
 
     textureDataField = textureHybridCoefficients =
             textureLonLatLevAxes = textureSurfacePressure =
-            textureDataFlags = texturePressureTexCoordTable = nullptr;
+            textureDataFlags = texturePressureTexCoordTable =
+            textureAuxiliaryPressure = nullptr;
 
     gridTopologyMayHaveChanged = true;
 
-    actor->getQtProperties()->mString()->setValue(datasourceNameProperty,
-                                                  dataSourceID);
+    actor->getQtProperties()->mString()->setValue(
+                datasourceNameProperty,
+                dataSourceID);
+    actor->getQtProperties()->mString()->setValue(
+                variableLongNameProperty,
+                dataSource->variableLongName(levelType, variableName));
 
     requestPropertiesFactory->updateProperties(&propertiesList,
                                                dataSource->requiredKeys());
@@ -473,6 +520,10 @@ void MNWPActorVariable::synchronizeWith(
             actor->enableActorUpdates(true);
         }
 
+        // Disable actor updates to avoid asynchonous data requests being
+        // triggered from the individual time/ensemble updates before all
+        // properties have been updated.
+        actor->enableActorUpdates(false);
         if (synchronizeInitTime)
         {
             setInitDateTime(sync->initDateTime());
@@ -484,6 +535,14 @@ void MNWPActorVariable::synchronizeWith(
         if (synchronizeEnsemble)
         {
             setEnsembleMember(sync->ensembleMember());
+        }
+        actor->enableActorUpdates(true);
+
+        // Trigger data request manually after all properties have been
+        // synchronised.
+        if (actor->isInitialized())
+        {
+            asynchronousDataRequest();
         }
     }
     else
@@ -741,9 +800,24 @@ bool MNWPActorVariable::onQtPropertyChanged(QtProperty *property)
 
     if (property == changeVariableProperty)
     {
-        if (actor->suppressActorUpdates()) return false;
+        if (actor->suppressActorUpdates())
+        {
+            return false;
+        }
 
         return changeVariable();
+    }
+
+    // Show data statistics of the variable.
+    else if (property == showDataStatisticsProperty)
+    {
+        if (actor->suppressActorUpdates())
+        {
+            return false;
+        }
+        runStatisticalAnalysis(
+                    properties->mDouble()->value(significantDigitsProperty),
+                    properties->mEnum()->value(histogramDisplayModeProperty));
     }
 
     // Connect to the time signals of the selected scene.
@@ -909,6 +983,16 @@ bool MNWPActorVariable::onQtPropertyChanged(QtProperty *property)
         return setTransferFunctionFromProperty();
     }
 
+    else if (property == dumpGridDataProperty)
+    {
+        if (grid)
+        {
+            // Dump raw grid data to console, printing first 200 data values.
+            grid->dumpGridData(200);
+        }
+        return false;
+    }
+
     else
     {
         bool redrawWithoutDataRequest = false;
@@ -932,7 +1016,15 @@ void MNWPActorVariable::saveConfiguration(QSettings *settings)
 
     MQtProperties *properties = actor->getQtProperties();
 
+    // Save data statistics properties.
+    // ================================
+    settings->setValue("statisticsSignificantDigits",
+                       properties->mDouble()->value(significantDigitsProperty));
+    settings->setValue("statisticsHistogramDisplayMode",
+                       properties->mEnum()->value(histogramDisplayModeProperty));
+
     // Save synchronization properties.
+    // ================================
     settings->setValue("synchronizationID",
                        (synchronizationControl != nullptr) ?
                            synchronizationControl->getID() : "");
@@ -944,6 +1036,7 @@ void MNWPActorVariable::saveConfiguration(QSettings *settings)
                        properties->mBool()->value(synchronizeEnsembleProperty));
 
     // Save ensemble mode properties.
+    // ==============================
     settings->setValue("ensembleUtilizedMembers",
                        MDataRequestHelper::uintSetToString(
                            selectedEnsembleMembers));
@@ -955,6 +1048,7 @@ void MNWPActorVariable::saveConfiguration(QSettings *settings)
                        properties->mDouble()->value(ensembleThresholdProperty));
 
     // Save rendering properties.
+    // ==========================
     settings->setValue("transferFunction",
                        properties->getEnumItem(transferFunctionProperty));
 
@@ -973,6 +1067,18 @@ void MNWPActorVariable::loadConfiguration(QSettings *settings)
     // remaining configuration should nevertheless be loaded.
 
     MQtProperties *properties = actor->getQtProperties();
+
+    // Load data statistics properties.
+    // ================================
+    properties->mDouble()->setValue(
+                significantDigitsProperty,
+                settings->value("statisticsSignificantDigits", 0.).toDouble());
+    properties->mEnum()->setValue(
+                histogramDisplayModeProperty,
+                settings->value(
+                    "statisticsHistogramDisplayMode",
+                    MStructuredGridStatisticsAnalysisControl
+                    ::RELATIVE_FREQUENCY_DISTRIBUTION).toInt());
 
     // Load ensemble mode properties.
     // ==============================
@@ -1041,31 +1147,9 @@ void MNWPActorVariable::loadConfiguration(QSettings *settings)
     QString tfName = settings->value("transferFunction", "None").toString();
     while (!setTransferFunction(tfName))
     {
-        QMessageBox msgBox;
-        msgBox.setIcon(QMessageBox::Warning);
-        msgBox.setWindowTitle(actor->getName());
-        msgBox.setText(QString("Variable '%1' requires a transfer function "
-                               "'%2' that does not exist.\n"
-                               "Would you like to load the transfer function "
-                               "from file?")
-                       .arg(variableName).arg(tfName));
-        msgBox.setStandardButtons(QMessageBox::Yes | QMessageBox::No);
-        msgBox.button(QMessageBox::Yes)->setText("Load transfer function");
-        msgBox.button(QMessageBox::No)->setText("Discard dependency");
-        msgBox.exec();
-        if (msgBox.clickedButton() == msgBox.button(QMessageBox::Yes))
-        {
-            MSystemManagerAndControl *sysMC =
-                    MSystemManagerAndControl::getInstance();
-            // Create default actor to get name of actor factory.
-            MTransferFunction1D *defaultActor = new MTransferFunction1D();
-            sysMC->getMainWindow()->getSceneManagementDialog()
-                    ->loadRequiredActorFromFile(defaultActor->getName(),
-                                                tfName,
-                                                settings->fileName());
-            delete defaultActor;
-        }
-        else
+        if (!MTransferFunction::loadMissingTransferFunction(
+                    tfName, MTransferFunction1D::staticActorType(),
+                    "Variable ", variableName, settings))
         {
             break;
         }
@@ -1518,6 +1602,13 @@ void MNWPActorVariable::asynchronousDataAvailable(MDataRequest request)
 #endif
         }
 
+        if (MLonLatAuxiliaryPressureGrid *apgrid =
+                dynamic_cast<MLonLatAuxiliaryPressureGrid*>(grid))
+        {
+            textureAuxiliaryPressure =
+                    apgrid->getAuxiliaryPressureFieldGrid()->getTexture();
+        }
+
         if (MRegularLonLatStructuredPressureGrid *pgrid =
                 dynamic_cast<MRegularLonLatStructuredPressureGrid*>(grid))
         {
@@ -1561,6 +1652,13 @@ void MNWPActorVariable::releaseDataItems()
 #endif
         }
 
+        if (MLonLatAuxiliaryPressureGrid *apgrid =
+                dynamic_cast<MLonLatAuxiliaryPressureGrid*>(grid))
+        {
+            apgrid->getAuxiliaryPressureFieldGrid()->releaseTexture();
+            textureAuxiliaryPressure = nullptr;
+        }
+
         if (MRegularLonLatStructuredPressureGrid *pgrid =
                 dynamic_cast<MRegularLonLatStructuredPressureGrid*>(grid))
         {
@@ -1580,6 +1678,13 @@ void MNWPActorVariable::releaseDataItems()
         textureLonLatLevAxes = nullptr;
         dataSource->releaseData(grid);
         grid = nullptr;
+    }
+
+    // Remove data statistics analysis control if present.
+    if (singleVariableAnalysisControl != nullptr)
+    {
+        delete singleVariableAnalysisControl;
+        singleVariableAnalysisControl = nullptr;
     }
 }
 
@@ -1962,8 +2067,16 @@ template<typename T> bool MNWPActorVariable::setEnumPropertyClosest(
 //                        << abs(value - availableValues.at(i-1)) << " "
 //                        << abs(availableValues.at(i) - value) << " ");
 
-        if ( abs(value - availableValues.at(i-1))
-             <= abs(availableValues.at(i) - value) ) i--;
+        T v1;
+        if (value < availableValues.at(i-1)) v1 = availableValues.at(i-1) - value;
+        else v1 = value - availableValues.at(i-1);
+
+        T v2;
+        if (availableValues.at(i) < value) v2 = value - availableValues.at(i);
+        else v2 = availableValues.at(i) - value;
+
+        if ( v1 <= v2 ) i--;
+
         // "i" now contains the index of the closest available value.
         break;
     }
@@ -2005,15 +2118,53 @@ template<typename T> bool MNWPActorVariable::setEnumPropertyClosest(
 }
 
 
+void MNWPActorVariable::runStatisticalAnalysis(double significantDigits,
+                                               int histogramDisplayMode)
+{
+    if (singleVariableAnalysisControl == nullptr)
+    {
+        // Create new analysis control. (Constructor of analysis control
+        // sets analysis control of variable.)
+        new MStructuredGridStatisticsAnalysisControl(this);
+        singleVariableAnalysisControl->setMemoryManager(
+                    grid->getMemoryManager());
+        singleVariableAnalysisControl->setScheduler(dataSource->getScheduler());
+    }
+    MDataRequestHelper rh;
+    rh.insert("HISTOGRAM_SIGNIFICANT_DIGITS",
+              QString::number(significantDigits));
+    rh.insert("HISTOGRAM_DISPLAYMODE", histogramDisplayMode);
+    singleVariableAnalysisControl->run(rh.request());
+}
+
+
 bool MNWPActorVariable::changeVariable()
 {
     // Open an MSelectDataSourceDialog and re-initialize the variable with
     // information returned from the dialog.
     MSelectDataSourceDialog dialog(actor->supportedLevelTypes());
 
-    if (dialog.exec() == QDialog::Rejected) return false;
+    if (dialog.exec() == QDialog::Rejected)
+    {
+        return false;
+    }
 
     MSelectableDataSource dsrc = dialog.getSelectedDataSource();
+
+    if (dynamic_cast<MNWP2DVerticalActorVariable*>(this))
+    {
+        if (actor->getNWPVariables().size() > 1
+                && dataSourceID != dsrc.dataSourceID)
+        {
+            QMessageBox::warning(
+                        nullptr, actor->getName(),
+                        "Vertical cross-section actors cannot handle"
+                        " multiple variables coming from different data"
+                        " sources.\n"
+                        "(Varible was not changed.)");
+            return false;
+        }
+    }
 
     LOG4CPLUS_DEBUG(mlog, "New variable has been selected: "
                     << dsrc.variableName.toStdString());
@@ -2809,31 +2960,9 @@ void MNWP2DHorizontalActorVariable::loadConfiguration(QSettings *settings)
     QString stfName = settings->value("spatialTransferFunction", "None").toString();
     while (!setSpatialTransferFunction(stfName))
     {
-        QMessageBox msgBox;
-        msgBox.setIcon(QMessageBox::Warning);
-        msgBox.setWindowTitle(actor->getName());
-        msgBox.setText(QString("Variable '%1' requires a transfer function "
-                               "'%2' that does not exist.\n"
-                               "Would you like to load the transfer function "
-                               "from file?")
-                       .arg(variableName).arg(stfName));
-        msgBox.setStandardButtons(QMessageBox::Yes | QMessageBox::No);
-        msgBox.button(QMessageBox::Yes)->setText("Load transfer function");
-        msgBox.button(QMessageBox::No)->setText("Discard dependency");
-        msgBox.exec();
-        if (msgBox.clickedButton() == msgBox.button(QMessageBox::Yes))
-        {
-            MSystemManagerAndControl *sysMC =
-                    MSystemManagerAndControl::getInstance();
-            // Create default actor to get name of actor factory.
-            MSpatial1DTransferFunction *defaultActor =
-                    new MSpatial1DTransferFunction();
-            sysMC->getMainWindow()->getSceneManagementDialog()
-                    ->loadRequiredActorFromFile(defaultActor->getName(),
-                                                stfName, settings->fileName());
-            delete defaultActor;
-        }
-        else
+        if (!MTransferFunction::loadMissingTransferFunction(
+                    stfName, MSpatial1DTransferFunction::staticActorType(),
+                    "Variable ", variableName, settings))
         {
             break;
         }
@@ -3565,6 +3694,22 @@ void MNWP2DVerticalActorVariable::updateVerticalLevelRange(
                         << " hPa; vertical levels from " << gridVerticalLevelStart
                         << ", count " << gridVerticalLevelCount << flush);
     }
+    else  if (MLonLatAuxiliaryPressureGrid *apgrid =
+              dynamic_cast<MLonLatAuxiliaryPressureGrid*>(grid))
+    {
+        // Min and max surface pressure.
+        double pfield_hPa_min = apgrid->getAuxiliaryPressureFieldGrid()->min() / 100.;
+        double pfield_hPa_max = apgrid->getAuxiliaryPressureFieldGrid()->max() / 100.;
+
+        gridVerticalLevelStart = 0;
+        gridVerticalLevelCount = grid->nlevs;
+
+        LOG4CPLUS_TRACE(mlog, "\tVariable: " << variableName.toStdString()
+                        << ": auxPressureField_min = " << pfield_hPa_min
+                        << " hPa, auxPressureField_max = " << pfield_hPa_max
+                        << " hPa; vertical levels from " << gridVerticalLevelStart
+                        << ", count " << gridVerticalLevelCount << flush);
+    }
     else
     {
         // All other leveltypes do not have terrain following vertical
@@ -3698,5 +3843,6 @@ bool MNWP3DVolumeActorVariable::setTransferFunctionFromProperty()
 
     return returnValue;
 }
+
 
 } // namespace Met3D

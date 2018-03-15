@@ -33,6 +33,7 @@
 // related third party imports
 #include <GL/glew.h>
 #include <QtCore>
+#include <QVector2D>
 #include <QtProperty>
 
 // local application imports
@@ -66,6 +67,8 @@ class MMovablePoleActor : public MActor
 public:
     MMovablePoleActor();
     ~MMovablePoleActor();
+
+    static QString staticActorType() { return "Movable poles"; }
 
     void reloadShaderEffects();
 

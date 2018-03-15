@@ -4,8 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2017 Marc Rautenhaus
-**  Copyright 2015-2017 Bianca Tost
+**  Copyright 2015-2018 Marc Rautenhaus
+**  Copyright 2017-2018 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -44,9 +44,11 @@ namespace Met3D
 ***                     CONSTRUCTOR / DESTRUCTOR                            ***
 *******************************************************************************/
 
-MWeatherPredictionReader::MWeatherPredictionReader(QString identifier)
+MWeatherPredictionReader::MWeatherPredictionReader(
+        QString identifier, QString auxiliary3DPressureField)
     : MWeatherPredictionDataSource(),
-      MAbstractDataReader(identifier)
+      MAbstractDataReader(identifier),
+      auxiliary3DPressureField(auxiliary3DPressureField)
 {
 }
 
@@ -124,6 +126,51 @@ MStructuredGrid* MWeatherPredictionReader::produceData(MDataRequest request)
                     )->surfacePressure =
                 static_cast<MRegularLonLatGrid*>(
                     memoryManager->getData(this, psfcRequest)
+                    );
+    }    
+    else if (levtype == AUXILIARY_PRESSURE_3D
+             && variable != auxiliary3DPressureField)
+    {
+        // Special case for auxiliary pressure 3d levels: Also load the
+        // required 3D pressure field and set a link to it BUT not if we load
+        // the pressure field itself because then we are already loading it at
+        // the moment (auxiliary3DPressureField is its own pressure field)!
+        QString pressureVar =
+                variableAuxiliaryPressureName(levtype, variable);
+        rh.insert("LEVELTYPE", AUXILIARY_PRESSURE_3D);
+        rh.insert("VARIABLE", pressureVar);
+
+        MDataRequest auxPressureFieldRequest = rh.request();
+        if ( !memoryManager->containsData(this, auxPressureFieldRequest) )
+        {
+            // Data field needs to be loaded from disk.
+            MLonLatAuxiliaryPressureGrid *auxPressureField_hPa =
+                    static_cast<MLonLatAuxiliaryPressureGrid*>(
+                        readGrid(AUXILIARY_PRESSURE_3D, pressureVar,
+                                 initTime, validTime, member)
+                        );
+            auxPressureField_hPa->setGeneratingRequest(auxPressureFieldRequest);
+            if ( !memoryManager->storeData(this, auxPressureField_hPa) )
+            {
+                // In rare cases another thread could have generated and
+                // stored the same data field in the mean time. In such a
+                // case the store request will fail. Delete the auxPressureField_hPa
+                // object, it is not required anymore.
+                delete auxPressureField_hPa;
+            }
+        }
+
+        // Get a pointer to the 3D pressure field from the memory manger.
+        // The field's reference counter was increased by either containsData()
+        // or storeData() above. NOTE: The field is released in the destructor
+        // of "result" -- the reference is kept for the entire lifetime of
+        // "result" to make sure the auxPressureField_hPa is not deleted while
+        // "result" is still in memory (notes 09Oct2013).
+        static_cast<MLonLatAuxiliaryPressureGrid*>(
+                    result
+                    )->auxPressureField_hPa =
+                static_cast<MLonLatAuxiliaryPressureGrid*>(
+                    memoryManager->getData(this, auxPressureFieldRequest)
                     );
     }
 

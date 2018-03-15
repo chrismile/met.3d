@@ -4,8 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2017 Marc Rautenhaus
-**  Copyright 2017      Bianca Tost
+**  Copyright 2015-2018 Marc Rautenhaus
+**  Copyright 2017-2018 Bianca Tost
 **  Copyright 2017      Michael Kern
 **
 **  Computer Graphics and Visualization Group
@@ -32,8 +32,6 @@
 
 // related third party imports
 #include "GL/glew.h"
-#include <QtCore>
-#include <QtGui>
 #include <QGLWidget>
 
 // local application imports
@@ -365,7 +363,7 @@ public:
     /** Writes coordinate axis data to the LOG. */
     void dumpCoordinateAxes();
 
-    virtual void dumpGridData();
+    virtual void dumpGridData(unsigned int maxValues=50);
 
     /** Saves the data field in text file @p filename. */
     void saveAsNetCDF(QString filename);
@@ -555,6 +553,8 @@ protected:
     friend class MStructuredGridEnsembleFilter;
     friend class MVerticalRegridder;
     friend class MGribReader;
+    friend class MDifferenceDataSource;
+    friend class MProcessingWeatherPredictionDataSource;
     friend class MIsosurfaceIntersectionSource;
     friend class MLineGeomoetryFilter;
 
@@ -735,7 +735,7 @@ public:
 
     float getBottomDataVolumePressure() override;
 
-    void dumpGridData();
+    void dumpGridData(unsigned int maxValues=50);
 
 protected:
     friend class MWeatherPredictionReader;
@@ -747,6 +747,8 @@ protected:
     friend class MProbDFTrajectoriesSource;
     friend class MProbABLTrajectoriesSource;
     friend class MGribReader;
+    friend class MDifferenceDataSource;
+    friend class MProcessingWeatherPredictionDataSource;
     friend class MIsosurfaceIntersectionSource;
     friend class MLineGeometryFilter;
 
@@ -768,6 +770,57 @@ protected:
 
 private:
     QString pressureTexCoordID;
+};
+
+
+class MLonLatAuxiliaryPressureGrid : public MStructuredGrid
+{
+public:
+    MLonLatAuxiliaryPressureGrid(unsigned int nlevs, unsigned int nlats,
+                                 unsigned int nlons, bool reverseLevels);
+
+    ~MLonLatAuxiliaryPressureGrid();
+
+    MLonLatAuxiliaryPressureGrid* getAuxiliaryPressureFieldGrid()
+    { return auxPressureField_hPa; }
+
+    float interpolateGridColumnToPressure(unsigned int j, unsigned int i,
+                                          float p_hPa);
+
+    int findLevel(unsigned int j, unsigned int i, float p_hPa);
+
+    float getPressure(unsigned int k, unsigned int j, unsigned int i);
+
+    float getBottomInterfacePressure(
+            unsigned int k, unsigned int j, unsigned int i);
+
+    float getTopInterfacePressure(
+            unsigned int k, unsigned int j, unsigned int i);
+
+    float getTopDataVolumePressure() override;
+
+    float getBottomDataVolumePressure() override;
+
+    /**
+      Returns the reverseLevels-Flag.
+
+      Since the structured grid is used to obtain the informations about the
+      auxiliary pressure field if it is not stored in the same file, this
+      method can be used to get the reverseLevels-Flag.
+      */
+    bool getReverseLevels() { return reverseLevels; }
+
+    void dumpGridData(unsigned int maxValues=50);
+
+protected:
+    friend class MWeatherPredictionReader;
+    friend class MClimateForecastReader;
+    friend class MStructuredGridEnsembleFilter;
+    friend class MProcessingWeatherPredictionDataSource;
+
+    MLonLatAuxiliaryPressureGrid *auxPressureField_hPa;
+
+    bool reverseLevels;
 };
 
 

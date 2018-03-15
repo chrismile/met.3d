@@ -4,8 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2017 Marc Rautenhaus
-**  Copyright 2017      Bianca Tost
+**  Copyright 2015-2018 Marc Rautenhaus
+**  Copyright 2017-2018 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -39,6 +39,7 @@
 #include "gxfw/mglresourcesmanager.h"
 #include "gxfw/msceneviewglwidget.h"
 #include "gxfw/mscenecontrol.h"
+#include "actors/nwpverticalsectionactor.h"
 
 using namespace std;
 
@@ -79,13 +80,6 @@ MNWPMultiVarActor::~MNWPMultiVarActor()
 ***                            PUBLIC METHODS                               ***
 *******************************************************************************/
 
-void MNWPMultiVarActor::synchronizeAllVariablesWith(MSyncControl *sync)
-
-{
-    foreach (MNWPActorVariable* var, variables) var->synchronizeWith(sync);
-}
-
-
 void MNWPMultiVarActor::provideSynchronizationInfoToScene(
         MSceneControl *scene)
 {
@@ -120,17 +114,39 @@ MNWPActorVariable* MNWPMultiVarActor::addActorVariable()
     MSelectDataSourceDialog dialog(this->supportedLevelTypes());
     if (dialog.exec() == QDialog::Rejected) return nullptr;
 
+    QStringList sysControlIdentifiers = MSystemManagerAndControl::getInstance()
+            ->getSyncControlIdentifiers();
+
     bool accepted = false;
     // ask user which sync control should be synchronized with variable
     QString syncName = QInputDialog::getItem(
                 nullptr, "Choose Sync Control",
                 "Please select a sync control to synchronize with: ",
-                MSystemManagerAndControl::getInstance()->getSyncControlIdentifiers(),
-                0, false, &accepted);
+                sysControlIdentifiers,
+                min(1, sysControlIdentifiers.size() - 1), false,
+                &accepted);
     // if user has aborted do not add any variable
     if (!accepted) return nullptr;
 
     MSelectableDataSource dataSource = dialog.getSelectedDataSource();
+
+    if (dynamic_cast<MNWPVerticalSectionActor*>(this))
+    {
+        if (!variables.isEmpty())
+        {
+            QString dataSourceID = variables.at(0)->dataSourceID;
+            if (dataSourceID != "" && dataSourceID != dataSource.dataSourceID)
+            {
+                QMessageBox::warning(
+                            nullptr, getName(),
+                            "Vertical cross-section actors cannot handle"
+                            " multiple variables coming from different data"
+                            " sources.\n"
+                            "(No variable was added.)");
+                return nullptr;
+            }
+        }
+    }
 
     MNWPActorVariable* var = createActorVariable(dataSource);
 
@@ -368,12 +384,20 @@ void MNWPMultiVarActor::onQtPropertyChanged(QtProperty *property)
     // Variable specific properties.
     foreach (MNWPActorVariable* var, variables)
     {
-        if ( var->onQtPropertyChanged(property) )
+        if (property == var->changeVariableProperty)
+        {
+            if ( var->onQtPropertyChanged(property) )
+            {
+                onChangeActorVariable(var);
+                emitActorChangedSignal();
+            }
+            break;
+        }
+        else if ( var->onQtPropertyChanged(property) )
         {
             emitActorChangedSignal();
             break;
         }
-
         else if (property == var->removeVariableProperty)
         {
             // Ask the user if the variable should really be deleted.

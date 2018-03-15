@@ -4,8 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2017 Marc Rautenhaus
-**  Copyright 2015-2017 Michael Kern
+**  Copyright 2015-2018 Marc Rautenhaus
+**  Copyright 2015-2018 Michael Kern
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -31,8 +31,10 @@
 #include <cmath>
 
 // related third party imports
+#include <log4cplus/loggingmacros.h>
 
 // local application imports
+#include "util/mutil.h"
 
 using namespace std;
 
@@ -434,6 +436,151 @@ double boxVolume_dry(double northWestLon, double northWestLat,
 }
 
 
+double windSpeed_ms(double u_ms, double v_ms)
+{
+    return sqrt(pow(u_ms, 2) + pow(v_ms, 2));
+}
+
+
+double potentialTemperature_K(double T_K, double p_Pa)
+{
+    return T_K * pow( 100000. / p_Pa,
+                      MetConstants::GAS_CONSTANT_DRY_AIR /
+                      MetConstants::SPECIFIC_HEAT_DRYAIR_CONST_PRESSURE );
+}
+
+
+double virtualTemperature_K(double T_K, double q_kgkg)
+{
+    return T_K * (q_kgkg + 0.622*(1.-q_kgkg)) / 0.622;
+}
+
+
+double geopotentialThicknessOfLayer_m(
+        double layerMeanVirtualTemperature_K, double p_bot, double p_top)
+{
+    // Layer mean scale height; Holten 3rd ed. p. 21 (before eq. 1.19):
+    //   H = R <Tv> / g0, with <Tv> being the layer mean temperature.
+    double layerMeanScaleHeight =
+            (MetConstants::GAS_CONSTANT_DRY_AIR
+             * layerMeanVirtualTemperature_K) /
+            MetConstants::GRAVITY_ACCELERATION;
+
+    // Holton eq. 1.19: Z_T = H * ln(p1/p2)
+    return layerMeanScaleHeight * log(p_bot / p_top);
+}
+
+
+double mixingRatio_kgkg(double q_kgkg)
+{
+    return q_kgkg / (1.-q_kgkg);
+}
+
+
+double specificHumidity_kgkg(double w_kgkg)
+{
+    return w_kgkg / (1.+w_kgkg);
+}
+
+
+double dewPointTemperature_K_Bolton(double p_Pa, double q_kgkg)
+{
+    // Compute mixing ratio w from specific humidiy q.
+    double w = mixingRatio_kgkg(q_kgkg);
+
+    // Compute vapour pressure from pressure and mixing ratio
+    // (Wallace and Hobbs 2nd ed. eq. 3.59).
+    double eq = w / (w + 0.622) * p_Pa;
+
+    double td = 243.5 / (17.67 / log(eq / 100. / 6.112) - 1.) + 273.15;
+
+    return td;
+}
+
+
+double equivalentPotentialTemperature_K_Bolton(
+        double T_K, double p_Pa, double q_kgkg)
+{
+    // Compute dewpoint Td in [K].
+    const double Td_K = dewPointTemperature_K_Bolton(p_Pa, q_kgkg);
+
+    // Mixing ratio in [kg/kg].
+    double r = mixingRatio_kgkg(q_kgkg);
+    // Convert r from kg/kg to g/kg.
+    r *= 1000;
+
+    // Computation based on Bolton's paper:
+
+    // Eq. 15: temperature at lifting condensation level.
+    const double Tl = 1.0 / (1.0 / (Td_K - 56.0) +
+                             std::log(T_K / Td_K) / 800.0) + 56.;
+
+    // Eq. 43: equivalent potential temperature (as recommended by Bolton).
+    const double thetaW_K = T_K * std::pow(100000. / p_Pa,
+                                           0.2854 * (1 - 0.28E-3 * r));
+
+    const double thetaE_K = thetaW_K * std::exp((3.376 / Tl - 2.54E-3) *
+                                                r * (1 + 0.81E-3 * r));
+
+    return thetaE_K;
+}
+
+
+// Test functions for meteorological computations.
+namespace MetRoutinesTests
+{
+
+void testEQPT()
+{
+    // Test values from https://www.ncl.ucar.edu/Document/Functions/
+    //  Contributed/pot_temp_equiv.shtml.
+    // p in [Pa], T in [K], mixing ratio w in [kg/kg].
+    float values_p_T_w[27][3] = {
+        {97067.80, 291.15, 0.012258},
+        {96040.00, 291.60, 0.012111},
+        {94825.50, 292.05, 0.011914},
+        {93331.30, 292.13, 0.011483},
+        {91371.40, 292.06, 0.010575},
+        {88947.80, 291.17, 0.008992},
+        {86064.70, 289.11, 0.006021},
+        {82495.50, 287.49, 0.002559},
+        {78140.20, 286.25, 0.005169},
+        {73035.40, 282.14, 0.005746},
+        {67383.70, 277.42, 0.001608},
+        {61327.50, 272.91, 0.001645},
+        {54994.70, 266.99, 0.001382},
+        {48897.30, 261.64, 0.000235},
+        {43034.60, 254.40, 0.000094},
+        {37495.20, 246.38, 0.000178},
+        {32555.80, 238.10, 0.000136},
+        {28124.40, 229.76, 0.000079},
+        {24201.00, 220.88, 0.000050},
+        {20693.00, 213.65, 0.000025},
+        {17600.60, 212.42, 0.000023},
+        {14877.30, 212.58, 0.000023},
+        {12477.20, 212.91, 0.000014},
+        {10400.20, 213.34, 0.000010},
+        {8553.98, 213.73, 0.000008},
+        {6984.69, 214.55, 0.000007},
+        {646.18, 216.59, 0.000007}
+    };
+
+    for (int i = 0; i < 27; i++)
+    {
+        float p_Pa = values_p_T_w[i][0];
+        float T_K = values_p_T_w[i][1];
+        float w_kgkg = values_p_T_w[i][2];
+        float q_kgkg = specificHumidity_kgkg(w_kgkg);
+        float eqpt_K = equivalentPotentialTemperature_K_Bolton(T_K, p_Pa, q_kgkg);
+
+        QString s = QString("(%1) p = %2  T = %3  w = %4  q = %5  eqpt = %6")
+                .arg(i).arg(p_Pa).arg(T_K).arg(w_kgkg).arg(q_kgkg).arg(eqpt_K);
+
+        LOG4CPLUS_INFO(mlog, s.toStdString());
+    }
+}
+
+
 QVector2D getLineSegmentsIntersectionPoint(
         const QVector2D& p, const QVector2D& p2,
         const QVector2D& q, const QVector2D& q2)
@@ -460,5 +607,6 @@ QVector2D getLineSegmentsIntersectionPoint(
     return  QVector2D(0, 0);
 }
 
+} // namespace MetRoutinesTests
 
 } // namespace Met3D

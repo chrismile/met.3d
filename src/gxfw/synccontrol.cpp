@@ -32,6 +32,8 @@
 
 // related third party imports
 #include <log4cplus/loggingmacros.h>
+#include <QMenu>
+#include <QFileDialog>
 
 // local application imports
 #include "util/mutil.h"
@@ -285,7 +287,7 @@ MSyncControl::MSyncControl(QString id, QWidget *parent) :
     timeAnimationReverseTimeDirectionAction->setText("Reverse time direction");
     timeAnimationDropdownMenu->addAction(timeAnimationReverseTimeDirectionAction);
 
-    connect(timeAnimationLoopGroup, SIGNAL(selected(QAction*)),
+    connect(timeAnimationLoopGroup, SIGNAL(triggered(QAction*)),
             this, SLOT(onAnimationLoopGroupChanged(QAction*)));
 
     // Save animation.

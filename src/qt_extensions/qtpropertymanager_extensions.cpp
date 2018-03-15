@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015-2018 Marc Rautenhaus
+**  Copyright 2017-2018 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -29,6 +30,8 @@
 ** have been copied and partly modified from the "decoration" example, from
 ** qtpropertymanager.h and .cpp, qtpropertybrowserutils_p.h and .cpp,
 ** qteditorfactory.h and .cpp.
+** Code of manager and factory handling support of scientific notation are
+** partially copied form manager and factory handling double spinboxes.
 **
 ** This file incorporates work covered by the following copyright and
 ** permission notice:
@@ -73,16 +76,18 @@
 #include "qtpropertymanager_extensions.h"
 
 // standard library imports
+#include <cfloat>
+#include <cmath>
 
 // related third party imports
-#include <QtGui/QApplication>
-#include <QtGui/QPainter>
-#include <QtGui/QHBoxLayout>
-#include <QtGui/QMouseEvent>
-#include <QtGui/QCheckBox>
-#include <QtGui/QLineEdit>
-#include <QtGui/QMenu>
-#include <QtGui/QStyleOption>
+#include <QApplication>
+#include <QPainter>
+#include <QHBoxLayout>
+#include <QMouseEvent>
+#include <QCheckBox>
+#include <QLineEdit>
+#include <QMenu>
+#include <QStyleOption>
 
 // local application imports
 
@@ -191,6 +196,7 @@ QtDecoratedDoubleSpinBoxFactory::QtDecoratedDoubleSpinBoxFactory(QObject *parent
 QtDecoratedDoubleSpinBoxFactory::~QtDecoratedDoubleSpinBoxFactory()
 {
     // not need to delete editors because they will be deleted by originalFactory in its destructor
+    delete originalFactory;
 }
 
 
@@ -344,6 +350,9 @@ void QtClickPropertyManager::uninitializeProperty(QtProperty *property)
 /******************************************************************************
 ***                         QtToolButtonBoolEdit                            ***
 *******************************************************************************/
+/******************************************************************************
+***                     CONSTRUCTOR / DESTRUCTOR                            ***
+*******************************************************************************/
 
 QtToolButtonBoolEdit::QtToolButtonBoolEdit(QWidget *parent) :
     QWidget(parent),
@@ -438,6 +447,872 @@ QWidget *QtToolButtonFactory::createEditor(
             this, SLOT(slotEditorDestroyed(QObject *)));
 
     return editor;
+}
+
+
+/******************************************************************************
+***                    QtScientificDoublePropertyManager                    ***
+*******************************************************************************/
+/******************************************************************************
+***                     CONSTRUCTOR / DESTRUCTOR                            ***
+*******************************************************************************/
+
+QtScientificDoublePropertyManager::QtScientificDoublePropertyManager(
+        QObject *parent)
+    : QtDecoratedDoublePropertyManager(parent)
+{
+}
+
+
+QtScientificDoublePropertyManager::~QtScientificDoublePropertyManager()
+{
+    clear();
+}
+
+
+/******************************************************************************
+***                            PUBLIC METHODS                               ***
+*******************************************************************************/
+
+int QtScientificDoublePropertyManager::significantDigits(
+        const QtProperty *property) const
+{
+    if (!propertyToData.contains(property))
+    {
+        return 0;
+    }
+    return propertyToData[property].significantDigits;
+}
+
+
+int QtScientificDoublePropertyManager::switchNotationExponent(
+        const QtProperty *property) const
+{
+    if (!propertyToData.contains(property))
+    {
+        return 0;
+    }
+    return propertyToData[property].switchNotationExponent;
+}
+
+
+int QtScientificDoublePropertyManager::minimumExponent(
+        const QtProperty *property) const
+{
+    if (!propertyToData.contains(property))
+    {
+        return 0;
+    }
+    return propertyToData[property].minimumExponent;
+}
+
+
+QString QtScientificDoublePropertyManager::valueAsPropertyFormatedText(
+        const QtProperty *property, const double value) const
+{
+    return getTextFromValue(property, value);
+}
+
+
+/******************************************************************************
+***                             PUBLIC SLOTS                                ***
+*******************************************************************************/
+
+void QtScientificDoublePropertyManager::setSignificantDigits(
+        QtProperty *property, const int &significantDigits)
+{
+    if (!propertyToData.contains(property))
+    {
+        return;
+    }
+
+    QtScientificDoublePropertyManager::Data data = propertyToData[property];
+    if (data.significantDigits == significantDigits)
+    {
+        return;
+    }
+
+    // Only in range from 1 to 9 (max significant digits of float value).
+    data.significantDigits = qBound(1, significantDigits, 9);
+
+    propertyToData[property] = data;
+
+    emit significantDigitsChanged(property, data.significantDigits);
+    emit propertyChanged(property);
+}
+
+
+void QtScientificDoublePropertyManager::setSwitchNotationExponent(
+        QtProperty *property, const int &switchNotationExponent)
+{
+    if (!propertyToData.contains(property))
+    {
+        return;
+    }
+
+    QtScientificDoublePropertyManager::Data data = propertyToData[property];
+    if (data.switchNotationExponent == switchNotationExponent)
+        return;
+
+    data.switchNotationExponent = switchNotationExponent;
+    propertyToData[property] = data;
+
+    emit switchNotationExponentChanged(property, switchNotationExponent);
+    emit propertyChanged(property);
+}
+
+
+void QtScientificDoublePropertyManager::setMinimumExponent(
+        QtProperty *property, const int &minExponent)
+{
+    if (!propertyToData.contains(property))
+    {
+        return;
+    }
+
+    int minExp = qBound(0, minExponent, FLT_MAX_10_EXP);
+
+    QtScientificDoublePropertyManager::Data data = propertyToData[property];
+    if (data.minimumExponent == minExp)
+        return;
+
+    data.minimumExponent = minExp;
+    propertyToData[property] = data;
+
+    setDecimals(property, minExp);
+
+    emit minimumExponentChanged(property, minExp);
+    emit propertyChanged(property);
+}
+
+
+/******************************************************************************
+***                          PROTECTED METHODS                              ***
+*******************************************************************************/
+
+QString QtScientificDoublePropertyManager::valueText(
+        const QtProperty *property) const
+{
+    QString text = QtDoublePropertyManager::valueText(property);
+
+    if (!propertyToData.contains(property))
+    {
+        return text;
+    }
+
+    double val = value(property);
+
+    text = getTextFromValue(property, val);
+
+    return prefix(property) + text + suffix(property);
+}
+
+
+QString QtScientificDoublePropertyManager::getTextFromValue(
+        const QtProperty *property, double value) const
+{
+    if (!propertyToData.contains(property))
+    {
+        return "";
+    }
+
+    int significDigits = std::max(0, significantDigits(property) - 1);
+    int switchNotationExp = switchNotationExponent(property);
+
+    QString text = QLocale::system().toString(value, 'E', significDigits);
+    value = QLocale::system().toDouble(text);
+
+    // Switch to scientific notation only if the absolute value of the exponent
+    // is bigger than the threshold given.
+    if (value != 0.
+            && (static_cast<int>(fabs(floor(log10(fabs(value)))))
+                >= switchNotationExp))
+    {
+        text = QLocale::system().toString(value, 'E', significDigits);
+    }
+    else
+    {
+        int indexExponentialSign = text.indexOf(
+                    QLocale::system().exponential(), 0, Qt::CaseInsensitive);
+        QString exponentString = text.right(
+                    text.length() - (indexExponentialSign + 1));
+        int exponent = QLocale::system().toInt(exponentString);
+        if (exponent < 0)
+        {
+            significDigits -= exponent;
+        }
+
+        text = QLocale::system().toString(value, 'f', significDigits);
+    }
+
+    // Remove trailing zeros after decimal point.
+    int decimalPointIndex = text.indexOf(QLocale::system().decimalPoint());
+    if (decimalPointIndex > 0)
+    {
+        int exponentIndex = text.indexOf(QLocale::system().exponential(), 0,
+                                         Qt::CaseInsensitive);
+        if (exponentIndex >= 0)
+        {
+            exponentIndex -= 1;
+        }
+        else
+        {
+            exponentIndex = text.length();
+        }
+        int nonZeroIndex = text.lastIndexOf(QRegExp("[^0]"), exponentIndex);
+        if (nonZeroIndex >= decimalPointIndex)
+        {
+            if (nonZeroIndex != decimalPointIndex)
+            {
+                nonZeroIndex++;
+            }
+            text.remove(nonZeroIndex, exponentIndex + 1 - nonZeroIndex);
+        }
+    }
+
+    return text;
+}
+
+
+void QtScientificDoublePropertyManager::initializeProperty(QtProperty *property)
+{
+    propertyToData[property] = QtScientificDoublePropertyManager::Data();
+    QtDecoratedDoublePropertyManager::initializeProperty(property);
+}
+
+
+void QtScientificDoublePropertyManager::uninitializeProperty(QtProperty *property)
+{
+    propertyToData.remove(property);
+    QtDecoratedDoublePropertyManager::uninitializeProperty(property);
+}
+
+
+// TODO (bt, 19Jan2018): Use this class to implement a configurable SDProperty Manager.
+//   Idea: cf. system/qtproperties.h
+/******************************************************************************
+***              QtConfigurableScientificDoublePropertyManager              ***
+*******************************************************************************/
+/******************************************************************************
+***                     CONSTRUCTOR / DESTRUCTOR                            ***
+*******************************************************************************/
+
+QtConfigurableScientificDoublePropertyManager
+::QtConfigurableScientificDoublePropertyManager(
+        QObject *parent)
+    : QtScientificDoublePropertyManager(parent)
+{
+    intPropertyManager = new QtIntPropertyManager(this);
+    connect(intPropertyManager, SIGNAL(valueChanged(QtProperty *, int)),
+            this, SLOT(slotIntChanged(QtProperty *, int)));
+    connect(intPropertyManager, SIGNAL(propertyDestroyed(QtProperty *)),
+            this, SLOT(slotPropertyDestroyed(QtProperty *)));
+
+    sciDoublePropertyManager = new QtScientificDoublePropertyManager(this);
+    connect(sciDoublePropertyManager, SIGNAL(valueChanged(QtProperty *, int)),
+            this, SLOT(slotScientificDoubleChanged(QtProperty *, double)));
+    connect(sciDoublePropertyManager, SIGNAL(propertyDestroyed(QtProperty *)),
+            this, SLOT(slotPropertyDestroyed(QtProperty *)));
+}
+
+
+QtConfigurableScientificDoublePropertyManager
+::~QtConfigurableScientificDoublePropertyManager()
+{
+    clear();
+    delete intPropertyManager;
+    delete sciDoublePropertyManager;
+}
+
+
+/******************************************************************************
+***                            PUBLIC METHODS                               ***
+*******************************************************************************/
+
+QtIntPropertyManager *QtConfigurableScientificDoublePropertyManager::subIntPropertyManager() const
+{
+    return intPropertyManager;
+}
+
+
+QtScientificDoublePropertyManager *QtConfigurableScientificDoublePropertyManager
+::subSciDoublePropertyManager() const
+{
+    return sciDoublePropertyManager;
+}
+
+
+QString QtConfigurableScientificDoublePropertyManager::configuration(
+        const QtProperty *property) const
+{
+    return QString("%1/%2/%3/%4")
+            .arg(value(property))
+            .arg(singleStep(property))
+            .arg(significantDigits(property))
+            .arg(switchNotationExponent(property));
+}
+
+
+/******************************************************************************
+***                             PUBLIC SLOTS                                ***
+*******************************************************************************/
+
+void QtConfigurableScientificDoublePropertyManager::setConfiguration(
+        QtProperty *property, const QString &config)
+{
+    if (!propertyToData.contains(property))
+    {
+        return;
+    }
+
+    QStringList configurationList = config.split("/");
+
+    if (configurationList.size() < 4)
+    {
+        return;
+    }
+
+    double configValue = QLocale::system().toDouble(configurationList.at(0));
+    int configSingleStep = QLocale::system().toInt(configurationList.at(1));
+    int configSignificantDigits = QLocale::system().toInt(configurationList.at(2));
+    int configMSwitchNotationExponent =
+            QLocale::system().toInt(configurationList.at(3));
+
+    QtScientificDoublePropertyManager::Data data = propertyToData[property];
+    if ((configValue == value(property))
+            && (configSingleStep == singleStep(property))
+            && (data.significantDigits == configSignificantDigits)
+            && (data.switchNotationExponent == configMSwitchNotationExponent))
+    {
+        return;
+    }
+
+    blockSignals(true);
+    setSignificantDigits(property, configSignificantDigits);
+    setSwitchNotationExponent(property, configMSwitchNotationExponent);
+    setSingleStep(property, configSingleStep);
+    setValue(property, configValue);
+    blockSignals(false);
+
+    emit singleStepChanged(property, configSingleStep);
+    emit significantDigitsChanged(property, configSignificantDigits);
+    emit switchNotationExponentChanged(property, configMSwitchNotationExponent);
+    emit valueChanged(property, configValue);
+    emit propertyChanged(property);
+}
+
+
+void QtConfigurableScientificDoublePropertyManager::setSingleStep(
+        QtProperty *property, const double &singleStep)
+{
+    if (!propertyToData.contains(property))
+    {
+        return;
+    }
+
+    QtScientificDoublePropertyManager::setSingleStep(property, singleStep);
+
+    sciDoublePropertyManager->blockSignals(true);
+    sciDoublePropertyManager->setValue(propertyToSingleStep[property], singleStep);
+    sciDoublePropertyManager->blockSignals(false);
+}
+
+
+void QtConfigurableScientificDoublePropertyManager::setSignificantDigits(
+        QtProperty *property, const int &significantDigits)
+{
+    if (!propertyToData.contains(property))
+    {
+        return;
+    }
+
+    QtScientificDoublePropertyManager::setSignificantDigits(property,
+                                                         significantDigits);
+
+    intPropertyManager->blockSignals(true);
+    intPropertyManager->setValue(propertyToSignificantDigits[property],
+                                 significantDigits);
+    intPropertyManager->blockSignals(false);
+}
+
+
+void QtConfigurableScientificDoublePropertyManager::setSwitchNotationExponent(
+        QtProperty *property, const int &switchNotationExponent)
+{
+    if (!propertyToData.contains(property))
+    {
+        return;
+    }
+
+    QtConfigurableScientificDoublePropertyManager::setSwitchNotationExponent(
+                property, switchNotationExponent);
+
+    intPropertyManager->blockSignals(true);
+    intPropertyManager->setValue(propertyToSignificantDigits[property],
+                                 switchNotationExponent);
+    intPropertyManager->blockSignals(false);
+}
+
+
+void QtConfigurableScientificDoublePropertyManager::slotIntChanged(
+        QtProperty *property, int value)
+{
+    if (QtProperty *prop = significantDigitsToProperty.value(property, 0))
+    {
+        setSignificantDigits(prop, value);
+    }
+    else if (QtProperty *prop = switchNotationExponentToProperty.value(property,
+                                                                       0))
+    {
+        setSwitchNotationExponent(prop, value);
+    }
+}
+
+
+void QtConfigurableScientificDoublePropertyManager::slotScientificDoubleChanged(
+        QtProperty *property, double value)
+{
+    if (QtProperty *prop = singleStepToProperty.value(property, 0))
+    {
+        setSingleStep(prop, value);
+    }
+}
+
+
+void QtConfigurableScientificDoublePropertyManager::slotPropertyDestroyed(
+        QtProperty *property)
+{
+    if (QtProperty *prop = singleStepToProperty.value(property, 0))
+    {
+        propertyToSingleStep.remove(prop);// = 0;
+        singleStepToProperty.remove(property);
+    }
+    else if (QtProperty *prop = significantDigitsToProperty.value(property, 0))
+    {
+        propertyToSignificantDigits.remove(prop); // = 0;
+        significantDigitsToProperty.remove(property);
+    }
+    else if (QtProperty *prop = switchNotationExponentToProperty.value(property, 0))
+    {
+//        propertyToSwitchNotationExponent[prop]  = 0;
+        propertyToSwitchNotationExponent.remove(prop); // = 0;
+        switchNotationExponentToProperty.remove(property);
+    }
+}
+
+
+/******************************************************************************
+***                          PROTECTED METHODS                              ***
+*******************************************************************************/
+
+void QtConfigurableScientificDoublePropertyManager::initializeProperty(
+        QtProperty *property)
+{
+    QtScientificDoublePropertyManager::initializeProperty(property);
+
+    QtProperty *singleStepProp = sciDoublePropertyManager->addProperty();
+    singleStepProp->setPropertyName(tr("single step"));
+    sciDoublePropertyManager->setValue(singleStepProp, 0.1);
+    sciDoublePropertyManager->setMinimum(singleStepProp, minimum(property));
+    propertyToSingleStep[property] = singleStepProp;
+    singleStepToProperty[singleStepProp] = property;
+    property->addSubProperty(singleStepProp);
+
+    QtProperty *significantDigitsProp = intPropertyManager->addProperty();
+    significantDigitsProp->setPropertyName(tr("significant digits"));
+    intPropertyManager->setValue(significantDigitsProp, 2);
+    intPropertyManager->setMinimum(significantDigitsProp, 0);
+    propertyToSignificantDigits[property] = significantDigitsProp;
+    significantDigitsToProperty[significantDigitsProp] = property;
+    property->addSubProperty(significantDigitsProp);
+
+    QtProperty *switchNotationExponentProp = intPropertyManager->addProperty();
+    switchNotationExponentProp->setPropertyName(tr("switch Notation Exponent"));
+    intPropertyManager->setValue(switchNotationExponentProp, 1);
+    intPropertyManager->setMinimum(switchNotationExponentProp, 0);
+    propertyToSwitchNotationExponent[property] = switchNotationExponentProp;
+    switchNotationExponentToProperty[switchNotationExponentProp] = property;
+    property->addSubProperty(switchNotationExponentProp);
+}
+
+
+void QtConfigurableScientificDoublePropertyManager::uninitializeProperty(
+        QtProperty *property)
+{
+    QtProperty *singleStepProp = propertyToSingleStep[property];
+    if (singleStepProp)
+    {
+        singleStepToProperty.remove(singleStepProp);
+        delete singleStepProp;
+    }
+    propertyToSingleStep.remove(property);
+
+    QtProperty *significantDigitsProp = propertyToSignificantDigits[property];
+    if (significantDigitsProp)
+    {
+        significantDigitsToProperty.remove(significantDigitsProp);
+        delete significantDigitsProp;
+    }
+    propertyToSignificantDigits.remove(property);
+
+    QtProperty *switchNotationExponentProp =
+            propertyToSwitchNotationExponent[property];
+    if (switchNotationExponentProp)
+    {
+        switchNotationExponentToProperty.remove(switchNotationExponentProp);
+        delete switchNotationExponentProp;
+    }
+    propertyToSwitchNotationExponent.remove(property);
+
+    QtScientificDoublePropertyManager::uninitializeProperty(property);
+}
+
+
+/******************************************************************************
+***                QtScientificDoubleSpinBoxFactoryPrivate                  ***
+*******************************************************************************/
+/******************************************************************************
+***                             PUBLIC SLOTS                                ***
+*******************************************************************************/
+
+void QtScientificDoubleSpinBoxFactoryPrivate::slotSetValue(double value)
+{
+    QObject *object = q_ptr->sender();
+    const QMap<MScientificDoubleSpinBox *, QtProperty *>::ConstIterator itcend =
+            m_editorToProperty.constEnd();
+    for (QMap<MScientificDoubleSpinBox *, QtProperty *>::ConstIterator itEditor =
+         m_editorToProperty.constBegin(); itEditor != itcend; ++itEditor)
+    {
+        if (itEditor.key() == object)
+        {
+            QtProperty *property = itEditor.value();
+            QtScientificDoublePropertyManager *manager =
+                    q_ptr->propertyManager(property);
+            if (!manager)
+            {
+                return;
+            }
+            manager->setValue(property, value);
+            return;
+        }
+    }
+}
+
+
+void QtScientificDoubleSpinBoxFactoryPrivate::slotPropertyChanged(
+        QtProperty *property, double value)
+{
+    QListIterator<MScientificDoubleSpinBox *> itEditor(m_createdEditors[property]);
+    while (itEditor.hasNext())
+    {
+        MScientificDoubleSpinBox *editor = itEditor.next();
+        if (editor->value() != value)
+        {
+            editor->blockSignals(true);
+            editor->setValue(value + 1.);
+            editor->blockSignals(false);
+        }
+    }
+}
+
+
+void QtScientificDoubleSpinBoxFactoryPrivate::slotRangeChanged(
+        QtProperty *property, double min, double max)
+{
+    if (!m_createdEditors.contains(property))
+    {
+        return;
+    }
+
+    QtScientificDoublePropertyManager *manager = q_ptr->propertyManager(property);
+    if (!manager)
+    {
+        return;
+    }
+
+    QList<MScientificDoubleSpinBox *> editors = m_createdEditors[property];
+    QListIterator<MScientificDoubleSpinBox *> itEditor(editors);
+    while (itEditor.hasNext())
+    {
+        MScientificDoubleSpinBox *editor = itEditor.next();
+        editor->blockSignals(true);
+        editor->setRange(min, max);
+        editor->setValue(manager->value(property));
+        editor->blockSignals(false);
+    }
+}
+
+
+void QtScientificDoubleSpinBoxFactoryPrivate::slotSingleStepChanged(
+        QtProperty *property, double step)
+{
+    if (!m_createdEditors.contains(property))
+        return;
+
+    QtScientificDoublePropertyManager *manager = q_ptr->propertyManager(property);
+    if (!manager)
+        return;
+
+    QList<MScientificDoubleSpinBox *> editors = m_createdEditors[property];
+    QListIterator<MScientificDoubleSpinBox *> itEditor(editors);
+    while (itEditor.hasNext())
+    {
+        MScientificDoubleSpinBox *editor = itEditor.next();
+        editor->blockSignals(true);
+        editor->setSingleStep(step);
+        editor->blockSignals(false);
+    }
+}
+
+
+void QtScientificDoubleSpinBoxFactoryPrivate::slotReadOnlyChanged(
+        QtProperty *property, bool readOnly)
+{
+    if (!m_createdEditors.contains(property))
+        return;
+
+    QtScientificDoublePropertyManager *manager = q_ptr->propertyManager(property);
+    if (!manager)
+        return;
+
+    QListIterator<MScientificDoubleSpinBox *> itEditor(m_createdEditors[property]);
+    while (itEditor.hasNext())
+    {
+        MScientificDoubleSpinBox *editor = itEditor.next();
+        editor->blockSignals(true);
+        editor->setReadOnly(readOnly);
+        editor->blockSignals(false);
+    }
+}
+
+
+void QtScientificDoubleSpinBoxFactoryPrivate::slotMinimumExponentChanged(
+        QtProperty *property, int minimumExponent)
+{
+    if (!m_createdEditors.contains(property))
+        return;
+
+    QtScientificDoublePropertyManager *manager = q_ptr->propertyManager(property);
+    if (!manager)
+        return;
+
+    QList<MScientificDoubleSpinBox *> editors = m_createdEditors[property];
+    QListIterator<MScientificDoubleSpinBox *> itEditor(editors);
+    while (itEditor.hasNext())
+    {
+        MScientificDoubleSpinBox *editor = itEditor.next();
+        editor->blockSignals(true);
+        editor->setDecimals(minimumExponent);
+        editor->setValue(manager->value(property));
+        editor->blockSignals(false);
+    }
+}
+
+
+void QtScientificDoubleSpinBoxFactoryPrivate::slotSwitchNotationExponentChanged(
+        QtProperty *property, int exponent)
+{
+    if (!m_createdEditors.contains(property))
+    {
+        return;
+    }
+
+    QtScientificDoublePropertyManager *manager = q_ptr->propertyManager(property);
+    if (!manager)
+    {
+        return;
+    }
+
+    QList<MScientificDoubleSpinBox *> editors = m_createdEditors[property];
+    QListIterator<MScientificDoubleSpinBox *> itEditor(editors);
+    while (itEditor.hasNext())
+    {
+        MScientificDoubleSpinBox *editor = itEditor.next();
+        editor->blockSignals(true);
+        editor->setSwitchNotationExponent(exponent);
+        editor->setValue(manager->value(property));
+        editor->blockSignals(false);
+    }
+}
+
+
+void QtScientificDoubleSpinBoxFactoryPrivate::slotSignificantDigitsChanged(
+        QtProperty *property, int significantDigits)
+{
+    if (!m_createdEditors.contains(property))
+    {
+        return;
+    }
+
+    QtScientificDoublePropertyManager *manager = q_ptr->propertyManager(property);
+    if (!manager)
+    {
+        return;
+    }
+
+    QList<MScientificDoubleSpinBox *> editors = m_createdEditors[property];
+    QListIterator<MScientificDoubleSpinBox *> itEditor(editors);
+    while (itEditor.hasNext())
+    {
+        MScientificDoubleSpinBox *editor = itEditor.next();
+        editor->blockSignals(true);
+        editor->setSignificantDigits(significantDigits);
+        editor->setValue(manager->value(property));
+        editor->blockSignals(false);
+    }
+}
+
+
+void QtScientificDoubleSpinBoxFactoryPrivate::slotPrefixChanged(
+        QtProperty *property, const QString &prefix)
+{
+    if (!m_createdEditors.contains(property))
+    {
+        return;
+    }
+
+    QtScientificDoublePropertyManager *manager = q_ptr->propertyManager(property);
+    if (!manager)
+    {
+        return;
+    }
+
+    QList<MScientificDoubleSpinBox *> editors = m_createdEditors[property];
+    QListIterator<MScientificDoubleSpinBox *> itEditor(editors);
+    while (itEditor.hasNext())
+    {
+        MScientificDoubleSpinBox *editor = itEditor.next();
+        editor->blockSignals(true);
+        editor->setPrefix(prefix);
+        editor->setValue(manager->value(property));
+        editor->blockSignals(false);
+    }
+}
+
+
+void QtScientificDoubleSpinBoxFactoryPrivate::slotSuffixChanged(
+        QtProperty *property, const QString &suffix)
+{
+    if (!m_createdEditors.contains(property))
+    {
+        return;
+    }
+
+    QtScientificDoublePropertyManager *manager = q_ptr->propertyManager(property);
+    if (!manager)
+    {
+        return;
+    }
+
+    QList<MScientificDoubleSpinBox *> editors = m_createdEditors[property];
+    QListIterator<MScientificDoubleSpinBox *> itEditor(editors);
+    while (itEditor.hasNext())
+    {
+        MScientificDoubleSpinBox *editor = itEditor.next();
+        editor->blockSignals(true);
+        editor->setSuffix(suffix);
+        editor->setValue(manager->value(property));
+        editor->blockSignals(false);
+    }
+}
+
+
+/******************************************************************************
+***                    QtScientificDoubleSpinBoxFactory                     ***
+*******************************************************************************/
+/******************************************************************************
+***                     CONSTRUCTOR / DESTRUCTOR                            ***
+*******************************************************************************/
+
+QtScientificDoubleSpinBoxFactory::QtScientificDoubleSpinBoxFactory(
+        QObject *parent)
+    : QtAbstractEditorFactory<QtScientificDoublePropertyManager>(parent)
+{
+    d_ptr = new QtScientificDoubleSpinBoxFactoryPrivate();
+    d_ptr->q_ptr = this;
+}
+
+
+QtScientificDoubleSpinBoxFactory::~QtScientificDoubleSpinBoxFactory()
+{
+    qDeleteAll(d_ptr->m_editorToProperty.keys());
+    delete d_ptr;
+}
+
+
+/******************************************************************************
+***                            PUBLIC METHODS                               ***
+*******************************************************************************/
+
+void QtScientificDoubleSpinBoxFactory::connectPropertyManager(
+        QtScientificDoublePropertyManager *manager)
+{
+    connect(manager, SIGNAL(valueChanged(QtProperty *, double)),
+            this, SLOT(slotPropertyChanged(QtProperty *, double)));
+    connect(manager, SIGNAL(rangeChanged(QtProperty *, double, double)),
+            this, SLOT(slotRangeChanged(QtProperty *, double, double)));
+    connect(manager, SIGNAL(singleStepChanged(QtProperty *, double)),
+            this, SLOT(slotSingleStepChanged(QtProperty *, double)));
+    connect(manager, SIGNAL(minimumExponentChanged(QtProperty *, int)),
+            this, SLOT(slotMinimumExponentChanged(QtProperty *, int)));
+    connect(manager, SIGNAL(switchNotationExponentChanged(QtProperty *, int)),
+            this, SLOT(slotSwitchNotationExponentChanged(QtProperty *, int)));
+    connect(manager, SIGNAL(significantDigitsChanged(QtProperty *, int)),
+            this, SLOT(slotSignificantDigitsChanged(QtProperty *, int)));
+    connect(manager, SIGNAL(prefixChanged(QtProperty *, const QString &)),
+            this, SLOT(slotPrefixChanged(QtProperty *, const QString &)));
+    connect(manager, SIGNAL(suffixChanged(QtProperty *, const QString &)),
+            this, SLOT(slotSuffixChanged(QtProperty *, const QString &)));
+    connect(manager, SIGNAL(readOnlyChanged(QtProperty *, bool)),
+            this, SLOT(slotReadOnlyChanged(QtProperty *, bool)));
+}
+
+
+QWidget *QtScientificDoubleSpinBoxFactory::createEditor(
+        QtScientificDoublePropertyManager *manager,
+        QtProperty *property, QWidget *parent)
+{
+    MScientificDoubleSpinBox *editor = d_ptr->createEditor(property, parent);
+    editor->setSingleStep(manager->singleStep(property));
+    editor->setDecimals(manager->minimumExponent(property)); // Minimum Exponent.
+    editor->setSwitchNotationExponent(manager->switchNotationExponent(property));
+    editor->setSignificantDigits(manager->significantDigits(property));
+    editor->setRange(manager->minimum(property), manager->maximum(property));
+    editor->setPrefix(manager->prefix(property));
+    editor->setSuffix(manager->suffix(property));
+    editor->setValue(manager->value(property));
+    editor->setKeyboardTracking(false);
+    editor->setReadOnly(manager->isReadOnly(property));
+
+    connect(editor, SIGNAL(valueChanged(double)),
+            this, SLOT(slotSetValue(double)));
+    connect(editor, SIGNAL(destroyed(QObject *)),
+            this, SLOT(slotEditorDestroyed(QObject *)));
+    return editor;
+}
+
+
+void QtScientificDoubleSpinBoxFactory::disconnectPropertyManager(
+        QtScientificDoublePropertyManager *manager)
+{
+    disconnect(manager, SIGNAL(valueChanged(QtProperty *, double)),
+               this, SLOT(slotPropertyChanged(QtProperty *, double)));
+    disconnect(manager, SIGNAL(rangeChanged(QtProperty *, double, double)),
+               this, SLOT(slotRangeChanged(QtProperty *, double, double)));
+    disconnect(manager, SIGNAL(singleStepChanged(QtProperty *, double)),
+               this, SLOT(slotSingleStepChanged(QtProperty *, double)));
+    disconnect(manager, SIGNAL(minimumExponentChanged(QtProperty *, int)),
+               this, SLOT(slotMinimumExponentChanged(QtProperty *, int)));
+    disconnect(manager, SIGNAL(switchNotationExponentChanged(QtProperty*,int)),
+               this, SLOT(slotSwitchNotationExponentChanged(QtProperty *, int)));
+    disconnect(manager, SIGNAL(significantDigitsChanged(QtProperty *, int)),
+               this, SLOT(slotSignificantDigitsChanged(QtProperty *, int)));
+    disconnect(manager, SIGNAL(prefixChanged(QtProperty *, const QString &)),
+               this, SLOT(slotPrefixChanged(QtProperty *, const QString &)));
+    disconnect(manager, SIGNAL(suffixChanged(QtProperty *, const QString &)),
+               this, SLOT(slotSuffixChanged(QtProperty *, const QString &)));
+    disconnect(manager, SIGNAL(readOnlyChanged(QtProperty *, bool)),
+               this, SLOT(slotReadOnlyChanged(QtProperty *, bool)));
 }
 
 } // namespace QtExtensions

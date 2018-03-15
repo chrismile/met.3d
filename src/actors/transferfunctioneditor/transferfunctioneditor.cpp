@@ -4,9 +4,9 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2017 Marc Rautenhaus
-**  Copyright 2017 Fabian Schöttl
-**  Copyright 2017 Bianca Tost
+**  Copyright 2017-2018 Marc Rautenhaus
+**  Copyright 2017      Fabian Schöttl
+**  Copyright 2017-2018 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -170,7 +170,7 @@ MTransferFunctionEditor::MTransferFunctionEditor(QWidget *parent) :
                                                Qt::AlignRight);
 
                 QFormLayout *colorBoxFormLayout = new QFormLayout();
-                colourPosBox = new QDoubleSpinBox(this);
+                colourPosBox = new QtExtensions::MScientificDoubleSpinBox(this);
                 colourNormPosBox = new QDoubleSpinBox(this);
                 colourValueBox = new MColourBox(colourFunction, this);
 
@@ -215,7 +215,7 @@ MTransferFunctionEditor::MTransferFunctionEditor(QWidget *parent) :
                                                Qt::AlignRight);
 
                 QFormLayout *alphaBoxFormLayout = new QFormLayout();
-                alphaPosBox = new QDoubleSpinBox();
+                alphaPosBox = new QtExtensions::MScientificDoubleSpinBox();
                 alphaNormPosBox = new QDoubleSpinBox();
                 alphaValueBox = new QDoubleSpinBox();
 
@@ -352,12 +352,13 @@ MTransferFunctionEditor::~MTransferFunctionEditor()
 *******************************************************************************/
 
 void MTransferFunctionEditor::setRange(float min, float max, float scaleFactor,
-                                      int maxNumTicks, int maxNumLabels,
-                                      int numSteps, int decimals)
+                                       int maxNumTicks, int maxNumLabels,
+                                       int numSteps, int significantDigits,
+                                       int minimumExponent,
+                                       int switchNotationExponent)
 {
-    rangeRuler->setRange(min, max, scaleFactor,
-                         maxNumTicks, maxNumLabels,
-                         numSteps, decimals);
+    rangeRuler->setRange(min, max, scaleFactor, maxNumTicks, maxNumLabels,
+                         numSteps, colourPosBox);
 
     // Only update spin box values but don't change position of the node.
     colourPosBox->blockSignals(true);
@@ -372,8 +373,10 @@ void MTransferFunctionEditor::setRange(float min, float max, float scaleFactor,
     {
         colourPosBox->setRange(max, min);
     }
-    colourPosBox->setSingleStep(pow(0.1, double(decimals)));
-    colourPosBox->setDecimals(decimals);
+    colourPosBox->setSingleStep(pow(0.1, double(significantDigits)));
+    colourPosBox->setSignificantDigits(significantDigits);
+    colourPosBox->setMinimumExponent(minimumExponent);
+    colourPosBox->setSwitchNotationExponent(switchNotationExponent);
     colourPosBox->setValue(denormalizeValue(colourNormPosBox->value()));
     colourPosBox->blockSignals(false);
 
@@ -390,8 +393,10 @@ void MTransferFunctionEditor::setRange(float min, float max, float scaleFactor,
     {
         alphaPosBox->setRange(max, min);
     }
-    alphaPosBox->setSingleStep(pow(0.1, double(decimals)));
-    alphaPosBox->setDecimals(decimals);
+    alphaPosBox->setSingleStep(pow(0.1, double(significantDigits)));
+    alphaPosBox->setSignificantDigits(significantDigits);
+    alphaPosBox->setMinimumExponent(minimumExponent);
+    alphaPosBox->setSwitchNotationExponent(switchNotationExponent);
     alphaPosBox->setValue(denormalizeValue(alphaNormPosBox->value()));
     alphaPosBox->blockSignals(false);
 
@@ -713,7 +718,7 @@ void MTransferFunctionEditor::openChannelDialog()
         this->setMinimumWidth(700 + channelsWidgetWidth);
     }
 
-    channelsWidget->setShown(channelsWidget->isHidden());
+    channelsWidget->setVisible(channelsWidget->isHidden());
 }
 
 
@@ -1628,13 +1633,13 @@ void MRuler::setRange(float min, float max)
 *******************************************************************************/
 
 MRangeRuler::MRangeRuler(QWidget *parent)
-    : MContentWidget(parent)
-    , MRuler(0 , 1000.0)
-    , scaleFactor(1)
-    , maxNumTicks(0)
-    , maxNumLables(0)
-    , numSteps(1)
-    , decimals(2)
+    : MContentWidget(parent),
+      MRuler(0 , 1000.0),
+      scaleFactor(1),
+      maxNumTicks(0),
+      maxNumLables(0),
+      numSteps(1),
+      colourPosBox(nullptr)
 {}
 
 
@@ -1668,7 +1673,8 @@ void MRangeRuler::updateTicks()
 
 
 void MRangeRuler::setRange(float min, float max, float scale,
-              int maxTicks, int maxLabels, int steps, int dec)
+                           int maxTicks, int maxLabels, int steps,
+                           QtExtensions::MScientificDoubleSpinBox *colourPosBox)
 {
     minValue = min;
     maxValue = max;
@@ -1676,7 +1682,7 @@ void MRangeRuler::setRange(float min, float max, float scale,
     maxNumTicks = maxTicks;
     maxNumLables = maxLabels;
     numSteps = steps;
-    decimals = dec;
+    this->colourPosBox = colourPosBox;
 }
 
 
@@ -1686,6 +1692,11 @@ void MRangeRuler::setRange(float min, float max, float scale,
 
 void MRangeRuler::paintEvent(QPaintEvent *event)
 {
+    if (colourPosBox == nullptr)
+    {
+        return;
+    }
+
     Q_UNUSED(event);
     QPainter painter(this);
 
@@ -1719,7 +1730,7 @@ void MRangeRuler::paintEvent(QPaintEvent *event)
 
     foreach (float v, bigTicks)
     {
-        QString text = QString::number(v * scaleFactor, 'f', decimals);
+        QString text = colourPosBox->textFromValue(v * scaleFactor);
 
         int fontWidth = fontMetrics.width(text);
 

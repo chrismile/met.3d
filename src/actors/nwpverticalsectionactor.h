@@ -66,6 +66,8 @@ public:
 
     ~MNWPVerticalSectionActor();
 
+    static QString staticActorType() { return "Vertical cross-section"; }
+
     void reloadShaderEffects();
 
     /**
@@ -189,6 +191,8 @@ protected:
     void onDeleteActorVariable(MNWPActorVariable* var) override;
 
     void onAddActorVariable(MNWPActorVariable* var) override;
+
+    void onChangeActorVariable(MNWPActorVariable *var) override;
 
 private:
     std::shared_ptr<GL::MShaderEffect> sectionGridShader;

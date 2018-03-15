@@ -64,13 +64,6 @@ public:
     ~MNWPMultiVarActor();
 
     /**
-     Synchronize time, ensemble of all variables of this actor with the
-     synchronization control @p sync. Calls @ref
-     NWPActorVariable::synchronizeWith() of the registered variables.
-     */
-    void synchronizeAllVariablesWith(MSyncControl *sync);
-
-    /**
      Tells every variable that is connected to an @ref MSyncControl instance to
      call the scene's variableSynchronizesWith() method. This is necessary if
      the actor is added to a scene during program runtime (that is, the
@@ -179,10 +172,10 @@ protected:
     { Q_UNUSED(var); }
 
     /**
-      Same as @ref onDeleteActorVariable() but called just after a
-      variable has been changed.
+      Same as @ref onDeleteActorVariable() but called just after a variable has
+      been changed.
      */
-    virtual void onChangeActorVariable(MNWPActorVariable* var)
+    virtual void onChangeActorVariable(MNWPActorVariable *var)
     { Q_UNUSED(var); }
 
     /** List of NWP variables that are rendered in this actor. */
