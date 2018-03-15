@@ -57,7 +57,7 @@ MAddDatasetDialog::MAddDatasetDialog(QWidget *parent) :
     connect(ui->saveConfigPushButton, SIGNAL(clicked()),
             this, SLOT(saveConfigurationToFile()));
 
-    connect(ui->nameEdit                , SIGNAL(textChanged(QString)),
+    connect(ui->nameEdit                  , SIGNAL(textChanged(QString)),
             this, SLOT(inputFieldChanged()));
 
     connect(ui->nwpBrowseButton           , SIGNAL(clicked(bool))       ,
@@ -135,7 +135,8 @@ MNWPPipelineConfigurationInfo MAddDatasetDialog::getNWPPipelineConfigurationInfo
     d.name = ui->nameEdit->text();
     d.fileDir = ui->nwpPathEdit->text();
     d.fileFilter = ui->nwpFileFilterEdit->text();
-    d.dataFormat = (MNWPReaderFileFormat) (ui->nwpFileFormatCombo->currentIndex() + 1);
+    d.dataFormat =
+            (MNWPReaderFileFormat) (ui->nwpFileFormatCombo->currentIndex() + 1);
 
     MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
     QStringList memoryManagers = sysMC->getMemoryManagerIdentifiers();
@@ -305,7 +306,8 @@ void MAddDatasetDialog::loadConfiguration(QSettings *settings)
         settings->beginGroup("NWPPipeline");
         ui->nameEdit->setText(settings->value("name", "").toString());
         ui->nwpPathEdit->setText(settings->value("path", "").toString());
-        ui->nwpFileFilterEdit->setText(settings->value("fileFilter", "*").toString());
+        ui->nwpFileFilterEdit->setText(
+                    settings->value("fileFilter", "*").toString());
         ui->schedulerIDCombo->setCurrentText(
                     settings->value("schedulerID", "MultiThread").toString());
         ui->memoryMCombo->setCurrentText(
@@ -351,8 +353,8 @@ void MAddDatasetDialog::loadConfiguration(QSettings *settings)
         {
             ui->trajectoriesTypeTabWidget->setCurrentWidget(
                         ui->trajectoriesPrecomputedTab);
-            ui->trajectoriesPathEdit->setText(settings->value("path",
-                                                              "").toString());
+            ui->trajectoriesPathEdit->setText(settings->value(
+                                                  "path", "").toString());
         }
         else
         {
@@ -422,7 +424,8 @@ bool MAddDatasetDialog::loadConfigurationFromFile(QString filename)
         filename = QFileDialog::getOpenFileName(
                     this, "Load pipeline configuration",
                     MSystemManagerAndControl::getInstance()
-                    ->getMet3DWorkingDirectory().absoluteFilePath("config/pipelines"),
+                    ->getMet3DWorkingDirectory().absoluteFilePath(
+                        "config/pipelines"),
                     "Pipeline configuration files (*.pipeline.conf)");
 
         if (filename.isEmpty())

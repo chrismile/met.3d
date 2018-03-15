@@ -239,9 +239,9 @@ public:
     void copyVertexDataFrom(float *lons, float *lats, float *pres);
 
     /**
-      Copies data from the given vector (numTrajectories -> numTimeStepsPerTrajectory ->
-      (longitude in degrees, latitude in degrees, pressure in hPa) to the internal
-      QVector-based vertex array.
+      Copies data from the given vector (numTrajectories ->
+      numTimeStepsPerTrajectory -> (longitude in degrees, latitude in degrees,
+      pressure in hPa) to the internal QVector-based vertex array.
     */
     void copyVertexDataFrom(QVector<QVector<QVector3D>> &vertices);
 
