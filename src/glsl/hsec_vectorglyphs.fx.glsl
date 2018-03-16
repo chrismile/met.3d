@@ -26,11 +26,6 @@
 **
 ******************************************************************************/
 
-// Set PIVOT_TIP to draw wind barbs pivoted around their tip; if unset their
-// middle of the barb is used as pivot.
-//TODO (mr, 03Nov2014): make this a property in the HSecActor.
-#define PIVOT_TIP
-
 /*****************************************************************************
  ***                             CONSTANTS
  *****************************************************************************/
@@ -58,6 +53,21 @@ interface GStoFS
 
 
 /*****************************************************************************
+ ***                             STRUCTS
+ *****************************************************************************/
+
+struct VectorFieldData
+{
+    vec3 dir;               // normalised vector field direction
+    vec3 normal;            // normal vector of vector field direction
+    float magnitude;        // magnitude of vector field
+    float deltaGrid;        // scaling factor
+    float adaptedLineWidth; // line width adapted to scaling factor (delta grid)
+    float glyphLength;      // adapted gylph length
+} vectorField;
+
+
+/*****************************************************************************
  ***                             UNIFORMS
  *****************************************************************************/
 
@@ -66,39 +76,49 @@ uniform float       deltaGridX; // delta between two points in x
 uniform float       deltaGridY; // delta between two points in y
 uniform float       worldZ;     // world z coordinate of this section
 
-// sample textures for u/v component of wind
-uniform sampler3D   dataUComp;
-uniform sampler3D   dataVComp;
+// Sample textures for longitudial/latitudial component of vector field.
+uniform sampler3D   dataLonComp;
+uniform sampler3D   dataLatComp;
 
-uniform sampler2D   surfacePressureU;    // surface pressure field in Pa
-uniform sampler1D   hybridCoefficientsU; // hybrid sigma pressure coefficients
-uniform sampler2D   surfacePressureV;    // surface pressure field in Pa
-uniform sampler1D   hybridCoefficientsV; // hybrid sigma pressure coefficients
-uniform sampler3D   auxPressureFieldU_hPa; // 3D pressure field in hPa
-uniform sampler3D   auxPressureFieldV_hPa; // 3D pressure field in hPa
+uniform sampler2D   surfacePressureLon;    // surface pressure field in Pa
+uniform sampler1D   hybridCoefficientsLon; // hybrid sigma pressure coefficients
+uniform sampler2D   surfacePressureLat;    // surface pressure field in Pa
+uniform sampler1D   hybridCoefficientsLat; // hybrid sigma pressure coefficients
+uniform sampler3D   auxPressureFieldLon_hPa; // 3D pressure field in hPa
+uniform sampler3D   auxPressureFieldLat_hPa; // 3D pressure field in hPa
 
 uniform float       deltaLon;
 uniform float       deltaLat;
 
-uniform vec2        dataSECrnr;
 uniform vec2        dataNWCrnr;
-
-uniform vec2        pToWorldZParams;
-
-uniform vec3        cameraPosition;
 
 uniform float       pressure_hPa; // current pressure of hsec
 
 uniform int         levelType;       // vertical level type of the data grid
 uniform sampler1D   latLonAxesData;  // 1D texture that holds both lon and lat
-uniform int         latOffset;       // index at which lat axis data starts
 uniform int         verticalOffset;  // index at which vertical axis data starts
 
-// adjustable glyph parameters
+// Adjustable glyph parameters.
 uniform float       lineWidth;
 uniform vec4        glyphColor;
+uniform int         pivotPosition;
+
+// Adjustable wind barbs parameters.
 uniform bool        showCalmGlyph;
 uniform int         numFlags;
+
+// Adjustable arrows parameters.
+uniform float       arrowHeadHeight;
+uniform bool        arrowDrawOutline;
+uniform float       arrowOutlineWidth;
+uniform vec4        arrowOutlineColour;
+uniform bool        scaleArrowWithMagnitude;
+uniform float       scaleArrowMinScalar;
+uniform float       scaleArrowMinLength;
+uniform bool        scaleArrowDiscardBelow;
+uniform float       scaleArrowMaxScalar;
+uniform float       scaleArrowMaxLength;
+uniform bool        scaleArrowDiscardAbove;
 
 
 /*****************************************************************************
@@ -346,6 +366,110 @@ float sampleDataAtPos(  in vec3 pos,
 }
 
 
+// Compute vector field specific data (vector field direction, magnitude,
+// direction normal, etc.) at posWorld used to render both wind barbs and arrow
+// glyphs.
+bool computeVectorFieldData(in vec3 posWorld)
+{
+    // Sample both vector field component textures, obtain scalar value in
+    // longitudial and latitudial direction.
+    float lonField = sampleDataAtPos(
+                posWorld, dataLonComp, surfacePressureLon, hybridCoefficientsLon,
+                auxPressureFieldLon_hPa);
+    float latField = sampleDataAtPos(
+                posWorld, dataLatComp, surfacePressureLat, hybridCoefficientsLat,
+                auxPressureFieldLat_hPa);
+
+    // If no data is available, do not draw any glyphs.
+    if (lonField == MISSING_VALUE || latField == MISSING_VALUE)
+    {
+        return false;
+    }
+
+    // Optain vector field direction at posWorld (e.g. wind).
+    vec3 magnitudeDir = vec3(lonField, latField, 0);
+
+    // Normalize direction vector.
+    vectorField.dir = normalize(magnitudeDir);
+    vectorField.normal = normalize(vec3(-vectorField.dir.y, vectorField.dir.x,
+                                        0));
+
+    // Get vector magnitude (e.g. wind speed).
+    vectorField.magnitude = length(magnitudeDir);
+
+    // distance from camera to glyph position
+    //float camDist = cameraPosition.z - pos.z;
+    // clamp distance factor from 0 to 2
+    //camDist = clamp(camDist / 50.0 + 1, 0.25, 10.0);
+    // compute scale factor [1; 3.5]
+    //const float scaleDistFactor = camDist * 0.6;
+
+    // Compute useful glyph parameters.
+    vectorField.deltaGrid = (deltaGridX + deltaGridY) / 2.0f;
+
+    // Adapt line width of glyph elements to (automatic) scaling.
+    vectorField.adaptedLineWidth = vectorField.deltaGrid * lineWidth;
+    // Compute glyph length.
+    vectorField.glyphLength = 0.75 * vectorField.deltaGrid;
+
+    return true;
+}
+
+
+// Determine the positions of the four vertices of the glyph's base line
+// located at pos. The base line is a line in vector field direction at which
+// the arrow head / wind barb pennants are attached. The positions are written
+// to pos0, pos1, pos2, pos3.
+void determineBaseLineVertices(in vec3 pos, out vec3 pos0, out vec3 pos1,
+                               out vec3 pos2, out vec3 pos3)
+{
+    // Place pivot at glyph tip.
+    if (pivotPosition == 0)
+    {
+        // Calculate position of left bottom vertex.
+        pos0 = pos - vectorField.dir * vectorField.glyphLength
+                - vectorField.normal * vectorField.adaptedLineWidth / 2.0;
+        // Calculate position of left top vertex.
+        pos1 = pos - vectorField.normal * vectorField.adaptedLineWidth / 2.0;
+        // Calculate position of right bottom vertex.
+        pos2 = pos - vectorField.dir * vectorField.glyphLength
+                + vectorField.normal * vectorField.adaptedLineWidth / 2.0;
+        // Calculate position of right top vertex.
+        pos3 = pos + vectorField.normal * vectorField.adaptedLineWidth / 2.0;
+    }
+    // Place pivot at glyph centre.
+    else if (pivotPosition == 1)
+    {
+        // Calculate position of left bottom vertex.
+        pos0 = pos - vectorField.dir * vectorField.glyphLength / 2.0
+                - vectorField.normal * vectorField.adaptedLineWidth / 2.0;
+        // Calculate position of left top vertex.
+        pos1 = pos + vectorField.dir * vectorField.glyphLength / 2.0
+                - vectorField.normal * vectorField.adaptedLineWidth / 2.0;
+        // Calculate position of right bottom vertex.
+        pos2 = pos - vectorField.dir * vectorField.glyphLength / 2.0
+                + vectorField.normal * vectorField.adaptedLineWidth / 2.0;
+        // Calculate position of right top vertex.
+        pos3 = pos + vectorField.dir * vectorField.glyphLength / 2.0
+                + vectorField.normal * vectorField.adaptedLineWidth / 2.0;
+    }
+    // Place pivot at glyph tail.
+    else if (pivotPosition == 2)
+    {
+        // Calculate position of left bottom vertex.
+        pos0 = pos - vectorField.normal * vectorField.adaptedLineWidth / 2.0;
+        // Calculate position of left top vertex.
+        pos1 = pos + vectorField.dir * vectorField.glyphLength
+                - vectorField.normal * vectorField.adaptedLineWidth / 2.0;
+        // Calculate position of right bottom vertex.
+        pos2 = pos + vectorField.normal * vectorField.adaptedLineWidth / 2.0;
+        // Calculate position of right top vertex.
+        pos3 = pos + vectorField.dir * vectorField.glyphLength
+                + vectorField.normal * vectorField.adaptedLineWidth / 2.0;
+    }
+}
+
+
 /*****************************************************************************
  ***                           VERTEX SHADER
  *****************************************************************************/
@@ -363,141 +487,108 @@ shader VSmain(in vec2 worldXY, out vec3 worldPos)
  *****************************************************************************/
 
 
-shader GSmain(in vec3 worldPos[], out GStoFS Output)
+shader GSwindBarbs(in vec3 worldPos[], out GStoFS Output)
 {
     Output.color = glyphColor;
 
-    // current world position
+    // Current world position.
     vec3 posWorld = worldPos[0];
 
-    // sample both wind textures, obtain wind speed in u and v direction
-    float windU = sampleDataAtPos(
-                posWorld, dataUComp, surfacePressureU, hybridCoefficientsU,
-                auxPressureFieldU_hPa);
-    float windV = sampleDataAtPos(
-                posWorld, dataVComp, surfacePressureV, hybridCoefficientsV,
-                auxPressureFieldV_hPa);
-
-    // if no data is available, do not draw any glyphs
-    if (windU == MISSING_VALUE || windV == MISSING_VALUE)
+    if (!computeVectorFieldData(posWorld))
     {
         return;
     }
 
-    // wind direction
-    vec3 windDir = vec3(windU, windV, 0);
+    // Convert wind velocity in m/s into kt.
+    float knots = computeKnots(vectorField.magnitude);
 
-    // normalized wind direction
-    vec3 dir = normalize(windDir);
-    vec3 normal = normalize( vec3( -dir.y, dir.x, 0));
+    // Compute small radius of calm wind.
+    float smallRadius = 0.15 * vectorField.deltaGrid;
+    // Compute large radius of calm wind.
+    float largeRadius = 0.3 * vectorField.deltaGrid;
 
-    // wind velocity in m/s
-    float velocity = length(windDir);
-    // wind velocity in kt
-    float knots = computeKnots(velocity);
+    // Set posOffset.
+    float posOffset = vectorField.glyphLength / numFlags;
 
-    // distance from camera to glyph position
-    //float camDist = cameraPosition.z - pos.z;
-    // clamp distance factor from 0 to 2
-    //camDist = clamp(camDist / 50.0 + 1, 0.25, 10.0);
-    // compute scale factor [1; 3.5]
-    //const float scaleDistFactor = camDist * 0.6;
-
-    // compute useful glyph parameters
-    float deltaGrid = (deltaGridX + deltaGridY) / 2.0f;
-
-    // adapt line width of glyph elements
-    float adaptedLineWidth = deltaGrid * lineWidth;
-    // compute barb length
-    float barbLength = 0.75 * deltaGrid;
-    // compute small radius of calm wind
-    float smallRadius = 0.15 * deltaGrid;
-    // compute large radius of calm wind
-    float largeRadius = 0.3 * deltaGrid;
-
-    // set posOffset
-    float posOffset = barbLength / numFlags;
-
-    // set pennant triangle offset
+    // Set pennant triangle offset.
     float pennantPeakOffset = 0.3 * posOffset;
-    // set offset of flags and pennant
+    // Set offset of flags and pennant.
     float pennantOffset = 2 * 0.95 * posOffset;
-    // set flag offset
+    // Set flag offset.
     float flagOffset = pennantOffset;
 
-    // compute width of small flag
-    float smallWidth = 0.2 * 0.6 * deltaGrid;
-    // compute width of large flag
-    float largeWidth = 0.2 * deltaGrid;
+    // Compute width of small flag.
+    float smallWidth = 0.2 * 0.6 * vectorField.deltaGrid;
+    // Compute width of large flag.
+    float largeWidth = 0.2 * vectorField.deltaGrid;
 
-    // distance between elements
+    // Compute distance between elements.
     //const float pennantDist = (offset  + pennantOffset);
     //const float flagDist = offset * 1    * scaleDistFactor;
 
-    // ------------------------------------------------------------------------------------
-    // Create the base line of the wind barb glyph
+    //! NOTE (Kern, 2016-11-03): Using EmitVertex() and EndPrimitve() in local
+    // functions is not possible after NVidia driver 340 since the latest driver
+    // do not allow to use stage-specific functions in all shaders. GLFX always
+    // includes local functions into all shader stage programs (VS/FS) which
+    // leads to compilation errors for all stages except the geometry shader.
 
-    //! NOTE (Kern, 2016-11-03): Using EmitVertex() and EndPrimitve() in local functions
-    // is not possible after NVidia driver 340 since the latest driver do not allow
-    // to use stage-specific functions in all shaders. GLFX always includes
-    // local functions into all shader stage programs (VS/FS) which leads to
-    // compilation errors for all stages except the geometry shader.
+// -----------------------------------------------------------------------------
+// Create the base line of the wind barb glyph.
 
     if (knots >= 5.0)
     {
         vec3 pos0, pos1, pos2, pos3;
         vec3 pos = posWorld;
 
-        #ifdef PIVOT_TIP
-            // left bottom
-            pos0 = pos - dir * barbLength - normal * adaptedLineWidth / 2.0;
-            // left top
-            pos1 = pos                    - normal * adaptedLineWidth / 2.0;
-            // right bottom
-            pos2 = pos - dir * barbLength + normal * adaptedLineWidth / 2.0;
-            // right top
-            pos3 = pos                    + normal * adaptedLineWidth / 2.0;
-        #else
-            // left bottom
-            pos0 = pos - dir * barbLength / 2.0 - normal * adaptedLineWidth / 2.0;
-            // left top
-            pos1 = pos + dir * barbLength / 2.0 - normal * adaptedLineWidth / 2.0;
-            // right bottom
-            pos2 = pos - dir * barbLength / 2.0 + normal * adaptedLineWidth / 2.0;
-            // right top
-            pos3 = pos + dir * barbLength / 2.0 + normal * adaptedLineWidth / 2.0;
-        #endif
+        determineBaseLineVertices(pos, pos0, pos1, pos2, pos3);
 
-            gl_Position = mvpMatrix * vec4(pos0, 1);
-            EmitVertex();
-            gl_Position = mvpMatrix * vec4(pos1, 1);
-            EmitVertex();
-            gl_Position = mvpMatrix * vec4(pos2, 1);
-            EmitVertex();
-            gl_Position = mvpMatrix * vec4(pos3, 1);
-            EmitVertex();
-            EndPrimitive();
+        gl_Position = mvpMatrix * vec4(pos0, 1);
+        EmitVertex();
+        gl_Position = mvpMatrix * vec4(pos1, 1);
+        EmitVertex();
+        gl_Position = mvpMatrix * vec4(pos2, 1);
+        EmitVertex();
+        gl_Position = mvpMatrix * vec4(pos3, 1);
+        EmitVertex();
+        EndPrimitive();
 
-#ifdef PIVOT_TIP
-        vec3 elemPos = posWorld - dir * barbLength + dir * (posOffset / 2.0);
-#else
-        vec3 elemPos = posWorld - dir * (barbLength / 2.0 * 0.9) + dir * (posOffset / 2.0);
-#endif
+        vec3 elemPos;
+        // Place pivot at glyph tip.
+        if (pivotPosition == 0)
+        {
+            elemPos = posWorld - vectorField.dir * vectorField.glyphLength
+                    + vectorField.dir * (posOffset / 2.0);
+        }
+        // Place pivot at glyph centre.
+        else if (pivotPosition == 1)
+        {
+            elemPos = posWorld
+                    - vectorField.dir * (vectorField.glyphLength / 2.0 * 0.9)
+                    + vectorField.dir * (posOffset / 2.0);
+        }
+        // Place pivot at glyph tail.
+        else if (pivotPosition == 2)
+        {
+            elemPos = posWorld + vectorField.dir * (posOffset / 2.0);
+        }
 
-        // ------------------------------------------------------------------------------------
-        // Create the pennants at the current wind barb position
+// -----------------------------------------------------------------------------
+// Create the pennants at the current wind barb position.
 
         for(int i = 0; i < floor(knots / 50); ++i)
         {
             vec3 pos0, pos1, pos2;
             vec3 pos = elemPos;
 
-            //float scaleFactor = adaptedLineWidth / lineWidth;
-            pos += normal * adaptedLineWidth / 2.0;
+            //float scaleFactor = vectorField.adaptedLineWidth / lineWidth;
+            pos += vectorField.normal * vectorField.adaptedLineWidth / 2.0;
 
-            pos0 = pos - posOffset / 2.0 * dir;
-            pos1 = pos0 - dir * posOffset / 2.0 + dir * pennantPeakOffset + normal * largeWidth;
-            pos2 = pos0 - dir * posOffset / 2.0 + dir * (pennantOffset + pennantPeakOffset);
+            pos0 = pos - posOffset / 2.0 * vectorField.dir;
+            pos1 = pos0 - vectorField.dir * posOffset / 2.0
+                    + vectorField.dir * pennantPeakOffset
+                    + vectorField.normal * largeWidth;
+            pos2 = pos0 - vectorField.dir * posOffset / 2.0
+                    + vectorField.dir * (pennantOffset + pennantPeakOffset);
 
             gl_Position = mvpMatrix * vec4(pos0, 1);
             EmitVertex();
@@ -507,31 +598,33 @@ shader GSmain(in vec3 worldPos[], out GStoFS Output)
             EmitVertex();
             EndPrimitive();
 
-            elemPos += 2 * posOffset * dir;
+            elemPos += 2 * posOffset * vectorField.dir;
         }
 
         knots = mod(knots,50);
 
-        //elemPos += flagDist * 0.001 * dir;
+        //elemPos += flagDist * 0.001 * vectorField.dir;
 
-        // ------------------------------------------------------------------------------------
-        // Create the full flag triangle at the current wind barb position
+// -----------------------------------------------------------------------------
+// Create the full flag triangle at the current wind barb position.
 
         for(int j = 0; j < floor(knots / 10); ++j)
         {
             vec3 pos0, pos1, pos2, pos3;
             vec3 pos = elemPos;
 
-            pos += normal * adaptedLineWidth / 2.0;
+            pos += vectorField.normal * vectorField.adaptedLineWidth / 2.0;
 
             // left bottom
-            pos0 = pos - dir * adaptedLineWidth / 2.0;
+            pos0 = pos - vectorField.dir * vectorField.adaptedLineWidth / 2.0;
             // left top
-            pos1 = pos0 - dir * flagOffset + normal * largeWidth;
+            pos1 = pos0 - vectorField.dir * flagOffset
+                    + vectorField.normal * largeWidth;
             // right bottom
-            pos2 = pos + dir * adaptedLineWidth / 2.0;
+            pos2 = pos + vectorField.dir * vectorField.adaptedLineWidth / 2.0;
             // right top
-            pos3 = pos2 - dir * flagOffset + normal * largeWidth;
+            pos3 = pos2 - vectorField.dir * flagOffset
+                    + vectorField.normal * largeWidth;
 
             gl_Position = mvpMatrix * vec4(pos0, 1);
             EmitVertex();
@@ -544,29 +637,31 @@ shader GSmain(in vec3 worldPos[], out GStoFS Output)
             EndPrimitive();
 
 
-            elemPos += posOffset * dir;
+            elemPos += posOffset * vectorField.dir;
         }
 
         knots = mod(knots,10);
 
-        // ------------------------------------------------------------------------------------
-        // Create the half flag triangle at the current wind barb position
+// -----------------------------------------------------------------------------
+// Create the half flag triangle at the current wind barb position.
 
         for(int k = 0; k < floor(knots / 5); ++k)
         {
             vec3 pos0, pos1, pos2, pos3;
             vec3 pos = elemPos;
 
-            pos += normal * adaptedLineWidth / 2.0;
+            pos += vectorField.normal * vectorField.adaptedLineWidth / 2.0;
 
             // left bottom
-            pos0 = pos - dir * adaptedLineWidth / 2.0;
+            pos0 = pos - vectorField.dir * vectorField.adaptedLineWidth / 2.0;
             // left top
-            pos1 = pos0 - dir * flagOffset * 0.6 + normal * smallWidth;
+            pos1 = pos0 - vectorField.dir * flagOffset * 0.6
+                    + vectorField.normal * smallWidth;
             // right bottom
-            pos2 = pos + dir * adaptedLineWidth / 2.0;
+            pos2 = pos + vectorField.dir * vectorField.adaptedLineWidth / 2.0;
             // right top
-            pos3 = pos2 - dir * flagOffset * 0.6 + normal * smallWidth;
+            pos3 = pos2 - vectorField.dir * flagOffset * 0.6
+                    + vectorField.normal * smallWidth;
 
             gl_Position = mvpMatrix * vec4(pos0, 1);
             EmitVertex();
@@ -578,17 +673,17 @@ shader GSmain(in vec3 worldPos[], out GStoFS Output)
             EmitVertex();
             EndPrimitive();
 
-            elemPos += posOffset * dir;
+            elemPos += posOffset * vectorField.dir;
         }
 
         knots = mod(knots,5);
    }
    else
    {
-        // ------------------------------------------------------------------------------------
-	// Create the glyph for calm wind with 2 circles consiting of 128 vertices each
+// -----------------------------------------------------------------------------
+// Create the glyph for calm wind with 2 circles consiting of 128 vertices each.
         
-	if (showCalmGlyph)
+        if (showCalmGlyph)
         {
 
             vec3 pos = posWorld;
@@ -605,8 +700,10 @@ shader GSmain(in vec3 worldPos[], out GStoFS Output)
                 float angle = radians(angleStep * i);
                 float cosi = cos(angle) * smallRadius;
                 float sini = sin(angle) * smallRadius;
-                float sinig = sin(angle) * (smallRadius - adaptedLineWidth);
-                float cosig = cos(angle) * (smallRadius - adaptedLineWidth);
+                float sinig = sin(angle)
+                        * (smallRadius - vectorField.adaptedLineWidth);
+                float cosig = cos(angle)
+                        * (smallRadius - vectorField.adaptedLineWidth);
 
                 if (i == 0)
                 {
@@ -637,8 +734,10 @@ shader GSmain(in vec3 worldPos[], out GStoFS Output)
                 float angle = radians(angleStep * i);
                 float cosi = cos(angle) * largeRadius;
                 float sini = sin(angle) * largeRadius;
-                float sinig = sin(angle) * (largeRadius - adaptedLineWidth);
-                float cosig = cos(angle) * (largeRadius - adaptedLineWidth);
+                float sinig = sin(angle)
+                        * (largeRadius - vectorField.adaptedLineWidth);
+                float cosig = cos(angle)
+                        * (largeRadius - vectorField.adaptedLineWidth);
 
                 if (i == 0)
                 {
@@ -665,8 +764,176 @@ shader GSmain(in vec3 worldPos[], out GStoFS Output)
             }
         }
 
-        // ------------------------------------------------------------------------------------
+// -----------------------------------------------------------------------------
    }
+}
+
+
+shader GSarrows(in vec3 worldPos[], out GStoFS Output)
+{
+    Output.color = glyphColor;
+
+    // Current world position.
+    vec3 posWorld = worldPos[0];
+
+    if (!computeVectorFieldData(posWorld))
+    {
+        return;
+    }
+
+    // distance between elements
+    //const float pennantDist = (offset  + pennantOffset);
+    //const float flagDist = offset * 1    * scaleDistFactor;
+
+    //! NOTE (Kern, 2016-11-03): Using EmitVertex() and EndPrimitve() in local
+    // functions is not possible after NVidia driver 340 since the latest driver
+    // do not allow to use stage-specific functions in all shaders. GLFX always
+    // includes local functions into all shader stage programs (VS/FS) which
+    // leads to compilation errors for all stages except the geometry shader.
+
+    // -------------------------------------------------------------------------
+    // Create the base line of the arrow glyph.
+
+    vec3 pos0, pos1, pos2, pos3;
+    vec3 pos = posWorld;
+
+    if (scaleArrowWithMagnitude)
+    {
+        if (scaleArrowDiscardBelow && vectorField.magnitude < scaleArrowMinScalar)
+        {
+            return;
+        }
+        if (scaleArrowDiscardAbove && vectorField.magnitude > scaleArrowMaxScalar)
+        {
+            return;
+        }
+
+        float scalar = min(max(vectorField.magnitude, scaleArrowMinScalar),
+                           scaleArrowMaxScalar);
+        float scalarScale = (scalar - scaleArrowMinScalar)
+                / (scaleArrowMaxScalar - scaleArrowMinScalar);
+        float lengthScale =
+                scaleArrowMinLength + scalarScale *
+                (scaleArrowMaxLength - scaleArrowMinLength);
+
+        vectorField.glyphLength = lengthScale * vectorField.deltaGrid;
+    }
+
+    determineBaseLineVertices(pos, pos0, pos1, pos2, pos3);
+
+    float arrowHeight = min(vectorField.glyphLength,
+                            arrowHeadHeight * vectorField.deltaGrid);
+
+    if (arrowHeight == 0.)
+    {
+        return;
+    }
+
+    vec3 posTip = pos1 + vectorField.normal * vectorField.adaptedLineWidth / 2.f;
+    vec3 posBase = posTip - vectorField.dir * arrowHeight;
+    vec3 sideVec = vectorField.normal * (arrowHeight);
+    vec3 posLeft = posBase - sideVec;
+    vec3 posRight = posBase + sideVec;
+
+    pos1 = pos1 - vectorField.dir * arrowHeight;
+    pos3 = pos3 - vectorField.dir * arrowHeight;
+
+
+    // Draw base line.
+
+    gl_Position = mvpMatrix * vec4(pos0, 1);
+    EmitVertex();
+    gl_Position = mvpMatrix * vec4(pos1, 1);
+    EmitVertex();
+    gl_Position = mvpMatrix * vec4(pos2, 1);
+    EmitVertex();
+    gl_Position = mvpMatrix * vec4(pos3, 1);
+    EmitVertex();
+    EndPrimitive();
+
+    // Draw arrowhead.
+
+    gl_Position = mvpMatrix * vec4(posBase + sideVec, 1);
+    EmitVertex();
+    gl_Position = mvpMatrix * vec4(posTip, 1);
+    EmitVertex();
+    gl_Position = mvpMatrix * vec4(posBase, 1);
+    EmitVertex();
+    gl_Position = mvpMatrix * vec4(posBase - sideVec, 1);
+    EmitVertex();
+    EndPrimitive();
+
+    if (!arrowDrawOutline)
+    {
+        return;
+    }
+
+    // Draw outline as triangle strip. Don't draw at the same position as the
+    // inside of the arrow since this leads to z-fighting.
+
+    float adaptedArrowOutlineWidth = vectorField.deltaGrid * arrowOutlineWidth;
+
+    vec3 outlineOffsetDir = adaptedArrowOutlineWidth * vectorField.dir;
+    vec3 outlineOffsetNormal = adaptedArrowOutlineWidth * vectorField.normal;
+
+    vec3 pos0Out = pos0 - outlineOffsetDir - outlineOffsetNormal;
+    vec3 pos1Out = pos1 - outlineOffsetDir - outlineOffsetNormal;
+    vec3 pos2Out = pos2 - outlineOffsetDir + outlineOffsetNormal;
+    vec3 pos3Out = pos3 - outlineOffsetDir + outlineOffsetNormal;
+
+    // Since the arrowhead is a rectangular and isosceles triangle, the
+    // positions of the outline vertices can be computed with the help of
+    // parallelograms and rectangular and isosceles triangles.
+    vec3 posTipOut = posTip + (sqrt(2) * outlineOffsetDir);
+    vec3 posBaseOut = posBase - outlineOffsetDir;
+    vec3 sideVecOut = sideVec + (sqrt(2.) + 1.) * adaptedArrowOutlineWidth
+            * vectorField.normal;
+    vec3 posLeftOut = posBaseOut - sideVecOut;
+    vec3 posRightOut = posBaseOut + sideVecOut;
+
+    Output.color = arrowOutlineColour;
+
+    // Triangle strip which defines the outline.
+
+    gl_Position = mvpMatrix * vec4(posLeftOut, 1.);
+    EmitVertex();
+    gl_Position = mvpMatrix * vec4(posLeft, 1.);
+    EmitVertex();
+
+    gl_Position = mvpMatrix * vec4(posTipOut, 1.);
+    EmitVertex();
+    gl_Position = mvpMatrix * vec4(posTip, 1.);
+    EmitVertex();
+    gl_Position = mvpMatrix * vec4(posRightOut, 1.);
+    EmitVertex();
+    gl_Position = mvpMatrix * vec4(posRight, 1.);
+    EmitVertex();
+    gl_Position = mvpMatrix * vec4(pos3Out, 1.);
+    EmitVertex();
+    gl_Position = mvpMatrix * vec4(pos3, 1.);
+    EmitVertex();
+    // Needs to be doubled since otherwise the outline won't be rendered
+    // correctly.
+    gl_Position = mvpMatrix * vec4(pos3Out, 1.);
+    EmitVertex();
+    gl_Position = mvpMatrix * vec4(pos2, 1.);
+    EmitVertex();
+    gl_Position = mvpMatrix * vec4(pos2Out, 1.);
+    EmitVertex();
+    gl_Position = mvpMatrix * vec4(pos0, 1.);
+    EmitVertex();
+    gl_Position = mvpMatrix * vec4(pos0Out, 1.);
+    EmitVertex();
+    gl_Position = mvpMatrix * vec4(pos1, 1.);
+    EmitVertex();
+    gl_Position = mvpMatrix * vec4(pos1Out, 1.);
+    EmitVertex();
+
+    gl_Position = mvpMatrix * vec4(posLeft, 1.);
+    EmitVertex();
+    gl_Position = mvpMatrix * vec4(posLeftOut, 1.);
+    EmitVertex();
+    EndPrimitive();
 }
 
 /*****************************************************************************
@@ -683,9 +950,24 @@ shader FSmain(in GStoFS Input, out vec4 fragColor)
  ***                             PROGRAMS
  *****************************************************************************/
 
-program Standard
+program WindBarbs
 {
     vs(330)=VSmain();
-    gs(330)=GSmain() : in(points), out(triangle_strip, max_vertices = 128);
+    gs(330)=GSwindBarbs() : in(points), out(triangle_strip, max_vertices = 128);
+    fs(330)=FSmain();
+};
+
+program Arrows
+{
+    vs(330)=VSmain();
+    gs(330)=GSarrows() : in(points), out(triangle_strip, max_vertices = 128);
+    fs(330)=FSmain();
+};
+
+program ArrowsOutline
+{
+    vs(330)=VSmain();
+    gs(330)=GSarrows() : in(points), out(line_strip, max_vertices = 128);
+//    gs(330)=GSarrows() : in(points), out(triangle_strip, max_vertices = 128);
     fs(330)=FSmain();
 };
