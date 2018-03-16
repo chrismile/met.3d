@@ -130,10 +130,6 @@ private slots:
     void setDefaultMemoryManager();
 
 protected:
-    /**
-      Reimplemented from QDialog::showEvent().
-     */
-    void showEvent(QShowEvent *event) override;
 
 private:
     Ui::MAddDatasetDialog *ui;

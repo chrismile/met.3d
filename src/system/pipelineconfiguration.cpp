@@ -790,7 +790,8 @@ void MPipelineConfiguration::initializeTrajectoriesComputationPipeline(
     // If verical level type is not given, search for it.
     if (verticalLvlType == "")
     {
-        QList<MVerticalLevelType> levelTypes = NWPDataSource->availableLevelTypes();
+        QList<MVerticalLevelType> levelTypes =
+                NWPDataSource->availableLevelTypes();
         foreach (MVerticalLevelType level, levelTypes)
         {
             QStringList variables = NWPDataSource->availableVariables(level);

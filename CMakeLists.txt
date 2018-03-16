@@ -8,6 +8,7 @@
 #   Copyright (c) 2016-2018 Marc Rautenhaus
 #   Copyright (c) 2016-2017 Michael Kern <kernm@in.tum.de>
 #   Copyright (c) 2017-2018 Bianca Tost
+#   Copyright (c) 2017      Philipp Kaiser
 #
 #   Computer Graphics and Visualization Group
 #   Technische Universitaet Muenchen, Garching, Germany

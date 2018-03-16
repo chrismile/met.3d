@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2017 Philipp Kaiser
+**  Copyright 2017 Marc Rautenhaus
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -152,13 +153,16 @@ void MSelectActorDialog::createActorEntries(QList<MSelectActorType> types)
                     addActor |= dynamic_cast<MMovablePoleActor*>(a) != nullptr;
                     break;
                 case HORIZONTAL_ACTOR:
-                    addActor |=  dynamic_cast<MNWPHorizontalSectionActor*>(a) != nullptr;
+                    addActor |=  (dynamic_cast<MNWPHorizontalSectionActor*>(a)
+                                  != nullptr);
                     break;
                 case VERTICAL_ACTOR:
-                    addActor |= dynamic_cast<MNWPVerticalSectionActor*>(a) != nullptr;
+                    addActor |= (dynamic_cast<MNWPVerticalSectionActor*>(a)
+                                 != nullptr);
                     break;
                 case BOX_ACTOR:
-                    addActor |= dynamic_cast<MVolumeBoundingBoxActor*>(a) != nullptr;
+                    addActor |= (dynamic_cast<MVolumeBoundingBoxActor*>(a)
+                                 != nullptr);
             }
         }
 

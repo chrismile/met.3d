@@ -6,6 +6,7 @@
 **
 **  Copyright 2015-2017 Marc Rautenhaus
 **  Copyright 2015-2017 Bianca Tost
+**  Copyright 2017      Philipp Kaiser
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -133,7 +134,7 @@ QString expandEnvironmentVariables(QString path);
 
 /**
  * Parse Pressure lvls given by a ranged String e.g. "[0, 100, 10]" or a list
- * of values e.g. "10, 20, 50, 100, 200, 500, 700, 900"
+ * of values e.g. "10, 20, 50, 100, 200, 500, 700, 900".
  */
 QVector<float> parsePressureLevelString(QString lvls);
 

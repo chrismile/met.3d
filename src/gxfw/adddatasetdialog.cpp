@@ -583,37 +583,5 @@ void MAddDatasetDialog::setDefaultMemoryManager()
 ***                          PROTECTED METHODS                              ***
 *******************************************************************************/
 
-void MAddDatasetDialog::showEvent(QShowEvent *event)
-{
-//    Q_UNUSED(event);
-
-//    ui->memoryMCombo->clear();
-//    ui->trajectoriesNWPDatasetCombo->clear();
-
-//    MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
-//    foreach (QString mmID, sysMC->getMemoryManagerIdentifiers())
-//    {
-//        ui->memoryMCombo->addItem(mmID);
-//    }
-//    foreach (QString nwpDataset, sysMC->getDataSourceIdentifiers())
-//    {
-//        MWeatherPredictionDataSource *source =
-//                dynamic_cast<MWeatherPredictionDataSource*>(
-//                    sysMC->getDataSource(nwpDataset));
-//        if (source != nullptr)
-//        {
-//                ui->trajectoriesNWPDatasetCombo->addItem(nwpDataset);
-//        }
-//    }
-
-
-//    if (ui->trajectoriesNWPDatasetCombo->count() > 0)
-//    {
-//        selectedNWPDatasetChanged(ui->trajectoriesNWPDatasetCombo->currentText());
-//    }
-
-//    setDefaultMemoryManager();
-}
-
 
 } // namespace Met3D
