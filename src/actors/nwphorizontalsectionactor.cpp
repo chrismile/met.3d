@@ -1749,6 +1749,11 @@ void MNWPHorizontalSectionActor::renderFilledContours(
 
     glFilledContoursShader->bind();
 
+    // Change the depth function to less and equal. This allows OpenGL to
+    // overwrite fragments with the same depths and thus allows the hsec actor
+    // to draw filled contours of more than one variable.
+    glDepthFunc(GL_LEQUAL);
+
     // Model-view-projection matrix from the current scene view.
     glFilledContoursShader->setUniformValue(
                 "mvpMatrix", *(sceneView->getModelViewProjectionMatrix())); CHECK_GL_ERROR;
@@ -1819,6 +1824,9 @@ void MNWPHorizontalSectionActor::renderFilledContours(
                           0, var->nlons * 2, var->nlats - 1); CHECK_GL_ERROR;
 
     glDisable(GL_POLYGON_OFFSET_FILL);
+
+    // Change the depth function back to its default value.
+    glDepthFunc(GL_LESS);
 }
 
 
@@ -2002,10 +2010,12 @@ void MNWPHorizontalSectionActor::renderTexturedContours(
     if (var->spatialTransferFunction == nullptr) return;
     if (var->spatialTransferFunction->getTexture() == nullptr) return;
 
-//    glEnable(GL_DEPTH_TEST);
-    glDepthFunc(GL_LEQUAL);
-
     glTexturedContoursShader->bind();
+
+    // Change the depth function to less and equal. This allows OpenGL to
+    // overwrite fragments with the same depths and thus allows the hsec actor
+    // to draw textured contours with filled contours.
+    glDepthFunc(GL_LEQUAL);
 
     // Model-view-projection matrix from the current scene view.
     glTexturedContoursShader->setUniformValue(
@@ -2117,8 +2127,8 @@ void MNWPHorizontalSectionActor::renderTexturedContours(
                           0, var->nlons * 2, var->nlats - 1); CHECK_GL_ERROR;
 
     glDisable(GL_POLYGON_OFFSET_FILL);
-
-//    glEnable(GL_DEPTH_TEST);
+    // Change the depth function back to its default value.
+    glDepthFunc(GL_LESS);
 }
 
 
