@@ -30,6 +30,7 @@
 // standard library imports
 #include <iostream>
 #include <math.h>
+#include <algorithm>
 
 
 // related third party imports
@@ -391,6 +392,12 @@ void MNWPHorizontalSectionActor::reloadShaderEffects()
     compileShadersFromFileWithProgressDialog(
                 positionSpheresShader,
                 "src/glsl/trajectory_positions.fx.glsl");
+    glContourPlotsShader->compileFromFile_Met3DHome(
+                "src/glsl/hsec_contourplots.fx.glsl");
+    glCSContourPlotsShader->compileFromFile_Met3DHome(
+                "src/glsl/hsec_cscontourplots.fx.glsl");
+    glVariabilityPlotsShader->compileFromFile_Met3DHome(
+                "src/glsl/hsec_variabilityplots.fx.glsl");
 
     endCompileShaders();
 
@@ -927,6 +934,8 @@ void MNWPHorizontalSectionActor::onBoundingBoxChanged()
 void MNWPHorizontalSectionActor::setSlicePosition(double pressure_hPa)
 {
     properties->mDDouble()->setValue(slicePosProperty, pressure_hPa);
+
+    emit slicePositionChanged(pressure_hPa);
 }
 
 
@@ -989,8 +998,21 @@ void MNWPHorizontalSectionActor::initializeActorResources()
                                                 glShadowQuad);
     loadShaders |= glRM->generateEffectProgram("vsec_positionsphere",
                                                 positionSpheresShader);
+    loadShaders |= glRM->generateEffectProgram("hsec_contourplots",
+                                                glContourPlotsShader);
+    loadShaders |= glRM->generateEffectProgram("hsec_cscontourplots",
+                                                glCSContourPlotsShader);
+    loadShaders |= glRM->generateEffectProgram("hsec_variabilityplots",
+                                                glVariabilityPlotsShader);
 
     if (loadShaders) reloadShaderEffects();
+
+    for (int vi = 0; vi < variables.size(); vi++)
+    {
+        MNWP2DHorizontalActorVariable *var =
+                static_cast<MNWP2DHorizontalActorVariable*> (variables.at(vi));
+        var->plotCollection->setShaders();
+    }
 
     // Explicitly initialize the graticule actor here. This is needed to get a
     // valid reference to its "labels" list in the first
@@ -1332,27 +1354,35 @@ void MNWPHorizontalSectionActor::renderToCurrentContext(MSceneViewGLWidget *scen
         // has changed).
         if (crossSectionGridsNeedUpdate)
         {
-            if ((vi == 0) && (differenceMode > 0))
+            if (var->gridAggregation != nullptr)
             {
-                // DIFFERENCE MODE: Render difference between 1st & 2nd variable
-                MNWP2DHorizontalActorVariable* varDiff =
-                        static_cast<MNWP2DHorizontalActorVariable*> (variables.at(1));
-
-
-                // If the slice position is outside the model grid domain of the
-                // 2nd variable, there is nothing to render.
-                if ((varDiff->grid->getBottomDataVolumePressure()
-                     < slicePosition_hPa)
-                        || (varDiff->grid->getTopDataVolumePressure()
-                            > slicePosition_hPa))
-                {
-                    continue;
-                }
-                computeVerticalInterpolationDifference(var, varDiff);
+                computeGridVerticalInterpolation(var);
             }
             else
             {
-                computeVerticalInterpolation(var);
+                if ((vi == 0) && (differenceMode > 0))
+                {
+                    // DIFFERENCE MODE: Render difference between 1st & 2nd
+                    // variable.
+                    MNWP2DHorizontalActorVariable* varDiff =
+                            static_cast<MNWP2DHorizontalActorVariable*>(
+                                variables.at(1));
+
+                    // If the slice position is outside the model grid domain of
+                    // the 2nd variable, there is nothing to render.
+                    if ((varDiff->grid->getBottomDataVolumePressure()
+                         < slicePosition_hPa)
+                            || (varDiff->grid->getTopDataVolumePressure()
+                                > slicePosition_hPa))
+                    {
+                        continue;
+                    }
+                    computeVerticalInterpolationDifference(var, varDiff);
+                }
+                else
+                {
+                    computeVerticalInterpolation(var);
+                }
             }
 
             // If line contours are enabled re-compute the contour indices
@@ -1369,7 +1399,12 @@ void MNWPHorizontalSectionActor::renderToCurrentContext(MSceneViewGLWidget *scen
             default:
                 break;
             }
+
+            var->plotCollection->needsRecomputation();
         }
+
+        // Compute plots from plot collection if necessary.
+        var->plotCollection->compute();
 
         switch (var->renderSettings.renderMode)
         {
@@ -1430,6 +1465,15 @@ void MNWPHorizontalSectionActor::renderToCurrentContext(MSceneViewGLWidget *scen
             renderTexturedContours(sceneView, var);
             renderLineCountours(sceneView, var);
             renderContourLabels(sceneView, var);
+            break;
+
+        case MNWP2DHorizontalActorVariable::RenderMode::SpaghettiPlot:
+        case MNWP2DHorizontalActorVariable::RenderMode::ContourBoxplot:
+        case MNWP2DHorizontalActorVariable::RenderMode::ContourProbabilityPlot:
+        case MNWP2DHorizontalActorVariable::RenderMode::DistanceVariabilityPlot:
+        case MNWP2DHorizontalActorVariable::RenderMode::ScalarVariabilityPlot:
+            // Render selected plot from plot collection.
+            var->plotCollection->render(sceneView);
             break;
 
         default:
@@ -2023,6 +2067,150 @@ void MNWPHorizontalSectionActor::computeVerticalInterpolationDifference(
                        var->nlats, 1);
     glMemoryBarrier(GL_TEXTURE_FETCH_BARRIER_BIT & GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 }
+
+
+void MNWPHorizontalSectionActor::computeGridVerticalInterpolation(
+        MNWP2DHorizontalActorVariable *var)
+{
+    // Recreate arrays from plot collection.
+    var->plotCollection->recreateArrays();
+
+    QList<MStructuredGrid*> grids = var->gridAggregation->getGrids();
+    unsigned int texturesize = grids.at(0)->getNumLats()
+            * grids.at(0)->getNumLons();
+
+    Met3D::MStructuredGrid *grid = nullptr;
+    GL::MTexture *texture2D = nullptr;
+    GL::MTexture *textureDataField = nullptr;
+    GL::MTexture *textureLonLatLevAxes = nullptr;
+
+    for (int i = 0; i < grids.size(); i++)
+    {
+
+        // Work around: Perform vertical interpolation for each member and
+        // store results in one array.
+        grid = grids.at(i);
+        texture2D = grid->get2DFieldTexture();
+        textureDataField  = grid->getTexture();
+        textureLonLatLevAxes = grid->getLonLatLevTexture();
+
+        if (MLonLatHybridSigmaPressureGrid *hgrid =
+                dynamic_cast<MLonLatHybridSigmaPressureGrid*>(grid))
+        {
+            var->textureHybridCoefficients = hgrid->getHybridCoeffTexture();
+            var->textureSurfacePressure =
+                    hgrid->getSurfacePressureGrid()->getTexture();
+        }
+
+
+        // Compute vertical interpolation.
+
+
+        glVerticalInterpolationEffect->bindProgram("Standard");
+
+        // Reset optional required textures (to avoid draw errors).
+        // ========================================================
+
+        var->textureDummy1D->bindToTextureUnit(var->textureUnitUnusedTextures);
+        glVerticalInterpolationEffect->setUniformValue(
+                    "hybridCoefficients", var->textureUnitUnusedTextures); CHECK_GL_ERROR;
+
+        var->textureDummy2D->bindToTextureUnit(var->textureUnitUnusedTextures);
+        glVerticalInterpolationEffect->setUniformValue(
+                    "surfacePressure", var->textureUnitUnusedTextures); CHECK_GL_ERROR;
+        glVerticalInterpolationEffect->setUniformValue(
+                    "dataField2D", var->textureUnitUnusedTextures); CHECK_GL_ERROR;
+
+        var->textureDummy3D->bindToTextureUnit(var->textureUnitUnusedTextures);
+        glVerticalInterpolationEffect->setUniformValue(
+                    "dataField", var->textureUnitUnusedTextures); CHECK_GL_ERROR;
+
+        // Set shader variables.
+        // =====================
+
+        glVerticalInterpolationEffect->setUniformValue(
+                    "levelType", int(grid->getLevelType()));
+
+        // Texture bindings for coordinate axes (1D texture).
+        textureLonLatLevAxes->bindToTextureUnit(var->textureUnitLonLatLevAxes);
+        glVerticalInterpolationEffect->setUniformValue(
+                    "latLonAxesData", var->textureUnitLonLatLevAxes);
+        glVerticalInterpolationEffect->setUniformValue(
+                    "verticalOffset", GLint(grid->nlons + grid->nlats));
+
+        if (grid->getLevelType() == SURFACE_2D)
+        {
+            // Texture bindings for data field (2D texture).
+            textureDataField->bindToTextureUnit(var->textureUnitDataField);
+            glVerticalInterpolationEffect->setUniformValue(
+                        "dataField2D", var->textureUnitDataField);
+        }
+        else
+        {
+            // Texture bindings for data field (3D texture).
+            textureDataField->bindToTextureUnit(var->textureUnitDataField);
+            glVerticalInterpolationEffect->setUniformValue(
+                        "dataField", var->textureUnitDataField);
+        }
+
+        if (grid->getLevelType() == HYBRID_SIGMA_PRESSURE_3D)
+        {
+            // Texture bindings for surface pressure (2D texture) and model
+            // level coefficients (1D texture).
+            var->textureSurfacePressure->bindToTextureUnit(
+                        var->textureUnitSurfacePressure);
+            var->textureHybridCoefficients->bindToTextureUnit(
+                        var->textureUnitHybridCoefficients);
+            glVerticalInterpolationEffect->setUniformValue(
+                        "surfacePressure", var->textureUnitSurfacePressure);
+            glVerticalInterpolationEffect->setUniformValue(
+                        "hybridCoefficients", var->textureUnitHybridCoefficients);
+        }
+
+        // Pressure value and world z coordinate of the slice.
+        glVerticalInterpolationEffect->setUniformValue(
+                    "pressure_hPa", GLfloat(slicePosition_hPa));
+
+        glVerticalInterpolationEffect->setUniformValue(
+                    "crossSectionGrid", var->imageUnitTargetGrid);
+        glBindImageTexture(var->imageUnitTargetGrid, // image unit
+                           texture2D->getTextureObject(),
+                                                     // texture object
+                           0,                        // level
+                           GL_FALSE,                 // layered
+                           0,                        // layer
+                           GL_READ_WRITE,            // shader access
+                           // GL_WRITE_ONLY,         // shader access
+                           GL_R32F); CHECK_GL_ERROR; // format
+
+        // Grid offsets to render only the requested subregion.
+        glVerticalInterpolationEffect->setUniformValue(
+                    "iOffset", GLint(var->i0)); CHECK_GL_ERROR;
+        glVerticalInterpolationEffect->setUniformValue(
+                    "jOffset", GLint(var->j0)); CHECK_GL_ERROR;
+
+        // We don't want to compute entries twice thus we need to use at most the
+        // width of the grid. (var->nlons can be larger than the grid size)
+        glDispatchCompute( min(var->nlons, int(var->grid->nlons + 1)),
+                           var->nlats, 1);
+        glMemoryBarrier(GL_TEXTURE_FETCH_BARRIER_BIT & GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+
+
+        // End vertical interpolation.
+
+        // Download 2D texture and store it in plot collection storage.
+        texture2D->bindToTextureUnit(var->imageUnitTargetGrid);
+        glGetTexImage(GL_TEXTURE_2D, 0, GL_RED, GL_FLOAT,
+                      (var->plotCollection->gridDataStorage)
+                      + i * texturesize); CHECK_GL_ERROR;
+        glMemoryBarrier(GL_TEXTURE_FETCH_BARRIER_BIT
+                        & GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+
+        grid->releaseTexture();
+        grid->release2DFieldTexture();
+    }
+}
+
 
 
 void MNWPHorizontalSectionActor::renderFilledContours(

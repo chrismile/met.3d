@@ -63,8 +63,6 @@ uniform float     worldZ;            // world z coordinate of this section
 uniform mat4      mvpMatrix;         // model-view-projection
 
 layout(r32f)
-// TODO:
-//layout(rg32f)
 uniform image2D   crossSectionGrid;  // 2D data grid
 uniform int       iOffset;           // grid index offsets if only a subregion
 uniform int       jOffset;           //   of the grid shall be rendered

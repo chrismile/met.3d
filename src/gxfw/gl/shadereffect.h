@@ -4,8 +4,9 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
-**  Copyright 2015 Michael Kern
+**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2015      Michael Kern
+**  Copyright 2016      Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -269,6 +270,8 @@ public:
                               const int8_t count);
 
     void setUniformValueArray(const QString name, const QPointF* data,
+                              const int8_t count);
+    void setUniformValueArray(const QString name, const GLuint64* data,
                               const int8_t count);
 
     /**

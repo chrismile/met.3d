@@ -357,6 +357,17 @@ public:
     /** Release a texture acquired with getLonLatTexture(). */
     void releaseLonLatLevTexture();
 
+    /**
+      Returns the handle to a texture containing the interpolated 2D grid data
+      (red channel).
+      The handle needs to be released with @ref release2DFieldTexture() if not
+      required anylonger.
+     */
+    virtual GL::MTexture* get2DFieldTexture(QGLWidget *currentGLContext = nullptr);
+
+    /** Release a texture acquired with get2DFieldTexture(). */
+    void release2DFieldTexture();
+
     /** Writes coordinate axis data to the LOG. */
     void dumpCoordinateAxes();
 
@@ -554,6 +565,8 @@ protected:
     friend class MDifferenceDataSource;
     friend class MProcessingWeatherPredictionDataSource;
 
+    friend class MPlotCollection;
+
     /** Sizes of the dimensions. */
     unsigned int nlevs, nlats, nlons;
     unsigned int nvalues;
@@ -582,6 +595,7 @@ protected:
     MVerticalLevelType leveltype;
 
     QString lonlatID; /** Texture ID string for the coordinate axes. */
+    QString field2DID; /** Texture ID string for the 2D field. */
     QString flagsID;
     QString minMaxAccelID;
 

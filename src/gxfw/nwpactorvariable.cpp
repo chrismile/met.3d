@@ -1042,6 +1042,15 @@ bool MNWPActorVariable::onQtPropertyChanged(QtProperty *property)
                 // ..or ens mode is != member.
                 updateDataField |= !ensembleFilterOperation.isEmpty();
 
+                // Plot collection needs to recompute distance fields for new
+                // members.
+                if (MNWP2DHorizontalActorVariable *var =
+                        dynamic_cast<MNWP2DHorizontalActorVariable*>(this))
+                {
+                    var->plotCollection->variabilityPlot->distanceNeedsRecompute = true;
+                }
+
+
                 if (updateDataField) asynchronousDataRequest();
                 return false;
             }
@@ -2263,6 +2272,18 @@ bool MNWPActorVariable::changeVariable()
     levelType    = dsrc.levelType;
     variableName = dsrc.variableName;
 
+// TODO (bt, 12Oct2017): Check if this is correct but at the moment program
+// crashes if variable is changed (problem seems to be gridAggregation or
+// aggregaionDataSource).
+    if (MNWP2DSectionActorVariable *var =
+            dynamic_cast<MNWP2DSectionActorVariable*>(this))
+    {
+        if (var->plotCollection != nullptr)
+        {
+            var->plotCollection->reset();
+        }
+    }
+
     releaseDataItems();
     releaseAggregatedDataItems();
     actor->enableActorUpdates(false);
@@ -2293,7 +2314,8 @@ MNWP2DSectionActorVariable::MNWP2DSectionActorVariable(
       textureTargetGrid(nullptr),
       textureUnitTargetGrid(-1),
       imageUnitTargetGrid(-1),
-      renderContourLabels(0)
+      renderContourLabels(0),
+      plotCollection(nullptr)
 {
     assert(actor != nullptr);
     MNWPMultiVarActor *a = actor;
@@ -2648,8 +2670,11 @@ void MNWP2DSectionActorVariable::loadConfiguration(QSettings *settings)
     {
         renderSettings.contourSetGroupProperty->removeSubProperty(
                     contourSet.groupProperty);
-    }
+    }    
+    // Clear contour sets lists.
     contourSetList.clear();
+    contourSetStringList.clear();
+
     int numContourSet = settings->beginReadArray("contourSet");
     properties->mBool()->setValue(
                 renderSettings.contoursUseTFProperty,
@@ -2737,6 +2762,16 @@ QString MNWP2DSectionActorVariable::renderModeToString(
         return QString("filled, line and textured contours");
     case RenderMode::PseudoColourAndLineAndTexturedContours:
         return QString("pcolour and line and textured contours");
+    case RenderMode::SpaghettiPlot:
+        return QString("spaghetti plot");
+    case RenderMode::ContourBoxplot:
+        return QString("contour boxplot");
+    case RenderMode::ContourProbabilityPlot:
+        return QString("contour probability plot");
+    case RenderMode::DistanceVariabilityPlot:
+        return QString("distance variability plot");
+    case RenderMode::ScalarVariabilityPlot:
+        return QString("scalar variability plot");
     default:
         return QString("");
     }
@@ -2797,6 +2832,12 @@ void MNWP2DSectionActorVariable::addContourSet(
                 contourSetList.back().groupProperty);
     parseContourLevelString(levelString, &(contourSetList.back()));
 
+    contourSetStringList
+            << contourSetList.back().groupProperty->propertyName();
+    if (plotCollection != nullptr)
+    {
+        plotCollection->updateContourList();
+    }
 }
 
 
@@ -2840,6 +2881,12 @@ bool MNWP2DSectionActorVariable::removeContourSet(int index)
         {
             contourSetList[index].groupProperty->setPropertyName(
                         text + QString::number(index + 1));
+        }
+
+        if (plotCollection != nullptr)
+        {
+            contourSetStringList.removeLast();
+            plotCollection->updateContourList(index);
         }
         return needsRedraw;
     }
@@ -3004,6 +3051,10 @@ MNWP2DHorizontalActorVariable::MNWP2DHorizontalActorVariable(
                 STRING_PROPERTY, "contour label suffix",
                 renderGroup);
 
+    // Setup for plot collection (contour boxplot/probability plot,
+    // spaghetti plot, scalar/distance variability plot).
+    plotCollection = new MPlotCollection(this);
+
     a->endInitialiseQtProperties();
 }
 
@@ -3011,7 +3062,13 @@ MNWP2DHorizontalActorVariable::MNWP2DHorizontalActorVariable(
 MNWP2DHorizontalActorVariable::~MNWP2DHorizontalActorVariable()
 {
     if (textureUnitSpatialTransferFunction >=0)
+    {
         actor->releaseTextureUnit(textureUnitSpatialTransferFunction);
+    }
+    if (plotCollection)
+    {
+        delete plotCollection;
+    }
 }
 
 
@@ -3043,6 +3100,9 @@ void MNWP2DHorizontalActorVariable::saveConfiguration(QSettings *settings)
                        properties->getEnumItem(spatialTransferFunctionProperty));
 
     settings->setValue("contourLabelSuffix", contourLabelSuffix);
+
+    // Save plot collection settings.
+    plotCollection->saveConfiguration(settings);
 }
 
 
@@ -3068,12 +3128,21 @@ void MNWP2DHorizontalActorVariable::loadConfiguration(QSettings *settings)
     contourLabelSuffix = settings->value("contourLabelSuffix").toString();
     properties->mString()->setValue(contourLabelSuffixProperty,
                                     contourLabelSuffix);
+
+    // Load plot collection settings.
+    plotCollection->loadConfiguration(settings);
 }
 
 
 bool MNWP2DHorizontalActorVariable::onQtPropertyChanged(QtProperty *property)
 {
     if (MNWP2DSectionActorVariable::onQtPropertyChanged(property)) return true;
+
+    // Check if property matches a plot property.
+    if (plotCollection->onQtPropertyChanged(property))
+    {
+        return true;
+    }
 
     MQtProperties *properties = actor->getQtProperties();
 
@@ -3453,6 +3522,26 @@ MNWP2DHorizontalActorVariable::stringToRenderMode(QString renderModeName)
     else if (renderModeName == QString("pcolour and line and textured contours"))
     {
         return RenderMode::PseudoColourAndLineAndTexturedContours;
+    }    
+    else if (renderModeName == QString("spaghetti plot"))
+    {
+        return RenderMode::SpaghettiPlot;
+    }
+    else if (renderModeName == QString("contour boxplot"))
+    {
+        return RenderMode::ContourBoxplot;
+    }
+    else if (renderModeName == QString("contour probability plot"))
+    {
+        return RenderMode::ContourProbabilityPlot;
+    }
+    else if (renderModeName == QString("distance variability plot"))
+    {
+        return RenderMode::DistanceVariabilityPlot;
+    }
+    else if (renderModeName == QString("scalar variability plot"))
+    {
+        return RenderMode::ScalarVariabilityPlot;
     }
     else
     {
@@ -3512,6 +3601,7 @@ void MNWP2DHorizontalActorVariable::dataFieldChangedEvent()
 void MNWP2DHorizontalActorVariable::contourValuesUpdateEvent(
         ContourSettings *levels)
 {
+    plotCollection->needsRecomputation();
     updateContourIndicesFromTargetGrid(targetGrid2D->levels[0], levels);
 }
 
