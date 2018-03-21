@@ -141,7 +141,8 @@ public:
 
 public slots:
     /**
-      Advance scene time by the value specified in @p ui->timeStepComboBox.
+      Advance scene time by the value specified in @p ui->timeStepSpinBox and
+      @p ui->timeUnitComboBox.
       */
     void timeForward();
 
@@ -325,10 +326,6 @@ private:
     void setAnimationTimeToStartTime(QDateTime startDateTime);
 
     Ui::MSyncControl *ui;
-
-    // Maps index of ui->timeStepComboBox to seconds (see constructor and
-    // applyTimeStep()).
-    int *timeStepIndexToSeconds;
 
     // Properties to control time animations.
     QMenu *timeAnimationDropdownMenu;
