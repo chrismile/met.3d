@@ -70,6 +70,7 @@ MSceneViewGLWidget::MSceneViewGLWidget()
       freezeMode(0),
       sceneNavigationSensitivity(1.),
       posLabelIsEnabled(true),
+      farPlaneDistance(500.f),
       multisamplingEnabled(true),
       antialiasingEnabled(false),
       synchronizationControl(nullptr),
@@ -305,6 +306,14 @@ MSceneViewGLWidget::MSceneViewGLWidget()
     systemControl->getColorPropertyManager()
             ->setValue(backgroundColourProperty, backgroundColour);
     renderingGroupProperty->addSubProperty(backgroundColourProperty);
+
+    farPlaneDistanceProperty = systemControl->getDecoratedDoublePropertyManager()
+            ->addProperty("far plane");
+    systemControl->getDecoratedDoublePropertyManager()
+            ->setValue(farPlaneDistanceProperty, farPlaneDistance);
+    systemControl->getDecoratedDoublePropertyManager()
+            ->setMinimum(farPlaneDistanceProperty, 0.01);
+    renderingGroupProperty->addSubProperty(farPlaneDistanceProperty);
 
     multisamplingProperty = systemControl->getBoolPropertyManager()
             ->addProperty("multisampling");
@@ -881,6 +890,16 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
         setBackgroundColour(
                 MSystemManagerAndControl::getInstance()
                 ->getColorPropertyManager()->value(backgroundColourProperty));
+    }
+
+    else if (property == farPlaneDistanceProperty)
+    {
+        farPlaneDistance = MSystemManagerAndControl::getInstance()
+                ->getDecoratedDoublePropertyManager()
+                ->value(farPlaneDistanceProperty);
+#ifndef CONTINUOUS_GL_UPDATE
+        updateGL();
+#endif
     }
 
     else if (property == multisamplingProperty)
@@ -1550,11 +1569,13 @@ void MSceneViewGLWidget::paintGL()
         float minY = - dyHalf;
         float maxY = + dyHalf;
 
-        modelViewProjectionMatrix.ortho(minX, maxX, minY, maxY, 0., 500.);
+        modelViewProjectionMatrix.ortho(minX, maxX, minY, maxY, 0.,
+                                        farPlaneDistance);
     }
     else
     {
-        modelViewProjectionMatrix.perspective(45., ratio, abs(co.z())/10., 500.);
+        modelViewProjectionMatrix.perspective(45., ratio, abs(co.z())/10.,
+                                              farPlaneDistance);
     }
 
     modelViewProjectionMatrix *= camera.getViewMatrix();
@@ -2459,6 +2480,7 @@ void MSceneViewGLWidget::saveConfiguration(QSettings *settings)
     settings->beginGroup("Rendering");
     settings->setValue("backgroundColour",  sysMC->getColorPropertyManager()
                        ->value(backgroundColourProperty));
+    settings->setValue("farPlaneDistance", farPlaneDistance);
     settings->setValue("multisampling", multisamplingEnabled);
     settings->setValue("antialiasing", antialiasingEnabled);
     settings->setValue("depthTestForLabels", renderLabelsWithDepthTest);
@@ -2564,6 +2586,9 @@ void MSceneViewGLWidget::loadConfiguration(QSettings *settings)
                 backgroundColourProperty,
                 settings->value("backgroundColour", QColor(255, 255, 255))
                 .value<QColor>());
+    sysMC->getDecoratedDoublePropertyManager()->setValue(
+                farPlaneDistanceProperty,
+                settings->value("farPlaneDistance", 500.f).toDouble());
     sysMC->getBoolPropertyManager()->setValue(
                 multisamplingProperty,
                 settings->value("multisampling", true).toBool());

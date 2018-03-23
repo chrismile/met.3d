@@ -458,6 +458,8 @@ private:
 
     QtProperty *renderingGroupProperty;
     QtProperty *backgroundColourProperty;
+    QtProperty *farPlaneDistanceProperty;
+    float       farPlaneDistance;
     QtProperty *multisamplingProperty;
     bool        multisamplingEnabled;
     QtProperty *antialiasingProperty;
