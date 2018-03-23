@@ -176,7 +176,10 @@ private:
     void renderTexturedContours(MSceneViewGLWidget *sceneView,
                              MNWP2DHorizontalActorVariable* var);
 
-    void renderVectorGlyphs(MSceneViewGLWidget *sceneView);
+    void renderVectorGlyphs(
+            MSceneViewGLWidget *sceneView,
+            std::shared_ptr<GL::MShaderEffect> glyphsShader,
+            bool renderShadow = false);
 
     void renderShadow(MSceneViewGLWidget* sceneView);
 
@@ -191,6 +194,7 @@ private:
     std::shared_ptr<GL::MShaderEffect> glPseudoColourShader;
     std::shared_ptr<GL::MShaderEffect> glMarchingSquaresShader;
     std::shared_ptr<GL::MShaderEffect> glVectorGlyphsShader;
+    std::shared_ptr<GL::MShaderEffect> gl3DVectorGlyphsShader;
     std::shared_ptr<GL::MShaderEffect> glShadowQuad;
     std::shared_ptr<GL::MShaderEffect> positionSpheresShader;
 
@@ -243,7 +247,8 @@ private:
         {
             Invalid = -1,
             WindBarbs = 0,
-            Arrows = 1
+            Arrows = 1,
+            Arrows3D = 2
         };
 
         enum class PivotPos
@@ -275,12 +280,6 @@ private:
         QtProperty *arrowsGroupProperty;
         double      arrowHeadHeight;
         QtProperty *arrowHeadHeightProperty;
-        bool        arrowDrawOutline;
-        QtProperty *arrowDrawOutlineProperty;
-        double      arrowOutlineWidth;
-        QtProperty *arrowOutlineWidthProperty;
-        QColor      arrowOutlineColour;
-        QtProperty *arrowOutlineColourProperty;
         QtProperty *scaleArrowGroupProperty;
         bool        scaleArrowWithMagnitude;
         QtProperty *scaleArrowWithMagnitudeProperty;
@@ -296,6 +295,20 @@ private:
         QtProperty *scaleArrowMaxLengthProperty;
         bool        scaleArrowDiscardAbove;
         QtProperty *scaleArrowDiscardAboveProperty;
+
+        QtProperty *arrows2DGroupProperty;
+        bool        arrowDrawOutline;
+        QtProperty *arrowDrawOutlineProperty;
+        double      arrowOutlineWidth;
+        QtProperty *arrowOutlineWidthProperty;
+        QColor      arrowOutlineColour;
+        QtProperty *arrowOutlineColourProperty;
+
+        QtProperty *arrows3DGroupProperty;
+        bool        arrows3DShadowEnabled;
+        QtProperty *arrows3DShadowEnabledProperty;
+        QColor      arrows3DShadowColour;
+        QtProperty *arrows3DShadowColourProperty;
 
         float       deltaGlyphsLonLat;
         QtProperty *deltaGlyphsLonLatProperty;
