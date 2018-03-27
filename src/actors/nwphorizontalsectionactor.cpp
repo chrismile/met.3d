@@ -159,13 +159,10 @@ MNWPHorizontalSectionActor::VectorGlyphsSettings::VectorGlyphsSettings(
       glyphType(GlyphType::WindBarbs),
       pivotPosition(PivotPos::Tip),
       lineWidth(0.04),
-      color(QColor(0,0,127)),
+      color(QColor(0, 0, 127)),
       showCalmGlyphs(false),
       pennantTilt(9),
       arrowHeadHeight(0.08),
-      arrowDrawOutline(true),
-      arrowOutlineWidth(0.05),
-      arrowOutlineColour(QColor(0, 0, 0)),
       scaleArrowWithMagnitude(true),
       scaleArrowMinScalar(0.),
       scaleArrowMinLength(0.1),
@@ -173,6 +170,11 @@ MNWPHorizontalSectionActor::VectorGlyphsSettings::VectorGlyphsSettings(
       scaleArrowMaxScalar(50.),
       scaleArrowMaxLength(.75),
       scaleArrowDiscardAbove(false),
+      arrowDrawOutline(true),
+      arrowOutlineWidth(0.05),
+      arrowOutlineColour(QColor(0, 0, 0)),
+      arrows3DShadowEnabled(true),
+      arrows3DShadowColour(QColor(10, 10, 10, 70)),
       deltaGlyphsLonLat(1.),
       clampDeltaGlyphsToGrid(true),
       automaticScalingEnabled(true),
@@ -203,7 +205,7 @@ MNWPHorizontalSectionActor::VectorGlyphsSettings::VectorGlyphsSettings(
                                              groupProperty);
 
     QStringList glyphTypes;
-    glyphTypes << "wind barbs" << "arrows";
+    glyphTypes << "wind barbs" << "arrows" << "3D arrows";
     glyphTypeProperty = a->addProperty(ENUM_PROPERTY, "glyph type",
                                        appearanceGroupProperty);
     properties->mEnum()->setEnumNames(glyphTypeProperty, glyphTypes);
@@ -220,7 +222,7 @@ MNWPHorizontalSectionActor::VectorGlyphsSettings::VectorGlyphsSettings(
                                        appearanceGroupProperty);
     properties->setDouble(lineWidthProperty, lineWidth, 0.001, 0.30, 3, 0.001);
 
-    colorProperty = a->addProperty(COLOR_PROPERTY, "line color",
+    colorProperty = a->addProperty(COLOR_PROPERTY, "glyph colour",
                                    appearanceGroupProperty);
     properties->mColor()->setValue(colorProperty, color);
 
@@ -240,18 +242,7 @@ MNWPHorizontalSectionActor::VectorGlyphsSettings::VectorGlyphsSettings(
     arrowHeadHeightProperty = a->addProperty(DOUBLE_PROPERTY, "head size",
                                            arrowsGroupProperty);
     properties->setDouble(arrowHeadHeightProperty, arrowHeadHeight, 0.001, 0.30,
-                          3, 0.001);    
-    arrowDrawOutlineProperty = a->addProperty(BOOL_PROPERTY, "draw outline",
-                                              arrowsGroupProperty);
-    properties->mBool()->setValue(arrowDrawOutlineProperty, arrowDrawOutline);
-    arrowOutlineWidthProperty = a->addProperty(DOUBLE_PROPERTY, "outline width",
-                                               arrowsGroupProperty);
-    properties->setDouble(arrowOutlineWidthProperty, arrowOutlineWidth, 0.001,
-                          0.30, 3, 0.001);
-    arrowOutlineColourProperty = a->addProperty(
-                COLOR_PROPERTY, "outline colour", arrowsGroupProperty);
-    properties->mColor()->setValue(arrowOutlineColourProperty,
-                                   arrowOutlineColour);
+                          3, 0.001);
     scaleArrowWithMagnitudeProperty = a->addProperty(
                 BOOL_PROPERTY, "scale with magnitude", arrowsGroupProperty);
     properties->mBool()->setValue(scaleArrowWithMagnitudeProperty,
@@ -288,6 +279,31 @@ MNWPHorizontalSectionActor::VectorGlyphsSettings::VectorGlyphsSettings(
                 scaleArrowWithMagnitudeProperty);
     properties->mBool()->setValue(scaleArrowDiscardAboveProperty,
                                   scaleArrowDiscardAbove);
+
+    arrows2DGroupProperty = a->addProperty(GROUP_PROPERTY, "2D arrows",
+                                         arrowsGroupProperty);
+    arrowDrawOutlineProperty = a->addProperty(BOOL_PROPERTY, "draw outline",
+                                              arrows2DGroupProperty);
+    properties->mBool()->setValue(arrowDrawOutlineProperty, arrowDrawOutline);
+    arrowOutlineWidthProperty = a->addProperty(DOUBLE_PROPERTY, "outline width",
+                                               arrows2DGroupProperty);
+    properties->setDouble(arrowOutlineWidthProperty, arrowOutlineWidth, 0.001,
+                          0.30, 3, 0.001);
+    arrowOutlineColourProperty = a->addProperty(
+                COLOR_PROPERTY, "outline colour", arrows2DGroupProperty);
+    properties->mColor()->setValue(arrowOutlineColourProperty,
+                                   arrowOutlineColour);
+
+    arrows3DGroupProperty = a->addProperty(GROUP_PROPERTY, "3D arrows",
+                                         arrowsGroupProperty);
+    arrows3DShadowEnabledProperty = a->addProperty(
+                BOOL_PROPERTY, "enabled", arrows3DGroupProperty);
+    properties->mBool()->setValue(arrows3DShadowEnabledProperty,
+                                  arrows3DShadowEnabled);
+    arrows3DShadowColourProperty = a->addProperty(
+                COLOR_PROPERTY, "shadow colour", arrows3DGroupProperty);
+    properties->mColor()->setValue(arrows3DShadowColourProperty,
+                                   arrows3DShadowColour);
 
     deltaGlyphsLonLatProperty = a->addProperty(
                 DOUBLE_PROPERTY, "glyph distance (deg)",
@@ -348,7 +364,7 @@ void MNWPHorizontalSectionActor::reloadShaderEffects()
 {
     LOG4CPLUS_DEBUG(mlog, "loading shader programs" << flush);
 
-    beginCompileShaders(7);
+    beginCompileShaders(9);
 
     compileShadersFromFileWithProgressDialog(
                 glVerticalInterpolationEffect,
@@ -368,6 +384,9 @@ void MNWPHorizontalSectionActor::reloadShaderEffects()
     compileShadersFromFileWithProgressDialog(
                 glVectorGlyphsShader,
                 "src/glsl/hsec_vectorglyphs.fx.glsl");
+    compileShadersFromFileWithProgressDialog(
+                gl3DVectorGlyphsShader,
+                "src/glsl/3d_glyphs.fx.glsl");
     compileShadersFromFileWithProgressDialog(
                 glShadowQuad,
                 "src/glsl/hsec_shadow.fx.glsl");
@@ -434,6 +453,10 @@ void MNWPHorizontalSectionActor::saveConfiguration(QSettings *settings)
                        vectorGlyphsSettings->scaleArrowMaxLength);
     settings->setValue("scaleArrowDiscardAbove",
                        vectorGlyphsSettings->scaleArrowDiscardAbove);
+    settings->setValue("drawShadow",
+                       vectorGlyphsSettings->arrows3DShadowEnabled);
+    settings->setValue("shadowColour",
+                       vectorGlyphsSettings->arrows3DShadowColour);
 
     settings->setValue("reduceFactor", vectorGlyphsSettings->reduceFactor);
     settings->setValue("reduceSlope", vectorGlyphsSettings->reduceSlope);
@@ -571,6 +594,13 @@ void MNWPHorizontalSectionActor::loadConfiguration(QSettings *settings)
     properties->mBool()->setValue(
                 vectorGlyphsSettings->scaleArrowDiscardAboveProperty,
                 settings->value("scaleArrowDiscardAbove", false).toBool());
+    properties->mBool()->setValue(
+                vectorGlyphsSettings->arrows3DShadowEnabledProperty,
+                settings->value("drawShadow", true).toBool());
+    properties->mColor()->setValue(
+                vectorGlyphsSettings->arrows3DShadowColourProperty,
+                settings->value("shadowColour",
+                                QColor(10, 10, 10, 70)).value<QColor>());
     properties->mDouble()->setValue(
                 vectorGlyphsSettings->deltaGlyphsLonLatProperty,
                 settings->value("deltaBarbsLonLat", 1.).toFloat());
@@ -950,6 +980,8 @@ void MNWPHorizontalSectionActor::initializeActorResources()
                                                 glPseudoColourShader);
     loadShaders |= glRM->generateEffectProgram("hsec_vectorglyphs",
                                                 glVectorGlyphsShader);
+    loadShaders |= glRM->generateEffectProgram("3d_glyphs",
+                                               gl3DVectorGlyphsShader);
     loadShaders |= glRM->generateEffectProgram("hsec_shadow",
                                                 glShadowQuad);
     loadShaders |= glRM->generateEffectProgram("vsec_positionsphere",
@@ -1099,6 +1131,8 @@ void MNWPHorizontalSectionActor::onQtPropertyChanged(QtProperty *property)
              || property == vectorGlyphsSettings->scaleArrowWithMagnitudeProperty
              || property == vectorGlyphsSettings->scaleArrowDiscardBelowProperty
              || property == vectorGlyphsSettings->scaleArrowDiscardAboveProperty
+             || property == vectorGlyphsSettings->arrows3DShadowEnabledProperty
+             || property == vectorGlyphsSettings->arrows3DShadowColourProperty
              || property == vectorGlyphsSettings->deltaGlyphsLonLatProperty
              || property == vectorGlyphsSettings->clampDeltaGlyphsToGridProperty
              || property == vectorGlyphsSettings->reduceFactorProperty
@@ -1139,6 +1173,10 @@ void MNWPHorizontalSectionActor::onQtPropertyChanged(QtProperty *property)
                 ->value(vectorGlyphsSettings->scaleArrowDiscardBelowProperty);
         vectorGlyphsSettings->scaleArrowDiscardAbove = properties->mBool()
                 ->value(vectorGlyphsSettings->scaleArrowDiscardAboveProperty);
+        vectorGlyphsSettings->arrows3DShadowEnabled = properties->mBool()
+                ->value(vectorGlyphsSettings->arrows3DShadowEnabledProperty);
+        vectorGlyphsSettings->arrows3DShadowColour = properties->mColor()
+                ->value(vectorGlyphsSettings->arrows3DShadowColourProperty);
         vectorGlyphsSettings->deltaGlyphsLonLat = properties->mDouble()
                 ->value(vectorGlyphsSettings->deltaGlyphsLonLatProperty);
         vectorGlyphsSettings->clampDeltaGlyphsToGrid = properties->mBool()
@@ -1426,7 +1464,26 @@ void MNWPHorizontalSectionActor::renderToCurrentContext(MSceneViewGLWidget *scen
     // =====================
     if (vectorGlyphsSettings->enabled)
     {
-        renderVectorGlyphs(sceneView);
+
+        switch (vectorGlyphsSettings->glyphType)
+        {
+        case VectorGlyphsSettings::GlyphType::WindBarbs:
+        case VectorGlyphsSettings::GlyphType::Arrows:
+        {
+            renderVectorGlyphs(sceneView, glVectorGlyphsShader);
+            break;
+        }
+        case VectorGlyphsSettings::GlyphType::Arrows3D:
+        {
+            renderVectorGlyphs(sceneView, gl3DVectorGlyphsShader);
+            if (vectorGlyphsSettings->arrows3DShadowEnabled)
+            {
+                renderVectorGlyphs(sceneView, gl3DVectorGlyphsShader, true);
+            }
+        }
+        default:
+            break;
+        }
     }
 
     // Render HANDLES in interaction mode.
@@ -2358,7 +2415,10 @@ void MNWPHorizontalSectionActor::renderTexturedContours(
 }
 
 
-void MNWPHorizontalSectionActor::renderVectorGlyphs(MSceneViewGLWidget *sceneView)
+void MNWPHorizontalSectionActor::renderVectorGlyphs(
+        MSceneViewGLWidget *sceneView,
+        std::shared_ptr<GL::MShaderEffect> glyphsShader,
+        bool renderShadow)
 {
     // Selected variables valid?
     if (vectorGlyphsSettings->latComponentVarIndex >= variables.size() ||
@@ -2387,17 +2447,11 @@ void MNWPHorizontalSectionActor::renderVectorGlyphs(MSceneViewGLWidget *sceneVie
         return;
     }
 
-    if (varLatitudinal->grid->getLevelType() == SURFACE_2D)
-    {
-        LOG4CPLUS_WARN(mlog, "WARNING: Vector glyphs have not been implemented "
-                             "for 2D surface fields. Disabling vector glyphs.");
-        return;
-    }
-
     // Don't render vector glyphs if horizontal slice position is outside the
     // data domain (assuming longitudial/latitudial are on the same grid).
-    if (varLatitudinal->grid->getBottomDataVolumePressure() < slicePosition_hPa
-            || varLatitudinal->grid->getTopDataVolumePressure() > slicePosition_hPa)
+    if (varLatitudinal->grid->getLevelType() != SURFACE_2D &&
+            (varLatitudinal->grid->getBottomDataVolumePressure() < slicePosition_hPa
+             || varLatitudinal->grid->getTopDataVolumePressure() > slicePosition_hPa))
     {
         return;
     }
@@ -2406,50 +2460,92 @@ void MNWPHorizontalSectionActor::renderVectorGlyphs(MSceneViewGLWidget *sceneVie
     {
     case VectorGlyphsSettings::GlyphType::WindBarbs:
     {
-        glVectorGlyphsShader->bindProgram("WindBarbs");
-        glVectorGlyphsShader->setUniformValue(
+        glyphsShader->bindProgram("WindBarbs");
+        glyphsShader->setUniformValue(
                     "showCalmGlyph", vectorGlyphsSettings->showCalmGlyphs); CHECK_GL_ERROR;
-        glVectorGlyphsShader->setUniformValue(
+        glyphsShader->setUniformValue(
                     "numFlags", vectorGlyphsSettings->pennantTilt); CHECK_GL_ERROR;
         break;
     }
     case VectorGlyphsSettings::GlyphType::Arrows:
     {
-        glVectorGlyphsShader->bindProgram("Arrows");
-        glVectorGlyphsShader->setUniformValue(
+        glyphsShader->bindProgram("Arrows");
+        glyphsShader->setUniformValue(
                     "arrowHeadHeight",
                     GLfloat(vectorGlyphsSettings->arrowHeadHeight)); CHECK_GL_ERROR;
-        glVectorGlyphsShader->setUniformValue(
+        glyphsShader->setUniformValue(
                     "arrowOutlineWidth",
                     GLfloat(vectorGlyphsSettings->arrowOutlineWidth)); CHECK_GL_ERROR;
-        glVectorGlyphsShader->setUniformValue(
+        glyphsShader->setUniformValue(
                     "arrowOutlineColour",
                     vectorGlyphsSettings->arrowOutlineColour); CHECK_GL_ERROR;
-        glVectorGlyphsShader->setUniformValue(
+        glyphsShader->setUniformValue(
                     "arrowDrawOutline",
                     GLfloat(vectorGlyphsSettings->arrowDrawOutline)); CHECK_GL_ERROR;
-        glVectorGlyphsShader->setUniformValue(
+        glyphsShader->setUniformValue(
                     "scaleArrowWithMagnitude",
                     vectorGlyphsSettings->scaleArrowWithMagnitude); CHECK_GL_ERROR;
-        glVectorGlyphsShader->setUniformValue(
+        glyphsShader->setUniformValue(
                     "scaleArrowDiscardBelow",
                     vectorGlyphsSettings->scaleArrowDiscardBelow); CHECK_GL_ERROR;
-        glVectorGlyphsShader->setUniformValue(
+        glyphsShader->setUniformValue(
                     "scaleArrowDiscardAbove",
                     vectorGlyphsSettings->scaleArrowDiscardAbove); CHECK_GL_ERROR;
-        glVectorGlyphsShader->setUniformValue(
+        glyphsShader->setUniformValue(
                     "scaleArrowMinScalar",
                     GLfloat(vectorGlyphsSettings->scaleArrowMinScalar)); CHECK_GL_ERROR;
-        glVectorGlyphsShader->setUniformValue(
+        glyphsShader->setUniformValue(
                     "scaleArrowMinLength",
                     GLfloat(vectorGlyphsSettings->scaleArrowMinLength)); CHECK_GL_ERROR;
-        glVectorGlyphsShader->setUniformValue(
+        glyphsShader->setUniformValue(
                     "scaleArrowMaxScalar",
                     GLfloat(vectorGlyphsSettings->scaleArrowMaxScalar)); CHECK_GL_ERROR;
-        glVectorGlyphsShader->setUniformValue(
+        glyphsShader->setUniformValue(
                     "scaleArrowMaxLength",
                     GLfloat(vectorGlyphsSettings->scaleArrowMaxLength)); CHECK_GL_ERROR;
         break;
+    }
+    case VectorGlyphsSettings::GlyphType::Arrows3D:
+    {
+        if (renderShadow)
+        {
+            glyphsShader->bindProgram("HSecArrowShadow");
+            glyphsShader->setUniformValue(
+                        "shadowColor",
+                        vectorGlyphsSettings->arrows3DShadowColour); CHECK_GL_ERROR;
+        }
+        else
+        {
+            glyphsShader->bindProgram("HSecArrowData");
+        }
+        glyphsShader->setUniformValue(
+                    "arrowRadius",
+                    GLfloat(vectorGlyphsSettings->arrowHeadHeight)); CHECK_GL_ERROR;
+        glyphsShader->setUniformValue(
+                    "lightDirection",
+                    sceneView->getLightDirection()); CHECK_GL_ERROR;
+
+        glyphsShader->setUniformValue(
+                    "scaleArrowWithMagnitude",
+                    vectorGlyphsSettings->scaleArrowWithMagnitude); CHECK_GL_ERROR;
+        glyphsShader->setUniformValue(
+                    "scaleArrowDiscardBelow",
+                    vectorGlyphsSettings->scaleArrowDiscardBelow); CHECK_GL_ERROR;
+        glyphsShader->setUniformValue(
+                    "scaleArrowDiscardAbove",
+                    vectorGlyphsSettings->scaleArrowDiscardAbove); CHECK_GL_ERROR;
+        glyphsShader->setUniformValue(
+                    "scaleArrowMinScalar",
+                    GLfloat(vectorGlyphsSettings->scaleArrowMinScalar)); CHECK_GL_ERROR;
+        glyphsShader->setUniformValue(
+                    "scaleArrowMinLength",
+                    GLfloat(vectorGlyphsSettings->scaleArrowMinLength)); CHECK_GL_ERROR;
+        glyphsShader->setUniformValue(
+                    "scaleArrowMaxScalar",
+                    GLfloat(vectorGlyphsSettings->scaleArrowMaxScalar)); CHECK_GL_ERROR;
+        glyphsShader->setUniformValue(
+                    "scaleArrowMaxLength",
+                    GLfloat(vectorGlyphsSettings->scaleArrowMaxLength)); CHECK_GL_ERROR;
     }
     default:
     {
@@ -2460,65 +2556,102 @@ void MNWPHorizontalSectionActor::renderVectorGlyphs(MSceneViewGLWidget *sceneVie
     // Reset optional required textures (to avoid draw errors).
     // ========================================================
 
-    varLongitudinal->textureDummy1D->bindToTextureUnit(varLongitudinal->textureUnitUnusedTextures);
-    glVectorGlyphsShader->setUniformValue(
-                "hybridCoefficientsLon", varLongitudinal->textureUnitUnusedTextures); CHECK_GL_ERROR;
-    varLatitudinal->textureDummy1D->bindToTextureUnit(varLatitudinal->textureUnitUnusedTextures);
-    glVectorGlyphsShader->setUniformValue(
-                "hybridCoefficientsLat", varLatitudinal->textureUnitUnusedTextures); CHECK_GL_ERROR;
+    varLongitudinal->textureDummy1D->bindToTextureUnit(
+                varLongitudinal->textureUnitUnusedTextures);
+    glyphsShader->setUniformValue(
+                "hybridCoefficientsLon",
+                varLongitudinal->textureUnitUnusedTextures); CHECK_GL_ERROR;
+    varLatitudinal->textureDummy1D->bindToTextureUnit(
+                varLatitudinal->textureUnitUnusedTextures);
+    glyphsShader->setUniformValue(
+                "hybridCoefficientsLat",
+                varLatitudinal->textureUnitUnusedTextures); CHECK_GL_ERROR;
 
-    varLongitudinal->textureDummy2D->bindToTextureUnit(varLongitudinal->textureUnitUnusedTextures);
-    glVectorGlyphsShader->setUniformValue(
-                "surfacePressureLon", varLongitudinal->textureUnitUnusedTextures); CHECK_GL_ERROR;
-    varLatitudinal->textureDummy2D->bindToTextureUnit(varLatitudinal->textureUnitUnusedTextures);
-    glVectorGlyphsShader->setUniformValue(
-                "surfacePressureLat", varLatitudinal->textureUnitUnusedTextures); CHECK_GL_ERROR;
+    varLongitudinal->textureDummy2D->bindToTextureUnit(
+                varLongitudinal->textureUnitUnusedTextures);
+    glyphsShader->setUniformValue(
+                "surfacePressureLon",
+                varLongitudinal->textureUnitUnusedTextures); CHECK_GL_ERROR;
+    varLatitudinal->textureDummy2D->bindToTextureUnit(
+                varLatitudinal->textureUnitUnusedTextures);
+    glyphsShader->setUniformValue(
+                "surfacePressureLat",
+                varLatitudinal->textureUnitUnusedTextures); CHECK_GL_ERROR;
+
+    glyphsShader->setUniformValue(
+                "vectorDataLonComponent2D",
+                varLongitudinal->textureUnitUnusedTextures); CHECK_GL_ERROR;
+    glyphsShader->setUniformValue(
+                "vectorDataLatComponent2D",
+                varLatitudinal->textureUnitUnusedTextures); CHECK_GL_ERROR;
 
     // Set shader variables.
     // =====================
 
-    glVectorGlyphsShader->setUniformValue(
+    glyphsShader->setUniformValue(
                 "pivotPosition",
                 GLint(int(vectorGlyphsSettings->pivotPosition))); CHECK_GL_ERROR;
 
-    glVectorGlyphsShader->setUniformValue(
+    glyphsShader->setUniformValue(
                 "mvpMatrix",
                 *(sceneView->getModelViewProjectionMatrix())); CHECK_GL_ERROR;
 
 //TODO (mr 17May2017) -- why is there an offset?
     const GLfloat worldZ = sceneView->worldZfromPressure(slicePosition_hPa) + 0.1;
-    glVectorGlyphsShader->setUniformValue(
+    glyphsShader->setUniformValue(
                 "worldZ", worldZ); CHECK_GL_ERROR;
 
-    varLongitudinal->textureDataField->bindToTextureUnit(
-                varLongitudinal->textureUnitDataField);
-    glVectorGlyphsShader->setUniformValue(
-                "dataLonComp",varLongitudinal->textureUnitDataField); CHECK_GL_ERROR;
-    varLatitudinal->textureDataField->bindToTextureUnit(
-                varLatitudinal->textureUnitDataField);
-    glVectorGlyphsShader->setUniformValue(
-                "dataLatComp",varLatitudinal->textureUnitDataField); CHECK_GL_ERROR;
+
+    // Texture bindings for data fields (2D texture).
+    if (varLongitudinal->grid->getLevelType() == SURFACE_2D)
+    {
+        varLongitudinal->textureDataField->bindToTextureUnit(
+                    varLongitudinal->textureUnitDataField);
+        glyphsShader->setUniformValue(
+                    "vectorDataLonComponent2D",
+                    varLongitudinal->textureUnitDataField); CHECK_GL_ERROR;
+
+        varLatitudinal->textureDataField->bindToTextureUnit(
+                    varLatitudinal->textureUnitDataField);
+        glyphsShader->setUniformValue(
+                    "vectorDataLatComponent2D",
+                    varLatitudinal->textureUnitDataField); CHECK_GL_ERROR;
+    }
+    // Texture bindings for data fields (3D texture).
+    else
+    {
+        varLongitudinal->textureDataField->bindToTextureUnit(
+                    varLongitudinal->textureUnitDataField);
+        glyphsShader->setUniformValue(
+                    "vectorDataLonComponent3D",
+                    varLongitudinal->textureUnitDataField); CHECK_GL_ERROR;
+        varLatitudinal->textureDataField->bindToTextureUnit(
+                    varLatitudinal->textureUnitDataField);
+        glyphsShader->setUniformValue(
+                    "vectorDataLatComponent3D",
+                    varLatitudinal->textureUnitDataField); CHECK_GL_ERROR;
+    }
 
     if (varLongitudinal->grid->getLevelType() == HYBRID_SIGMA_PRESSURE_3D)
     {
         varLongitudinal->textureSurfacePressure->bindToTextureUnit(
                     varLongitudinal->textureUnitSurfacePressure);
-        glVectorGlyphsShader->setUniformValue(
+        glyphsShader->setUniformValue(
                     "surfacePressureLon",
                     varLongitudinal->textureUnitSurfacePressure); CHECK_GL_ERROR;
         varLatitudinal->textureSurfacePressure->bindToTextureUnit(
                     varLatitudinal->textureUnitSurfacePressure);
-        glVectorGlyphsShader->setUniformValue(
+        glyphsShader->setUniformValue(
                     "surfacePressureLat",
                     varLatitudinal->textureUnitSurfacePressure); CHECK_GL_ERROR;
         varLongitudinal->textureHybridCoefficients->bindToTextureUnit(
                     varLongitudinal->textureUnitHybridCoefficients);
-        glVectorGlyphsShader->setUniformValue(
+        glyphsShader->setUniformValue(
                     "hybridCoefficientsLon",
                     varLongitudinal->textureUnitHybridCoefficients); CHECK_GL_ERROR;
         varLatitudinal->textureHybridCoefficients->bindToTextureUnit(
                     varLatitudinal->textureUnitHybridCoefficients);
-        glVectorGlyphsShader->setUniformValue(
+        glyphsShader->setUniformValue(
                     "hybridCoefficientsLat",
                     varLatitudinal->textureUnitHybridCoefficients);CHECK_GL_ERROR;
     }
@@ -2527,47 +2660,47 @@ void MNWPHorizontalSectionActor::renderVectorGlyphs(MSceneViewGLWidget *sceneVie
     {
         varLongitudinal->textureAuxiliaryPressure->bindToTextureUnit(
                     varLongitudinal->textureUnitAuxiliaryPressure); CHECK_GL_ERROR;
-        glVectorGlyphsShader->setUniformValue(
+        glyphsShader->setUniformValue(
                     "auxPressureFieldLon_hPa",
                     varLongitudinal->textureUnitAuxiliaryPressure); CHECK_GL_ERROR;
 
         varLatitudinal->textureAuxiliaryPressure->bindToTextureUnit(
                     varLatitudinal->textureUnitAuxiliaryPressure); CHECK_GL_ERROR;
-        glVectorGlyphsShader->setUniformValue(
+        glyphsShader->setUniformValue(
                     "auxPressureFieldLat_hPa",
                     varLatitudinal->textureUnitAuxiliaryPressure); CHECK_GL_ERROR;
     }
 
-    glVectorGlyphsShader->setUniformValue(
+    glyphsShader->setUniformValue(
                 "deltaLon", varLongitudinal->grid->getDeltaLon()); CHECK_GL_ERROR;
-    glVectorGlyphsShader->setUniformValue(
+    glyphsShader->setUniformValue(
                 "deltaLat", varLongitudinal->grid->getDeltaLat()); CHECK_GL_ERROR;
 
     QVector2D dataNWCrnr(varLongitudinal->grid->lons[0],
                          varLongitudinal->grid->lats[0]);
-    glVectorGlyphsShader->setUniformValue(
+    glyphsShader->setUniformValue(
                         "dataNWCrnr", dataNWCrnr); CHECK_GL_ERROR;
 
     // Texture bindings for Lat/Lon axes (1D textures).
     varLongitudinal->textureLonLatLevAxes->bindToTextureUnit(
                 varLongitudinal->textureUnitLonLatLevAxes); CHECK_GL_ERROR;
-    glVectorGlyphsShader->setUniformValue(
+    glyphsShader->setUniformValue(
                 "latLonAxesData",
                 varLongitudinal->textureUnitLonLatLevAxes); CHECK_GL_ERROR;
-    glVectorGlyphsShader->setUniformValue(
+    glyphsShader->setUniformValue(
                 "verticalOffset",
                 GLint(varLongitudinal->grid->nlons
                       + varLongitudinal->grid->nlats)); CHECK_GL_ERROR;
-    glVectorGlyphsShader->setUniformValue(
+    glyphsShader->setUniformValue(
                 "levelType",
                 static_cast<GLint>(varLongitudinal->levelType)); CHECK_GL_ERROR;
 
-    glVectorGlyphsShader->setUniformValue(
+    glyphsShader->setUniformValue(
                 "pressure_hPa", GLfloat(slicePosition_hPa)); CHECK_GL_ERROR;
 
-    glVectorGlyphsShader->setUniformValue(
+    glyphsShader->setUniformValue(
                 "lineWidth", vectorGlyphsSettings->lineWidth); CHECK_GL_ERROR;
-    glVectorGlyphsShader->setUniformValue(
+    glyphsShader->setUniformValue(
                 "glyphColor", vectorGlyphsSettings->color); CHECK_GL_ERROR;
 
     float scale = 1.;
@@ -2622,9 +2755,9 @@ void MNWPHorizontalSectionActor::renderVectorGlyphs(MSceneViewGLWidget *sceneVie
         deltaGlyphs = varLongitudinal->grid->getDeltaLon() * scale;
     }
 
-    glVectorGlyphsShader->setUniformValue("deltaGridX",
+    glyphsShader->setUniformValue("deltaGridX",
                                           deltaGlyphs); CHECK_GL_ERROR;
-    glVectorGlyphsShader->setUniformValue("deltaGridY",
+    glyphsShader->setUniformValue("deltaGridY",
                                           deltaGlyphs); CHECK_GL_ERROR;
 
     MGLResourcesManager* glRM = MGLResourcesManager::getInstance();
