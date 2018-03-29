@@ -72,6 +72,8 @@ public:
     MStructuredGrid* produceData(MDataRequest request) override;
     MTask* createTaskGraph(MDataRequest request) override;
 
+    void setGeoPotInputSource(MWeatherPredictionDataSource* s);
+
 protected:
     const QStringList locallyRequiredKeys() override;
     /**
@@ -82,6 +84,8 @@ protected:
      */
     inline double computeVs(MStructuredGrid* gridU, MStructuredGrid* gridV,
                             int k, int j, int i, const QVector2D& s) const;
+
+    MWeatherPredictionDataSource* geoPotSource;
 };
 
 class MBlurFilter : public MStructuredGridEnsembleFilter

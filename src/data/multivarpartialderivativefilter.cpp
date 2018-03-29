@@ -107,8 +107,22 @@ MMultiVarPartialDerivativeFilter::MMultiVarPartialDerivativeFilter()
 ***                            PUBLIC METHODS                               ***
 *******************************************************************************/
 
+
+void MMultiVarPartialDerivativeFilter::setGeoPotInputSource(
+            MWeatherPredictionDataSource* s)
+{
+    geoPotSource = s;
+    registerInputSource(geoPotSource);
+    enablePassThrough(s);
+}
+
+
 MStructuredGrid* MMultiVarPartialDerivativeFilter::produceData(
-        MDataRequest request) {
+        MDataRequest request)
+{
+    assert (inputSource != nullptr);
+    assert (geoPotSource != nullptr);
+
     MStructuredGrid *result = nullptr;
 
     MDataRequestHelper rh(request);
@@ -151,7 +165,7 @@ MStructuredGrid* MMultiVarPartialDerivativeFilter::produceData(
     {
         // And the geopotential data (geopotential, ...).
         rhVar.insert("VARIABLE", varGeoP);
-        gridGeoP = inputSource->getData(rhVar.request());
+        gridGeoP = geoPotSource->getData(rhVar.request());
     }
 
     // If the grids are not available, return a nullptr.
@@ -480,7 +494,7 @@ MStructuredGrid* MMultiVarPartialDerivativeFilter::produceData(
     inputSource->releaseData(gridU);
     inputSource->releaseData(gridV);
 
-    if (gridGeoP) { inputSource->releaseData(gridGeoP); }
+    if (gridGeoP) { geoPotSource->releaseData(gridGeoP); }
 
     return result;
 }
@@ -504,7 +518,7 @@ MTask* MMultiVarPartialDerivativeFilter::createTaskGraph(MDataRequest request)
     if (derivOps.contains("dz") && varGeoP != "")
     {
         rh.insert("VARIABLE", varGeoP);
-        task->addParent(inputSource->getTaskGraph(rh.request()));
+        task->addParent(geoPotSource->getTaskGraph(rh.request()));
     }
 
     // Before proceeding with this task, obtain all required variables.

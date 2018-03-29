@@ -383,7 +383,9 @@ void MJetcoreDetectionActor::requestIsoSurfaceIntersectionLines()
                 variables.at(variableSettingsCores->geoPotVarIndex));
 
     partialDerivFilters[0]->setInputSource(var1st->dataSource);
+    partialDerivFilters[0]->setGeoPotInputSource(varGeoPot->dataSource);
     partialDerivFilters[1]->setInputSource(var2nd->dataSource);
+    partialDerivFilters[1]->setGeoPotInputSource(varGeoPot->dataSource);
 
     isosurfaceSource->setInputSourceFirstVar(partialDerivFilters[0]);
     isosurfaceSource->setInputSourceSecondVar(partialDerivFilters[1]);
