@@ -765,11 +765,10 @@ void MIsosurfaceIntersectionActor::onActorRenamed(MActor *actor,
 
 void MIsosurfaceIntersectionActor::onQtPropertyChanged(QtProperty *property)
 {
-
-    if (suppressActorUpdates()) { return; }
-
     // Parent signal processing.
     MNWPMultiVarActor::onQtPropertyChanged(property);
+
+    if (suppressActorUpdates()) { return; }
 
     if (property == boundingBoxSettings->enabledProperty)
     {
