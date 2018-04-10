@@ -53,9 +53,14 @@ namespace Met3D
 
 MNWPSurfaceTopographyActor::MNWPSurfaceTopographyActor()
     : MNWPMultiVarActor(),
+      MBoundingBoxInterface(this),
       topographyVariableIndex(0),
-      shadingVariableIndex(0)
+      shadingVariableIndex(0),
+      updateRenderRegion(false)
 {
+    bBoxConnection = new MBoundingBoxConnection(
+                this, MBoundingBoxConnection::HORIZONTAL);
+
     // Create and initialise QtProperties for the GUI.
     // ===============================================
     beginInitialiseQtProperties();
@@ -68,6 +73,9 @@ MNWPSurfaceTopographyActor::MNWPSurfaceTopographyActor()
 
     shadingVariableIndexProp = addProperty(ENUM_PROPERTY, "shading variable",
                                     actorPropertiesSupGroup);
+
+    // Bounding box of the actor.
+    actorPropertiesSupGroup->addSubProperty(bBoxConnection->getProperty());
 
     endInitialiseQtProperties();
 }
@@ -98,7 +106,17 @@ const QList<MVerticalLevelType> MNWPSurfaceTopographyActor::supportedLevelTypes(
 MNWPActorVariable* MNWPSurfaceTopographyActor::createActorVariable(
         const MSelectableDataSource& dataSource)
 {
-    MNWPActorVariable* newVar = new MNWPActorVariable(this);
+    MNWP2DHorizontalActorVariable* newVar = new MNWP2DHorizontalActorVariable(this);
+
+    // Remove property groups not needed by surface topography actor.
+    newVar->renderSettings.groupProperty->removeSubProperty(
+                newVar->renderSettings.renderModeProperty);
+    newVar->renderSettings.groupProperty->removeSubProperty(
+                newVar->renderSettings.contourSetGroupProperty);
+    newVar->renderSettings.groupProperty->removeSubProperty(
+                newVar->contourLabelSuffixProperty);
+    newVar->renderSettings.groupProperty->removeSubProperty(
+                newVar->spatialTransferFunctionProperty);
 
     newVar->dataSourceID = dataSource.dataSourceID;
     newVar->levelType = dataSource.levelType;
@@ -147,6 +165,20 @@ void MNWPSurfaceTopographyActor::loadConfiguration(QSettings *settings)
 }
 
 
+void MNWPSurfaceTopographyActor::onBoundingBoxChanged()
+{
+    if (suppressActorUpdates())
+    {
+        return;
+    }
+
+    // The bbox position has changed. In the next render cycle, update the
+    // render region, download target grid from GPU and update contours.
+    updateRenderRegion = true;
+    emitActorChangedSignal();
+}
+
+
 /******************************************************************************
 ***                             PUBLIC SLOTS                                ***
 *******************************************************************************/
@@ -192,6 +224,11 @@ void MNWPSurfaceTopographyActor::initializeActorResources()
     properties->mEnum()->setValue(shadingVariableIndexProp,
                                   shadingVariableIndex);
 
+    // Compute the grid indices that correspond to the current bounding box
+    // (the bounding box can have different extents than the data grid) during
+    // the first render cycle.
+    updateRenderRegion = true;
+
     // Load shader.
     MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
 
@@ -205,13 +242,39 @@ void MNWPSurfaceTopographyActor::initializeActorResources()
 
 void MNWPSurfaceTopographyActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
 {
-    if (variables.size() == 0) return;
+    if (variables.size() == 0 || bBoxConnection->getBoundingBox() == nullptr)
+    {
+        return;
+    }
 
     // Shortcuts to the variable's properties.
-    MNWPActorVariable* varTopo = variables.at(topographyVariableIndex);
-    MNWPActorVariable* var     = variables.at(shadingVariableIndex);
+    MNWP2DHorizontalActorVariable* varTopo =
+            static_cast<MNWP2DHorizontalActorVariable*>(
+                variables.at(topographyVariableIndex));
+    MNWP2DHorizontalActorVariable* var     =
+            static_cast<MNWP2DHorizontalActorVariable*>(
+                variables.at(shadingVariableIndex));
 
-    if ( !var->hasData() || !varTopo->hasData() ) return;
+    if ( !var->hasData() || !varTopo->hasData() )
+    {
+        return;
+    }
+
+    // UPDATE REGION PARAMETERS if bounding box has changed.
+    // =====================================================
+    if (updateRenderRegion)
+    {
+        // This method might already be called between initial data request and
+        // all data fields being available. Return if not all variables
+        // contain valid data yet.
+        foreach (MNWPActorVariable *var, variables)
+        {
+            if ( !var->hasData() ) return;
+        }
+
+        computeRenderRegionParameters();
+        updateRenderRegion = false;
+    }
 
     // Bind shader program that renders the volume slice.
     shaderProgram->bind();
@@ -259,19 +322,57 @@ void MNWPSurfaceTopographyActor::renderToCurrentContext(MSceneViewGLWidget *scen
     shaderProgram->setUniformValue(
                 "lightDirection", sceneView->getLightDirection());
 
+    // Grid offsets to render only the requested subregion.
+    shaderProgram->setUniformValue("iOffset", GLint(var->i0)); CHECK_GL_ERROR;
+    shaderProgram->setUniformValue("jOffset", GLint(var->j0)); CHECK_GL_ERROR;
+    shaderProgram->setUniformValue(
+                "bboxLons", QVector2D(bBoxConnection->westLon(),
+                                      bBoxConnection->eastLon())); CHECK_GL_ERROR;
+    shaderProgram->setUniformValue(
+                "isCyclicGrid",
+                GLboolean(var->grid->gridIsCyclicInLongitude())); CHECK_GL_ERROR;
+    shaderProgram->setUniformValue(
+                "leftGridLon", GLfloat(var->grid->lons[0])); CHECK_GL_ERROR;
+    shaderProgram->setUniformValue(
+                "eastGridLon", GLfloat(var->grid->lons[var->grid->nlons - 1]));
+    CHECK_GL_ERROR;
+    shaderProgram->setUniformValue(
+                "shiftForWesternLon",
+                GLfloat(var->shiftForWesternLon)); CHECK_GL_ERROR;
+
     // Use instanced rendering to avoid geometry upload (see notes 09Feb2012).
     glPolygonMode(GL_FRONT_AND_BACK,
                   renderAsWireFrame ? GL_LINE : GL_FILL); CHECK_GL_ERROR;
     glDrawArraysInstanced(GL_TRIANGLE_STRIP,
                           0,
-                          var->grid->nlons * 2,
-                          var->grid->nlats - 1); CHECK_GL_ERROR;
+                          var->nlons * 2,
+                          var->nlats - 1); CHECK_GL_ERROR;
 }
 
 
 void MNWPSurfaceTopographyActor::dataFieldChangedEvent()
 {
     emitActorChangedSignal();
+}
+
+
+void MNWPSurfaceTopographyActor::computeRenderRegionParameters()
+{
+    if (bBoxConnection->getBoundingBox() == nullptr)
+    {
+        return;
+    }
+
+    // Compute render region parameters for each variable.
+    for (int vi = 0; vi < variables.size(); vi++)
+    {
+        MNWP2DHorizontalActorVariable* var =
+                static_cast<MNWP2DHorizontalActorVariable*> (variables.at(vi));
+
+        var->computeRenderRegionParameters(
+                    bBoxConnection->westLon(), bBoxConnection->southLat(),
+                    bBoxConnection->eastLon(), bBoxConnection->northLat());
+    }
 }
 
 
@@ -310,7 +411,6 @@ void MNWPSurfaceTopographyActor::onDeleteActorVariable(
                                   tmpTopographyVariableIndex);
     properties->mEnum()->setValue(shadingVariableIndexProp,
                                   tmpShadingVariableIndex);
-
 }
 
 
@@ -331,6 +431,8 @@ void MNWPSurfaceTopographyActor::onAddActorVariable(
                                   tmpTopographyVariableIndex);
     properties->mEnum()->setValue(shadingVariableIndexProp,
                                   tmpShadingVariableIndex);
+
+    updateRenderRegion = true;
 }
 
 
@@ -353,6 +455,8 @@ void MNWPSurfaceTopographyActor::onChangeActorVariable(MNWPActorVariable *var)
     properties->mEnum()->setValue(shadingVariableIndexProp,
                                   tmpShadingVariableIndex);
     enableActorUpdates(true);
+
+    updateRenderRegion = true;
 }
 
 
