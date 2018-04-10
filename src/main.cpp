@@ -78,11 +78,7 @@ int main(int argc, char *argv[])
     }
 
     // Create the application window and run the application.
-    QString applicationTitle = QString("Met.3D version %1 (%2)")
-            .arg(met3dVersionString).arg(met3dBuildDate);
-
     Met3D::MMainWindow win(commandLineArguments);
-    win.setWindowTitle(applicationTitle);
 //    win.resize(1280, 610);
     win.resize(1288, 610);
 //    win.resize(1600, 900);
