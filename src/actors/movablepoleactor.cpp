@@ -713,24 +713,28 @@ void MMovablePoleActor::dragEvent(MSceneViewGLWidget *sceneView,
             poleVertices[handleID].z()));
 
     // Compute the mouse position in world space.
-    float d = static_cast<float>(QVector3D::dotProduct(p0 - l0, n) / QVector3D::dotProduct(l, n));
+    float d = static_cast<float>(QVector3D::dotProduct(p0 - l0, n)
+                                 / QVector3D::dotProduct(l, n));
     QVector3D mousePosWorldSpace = l0 + d * l;
 
     // Update the coordinates of pole, axis tick marks and labels. Upload new
     // positions to vertex buffers and redraw the scene.
 
-    // We only have one pole vertex in a pole actor. So simply use handleID = 0
+    // One pole has two handles so to get the pole index, divide the handleID by
+    // 2 and round down.
     int pole = handleID / 2;
+    // Get the smaller index belonging to the pole in a vector containing two
+    // elements per pole (e.g. poleVertices, startEndPositions vectors).
+    int poleVectorPos = pole * 2;
 
-    poleVertices[pole  ].setX(mousePosWorldSpace.x());
-    poleVertices[pole  ].setY(mousePosWorldSpace.y());
-    poleVertices[pole + 1].setX(mousePosWorldSpace.x());
-    poleVertices[pole + 1].setY(mousePosWorldSpace.y());
+    poleVertices[poleVectorPos    ].setX(mousePosWorldSpace.x());
+    poleVertices[poleVectorPos    ].setY(mousePosWorldSpace.y());
+    poleVertices[poleVectorPos + 1].setX(mousePosWorldSpace.x());
+    poleVertices[poleVectorPos + 1].setY(mousePosWorldSpace.y());
 
     // Update tick mark positions.
-    int numPoles = poleVertices.size() / 2; // two vertices per pole
-
-    for (int i = pole; i < axisTicks.size(); i += numPoles)
+    for (int i = axisTicksFirstLastIndices[poleVectorPos];
+         i < axisTicksFirstLastIndices[poleVectorPos + 1]; ++i)
     {
         axisTicks[i].setX(mousePosWorldSpace.x());
         axisTicks[i].setY(mousePosWorldSpace.y());
@@ -738,14 +742,17 @@ void MMovablePoleActor::dragEvent(MSceneViewGLWidget *sceneView,
 
     const QString poleRequestKey = "pole_vertices_actor#"
                                    + QString::number(getID());
-    uploadVec3ToVertexBuffer(poleVertices, poleRequestKey, &poleVertexBuffer, sceneView);
+    uploadVec3ToVertexBuffer(poleVertices, poleRequestKey, &poleVertexBuffer,
+                             sceneView);
 
     const QString axisRequestKey = "axis_vertices_actor#"
                                    + QString::number(getID());
-    uploadVec3ToVertexBuffer(axisTicks, axisRequestKey, &axisVertexBuffer, sceneView);
+    uploadVec3ToVertexBuffer(axisTicks, axisRequestKey, &axisVertexBuffer,
+                             sceneView);
 
     // Update label positions.
-    for (int i = pole; i < labels.size(); i+=numPoles)
+    for (int i = labelsFirstLastIndices[poleVectorPos];
+         i < labelsFirstLastIndices[poleVectorPos + 1]; ++i)
     {
         labels[i]->anchor.setX(mousePosWorldSpace.x());
         labels[i]->anchor.setY(mousePosWorldSpace.y());
@@ -780,10 +787,12 @@ void MMovablePoleActor::dragEvent(MSceneViewGLWidget *sceneView,
                 * sceneView->getCamera()->getXAxis());
     }
 
+    enableActorUpdates(false);
     // Update GUI properties.
     properties->mPointF()->setValue(
             poles[pole]->positionProperty,
             QPointF(mousePosWorldSpace.x(), mousePosWorldSpace.y()));
+    enableActorUpdates(true);
 
     emitActorChangedSignal();
 }
@@ -955,12 +964,15 @@ void MMovablePoleActor::generateGeometry()
     poleVertices.clear();
     // Clear all ticks
     axisTicks.clear();
+    axisTicksFirstLastIndices.clear();
 
     // C) Generate labels.
     // ===================
 
     // Remove all text labels of the old geometry (MActor method).
     removeAllLabels();
+    labelsFirstLastIndices.clear();
+
     MGLResourcesManager* glRM = MGLResourcesManager::getInstance();
     MTextManager* tm = glRM->getTextManager();
 
@@ -1011,6 +1023,8 @@ void MMovablePoleActor::generateGeometry()
         int p = int(pBot / interval) * interval;
         int counter = 0;
 
+        axisTicksFirstLastIndices.append(axisTicks.size());
+        labelsFirstLastIndices.append(labels.size());
         while (p >= pTop)
         {
             axisTicks.append(QVector3D(polePos.x(), polePos.y(), p));
@@ -1030,6 +1044,8 @@ void MMovablePoleActor::generateGeometry()
             counter++;
             p -= (p > pressureThreshold) ? upperTickStep : lowerTickStep;
         }
+        axisTicksFirstLastIndices.append(axisTicks.size());
+        labelsFirstLastIndices.append(labels.size());
     }
 
     // B) Upload geometry data to VBO.
