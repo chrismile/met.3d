@@ -60,10 +60,95 @@ MAbstractDataReader::~MAbstractDataReader()
 void MAbstractDataReader::setDataRoot(QString path, QString fFilter)
 {
     dataRoot = QDir(path);
-    fileFilter = fFilter;
+    dirFileFilters = fFilter;
     scanDataRoot();
 }
 
+
+void MAbstractDataReader::getAvailableFilesFromFilters(QStringList &availableFiles)
+{
+    availableFiles.clear();
+    QString rootPath = dataRoot.absolutePath();
+    QString filters = dirFileFilters;
+    filters.replace("\\e", "*");
+    QStringList dirFilters = filters.split("/", QString::SkipEmptyParts);
+    // Take the last part of the filters list as file filter.
+    QString fileFilter = dirFilters.takeLast();
+
+    if (!dirFilters.isEmpty())
+    {
+        // Get directories.
+
+        // Initialise availableFile with the first "sub-directory-layer".
+        availableFiles = dataRoot.entryList(
+                    QStringList(dirFilters.takeFirst()),
+                    QDir::Dirs | QDir::NoDotAndDotDot);
+        int numPaths = availableFiles.size();
+        foreach (QString dirFilter, dirFilters)
+        {
+            for (int i = 0; i < numPaths; ++i)
+            {
+                // Set directory path to the path to the current sub-directory
+                // to be searched in and filter the sub-directories according to
+                // the filter of the  current "layer".
+                QString path = availableFiles.takeFirst();
+                dataRoot.setPath(rootPath + "/" + path);
+                QStringList availableDirs = dataRoot.entryList(
+                            QStringList(dirFilter),
+                            (QDir::Dirs | QDir::NoDotAndDotDot));
+                foreach (QString availableDir, availableDirs)
+                {
+                    availableFiles.append(path + "/" + availableDir);
+                }
+            }
+            numPaths = availableFiles.size();
+        }
+
+        // Get files.
+        for (int i = 0; i < numPaths; ++i)
+        {
+            QString path = availableFiles.takeFirst();
+            dataRoot.setPath(rootPath + "/" + path);
+            QStringList availableFileList = dataRoot.entryList(
+                        QStringList(fileFilter), QDir::Files);
+            foreach (QString availableFile, availableFileList)
+            {
+                availableFiles.append(path + "/" + availableFile);
+            }
+        }
+    }
+    else
+    {
+        // No directory filters given thus only search for files.
+        availableFiles = dataRoot.entryList(
+                    QStringList(fileFilter), QDir::Files);
+    }
+
+    // Since dataRoot was used to search the sub-directories, reset dataRoot to
+    // the root directory.
+    dataRoot.setPath(rootPath);
+}
+
+
+int MAbstractDataReader::getEnsembleMemberIDFromFileName(QString fileName)
+{
+    QString ensembleNameFilter = QRegExp::escape(dirFileFilters);
+    ensembleNameFilter.replace("\\*", ".*");
+    ensembleNameFilter.replace("\\\\e", "(\\d+)");
+
+    QRegExp findEnsemble(ensembleNameFilter);
+
+    findEnsemble.exactMatch(fileName);
+    // Get ensemble member.
+    QString ensembleMember = findEnsemble.cap(1);
+
+    if (ensembleMember.isEmpty())
+    {
+        return -1;
+    }
+
+    return ensembleMember.toInt();
+}
 
 
 /******************************************************************************

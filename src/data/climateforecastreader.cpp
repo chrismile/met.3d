@@ -65,7 +65,8 @@ MClimateForecastReader::MClimateForecastReader(
       treatRotatedGridAsRegularGrid(treatRotatedGridAsRegularGrid),
       convertGeometricHeightToPressure_ICAOStandard(
           convertGeometricHeightToPressure_ICAOStandard),
-      disableGridConsistencyCheck(disableGridConsistencyCheck)
+      disableGridConsistencyCheck(disableGridConsistencyCheck),
+      ensembleIDIsSpecifiedInFileName(false)
 
 {
     // Read mapping "variable name to CF standard name", specific to ECMWF
@@ -459,13 +460,17 @@ void MClimateForecastReader::scanDataRoot()
     LOG4CPLUS_DEBUG(mlog, "Scanning directory "
                     << dataRoot.absolutePath().toStdString() << " "
                     << "for files with NetCDF-CF forecast data.");
-    LOG4CPLUS_DEBUG(mlog, "Using file filter: " << fileFilter.toStdString());
+    LOG4CPLUS_DEBUG(mlog, "Using file filter: " << dirFileFilters.toStdString());
     LOG4CPLUS_DEBUG(mlog, "Available files with forecast data:");
 
     // Get a list of all files in the directory that match the wildcard name
-    // filter given in "fileFilter".
-    QStringList availableFiles = dataRoot.entryList(
-                QStringList(fileFilter), QDir::Files);
+    // filter given in "dirFileFilters".
+
+    QStringList availableFiles;
+    getAvailableFilesFromFilters(availableFiles);
+
+    ensembleIDIsSpecifiedInFileName = dirFileFilters.contains("\\e");
+    int  ensembleIDFromFile = -1;
 
     QMap<QString, MNcVarDimensionInfo> auxiliaryVarsDimensionsInfo;
 
@@ -512,6 +517,21 @@ void MClimateForecastReader::scanDataRoot()
         }
 
         multimap<string, NcVar> ncVariables = ncFile->getVars();
+
+        if (ensembleIDIsSpecifiedInFileName)
+        {
+            ensembleIDFromFile = getEnsembleMemberIDFromFileName(fileName);
+
+            if (ensembleIDFromFile == -1)
+            {
+                LOG4CPLUS_ERROR(mlog, "ERROR: ensemble tag found in file filter "
+                                      " but filter did not match file \""
+                                << fileName.toStdString()
+                                << "\" (currently only integer values are allowed"
+                                   " as ensemble member specifiers)." << flush);
+                continue;
+            }
+        }
 
         QStringList gridMappingVarNames = QStringList();
         // Since we don't know the name of the grid mapping variable, loop over
@@ -690,7 +710,8 @@ void MClimateForecastReader::scanDataRoot()
                     {
                         bool consistent = checkSharedVariableDataConsistency(
                                     &sharedVariableInfos[levelType][varName],
-                                    &currCFVar, levelType, false, true);
+                                    &currCFVar, levelType, false,
+                                    !ensembleIDIsSpecifiedInFileName);
                         checkedVariables[levelType][varName] = consistent;
                         if (!consistent)
                         {
@@ -706,6 +727,18 @@ void MClimateForecastReader::scanDataRoot()
                         }
                     }
                     vinfo = availableDataFields[levelType].value(varName);
+                    if (ensembleIDIsSpecifiedInFileName)
+                    {
+                        vinfo->availableMembers.insert(ensembleIDFromFile);
+
+                        foreach (QDateTime validTime, currTimeCoordValues) // in UTC!
+                        {
+                            MDatafieldInfo info;
+                            info.filename = fileName;
+                            vinfo->timeMap[initTime][validTime][ensembleIDFromFile]
+                                    = info;
+                        } // for (valid times)
+                    }
                 }
                 else
                 {
@@ -764,18 +797,25 @@ void MClimateForecastReader::scanDataRoot()
                     }
 
 
-                    // Check if the variable has an ensemble dimension.
-                    if (currCFVar.hasEnsembleDimension())
+                    if (ensembleIDIsSpecifiedInFileName)
                     {
-                        // If yes, get the available ensemble members.
-                        vinfo->availableMembers =
-                                currCFVar.getEnsembleMembers();
+                        vinfo->availableMembers.insert(ensembleIDFromFile);
                     }
                     else
                     {
-                        // No ensemble dimension could be found. List the
-                        // available data field as the "0" member.
-                        vinfo->availableMembers.insert(0);
+                        // Check if the variable has an ensemble dimension.
+                        if (currCFVar.hasEnsembleDimension())
+                        {
+                            // If yes, get the available ensemble members.
+                            vinfo->availableMembers =
+                                    currCFVar.getEnsembleMembers();
+                        }
+                        else
+                        {
+                            // No ensemble dimension could be found. List the
+                            // available data field as the "0" member.
+                            vinfo->availableMembers.insert(0);
+                        }
                     }
 
                     vinfo->horizontalGridType = MHorizontalGridType::REGULAR_LONLAT;
@@ -894,11 +934,23 @@ void MClimateForecastReader::scanDataRoot()
                     checkedVariables[levelType][varName] = true;
                 }
 
+                unsigned int ensMem;
+                if (ensembleIDIsSpecifiedInFileName)
+                {
+                    ensMem = ensembleIDFromFile;
+                }
+                else
+                {
+                    // If ensemble members are all stored in one file, use 0 to
+                    // represent them to avoid redundant informations stored.
+                    ensMem = 0;
+                }
+
                 foreach (QDateTime validTime, currTimeCoordValues) // in UTC!
                 {
                     MDatafieldInfo info;
                     info.filename = fileName;
-                    vinfo->timeMap[initTime][validTime] = info;
+                    vinfo->timeMap[initTime][validTime][ensMem] = info;
 
 //                        cout << "\t"  << filedomain.toStdString()
 //                             << "  "  << varName.toStdString()
@@ -1030,7 +1082,18 @@ MStructuredGrid *MClimateForecastReader::readGrid(
     QString filename;
     try
     {
-        filename = dataFieldFile(levelType, variableName, initTime, validTime);
+        if (ensembleIDIsSpecifiedInFileName)
+        {
+            filename = dataFieldFile(levelType, variableName, initTime,
+                                     validTime, ensembleMember);
+        }
+        else
+        {
+            // If ensemble members are all stored in one file, 0 is used to
+            // represent them to avoid redundant informations stored.
+            filename = dataFieldFile(levelType, variableName, initTime,
+                                     validTime, 0);
+        }
     }
     catch (MBadDataFieldRequest& e)
     {
@@ -1845,10 +1908,11 @@ MStructuredGrid *MClimateForecastReader::readGrid(
 *******************************************************************************/
 
 QString MClimateForecastReader::dataFieldFile(
-        MVerticalLevelType levelType,
-        const QString&     variableName,
-        const QDateTime&   initTime,
-        const QDateTime&   validTime)
+        MVerticalLevelType  levelType,
+        const QString&      variableName,
+        const QDateTime&    initTime,
+        const QDateTime&    validTime,
+        const unsigned int& ensembleMember)
 {
     QString filename = "";
 
@@ -1857,11 +1921,11 @@ QString MClimateForecastReader::dataFieldFile(
     if (availableDataFields.value(levelType).keys().contains(variableName))
         filename = availableDataFields.value(levelType)
                 .value(variableName)->timeMap.value(initTime)
-                .value(validTime).filename;
+                .value(validTime).value(ensembleMember).filename;
     else if (availableDataFieldsByStdName.value(levelType).keys().contains(variableName))
         filename = availableDataFieldsByStdName.value(levelType)
                 .value(variableName)->timeMap.value(initTime)
-                .value(validTime).filename;
+                .value(validTime).value(ensembleMember).filename;
 
     if (filename.length() == 0)
     {
