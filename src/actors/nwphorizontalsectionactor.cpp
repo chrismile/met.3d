@@ -1480,6 +1480,7 @@ void MNWPHorizontalSectionActor::renderToCurrentContext(MSceneViewGLWidget *scen
             {
                 renderVectorGlyphs(sceneView, gl3DVectorGlyphsShader, true);
             }
+            break;
         }
         default:
             break;
@@ -2546,6 +2547,7 @@ void MNWPHorizontalSectionActor::renderVectorGlyphs(
         glyphsShader->setUniformValue(
                     "scaleArrowMaxLength",
                     GLfloat(vectorGlyphsSettings->scaleArrowMaxLength)); CHECK_GL_ERROR;
+        break;
     }
     default:
     {

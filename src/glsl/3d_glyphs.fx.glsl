@@ -29,7 +29,7 @@
 ***                             CONSTANTS                                   ***
 *******************************************************************************/
 
-#define M_PI 3.1415926535897932384626433832795
+const float M_PI = 3.1415926535897932384626433832795;
 const int numVerts = 8;
 
 
@@ -230,6 +230,7 @@ shader VSHSecVertex(in vec2 vertex : 0, out vec4 vs_vertex, out vec4 vs_data,
     // If no data is available, do not draw any glyphs.
     if (lonField == MISSING_VALUE || latField == MISSING_VALUE)
     {
+        vs_data.w = 0;
         return;
     }
 
@@ -248,10 +249,12 @@ shader VSHSecVertex(in vec2 vertex : 0, out vec4 vs_vertex, out vec4 vs_data,
         float magnitude = length(magnitudeDir);
         if (scaleArrowDiscardBelow && magnitude < scaleArrowMinScalar)
         {
+            vs_data.w = 0;
             return;
         }
         if (scaleArrowDiscardAbove && magnitude > scaleArrowMaxScalar)
         {
+            vs_data.w = 0;
             return;
         }
 
