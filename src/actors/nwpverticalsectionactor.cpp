@@ -1070,6 +1070,12 @@ void MNWPVerticalSectionActor::renderToCurrentContext(MSceneViewGLWidget *sceneV
             if (renderFilledContours)
             {
                 sectionGridShader->bindProgram("Standard");
+
+                // Change the depth function to less and equal. This allows
+                // OpenGL to overwrite fragments with the same depths and thus
+                // allows the vsec actor to draw filled contours of more than
+                // one variable.
+                glDepthFunc(GL_LEQUAL);
             }
             else
             {
@@ -1188,6 +1194,8 @@ void MNWPVerticalSectionActor::renderToCurrentContext(MSceneViewGLWidget *sceneV
                                   2 * var->gridVerticalLevelCount,
                                   path.size() - 1); CHECK_GL_ERROR;
             glDisable(GL_POLYGON_OFFSET_FILL);
+            // Change the depth function back to its default value.
+            glDepthFunc(GL_LESS);
         } // sectionGridShader (interpolation, target grid, filled contours)
 
         // B) Contouring with the GPU Marching Squares implementation, if

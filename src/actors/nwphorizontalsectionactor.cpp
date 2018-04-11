@@ -65,8 +65,8 @@ MNWPHorizontalSectionActor::MNWPHorizontalSectionActor()
       vbMouseHandlePoints(nullptr),
       selectedMouseHandle(-1),
       differenceMode(0),
-      windBarbsVertexBuffer(nullptr),
-      windBarbsSettings(),
+      vectorGlyphsVertexBuffer(nullptr),
+      vectorGlyphsSettings(),
       renderShadowQuad(true),
       shadowColor(QColor(60, 60, 60, 70)),
       shadowHeight(0.01f),
@@ -123,8 +123,8 @@ MNWPHorizontalSectionActor::MNWPHorizontalSectionActor()
     actorPropertiesSupGroup->addSubProperty(bBoxConnection->getProperty());
 
     // Wind barbs.
-    windBarbsSettings = new WindBarbsSettings(this);
-    actorPropertiesSupGroup->addSubProperty(windBarbsSettings->groupProperty);
+    vectorGlyphsSettings = new VectorGlyphsSettings(this);
+    actorPropertiesSupGroup->addSubProperty(vectorGlyphsSettings->groupProperty);
 
     // Shadow properties.
     shadowPropGroup = addProperty(GROUP_PROPERTY, "ground shadow",
@@ -151,17 +151,32 @@ MNWPHorizontalSectionActor::MNWPHorizontalSectionActor()
 }
 
 
-MNWPHorizontalSectionActor::WindBarbsSettings::WindBarbsSettings(
+MNWPHorizontalSectionActor::VectorGlyphsSettings::VectorGlyphsSettings(
         MNWPHorizontalSectionActor *hostActor)
     : enabled(false),
-      uComponentVarIndex(0),
-      vComponentVarIndex(0),
+      lonComponentVarIndex(0),
+      latComponentVarIndex(0),
+      glyphType(GlyphType::WindBarbs),
+      pivotPosition(PivotPos::Tip),
       lineWidth(0.04),
-      pennantTilt(9),
-      color(QColor(0,0,127)),
+      color(QColor(0, 0, 127)),
       showCalmGlyphs(false),
-      deltaBarbsLonLat(1.),
-      clampDeltaBarbsToGrid(true),
+      pennantTilt(9),
+      arrowHeadHeight(0.08),
+      scaleArrowWithMagnitude(true),
+      scaleArrowMinScalar(0.),
+      scaleArrowMinLength(0.1),
+      scaleArrowDiscardBelow(true),
+      scaleArrowMaxScalar(50.),
+      scaleArrowMaxLength(.75),
+      scaleArrowDiscardAbove(false),
+      arrowDrawOutline(true),
+      arrowOutlineWidth(0.05),
+      arrowOutlineColour(QColor(0, 0, 0)),
+      arrows3DShadowEnabled(true),
+      arrows3DShadowColour(QColor(10, 10, 10, 70)),
+      deltaGlyphsLonLat(1.),
+      clampDeltaGlyphsToGrid(true),
       automaticScalingEnabled(true),
       oldScale(1),
       reduceFactor(15.0f),
@@ -172,53 +187,142 @@ MNWPHorizontalSectionActor::WindBarbsSettings::WindBarbsSettings(
     MActor *a = hostActor;
     MQtProperties *properties = a->getQtProperties();
 
-    groupProperty = a->addProperty(GROUP_PROPERTY, "wind barbs");
+    groupProperty = a->addProperty(GROUP_PROPERTY, "vector glyphs");
 
     enabledProperty = a->addProperty(BOOL_PROPERTY, "enabled", groupProperty);
     properties->mBool()->setValue(enabledProperty, enabled);
 
-    uComponentVarProperty = a->addProperty(ENUM_PROPERTY, "longitudinal wind",
-                                           groupProperty);
-    vComponentVarProperty = a->addProperty(ENUM_PROPERTY, "latitudinal wind",
-                                           groupProperty);
+    lonComponentVarProperty = a->addProperty(ENUM_PROPERTY,
+                                             "longitudinal component",
+                                             groupProperty);
+    lonComponentVarProperty->setToolTip("example: eastward component of wind");
+    latComponentVarProperty = a->addProperty(ENUM_PROPERTY,
+                                             "latitudinal component",
+                                             groupProperty);
+    latComponentVarProperty->setToolTip("example: northward component of wind");
 
     appearanceGroupProperty = a->addProperty(GROUP_PROPERTY, "appearance",
                                              groupProperty);
+
+    QStringList glyphTypes;
+    glyphTypes << "wind barbs" << "arrows" << "3D arrows";
+    glyphTypeProperty = a->addProperty(ENUM_PROPERTY, "glyph type",
+                                       appearanceGroupProperty);
+    properties->mEnum()->setEnumNames(glyphTypeProperty, glyphTypes);
+    properties->mEnum()->setValue(glyphTypeProperty, int(glyphType));
+
+    QStringList pivotPositions;
+    pivotPositions << "glyph tip" << "glyph centre" << "glyph tail";
+    pivotPositionProperty = a->addProperty(ENUM_PROPERTY, "pivot position",
+                                       appearanceGroupProperty);
+    properties->mEnum()->setEnumNames(pivotPositionProperty, pivotPositions);
+    properties->mEnum()->setValue(pivotPositionProperty, int(pivotPosition));
 
     lineWidthProperty = a->addProperty(DOUBLE_PROPERTY, "line width",
                                        appearanceGroupProperty);
     properties->setDouble(lineWidthProperty, lineWidth, 0.001, 0.30, 3, 0.001);
 
-    colorProperty = a->addProperty(COLOR_PROPERTY, "line color",
+    colorProperty = a->addProperty(COLOR_PROPERTY, "glyph colour",
                                    appearanceGroupProperty);
     properties->mColor()->setValue(colorProperty, color);
 
-    showCalmGlyphsProperty = a->addProperty(BOOL_PROPERTY, "show calm glyphs",
+    windBarbsGroupProperty = a->addProperty(GROUP_PROPERTY, "wind barbs",
                                             appearanceGroupProperty);
+
+    showCalmGlyphsProperty = a->addProperty(BOOL_PROPERTY, "show calm glyphs",
+                                            windBarbsGroupProperty);
     properties->mBool()->setValue(showCalmGlyphsProperty, showCalmGlyphs);
 
     pennantTiltProperty = a->addProperty(INT_PROPERTY, "pennant tilt",
-                                         appearanceGroupProperty);
+                                         windBarbsGroupProperty);
     properties->setInt(pennantTiltProperty, pennantTilt, 1, 20, 1);
 
-    deltaBarbsLonLatProperty = a->addProperty(
-                DOUBLE_PROPERTY, "barb distance (deg)",
+    arrowsGroupProperty = a->addProperty(GROUP_PROPERTY, "arrows",
+                                         appearanceGroupProperty);
+    arrowHeadHeightProperty = a->addProperty(DOUBLE_PROPERTY, "head size",
+                                           arrowsGroupProperty);
+    properties->setDouble(arrowHeadHeightProperty, arrowHeadHeight, 0.001, 0.30,
+                          3, 0.001);
+    scaleArrowWithMagnitudeProperty = a->addProperty(
+                BOOL_PROPERTY, "scale with magnitude", arrowsGroupProperty);
+    properties->mBool()->setValue(scaleArrowWithMagnitudeProperty,
+                                  scaleArrowWithMagnitude);
+
+    scaleArrowMinScalarProperty = a->addProperty(
+                DOUBLE_PROPERTY, "min. magnitude",
+                scaleArrowWithMagnitudeProperty);
+    properties->setDouble(scaleArrowMinScalarProperty, scaleArrowMinScalar, 0.,
+                          scaleArrowMaxScalar, 2, 1.);
+    scaleArrowMinLengthProperty = a->addProperty(
+                DOUBLE_PROPERTY, "min. length", scaleArrowWithMagnitudeProperty);
+    properties->setDouble(scaleArrowMinLengthProperty, scaleArrowMinLength,
+                          0.001, scaleArrowMaxLength, 3, 0.001);
+    scaleArrowDiscardBelowProperty = a->addProperty(
+                BOOL_PROPERTY, "discard below min.",
+                scaleArrowWithMagnitudeProperty);
+    properties->mBool()->setValue(scaleArrowDiscardBelowProperty,
+                                  scaleArrowDiscardBelow);
+
+    scaleArrowMaxScalarProperty = a->addProperty(
+                DOUBLE_PROPERTY, "max. magnitude",
+                scaleArrowWithMagnitudeProperty);
+    properties->setDouble(scaleArrowMaxScalarProperty, scaleArrowMaxScalar, 2,
+                          1.);
+    properties->mDouble()->setMinimum(scaleArrowMaxScalarProperty,
+                                      scaleArrowMinScalar);
+    scaleArrowMaxLengthProperty = a->addProperty(
+                DOUBLE_PROPERTY, "max. length", scaleArrowWithMagnitudeProperty);
+    properties->setDouble(scaleArrowMaxLengthProperty, scaleArrowMaxLength,
+                          scaleArrowMinLength, 2., 3, 0.001);
+    scaleArrowDiscardAboveProperty = a->addProperty(
+                BOOL_PROPERTY, "discard above max.",
+                scaleArrowWithMagnitudeProperty);
+    properties->mBool()->setValue(scaleArrowDiscardAboveProperty,
+                                  scaleArrowDiscardAbove);
+
+    arrows2DGroupProperty = a->addProperty(GROUP_PROPERTY, "2D arrows",
+                                         arrowsGroupProperty);
+    arrowDrawOutlineProperty = a->addProperty(BOOL_PROPERTY, "draw outline",
+                                              arrows2DGroupProperty);
+    properties->mBool()->setValue(arrowDrawOutlineProperty, arrowDrawOutline);
+    arrowOutlineWidthProperty = a->addProperty(DOUBLE_PROPERTY, "outline width",
+                                               arrows2DGroupProperty);
+    properties->setDouble(arrowOutlineWidthProperty, arrowOutlineWidth, 0.001,
+                          0.30, 3, 0.001);
+    arrowOutlineColourProperty = a->addProperty(
+                COLOR_PROPERTY, "outline colour", arrows2DGroupProperty);
+    properties->mColor()->setValue(arrowOutlineColourProperty,
+                                   arrowOutlineColour);
+
+    arrows3DGroupProperty = a->addProperty(GROUP_PROPERTY, "3D arrows",
+                                         arrowsGroupProperty);
+    arrows3DShadowEnabledProperty = a->addProperty(
+                BOOL_PROPERTY, "enabled", arrows3DGroupProperty);
+    properties->mBool()->setValue(arrows3DShadowEnabledProperty,
+                                  arrows3DShadowEnabled);
+    arrows3DShadowColourProperty = a->addProperty(
+                COLOR_PROPERTY, "shadow colour", arrows3DGroupProperty);
+    properties->mColor()->setValue(arrows3DShadowColourProperty,
+                                   arrows3DShadowColour);
+
+    deltaGlyphsLonLatProperty = a->addProperty(
+                DOUBLE_PROPERTY, "glyph distance (deg)",
                 groupProperty);
     properties->setDouble(
-                deltaBarbsLonLatProperty, deltaBarbsLonLat, 0.05, 45., 2, 0.1);
-    deltaBarbsLonLatProperty->setToolTip(
-                "Manually specify the distance between the wind barbs. If the "
-                "distance if below grid point spacing, nearest-neighbour "
+                deltaGlyphsLonLatProperty, deltaGlyphsLonLat, 0.05, 45., 2, 0.1);
+    deltaGlyphsLonLatProperty->setToolTip(
+                "Manually specify the distance between the vector glyphs. If "
+                "the distance if below grid point spacing, nearest-neighbour "
                 "interpolation is used.");
 
-    clampDeltaBarbsToGridProperty = a->addProperty(
-                BOOL_PROPERTY, "restrict barb distance to grid",
+    clampDeltaGlyphsToGridProperty = a->addProperty(
+                BOOL_PROPERTY, "restrict glyph distance to grid",
                 groupProperty);
     properties->mBool()->setValue(
-                clampDeltaBarbsToGridProperty, clampDeltaBarbsToGrid);
-    clampDeltaBarbsToGridProperty->setToolTip(
-                "If enabled the manually set barb distance cannot be smaller "
-                "than the grid point spacing of the wind field.");
+                clampDeltaGlyphsToGridProperty, clampDeltaGlyphsToGrid);
+    clampDeltaGlyphsToGridProperty->setToolTip(
+                "If enabled the manually set glyph distance cannot be smaller "
+                "than the grid point spacing of the vector field.");
 
     automaticScalingEnabledProperty = a->addProperty(BOOL_PROPERTY, "automatic scaling",
                                               groupProperty);
@@ -245,7 +349,7 @@ MNWPHorizontalSectionActor::~MNWPHorizontalSectionActor()
 {
     // "graticuleActor" is deleted by the resourcesManager.
 
-    delete windBarbsSettings;
+    delete vectorGlyphsSettings;
     if (vbMouseHandlePoints) delete vbMouseHandlePoints;
 }
 
@@ -260,7 +364,7 @@ void MNWPHorizontalSectionActor::reloadShaderEffects()
 {
     LOG4CPLUS_DEBUG(mlog, "loading shader programs" << flush);
 
-    beginCompileShaders(8);
+    beginCompileShaders(9);
 
     compileShadersFromFileWithProgressDialog(
                 glVerticalInterpolationEffect,
@@ -278,8 +382,11 @@ void MNWPHorizontalSectionActor::reloadShaderEffects()
                 glMarchingSquaresShader,
                 "src/glsl/hsec_marching_squares.fx.glsl");
     compileShadersFromFileWithProgressDialog(
-                glWindBarbsShader,
-                "src/glsl/hsec_windbarbs.fx.glsl");
+                glVectorGlyphsShader,
+                "src/glsl/hsec_vectorglyphs.fx.glsl");
+    compileShadersFromFileWithProgressDialog(
+                gl3DVectorGlyphsShader,
+                "src/glsl/3d_glyphs.fx.glsl");
     compileShadersFromFileWithProgressDialog(
                 glShadowQuad,
                 "src/glsl/hsec_shadow.fx.glsl");
@@ -314,21 +421,53 @@ void MNWPHorizontalSectionActor::saveConfiguration(QSettings *settings)
 
     settings->beginGroup("Windbarbs");
 
-    settings->setValue("enabled", windBarbsSettings->enabled);
-    settings->setValue("automatic", windBarbsSettings->automaticScalingEnabled);
-    settings->setValue("lineWidth", windBarbsSettings->lineWidth);
-    settings->setValue("pennantTilt", windBarbsSettings->pennantTilt);
-    settings->setValue("color", windBarbsSettings->color);
-    settings->setValue("showCalmGlyphs", windBarbsSettings->showCalmGlyphs);
-    settings->setValue("reduceFactor", windBarbsSettings->reduceFactor);
-    settings->setValue("reduceSlope", windBarbsSettings->reduceSlope);
-    settings->setValue("sensitivity", windBarbsSettings->sensitivity);
-    settings->setValue("uComponent", windBarbsSettings->uComponentVarIndex);
-    settings->setValue("vComponent", windBarbsSettings->vComponentVarIndex);
-    settings->setValue("deltaBarbsLonLat", windBarbsSettings->deltaBarbsLonLat);
-    settings->setValue("clampDeltaBarbsToGrid", windBarbsSettings->clampDeltaBarbsToGrid);
+    settings->setValue("enabled", vectorGlyphsSettings->enabled);
+    settings->setValue("automatic",
+                       vectorGlyphsSettings->automaticScalingEnabled);
+    settings->setValue("glyphType", int(vectorGlyphsSettings->glyphType));
+    settings->setValue("pivotPosition",
+                       int(vectorGlyphsSettings->pivotPosition));
+    settings->setValue("lineWidth", vectorGlyphsSettings->lineWidth);
+    settings->setValue("pennantTilt", vectorGlyphsSettings->pennantTilt);
+    settings->setValue("color", vectorGlyphsSettings->color);
+    settings->setValue("showCalmGlyphs", vectorGlyphsSettings->showCalmGlyphs);
 
-    settings->endGroup(); // Windbarbs
+    settings->setValue("arrowHeadHeight", vectorGlyphsSettings->arrowHeadHeight);
+    settings->setValue("arrowDrawOutline",
+                       vectorGlyphsSettings->arrowDrawOutline);
+    settings->setValue("arrowOutlineColour",
+                       vectorGlyphsSettings->arrowOutlineColour);
+    settings->setValue("arrowOutlineWidth",
+                       vectorGlyphsSettings->arrowOutlineWidth);
+    settings->setValue("scaleArrowWithMagnitude",
+                       vectorGlyphsSettings->scaleArrowWithMagnitude);
+    settings->setValue("scaleArrowMinScalar",
+                       vectorGlyphsSettings->scaleArrowMinScalar);
+    settings->setValue("scaleArrowMinLength",
+                       vectorGlyphsSettings->scaleArrowMinLength);
+    settings->setValue("scaleArrowDiscardBelow",
+                       vectorGlyphsSettings->scaleArrowDiscardBelow);
+    settings->setValue("scaleArrowMaxScalar",
+                       vectorGlyphsSettings->scaleArrowMaxScalar);
+    settings->setValue("scaleArrowMaxLength",
+                       vectorGlyphsSettings->scaleArrowMaxLength);
+    settings->setValue("scaleArrowDiscardAbove",
+                       vectorGlyphsSettings->scaleArrowDiscardAbove);
+    settings->setValue("drawShadow",
+                       vectorGlyphsSettings->arrows3DShadowEnabled);
+    settings->setValue("shadowColour",
+                       vectorGlyphsSettings->arrows3DShadowColour);
+
+    settings->setValue("reduceFactor", vectorGlyphsSettings->reduceFactor);
+    settings->setValue("reduceSlope", vectorGlyphsSettings->reduceSlope);
+    settings->setValue("sensitivity", vectorGlyphsSettings->sensitivity);
+    settings->setValue("uComponent", vectorGlyphsSettings->lonComponentVarIndex);
+    settings->setValue("vComponent", vectorGlyphsSettings->latComponentVarIndex);
+    settings->setValue("deltaBarbsLonLat", vectorGlyphsSettings->deltaGlyphsLonLat);
+    settings->setValue("clampDeltaBarbsToGrid",
+                       vectorGlyphsSettings->clampDeltaGlyphsToGrid);
+
+    settings->endGroup(); // Windbarbs = Vector Glyphs
 
     graticuleActor->saveConfiguration(settings);
     settings->endGroup(); // MNWPHorizontalSectionActor
@@ -394,46 +533,97 @@ void MNWPHorizontalSectionActor::loadConfiguration(QSettings *settings)
     settings->beginGroup("Windbarbs");
 
     properties->mBool()->setValue(
-                windBarbsSettings->enabledProperty,
+                vectorGlyphsSettings->enabledProperty,
                 settings->value("enabled", false).toBool());
     properties->mBool()->setValue(
-                windBarbsSettings->automaticScalingEnabledProperty,
+                vectorGlyphsSettings->automaticScalingEnabledProperty,
                 settings->value("automatic", false).toBool());
+    properties->mEnum()->setValue(
+                vectorGlyphsSettings->glyphTypeProperty,
+                settings->value(
+                    "glyphType",
+                    int(VectorGlyphsSettings::GlyphType::WindBarbs)).toInt());
+    properties->mEnum()->setValue(
+                vectorGlyphsSettings->pivotPositionProperty,
+                settings->value(
+                    "pivotPosition",
+                    int(VectorGlyphsSettings::PivotPos::Tip)).toInt());
     properties->mDouble()->setValue(
-                windBarbsSettings->lineWidthProperty,
+                vectorGlyphsSettings->lineWidthProperty,
                 settings->value("lineWidth", 0.04).toFloat());
     properties->mInt()->setValue(
-                windBarbsSettings->pennantTiltProperty,
+                vectorGlyphsSettings->pennantTiltProperty,
                 settings->value("pennantTilt", 9).toInt());
     properties->mColor()->setValue(
-                windBarbsSettings->colorProperty,
+                vectorGlyphsSettings->colorProperty,
                 settings->value("color", QColor(0,0,127)).value<QColor>());
     properties->mBool()->setValue(
-                windBarbsSettings->showCalmGlyphsProperty,
+                vectorGlyphsSettings->showCalmGlyphsProperty,
                 settings->value("showCalmGlyphs", false).toBool());
     properties->mDouble()->setValue(
-                windBarbsSettings->deltaBarbsLonLatProperty,
+                vectorGlyphsSettings->arrowHeadHeightProperty,
+                settings->value("arrowHeadHeight", 0.08).toDouble());
+    properties->mBool()->setValue(
+                vectorGlyphsSettings->arrowDrawOutlineProperty,
+                settings->value("arrowDrawOutline", true).toBool());
+    properties->mDouble()->setValue(
+                vectorGlyphsSettings->arrowOutlineWidthProperty,
+                settings->value("arrowOutlineWidth", 0.05).toDouble());
+    properties->mColor()->setValue(
+                vectorGlyphsSettings->arrowOutlineColourProperty,
+                settings->value("arrowOutlineColour",
+                                QColor(0, 0, 0)).value<QColor>());
+    properties->mBool()->setValue(
+                vectorGlyphsSettings->scaleArrowWithMagnitudeProperty,
+                settings->value("scaleArrowWithMagnitude", true).toBool());
+    properties->mDouble()->setValue(
+                vectorGlyphsSettings->scaleArrowMinScalarProperty,
+                settings->value("scaleArrowMinScalar", 0.).toDouble());
+    properties->mDouble()->setValue(
+                vectorGlyphsSettings->scaleArrowMinLengthProperty,
+                settings->value("scaleArrowMinLength", 0.1).toDouble());
+    properties->mBool()->setValue(
+                vectorGlyphsSettings->scaleArrowDiscardBelowProperty,
+                settings->value("scaleArrowDiscardBelow", true).toBool());
+    properties->mDouble()->setValue(
+                vectorGlyphsSettings->scaleArrowMaxScalarProperty,
+                settings->value("scaleArrowMaxScalar", 50.).toDouble());
+    properties->mDouble()->setValue(
+                vectorGlyphsSettings->scaleArrowMaxLengthProperty,
+                settings->value("scaleArrowMaxLength", .75).toDouble());
+    properties->mBool()->setValue(
+                vectorGlyphsSettings->scaleArrowDiscardAboveProperty,
+                settings->value("scaleArrowDiscardAbove", false).toBool());
+    properties->mBool()->setValue(
+                vectorGlyphsSettings->arrows3DShadowEnabledProperty,
+                settings->value("drawShadow", true).toBool());
+    properties->mColor()->setValue(
+                vectorGlyphsSettings->arrows3DShadowColourProperty,
+                settings->value("shadowColour",
+                                QColor(10, 10, 10, 70)).value<QColor>());
+    properties->mDouble()->setValue(
+                vectorGlyphsSettings->deltaGlyphsLonLatProperty,
                 settings->value("deltaBarbsLonLat", 1.).toFloat());
     properties->mBool()->setValue(
-                windBarbsSettings->clampDeltaBarbsToGridProperty,
+                vectorGlyphsSettings->clampDeltaGlyphsToGridProperty,
                 settings->value("clampDeltaBarbsToGrid", true).toBool());
     properties->mDouble()->setValue(
-                windBarbsSettings->reduceFactorProperty,
+                vectorGlyphsSettings->reduceFactorProperty,
                 settings->value("reduceFactor", 15.).toFloat());
     properties->mDouble()->setValue(
-                windBarbsSettings->reduceSlopeProperty,
+                vectorGlyphsSettings->reduceSlopeProperty,
                 settings->value("reduceSlope", 0.0175).toFloat());
     properties->mDouble()->setValue(
-                windBarbsSettings->sensitivityProperty,
+                vectorGlyphsSettings->sensitivityProperty,
                 settings->value("sensitivity", 1.).toFloat());
     properties->mEnum()->setValue(
-                windBarbsSettings->uComponentVarProperty,
+                vectorGlyphsSettings->lonComponentVarProperty,
                 settings->value("uComponent", 0).toInt());
     properties->mEnum()->setValue(
-                windBarbsSettings->vComponentVarProperty,
+                vectorGlyphsSettings->latComponentVarProperty,
                 settings->value("vComponent", 0).toInt());
 
-    settings->endGroup(); // Windbarbs
+    settings->endGroup(); // Windbarbs = Vector Glyphs
 
     graticuleActor->loadConfiguration(settings);
     settings->endGroup(); // MNWPHorizontalSectionActor
@@ -745,7 +935,7 @@ void MNWPHorizontalSectionActor::initializeActorResources()
 {
     MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
 
-    windBarbsSettings->varNameList.clear();
+    vectorGlyphsSettings->varNameList.clear();
 
     // Parent initialisation.
     MNWPMultiVarActor::initializeActorResources();
@@ -754,17 +944,17 @@ void MNWPHorizontalSectionActor::initializeActorResources()
     {
         MNWPActorVariable* var = variables.at(vi);
 
-        windBarbsSettings->varNameList << var->variableName;
+        vectorGlyphsSettings->varNameList << var->variableName;
     }
 
-    properties->mEnum()->setEnumNames(windBarbsSettings->uComponentVarProperty,
-                                      windBarbsSettings->varNameList);
-    properties->mEnum()->setEnumNames(windBarbsSettings->vComponentVarProperty,
-                                      windBarbsSettings->varNameList);
-    properties->mEnum()->setValue(windBarbsSettings->uComponentVarProperty,
-                                  windBarbsSettings->uComponentVarIndex);
-    properties->mEnum()->setValue(windBarbsSettings->vComponentVarProperty,
-                                  windBarbsSettings->vComponentVarIndex);
+    properties->mEnum()->setEnumNames(vectorGlyphsSettings->lonComponentVarProperty,
+                                      vectorGlyphsSettings->varNameList);
+    properties->mEnum()->setEnumNames(vectorGlyphsSettings->latComponentVarProperty,
+                                      vectorGlyphsSettings->varNameList);
+    properties->mEnum()->setValue(vectorGlyphsSettings->lonComponentVarProperty,
+                                  vectorGlyphsSettings->lonComponentVarIndex);
+    properties->mEnum()->setValue(vectorGlyphsSettings->latComponentVarProperty,
+                                  vectorGlyphsSettings->latComponentVarIndex);
 
     // Set this status variable to download the target grid to CPU memory in
     // the first render cycle.
@@ -788,8 +978,10 @@ void MNWPHorizontalSectionActor::initializeActorResources()
                                                 glVerticalInterpolationEffect);
     loadShaders |= glRM->generateEffectProgram("hsec_pseudocolor",
                                                 glPseudoColourShader);
-    loadShaders |= glRM->generateEffectProgram("hsec_windbarbs",
-                                                glWindBarbsShader);
+    loadShaders |= glRM->generateEffectProgram("hsec_vectorglyphs",
+                                                glVectorGlyphsShader);
+    loadShaders |= glRM->generateEffectProgram("3d_glyphs",
+                                               gl3DVectorGlyphsShader);
     loadShaders |= glRM->generateEffectProgram("hsec_shadow",
                                                 glShadowQuad);
     loadShaders |= glRM->generateEffectProgram("vsec_positionsphere",
@@ -887,46 +1079,118 @@ void MNWPHorizontalSectionActor::onQtPropertyChanged(QtProperty *property)
         emitActorChangedSignal();
     }
 
-    else if (property == windBarbsSettings->enabledProperty ||
-             property == windBarbsSettings->automaticScalingEnabledProperty ||
-             property == windBarbsSettings->lineWidthProperty ||
-             property == windBarbsSettings->pennantTiltProperty ||
-             property == windBarbsSettings->colorProperty ||
-             property == windBarbsSettings->showCalmGlyphsProperty ||
-             property == windBarbsSettings->deltaBarbsLonLatProperty ||
-             property == windBarbsSettings->clampDeltaBarbsToGridProperty ||
-             property == windBarbsSettings->reduceFactorProperty ||
-             property == windBarbsSettings->reduceSlopeProperty ||
-             property == windBarbsSettings->sensitivityProperty ||
-             property == windBarbsSettings->uComponentVarProperty ||
-             property == windBarbsSettings->vComponentVarProperty)
+    else if (property == vectorGlyphsSettings->scaleArrowMinScalarProperty ||
+             property == vectorGlyphsSettings->scaleArrowMinLengthProperty ||
+             property == vectorGlyphsSettings->scaleArrowMaxScalarProperty ||
+             property == vectorGlyphsSettings->scaleArrowMaxLengthProperty)
     {
-        windBarbsSettings->enabled = properties->mBool()
-                ->value(windBarbsSettings->enabledProperty);
-        windBarbsSettings->automaticScalingEnabled = properties->mBool()
-                ->value(windBarbsSettings->automaticScalingEnabledProperty);
-        windBarbsSettings->lineWidth = properties->mDouble()
-                ->value(windBarbsSettings->lineWidthProperty);
-        windBarbsSettings->pennantTilt = properties->mInt()
-                ->value(windBarbsSettings->pennantTiltProperty);
-        windBarbsSettings->color = properties->mColor()
-                ->value(windBarbsSettings->colorProperty);
-        windBarbsSettings->showCalmGlyphs = properties->mBool()
-                ->value(windBarbsSettings->showCalmGlyphsProperty);
-        windBarbsSettings->deltaBarbsLonLat = properties->mDouble()
-                ->value(windBarbsSettings->deltaBarbsLonLatProperty);
-        windBarbsSettings->clampDeltaBarbsToGrid = properties->mBool()
-                ->value(windBarbsSettings->clampDeltaBarbsToGridProperty);
-        windBarbsSettings->reduceFactor = properties->mDouble()
-                ->value(windBarbsSettings->reduceFactorProperty);
-        windBarbsSettings->reduceSlope = properties->mDouble()
-                ->value(windBarbsSettings->reduceSlopeProperty);
-        windBarbsSettings->sensitivity = properties->mDouble()
-                ->value(windBarbsSettings->sensitivityProperty);
-        windBarbsSettings->uComponentVarIndex = properties->mEnum()
-                ->value(windBarbsSettings->uComponentVarProperty);
-        windBarbsSettings->vComponentVarIndex = properties->mEnum()
-                ->value(windBarbsSettings->vComponentVarProperty);
+        vectorGlyphsSettings->scaleArrowMinScalar = properties->mDouble()
+                ->value(vectorGlyphsSettings->scaleArrowMinScalarProperty);
+        vectorGlyphsSettings->scaleArrowMinLength = properties->mDouble()
+                ->value(vectorGlyphsSettings->scaleArrowMinLengthProperty);
+        vectorGlyphsSettings->scaleArrowMaxScalar = properties->mDouble()
+                ->value(vectorGlyphsSettings->scaleArrowMaxScalarProperty);
+        vectorGlyphsSettings->scaleArrowMaxLength = properties->mDouble()
+                ->value(vectorGlyphsSettings->scaleArrowMaxLengthProperty);
+
+        if (suppressActorUpdates())
+        {
+            return;
+        }
+
+        enableActorUpdates(false);
+        properties->mDouble()->setMaximum(
+                    vectorGlyphsSettings->scaleArrowMinScalarProperty,
+                    vectorGlyphsSettings->scaleArrowMaxScalar);
+        properties->mDouble()->setMaximum(
+                    vectorGlyphsSettings->scaleArrowMinLengthProperty,
+                    vectorGlyphsSettings->scaleArrowMaxLength);
+        properties->mDouble()->setMinimum(
+                    vectorGlyphsSettings->scaleArrowMaxScalarProperty,
+                    vectorGlyphsSettings->scaleArrowMinScalar);
+        properties->mDouble()->setMinimum(
+                    vectorGlyphsSettings->scaleArrowMaxLengthProperty,
+                    vectorGlyphsSettings->scaleArrowMinLength);
+        enableActorUpdates(true);
+
+        emitActorChangedSignal();
+    }
+
+    else if (property == vectorGlyphsSettings->enabledProperty
+             || property == vectorGlyphsSettings->glyphTypeProperty
+             || property == vectorGlyphsSettings->pivotPositionProperty
+             || property == vectorGlyphsSettings->automaticScalingEnabledProperty
+             || property == vectorGlyphsSettings->lineWidthProperty
+             || property == vectorGlyphsSettings->pennantTiltProperty
+             || property == vectorGlyphsSettings->colorProperty
+             || property == vectorGlyphsSettings->showCalmGlyphsProperty
+             || property == vectorGlyphsSettings->arrowHeadHeightProperty
+             || property == vectorGlyphsSettings->arrowDrawOutlineProperty
+             || property == vectorGlyphsSettings->arrowOutlineWidthProperty
+             || property == vectorGlyphsSettings->arrowOutlineColourProperty
+             || property == vectorGlyphsSettings->scaleArrowWithMagnitudeProperty
+             || property == vectorGlyphsSettings->scaleArrowDiscardBelowProperty
+             || property == vectorGlyphsSettings->scaleArrowDiscardAboveProperty
+             || property == vectorGlyphsSettings->arrows3DShadowEnabledProperty
+             || property == vectorGlyphsSettings->arrows3DShadowColourProperty
+             || property == vectorGlyphsSettings->deltaGlyphsLonLatProperty
+             || property == vectorGlyphsSettings->clampDeltaGlyphsToGridProperty
+             || property == vectorGlyphsSettings->reduceFactorProperty
+             || property == vectorGlyphsSettings->reduceSlopeProperty
+             || property == vectorGlyphsSettings->sensitivityProperty
+             || property == vectorGlyphsSettings->lonComponentVarProperty
+             || property == vectorGlyphsSettings->latComponentVarProperty)
+    {
+        vectorGlyphsSettings->glyphType = VectorGlyphsSettings::GlyphType(
+                    properties->mEnum()
+                    ->value(vectorGlyphsSettings->glyphTypeProperty));
+        vectorGlyphsSettings->pivotPosition = VectorGlyphsSettings::PivotPos(
+                    properties->mEnum()
+                    ->value(vectorGlyphsSettings->pivotPositionProperty));
+        vectorGlyphsSettings->enabled = properties->mBool()
+                ->value(vectorGlyphsSettings->enabledProperty);
+        vectorGlyphsSettings->automaticScalingEnabled = properties->mBool()
+                ->value(vectorGlyphsSettings->automaticScalingEnabledProperty);
+        vectorGlyphsSettings->lineWidth = properties->mDouble()
+                ->value(vectorGlyphsSettings->lineWidthProperty);
+        vectorGlyphsSettings->pennantTilt = properties->mInt()
+                ->value(vectorGlyphsSettings->pennantTiltProperty);
+        vectorGlyphsSettings->color = properties->mColor()
+                ->value(vectorGlyphsSettings->colorProperty);
+        vectorGlyphsSettings->showCalmGlyphs = properties->mBool()
+                ->value(vectorGlyphsSettings->showCalmGlyphsProperty);
+        vectorGlyphsSettings->arrowHeadHeight = properties->mDouble()
+                ->value(vectorGlyphsSettings->arrowHeadHeightProperty);
+        vectorGlyphsSettings->arrowDrawOutline = properties->mBool()
+                ->value(vectorGlyphsSettings->arrowDrawOutlineProperty);
+        vectorGlyphsSettings->arrowOutlineWidth = properties->mDouble()
+                ->value(vectorGlyphsSettings->arrowOutlineWidthProperty);
+        vectorGlyphsSettings->arrowOutlineColour = properties->mColor()
+                ->value(vectorGlyphsSettings->arrowOutlineColourProperty);
+        vectorGlyphsSettings->scaleArrowWithMagnitude = properties->mBool()
+                ->value(vectorGlyphsSettings->scaleArrowWithMagnitudeProperty);
+        vectorGlyphsSettings->scaleArrowDiscardBelow = properties->mBool()
+                ->value(vectorGlyphsSettings->scaleArrowDiscardBelowProperty);
+        vectorGlyphsSettings->scaleArrowDiscardAbove = properties->mBool()
+                ->value(vectorGlyphsSettings->scaleArrowDiscardAboveProperty);
+        vectorGlyphsSettings->arrows3DShadowEnabled = properties->mBool()
+                ->value(vectorGlyphsSettings->arrows3DShadowEnabledProperty);
+        vectorGlyphsSettings->arrows3DShadowColour = properties->mColor()
+                ->value(vectorGlyphsSettings->arrows3DShadowColourProperty);
+        vectorGlyphsSettings->deltaGlyphsLonLat = properties->mDouble()
+                ->value(vectorGlyphsSettings->deltaGlyphsLonLatProperty);
+        vectorGlyphsSettings->clampDeltaGlyphsToGrid = properties->mBool()
+                ->value(vectorGlyphsSettings->clampDeltaGlyphsToGridProperty);
+        vectorGlyphsSettings->reduceFactor = properties->mDouble()
+                ->value(vectorGlyphsSettings->reduceFactorProperty);
+        vectorGlyphsSettings->reduceSlope = properties->mDouble()
+                ->value(vectorGlyphsSettings->reduceSlopeProperty);
+        vectorGlyphsSettings->sensitivity = properties->mDouble()
+                ->value(vectorGlyphsSettings->sensitivityProperty);
+        vectorGlyphsSettings->lonComponentVarIndex = properties->mEnum()
+                ->value(vectorGlyphsSettings->lonComponentVarProperty);
+        vectorGlyphsSettings->latComponentVarIndex = properties->mEnum()
+                ->value(vectorGlyphsSettings->latComponentVarProperty);
 
         if (suppressActorUpdates()) return;
 
@@ -1196,11 +1460,31 @@ void MNWPHorizontalSectionActor::renderToCurrentContext(MSceneViewGLWidget *scen
         tm->renderLabelList(sceneView, graticuleActor->getLabelsToRender());
     }
 
-    // Render the WINDBARBS.
+    // Render the VECTORGLYPHS.
     // =====================
-    if (windBarbsSettings->enabled)
+    if (vectorGlyphsSettings->enabled)
     {
-        renderWindBarbs(sceneView);
+
+        switch (vectorGlyphsSettings->glyphType)
+        {
+        case VectorGlyphsSettings::GlyphType::WindBarbs:
+        case VectorGlyphsSettings::GlyphType::Arrows:
+        {
+            renderVectorGlyphs(sceneView, glVectorGlyphsShader);
+            break;
+        }
+        case VectorGlyphsSettings::GlyphType::Arrows3D:
+        {
+            renderVectorGlyphs(sceneView, gl3DVectorGlyphsShader);
+            if (vectorGlyphsSettings->arrows3DShadowEnabled)
+            {
+                renderVectorGlyphs(sceneView, gl3DVectorGlyphsShader, true);
+            }
+            break;
+        }
+        default:
+            break;
+        }
     }
 
     // Render HANDLES in interaction mode.
@@ -1364,66 +1648,66 @@ void MNWPHorizontalSectionActor::updateMouseHandlePositions()
 
 void MNWPHorizontalSectionActor::onDeleteActorVariable(MNWPActorVariable *var)
 {
-    // Correct wind barb indices.
+    // Correct vector field component indices.
 
     // Get index of variable that is about to be removed.
     int i = variables.indexOf(var);
 
-    // Update vComponentVarIndex and uComponentVarIndex if these point to
+    // Update latComponentVarIndex and lonComponentVarIndex if these point to
     // the removed variable or to one with a lower index.
-    if (i <= windBarbsSettings->uComponentVarIndex)
+    if (i <= vectorGlyphsSettings->lonComponentVarIndex)
     {
-        windBarbsSettings->uComponentVarIndex =
-                std::max(-1, windBarbsSettings->uComponentVarIndex - 1);
+        vectorGlyphsSettings->lonComponentVarIndex =
+                std::max(-1, vectorGlyphsSettings->lonComponentVarIndex - 1);
     }
-    if (i <= windBarbsSettings->vComponentVarIndex)
+    if (i <= vectorGlyphsSettings->latComponentVarIndex)
     {
-        windBarbsSettings->vComponentVarIndex =
-                std::max(-1, windBarbsSettings->vComponentVarIndex - 1);
+        vectorGlyphsSettings->latComponentVarIndex =
+                std::max(-1, vectorGlyphsSettings->latComponentVarIndex - 1);
     }
 
     // Temporarily save variable indices.
-    int tmpuComponentVarIndex = windBarbsSettings->uComponentVarIndex;
-    int tmpvComponentVarIndex = windBarbsSettings->vComponentVarIndex;
+    int tmpLonComponentVarIndex = vectorGlyphsSettings->lonComponentVarIndex;
+    int tmpLatComponentVarIndex = vectorGlyphsSettings->latComponentVarIndex;
 
     // Remove the variable name from the enum lists.
-    windBarbsSettings->varNameList.removeAt(i);
+    vectorGlyphsSettings->varNameList.removeAt(i);
 
     // Update enum lists.
     properties->mEnum()->setEnumNames(
-                windBarbsSettings->uComponentVarProperty,
-                windBarbsSettings->varNameList);
+                vectorGlyphsSettings->lonComponentVarProperty,
+                vectorGlyphsSettings->varNameList);
     properties->mEnum()->setEnumNames(
-                windBarbsSettings->vComponentVarProperty,
-                windBarbsSettings->varNameList);
+                vectorGlyphsSettings->latComponentVarProperty,
+                vectorGlyphsSettings->varNameList);
 
     properties->mEnum()->setValue(
-                windBarbsSettings->uComponentVarProperty,
-                tmpuComponentVarIndex);
+                vectorGlyphsSettings->lonComponentVarProperty,
+                tmpLonComponentVarIndex);
     properties->mEnum()->setValue(
-                windBarbsSettings->vComponentVarProperty,
-                tmpvComponentVarIndex);
+                vectorGlyphsSettings->latComponentVarProperty,
+                tmpLatComponentVarIndex);
 }
 
 
 void MNWPHorizontalSectionActor::onAddActorVariable(MNWPActorVariable *var)
 {
-    windBarbsSettings->varNameList << var->variableName;
+    vectorGlyphsSettings->varNameList << var->variableName;
 
     // Temporarily save variable indices.
-    int tmpuComponentVarIndex = windBarbsSettings->uComponentVarIndex;
-    int tmpvComponentVarIndex = windBarbsSettings->vComponentVarIndex;
+    int tmpuComponentVarIndex = vectorGlyphsSettings->lonComponentVarIndex;
+    int tmpvComponentVarIndex = vectorGlyphsSettings->latComponentVarIndex;
 
-    properties->mEnum()->setEnumNames(windBarbsSettings->uComponentVarProperty,
-                                      windBarbsSettings->varNameList);
-    properties->mEnum()->setEnumNames(windBarbsSettings->vComponentVarProperty,
-                                      windBarbsSettings->varNameList);
+    properties->mEnum()->setEnumNames(vectorGlyphsSettings->lonComponentVarProperty,
+                                      vectorGlyphsSettings->varNameList);
+    properties->mEnum()->setEnumNames(vectorGlyphsSettings->latComponentVarProperty,
+                                      vectorGlyphsSettings->varNameList);
 
     properties->mEnum()->setValue(
-                windBarbsSettings->uComponentVarProperty,
+                vectorGlyphsSettings->lonComponentVarProperty,
                 tmpuComponentVarIndex);
     properties->mEnum()->setValue(
-                windBarbsSettings->vComponentVarProperty,
+                vectorGlyphsSettings->latComponentVarProperty,
                 tmpvComponentVarIndex);
 
     crossSectionGridsNeedUpdate = true;
@@ -1435,24 +1719,24 @@ void MNWPHorizontalSectionActor::onChangeActorVariable(MNWPActorVariable *var)
 {
     int varIndex = variables.indexOf(var);
     // Update lists of variable names.
-    windBarbsSettings->varNameList.replace(varIndex, var->variableName);
+    vectorGlyphsSettings->varNameList.replace(varIndex, var->variableName);
 
     // Temporarily save variable indices.
-    int tmpuComponentVarIndex = windBarbsSettings->uComponentVarIndex;
-    int tmpvComponentVarIndex = windBarbsSettings->vComponentVarIndex;
+    int tmpuComponentVarIndex = vectorGlyphsSettings->lonComponentVarIndex;
+    int tmpvComponentVarIndex = vectorGlyphsSettings->latComponentVarIndex;
 
     enableActorUpdates(false);
-    properties->mEnum()->setEnumNames(windBarbsSettings->uComponentVarProperty,
-                                      windBarbsSettings->varNameList);
-    properties->mEnum()->setEnumNames(windBarbsSettings->vComponentVarProperty,
-                                      windBarbsSettings->varNameList);
+    properties->mEnum()->setEnumNames(vectorGlyphsSettings->lonComponentVarProperty,
+                                      vectorGlyphsSettings->varNameList);
+    properties->mEnum()->setEnumNames(vectorGlyphsSettings->latComponentVarProperty,
+                                      vectorGlyphsSettings->varNameList);
 
     properties->mEnum()->setValue(
-                windBarbsSettings->uComponentVarProperty,
+                vectorGlyphsSettings->lonComponentVarProperty,
                 tmpuComponentVarIndex);
 
     properties->mEnum()->setValue(
-                windBarbsSettings->vComponentVarProperty,
+                vectorGlyphsSettings->latComponentVarProperty,
                 tmpvComponentVarIndex);
     enableActorUpdates(true);
 
@@ -1749,6 +2033,11 @@ void MNWPHorizontalSectionActor::renderFilledContours(
 
     glFilledContoursShader->bind();
 
+    // Change the depth function to less and equal. This allows OpenGL to
+    // overwrite fragments with the same depths and thus allows the hsec actor
+    // to draw filled contours of more than one variable.
+    glDepthFunc(GL_LEQUAL);
+
     // Model-view-projection matrix from the current scene view.
     glFilledContoursShader->setUniformValue(
                 "mvpMatrix", *(sceneView->getModelViewProjectionMatrix())); CHECK_GL_ERROR;
@@ -1819,6 +2108,9 @@ void MNWPHorizontalSectionActor::renderFilledContours(
                           0, var->nlons * 2, var->nlats - 1); CHECK_GL_ERROR;
 
     glDisable(GL_POLYGON_OFFSET_FILL);
+
+    // Change the depth function back to its default value.
+    glDepthFunc(GL_LESS);
 }
 
 
@@ -2002,10 +2294,12 @@ void MNWPHorizontalSectionActor::renderTexturedContours(
     if (var->spatialTransferFunction == nullptr) return;
     if (var->spatialTransferFunction->getTexture() == nullptr) return;
 
-//    glEnable(GL_DEPTH_TEST);
-    glDepthFunc(GL_LEQUAL);
-
     glTexturedContoursShader->bind();
+
+    // Change the depth function to less and equal. This allows OpenGL to
+    // overwrite fragments with the same depths and thus allows the hsec actor
+    // to draw textured contours with filled contours.
+    glDepthFunc(GL_LEQUAL);
 
     // Model-view-projection matrix from the current scene view.
     glTexturedContoursShader->setUniformValue(
@@ -2117,294 +2411,424 @@ void MNWPHorizontalSectionActor::renderTexturedContours(
                           0, var->nlons * 2, var->nlats - 1); CHECK_GL_ERROR;
 
     glDisable(GL_POLYGON_OFFSET_FILL);
-
-//    glEnable(GL_DEPTH_TEST);
+    // Change the depth function back to its default value.
+    glDepthFunc(GL_LESS);
 }
 
 
-void MNWPHorizontalSectionActor::renderWindBarbs(MSceneViewGLWidget *sceneView)
+void MNWPHorizontalSectionActor::renderVectorGlyphs(
+        MSceneViewGLWidget *sceneView,
+        std::shared_ptr<GL::MShaderEffect> glyphsShader,
+        bool renderShadow)
 {
     // Selected variables valid?
-    if (windBarbsSettings->vComponentVarIndex >= variables.size() ||
-            windBarbsSettings->vComponentVarIndex < 0 ||
-            windBarbsSettings->uComponentVarIndex >= variables.size() ||
-            windBarbsSettings->uComponentVarIndex < 0)
+    if (vectorGlyphsSettings->latComponentVarIndex >= variables.size() ||
+            vectorGlyphsSettings->latComponentVarIndex < 0 ||
+            vectorGlyphsSettings->lonComponentVarIndex >= variables.size() ||
+            vectorGlyphsSettings->lonComponentVarIndex < 0)
     {
         return;
     }
 
-    MNWP2DHorizontalActorVariable *varWindV =
+    MNWP2DHorizontalActorVariable *varLatitudinal =
             static_cast<MNWP2DHorizontalActorVariable*>(
-                variables.at(windBarbsSettings->vComponentVarIndex)
+                variables.at(vectorGlyphsSettings->latComponentVarIndex)
                 );
-    MNWP2DHorizontalActorVariable *varWindU =
+    MNWP2DHorizontalActorVariable *varLongitudinal =
             static_cast<MNWP2DHorizontalActorVariable*>(
-                variables.at(windBarbsSettings->uComponentVarIndex)
+                variables.at(vectorGlyphsSettings->lonComponentVarIndex)
                 );
 
-    if (varWindV->grid->getLevelType() != varWindU->grid->getLevelType())
+    if (varLatitudinal->grid->getLevelType()
+            != varLongitudinal->grid->getLevelType())
     {
-        LOG4CPLUS_WARN(mlog, "WARNING: Wind barbs u and v variables must have "
-                       "the same vertical level type. Disabling wind barbs.");
+        LOG4CPLUS_WARN(mlog, "WARNING: Vector field longitudinal and latitudinal"
+                             " variables must have the same vertical level type."
+                             " Disabling vector glyphs.");
         return;
     }
 
-    if (varWindV->grid->getLevelType() == SURFACE_2D)
-    {
-        LOG4CPLUS_WARN(mlog, "WARNING: Wind barbs have not been implemented for "
-                       "2D surface fields. Disabling wind barbs.");
-        return;
-    }
-
-    // Don't render wind barbs if horizontal slice position is
-    // outside the data domain (assuming u/v are on the same grid).
-    if (varWindV->grid->getBottomDataVolumePressure() < slicePosition_hPa
-            || varWindV->grid->getTopDataVolumePressure() > slicePosition_hPa)
+    // Don't render vector glyphs if horizontal slice position is outside the
+    // data domain (assuming longitudial/latitudial are on the same grid).
+    if (varLatitudinal->grid->getLevelType() != SURFACE_2D &&
+            (varLatitudinal->grid->getBottomDataVolumePressure() < slicePosition_hPa
+             || varLatitudinal->grid->getTopDataVolumePressure() > slicePosition_hPa))
     {
         return;
     }
 
-    glWindBarbsShader->bind();
+    switch (vectorGlyphsSettings->glyphType)
+    {
+    case VectorGlyphsSettings::GlyphType::WindBarbs:
+    {
+        glyphsShader->bindProgram("WindBarbs");
+        glyphsShader->setUniformValue(
+                    "showCalmGlyph", vectorGlyphsSettings->showCalmGlyphs); CHECK_GL_ERROR;
+        glyphsShader->setUniformValue(
+                    "numFlags", vectorGlyphsSettings->pennantTilt); CHECK_GL_ERROR;
+        break;
+    }
+    case VectorGlyphsSettings::GlyphType::Arrows:
+    {
+        glyphsShader->bindProgram("Arrows");
+        glyphsShader->setUniformValue(
+                    "arrowHeadHeight",
+                    GLfloat(vectorGlyphsSettings->arrowHeadHeight)); CHECK_GL_ERROR;
+        glyphsShader->setUniformValue(
+                    "arrowOutlineWidth",
+                    GLfloat(vectorGlyphsSettings->arrowOutlineWidth)); CHECK_GL_ERROR;
+        glyphsShader->setUniformValue(
+                    "arrowOutlineColour",
+                    vectorGlyphsSettings->arrowOutlineColour); CHECK_GL_ERROR;
+        glyphsShader->setUniformValue(
+                    "arrowDrawOutline",
+                    GLfloat(vectorGlyphsSettings->arrowDrawOutline)); CHECK_GL_ERROR;
+        glyphsShader->setUniformValue(
+                    "scaleArrowWithMagnitude",
+                    vectorGlyphsSettings->scaleArrowWithMagnitude); CHECK_GL_ERROR;
+        glyphsShader->setUniformValue(
+                    "scaleArrowDiscardBelow",
+                    vectorGlyphsSettings->scaleArrowDiscardBelow); CHECK_GL_ERROR;
+        glyphsShader->setUniformValue(
+                    "scaleArrowDiscardAbove",
+                    vectorGlyphsSettings->scaleArrowDiscardAbove); CHECK_GL_ERROR;
+        glyphsShader->setUniformValue(
+                    "scaleArrowMinScalar",
+                    GLfloat(vectorGlyphsSettings->scaleArrowMinScalar)); CHECK_GL_ERROR;
+        glyphsShader->setUniformValue(
+                    "scaleArrowMinLength",
+                    GLfloat(vectorGlyphsSettings->scaleArrowMinLength)); CHECK_GL_ERROR;
+        glyphsShader->setUniformValue(
+                    "scaleArrowMaxScalar",
+                    GLfloat(vectorGlyphsSettings->scaleArrowMaxScalar)); CHECK_GL_ERROR;
+        glyphsShader->setUniformValue(
+                    "scaleArrowMaxLength",
+                    GLfloat(vectorGlyphsSettings->scaleArrowMaxLength)); CHECK_GL_ERROR;
+        break;
+    }
+    case VectorGlyphsSettings::GlyphType::Arrows3D:
+    {
+        if (renderShadow)
+        {
+            glyphsShader->bindProgram("HSecArrowShadow");
+            glyphsShader->setUniformValue(
+                        "shadowColor",
+                        vectorGlyphsSettings->arrows3DShadowColour); CHECK_GL_ERROR;
+        }
+        else
+        {
+            glyphsShader->bindProgram("HSecArrowData");
+        }
+        glyphsShader->setUniformValue(
+                    "arrowRadius",
+                    GLfloat(vectorGlyphsSettings->arrowHeadHeight)); CHECK_GL_ERROR;
+        glyphsShader->setUniformValue(
+                    "lightDirection",
+                    sceneView->getLightDirection()); CHECK_GL_ERROR;
+
+        glyphsShader->setUniformValue(
+                    "scaleArrowWithMagnitude",
+                    vectorGlyphsSettings->scaleArrowWithMagnitude); CHECK_GL_ERROR;
+        glyphsShader->setUniformValue(
+                    "scaleArrowDiscardBelow",
+                    vectorGlyphsSettings->scaleArrowDiscardBelow); CHECK_GL_ERROR;
+        glyphsShader->setUniformValue(
+                    "scaleArrowDiscardAbove",
+                    vectorGlyphsSettings->scaleArrowDiscardAbove); CHECK_GL_ERROR;
+        glyphsShader->setUniformValue(
+                    "scaleArrowMinScalar",
+                    GLfloat(vectorGlyphsSettings->scaleArrowMinScalar)); CHECK_GL_ERROR;
+        glyphsShader->setUniformValue(
+                    "scaleArrowMinLength",
+                    GLfloat(vectorGlyphsSettings->scaleArrowMinLength)); CHECK_GL_ERROR;
+        glyphsShader->setUniformValue(
+                    "scaleArrowMaxScalar",
+                    GLfloat(vectorGlyphsSettings->scaleArrowMaxScalar)); CHECK_GL_ERROR;
+        glyphsShader->setUniformValue(
+                    "scaleArrowMaxLength",
+                    GLfloat(vectorGlyphsSettings->scaleArrowMaxLength)); CHECK_GL_ERROR;
+        break;
+    }
+    default:
+    {
+        break;
+    }
+    }
 
     // Reset optional required textures (to avoid draw errors).
     // ========================================================
 
-    varWindU->textureDummy1D->bindToTextureUnit(varWindU->textureUnitUnusedTextures);
-    glWindBarbsShader->setUniformValue(
-                "hybridCoefficientsU", varWindU->textureUnitUnusedTextures); CHECK_GL_ERROR;
-    varWindV->textureDummy1D->bindToTextureUnit(varWindV->textureUnitUnusedTextures);
-    glWindBarbsShader->setUniformValue(
-                "hybridCoefficientsV", varWindV->textureUnitUnusedTextures); CHECK_GL_ERROR;
+    varLongitudinal->textureDummy1D->bindToTextureUnit(
+                varLongitudinal->textureUnitUnusedTextures);
+    glyphsShader->setUniformValue(
+                "hybridCoefficientsLon",
+                varLongitudinal->textureUnitUnusedTextures); CHECK_GL_ERROR;
+    varLatitudinal->textureDummy1D->bindToTextureUnit(
+                varLatitudinal->textureUnitUnusedTextures);
+    glyphsShader->setUniformValue(
+                "hybridCoefficientsLat",
+                varLatitudinal->textureUnitUnusedTextures); CHECK_GL_ERROR;
 
-    varWindU->textureDummy2D->bindToTextureUnit(varWindU->textureUnitUnusedTextures);
-    glWindBarbsShader->setUniformValue(
-                "surfacePressureU", varWindU->textureUnitUnusedTextures); CHECK_GL_ERROR;
-    varWindV->textureDummy2D->bindToTextureUnit(varWindV->textureUnitUnusedTextures);
-    glWindBarbsShader->setUniformValue(
-                "surfacePressureV", varWindV->textureUnitUnusedTextures); CHECK_GL_ERROR;
+    varLongitudinal->textureDummy2D->bindToTextureUnit(
+                varLongitudinal->textureUnitUnusedTextures);
+    glyphsShader->setUniformValue(
+                "surfacePressureLon",
+                varLongitudinal->textureUnitUnusedTextures); CHECK_GL_ERROR;
+    varLatitudinal->textureDummy2D->bindToTextureUnit(
+                varLatitudinal->textureUnitUnusedTextures);
+    glyphsShader->setUniformValue(
+                "surfacePressureLat",
+                varLatitudinal->textureUnitUnusedTextures); CHECK_GL_ERROR;
+
+    glyphsShader->setUniformValue(
+                "vectorDataLonComponent2D",
+                varLongitudinal->textureUnitUnusedTextures); CHECK_GL_ERROR;
+    glyphsShader->setUniformValue(
+                "vectorDataLatComponent2D",
+                varLatitudinal->textureUnitUnusedTextures); CHECK_GL_ERROR;
 
     // Set shader variables.
     // =====================
 
-    glWindBarbsShader->setUniformValue(
+    glyphsShader->setUniformValue(
+                "pivotPosition",
+                GLint(int(vectorGlyphsSettings->pivotPosition))); CHECK_GL_ERROR;
+
+    glyphsShader->setUniformValue(
                 "mvpMatrix",
                 *(sceneView->getModelViewProjectionMatrix())); CHECK_GL_ERROR;
 
 //TODO (mr 17May2017) -- why is there an offset?
     const GLfloat worldZ = sceneView->worldZfromPressure(slicePosition_hPa) + 0.1;
-    glWindBarbsShader->setUniformValue(
+    glyphsShader->setUniformValue(
                 "worldZ", worldZ); CHECK_GL_ERROR;
 
-    varWindU->textureDataField->bindToTextureUnit(
-                varWindU->textureUnitDataField);
-    glWindBarbsShader->setUniformValue(
-                "dataUComp",varWindU->textureUnitDataField); CHECK_GL_ERROR;
-    varWindV->textureDataField->bindToTextureUnit(
-                varWindV->textureUnitDataField);
-    glWindBarbsShader->setUniformValue(
-                "dataVComp",varWindV->textureUnitDataField); CHECK_GL_ERROR;
 
-    if (varWindU->grid->getLevelType() == HYBRID_SIGMA_PRESSURE_3D)
+    // Texture bindings for data fields (2D texture).
+    if (varLongitudinal->grid->getLevelType() == SURFACE_2D)
     {
-        varWindU->textureSurfacePressure->bindToTextureUnit(
-                    varWindU->textureUnitSurfacePressure);
-        glWindBarbsShader->setUniformValue(
-                    "surfacePressureU",varWindU->textureUnitSurfacePressure); CHECK_GL_ERROR;
-        varWindV->textureSurfacePressure->bindToTextureUnit(
-                    varWindV->textureUnitSurfacePressure);
-        glWindBarbsShader->setUniformValue(
-                    "surfacePressureV",varWindV->textureUnitSurfacePressure); CHECK_GL_ERROR;
-        varWindU->textureHybridCoefficients->bindToTextureUnit(
-                    varWindU->textureUnitHybridCoefficients);
-        glWindBarbsShader->setUniformValue(
-                    "hybridCoefficientsU",varWindU->textureUnitHybridCoefficients); CHECK_GL_ERROR;
-        varWindV->textureHybridCoefficients->bindToTextureUnit(
-                    varWindV->textureUnitHybridCoefficients);
-        glWindBarbsShader->setUniformValue(
-                    "hybridCoefficientsV",varWindV->textureUnitHybridCoefficients);CHECK_GL_ERROR;
+        varLongitudinal->textureDataField->bindToTextureUnit(
+                    varLongitudinal->textureUnitDataField);
+        glyphsShader->setUniformValue(
+                    "vectorDataLonComponent2D",
+                    varLongitudinal->textureUnitDataField); CHECK_GL_ERROR;
+
+        varLatitudinal->textureDataField->bindToTextureUnit(
+                    varLatitudinal->textureUnitDataField);
+        glyphsShader->setUniformValue(
+                    "vectorDataLatComponent2D",
+                    varLatitudinal->textureUnitDataField); CHECK_GL_ERROR;
+    }
+    // Texture bindings for data fields (3D texture).
+    else
+    {
+        varLongitudinal->textureDataField->bindToTextureUnit(
+                    varLongitudinal->textureUnitDataField);
+        glyphsShader->setUniformValue(
+                    "vectorDataLonComponent3D",
+                    varLongitudinal->textureUnitDataField); CHECK_GL_ERROR;
+        varLatitudinal->textureDataField->bindToTextureUnit(
+                    varLatitudinal->textureUnitDataField);
+        glyphsShader->setUniformValue(
+                    "vectorDataLatComponent3D",
+                    varLatitudinal->textureUnitDataField); CHECK_GL_ERROR;
     }
 
-    if (varWindU->grid->getLevelType() == AUXILIARY_PRESSURE_3D)
+    if (varLongitudinal->grid->getLevelType() == HYBRID_SIGMA_PRESSURE_3D)
     {
-        varWindU->textureAuxiliaryPressure->bindToTextureUnit(
-                    varWindU->textureUnitAuxiliaryPressure); CHECK_GL_ERROR;
-        glWindBarbsShader->setUniformValue(
-                    "auxPressureFieldU_hPa", varWindU->textureUnitAuxiliaryPressure); CHECK_GL_ERROR;
-
-        varWindV->textureAuxiliaryPressure->bindToTextureUnit(
-                    varWindV->textureUnitAuxiliaryPressure); CHECK_GL_ERROR;
-        glWindBarbsShader->setUniformValue(
-                    "auxPressureFieldV_hPa", varWindV->textureUnitAuxiliaryPressure); CHECK_GL_ERROR;
+        varLongitudinal->textureSurfacePressure->bindToTextureUnit(
+                    varLongitudinal->textureUnitSurfacePressure);
+        glyphsShader->setUniformValue(
+                    "surfacePressureLon",
+                    varLongitudinal->textureUnitSurfacePressure); CHECK_GL_ERROR;
+        varLatitudinal->textureSurfacePressure->bindToTextureUnit(
+                    varLatitudinal->textureUnitSurfacePressure);
+        glyphsShader->setUniformValue(
+                    "surfacePressureLat",
+                    varLatitudinal->textureUnitSurfacePressure); CHECK_GL_ERROR;
+        varLongitudinal->textureHybridCoefficients->bindToTextureUnit(
+                    varLongitudinal->textureUnitHybridCoefficients);
+        glyphsShader->setUniformValue(
+                    "hybridCoefficientsLon",
+                    varLongitudinal->textureUnitHybridCoefficients); CHECK_GL_ERROR;
+        varLatitudinal->textureHybridCoefficients->bindToTextureUnit(
+                    varLatitudinal->textureUnitHybridCoefficients);
+        glyphsShader->setUniformValue(
+                    "hybridCoefficientsLat",
+                    varLatitudinal->textureUnitHybridCoefficients);CHECK_GL_ERROR;
     }
 
-    glWindBarbsShader->setUniformValue(
-                "deltaLon", varWindU->grid->getDeltaLon()); CHECK_GL_ERROR;
-    glWindBarbsShader->setUniformValue(
-                "deltaLat", varWindU->grid->getDeltaLat()); CHECK_GL_ERROR;
+    if (varLongitudinal->grid->getLevelType() == AUXILIARY_PRESSURE_3D)
+    {
+        varLongitudinal->textureAuxiliaryPressure->bindToTextureUnit(
+                    varLongitudinal->textureUnitAuxiliaryPressure); CHECK_GL_ERROR;
+        glyphsShader->setUniformValue(
+                    "auxPressureFieldLon_hPa",
+                    varLongitudinal->textureUnitAuxiliaryPressure); CHECK_GL_ERROR;
 
-    glWindBarbsShader->setUniformValue(
-                "pToWorldZParams",
-                sceneView->pressureToWorldZParameters()); CHECK_GL_ERROR;
+        varLatitudinal->textureAuxiliaryPressure->bindToTextureUnit(
+                    varLatitudinal->textureUnitAuxiliaryPressure); CHECK_GL_ERROR;
+        glyphsShader->setUniformValue(
+                    "auxPressureFieldLat_hPa",
+                    varLatitudinal->textureUnitAuxiliaryPressure); CHECK_GL_ERROR;
+    }
 
-    QVector3D cameraPos = sceneView->getCamera()->getOrigin();
-    glWindBarbsShader->setUniformValue(
-                "cameraPosition", cameraPos); CHECK_GL_ERROR;
+    glyphsShader->setUniformValue(
+                "deltaLon", varLongitudinal->grid->getDeltaLon()); CHECK_GL_ERROR;
+    glyphsShader->setUniformValue(
+                "deltaLat", varLongitudinal->grid->getDeltaLat()); CHECK_GL_ERROR;
 
-    QVector2D dataSECrnr(varWindU->grid->lons[varWindU->grid->nlons - 1],
-                         varWindU->grid->lats[varWindU->grid->nlats - 1]);
-    glWindBarbsShader->setUniformValue(
-                        "dataSECrnr", dataSECrnr); CHECK_GL_ERROR;
-
-    QVector2D dataNWCrnr(varWindU->grid->lons[0],
-                         varWindU->grid->lats[0]);
-    glWindBarbsShader->setUniformValue(
+    QVector2D dataNWCrnr(varLongitudinal->grid->lons[0],
+                         varLongitudinal->grid->lats[0]);
+    glyphsShader->setUniformValue(
                         "dataNWCrnr", dataNWCrnr); CHECK_GL_ERROR;
 
     // Texture bindings for Lat/Lon axes (1D textures).
-    varWindU->textureLonLatLevAxes->bindToTextureUnit(
-                varWindU->textureUnitLonLatLevAxes); CHECK_GL_ERROR;
-    glWindBarbsShader->setUniformValue(
-                "latLonAxesData", varWindU->textureUnitLonLatLevAxes); CHECK_GL_ERROR;
-    glWindBarbsShader->setUniformValue(
-                "latOffset", GLint(varWindU->grid->nlons)); CHECK_GL_ERROR;
-    glWindBarbsShader->setUniformValue(
-                "verticalOffset", GLint(varWindU->grid->nlons + varWindU->grid->nlats)); CHECK_GL_ERROR;
-    glWindBarbsShader->setUniformValue(
-                "levelType", static_cast<GLint>(varWindU->levelType)); CHECK_GL_ERROR;
+    varLongitudinal->textureLonLatLevAxes->bindToTextureUnit(
+                varLongitudinal->textureUnitLonLatLevAxes); CHECK_GL_ERROR;
+    glyphsShader->setUniformValue(
+                "latLonAxesData",
+                varLongitudinal->textureUnitLonLatLevAxes); CHECK_GL_ERROR;
+    glyphsShader->setUniformValue(
+                "verticalOffset",
+                GLint(varLongitudinal->grid->nlons
+                      + varLongitudinal->grid->nlats)); CHECK_GL_ERROR;
+    glyphsShader->setUniformValue(
+                "levelType",
+                static_cast<GLint>(varLongitudinal->levelType)); CHECK_GL_ERROR;
 
-    glWindBarbsShader->setUniformValue(
+    glyphsShader->setUniformValue(
                 "pressure_hPa", GLfloat(slicePosition_hPa)); CHECK_GL_ERROR;
 
-    glWindBarbsShader->setUniformValue(
-                "lineWidth", windBarbsSettings->lineWidth); CHECK_GL_ERROR;
-    glWindBarbsShader->setUniformValue(
-                "glyphColor", windBarbsSettings->color); CHECK_GL_ERROR;
-    glWindBarbsShader->setUniformValue(
-                "showCalmGlyph", windBarbsSettings->showCalmGlyphs); CHECK_GL_ERROR;
-    glWindBarbsShader->setUniformValue(
-                "numFlags", windBarbsSettings->pennantTilt); CHECK_GL_ERROR;
+    glyphsShader->setUniformValue(
+                "lineWidth", vectorGlyphsSettings->lineWidth); CHECK_GL_ERROR;
+    glyphsShader->setUniformValue(
+                "glyphColor", vectorGlyphsSettings->color); CHECK_GL_ERROR;
 
     float scale = 1.;
-    float deltaBarbs = 1.;
+    float deltaGlyphs = 1.;
 
-    if (!windBarbsSettings->automaticScalingEnabled)
+    if (!vectorGlyphsSettings->automaticScalingEnabled)
     {
-        scale = windBarbsSettings->oldScale;
-        deltaBarbs = windBarbsSettings->deltaBarbsLonLat;
+        scale = vectorGlyphsSettings->oldScale;
+        deltaGlyphs = vectorGlyphsSettings->deltaGlyphsLonLat;
 
-        // Restrict wind barb distance to grid point spacing? If the barb
+        // Restrict vector glyph distance to grid point spacing? If the glyph
         // distance is smaller than the grid point spacing, nearest-neighbour
         // interpolation is used.
-        if (windBarbsSettings->clampDeltaBarbsToGrid)
+        if (vectorGlyphsSettings->clampDeltaGlyphsToGrid)
         {
-            deltaBarbs = max(deltaBarbs, varWindU->grid->getDeltaLon());
+            deltaGlyphs = max(deltaGlyphs, varLongitudinal->grid->getDeltaLon());
         }
     }
     else
     {
-        // Automatic barb scaling.
+        // Compute automatic glyph scaling.
 
-        // ray definition
+        // Define view ray.
         const QVector3D rayDir = sceneView->getCamera()->getZAxis();
         const QVector3D rayOrig = sceneView->getCamera()->getOrigin();
 
-        // plane definition
-        const QVector3D planeNormal(0,0,1);
+        // Define horizontal plane.
+        const QVector3D planeNormal(0, 0, 1);
         const float D = -worldZ;
 
-        // compute intersection point between ray and plane
+        // Compute intersection point between ray and plane.
         const float s = -(planeNormal.z() * rayOrig.z() + D) /
                 (planeNormal.z() * rayDir.z());
         const QVector3D P = rayOrig + s * rayDir;
         float t = (P - rayOrig).length();
 
-        // quantize distance
-        const float step = windBarbsSettings->sensitivity;
+        // Quantize distance.
+        const float step = vectorGlyphsSettings->sensitivity;
         t = step * std::floor(t / step);
 
-        // try to handle camera distance to glyphs via logistical function
-        const float c = windBarbsSettings->reduceFactor;
-        const float b = windBarbsSettings->reduceSlope;
+        // Try to handle camera distance to glyphs via logistical function.
+        const float c = vectorGlyphsSettings->reduceFactor;
+        const float b = vectorGlyphsSettings->reduceSlope;
         const float a = c - 1;
         scale = c / (1.0f + a * std::exp(-b * (t)));
 
-        // quantize scale to get only power-of-two scales
+        // Quantize scale to get only power-of-two scales.
         scale = std::pow(2, std::floor(std::log2(scale) + 0.5));
-        //scale = 2 * std::floor(scale / 2);
         scale = clamp(scale, 1.0f, 1024.0f);
 
-        windBarbsSettings->oldScale = scale;
-        deltaBarbs = varWindU->grid->getDeltaLon() * scale;
+        vectorGlyphsSettings->oldScale = scale;
+        deltaGlyphs = varLongitudinal->grid->getDeltaLon() * scale;
     }
 
-    glWindBarbsShader->setUniformValue("deltaGridX", deltaBarbs); CHECK_GL_ERROR;
-    glWindBarbsShader->setUniformValue("deltaGridY", deltaBarbs); CHECK_GL_ERROR;
+    glyphsShader->setUniformValue("deltaGridX",
+                                          deltaGlyphs); CHECK_GL_ERROR;
+    glyphsShader->setUniformValue("deltaGridY",
+                                          deltaGlyphs); CHECK_GL_ERROR;
 
     MGLResourcesManager* glRM = MGLResourcesManager::getInstance();
-    const QString requestKey = QString("vbo_windbarbs_actor#%1").arg(myID);
+    const QString requestKey = QString("vbo_vectorglyphs_actor#%1").arg(myID);
 
     GL::MVertexBuffer* vb = static_cast<GL::MVertexBuffer*>(
                 glRM->getGPUItem(requestKey));
 
-    int nBarbsLon = (bBoxConnection->eastWestExtent() / deltaBarbs) + 1;
-    int nBarbsLat = (bBoxConnection->northSouthExtent() / deltaBarbs) + 1;
-    const GLuint numBarbsTimes2 = nBarbsLon * nBarbsLat * 2;
+    int nGlyphsLon = (bBoxConnection->eastWestExtent() / deltaGlyphs) + 1;
+    int nGlyphsLat = (bBoxConnection->northSouthExtent() / deltaGlyphs) + 1;
+    const GLuint numGlyphsTimes2 = nGlyphsLon * nGlyphsLat * 2;
 
     // If VBO doesn't exist, create a new one.
     if (!vb)
     {
         GL::MFloatVertexBuffer* newVB = nullptr;
-        newVB = new GL::MFloatVertexBuffer(requestKey, numBarbsTimes2);
+        newVB = new GL::MFloatVertexBuffer(requestKey, numGlyphsTimes2);
         if (glRM->tryStoreGPUItem(newVB))
         {
-            newVB->upload(nullptr, numBarbsTimes2, sceneView);
+            newVB->upload(nullptr, numGlyphsTimes2, sceneView);
         }
         else
         {
             delete newVB; return;
         }
 
-        windBarbsVertexBuffer = static_cast<GL::MVertexBuffer*>(
+        vectorGlyphsVertexBuffer = static_cast<GL::MVertexBuffer*>(
                     glRM->getGPUItem(requestKey));
     }
     else
     {
-        windBarbsVertexBuffer = vb;
+        vectorGlyphsVertexBuffer = vb;
     }
 
-    // Generate vertex data (one vertex for each wind barb).
-    QVector<float> vertexData(numBarbsTimes2);
+    // Generate vertex data (one vertex for each vector glyph).
+    QVector<float> vertexData(numGlyphsTimes2);
     int iVertex = 0;
-    for (int i = 0; i < nBarbsLon; i++)
+    for (int i = 0; i < nGlyphsLon; i++)
     {
-        for (int j = 0; j < nBarbsLat; j++)
+        for (int j = 0; j < nGlyphsLat; j++)
         {
             vertexData[iVertex * 2    ] =
-                    bBoxConnection->westLon() + i * deltaBarbs;
+                    bBoxConnection->westLon() + i * deltaGlyphs;
             vertexData[iVertex * 2 + 1] =
-                    bBoxConnection->southLat() + j * deltaBarbs;
+                    bBoxConnection->southLat() + j * deltaGlyphs;
             iVertex++;
         }
     }
 
-    // Upload vertex data to GPU and draw barbs.
+    // Upload vertex data to GPU and draw vector glyphs.
     GL::MFloatVertexBuffer* buf =
-            dynamic_cast<GL::MFloatVertexBuffer*>(windBarbsVertexBuffer);
-    buf->reallocate(nullptr, numBarbsTimes2, 0, false, sceneView);
+            dynamic_cast<GL::MFloatVertexBuffer*>(vectorGlyphsVertexBuffer);
+    buf->reallocate(nullptr, numGlyphsTimes2, 0, false, sceneView);
     buf->update(vertexData, 0, 0, sceneView);
 
     const int VERTEX_ATTRIBUTE = 0;
-    windBarbsVertexBuffer->attachToVertexAttribute(VERTEX_ATTRIBUTE, 2);
+    vectorGlyphsVertexBuffer->attachToVertexAttribute(VERTEX_ATTRIBUTE, 2);
 
-    glPolygonOffset(.8f, 1.0f); CHECK_GL_ERROR;
-    glEnable(GL_POLYGON_OFFSET_FILL); CHECK_GL_ERROR;
     glPolygonMode(GL_FRONT_AND_BACK,
                   renderAsWireFrame ? GL_LINE : GL_FILL); CHECK_GL_ERROR;
 
-    glDrawArrays(GL_POINTS, 0, nBarbsLon * nBarbsLat); CHECK_GL_ERROR;
+    glPolygonOffset(.8f, 1.0f); CHECK_GL_ERROR;
+    glEnable(GL_POLYGON_OFFSET_FILL); CHECK_GL_ERROR;
+    glDrawArrays(GL_POINTS, 0, nGlyphsLon * nGlyphsLat); CHECK_GL_ERROR;
+
 
     glBindBuffer(GL_ARRAY_BUFFER, 0); CHECK_GL_ERROR;
     glDisable(GL_POLYGON_OFFSET_FILL); CHECK_GL_ERROR;
+    glDepthFunc(GL_LESS);
 }
 
 

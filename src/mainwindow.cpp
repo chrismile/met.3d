@@ -72,6 +72,12 @@ MMainWindow::MMainWindow(QStringList commandLineArguments, QWidget *parent)
     // Qt Designer specific initialization.
     ui->setupUi(this);
 
+    // Create the application window title.
+    QString applicationTitle = QString("Met.3D version %1 (%2)")
+            .arg(met3dVersionString).arg(met3dBuildDate);
+
+    setWindowTitle(applicationTitle);
+
     LOG4CPLUS_DEBUG(mlog, "Initialising Met.3D system ... please wait.");
 
     // Timer used to handle automatic saving of current session.
@@ -882,6 +888,15 @@ void MMainWindow::onSessionSwitch(QString currentSession)
         }
         action->setFont(actionFont);
     }
+
+    // Remove old session name if present and append current session name to
+    // window title.
+    QString newWindowTitle = windowTitle().split(" -- ").first();
+    if (!currentSession.isEmpty())
+    {
+        newWindowTitle.append(" -- " + currentSession);
+    }
+    setWindowTitle(newWindowTitle);
 }
 
 

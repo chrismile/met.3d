@@ -34,6 +34,8 @@ interface VStoFS
                                   // the value shall be perspectively correct
                                   // interpolated to the fragment shader
     smooth vec3   surfaceNormal;
+    smooth float lon;     // holds the longitude coordinate of the fragment in
+                          // world space coordinates
 };
 
 
@@ -48,6 +50,15 @@ uniform sampler2D surfaceTopography; // pressure elevation field in Pa
 uniform vec2      pToWorldZParams;   // parameters to convert p[hPa] to world z
 uniform mat4      mvpMatrix;         // model-view-projection
 
+uniform int       iOffset;           // grid index offsets if only a subregion
+uniform int       jOffset;           //   of the grid shall be rendered
+uniform vec2      bboxLons;          // western and eastern lon of the bbox
+
+uniform float     shiftForWesternLon; // shift in multiples of 360 to get the
+                                      // correct starting position (depends on
+                                      // the distance between the left border of
+                                      // the grid and the left border of the bbox)
+
 
 /*****************************************************************************
  ***                           VERTEX SHADER
@@ -57,7 +68,7 @@ uniform mat4      mvpMatrix;         // model-view-projection
   Returns the position of the vertex located at grid space position (i,j) in
   world coordinates (lon, lat, ln p).
   */
-vec3 fetchVertexPosition(int i, int j)
+vec3 fetchVertexPosition(int i, int j, float numGlobalLonShifts)
 {
     // Fetch lat/lon/p values from texture.
     float lon   = texelFetch(latLonAxesData, i, 0).a;
@@ -66,6 +77,8 @@ vec3 fetchVertexPosition(int i, int j)
 
     // Convert pressure to world Z coordinate.
     float z = (log(p_hPa) - pToWorldZParams.x) * pToWorldZParams.y;
+
+    lon += (numGlobalLonShifts * 360.) + shiftForWesternLon;
 
     return vec3(lon, lat, z);
 }
@@ -77,7 +90,20 @@ shader VSmain(out VStoFS Output)
     int i = int(gl_VertexID / 2);
     int j = bool(gl_VertexID & 1) ? (gl_InstanceID + 1) : gl_InstanceID;
 
-    vec3 vertexPosition = fetchVertexPosition(i, j);
+    int numLons = latOffset;
+
+    // In case of repeated grid region parts, this shift places the vertex to
+    // the correct global position. This is necessary since the modulo operation
+    // maps repeated parts to the same position. It contains the factor 360.
+    // needs to be multiplied with to place the vertex correctly.
+    float numGlobalLonShifts = floor((i + iOffset) / latOffset);
+
+    i = (i + iOffset) % numLons;
+    j = j + jOffset;
+
+    vec3 vertexPosition = fetchVertexPosition(i, j, numGlobalLonShifts);
+
+    float lon = vertexPosition.x;
 
     // Convert from world to clip space.
     gl_Position = mvpMatrix * vec4(vertexPosition, 1);
@@ -90,10 +116,14 @@ shader VSmain(out VStoFS Output)
     // four possible normals, of which we take the mean as the "true" normal.
     // See, for instance, the Lighthouse3D terrain tutorial:
     // http://www.lighthouse3d.com/opengl/terrain/index.php3?normals
-    vec3 vThisToLeft   = fetchVertexPosition(i-1, j  ) - vertexPosition;
-    vec3 vThisToTop    = fetchVertexPosition(i  , j-1) - vertexPosition;
-    vec3 vThisToRight  = fetchVertexPosition(i+1, j  ) - vertexPosition;
-    vec3 vThisToBottom = fetchVertexPosition(i  , j+1) - vertexPosition;
+    vec3 vThisToLeft   = fetchVertexPosition(i-1, j  , numGlobalLonShifts)
+            - vertexPosition;
+    vec3 vThisToTop    = fetchVertexPosition(i  , j-1, numGlobalLonShifts)
+            - vertexPosition;
+    vec3 vThisToRight  = fetchVertexPosition(i+1, j  , numGlobalLonShifts)
+            - vertexPosition;
+    vec3 vThisToBottom = fetchVertexPosition(i  , j+1, numGlobalLonShifts)
+            - vertexPosition;
 
     if (i == 0) vThisToLeft = -vThisToRight;
     else if (i == textureSize(dataField, 0).x - 1) vThisToRight = -vThisToLeft;
@@ -106,6 +136,8 @@ shader VSmain(out VStoFS Output)
     vec3 cross4 = normalize(cross(vThisToBottom, vThisToLeft));
 
     Output.surfaceNormal = normalize(cross1 + cross2 + cross3 + cross4);
+
+    Output.lon = lon;
 }
 
 
@@ -118,8 +150,28 @@ uniform float     scalarMinimum;    // min/max data values to scale to 0..1
 uniform float     scalarMaximum;
 uniform vec3      lightDirection;   // light direction in world space
 
+uniform bool      isCyclicGrid;   // indicates whether the grid is cyclic or not
+uniform float     leftGridLon;    // leftmost longitude of the grid
+uniform float     eastGridLon;    // eastmost longitude of the grid
+
 shader FSmain(in VStoFS Input, out vec4 fragColour)
 {
+    // Discard the element if it is outside the model domain (no scalar value).
+    if (Input.lon < bboxLons.x || Input.lon > bboxLons.y)
+    {
+        discard;
+    }
+
+    // In the case of the rendered region falling apart into disjunct region
+    // discard fragments between seperated regions.
+    // (cf. computeRenderRegionParameters of MNWP2DHorizontalActorVariable in
+    // nwpactorvariable.cpp).
+    if (!isCyclicGrid
+            && (mod(Input.lon - leftGridLon, 360.) >= (eastGridLon - leftGridLon)))
+    {
+        discard;
+    }
+
     // Compute diffuse shading.
     float diffuse = 0.5 + 0.5 * abs(dot(normalize(lightDirection), Input.surfaceNormal));
 
