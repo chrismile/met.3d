@@ -626,6 +626,7 @@ public:
 
 protected:
     friend class MNWPHorizontalSectionActor;
+    friend class MNWPSurfaceTopographyActor;
 
     void dataFieldChangedEvent() override;
 
