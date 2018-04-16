@@ -21,5 +21,3 @@ __
 build
 .idea
 cmake-build-*
-/.cproject
-/.project
