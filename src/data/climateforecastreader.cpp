@@ -99,13 +99,18 @@ QList<MVerticalLevelType> MClimateForecastReader::availableLevelTypes()
 QStringList MClimateForecastReader::availableVariables(
         MVerticalLevelType levelType)
 {
+    // Reading values with []-operator results in non deterministic crashes
+    // when using multi threading and QReadLocker. Thus it is necessary to use
+    // QMap's value()-method or QWriteLocker. But since these operations should
+    // only be reading operations, using the value()-method is prefered.
+
     QReadLocker availableItemsReadLocker(&availableItemsLock);
     if (!availableDataFields.keys().contains(levelType))
         throw MBadDataFieldRequest(
                 "unkown level type requested: " +
                 MStructuredGrid::verticalLevelTypeToString(levelType).toStdString(),
                 __FILE__, __LINE__);
-    return availableDataFields[levelType].keys();
+    return availableDataFields.value(levelType).keys();
 }
 
 
@@ -113,6 +118,7 @@ QSet<unsigned int> MClimateForecastReader::availableEnsembleMembers(
         MVerticalLevelType levelType,
         const QString&     variableName)
 {
+    // cf.  MClimateForecastReader::availableVariables() .
     QReadLocker availableItemsReadLocker(&availableItemsLock);
     if (!availableDataFields.keys().contains(levelType))
         throw MBadDataFieldRequest(
@@ -120,13 +126,16 @@ QSet<unsigned int> MClimateForecastReader::availableEnsembleMembers(
                 MStructuredGrid::verticalLevelTypeToString(levelType).toStdString(),
                 __FILE__, __LINE__);
 
-    if (availableDataFields[levelType].keys().contains(variableName))
+    if (availableDataFields.value(levelType).keys().contains(variableName))
     {
-        return availableDataFields[levelType][variableName]->availableMembers;
+        return availableDataFields.value(levelType).value(variableName)
+                ->availableMembers;
     }
-    else if (availableDataFieldsByStdName[levelType].keys().contains(variableName))
+    else if (availableDataFieldsByStdName.value(levelType).keys().contains(
+                 variableName))
     {
-        return availableDataFieldsByStdName[levelType][variableName]->availableMembers;
+        return availableDataFieldsByStdName.value(levelType).value(variableName)
+                ->availableMembers;
     }
     else
     {
@@ -141,6 +150,7 @@ QList<QDateTime> MClimateForecastReader::availableInitTimes(
         MVerticalLevelType levelType,
         const QString&     variableName)
 {
+    // cf.  MClimateForecastReader::availableVariables() .
     QReadLocker availableItemsReadLocker(&availableItemsLock);
     if (!availableDataFields.keys().contains(levelType))
         throw MBadDataFieldRequest(
@@ -148,13 +158,13 @@ QList<QDateTime> MClimateForecastReader::availableInitTimes(
                 MStructuredGrid::verticalLevelTypeToString(levelType).toStdString(),
                 __FILE__, __LINE__);
 
-    if (availableDataFields[levelType].keys().contains(variableName))
+    if (availableDataFields.value(levelType).keys().contains(variableName))
     {
-        return availableDataFields[levelType][variableName]->timeMap.keys();
+        return availableDataFields.value(levelType).value(variableName)->timeMap.keys();
     }
-    else if (availableDataFieldsByStdName[levelType].keys().contains(variableName))
+    else if (availableDataFieldsByStdName.value(levelType).keys().contains(variableName))
     {
-        return availableDataFieldsByStdName[levelType][variableName]->timeMap.keys();
+        return availableDataFieldsByStdName.value(levelType).value(variableName)->timeMap.keys();
     }
     else
     {
@@ -170,6 +180,7 @@ QList<QDateTime> MClimateForecastReader::availableValidTimes(
         const QString&     variableName,
         const QDateTime&   initTime)
 {
+    // cf.  MClimateForecastReader::availableVariables() .
     QReadLocker availableItemsReadLocker(&availableItemsLock);
     if (!availableDataFields.keys().contains(levelType))
         throw MBadDataFieldRequest(
@@ -177,25 +188,30 @@ QList<QDateTime> MClimateForecastReader::availableValidTimes(
                 MStructuredGrid::verticalLevelTypeToString(levelType).toStdString(),
                 __FILE__, __LINE__);
 
-    if (availableDataFields[levelType].keys().contains(variableName))
+    if (availableDataFields.value(levelType).keys().contains(variableName))
     {
-        if (!availableDataFields[levelType][variableName]->timeMap.keys().contains(initTime))
+        if (!availableDataFields.value(levelType).value(variableName)
+                ->timeMap.keys().contains(initTime))
             throw MBadDataFieldRequest(
                     "unkown init time requested: " +
                     initTime.toString(Qt::ISODate).toStdString(),
                     __FILE__, __LINE__);
         else
-            return availableDataFields[levelType][variableName]->timeMap[initTime].keys();
+            return availableDataFields.value(levelType).value(variableName)
+                    ->timeMap.value(initTime).keys();
     }
-    else if(availableDataFieldsByStdName[levelType].keys().contains(variableName))
+    else if(availableDataFieldsByStdName.value(levelType).keys().contains(
+                variableName))
     {
-        if (!availableDataFieldsByStdName[levelType][variableName]->timeMap.keys().contains(initTime))
+        if (!availableDataFieldsByStdName.value(levelType).value(variableName)
+                ->timeMap.keys().contains(initTime))
             throw MBadDataFieldRequest(
                     "unkown init time requested: " +
                     initTime.toString(Qt::ISODate).toStdString(),
                     __FILE__, __LINE__);
         else
-            return availableDataFieldsByStdName[levelType][variableName]->timeMap[initTime].keys();
+            return availableDataFieldsByStdName.value(levelType)
+                    .value(variableName)->timeMap.value(initTime).keys();
     }
     else
         throw MBadDataFieldRequest(
@@ -208,6 +224,7 @@ QString MClimateForecastReader::variableLongName(
         MVerticalLevelType levelType,
         const QString&     variableName)
 {
+    // cf.  MClimateForecastReader::availableVariables() .
     QReadLocker availableItemsReadLocker(&availableItemsLock);
     if (!availableDataFields.keys().contains(levelType))
         throw MBadDataFieldRequest(
@@ -215,13 +232,16 @@ QString MClimateForecastReader::variableLongName(
                 MStructuredGrid::verticalLevelTypeToString(levelType).toStdString(),
                 __FILE__, __LINE__);
 
-    if (availableDataFields[levelType].keys().contains(variableName))
+    if (availableDataFields.value(levelType).keys().contains(variableName))
     {
-        return availableDataFields[levelType][variableName]->longname;
+        return availableDataFields.value(levelType).value(variableName)
+                ->longname;
     }
-    else if (availableDataFieldsByStdName[levelType].keys().contains(variableName))
+    else if (availableDataFieldsByStdName.value(levelType).keys().contains(
+                 variableName))
     {
-        return availableDataFieldsByStdName[levelType][variableName]->longname;
+        return availableDataFieldsByStdName.value(levelType).value(variableName)
+                ->longname;
     }
     else
     {
@@ -236,6 +256,7 @@ QString MClimateForecastReader::variableStandardName(
         MVerticalLevelType levelType,
         const QString&     variableName)
 {
+    // cf.  MClimateForecastReader::availableVariables() .
     QReadLocker availableItemsReadLocker(&availableItemsLock);
     if (!availableDataFields.keys().contains(levelType))
         throw MBadDataFieldRequest(
@@ -243,13 +264,16 @@ QString MClimateForecastReader::variableStandardName(
                 MStructuredGrid::verticalLevelTypeToString(levelType).toStdString(),
                 __FILE__, __LINE__);
 
-    if (availableDataFields[levelType].keys().contains(variableName))
+    if (availableDataFields.value(levelType).keys().contains(variableName))
     {
-        return availableDataFields[levelType][variableName]->standardname;
+        return availableDataFields.value(levelType).value(variableName)
+                ->standardname;
     }
-    else if (availableDataFieldsByStdName[levelType].keys().contains(variableName))
+    else if (availableDataFieldsByStdName.value(levelType).keys().contains(
+                 variableName))
     {
-        return availableDataFieldsByStdName[levelType][variableName]->standardname;
+        return availableDataFieldsByStdName.value(levelType).value(variableName)
+                ->standardname;
     }
     else
     {
@@ -264,19 +288,22 @@ QString MClimateForecastReader::variableUnits(
         MVerticalLevelType levelType,
         const QString&     variableName)
 {
+    // cf.  MClimateForecastReader::availableVariables() .
     QReadLocker availableItemsReadLocker(&availableItemsLock);
     if (!availableDataFields.keys().contains(levelType))
         throw MBadDataFieldRequest(
                 "unkown level type requested: " +
                 MStructuredGrid::verticalLevelTypeToString(levelType).toStdString(),
                 __FILE__, __LINE__);
-    if (availableDataFields[levelType].keys().contains(variableName))
+    if (availableDataFields.value(levelType).keys().contains(variableName))
     {
-        return availableDataFields[levelType][variableName]->units;
+        return availableDataFields.value(levelType).value(variableName)->units;
     }
-    else if (availableDataFieldsByStdName[levelType].keys().contains(variableName))
+    else if (availableDataFieldsByStdName.value(levelType).keys().contains(
+                 variableName))
     {
-        return availableDataFieldsByStdName[levelType][variableName]->units;
+        return availableDataFieldsByStdName.value(levelType).value(variableName)
+                ->units;
     }
     else
     {
@@ -291,6 +318,7 @@ QString MClimateForecastReader::variableSurfacePressureName(
         MVerticalLevelType levelType,
         const QString&     variableName)
 {
+    // cf.  MClimateForecastReader::availableVariables() .
     QReadLocker availableItemsReadLocker(&availableItemsLock);
     if (!availableDataFields.keys().contains(levelType))
         throw MBadDataFieldRequest(
@@ -298,15 +326,15 @@ QString MClimateForecastReader::variableSurfacePressureName(
                 MStructuredGrid::verticalLevelTypeToString(
                     levelType).toStdString(),
                 __FILE__, __LINE__);
-    if (availableDataFields[levelType].keys().contains(variableName))
+    if (availableDataFields.value(levelType).keys().contains(variableName))
     {
-        return availableDataFields[levelType][variableName]
+        return availableDataFields.value(levelType).value(variableName)
                 ->surfacePressureName;
     }
-    else if (availableDataFieldsByStdName[levelType].keys().contains(
+    else if (availableDataFieldsByStdName.value(levelType).keys().contains(
                  variableName))
     {
-        return availableDataFieldsByStdName[levelType][variableName]
+        return availableDataFieldsByStdName.value(levelType).value(variableName)
                 ->surfacePressureName;
     }
     else
@@ -323,6 +351,7 @@ QString MClimateForecastReader::variableAuxiliaryPressureName(
         MVerticalLevelType levelType,
         const QString&     variableName)
 {
+    // cf.  MClimateForecastReader::availableVariables() .
     QReadLocker availableItemsReadLocker(&availableItemsLock);
     if (!availableDataFields.keys().contains(levelType))
         throw MBadDataFieldRequest(
@@ -330,15 +359,15 @@ QString MClimateForecastReader::variableAuxiliaryPressureName(
                 MStructuredGrid::verticalLevelTypeToString(
                     levelType).toStdString(),
                 __FILE__, __LINE__);
-    if (availableDataFields[levelType].keys().contains(variableName))
+    if (availableDataFields.value(levelType).keys().contains(variableName))
     {
-        return availableDataFields[levelType][variableName]
+        return availableDataFields.value(levelType).value(variableName)
                 ->auxiliaryPressureName;
     }
-    else if (availableDataFieldsByStdName[levelType].keys().contains(
+    else if (availableDataFieldsByStdName.value(levelType).keys().contains(
                  variableName))
     {
-        return availableDataFieldsByStdName[levelType][variableName]
+        return availableDataFieldsByStdName.value(levelType).value(variableName)
                 ->auxiliaryPressureName;
     }
     else
@@ -355,6 +384,7 @@ MHorizontalGridType MClimateForecastReader::variableHorizontalGridType(
         MVerticalLevelType levelType,
         const QString&     variableName)
 {
+    // cf.  MClimateForecastReader::availableVariables() .
     QReadLocker availableItemsReadLocker(&availableItemsLock);
     if (!availableDataFields.keys().contains(levelType))
     {
@@ -364,15 +394,16 @@ MHorizontalGridType MClimateForecastReader::variableHorizontalGridType(
                         levelType).toStdString(),
                     __FILE__, __LINE__);
     }
-    if (availableDataFields[levelType].keys().contains(variableName))
+    if (availableDataFields.value(levelType).keys().contains(variableName))
     {
-        return availableDataFields[levelType][variableName]->horizontalGridType;
+        return availableDataFields.value(levelType).value(variableName)
+                ->horizontalGridType;
     }
-    else if (availableDataFieldsByStdName[levelType].keys().contains(
+    else if (availableDataFieldsByStdName.value(levelType).keys().contains(
                  variableName))
     {
-        return availableDataFieldsByStdName[levelType][
-                variableName]->horizontalGridType;
+        return availableDataFieldsByStdName.value(levelType).value(
+                    variableName)->horizontalGridType;
     }
     else
     {
@@ -388,6 +419,7 @@ QVector2D MClimateForecastReader::variableRotatedNorthPoleCoordinates(
         MVerticalLevelType levelType,
         const QString&     variableName)
 {
+    // cf.  MClimateForecastReader::availableVariables() .
     QReadLocker availableItemsReadLocker(&availableItemsLock);
     if (!availableDataFields.keys().contains(levelType))
     {
@@ -397,17 +429,17 @@ QVector2D MClimateForecastReader::variableRotatedNorthPoleCoordinates(
                         levelType).toStdString(),
                     __FILE__, __LINE__);
     }
-    if (availableDataFields[levelType].keys().contains(variableName))
+    if (availableDataFields.value(levelType).keys().contains(variableName))
     {
-        if (availableDataFields[levelType][variableName]->horizontalGridType
-                == ROTATED_LONLAT)
+        if (availableDataFields.value(levelType).value(variableName)
+                ->horizontalGridType == ROTATED_LONLAT)
         {
             QVector2D coordinates;
             coordinates.setX(
-                        availableDataFields[levelType][variableName]
+                        availableDataFields.value(levelType).value(variableName)
                         ->rotatedNorthPoleLon);
             coordinates.setY(
-                        availableDataFields[levelType][variableName]
+                        availableDataFields.value(levelType).value(variableName)
                         ->rotatedNorthPoleLat);
 
             return coordinates;
@@ -419,19 +451,19 @@ QVector2D MClimateForecastReader::variableRotatedNorthPoleCoordinates(
                         "rotated", __FILE__, __LINE__);
         }
     }
-    else if (availableDataFieldsByStdName[levelType].keys().contains(
+    else if (availableDataFieldsByStdName.value(levelType).keys().contains(
                  variableName))
     {
-        if (availableDataFields[levelType][variableName]->horizontalGridType
-                == ROTATED_LONLAT)
+        if (availableDataFields.value(levelType).value(variableName)
+                ->horizontalGridType == ROTATED_LONLAT)
         {
             QVector2D coordinates;
             coordinates.setX(
-                        availableDataFieldsByStdName[levelType][variableName]
-                        ->rotatedNorthPoleLon);
+                        availableDataFieldsByStdName.value(levelType)
+                        .value(variableName)->rotatedNorthPoleLon);
             coordinates.setY(
-                        availableDataFieldsByStdName[levelType][variableName]
-                        ->rotatedNorthPoleLat);
+                        availableDataFieldsByStdName.value(levelType)
+                        .value(variableName)->rotatedNorthPoleLat);
 
             return coordinates;
         }
