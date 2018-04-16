@@ -136,6 +136,7 @@ NcVar NcCFVar::getCFCoordinateVar(const vector<string>& units,
             try
             {
                 var.getAtt("positive").getValues(attribute);
+                fixZeroTermination(&attribute);
                 // The 'positive' attribute is present but contains a value
                 // other that 'up' or 'down': Continue with next variable.
                 if (!((attribute == "up") || (attribute == "down")))
@@ -156,6 +157,7 @@ NcVar NcCFVar::getCFCoordinateVar(const vector<string>& units,
         try
         {
             var.getAtt("units").getValues(attribute);
+            fixZeroTermination(&attribute);
             for (unsigned int i = 0; i < units.size(); i++)
             {
                 // degrees attribute is not unique and thus cannot be used to
@@ -175,6 +177,7 @@ NcVar NcCFVar::getCFCoordinateVar(const vector<string>& units,
         try
         {
             var.getAtt("standard_name").getValues(attribute);
+            fixZeroTermination(&attribute);
             for (unsigned int i = 0; i < standardnames.size(); i++)
             {
                 if (attribute == standardnames[i])
@@ -279,6 +282,7 @@ NcVar NcCFVar::getVerticalCoordinateHybridSigmaPressure(NcVar *ap, NcVar *b,
     string formulaTerms = "";
     try { hybridVar.getAtt("formula_terms").getValues(formulaTerms); }
     catch (NcException) {}
+    fixZeroTermination(&formulaTerms);
 
     // Set up a regular expression to match the "formula_terms" attribute.
     QRegExp re("ap: (.+) b: (.+) ps: (.+)");
@@ -334,10 +338,12 @@ NcVar NcCFVar::getVerticalCoordinateAuxiliaryPressure(
         string units = "";
         try { var.getAtt("units").getValues(units); }
         catch (NcException) {}
+        fixZeroTermination(&units);
 
         string axis = "";
         try { var.getAtt("axis").getValues(axis); }
         catch (NcException) {}
+        fixZeroTermination(&axis);
 
         bool isConnectedToAuxiliaryPressureVar = false;
 
@@ -807,6 +813,7 @@ bool NcCFVar::isCFGridMappingVariable(const NcVar& var)
     try
     {
         var.getAtt("grid_mapping_name").getValues(attribute);
+        fixZeroTermination(&attribute);
         // The 'grid_mapping_name' attribute is present but contains a value
         // other that 'rotated_latitude_longitude': return false.
         if ((attribute != "rotated_latitude_longitude"))
@@ -834,6 +841,7 @@ bool NcCFVar::isDefinedOnRotatedGrid(const NcVar& var,
     try
     {
         var.getAtt("grid_mapping").getValues(attribute);
+        fixZeroTermination(&attribute);
         *gridMappingVarName = "";
         foreach (*gridMappingVarName, gridMappingVarNames)
         {
@@ -893,6 +901,7 @@ bool NcCFVar::getRotatedNorthPoleCoordinates(const NcVar& gridMappingVar,
     try
     {
         gridMappingVar.getAtt("grid_mapping_name").getValues(attribute);
+        fixZeroTermination(&attribute);
         if (attribute != "rotated_latitude_longitude")
         {
             return false;
@@ -909,6 +918,9 @@ bool NcCFVar::getRotatedNorthPoleCoordinates(const NcVar& gridMappingVar,
     {
         gridMappingVar.getAtt("grid_north_pole_longitude").getValues(
                     &coordinate);
+        string attribute = QString::number(coordinate).toStdString();
+        fixZeroTermination(&attribute);
+        coordinate = QString::fromStdString(attribute).toFloat();
         *rotatedNorthPoleLon = coordinate;
 
     }
@@ -921,6 +933,9 @@ bool NcCFVar::getRotatedNorthPoleCoordinates(const NcVar& gridMappingVar,
     {
         gridMappingVar.getAtt("grid_north_pole_latitude").getValues(
                     &coordinate);
+        string attribute = QString::number(coordinate).toStdString();
+        fixZeroTermination(&attribute);
+        coordinate = QString::fromStdString(attribute).toFloat();
         *rotatedNorthPoleLat = coordinate;
         return true;
     }
