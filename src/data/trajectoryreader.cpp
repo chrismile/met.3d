@@ -59,7 +59,7 @@ MTrajectoryReader::MTrajectoryReader(QString identifier)
     : MTrajectoryDataSource(),
       MAbstractDataReader(identifier)
 {
-    fileFilter = "*_lagranto_ensemble_forecast__START_*.nc";
+    dirFileFilters = "*_lagranto_ensemble_forecast__START_*.nc";
 }
 
 
@@ -398,9 +398,10 @@ void MTrajectoryReader::scanDataRoot()
                        dataRoot.absolutePath().toStdString().c_str());
 
     // Get a list of all files in the directory that match the wildcard name
-    // filter in "fileFilter".
-    QStringList availableFiles = dataRoot.entryList(
-                QStringList(fileFilter), QDir::Files);
+    // filter in "dirFileFilters".
+    QStringList availableFiles;
+    getAvailableFilesFromFilters(availableFiles);
+
 
     // For each file, extract information about the contained start time and
     // valid times. Store these information in "availableTrajectories".

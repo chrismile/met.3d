@@ -277,6 +277,7 @@ protected:
 
     QString surfacePressureFieldType; // for hybrid grids: sp, lnsp, <empty>
     bool disableGridConsistencyCheck;
+    bool ensembleIDIsSpecifiedInFileName;
 };
 
 

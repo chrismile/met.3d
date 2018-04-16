@@ -167,7 +167,7 @@ protected:
      */
     void checkFileOpen(QString filename);
 
-    QString fileFilter;
+    QString dirFileFilters;
 
     // Dictionaries of available trajectory data. Access needs to be proteced
     // by the provided read/write lock.
