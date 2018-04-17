@@ -7,19 +7,14 @@ size=3
 # Numerical weather prediction memory manager gets 10 GB system memory.
 1\name=NWP
 1\size_MB=10240
-# [Optional] Pipeline for which the memory manager should used as default in
-# new dataset dialog. Can be 'NWP', 'Analysis' or 'Trajectories'.
-1\default=NWP
 
 # Memory manager that caches analysis results (10 MB are sufficient).
 2\name=Analysis
 2\size_MB=10
-2\default=Analysis
 
 # Memory manager for trajectory data.
 #3\name=Trajectories
 #3\size_MB=10240
-#3\default=Trajectories
 
 
 [DefaultMemoryManagers]
@@ -27,7 +22,7 @@ size=3
 # in the "New Dataset"-dialog in Met.3D.
 defaultNWPMemoryManager=NWP
 defaultAnalysisMemoryManager=Analysis
-defaultTrajectoryMemoryManager=Trajectories
+#defaultTrajectoryMemoryManager=Trajectories
 
 
 

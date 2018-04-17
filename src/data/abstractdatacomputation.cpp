@@ -59,7 +59,7 @@ MAbstractDataComputation::~MAbstractDataComputation()
 
 void MAbstractDataComputation::setInputSource(MWeatherPredictionDataSource* source)
 {
-    assert(dataSource != nullptr);
+    assert(source != nullptr);
     dataSource = source;
     initialiseFormDataSource();
 }

@@ -243,6 +243,9 @@ public:
       Copies data from the given vector (numTrajectories ->
       numTimeStepsPerTrajectory -> (longitude in degrees, latitude in degrees,
       pressure in hPa) to the internal QVector-based vertex array.
+
+      Used to copy vertex data from trajectories variable during trajectory
+      computation.
     */
     void copyVertexDataFrom(QVector<QVector<QVector3D>> &vertices);
 

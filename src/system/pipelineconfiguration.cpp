@@ -785,7 +785,8 @@ void MPipelineConfiguration::initializeTrajectoryComputationPipeline(
         foreach (MVerticalLevelType level, levelTypes)
         {
             QStringList variables = NWPDataSource->availableVariables(level);
-            if (variables.contains(windEastwardVariable) && variables.contains(windNorthwardVariable)
+            if (variables.contains(windEastwardVariable)
+                    && variables.contains(windNorthwardVariable)
                     && variables.contains(windVerticalVariable))
             {
                 verticalLevelType =
@@ -826,7 +827,7 @@ void MPipelineConfiguration::initializeTrajectoryComputationPipeline(
                                                  windNorthwardVariable,
                                                  windVerticalVariable);
 
-    trajectoryComputation->setVericalLevelType(verticalLevelType);
+    trajectoryComputation-> setVericalLevelType(verticalLevelType);
     trajectoryComputation->setInputSource(NWPDataSource);
     sysMC->registerDataSource(dataSourceId + QString(" Reader"),
                               trajectoryComputation);

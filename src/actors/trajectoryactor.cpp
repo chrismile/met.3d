@@ -993,7 +993,7 @@ void MTrajectoryActor::setDataSource(MTrajectoryDataSource *ds)
         connect(trajectorySource, SIGNAL(dataRequestCompleted(MDataRequest)),
                 this, SLOT(asynchronousDataAvailable(MDataRequest)));
 
-        // check whether this datasource is precomputed
+        // Check whether this datasource is precomputed.
         precomputedDataSource =
                 (dynamic_cast<MTrajectoryComputation*>(trajectorySource)
                  == nullptr);
@@ -1153,7 +1153,7 @@ void MTrajectoryActor::asynchronousDataAvailable(MDataRequest request)
 {
     // See NWPActorVariabe::asynchronousDataAvailable() for explanations
     // on request queue handling.
-    // Iterate over all trajectory requests
+    // Iterate over all trajectory requests.
     for (int t = 0; t < trajectoryRequests.size(); t++)
     {
         bool queueContainsEntryWithNoPendingRequests = false;
@@ -1649,7 +1649,6 @@ void MTrajectoryActor::initializeActorResources()
             synchronizeWith(temp);
         }
 
-        //update actor data
         updateActorData();
 
         asynchronousDataRequest();

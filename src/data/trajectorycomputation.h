@@ -214,44 +214,90 @@ protected:
     QVector3D convertWindVelocityFromMetricToSpherical(
             QVector3D velocity_ms_ms_Pas, QVector3D position_lon_lat_p);
 
+    /* Computation Methods. */
     /**
-      Computation Methods.
-     */
-    /**
-      Performs euler method with step size @p deltat
-       @brief trajectoryIntegrationEuler
-       @param pos
-       @param deltat
-       @param factor0
-       @param factor1
-       @param method
-       @param grids
-       @param valid
-       @return
+      Performs Euler integration between @p timePos0 and @p timePos1 on
+      @p grids with step size @p deltaT using the interpolation method given by
+      @p method to get wind velocity at @p pos.
+
+      @p grids needs to contain eastward wind grid, northward wind grid and
+      vertical wind grid in this order.
+
+      If the integration was successfull @p valid will be set to true, false
+      otherwise.
+
+     Note: The method performs @ref EULER_ITERATION times the integration using
+     the results of the previous integration.
      */
     QVector3D trajectoryIntegrationEuler(
-            QVector3D pos, float deltat, float timePos0, float timePos1,
-            TRAJECTORY_COMPUTATION_INTERPOLATION_METHOD method,
-            QVector<QVector<MStructuredGrid*>> &grids, bool& valid);
-    QVector3D trajectoryIntegrationRungeKutta(
-            QVector3D pos, float deltat, float timePos0, float timePos1,
+            QVector3D pos, float deltaT, float timePos0, float timePos1,
             TRAJECTORY_COMPUTATION_INTERPOLATION_METHOD method,
             QVector<QVector<MStructuredGrid*>> &grids, bool& valid);
 
     /**
-      Sample methods.
+      Performs Runge-Kutta integration between @p timePos0 and @p timePos1 on
+      @p grids with step size @p deltaT using the interpolation method given by
+      @p method to get wind velocity at @p pos.
+
+      @p grids needs to contain eastward wind grid, northward wind grid and
+      vertical wind grid in this order.
+
+      If the integration was successfull @p valid will be set to true, false
+      otherwise.
+     */
+    QVector3D trajectoryIntegrationRungeKutta(
+            QVector3D pos, float deltaT, float timePos0, float timePos1,
+            TRAJECTORY_COMPUTATION_INTERPOLATION_METHOD method,
+            QVector<QVector<MStructuredGrid*>> &grids, bool& valid);
+
+    /* Sample methods. */
+    /**
+      Samples wind velocity from @p grid using the interpolation method
+      @p method and the interpolation factor @p factor.
+
+      @p grids needs to contain eastward wind grid, northward wind grid and
+      vertical wind grid in this order.
+
+      If sampling was successfull @p valid will be set to true, false otherwise.
      */
     QVector3D sampleVelocity(QVector3D pos, float factor,
                              TRAJECTORY_COMPUTATION_INTERPOLATION_METHOD method,
-                             QVector<QVector<MStructuredGrid *>> &grids,
+                             QVector<QVector<MStructuredGrid*>> &grids,
                              bool& valid);
-    float pressure(QVector3D index, MStructuredGrid* grid);
-    float value(QVector3D index, MStructuredGrid* grid);
-    QVector3D findGridIndex(QVector3D pos, MStructuredGrid* grid);
+
+    /**
+      Performs tri-linear intperpolation to get pressure value in @p grid at the
+      relative position @p index.
+     */
+    float pressure(QVector3D index, MStructuredGrid *grid);
+
+    /**
+      Performs tri-linear intperpolation to get scalar value in @p grid at the
+      relative position @p index.
+     */
+    float value(QVector3D index, MStructuredGrid *grid);
+
+    /**
+      Get indices (lon, lat, pressure) as floating point number representing @p
+      pos with respect to position and dimensions of @p grid.
+
+      If an index is out of bounds it is replaced by -1.
+     */
+    QVector3D findGridIndex(QVector3D pos, MStructuredGrid *grid);
+
+    /**
+      Computes linear interpolation between indices of @p grid0 and @p grid1 at
+      position @p pos using @p factor as interpolation factor.
+     */
     QVector3D interpolatedIndex(QVector3D pos, MStructuredGrid* grid0,
                                 MStructuredGrid* grid1, float factor);
-    float interpolatedValue(QVector3D index, MStructuredGrid* grid0,
-                            MStructuredGrid* grid1, float factor);
+
+    /**
+      Computes linear interpolation between values of @p grid0 and @p grid1 at
+      index @p index using @p factor as interpolation factor.
+     */
+    float interpolatedValue(QVector3D index, MStructuredGrid *grid0,
+                            MStructuredGrid *grid1, float factor);
 
     /**
       Computes seeding position for given trajectory.
