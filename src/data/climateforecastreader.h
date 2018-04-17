@@ -181,10 +181,11 @@ protected:
     /**
       Determine the name of the file that contains the specified data field.
       */
-    QString dataFieldFile(MVerticalLevelType levelType,
-                          const QString&     variableName,
-                          const QDateTime&   initTime,
-                          const QDateTime&   validTime);
+    QString dataFieldFile(MVerticalLevelType  levelType,
+                          const QString&      variableName,
+                          const QDateTime&    initTime,
+                          const QDateTime&    validTime,
+                          const unsigned int& ensembleMember);
 
     // Maps NetCDF variable names to standard names.
     QMap<QString, QString> variableToStandardNameMap;
@@ -228,6 +229,7 @@ protected:
     bool treatRotatedGridAsRegularGrid;
     bool convertGeometricHeightToPressure_ICAOStandard;
     bool disableGridConsistencyCheck;
+    bool ensembleIDIsSpecifiedInFileName;
 };
 
 

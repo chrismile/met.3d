@@ -106,6 +106,14 @@ public:
 
     void loadConfiguration(QSettings *settings);
 
+    /**
+     * Returns the color value (rgba) of the corresponding scalar value based
+     * on the user-defined colour mapping and range boundaries.
+     * @param scalar
+     * @return interpolated color value as QColor
+     */
+    QColor getColorValue(const float scalar) const;
+
 protected:
     /**
       Generates the colourbar texture with the colour mapping specified by the
@@ -134,6 +142,8 @@ private:
     void updateHCLProperties();
 
     void updateHSVProperties();
+
+    std::vector<unsigned char> colorValues;
 
     // Type of colourmap.
     enum MColourmapType { INVALID = -1, HCL = 0, EDITOR = 1, PREDEFINED = 2,

@@ -44,6 +44,16 @@ size=2
 # Specify the directory in which the data files are stored. If you specify
 # a file filter (wildcards allowed), only those files that correspond to the
 # filter will be used.
+# Special cases:
+#  If files are distributed over multiple subdirectories, use "/" as the
+# path separator. Example: "/my_forecast.grb".
+#  For ensemble datasets that do NOT store the ensemble dimension in their 
+# NetCDF/GRIB files but instead have the ensemble member ID encoded in their 
+# file or subdirectory names (e.g., "my_forecast.004.grb" or
+# "member_004/temperature.nc"), the position of the ensemble ID can be specified
+# by placing "\\e" in the file filter string. Example: "my_forecast.\\e.grb" or
+# "member_\\e/temperature.nc". Note: At the moment Met.3D only allows positive
+# integers as ensemble identifiers (leading zeros allowed).
 1\path=/your/path/data/mss/grid/ecmwf/netcdf
 1\fileFilter=*ecmwf_forecast*EUR_LL015*.nc
 # schedulerID can be "MultiThread" or "SingleThread".

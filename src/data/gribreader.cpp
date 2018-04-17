@@ -53,7 +53,8 @@ MGribReader::MGribReader(QString identifier, QString surfacePressureFieldType,
                          bool disableGridConsistencyCheck)
     : MWeatherPredictionReader(identifier),
       surfacePressureFieldType(surfacePressureFieldType),
-      disableGridConsistencyCheck(disableGridConsistencyCheck)
+      disableGridConsistencyCheck(disableGridConsistencyCheck),
+      ensembleIDIsSpecifiedInFileName(false)
 {
     // Name of surface pressure field to reconstruct pressure for hybrid
     // coordinates. If set to "auto" set the string to empty here (will trigger
@@ -659,13 +660,17 @@ void MGribReader::scanDataRoot()
     LOG4CPLUS_DEBUG(mlog, "Scanning directory "
                     << dataRoot.absolutePath().toStdString() << " "
                     << "for grib files with forecast data.");
-    LOG4CPLUS_DEBUG(mlog, "Using file filter: " << fileFilter.toStdString());
+    LOG4CPLUS_DEBUG(mlog, "Using file filter: " << dirFileFilters.toStdString());
     LOG4CPLUS_DEBUG(mlog, "Available files:" << flush);
 
     // Get a list of all files in the directory that match the wildcard name
-    // filter given in "fileFilter".
-    QStringList availableFiles = dataRoot.entryList(
-                QStringList(fileFilter), QDir::Files);
+    // filter given in "dirFileFilters".
+
+    QStringList availableFiles;
+    getAvailableFilesFromFilters(availableFiles);
+
+    ensembleIDIsSpecifiedInFileName = dirFileFilters.contains("\\e");
+    int  ensembleIDFromFile = -1;
 
     // Scan all grib files contained in the directory.
     foreach (QString gribFileName, availableFiles)
@@ -847,6 +852,21 @@ void MGribReader::scanDataRoot()
                 continue;
             }
 
+            if (ensembleIDIsSpecifiedInFileName)
+            {
+                ensembleIDFromFile = getEnsembleMemberIDFromFileName(gribFileName);
+
+                if (ensembleIDFromFile == -1)
+                {
+                    LOG4CPLUS_ERROR(mlog, "ERROR: ensemble tag found in file filter "
+                                          " but filter did not match file \""
+                                    << gribFileName.toStdString()
+                                    << "\" (currently only integer values are allowed"
+                                       " as ensemble member specifiers)." << flush);
+                    continue;
+                }
+            }
+
             // Open a new index file.
             QFile indexFile(fileIndexPath);
             indexFile.open(QIODevice::WriteOnly);
@@ -882,11 +902,24 @@ void MGribReader::scanDataRoot()
                 // Determine type of data fields (analysis, deterministic,
                 // ensemble). Append type to variable name so variables with
                 // the same name but different types can be distinguished).
-                QString dataType = getGribStringKey(gribHandle, "ls.dataType");
-                // LOG4CPLUS_DEBUG(mlog, "ls.dataType: " << dataType.toStdString());
-                // Perturbed (pf) and control (cf) forecasts are combined into
-                // "ensemble" (ens) forecasts.
-                if ( (dataType == "pf") || (dataType == "cf") ) dataType = "ens";
+                // If ensemble members are stored implicitly, all variables 
+                // read are of ensemble data type.
+                QString dataType = "";
+                if (!ensembleIDIsSpecifiedInFileName)
+                {
+                    dataType = getGribStringKey(gribHandle, "ls.dataType");
+                    // LOG4CPLUS_DEBUG(mlog, "ls.dataType: " << dataType.toStdString());
+                    // Perturbed (pf) and control (cf) forecasts are combined into
+                    // "ensemble" (ens) forecasts.
+                    if ( (dataType == "pf") || (dataType == "cf"))
+                    {
+                        dataType = "ens";
+                    }
+                }
+                else
+                {
+                    dataType = "ens";
+                }
 
                 // Currently Met.3D can only handle data fields on a regular
                 // lat/lon grid in the horizontal.
@@ -1099,8 +1132,16 @@ void MGribReader::scanDataRoot()
                 long ensMember = 0;
                 if (vinfo->fcType == ENSEMBLE_FORECAST)
                 {
-                    ensMember = getGribLongKey(gribHandle, "perturbationNumber");
-                    // LOG4CPLUS_DEBUG(mlog, "perturbationNumber: " << ensMember);
+                    if (ensembleIDIsSpecifiedInFileName)
+                    {
+                        ensMember = ensembleIDFromFile;
+                    }
+                    else
+                    {
+                        ensMember = getGribLongKey(gribHandle,
+                                                   "perturbationNumber");
+                        // LOG4CPLUS_DEBUG(mlog, "perturbationNumber: " << ensMember);
+                    }
                 }
                 vinfo->availableMembers.insert(ensMember);
                 vinfo->availableMembers_bitfield |= (Q_UINT64_C(1) << ensMember);
