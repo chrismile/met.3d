@@ -43,7 +43,7 @@
 #include "mainwindow.h"
 #include "gxfw/selectactordialog.h"
 #include "data/trajectoryreader.h"
-#include "data/trajectorycalculator.h"
+#include "data/trajectorycomputation.h"
 #include "actors/movablepoleactor.h"
 #include "actors/nwphorizontalsectionactor.h"
 #include "actors/nwpverticalsectionactor.h"
@@ -995,7 +995,7 @@ void MTrajectoryActor::setDataSource(MTrajectoryDataSource *ds)
 
         // check whether this datasource is precomputed
         precomputedDataSource =
-                (dynamic_cast<MTrajectoryCalculator*>(trajectorySource)
+                (dynamic_cast<MTrajectoryComputation*>(trajectorySource)
                  == nullptr);
         updateActorData();
     }
@@ -1917,7 +1917,8 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
 
     else if (property == computationLineTypeProperty)
     {
-        TRAJ_CALC_LINE_TYPE lineType = TRAJ_CALC_LINE_TYPE(
+        TRAJECTORY_COMPUTATION_LINE_TYPE lineType =
+                TRAJECTORY_COMPUTATION_LINE_TYPE(
                     properties->mEnum()->value(computationLineTypeProperty));
         switch (lineType)
         {
@@ -2458,7 +2459,7 @@ void MTrajectoryActor::updateActorData()
             }
 
             QRectF hor = actor->getHorizontalBBox();
-            double p = actor->getSlicePosition();
+            double p = actor->getSectionElevation_hPa();
 
             SeedActorData data;
             data.type = HORIZONTAL;
@@ -2489,8 +2490,8 @@ void MTrajectoryActor::updateActorData()
                 QVector2D point1 = actor->getWaypointsModel()->positionLonLat(i);
                 QVector2D point2 =
                         actor->getWaypointsModel()->positionLonLat(i + 1);
-                double pbot = actor->getBottomPressure();
-                double ptop = actor->getTopPressure();
+                double pbot = actor->getBottomPressure_hPa();
+                double ptop = actor->getTopPressure_hPa();
 
                 SeedActorData data;
                 data.type = VERTICAL;
@@ -2519,8 +2520,8 @@ void MTrajectoryActor::updateActorData()
             }
 
             QRectF hor = actor->getHorizontalBBox();
-            double pbot = actor->getBottomPressure();
-            double ptop = actor->getTopPressure();
+            double pbot = actor->getBottomPressure_hPa();
+            double ptop = actor->getTopPressure_hPa();
 
             SeedActorData data;
             data.type = BOX;
@@ -3084,15 +3085,15 @@ void MTrajectoryActor::updateDeltaTimeProperty()
         QDateTime initTime  = getPropertyTime(initTimeProperty);
         QDateTime startTime = getPropertyTime(startTimeProperty);
 
-        // get available timesteps and add time delta to list (ignore currently
-        // selected start Time)
+        // Get available timesteps and add time delta to list (ignore currently
+        // selected start time).
         QStringList endTimes;
         for (QDateTime& time : availableStartTimes)
         {
            endTimes << QString("%1 hrs").arg(startTime.secsTo(time) / 3600.0);
         }
 
-        // set new list to property
+        // Set new list to property.
         int currentIndex = properties->mEnum()->value(
                     computationIntegrationTimeProperty);
         properties->mEnum()->setEnumNames(computationIntegrationTimeProperty,
@@ -3278,8 +3279,8 @@ bool MTrajectoryActor::selectDataSource()
 void MTrajectoryActor::openSeedActorDialog()
 {
     const QList<MSelectActorType> types =
-    {MSelectActorType::POLE_ACTOR, MSelectActorType::HORIZONTAL_ACTOR,
-     MSelectActorType::VERTICAL_ACTOR, MSelectActorType::BOX_ACTOR};
+    {MSelectActorType::POLE_ACTOR, MSelectActorType::HORIZONTALSECTION_ACTOR,
+     MSelectActorType::VERTICALSECTION_ACTOR, MSelectActorType::BOX_ACTOR};
 
     MSelectActorDialog dialog(types, 0);
     if (dialog.exec() == QDialog::Rejected)
@@ -3450,9 +3451,9 @@ void MTrajectoryActor::enableProperties(bool enable)
     bBoxConnection->getProperty()->setEnabled(enable);
     ensembleMemberProperty->setEnabled(enable && !synchronizeEnsemble);
 
-    // Computation Properties
-    bool enableCalc = enable && !precomputedDataSource;
-    computationPropertyGroup->setEnabled(enableCalc);
+    // Computation Properties.
+    bool enableComputation = enable && !precomputedDataSource;
+    computationPropertyGroup->setEnabled(enableComputation);
 
     enableActorUpdates(true);
 }

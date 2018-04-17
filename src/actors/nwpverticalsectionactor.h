@@ -117,9 +117,9 @@ public:
 
     MWaypointsTableModel* getWaypointsModel();
 
-    double getBottomPressure();
+    double getBottomPressure_hPa();
 
-    double getTopPressure();
+    double getTopPressure_hPa();
 
     QString getSettingsID() override { return "NWPVerticalSectionActor"; }
 

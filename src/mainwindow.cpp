@@ -1356,16 +1356,16 @@ void MMainWindow::openDatasetDialog(MAddDatasetDialog &addDatasetDialog)
             }
             else
             {
-                newPipelineConfig.initializeTrajectoriesComputationPipeline(
+                newPipelineConfig.initializeTrajectoryComputationPipeline(
                             pipelineConfig.name,
                             pipelineConfig.boundaryLayerTrajectories,
                             pipelineConfig.schedulerID,
                             pipelineConfig.memoryManagerID,
                             pipelineConfig.NWPDataset,
-                            pipelineConfig.windUVariable,
-                            pipelineConfig.windVVariable,
-                            pipelineConfig.windWVariable,
-                            pipelineConfig.verticalLvlType);
+                            pipelineConfig.windEastwardVariable,
+                            pipelineConfig.windNorthwardVariable,
+                            pipelineConfig.windVerticalVariable,
+                            pipelineConfig.verticalLevelType);
             }
             break;
         }

@@ -31,7 +31,7 @@
 
 // related third party imports
 #include <log4cplus/loggingmacros.h>
-#include <src/data/trajectorycalculator.h>
+#include <src/data/trajectorycomputation.h>
 
 // local application imports
 #include "util/mutil.h"
@@ -53,7 +53,7 @@
 #include "data/differencedatasource.h"
 
 #include "data/trajectoryreader.h"
-#include "data/trajectorycalculator.h"
+#include "data/trajectorycomputation.h"
 #include "data/trajectorynormalssource.h"
 #include "data/trajectoryselectionsource.h"
 #include "data/deltapressurepertrajectory.h"
@@ -184,16 +184,10 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
         // Read settings from file.
         QString name = config.value("name").toString();
         int size_MB = config.value("size_MB").toInt();
-        QString defaultFor = config.value("default", "").toString();
 
         LOG4CPLUS_DEBUG(mlog, "initializing memory manager #" << i << ": ");
         LOG4CPLUS_DEBUG(mlog, "  name = " << name.toStdString());
         LOG4CPLUS_DEBUG(mlog, "  size = " << size_MB << " MB");
-        if (defaultFor != "")
-        {
-            LOG4CPLUS_DEBUG(mlog, "  default memory manager for '"
-                            << defaultFor.toStdString() << "' pipeline");
-        }
 
         // Check parameter validity.
         if ( name.isEmpty()
@@ -203,38 +197,34 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
             continue;
         }
 
-        if (defaultFor != "")
-        {
-            if (!defaultMemoryManagers->contains(defaultFor))
-            {
-                LOG4CPLUS_WARN(mlog, "Pipeline '" << defaultFor.toStdString()
-                               << "' does not exist. Memory manager '"
-                               << name.toStdString()
-                               << "' won't be used as a default for any"
-                                  " pipeline.");
-            }
-            else if (defaultMemoryManagers->value(defaultFor, "") != "")
-            {
-                LOG4CPLUS_WARN(mlog,
-                               "Memory manager '" << name.toStdString()
-                               << "' is set as default for pipeline '"
-                               << defaultFor.toStdString()
-                               << "' but default of this pipeline is already"
-                                  " set. This memory manager won't be used as"
-                                  " a default.");
-            }
-            else
-            {
-                defaultMemoryManagers->insert(defaultFor, name);
-            }
-        }
-
         // Create new memory manager.
         sysMC->registerMemoryManager(
                     name, new MLRUMemoryManager(name, size_MB * 1024.));
     }
 
     config.endArray();
+
+
+    // Default memory managers.
+    // ========================
+    config.beginGroup("DefaultMemoryManagers");
+
+    QString defaultMemoryManager =
+            config.value("defaultNWPMemoryManager", "").toString();
+    checkAndStoreDefaultPipelineMemoryManager(
+            defaultMemoryManager, "NWP", defaultMemoryManagers, sysMC);
+
+    defaultMemoryManager =
+            config.value("defaultAnalysisMemoryManager", "").toString();
+    checkAndStoreDefaultPipelineMemoryManager(
+            defaultMemoryManager, "Analysis", defaultMemoryManagers, sysMC);
+
+    defaultMemoryManager =
+            config.value("defaultTrajectoryMemoryManager", "").toString();
+    checkAndStoreDefaultPipelineMemoryManager(
+            defaultMemoryManager, "Trajectories", defaultMemoryManagers, sysMC);
+
+    config.endGroup();
 
     // NWP pipeline(s).
     // ================
@@ -390,14 +380,14 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
         bool precomputed = config.value("precomputed").toBool();
         QString NWPDataset =
                 config.value("NWPDataset").toString();
-        QString windUVariable =
-                config.value("wind_uVariable").toString();
-        QString windVVariable =
-                config.value("wind_vVariable").toString();
-        QString windOmegaVariable =
-                config.value("wind_omegaVariable").toString();
-        QString computationVerticalLvlType =
-                config.value("computationVerticalLvlType").toString();
+        QString windEastwardVariable =
+                config.value("eastwardWind_ms").toString();
+        QString windNorthwardVariable =
+                config.value("northwardWind_ms").toString();
+        QString windVerticalVariable =
+                config.value("verticalWind_Pas").toString();
+        QString computationVerticalLevelType =
+                config.value("computationVerticalLevelType").toString();
 
         if (precomputed)
         {
@@ -433,14 +423,15 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
             }
             else
             {
-                LOG4CPLUS_WARN(mlog, "deterministic precomputed LAGRANTO"
+                LOG4CPLUS_WARN(mlog, "deterministic precomputed trajectories"
                                      " pipeline has not been implemented yet;"
                                      " skipping.");
             }
         }
         else
         {
-            LOG4CPLUS_DEBUG(mlog, "initializing computed LAGRANTO pipeline #"
+            LOG4CPLUS_DEBUG(mlog,
+                            "initializing trajectory computation pipeline #"
                             << i << ": ");
             LOG4CPLUS_DEBUG(mlog, "  name = " << name.toStdString());
             LOG4CPLUS_DEBUG(mlog, "  "
@@ -453,22 +444,21 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
                             << memoryManagerID.toStdString());
             LOG4CPLUS_DEBUG(mlog, "  NWPDataset = "
                             << NWPDataset.toStdString());
-            LOG4CPLUS_DEBUG(mlog, "  wind U-Variable = "
-                            << windUVariable.toStdString());
-            LOG4CPLUS_DEBUG(mlog, "  wind V-Variable = "
-                            << windVVariable.toStdString());
-            LOG4CPLUS_DEBUG(mlog, "  wind Omega-Variable = "
-                            << windOmegaVariable.toStdString());
+            LOG4CPLUS_DEBUG(mlog, "  eastward wind variable = "
+                            << windEastwardVariable.toStdString());
+            LOG4CPLUS_DEBUG(mlog, "  northward wind variable = "
+                            << windNorthwardVariable.toStdString());
+            LOG4CPLUS_DEBUG(mlog, "  vertical wind variable = "
+                            << windVerticalVariable.toStdString());
             LOG4CPLUS_DEBUG(mlog, "  wind vertical level type  = "
-                            << computationVerticalLvlType.toStdString());
+                            << computationVerticalLevelType.toStdString());
 
             // Check parameter validity.
             if ( name.isEmpty()
                  || NWPDataset.isEmpty()
-                 || windUVariable.isEmpty()
-                 || windVVariable.isEmpty()
-                 || windOmegaVariable.isEmpty()
-//                 || computationVerticalLvlType.isEmpty()
+                 || windEastwardVariable.isEmpty()
+                 || windNorthwardVariable.isEmpty()
+                 || windVerticalVariable.isEmpty()
                  || schedulerID.isEmpty()
                  || memoryManagerID.isEmpty() )
             {
@@ -480,11 +470,11 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
             // Create new pipeline.
             if (isEnsemble)
             {
-                initializeTrajectoriesComputationPipeline(
+                initializeTrajectoryComputationPipeline(
                         name, ablTrajectories, schedulerID,
                         memoryManagerID, NWPDataset,
-                        windUVariable, windVVariable,
-                        windOmegaVariable, computationVerticalLvlType);
+                        windEastwardVariable, windNorthwardVariable,
+                        windVerticalVariable, computationVerticalLevelType);
             }
             else
             {
@@ -756,16 +746,16 @@ void MPipelineConfiguration::initializePrecomputedTrajectoriesPipeline(
 }
 
 
-void MPipelineConfiguration::initializeTrajectoriesComputationPipeline(
+void MPipelineConfiguration::initializeTrajectoryComputationPipeline(
         QString name,
         bool boundaryLayerTrajectories,
         QString schedulerID,
         QString memoryManagerID,
         QString NWPDataset,
-        QString variableU,
-        QString variableV,
-        QString variableW,
-        QString verticalLvlType)
+        QString windEastwardVariable,
+        QString windNorthwardVariable,
+        QString windVerticalVariable,
+        QString verticalLevelType)
 {
     MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
     MAbstractScheduler* scheduler = sysMC->getScheduler(schedulerID);
@@ -788,17 +778,17 @@ void MPipelineConfiguration::initializeTrajectoriesComputationPipeline(
     }
 
     // If verical level type is not given, search for it.
-    if (verticalLvlType == "")
+    if (verticalLevelType == "")
     {
         QList<MVerticalLevelType> levelTypes =
                 NWPDataSource->availableLevelTypes();
         foreach (MVerticalLevelType level, levelTypes)
         {
             QStringList variables = NWPDataSource->availableVariables(level);
-            if (variables.contains(variableU) && variables.contains(variableV)
-                    && variables.contains(variableW))
+            if (variables.contains(windEastwardVariable) && variables.contains(windNorthwardVariable)
+                    && variables.contains(windVerticalVariable))
             {
-                verticalLvlType =
+                verticalLevelType =
                         MStructuredGrid::verticalLevelTypeToString(level);
             }
         }
@@ -808,16 +798,16 @@ void MPipelineConfiguration::initializeTrajectoriesComputationPipeline(
             dynamic_cast<MClimateForecastReader*>(NWPDataSource))
     {
         MVerticalLevelType levelType =
-                MStructuredGrid::verticalLevelTypeFromString(verticalLvlType);
+                MStructuredGrid::verticalLevelTypeFromString(verticalLevelType);
         MHorizontalGridType hGridTypU =
                 netCDFDataSource->variableHorizontalGridType(
-                    levelType, variableU);
+                    levelType, windEastwardVariable);
         MHorizontalGridType hGridTypV =
                 netCDFDataSource->variableHorizontalGridType(
-                    levelType, variableV);
+                    levelType, windNorthwardVariable);
         MHorizontalGridType hGridTypW =
                 netCDFDataSource->variableHorizontalGridType(
-                    levelType, variableW);
+                    levelType, windVerticalVariable);
         if (hGridTypU == MHorizontalGridType::ROTATED_LONLAT
                 || hGridTypV == MHorizontalGridType::ROTATED_LONLAT
                 || hGridTypW == MHorizontalGridType::ROTATED_LONLAT)
@@ -828,20 +818,22 @@ void MPipelineConfiguration::initializeTrajectoriesComputationPipeline(
         }
     }
 
-    MTrajectoryCalculator* trajectoryCalculator =
-            new MTrajectoryCalculator(dataSourceId);
-    trajectoryCalculator->setMemoryManager(memoryManager);
-    trajectoryCalculator->setScheduler(scheduler);
-    trajectoryCalculator->setUVWVariables(variableU, variableV, variableW);
+    MTrajectoryComputation* trajectoryComputation =
+            new MTrajectoryComputation(dataSourceId);
+    trajectoryComputation->setMemoryManager(memoryManager);
+    trajectoryComputation->setScheduler(scheduler);
+    trajectoryComputation->setInputWindVariables(windEastwardVariable,
+                                                 windNorthwardVariable,
+                                                 windVerticalVariable);
 
-    trajectoryCalculator->setVericalLevelType(verticalLvlType);
-    trajectoryCalculator->setInputSource(NWPDataSource);
+    trajectoryComputation->setVericalLevelType(verticalLevelType);
+    trajectoryComputation->setInputSource(NWPDataSource);
     sysMC->registerDataSource(dataSourceId + QString(" Reader"),
-                              trajectoryCalculator);
+                              trajectoryComputation);
 
     // initialize trajectory pipeline
     initializeEnsemblePipeline(dataSourceId, boundaryLayerTrajectories,
-                               trajectoryCalculator, scheduler, memoryManager);
+                               trajectoryComputation, scheduler, memoryManager);
 
     LOG4CPLUS_DEBUG(mlog, "Pipeline ''" << dataSourceId.toStdString()
                     << "'' has been initialized.");
@@ -1164,6 +1156,44 @@ MPipelineConfiguration::configurablePipelineTypeFromString(QString typeName)
     {
         return MConfigurablePipelineType::INVALID_PIPELINE_TYPE;
     }
+}
+
+
+void MPipelineConfiguration::checkAndStoreDefaultPipelineMemoryManager(
+        QString defaultMemoryManager, QString PipelineID,
+        QMap<QString, QString> *defaultMemoryManagers,
+        MSystemManagerAndControl *sysMC)
+{
+    if (defaultMemoryManager.isEmpty())
+    {
+        defaultMemoryManager = sysMC->getMemoryManagerIdentifiers().first();
+
+        LOG4CPLUS_WARN(mlog,
+                       "No memory manager set as default for '"
+                       << PipelineID.toStdString() << "' pipeline.");
+    }
+    else
+    {
+        if (!sysMC->getMemoryManagerIdentifiers().contains(defaultMemoryManager))
+        {
+            defaultMemoryManager = sysMC->getMemoryManagerIdentifiers().first();
+
+            LOG4CPLUS_WARN(mlog,
+                           "Memory manager '"
+                           << defaultMemoryManager.toStdString()
+                           << "' is set as default for '"
+                           << PipelineID.toStdString()
+                           << "' pipeline but it does not exist.");
+        }
+    }
+    if (!defaultMemoryManager.isEmpty())
+    {
+        LOG4CPLUS_DEBUG(mlog,
+                        "Using '" << defaultMemoryManager.toStdString()
+                        << "' as default memory manager for '"
+                        << PipelineID.toStdString() << "' pipeline.");
+    }
+    defaultMemoryManagers->insert(PipelineID, defaultMemoryManager);
 }
 
 

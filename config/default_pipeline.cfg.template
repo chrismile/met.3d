@@ -22,6 +22,15 @@ size=3
 #3\default=Trajectories
 
 
+[DefaultMemoryManagers]
+# The memory managers set as "default" here will appear as defaults
+# in the "New Dataset"-dialog in Met.3D.
+defaultNWPMemoryManager=NWP
+defaultAnalysisMemoryManager=Analysis
+defaultTrajectoryMemoryManager=Trajectories
+
+
+
 # Configure data processing pipelines.
 # =============================================================================
 
@@ -110,7 +119,7 @@ size=2
 [TrajectoriesPipeline]
 size=0
 
-1\name=precomputed
+1\name=Precomputed Trajectories
 1\ensemble=true
 1\path=/your/path/data/trajectories/EUR_LL10/psfc_1000hPa_L62
 1\ABLTrajectories=false
@@ -119,15 +128,18 @@ size=0
 1\memoryManagerID=Trajectories
 1\precomputed=true
 
-2\name=computed
+2\name=Trajectories computed in Met.3D
 2\ensemble=true
 2\ABLTrajectories=false
-#2\schedulerID=SingleThread
 2\schedulerID=MultiThread
 2\memoryManagerID=Trajectories
 2\precomputed=false
 2\NWPDataset=ECMWF DET EUR_LL015
-2\wind_uVariable=u-component_of_wind_hybrid
-2\wind_vVariable=v-component_of_wind_hybrid
-2\wind_omegaVariable=Vertical_velocity_pressure_hybrid
+2\eastwardWind_ms=u-component_of_wind_hybrid
+2\northwardWind_ms=v-component_of_wind_hybrid
+2\verticalWind_Pas=Vertical_velocity_pressure_hybrid
+# Vertical level type of input wind variables. Can be "Surface",
+# "Pressure Levels", "Hybrid Sigma Pressure Model Levels", "Log(Pressure) Levels",
+# "Potential Vorticity Levels".
+2\computationVerticalLevelType=
 

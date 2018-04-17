@@ -24,8 +24,8 @@
 **  along with Met.3D.  If not, see <http://www.gnu.org/licenses/>.
 **
 *******************************************************************************/
-#ifndef MET_3D_ABSTRACTDATACALCULATOR_H
-#define MET_3D_ABSTRACTDATACALCULATOR_H
+#ifndef MET_3D_ABSTRACTDATACOMPUTATION_H
+#define MET_3D_ABSTRACTDATACOMPUTATION_H
 
 // standard library imports
 
@@ -40,30 +40,33 @@ namespace Met3D
 {
 
 /**
- * @brief MAbstractDataCalculator is the base class for all data calculation
+  @brief MAbstractDataComputation is the base class for all data computations.
  */
-class MAbstractDataCalculator
+class MAbstractDataComputation
 {
 public:
-    MAbstractDataCalculator(QString identifier);
-    virtual ~MAbstractDataCalculator();
+    MAbstractDataComputation(QString identifier);
+    virtual ~MAbstractDataComputation();
 
     /**
-     * Returns the identifier string of this data calculator.
+      Returns the identifier string of this data computation.
      */
     QString getIdentifier() { return identifier; }
 
     /**
-     * Set input source for calculations
-     * @param reader is a pointer to a MWeatherPredictionDataSource instance
+      Set input source for computations.
+      @param reader is a pointer to a MWeatherPredictionDataSource instance.
      */
     void setInputSource(MWeatherPredictionDataSource* source);
 
 protected:
     /**
-     * Implementations of this class should check the input dataSource
+      Will be called when input dataSource is set.
+
+      Needs to implement initialisation from data drawn from dataSource (e.g.
+      valid times, ensemble members, etc.).
      */
-    virtual void checkDataSource() = 0;
+    virtual void initialiseFormDataSource() = 0;
 
     QString identifier;
     MWeatherPredictionDataSource* dataSource;
@@ -73,4 +76,4 @@ protected:
 
 } // namespace Met3D
 
-#endif //MET_3D_ABSTRACTDATACALCULATOR_H
+#endif // MET_3D_ABSTRACTDATACOMPUTATION_H

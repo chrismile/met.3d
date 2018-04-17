@@ -41,10 +41,10 @@ namespace Met3D
 {
 
 enum MSelectActorType {
-    POLE_ACTOR       = 0,
-    HORIZONTAL_ACTOR = 1,
-    VERTICAL_ACTOR   = 2,
-    BOX_ACTOR        = 3
+    POLE_ACTOR              = 0,
+    HORIZONTALSECTION_ACTOR = 1,
+    VERTICALSECTION_ACTOR   = 2,
+    BOX_ACTOR               = 3
 };
 
 struct MSelectableActor
@@ -55,10 +55,7 @@ struct MSelectableActor
 /**
   @brief MSelectActorDialog implements a dialog from which the user can
   select an existing actor
-
-  Which dialog is created depends on the constructor used to construct the
-  dialog.
-  */
+ */
 class MSelectActorDialog : public QDialog
 {
     Q_OBJECT
@@ -68,8 +65,8 @@ public:
       Constructs a new dialog. The dialog's data field table is filled with a
       list of the actor registered with @ref MGLResourcesManager.
 
-      Which actors should be available is defined by @param types.
-      */
+      Which actors should be available is defined by @p types.
+     */
     explicit MSelectActorDialog(QList<MSelectActorType> types,
                                      QWidget *parent = 0);
 
@@ -86,7 +83,7 @@ public slots:
       are available to select.
 
       Prints warning corresponding to the selection dialog executed.
-      */
+     */
     int exec();
 
 private:
@@ -94,7 +91,7 @@ private:
 
     /**
       Creates table entries for actor selection dialog.
-      */
+     */
     void createActorEntries(QList<MSelectActorType> types);
 
     MSelectableActor getActorFromRow(int row);

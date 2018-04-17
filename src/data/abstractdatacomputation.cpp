@@ -24,7 +24,7 @@
 **  along with Met.3D.  If not, see <http://www.gnu.org/licenses/>.
 **
 *******************************************************************************/
-#include "abstractdatacalculator.h"
+#include "abstractdatacomputation.h"
 
 // standard library imports
 
@@ -41,14 +41,14 @@ namespace Met3D
 ***                     CONSTRUCTOR / DESTRUCTOR                            ***
 *******************************************************************************/
 
-MAbstractDataCalculator::MAbstractDataCalculator(QString identifier)
+MAbstractDataComputation::MAbstractDataComputation(QString identifier)
         : identifier(identifier),
           dataSource(nullptr)
 {
 }
 
 
-MAbstractDataCalculator::~MAbstractDataCalculator()
+MAbstractDataComputation::~MAbstractDataComputation()
 {
 }
 
@@ -57,10 +57,11 @@ MAbstractDataCalculator::~MAbstractDataCalculator()
 ***                            PUBLIC METHODS                               ***
 *******************************************************************************/
 
-void MAbstractDataCalculator::setInputSource(MWeatherPredictionDataSource* source)
+void MAbstractDataComputation::setInputSource(MWeatherPredictionDataSource* source)
 {
+    assert(dataSource != nullptr);
     dataSource = source;
-    checkDataSource();
+    initialiseFormDataSource();
 }
 
 

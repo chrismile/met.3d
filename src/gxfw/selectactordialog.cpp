@@ -90,7 +90,10 @@ QList<MSelectableActor> MSelectActorDialog::getSelectedActors()
     foreach (QTableWidgetItem *item, items)
     {
         const int row = item->row();
-        if (visitedRows.contains(row)) { continue; }
+        if (visitedRows.contains(row))
+        {
+            continue;
+        }
         visitedRows.push_back(row);
         actors.push_back(getActorFromRow(row));
     }
@@ -106,7 +109,7 @@ QList<MSelectableActor> MSelectActorDialog::getSelectedActors()
 
 int MSelectActorDialog::exec()
 {
-    if(actorsAvailable)
+    if (actorsAvailable)
     {
         return QDialog::exec();
     }
@@ -139,7 +142,7 @@ void MSelectActorDialog::createActorEntries(QList<MSelectActorType> types)
     actorsAvailable = false;
 
     // iterate through all actors
-    for(MActor* a : glRM->getActors())
+    for (MActor* a : glRM->getActors())
     {
         if (a == nullptr)
             continue;
@@ -152,11 +155,11 @@ void MSelectActorDialog::createActorEntries(QList<MSelectActorType> types)
                 case POLE_ACTOR:
                     addActor |= dynamic_cast<MMovablePoleActor*>(a) != nullptr;
                     break;
-                case HORIZONTAL_ACTOR:
+                case HORIZONTALSECTION_ACTOR:
                     addActor |=  (dynamic_cast<MNWPHorizontalSectionActor*>(a)
                                   != nullptr);
                     break;
-                case VERTICAL_ACTOR:
+                case VERTICALSECTION_ACTOR:
                     addActor |= (dynamic_cast<MNWPVerticalSectionActor*>(a)
                                  != nullptr);
                     break;
@@ -167,7 +170,7 @@ void MSelectActorDialog::createActorEntries(QList<MSelectActorType> types)
         }
 
         // only add if type is requested
-        if(addActor)
+        if (addActor)
         {
             // Add a row to the table..
             int row = table->rowCount();

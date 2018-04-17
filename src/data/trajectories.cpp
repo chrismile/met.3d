@@ -240,7 +240,9 @@ void MTrajectories::copyVertexDataFrom(
         float *lons, float *lats, float *pres)
 {
     for (int i = 0; i < getVertices().size(); i++)
+    {
         vertices[i] = QVector3D(lons[i], lats[i], pres[i]);
+    }
 }
 
 
@@ -248,12 +250,12 @@ void MTrajectories::copyVertexDataFrom(QVector<QVector<QVector3D>> &v)
 {
     for (int i = 0; i < v.size(); ++i)
     {
-        for (int j = 0; j < v[i].size(); ++j)
+        int viSize = v[i].size();
+        for (int j = 0; j < viSize; ++j)
         {
-            vertices[i * v[i].size() + j] = v[i][j];
+            vertices[i * viSize + j] = v[i][j];
         }
     }
-
 }
 
 

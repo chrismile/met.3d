@@ -115,9 +115,9 @@ PipelineType MAddDatasetDialog::getSelectedPipelineType()
             if (levelTypeU != levelTypeV || levelTypeV != levelTypeW)
             {
                 QMessageBox::warning(nullptr, "Add New Dataset",
-                                     "wind u, v and omega variable do NOT have"
-                                     " the same vertical level type. Failed to"
-                                     " add new data set.");
+                                     "wind eastward, northward and vertical"
+                                     " variables do NOT have the same vertical"
+                                     " level type. Failed to add new data set.");
                 return PipelineType::INVALID_PIPELINE_TYPE;
             }
 
@@ -179,13 +179,13 @@ MAddDatasetDialog::getTrajectoriesPipelineConfigurationInfo()
     d.memoryManagerID = memoryManagers.at(ui->memoryMCombo->currentIndex());
     d.boundaryLayerTrajectories = ui->ablTrajectoriesCheckBox;
     d.NWPDataset = ui->trajectoriesNWPDatasetCombo->currentText();
-    d.windUVariable = ui->trajectoriesWindUVarCombo
+    d.windEastwardVariable = ui->trajectoriesWindUVarCombo
             ->currentText().split(" || Level type: ").first();
-    d.windVVariable = ui->trajectoriesWindVVarCombo
+    d.windNorthwardVariable = ui->trajectoriesWindVVarCombo
             ->currentText().split(" || Level type: ").first();
-    d.windWVariable = ui->trajectoriesWindWVarCombo
+    d.windVerticalVariable = ui->trajectoriesWindWVarCombo
             ->currentText().split(" || Level type: ").first();
-    d.verticalLvlType = ui->trajectoriesWindUVarCombo
+    d.verticalLevelType = ui->trajectoriesWindUVarCombo
             ->currentText().split(" || Level type: ").last();
     return d;
 }
@@ -282,11 +282,11 @@ void MAddDatasetDialog::saveConfiguration(QSettings *settings)
         {
             settings->setValue("NWPDataset",
                                ui->trajectoriesNWPDatasetCombo->currentText());
-            settings->setValue("wind_uVariable",
+            settings->setValue("eastwardWind_ms",
                                ui->trajectoriesWindUVarCombo->currentText());
-            settings->setValue("wind_vVariable",
+            settings->setValue("northwardWind_ms",
                                ui->trajectoriesWindVVarCombo->currentText());
-            settings->setValue("wind_omegaVariable",
+            settings->setValue("verticalWind_Pas",
                                ui->trajectoriesWindWVarCombo->currentText());
             settings->setValue("precomputed", false);
         }
@@ -363,11 +363,11 @@ void MAddDatasetDialog::loadConfiguration(QSettings *settings)
             ui->trajectoriesNWPDatasetCombo->setCurrentText(
                         settings->value("NWPDataset", "").toString());
             ui->trajectoriesWindUVarCombo->setCurrentText(
-                        settings->value("wind_uVariable", "").toString());
+                        settings->value("eastwardWind_ms", "").toString());
             ui->trajectoriesWindVVarCombo->setCurrentText(
-                        settings->value("wind_vVariable", "").toString());
+                        settings->value("northwardWind_ms", "").toString());
             ui->trajectoriesWindWVarCombo->setCurrentText(
-                        settings->value("wind_omegaVariable", "").toString());
+                        settings->value("verticalWind_Pas", "").toString());
         }
         ui->ablTrajectoriesCheckBox->setChecked(
                     settings->value("ABLTrajectories", false).toBool());

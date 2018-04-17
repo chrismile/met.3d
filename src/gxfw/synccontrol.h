@@ -361,8 +361,8 @@ private:
     bool synchronizationInProgress;
     bool forwardBackwardButtonClicked;
     /**
-     * Handle sync event if valid and init time should be updated, but only
-     * valid time changes due to restriction to the data set.
+      Handle sync event if valid and init time should be updated, but only
+      valid time changes due to restriction to the data set.
      */
     bool validDateTimeHasChanged;
     QWidget *lastFocusWidget;

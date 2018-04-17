@@ -89,10 +89,10 @@ struct MTrajectoriesPipelineConfigurationInfo
     QString memoryManagerID;
     bool boundaryLayerTrajectories;
     QString NWPDataset;
-    QString windUVariable;
-    QString windVVariable;
-    QString windWVariable;
-    QString verticalLvlType;
+    QString windEastwardVariable;
+    QString windNorthwardVariable;
+    QString windVerticalVariable;
+    QString verticalLevelType;
 };
 
 

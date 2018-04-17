@@ -149,16 +149,16 @@ protected:
                                         QString memoryManagerID,
                                         bool enableRegridding);
 
-    void initializeTrajectoriesComputationPipeline(
+    void initializeTrajectoryComputationPipeline(
             QString name,
             bool boundaryLayerTrajectories,
             QString schedulerID,
             QString memoryManagerID,
             QString NWPDataset,
-            QString variableU,
-            QString variableV,
-            QString variableW,
-            QString verticalLvlType);
+            QString windEastwardVariable,
+            QString windNorthwardVariable,
+            QString windVerticalVariable,
+            QString verticalLevelType);
 
     void initializeEnsemblePipeline(
             QString dataSourceId,
@@ -180,6 +180,20 @@ protected:
     void getMetviewGribFilePaths(QList<MetviewGribFilePath> *gribFilePaths);
 
     MConfigurablePipelineType configurablePipelineTypeFromString(QString typeName);
+
+    /**
+      Checks if the memory manager @p defaultMemoryManager exists and if so
+      registers it as default memory manager for the pipeline with ID
+      @p PipelineID in @p defaultMemoryManagers.
+
+      If @p defaultMemoryManager is empty or does not exists, the first entry
+      of @ref MSystemManagerAndControl::getMemoryManagerIdentifiers() is used
+      as default memory manager.
+     */
+    void checkAndStoreDefaultPipelineMemoryManager(
+            QString defaultMemoryManager, QString PipelineID,
+            QMap<QString, QString> *defaultMemoryManagers,
+            MSystemManagerAndControl *sysMC);
 };
 
 } // namespace Met3D

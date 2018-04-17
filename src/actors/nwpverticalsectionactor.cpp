@@ -559,13 +559,13 @@ MWaypointsTableModel* MNWPVerticalSectionActor::getWaypointsModel()
 }
 
 
-double MNWPVerticalSectionActor::getBottomPressure()
+double MNWPVerticalSectionActor::getBottomPressure_hPa()
 {
     return p_bot_hPa;
 }
 
 
-double MNWPVerticalSectionActor::getTopPressure()
+double MNWPVerticalSectionActor::getTopPressure_hPa()
 {
     return p_top_hPa;
 }

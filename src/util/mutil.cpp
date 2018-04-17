@@ -138,14 +138,14 @@ QString expandEnvironmentVariables(QString path)
 }
 
 
-QVector<float> parsePressureLevelString(QString lvlString)
+QVector<float> parsePressureLevelString(QString levels)
 {
     // Clear the current list of pressure line levels; if pLevelStr does not
     // match any accepted format no pressure lines are drawn.
     QVector<float> pressureLevels;
 
     // Empty strings, i.e. no pressure lines, are accepted.
-    if (lvlString.isEmpty())
+    if (levels.isEmpty())
     {
         return pressureLevels;
     }
@@ -157,7 +157,7 @@ QVector<float> parsePressureLevelString(QString lvlString)
     // values is arbitrary).
     QRegExp rxList("^([\\-|\\+]*\\d+\\.*\\d*,*)+$");
 
-    if (rxRange.exactMatch(lvlString))
+    if (rxRange.exactMatch(levels))
     {
         QStringList rangeValues = rxRange.capturedTexts();
 
@@ -181,9 +181,9 @@ QVector<float> parsePressureLevelString(QString lvlString)
             }
         }
     }
-    else if (rxList.exactMatch(lvlString))
+    else if (rxList.exactMatch(levels))
     {
-        QStringList listValues = lvlString.split(",");
+        QStringList listValues = levels.split(",");
 
         bool ok;
         for (int i = 0; i < listValues.size(); i++)
@@ -196,21 +196,21 @@ QVector<float> parsePressureLevelString(QString lvlString)
 }
 
 
-QString encodePressureLevels(QVector<float> lvls, QString delimiter)
+QString encodePressureLevels(QVector<float> levels, QString delimiter)
 {
-    // create empty string
+    // Create empty string.
     QString stringValue = QString("");
 
-    // add values to string with given delimiter
-    for (int i = 0; i < lvls.size(); i++)
+    // Add values to string with given delimiter.
+    for (int i = 0; i < levels.size(); i++)
     {
         if (i == 0)
         {
-            stringValue.append(QString("%1").arg(lvls.at(i)));
+            stringValue.append(QString("%1").arg(levels.at(i)));
         }
         else
         {
-            stringValue.append(QString("%1%2").arg(delimiter).arg(lvls.at(i)));
+            stringValue.append(QString("%1%2").arg(delimiter).arg(levels.at(i)));
         }
     }
 

@@ -115,7 +115,7 @@ public:
     const QRectF getHorizontalBBox()
     { return bBoxConnection->horizontal2DCoords(); }
 
-    const double getSlicePosition() { return slicePosition_hPa; }
+    const double getSectionElevation_hPa() { return slicePosition_hPa; }
 
 public slots:
     /**

@@ -90,6 +90,8 @@ extern log4cplus::Logger mlog;
 #define M_MISSING_VALUE -999.E9f
 #define M_INVALID_TRAJECTORY_POS -999.99f
 
+#define LAT_TO_METER 1.112e5
+
 //WORKAROUND
     // NOTE (mr, Dec2013): Workaround to fix a float accuracy problem
     // occuring with some NetCDF data files (e.g. converted from GRIB with
@@ -137,13 +139,17 @@ QStringList readConfigVersionID(QSettings *settings);
  */
 QString expandEnvironmentVariables(QString path);
 
+/**
+  Parse pressure levels string @p levels which should contain pressure levels
+  either given by a range (e.g. "[0, 100, 10]") or by a list of values (e.g.
+  "10, 20, 50, 100, 200, 500, 700, 900").
+ */
+QVector<float> parsePressureLevelString(QString levels);
 
 /**
- * Parse Pressure lvls given by a ranged String e.g. "[0, 100, 10]" or a list
- * of values e.g. "10, 20, 50, 100, 200, 500, 700, 900".
+  Builds a string containing all values given by @p levels by separating the
+  values by @p delimiter.
  */
-QVector<float> parsePressureLevelString(QString lvls);
-
-QString encodePressureLevels(QVector<float> lvls, QString delimiter);
+QString encodePressureLevels(QVector<float> levels, QString delimiter);
 
 #endif // MUTIL_H

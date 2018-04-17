@@ -80,9 +80,9 @@ public:
 
     QRectF getHorizontalBBox() { return bBoxConnection->horizontal2DCoords(); }
 
-    double getBottomPressure() { return bBoxConnection->bottomPressure_hPa(); }
+    double getBottomPressure_hPa() { return bBoxConnection->bottomPressure_hPa(); }
 
-    double getTopPressure() { return bBoxConnection->topPressure_hPa(); }
+    double getTopPressure_hPa() { return bBoxConnection->topPressure_hPa(); }
 
     void onBoundingBoxChanged();
 
