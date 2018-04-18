@@ -6,7 +6,7 @@
 **
 **  Copyright 2015-2017 Marc Rautenhaus
 **  Copyright 2015      Michael Kern
-**  Copyright 2016-2017 Bianca Tost
+**  Copyright 2015-2017 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -158,9 +158,9 @@ protected:
 
 private:
     /** Methods to render the horizontal section. */
-    void renderVerticalInterpolation(MNWP2DHorizontalActorVariable* var);
+    void computeVerticalInterpolation(MNWP2DHorizontalActorVariable* var);
 
-    void renderVerticalInterpolationDifference(
+    void computeVerticalInterpolationDifference(
                                 MNWP2DHorizontalActorVariable* var,
                                 MNWP2DHorizontalActorVariable* varDiff);
 
