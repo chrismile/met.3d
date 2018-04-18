@@ -772,7 +772,7 @@ void MGraticuleActor::generateGeometry()
             OGRPolygon *bboxPolygon =
                     MNaturalEarthDataLoader::getBBoxPolygon(&cornerRect);
 
-            // List storing seperated ling strings.
+            // List storing separated ling strings.
             QList<OGRLineString*> lineStringList;
             OGRLineString* lineString;
 
@@ -900,7 +900,7 @@ void MGraticuleActor::generateGeometry()
                             }
                             delete[] v;
                             // Restart after each line segment to avoid
-                            // connections between line segements seperated by
+                            // connections between line segements separated by
                             // intersection with bounding box.
                             nLats.append(numVertices);
                             numVertices = 0;

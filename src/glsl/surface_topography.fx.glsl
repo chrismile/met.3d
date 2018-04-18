@@ -163,7 +163,7 @@ shader FSmain(in VStoFS Input, out vec4 fragColour)
     }
 
     // In the case of the rendered region falling apart into disjunct region
-    // discard fragments between seperated regions.
+    // discard fragments between separated regions.
     // (cf. computeRenderRegionParameters of MNWP2DHorizontalActorVariable in
     // nwpactorvariable.cpp).
     if (!isCyclicGrid

@@ -376,7 +376,7 @@ void MSpatial1DTransferFunction::onQtPropertyChanged(QtProperty *property)
                 // Clear fileNames to store file names in user set order.
                 fileNames.clear();
 
-                for(int index = 0; index < listWidget->count(); index++)
+                for (int index = 0; index < listWidget->count(); index++)
                 {
                   QListWidgetItem *item = listWidget->item(index);
                   fileNames.push_back(item->text());
