@@ -542,7 +542,7 @@ shader VSmainDiff()
             // discard all fragments that touch this vertex.
             scalar = MISSING_VALUE;
         }
-        else 
+        else
         {
             // Fetch the scalar values at klower and kupper.
             float scalar_klower = texelFetch(dataField1, ivec3(i, j, klower), 0).a;
@@ -708,7 +708,7 @@ shader VSmainDiff()
             }
         }
     }
-    
+
     // Compute difference between both variables.
     // ========================================================================
 

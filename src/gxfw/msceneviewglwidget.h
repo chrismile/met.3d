@@ -341,13 +341,13 @@ protected slots:
 
 private:
     /**
-     * Handles opening of file dialog and letting the user choose where to save
-     * the screenshot, how to call it and as which image file type.
+      Handles opening of file dialog and letting the user choose where to save
+      the screenshot, how to call it and as which image file type.
      */
     void saveScreenshot();
 
     /**
-     * Handles taking and saving a screenshot of the scene to @p filename.
+      Handles taking and saving a screenshot of the scene to @p filename.
      */
     void saveScreenshotToFileName(QString filename);
 
@@ -511,7 +511,9 @@ private:
     QtProperty *sceneViewLabelGroupProperty;
     QtProperty *sceneViewLabelEnableProperty;
 
-    /** List of static labels to display in this view. */
+    /**
+      List of static labels to display in this view.
+     */
     MLabel *sceneNameLabel;
 
     bool measureFPS;
@@ -526,16 +528,16 @@ private:
     MActor *singleInteractionActor;
 
     /**
-     * If this variable is set to false, the qt property changed events will be
-     * ignored for the instance of the scene.
+      If this variable is set to false, the qt property changed events will be
+      ignored for the instance of the scene.
      */
     bool enablePropertyEvents;
 
     MResizeWindowDialog *resizeViewDialog;
 
     /**
-     * If this variable is set to true, Met.3D will write the files of a time
-     * series without checking if the file name already exists.
+      If this variable is set to true, Met.3D will write the files of a time
+      series without checking if the file name already exists.
      */
     bool overwriteImageSerie;
 };

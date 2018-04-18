@@ -495,7 +495,7 @@ void MNaturalEarthDataLoader::loadAndRotateLineGeometryUsingRotatedBBox(
                 lineString->addPoint(currPosition.x(), currPosition.y());
             }
 
-            // Loop over all seperated lines and intersect each with the
+            // Loop over all separated lines and intersect each with the
             // bounding box.
             foreach (lineString, lineStringList)
             {
@@ -548,7 +548,7 @@ void MNaturalEarthDataLoader::loadAndRotateLineGeometryUsingRotatedBBox(
                         }
                         delete[] v;
                         // Restart after each line segment to avoid connections
-                        // between line segements seperated by intersection
+                        // between line segements separated by intersection
                         // with bounding box.
                         count->append(vertices->size() - startIndices->last());
                         startIndices->append(vertices->size());

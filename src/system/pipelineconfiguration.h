@@ -51,7 +51,7 @@ namespace Met3D
   it uses directory paths and file filters given by the command line argument
   "--path=" instead of the ones defined in the configuration file. Each
   directory file filter pairing results in its own data source and must be
-  seperated in the path argument by a semicolon from other paths. For file
+  separated in the path argument by a semicolon from other paths. For file
   filters Met.3D supports the use of wildcard expressions. If no configuration
   file is given via the command line, in this mode Met.3D uses a default
   configuration file stored at $MET3D_HOME/config/metview/default_pipeline.cfg

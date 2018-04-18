@@ -73,7 +73,7 @@ public:
 typedef QPair<float, MColourXYZ64> ColourNode;
 
 /**
- * @brief Class for storing Met3D::TFEditor::ColourNode's.
+  @brief Class for storing Met3D::TFEditor::ColourNode's.
  */
 class MColourNodes : public MAbstractNodes
 {
@@ -108,7 +108,7 @@ public:
 typedef QPair<float, float> AlphaNode;
 
 /**
- * @brief Class for storing Met3D::TFEditor::AlphaNode's.
+  @brief Class for storing Met3D::TFEditor::AlphaNode's.
  */
 class MAlphaNodes : public MAbstractNodes
 {
@@ -137,8 +137,8 @@ public:
 
 
 /**
- * @brief The TransferFunction class consists of color and alpha nodes as well
- * as a presampled color buffer.
+  @brief The TransferFunction class consists of color and alpha nodes as well
+  as a presampled color buffer.
  */
 class MEditorTransferFunction
 {
@@ -146,8 +146,8 @@ public:
     MEditorTransferFunction();
 
     /**
-     * Samples the current color and alpha nodes and saves the result in the
-     * sampled buffer.
+      Samples the current color and alpha nodes and saves the result in the
+      sampled buffer.
      */
     void update(int numSamples);
 
