@@ -122,6 +122,7 @@ HEADERS += \
     src/gxfw/adddatasetdialog.h \
     src/data/derivedmetvarsdatasource.h \
     src/data/bboxtrajectoryfilter.h \
+    src/data/gridaggregation.h \
     src/gxfw/mresizewindowdialog.h \
     src/actors/spatial1dtransferfunction.h \
     src/actors/transferfunctioneditor/transferfunctioneditor.h \
@@ -225,6 +226,7 @@ SOURCES += \
     src/gxfw/adddatasetdialog.cpp \
     src/data/derivedmetvarsdatasource.cpp \
     src/data/bboxtrajectoryfilter.cpp \
+    src/data/gridaggregation.cpp \
     src/gxfw/mresizewindowdialog.cpp \
     src/actors/spatial1dtransferfunction.cpp \
     src/actors/transferfunctioneditor/transferfunctioneditor.cpp \

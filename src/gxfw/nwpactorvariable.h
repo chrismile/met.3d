@@ -42,6 +42,7 @@
 #include "data/structuredgrid.h"
 #include "data/weatherpredictiondatasource.h"
 #include "data/singlevariableanalysis.h"
+#include "data/gridaggregation.h"
 #include "actors/transferfunction1d.h"
 #include "actors/spatial1dtransferfunction.h"
 #include "util/mstopwatch.h"
@@ -179,6 +180,17 @@ public:
     /* CPU memory object that stores the current data field. */
     MStructuredGrid *grid;
 
+    /**
+      Special case for ensemble mode "multiple members": This NWPActorVariable
+      keeps its own instance of a grid aggregation source that assembles the
+      required set of multiple ensemble member grids.
+     */
+    //TODO (mr, 18Apr2018) -- This architecture should probably be changed to
+    //  aggregation sources in the generic pipelines. May change in the future.
+    MGridAggregationDataSource *aggregationDataSource;
+    MGridAggregation *gridAggregation;
+    bool multipleEnsembleMembersEnabled;
+
     /* OpenGL GPU texture objects and units that belong to this variable. */
     GL::MTexture *textureDataField;
     int          textureUnitDataField;
@@ -262,6 +274,7 @@ protected:
     friend class MVerticalRegridProperties;
 
     virtual void releaseDataItems();
+    virtual void releaseAggregatedDataItems();
 
     /**
       Determine the current time value of the given enum property.

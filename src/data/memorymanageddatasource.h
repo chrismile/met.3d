@@ -58,6 +58,8 @@ public:
      */
     void setMemoryManager(MAbstractMemoryManager *manager);
 
+    MAbstractMemoryManager* getMemoryManager() { return memoryManager; }
+
     void requestData(MDataRequest request);
 
     MAbstractDataItem* getData(MDataRequest request);
