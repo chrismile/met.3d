@@ -48,6 +48,7 @@
 #include "ui_scenemanagementdialog.h"
 #include "system/applicationconfiguration.h"
 #include "system/pipelineconfiguration.h"
+#include "data/structuredgrid.h"
 
 using namespace std;
 
@@ -1365,7 +1366,8 @@ void MMainWindow::openDatasetDialog(MAddDatasetDialog &addDatasetDialog)
                             pipelineConfig.windEastwardVariable,
                             pipelineConfig.windNorthwardVariable,
                             pipelineConfig.windVerticalVariable,
-                            pipelineConfig.verticalLevelType);
+                            MStructuredGrid::verticalLevelTypeFromString(
+                                pipelineConfig.verticalLevelType));
             }
             break;
         }

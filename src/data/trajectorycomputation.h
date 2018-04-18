@@ -108,7 +108,15 @@ public:
 
     void setInputWindVariables(QString eastwardWind_ms, QString northwardWind_ms,
                                QString verticalWind_Pas);
-    void setVericalLevelType(QString levelTypeString);
+
+    /**
+      Sets vertical level type of computed trajectories.
+
+      Needs to be 3D and the same as the vertical level type of the wind
+      component variables (eastwardWind_ms, northwardWind_ms and
+      verticalWind_Pas).
+     */
+    void setVericalLevelType(MVerticalLevelType levelType);
 
     /**
       Returns a @ref QList<QDateTime> containing the available forecast

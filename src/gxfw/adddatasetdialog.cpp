@@ -103,7 +103,7 @@ PipelineType MAddDatasetDialog::getSelectedPipelineType()
     }
     else if (ui->pipelineTypeTabWidget->currentWidget()  == ui->trajectoriesTab)
     {
-        if (ui->pipelineTypeTabWidget->currentWidget()
+        if (ui->trajectoriesTypeTabWidget->currentWidget()
                 == ui->trajectoriesComputationTab)
         {
             QString levelTypeU = ui->trajectoriesWindUVarCombo
@@ -115,7 +115,7 @@ PipelineType MAddDatasetDialog::getSelectedPipelineType()
             if (levelTypeU != levelTypeV || levelTypeV != levelTypeW)
             {
                 QMessageBox::warning(nullptr, "Add New Dataset",
-                                     "wind eastward, northward and vertical"
+                                     "Wind eastward, northward and vertical"
                                      " variables do NOT have the same vertical"
                                      " level type. Failed to add new data set.");
                 return PipelineType::INVALID_PIPELINE_TYPE;
@@ -541,11 +541,16 @@ void MAddDatasetDialog::selectedNWPDatasetChanged(QString dataset)
             dynamic_cast<MWeatherPredictionDataSource*>
             (sysMC->getDataSource(dataset));
     QList<MVerticalLevelType> levelTypes = source->availableLevelTypes();
-    foreach (MVerticalLevelType lvl, levelTypes)
+    foreach (MVerticalLevelType levelType, levelTypes)
     {
-        QStringList variables = source->availableVariables(lvl);
+        // Skip 2D data fields.
+        if ( levelType == SURFACE_2D || levelType == POTENTIAL_VORTICITY_2D )
+        {
+            continue;
+        }
+        QStringList variables = source->availableVariables(levelType);
         QString levelTypeString =
-                MStructuredGrid::verticalLevelTypeToString(lvl);
+                MStructuredGrid::verticalLevelTypeToString(levelType);
         foreach (QString variable, variables)
         {
             QString item = variable + " || Level type: " + levelTypeString;

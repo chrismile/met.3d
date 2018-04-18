@@ -34,8 +34,6 @@
 
 using namespace std;
 
-#define IS_MISSING(x) (abs((x) - (M_MISSING_VALUE)) < 0.0001)
-
 #define EULER_ITERATION 3
 
 namespace Met3D
@@ -71,9 +69,9 @@ void MTrajectoryComputation::setInputWindVariables(QString eastwardWind_ms,
 }
 
 
-void MTrajectoryComputation::setVericalLevelType(QString levelTypeString)
+void MTrajectoryComputation::setVericalLevelType(MVerticalLevelType levelType)
 {
-    levelType = MStructuredGrid::verticalLevelTypeFromString(levelTypeString);
+    this->levelType = levelType;
 }
 
 

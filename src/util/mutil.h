@@ -90,6 +90,8 @@ extern log4cplus::Logger mlog;
 #define M_MISSING_VALUE -999.E9f
 #define M_INVALID_TRAJECTORY_POS -999.99f
 
+#define IS_MISSING(x) (abs((x) - (M_MISSING_VALUE)) < 0.0001)
+
 #define LAT_TO_METER 1.112e5
 
 //WORKAROUND

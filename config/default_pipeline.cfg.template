@@ -143,8 +143,10 @@ size=0
 2\eastwardWind_ms=u-component_of_wind_hybrid
 2\northwardWind_ms=v-component_of_wind_hybrid
 2\verticalWind_Pas=Vertical_velocity_pressure_hybrid
-# Vertical level type of input wind variables. Can be "Surface",
-# "Pressure Levels", "Hybrid Sigma Pressure Model Levels", "Log(Pressure) Levels",
-# "Potential Vorticity Levels".
-2\computationVerticalLevelType=
+# [Optional] Vertical level type of input wind component variables. Can be 
+# "PRESSURE_LEVELS_3D", "HYBRID_SIGMA_PRESSURE_3D", "LOG_PRESSURE_LEVELS_3D" or
+# "AUXILIARY_PRESSURE_3D". If vertical level type is not given, Met.3D will
+# search for one vertical level type containing the names of eastwardWind_ms,
+# northwardWind_ms and verticalWind_Pas variables.
+2\windComponentVariablesVerticalLevelType=
 

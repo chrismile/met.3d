@@ -158,7 +158,7 @@ protected:
             QString windEastwardVariable,
             QString windNorthwardVariable,
             QString windVerticalVariable,
-            QString verticalLevelType);
+            MVerticalLevelType verticalLevelType);
 
     void initializeEnsemblePipeline(
             QString dataSourceId,

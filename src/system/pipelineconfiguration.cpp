@@ -386,8 +386,8 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
                 config.value("northwardWind_ms").toString();
         QString windVerticalVariable =
                 config.value("verticalWind_Pas").toString();
-        QString computationVerticalLevelType =
-                config.value("computationVerticalLevelType").toString();
+        QString windVarsVerticalLevelTypeString =
+                config.value("windComponentVariablesVerticalLevelType").toString();
 
         if (precomputed)
         {
@@ -451,7 +451,11 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
             LOG4CPLUS_DEBUG(mlog, "  vertical wind variable = "
                             << windVerticalVariable.toStdString());
             LOG4CPLUS_DEBUG(mlog, "  wind vertical level type  = "
-                            << computationVerticalLevelType.toStdString());
+                            << windVarsVerticalLevelTypeString.toStdString());
+
+            MVerticalLevelType windVarsVerticalLevelType =
+                    MStructuredGrid::verticalLevelTypeFromConfigString(
+                        windVarsVerticalLevelTypeString);
 
             // Check parameter validity.
             if ( name.isEmpty()
@@ -460,7 +464,11 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
                  || windNorthwardVariable.isEmpty()
                  || windVerticalVariable.isEmpty()
                  || schedulerID.isEmpty()
-                 || memoryManagerID.isEmpty() )
+                 || memoryManagerID.isEmpty()
+                 || ( windVarsVerticalLevelType == SURFACE_2D
+                      || windVarsVerticalLevelType == POTENTIAL_VORTICITY_2D )
+                 || ( !windVarsVerticalLevelTypeString.isEmpty()
+                      && windVarsVerticalLevelType == SIZE_LEVELTYPES ))
             {
                 LOG4CPLUS_WARN(mlog, "invalid parameters encountered;"
                                      " skipping.");
@@ -474,12 +482,12 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
                         name, ablTrajectories, schedulerID,
                         memoryManagerID, NWPDataset,
                         windEastwardVariable, windNorthwardVariable,
-                        windVerticalVariable, computationVerticalLevelType);
+                        windVerticalVariable, windVarsVerticalLevelType);
             }
             else
             {
-                LOG4CPLUS_WARN(mlog, "deterministic computed LAGRANTO pipeline"
-                                     " has not been implemented yet;"
+                LOG4CPLUS_WARN(mlog, "deterministic computed trajectories"
+                                     " pipeline has not been implemented yet;"
                                      " skipping.");
             }
         }
@@ -755,7 +763,7 @@ void MPipelineConfiguration::initializeTrajectoryComputationPipeline(
         QString windEastwardVariable,
         QString windNorthwardVariable,
         QString windVerticalVariable,
-        QString verticalLevelType)
+        MVerticalLevelType verticalLevelType)
 {
     MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
     MAbstractScheduler* scheduler = sysMC->getScheduler(schedulerID);
@@ -778,7 +786,7 @@ void MPipelineConfiguration::initializeTrajectoryComputationPipeline(
     }
 
     // If verical level type is not given, search for it.
-    if (verticalLevelType == "")
+    if (verticalLevelType == MVerticalLevelType::SIZE_LEVELTYPES)
     {
         QList<MVerticalLevelType> levelTypes =
                 NWPDataSource->availableLevelTypes();
@@ -789,26 +797,53 @@ void MPipelineConfiguration::initializeTrajectoryComputationPipeline(
                     && variables.contains(windNorthwardVariable)
                     && variables.contains(windVerticalVariable))
             {
-                verticalLevelType =
-                        MStructuredGrid::verticalLevelTypeToString(level);
+                verticalLevelType = level;
             }
+        }
+    }
+    else
+    {
+        QList<MVerticalLevelType> levelTypes =
+                NWPDataSource->availableLevelTypes();
+        if (!levelTypes.contains(verticalLevelType))
+        {
+            LOG4CPLUS_WARN(mlog, "MWeatherPredictionDataSource ''"
+                           << NWPDataset.toStdString()
+                           << "'' does NOT contain level type '"
+                           << MStructuredGrid::verticalLevelTypeToString(
+                               verticalLevelType).toStdString()
+                           << "'; skipping.");
+            return;
+        }
+        QStringList variables = NWPDataSource->availableVariables(
+                    verticalLevelType);
+        if (!variables.contains(windEastwardVariable)
+                || !variables.contains(windNorthwardVariable)
+                || !variables.contains(windVerticalVariable))
+        {
+            LOG4CPLUS_WARN(mlog, "MWeatherPredictionDataSource ''"
+                           << NWPDataset.toStdString()
+                           << "'' does NOT contain all wind component variables"
+                              " with vertical level type '"
+                           << MStructuredGrid::verticalLevelTypeToString(
+                               verticalLevelType).toStdString()
+                           << "'; skipping.");
+            return;
         }
     }
 
     if (MClimateForecastReader *netCDFDataSource =
             dynamic_cast<MClimateForecastReader*>(NWPDataSource))
     {
-        MVerticalLevelType levelType =
-                MStructuredGrid::verticalLevelTypeFromString(verticalLevelType);
         MHorizontalGridType hGridTypU =
                 netCDFDataSource->variableHorizontalGridType(
-                    levelType, windEastwardVariable);
+                    verticalLevelType, windEastwardVariable);
         MHorizontalGridType hGridTypV =
                 netCDFDataSource->variableHorizontalGridType(
-                    levelType, windNorthwardVariable);
+                    verticalLevelType, windNorthwardVariable);
         MHorizontalGridType hGridTypW =
                 netCDFDataSource->variableHorizontalGridType(
-                    levelType, windVerticalVariable);
+                    verticalLevelType, windVerticalVariable);
         if (hGridTypU == MHorizontalGridType::ROTATED_LONLAT
                 || hGridTypV == MHorizontalGridType::ROTATED_LONLAT
                 || hGridTypW == MHorizontalGridType::ROTATED_LONLAT)
