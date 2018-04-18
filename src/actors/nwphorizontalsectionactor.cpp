@@ -1345,11 +1345,11 @@ void MNWPHorizontalSectionActor::renderToCurrentContext(MSceneViewGLWidget *scen
                 {
                     continue;
                 }
-                renderVerticalInterpolationDifference(var, varDiff);
+                computeVerticalInterpolationDifference(var, varDiff);
             }
             else
             {
-                renderVerticalInterpolation(var);
+                computeVerticalInterpolation(var);
             }
 
             // If line contours are enabled re-compute the contour indices
@@ -1749,7 +1749,7 @@ void MNWPHorizontalSectionActor::onChangeActorVariable(MNWPActorVariable *var)
 ***                           PRIVATE METHODS                               ***
 *******************************************************************************/
 
-void MNWPHorizontalSectionActor::renderVerticalInterpolation(
+void MNWPHorizontalSectionActor::computeVerticalInterpolation(
         MNWP2DHorizontalActorVariable *var)
 {
     glVerticalInterpolationEffect->bindProgram("Standard");
@@ -1848,13 +1848,13 @@ void MNWPHorizontalSectionActor::renderVerticalInterpolation(
 
     // We don't want to compute entries twice thus we need to use at most the
     // width of the grid. (var->nlons can be larger than the grid size)
-    glDrawArraysInstanced(GL_POINTS,
-                          0, min(var->nlons, int(var->grid->nlons + 1)),
-                          var->nlats); CHECK_GL_ERROR;
+    glDispatchCompute( min(var->nlons, int(var->grid->nlons + 1)),
+                       var->nlats, 1);
+    glMemoryBarrier(GL_TEXTURE_FETCH_BARRIER_BIT & GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 }
 
 
-void MNWPHorizontalSectionActor::renderVerticalInterpolationDifference(
+void MNWPHorizontalSectionActor::computeVerticalInterpolationDifference(
         MNWP2DHorizontalActorVariable *var,
         MNWP2DHorizontalActorVariable *varDiff)
 {
@@ -2016,9 +2016,9 @@ void MNWPHorizontalSectionActor::renderVerticalInterpolationDifference(
 
     // We don't want to compute entries twice thus we need to use at most the
     // width of the grid. (var->nlons can be larger than the grid size)
-    glDrawArraysInstanced(GL_POINTS,
-                          0, min(var->nlons, int(var->grid->nlons + 1)),
-                          var->nlats); CHECK_GL_ERROR;
+    glDispatchCompute( min(var->nlons, int(var->grid->nlons + 1)),
+                       var->nlats, 1);
+    glMemoryBarrier(GL_TEXTURE_FETCH_BARRIER_BIT & GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 }
 
 

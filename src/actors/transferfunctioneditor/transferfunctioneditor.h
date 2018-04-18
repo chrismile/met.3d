@@ -78,8 +78,8 @@ class MColourBox;
 class MChannelsWidget;
 
 /**
- * @brief Dialog to edit and create a TransferFunction in rgb and hcl
- * colorspace.
+  @brief Dialog to edit and create a TransferFunction in rgb and hcl
+  colorspace.
  */
 class MTransferFunctionEditor : public QDialog
 {
@@ -222,11 +222,11 @@ protected:
     void mouseMoveEvent(QMouseEvent * event) override;
 
     /**
-     * Calculates pixel position of node.
+      Calculates pixel position of node.
      */
     QPoint toPixelPos(QPointF) const;
     /**
-     * Calculates node position from pixel coordinates.
+      Calculates node position from pixel coordinates.
      */
     QPointF toLogicalPos(QPoint p) const;
 

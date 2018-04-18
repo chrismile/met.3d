@@ -88,8 +88,8 @@ shader GSmain(out GStoFS vertex)
 
     // In case of repeated grid region parts, this shift places the vertex to
     // the correct global position. This is necessary since the modulo operation
-    // maps repeated parts to the same position. It contains the factor 360.
-    // needs to be multiplied with to place the vertex correctly.
+    // maps repeated parts to the same position. It needs to be mulitplied by a
+    // factor of 360 to place the vertex correctly.
     float numGlobalLonShifts = floor((ij.x + iOffset) / (latOffset));
 
     float lon, lon_west, lon_east;

@@ -107,10 +107,10 @@ public:
     void loadConfiguration(QSettings *settings);
 
     /**
-     * Returns the color value (rgba) of the corresponding scalar value based
-     * on the user-defined colour mapping and range boundaries.
-     * @param scalar
-     * @return interpolated color value as QColor
+      Returns the color value (rgba) of the corresponding scalar value based
+      on the user-defined colour mapping and range boundaries.
+      @param scalar
+      @return interpolated color value as QColor
      */
     QColor getColorValue(const float scalar) const;
 

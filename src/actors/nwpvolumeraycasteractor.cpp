@@ -1819,7 +1819,7 @@ void MNWPVolumeRaycasterActor::renderToCurrentContext(
     // ===============================================================
     if (normalCurveSettings->normalCurvesEnabled)
     {
-        if(updateNextRenderFrame[RecomputeNCLines])
+        if (updateNextRenderFrame[RecomputeNCLines])
         {
             computeNormalCurves(sceneView);
         }
@@ -1900,7 +1900,7 @@ bool MNWPVolumeRaycasterActor::rayBoxIntersection(
 
     QVector3D rayDirInv = QVector3D(1./rayDirection.x(), 1./rayDirection.y(),
                                     1./rayDirection.z());
-    if(rayDirInv.x() >= 0.0)
+    if (rayDirInv.x() >= 0.0)
     {
         tnear = (boxCrnr1.x() - rayOrigin.x()) * rayDirInv.x();
         tfar  = (boxCrnr2.x() - rayOrigin.x()) * rayDirInv.x();
@@ -1911,7 +1911,7 @@ bool MNWPVolumeRaycasterActor::rayBoxIntersection(
         tfar  = (boxCrnr1.x() - rayOrigin.x()) * rayDirInv.x();
     }
 
-    if(rayDirInv.y() >= 0.0)
+    if (rayDirInv.y() >= 0.0)
     {
         tnear = max(tnear, float((boxCrnr1.y() - rayOrigin.y()) * rayDirInv.y()));
         tfar  = min(tfar,  float((boxCrnr2.y() - rayOrigin.y()) * rayDirInv.y()));
@@ -1922,7 +1922,7 @@ bool MNWPVolumeRaycasterActor::rayBoxIntersection(
         tfar  = min(tfar,  float((boxCrnr1.y() - rayOrigin.y()) * rayDirInv.y()));
     }
 
-    if(rayDirInv.z() >= 0.0)
+    if (rayDirInv.z() >= 0.0)
     {
         tnear = max(tnear, float((boxCrnr1.z() - rayOrigin.z()) * rayDirInv.z()));
         tfar  = min(tfar,  float((boxCrnr2.z() - rayOrigin.z()) * rayDirInv.z()));
@@ -3248,7 +3248,7 @@ void MNWPVolumeRaycasterActor::computeNormalCurveInitialPoints(
 //    NormalCurveLineSegment* vertices = (NormalCurveLineSegment*) glMapBufferRange(GL_SHADER_STORAGE_BUFFER, 0,
 //                numRays * (normalCurveSettings->numLineSegments + 2) * sizeof(NormalCurveLineSegment), bufMask); CHECK_GL_ERROR;
 
-//    for(int i = 0; i < 200; ++i)
+//    for (int i = 0; i < 200; ++i)
 //    {
 //        lines[i] = vertices[i];
 //    }

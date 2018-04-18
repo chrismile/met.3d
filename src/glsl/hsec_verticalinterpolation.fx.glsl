@@ -5,7 +5,7 @@
 **  prediction data.
 **
 **  Copyright 2015-2018 Marc Rautenhaus
-**  Copyright 2017-2018 Bianca Tost
+**  Copyright 2015-2018 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -44,7 +44,7 @@ const int AUXILIARY_PRESSURE_3D = 5;
 
 
 /*****************************************************************************
- ***                           VERTEX SHADER
+ ***                           COMPUTE SHADER
  *****************************************************************************/
 
 uniform int       levelType;         // vertical level type of the data grid
@@ -64,12 +64,12 @@ uniform int       jOffset;           //   of the grid shall be rendered
 layout(r32f)                         // texture in which the interpolated grid
 uniform image2D   crossSectionGrid;  // is stored.
 
-shader VSmain()
+shader CSmain()
 {
     // Compute grid indices (i, j) of the this vertex from vertex and instance
     // ID (notes 09Feb2012).
-    int i = gl_VertexID;
-    int j = gl_InstanceID;
+    int i = int(gl_GlobalInvocationID.x);
+    int j = int(gl_GlobalInvocationID.y);
 
     // Subregion shift?
     int numLons = textureSize(dataField, 0).x;
@@ -308,7 +308,7 @@ shader VSmain()
 /*****************************************************************************/
 /*****************************************************************************/
 
-// Vertex shader for difference mode (compute the per-vertex difference
+// Compute shader for difference mode (compute the per-vertex difference
 // between two fields).
 
 uniform int       levelType1;         // vertical level type of the data grid
@@ -331,12 +331,12 @@ uniform sampler3D auxPressureField2_hPa; // 3D pressure field in hPa
 
 uniform int       mode;               // 1 = absolute difference, 2 = relative
 
-shader VSmainDiff()
+shader CSmainDiff()
 {
     // Compute grid indices (i, j) of the this vertex from vertex and instance
     // ID (see notes 09Feb2012).
-    int i = gl_VertexID;
-    int j = gl_InstanceID;
+    int i = int(gl_GlobalInvocationID.x);
+    int j = int(gl_GlobalInvocationID.y);
 
     int numLons = textureSize(dataField1, 0).x;
     if (levelType1 == SURFACE_2D) numLons = textureSize(dataField2D1, 0).x;
@@ -542,7 +542,7 @@ shader VSmainDiff()
             // discard all fragments that touch this vertex.
             scalar = MISSING_VALUE;
         }
-        else 
+        else
         {
             // Fetch the scalar values at klower and kupper.
             float scalar_klower = texelFetch(dataField1, ivec3(i, j, klower), 0).a;
@@ -708,7 +708,7 @@ shader VSmainDiff()
             }
         }
     }
-    
+
     // Compute difference between both variables.
     // ========================================================================
 
@@ -737,27 +737,15 @@ shader VSmainDiff()
 
 
 /*****************************************************************************
- ***                          FRAGMENT SHADER
- *****************************************************************************/
-
-shader FSmain()
-{
- // empty
-}
-
-
-/*****************************************************************************
  ***                             PROGRAMS
  *****************************************************************************/
 
 program Standard
 {
-    vs(420)=VSmain();
-    fs(420)=FSmain();
+    cs(430)=CSmain(): in(local_size_x = 1, local_size_y = 1, local_size_z = 1);
 };
 
 program Difference
 {
-    vs(420)=VSmainDiff();
-    fs(420)=FSmain();
+    cs(430)=CSmainDiff(): in(local_size_x = 1, local_size_y = 1, local_size_z = 1);
 };

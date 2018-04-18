@@ -672,7 +672,7 @@ void MHSVColourmap::readFromVaporFile(QString fileName)
         i += 1;
     }
 
-    for(unsigned int c=HUE; c<=VALUE; c++)
+    for (unsigned int c=HUE; c<=VALUE; c++)
     {
         vaporNodes[c].erase(vaporNodes[c].begin());
     }

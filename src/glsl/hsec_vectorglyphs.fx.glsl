@@ -327,7 +327,7 @@ shader GSwindBarbs(in vec3 worldPos[], out GStoFS Output)
 // -----------------------------------------------------------------------------
 // Create the pennants at the current wind barb position.
 
-        for(int i = 0; i < floor(knots / 50); ++i)
+        for (int i = 0; i < floor(knots / 50); ++i)
         {
             vec3 pos0, pos1, pos2;
             vec3 pos = elemPos;
@@ -360,7 +360,7 @@ shader GSwindBarbs(in vec3 worldPos[], out GStoFS Output)
 // -----------------------------------------------------------------------------
 // Create the full flag triangle at the current wind barb position.
 
-        for(int j = 0; j < floor(knots / 10); ++j)
+        for (int j = 0; j < floor(knots / 10); ++j)
         {
             vec3 pos0, pos1, pos2, pos3;
             vec3 pos = elemPos;
@@ -397,7 +397,7 @@ shader GSwindBarbs(in vec3 worldPos[], out GStoFS Output)
 // -----------------------------------------------------------------------------
 // Create the half flag triangle at the current wind barb position.
 
-        for(int k = 0; k < floor(knots / 5); ++k)
+        for (int k = 0; k < floor(knots / 5); ++k)
         {
             vec3 pos0, pos1, pos2, pos3;
             vec3 pos = elemPos;

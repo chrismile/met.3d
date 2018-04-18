@@ -81,8 +81,8 @@ shader VSmain(out VStoFS output)
 
     // In case of repeated grid region parts, this shift places the vertex to
     // the correct global position. This is necessary since the modulo operation
-    // maps repeated parts to the same position. It contains the factor 360.
-    // needs to be multiplied with to place the vertex correctly.
+    // maps repeated parts to the same position. It needs to be mulitplied by a
+    // factor of 360 to place the vertex correctly.
     float numGlobalLonShifts = floor((i + iOffset) / latOffset);
 
     i = (i + iOffset) % numLons;
@@ -131,7 +131,7 @@ shader FSmain(in VStoFS input, out vec4 fragColour)
     }
 
     // In the case of the rendered region falling apart into disjunct region
-    // discard fragments between seperated regions.
+    // discard fragments between separated regions.
     // (cf. computeRenderRegionParameters of MNWP2DHorizontalActorVariable in
     // nwpactorvariable.cpp).
     if (!isCyclicGrid

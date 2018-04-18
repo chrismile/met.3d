@@ -511,7 +511,9 @@ private:
     QtProperty *sceneViewLabelGroupProperty;
     QtProperty *sceneViewLabelEnableProperty;
 
-    /** List of static labels to display in this view. */
+    /**
+      List of static labels to display in this view.
+     */
     MLabel *sceneNameLabel;
 
     bool measureFPS;

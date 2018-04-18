@@ -127,7 +127,7 @@ public:
     void emitPressureLevelChanged();
 
 signals:
-    // Use seperated signals for 2D and 3D to avoid duplicated invocation of
+    // Use separated signals for 2D and 3D to avoid duplicated invocation of
     // computation for 3D actors (emitChangeSignal()).
     void horizontal2DCoordsChanged();
     void pressureLevelChanged();

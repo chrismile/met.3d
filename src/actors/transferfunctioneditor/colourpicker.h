@@ -128,26 +128,26 @@ public:
                      QWidget *parent = nullptr);
 
     /**
-     * Generates new color by changing one component of the base
-     * color.
-     *
-     * Which component to be changed is given by Met3D::TFEditor::Type1D.
-     * @param t Normalized component value (Range: [0, 1])
-     * @return generated color.
-     * @see HCLColorRangeWidget::getValue()
+      Generates new color by changing one component of the base
+      color.
+
+      Which component to be changed is given by Met3D::TFEditor::Type1D.
+      @param t Normalized component value (Range: [0, 1])
+      @return generated color.
+      @see HCLColorRangeWidget::getValue()
      */
     MColourHCL16 getColor(float t) const;
 
     /**
-     * @return normalized component value of given color
-     * @see HCLColorRangeWidget::getColor()
-     * @see Met3D::TFEditor::Type1D
+      @return normalized component value of given color
+      @see HCLColorRangeWidget::getColor()
+      @see Met3D::TFEditor::Type1D
      */
     float getValue(const MColourHCL16& color) const;
     /**
-     * @return normalized component value of base color
-     * @see HCLColorRangeWidget::getColor()
-     * @see Met3D::TFEditor::Type1D
+      @return normalized component value of base color
+      @see HCLColorRangeWidget::getColor()
+      @see Met3D::TFEditor::Type1D
      */
     float getValue() const;
 
@@ -166,24 +166,23 @@ private:
 
 
 /**
-  *
-  * @brief Widget for adjusting simultaneously either hue and chroma, hue and
-  * luminance or chroma and luminance of a given color.
-  *
-  * It is inspired by the hcl-picker at (http://tristen.ca/hcl-picker) which is
-  * based on the color conversion library 'chroma.js'.
-  *
-  * Issue:
-  *     - Our 2D plots for HC, HL and CL which use 'colorspace.c' for color
-  *         conversions differ from those in the original colorpicker
-  *
-  * Possible causes:
-  *     - different whitepoints are used (unlikely since the D65 standard is
-  *         apparently used both times)
-  *     - wrong usage of colorspace.c (unlikely since our rgb plots match those
-  *         from hcl-wizard which also uses colorspace.c, but still possible)
-  *     - either chroma.js or colorspace.c have errors in their colorspace
-  *         conversions
+  @brief Widget for adjusting simultaneously either hue and chroma, hue and
+  luminance or chroma and luminance of a given color.
+
+  It is inspired by the hcl-picker at (http://tristen.ca/hcl-picker) which is
+  based on the color conversion library 'chroma.js'.
+
+  Issue:
+      - Our 2D plots for HC, HL and CL which use 'colorspace.c' for color
+          conversions differ from those in the original colorpicker
+
+  Possible causes:
+      - different whitepoints are used (unlikely since the D65 standard is
+          apparently used both times)
+      - wrong usage of colorspace.c (unlikely since our rgb plots match those
+          from hcl-wizard which also uses colorspace.c, but still possible)
+      - either chroma.js or colorspace.c have errors in their colorspace
+          conversions
  */
 class MHCLColorRange2DWidget : public QWidget
 {
@@ -201,53 +200,53 @@ public:
     void setShowInterpolationPaths(bool show);
 
     /**
-     * Generates new color by changing two components of the base
-     * color.
-     *
-     * Which components to be changed is given by Met3D::TFEditor::Type2D.
-     * @param tx First normalized component value (Range: [0, 1])
-     * @param ty Second normalized component value (Range: [0, 1])
-     * @return generated color.
-     * @see HCLColorRange2DWidget::getValueX()
-     * @see HCLColorRange2DWidget::getValueY()
-     * @see HCLColorRange2DWidget::getValueZ()
+      Generates new color by changing two components of the base
+      color.
+
+      Which components to be changed is given by Met3D::TFEditor::Type2D.
+      @param tx First normalized component value (Range: [0, 1])
+      @param ty Second normalized component value (Range: [0, 1])
+      @return generated color.
+      @see HCLColorRange2DWidget::getValueX()
+      @see HCLColorRange2DWidget::getValueY()
+      @see HCLColorRange2DWidget::getValueZ()
      */
     MColourHCL16 getColor(float tx, float ty) const;
 
     /**
-     * @return first normalized component value of base color
-     * @see HCLColorRange2DWidget::getColor()
-     * @see Met3D::TFEditor::Type2D
+      @return first normalized component value of base color
+      @see HCLColorRange2DWidget::getColor()
+      @see Met3D::TFEditor::Type2D
      */
     float getValueX() const;
     /**
-     * @return second normalized component value of base color
-     * @see HCLColorRange2DWidget::getColor()
-     * @see Met3D::TFEditor::Type2D
+      @return second normalized component value of base color
+      @see HCLColorRange2DWidget::getColor()
+      @see Met3D::TFEditor::Type2D
      */
     float getValueY() const;
     /**
-     * @return third (unchanged) normalized component value of base color
-     * @see HCLColorRange2DWidget::getColor()
-     * @see Met3D::TFEditor::Type2D
+      @return third (unchanged) normalized component value of base color
+      @see HCLColorRange2DWidget::getColor()
+      @see Met3D::TFEditor::Type2D
      */
     float getValueZ() const;
     /**
-     * @return first normalized component value of given color
-     * @see HCLColorRange2DWidget::getColor()
-     * @see Met3D::TFEditor::Type2D
+      @return first normalized component value of given color
+      @see HCLColorRange2DWidget::getColor()
+      @see Met3D::TFEditor::Type2D
      */
     float getValueX(const MColourHCL16& color) const;
     /**
-     * @return second normalized component value of given color
-     * @see HCLColorRange2DWidget::getColor()
-     * @see Met3D::TFEditor::Type2D
+      @return second normalized component value of given color
+      @see HCLColorRange2DWidget::getColor()
+      @see Met3D::TFEditor::Type2D
      */
     float getValueY(const MColourHCL16& color) const;
     /**
-     * @return third (unchanged) normalized component value of given color
-     * @see HCLColorRange2DWidget::getColor()
-     * @see Met3D::TFEditor::Type2D
+      @return third (unchanged) normalized component value of given color
+      @see HCLColorRange2DWidget::getColor()
+      @see Met3D::TFEditor::Type2D
      */
     float getValueZ(const MColourHCL16& color) const;
 

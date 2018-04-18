@@ -46,51 +46,51 @@ class MColourRGB8
 {
 public:
     /**
-     * Default constructor. Initializes black colour.
+      Default constructor. Initializes black colour.
      */
     MColourRGB8();
     /**
-     * @param rgb Array of red, green and blue component (Range: [0, 255]).
+      @param rgb Array of red, green and blue component (Range: [0, 255]).
      */
     MColourRGB8(const unsigned char (&rgb)[3]);
     /**
-     * @param rgb Array of red, green and blue component (Range: [0, 1]).
+      @param rgb Array of red, green and blue component (Range: [0, 1]).
      */
     MColourRGB8(const double (&rgb)[3]);
     /**
-     * @param R red component (Range: [0, 1]).
-     * @param G green component (Range: [0, 1]).
-     * @param B blue component (Range: [0, 1]).
+      @param R red component (Range: [0, 1]).
+      @param G green component (Range: [0, 1]).
+      @param B blue component (Range: [0, 1]).
      */
     MColourRGB8(double R, double G, double B);
 
     /**
-     * @return red component (Range: [0, 1]).
+      @return red component (Range: [0, 1]).
      */
     double getR() const;
     /**
-     * Sets red component.
-     * @param R (Range: [0, 1]).
+      Sets red component.
+      @param R (Range: [0, 1]).
      */
     void setR(double R);
 
     /**
-     * @return green component (Range: [0, 1]).
+      @return green component (Range: [0, 1]).
      */
     double getG() const;
     /**
-     * Sets green component.
-     * @param G (Range: [0, 1]).
+      Sets green component.
+      @param G (Range: [0, 1]).
      */
     void setG(double G);
 
     /**
-     * @return blue component (Range: [0, 1]).
+      @return blue component (Range: [0, 1]).
      */
     double getB() const;
     /**
-     * Sets blue component.
-     * @param B (Range: [0, 1]).
+      Sets blue component.
+      @param B (Range: [0, 1]).
      */
     void setB(double B);
 
@@ -107,48 +107,48 @@ class MColourHCL16
 {
 public:
     /**
-     * Default constructor. Initializes black colour.
+      Default constructor. Initializes black colour.
      */
     MColourHCL16();
     /**
-     * @param rgb Array of hue, chroma and luminace component
-     * (Range: [-360, 360], [0, 100], [0, 100]).
+      @param rgb Array of hue, chroma and luminace component
+      (Range: [-360, 360], [0, 100], [0, 100]).
      */
     MColourHCL16(const double (&hcl)[3]);
     /**
-     * @param H hue component (Range: [-360, 360]).
-     * @param C chroma component (Range: [0, 100]).
-     * @param L luminance component (Range: [0, 100]).
+      @param H hue component (Range: [-360, 360]).
+      @param C chroma component (Range: [0, 100]).
+      @param L luminance component (Range: [0, 100]).
      */
     MColourHCL16(double H, double C, double L);
 
     /**
-     * @return hue component (Range: [-360, 360]).
+      @return hue component (Range: [-360, 360]).
      */
     double getH() const;
     /**
-     * Sets hue component.
-     * @param H (Range: [-360, 360]).
+      Sets hue component.
+      @param H (Range: [-360, 360]).
      */
     void setH(double H);
 
     /**
-     * @return chroma component (Range: [0, 100])
+      @return chroma component (Range: [0, 100])
      */
     double getC() const;
     /**
-     * Sets chroma component.
-     * @param C (Range: [0, 100]).
+      Sets chroma component.
+      @param C (Range: [0, 100]).
      */
     void setC(double C);
 
     /**
-     * @return luminance component (Range: [0, 100]).
+      @return luminance component (Range: [0, 100]).
      */
     double getL() const;
     /**
-     * Sets luminance component.
-     * @param L (Range: [0, 100]).
+      Sets luminance component.
+      @param L (Range: [0, 100]).
      */
     void setL(double L);
 
@@ -165,45 +165,45 @@ class MColourXYZ64
 {
 public:
     /**
-     * Default constructor. Initializes colour at D65 whitepoint.
+      Default constructor. Initializes colour at D65 whitepoint.
      */
     MColourXYZ64();
     bool operator==(const MColourXYZ64& rhs) const;
     bool operator!=(const MColourXYZ64& rhs) const;
 
     /**
-     * ColorRGB8 to ColorXYZ64 conversion.
+      ColorRGB8 to ColorXYZ64 conversion.
      */
     explicit MColourXYZ64(const MColourRGB8& rgb);
     /**
-     * ColorHCL16 to ColorXYZ64 conversion.
+      ColorHCL16 to ColorXYZ64 conversion.
      */
     explicit MColourXYZ64(const MColourHCL16& hcl);
 
     /**
-     * ColorXYZ64 to ColorRGB8 conversion.
-     *
-     * Same as ColorXYZ64::toRGB but with fixed e = 1e-4.
+      ColorXYZ64 to ColorRGB8 conversion.
+
+      Same as ColorXYZ64::toRGB but with fixed e = 1e-4.
      */
     explicit operator MColourRGB8() const;
 
     /**
-     * ColorXYZ64 to ColorHCL16 conversion.
-     *
-     * Same as ColorXYZ64::toHCL but with fixed e = 1.0.
+      ColorXYZ64 to ColorHCL16 conversion.
+
+      Same as ColorXYZ64::toHCL but with fixed e = 1.0.
      */
     explicit operator MColourHCL16() const;
 
     /**
-     * ColorXYZ64 to ColorRGB8 conversion. RGB colours with values outside the
-     * range of [0 - e, 1 + e] will be mapped to black.
-     * @param e maximum error.
+      ColorXYZ64 to ColorRGB8 conversion. RGB colours with values outside the
+      range of [0 - e, 1 + e] will be mapped to black.
+      @param e maximum error.
      */
     MColourRGB8 toRGB(double e) const;
     /**
-     * ColorXYZ64 to ColorHCL16 conversion. HCL colours with values outside the
-     * range of [-360 - e, 360 + e] or [0 - e, 100 + e] will be mapped to black.
-     * @param e maximum error.
+      ColorXYZ64 to ColorHCL16 conversion. HCL colours with values outside the
+      range of [-360 - e, 360 + e] or [0 - e, 100 + e] will be mapped to black.
+      @param e maximum error.
      */
     MColourHCL16 toHCL(double e) const;
 
@@ -211,58 +211,58 @@ public:
     double y;
     double z;
     /**
-     * Flag to indicate whether the hue value of the original HCL colour was
-     * negative.
-     *
-     * Only used for conversions between ColourHCL16 <--> ColourXYZ64.
+      Flag to indicate whether the hue value of the original HCL colour was
+      negative.
+
+      Only used for conversions between ColourHCL16 <--> ColourXYZ64.
      */
     bool hueSgn;
 };
 
 /**
- * @brief Linear componentwise interpolation between two ColourRGB8's.
- * @param c1 The first colour.
- * @param c2 The second colour.
- * @param pos Position at which the interpolation is evaluated (Range: [0, 1]).
- * @return ColourRGB8 between c1 and c2 at position pos.
+  @brief Linear componentwise interpolation between two ColourRGB8's.
+  @param c1 The first colour.
+  @param c2 The second colour.
+  @param pos Position at which the interpolation is evaluated (Range: [0, 1]).
+  @return ColourRGB8 between c1 and c2 at position pos.
  */
 MColourRGB8 lerp(const MColourRGB8& c1, const MColourRGB8& c2, float pos);
 
 /**
- * @brief Linear componentwise interpolation between two ColourHCL16's.
- * @param c1 The first colour.
- * @param c2 The second colour.
- * @param pos Position at which the interpolation is evaluated, (Range: [0, 1]).
- * @return ColourHCL16 between c1 and c2 at position pos.
+  @brief Linear componentwise interpolation between two ColourHCL16's.
+  @param c1 The first colour.
+  @param c2 The second colour.
+  @param pos Position at which the interpolation is evaluated, (Range: [0, 1]).
+  @return ColourHCL16 between c1 and c2 at position pos.
  */
 MColourHCL16 lerp(const MColourHCL16& c1, const MColourHCL16& c2, float pos);
 
 /**
- * @brief Linear componentwise interpolation between two ColourXYZ64's.
- * @param c1 The first colour.
- * @param c2 The second colour.
- * @param pos Position at which the interpolation is evaluated, (Range: [0, 1]).
- * @return ColourXYZ64 between c1 and c2 at position pos.
+  @brief Linear componentwise interpolation between two ColourXYZ64's.
+  @param c1 The first colour.
+  @param c2 The second colour.
+  @param pos Position at which the interpolation is evaluated, (Range: [0, 1]).
+  @return ColourXYZ64 between c1 and c2 at position pos.
  */
 MColourXYZ64 lerp(const MColourXYZ64& c1, const MColourXYZ64& c2, float pos);
 
 /**
- * @brief Linear interpolation between two ColourXYZ64's, based on their
- * RGB representation.
- * @param c1 The first colour.
- * @param c2 The second colour.
- * @param pos Position at which the interpolation is evaluated, (Range: [0, 1]).
- * @return ColourXYZ64 between (ColorRGB8)c1 and (ColorRGB8)c2 at position pos.
+  @brief Linear interpolation between two ColourXYZ64's, based on their
+  RGB representation.
+  @param c1 The first colour.
+  @param c2 The second colour.
+  @param pos Position at which the interpolation is evaluated, (Range: [0, 1]).
+  @return ColourXYZ64 between (ColorRGB8)c1 and (ColorRGB8)c2 at position pos.
  */
 MColourXYZ64 lerpRGB(const MColourXYZ64& c1, const MColourXYZ64& c2, float pos);
 
 /**
- * @brief Linear interpolation between two ColourXYZ64's, based on their
- * HCL representation.
- * @param c1 The first colour.
- * @param c2 The second colour.
- * @param pos Position at which the interpolation is evaluated, (Range: [0, 1]).
- * @return ColourXYZ64 between (ColorHCL16)c1 and (ColorHCL16)c2 at position pos.
+  @brief Linear interpolation between two ColourXYZ64's, based on their
+  HCL representation.
+  @param c1 The first colour.
+  @param c2 The second colour.
+  @param pos Position at which the interpolation is evaluated, (Range: [0, 1]).
+  @return ColourXYZ64 between (ColorHCL16)c1 and (ColorHCL16)c2 at position pos.
  */
 MColourXYZ64 lerpHCL(const MColourXYZ64& c1, const MColourXYZ64& c2, float pos);
 
