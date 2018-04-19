@@ -4,8 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2017 Marc Rautenhaus
-**  Copyright 2016-2017 Bianca Tost
+**  Copyright 2015-2018 Marc Rautenhaus
+**  Copyright 2016-2018 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -389,6 +389,14 @@ public:
      */
     virtual bool isConnectedTo(MActor *actor) { Q_UNUSED(actor); return false; }
 
+    /**
+      Returns @p true if this actor supports visualisation of multiple ensemble
+      members (e.g. spaghetti plots).
+
+      @note Override this method in your derived class.
+     */
+    virtual bool supportsMultipleEnsembleMemberVisualization() { return false; }
+
 public slots:
     /**
       Handles change events of the properties in the property browser. Calls
@@ -645,6 +653,8 @@ protected:
 
     /** Unique integer identifying this actor, assigned in the constructor. */
     unsigned int myID;
+
+    bool multipleEnsembleMembersEnabled;
 
 private:
     static unsigned int idCounter;
