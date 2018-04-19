@@ -1753,7 +1753,8 @@ void MGribReader::detectSurfacePressureFieldType(QStringList *availableFiles)
 #ifdef ENABLE_MET3D_STOPWATCH
     MStopwatch stopwatch;
 #endif
-
+        LOG4CPLUS_DEBUG(mlog, "Searching for surface pressure field type..."
+                              " this may take a while... please wait." << flush);
         // Scan all grib files contained in the directory and search for
         // a surface pressure field. (Only use grib files directly
         // since there is no speed up when using index files.)
