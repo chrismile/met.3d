@@ -402,11 +402,14 @@ void MTrajectoryReader::scanDataRoot()
     QStringList availableFiles;
     getAvailableFilesFromFilters(availableFiles);
 
+    // Create and initialise progress bar.
+    initializeFileScanProgressDialog(availableFiles.size());
 
     // For each file, extract information about the contained start time and
     // valid times. Store these information in "availableTrajectories".
     for (int i = 0; i < availableFiles.size(); i++)
     {
+        updateFileScanProgressDialog();
         QString filename = availableFiles[i];
 
         LOG4CPLUS_DEBUG_FMT(mlog, "\tParsing file %s ..",
@@ -464,6 +467,8 @@ void MTrajectoryReader::scanDataRoot()
 
         delete ncFile;
     } // for (files)
+
+    deleteFileScanProgressDialog();
 
     // After all files have been scanned remove wrong valid times (see above).
     // (Do not use availableInitTimes() and availableValidTimes() as they

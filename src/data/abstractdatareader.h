@@ -30,6 +30,7 @@
 
 // related third party imports
 #include <QtCore>
+#include <QProgressDialog>
 
 // local application imports
 
@@ -98,6 +99,35 @@ protected:
      */
     virtual void scanDataRoot() = 0;
 
+    /**
+      Creates a progress dialog which can be used to monitor the progress while
+      reading data set files and appends it to @ref fileScanProgressDialogList.
+
+      If @p labelText is empty, ("Loading data set " + getIdentifier() + " ...")
+      is used as default label text.
+
+      Call @ref updateFileScanProgressDialog() to update progress bar.
+
+      After using it call @ref deleteFileScanProgressDialog() to delete the
+      progressbar.
+     */
+    void initializeFileScanProgressDialog(int numFiles, QString labelText = "");
+
+    /**
+      Updates last entry in @p fileScanProgressDialogList and @ref
+      loadingProgressList by inceasing the progress by one.
+
+      @note A progress dialog needs to be initialized by calling @ref
+      initializeFileScanProgressDialog() before using this method!
+     */
+    void updateFileScanProgressDialog();
+
+    /**
+      Deletes last entry in @p fileScanProgressDialogList and removes last
+      entry in @ref fileScanProgressDialogList and @ref loadingProgressList.
+     */
+    void deleteFileScanProgressDialog();
+
     QString identifier;
     QDir dataRoot;
     QString dirFileFilters;
@@ -106,6 +136,9 @@ protected:
         thread-safe (notes Feb2015). This mutex must be used to protect
         ALL access to NetCDF files in Met.3D! */
     static QMutex staticNetCDFAccessMutex;
+
+    QList<QProgressDialog*> fileScanProgressDialogList;
+    QList<int> loadingProgressList;
 };
 
 

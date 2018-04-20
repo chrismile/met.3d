@@ -519,10 +519,14 @@ void MClimateForecastReader::scanDataRoot()
     // cleared when starting to read a new file.
     QMap<MVerticalLevelType, QMap<QString, bool>> checkedVariables;
 
+    // Create and initialise progress bar.
+    initializeFileScanProgressDialog(availableFiles.size());
+
     // For each file, open the file and extract information about the contained
     // variables and forecast valid times.
     foreach (QString fileName, availableFiles)
     {
+        updateFileScanProgressDialog();
         LOG4CPLUS_DEBUG(mlog, "\tParsing file "
                         << fileName.toStdString() << " .." << flush);
 
@@ -1014,6 +1018,8 @@ void MClimateForecastReader::scanDataRoot()
 
         delete ncFile;
     } // for (files)
+
+    deleteFileScanProgressDialog();
 
     // Some auxiliary pressure variables might NOT have been checked yet if
     // their dimensions match the dimensions of auxiliary pressure field (i.e.
