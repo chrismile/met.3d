@@ -78,9 +78,10 @@ public:
     };
 
     enum SceneNavigationMode {
-        MOVE_CAMERA  = 0,
-        ROTATE_SCENE = 1,
-        TOPVIEW_2D   = 2
+        MOVE_CAMERA             = 0,
+        ROTATE_SCENE            = 1,
+        TOPVIEW_2D              = 2,
+        SINGLE_FULLSCREEN_ACTOR = 3
     };
 
     enum LightDirection {
@@ -289,6 +290,35 @@ public slots:
 
     void updateSyncControlProperty();
 
+    /**
+     Connects to the MGLResourcesManager::actorCreated() signal. If the new
+     actor supports full-screen mode, it is added to the list of full-screen
+     actors displayed by the fullScreenActorProperty.
+     */
+    void onActorCreated(MActor *actor);
+
+    /**
+     Connects to the MGLResourcesManager::actorDeleted() signal. If the deleted
+     actor supports full-screen mode, update the list of full-screen actors
+     displayed by the fullScreenActorProperty, possibly disconnect from the
+     full-screen actor.
+     */
+    void onActorDeleted(MActor *actor);
+
+    /**
+     Connects to the MGLResourcesManager::actorRenamed() signal. If the renamed
+     actor supports full-screen mode, it is renamed in the list of full-screen
+     actors displayed by the fullScreenActorProperty.
+     */
+    void onActorRenamed(MActor *actor, QString oldName);
+
+    /**
+      Directly connect change signal of full-screen actor to @ref updateGL() to
+      allow the user to select actors as full-screen actors which are not
+      connected to the scene view's scene.
+     */
+    void onFullScreenActorUpdate();
+
 protected:
     void initializeGL();
 
@@ -447,6 +477,8 @@ private:
     QtProperty *sceneRotationCentreLonProperty;
     QtProperty *sceneRotationCentreElevationProperty;
     QtProperty *selectSceneRotationCentreProperty;
+    MActor     *fullScreenActor;
+    QtProperty *fullScreenActorProperty;
     float       sceneNavigationSensitivity;
     QtProperty *sceneNavigationSensitivityProperty;
     QtProperty *syncCameraWithViewProperty;

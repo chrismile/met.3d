@@ -106,6 +106,15 @@ public:
     void render(MSceneViewGLWidget *sceneView);
 
     /**
+      If the actor is enabled (property @ref enabled is set to true), render
+      the actor in the current OpenGL context in full-screen mode. Calls the
+      virtual method @ref renderToCurrentContextFullScreen() to perform the
+      actual rendering in the derived classes. Do not overwrite this method,
+      but reimplement @ref renderToCurrentContextFullScreen() instead.
+      */
+    void renderToFullScreen(MSceneViewGLWidget *sceneView);
+
+    /**
       Returns whether the actor has been initialised. Usually true after @ref
       initialize() has been called.
       */
@@ -395,7 +404,14 @@ public:
 
       @note Override this method in your derived class.
      */
-    virtual bool supportsMultipleEnsembleMemberVisualization() { return false; }
+    virtual bool supportsMultipleEnsembleMemberVisualization()
+    { return actorSupportsMultipleEnsembleMemberVisualization; }
+
+    /**
+      Returns @p true if this actor supports visualisation in full-screen mode.
+     */
+    virtual bool supportsFullScreenVisualisation()
+    { return actorSupportsFullScreenVisualisation; }
 
 public slots:
     /**
@@ -510,10 +526,20 @@ protected:
     void enableEmissionOfActorChangedSignal(bool enabled);
 
     /**
-      Render the actor in the current OpenGL context. Needs to be implemented
-      in derived classes.
+      Render the actor in the current OpenGL context.
+
+      Needs to be implemented in derived classes.
       */
     virtual void renderToCurrentContext(MSceneViewGLWidget *sceneView) = 0;
+
+    /**
+      Render the actor in the current OpenGL context in full screen mode.
+
+      Needs to be implemented in derived classes supporting full-screen mode.
+      */
+    virtual void renderToCurrentFullScreenContext(
+            MSceneViewGLWidget *sceneView)
+    { Q_UNUSED(sceneView); }
 
     void enablePicking(bool p) { actorIsPickable = p; }
 
@@ -580,6 +606,27 @@ protected:
 
     double computePositionLabelDistanceWeight(MCamera *camera,
                                               QVector3D mousePosWorldSpace);
+
+    /**
+      Call this method from a derived actor's constructor to enable full-screen
+      rendering support for this actor. If set to @p true, the actor will be
+      listed as available in a scene view's full-screen rendering property.
+
+      Compare to @ref MSceneViewGLWidget::onActorCreated(MActor *actor) .
+     */
+    void setActorSupportsFullScreenVisualisation(bool b)
+    { actorSupportsFullScreenVisualisation = b; }
+
+    /**
+      Call this method from a derived actor's constructor to enable multiple
+      ensemble member visualisation support for this actor. If set to @p true,
+      actor variables will list the "multiple members" option in their ensemble
+      mode list and will be connected to a grid aggregation data source.
+
+      Compare to @ref MNWPActorVariable .
+     */
+    void setActorSupportsMultipleEnsembleMemberVisualization(bool b)
+    { actorSupportsMultipleEnsembleMemberVisualization = b; }
 
     // Properties common to all actors.
     //=================================
@@ -671,6 +718,12 @@ private:
 
     // "true" (default) if the actor can be deleted from the GUI.
     bool actorIsUserDeletable;
+    // "true" if the actor supports full-screen visualisation.
+    // (default = "false")
+    bool actorSupportsFullScreenVisualisation;
+    // "true" if the actor supports multiple ensemble member visualisation.
+    // (default = "false")
+    bool actorSupportsMultipleEnsembleMemberVisualization;
 
     QList<GLint> availableTextureUnits;
     QList<GLint> assignedTextureUnits;
