@@ -6,6 +6,7 @@
 **
 **  Copyright 2015-2018 Marc Rautenhaus
 **  Copyright 2016-2018 Bianca Tost
+**  Copyright 2015-2016 Christoph Heidelmann
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -3939,6 +3940,92 @@ bool MNWP3DVolumeActorVariable::setTransferFunctionFromProperty()
     }
 
     return returnValue;
+}
+
+
+/******************************************************************************
+*******************************************************************************/
+/******************************************************************************
+*******************************************************************************/
+
+/******************************************************************************
+***                         MNWPSkewTActorVariable                          ***
+*******************************************************************************/
+/******************************************************************************
+***                     CONSTRUCTOR / DESTRUCTOR                            ***
+*******************************************************************************/
+
+MNWPSkewTActorVariable::MNWPSkewTActorVariable(MNWPMultiVarActor *actor)
+    : MNWPActorVariable(actor),
+      color(QColor(0, 0, 0, 255)),
+      thickness(2.)
+{
+    assert(actor != nullptr);
+    MQtProperties *properties = actor->getQtProperties();
+
+    // Create and initialise QtProperties for the GUI.
+    // ===============================================
+    actor->beginInitialiseQtProperties();
+
+    QtProperty* renderGroup = getPropertyGroup("rendering");
+    assert(renderGroup != nullptr);
+
+    colorProperty = actor->addProperty(COLOR_PROPERTY, "colour", renderGroup);
+    properties->mColor()->setValue(colorProperty, color);
+
+    thicknessProperty = actor->addProperty(DOUBLE_PROPERTY, "line thickness",
+                                           renderGroup);
+    properties->setDouble(thicknessProperty, thickness, 0., 10., 2, 0.1);
+
+    actor->endInitialiseQtProperties();
+}
+
+
+/******************************************************************************
+***                            PUBLIC METHODS                               ***
+*******************************************************************************/
+
+bool MNWPSkewTActorVariable::onQtPropertyChanged(QtProperty *property)
+{
+
+    if (MNWPActorVariable::onQtPropertyChanged(property)) return true;
+
+    MQtProperties *properties = actor->getQtProperties();
+
+    if (property == colorProperty)
+    {
+        color = properties->mColor()->value(colorProperty);
+        return true;
+    }
+    else if (property == thicknessProperty)
+    {
+        thickness = properties->mDouble()->value(thicknessProperty);
+        return true;
+    }
+
+    return false;
+}
+
+
+void MNWPSkewTActorVariable::saveConfiguration(QSettings *settings)
+{
+    MNWPActorVariable::saveConfiguration(settings);
+
+    settings->setValue("colour", color);
+    settings->setValue("thickness", thickness);
+}
+
+
+void MNWPSkewTActorVariable::loadConfiguration(QSettings *settings)
+{
+    MNWPActorVariable::loadConfiguration(settings);
+
+    MQtProperties *properties = actor->getQtProperties();
+
+    properties->mColor()->setValue(colorProperty,
+                                   settings->value("colour").value<QColor>());
+    properties->mDouble()->setValue(thicknessProperty,
+                                    settings->value("thickness", 2.).toDouble());
 }
 
 

@@ -131,6 +131,10 @@ MGLResourcesManager::~MGLResourcesManager()
                         << " (" << actorPool[i]->getName().toStdString() << ")"
                         << flush);
         delete actorPool[i];
+        if (actorPool[i] == textManager)
+        {
+            textManager = nullptr;
+        }
     }
 
     LOG4CPLUS_DEBUG(mlog, "\tactor factory pool" << flush);

@@ -6,6 +6,7 @@
 **
 **  Copyright 2015-2016 Marc Rautenhaus
 **  Copyright 2016      Bianca Tost
+**  Copyright 2015-2016 Christoph Heidelmann
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -48,7 +49,7 @@
 #include "actors/nwpvolumeraycasteractor.h"
 #include "actors/nwpsurfacetopographyactor.h"
 #include "actors/spatial1dtransferfunction.h"
-
+#include "actors/skewtactor.h"
 
 namespace Met3D
 {
@@ -105,6 +106,7 @@ void MApplicationConfigurationManager::registerActorFactories()
     glRM->registerActorFactory(new MTransferFunction1DFactory());
     glRM->registerActorFactory(new MSpatial1DTransferFunctionFactory());
     glRM->registerActorFactory(new MTrajectoryActorFactory());
+    glRM->registerActorFactory(new MSkewTActorFactory());
 }
 
 
