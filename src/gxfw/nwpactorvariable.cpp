@@ -384,12 +384,11 @@ void MNWPActorVariable::initialize()
     }
     else
     {
+        connect(dataSource, SIGNAL(dataRequestCompleted(MDataRequest)),
+                this, SLOT(asynchronousDataAvailable(MDataRequest)));
 
         if (multipleEnsembleMembersEnabled)
         {
-            connect(dataSource, SIGNAL(dataRequestCompleted(MDataRequest)),
-                    this, SLOT(asynchronousDataAvailable(MDataRequest)));
-
             // Connect the new data source to this variable's aggregation source.
             aggregationDataSource->setMemoryManager(dataSource->getMemoryManager());
             aggregationDataSource->setScheduler(dataSource->getScheduler());
