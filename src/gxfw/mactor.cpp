@@ -68,7 +68,9 @@ MActor::MActor(QObject *parent)
       actorIsInitialized(false),
       actorChangedSignalDisabledCounter(0),
       actorUpdatesDisabledCounter(0),
-      actorIsUserDeletable(true)
+      actorIsUserDeletable(true),
+      actorSupportsFullScreenVisualisation(false),
+      actorSupportsMultipleEnsembleMemberVisualization(false)
 {
     // Get a pointer to the property managers used for the GUI properties.
     properties = MSceneControl::getQtProperties();
@@ -196,6 +198,13 @@ void MActor::render(MSceneViewGLWidget *sceneView)
 {
     if (!actorIsEnabled) return;
     renderToCurrentContext(sceneView);
+}
+
+
+void MActor::renderToFullScreen(MSceneViewGLWidget *sceneView)
+{
+    if (!actorIsEnabled) return;
+    renderToCurrentFullScreenContext(sceneView);
 }
 
 
