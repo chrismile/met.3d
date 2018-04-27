@@ -135,3 +135,9 @@ QString expandEnvironmentVariables(QString path)
 
     return path;
 }
+
+
+bool isValidObjectName(QString name)
+{
+    return name != "None";
+}

@@ -463,7 +463,15 @@ void MActor::loadActorConfiguration(QSettings *settings)
     settings->beginGroup(MActor::getSettingsID());
 
     const QString name = settings->value("actorName").toString();
-    setName(name);
+
+    // Reject new actor name if it is invalid or the name does already exist.
+    // (If the name of the actor stays the same, the name also already exists
+    // but it also does not need to be changed).
+    if (!MGLResourcesManager::getInstance()->getActorByName(name)
+            && isValidObjectName(name))
+    {
+        setName(name);
+    }
 
     properties->mBool()->setValue(
                 actorEnabledProperty,

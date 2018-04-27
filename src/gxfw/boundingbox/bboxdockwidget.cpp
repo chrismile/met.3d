@@ -826,6 +826,18 @@ bool MBoundingBoxDockWidget::isValidBoundingBoxName(QString boundingBoxName,
         return false;
     }
 
+    // Reject if name is invalid.
+    if (!isValidObjectName(boundingBoxName))
+    {
+        QMessageBox msg;
+        msg.setWindowTitle("Error");
+        msg.setText("''" + boundingBoxName
+                    + "'' is not a valid bounding box name.");
+        msg.setIcon(QMessageBox::Warning);
+        msg.exec();
+        return false;
+    }
+
     return true;
 }
 
