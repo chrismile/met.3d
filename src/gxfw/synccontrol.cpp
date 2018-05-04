@@ -879,7 +879,9 @@ void MSyncControl::loadConfiguration(QSettings *settings)
                 ui->timeUnitsComboBox->findText(timeStep.last()));
     ui->showMeanCheckBox->setChecked(settings->value("showMean", false).toBool());
     selectedDataSources =
-            settings->value("dataSources", QStringList("")).toStringList();
+            settings->value("dataSources",
+                            MSystemManagerAndControl::getInstance()
+                            ->getDataSourceIdentifiers()).toStringList();
     restrictToDataSourcesFromSettings(selectedDataSources);
     unsigned int selectedMember = settings->value("selectedMember", 0).toUInt();
     if (availableEnsembleMembers.contains(selectedMember))

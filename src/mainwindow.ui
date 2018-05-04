@@ -62,6 +62,7 @@
     <addaction name="menuRevertCurrentSession"/>
     <addaction name="actionSessionManager"/>
     <addaction name="actionSaveSession"/>
+    <addaction name="actionSaveSessionAs"/>
     <addaction name="separator"/>
     <addaction name="actionExit"/>
    </widget>
@@ -267,6 +268,11 @@
    </property>
    <property name="shortcut">
     <string>Ctrl+S</string>
+   </property>
+  </action>
+  <action name="actionSaveSessionAs">
+   <property name="text">
+    <string>Save Session as...</string>
    </property>
   </action>
  </widget>
