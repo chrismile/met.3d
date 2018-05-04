@@ -413,6 +413,18 @@ public:
     virtual bool supportsFullScreenVisualisation()
     { return actorSupportsFullScreenVisualisation; }
 
+    /**
+      Called if full-screen mode is switched.
+
+      @p fullScreenEnabled is true if full-screen mode is switched on and to
+      false if switched off.
+
+     Needs to be reimplemented in derived classes which support full-screen
+     visualisation and need to react when full-screen mode is changed.
+     */
+    virtual void onFullScreenModeSwitch(bool fullScreenEnabled)
+    { Q_UNUSED(fullScreenEnabled); }
+
 public slots:
     /**
       Handles change events of the properties in the property browser. Calls
