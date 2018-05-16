@@ -913,6 +913,11 @@ bool MNWPVolumeRaycasterActor::triggerAnalysisOfObjectAtPos(
         LOG4CPLUS_DEBUG(mlog, "No bounding box is set.");
         return false;
     }
+    if (var == nullptr)
+    {
+        LOG4CPLUS_DEBUG(mlog, "No variable selected.");
+        return false;
+    }
 
     Q_UNUSED(clipRadius);
     LOG4CPLUS_DEBUG(mlog, "triggering isosurface analysis.");
@@ -1501,7 +1506,11 @@ void MNWPVolumeRaycasterActor::onQtPropertyChanged(QtProperty* property)
     else if (property == variableIndexProp)
     {
         variableIndex = properties->mEnum()->value(variableIndexProp);
-        if (variableIndex < 0) return;
+        if (variableIndex < 0)
+        {
+            var = nullptr;
+            return;
+        }
 
         if (variableIndex >= variables.size())
         {
