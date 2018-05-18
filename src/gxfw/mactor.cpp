@@ -186,6 +186,16 @@ void MActor::initialize()
         availableImageUnits << u;
     }
 
+    // Get the values of the bounding box connected initially to the actor if
+    // the actor is using bounding boxes.
+    if (MBoundingBoxInterface *bboxInteface =
+            dynamic_cast<MBoundingBoxInterface*>(this))
+    {
+        enableActorUpdates(false);
+        bboxInteface->onBoundingBoxChanged();
+        enableActorUpdates(true);
+    }
+
     initializeActorResources();
 
     actorIsInitialized = true;
