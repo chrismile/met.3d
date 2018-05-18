@@ -5,7 +5,7 @@
 **  prediction data.
 **
 **  Copyright 2015-2018 Marc Rautenhaus
-**  Copyright 2016-2017 Bianca Tost
+**  Copyright 2016-2018 Bianca Tost
 **  Copyright 2017      Philipp Kaiser
 **
 **  Computer Graphics and Visualization Group
@@ -63,7 +63,7 @@ namespace Met3D
 
 MTrajectoryActor::MTrajectoryActor()
     : MActor(),
-      MBoundingBoxInterface(this),
+      MBoundingBoxInterface(this, MBoundingBoxConnectionType::HORIZONTAL),
       trajectorySource(nullptr),
       normalsSource(nullptr),
       trajectoryFilter(nullptr),
@@ -83,9 +83,6 @@ MTrajectoryActor::MTrajectoryActor()
       shadowEnabled(true),
       shadowColoured(false)
 {
-    bBoxConnection =
-            new MBoundingBoxConnection(this, MBoundingBoxConnection::HORIZONTAL);
-
     // Create and initialise QtProperties for the GUI.
     // ===============================================
     beginInitialiseQtProperties();
@@ -241,8 +238,8 @@ MTrajectoryActor::MTrajectoryActor()
                 GROUP_PROPERTY, "trajectory filters",
                 actorPropertiesSupGroup);
 
-    // Bounding box.
-    filtersGroupProperty->addSubProperty(bBoxConnection->getProperty());
+    // Bounding box of the actor.
+    insertBoundingBoxProperty(actorPropertiesSupGroup);
 
     // Ascent (dp/dt > x).
     enableAscentFilterProperty = addProperty(

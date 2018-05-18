@@ -4,8 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2017 Marc Rautenhaus
-**  Copyright 2017 Bianca Tost
+**  Copyright 2017-2018 Bianca Tost
+**  Copyright 2017-2018 Marc Rautenhaus
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -146,6 +146,12 @@ protected:
     bool signalEmitEnabled;
 };
 
+enum class MBoundingBoxConnectionType
+{
+    HORIZONTAL = 0,
+    VERTICAL   = 1,
+    VOLUME     = 2
+};
 
 class MBoundingBoxConnection;
 class MActor;
@@ -161,11 +167,17 @@ class MActor;
   cannot be solved due to the static_cast automatically created in Qt's
   moc-files when using signals and slots.
   (cp. http://www.drdobbs.com/cpp/multiple-inheritance-considered-useful/184402074).
+
+  NOTE: To use bounding boxes it is mandatory to insert the bounding box
+  property with @ref insertBoundingBoxProperty() during creation of properties
+  in the constructor of the child class!
  */
 class MBoundingBoxInterface
 {
 public:
-    MBoundingBoxInterface(MActor *child);
+    MBoundingBoxInterface(MActor *child,
+                          MBoundingBoxConnectionType bBoxType,
+                          MBoundingBoxConnection *parentBBoxConnection = nullptr);
     ~MBoundingBoxInterface();
 
     /**
@@ -194,6 +206,11 @@ public:
     void switchToBoundingBox(QString bBoxName);
 
 protected:
+    /**
+      Use this method to insert bounding box property as subproperty of @p parentGroup.
+     */
+    void insertBoundingBoxProperty(QtProperty *parentGroup);
+
     // Pointer to actor inheriting from the interface.
     MActor *child;
     // Object realising and handling connection between actor and bounding box.
@@ -213,14 +230,8 @@ class MBoundingBoxConnection : public QObject
     Q_OBJECT
 
 public:
-    enum ConnectionType
-    {
-        HORIZONTAL = 0,
-        VERTICAL   = 1,
-        VOLUME     = 2
-    };
-
-    MBoundingBoxConnection(MBoundingBoxInterface *actor, ConnectionType type);
+    MBoundingBoxConnection(MBoundingBoxInterface *actor,
+                           MBoundingBoxConnectionType type);
     ~MBoundingBoxConnection();
 
     MBoundingBox *getBoundingBox() { return boundingBox; }
@@ -282,7 +293,7 @@ protected:
 
     MSystemManagerAndControl *sysMC;
     MBoundingBoxInterface *actor;
-    ConnectionType type;
+    MBoundingBoxConnectionType type;
     MBoundingBox *boundingBox;
 
     MQtProperties *properties;

@@ -54,7 +54,7 @@ namespace Met3D
 
 MNWPVerticalSectionActor::MNWPVerticalSectionActor()
     : MNWPMultiVarActor(),
-      MBoundingBoxInterface(this),
+      MBoundingBoxInterface(this, MBoundingBoxConnectionType::VERTICAL),
       labelDistance(1),
       waypointsModel(nullptr),
       modifyWaypoint(-1),
@@ -74,8 +74,6 @@ MNWPVerticalSectionActor::MNWPVerticalSectionActor()
       updatePath(false),
       offsetPickPositionToHandleCentre(QVector2D(0., 0.))
 {
-    bBoxConnection =
-            new MBoundingBoxConnection(this, MBoundingBoxConnection::VERTICAL);
     enablePicking(true);
 
     // Create and initialise QtProperties for the GUI.
@@ -107,7 +105,8 @@ MNWPVerticalSectionActor::MNWPVerticalSectionActor()
         enableActorUpdates(true);
     }
 
-    actorPropertiesSupGroup->addSubProperty(bBoxConnection->getProperty());
+    // Bounding box of the actor.
+    insertBoundingBoxProperty(actorPropertiesSupGroup);
 
     QString defaultPressureLineLevel = QString("1000.,900.,800.,700.,600.,500.")
                                        + QString(",400.,300.,200.,100.,90.,80.")
