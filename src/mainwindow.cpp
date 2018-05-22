@@ -153,7 +153,7 @@ MMainWindow::MMainWindow(QStringList commandLineArguments, QWidget *parent)
     ui->centralframe->setLayout(layout);
 
     // Initial layout settings.
-    setSceneViewLayout(1);    
+    setSceneViewLayout(1);
 
     // Initialise bounding box dock widget.
     //==========================================================================
@@ -262,6 +262,8 @@ MMainWindow::MMainWindow(QStringList commandLineArguments, QWidget *parent)
             this, SLOT(openSessionManager()));
     connect(ui->actionSaveSession, SIGNAL(triggered()),
             sessionManagerDialog, SLOT(saveSession()));
+    connect(ui->actionSaveSessionAs, SIGNAL(triggered()),
+            sessionManagerDialog, SLOT(saveSessionAs()));
     connect(ui->menuSessions, SIGNAL(triggered(QAction*)),
             this, SLOT(switchSession(QAction*)));
     connect(ui->menuRevertCurrentSession, SIGNAL(triggered(QAction*)),
@@ -892,10 +894,10 @@ void MMainWindow::onSessionSwitch(QString currentSession)
 
     // Remove old session name if present and append current session name to
     // window title.
-    QString newWindowTitle = windowTitle().split(" -- ").first();
+    QString newWindowTitle = windowTitle().split(" -- ").last();
     if (!currentSession.isEmpty())
     {
-        newWindowTitle.append(" -- " + currentSession);
+        newWindowTitle.prepend(currentSession + " -- ");
     }
     setWindowTitle(newWindowTitle);
 }

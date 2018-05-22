@@ -874,7 +874,9 @@ void MSyncControl::loadConfiguration(QSettings *settings)
     ui->showMeanCheckBox->setChecked(settings->value("showMean", false).toBool());
 
     selectedDataSources =
-            settings->value("dataSources", QStringList("")).toStringList();
+            settings->value("dataSources",
+                            MSystemManagerAndControl::getInstance()
+                            ->getDataSourceIdentifiers()).toStringList();
     restrictToDataSourcesFromSettings(selectedDataSources);
 
     // Load times after restricting the sync control, since otherwise the times

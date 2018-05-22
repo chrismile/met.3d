@@ -75,6 +75,8 @@ namespace Met3D
 MNWPActorVariable::MNWPActorVariable(MNWPMultiVarActor *actor)
     : dataSource(nullptr),
       grid(nullptr),
+      aggregationDataSource(nullptr),
+      gridAggregation(nullptr),
       textureDataField(nullptr),
       textureUnitDataField(-1),
       textureLonLatLevAxes(nullptr),
@@ -196,6 +198,16 @@ MNWPActorVariable::MNWPActorVariable(MNWPMultiVarActor *actor)
     ensembleModeNames << "member" << "mean" << "standard deviation"
                       << "p(> threshold)" << "p(< threshold)"
                       << "min" << "max" << "max-min";
+    multipleEnsembleMembersEnabled =
+            actor->supportsMultipleEnsembleMemberVisualization();
+    // Check if the actor supports simultaneous visualization of multiple
+    // ensemble members. If yes, the corresponding ensemble mode will trigger
+    // the request of a "grid aggregation" containing all requested members.
+    // Search the code for "if (multipleEnsembleMembersEnabled)...".
+    if (multipleEnsembleMembersEnabled)
+    {
+        ensembleModeNames << "multiple members";
+    }
     ensembleModeProperty = a->addProperty(
                 ENUM_PROPERTY, "ensemble mode", varPropertyGroup);
     properties->mEnum()->setEnumNames(ensembleModeProperty, ensembleModeNames);
@@ -239,6 +251,14 @@ MNWPActorVariable::MNWPActorVariable(MNWPMultiVarActor *actor)
             SLOT(onActorRenamed(MActor*, QString)));
 
     actor->endInitialiseQtProperties();
+
+    if (multipleEnsembleMembersEnabled)
+    {
+        // Create an aggregation source that belongs to this actor variable.
+        aggregationDataSource = new MGridAggregationDataSource();
+        connect(aggregationDataSource, SIGNAL(dataRequestCompleted(MDataRequest)),
+                this, SLOT(asynchronousDataAvailable(MDataRequest)));
+    }
 }
 
 
@@ -246,6 +266,7 @@ MNWPActorVariable::~MNWPActorVariable()
 {
     // Release data fields.
     releaseDataItems();
+    releaseAggregatedDataItems();
 
     // Disconnect signals.
     MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
@@ -259,6 +280,14 @@ MNWPActorVariable::~MNWPActorVariable()
     // Delete synchronization links (don't update the already deleted GUI
     // properties anymore...).
     synchronizeWith(nullptr, false);
+
+    if (multipleEnsembleMembersEnabled)
+    {
+        disconnect(aggregationDataSource,
+                   SIGNAL(dataRequestCompleted(MDataRequest)),
+                   this, SLOT(asynchronousDataAvailable(MDataRequest)));
+        delete aggregationDataSource;
+    }
 
     if (textureUnitDataField >=0)
         actor->releaseTextureUnit(textureUnitDataField);
@@ -357,6 +386,14 @@ void MNWPActorVariable::initialize()
     {
         connect(dataSource, SIGNAL(dataRequestCompleted(MDataRequest)),
                 this, SLOT(asynchronousDataAvailable(MDataRequest)));
+
+        if (multipleEnsembleMembersEnabled)
+        {
+            // Connect the new data source to this variable's aggregation source.
+            aggregationDataSource->setMemoryManager(dataSource->getMemoryManager());
+            aggregationDataSource->setScheduler(dataSource->getScheduler());
+            aggregationDataSource->setInputSource(dataSource);
+        }
     }
 
     textureDataField = textureHybridCoefficients =
@@ -753,7 +790,8 @@ void MNWPActorVariable::asynchronousDataRequest(bool synchronizationRequest)
     rh.insert("INIT_TIME", initTime);
     rh.insert("VALID_TIME", validTime);
 
-    if (ensembleFilterOperation == "")
+    if ((ensembleFilterOperation == "")
+            || (ensembleFilterOperation == "MULTIPLE_MEMBERS"))
     {
         rh.insert("MEMBER", member);
     }
@@ -788,6 +826,41 @@ void MNWPActorVariable::asynchronousDataRequest(bool synchronizationRequest)
 #endif
 
     dataSource->requestData(r);
+
+    // Special case: If ensemble mode is set to "multiple members". A grid
+    // aggregation containing the required members is requested IN ADDITION to
+    // the single member requested before. The single member request before is
+    // REDUNDANT and should be suppressed in the future.
+
+    //TODO (mr, 18Apr2018) -- Revise this architecture.
+    if (ensembleFilterOperation == "MULTIPLE_MEMBERS")
+    {
+        if (!multipleEnsembleMembersEnabled)
+        {
+            return;
+        }
+        rh.remove("MEMBER");
+        rh.insert("ENS_OPERATION", ensembleFilterOperation);
+        rh.insert("SELECTED_MEMBERS", selectedEnsembleMembers);
+        r = rh.request();
+
+        LOG4CPLUS_DEBUG(mlog, "Emitting additional 'multiple ensemble member'"
+                              " request " << r.toStdString() << " ...");
+
+        pendingRequests.insert(r);
+        MRequestQueueInfo rqi;
+        rqi.request = r;
+        rqi.available = false;
+#ifdef DIRECT_SYNCHRONIZATION
+        rqi.syncchronizationRequest = synchronizationRequest;
+#endif
+        pendingRequestsQueue.enqueue(rqi);
+#ifdef MSTOPWATCH_ENABLED
+        if (!stopwatches.contains(r)) stopwatches[r] = new MStopwatch();
+#endif
+
+        aggregationDataSource->requestData(r);
+    }
 }
 
 
@@ -1578,40 +1651,67 @@ void MNWPActorVariable::asynchronousDataAvailable(MDataRequest request)
         LOG4CPLUS_DEBUG(mlog, "Preparing for rendering: request <"
                         << processRequest.toStdString() << ">.");
 
-        // Release currently used data items.
-        releaseDataItems();
-
-        // Acquire the new ones.
-        grid = dataSource->getData(processRequest);
-        textureDataField  = grid->getTexture();
-        textureLonLatLevAxes = grid->getLonLatLevTexture();
-
-        if (useFlagsIfAvailable && grid->flagsEnabled())
-            textureDataFlags = grid->getFlagsTexture();
+        if (processRequest.contains("MULTIPLE_MEMBERS"))
+        {
+            if (multipleEnsembleMembersEnabled)
+            {
+                // Handle incoming grid aggregation.
+                releaseAggregatedDataItems();
+                gridAggregation = aggregationDataSource->getData(processRequest);
+            }
+        }
         else
-            textureDataFlags = nullptr;
-
-        if (MLonLatHybridSigmaPressureGrid *hgrid =
-                dynamic_cast<MLonLatHybridSigmaPressureGrid*>(grid))
         {
-            textureHybridCoefficients = hgrid->getHybridCoeffTexture();
-            textureSurfacePressure = hgrid->getSurfacePressureGrid()->getTexture();
+            // Release currently used data items.
+            releaseDataItems();
+
+            // If the ensemble mode was "multiple members" before but is not
+            // anymore, the aggregated data grids have not yet been released.
+            // Hence, if the current ensemble more is NOT "multiple members",
+            // release them here.
+            if (ensembleFilterOperation != "MULTIPLE_MEMBERS")
+            {
+                releaseAggregatedDataItems();
+            }
+
+            // Acquire the new ones.
+            grid = dataSource->getData(processRequest);
+            textureDataField  = grid->getTexture();
+            textureLonLatLevAxes = grid->getLonLatLevTexture();
+
+            if (useFlagsIfAvailable && grid->flagsEnabled())
+            {
+                textureDataFlags = grid->getFlagsTexture();
+            }
+            else
+            {
+                textureDataFlags = nullptr;
+            }
+
+            if (MLonLatHybridSigmaPressureGrid *hgrid =
+                    dynamic_cast<MLonLatHybridSigmaPressureGrid*>(grid))
+            {
+                textureHybridCoefficients = hgrid->getHybridCoeffTexture();
+                textureSurfacePressure = hgrid->getSurfacePressureGrid()->getTexture();
 #ifdef ENABLE_HYBRID_PRESSURETEXCOORDTABLE
-            texturePressureTexCoordTable = hgrid->getPressureTexCoordTexture2D();
+                texturePressureTexCoordTable = hgrid->getPressureTexCoordTexture2D();
 #endif
-        }
+            }
 
-        if (MLonLatAuxiliaryPressureGrid *apgrid =
-                dynamic_cast<MLonLatAuxiliaryPressureGrid*>(grid))
-        {
-            textureAuxiliaryPressure =
-                    apgrid->getAuxiliaryPressureFieldGrid()->getTexture();
-        }
+            if (MLonLatAuxiliaryPressureGrid *apgrid =
+                    dynamic_cast<MLonLatAuxiliaryPressureGrid*>(grid))
+            {
+                textureAuxiliaryPressure =
+                        apgrid->getAuxiliaryPressureFieldGrid()->getTexture();
+            }
 
-        if (MRegularLonLatStructuredPressureGrid *pgrid =
-                dynamic_cast<MRegularLonLatStructuredPressureGrid*>(grid))
-        {
-            texturePressureTexCoordTable = pgrid->getPressureTexCoordTexture1D();
+            if (MRegularLonLatStructuredPressureGrid *pgrid =
+                    dynamic_cast<MRegularLonLatStructuredPressureGrid*>(grid))
+            {
+                texturePressureTexCoordTable = pgrid->getPressureTexCoordTexture1D();
+            }
+
+            asynchronousDataAvailableEvent(grid);
         }
 
         asynchronousDataAvailableEvent(grid);
@@ -1684,6 +1784,16 @@ void MNWPActorVariable::releaseDataItems()
     {
         delete singleVariableAnalysisControl;
         singleVariableAnalysisControl = nullptr;
+    }
+}
+
+
+void MNWPActorVariable::releaseAggregatedDataItems()
+{
+    if (gridAggregation)
+    {
+        aggregationDataSource->releaseData(gridAggregation);
+        gridAggregation = nullptr;
     }
 }
 
@@ -1851,7 +1961,7 @@ void MNWPActorVariable::updateEnsembleProperties()
         // multiple members
         ensembleSingleMemberProperty->setEnabled(false);
         ensembleThresholdProperty->setEnabled(false);
-        ensembleFilterOperation = "MULTIPLE";
+        ensembleFilterOperation = "MULTIPLE_MEMBERS";
     }
 
     // If the ensemble is synchronized, disable all properties (they are set
@@ -2173,6 +2283,7 @@ bool MNWPActorVariable::changeVariable()
     variableName = dsrc.variableName;
 
     releaseDataItems();
+    releaseAggregatedDataItems();
     actor->enableActorUpdates(false);
     initialize();
     actor->enableActorUpdates(true);
