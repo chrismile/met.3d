@@ -140,8 +140,8 @@ QString expandEnvironmentVariables(QString path)
 
 QVector<float> parsePressureLevelString(QString levels)
 {
-    // Clear the current list of pressure line levels; if pLevelStr does not
-    // match any accepted format no pressure lines are drawn.
+    // Clear the current list of pressure line levels. If pLevelStr does not
+    // match any accepted format, no pressure lines are drawn.
     QVector<float> pressureLevels;
 
     // Empty strings, i.e. no pressure lines, are accepted.

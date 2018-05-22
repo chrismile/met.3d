@@ -121,7 +121,7 @@ public:
     bool isInitialized();
 
     /**
-      Returns whether the actor is enabled.
+      Returns true if the actor is enabled.
      */
     bool isEnabled();
 

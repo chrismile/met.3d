@@ -1483,7 +1483,7 @@ void MTrajectoryActor::onActorDeleted(MActor *actor)
         enableEmissionOfActorChangedSignal(true);
     }
 
-    // check whether the actor is in our seed list
+    // Check whether the actor is in our seeding actors list.
     else
     {
         for (SeedActorSettings& sas : computationSeedActorProperties)
@@ -1520,7 +1520,7 @@ void MTrajectoryActor::onActorRenamed(MActor *actor, QString oldName)
         enableEmissionOfActorChangedSignal(true);
     }
 
-    // check whether the actor is in our seed list
+    // Check whether the actor is in our seeding actors list.
     else
     {
         for (SeedActorSettings& sas : computationSeedActorProperties)
@@ -1934,7 +1934,8 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
 
     else if (property == computationIntegrationTimeProperty)
     {
-        if (suppressUpdate) return; // ignore if init times are being updated
+        // Ignore update of init times.
+        if (suppressUpdate) return;
         if (suppressActorUpdates()) return;
         asynchronousDataRequest();
     }
@@ -2426,7 +2427,7 @@ void MTrajectoryActor::updateActorData()
             MMovablePoleActor *actor =
                     dynamic_cast<MMovablePoleActor *>(sas.actor);
 
-            // every pole has 2 vertices for bot and top
+            // Every pole has 2 vertices for bottom and top.
             for (int i = 0; i < actor->getPoleVertices().size(); i += 2)
             {
                 QVector3D bot = actor->getPoleVertices().at(i);
@@ -2542,7 +2543,7 @@ void MTrajectoryActor::updateActorData()
 
     int size = precomputedDataSource ? 1 : seedActorData.size();
 
-    // resize trajectory Request vector containing all buffers
+    // Resize trajectory request vector containing all buffers.
     trajectoryRequests.resize(size);
 }
 
@@ -2646,7 +2647,7 @@ void MTrajectoryActor::asynchronousDataRequest(bool synchronizationRequest)
         rh.insert("MEMBER", member);
         rh.insert("TIME_SPAN", "ALL");
 
-        // if computed dataSource is used, additional information is needed
+        // If computed dataSource is used, additional information is needed.
         if (!precomputedDataSource)
         {
             QDateTime endTime = availableStartTimes.at(
@@ -2675,7 +2676,7 @@ void MTrajectoryActor::asynchronousDataRequest(bool synchronizationRequest)
             QString seedPressureLevels = encodePressureLevels(
                         seedActorData[t].pressureLevels, QString("/"));
 
-            // insert additional infos to request
+            // Insert additional informations into data request.
             rh.insert("END_TIME", endTime);
             rh.insert("LINE_TYPE", lineType);
             rh.insert("ITERATION_PER_TIMESTEP", iterationCount);
@@ -2818,7 +2819,7 @@ void MTrajectoryActor::asynchronousSelectionRequest()
         //TODO: add property
         rh.insert("TRY_PRECOMPUTED", 1);
 
-        // if computed dataSource is used, additional information is needed
+        // If computed dataSource is used, additional information is needed.
         if (!precomputedDataSource)
         {
             int endTimeIndex =
@@ -2851,7 +2852,7 @@ void MTrajectoryActor::asynchronousSelectionRequest()
             QString seedPressureLevels = encodePressureLevels(
                         seedActorData[t].pressureLevels, QString("/"));
 
-            // insert additional infos to request
+            // Insert additional informations into data request.
             rh.insert("END_TIME", endTime);
             rh.insert("LINE_TYPE", lineType);
             rh.insert("ITERATION_PER_TIMESTEP", iterationCount);
@@ -3004,7 +3005,7 @@ void MTrajectoryActor::updateParticlePosTimeProperty()
 {
     suppressUpdate = true;
 
-    // all trajectories have the exact same type, find any initialized source
+    // All trajectories have the exact same type, find any initialized source.
     int index = -1;
     for (int t = 0; t < (precomputedDataSource ? 1 : seedActorData.size()); t++)
     {
@@ -3015,7 +3016,7 @@ void MTrajectoryActor::updateParticlePosTimeProperty()
         }
     }
 
-    // no initialized trajectory found
+    // No initialized trajectory found.
     if (index < 0)
     {
         properties->mEnum()->setEnumNames(particlePosTimeProperty, QStringList());
@@ -3299,23 +3300,25 @@ void MTrajectoryActor::addSeedActor(QString actorName, double lon, double lat,
     MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
     MActor* actor = glRM->getActorByName(actorName);
 
-    // actor does not exist
+    // Actor does not exist.
     if (!actor)
     {
         return;
     }
 
-    // check if entry already exists
+    // Check if entry already exists.
     for (SeedActorSettings& sas : computationSeedActorProperties)
     {
         if (sas.actor->getName().compare(actorName) == 0)
+        {
             return;
+        }
     }
 
-    // connect to actor changed signal
+    // Connect to actor changed signal.
     connect(actor, SIGNAL(actorChanged()), this, SLOT(onSeedActorChanged()));
 
-    // create property section
+    // Create property section.
     SeedActorSettings actorSettings;
     actorSettings.actor = actor;
     actorSettings.propertyGroup = addProperty(GROUP_PROPERTY, actorName,
@@ -3330,7 +3333,7 @@ void MTrajectoryActor::addSeedActor(QString actorName, double lon, double lat,
     actorSettings.pressureLevels = addProperty(STRING_PROPERTY, "pressure leves",
                                                actorSettings.propertyGroup);
 
-    // fill data with corresponding
+    // Fill data with corresponding values.
     bool enableX = false, enableY = false, enableZ = false;
     if (dynamic_cast<MMovablePoleActor*>(actor))
     {
@@ -3361,7 +3364,7 @@ void MTrajectoryActor::addSeedActor(QString actorName, double lon, double lat,
         enableZ = true;
     }
 
-    // fill property
+    // Fill property.
     properties->setDouble(actorSettings.lonSpacing,
                           enableX ? lon : NC_MAX_DOUBLE, 0.01, 999999.99, 2, 1.0);
     properties->setDouble(actorSettings.latSpacing,
@@ -3372,7 +3375,7 @@ void MTrajectoryActor::addSeedActor(QString actorName, double lon, double lat,
     actorSettings.latSpacing->setEnabled(enableY);
     actorSettings.pressureLevels->setEnabled(enableZ);
 
-    // store settings to list
+    // Store settings to list.
     computationSeedActorProperties.push_back(actorSettings);
 }
 
@@ -3381,32 +3384,32 @@ void MTrajectoryActor::clearSeedActor()
 {
     for (SeedActorSettings& sas : computationSeedActorProperties)
     {
-        // disconnect signal before deletion
+        // Disconnect signal before deletion.
         disconnect(sas.actor, SIGNAL(actorChanged()), this,
                    SLOT(onSeedActorChanged()));
 
-        // delete property
+        // Delete property.
         computationSeedPropertyGroup->removeSubProperty(sas.propertyGroup);
     }
 
-    // clear list
+    // Clear list.
     computationSeedActorProperties.clear();
 }
 
 
 void MTrajectoryActor::removeSeedActor(QString name)
 {
-    // delete actor with given name
+    // Delete actor with given name.
     for (int i = 0; i < computationSeedActorProperties.size(); i++)
     {
         if (computationSeedActorProperties.at(i).actor->getName()
                 .compare(name) == 0)
         {
-            // disconnect signal before deletion
+            // Disconnect signal before deletion.
             disconnect(computationSeedActorProperties.at(i).actor,
                        SIGNAL(actorChanged()), this, SLOT(onSeedActorChanged()));
 
-            // remove from properties and list
+            // Remove actor from properties and list.
             computationSeedPropertyGroup->removeSubProperty(
                         computationSeedActorProperties.at(i).propertyGroup);
             computationSeedActorProperties.removeAt(i);

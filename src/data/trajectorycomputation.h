@@ -82,7 +82,7 @@ struct MTrajectoryComputationInfo
     // QVector3D (lon, lat, pres) * numTimeSteps * numTrajectories
     QVector<QVector<QVector3D>> vertices;
 
-    // all available times
+    // All available times.
     QVector<QDateTime> times;
 
     // Start grid geometry stored in the file.
@@ -96,7 +96,7 @@ struct MTrajectoryComputationInfo
   @brief MTrajectoryComputation computes particle trajectories similar to
   LAGRANTO NetCDF based on weather prediction data.
 
-  Vertical level type needs to be the same for all
+  Vertical level type needs to be the same for all input wind variables.
  */
 class MTrajectoryComputation : public MTrajectoryDataSource,
         public MAbstractDataComputation

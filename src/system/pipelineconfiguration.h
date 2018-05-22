@@ -182,7 +182,7 @@ protected:
     MConfigurablePipelineType configurablePipelineTypeFromString(QString typeName);
 
     /**
-      Checks if the memory manager @p defaultMemoryManager exists and if so
+      Checks if the memory manager @p defaultMemoryManager exists and if so,
       registers it as default memory manager for the pipeline with ID
       @p PipelineID in @p defaultMemoryManagers.
 

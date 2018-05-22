@@ -141,17 +141,20 @@ void MSelectActorDialog::createActorEntries(QList<MSelectActorType> types)
 
     actorsAvailable = false;
 
-    // iterate through all actors
+    // Iterate over all actors.
     for (MActor* a : glRM->getActors())
     {
         if (a == nullptr)
+        {
             continue;
+        }
 
-        // check if actor is of requested type
+        // Check if actor is of requested type.
         bool addActor = false;
         for (MSelectActorType type : types)
         {
-            switch (type) {
+            switch (type) 
+            {
                 case POLE_ACTOR:
                     addActor |= dynamic_cast<MMovablePoleActor*>(a) != nullptr;
                     break;
@@ -169,7 +172,7 @@ void MSelectActorDialog::createActorEntries(QList<MSelectActorType> types)
             }
         }
 
-        // only add if type is requested
+        // Only add if type is requested.
         if (addActor)
         {
             // Add a row to the table..

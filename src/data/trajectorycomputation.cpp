@@ -146,9 +146,13 @@ MTrajectories* MTrajectoryComputation::produceData(MDataRequest request)
         QStringList args = timeSpan.split("/");
         startTime = QDateTime::fromString(args[0], Qt::ISODate);
         if (args.size() > 1)
+        {
             stopTime = QDateTime::fromString(args[1], Qt::ISODate);
+        }
         else
+        {
             stopTime = startTime;
+        }
     }
 
     LOG4CPLUS_DEBUG(mlog, "Computating trajectories for IT="
@@ -214,11 +218,11 @@ MTask* MTrajectoryComputation::createTaskGraph(MDataRequest request)
 {
     assert(dataSource != nullptr);
 
-    // create a new tasnk
+    // Create a new tasnk.
     MTask* task = new MTask(request, this);
     MDataRequestHelper rh(request);
 
-    // remove variables used by this instance
+    // Remove variables used by this instance.
     rh.remove("TIME_SPAN");
     rh.remove("LINE_TYPE");
     rh.remove("ITERATION_METHOD");
@@ -230,23 +234,23 @@ MTask* MTrajectoryComputation::createTaskGraph(MDataRequest request)
     rh.remove("SEED_STEP_SIZE_LON_LAT");
     rh.remove("SEED_PRESSURE_LEVELS");
 
-    // get parameters from request
+    // Get parameters from request.
     QDateTime initTime = rh.timeValue("INIT_TIME");
     QDateTime validTime = rh.timeValue("VALID_TIME");
     QDateTime endTime = rh.timeValue("END_TIME");
     QStringList variables = QStringList() << windEastwardVariableName << windNorthwardVariableName
                                           << windVerticalVariableName;
 
-    // get valid times for given init time
+    // get valid times for given init time.
     QReadLocker availableItemsReadLocker(&availableItemsLock);
     QList<QDateTime> validTimes = availableTrajectories.value(initTime).keys();
     availableItemsReadLocker.unlock();
 
-    // get indices
+    // Get indices.
     int startIndex = validTimes.indexOf(validTime);
     int endIndex = validTimes.indexOf(endTime);
 
-    // request for computation needed resources
+    // Request for computation needed resources.
     for (QString variable : variables)
     {
         for (int i = min(startIndex, endIndex);
@@ -309,7 +313,7 @@ void MTrajectoryComputation::computeTrajectory(MDataRequest request,
      Get the time steps that are needed to be requested for the computation
     */
 
-    // request data of all variables
+    // Request data of all variables.
     MDataRequestHelper rh(request);
     QDateTime initTime = rh.timeValue("INIT_TIME");
     QDateTime validTime = rh.timeValue("VALID_TIME");
@@ -345,7 +349,7 @@ void MTrajectoryComputation::computeTrajectory(MDataRequest request,
         seedPressureLevels[i] = seedPressureLevelsList.at(i).toDouble();
     }
 
-    // change request to be base request for underlaying access
+    // Change request to be base request for underlaying access.
     rh.remove("END_TIME");
     rh.remove("TIME_SPAN");
     rh.remove("LINE_TYPE");
@@ -359,7 +363,7 @@ void MTrajectoryComputation::computeTrajectory(MDataRequest request,
     rh.remove("SEED_PRESSURE_LEVELS");
     rh.insert("LEVELTYPE", levelType);
 
-    // access all validTimes
+    // Access all validTimes.
     QReadLocker availableItemsReadLocker(&availableItemsLock);
     QList<QDateTime> validTimes = availableTrajectories.value(initTime).keys();
     availableItemsReadLocker.unlock();
@@ -531,8 +535,10 @@ void MTrajectoryComputation::computeStreamLine(
 
             // Mark position as invalid.
             if (!validPosition[trajectory])
+            {
                 nextPos = QVector3D(M_MISSING_VALUE, M_MISSING_VALUE,
                                     M_MISSING_VALUE);
+            }
 
             // Store position in vertex buffer.
             cInfo.vertices[trajectory].push_back(nextPos);
@@ -656,7 +662,8 @@ void MTrajectoryComputation::computePathLine(TrajectoryComputationHelper& ch,
         }
 
         // Release lower time step grid.
-        for (int v = 0; v < ch.varNames.size(); ++v) {
+        for (int v = 0; v < ch.varNames.size(); ++v)
+        {
             dataSource->releaseData(grids[0][v]);
             grids[0][v] = nullptr;
         }
@@ -804,7 +811,7 @@ QVector3D MTrajectoryComputation::sampleVelocity(
 QVector3D MTrajectoryComputation::convertWindVelocityFromMetricToSpherical(
         QVector3D velocity_ms_ms_Pas, QVector3D position_lon_lat_p)
 {
-    // convert velocity from m/s to (lat, lon, p)/s
+    // Convert velocity from m/s to (lat, lon, p)/s .
     QVector3D vel;
     vel.setX(velocity_ms_ms_Pas.x()
              / (LAT_TO_METER * cos(position_lon_lat_p.y() * M_PI / 180.0)));
@@ -979,7 +986,7 @@ QVector3D MTrajectoryComputation::computeSeedPosition(int trajectory,
             int x = trajectory % static_cast<int>(ch.seedCount.x());
             int z = trajectory / static_cast<int>(ch.seedCount.x());
 
-            // iInterpolate horizontal position along with factor given by grid
+            // Interpolate horizontal position along with factor given by grid
             // slot x.
             QVector2D dir = (ch.seedMaxPosition.toVector2D()
                              - ch.seedMinPosition.toVector2D()).normalized();

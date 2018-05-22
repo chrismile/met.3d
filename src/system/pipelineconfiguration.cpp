@@ -495,7 +495,6 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
 
     config.endArray();
 
-
     // Configurable pipeline(s).
     // ================
     size = config.beginReadArray("ConfigurablePipeline");
@@ -603,7 +602,7 @@ void MPipelineConfiguration::initializeNWPPipeline(
     nwpReaderENS->setDataRoot(fileDir, fileFilter);
 
     // (Should the "raw" data reader be selectable as a data source?)
-    // Yes it should, for computed trajectories
+    // Yes it should, for computed trajectories.
     sysMC->registerDataSource(dataSourceId, nwpReaderENS);
 
     MStructuredGridEnsembleFilter *ensFilter =
@@ -745,7 +744,7 @@ void MPipelineConfiguration::initializePrecomputedTrajectoriesPipeline(
     sysMC->registerDataSource(dataSourceId + QString(" Reader"),
                               trajectoryReader);
 
-    // initialize trajectory pipeline
+    // Initialize trajectory pipeline.
     initializeEnsemblePipeline(dataSourceId, boundaryLayerTrajectories,
                                trajectoryReader, scheduler, memoryManager);
 
@@ -867,7 +866,7 @@ void MPipelineConfiguration::initializeTrajectoryComputationPipeline(
     sysMC->registerDataSource(dataSourceId + QString(" Reader"),
                               trajectoryComputation);
 
-    // initialize trajectory pipeline
+    // Initialize trajectory pipeline.
     initializeEnsemblePipeline(dataSourceId, boundaryLayerTrajectories,
                                trajectoryComputation, scheduler, memoryManager);
 

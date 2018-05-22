@@ -225,15 +225,15 @@ void MAddDatasetDialog::resetAddDatasetGUI()
 void MAddDatasetDialog::saveConfiguration(QSettings *settings)
 {
     // File Format.
-    // ==========================================
+    // ============
     settings->beginGroup("FileFormat");
     // Save version id of Met.3D.
     settings->setValue("met3dVersion", met3dVersionString);
     settings->endGroup();
-    // ==========================================
+    // ============
 
     // Save configuration for NWP Pipeline.
-    // ==========================================
+    // ====================================
     if (ui->pipelineTypeTabWidget->currentWidget() == ui->nwpTab)
     {
         settings->beginGroup("NWPPipeline");
@@ -257,7 +257,7 @@ void MAddDatasetDialog::saveConfiguration(QSettings *settings)
         settings->endGroup();
     }
     // Save configuration for Trajectories Pipeline.
-    // ==========================================
+    // =============================================
     else if (ui->pipelineTypeTabWidget->currentWidget() == ui->trajectoriesTab)
     {
         settings->beginGroup("TrajectoriesPipeline");
@@ -268,7 +268,7 @@ void MAddDatasetDialog::saveConfiguration(QSettings *settings)
         settings->setValue("memoryManagerID", ui->memoryMCombo->currentText());
 
         // Precomputed trajectories.
-        // ==========================================
+        // =========================
         if (ui->trajectoriesTypeTabWidget->currentWidget()
                 == ui->trajectoriesPrecomputedTab)
         {
@@ -276,7 +276,7 @@ void MAddDatasetDialog::saveConfiguration(QSettings *settings)
             settings->setValue("precomputed", true);
         }
         // Computed trajectories.
-        // ==========================================
+        // ======================
         else if (ui->trajectoriesTypeTabWidget->currentWidget()
                  == ui->trajectoriesComputationTab)
         {

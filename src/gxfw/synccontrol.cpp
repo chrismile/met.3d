@@ -872,14 +872,13 @@ void MSyncControl::loadConfiguration(QSettings *settings)
     ui->timeUnitsComboBox->setCurrentIndex(
                 ui->timeUnitsComboBox->findText(timeStep.last()));
     ui->showMeanCheckBox->setChecked(settings->value("showMean", false).toBool());
-
     selectedDataSources =
             settings->value("dataSources",
                             MSystemManagerAndControl::getInstance()
                             ->getDataSourceIdentifiers()).toStringList();
     restrictToDataSourcesFromSettings(selectedDataSources);
 
-    // Load times after restricting the sync control, since otherwise the times
+    // Load times after restricting the sync control since otherwise the times
     // might not be set correctly.
     ui->initTimeEdit->setDateTime(
                 settings->value("initTime", QDateTime()).value<QDateTime>());
