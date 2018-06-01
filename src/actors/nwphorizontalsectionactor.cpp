@@ -413,6 +413,8 @@ void MNWPHorizontalSectionActor::saveConfiguration(QSettings *settings)
     settings->beginGroup(MNWPHorizontalSectionActor::getSettingsID());
 
     settings->setValue("slicePosition_hPa", slicePosition_hPa);
+    settings->setValue("slicePositionGranularity_hPa",
+                       slicePositionGranularity_hPa);
     settings->setValue("differenceMode", differenceMode);
     MBoundingBoxInterface::saveConfiguration(settings);
     settings->setValue("shadowEnabled", renderShadowQuad);
@@ -508,6 +510,9 @@ void MNWPHorizontalSectionActor::loadConfiguration(QSettings *settings)
     settings->beginGroup(MNWPHorizontalSectionActor::getSettingsID());
 
     setSlicePosition(settings->value("slicePosition_hPa", 500.).toDouble());
+    properties->mDDouble()->setValue(
+                slicePosGranularityProperty,
+                settings->value("slicePositionGranularity_hPa", 5.).toDouble());
 
     // Suppress actor updates when loading bounding box to avoid
     // computeRenderRegionParameters() method being called when no grid is

@@ -675,17 +675,28 @@ void MNWPVolumeRaycasterActor::saveConfiguration(QSettings *settings)
 
 void MNWPVolumeRaycasterActor::loadConfiguration(QSettings *settings)
 {
+    // It is necessary to load the variable indices BEFORE loading the
+    // variables since they might need to be adapted if a variable cannot be
+    // loaded and the user does NOT choose a new one. (Store the loaded indices
+    // separately from the used indices since these are changed when adding,
+    // changing or deleting a variable (which is done during loading of
+    // variables!).)
+    settings->beginGroup(MNWPVolumeRaycasterActor::getSettingsID());
+    loadedVariableIndex = settings->value("varIndex").toInt();
+    loadedShadingVariableIndex = settings->value("shadingVarIndex").toInt();
+    settings->endGroup();
+
     MNWPMultiVarActor::loadConfiguration(settings);
+
+    variableIndex = loadedVariableIndex;
+    shadingVariableIndex = loadedShadingVariableIndex;
 
     settings->beginGroup(MNWPVolumeRaycasterActor::getSettingsID());
 
     properties->setEnumItem(renderModeProp,
                             settings->value("renderMode").toString());
-    variableIndex = settings->value("varIndex").toInt();
     properties->mInt()->setValue(variableIndexProp, variableIndex);
-    shadingVariableIndex = settings->value("shadingVarIndex").toInt();
-    properties->mInt()->setValue(shadingVariableIndexProp,
-                                 shadingVariableIndex);
+    properties->mInt()->setValue(shadingVariableIndexProp, shadingVariableIndex);
     properties->mBool()->setValue(bBoxEnabledProperty,
                                   settings->value("bBoxEnabled", true).toBool());
 
@@ -2058,6 +2069,27 @@ void MNWPVolumeRaycasterActor::onChangeActorVariable(MNWPActorVariable *var)
     properties->mEnum()->setValue(variableIndexProp, tmpVarIndex);
     properties->mEnum()->setValue(shadingVariableIndexProp, tmpShadingVarIndex);
     enableActorUpdates(true);
+}
+
+
+void MNWPVolumeRaycasterActor::onLoadActorVariableFailure(int varIndex)
+{
+    if (varIndex < loadedVariableIndex)
+    {
+        loadedVariableIndex--;
+    }
+    else if (varIndex == loadedVariableIndex)
+    {
+        loadedVariableIndex = 0;
+    }
+    if (varIndex < loadedShadingVariableIndex)
+    {
+        loadedShadingVariableIndex--;
+    }
+    else if (varIndex == loadedShadingVariableIndex)
+    {
+        loadedShadingVariableIndex = 0;
+    }
 }
 
 
