@@ -136,4 +136,10 @@ QStringList readConfigVersionID(QSettings *settings);
  */
 QString expandEnvironmentVariables(QString path);
 
+/**
+   @brief Checks if @p name is a valid name for actors, bounding boxes, sync
+   controls or waypoint models. (e.g. "None" is not a valid name.)
+ */
+bool isValidObjectName(QString name);
+
 #endif // MUTIL_H
