@@ -163,6 +163,8 @@ protected:
 
     void onChangeActorVariable(MNWPActorVariable *var) override;
 
+    void onLoadActorVariableFailure(int varIndex) override;
+
 private:
     // Methods that create/compute graphics resources (volume bounding box,
     // shadow image, normal curves).
@@ -532,12 +534,14 @@ private:
 
     // Variable that is raycasted.
     int8_t                  variableIndex;
+    int8_t                  loadedVariableIndex;
     QtProperty*             variableIndexProp;
     MNWP3DVolumeActorVariable* var;
 
     // Variable that is used to shade an isosurface set to "transfer function
     // shading".
     int8_t                  shadingVariableIndex;
+    int8_t                  loadedShadingVariableIndex;
     QtProperty*             shadingVariableIndexProp;
     MNWP3DVolumeActorVariable* shadingVar;
 
