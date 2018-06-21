@@ -1387,10 +1387,13 @@ void MSessionManagerDialog::loadSessionFromFile(QString sessionName,
         QString actorName = settings->value("actorName", "").toString();
         QString actorType = settings->value("actorType", "").toString();
         // Skip actor if it has no name, its type does not fit any present
-        // actor type, its name is invalid or its name already exists.
+        // actor type or its name is invalid.
+        // NOTE: Don't check if the actor name already exists since actors
+        // won't be deleted thereby when e.g. reloading a session actors don't
+        // need to be deleted and recreated but only their configurtation needs
+        // to be loaded.
         if (actorName == "" || !factoryNames.contains(actorType)
-                || !isValidObjectName(actorName)
-                || glRM->getActorByName(actorName) != nullptr)
+                || !isValidObjectName(actorName))
         {
             LOG4CPLUS_WARN(mlog, "'" << actorName.toStdString()
                            << "': encountered invalid actor name or type;"
