@@ -142,6 +142,12 @@ QStringList readConfigVersionID(QSettings *settings);
 QString expandEnvironmentVariables(QString path);
 
 /**
+   @brief Checks if @p name is a valid name for actors, bounding boxes, sync
+   controls or waypoint models. (e.g. "None" is not a valid name.)
+ */
+bool isValidObjectName(QString name);
+
+/**
   Parse pressure levels string @p levels which should contain pressure levels
   either given by a range (e.g. "[0, 100, 10]") or by a list of values (e.g.
   "10, 20, 50, 100, 200, 500, 700, 900").

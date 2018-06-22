@@ -138,6 +138,12 @@ QString expandEnvironmentVariables(QString path)
 }
 
 
+bool isValidObjectName(QString name)
+{
+    return name != "None";
+}
+
+
 QVector<float> parsePressureLevelString(QString levels)
 {
     // Clear the current list of pressure line levels. If pLevelStr does not

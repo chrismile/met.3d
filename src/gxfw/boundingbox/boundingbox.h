@@ -212,7 +212,7 @@ class MBoundingBoxConnection : public QObject
 {
     Q_OBJECT
 
-public:    
+public:
     enum ConnectionType
     {
         HORIZONTAL = 0,

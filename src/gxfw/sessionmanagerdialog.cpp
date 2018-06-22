@@ -1266,8 +1266,8 @@ void MSessionManagerDialog::loadSessionFromFile(QString sessionName,
     settings->beginGroup("MSyncControls");
     QStringList syncControlsToDelete = sysMC->getSyncControlIdentifiers();
     // Remove the "None" synchronisation control from the list of sync controls
-    // to delete.
-    syncControlsToDelete.removeFirst();
+    // to be deleted.
+    syncControlsToDelete.removeOne("None");
     QStringList syncNames = settings->value("syncControls",
                                             QStringList()).toStringList();
     // Get sync controls which are present at the moment but not part of the
@@ -1286,6 +1286,14 @@ void MSessionManagerDialog::loadSessionFromFile(QString sessionName,
 
     foreach (QString syncName, syncNames)
     {
+        // Do not create sync controls with invalid object names.
+        if (!isValidObjectName(syncName))
+        {
+            LOG4CPLUS_WARN(mlog, "'" << syncName.toStdString()
+                           << "' is an invalid sync control name; skipping.");
+            continue;
+        }
+
         MSyncControl *syncControl = sysMC->getSyncControl(syncName);
         // Create new sync control if none with this names exists.
         if (syncControl == nullptr)
@@ -1322,7 +1330,7 @@ void MSessionManagerDialog::loadSessionFromFile(QString sessionName,
     {
         settings->setArrayIndex(i);
         QString waypointsModelID = settings->value("name", "").toString();
-        if (waypointsModelID != "")
+        if (waypointsModelID != "" && isValidObjectName(waypointsModelID))
         {
             sysMC->getWaypointsModel(waypointsModelID)->loadFromSettings(
                         settings);
@@ -1378,10 +1386,18 @@ void MSessionManagerDialog::loadSessionFromFile(QString sessionName,
         settings->beginGroup(QString("MActor_%1").arg(i));
         QString actorName = settings->value("actorName", "").toString();
         QString actorType = settings->value("actorType", "").toString();
-        // Skip actor if it has no name or its type does not fit any present
-        // actor type.
-        if (actorName == "" || !factoryNames.contains(actorType))
+        // Skip actor if it has no name, its type does not fit any present
+        // actor type or its name is invalid.
+        // NOTE: Don't check if the actor name already exists since actors
+        // won't be deleted thereby when e.g. reloading a session actors don't
+        // need to be deleted and recreated but only their configurtation needs
+        // to be loaded.
+        if (actorName == "" || !factoryNames.contains(actorType)
+                || !isValidObjectName(actorName))
         {
+            LOG4CPLUS_WARN(mlog, "'" << actorName.toStdString()
+                           << "': encountered invalid actor name or type;"
+                              " skipping.");
             settings->endGroup();
             continue;
         }

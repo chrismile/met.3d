@@ -988,7 +988,7 @@ void MTransferFunction1D::onQtPropertyChanged(QtProperty *property)
 
     else if (property == valueStepProperty)
     {
-        int step = properties->mSciDouble()->value(valueStepProperty);
+        double step = properties->mSciDouble()->value(valueStepProperty);
         properties->mSciDouble()->setSingleStep(minimumValueProperty, step);
         properties->mSciDouble()->setSingleStep(maximumValueProperty, step);
     }

@@ -804,7 +804,16 @@ void MSceneViewGLWidget::executeCameraAction(int action,
                                              bool ignoreWithoutFocus)
 {
     // Only act on this signal if we have input focus.
-    if ( ignoreWithoutFocus && (!hasFocus()) ) return;
+    if ( ignoreWithoutFocus && (!hasFocus()) )
+    {
+        return;
+    }
+
+    // If in full-screen mode, don't move camera.
+    if (sceneNavigationMode == SINGLE_FULLSCREEN_ACTOR)
+    {
+        return;
+    }
 
     // Get current camera axes.
     QVector3D yAxis = camera.getYAxis();
@@ -1051,8 +1060,9 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
                 ->getEnumPropertyManager()->value(sceneNavigationModeProperty);
 
         // Disconnect full-screen actor to directly update connected scene view.
-        if (fullScreenActor)
+        if (fullScreenActor && sceneNavigationMode != SINGLE_FULLSCREEN_ACTOR)
         {
+            fullScreenActor->onFullScreenModeSwitch(false);
             disconnect(fullScreenActor, SIGNAL(actorChanged()),
                        this, SLOT(onFullScreenActorUpdate()));
         }
@@ -1096,6 +1106,7 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
             // Connect full-screen actor to directly update connected scene view.
             if (fullScreenActor)
             {
+                fullScreenActor->onFullScreenModeSwitch(true);
                 connect(fullScreenActor, SIGNAL(actorChanged()),
                         this, SLOT(onFullScreenActorUpdate()));
             }
@@ -1152,6 +1163,7 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
         // Disconnect previous full-screen actor.
         if (fullScreenActor)
         {
+            fullScreenActor->onFullScreenModeSwitch(false);
             disconnect(fullScreenActor, SIGNAL(actorChanged()),
                        this, SLOT(onFullScreenActorUpdate()));
         }
@@ -1160,6 +1172,7 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
         // Connect current full-screen actor.
         if (fullScreenActor)
         {
+            fullScreenActor->onFullScreenModeSwitch(true);
             connect(fullScreenActor, SIGNAL(actorChanged()),
                     this, SLOT(onFullScreenActorUpdate()));
         }
@@ -1934,24 +1947,47 @@ void MSceneViewGLWidget::mouseMoveEvent(QMouseEvent *event)
             pickedActor.actor = 0;
             pickedActor.handleID = -1;
 
-            // Loop over all actors in the scene and let them check whether
-            // the mouse cursor coincides with one of their handles.
-            foreach (MActor* actor, scene->getRenderQueue())
+            // If in full-screen mode, only interact with selected full-screen
+            // actor.
+            if (sceneNavigationMode == SINGLE_FULLSCREEN_ACTOR)
             {
                 // Only check actors that are pickable.
-                if (actor->isPickable())
+                if (fullScreenActor != nullptr && fullScreenActor->isPickable())
                 {
-                    if (singleInteractionActor == nullptr ||
-                           singleInteractionActor->getName() == actor->getName())
+                    pickedActor.handleID =
+                            fullScreenActor->checkIntersectionWithHandle(
+                                this, clipX, clipY);
+                    // If the test returned a valid handle ID, store the actor
+                    // and its handle as the currently picked actor.
+                    if (pickedActor.handleID >= 0)
                     {
-                        pickedActor.handleID = actor->checkIntersectionWithHandle(
-                                    this, clipX, clipY);
-                        // If the test returned a valid handle ID, store the actor
-                        // and its handle as the currently picked actor.
-                        if (pickedActor.handleID >= 0)
+                        pickedActor.actor = fullScreenActor;
+                    }
+                }
+            }
+            else
+            {
+
+                // Loop over all actors in the scene and let them check whether
+                // the mouse cursor coincides with one of their handles.
+                foreach (MActor* actor, scene->getRenderQueue())
+                {
+                    // Only check actors that are pickable.
+                    if (actor->isPickable())
+                    {
+                        if (singleInteractionActor == nullptr ||
+                                singleInteractionActor->getName()
+                                == actor->getName())
                         {
-                            pickedActor.actor = actor;
-                            break;
+                            pickedActor.handleID = actor->checkIntersectionWithHandle(
+                                        this, clipX, clipY);
+                            // If the test returned a valid handle ID, store the actor
+                            // and its handle as the currently picked actor.
+                            if (pickedActor.handleID >= 0)
+                            {
+                                pickedActor.actor = actor;
+                                break;
+                            }
                         }
                     }
                 }
@@ -1969,10 +2005,22 @@ void MSceneViewGLWidget::mouseMoveEvent(QMouseEvent *event)
 
     // B) ANALYSIS MODE.
     // ========================================================================
-    if (analysisMode) return;
+    if (analysisMode)
+    {
+        return;
+    }
 
 
-    // C) CAMERA MOVEMENTS.
+    // C) FULL-SCREEN MODE.
+    // ========================================================================
+    if (sceneNavigationMode == SINGLE_FULLSCREEN_ACTOR)
+    {
+        // If in full-screen mode, don't move camera.
+        return;
+    }
+
+
+    // D) CAMERA MOVEMENTS.
     // ========================================================================
 
     MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
@@ -2128,9 +2176,19 @@ void MSceneViewGLWidget::wheelEvent(QWheelEvent *event)
 {
     MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
 
-    if (actorInteractionMode || analysisMode) return;
-    if (freezeMode) return;
-    if (glRM->globalMouseButtonZoom != Qt::MiddleButton) return;
+    if (actorInteractionMode || analysisMode
+            || sceneNavigationMode == SINGLE_FULLSCREEN_ACTOR)
+    {
+        return;
+    }
+    if (freezeMode)
+    {
+        return;
+    }
+    if (glRM->globalMouseButtonZoom != Qt::MiddleButton)
+    {
+        return;
+    }
     if (event->modifiers() == Qt::ControlModifier)
     {
         // Ctrl + mouse wheel: -- none --

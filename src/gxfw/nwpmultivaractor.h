@@ -177,6 +177,15 @@ protected:
     virtual void onChangeActorVariable(MNWPActorVariable *var)
     { Q_UNUSED(var); }
 
+    /**
+      Same as @ref onDeleteActorVariable() but called when loading a variable
+      fails and the user does NOT choose a new variable and with @p varIndex
+      being the index of the variable which should have been loaded with
+      resepct to the list not containing variables which were not loaded.
+     */
+    virtual void onLoadActorVariableFailure(int varIndex)
+    { Q_UNUSED(varIndex); }
+
     /** List of NWP variables that are rendered in this actor. */
     QList<MNWPActorVariable*> variables;
 

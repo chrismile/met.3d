@@ -186,6 +186,16 @@ void MActor::initialize()
         availableImageUnits << u;
     }
 
+    // Get the values of the bounding box connected initially to the actor if
+    // the actor is using bounding boxes.
+    if (MBoundingBoxInterface *bboxInteface =
+            dynamic_cast<MBoundingBoxInterface*>(this))
+    {
+        enableActorUpdates(false);
+        bboxInteface->onBoundingBoxChanged();
+        enableActorUpdates(true);
+    }
+
     initializeActorResources();
 
     actorIsInitialized = true;
@@ -469,7 +479,15 @@ void MActor::loadActorConfiguration(QSettings *settings)
     settings->beginGroup(MActor::getSettingsID());
 
     const QString name = settings->value("actorName").toString();
-    setName(name);
+
+    // Reject new actor name if it is invalid or the name does already exist.
+    // (If the name of the actor stays the same, the name also already exists
+    // but it also does not need to be changed).
+    if (!MGLResourcesManager::getInstance()->getActorByName(name)
+            && isValidObjectName(name))
+    {
+        setName(name);
+    }
 
     properties->mBool()->setValue(
                 actorEnabledProperty,

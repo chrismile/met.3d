@@ -544,6 +544,7 @@ void MFrontendConfiguration::initializeFrontendFromConfigFile(
 
         // Check parameter validity.
         if ( name.isEmpty()
+             || !isValidObjectName(name)
              || datafile.isEmpty() )
         {
             LOG4CPLUS_WARN(mlog, "invalid parameters encountered; skipping.");
@@ -778,6 +779,18 @@ void MFrontendConfiguration::initializeSynchronization(
         QStringList initializeFromDataSources)
 {
     MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
+
+    if (!isValidObjectName(syncName))
+    {
+        QMessageBox msg;
+        msg.setWindowTitle("Error");
+        msg.setText("''" + syncName
+                    + "'' is not a valid synchronisation control name."
+                      " Synchronisation control will not be created.");
+        msg.setIcon(QMessageBox::Warning);
+        msg.exec();
+        return;
+    }
 
     MSyncControl* syncControl =
             new MSyncControl(syncName, sysMC->getMainWindow());
