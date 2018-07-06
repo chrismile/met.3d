@@ -397,7 +397,6 @@ private:
     QMatrix4x4 modelViewProjectionMatrix;
     QMatrix4x4 sceneRotationMatrix;
     SceneNavigationMode sceneNavigationMode;
-    SceneNavigationMode sceneNavigationMode_NoActorInteraction;
     QVector3D sceneRotationCentre;
     QTimer *cameraAutoRotationTimer;
     QVector3D cameraAutoRotationAxis;

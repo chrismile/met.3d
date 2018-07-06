@@ -64,7 +64,6 @@ MSceneViewGLWidget::MSceneViewGLWidget()
       scene(nullptr),
       lastPoint(QVector3D(0,0,0)),
       sceneNavigationMode(MOVE_CAMERA),
-      sceneNavigationMode_NoActorInteraction(MOVE_CAMERA),
       sceneRotationCentre(QVector3D(0,0,1020)),
       cameraAutorotationMode(false),
       freezeMode(0),
@@ -746,6 +745,12 @@ void MSceneViewGLWidget::setVerticalScaling(float scaling)
 
 void MSceneViewGLWidget::setInteractionMode(bool enabled)
 {
+    // Don't change interaction mode if property is disabled.
+    if (!actorInteractionProperty->isEnabled())
+    {
+        return;
+    }
+
     // Analysis mode cannot be active at the same time.
     if (enabled && analysisMode)
         MSystemManagerAndControl::getInstance()->getBoolPropertyManager()
@@ -758,6 +763,12 @@ void MSceneViewGLWidget::setInteractionMode(bool enabled)
 
 void MSceneViewGLWidget::setAnalysisMode(bool enabled)
 {
+    // Don't change analysis mode if property is disabled.
+    if (!analysisModeProperty->isEnabled())
+    {
+        return;
+    }
+
     // Interaction mode cannot be active at the same time.
     if (enabled && actorInteractionMode)
         MSystemManagerAndControl::getInstance()->getBoolPropertyManager()
@@ -876,29 +887,11 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
         // Toggle actor interaction mode.
         actorInteractionMode = MSystemManagerAndControl::getInstance()
                 ->getBoolPropertyManager()->value(actorInteractionProperty);
-
-        if ( actorInteractionMode )
+        // Analysis mode cannot be active at the same time.
+        if (actorInteractionMode && analysisMode)
         {
-            // "actorInteractionMode" was switched from "false" to "true". Save
-            // the current scene navigation mode and switch to MOVE_CAMERA.
-            sceneNavigationMode_NoActorInteraction = sceneNavigationMode;
-
-            if (sceneNavigationMode == ROTATE_SCENE)
-            {
-                sceneNavigationMode = MOVE_CAMERA;
-                sceneNavigationModeProperty->setEnabled(false);
-                selectSceneRotationCentreProperty->setEnabled(false);
-                sceneRotationCenterProperty->setEnabled(false);
-            }
-        }
-        else
-        {
-            // "actorInteractionMode" was switched from "true" to "false".
-            // Restore scene navigation mode.
-            sceneNavigationMode = sceneNavigationMode_NoActorInteraction;
-            sceneNavigationModeProperty->setEnabled(true);
-            MSystemManagerAndControl::getInstance()->getEnumPropertyManager()
-                    ->setValue(sceneNavigationModeProperty, sceneNavigationMode);
+            MSystemManagerAndControl::getInstance()->getBoolPropertyManager()
+                    ->setValue(analysisModeProperty, false);
         }
 
         // In actor interaction mode, mouse tracking is enabled to have
@@ -913,8 +906,14 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
 
     else if (property == analysisModeProperty)
     {
-        analysisMode = MSystemManagerAndControl::getInstance()->getBoolPropertyManager()
-                ->value(analysisModeProperty);
+        analysisMode = MSystemManagerAndControl::getInstance()
+                ->getBoolPropertyManager()->value(analysisModeProperty);
+        // Interaction mode cannot be active at the same time.
+        if (analysisMode && actorInteractionMode)
+        {
+            MSystemManagerAndControl::getInstance()->getBoolPropertyManager()
+                    ->setValue(actorInteractionProperty, false);
+        }
         updateSceneLabel();
 #ifndef CONTINUOUS_GL_UPDATE
         updateGL();
@@ -1062,7 +1061,7 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
         // Disconnect full-screen actor to directly update connected scene view.
         if (fullScreenActor && sceneNavigationMode != SINGLE_FULLSCREEN_ACTOR)
         {
-            fullScreenActor->onFullScreenModeSwitch(false);
+            fullScreenActor->onFullScreenModeSwitch(this, false);
             disconnect(fullScreenActor, SIGNAL(actorChanged()),
                        this, SLOT(onFullScreenActorUpdate()));
         }
@@ -1106,7 +1105,7 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
             // Connect full-screen actor to directly update connected scene view.
             if (fullScreenActor)
             {
-                fullScreenActor->onFullScreenModeSwitch(true);
+                fullScreenActor->onFullScreenModeSwitch(this, true);
                 connect(fullScreenActor, SIGNAL(actorChanged()),
                         this, SLOT(onFullScreenActorUpdate()));
             }
@@ -1134,6 +1133,7 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
     {
 
         selectSceneRotationCentreProperty->setEnabled(false);
+        sceneNavigationModeProperty->setEnabled(false);
         MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
         MLabel *pickText  = glRM->getSceneRotationCentreSelectionLabel();
         MMovablePoleActor *pickActor = glRM->getSceneRotationCentreSelectionPoleActor();
@@ -1163,7 +1163,7 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
         // Disconnect previous full-screen actor.
         if (fullScreenActor)
         {
-            fullScreenActor->onFullScreenModeSwitch(false);
+            fullScreenActor->onFullScreenModeSwitch(this, false);
             disconnect(fullScreenActor, SIGNAL(actorChanged()),
                        this, SLOT(onFullScreenActorUpdate()));
         }
@@ -1172,7 +1172,7 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
         // Connect current full-screen actor.
         if (fullScreenActor)
         {
-            fullScreenActor->onFullScreenModeSwitch(true);
+            fullScreenActor->onFullScreenModeSwitch(this, true);
             connect(fullScreenActor, SIGNAL(actorChanged()),
                     this, SLOT(onFullScreenActorUpdate()));
         }
@@ -2292,6 +2292,7 @@ void MSceneViewGLWidget::keyPressEvent(QKeyEvent *event)
                         sceneNavigationModeProperty, sceneNavigationMode);
             enablePropertyEvents = false;
             selectSceneRotationCentreProperty->setEnabled(true);
+            sceneNavigationModeProperty->setEnabled(true);
             enablePropertyEvents = true;
         }
     }
