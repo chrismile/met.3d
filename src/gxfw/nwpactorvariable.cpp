@@ -390,7 +390,12 @@ void MNWPActorVariable::initialize()
         if (multipleEnsembleMembersEnabled)
         {
             // Connect the new data source to this variable's aggregation source.
-            aggregationDataSource->setMemoryManager(dataSource->getMemoryManager());
+            // Memory manager may be set only once.
+            if (aggregationDataSource->getMemoryManager() == nullptr)
+            {
+                aggregationDataSource->setMemoryManager(
+                            dataSource->getMemoryManager());
+            }
             aggregationDataSource->setScheduler(dataSource->getScheduler());
             aggregationDataSource->setInputSource(dataSource);
         }
