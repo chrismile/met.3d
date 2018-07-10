@@ -97,6 +97,20 @@ shader GSmain(in vec4 vs_vertex[], in vec3 vs_normal[], in int vs_vertexID[],
        vec3 position1 = vs_vertex[1].xyz;
        vec3 position2 = vs_vertex[2].xyz;
 
+       // Don't draw parts of a trajectory containing invalid vertex positions.
+       if (position0.x == M_INVALID_TRAJECTORY_POS
+               || position0.y == M_INVALID_TRAJECTORY_POS
+               || position0.z == M_INVALID_TRAJECTORY_POS
+               || position1.x == M_INVALID_TRAJECTORY_POS
+               || position1.y == M_INVALID_TRAJECTORY_POS
+               || position1.z == M_INVALID_TRAJECTORY_POS
+               || position2.x == M_INVALID_TRAJECTORY_POS
+               || position2.y == M_INVALID_TRAJECTORY_POS
+               || position2.z == M_INVALID_TRAJECTORY_POS)
+       {
+           return;
+       }
+
        float scalar0 = vs_vertex[0].w;
        float scalar1 = vs_vertex[1].w;
 
@@ -181,6 +195,20 @@ shader GSmain(in vec4 vs_vertex[], in vec3 vs_normal[], in int vs_vertexID[],
     vec3 position1 = vs_vertex[1].xyz;
     vec3 position2 = vs_vertex[2].xyz;
     vec3 position3 = vs_vertex[3].xyz;
+
+    // Don't draw parts of a trajectory containing invalid vertex positions.
+    if (position0.x == M_INVALID_TRAJECTORY_POS
+            || position0.y == M_INVALID_TRAJECTORY_POS
+            || position0.z == M_INVALID_TRAJECTORY_POS
+            || position1.x == M_INVALID_TRAJECTORY_POS
+            || position1.y == M_INVALID_TRAJECTORY_POS
+            || position1.z == M_INVALID_TRAJECTORY_POS
+            || position2.x == M_INVALID_TRAJECTORY_POS
+            || position2.y == M_INVALID_TRAJECTORY_POS
+            || position2.z == M_INVALID_TRAJECTORY_POS)
+    {
+        return;
+    }
 
     float scalar1 = vs_vertex[1].w;
     float scalar2 = vs_vertex[2].w;

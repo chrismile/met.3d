@@ -24,6 +24,8 @@
 **
 ******************************************************************************/
 
+const float M_INVALID_TRAJECTORY_POS = -999.99;
+
 /*****************************************************************************
  ***                             INTERFACES
  *****************************************************************************/
@@ -73,6 +75,15 @@ shader VSmain(in vec3 vertex : 0, out vec4 vs_vertex)
 
 shader GSmain(in vec4 vs_vertex[], out GStoFS Output)
 {
+
+    // Don't draw spheres at invalid positions.
+    if (vs_vertex[0].x == M_INVALID_TRAJECTORY_POS
+            || vs_vertex[0].y == M_INVALID_TRAJECTORY_POS
+            || vs_vertex[0].z == M_INVALID_TRAJECTORY_POS)
+    {
+        return;
+    }
+
     // Vector from camera to sphere centre.
     vec3 view  = vs_vertex[0].xyz - cameraPosition;
     Output.gs_radius = radius;
