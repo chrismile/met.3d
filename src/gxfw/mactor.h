@@ -427,8 +427,9 @@ public:
      Needs to be reimplemented in derived classes which support full-screen
      visualisation and need to react when full-screen mode is changed.
      */
-    virtual void onFullScreenModeSwitch(bool fullScreenEnabled)
-    { Q_UNUSED(fullScreenEnabled); }
+    virtual void onFullScreenModeSwitch(MSceneViewGLWidget *sceneView,
+                                        bool fullScreenEnabled)
+    { Q_UNUSED(sceneView); Q_UNUSED(fullScreenEnabled); }
 
 public slots:
     /**
