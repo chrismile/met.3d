@@ -229,6 +229,7 @@ MTask* MTrajectoryComputation::createTaskGraph(MDataRequest request)
     rh.remove("INTERPOLATION_METHOD");
     rh.remove("SEED_TYPE");
     rh.remove("ITERATION_PER_TIMESTEP");
+    rh.remove("STREAMLINE_DELTA_T");
     rh.remove("SEED_MIN_POSITION");
     rh.remove("SEED_MAX_POSITION");
     rh.remove("SEED_STEP_SIZE_LON_LAT");
@@ -298,9 +299,10 @@ const QStringList MTrajectoryComputation::locallyRequiredKeys()
 {
     return (QStringList() << "INIT_TIME" << "VALID_TIME" << "END_TIME"
             << "MEMBER" << "TIME_SPAN" << "ITERATION_PER_TIMESTEP"
-            << "LINE_TYPE" << "ITERATION_METHOD" << "INTERPOLATION_METHOD"
-            << "SEED_TYPE" << "SEED_MIN_POSITION" << "SEED_MAX_POSITION"
-            << "SEED_STEP_SIZE_LON_LAT" << "SEED_PRESSURE_LEVELS");
+            << "STREAMLINE_DELTA_T" << "LINE_TYPE" << "ITERATION_METHOD"
+            << "INTERPOLATION_METHOD" << "SEED_TYPE" << "SEED_MIN_POSITION"
+            << "SEED_MAX_POSITION" << "SEED_STEP_SIZE_LON_LAT"
+            << "SEED_PRESSURE_LEVELS");
 }
 
 
@@ -329,6 +331,7 @@ void MTrajectoryComputation::computeTrajectory(MDataRequest request,
     TRAJECTORY_COMPUTATION_SEED_TYPE seedType =
             TRAJECTORY_COMPUTATION_SEED_TYPE(rh.intValue("SEED_TYPE"));
     uint iterationPerTimeStep = rh.intValue("ITERATION_PER_TIMESTEP");
+    double streamlineDeltaT = rh.doubleValue("STREAMLINE_DELTA_T");
     QStringList seedMinPositionList = rh.value("SEED_MIN_POSITION").split("/");
     QStringList seedMaxPositionList = rh.value("SEED_MAX_POSITION").split("/");
     QStringList seedStepSizeList = rh.value("SEED_STEP_SIZE_LON_LAT").split("/");
@@ -357,6 +360,7 @@ void MTrajectoryComputation::computeTrajectory(MDataRequest request,
     rh.remove("INTERPOLATION_METHOD");
     rh.remove("SEED_TYPE");
     rh.remove("ITERATION_PER_TIMESTEP");
+    rh.remove("STREAMLINE_DELTA_T");
     rh.remove("SEED_MIN_POSITION");
     rh.remove("SEED_MAX_POSITION");
     rh.remove("SEED_STEP_SIZE_LON_LAT");
@@ -385,6 +389,7 @@ void MTrajectoryComputation::computeTrajectory(MDataRequest request,
     helper.startTimeStep = validTimes.indexOf(validTime);
     helper.endTimeStep = validTimes.indexOf(endTime);
     helper.iterationPerTimeStep = iterationPerTimeStep;
+    helper.streamlineDeltaT = streamlineDeltaT;
     helper.seedType = seedType;
     helper.seedMinPosition = seedMinPosition;
     helper.seedMaxPosition = seedMaxPosition;
@@ -521,13 +526,13 @@ void MTrajectoryComputation::computeStreamLine(
             {
                 case EULER:
                     nextPos = trajectoryIntegrationEuler(
-                                currentPosition, 3600, 0, 0,
+                                currentPosition, ch.streamlineDeltaT, 0, 0,
                                 ch.interpolationMethod, grids,
                                 validPosition[trajectory]);
                     break;
                 case RUNGE_KUTTA:
                     nextPos = trajectoryIntegrationRungeKutta(
-                                currentPosition, 3600, 0, 0,
+                                currentPosition, ch.streamlineDeltaT, 0, 0,
                                 ch.interpolationMethod, grids,
                                 validPosition[trajectory]);
                     break;

@@ -169,6 +169,7 @@ protected:
         uint endTimeStep;
         uint trajectoryCount;
         uint iterationPerTimeStep;
+        double streamlineDeltaT;
         QVector3D seedMinPosition;
         QVector3D seedMaxPosition;
         QVector3D seedCount;

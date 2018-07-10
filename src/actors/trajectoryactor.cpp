@@ -186,6 +186,15 @@ MTrajectoryActor::MTrajectoryActor()
                                                     computationPropertyGroup);
     properties->setInt(computationIterationCountProperty, 5, 1, 1000);
 
+    computationDeltaTProperty = addProperty(DECORATEDDOUBLE_PROPERTY,
+                                            "delta t",
+                                            computationPropertyGroup);
+    properties->setDDouble(computationDeltaTProperty, 3600., 0.001,
+                           numeric_limits<double>::max(), 3, 0.5, " sec");
+    computationDeltaTProperty->setToolTip(
+                "Timestep [in seconds] used for streamline computation.");
+    computationDeltaTProperty->setEnabled(false);
+
     computationIntegrationTimeProperty = addProperty(
                 ENUM_PROPERTY, "integration time", computationPropertyGroup);
     computationIntegrationTimeProperty->setToolTip(
@@ -376,6 +385,9 @@ void MTrajectoryActor::saveConfiguration(QSettings *settings)
     settings->setValue(
                 "computationIterationCountProperty",
                 properties->mInt()->value(computationIterationCountProperty));
+    settings->setValue(
+                "computationDeltaTProperty",
+                properties->mDDouble()->value(computationDeltaTProperty));
     settings->setValue(
                 "computationDeltaTimeProperty",
                 properties->mEnum()->value(computationIntegrationTimeProperty));
@@ -576,6 +588,9 @@ void MTrajectoryActor::loadConfiguration(QSettings *settings)
                 computationIterationCountProperty,
                 settings->value("computationIterationCountProperty",
                                 5).toInt());
+    properties->mDDouble()->setValue(
+                computationDeltaTProperty,
+                settings->value("computationDeltaTProperty", 3600.).toDouble());
     properties->mEnum()->setValue(
                 computationIntegrationTimeProperty,
                 settings->value("computationDeltaTimeProperty", 0).toInt());
@@ -1919,15 +1934,20 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
         TRAJECTORY_COMPUTATION_LINE_TYPE lineType =
                 TRAJECTORY_COMPUTATION_LINE_TYPE(
                     properties->mEnum()->value(computationLineTypeProperty));
+        bool suppressUpdates = suppressActorUpdates();
+        enableActorUpdates(false);
         switch (lineType)
         {
             case PATH_LINE:
                 computationIntegrationTimeProperty->setEnabled(true);
+                computationDeltaTProperty->setEnabled(false);
                 break;
             case STREAM_LINE:
                 computationIntegrationTimeProperty->setEnabled(false);
+                computationDeltaTProperty->setEnabled(true);
                 break;
         }
+        enableActorUpdates(suppressUpdates);
         if (suppressActorUpdates()) return;
         asynchronousDataRequest();
     }
@@ -1941,6 +1961,12 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
     }
 
     else if (property == computationIterationCountProperty)
+    {
+        if (suppressActorUpdates()) return;
+        asynchronousDataRequest();
+    }
+
+    else if (property == computationDeltaTProperty)
     {
         if (suppressActorUpdates()) return;
         asynchronousDataRequest();
@@ -2465,7 +2491,7 @@ void MTrajectoryActor::updateActorData()
             data.type = HORIZONTAL;
             data.minPosition = QVector3D(hor.x(), hor.y(), p);
             data.maxPosition = QVector3D(hor.x() + hor.width(),
-                                         hor.y() + hor.width(), p);
+                                         hor.y() + hor.height(), p);
             data.stepSize = QVector2D(stepSizeLon, stepSizeLat);
             data.pressureLevels.clear();
             data.pressureLevels << p;
@@ -2527,7 +2553,7 @@ void MTrajectoryActor::updateActorData()
             data.type = BOX;
             data.minPosition = QVector3D(hor.x(), hor.y(), ptop);
             data.maxPosition = QVector3D(hor.x() + hor.width(),
-                                         hor.y() + hor.width(), pbot);
+                                         hor.y() + hor.height(), pbot);
             data.stepSize = QVector2D(stepSizeLon, stepSizeLat);
             data.pressureLevels.clear();
             for (float f : pressureLevels)
@@ -2662,6 +2688,8 @@ void MTrajectoryActor::asynchronousDataRequest(bool synchronizationRequest)
             unsigned int iterationCount = properties->mInt()->value(
                         computationIterationCountProperty);
             unsigned int seedType = seedActorData[t].type;
+            double streamlineDeltaT = properties->mDDouble()->value(
+                        computationDeltaTProperty);
             QString seedMinPosition = QString("%1/%2/%3")
                     .arg(seedActorData[t].minPosition.x())
                     .arg(seedActorData[t].minPosition.y())
@@ -2680,6 +2708,7 @@ void MTrajectoryActor::asynchronousDataRequest(bool synchronizationRequest)
             rh.insert("END_TIME", endTime);
             rh.insert("LINE_TYPE", lineType);
             rh.insert("ITERATION_PER_TIMESTEP", iterationCount);
+            rh.insert("STREAMLINE_DELTA_T", streamlineDeltaT);
             rh.insert("ITERATION_METHOD", iterationMethod);
             rh.insert("INTERPOLATION_METHOD", interpolationMethod);
             rh.insert("SEED_TYPE", seedType);
@@ -2838,6 +2867,8 @@ void MTrajectoryActor::asynchronousSelectionRequest()
             unsigned int iterationCount = properties->mInt()->value(
                         computationIterationCountProperty);
             unsigned int seedType = seedActorData[t].type;
+            double streamlineDeltaT = properties->mDDouble()->value(
+                        computationDeltaTProperty);
             QString seedMinPosition = QString("%1/%2/%3")
                     .arg(seedActorData[t].minPosition.x())
                     .arg(seedActorData[t].minPosition.y())
@@ -2856,6 +2887,7 @@ void MTrajectoryActor::asynchronousSelectionRequest()
             rh.insert("END_TIME", endTime);
             rh.insert("LINE_TYPE", lineType);
             rh.insert("ITERATION_PER_TIMESTEP", iterationCount);
+            rh.insert("STREAMLINE_DELTA_T", streamlineDeltaT);
             rh.insert("ITERATION_METHOD", iterationMethod);
             rh.insert("INTERPOLATION_METHOD", interpolatonMethod);
             rh.insert("SEED_TYPE", seedType);

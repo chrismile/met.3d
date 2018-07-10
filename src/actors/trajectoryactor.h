@@ -388,6 +388,7 @@ private:
     QtProperty *computationLineTypeProperty;
     QtProperty* computationIntegrationMethodProperty;
     QtProperty *computationIterationCountProperty;
+    QtProperty *computationDeltaTProperty;
     QtProperty* computationSeedPropertyGroup;
     QtProperty* computationSeedAddActorProperty;
 
