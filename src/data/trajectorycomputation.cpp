@@ -536,8 +536,9 @@ void MTrajectoryComputation::computeStreamLine(
             // Mark position as invalid.
             if (!validPosition[trajectory])
             {
-                nextPos = QVector3D(M_MISSING_VALUE, M_MISSING_VALUE,
-                                    M_MISSING_VALUE);
+                nextPos = QVector3D(M_INVALID_TRAJECTORY_POS,
+                                    M_INVALID_TRAJECTORY_POS,
+                                    M_INVALID_TRAJECTORY_POS);
             }
 
             // Store position in vertex buffer.
@@ -651,9 +652,9 @@ void MTrajectoryComputation::computePathLine(TrajectoryComputationHelper& ch,
                 // Mark position as invalid.
                 if (!validPosition[trajectory])
                 {
-                    positions[trajectory] = QVector3D(M_MISSING_VALUE,
-                                                      M_MISSING_VALUE,
-                                                      M_MISSING_VALUE);
+                    positions[trajectory] = QVector3D(M_INVALID_TRAJECTORY_POS,
+                                                      M_INVALID_TRAJECTORY_POS,
+                                                      M_INVALID_TRAJECTORY_POS);
                 }
             }
 
