@@ -50,6 +50,12 @@ MAbstractDataReader::MAbstractDataReader(QString identifier)
 
 MAbstractDataReader::~MAbstractDataReader()
 {
+    // Clear file scan progress dialog list. (This should not be necessary if
+    // file scan progress dialogs are deleted correctly.)
+    while (!fileScanProgressDialogList.isEmpty())
+    {
+        deleteFileScanProgressDialog();
+    }
 }
 
 
@@ -154,5 +160,49 @@ int MAbstractDataReader::getEnsembleMemberIDFromFileName(QString fileName)
 /******************************************************************************
 ***                          PROTECTED METHODS                              ***
 *******************************************************************************/
+
+void MAbstractDataReader::initializeFileScanProgressDialog(
+        int numFiles, QString labelText)
+{
+    if (labelText.isEmpty())
+    {
+        labelText = "Loading data set " + getIdentifier() + " ...";
+    }
+    fileScanProgressDialogList.append(new QProgressDialog(
+                labelText, "cancel",
+                0, numFiles));
+    // Hide close, resize and minimize buttons. (Use tool tip since dialog won't
+    // be shown right away).
+    fileScanProgressDialogList.last()->setWindowFlags(
+                Qt::ToolTip | Qt::CustomizeWindowHint);
+    fileScanProgressDialogList.last()->setMinimumDuration(0);
+    fileScanProgressDialogList.last()->setCancelButton(0);
+    // Always show progress dialog right away.
+    fileScanProgressDialogList.last()->setVisible(true);
+
+    loadingProgressList.append(0);
+    fileScanProgressDialogList.last()->setValue(0);
+    fileScanProgressDialogList.last()->update();
+    qApp->processEvents();
+}
+
+
+void MAbstractDataReader::updateFileScanProgressDialog()
+{
+    fileScanProgressDialogList.last()->setValue(
+                ++loadingProgressList[loadingProgressList.size() - 1]);
+    fileScanProgressDialogList.last()->update();
+    qApp->processEvents();
+}
+
+
+void MAbstractDataReader::deleteFileScanProgressDialog()
+{
+    if (fileScanProgressDialogList.last() != nullptr)
+    {
+        delete fileScanProgressDialogList.takeLast();
+        loadingProgressList.removeLast();
+    }
+}
 
 } // namespace Met3D

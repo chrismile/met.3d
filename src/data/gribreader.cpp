@@ -672,9 +672,13 @@ void MGribReader::scanDataRoot()
     ensembleIDIsSpecifiedInFileName = dirFileFilters.contains("\\e");
     int  ensembleIDFromFile = -1;
 
+    // Create and initialise progress bar.
+    initializeFileScanProgressDialog(availableFiles.size());
+
     // Scan all grib files contained in the directory.
     foreach (QString gribFileName, availableFiles)
     {
+        updateFileScanProgressDialog();
         // (Skip index files.)
         if (gribFileName.endsWith("met3d_grib_index")) continue;
 
@@ -1251,6 +1255,7 @@ void MGribReader::scanDataRoot()
 #endif
     } // for (files)
 
+    deleteFileScanProgressDialog();
 
     QString horizontalRefVarName = "";
     MVerticalLevelType referenceLevelType;
@@ -1758,8 +1763,17 @@ void MGribReader::detectSurfacePressureFieldType(QStringList *availableFiles)
         // Scan all grib files contained in the directory and search for
         // a surface pressure field. (Only use grib files directly
         // since there is no speed up when using index files.)
+
+        initializeFileScanProgressDialog(
+                    availableFiles->size(),
+                    "Scanning grib files to determine surface pressure variable"
+                    " (\"sp\" or \"lnsp\").\nThis scan can be avoided by"
+                    " specifying the variable in the pipeline configuration"
+                    " (currently set to \"auto\")");
+
         foreach (QString gribFileName, *availableFiles)
         {
+            updateFileScanProgressDialog();
             // (Skip index files.)
             if (gribFileName.endsWith("met3d_grib_index")) continue;
             QString filePath = dataRoot.filePath(gribFileName);
@@ -1797,6 +1811,8 @@ void MGribReader::detectSurfacePressureFieldType(QStringList *availableFiles)
             }
             fclose(gribfile);
         } // foreach loop grib files
+
+        deleteFileScanProgressDialog();
 
         // No surface pressure field found.
         if (surfacePressureFieldType == "")
