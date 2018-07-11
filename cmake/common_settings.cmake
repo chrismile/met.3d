@@ -18,6 +18,7 @@ set (COMMON_INSTALL_DIRS
         /home/local/sw/unidata
         /home/local/sw/qt
         /home/local/sw/qt5
+        /home/local/sw/ecmwf
     )
 
 if (UNIX)
