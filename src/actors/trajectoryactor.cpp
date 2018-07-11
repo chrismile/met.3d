@@ -1010,7 +1010,7 @@ void MTrajectoryActor::setDataSource(MTrajectoryDataSource *ds)
 
         // Check whether this datasource is precomputed.
         precomputedDataSource =
-                (dynamic_cast<MTrajectoryComputation*>(trajectorySource)
+                (dynamic_cast<MTrajectoryComputationSource*>(trajectorySource)
                  == nullptr);
         updateActorData();
     }
@@ -2460,7 +2460,7 @@ void MTrajectoryActor::updateActorData()
                 QVector3D top = actor->getPoleVertices().at(i + 1);
 
                 SeedActorData data;
-                data.type = POLE;
+                data.type = VERTICAL_POLE;
                 data.minPosition = QVector3D(top.x(), top.y(), top.z());
                 data.maxPosition = QVector3D(bot.x(), bot.y(), bot.z());
                 data.stepSize = QVector2D(stepSizeLon, stepSizeLat);
@@ -2488,7 +2488,7 @@ void MTrajectoryActor::updateActorData()
             double p = actor->getSectionElevation_hPa();
 
             SeedActorData data;
-            data.type = HORIZONTAL;
+            data.type = HORIZONTAL_SECTION;
             data.minPosition = QVector3D(hor.x(), hor.y(), p);
             data.maxPosition = QVector3D(hor.x() + hor.width(),
                                          hor.y() + hor.height(), p);
@@ -2520,7 +2520,7 @@ void MTrajectoryActor::updateActorData()
                 double ptop = actor->getTopPressure_hPa();
 
                 SeedActorData data;
-                data.type = VERTICAL;
+                data.type = VERTICAL_SECTION;
                 data.minPosition = QVector3D(point1.x(), point1.y(), ptop);
                 data.maxPosition = QVector3D(point2.x(), point2.y(), pbot);
                 data.stepSize = QVector2D(stepSizeLon, stepSizeLat);
@@ -2550,7 +2550,7 @@ void MTrajectoryActor::updateActorData()
             double ptop = actor->getTopPressure_hPa();
 
             SeedActorData data;
-            data.type = BOX;
+            data.type = VOLUME_BOX;
             data.minPosition = QVector3D(hor.x(), hor.y(), ptop);
             data.maxPosition = QVector3D(hor.x() + hor.width(),
                                          hor.y() + hor.height(), pbot);

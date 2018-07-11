@@ -853,15 +853,15 @@ void MPipelineConfiguration::initializeTrajectoryComputationPipeline(
         }
     }
 
-    MTrajectoryComputation* trajectoryComputation =
-            new MTrajectoryComputation(dataSourceId);
+    MTrajectoryComputationSource* trajectoryComputation =
+            new MTrajectoryComputationSource(dataSourceId);
     trajectoryComputation->setMemoryManager(memoryManager);
     trajectoryComputation->setScheduler(scheduler);
     trajectoryComputation->setInputWindVariables(windEastwardVariable,
                                                  windNorthwardVariable,
                                                  windVerticalVariable);
 
-    trajectoryComputation-> setVericalLevelType(verticalLevelType);
+    trajectoryComputation-> setVerticalLevelType(verticalLevelType);
     trajectoryComputation->setInputSource(NWPDataSource);
     sysMC->registerDataSource(dataSourceId + QString(" Reader"),
                               trajectoryComputation);

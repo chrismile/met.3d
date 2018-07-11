@@ -41,14 +41,14 @@ namespace Met3D
 ***                     CONSTRUCTOR / DESTRUCTOR                            ***
 *******************************************************************************/
 
-MAbstractDataComputation::MAbstractDataComputation(QString identifier)
+MAbstractDataComputationSource::MAbstractDataComputationSource(QString identifier)
         : identifier(identifier),
           dataSource(nullptr)
 {
 }
 
 
-MAbstractDataComputation::~MAbstractDataComputation()
+MAbstractDataComputationSource::~MAbstractDataComputationSource()
 {
 }
 
@@ -57,11 +57,11 @@ MAbstractDataComputation::~MAbstractDataComputation()
 ***                            PUBLIC METHODS                               ***
 *******************************************************************************/
 
-void MAbstractDataComputation::setInputSource(MWeatherPredictionDataSource* source)
+void MAbstractDataComputationSource::setInputSource(MWeatherPredictionDataSource* source)
 {
     assert(source != nullptr);
     dataSource = source;
-    initialiseFormDataSource();
+    initialiseFromDataSource();
 }
 
 

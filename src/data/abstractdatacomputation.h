@@ -42,11 +42,11 @@ namespace Met3D
 /**
   @brief MAbstractDataComputation is the base class for all data computations.
  */
-class MAbstractDataComputation
+class MAbstractDataComputationSource
 {
 public:
-    MAbstractDataComputation(QString identifier);
-    virtual ~MAbstractDataComputation();
+    MAbstractDataComputationSource(QString identifier);
+    virtual ~MAbstractDataComputationSource();
 
     /**
       Returns the identifier string of this data computation.
@@ -63,14 +63,13 @@ protected:
     /**
       Will be called when input dataSource is set.
 
-      Needs to implement initialisation from data drawn from dataSource (e.g.
+      Needs to implement initialisation of data drawn from dataSource (e.g.
       valid times, ensemble members, etc.).
      */
-    virtual void initialiseFormDataSource() = 0;
+    virtual void initialiseFromDataSource() = 0;
 
     QString identifier;
     MWeatherPredictionDataSource* dataSource;
-
 };
 
 

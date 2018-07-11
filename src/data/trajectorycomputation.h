@@ -41,31 +41,36 @@
 namespace Met3D
 {
 
-    enum TRAJECTORY_COMPUTATION_ITERATION_METHOD
-    {
-        EULER,
-        RUNGE_KUTTA
-    };
+enum TRAJECTORY_COMPUTATION_ITERATION_METHOD
+{
+    EULER,
+    RUNGE_KUTTA
+};
 
-    enum TRAJECTORY_COMPUTATION_INTERPOLATION_METHOD
-    {
-        LAGRANTO_INTERPOLATION,
-        MET3D_INTERPOLATION
-    };
+enum TRAJECTORY_COMPUTATION_INTERPOLATION_METHOD
+{
+    // NOTE: See Philipp Kaiser's master's thesis (TUM 2017) for details on the
+    // different interpolation approaches. The LAGRANTO_INTERPOLATION method
+    // follows the implementation of LAGRANTO v2
+    // (http://dx.doi.org/10.5194/gmd-8-2569-2015).
+    LAGRANTO_INTERPOLATION,
+    MET3D_INTERPOLATION
+};
 
-    enum TRAJECTORY_COMPUTATION_LINE_TYPE
-    {
-        PATH_LINE,
-        STREAM_LINE
-    };
+enum TRAJECTORY_COMPUTATION_LINE_TYPE
+{
+    PATH_LINE,
+    STREAM_LINE
+};
 
-    enum TRAJECTORY_COMPUTATION_SEED_TYPE
-    {
-        POLE,
-        HORIZONTAL,
-        BOX,
-        VERTICAL
-    };
+enum TRAJECTORY_COMPUTATION_SEED_TYPE
+{
+    VERTICAL_POLE,
+    HORIZONTAL_SECTION,
+    VOLUME_BOX,
+    VERTICAL_SECTION
+};
+
 
 /**
   Stores data that for each trajectory computation has to be computed only once
@@ -85,38 +90,45 @@ struct MTrajectoryComputationInfo
     // All available times.
     QVector<QDateTime> times;
 
-    // Start grid geometry stored in the file.
+    // Start grid geometry (i.e., seed points).
     std::shared_ptr<MStructuredGrid> startGrid;
 
     // Mutex to lock access to the struct.
     QMutex accessMutex;
 };
 
-/**
-  @brief MTrajectoryComputation computes particle trajectories similar to
-  LAGRANTO NetCDF based on weather prediction data.
 
-  Vertical level type needs to be the same for all input wind variables.
+/**
+  @brief MTrajectoryComputationSource computes particle trajectories (path lines)
+  and stream lines. Computation is implemented following the implementation of
+  the LAGRANTO model (http://dx.doi.org/10.5194/gmd-8-2569-2015).
+
+  @note Vertical level type needs to be the same for all input wind variables.
  */
-class MTrajectoryComputation : public MTrajectoryDataSource,
-        public MAbstractDataComputation
+class MTrajectoryComputationSource : public MTrajectoryDataSource,
+        public MAbstractDataComputationSource
 {
 public:
-    MTrajectoryComputation(QString identifier);
+    MTrajectoryComputationSource(QString identifier);
 
-    ~MTrajectoryComputation();
-
-    void setInputWindVariables(QString eastwardWind_ms, QString northwardWind_ms,
-                               QString verticalWind_Pas);
+    ~MTrajectoryComputationSource();
 
     /**
-      Sets vertical level type of computed trajectories.
+      Specify the vertical level type of the used input wind fields (cf.
+      @ref setInputWindVariables()).
 
-      Needs to be 3D and the same as the vertical level type of the wind
-      component variables (eastwardWind_ms, northwardWind_ms and
-      verticalWind_Pas).
+      @note Needs to be a 3D level type.
      */
-    void setVericalLevelType(MVerticalLevelType levelType);
+    void setVerticalLevelType(MVerticalLevelType levelType);
+
+    /**
+      Specify variable names of the three wind components used to compute the
+      field lines. Names refer to variable names in the data source set by @ref
+      setInputSource() and the level type set by @ref setVerticalLevelType().
+     */
+    void setInputWindVariables(
+            QString eastwardWind_ms, QString northwardWind_ms,
+            QString verticalWind_Pas);
 
     /**
       Returns a @ref QList<QDateTime> containing the available forecast
@@ -151,7 +163,7 @@ protected:
                 : varNames(3, QString()),
                   iterationMethod(EULER),
                   lineType(PATH_LINE),
-                  seedType(POLE),
+                  seedType(VERTICAL_POLE),
                   startTimeStep(0),
                   endTimeStep(0),
                   trajectoryCount(0),
@@ -177,44 +189,38 @@ protected:
         QVector<double> seedPressureLevels;
     };
 
-
-    /**
-      Defines the request keys required by this reader.
-     */
     const QStringList locallyRequiredKeys();
 
     /**
       Fills data source specific fields (init and valid time, ensemble members).
      */
-    void initialiseFormDataSource();
+    void initialiseFromDataSource();
 
     /**
-      @brief Computes trajectory for given parameter.
+      Computes the field lines for the specified parameters.
 
       Performs tasks needed for both computing stream and path lines and
       calls either @ref computeStreamLine() or @ref computePathLine()
       depending on which line type is chosen.
      */
-    void computeTrajectory(MDataRequest request,
-                           MTrajectoryComputationInfo& cInfo);
+    void computeTrajectories(MDataRequest request,
+                             MTrajectoryComputationInfo& cInfo);
 
     /**
-      @brief Computes stream lines for given parameter.
+      Computes streamlines.
 
-      Is called by @ref computeTrajectory() which performs the tasks needed for
-      both stream and path lines.
+      Is called by @ref computeTrajectories() if streamlines are requested.
      */
-    void computeStreamLine(TrajectoryComputationHelper& ch,
-                           MTrajectoryComputationInfo& cInfo);
+    void computeStreamLines(TrajectoryComputationHelper& ch,
+                            MTrajectoryComputationInfo& cInfo);
 
     /**
-      @brief Computes path lines for given parameter.
+      Computes path lines (i.e., trajectories).
 
-      Is called by @ref computeTrajectory() which performs the tasks needed for
-      both stream and path lines.
+      Is called by @ref computeTrajectories() if path lines are requested.
      */
-    void computePathLine(TrajectoryComputationHelper& ch,
-                         MTrajectoryComputationInfo& cInfo);
+    void computePathLines(TrajectoryComputationHelper& ch,
+                          MTrajectoryComputationInfo& cInfo);
 
     /**
       Converts 3D wind velocity in (m/s, m/s, Pa/s) to units (deg lon, deg lat,
@@ -223,7 +229,7 @@ protected:
     QVector3D convertWindVelocityFromMetricToSpherical(
             QVector3D velocity_ms_ms_Pas, QVector3D position_lon_lat_p);
 
-    /* Computation Methods. */
+    /* Methods for Euler and Runge-Kutta integration. */
     /**
       Performs Euler integration between @p timePos0 and @p timePos1 on
       @p grids with step size @p deltaT using the interpolation method given by
@@ -235,8 +241,8 @@ protected:
       If the integration was successfull @p valid will be set to true, false
       otherwise.
 
-     Note: The method performs @ref EULER_ITERATION times the integration using
-     the results of the previous integration.
+      @note The method performs @ref EULER_ITERATION times the integration using
+      the results of the previous integration.
      */
     QVector3D trajectoryIntegrationEuler(
             QVector3D pos, float deltaT, float timePos0, float timePos1,
@@ -259,59 +265,76 @@ protected:
             TRAJECTORY_COMPUTATION_INTERPOLATION_METHOD method,
             QVector<QVector<MStructuredGrid*>> &grids, bool& valid);
 
-    /* Sample methods. */
+    /* Sampling methods. */
     /**
-      Samples wind velocity from @p grid using the interpolation method
-      @p method and the interpolation factor @p factor.
+      Samples wind velocity at @p pos in 3D space and time from @p grids using
+      the interpolation method @p method and the time interpolation
+      factor @p timeInterpolationValue (0..1).
 
-      @p grids needs to contain eastward wind grid, northward wind grid and
-      vertical wind grid in this order.
+      @p grids is a two-dimensional list of grids that needs to contain two
+      timesteps of eastward wind grid, northward wind grid and vertical wind
+      grid (in this order).
 
       If sampling was successfull @p valid will be set to true, false otherwise.
+
+      @note The different approaches to 3D space/time interpolation are
+      documented in Philipp Kaiser's master's thesis (TUM 2017).
      */
-    QVector3D sampleVelocity(QVector3D pos, float factor,
-                             TRAJECTORY_COMPUTATION_INTERPOLATION_METHOD method,
-                             QVector<QVector<MStructuredGrid*>> &grids,
-                             bool& valid);
+    QVector3D sampleVelocity3DSpaceTime(
+            QVector3D pos, float timeInterpolationValue,
+            TRAJECTORY_COMPUTATION_INTERPOLATION_METHOD method,
+            QVector<QVector<MStructuredGrid*>> &grids, bool& valid);
 
     /**
-      Performs tri-linear intperpolation to get pressure value in @p grid at the
-      relative position @p index.
+      Performs tri-linear intperpolation to obtain the pressure value of
+      @p grid at the float index position @p index.
      */
-    float pressure(QVector3D index, MStructuredGrid *grid);
+    float samplePressureAtFloatIndex(QVector3D index, MStructuredGrid *grid);
 
     /**
-      Performs tri-linear intperpolation to get scalar value in @p grid at the
-      relative position @p index.
+      Performs tri-linear intperpolation to obtain the data value of
+      @p grid at the float index position @p index.
      */
-    float value(QVector3D index, MStructuredGrid *grid);
+    float sampleDataValueAtFloatIndex(QVector3D index, MStructuredGrid *grid);
 
     /**
-      Get indices (lon, lat, pressure) as floating point number representing @p
-      pos with respect to position and dimensions of @p grid.
+      Determine indices (of lon, lat, pressure) as floating point numbers
+      representing @p pos with respect to position and dimensions of @p grid.
 
       If an index is out of bounds it is replaced by -1.
      */
-    QVector3D findGridIndex(QVector3D pos, MStructuredGrid *grid);
+    QVector3D floatIndexAtPos(QVector3D pos, MStructuredGrid *grid);
 
     /**
-      Computes linear interpolation between indices of @p grid0 and @p grid1 at
-      position @p pos using @p factor as interpolation factor.
+      Determines the float indices at position @p pos in @p grid0 and @p grid1,
+      then interpolates these indices linearly in time using the time using
+      the time interpolation factor @p timeInterpolationValue.
+
+      @note The different approaches to 3D space/time interpolation are
+      documented in Philipp Kaiser's master's thesis (TUM 2017).
      */
-    QVector3D interpolatedIndex(QVector3D pos, MStructuredGrid* grid0,
-                                MStructuredGrid* grid1, float factor);
+    QVector3D floatIndexAtPosInterpolatedInTime(
+            QVector3D pos, MStructuredGrid* grid0,
+            MStructuredGrid* grid1, float timeInterpolationValue);
 
     /**
-      Computes linear interpolation between values of @p grid0 and @p grid1 at
-      index @p index using @p factor as interpolation factor.
+      For a pre-computed float index, first samples the data values in both
+      grids @p grid0 and @p grid1 using @ref sampleDataValueAtFloatIndex(),
+      then linearly interpolates the two values in time using the time
+      interpolation factor @p timeInterpolationValue.
+
+      @note The different approaches to 3D space/time interpolation are
+      documented in Philipp Kaiser's master's thesis (TUM 2017).
      */
-    float interpolatedValue(QVector3D index, MStructuredGrid *grid0,
-                            MStructuredGrid *grid1, float factor);
+    float sampleDataValueAtFloatIndexAndInterpolateInTime(
+            QVector3D index, MStructuredGrid *grid0,
+            MStructuredGrid *grid1, float timeInterpolationValue);
 
     /**
-      Computes seeding position for given trajectory.
+      Determines the seed position for a given trajectory.
      */
-     QVector3D computeSeedPosition(int trajectory, TrajectoryComputationHelper& ch);
+    QVector3D determineTrajectorySeedPosition(
+            int trajectory, TrajectoryComputationHelper& ch);
 
     // Dictionaries of available trajectory data. Access needs to be proteced
     // by the provided read/write lock.
@@ -323,7 +346,6 @@ protected:
     QString windNorthwardVariableName;
     QString windVerticalVariableName;
     MVerticalLevelType levelType;
-
 };
 
 
