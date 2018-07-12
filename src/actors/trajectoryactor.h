@@ -279,12 +279,13 @@ private:
     void updateParticlePosTimeProperty();
 
     /**
-      Updates the delta time property (available times for computation) from
-      the current trajectories data source.
+      Updates the property displaying available integration times for
+      trajectory computation from the current trajectories data source and
+      "trajectory start time" setting.
 
       Note: Precomputed datasources do not support that property.
      */
-    void updateDeltaTimeProperty();
+    void updateTrajectoryIntegrationTimeProperty();
 
     /**
       Internal function containing common code for @ref setStartDateTime() and
@@ -391,6 +392,7 @@ private:
     QtProperty *computationDeltaTProperty;
     QtProperty* computationSeedPropertyGroup;
     QtProperty* computationSeedAddActorProperty;
+    QtProperty* computationRecomputeProperty;
 
     enum SeedActorType
     {
@@ -503,7 +505,7 @@ private:
       seed actor for this trajectory actor.
      */
     void addSeedActor(QString name, double deltaLon, double deltaLat,
-                      QVector<float> presLvls);
+                      QVector<float> pressureLevels);
 
     /**
       Removes all seed actors from the trajectory actor.

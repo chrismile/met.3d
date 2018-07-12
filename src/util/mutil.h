@@ -157,6 +157,6 @@ QVector<float> parsePressureLevelString(QString levels);
   Builds a string containing all values given by @p levels by separating the
   values by @p delimiter.
  */
-QString encodePressureLevels(QVector<float> levels, QString delimiter);
+QString listOfPressureLevelsAsString(QVector<float> levels, QString delimiter);
 
 #endif // MUTIL_H

@@ -149,6 +149,13 @@ public:
 
     QStringList getEnumItems(QtProperty* prop);
 
+    /**
+      Updates the list of enum items in @prop and tries to restores the
+      previously set item. If this is successful, @p true is returned; if
+      the previous item cannot be restored, @p false is returned.
+     */
+    bool updateEnumItems(QtProperty* prop, const QStringList& names);
+
 private:
     QtGroupPropertyManager    *groupPropertyManager;
     QtBoolPropertyManager     *boolPropertyManager;

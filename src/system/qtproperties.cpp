@@ -325,4 +325,15 @@ QStringList MQtProperties::getEnumItems(QtProperty *prop)
 }
 
 
+bool MQtProperties::updateEnumItems(QtProperty *prop, const QStringList &names)
+{
+    // Remember the item that is selected before the update.
+    QString previouslySelectedItem = getEnumItem(prop);
+    // Update names.
+    mEnum()->setEnumNames(prop, names);
+    // Try to restore previously selected item.
+    return setEnumItem(prop, previouslySelectedItem);
+}
+
+
 } // namespace Met3D

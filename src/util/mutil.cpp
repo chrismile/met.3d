@@ -201,7 +201,7 @@ QVector<float> parsePressureLevelString(QString levels)
 }
 
 
-QString encodePressureLevels(QVector<float> levels, QString delimiter)
+QString listOfPressureLevelsAsString(QVector<float> levels, QString delimiter)
 {
     // Create empty string.
     QString stringValue = QString("");
