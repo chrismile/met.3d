@@ -32,6 +32,7 @@
 #include <log4cplus/loggingmacros.h>
 
 // local application imports
+#include "gxfw/mscenecontrol.h"
 
 using namespace QtExtensions;
 

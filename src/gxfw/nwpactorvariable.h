@@ -415,13 +415,6 @@ private:
                              const QDateTime& datetime,
                              QtProperty* timeProperty);
 
-
-    template<typename T> bool setEnumPropertyClosest(
-            const QList<T>& availableValues,
-            const T& value,
-            QtProperty* property,
-            bool setSyncColour=true);
-
     void runStatisticalAnalysis(double significantDigits,
                                 int histogramDisplayMode);
 

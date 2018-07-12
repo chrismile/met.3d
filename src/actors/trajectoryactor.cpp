@@ -48,6 +48,9 @@
 #include "actors/nwphorizontalsectionactor.h"
 #include "actors/nwpverticalsectionactor.h"
 #include "actors/volumebboxactor.h"
+#include "gxfw/mscenecontrol.h"
+#include "system/qtproperties.h"
+#include "system/qtproperties_templates.h"
 
 using namespace std;
 
@@ -149,14 +152,15 @@ MTrajectoryActor::MTrajectoryActor()
     // Ensemble.
     QStringList ensembleModeNames;
     ensembleModeNames << "member" << "all";
-    ensembleModeProperty = addProperty(ENUM_PROPERTY, "ensemble mode",
-                                       actorPropertiesSupGroup);
+    ensembleModeProperty = addProperty(
+                ENUM_PROPERTY, "ensemble mode",
+                actorPropertiesSupGroup);
     properties->mEnum()->setEnumNames(ensembleModeProperty, ensembleModeNames);
     ensembleModeProperty->setEnabled(false);
 
-    ensembleMemberProperty = addProperty(INT_PROPERTY, "ensemble member",
-                                         actorPropertiesSupGroup);
-    properties->setInt(ensembleMemberProperty, 0, 0, 50, 1);
+    ensembleSingleMemberProperty = addProperty(
+                ENUM_PROPERTY, "ensemble member",
+                actorPropertiesSupGroup);
 
     // Property group: Trajectory computation.
     // ====================================
@@ -480,10 +484,8 @@ void MTrajectoryActor::loadConfiguration(QSettings *settings)
                                    " properties.");
                     msgBox.exec();
                     enableActorUpdates(false);
-                    properties->mString()->setValue(utilizedDataSourceProperty,
-                                                    "");
-                    properties->mInt()->setValue(ensembleMemberProperty, 0);
-                    properties->mInt()->setMaximum(ensembleMemberProperty, 0);
+                    properties->mString()->setValue(
+                                utilizedDataSourceProperty, "");
                     enableActorUpdates(true);
                     enableProperties(false);
                 }
@@ -504,6 +506,7 @@ void MTrajectoryActor::loadConfiguration(QSettings *settings)
 
             updateInitTimeProperty();
             updateStartTimeProperty();
+            updateEnsembleSingleMemberProperty();
         }
     }
 
@@ -814,7 +817,7 @@ void MTrajectoryActor::synchronizeWith(
             scene->resetPropertyColour(initTimeProperty);
             scene->resetPropertyColour(startTimeProperty);
             scene->resetPropertyColour(particlePosTimeProperty);
-            scene->resetPropertyColour(ensembleMemberProperty);
+            scene->resetPropertyColour(ensembleSingleMemberProperty);
         }
 
         if (updateGUIProperties)
@@ -943,7 +946,7 @@ void MTrajectoryActor::updateSyncPropertyColourHints(MSceneControl *scene)
         setPropertyColour(initTimeProperty, QColor(), true, scene);
         setPropertyColour(startTimeProperty, QColor(), true, scene);
         setPropertyColour(particlePosTimeProperty, QColor(), true, scene);
-        setPropertyColour(ensembleMemberProperty, QColor(), true, scene);
+        setPropertyColour(ensembleSingleMemberProperty, QColor(), true, scene);
     }
     else
     {
@@ -977,7 +980,7 @@ void MTrajectoryActor::updateSyncPropertyColourHints(MSceneControl *scene)
         match = (getEnsembleMember()
                  == synchronizationControl->ensembleMember());
         colour = match ? QColor(0, 255, 0) : QColor(255, 0, 0);
-        setPropertyColour(ensembleMemberProperty, colour,
+        setPropertyColour(ensembleSingleMemberProperty, colour,
                           !synchronizeEnsemble, scene);
     }
 }
@@ -1138,27 +1141,14 @@ bool MTrajectoryActor::setEnsembleMember(int member)
     else
     {
 #ifdef DIRECT_SYNCHRONIZATION
-        int prevEnsembleMember = properties->mInt()->value(
-                    ensembleMemberProperty);
+        int prevEnsembleMember = getEnsembleMember();
 #endif
         // Change ensemble member.
-        properties->mInt()->setValue(ensembleMemberProperty, member);
+        properties->setEnumPropertyClosest<unsigned int>(
+                    availableEnsembleMembersAsSortedList, (unsigned int)member,
+                    ensembleSingleMemberProperty,
+                    synchronizeEnsemble, getScenes());
         properties->mEnum()->setValue(ensembleModeProperty, 0);
-
-        // Update background colour of the property in the connected
-        // scene's property browser: green if "value" is an
-        // exact match with one of the available values, red otherwise.
-        if (synchronizeEnsemble)
-        {
-            bool exactMatch =
-                    (member == properties->mInt()->value(ensembleMemberProperty));
-            QColor colour = exactMatch ? QColor(0, 255, 0) : QColor(255, 0, 0);
-            foreach (MSceneControl* scene, getScenes())
-            {
-                scene->setPropertyColour(ensembleMemberProperty, colour);
-            }
-        }
-
 
 #ifdef DIRECT_SYNCHRONIZATION
         // Does a new data request need to be emitted?
@@ -1668,6 +1658,7 @@ void MTrajectoryActor::initializeActorResources()
 
         updateInitTimeProperty();
         updateStartTimeProperty();
+        updateEnsembleSingleMemberProperty();
 
         // Get values from sync control, if connected to one.
         if (synchronizationControl == nullptr)
@@ -1724,6 +1715,7 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
             enableProperties(true);
             updateInitTimeProperty();
             updateStartTimeProperty();
+            updateEnsembleSingleMemberProperty();
             // Synchronise with synchronisation control if available.
             if (synchronizationControl != nullptr)
             {
@@ -1845,7 +1837,7 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
         return;
     }
 
-    else if (property == ensembleMemberProperty)
+    else if (property == ensembleSingleMemberProperty)
     {
 //        updateSyncPropertyColourHints();
         if (suppressActorUpdates()) return;
@@ -2453,7 +2445,7 @@ void MTrajectoryActor::updateEnsembleProperties()
 
     // If the ensemble is synchronized, disable all properties (they are set
     // via the synchronization control).
-    ensembleMemberProperty->setEnabled(!synchronizeEnsemble);
+    ensembleSingleMemberProperty->setEnabled(!synchronizeEnsemble);
 
     enableActorUpdates(true);
 }
@@ -2623,14 +2615,12 @@ QDateTime MTrajectoryActor::getPropertyTime(QtProperty *enumProperty)
 
 int MTrajectoryActor::getEnsembleMember()
 {
-    return properties->mInt()->value(ensembleMemberProperty);
-//    QString memberString =
-//            getQtProperties()->getEnumItem(ensembleMemberProperty);
+    QString memberString = properties->getEnumItem(ensembleSingleMemberProperty);
 
-//    bool ok = true;
-//    int member = memberString.toInt(&ok);
+    bool ok = true;
+    int member = memberString.toInt(&ok);
 
-//    if (ok) return member; else return -99999;
+    if (ok) return member; else return -99999;
 }
 
 
@@ -2697,7 +2687,7 @@ void MTrajectoryActor::asynchronousDataRequest(bool synchronizationRequest)
         // ===================================================================
         QDateTime initTime  = getPropertyTime(initTimeProperty);
         QDateTime validTime = getPropertyTime(startTimeProperty);
-        unsigned int member = properties->mInt()->value(ensembleMemberProperty);
+        unsigned int member = getEnsembleMember();
 
         MDataRequestHelper rh;
         rh.insert("INIT_TIME", initTime);
@@ -2870,7 +2860,7 @@ void MTrajectoryActor::asynchronousSelectionRequest()
         // Get the current init and valid (= trajectory start) time.
         QDateTime initTime  = getPropertyTime(initTimeProperty);
         QDateTime validTime = getPropertyTime(startTimeProperty);
-        unsigned int member = properties->mInt()->value(ensembleMemberProperty);
+        unsigned int member = getEnsembleMember();
 
         MDataRequestHelper rh;
         rh.insert("INIT_TIME", initTime);
@@ -3005,8 +2995,8 @@ void MTrajectoryActor::updateInitTimeProperty()
         // Get the current init time value.
         QDateTime initTime  = getPropertyTime(initTimeProperty);
 
-        // Get available init times from the data loader. Convert the QDateTime
-        // objects to strings for the enum manager.
+        // Get available init times from the trajectory source. Convert the
+        // QDateTime objects to strings for the enum manager.
         availableInitTimes = trajectorySource->availableInitTimes();
         QStringList timeStrings;
         for (int i = 0; i < availableInitTimes.size(); i++)
@@ -3131,6 +3121,39 @@ void MTrajectoryActor::updateParticlePosTimeProperty()
     }
 
     suppressUpdate = false;
+}
+
+
+bool MTrajectoryActor::updateEnsembleSingleMemberProperty()
+{
+    // Remember currently set ensemble member in order to restore it below
+    // (if getEnsembleMember() returns a value < 0 the list is currently
+    // empty; however, since the ensemble members are represented by
+    // unsigned ints below we cast this case to 0).
+    int prevEnsembleMember = max(0, getEnsembleMember());
+
+    // Update ensembleSingleMemberProperty so that the user can choose
+    // from the list of available members. (Requires first sorting the set of
+    // members as a list, which can then be converted  to a string list).
+    availableEnsembleMembersAsSortedList =
+            trajectorySource->availableEnsembleMembers().toList();
+    qSort(availableEnsembleMembersAsSortedList);
+
+    QStringList availableMembersAsStringList;
+    foreach (unsigned int member, availableEnsembleMembersAsSortedList)
+        availableMembersAsStringList << QString("%1").arg(member);
+
+    enableActorUpdates(false);
+    properties->mEnum()->setEnumNames(
+                ensembleSingleMemberProperty, availableMembersAsStringList);
+    properties->setEnumPropertyClosest<unsigned int>(
+                availableEnsembleMembersAsSortedList,
+                (unsigned int)prevEnsembleMember,
+                ensembleSingleMemberProperty, synchronizeEnsemble, getScenes());
+    enableActorUpdates(true);
+
+    bool displayedMemberHasChanged = (getEnsembleMember() != prevEnsembleMember);
+    return displayedMemberHasChanged;
 }
 
 
@@ -3324,6 +3347,7 @@ bool MTrajectoryActor::selectDataSource()
 
         updateInitTimeProperty();
         updateStartTimeProperty();
+        updateEnsembleSingleMemberProperty();
 
         return true;
     }
@@ -3513,7 +3537,7 @@ void MTrajectoryActor::enableProperties(bool enable)
                 enable && !(enableSync && synchronizeParticlePosTime));
 
     bBoxConnection->getProperty()->setEnabled(enable);
-    ensembleMemberProperty->setEnabled(enable && !synchronizeEnsemble);
+    ensembleSingleMemberProperty->setEnabled(enable && !synchronizeEnsemble);
 
     // Computation Properties.
     bool enableComputation = enable && !precomputedDataSource;

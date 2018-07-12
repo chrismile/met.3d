@@ -278,6 +278,8 @@ private:
      */
     void updateParticlePosTimeProperty();
 
+    bool updateEnsembleSingleMemberProperty();
+
     /**
       Updates the property displaying available integration times for
       trajectory computation from the current trajectories data source and
@@ -429,6 +431,7 @@ private:
     QList<QDateTime> availableStartTimes;
     QList<QDateTime> availableInitTimes;
     QList<QDateTime> availableParticlePosTimes;
+    QList<unsigned int> availableEnsembleMembersAsSortedList;
     QtProperty *initTimeProperty;
     QtProperty *startTimeProperty;
     QtProperty *particlePosTimeProperty;
@@ -436,7 +439,7 @@ private:
 
     /** Ensemble management. */
     QtProperty *ensembleModeProperty;
-    QtProperty *ensembleMemberProperty;
+    QtProperty *ensembleSingleMemberProperty;
     /** Trajectory filtering. */
     QtProperty *filtersGroupProperty;
     QtProperty *enableAscentFilterProperty;
