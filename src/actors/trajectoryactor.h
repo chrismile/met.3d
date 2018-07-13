@@ -390,8 +390,9 @@ private:
     QtProperty *computationInterpolationMethodProperty;
     QtProperty *computationLineTypeProperty;
     QtProperty* computationIntegrationMethodProperty;
-    QtProperty *computationIterationCountProperty;
-    QtProperty *computationDeltaTProperty;
+    QtProperty *computationNumSubTimeStepsProperty;
+    QtProperty *computationStreamlineDeltaSProperty;
+    QtProperty *computationStreamlineLengthProperty;
     QtProperty* computationSeedPropertyGroup;
     QtProperty* computationSeedAddActorProperty;
     QtProperty* computationRecomputeProperty;

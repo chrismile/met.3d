@@ -197,31 +197,40 @@ MTrajectoryActor::MTrajectoryActor()
                 computationInterpolationMethodProperty,
                 QStringList() << "as LAGRANTO v2" << "trilinear (in lon-lat-lnp)");
 
-    computationIterationCountProperty = addProperty(
-                INT_PROPERTY,
-                "timest. per data t.interv.",
+    computationNumSubTimeStepsProperty = addProperty(
+                INT_PROPERTY, "timestep per data t.interv.",
                 computationPropertyGroup);
-    properties->setInt(computationIterationCountProperty, 12, 1, 1000);
-    computationIterationCountProperty->setToolTip(
-                "the timestep used for the trajectory integrations is taken "
-                "to be 1/<this value> of the wind data time interval (default"
-                " in LAGRANTO v2 is 1/12)");
-
-    computationDeltaTProperty = addProperty(
-                DECORATEDDOUBLE_PROPERTY, "delta t",
-                computationPropertyGroup);
-    properties->setDDouble(
-                computationDeltaTProperty, 3600., 0.001,
-                numeric_limits<double>::max(), 3, 0.5, " sec");
-    computationDeltaTProperty->setToolTip(
-                "Timestep [in seconds] used for streamline computation.");
-    computationDeltaTProperty->setEnabled(false);
+    properties->setInt(computationNumSubTimeStepsProperty, 12, 1, 1000);
+    computationNumSubTimeStepsProperty->setToolTip(
+                "internal timestep for the trajectory integrations is taken "
+                "to be 1/<this value> of the wind data time interval (default "
+                "in LAGRANTO v2 is 1/12); wind data is interpolated in time "
+                "to times between available wind data timesteps");
 
     computationIntegrationTimeProperty = addProperty(
                 ENUM_PROPERTY, "integration time", computationPropertyGroup);
     computationIntegrationTimeProperty->setToolTip(
                 "trajectory integration time (forward/backward) relative to "
                 "\"trajectory start\" time specified above");
+
+    computationStreamlineDeltaSProperty = addProperty(
+                DECORATEDDOUBLE_PROPERTY, "seg. length (delta s)",
+                computationPropertyGroup);
+    properties->setDDouble(
+                computationStreamlineDeltaSProperty, 1000., 0.001,
+                numeric_limits<double>::max(), 3, 0.5, "");
+    computationStreamlineDeltaSProperty->setToolTip(
+                "for streamline computations: segment length (delta s) for "
+                "integration (dx(s)/ds = v(x); x = position, v = wind)");
+    computationStreamlineDeltaSProperty->setEnabled(false);
+
+    computationStreamlineLengthProperty = addProperty(
+                INT_PROPERTY, "streamline length",
+                computationPropertyGroup);
+    properties->setInt(computationStreamlineLengthProperty, 500, 1, 1000000);
+    computationStreamlineLengthProperty->setToolTip(
+                "length of streamline in terms of number of segments");
+    computationStreamlineLengthProperty->setEnabled(false);
 
     computationRecomputeProperty = addProperty(
                 CLICK_PROPERTY, "recompute", computationPropertyGroup);
@@ -415,14 +424,17 @@ void MTrajectoryActor::saveConfiguration(QSettings *settings)
                        properties->mEnum()->value(
                            computationInterpolationMethodProperty));
     settings->setValue(
-                "computationIterationCountProperty",
-                properties->mInt()->value(computationIterationCountProperty));
+                "computationNumSubTimeStepsProperty",
+                properties->mInt()->value(computationNumSubTimeStepsProperty));
     settings->setValue(
-                "computationDeltaTProperty",
-                properties->mDDouble()->value(computationDeltaTProperty));
-    settings->setValue(
-                "computationDeltaTimeProperty",
+                "computationIntegrationTimeProperty",
                 properties->mEnum()->value(computationIntegrationTimeProperty));
+    settings->setValue(
+                "computationStreamlineDeltaSProperty",
+                properties->mDDouble()->value(computationStreamlineDeltaSProperty));
+    settings->setValue(
+                "computationStreamlineLengthProperty",
+                properties->mInt()->value(computationStreamlineLengthProperty));
     settings->setValue(
                 "computationSeedActorSize",
                 computationSeedActorProperties.size());
@@ -616,15 +628,21 @@ void MTrajectoryActor::loadConfiguration(QSettings *settings)
                 settings->value("computationInterpolationMethodProperty",
                                 0).toInt());
     properties->mInt()->setValue(
-                computationIterationCountProperty,
-                settings->value("computationIterationCountProperty",
-                                5).toInt());
-    properties->mDDouble()->setValue(
-                computationDeltaTProperty,
-                settings->value("computationDeltaTProperty", 3600.).toDouble());
+                computationNumSubTimeStepsProperty,
+                settings->value("computationNumSubTimeStepsProperty",
+                                12).toInt());
     properties->mEnum()->setValue(
                 computationIntegrationTimeProperty,
-                settings->value("computationDeltaTimeProperty", 0).toInt());
+                settings->value("computationIntegrationTimeProperty",
+                                0).toInt());
+    properties->mDDouble()->setValue(
+                computationStreamlineDeltaSProperty,
+                settings->value("computationStreamlineDeltaSProperty",
+                                1000.).toDouble());
+    properties->mInt()->setValue(
+                computationStreamlineLengthProperty,
+                settings->value("computationStreamlineLengthProperty",
+                                500.).toDouble());
 
     // Remove current seed actors.
     clearSeedActor();
@@ -1959,12 +1977,16 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
         switch (lineType)
         {
             case PATH_LINE:
+                computationNumSubTimeStepsProperty->setEnabled(true);
                 computationIntegrationTimeProperty->setEnabled(true);
-                computationDeltaTProperty->setEnabled(false);
+                computationStreamlineDeltaSProperty->setEnabled(false);
+                computationStreamlineLengthProperty->setEnabled(false);
                 break;
             case STREAM_LINE:
+                computationNumSubTimeStepsProperty->setEnabled(false);
                 computationIntegrationTimeProperty->setEnabled(false);
-                computationDeltaTProperty->setEnabled(true);
+                computationStreamlineDeltaSProperty->setEnabled(true);
+                computationStreamlineLengthProperty->setEnabled(true);
                 break;
         }
         enableActorUpdates(true);
@@ -1981,25 +2003,11 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
         asynchronousDataRequest();
     }
 
-    else if (property == computationIterationCountProperty)
-    {
-        if (suppressActorUpdates()) return;
-        asynchronousDataRequest();
-    }
-
-    else if (property == computationDeltaTProperty)
-    {
-        if (suppressActorUpdates()) return;
-        asynchronousDataRequest();
-    }
-
-    else if (property == computationIntegrationMethodProperty)
-    {
-        if (suppressActorUpdates()) return;
-        asynchronousDataRequest();
-    }
-
-    else if (property == computationInterpolationMethodProperty)
+    else if ( (property == computationStreamlineDeltaSProperty)    ||
+              (property == computationStreamlineLengthProperty)    ||
+              (property == computationInterpolationMethodProperty) ||
+              (property == computationIntegrationMethodProperty)   ||
+              (property == computationNumSubTimeStepsProperty)        )
     {
         if (suppressActorUpdates()) return;
         asynchronousDataRequest();
@@ -2703,15 +2711,17 @@ void MTrajectoryActor::asynchronousDataRequest(bool synchronizationRequest)
                             computationIntegrationTimeProperty));
             unsigned int lineType = properties->mEnum()->value(
                         computationLineTypeProperty);
-            unsigned int iterationMethod = properties->mEnum()->value(
+            unsigned int integrationMethod = properties->mEnum()->value(
                         computationIntegrationMethodProperty);
             unsigned int interpolationMethod = properties->mEnum()->value(
                         computationInterpolationMethodProperty);
-            unsigned int iterationCount = properties->mInt()->value(
-                        computationIterationCountProperty);
+            unsigned int numSubTimeSteps = properties->mInt()->value(
+                        computationNumSubTimeStepsProperty);
             unsigned int seedType = seedActorData[t].type;
-            double streamlineDeltaT = properties->mDDouble()->value(
-                        computationDeltaTProperty);
+            double streamlineDeltaS = properties->mDDouble()->value(
+                        computationStreamlineDeltaSProperty);
+            int streamlineLength = properties->mInt()->value(
+                        computationStreamlineLengthProperty);
             QString seedMinPosition = QString("%1/%2/%3")
                     .arg(seedActorData[t].minPosition.x())
                     .arg(seedActorData[t].minPosition.y())
@@ -2729,9 +2739,10 @@ void MTrajectoryActor::asynchronousDataRequest(bool synchronizationRequest)
             // Insert additional informations into data request.
             rh.insert("END_TIME", endTime);
             rh.insert("LINE_TYPE", lineType);
-            rh.insert("ITERATION_PER_TIMESTEP", iterationCount);
-            rh.insert("STREAMLINE_DELTA_T", streamlineDeltaT);
-            rh.insert("ITERATION_METHOD", iterationMethod);
+            rh.insert("SUBTIMESTEPS_PER_DATATIMESTEP", numSubTimeSteps);
+            rh.insert("STREAMLINE_DELTA_S", streamlineDeltaS);
+            rh.insert("STREAMLINE_LENGTH", streamlineLength);
+            rh.insert("INTEGRATION_METHOD", integrationMethod);
             rh.insert("INTERPOLATION_METHOD", interpolationMethod);
             rh.insert("SEED_TYPE", seedType);
             rh.insert("SEED_MIN_POSITION", seedMinPosition);
@@ -2882,15 +2893,17 @@ void MTrajectoryActor::asynchronousSelectionRequest()
             QDateTime endTime = availableStartTimes.at(max(0, endTimeIndex));
             unsigned int lineType =
                     properties->mEnum()->value(computationLineTypeProperty);
-            unsigned int iterationMethod = properties->mEnum()->value(
+            unsigned int integrationMethod = properties->mEnum()->value(
                         computationIntegrationMethodProperty);
             unsigned int interpolatonMethod = properties->mEnum()->value(
                         computationInterpolationMethodProperty);
-            unsigned int iterationCount = properties->mInt()->value(
-                        computationIterationCountProperty);
+            unsigned int subTimeSteps = properties->mInt()->value(
+                        computationNumSubTimeStepsProperty);
             unsigned int seedType = seedActorData[t].type;
-            double streamlineDeltaT = properties->mDDouble()->value(
-                        computationDeltaTProperty);
+            double streamlineDeltaS = properties->mDDouble()->value(
+                        computationStreamlineDeltaSProperty);
+            int streamlineLength = properties->mInt()->value(
+                        computationStreamlineLengthProperty);
             QString seedMinPosition = QString("%1/%2/%3")
                     .arg(seedActorData[t].minPosition.x())
                     .arg(seedActorData[t].minPosition.y())
@@ -2908,9 +2921,10 @@ void MTrajectoryActor::asynchronousSelectionRequest()
             // Insert additional informations into data request.
             rh.insert("END_TIME", endTime);
             rh.insert("LINE_TYPE", lineType);
-            rh.insert("ITERATION_PER_TIMESTEP", iterationCount);
-            rh.insert("STREAMLINE_DELTA_T", streamlineDeltaT);
-            rh.insert("ITERATION_METHOD", iterationMethod);
+            rh.insert("SUBTIMESTEPS_PER_DATATIMESTEP", subTimeSteps);
+            rh.insert("STREAMLINE_DELTA_S", streamlineDeltaS);
+            rh.insert("STREAMLINE_LENGTH", streamlineLength);
+            rh.insert("INTEGRATION_METHOD", integrationMethod);
             rh.insert("INTERPOLATION_METHOD", interpolatonMethod);
             rh.insert("SEED_TYPE", seedType);
             rh.insert("SEED_MIN_POSITION", seedMinPosition);

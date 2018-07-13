@@ -226,11 +226,12 @@ MTask* MTrajectoryComputationSource::createTaskGraph(MDataRequest request)
     // Remove variables used by this instance.
     rh.remove("TIME_SPAN");
     rh.remove("LINE_TYPE");
-    rh.remove("ITERATION_METHOD");
+    rh.remove("INTEGRATION_METHOD");
     rh.remove("INTERPOLATION_METHOD");
     rh.remove("SEED_TYPE");
-    rh.remove("ITERATION_PER_TIMESTEP");
-    rh.remove("STREAMLINE_DELTA_T");
+    rh.remove("SUBTIMESTEPS_PER_DATATIMESTEP");
+    rh.remove("STREAMLINE_DELTA_S");
+    rh.remove("STREAMLINE_LENGTH");
     rh.remove("SEED_MIN_POSITION");
     rh.remove("SEED_MAX_POSITION");
     rh.remove("SEED_STEP_SIZE_LON_LAT");
@@ -300,32 +301,30 @@ void MTrajectoryComputationSource::initialiseFromDataSource()
 
 const QStringList MTrajectoryComputationSource::locallyRequiredKeys()
 {
-    return (QStringList() << "INIT_TIME" << "VALID_TIME" << "END_TIME"
-            << "MEMBER" << "TIME_SPAN" << "ITERATION_PER_TIMESTEP"
-            << "STREAMLINE_DELTA_T" << "LINE_TYPE" << "ITERATION_METHOD"
-            << "INTERPOLATION_METHOD" << "SEED_TYPE" << "SEED_MIN_POSITION"
-            << "SEED_MAX_POSITION" << "SEED_STEP_SIZE_LON_LAT"
-            << "SEED_PRESSURE_LEVELS");
+    return (QStringList() << "INIT_TIME" << "VALID_TIME" << "END_TIME" <<
+            "MEMBER" << "TIME_SPAN" << "SUBTIMESTEPS_PER_DATATIMESTEP" <<
+            "STREAMLINE_DELTA_S" << "STREAMLINE_LENGTH" << "LINE_TYPE" <<
+            "INTEGRATION_METHOD" << "INTERPOLATION_METHOD" << "SEED_TYPE" <<
+            "SEED_MIN_POSITION" << "SEED_MAX_POSITION" <<
+            "SEED_STEP_SIZE_LON_LAT" << "SEED_PRESSURE_LEVELS");
 }
 
 
 void MTrajectoryComputationSource::computeTrajectories(
         MDataRequest request, MTrajectoryComputationInfo& cInfo)
 {
-    /* A) Process request
-    ===============================
-     Read parameters from basic request, such as Init_time and valid_time.
-     Get the time steps that are needed to be requested for the computation
-    */
+    // A) Process request
+    // ===============================
+    // Read parameters from incoming request string.
 
     // Request data of all variables.
     MDataRequestHelper rh(request);
     QDateTime initTime = rh.timeValue("INIT_TIME");
     QDateTime validTime = rh.timeValue("VALID_TIME");
     QDateTime endTime = rh.timeValue("END_TIME");
-    TRAJECTORY_COMPUTATION_ITERATION_METHOD iterationMethod =
-            TRAJECTORY_COMPUTATION_ITERATION_METHOD(
-                rh.intValue("ITERATION_METHOD"));
+    TRAJECTORY_COMPUTATION_INTEGRATION_METHOD integrationMethod =
+            TRAJECTORY_COMPUTATION_INTEGRATION_METHOD(
+                rh.intValue("INTEGRATION_METHOD"));
     TRAJECTORY_COMPUTATION_INTERPOLATION_METHOD  interpolationMethod =
             TRAJECTORY_COMPUTATION_INTERPOLATION_METHOD(
                 rh.intValue("INTERPOLATION_METHOD"));
@@ -333,8 +332,9 @@ void MTrajectoryComputationSource::computeTrajectories(
             TRAJECTORY_COMPUTATION_LINE_TYPE(rh.intValue("LINE_TYPE"));
     TRAJECTORY_COMPUTATION_SEED_TYPE seedType =
             TRAJECTORY_COMPUTATION_SEED_TYPE(rh.intValue("SEED_TYPE"));
-    uint iterationPerTimeStep = rh.intValue("ITERATION_PER_TIMESTEP");
-    double streamlineDeltaT = rh.doubleValue("STREAMLINE_DELTA_T");
+    uint iterationPerTimeStep = rh.intValue("SUBTIMESTEPS_PER_DATATIMESTEP");
+    double streamlineDeltaT = rh.doubleValue("STREAMLINE_DELTA_S");
+    int streamlineLength = rh.intValue("STREAMLINE_LENGTH");
     QStringList seedMinPositionList = rh.value("SEED_MIN_POSITION").split("/");
     QStringList seedMaxPositionList = rh.value("SEED_MAX_POSITION").split("/");
     QStringList seedStepSizeList = rh.value("SEED_STEP_SIZE_LON_LAT").split("/");
@@ -359,27 +359,27 @@ void MTrajectoryComputationSource::computeTrajectories(
     rh.remove("END_TIME");
     rh.remove("TIME_SPAN");
     rh.remove("LINE_TYPE");
-    rh.remove("ITERATION_METHOD");
+    rh.remove("INTEGRATION_METHOD");
     rh.remove("INTERPOLATION_METHOD");
     rh.remove("SEED_TYPE");
-    rh.remove("ITERATION_PER_TIMESTEP");
-    rh.remove("STREAMLINE_DELTA_T");
+    rh.remove("SUBTIMESTEPS_PER_DATATIMESTEP");
+    rh.remove("STREAMLINE_DELTA_S");
+    rh.remove("STREAMLINE_LENGTH");
     rh.remove("SEED_MIN_POSITION");
     rh.remove("SEED_MAX_POSITION");
     rh.remove("SEED_STEP_SIZE_LON_LAT");
     rh.remove("SEED_PRESSURE_LEVELS");
     rh.insert("LEVELTYPE", levelType);
 
-    // Access all validTimes.
+    // Determine available valid times.
     QReadLocker availableItemsReadLocker(&availableItemsLock);
     QList<QDateTime> validTimes = availableTrajectories.value(initTime).keys();
     availableItemsReadLocker.unlock();
 
-    /* B) Initialization
-    ===============================
-     Initialize ComputationHelper with all needed variables for further
-     processing.
-    */
+    // B) Initialization
+    // ===============================
+    // Initialize a data struct of type TrajectoryComputationHelper that
+    // contains all variables required for further processing.
 
     TrajectoryComputationHelper helper;
     helper.baseRequest = rh.request();
@@ -387,16 +387,17 @@ void MTrajectoryComputationSource::computeTrajectories(
     helper.varNames[1] = windNorthwardVariableName;
     helper.varNames[2] = windVerticalVariableName;
     helper.validTimes = validTimes;
-    helper.iterationMethod = iterationMethod;
+    helper.iterationMethod = integrationMethod;
     helper.interpolationMethod = interpolationMethod;
     helper.startTimeStep = validTimes.indexOf(validTime);
     helper.endTimeStep = validTimes.indexOf(endTime);
-    helper.iterationPerTimeStep = iterationPerTimeStep;
-    helper.streamlineDeltaT = streamlineDeltaT;
+    helper.subTimeStepsPerDataTimeStep = iterationPerTimeStep;
+    helper.streamlineDeltaS = streamlineDeltaT;
+    helper.streamlineLength = streamlineLength;
     helper.seedType = seedType;
     helper.seedMinPosition = seedMinPosition;
     helper.seedMaxPosition = seedMaxPosition;
-    helper.seedStepSizeLonLat = seedStepSize;
+    helper.seedStepSizeHorizontalLonLat = seedStepSize;
     helper.seedPressureLevels = seedPressureLevels;
     switch (helper.seedType)
     {
@@ -446,13 +447,8 @@ void MTrajectoryComputationSource::computeTrajectories(
                                                * helper.seedCount.z());
 
 
-    /* C) Trajectory Computation
-    ============================
-     Fill needed grid slots with correct time step and compute trajectory
-     vertices for given trajectory number. Path lines needed adjusted vector
-     field after every processed time step. Stream lines are computed with a
-     fixed vector field.
-    */
+    // C) Trajectory or streamline computation
+    // =======================================
 
     switch (lineType)
     {
@@ -469,19 +465,24 @@ void MTrajectoryComputationSource::computeTrajectories(
 void MTrajectoryComputationSource::computeStreamLines(
         TrajectoryComputationHelper& ch, MTrajectoryComputationInfo& cInfo)
 {
-    // Initialize used variables.
+    // Array to store grids with wind data that are passed to the integration
+    // methods. trajectoryIntegrationEuler() and trajectoryIntegrationRungeKutta()
+    // both require two timesteps to be passed. As for streamlines we only
+    // consider a single timestep, the current implementation simply stores
+    // pointers to the same data for both time steps (see below).
     QVector<QVector<MStructuredGrid*>> grids(
                 2, QVector<MStructuredGrid *>(3, nullptr));
+
     MDataRequestHelper rh(ch.baseRequest);
 
-    // Initialize computation informations.
+    // Initialize computation information.
     cInfo.numTrajectories = ch.trajectoryCount;
-    cInfo.numTimeSteps = ch.iterationPerTimeStep;
-    cInfo.times.reserve(cInfo.numTimeSteps);
+    cInfo.numStoredVerticesPerTrajectory = ch.streamlineLength;
+    cInfo.times.reserve(cInfo.numStoredVerticesPerTrajectory);
     cInfo.vertices = QVector<QVector<QVector3D>>(cInfo.numTrajectories);
     for (uint t = 0; t < cInfo.numTrajectories; ++t)
     {
-        cInfo.vertices[t].reserve(cInfo.numTimeSteps);
+        cInfo.vertices[t].reserve(cInfo.numStoredVerticesPerTrajectory);
     }
 
     // Add start time step and seed points.
@@ -489,60 +490,64 @@ void MTrajectoryComputationSource::computeStreamLines(
     cInfo.times.push_back(ch.validTimes.at(ch.startTimeStep));
     for (uint trajectory = 0; trajectory < ch.trajectoryCount; ++trajectory)
     {
-        cInfo.vertices[trajectory].push_back(determineTrajectorySeedPosition(trajectory,
-                                                                   ch));
+        cInfo.vertices[trajectory].push_back(
+                    determineTrajectorySeedPosition(trajectory, ch));
         validPosition[trajectory] = true;
     }
 
-    // Load grids (both grids are the same, because only a single time step is
-    // used).
+    // Load wind data (see comment above; two timesteps are required for the
+    // integration methods, here both grids are the same as only a single time
+    // step is required for streamline computation).
     QDateTime timeStep = ch.validTimes.at(ch.startTimeStep);
     rh.insert("VALID_TIME", timeStep);
-    for (int v = 0; v < ch.varNames.size(); ++v)
+    for (int v = 0; v < ch.varNames.size(); ++v) // v = 0,1,2 => wind u,v,w
     {
         rh.insert("VARIABLE", ch.varNames[v]);
-        grids[0][v] = dataSource->getData(rh.request());
-        grids[1][v] = grids[0][v];
+        grids[0][v] = dataSource->getData(rh.request()); // timestep 0
+        grids[1][v] = grids[0][v];                       // timestep 1 (link)
     }
 
-    // This should be removed in future, find a better way than getting number
-    // from times vector.
-    for (uint iteration = 1; iteration <= ch.iterationPerTimeStep; ++iteration)
+    // cInfo.times contains the list of timesteps that correspond to the
+    // trajectory vertices. For streamlines, there is only one timestep.
+    // How should this be handled? Currently, all times are set to the same
+    // value.
+//TODO (mr, 13Jul2018) -- how should this be handled?
+    for (uint i = 1; i <= cInfo.numStoredVerticesPerTrajectory; ++i)
     {
         cInfo.times.push_back(ch.validTimes.at(ch.startTimeStep));
     }
 
-    // Compute every trajectory.
+    // Compute the streamlines.
     #pragma omp parallel for
-    for (uint trajectory = 0; trajectory < ch.trajectoryCount; ++trajectory)
+    for (uint iStreamline = 0; iStreamline < ch.trajectoryCount; ++iStreamline)
     {
-        // Perform iteration per trajectory.
-        for (uint iteration = 1; iteration <= ch.iterationPerTimeStep;
-             ++iteration)
+        // Integrate streamline in wind field.
+        for (uint iVertex = 1; iVertex <= cInfo.numStoredVerticesPerTrajectory;
+             ++iVertex)
         {
             // Get current position from vertex buffer.
-            QVector3D currentPosition = cInfo.vertices[trajectory].back();
+            QVector3D currentPosition = cInfo.vertices[iStreamline].back();
 
-            // Compute next timestep with euler or runge-kutta.
+            // Compute next vertex with Euler or Runge-Kutta integration.
             QVector3D nextPos;
             switch (ch.iterationMethod)
             {
                 case EULER:
                     nextPos = trajectoryIntegrationEuler(
-                                currentPosition, ch.streamlineDeltaT, 0, 0,
+                                currentPosition, ch.streamlineDeltaS, 0, 0,
                                 ch.interpolationMethod, grids,
-                                validPosition[trajectory]);
+                                validPosition[iStreamline]);
                     break;
                 case RUNGE_KUTTA:
                     nextPos = trajectoryIntegrationRungeKutta(
-                                currentPosition, ch.streamlineDeltaT, 0, 0,
+                                currentPosition, ch.streamlineDeltaS, 0, 0,
                                 ch.interpolationMethod, grids,
-                                validPosition[trajectory]);
+                                validPosition[iStreamline]);
                     break;
             }
 
-            // Mark position as invalid.
-            if (!validPosition[trajectory])
+            // Check validity of computed vertex position.
+            if (!validPosition[iStreamline])
             {
                 nextPos = QVector3D(M_INVALID_TRAJECTORY_POS,
                                     M_INVALID_TRAJECTORY_POS,
@@ -550,11 +555,11 @@ void MTrajectoryComputationSource::computeStreamLines(
             }
 
             // Store position in vertex buffer.
-            cInfo.vertices[trajectory].push_back(nextPos);
+            cInfo.vertices[iStreamline].push_back(nextPos);
         }
     }
 
-    // Release all data.
+    // Release wind data grids.
     for (int v = 0; v < ch.varNames.size(); ++v)
     {
         if (grids[0][v])
@@ -568,23 +573,25 @@ void MTrajectoryComputationSource::computeStreamLines(
 void MTrajectoryComputationSource::computePathLines(
         TrajectoryComputationHelper& ch, MTrajectoryComputationInfo& cInfo)
 {
-    // Initialize used variables.
+    // Array to store grids with wind data that are passed to the integration
+    // methods. Two timesteps are stored.
     QVector<QVector<MStructuredGrid*>> grids(
                 2, QVector<MStructuredGrid *>(3, nullptr));
     QVector<QDateTime> timeSteps(2);
     MDataRequestHelper rh(ch.baseRequest);
 
-    // Initialize computation informations.
-    cInfo.numTimeSteps = abs(int(ch.endTimeStep) - int(ch.startTimeStep)) + 1;
+    // Initialize computation information.
+    cInfo.numStoredVerticesPerTrajectory =
+            abs(int(ch.endTimeStep) - int(ch.startTimeStep)) + 1;
     cInfo.numTrajectories = ch.trajectoryCount;
-    cInfo.times.reserve(cInfo.numTimeSteps);
+    cInfo.times.reserve(cInfo.numStoredVerticesPerTrajectory);
     cInfo.vertices = QVector<QVector<QVector3D>>(cInfo.numTrajectories);
     for (uint t = 0; t < cInfo.numTrajectories; ++t)
     {
-        cInfo.vertices[t].reserve(cInfo.numTimeSteps);
+        cInfo.vertices[t].reserve(cInfo.numStoredVerticesPerTrajectory);
     }
 
-    // Create temporary vector with current positions of trajectories.
+    // Create temporary vector to cache trajectory vertex positions.
     QVector<QVector3D> positions(cInfo.numTrajectories);
     QVector<bool> validPosition(cInfo.numTrajectories);
 
@@ -604,13 +611,14 @@ void MTrajectoryComputationSource::computePathLines(
     for (uint step = ch.startTimeStep; step != ch.endTimeStep;
          forward ? step++ : step--)
     {
-        // Set low and high times and time between time steps.
+        // Set previous and next data times and time between data time
+        // steps.
         timeSteps[0] = ch.validTimes.at(step);
         timeSteps[1] = ch.validTimes.at(step + (forward ? 1 : -1));
         const float timeStepSeconds = timeSteps[0].secsTo(timeSteps[1])
-                / static_cast<float>(ch.iterationPerTimeStep);
+                / static_cast<float>(ch.subTimeStepsPerDataTimeStep);
 
-        // Load missing grids.
+        // Load wind data (u,v,w components for both data time steps).
         for (int t = 0; t < timeSteps.size(); ++t)
         {
             rh.insert("VALID_TIME", timeSteps[t]);
@@ -618,71 +626,83 @@ void MTrajectoryComputationSource::computePathLines(
             {
                 rh.insert("VARIABLE", ch.varNames[v]);
                 if (!grids[t][v])
+                {
+                    // The "next" timestep of the previous time iteration
+                    // is now at the "previous" storage index [0] (see "swap"
+                    // command below) and set -- hence the check for a valid
+                    // pointer above.
                     grids[t][v] = dataSource->getData(rh.request());
+                }
             }
         }
 
-        // Save this timestep.
+        // The "current" timestep for which the new vertex position needs to
+        // be computed is the "next" timestep (index [1]).
         cInfo.times.push_back(timeSteps[1]);
 
-        // Compute every trajectory.
+        // Compute the trajectories.
         #pragma omp parallel for
-        for (uint trajectory = 0; trajectory < ch.trajectoryCount; ++trajectory)
+        for (uint iTrajectory = 0; iTrajectory < ch.trajectoryCount; ++iTrajectory)
         {
-            // Do iteration per trajectory and timestep.
-            for (uint iteration = 1; iteration <= ch.iterationPerTimeStep;
-                 ++iteration)
+            // Iterate over "sub-timesteps" (i.e. internally time-interpolated
+            // interpolation nodes; cf. trajectory integration implemented in
+            // LAGRANTO and described in Sprenger and Wernli (GMD, 2015)).
+            for (uint iSubTimeStep = 1;
+                 iSubTimeStep <= ch.subTimeStepsPerDataTimeStep; ++iSubTimeStep)
             {
-                // Compute current factor and store current time step.
-                const float factor0 = (iteration - 1)
-                        / static_cast<float>(ch.iterationPerTimeStep);
-                const float factor1 = iteration
-                        / static_cast<float>(ch.iterationPerTimeStep);
+                // Compute time interpolation weights.
+                const float timeIntWeight0 = (iSubTimeStep - 1)
+                        / static_cast<float>(ch.subTimeStepsPerDataTimeStep);
+                const float timeIntWeight1 = iSubTimeStep
+                        / static_cast<float>(ch.subTimeStepsPerDataTimeStep);
 
-                // Compute next timestep with euler or runge-kutta.
+                // Compute next vertex with Euler or Runge-Kutta integration.
                 switch (ch.iterationMethod)
                 {
                     case EULER:
-                        positions[trajectory] =
+                        positions[iTrajectory] =
                                 trajectoryIntegrationEuler(
-                                    positions[trajectory], timeStepSeconds,
-                                    factor0, factor1, ch.interpolationMethod,
-                                    grids, validPosition[trajectory]);
+                                    positions[iTrajectory], timeStepSeconds,
+                                    timeIntWeight0, timeIntWeight1,
+                                    ch.interpolationMethod,
+                                    grids, validPosition[iTrajectory]);
                         break;
                     case RUNGE_KUTTA:
-                        positions[trajectory] =
+                        positions[iTrajectory] =
                                 trajectoryIntegrationRungeKutta(
-                                    positions[trajectory], timeStepSeconds,
-                                    factor0, factor1, ch.interpolationMethod,
-                                    grids, validPosition[trajectory]);
+                                    positions[iTrajectory], timeStepSeconds,
+                                    timeIntWeight0, timeIntWeight1,
+                                    ch.interpolationMethod,
+                                    grids, validPosition[iTrajectory]);
                         break;
                 }
 
-                // Mark position as invalid.
-                if (!validPosition[trajectory])
+                // Check validity of computed vertex position.
+                if (!validPosition[iTrajectory])
                 {
-                    positions[trajectory] = QVector3D(M_INVALID_TRAJECTORY_POS,
-                                                      M_INVALID_TRAJECTORY_POS,
-                                                      M_INVALID_TRAJECTORY_POS);
+                    positions[iTrajectory] = QVector3D(M_INVALID_TRAJECTORY_POS,
+                                                       M_INVALID_TRAJECTORY_POS,
+                                                       M_INVALID_TRAJECTORY_POS);
                 }
             }
 
-            // Save position for this time step.
-            cInfo.vertices[trajectory].push_back(positions[trajectory]);
+            // Save computed vertex position for the "current" time step.
+            cInfo.vertices[iTrajectory].push_back(positions[iTrajectory]);
         }
 
-        // Release lower time step grid.
+        // Release data grid of previous time step (i.e. index [0]).
         for (int v = 0; v < ch.varNames.size(); ++v)
         {
             dataSource->releaseData(grids[0][v]);
             grids[0][v] = nullptr;
         }
 
-        // Swap grid.
+        // Swap data grids (the current data field at index [1] will be
+        // needed at index [0] in the next time iteration).
         swap(grids[0], grids[1]);
     }
 
-    // Release all data.
+    // Release all remaining not-yet released data fields.
     for (int t = 0; t < grids.size(); ++t)
     {
         for (int v = 0; v < grids[t].size(); ++v)
@@ -724,28 +744,28 @@ QVector3D MTrajectoryComputationSource::trajectoryIntegrationRungeKutta(
 {
     QVector3D s;
     QVector<QVector3D> k(4);
-    float timeInterpolationValue;
+    float timeInterpolationWeight;
 
     for (int i = 0; i < 4; i++)
     {
         if (i == 0)
         {
             s = QVector3D(0.0f, 0.0f, 0.0f);
-            timeInterpolationValue = timePos0;
+            timeInterpolationWeight = timePos0;
         }
         else if (i == 3)
         {
             s = k[i - 1];
-            timeInterpolationValue = timePos1;
+            timeInterpolationWeight = timePos1;
         }
         else
         {
             s = k[i - 1] / 2.0f;
-            timeInterpolationValue = (timePos0 + timePos1) / 2.0f;
+            timeInterpolationWeight = (timePos0 + timePos1) / 2.0f;
         }
 
         QVector3D v = sampleVelocity3DSpaceTime(
-                    pos + s, timeInterpolationValue, method, grids, valid);
+                    pos + s, timeInterpolationWeight, method, grids, valid);
         k[i] = convertWindVelocityFromMetricToSpherical(v, pos);
     }
 
@@ -998,9 +1018,9 @@ QVector3D MTrajectoryComputationSource::determineTrajectorySeedPosition(
 
             // Compute seed position given by delta and grid position.
             return QVector3D(ch.seedMinPosition.x()
-                             + x * ch.seedStepSizeLonLat.x(),
+                             + x * ch.seedStepSizeHorizontalLonLat.x(),
                              ch.seedMinPosition.y()
-                             + y * ch.seedStepSizeLonLat.y(),
+                             + y * ch.seedStepSizeHorizontalLonLat.y(),
                              ch.seedPressureLevels.at(z));
         }
          // VERTICAL seed type is not axis aligned in x and y, interpolate along x;
@@ -1015,7 +1035,7 @@ QVector3D MTrajectoryComputationSource::determineTrajectorySeedPosition(
             QVector2D dir = (ch.seedMaxPosition.toVector2D()
                              - ch.seedMinPosition.toVector2D()).normalized();
             QVector2D xyPos = ch.seedMinPosition.toVector2D()
-                    + dir * ch.seedStepSizeLonLat.x() * x;
+                    + dir * ch.seedStepSizeHorizontalLonLat.x() * x;
 
             // Compute seed position given by interpolation value for xy and
             // by z delta and z grid position.

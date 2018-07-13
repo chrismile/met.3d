@@ -41,7 +41,7 @@
 namespace Met3D
 {
 
-enum TRAJECTORY_COMPUTATION_ITERATION_METHOD
+enum TRAJECTORY_COMPUTATION_INTEGRATION_METHOD
 {
     EULER,
     RUNGE_KUTTA
@@ -79,15 +79,17 @@ enum TRAJECTORY_COMPUTATION_SEED_TYPE
 struct MTrajectoryComputationInfo
 {
     MTrajectoryComputationInfo()
-            : numTimeSteps(0), numTrajectories(0), numEnsembleMembers(0)
+        : numStoredVerticesPerTrajectory(0),
+          numTrajectories(0),
+          numEnsembleMembers(0)
     { }
 
-    unsigned int numTimeSteps, numTrajectories, numEnsembleMembers;
+    unsigned int numStoredVerticesPerTrajectory, numTrajectories, numEnsembleMembers;
 
-    // QVector3D (lon, lat, pres) * numTimeSteps * numTrajectories
+    // QVector3D (lon, lat, pres) * numStoredVerticesPerTrajectory * numTrajectories
     QVector<QVector<QVector3D>> vertices;
 
-    // All available times.
+    // Times corresponding to the trajectory vertices.
     QVector<QDateTime> times;
 
     // Start grid geometry (i.e., seed points).
@@ -167,25 +169,29 @@ protected:
                   startTimeStep(0),
                   endTimeStep(0),
                   trajectoryCount(0),
-                  iterationPerTimeStep(0)
+                  subTimeStepsPerDataTimeStep(0),
+                  streamlineDeltaS(1.),
+                  streamlineLength(1)
         { }
 
         QVector<QString> varNames;
         QList<QDateTime> validTimes;
         MDataRequest baseRequest;
-        TRAJECTORY_COMPUTATION_ITERATION_METHOD iterationMethod;
+        TRAJECTORY_COMPUTATION_INTEGRATION_METHOD iterationMethod;
         TRAJECTORY_COMPUTATION_INTERPOLATION_METHOD interpolationMethod;
         TRAJECTORY_COMPUTATION_LINE_TYPE lineType;
         TRAJECTORY_COMPUTATION_SEED_TYPE seedType;
         uint startTimeStep;
         uint endTimeStep;
         uint trajectoryCount;
-        uint iterationPerTimeStep;
-        double streamlineDeltaT;
+        uint subTimeStepsPerDataTimeStep;
+        double streamlineDeltaS; // delta of parameter "s" that parameterises
+                                 // the streamline: dx(s)/ds = v(x)
+        int streamlineLength;
         QVector3D seedMinPosition;
         QVector3D seedMaxPosition;
         QVector3D seedCount;
-        QVector2D seedStepSizeLonLat;
+        QVector2D seedStepSizeHorizontalLonLat;
         QVector<double> seedPressureLevels;
     };
 
