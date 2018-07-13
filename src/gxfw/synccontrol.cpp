@@ -858,12 +858,6 @@ void MSyncControl::loadConfiguration(QSettings *settings)
 {
     settings->beginGroup("General");
 
-    ui->initTimeEdit->setDateTime(
-                settings->value("initTime", QDateTime()).value<QDateTime>());
-
-    ui->validTimeEdit->setDateTime(
-                settings->value("validTime", QDateTime()).value<QDateTime>());
-
     ui->stepChooseVTITComboBox->setCurrentIndex(
                 ui->stepChooseVTITComboBox->findText(
                     settings->value("stepChooseVtIt", "valid").toString()));
@@ -883,6 +877,15 @@ void MSyncControl::loadConfiguration(QSettings *settings)
                             MSystemManagerAndControl::getInstance()
                             ->getDataSourceIdentifiers()).toStringList();
     restrictToDataSourcesFromSettings(selectedDataSources);
+
+    // Load times after restricting the sync control since otherwise the times
+    // might not be set correctly.
+    ui->initTimeEdit->setDateTime(
+                settings->value("initTime", QDateTime()).value<QDateTime>());
+
+    ui->validTimeEdit->setDateTime(
+                settings->value("validTime", QDateTime()).value<QDateTime>());
+
     unsigned int selectedMember = settings->value("selectedMember", 0).toUInt();
     if (availableEnsembleMembers.contains(selectedMember))
     {

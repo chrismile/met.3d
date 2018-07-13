@@ -231,7 +231,7 @@ MTrajectories* MTrajectoryReader::produceData(MDataRequest request)
             new Met3D::MTrajectories(numTrajectories, times);
 
     trajectories->setMetaData(
-                initTime, validTime, "LAGRANTO_trajectories", member);
+                initTime, validTime, "PRECOMPUTED_trajectories", member);
 
     // Copy temporary data fields to return data struct.
     trajectories->copyVertexDataFrom(lons, lats, pres);

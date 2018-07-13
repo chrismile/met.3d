@@ -111,6 +111,12 @@ public:
 
     void onBoundingBoxChanged() override;
 
+
+    const QRectF getHorizontalBBox()
+    { return bBoxConnection->horizontal2DCoords(); }
+
+    const double getSectionElevation_hPa() { return slicePosition_hPa; }
+
 public slots:
     /**
       Set the pressure at which the section is rendered.

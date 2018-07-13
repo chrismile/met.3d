@@ -56,7 +56,8 @@
       <string>&amp;Revert Current Session</string>
      </property>
     </widget>
-    <addaction name="actionAddDataset"/>
+    <addaction name="actionNewDataset"/>
+    <addaction name="actionOpenDatasetConfiguration"/>
     <addaction name="separator"/>
     <addaction name="menuSessions"/>
     <addaction name="menuRevertCurrentSession"/>
@@ -191,9 +192,9 @@
     <string>F11</string>
    </property>
   </action>
-  <action name="actionAddDataset">
+  <action name="actionNewDataset">
    <property name="text">
-    <string>&amp;Add Dataset</string>
+    <string>&amp;New Dataset</string>
    </property>
    <property name="shortcut">
     <string comment="F3"/>
@@ -268,6 +269,11 @@
    </property>
    <property name="shortcut">
     <string>Ctrl+S</string>
+   </property>
+  </action>
+  <action name="actionOpenDatasetConfiguration">
+   <property name="text">
+    <string>Open Dataset Configuration</string>
    </property>
   </action>
   <action name="actionSaveSessionAs">

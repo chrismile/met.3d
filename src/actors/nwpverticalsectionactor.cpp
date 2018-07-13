@@ -6,6 +6,7 @@
 **
 **  Copyright 2015-2018 Marc Rautenhaus
 **  Copyright 2016-2018 Bianca Tost
+**  Copyright 2017      Philipp Kaiser
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -116,7 +117,8 @@ MNWPVerticalSectionActor::MNWPVerticalSectionActor()
                                                 actorPropertiesSupGroup);
     properties->mString()->setValue(pressureLineLevelsProperty,
                                     defaultPressureLineLevel);
-    parseIsoPressureLevelString(defaultPressureLineLevel);
+
+    selectedPressureLineLevels = parsePressureLevelString(defaultPressureLineLevel);
 
     opacityProperty = addProperty(DECORATEDDOUBLE_PROPERTY, "opacity",
                                   actorPropertiesSupGroup);
@@ -551,6 +553,24 @@ void MNWPVerticalSectionActor::setWaypointsModel(MWaypointsTableModel *model)
 }
 
 
+MWaypointsTableModel* MNWPVerticalSectionActor::getWaypointsModel()
+{
+    return waypointsModel;
+}
+
+
+double MNWPVerticalSectionActor::getBottomPressure_hPa()
+{
+    return p_bot_hPa;
+}
+
+
+double MNWPVerticalSectionActor::getTopPressure_hPa()
+{
+    return p_top_hPa;
+}
+
+
 const QList<MVerticalLevelType> MNWPVerticalSectionActor::supportedLevelTypes()
 {
     return (QList<MVerticalLevelType>()
@@ -620,7 +640,7 @@ void MNWPVerticalSectionActor::onQtPropertyChanged(QtProperty *property)
     {
         QString pressureLevelStr = properties->mString()->value(
                     pressureLineLevelsProperty);
-        parseIsoPressureLevelString(pressureLevelStr);
+        selectedPressureLineLevels = parsePressureLevelString(pressureLevelStr);
 
         if (suppressActorUpdates()) return;
 
@@ -825,7 +845,7 @@ void MNWPVerticalSectionActor::generatePathFromWaypoints(
         path.append(p);
 
         // Compute segment midpoint for interaction handle.
-        QVector2D p_mid = QVector2D(p1) + (QVector2D(p2)-QVector2D(p1)) / 2.;
+        QVector2D p_mid = p1 + (p2 - p1) / 2.;
         px = p_mid.x();
         if (px < gridLonMin) px += 360.; // see above
         if (px > gridLonMax) px -= 360.;
@@ -1408,66 +1428,6 @@ void MNWPVerticalSectionActor::dataFieldChangedEvent()
 {
     targetGridToBeUpdated = true;
     emitActorChangedSignal();
-}
-
-
-bool MNWPVerticalSectionActor::parseIsoPressureLevelString(QString pressureLevelStr)
-{
-    // Clear the current list of pressure line levels; if pLevelStr does not
-    // match any accepted format no pressure lines are drawn.
-    selectedPressureLineLevels.clear();
-
-    // Empty strings, i.e. no pressure lines, are accepted.
-    if (pressureLevelStr.isEmpty()) return true;
-
-    // Match strings of format "[0,100,10]" or "[0.5,10,0.5]".
-    QRegExp rxRange("^\\[([\\-|\\+]*\\d+\\.*\\d*),([\\-|\\+]*\\d+\\.*\\d*),"
-                    "([\\-|\\+]*\\d+\\.*\\d*)\\]$");
-    // Match strings of format "1,2,3,4,5" or "0,0.5,1,1.5,5,10" (number of
-    // values is arbitrary).
-    QRegExp rxList("^([\\-|\\+]*\\d+\\.*\\d*,*)+$");
-
-    if (rxRange.exactMatch(pressureLevelStr))
-    {
-        QStringList rangeValues = rxRange.capturedTexts();
-
-        bool ok;
-        double from = rangeValues.value(1).toDouble(&ok);
-        double to   = rangeValues.value(2).toDouble(&ok);
-        double step = rangeValues.value(3).toDouble(&ok);
-
-        if (step > 0)
-        {
-            for (double d = from; d <= to; d += step)
-            {
-                selectedPressureLineLevels << d;
-            }
-        }
-        else if (step < 0)
-        {
-            for (double d = from; d >= to; d += step)
-            {
-                selectedPressureLineLevels << d;
-            }
-        }
-
-        return true;
-    }
-    else if (rxList.exactMatch(pressureLevelStr))
-    {
-        QStringList listValues = pressureLevelStr.split(",");
-
-        bool ok;
-        for (int i = 0; i < listValues.size(); i++)
-        {
-            selectedPressureLineLevels << listValues.value(i).toDouble(&ok);
-        }
-
-        return true;
-    }
-
-    // No RegExp could be matched.
-    return false;
 }
 
 

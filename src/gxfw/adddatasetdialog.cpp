@@ -32,10 +32,12 @@
 
 // related third party imports
 #include <QFileDialog>
+#include <log4cplus/loggingmacros.h>
 
 // local application imports
 #include "mglresourcesmanager.h"
 #include "msystemcontrol.h"
+#include "data/weatherpredictiondatasource.h"
 
 
 namespace Met3D
@@ -52,14 +54,34 @@ MAddDatasetDialog::MAddDatasetDialog(QWidget *parent) :
     ui->setupUi(this);
     okButton = ui->buttonBox->buttons().at(0);
     okButton->setEnabled(false);
-    connect(ui->browseButton  , SIGNAL(clicked(bool))       ,
+    connect(ui->saveConfigPushButton, SIGNAL(clicked()),
+            this, SLOT(saveConfigurationToFile()));
+
+    connect(ui->nameEdit                  , SIGNAL(textChanged(QString)),
+            this, SLOT(inputFieldChanged()));
+
+    connect(ui->nwpBrowseButton           , SIGNAL(clicked(bool))       ,
             this, SLOT(browsePath()));
-    connect(ui->nameEdit      , SIGNAL(textChanged(QString)),
+    connect(ui->trajectoriesBrowseButton  , SIGNAL(clicked(bool))       ,
+            this, SLOT(browsePath()));
+
+    connect(ui->nwpPathEdit               , SIGNAL(textChanged(QString)),
             this, SLOT(inputFieldChanged()));
-    connect(ui->pathEdit      , SIGNAL(textChanged(QString)),
+    connect(ui->nwpFileFilterEdit         , SIGNAL(textChanged(QString)),
             this, SLOT(inputFieldChanged()));
-    connect(ui->fileFilterEdit, SIGNAL(textChanged(QString)),
+    connect(ui->trajectoriesPathEdit      , SIGNAL(textChanged(QString)),
             this, SLOT(inputFieldChanged()));
+    connect(ui->pipelineTypeTabWidget     , SIGNAL(currentChanged(int)) ,
+            this, SLOT(inputFieldChanged()));
+    connect(ui->pipelineTypeTabWidget     , SIGNAL(currentChanged(int)) ,
+            this, SLOT(setDefaultMemoryManager()));
+    connect(ui->trajectoriesTypeTabWidget , SIGNAL(currentChanged(int)) ,
+            this, SLOT(inputFieldChanged()));
+
+    connect(ui->trajectoriesNWPDatasetCombo, SIGNAL(currentIndexChanged(QString)),
+            this, SLOT(selectedNWPDatasetChanged(QString)));
+
+    resetAddDatasetGUI();
 }
 
 
@@ -73,19 +95,53 @@ MAddDatasetDialog::~MAddDatasetDialog()
 ***                            PUBLIC METHODS                               ***
 *******************************************************************************/
 
+PipelineType MAddDatasetDialog::getSelectedPipelineType()
+{
+    if (ui->pipelineTypeTabWidget->currentWidget() == ui->nwpTab)
+    {
+        return PipelineType::NWP_PIPELINE;
+    }
+    else if (ui->pipelineTypeTabWidget->currentWidget()  == ui->trajectoriesTab)
+    {
+        if (ui->trajectoriesTypeTabWidget->currentWidget()
+                == ui->trajectoriesComputationTab)
+        {
+            QString levelTypeU = ui->trajectoriesWindUVarCombo
+                    ->currentText().split(" || Level type: ").last();
+            QString levelTypeV = ui->trajectoriesWindVVarCombo
+                    ->currentText().split(" || Level type: ").last();
+            QString levelTypeW = ui->trajectoriesWindWVarCombo
+                    ->currentText().split(" || Level type: ").last();
+            if (levelTypeU != levelTypeV || levelTypeV != levelTypeW)
+            {
+                QMessageBox::warning(nullptr, "Add New Dataset",
+                                     "Wind eastward, northward and vertical"
+                                     " variables do NOT have the same vertical"
+                                     " level type. Failed to add new data set.");
+                return PipelineType::INVALID_PIPELINE_TYPE;
+            }
+
+        }
+        return PipelineType::TRAJECTORIES_PIPELINE;
+    }
+    return PipelineType::INVALID_PIPELINE_TYPE;
+}
+
+
 MNWPPipelineConfigurationInfo MAddDatasetDialog::getNWPPipelineConfigurationInfo()
 {
     MNWPPipelineConfigurationInfo d;
 
     d.name = ui->nameEdit->text();
-    d.fileDir = ui->pathEdit->text();
-    d.fileFilter = ui->fileFilterEdit->text();
-    d.dataFormat = (MNWPReaderFileFormat) (ui->fileFormatCombo->currentIndex() + 1);
+    d.fileDir = ui->nwpPathEdit->text();
+    d.fileFilter = ui->nwpFileFilterEdit->text();
+    d.dataFormat =
+            (MNWPReaderFileFormat) (ui->nwpFileFormatCombo->currentIndex() + 1);
 
     MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
     QStringList memoryManagers = sysMC->getMemoryManagerIdentifiers();
     d.memoryManagerID = memoryManagers.at(ui->memoryMCombo->currentIndex());
-    d.schedulerID = "MultiThread";
+    d.schedulerID = ui->schedulerIDCombo->currentText(); // "MultiThread";
     d.enableProbabiltyRegionFilter = ui->propRegBool->isChecked();
     d.treatRotatedGridAsRegularGrid =
             ui->treatRotatedAsRegularCheckBox->isChecked();
@@ -101,8 +157,326 @@ MNWPPipelineConfigurationInfo MAddDatasetDialog::getNWPPipelineConfigurationInfo
 }
 
 
+MTrajectoriesPipelineConfigurationInfo
+MAddDatasetDialog::getTrajectoriesPipelineConfigurationInfo()
+{
+    MTrajectoriesPipelineConfigurationInfo d;
+
+    d.name = ui->nameEdit->text();
+    if (ui->trajectoriesTypeTabWidget->currentWidget()
+            == ui->trajectoriesPrecomputedTab)
+    {
+        d.precomputed = true;
+    }
+    else
+    {
+        d.precomputed = false;
+    }
+    d.fileDir = ui->trajectoriesPathEdit->text();
+    d.schedulerID = ui->schedulerIDCombo->currentText(); // "MultiThread";
+    MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
+    QStringList memoryManagers = sysMC->getMemoryManagerIdentifiers();
+    d.memoryManagerID = memoryManagers.at(ui->memoryMCombo->currentIndex());
+    d.boundaryLayerTrajectories = ui->ablTrajectoriesCheckBox;
+    d.NWPDataset = ui->trajectoriesNWPDatasetCombo->currentText();
+    d.windEastwardVariable = ui->trajectoriesWindUVarCombo
+            ->currentText().split(" || Level type: ").first();
+    d.windNorthwardVariable = ui->trajectoriesWindVVarCombo
+            ->currentText().split(" || Level type: ").first();
+    d.windVerticalVariable = ui->trajectoriesWindWVarCombo
+            ->currentText().split(" || Level type: ").first();
+    d.verticalLevelType = ui->trajectoriesWindUVarCombo
+            ->currentText().split(" || Level type: ").last();
+    return d;
+}
+
+
+void MAddDatasetDialog::resetAddDatasetGUI()
+{
+    ui->memoryMCombo->clear();
+    ui->trajectoriesNWPDatasetCombo->clear();
+
+    MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
+    foreach (QString mmID, sysMC->getMemoryManagerIdentifiers())
+    {
+        ui->memoryMCombo->addItem(mmID);
+    }
+    foreach (QString nwpDataset, sysMC->getDataSourceIdentifiers())
+    {
+        MWeatherPredictionDataSource *source =
+                dynamic_cast<MWeatherPredictionDataSource*>(
+                    sysMC->getDataSource(nwpDataset));
+        if (source != nullptr)
+        {
+                ui->trajectoriesNWPDatasetCombo->addItem(nwpDataset);
+        }
+    }
+
+
+    if (ui->trajectoriesNWPDatasetCombo->count() > 0)
+    {
+        selectedNWPDatasetChanged(ui->trajectoriesNWPDatasetCombo->currentText());
+    }
+
+    setDefaultMemoryManager();
+}
+
+
+void MAddDatasetDialog::saveConfiguration(QSettings *settings)
+{
+    // File Format.
+    // ============
+    settings->beginGroup("FileFormat");
+    // Save version id of Met.3D.
+    settings->setValue("met3dVersion", met3dVersionString);
+    settings->endGroup();
+    // ============
+
+    // Save configuration for NWP Pipeline.
+    // ====================================
+    if (ui->pipelineTypeTabWidget->currentWidget() == ui->nwpTab)
+    {
+        settings->beginGroup("NWPPipeline");
+        settings->setValue("name", ui->nameEdit->text());
+        settings->setValue("path", ui->nwpPathEdit->text());
+        settings->setValue("fileFilter", ui->nwpFileFilterEdit->text());
+        settings->setValue("schedulerID", ui->schedulerIDCombo->currentText());
+        settings->setValue("memoryManagerID", ui->memoryMCombo->currentText());
+        settings->setValue("fileFormat", ui->nwpFileFormatCombo->currentText());
+        settings->setValue("enableRegridding", ui->regriddingBool->isChecked());
+        settings->setValue("enableProbabilityRegionFilter",
+                           ui->propRegBool->isChecked());
+        settings->setValue("treatRotatedGridAsRegularGrid",
+                           ui->treatRotatedAsRegularCheckBox->isChecked());
+        settings->setValue(
+                    "convertGeometricHeightToPressure_ICAOStandard",
+                    ui->convertGeometricHeightToPressureICAOStandardCheckBox
+                    ->isChecked());
+        settings->setValue("gribSurfacePressureFieldType",
+                           ui->surfacePressureTypeComboBox->currentText());
+        settings->endGroup();
+    }
+    // Save configuration for Trajectories Pipeline.
+    // =============================================
+    else if (ui->pipelineTypeTabWidget->currentWidget() == ui->trajectoriesTab)
+    {
+        settings->beginGroup("TrajectoriesPipeline");
+        settings->setValue("name", ui->nameEdit->text());
+        settings->setValue("ABLTrajectories",
+                           ui->ablTrajectoriesCheckBox->isChecked());
+        settings->setValue("schedulerID", ui->schedulerIDCombo->currentText());
+        settings->setValue("memoryManagerID", ui->memoryMCombo->currentText());
+
+        // Precomputed trajectories.
+        // =========================
+        if (ui->trajectoriesTypeTabWidget->currentWidget()
+                == ui->trajectoriesPrecomputedTab)
+        {
+            settings->setValue("path", ui->trajectoriesPathEdit->text());
+            settings->setValue("precomputed", true);
+        }
+        // Computed trajectories.
+        // ======================
+        else if (ui->trajectoriesTypeTabWidget->currentWidget()
+                 == ui->trajectoriesComputationTab)
+        {
+            settings->setValue("NWPDataset",
+                               ui->trajectoriesNWPDatasetCombo->currentText());
+            settings->setValue("eastwardWind_ms",
+                               ui->trajectoriesWindUVarCombo->currentText());
+            settings->setValue("northwardWind_ms",
+                               ui->trajectoriesWindVVarCombo->currentText());
+            settings->setValue("verticalWind_Pas",
+                               ui->trajectoriesWindWVarCombo->currentText());
+            settings->setValue("precomputed", false);
+        }
+        settings->endGroup();
+    }
+}
+
+
+void MAddDatasetDialog::loadConfiguration(QSettings *settings)
+{
+    MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
+    QStringList groups = settings->childGroups();
+    if ( groups.contains("NWPPipeline") )
+    {
+        ui->pipelineTypeTabWidget->setCurrentWidget(ui->nwpTab);
+
+        settings->beginGroup("NWPPipeline");
+        ui->nameEdit->setText(settings->value("name", "").toString());
+        ui->nwpPathEdit->setText(settings->value("path", "").toString());
+        ui->nwpFileFilterEdit->setText(
+                    settings->value("fileFilter", "*").toString());
+        ui->schedulerIDCombo->setCurrentText(
+                    settings->value("schedulerID", "MultiThread").toString());
+        ui->memoryMCombo->setCurrentText(
+                    settings->value(
+                        "memoryManagerID",
+                        sysMC->getDefaultMemoryManagers()->value("NWP"))
+                    .toString());
+        ui->nwpFileFormatCombo->setCurrentText(
+                    settings->value("fileFormat", "CF_NETCDF").toString());
+        ui->regriddingBool->setChecked(
+                    settings->value("enableRegridding", false).toBool());
+        ui->propRegBool->setChecked(
+                    settings->value(
+                        "enableProbabilityRegionFilter", false).toBool());
+        ui->treatRotatedAsRegularCheckBox->setChecked(
+                    settings->value(
+                        "treatRotatedGridAsRegularGrid", false).toBool());
+        ui->convertGeometricHeightToPressureICAOStandardCheckBox->setChecked(
+                    settings->value(
+                        "convertGeometricHeightToPressure_ICAOStandard",
+                        false).toBool());
+        ui->surfacePressureTypeComboBox->setCurrentText(
+                    settings->value("gribSurfacePressureFieldType",
+                                    "auto").toString());
+
+        settings->endGroup();
+    }
+    else if ( groups.contains("TrajectoriesPipeline") )
+    {
+        ui->pipelineTypeTabWidget->setCurrentWidget(ui->trajectoriesTab);
+
+        settings->beginGroup("TrajectoriesPipeline");
+        ui->nameEdit->setText(settings->value("name", "").toString());
+        ui->schedulerIDCombo->setCurrentText(
+                    settings->value("schedulerID", "MultiThread").toString());
+        ui->memoryMCombo->setCurrentText(
+                    settings->value(
+                        "memoryManagerID",
+                        sysMC->getDefaultMemoryManagers()->value("Trajectories"))
+                    .toString());
+        bool precomputed = settings->value("precomputed", true).toBool();
+        if (precomputed)
+        {
+            ui->trajectoriesTypeTabWidget->setCurrentWidget(
+                        ui->trajectoriesPrecomputedTab);
+            ui->trajectoriesPathEdit->setText(settings->value(
+                                                  "path", "").toString());
+        }
+        else
+        {
+            ui->trajectoriesTypeTabWidget->setCurrentWidget(
+                        ui->trajectoriesComputationTab);
+            ui->trajectoriesNWPDatasetCombo->setCurrentText(
+                        settings->value("NWPDataset", "").toString());
+            ui->trajectoriesWindUVarCombo->setCurrentText(
+                        settings->value("eastwardWind_ms", "").toString());
+            ui->trajectoriesWindVVarCombo->setCurrentText(
+                        settings->value("northwardWind_ms", "").toString());
+            ui->trajectoriesWindWVarCombo->setCurrentText(
+                        settings->value("verticalWind_Pas", "").toString());
+        }
+        ui->ablTrajectoriesCheckBox->setChecked(
+                    settings->value("ABLTrajectories", false).toBool());
+
+        settings->endGroup();
+    }
+}
+
+
 /******************************************************************************
 ***                             PUBLIC SLOTS                                ***
+*******************************************************************************/
+
+void MAddDatasetDialog::saveConfigurationToFile(QString filename)
+{
+    if (filename.isEmpty())
+    {
+        QString directory =
+                MSystemManagerAndControl::getInstance()
+                ->getMet3DWorkingDirectory().absoluteFilePath("config/pipelines");
+        QDir().mkpath(directory);
+        filename = QFileDialog::getSaveFileName(
+                    this, "Save pipeline configuration",
+                    QDir(directory).absoluteFilePath("default.pipeline.conf"),
+                    "Pipeline configuration files (*.pipeline.conf)");
+        if (filename.isEmpty())
+        {
+            return;
+        }
+    }
+
+    // Overwrite if the file exists.
+    if (QFile::exists(filename))
+    {
+        QFile::remove(filename);
+    }
+
+    LOG4CPLUS_DEBUG(mlog, "Saving configuration to " << filename.toStdString());
+
+    QSettings *settings = new QSettings(filename, QSettings::IniFormat);
+
+    saveConfiguration(settings);
+
+    delete settings;
+
+    LOG4CPLUS_DEBUG(mlog, "... configuration has been saved.");
+}
+
+
+bool MAddDatasetDialog::loadConfigurationFromFile(QString filename)
+{
+    if (filename.isEmpty())
+    {
+        filename = QFileDialog::getOpenFileName(
+                    this, "Load pipeline configuration",
+                    MSystemManagerAndControl::getInstance()
+                    ->getMet3DWorkingDirectory().absoluteFilePath(
+                        "config/pipelines"),
+                    "Pipeline configuration files (*.pipeline.conf)");
+
+        if (filename.isEmpty())
+        {
+            return false;
+        }
+    }
+
+    QFileInfo fileInfo(filename);
+    if (!fileInfo.exists())
+    {
+        QMessageBox msg;
+        msg.setWindowTitle("Error");
+        msg.setText(QString("Pipeline configuration file"
+                            " ' %1 ' does not exist.").arg(filename));
+        msg.setIcon(QMessageBox::Warning);
+        msg.exec();
+        return false;
+    }
+
+    LOG4CPLUS_DEBUG(mlog,
+                    "Loading pipeline configuration from "
+                    << filename.toStdString());
+
+    QSettings *settings = new QSettings(filename, QSettings::IniFormat);
+
+    QStringList groups = settings->childGroups();
+    if ( !(groups.contains("NWPPipeline")
+           || groups.contains("TrajectoriesPipeline")) )
+    {
+        QMessageBox msg;
+        msg.setWindowTitle("Error");
+        msg.setText("The selected file does not contain configuration data "
+                    "for nwp or trajectories pipeline.");
+        msg.setIcon(QMessageBox::Warning);
+        msg.exec();
+        return false;
+    }
+
+    loadConfiguration(settings);
+
+    delete settings;
+
+    LOG4CPLUS_DEBUG(mlog, "... configuration has been loaded.");
+
+    return true;
+}
+
+
+/******************************************************************************
+***                            PRIVATE SLOTS                                ***
 *******************************************************************************/
 
 void MAddDatasetDialog::browsePath()
@@ -113,17 +487,99 @@ void MAddDatasetDialog::browsePath()
                 sysMC->getMet3DHomeDir().absolutePath(),
                 QFileDialog::ShowDirsOnly | QFileDialog::DontResolveSymlinks);
 
-    if (path != nullptr) ui->pathEdit->setText(path);
+    if (path != nullptr)
+    {
+        if (ui->pipelineTypeTabWidget->currentIndex() == 0)
+        {
+            ui->nwpPathEdit->setText(path);
+        }
+        else
+        {
+            ui->trajectoriesPathEdit->setText(path);
+        }
+    }
 }
 
 
 void MAddDatasetDialog::inputFieldChanged()
 {
-    if (ui->nameEdit->text()       != "" &&
-        ui->pathEdit->text()       != "" &&
-        ui->fileFilterEdit->text() != "")
+    if (ui->nameEdit->text()       != ""
+            &&
+            ((ui->pipelineTypeTabWidget->currentIndex() == 0
+              && ui->nwpPathEdit->text()                != ""
+              && ui->nwpFileFilterEdit->text()          != ""
+                )
+            || (ui->pipelineTypeTabWidget->currentIndex()        == 1
+                && ui->trajectoriesTypeTabWidget->currentIndex() == 0
+                && ui->trajectoriesPathEdit->text()              != "")
+             || (ui->pipelineTypeTabWidget->currentIndex()         == 1
+                 && ui->trajectoriesTypeTabWidget->currentIndex()  == 1
+                 && ui->trajectoriesNWPDatasetCombo->currentText() != ""
+                 && ui->trajectoriesWindUVarCombo->currentText()   != ""
+                 && ui->trajectoriesWindVVarCombo->currentText()   != ""
+                 && ui->trajectoriesWindWVarCombo->currentText()   != ""))
+        )
     {
         okButton->setEnabled(true);
+    }
+    else
+    {
+        okButton->setEnabled(false);
+    }
+}
+
+
+void MAddDatasetDialog::selectedNWPDatasetChanged(QString dataset)
+{
+    ui->trajectoriesWindUVarCombo->clear();
+    ui->trajectoriesWindVVarCombo->clear();
+    ui->trajectoriesWindWVarCombo->clear();
+
+    MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
+
+    MWeatherPredictionDataSource* source =
+            dynamic_cast<MWeatherPredictionDataSource*>
+            (sysMC->getDataSource(dataset));
+    QList<MVerticalLevelType> levelTypes = source->availableLevelTypes();
+    foreach (MVerticalLevelType levelType, levelTypes)
+    {
+        // Skip 2D data fields.
+        if ( levelType == SURFACE_2D || levelType == POTENTIAL_VORTICITY_2D )
+        {
+            continue;
+        }
+        QStringList variables = source->availableVariables(levelType);
+        QString levelTypeString =
+                MStructuredGrid::verticalLevelTypeToString(levelType);
+        foreach (QString variable, variables)
+        {
+            QString item = variable + " || Level type: " + levelTypeString;
+            ui->trajectoriesWindUVarCombo->addItem(item);
+            ui->trajectoriesWindVVarCombo->addItem(item);
+            ui->trajectoriesWindWVarCombo->addItem(item);
+        }
+    }
+}
+
+
+void MAddDatasetDialog::setDefaultMemoryManager()
+{
+    MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
+    if (ui->pipelineTypeTabWidget->currentWidget() == ui->nwpTab)
+    {
+        if (sysMC->getDefaultMemoryManagers()->value("NWP") != "")
+        {
+            ui->memoryMCombo->setCurrentText(
+                        sysMC->getDefaultMemoryManagers()->value("NWP"));
+        }
+    }
+    else if (ui->pipelineTypeTabWidget->currentWidget() == ui->trajectoriesTab)
+    {
+        if (sysMC->getDefaultMemoryManagers()->value("Trajectories") != "")
+        {
+            ui->memoryMCombo->setCurrentText(
+                        sysMC->getDefaultMemoryManagers()->value("Trajectories"));
+        }
     }
 }
 
@@ -131,21 +587,6 @@ void MAddDatasetDialog::inputFieldChanged()
 /******************************************************************************
 ***                          PROTECTED METHODS                              ***
 *******************************************************************************/
-
-void MAddDatasetDialog::showEvent(QShowEvent *event)
-{
-    Q_UNUSED(event);
-
-    ui->memoryMCombo->clear();
-    ui->fileFormatCombo->clear();
-
-    MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
-    foreach (QString mmID, sysMC->getMemoryManagerIdentifiers())
-        ui->memoryMCombo->addItem(mmID);
-
-    ui->fileFormatCombo->addItem("CF_NETCDF");
-    ui->fileFormatCombo->addItem("ECMWF_GRIB");
-}
 
 
 } // namespace Met3D

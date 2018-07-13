@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015-2018 Marc Rautenhaus
+**  Copyright 2017      Philipp Kaiser
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -237,6 +238,16 @@ public:
       numTimeStepsPerTrajectory).
      */
     void copyVertexDataFrom(float *lons, float *lats, float *pres);
+
+    /**
+      Copies data from the given vector (numTrajectories ->
+      numTimeStepsPerTrajectory -> (longitude in degrees, latitude in degrees,
+      pressure in hPa) to the internal QVector-based vertex array.
+
+      Used to copy vertex data from trajectories variable during trajectory
+      computation.
+    */
+    void copyVertexDataFrom(QVector<QVector<QVector3D>> &vertices);
 
     const QVector<QVector3D>& getVertices() { return vertices; }
 

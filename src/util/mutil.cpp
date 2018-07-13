@@ -4,7 +4,7 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015-2018 Marc Rautenhaus
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -140,4 +140,84 @@ QString expandEnvironmentVariables(QString path)
 bool isValidObjectName(QString name)
 {
     return name != "None";
+}
+
+
+QVector<float> parsePressureLevelString(QString levels)
+{
+    // Clear the current list of pressure line levels. If pLevelStr does not
+    // match any accepted format, no pressure lines are drawn.
+    QVector<float> pressureLevels;
+
+    // Empty strings, i.e. no pressure lines, are accepted.
+    if (levels.isEmpty())
+    {
+        return pressureLevels;
+    }
+
+    // Match strings of format "[0,100,10]" or "[0.5,10,0.5]".
+    QRegExp rxRange("^\\[([\\-|\\+]*\\d+\\.*\\d*),([\\-|\\+]*\\d+\\.*\\d*),"
+                            "([\\-|\\+]*\\d+\\.*\\d*)\\]$");
+    // Match strings of format "1,2,3,4,5" or "0,0.5,1,1.5,5,10" (number of
+    // values is arbitrary).
+    QRegExp rxList("^([\\-|\\+]*\\d+\\.*\\d*,*)+$");
+
+    if (rxRange.exactMatch(levels))
+    {
+        QStringList rangeValues = rxRange.capturedTexts();
+
+        bool ok;
+        double from = rangeValues.value(1).toFloat(&ok);
+        double to   = rangeValues.value(2).toFloat(&ok);
+        double step = rangeValues.value(3).toFloat(&ok);
+
+        if (step > 0)
+        {
+            for (float d = from; d <= to; d += step)
+            {
+                pressureLevels << d;
+            }
+        }
+        else if (step < 0)
+        {
+            for (float d = from; d >= to; d += step)
+            {
+                pressureLevels << d;
+            }
+        }
+    }
+    else if (rxList.exactMatch(levels))
+    {
+        QStringList listValues = levels.split(",");
+
+        bool ok;
+        for (int i = 0; i < listValues.size(); i++)
+        {
+            pressureLevels << listValues.value(i).toFloat(&ok);
+        }
+    }
+
+    return pressureLevels;
+}
+
+
+QString listOfPressureLevelsAsString(QVector<float> levels, QString delimiter)
+{
+    // Create empty string.
+    QString stringValue = QString("");
+
+    // Add values to string with given delimiter.
+    for (int i = 0; i < levels.size(); i++)
+    {
+        if (i == 0)
+        {
+            stringValue.append(QString("%1").arg(levels.at(i)));
+        }
+        else
+        {
+            stringValue.append(QString("%1%2").arg(delimiter).arg(levels.at(i)));
+        }
+    }
+
+    return stringValue;
 }

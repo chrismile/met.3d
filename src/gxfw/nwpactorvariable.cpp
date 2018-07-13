@@ -48,6 +48,8 @@
 #include "actors/nwphorizontalsectionactor.h"
 #include "mainwindow.h"
 #include "data/structuredgridstatisticsanalysis.h"
+#include "system/qtproperties.h"
+#include "system/qtproperties_templates.h"
 
 using namespace std;
 
@@ -1431,9 +1433,10 @@ bool MNWPActorVariable::setEnsembleMember(int member)
 
         if (ensembleFilterOperation != "MEMBER") setEnsembleMode("member");
 
-        setEnumPropertyClosest<unsigned int>(
+        actor->getQtProperties()->setEnumPropertyClosest<unsigned int>(
                     selectedEnsembleMembersAsSortedList, (unsigned int)member,
-                    ensembleSingleMemberProperty);
+                    ensembleSingleMemberProperty, synchronizeEnsemble,
+                    actor->getScenes());
 
 #ifdef DIRECT_SYNCHRONIZATION
         // Does a new data request need to be emitted?
@@ -2018,10 +2021,11 @@ bool MNWPActorVariable::updateEnsembleSingleMemberProperty()
     actor->enableActorUpdates(false);
     properties->mEnum()->setEnumNames(
                 ensembleSingleMemberProperty, selectedMembersAsStringList);
-    setEnumPropertyClosest<unsigned int>(
+    properties->setEnumPropertyClosest<unsigned int>(
                 selectedEnsembleMembersAsSortedList,
                 (unsigned int)prevEnsembleMember,
-                ensembleSingleMemberProperty, synchronizeEnsemble);
+                ensembleSingleMemberProperty, synchronizeEnsemble,
+                actor->getScenes());
     actor->enableActorUpdates(true);
 
     bool displayedMemberHasChanged = (getEnsembleMember() != prevEnsembleMember);
@@ -2141,88 +2145,6 @@ bool MNWPActorVariable::internalSetDateTime(
             // Set the new valid time.
             static_cast<QtEnumPropertyManager*> (timeProperty->propertyManager())
                     ->setValue(timeProperty, i);
-            // A new index was set. Return true.
-            return true;
-        }
-    }
-
-    return false;
-}
-
-
-template<typename T> bool MNWPActorVariable::setEnumPropertyClosest(
-        const QList<T>& availableValues, const T& value,
-        QtProperty *property, bool setSyncColour)
-{
-    // Find the value closest to "value" in the list of available values.
-    int i = -1; // use of "++i" below
-    bool exactMatch = false;
-    while (i < availableValues.size()-1)
-    {
-        // Loop as long as "value" is larger that the currently inspected
-        // element (use "++i" to have the same i available for the remaining
-        // statements in this block).
-        if (value > availableValues.at(++i)) continue;
-
-        // We'll only get here if "value" <= availableValues.at(i). If we
-        // have an exact match, break the loop. This is our value.
-        if (availableValues.at(i) == value)
-        {
-            exactMatch = true;
-            break;
-        }
-
-        // If "value" cannot be exactly matched it lies between indices i-1
-        // and i in availableValues. Determine which is closer.
-        if (i == 0) break; // if there's no i-1 we're done
-
-//        LOG4CPLUS_DEBUG(mlog, value << " " << availableValues.at(i-1) << " "
-//                        << availableValues.at(i) << " "
-//                        << abs(value - availableValues.at(i-1)) << " "
-//                        << abs(availableValues.at(i) - value) << " ");
-
-        T v1;
-        if (value < availableValues.at(i-1)) v1 = availableValues.at(i-1) - value;
-        else v1 = value - availableValues.at(i-1);
-
-        T v2;
-        if (availableValues.at(i) < value) v2 = value - availableValues.at(i);
-        else v2 = availableValues.at(i) - value;
-
-        if ( v1 <= v2 ) i--;
-
-        // "i" now contains the index of the closest available value.
-        break;
-    }
-
-    if (i > -1)
-    {
-        // ( Also see updateSyncPropertyColourHints() ).
-
-        // Update background colour of the property in the connected
-        // scene's property browser: green if "value" is an
-        // exact match with one of the available values, red otherwise.
-        if (setSyncColour)
-        {
-            QColor colour = exactMatch ? QColor(0, 255, 0) : QColor(255, 0, 0);
-            foreach (MSceneControl* scene, actor->getScenes())
-                scene->setPropertyColour(property, colour);
-        }
-
-        // Get the currently selected index.
-        int currentIndex = static_cast<QtEnumPropertyManager*> (
-                    property->propertyManager())->value(property);
-
-        if (i == currentIndex)
-        {
-            // Index i is already the current one. Nothing needs to be done.
-            return false;
-        }
-        else
-        {
-            // Set the new value.
-            static_cast<QtEnumPropertyManager*> (property->propertyManager())
-                    ->setValue(property, i);
             // A new index was set. Return true.
             return true;
         }

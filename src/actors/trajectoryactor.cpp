@@ -6,6 +6,7 @@
 **
 **  Copyright 2015-2017 Marc Rautenhaus
 **  Copyright 2016-2017 Bianca Tost
+**  Copyright 2017      Philipp Kaiser
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -40,6 +41,16 @@
 #include "gxfw/msceneviewglwidget.h"
 #include "gxfw/selectdatasourcedialog.h"
 #include "mainwindow.h"
+#include "gxfw/selectactordialog.h"
+#include "data/trajectoryreader.h"
+#include "data/trajectorycomputation.h"
+#include "actors/movablepoleactor.h"
+#include "actors/nwphorizontalsectionactor.h"
+#include "actors/nwpverticalsectionactor.h"
+#include "actors/volumebboxactor.h"
+#include "gxfw/mscenecontrol.h"
+#include "system/qtproperties.h"
+#include "system/qtproperties_templates.h"
 
 using namespace std;
 
@@ -54,16 +65,12 @@ MTrajectoryActor::MTrajectoryActor()
     : MActor(),
       MBoundingBoxInterface(this),
       trajectorySource(nullptr),
-      trajectories(nullptr),
-      trajectoriesVertexBuffer(nullptr),
       normalsSource(nullptr),
       trajectoryFilter(nullptr),
-      trajectorySelection(nullptr),
-      trajectorySingleTimeSelection(nullptr),
       dataSourceID(""),
+      precomputedDataSource(false),
       initialDataRequest(true),
       suppressUpdate(false),
-      normalsToBeComputed(true),
       renderMode(TRAJECTORY_TUBES),
       synchronizationControl(nullptr),
       synchronizeInitTime(true),
@@ -92,27 +99,16 @@ MTrajectoryActor::MTrajectoryActor()
     actorPropertiesSupGroup->removeSubProperty(labelPropertiesSupGroup);
 
     // Data source selection.
-    selectDataSourceProperty = addProperty(CLICK_PROPERTY, "select data source",
-                                           actorPropertiesSupGroup);
-    utilizedDataSourceProperty = addProperty(STRING_PROPERTY,
-                                             "data source",
-                                             actorPropertiesSupGroup);
+    selectDataSourceProperty = addProperty(
+                CLICK_PROPERTY, "select data source",
+                actorPropertiesSupGroup);
+    utilizedDataSourceProperty = addProperty(
+                STRING_PROPERTY, "data source",
+                actorPropertiesSupGroup);
     utilizedDataSourceProperty->setEnabled(false);
 
-    // Render mode.
-    QStringList renderModeNames;
-    renderModeNames << "tubes"
-                    << "all positions"
-                    << "positions"
-                    << "positions and tubes"
-                    << "positions and backward tubes";
-    renderModeProperty = addProperty(ENUM_PROPERTY, "render mode",
-                                     actorPropertiesSupGroup);
-    properties->mEnum()->setEnumNames(renderModeProperty, renderModeNames);
-    properties->mEnum()->setValue(renderModeProperty, renderMode);
-
-
-    // Property: Synchronize time and ensemble with an MSyncControl instance?
+    // Synchronization properties.
+    // ====================================
     synchronizationPropertyGroup = addProperty(
                 GROUP_PROPERTY, "synchronization", actorPropertiesSupGroup);
 
@@ -153,35 +149,137 @@ MTrajectoryActor::MTrajectoryActor()
     particlePosTimeProperty->setToolTip("Not selectable for 'tubes' and 'all"
                                         " positions' render mode");
 
-
     // Ensemble.
     QStringList ensembleModeNames;
     ensembleModeNames << "member" << "all";
-    ensembleModeProperty = addProperty(ENUM_PROPERTY, "ensemble mode",
-                                       actorPropertiesSupGroup);
+    ensembleModeProperty = addProperty(
+                ENUM_PROPERTY, "ensemble mode",
+                actorPropertiesSupGroup);
     properties->mEnum()->setEnumNames(ensembleModeProperty, ensembleModeNames);
     ensembleModeProperty->setEnabled(false);
 
-    ensembleMemberProperty = addProperty(INT_PROPERTY, "ensemble member",
-                                         actorPropertiesSupGroup);
-    properties->setInt(ensembleMemberProperty, 0, 0, 50, 1);
+    ensembleSingleMemberProperty = addProperty(
+                ENUM_PROPERTY, "ensemble member",
+                actorPropertiesSupGroup);
 
-    // Trajectory filtering.
-    enableFilterProperty = addProperty(BOOL_PROPERTY, "filter trajectories",
-                                       actorPropertiesSupGroup);
-    properties->mBool()->setValue(enableFilterProperty, true);
+    // Property group: Trajectory computation.
+    // ====================================
+    computationPropertyGroup = addProperty(GROUP_PROPERTY,
+                                           "trajectory computation",
+                                           actorPropertiesSupGroup);
 
-    deltaPressureProperty = addProperty(DECORATEDDOUBLE_PROPERTY,
-                                        "pressure difference",
-                                        actorPropertiesSupGroup);
-    properties->setDDouble(deltaPressureProperty, 500., 1., 1050., 2, 5.,
+    computationSeedPropertyGroup = addProperty(
+                GROUP_PROPERTY, "seed points (start positions) from actors",
+                computationPropertyGroup);
+    computationSeedAddActorProperty = addProperty(
+                CLICK_PROPERTY, "add seed actor",
+                computationSeedPropertyGroup);
+
+    computationLineTypeProperty = addProperty(
+                ENUM_PROPERTY, "type",
+                computationPropertyGroup);
+    properties->mEnum()->setEnumNames(
+                computationLineTypeProperty,
+                QStringList()
+                << "trajectories (path lines)" << "streamlines");
+
+    computationIntegrationMethodProperty = addProperty(
+                ENUM_PROPERTY, "integration method",
+                computationPropertyGroup);
+    properties->mEnum()->setEnumNames(
+                computationIntegrationMethodProperty,
+                QStringList() << "Euler (3 iter.)" << "Runge-Kutta");
+
+    computationInterpolationMethodProperty = addProperty(
+                ENUM_PROPERTY, "interpolation method",
+                computationPropertyGroup);
+    properties->mEnum()->setEnumNames(
+                computationInterpolationMethodProperty,
+                QStringList() << "as LAGRANTO v2" << "trilinear (in lon-lat-lnp)");
+
+    computationNumSubTimeStepsProperty = addProperty(
+                INT_PROPERTY, "timestep per data t.interv.",
+                computationPropertyGroup);
+    properties->setInt(computationNumSubTimeStepsProperty, 12, 1, 1000);
+    computationNumSubTimeStepsProperty->setToolTip(
+                "internal timestep for the trajectory integrations is taken "
+                "to be 1/<this value> of the wind data time interval (default "
+                "in LAGRANTO v2 is 1/12); wind data is interpolated in time "
+                "to times between available wind data timesteps");
+
+    computationIntegrationTimeProperty = addProperty(
+                ENUM_PROPERTY, "integration time", computationPropertyGroup);
+    computationIntegrationTimeProperty->setToolTip(
+                "trajectory integration time (forward/backward) relative to "
+                "\"trajectory start\" time specified above");
+
+    computationStreamlineDeltaSProperty = addProperty(
+                DECORATEDDOUBLE_PROPERTY, "seg. length (delta s)",
+                computationPropertyGroup);
+    properties->setDDouble(
+                computationStreamlineDeltaSProperty, 1000., 0.001,
+                numeric_limits<double>::max(), 3, 0.5, "");
+    computationStreamlineDeltaSProperty->setToolTip(
+                "for streamline computations: segment length (delta s) for "
+                "integration (dx(s)/ds = v(x); x = position, v = wind)");
+    computationStreamlineDeltaSProperty->setEnabled(false);
+
+    computationStreamlineLengthProperty = addProperty(
+                INT_PROPERTY, "streamline length",
+                computationPropertyGroup);
+    properties->setInt(computationStreamlineLengthProperty, 500, 1, 1000000);
+    computationStreamlineLengthProperty->setToolTip(
+                "length of streamline in terms of number of segments");
+    computationStreamlineLengthProperty->setEnabled(false);
+
+    computationRecomputeProperty = addProperty(
+                CLICK_PROPERTY, "recompute", computationPropertyGroup);
+
+
+    // Trajectory filtering property group.
+    // ====================================
+    filtersGroupProperty =  addProperty(
+                GROUP_PROPERTY, "trajectory filters",
+                actorPropertiesSupGroup);
+
+    // Bounding box.
+    filtersGroupProperty->addSubProperty(bBoxConnection->getProperty());
+
+    // Ascent (dp/dt > x).
+    enableAscentFilterProperty = addProperty(
+                BOOL_PROPERTY, "min. req. ascent",
+                filtersGroupProperty);
+    properties->mBool()->setValue(enableAscentFilterProperty, false);
+    enableAscentFilterProperty->setToolTip(
+                "require trajectories to ascend at least <pressure "
+                "difference> in <time interval>.");
+
+    deltaPressureFilterProperty = addProperty(
+                DECORATEDDOUBLE_PROPERTY, "pressure difference",
+                enableAscentFilterProperty);
+    properties->setDDouble(deltaPressureFilterProperty, 500., 1., 1050., 2, 5.,
                            " hPa");
+    deltaTimeFilterProperty = addProperty(DECORATEDDOUBLE_PROPERTY,
+                                          "time interval",
+                                          enableAscentFilterProperty);
+    properties->setDDouble(deltaTimeFilterProperty, 48, 1, 48, 0, 1, " hrs");
 
-    deltaTimeProperty = addProperty(DECORATEDDOUBLE_PROPERTY, "time interval",
-                                    actorPropertiesSupGroup);
-    properties->setDDouble(deltaTimeProperty, 48, 1, 48, 0, 1, " hrs");
+    // Property group: Rendering.
+    // ====================================
+    renderingGroupProperty = addProperty(GROUP_PROPERTY, "rendering",
+                                         actorPropertiesSupGroup);
 
-    actorPropertiesSupGroup->addSubProperty(bBoxConnection->getProperty());
+    // Render mode.
+    QStringList renderModeNames;
+    renderModeNames << "entire trajectories as tubes"
+                    << "all particle positions"
+                    << "single time positions"
+                    << "tubes and single time positions"
+                    << "backward tubes and single time positions";
+    renderModeProperty = addProperty(ENUM_PROPERTY, "render mode",
+                                     renderingGroupProperty);
+    properties->mEnum()->setEnumNames(renderModeProperty, renderModeNames);
+    properties->mEnum()->setValue(renderModeProperty, renderMode);
 
     // Transfer function.
     // Scan currently available actors for transfer functions. Add TFs to
@@ -196,31 +294,35 @@ MTrajectoryActor::MTrajectoryActor()
             availableTFs << tf->transferFunctionName();
         }
     }
-    transferFunctionProperty = addProperty(ENUM_PROPERTY, "transfer function",
-                                           actorPropertiesSupGroup);
+    transferFunctionProperty = addProperty(ENUM_PROPERTY,
+                                           "transfer function (pressure)",
+                                           renderingGroupProperty);
     properties->mEnum()->setEnumNames(transferFunctionProperty, availableTFs);
 
     // Render mode and parameters.
     tubeRadiusProperty = addProperty(DECORATEDDOUBLE_PROPERTY, "tube radius",
-                                     actorPropertiesSupGroup);
+                                     renderingGroupProperty);
     properties->setDDouble(tubeRadiusProperty, tubeRadius,
                            0.01, 1., 2, 0.1, " (world space)");
 
     sphereRadiusProperty = addProperty(DECORATEDDOUBLE_PROPERTY, "sphere radius",
-                                       actorPropertiesSupGroup);
+                                       renderingGroupProperty);
     properties->setDDouble(sphereRadiusProperty, sphereRadius,
                            0.01, 1., 2, 0.1, " (world space)");
 
-    enableShadowProperty = addProperty(BOOL_PROPERTY, "render shadows",
-                                       actorPropertiesSupGroup);
+    enableShadowProperty = addProperty(BOOL_PROPERTY, "display shadows",
+                                       renderingGroupProperty);
     properties->mBool()->setValue(enableShadowProperty, shadowEnabled);
 
     colourShadowProperty = addProperty(BOOL_PROPERTY, "colour shadows",
-                                       actorPropertiesSupGroup);
+                                       renderingGroupProperty);
     properties->mBool()->setValue(colourShadowProperty, shadowColoured);
 
-    // Observe the creation/deletion of other actors -- if these are transfer
-    // functions, add to the list displayed in the transfer function property.
+    // ====================================
+
+    // Observe the creation/deletion of other actors
+    // -- if these are transfer functions add to the list displayed in the transfer function property.
+    // -- if these are used as seed actors, change corresponding properties
     connect(glRM, SIGNAL(actorCreated(MActor*)), SLOT(onActorCreated(MActor*)));
     connect(glRM, SIGNAL(actorDeleted(MActor*)), SLOT(onActorDeleted(MActor*)));
     connect(glRM, SIGNAL(actorRenamed(MActor*, QString)),
@@ -294,12 +396,12 @@ void MTrajectoryActor::saveConfiguration(QSettings *settings)
                        properties->mBool()->value(synchronizeEnsembleProperty));
 
     settings->setValue("enableFilter",
-                       properties->mBool()->value(enableFilterProperty));
+                       properties->mBool()->value(enableAscentFilterProperty));
 
     settings->setValue("deltaPressure",
-                       properties->mDDouble()->value(deltaPressureProperty));
+                       properties->mDDouble()->value(deltaPressureFilterProperty));
     settings->setValue("deltaTime",
-                       properties->mDDouble()->value(deltaTimeProperty));
+                       properties->mDDouble()->value(deltaTimeFilterProperty));
 
     MBoundingBoxInterface::saveConfiguration(settings);
 
@@ -310,6 +412,45 @@ void MTrajectoryActor::saveConfiguration(QSettings *settings)
     settings->setValue("sphereRadius", sphereRadius);
     settings->setValue("shadowEnabled", shadowEnabled);
     settings->setValue("shadowColoured", shadowColoured);
+
+    // Save computation properties.
+    settings->setValue(
+                "computationLineTypeProperty",
+                properties->mEnum()->value(computationLineTypeProperty));
+    settings->setValue(
+                "computationIterationMethodProperty",
+                properties->mEnum()->value(computationLineTypeProperty));
+    settings->setValue("computationInterpolationMethodProperty",
+                       properties->mEnum()->value(
+                           computationInterpolationMethodProperty));
+    settings->setValue(
+                "computationNumSubTimeStepsProperty",
+                properties->mInt()->value(computationNumSubTimeStepsProperty));
+    settings->setValue(
+                "computationIntegrationTimeProperty",
+                properties->mEnum()->value(computationIntegrationTimeProperty));
+    settings->setValue(
+                "computationStreamlineDeltaSProperty",
+                properties->mDDouble()->value(computationStreamlineDeltaSProperty));
+    settings->setValue(
+                "computationStreamlineLengthProperty",
+                properties->mInt()->value(computationStreamlineLengthProperty));
+    settings->setValue(
+                "computationSeedActorSize",
+                computationSeedActorProperties.size());
+    for (int i = 0; i <  computationSeedActorProperties.size(); i++)
+    {
+        const SeedActorSettings& sas = computationSeedActorProperties.at(i);
+        settings->setValue(QString("computationSeedActorName%1").arg(i),
+                           sas.propertyGroup->propertyName());
+        settings->setValue(QString("computationSeedActorStepSizeLon%1").arg(i),
+                           properties->mDDouble()->value(sas.lonSpacing));
+        settings->setValue(QString("computationSeedActorStepSizeLat%1").arg(i),
+                           properties->mDDouble()->value(sas.latSpacing));
+        settings->setValue(
+                    QString("computationSeedActorPressureLevels%1").arg(i),
+                    properties->mString()->value(sas.pressureLevels));
+    }
 
     settings->endGroup();
 }
@@ -355,10 +496,8 @@ void MTrajectoryActor::loadConfiguration(QSettings *settings)
                                    " properties.");
                     msgBox.exec();
                     enableActorUpdates(false);
-                    properties->mString()->setValue(utilizedDataSourceProperty,
-                                                    "");
-                    properties->mInt()->setValue(ensembleMemberProperty, 0);
-                    properties->mInt()->setMaximum(ensembleMemberProperty, 0);
+                    properties->mString()->setValue(
+                                utilizedDataSourceProperty, "");
                     enableActorUpdates(true);
                     enableProperties(false);
                 }
@@ -379,12 +518,13 @@ void MTrajectoryActor::loadConfiguration(QSettings *settings)
 
             updateInitTimeProperty();
             updateStartTimeProperty();
+            updateEnsembleSingleMemberProperty();
         }
     }
 
     properties->mEnum()->setValue(
                 renderModeProperty,
-                settings->value("renderMode").toInt());
+                settings->value("renderMode", 0).toInt());
 
     // Load synchronization properties (AFTER the ensemble mode properties
     // have been loaded; sync may overwrite some settings).
@@ -426,16 +566,24 @@ void MTrajectoryActor::loadConfiguration(QSettings *settings)
     }
 
     properties->mBool()->setValue(
-                enableFilterProperty,
-                settings->value("enableFilter").toBool());
+                enableAscentFilterProperty,
+                settings->value("enableFilter", true).toBool());
 
     properties->mDDouble()->setValue(
-                deltaPressureProperty,
-                settings->value("deltaPressure").toFloat());
+                deltaPressureFilterProperty,
+                settings->value("deltaPressure", 500.).toDouble());
+
+    // The range is adapted to the data source thus when changing sessions it
+    // might appear the value can't be set correctly due to the property is
+    // still restricted to the range of the data sourc of the previous session.
+    // Therefore we set the range to a range which covers all possible value.
+    properties->mDDouble()->setRange(
+                deltaTimeFilterProperty, 0.,
+                std::numeric_limits<double>::max());
 
     properties->mDDouble()->setValue(
-                deltaTimeProperty,
-                settings->value("deltaTime").toFloat());
+                deltaTimeFilterProperty,
+                settings->value("deltaTime", 48.).toDouble());
 
     MBoundingBoxInterface::loadConfiguration(settings);
 
@@ -452,24 +600,77 @@ void MTrajectoryActor::loadConfiguration(QSettings *settings)
 
     properties->mDDouble()->setValue(
                 tubeRadiusProperty,
-                settings->value("tubeRadius").toFloat());
+                settings->value("tubeRadius", 0.1).toDouble());
 
     properties->mDDouble()->setValue(
                 sphereRadiusProperty,
-                settings->value("sphereRadius").toFloat());
+                settings->value("sphereRadius", 0.2).toDouble());
 
     properties->mBool()->setValue(
                 enableShadowProperty,
-                settings->value("shadowEnabled").toBool());
+                settings->value("shadowEnabled", true).toBool());
 
     properties->mBool()->setValue(
                 colourShadowProperty,
-                settings->value("shadowColoured").toBool());
+                settings->value("shadowColoured", false).toBool());
+
+
+    // Load computation properties (The saved actors should already be initialized)
+    properties->mEnum()->setValue(
+                computationLineTypeProperty,
+                settings->value("computationLineTypeProperty", 0).toInt());
+    properties->mEnum()->setValue(
+                computationIntegrationMethodProperty,
+                settings->value("computationIterationMethodProperty",
+                                0).toInt());
+    properties->mEnum()->setValue(
+                computationInterpolationMethodProperty,
+                settings->value("computationInterpolationMethodProperty",
+                                0).toInt());
+    properties->mInt()->setValue(
+                computationNumSubTimeStepsProperty,
+                settings->value("computationNumSubTimeStepsProperty",
+                                12).toInt());
+    properties->mEnum()->setValue(
+                computationIntegrationTimeProperty,
+                settings->value("computationIntegrationTimeProperty",
+                                0).toInt());
+    properties->mDDouble()->setValue(
+                computationStreamlineDeltaSProperty,
+                settings->value("computationStreamlineDeltaSProperty",
+                                1000.).toDouble());
+    properties->mInt()->setValue(
+                computationStreamlineLengthProperty,
+                settings->value("computationStreamlineLengthProperty",
+                                500.).toDouble());
+
+    // Remove current seed actors.
+    clearSeedActor();
+
+    const int actorCount =
+            settings->value("computationSeedActorSize", 0).toInt();
+    for (int i = 0; i < actorCount; i++)
+    {
+        QString actorName = settings->value(
+                    QString("computationSeedActorName%1").arg(i)).toString();
+        double deltaLon =
+                settings->value(QString("computationSeedActorStepSizeLon%1")
+                                .arg(i)).toDouble();
+        double deltaLat =
+                settings->value(QString("computationSeedActorStepSizeLat%1")
+                                .arg(i)).toDouble();
+        QString presLvls =
+                settings->value(QString("computationSeedActorPressureLevels%1")
+                                .arg(i)).toString();
+        addSeedActor(actorName, deltaLon, deltaLat,
+                     parsePressureLevelString(presLvls));
+    }
 
     settings->endGroup();
 
     if (isInitialized() && dataSourceAvailable)
     {
+        updateActorData();
         asynchronousSelectionRequest();
         asynchronousDataRequest();
     }
@@ -634,7 +835,7 @@ void MTrajectoryActor::synchronizeWith(
             scene->resetPropertyColour(initTimeProperty);
             scene->resetPropertyColour(startTimeProperty);
             scene->resetPropertyColour(particlePosTimeProperty);
-            scene->resetPropertyColour(ensembleMemberProperty);
+            scene->resetPropertyColour(ensembleSingleMemberProperty);
         }
 
         if (updateGUIProperties)
@@ -763,7 +964,7 @@ void MTrajectoryActor::updateSyncPropertyColourHints(MSceneControl *scene)
         setPropertyColour(initTimeProperty, QColor(), true, scene);
         setPropertyColour(startTimeProperty, QColor(), true, scene);
         setPropertyColour(particlePosTimeProperty, QColor(), true, scene);
-        setPropertyColour(ensembleMemberProperty, QColor(), true, scene);
+        setPropertyColour(ensembleSingleMemberProperty, QColor(), true, scene);
     }
     else
     {
@@ -797,7 +998,7 @@ void MTrajectoryActor::updateSyncPropertyColourHints(MSceneControl *scene)
         match = (getEnsembleMember()
                  == synchronizationControl->ensembleMember());
         colour = match ? QColor(0, 255, 0) : QColor(255, 0, 0);
-        setPropertyColour(ensembleMemberProperty, colour,
+        setPropertyColour(ensembleSingleMemberProperty, colour,
                           !synchronizeEnsemble, scene);
     }
 }
@@ -855,6 +1056,12 @@ void MTrajectoryActor::setDataSource(MTrajectoryDataSource *ds)
     {
         connect(trajectorySource, SIGNAL(dataRequestCompleted(MDataRequest)),
                 this, SLOT(asynchronousDataAvailable(MDataRequest)));
+
+        // Check whether this datasource is precomputed.
+        precomputedDataSource =
+                (dynamic_cast<MTrajectoryComputationSource*>(trajectorySource)
+                 == nullptr);
+        updateActorData();
     }
 }
 
@@ -952,27 +1159,14 @@ bool MTrajectoryActor::setEnsembleMember(int member)
     else
     {
 #ifdef DIRECT_SYNCHRONIZATION
-        int prevEnsembleMember = properties->mInt()->value(
-                    ensembleMemberProperty);
+        int prevEnsembleMember = getEnsembleMember();
 #endif
         // Change ensemble member.
-        properties->mInt()->setValue(ensembleMemberProperty, member);
+        properties->setEnumPropertyClosest<unsigned int>(
+                    availableEnsembleMembersAsSortedList, (unsigned int)member,
+                    ensembleSingleMemberProperty,
+                    synchronizeEnsemble, getScenes());
         properties->mEnum()->setValue(ensembleModeProperty, 0);
-
-        // Update background colour of the property in the connected
-        // scene's property browser: green if "value" is an
-        // exact match with one of the available values, red otherwise.
-        if (synchronizeEnsemble)
-        {
-            bool exactMatch =
-                    (member == properties->mInt()->value(ensembleMemberProperty));
-            QColor colour = exactMatch ? QColor(0, 255, 0) : QColor(255, 0, 0);
-            foreach (MSceneControl* scene, getScenes())
-            {
-                scene->setPropertyColour(ensembleMemberProperty, colour);
-            }
-        }
-
 
 #ifdef DIRECT_SYNCHRONIZATION
         // Does a new data request need to be emitted?
@@ -1010,129 +1204,183 @@ void MTrajectoryActor::asynchronousDataAvailable(MDataRequest request)
 {
     // See NWPActorVariabe::asynchronousDataAvailable() for explanations
     // on request queue handling.
-
-    bool queueContainsEntryWithNoPendingRequests = false;
-    for (int i = 0; i < pendingRequestsQueue.size(); i++)
+    // Iterate over all trajectory requests.
+    for (int t = 0; t < trajectoryRequests.size(); t++)
     {
-        if (pendingRequestsQueue[i].dataRequest.request == request)
+        bool queueContainsEntryWithNoPendingRequests = false;
+        for (int i = 0; i < trajectoryRequests[t].pendingRequestsQueue.size();
+             i++)
         {
-            // If this is the first time we are informed about the availability
-            // of the request (available still == false) decrease number of
-            // pending requests.
-            if ( !pendingRequestsQueue[i].dataRequest.available )
-                pendingRequestsQueue[i].numPendingRequests--;
+            if (trajectoryRequests[t].pendingRequestsQueue[i]
+                    .dataRequest.request == request)
+            {
+                // If this is the first time we are informed about the availability
+                // of the request (available still == false) decrease number of
+                // pending requests.
+                if ( !trajectoryRequests[t].pendingRequestsQueue[i]
+                     .dataRequest.available )
+                {
+                    trajectoryRequests[t].pendingRequestsQueue[i]
+                            .numPendingRequests--;
+                }
 
-            pendingRequestsQueue[i].dataRequest.available = true;
+                trajectoryRequests[t].pendingRequestsQueue[i]
+                        .dataRequest.available = true;
 
-            if (pendingRequestsQueue[i].numPendingRequests == 0)
-                queueContainsEntryWithNoPendingRequests = true;
+                if (trajectoryRequests[t].pendingRequestsQueue[i]
+                        .numPendingRequests == 0)
+                {
+                    queueContainsEntryWithNoPendingRequests = true;
+                }
 
-            // Do NOT break the loop here; "request" might be relevant to
-            // multiple entries in the queue.
+                // Do NOT break the loop here; "request" might be relevant to
+                // multiple entries in the queue.
+            }
         }
-    }
 
-    if (queueContainsEntryWithNoPendingRequests)
-    {
-        prepareAvailableDataForRendering();
+        if (queueContainsEntryWithNoPendingRequests)
+        {
+            prepareAvailableDataForRendering(t);
+        }
     }
 }
 
 
 void MTrajectoryActor::asynchronousNormalsAvailable(MDataRequest request)
 {
-    bool queueContainsEntryWithNoPendingRequests = false;
-    for (int i = 0; i < pendingRequestsQueue.size(); i++)
+    for (int t = 0; t < trajectoryRequests.size(); t++)
     {
-        foreach (MSceneViewGLWidget *view,
-                 pendingRequestsQueue[i].normalsRequests.keys())
+        bool queueContainsEntryWithNoPendingRequests = false;
+        for (int i = 0; i < trajectoryRequests[t].pendingRequestsQueue.size();
+             i++)
         {
-            if (pendingRequestsQueue[i].normalsRequests[view].request == request)
+            foreach (MSceneViewGLWidget *view,
+                     trajectoryRequests[t].pendingRequestsQueue[i]
+                     .normalsRequests.keys())
             {
-                if ( !pendingRequestsQueue[i].normalsRequests[view].available )
-                    pendingRequestsQueue[i].numPendingRequests--;
+                if (trajectoryRequests[t].pendingRequestsQueue[i]
+                        .normalsRequests[view].request == request)
+                {
+                    if ( !trajectoryRequests[t].pendingRequestsQueue[i]
+                         .normalsRequests[view].available )
+                    {
+                        trajectoryRequests[t].pendingRequestsQueue[i]
+                                .numPendingRequests--;
+                    }
 
-                pendingRequestsQueue[i].normalsRequests[view].available = true;
+                    trajectoryRequests[t].pendingRequestsQueue[i]
+                            .normalsRequests[view].available = true;
 
-                if (pendingRequestsQueue[i].numPendingRequests == 0)
-                    queueContainsEntryWithNoPendingRequests = true;
+                    if (trajectoryRequests[t].pendingRequestsQueue[i]
+                            .numPendingRequests == 0)
+                    {
+                        queueContainsEntryWithNoPendingRequests = true;
+                    }
 
-                // Do NOT break the loop here; "request" might be relevant to
-                // multiple entries in the queue.
+                    // Do NOT break the loop here; "request" might be relevant to
+                    // multiple entries in the queue.
+                }
             }
         }
-    }
 
-    if (queueContainsEntryWithNoPendingRequests)
-    {
-        prepareAvailableDataForRendering();
+        if (queueContainsEntryWithNoPendingRequests)
+        {
+            prepareAvailableDataForRendering(t);
+        }
     }
 }
 
 
 void MTrajectoryActor::asynchronousSelectionAvailable(MDataRequest request)
 {
-    bool queueContainsEntryWithNoPendingRequests = false;
-    for (int i = 0; i < pendingRequestsQueue.size(); i++)
+    for (int t = 0; t < trajectoryRequests.size(); t++)
     {
-        if (pendingRequestsQueue[i].filterRequest.request == request)
+        bool queueContainsEntryWithNoPendingRequests = false;
+        for (int i = 0; i < trajectoryRequests[t].pendingRequestsQueue.size();
+             i++)
         {
-            if (!pendingRequestsQueue[i].filterRequest.available)
-                pendingRequestsQueue[i].numPendingRequests--;
+            if (trajectoryRequests[t].pendingRequestsQueue[i].filterRequest
+                    .request == request)
+            {
+                if (!trajectoryRequests[t].pendingRequestsQueue[i]
+                        .filterRequest.available)
+                {
+                    trajectoryRequests[t].pendingRequestsQueue[i]
+                            .numPendingRequests--;
+                }
 
-            pendingRequestsQueue[i].filterRequest.available = true;
+                trajectoryRequests[t].pendingRequestsQueue[i]
+                        .filterRequest.available = true;
 
-            if (pendingRequestsQueue[i].numPendingRequests == 0)
-                queueContainsEntryWithNoPendingRequests = true;
+                if (trajectoryRequests[t].pendingRequestsQueue[i]
+                        .numPendingRequests == 0)
+                {
+                    queueContainsEntryWithNoPendingRequests = true;
+                }
 
-            // Do NOT break the loop here; "request" might be relevant to
-            // multiple entries in the queue.
+                // Do NOT break the loop here; "request" might be relevant to
+                // multiple entries in the queue.
+            }
         }
-    }
 
-    if (queueContainsEntryWithNoPendingRequests)
-    {
-        prepareAvailableDataForRendering();
+        if (queueContainsEntryWithNoPendingRequests)
+        {
+            prepareAvailableDataForRendering(t);
+        }
     }
 }
 
 
-void MTrajectoryActor::asynchronousSingleTimeSelectionAvailable(
-        MDataRequest request)
+void MTrajectoryActor::asynchronousSingleTimeSelectionAvailable(MDataRequest request)
 {
-    bool queueContainsEntryWithNoPendingRequests = false;
-    for (int i = 0; i < pendingRequestsQueue.size(); i++)
+    for (int t = 0; t < trajectoryRequests.size(); t++)
     {
-        if (pendingRequestsQueue[i].singleTimeFilterRequest.request == request)
+        bool queueContainsEntryWithNoPendingRequests = false;
+        for (int i = 0; i < trajectoryRequests[t].pendingRequestsQueue.size();
+             i++)
         {
-            if (!pendingRequestsQueue[i].singleTimeFilterRequest.available)
-                pendingRequestsQueue[i].numPendingRequests--;
+            if (trajectoryRequests[t].pendingRequestsQueue[i]
+                    .singleTimeFilterRequest.request == request)
+            {
+                if (!trajectoryRequests[t].pendingRequestsQueue[i]
+                        .singleTimeFilterRequest.available)
+                {
+                    trajectoryRequests[t].pendingRequestsQueue[i]
+                            .numPendingRequests--;
+                }
 
-            pendingRequestsQueue[i].singleTimeFilterRequest.available = true;
+                trajectoryRequests[t].pendingRequestsQueue[i]
+                        .singleTimeFilterRequest.available = true;
 
-            if (pendingRequestsQueue[i].numPendingRequests == 0)
-                queueContainsEntryWithNoPendingRequests = true;
+                if (trajectoryRequests[t].pendingRequestsQueue[i]
+                        .numPendingRequests == 0)
+                {
+                    queueContainsEntryWithNoPendingRequests = true;
+                }
 
-            // Do NOT break the loop here; "request" might be relevant to
-            // multiple entries in the queue.
+                // Do NOT break the loop here; "request" might be relevant to
+                // multiple entries in the queue.
+            }
         }
-    }
 
-    if (queueContainsEntryWithNoPendingRequests)
-    {
-        prepareAvailableDataForRendering();
+        if (queueContainsEntryWithNoPendingRequests)
+        {
+            prepareAvailableDataForRendering(t);
+        }
     }
 }
 
 
-void MTrajectoryActor::prepareAvailableDataForRendering()
+void MTrajectoryActor::prepareAvailableDataForRendering(uint slot)
 {
     // Prepare datafields for rendering as long as they are available in
     // the order in which they were requested.
-    while ( ( !pendingRequestsQueue.isEmpty() ) &&
-            ( pendingRequestsQueue.head().numPendingRequests == 0 ) )
+    while ( ( !trajectoryRequests[slot].pendingRequestsQueue.isEmpty() )
+            && ( trajectoryRequests[slot].pendingRequestsQueue.head()
+                 .numPendingRequests == 0 ) )
     {
-        MTrajectoryRequestQueueInfo trqi = pendingRequestsQueue.dequeue();
+        MTrajectoryRequestQueueInfo trqi = trajectoryRequests[slot]
+                .pendingRequestsQueue.dequeue();
 
         // 1. Trajectory data.
         // ===================
@@ -1140,23 +1388,27 @@ void MTrajectoryActor::prepareAvailableDataForRendering()
         if (trqi.dataRequest.available)
         {
             // Release current and get new trajectories.
-            if (trajectories)
+            if (trajectoryRequests[slot].trajectories)
             {
-                trajectories->releaseVertexBuffer();
-                trajectorySource->releaseData(trajectories);
+                trajectoryRequests[slot].trajectories->releaseVertexBuffer();
+                trajectorySource->releaseData(trajectoryRequests[slot]
+                                              .trajectories);
             }
-            trajectories = trajectorySource->getData(trqi.dataRequest.request);
-            trajectoriesVertexBuffer = trajectories->getVertexBuffer();
+            trajectoryRequests[slot].trajectories = trajectorySource->getData(
+                        trqi.dataRequest.request);
+            trajectoryRequests[slot].trajectoriesVertexBuffer =
+                    trajectoryRequests[slot].trajectories->getVertexBuffer();
 
             // Update displayed information about timestep length.
-            float timeStepLength_hours =
-                    trajectories->getTimeStepLength_sec() / 3600.;
+            float timeStepLength_hours = trajectoryRequests[slot].trajectories
+                    ->getTimeStepLength_sec() / 3600.;
 
             properties->mDDouble()->setSingleStep(
-                        deltaTimeProperty, timeStepLength_hours);
+                        deltaTimeFilterProperty, timeStepLength_hours);
             properties->mDDouble()->setRange(
-                        deltaTimeProperty, timeStepLength_hours,
-                        (trajectories->getNumTimeStepsPerTrajectory() - 1)
+                        deltaTimeFilterProperty, timeStepLength_hours,
+                        (trajectoryRequests[slot].trajectories
+                         ->getNumTimeStepsPerTrajectory() - 1)
                         * timeStepLength_hours);
 
             updateParticlePosTimeProperty();
@@ -1169,14 +1421,15 @@ void MTrajectoryActor::prepareAvailableDataForRendering()
         {
             if (trqi.normalsRequests[view].available)
             {
-                if (normals.value(view, nullptr))
+                if (trajectoryRequests[slot].normals.value(view, nullptr))
                 {
-                    normals[view]->releaseVertexBuffer();
-                    normalsSource->releaseData(normals[view]);
+                    trajectoryRequests[slot].normals[view]->releaseVertexBuffer();
+                    normalsSource->releaseData(trajectoryRequests[slot].normals[view]);
                 }
-                normals[view] = normalsSource->getData(
+                trajectoryRequests[slot].normals[view] = normalsSource->getData(
                             trqi.normalsRequests[view].request);
-                normalsVertexBuffer[view] = normals[view]->getVertexBuffer();
+                trajectoryRequests[slot].normalsVertexBuffer[view] =
+                        trajectoryRequests[slot].normals[view]->getVertexBuffer();
             }
         }
 
@@ -1185,9 +1438,12 @@ void MTrajectoryActor::prepareAvailableDataForRendering()
 
         if (trqi.filterRequest.available)
         {
-            if (trajectorySelection)
-                trajectoryFilter->releaseData(trajectorySelection);
-            trajectorySelection =
+            if (trajectoryRequests[slot].trajectorySelection)
+            {
+                trajectoryFilter->releaseData(trajectoryRequests[slot]
+                                              .trajectorySelection);
+            }
+            trajectoryRequests[slot].trajectorySelection =
                     trajectoryFilter->getData(trqi.filterRequest.request);
         }
 
@@ -1196,11 +1452,13 @@ void MTrajectoryActor::prepareAvailableDataForRendering()
 
         if (trqi.singleTimeFilterRequest.available)
         {
-            if (trajectorySingleTimeSelection)
-                trajectoryFilter->releaseData(trajectorySingleTimeSelection);
-            trajectorySingleTimeSelection =
-                    trajectoryFilter->getData(
-                        trqi.singleTimeFilterRequest.request);
+            if (trajectoryRequests[slot].trajectorySingleTimeSelection)
+            {
+                trajectoryFilter->releaseData(trajectoryRequests[slot]
+                                              .trajectorySingleTimeSelection);
+            }
+            trajectoryRequests[slot].trajectorySingleTimeSelection =
+                    trajectoryFilter->getData(trqi.singleTimeFilterRequest.request);
         }
 
 #ifdef DIRECT_SYNCHRONIZATION
@@ -1209,21 +1467,21 @@ void MTrajectoryActor::prepareAvailableDataForRendering()
         if (trqi.syncchronizationRequest)
             synchronizationControl->synchronizationCompleted(this);
 #endif
+    }
 
-        // Special case:
-        // Since the particle position times depend on the data requested,
-        // we need to call asynchronousSelectionRequest() after data request is
-        // complete when requesting data from a data source for the first time.
-        if (initialDataRequest)
-        {
-            initialDataRequest = false;
-            asynchronousSelectionRequest();
-        }
-        else
-        {
-            emitActorChangedSignal();
-            updateSyncPropertyColourHints();
-        }
+    // Special case:
+    // Since the particle position times depend on the data requested,
+    // we need to call asynchronousSelectionRequest() after data request is
+    // complete when requesting data from a data source for the first time.
+    if (initialDataRequest)
+    {
+        initialDataRequest = false;
+        asynchronousSelectionRequest();
+    }
+    else
+    {
+        emitActorChangedSignal();
+        updateSyncPropertyColourHints();
     }
 }
 
@@ -1275,6 +1533,18 @@ void MTrajectoryActor::onActorDeleted(MActor *actor)
 
         enableEmissionOfActorChangedSignal(true);
     }
+
+    // Check whether the actor is in our seeding actors list.
+    else
+    {
+        for (SeedActorSettings& sas : computationSeedActorProperties)
+        {
+            if (sas.actor == actor)
+            {
+                removeSeedActor(sas.actor->getName());
+            }
+        }
+    }
 }
 
 
@@ -1299,6 +1569,18 @@ void MTrajectoryActor::onActorRenamed(MActor *actor, QString oldName)
         properties->mEnum()->setValue(transferFunctionProperty, index);
 
         enableEmissionOfActorChangedSignal(true);
+    }
+
+    // Check whether the actor is in our seeding actors list.
+    else
+    {
+        for (SeedActorSettings& sas : computationSeedActorProperties)
+        {
+            if (sas.actor == actor)
+            {
+                sas.propertyGroup->setPropertyName(sas.actor->getName());
+            }
+        }
     }
 }
 
@@ -1344,6 +1626,17 @@ bool MTrajectoryActor::isConnectedTo(MActor *actor)
 }
 
 
+void MTrajectoryActor::onSeedActorChanged()
+{
+    if (suppressActorUpdates()) return;
+
+    releaseData();
+    updateActorData();
+
+    asynchronousDataRequest();
+}
+
+
 /******************************************************************************
 ***                          PROTECTED METHODS                              ***
 *******************************************************************************/
@@ -1383,6 +1676,7 @@ void MTrajectoryActor::initializeActorResources()
 
         updateInitTimeProperty();
         updateStartTimeProperty();
+        updateEnsembleSingleMemberProperty();
 
         // Get values from sync control, if connected to one.
         if (synchronizationControl == nullptr)
@@ -1405,6 +1699,8 @@ void MTrajectoryActor::initializeActorResources()
             synchronizationControl = nullptr;
             synchronizeWith(temp);
         }
+
+        updateActorData();
 
         asynchronousDataRequest();
     }
@@ -1437,6 +1733,7 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
             enableProperties(true);
             updateInitTimeProperty();
             updateStartTimeProperty();
+            updateEnsembleSingleMemberProperty();
             // Synchronise with synchronisation control if available.
             if (synchronizationControl != nullptr)
             {
@@ -1460,6 +1757,10 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
         if (!validDataSource)
         {
             dataSourceID = "";
+        }
+        else
+        {
+            initialDataRequest = true;
         }
         return;
     }
@@ -1485,7 +1786,7 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
 
         if (suppressActorUpdates()) return;
 
-        if (synchronizeInitTime)
+        if (synchronizeInitTime && synchronizationControl != nullptr)
         {
             if (setInitDateTime(synchronizationControl->initDateTime()))
             {
@@ -1504,7 +1805,7 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
 
         if (suppressActorUpdates()) return;
 
-        if (synchronizeStartTime)
+        if (synchronizeStartTime && synchronizationControl != nullptr)
         {
             if (setStartDateTime(synchronizationControl->validDateTime()))
             {
@@ -1523,7 +1824,7 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
 
         if (suppressActorUpdates()) return;
 
-        if (synchronizeParticlePosTime)
+        if (synchronizeParticlePosTime && synchronizationControl != nullptr)
         {
             if (setParticleDateTime(synchronizationControl->validDateTime()))
             {
@@ -1543,7 +1844,7 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
 
         if (suppressActorUpdates()) return;
 
-        if (synchronizeEnsemble)
+        if (synchronizeEnsemble && synchronizationControl != nullptr)
         {
             if (setEnsembleMember(synchronizationControl->ensembleMember()))
             {
@@ -1554,26 +1855,26 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
         return;
     }
 
-    else if (property == ensembleMemberProperty)
+    else if (property == ensembleSingleMemberProperty)
     {
 //        updateSyncPropertyColourHints();
         if (suppressActorUpdates()) return;
         asynchronousDataRequest();
     }
 
-    else if (property == enableFilterProperty)
+    else if (property == enableAscentFilterProperty)
     {
         if (suppressActorUpdates()) return;
         asynchronousSelectionRequest();
     }
 
-    else if (property == deltaPressureProperty)
+    else if (property == deltaPressureFilterProperty)
     {
         if (suppressActorUpdates()) return;
         asynchronousSelectionRequest();
     }
 
-    else if (property == deltaTimeProperty)
+    else if (property == deltaTimeFilterProperty)
     {
         if (suppressActorUpdates()) return;
         asynchronousSelectionRequest();
@@ -1651,6 +1952,7 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
     {
         if (suppressUpdate) return; // ignore if init times are being updated
         if (suppressActorUpdates()) return;
+        updateTrajectoryIntegrationTimeProperty();
         asynchronousDataRequest();
     }
 
@@ -1662,6 +1964,107 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
         if (suppressUpdate) return;
         if (suppressActorUpdates()) return;
         asynchronousSelectionRequest();
+    }
+
+    else if (property == computationLineTypeProperty)
+    {
+        TRAJECTORY_COMPUTATION_LINE_TYPE lineType =
+                TRAJECTORY_COMPUTATION_LINE_TYPE(
+                    properties->mEnum()->value(computationLineTypeProperty));
+
+        // Enable/disable associated properties.
+        enableActorUpdates(false);
+        switch (lineType)
+        {
+            case PATH_LINE:
+                computationNumSubTimeStepsProperty->setEnabled(true);
+                computationIntegrationTimeProperty->setEnabled(true);
+                computationStreamlineDeltaSProperty->setEnabled(false);
+                computationStreamlineLengthProperty->setEnabled(false);
+                break;
+            case STREAM_LINE:
+                computationNumSubTimeStepsProperty->setEnabled(false);
+                computationIntegrationTimeProperty->setEnabled(false);
+                computationStreamlineDeltaSProperty->setEnabled(true);
+                computationStreamlineLengthProperty->setEnabled(true);
+                break;
+        }
+        enableActorUpdates(true);
+
+        if (suppressActorUpdates()) return;
+        asynchronousDataRequest();
+    }
+
+    else if (property == computationIntegrationTimeProperty)
+    {
+        // Ignore update of init times.
+        if (suppressUpdate) return;
+        if (suppressActorUpdates()) return;
+        asynchronousDataRequest();
+    }
+
+    else if ( (property == computationStreamlineDeltaSProperty)    ||
+              (property == computationStreamlineLengthProperty)    ||
+              (property == computationInterpolationMethodProperty) ||
+              (property == computationIntegrationMethodProperty)   ||
+              (property == computationNumSubTimeStepsProperty)        )
+    {
+        if (suppressActorUpdates()) return;
+        asynchronousDataRequest();
+    }
+
+    else if (property == computationSeedAddActorProperty)
+    {
+        if (suppressActorUpdates()) return;
+        openSeedActorDialog();
+        onSeedActorChanged();
+    }
+
+    else if (property == computationRecomputeProperty)
+    {
+        onSeedActorChanged();
+    }
+
+    else
+    {
+        for (SeedActorSettings& sas : computationSeedActorProperties)
+        {
+            if (property == sas.removeProperty)
+            {
+                if (suppressActorUpdates())
+                {
+                    return;
+                }
+
+                QMessageBox::StandardButton reply = QMessageBox::question(
+                            nullptr,
+                            "Trajectory Actor",
+                            "Are you sure you want to remove '"
+                            + sas.actor->getName() + "'?",
+                            QMessageBox::Yes|QMessageBox::No,
+                            QMessageBox::No);
+
+                if (reply == QMessageBox::Yes)
+                {
+                    removeSeedActor(sas.actor->getName());
+
+                    releaseData();
+                    updateActorData();
+
+                    asynchronousDataRequest();
+                    emitActorChangedSignal();
+                }
+            }
+            else if (property == sas.lonSpacing || property == sas.latSpacing
+                     || property == sas.pressureLevels)
+            {
+                if (suppressActorUpdates()) return;
+
+                updateActorData();
+
+                asynchronousDataRequest();
+            }
+        }
     }
 }
 
@@ -1677,155 +2080,173 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
     if ( (renderMode == TRAJECTORY_TUBES)
          || (renderMode == TUBES_AND_SINGLETIME)
          || (renderMode == BACKWARDTUBES_AND_SINGLETIME))
-    {        
-        // If any required data item is missing we cannot render.
-        if ( (trajectories == nullptr)
-             || (normals[sceneView] == nullptr)
-             || (trajectorySelection == nullptr))
+    {
+        for (int t = 0; t < (precomputedDataSource ? 1 : seedActorData.size());
+             t++)
         {
-            return;
-        }
+            // If any required data item is missing we cannot render.
+            if ( (trajectoryRequests[t].trajectories == nullptr)
+                 || (trajectoryRequests[t].normals[sceneView] == nullptr)
+                 || (trajectoryRequests[t].trajectorySelection == nullptr) )
+            {
+                continue;
+            }
 
-        // If the vertical scaling of the view has changed, a recomputation of
-        // the normals is necessary, as they are based on worldZ coordinates.
-        if (sceneView->visualisationParametersHaveChanged())
-        {
-            // Discard old normals.
-            if (normals.value(sceneView, nullptr))
-                normalsSource->releaseData(normals[sceneView]);
+            // If the vertical scaling of the view has changed, a recomputation
+            // of the normals is necessary, as they are based on worldZ
+            // coordinates.
+            if (sceneView->visualisationParametersHaveChanged())
+            {
+                // Discard old normals.
+                if (trajectoryRequests[t].normals.value(sceneView, nullptr))
+                {
+                    normalsSource->releaseData(trajectoryRequests[t]
+                                               .normals[sceneView]);
+                }
 
-            normals[sceneView] = nullptr;
-            return;
-        }
+                trajectoryRequests[t].normals[sceneView] = nullptr;
+                continue;
+            }
 
-        tubeShader->bind();
+            tubeShader->bind();
 
-        tubeShader->setUniformValue(
+            tubeShader->setUniformValue(
                     "mvpMatrix",
                     *(sceneView->getModelViewProjectionMatrix()));
-        tubeShader->setUniformValue(
+            tubeShader->setUniformValue(
                     "pToWorldZParams",
                     sceneView->pressureToWorldZParameters());
-        tubeShader->setUniformValue(
+            tubeShader->setUniformValue(
                     "lightDirection",
                     sceneView->getLightDirection());
-        tubeShader->setUniformValue(
+            tubeShader->setUniformValue(
                     "cameraPosition",
                     sceneView->getCamera()->getOrigin());
-        tubeShader->setUniformValue(
+            tubeShader->setUniformValue(
                     "radius",
                     GLfloat(tubeRadius));
-        tubeShader->setUniformValue(
+            tubeShader->setUniformValue(
                     "numObsPerTrajectory",
-                    trajectories->getNumTimeStepsPerTrajectory());
-
-        if (renderMode == BACKWARDTUBES_AND_SINGLETIME)
-        {
-            tubeShader->setUniformValue(
-                        "renderTubesUpToIndex",
-                        particlePosTimeStep);
-        }
-        else
-        {
-            tubeShader->setUniformValue(
-                        "renderTubesUpToIndex",
-                        trajectories->getNumTimeStepsPerTrajectory());
-        }
-
-        // Texture bindings for transfer function for data scalar (1D texture
-        // from transfer function class). The data scalar is stored in the
-        // vertex.w component passed to the vertex shader.
-        transferFunction->getTexture()->bindToTextureUnit(
-                    textureUnitTransferFunction);
-        tubeShader->setUniformValue(
-                    "transferFunction", textureUnitTransferFunction);
-        tubeShader->setUniformValue(
-                    "scalarMinimum", transferFunction->getMinimumValue());
-        tubeShader->setUniformValue(
-                    "scalarMaximum", transferFunction->getMaximumValue());
-
-        // Bind trajectories and normals vertex buffer objects.
-        trajectoriesVertexBuffer
-                ->attachToVertexAttribute(SHADER_VERTEX_ATTRIBUTE);
-
-        normalsVertexBuffer[sceneView]
-                ->attachToVertexAttribute(SHADER_NORMAL_ATTRIBUTE);
-
-        glPolygonMode(GL_FRONT_AND_BACK,
-                      renderAsWireFrame ? GL_LINE : GL_FILL); CHECK_GL_ERROR;
-        glLineWidth(1); CHECK_GL_ERROR;
-
-        glMultiDrawArrays(GL_LINE_STRIP_ADJACENCY,
-                          trajectorySelection->getStartIndices(),
-                          trajectorySelection->getIndexCount(),
-                          trajectorySelection->getNumTrajectories());
-        CHECK_GL_ERROR;
-
-
-        if (shadowEnabled)
-        {
-
-            tubeShadowShader->bind();
-
-            tubeShadowShader->setUniformValue(
-                        "mvpMatrix",
-                        *(sceneView->getModelViewProjectionMatrix()));
-            tubeShadowShader->setUniformValue(
-                        "pToWorldZParams",
-                        sceneView->pressureToWorldZParameters());
-            tubeShadowShader->setUniformValue(
-                        "lightDirection",
-                        sceneView->getLightDirection());
-            tubeShadowShader->setUniformValue(
-                        "cameraPosition",
-                        sceneView->getCamera()->getOrigin());
-            tubeShadowShader->setUniformValue(
-                        "radius",
-                        GLfloat(tubeRadius));
-            tubeShadowShader->setUniformValue(
-                        "numObsPerTrajectory",
-                        trajectories->getNumTimeStepsPerTrajectory());
+                    trajectoryRequests[t]
+                        .trajectories->getNumTimeStepsPerTrajectory());
 
             if (renderMode == BACKWARDTUBES_AND_SINGLETIME)
             {
-                tubeShadowShader->setUniformValue(
-                            "renderTubesUpToIndex",
-                            particlePosTimeStep);
+                tubeShader->setUniformValue(
+                        "renderTubesUpToIndex",
+                        particlePosTimeStep);
             }
             else
             {
-                tubeShadowShader->setUniformValue(
-                            "renderTubesUpToIndex",
-                            trajectories->getNumTimeStepsPerTrajectory());
+                tubeShader->setUniformValue(
+                        "renderTubesUpToIndex",
+                        trajectoryRequests[t]
+                            .trajectories->getNumTimeStepsPerTrajectory());
             }
 
-            tubeShadowShader->setUniformValue(
-                        "useTransferFunction", GLboolean(shadowColoured));
+            // Texture bindings for transfer function for data scalar (1D texture
+            // from transfer function class). The data scalar is stored in the
+            // vertex.w component passed to the vertex shader.
+            transferFunction->getTexture()->bindToTextureUnit(
+                    textureUnitTransferFunction);
+            tubeShader->setUniformValue(
+                    "transferFunction", textureUnitTransferFunction);
+            tubeShader->setUniformValue(
+                    "scalarMinimum", transferFunction->getMinimumValue());
+            tubeShader->setUniformValue(
+                    "scalarMaximum", transferFunction->getMaximumValue());
 
-            if (shadowColoured)
-            {
-                tubeShadowShader->setUniformValue(
-                            "transferFunction", textureUnitTransferFunction);
-                tubeShadowShader->setUniformValue(
-                            "scalarMinimum",
-                            transferFunction->getMinimumValue());
-                tubeShadowShader->setUniformValue(
-                            "scalarMaximum",
-                            transferFunction->getMaximumValue());
-            }
-            else
-                tubeShadowShader->setUniformValue(
-                            "constColour", QColor(20, 20, 20, 155));
+            // Bind trajectories and normals vertex buffer objects.
+            trajectoryRequests[t].trajectoriesVertexBuffer
+                    ->attachToVertexAttribute(SHADER_VERTEX_ATTRIBUTE);
+
+            trajectoryRequests[t].normalsVertexBuffer[sceneView]
+                    ->attachToVertexAttribute(SHADER_NORMAL_ATTRIBUTE);
+
+            glPolygonMode(GL_FRONT_AND_BACK,
+                          renderAsWireFrame ? GL_LINE : GL_FILL); CHECK_GL_ERROR;
+            glLineWidth(1); CHECK_GL_ERROR;
 
             glMultiDrawArrays(GL_LINE_STRIP_ADJACENCY,
-                              trajectorySelection->getStartIndices(),
-                              trajectorySelection->getIndexCount(),
-                              trajectorySelection->getNumTrajectories());
+                              trajectoryRequests[t].trajectorySelection
+                              ->getStartIndices(),
+                              trajectoryRequests[t].trajectorySelection
+                              ->getIndexCount(),
+                              trajectoryRequests[t].trajectorySelection
+                              ->getNumTrajectories());
             CHECK_GL_ERROR;
-        }
 
-        // Unbind VBO.
-        glBindBuffer(GL_ARRAY_BUFFER, 0); CHECK_GL_ERROR;
+
+            if (shadowEnabled)
+            {
+
+                tubeShadowShader->bind();
+
+                tubeShadowShader->setUniformValue(
+                        "mvpMatrix",
+                        *(sceneView->getModelViewProjectionMatrix()));
+                tubeShadowShader->setUniformValue(
+                        "pToWorldZParams",
+                        sceneView->pressureToWorldZParameters());
+                tubeShadowShader->setUniformValue(
+                        "lightDirection",
+                        sceneView->getLightDirection());
+                tubeShadowShader->setUniformValue(
+                        "cameraPosition",
+                        sceneView->getCamera()->getOrigin());
+                tubeShadowShader->setUniformValue(
+                        "radius",
+                        GLfloat(tubeRadius));
+                tubeShadowShader->setUniformValue(
+                        "numObsPerTrajectory",
+                        trajectoryRequests[t].trajectories
+                            ->getNumTimeStepsPerTrajectory());
+
+                if (renderMode == BACKWARDTUBES_AND_SINGLETIME)
+                {
+                    tubeShadowShader->setUniformValue(
+                            "renderTubesUpToIndex",
+                            particlePosTimeStep);
+                }
+                else
+                {
+                    tubeShadowShader->setUniformValue(
+                            "renderTubesUpToIndex",
+                            trajectoryRequests[t].trajectories
+                                ->getNumTimeStepsPerTrajectory());
+                }
+
+                tubeShadowShader->setUniformValue(
+                        "useTransferFunction", GLboolean(shadowColoured));
+
+                if (shadowColoured)
+                {
+                    tubeShadowShader->setUniformValue(
+                            "transferFunction", textureUnitTransferFunction);
+                    tubeShadowShader->setUniformValue(
+                            "scalarMinimum",
+                            transferFunction->getMinimumValue());
+                    tubeShadowShader->setUniformValue(
+                            "scalarMaximum",
+                            transferFunction->getMaximumValue());
+                }
+                else
+                    tubeShadowShader->setUniformValue(
+                            "constColour", QColor(20, 20, 20, 155));
+
+                glMultiDrawArrays(GL_LINE_STRIP_ADJACENCY,
+                                  trajectoryRequests[t].trajectorySelection
+                                  ->getStartIndices(),
+                                  trajectoryRequests[t].trajectorySelection
+                                  ->getIndexCount(),
+                                  trajectoryRequests[t].trajectorySelection
+                                  ->getNumTrajectories());
+                CHECK_GL_ERROR;
+            }
+
+            // Unbind VBO.
+            glBindBuffer(GL_ARRAY_BUFFER, 0); CHECK_GL_ERROR;
+        }
     }
 
 
@@ -1834,144 +2255,177 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
          || (renderMode == TUBES_AND_SINGLETIME)
          || (renderMode == BACKWARDTUBES_AND_SINGLETIME))
     {
-        if (trajectories == nullptr)
+        for (int t = 0; t < (precomputedDataSource ? 1 : seedActorData.size());
+             t++)
         {
-            return;
-        }
+            if (trajectoryRequests[t].trajectories == nullptr)
+            {
+                continue;
+            }
 
-        if (renderMode == ALL_POSITION_SPHERES)
-        {
-            if (trajectorySelection == nullptr) return;
-        }
-        else
-        {
-            if (trajectorySingleTimeSelection == nullptr) return;
-        }
+            if (renderMode == ALL_POSITION_SPHERES)
+            {
+                if (trajectoryRequests[t].trajectorySelection == nullptr)
+                {
+                    continue;
+                }
+            }
+            else
+            {
+                if (trajectoryRequests[t]
+                        .trajectorySingleTimeSelection == nullptr)
+                {
+                    continue;
+                }
+            }
 
-        positionSphereShader->bindProgram("Normal");
+            positionSphereShader->bindProgram("Normal");
 
-        // Set MVP-matrix and parameters to map pressure to world space in the
-        // vertex shader.
-        positionSphereShader->setUniformValue(
+            // Set MVP-matrix and parameters to map pressure to world space in
+            // the vertex shader.
+            positionSphereShader->setUniformValue(
                     "mvpMatrix",
                     *(sceneView->getModelViewProjectionMatrix()));
-        positionSphereShader->setUniformValue(
+            positionSphereShader->setUniformValue(
                     "pToWorldZParams",
                     sceneView->pressureToWorldZParameters());
-        positionSphereShader->setUniformValue(
+            positionSphereShader->setUniformValue(
                     "lightDirection",
                     sceneView->getLightDirection());
-        positionSphereShader->setUniformValue(
+            positionSphereShader->setUniformValue(
                     "cameraPosition",
                     sceneView->getCamera()->getOrigin());
-        positionSphereShader->setUniformValue(
+            positionSphereShader->setUniformValue(
                     "cameraUpDir",
                     sceneView->getCamera()->getYAxis());
-        positionSphereShader->setUniformValue(
+            positionSphereShader->setUniformValue(
                     "radius",
                     GLfloat(sphereRadius));
-        positionSphereShader->setUniformValue(
+            positionSphereShader->setUniformValue(
                     "scaleRadius",
                     GLboolean(false));
 
 
-        // Texture bindings for transfer function for data scalar (1D texture
-        // from transfer function class). The data scalar is stored in the
-        // vertex.w component passed to the vertex shader.
-        transferFunction->getTexture()->bindToTextureUnit(
+            // Texture bindings for transfer function for data scalar (1D
+            // texture from transfer function class). The data scalar is stored
+            // in the vertex.w component passed to the vertex shader.
+            transferFunction->getTexture()->bindToTextureUnit(
                     textureUnitTransferFunction);
-        positionSphereShader->setUniformValue(
+            positionSphereShader->setUniformValue(
                     "useTransferFunction", GLboolean(true));
-        positionSphereShader->setUniformValue(
+            positionSphereShader->setUniformValue(
                     "transferFunction", textureUnitTransferFunction);
-        positionSphereShader->setUniformValue(
+            positionSphereShader->setUniformValue(
                     "scalarMinimum", transferFunction->getMinimumValue());
-        positionSphereShader->setUniformValue(
+            positionSphereShader->setUniformValue(
                     "scalarMaximum", transferFunction->getMaximumValue());
 
-        // Bind vertex buffer object.
-        trajectoriesVertexBuffer
-                ->attachToVertexAttribute(SHADER_VERTEX_ATTRIBUTE);
+            // Bind vertex buffer object.
+            trajectoryRequests[t].trajectoriesVertexBuffer
+                    ->attachToVertexAttribute(SHADER_VERTEX_ATTRIBUTE);
 
-        glPolygonMode(GL_FRONT_AND_BACK,
-                      renderAsWireFrame ? GL_LINE : GL_FILL); CHECK_GL_ERROR;
-        glLineWidth(1); CHECK_GL_ERROR;
+            glPolygonMode(GL_FRONT_AND_BACK,
+                          renderAsWireFrame ? GL_LINE : GL_FILL); CHECK_GL_ERROR;
+            glLineWidth(1); CHECK_GL_ERROR;
 
-        if (renderMode == ALL_POSITION_SPHERES)
-            glMultiDrawArrays(GL_POINTS,
-                              trajectorySelection->getStartIndices(),
-                              trajectorySelection->getIndexCount(),
-                              trajectorySelection->getNumTrajectories());
-        else
-            glMultiDrawArrays(GL_POINTS,
-                              trajectorySingleTimeSelection->getStartIndices(),
-                              trajectorySingleTimeSelection->getIndexCount(),
-                              trajectorySingleTimeSelection->getNumTrajectories());
-        CHECK_GL_ERROR;
+            if (renderMode == ALL_POSITION_SPHERES)
+            {
+                glMultiDrawArrays(GL_POINTS,
+                                  trajectoryRequests[t]
+                                  .trajectorySelection->getStartIndices(),
+                                  trajectoryRequests[t]
+                                  .trajectorySelection->getIndexCount(),
+                                  trajectoryRequests[t]
+                                  .trajectorySelection->getNumTrajectories());
+            }
+            else
+            {
+                glMultiDrawArrays(GL_POINTS,
+                                  trajectoryRequests[t]
+                                  .trajectorySingleTimeSelection
+                                  ->getStartIndices(),
+                                  trajectoryRequests[t]
+                                  .trajectorySingleTimeSelection
+                                  ->getIndexCount(),
+                                  trajectoryRequests[t]
+                                  .trajectorySingleTimeSelection
+                                  ->getNumTrajectories());
+            }
+            CHECK_GL_ERROR;
 
 
-        if (shadowEnabled)
-        {
-            positionSphereShadowShader->bind();
+            if (shadowEnabled)
+            {
+                positionSphereShadowShader->bind();
 
-            positionSphereShadowShader->setUniformValue(
+                positionSphereShadowShader->setUniformValue(
                         "mvpMatrix",
                         *(sceneView->getModelViewProjectionMatrix()));
-            CHECK_GL_ERROR;
-            positionSphereShadowShader->setUniformValue(
+                CHECK_GL_ERROR;
+                positionSphereShadowShader->setUniformValue(
                         "pToWorldZParams",
                         sceneView->pressureToWorldZParameters()); CHECK_GL_ERROR;
-            positionSphereShadowShader->setUniformValue(
+                positionSphereShadowShader->setUniformValue(
                         "lightDirection",
                         sceneView->getLightDirection());
-            positionSphereShadowShader->setUniformValue(
+                positionSphereShadowShader->setUniformValue(
                         "cameraPosition",
                         sceneView->getCamera()->getOrigin()); CHECK_GL_ERROR;
-            positionSphereShadowShader->setUniformValue(
+                positionSphereShadowShader->setUniformValue(
                         "radius",
                         GLfloat(sphereRadius)); CHECK_GL_ERROR;
-            positionSphereShadowShader->setUniformValue(
+                positionSphereShadowShader->setUniformValue(
                         "scaleRadius",
                         GLboolean(false)); CHECK_GL_ERROR;
 
-            positionSphereShadowShader->setUniformValue(
+                positionSphereShadowShader->setUniformValue(
                         "useTransferFunction",
                         GLboolean(shadowColoured)); CHECK_GL_ERROR;
 
-            if (shadowColoured)
-            {
-                // Transfer function texture is still bound from the sphere
-                // shader.
-                positionSphereShadowShader->setUniformValue(
+                if (shadowColoured)
+                {
+                    // Transfer function texture is still bound from the sphere
+                    // shader.
+                    positionSphereShadowShader->setUniformValue(
                             "transferFunction",
                             textureUnitTransferFunction); CHECK_GL_ERROR;
-                positionSphereShadowShader->setUniformValue(
+                    positionSphereShadowShader->setUniformValue(
                             "scalarMinimum",
                             transferFunction->getMinimumValue()); CHECK_GL_ERROR;
-                positionSphereShadowShader->setUniformValue(
+                    positionSphereShadowShader->setUniformValue(
                             "scalarMaximum",
                             transferFunction->getMaximumValue()); CHECK_GL_ERROR;
 
-            }
-            else
-                positionSphereShadowShader->setUniformValue(
+                }
+                else
+                    positionSphereShadowShader->setUniformValue(
                             "constColour", QColor(20, 20, 20, 155)); CHECK_GL_ERROR;
 
-            if (renderMode == ALL_POSITION_SPHERES)
-                glMultiDrawArrays(GL_POINTS,
-                                  trajectorySelection->getStartIndices(),
-                                  trajectorySelection->getIndexCount(),
-                                  trajectorySelection->getNumTrajectories());
-            else
-                glMultiDrawArrays(GL_POINTS,
-                                  trajectorySingleTimeSelection->getStartIndices(),
-                                  trajectorySingleTimeSelection->getIndexCount(),
-                                  trajectorySingleTimeSelection->getNumTrajectories());
-            CHECK_GL_ERROR;
-        }
+                if (renderMode == ALL_POSITION_SPHERES)
+                    glMultiDrawArrays(GL_POINTS,
+                                      trajectoryRequests[t]
+                                      .trajectorySelection->getStartIndices(),
+                                      trajectoryRequests[t]
+                                      .trajectorySelection->getIndexCount(),
+                                      trajectoryRequests[t]
+                                      .trajectorySelection->getNumTrajectories());
+                else
+                    glMultiDrawArrays(GL_POINTS,
+                                      trajectoryRequests[t]
+                                      .trajectorySingleTimeSelection
+                                      ->getStartIndices(),
+                                      trajectoryRequests[t]
+                                      .trajectorySingleTimeSelection
+                                      ->getIndexCount(),
+                                      trajectoryRequests[t]
+                                      .trajectorySingleTimeSelection
+                                      ->getNumTrajectories());
+                CHECK_GL_ERROR;
+            }
 
-        // Unbind VBO.
-        glBindBuffer(GL_ARRAY_BUFFER, 0); CHECK_GL_ERROR;
+            // Unbind VBO.
+            glBindBuffer(GL_ARRAY_BUFFER, 0); CHECK_GL_ERROR;
+        }
     }
 }
 
@@ -1999,7 +2453,7 @@ void MTrajectoryActor::updateEnsembleProperties()
 
     // If the ensemble is synchronized, disable all properties (they are set
     // via the synchronization control).
-    ensembleMemberProperty->setEnabled(!synchronizeEnsemble);
+    ensembleSingleMemberProperty->setEnabled(!synchronizeEnsemble);
 
     enableActorUpdates(true);
 }
@@ -2008,6 +2462,149 @@ void MTrajectoryActor::updateEnsembleProperties()
 /******************************************************************************
 ***                           PRIVATE METHODS                               ***
 *******************************************************************************/
+
+void MTrajectoryActor::updateActorData()
+{
+    seedActorData.clear();
+    for (SeedActorSettings& sas : computationSeedActorProperties)
+    {
+        if (!sas.actor->isEnabled())
+        {
+            continue;
+        }
+
+        double stepSizeLon = properties->mDDouble()->value(sas.lonSpacing);
+        double stepSizeLat = properties->mDDouble()->value(sas.latSpacing);
+        QVector<float> pressureLevels = parsePressureLevelString(
+                    properties->mString()->value(sas.pressureLevels));
+
+        switch (sas.type)
+        {
+        case POLE_ACTOR:
+        {
+            MMovablePoleActor *actor =
+                    dynamic_cast<MMovablePoleActor *>(sas.actor);
+
+            // Every pole has 2 vertices for bottom and top.
+            for (int i = 0; i < actor->getPoleVertices().size(); i += 2)
+            {
+                QVector3D bot = actor->getPoleVertices().at(i);
+                QVector3D top = actor->getPoleVertices().at(i + 1);
+
+                SeedActorData data;
+                data.type = VERTICAL_POLE;
+                data.minPosition = QVector3D(top.x(), top.y(), top.z());
+                data.maxPosition = QVector3D(bot.x(), bot.y(), bot.z());
+                data.stepSize = QVector2D(stepSizeLon, stepSizeLat);
+                data.pressureLevels.clear();
+                for (float f : pressureLevels)
+                {
+                    if (bot.z() >= f && f >= top.z())
+                        data.pressureLevels << f;
+                }
+                seedActorData.push_back(data);
+            }
+            break;
+        }
+        case HORIZONTAL_ACTOR:
+        {
+            MNWPHorizontalSectionActor *actor =
+                    dynamic_cast<MNWPHorizontalSectionActor *>(sas.actor);
+
+            if (actor->getBoundingBoxName() == "None")
+            {
+                continue;
+            }
+
+            QRectF hor = actor->getHorizontalBBox();
+            double p = actor->getSectionElevation_hPa();
+
+            SeedActorData data;
+            data.type = HORIZONTAL_SECTION;
+            data.minPosition = QVector3D(hor.x(), hor.y(), p);
+            data.maxPosition = QVector3D(hor.x() + hor.width(),
+                                         hor.y() + hor.height(), p);
+            data.stepSize = QVector2D(stepSizeLon, stepSizeLat);
+            data.pressureLevels.clear();
+            data.pressureLevels << p;
+            seedActorData.push_back(data);
+            break;
+        }
+        case VERTICAL_ACTOR:
+        {
+            MNWPVerticalSectionActor *actor =
+                    dynamic_cast<MNWPVerticalSectionActor *>(sas.actor);
+
+            if (actor->getBoundingBoxName() == "None")
+            {
+                continue;
+            }
+
+            if (!actor->getWaypointsModel())
+                continue;
+
+            for (int i = 0; i < actor->getWaypointsModel()->size() - 1; i++)
+            {
+                QVector2D point1 = actor->getWaypointsModel()->positionLonLat(i);
+                QVector2D point2 =
+                        actor->getWaypointsModel()->positionLonLat(i + 1);
+                double pbot = actor->getBottomPressure_hPa();
+                double ptop = actor->getTopPressure_hPa();
+
+                SeedActorData data;
+                data.type = VERTICAL_SECTION;
+                data.minPosition = QVector3D(point1.x(), point1.y(), ptop);
+                data.maxPosition = QVector3D(point2.x(), point2.y(), pbot);
+                data.stepSize = QVector2D(stepSizeLon, stepSizeLat);
+                data.pressureLevels.clear();
+                for (float f : pressureLevels)
+                {
+                    if (pbot >= f && f >= ptop)
+                        data.pressureLevels << f;
+                }
+
+                seedActorData.push_back(data);
+            }
+            break;
+        }
+        case BOX_ACTOR:
+        {
+            MVolumeBoundingBoxActor *actor =
+                    dynamic_cast<MVolumeBoundingBoxActor *>(sas.actor);
+
+            if (actor->getBoundingBoxName() == "None")
+            {
+                continue;
+            }
+
+            QRectF hor = actor->getHorizontalBBox();
+            double pbot = actor->getBottomPressure_hPa();
+            double ptop = actor->getTopPressure_hPa();
+
+            SeedActorData data;
+            data.type = VOLUME_BOX;
+            data.minPosition = QVector3D(hor.x(), hor.y(), ptop);
+            data.maxPosition = QVector3D(hor.x() + hor.width(),
+                                         hor.y() + hor.height(), pbot);
+            data.stepSize = QVector2D(stepSizeLon, stepSizeLat);
+            data.pressureLevels.clear();
+            for (float f : pressureLevels)
+            {
+                if (pbot >= f && f >= ptop)
+                    data.pressureLevels << f;
+            }
+            seedActorData.push_back(data);
+            break;
+        }
+        }
+    }
+
+    int size = precomputedDataSource ? 1 : seedActorData.size();
+
+    // Resize trajectory request vector containing all buffers.
+    trajectoryRequests.resize(size);
+}
+
 
 QDateTime MTrajectoryActor::getPropertyTime(QtProperty *enumProperty)
 {
@@ -2026,14 +2623,12 @@ QDateTime MTrajectoryActor::getPropertyTime(QtProperty *enumProperty)
 
 int MTrajectoryActor::getEnsembleMember()
 {
-    return properties->mInt()->value(ensembleMemberProperty);
-//    QString memberString =
-//            getQtProperties()->getEnumItem(ensembleMemberProperty);
+    QString memberString = properties->getEnumItem(ensembleSingleMemberProperty);
 
-//    bool ok = true;
-//    int member = memberString.toInt(&ok);
+    bool ok = true;
+    int member = memberString.toInt(&ok);
 
-//    if (ok) return member; else return -99999;
+    if (ok) return member; else return -99999;
 }
 
 
@@ -2061,7 +2656,6 @@ void MTrajectoryActor::setTransferFunctionFromProperty()
                 transferFunction = tf;
                 return;
             }
-
         }
     }
 }
@@ -2069,7 +2663,7 @@ void MTrajectoryActor::setTransferFunctionFromProperty()
 
 void MTrajectoryActor::asynchronousDataRequest(bool synchronizationRequest)
 {
-    // No calculations necessary if trajectories are not displayed. (Besides
+    // No computations necessary if trajectories are not displayed. (Besides
     // data requests not needed lead to predefined trajectory actor not being
     // displayed and system crash due to waiting for a unfinished thread at
     // program end.)
@@ -2081,66 +2675,124 @@ void MTrajectoryActor::asynchronousDataRequest(bool synchronizationRequest)
 #ifndef DIRECT_SYNCHRONIZATION
     Q_UNUSED(synchronizationRequest);
 #endif
-    // Initialize empty MTrajectoryRequestQueueInfo.
-    MTrajectoryRequestQueueInfo trqi;
-    trqi.dataRequest.request = "NULL";
-    trqi.dataRequest.available = false;
-    trqi.singleTimeFilterRequest.request = "NULL";
-    trqi.singleTimeFilterRequest.available = false;
-    trqi.filterRequest.request = "NULL";
-    trqi.filterRequest.available = false;
-    trqi.numPendingRequests = 0;
+
+    for (int t = 0; t < (precomputedDataSource ? 1 : seedActorData.size()); t++)
+    {
+        // Initialize empty MTrajectoryRequestQueueInfo.
+        MTrajectoryRequestQueueInfo trqi;
+        trqi.dataRequest.request = "NULL";
+        trqi.dataRequest.available = false;
+        trqi.singleTimeFilterRequest.request = "NULL";
+        trqi.singleTimeFilterRequest.available = false;
+        trqi.filterRequest.request = "NULL";
+        trqi.filterRequest.available = false;
+        trqi.numPendingRequests = 0;
 #ifdef DIRECT_SYNCHRONIZATION
-    trqi.syncchronizationRequest = synchronizationRequest;
+        trqi.syncchronizationRequest = synchronizationRequest;
 #endif
 
-    // Request 1: Trajectories for the current time and ensemble settings.
-    // ===================================================================
-    QDateTime initTime  = getPropertyTime(initTimeProperty);
-    QDateTime validTime = getPropertyTime(startTimeProperty);
-    unsigned int member = properties->mInt()->value(ensembleMemberProperty);
+        // Request 1: Trajectories for the current time and ensemble settings.
+        // ===================================================================
+        QDateTime initTime  = getPropertyTime(initTimeProperty);
+        QDateTime validTime = getPropertyTime(startTimeProperty);
+        unsigned int member = getEnsembleMember();
 
-    MDataRequestHelper rh;
-    rh.insert("INIT_TIME", initTime);
-    rh.insert("VALID_TIME", validTime);
-    rh.insert("MEMBER", member);
-    rh.insert("TIME_SPAN", "ALL");
+        MDataRequestHelper rh;
+        rh.insert("INIT_TIME", initTime);
+        rh.insert("VALID_TIME", validTime);
+        rh.insert("MEMBER", member);
+        rh.insert("TIME_SPAN", "ALL");
 
-    trqi.dataRequest.request = rh.request();
-    trqi.numPendingRequests++;
+        // If computed dataSource is used, additional information is needed.
+        if (!precomputedDataSource)
+        {
+            QDateTime endTime = availableStartTimes.at(
+                        properties->mEnum()->value(
+                            computationIntegrationTimeProperty));
+            unsigned int lineType = properties->mEnum()->value(
+                        computationLineTypeProperty);
+            unsigned int integrationMethod = properties->mEnum()->value(
+                        computationIntegrationMethodProperty);
+            unsigned int interpolationMethod = properties->mEnum()->value(
+                        computationInterpolationMethodProperty);
+            unsigned int numSubTimeSteps = properties->mInt()->value(
+                        computationNumSubTimeStepsProperty);
+            unsigned int seedType = seedActorData[t].type;
+            double streamlineDeltaS = properties->mDDouble()->value(
+                        computationStreamlineDeltaSProperty);
+            int streamlineLength = properties->mInt()->value(
+                        computationStreamlineLengthProperty);
+            QString seedMinPosition = QString("%1/%2/%3")
+                    .arg(seedActorData[t].minPosition.x())
+                    .arg(seedActorData[t].minPosition.y())
+                    .arg(seedActorData[t].minPosition.z());
+            QString seedMaxPosition = QString("%1/%2/%3")
+                    .arg(seedActorData[t].maxPosition.x())
+                    .arg(seedActorData[t].maxPosition.y())
+                    .arg(seedActorData[t].maxPosition.z());
+            QString seedStepSize = QString("%1/%2")
+                    .arg(seedActorData[t].stepSize.x())
+                    .arg(seedActorData[t].stepSize.y());
+            QString seedPressureLevels = listOfPressureLevelsAsString(
+                        seedActorData[t].pressureLevels, QString("/"));
 
-    // Request 2: Normals for all scene views that display the trajectories.
-    // =====================================================================
-    foreach (MSceneViewGLWidget* view, getViews())
-    {
-        QVector2D params = view->pressureToWorldZParameters();
-        QString query = QString("%1/%2").arg(params.x()).arg(params.y());
-        LOG4CPLUS_DEBUG(mlog, "NORMALS: " << query.toStdString());
+            // Insert additional informations into data request.
+            rh.insert("END_TIME", endTime);
+            rh.insert("LINE_TYPE", lineType);
+            rh.insert("SUBTIMESTEPS_PER_DATATIMESTEP", numSubTimeSteps);
+            rh.insert("STREAMLINE_DELTA_S", streamlineDeltaS);
+            rh.insert("STREAMLINE_LENGTH", streamlineLength);
+            rh.insert("INTEGRATION_METHOD", integrationMethod);
+            rh.insert("INTERPOLATION_METHOD", interpolationMethod);
+            rh.insert("SEED_TYPE", seedType);
+            rh.insert("SEED_MIN_POSITION", seedMinPosition);
+            rh.insert("SEED_MAX_POSITION", seedMaxPosition);
+            rh.insert("SEED_STEP_SIZE_LON_LAT", seedStepSize);
+            rh.insert("SEED_PRESSURE_LEVELS", seedPressureLevels);
+        }
 
-        rh.insert("NORMALS_LOGP_SCALED", query);
-        MRequestQueueInfo rqi;
-        rqi.request = rh.request();
-        rqi.available = false;
-        trqi.normalsRequests.insert(view, rqi);
+        trqi.dataRequest.request = rh.request();
         trqi.numPendingRequests++;
-    }
-    rh.remove("NORMALS_LOGP_SCALED");
 
-    // Request 3: Pressure/Time selection filter.
-    // ==========================================
+        // Request 2: Normals for all scene views that display the trajectories.
+        // =====================================================================
+        foreach (MSceneViewGLWidget* view, getViews())
+        {
+            QVector2D params = view->pressureToWorldZParameters();
+            QString query = QString("%1/%2").arg(params.x()).arg(params.y());
+            LOG4CPLUS_DEBUG(mlog, "NORMALS: " << query.toStdString());
 
-//TODO: add property
-    rh.insert("TRY_PRECOMPUTED", 1);
+            rh.insert("NORMALS_LOGP_SCALED", query);
+            MRequestQueueInfo rqi;
+            rqi.request = rh.request();
+            rqi.available = false;
+            trqi.normalsRequests.insert(view, rqi);
+            trqi.numPendingRequests++;
+        }
+        rh.remove("NORMALS_LOGP_SCALED");
 
-    bool filteringEnabled = properties->mBool()->value(enableFilterProperty);
-    if (filteringEnabled)
-    {
-        float deltaPressure_hPa = properties->mDDouble()->value(
-                    deltaPressureProperty);
-        int deltaTime_hrs = properties->mDDouble()->value(deltaTimeProperty);
-        // Request is e.g. 500/48 for 500 hPa in 48 hours.
-        rh.insert("FILTER_PRESSURE_TIME",
-                  QString("%1/%2").arg(deltaPressure_hPa).arg(deltaTime_hrs));
+        // Request 3: Pressure/Time selection filter.
+        // ==========================================
+
+        //TODO: add property
+        rh.insert("TRY_PRECOMPUTED", 1);
+
+        bool filteringEnabled = properties->mBool()->value(
+                    enableAscentFilterProperty);
+        if (filteringEnabled)
+        {
+            float deltaPressure_hPa = properties->mDDouble()->value(
+                        deltaPressureFilterProperty);
+            int deltaTime_hrs =
+                    properties->mDDouble()->value(deltaTimeFilterProperty);
+            // Request is e.g. 500/48 for 500 hPa in 48 hours.
+            rh.insert("FILTER_PRESSURE_TIME",
+                      QString("%1/%2").arg(deltaPressure_hPa).arg(deltaTime_hrs));
+        }
+        else
+        {
+            rh.insert("FILTER_PRESSURE_TIME", "ALL");
+        }
         // Request bounding box filtering.
         if (bBoxConnection->getBoundingBox() != nullptr)
         {
@@ -2150,100 +2802,157 @@ void MTrajectoryActor::asynchronousDataRequest(bool synchronizationRequest)
                       .arg(bBoxConnection->eastLon()).arg(
                           bBoxConnection->northLat()));
         }
-    }
-    else
-    {
-        rh.insert("FILTER_PRESSURE_TIME", "ALL");
-    }
 
-    if ((renderMode == SINGLETIME_POSITIONS)
+        if ((renderMode == SINGLETIME_POSITIONS)
             || (renderMode == TUBES_AND_SINGLETIME)
             || (renderMode == BACKWARDTUBES_AND_SINGLETIME))
-    {
-        rh.insert("FILTER_TIMESTEP", QString("%1").arg(particlePosTimeStep));
-        trqi.singleTimeFilterRequest.request = rh.request();
-        trqi.numPendingRequests++;
-    }
+        {
+            rh.insert("FILTER_TIMESTEP", QString("%1").arg(particlePosTimeStep));
+            trqi.singleTimeFilterRequest.request = rh.request();
+            trqi.numPendingRequests++;
+        }
 
-    if (renderMode != SINGLETIME_POSITIONS)
-    {
-        rh.insert("FILTER_TIMESTEP", "ALL");
-        trqi.filterRequest.request = rh.request();
-        trqi.numPendingRequests++;
-    }
+        if (renderMode != SINGLETIME_POSITIONS)
+        {
+            rh.insert("FILTER_TIMESTEP", "ALL");
+            trqi.filterRequest.request = rh.request();
+            trqi.numPendingRequests++;
+        }
 
-    LOG4CPLUS_DEBUG(mlog, "Enqueuing with [" << trqi.numPendingRequests
-                    << "] pending requests.");
-    pendingRequestsQueue.enqueue(trqi);
-//    debugPrintPendingRequestsQueue();
+        LOG4CPLUS_DEBUG(mlog, "Enqueuing with [" << trqi.numPendingRequests
+                                                 << "] pending requests.");
+        trajectoryRequests[t].pendingRequestsQueue.enqueue(trqi);
+//        debugPrintPendingRequestsQueue();
 
-    // Emit requests AFTER its information has been posted to the queue.
-    // (Otherwise requestData() may trigger a call to asynchronous...Available()
-    // before the request information has been posted; then the incoming
-    // request is not accepted).
+        // Emit requests AFTER its information has been posted to the queue.
+        // (Otherwise requestData() may trigger a call to
+        // asynchronous...Available() before the request information has been
+        // posted; then the incoming request is not accepted).
 
-    trajectorySource->requestData(trqi.dataRequest.request);
+        trajectorySource->requestData(trqi.dataRequest.request);
 
-    foreach (MSceneViewGLWidget* view, getViews())
-    {
-        normalsSource->requestData(trqi.normalsRequests[view].request);
-    }
+        foreach (MSceneViewGLWidget* view, getViews())
+        {
+            normalsSource->requestData(trqi.normalsRequests[view].request);
+        }
 
-    if ((renderMode == SINGLETIME_POSITIONS)
+        if ((renderMode == SINGLETIME_POSITIONS)
             || (renderMode == TUBES_AND_SINGLETIME)
             || (renderMode == BACKWARDTUBES_AND_SINGLETIME))
-    {
-        trajectoryFilter->requestData(trqi.singleTimeFilterRequest.request);
-    }
+        {
+            trajectoryFilter->requestData(trqi.singleTimeFilterRequest.request);
+        }
 
-    if (renderMode != SINGLETIME_POSITIONS)
-    {
-        trajectoryFilter->requestData(trqi.filterRequest.request);
+        if (renderMode != SINGLETIME_POSITIONS)
+        {
+            trajectoryFilter->requestData(trqi.filterRequest.request);
+        }
     }
 }
 
 
 void MTrajectoryActor::asynchronousSelectionRequest()
 {
-    MTrajectoryRequestQueueInfo trqi;
-    trqi.dataRequest.request = "NULL";
-    trqi.dataRequest.available = false;
-    trqi.singleTimeFilterRequest.request = "NULL";
-    trqi.singleTimeFilterRequest.available = false;
-    trqi.filterRequest.request = "NULL";
-    trqi.filterRequest.available = false;
-    trqi.numPendingRequests = 0;
+    for (int t = 0; t < (precomputedDataSource ? 1 : seedActorData.size()); t++)
+    {
+        MTrajectoryRequestQueueInfo trqi;
+        trqi.dataRequest.request = "NULL";
+        trqi.dataRequest.available = false;
+        trqi.singleTimeFilterRequest.request = "NULL";
+        trqi.singleTimeFilterRequest.available = false;
+        trqi.filterRequest.request = "NULL";
+        trqi.filterRequest.available = false;
+        trqi.numPendingRequests = 0;
 #ifdef DIRECT_SYNCHRONIZATION
-    // Selection requests currently are not synchronized.
-    trqi.syncchronizationRequest = false;
+        // Selection requests currently are not synchronized.
+        trqi.syncchronizationRequest = false;
 #endif
 
-    // Get the current init and valid (= trajectory start) time.
-    QDateTime initTime  = getPropertyTime(initTimeProperty);
-    QDateTime validTime = getPropertyTime(startTimeProperty);
-    unsigned int member = properties->mInt()->value(ensembleMemberProperty);
+        // Get the current init and valid (= trajectory start) time.
+        QDateTime initTime  = getPropertyTime(initTimeProperty);
+        QDateTime validTime = getPropertyTime(startTimeProperty);
+        unsigned int member = getEnsembleMember();
 
-    MDataRequestHelper rh;
-    rh.insert("INIT_TIME", initTime);
-    rh.insert("VALID_TIME", validTime);
-    rh.insert("MEMBER", member);
-    rh.insert("TIME_SPAN", "ALL");
-//TODO: add property
-    rh.insert("TRY_PRECOMPUTED", 1);
+        MDataRequestHelper rh;
+        rh.insert("INIT_TIME", initTime);
+        rh.insert("VALID_TIME", validTime);
+        rh.insert("MEMBER", member);
+        rh.insert("TIME_SPAN", "ALL");
+        //TODO: add property
+        rh.insert("TRY_PRECOMPUTED", 1);
 
-    // Filter the trajectories of this member according to the specified
-    // pressure interval (xx hPa over the "lifetime" of the trajectories;
-    // e.g. for T-NAWDEX over 48 hours).
+        // If computed dataSource is used, additional information is needed.
+        if (!precomputedDataSource)
+        {
+            int endTimeIndex =
+                    properties->mEnum()->value(computationIntegrationTimeProperty);
+            if (endTimeIndex < 0)
+            {
+                continue;
+            }
+            QDateTime endTime = availableStartTimes.at(max(0, endTimeIndex));
+            unsigned int lineType =
+                    properties->mEnum()->value(computationLineTypeProperty);
+            unsigned int integrationMethod = properties->mEnum()->value(
+                        computationIntegrationMethodProperty);
+            unsigned int interpolatonMethod = properties->mEnum()->value(
+                        computationInterpolationMethodProperty);
+            unsigned int subTimeSteps = properties->mInt()->value(
+                        computationNumSubTimeStepsProperty);
+            unsigned int seedType = seedActorData[t].type;
+            double streamlineDeltaS = properties->mDDouble()->value(
+                        computationStreamlineDeltaSProperty);
+            int streamlineLength = properties->mInt()->value(
+                        computationStreamlineLengthProperty);
+            QString seedMinPosition = QString("%1/%2/%3")
+                    .arg(seedActorData[t].minPosition.x())
+                    .arg(seedActorData[t].minPosition.y())
+                    .arg(seedActorData[t].minPosition.z());
+            QString seedMaxPosition = QString("%1/%2/%3")
+                    .arg(seedActorData[t].maxPosition.x())
+                    .arg(seedActorData[t].maxPosition.y())
+                    .arg(seedActorData[t].maxPosition.z());
+            QString seedStepSize = QString("%1/%2")
+                    .arg(seedActorData[t].stepSize.x())
+                    .arg(seedActorData[t].stepSize.y());
+            QString seedPressureLevels = listOfPressureLevelsAsString(
+                        seedActorData[t].pressureLevels, QString("/"));
 
-    bool filteringEnabled = properties->mBool()->value(enableFilterProperty);
-    if (filteringEnabled)
-    {
-        float deltaPressure_hPa = properties->mDDouble()->value(
-                    deltaPressureProperty);
-        int deltaTime_hrs = properties->mDDouble()->value(deltaTimeProperty);
-        // Request is e.g. 500/48 for 500 hPa in 48 hours.
-        rh.insert("FILTER_PRESSURE_TIME",
-                  QString("%1/%2").arg(deltaPressure_hPa).arg(deltaTime_hrs));
+            // Insert additional informations into data request.
+            rh.insert("END_TIME", endTime);
+            rh.insert("LINE_TYPE", lineType);
+            rh.insert("SUBTIMESTEPS_PER_DATATIMESTEP", subTimeSteps);
+            rh.insert("STREAMLINE_DELTA_S", streamlineDeltaS);
+            rh.insert("STREAMLINE_LENGTH", streamlineLength);
+            rh.insert("INTEGRATION_METHOD", integrationMethod);
+            rh.insert("INTERPOLATION_METHOD", interpolatonMethod);
+            rh.insert("SEED_TYPE", seedType);
+            rh.insert("SEED_MIN_POSITION", seedMinPosition);
+            rh.insert("SEED_MAX_POSITION", seedMaxPosition);
+            rh.insert("SEED_STEP_SIZE_LON_LAT", seedStepSize);
+            rh.insert("SEED_PRESSURE_LEVELS", seedPressureLevels);
+        }
+
+        // Filter the trajectories of this member according to the specified
+        // pressure interval (xx hPa over the "lifetime" of the trajectories;
+        // e.g. for T-NAWDEX over 48 hours).
+
+        bool filteringEnabled = properties->mBool()->value(
+                    enableAscentFilterProperty);
+        if (filteringEnabled)
+        {
+            float deltaPressure_hPa = properties->mDDouble()->value(
+                    deltaPressureFilterProperty);
+            int deltaTime_hrs = properties->mDDouble()->value(
+                        deltaTimeFilterProperty);
+            // Request is e.g. 500/48 for 500 hPa in 48 hours.
+            rh.insert("FILTER_PRESSURE_TIME",
+                      QString("%1/%2").arg(deltaPressure_hPa).arg(deltaTime_hrs));
+        }
+        else
+        {
+            rh.insert("FILTER_PRESSURE_TIME", "ALL");
+        }
         // Request bounding box filtering.
         if (bBoxConnection->getBoundingBox() != nullptr)
         {
@@ -2253,40 +2962,36 @@ void MTrajectoryActor::asynchronousSelectionRequest()
                   .arg(bBoxConnection->eastLon()).arg(
                           bBoxConnection->northLat()));
         }
-    }
-    else
-    {
-        rh.insert("FILTER_PRESSURE_TIME", "ALL");
-    }
 
-    if ((renderMode == SINGLETIME_POSITIONS)
+        if ((renderMode == SINGLETIME_POSITIONS)
             || (renderMode == TUBES_AND_SINGLETIME)
             || (renderMode == BACKWARDTUBES_AND_SINGLETIME))
-    {
-        rh.insert("FILTER_TIMESTEP", QString("%1").arg(particlePosTimeStep));
-        trqi.singleTimeFilterRequest.request = rh.request();
-        trqi.numPendingRequests++;
-    }
+        {
+            rh.insert("FILTER_TIMESTEP", QString("%1").arg(particlePosTimeStep));
+            trqi.singleTimeFilterRequest.request = rh.request();
+            trqi.numPendingRequests++;
+        }
 
-    if (renderMode != SINGLETIME_POSITIONS)
-    {
-        rh.insert("FILTER_TIMESTEP", "ALL");
-        trqi.filterRequest.request = rh.request();
-        trqi.numPendingRequests++;
-    }
+        if (renderMode != SINGLETIME_POSITIONS)
+        {
+            rh.insert("FILTER_TIMESTEP", "ALL");
+            trqi.filterRequest.request = rh.request();
+            trqi.numPendingRequests++;
+        }
 
-    pendingRequestsQueue.enqueue(trqi);
+        trajectoryRequests[t].pendingRequestsQueue.enqueue(trqi);
 
-    if ((renderMode == SINGLETIME_POSITIONS)
+        if ((renderMode == SINGLETIME_POSITIONS)
             || (renderMode == TUBES_AND_SINGLETIME)
             || (renderMode == BACKWARDTUBES_AND_SINGLETIME))
-    {
-        trajectoryFilter->requestData(trqi.singleTimeFilterRequest.request);
-    }
+        {
+            trajectoryFilter->requestData(trqi.singleTimeFilterRequest.request);
+        }
 
-    if (renderMode != SINGLETIME_POSITIONS)
-    {
-        trajectoryFilter->requestData(trqi.filterRequest.request);
+        if (renderMode != SINGLETIME_POSITIONS)
+        {
+            trajectoryFilter->requestData(trqi.filterRequest.request);
+        }
     }
 }
 
@@ -2304,8 +3009,8 @@ void MTrajectoryActor::updateInitTimeProperty()
         // Get the current init time value.
         QDateTime initTime  = getPropertyTime(initTimeProperty);
 
-        // Get available init times from the data loader. Convert the QDateTime
-        // objects to strings for the enum manager.
+        // Get available init times from the trajectory source. Convert the
+        // QDateTime objects to strings for the enum manager.
         availableInitTimes = trajectorySource->availableInitTimes();
         QStringList timeStrings;
         for (int i = 0; i < availableInitTimes.size(); i++)
@@ -2358,6 +3063,8 @@ void MTrajectoryActor::updateStartTimeProperty()
         }
     }
 
+    updateTrajectoryIntegrationTimeProperty();
+
     suppressUpdate = false;
 }
 
@@ -2366,21 +3073,35 @@ void MTrajectoryActor::updateParticlePosTimeProperty()
 {
     suppressUpdate = true;
 
-    if (trajectories == nullptr)
+    // All trajectories have the exact same type, find any initialized source.
+    int index = -1;
+    for (int t = 0; t < (precomputedDataSource ? 1 : seedActorData.size()); t++)
     {
-        properties->mEnum()->setEnumNames(particlePosTimeProperty,
-                                          QStringList());
+        if (trajectoryRequests[t].trajectories != nullptr)
+        {
+            index = t;
+            break;
+        }
+    }
+
+    // No initialized trajectory found.
+    if (index < 0)
+    {
+        properties->mEnum()->setEnumNames(particlePosTimeProperty, QStringList());
     }
     else
     {
         QDateTime currentValue = getPropertyTime(particlePosTimeProperty);
 
-        availableParticlePosTimes = trajectories->getTimes().toList();
+        availableParticlePosTimes = trajectoryRequests[index].trajectories
+                ->getTimes().toList();
         QStringList particlePosTimeStrings;
-        for (int i = 0; i < trajectories->getTimes().size(); i++)
+        for (int i = 0;
+             i < trajectoryRequests[index].trajectories->getTimes().size(); i++)
         {
             particlePosTimeStrings
-                    << trajectories->getTimes().at(i).toString(Qt::ISODate);
+                    << trajectoryRequests[index].trajectories
+                       ->getTimes().at(i).toString(Qt::ISODate);
         }
 
         properties->mEnum()->setEnumNames(particlePosTimeProperty,
@@ -2389,7 +3110,8 @@ void MTrajectoryActor::updateParticlePosTimeProperty()
         // Try to restore previous time value. If the previous value is not
         // available for the new trajectories, indexOf() returns -1. This is
         // changed to 0, i.e. the first available time value is selected.
-        int newIndex = max(0, trajectories->getTimes().indexOf(currentValue));
+        int newIndex = max(0, trajectoryRequests[index].trajectories
+                           ->getTimes().indexOf(currentValue));
         properties->mEnum()->setValue(particlePosTimeProperty, newIndex);
 
         // The trajectory time property is not needed when the entire
@@ -2410,6 +3132,70 @@ void MTrajectoryActor::updateParticlePosTimeProperty()
         {
             setParticleDateTime(synchronizationControl->validDateTime());
         }
+    }
+
+    suppressUpdate = false;
+}
+
+
+bool MTrajectoryActor::updateEnsembleSingleMemberProperty()
+{
+    // Remember currently set ensemble member in order to restore it below
+    // (if getEnsembleMember() returns a value < 0 the list is currently
+    // empty; however, since the ensemble members are represented by
+    // unsigned ints below we cast this case to 0).
+    int prevEnsembleMember = max(0, getEnsembleMember());
+
+    // Update ensembleSingleMemberProperty so that the user can choose
+    // from the list of available members. (Requires first sorting the set of
+    // members as a list, which can then be converted  to a string list).
+    availableEnsembleMembersAsSortedList =
+            trajectorySource->availableEnsembleMembers().toList();
+    qSort(availableEnsembleMembersAsSortedList);
+
+    QStringList availableMembersAsStringList;
+    foreach (unsigned int member, availableEnsembleMembersAsSortedList)
+        availableMembersAsStringList << QString("%1").arg(member);
+
+    enableActorUpdates(false);
+    properties->mEnum()->setEnumNames(
+                ensembleSingleMemberProperty, availableMembersAsStringList);
+    properties->setEnumPropertyClosest<unsigned int>(
+                availableEnsembleMembersAsSortedList,
+                (unsigned int)prevEnsembleMember,
+                ensembleSingleMemberProperty, synchronizeEnsemble, getScenes());
+    enableActorUpdates(true);
+
+    bool displayedMemberHasChanged = (getEnsembleMember() != prevEnsembleMember);
+    return displayedMemberHasChanged;
+}
+
+
+void MTrajectoryActor::updateTrajectoryIntegrationTimeProperty()
+{
+    suppressUpdate = true;
+
+    if (trajectorySource == nullptr || precomputedDataSource)
+    {
+        properties->mEnum()->setEnumNames(
+                    computationIntegrationTimeProperty, QStringList());
+    }
+    else
+    {
+        // Get current start time.
+        QDateTime startTime = getPropertyTime(startTimeProperty);
+
+        // Determine possible integration times from available time steps
+        // in the NWP data source.
+        QStringList endTimes;
+        for (QDateTime& time : availableStartTimes)
+        {
+           endTimes << QString("%1 hrs").arg(startTime.secsTo(time) / 3600.0);
+        }
+
+        // Update items in GUI list.
+        properties->updateEnumItems(
+                    computationIntegrationTimeProperty, endTimes);
     }
 
     suppressUpdate = false;
@@ -2492,23 +3278,39 @@ void MTrajectoryActor::debugPrintPendingRequestsQueue()
 
     QString str = QString("\n==================\nPending requests queue:\n");
 
-    for (int i = 0; i < pendingRequestsQueue.size(); i++)
+    for (int t = 0; t < (precomputedDataSource ? 1 : seedActorData.size()); t++)
     {
-        str += QString("Entry #%1 [%2]\n[%3] %4\n[%5] %6\n[%7] %8\n")
-                .arg(i).arg(pendingRequestsQueue[i].numPendingRequests)
-                .arg(pendingRequestsQueue[i].dataRequest.available)
-                .arg(pendingRequestsQueue[i].dataRequest.request)
-                .arg(pendingRequestsQueue[i].filterRequest.available)
-                .arg(pendingRequestsQueue[i].filterRequest.request)
-                .arg(pendingRequestsQueue[i].singleTimeFilterRequest.available)
-                .arg(pendingRequestsQueue[i].singleTimeFilterRequest.request);
+        if (!precomputedDataSource)
+            str += QString("Seed position #%1").arg(t);
 
-        foreach (MSceneViewGLWidget *view,
-                 pendingRequestsQueue[i].normalsRequests.keys())
+        for (int i = 0; i < trajectoryRequests[t].pendingRequestsQueue.size(); i++)
         {
-            str += QString("[%1] %2\n")
-                    .arg(pendingRequestsQueue[i].normalsRequests[view].available)
-                    .arg(pendingRequestsQueue[i].normalsRequests[view].request);
+            str += QString("Entry #%1 [%2]\n[%3] %4\n[%5] %6\n[%7] %8\n")
+                    .arg(i).arg(trajectoryRequests[t].pendingRequestsQueue[i]
+                                .numPendingRequests)
+                    .arg(trajectoryRequests[t].pendingRequestsQueue[i]
+                         .dataRequest.available)
+                    .arg(trajectoryRequests[t].pendingRequestsQueue[i]
+                         .dataRequest.request)
+                    .arg(trajectoryRequests[t].pendingRequestsQueue[i]
+                         .filterRequest.available)
+                    .arg(trajectoryRequests[t].pendingRequestsQueue[i]
+                         .filterRequest.request)
+                    .arg(trajectoryRequests[t].pendingRequestsQueue[i]
+                         .singleTimeFilterRequest.available)
+                    .arg(trajectoryRequests[t].pendingRequestsQueue[i]
+                         .singleTimeFilterRequest.request);
+
+                    foreach (MSceneViewGLWidget *view,
+                             trajectoryRequests[t].pendingRequestsQueue[i]
+                             .normalsRequests.keys())
+                {
+                    str += QString("[%1] %2\n")
+                            .arg(trajectoryRequests[t].pendingRequestsQueue[i]
+                                 .normalsRequests[view].available)
+                            .arg(trajectoryRequests[t].pendingRequestsQueue[i]
+                                 .normalsRequests[view].request);
+                }
         }
     }
 
@@ -2557,10 +3359,163 @@ bool MTrajectoryActor::selectDataSource()
         this->setNormalsSource(dataSourceID + QString(" Normals"));
         this->setTrajectoryFilter(dataSourceID + QString(" timestepFilter"));
 
+        updateInitTimeProperty();
+        updateStartTimeProperty();
+        updateEnsembleSingleMemberProperty();
+
         return true;
     }
 
-    return false;
+    return true;
+}
+
+
+void MTrajectoryActor::openSeedActorDialog()
+{
+    const QList<MSelectActorType> types =
+    {MSelectActorType::POLE_ACTOR, MSelectActorType::HORIZONTALSECTION_ACTOR,
+     MSelectActorType::VERTICALSECTION_ACTOR, MSelectActorType::BOX_ACTOR};
+
+    MSelectActorDialog dialog(types, 0);
+    if (dialog.exec() == QDialog::Rejected)
+    {
+        return;
+    }
+
+    QString actorName = dialog.getSelectedActor().actorName;
+    QVector<float> defaultPressureLvls = {850, 700, 500, 300, 200};
+    addSeedActor(actorName, 10.0, 10.0, defaultPressureLvls);
+}
+
+
+void MTrajectoryActor::addSeedActor(
+        QString actorName, double deltaLon, double deltaLat,
+        QVector<float> pressureLevels)
+{
+    MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
+    MActor* actor = glRM->getActorByName(actorName);
+
+    // Actor does not exist.
+    if (!actor)
+    {
+        return;
+    }
+
+    // Check if entry already exists.
+    for (SeedActorSettings& sas : computationSeedActorProperties)
+    {
+        if (sas.actor->getName().compare(actorName) == 0)
+        {
+            return;
+        }
+    }
+
+    // Connect to actor changed signal.
+    connect(actor, SIGNAL(actorChanged()), this, SLOT(onSeedActorChanged()));
+
+    // Create property group for this seed actor.
+    SeedActorSettings actorSettings;
+    actorSettings.actor = actor;
+    actorSettings.propertyGroup = addProperty(
+                GROUP_PROPERTY, actorName, computationSeedPropertyGroup);
+    actorSettings.removeProperty = addProperty(
+                CLICK_PROPERTY, "remove", actorSettings.propertyGroup);
+
+    actorSettings.lonSpacing = addProperty(
+                DECORATEDDOUBLE_PROPERTY, "seed lon spacing",
+                actorSettings.propertyGroup);
+    actorSettings.latSpacing = addProperty(
+                DECORATEDDOUBLE_PROPERTY, "seed lat spacing",
+                actorSettings.propertyGroup);
+    actorSettings.pressureLevels = addProperty(
+                STRING_PROPERTY, "seed pressure levels",
+                actorSettings.propertyGroup);
+
+    bool seedInLon = false, seedInLat = false, seedInP = false;
+    if (dynamic_cast<MMovablePoleActor*>(actor))
+    {
+        actorSettings.type = POLE_ACTOR;
+        seedInLon = false;
+        seedInLat = false;
+        seedInP = true;
+    }
+    else if (dynamic_cast<MNWPHorizontalSectionActor*>(actor))
+    {
+        actorSettings.type = HORIZONTAL_ACTOR;
+        seedInLon = true;
+        seedInLat = true;
+        seedInP = false;
+    }
+    else if (dynamic_cast<MNWPVerticalSectionActor*>(actor))
+    {
+        actorSettings.type = VERTICAL_ACTOR;
+        seedInLon = true;
+        seedInLat = false;
+        seedInP = true;
+    }
+    else if (dynamic_cast<MVolumeBoundingBoxActor*>(actor))
+    {
+        actorSettings.type = BOX_ACTOR;
+        seedInLon = true;
+        seedInLat = true;
+        seedInP = true;
+    }
+
+    properties->setDDouble(actorSettings.lonSpacing,
+                           seedInLon ? deltaLon : NC_MAX_DOUBLE,
+                           0.001, 999999.999, 3, 1.0, " deg");
+    properties->setDDouble(actorSettings.latSpacing,
+                           seedInLat ? deltaLat : NC_MAX_DOUBLE,
+                           0.001, 999999.999, 3, 1.0, " deg");
+    properties->mString()->setValue(
+                actorSettings.pressureLevels,
+                listOfPressureLevelsAsString(pressureLevels, QString(",")));
+
+    actorSettings.lonSpacing->setEnabled(seedInLon);
+    actorSettings.latSpacing->setEnabled(seedInLat);
+    actorSettings.pressureLevels->setEnabled(seedInP);
+
+    // Store new seed actor settings to list of seed actors.
+    computationSeedActorProperties.push_back(actorSettings);
+}
+
+
+void MTrajectoryActor::clearSeedActor()
+{
+    for (SeedActorSettings& sas : computationSeedActorProperties)
+    {
+        // Disconnect signal before deletion.
+        disconnect(sas.actor, SIGNAL(actorChanged()), this,
+                   SLOT(onSeedActorChanged()));
+
+        // Delete property.
+        computationSeedPropertyGroup->removeSubProperty(sas.propertyGroup);
+    }
+
+    // Clear list.
+    computationSeedActorProperties.clear();
+}
+
+
+void MTrajectoryActor::removeSeedActor(QString name)
+{
+    // Delete actor with given name.
+    for (int i = 0; i < computationSeedActorProperties.size(); i++)
+    {
+        if (computationSeedActorProperties.at(i).actor->getName()
+                .compare(name) == 0)
+        {
+            // Disconnect signal before deletion.
+            disconnect(computationSeedActorProperties.at(i).actor,
+                       SIGNAL(actorChanged()), this, SLOT(onSeedActorChanged()));
+
+            // Remove actor from properties and list.
+            computationSeedPropertyGroup->removeSubProperty(
+                        computationSeedActorProperties.at(i).propertyGroup);
+            computationSeedActorProperties.removeAt(i);
+            break;
+        }
+    }
 }
 
 
@@ -2568,9 +3523,9 @@ void MTrajectoryActor::enableProperties(bool enable)
 {
     enableActorUpdates(false);
 //    ensembleModeProperty->setEnabled(enable);
-    enableFilterProperty->setEnabled(enable);
-    deltaPressureProperty->setEnabled(enable);
-    deltaTimeProperty->setEnabled(enable);
+    enableAscentFilterProperty->setEnabled(enable);
+    deltaPressureFilterProperty->setEnabled(enable);
+    deltaTimeFilterProperty->setEnabled(enable);
     renderModeProperty->setEnabled(enable);
 
     // Synchronisation properties should only be enabled if actor is connected
@@ -2596,49 +3551,65 @@ void MTrajectoryActor::enableProperties(bool enable)
                 enable && !(enableSync && synchronizeParticlePosTime));
 
     bBoxConnection->getProperty()->setEnabled(enable);
-    ensembleMemberProperty->setEnabled(enable && !synchronizeEnsemble);
+    ensembleSingleMemberProperty->setEnabled(enable && !synchronizeEnsemble);
+
+    // Computation Properties.
+    bool enableComputation = enable && !precomputedDataSource;
+    computationPropertyGroup->setEnabled(enableComputation);
+
     enableActorUpdates(true);
 }
 
 
 void MTrajectoryActor::releaseData()
 {
+    // Release for all seed points or for single precomputed trajectories
+    for (int t = 0; t < (precomputedDataSource ? 1 : seedActorData.size()); t++)
+    {
+        releaseData(t);
+    }
+}
+
+
+void MTrajectoryActor::releaseData(int slot)
+{
     // 1. Trajectory data.
     // ===================
-    if (trajectories)
+    if (trajectoryRequests[slot].trajectories)
     {
-        trajectories->releaseVertexBuffer();
-        trajectorySource->releaseData(trajectories);
-        trajectories = nullptr;
+        trajectoryRequests[slot].trajectories->releaseVertexBuffer();
+        trajectorySource->releaseData(trajectoryRequests[slot].trajectories);
+        trajectoryRequests[slot].trajectories = nullptr;
     }
 
     // 2. Normals.
     // ===========
-    foreach (MSceneViewGLWidget *view,
-             MSystemManagerAndControl::getInstance()->getRegisteredViews())
-    {
-        if (normals.value(view, nullptr))
+            foreach (MSceneViewGLWidget *view,
+                     MSystemManagerAndControl::getInstance()->getRegisteredViews())
         {
-            normals[view]->releaseVertexBuffer();
-            normalsSource->releaseData(normals[view]);
-            normals[view] = nullptr;
+            if (trajectoryRequests[slot].normals.value(view, nullptr))
+            {
+                trajectoryRequests[slot].normals[view]->releaseVertexBuffer();
+                normalsSource->releaseData(trajectoryRequests[slot].normals[view]);
+                trajectoryRequests[slot].normals[view] = nullptr;
+            }
         }
-    }
 
     // 3. Selection.
     // =============
-    if (trajectorySelection)
+    if (trajectoryRequests[slot].trajectorySelection)
     {
-        trajectoryFilter->releaseData(trajectorySelection);
-        trajectorySelection = nullptr;
+        trajectoryFilter->releaseData(trajectoryRequests[slot].trajectorySelection);
+        trajectoryRequests[slot].trajectorySelection = nullptr;
     }
 
     // 4. Single time selection.
     // =========================
-    if (trajectorySingleTimeSelection)
+    if (trajectoryRequests[slot].trajectorySingleTimeSelection)
     {
-        trajectoryFilter->releaseData(trajectorySingleTimeSelection);
-        trajectorySingleTimeSelection = nullptr;
+        trajectoryFilter->releaseData(trajectoryRequests[slot]
+                                      .trajectorySingleTimeSelection);
+        trajectoryRequests[slot].trajectorySingleTimeSelection = nullptr;
     }
 }
 

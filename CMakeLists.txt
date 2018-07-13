@@ -8,6 +8,7 @@
 #   Copyright (c) 2016-2018 Marc Rautenhaus
 #   Copyright (c) 2016-2017 Michael Kern <kernm@in.tum.de>
 #   Copyright (c) 2017-2018 Bianca Tost
+#   Copyright (c) 2017      Philipp Kaiser
 #
 #   Computer Graphics and Visualization Group
 #   Technische Universitaet Muenchen, Garching, Germany
@@ -220,6 +221,13 @@ include_directories(${glfx_INCLUDE_DIR})
 add_definitions(-DGLFX_VERSION_MAJOR=${glfx_VERSION_MAJOR}
                 -DGLFX_VERSION_MINOR=${glfx_VERSION_MINOR}
                 -DGLFX_VERSION_PATCH=${glfx_VERSION_PATCH})
+
+# OpenMP
+find_package(OpenMP)
+if (OPENMP_FOUND)
+    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+    set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+endif()
 
 # Eigen3
 #find_package(Eigen3 REQUIRED)

@@ -170,6 +170,10 @@ MSystemManagerAndControl::MSystemManagerAndControl(QWidget *parent) :
                             "MET3D_HOME"));
     LOG4CPLUS_DEBUG(mlog, "  > MET3D_HOME set to "
                     << met3DHomeDir.absolutePath().toStdString());
+
+    defaultMemoryManagers.insert("NWP", "");
+    defaultMemoryManagers.insert("Analysis", "");
+    defaultMemoryManagers.insert("Trajectories", "");
 }
 
 

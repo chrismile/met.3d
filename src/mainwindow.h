@@ -147,6 +147,8 @@ public slots:
 
     void addDataset();
 
+    void openDatasetConfiguration();
+
     void openSessionManager();
 
     void openOnlineManual();
@@ -167,6 +169,8 @@ protected:
     virtual void keyPressEvent(QKeyEvent *);
 
 private:
+    void openDatasetDialog(MAddDatasetDialog &addDatasetDialog);
+
     Ui::MainWindow *ui;
     QSplitter *mainSplitter;
     QSplitter *rightSplitter;

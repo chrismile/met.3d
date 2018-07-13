@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015-2018 Marc Rautenhaus
+**  Copyright 2017      Philipp Kaiser
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -239,7 +240,22 @@ void MTrajectories::copyVertexDataFrom(
         float *lons, float *lats, float *pres)
 {
     for (int i = 0; i < getVertices().size(); i++)
+    {
         vertices[i] = QVector3D(lons[i], lats[i], pres[i]);
+    }
+}
+
+
+void MTrajectories::copyVertexDataFrom(QVector<QVector<QVector3D>> &v)
+{
+    for (int i = 0; i < v.size(); ++i)
+    {
+        int viSize = v[i].size();
+        for (int j = 0; j < viSize; ++j)
+        {
+            vertices[i * viSize + j] = v[i][j];
+        }
+    }
 }
 
 

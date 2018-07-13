@@ -6,6 +6,7 @@
 **
 **  Copyright 2015-2018 Marc Rautenhaus
 **  Copyright 2017-2018 Bianca Tost
+**  Copyright 2017      Philipp Kaiser
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -30,6 +31,7 @@
 
 // related third party imports
 #include <log4cplus/loggingmacros.h>
+#include <src/data/trajectorycomputation.h>
 
 // local application imports
 #include "util/mutil.h"
@@ -51,6 +53,7 @@
 #include "data/differencedatasource.h"
 
 #include "data/trajectoryreader.h"
+#include "data/trajectorycomputation.h"
 #include "data/trajectorynormalssource.h"
 #include "data/trajectoryselectionsource.h"
 #include "data/deltapressurepertrajectory.h"
@@ -166,6 +169,8 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
     initializeScheduler();
 
     MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
+    QMap<QString, QString> *defaultMemoryManagers =
+            sysMC->getDefaultMemoryManagers();
     QSettings config(filename, QSettings::IniFormat);
 
     // Initialize memory manager(s).
@@ -198,6 +203,28 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
     }
 
     config.endArray();
+
+
+    // Default memory managers.
+    // ========================
+    config.beginGroup("DefaultMemoryManagers");
+
+    QString defaultMemoryManager =
+            config.value("defaultNWPMemoryManager", "").toString();
+    checkAndStoreDefaultPipelineMemoryManager(
+            defaultMemoryManager, "NWP", defaultMemoryManagers, sysMC);
+
+    defaultMemoryManager =
+            config.value("defaultAnalysisMemoryManager", "").toString();
+    checkAndStoreDefaultPipelineMemoryManager(
+            defaultMemoryManager, "Analysis", defaultMemoryManagers, sysMC);
+
+    defaultMemoryManager =
+            config.value("defaultTrajectoryMemoryManager", "").toString();
+    checkAndStoreDefaultPipelineMemoryManager(
+            defaultMemoryManager, "Trajectories", defaultMemoryManagers, sysMC);
+
+    config.endGroup();
 
     // NWP pipeline(s).
     // ================
@@ -334,9 +361,9 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
 
     config.endArray();
 
-    // Lagranto trajectory pipeline(s).
+    // Trajectory pipeline(s).
     // ================================
-    size = config.beginReadArray("LagrantoPipeline");
+    size = config.beginReadArray("TrajectoriesPipeline");
 
     for (int i = 0; i < size; i++)
     {
@@ -344,38 +371,126 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
 
         // Read settings from file.
         QString name = config.value("name").toString();
-        bool isEnsemble = config.value("ensemble").toBool();
-        QString path = expandEnvironmentVariables(config.value("path").toString());
-        bool ablTrajectories = config.value("ABLTrajectories").toBool();
+        bool isEnsemble = config.value("ensemble", true).toBool();
+        QString path =
+                expandEnvironmentVariables(config.value("path").toString());
+        bool ablTrajectories = config.value("ABLTrajectories", false).toBool();
         QString schedulerID = config.value("schedulerID").toString();
         QString memoryManagerID = config.value("memoryManagerID").toString();
+        bool precomputed = config.value("precomputed", false).toBool();
+        QString NWPDataset =
+                config.value("NWPDataset").toString();
+        QString windEastwardVariable =
+                config.value("eastwardWind_ms").toString();
+        QString windNorthwardVariable =
+                config.value("northwardWind_ms").toString();
+        QString windVerticalVariable =
+                config.value("verticalWind_Pas").toString();
+        QString windVarsVerticalLevelTypeString =
+                config.value("windComponentVariablesVerticalLevelType").toString();
 
-        LOG4CPLUS_DEBUG(mlog, "initializing LAGRANTO pipeline #" << i << ": ");
-        LOG4CPLUS_DEBUG(mlog, "  name = " << name.toStdString());
-        LOG4CPLUS_DEBUG(mlog, "  " << (isEnsemble ? "ensemble" : "deterministic"));
-        LOG4CPLUS_DEBUG(mlog, "  path = " << path.toStdString());
-        LOG4CPLUS_DEBUG(mlog, "  type = " << (ablTrajectories ? "ABL-T" : "DF-T"));
-        LOG4CPLUS_DEBUG(mlog, "  schedulerID = " << schedulerID.toStdString());
-        LOG4CPLUS_DEBUG(mlog, "  memoryManagerID = " << memoryManagerID.toStdString());
-
-        // Check parameter validity.
-        if ( name.isEmpty()
-             || path.isEmpty()
-             || schedulerID.isEmpty()
-             || memoryManagerID.isEmpty() )
+        if (precomputed)
         {
-            LOG4CPLUS_WARN(mlog, "invalid parameters encountered; skipping.");
-            continue;
-        }
+            LOG4CPLUS_DEBUG(mlog, "initializing precomputed trajectories pipeline #"
+                            << i << ": ");
+            LOG4CPLUS_DEBUG(mlog, "  name = " << name.toStdString());
+            LOG4CPLUS_DEBUG(mlog, "  "
+                            << (isEnsemble ? "ensemble" : "deterministic"));
+            LOG4CPLUS_DEBUG(mlog, "  path = " << path.toStdString());
+            LOG4CPLUS_DEBUG(mlog, "  type = "
+                            << (ablTrajectories ? "ABL-T" : "DF-T"));
+            LOG4CPLUS_DEBUG(mlog, "  schedulerID = "
+                            << schedulerID.toStdString());
+            LOG4CPLUS_DEBUG(mlog, "  memoryManagerID = "
+                            << memoryManagerID.toStdString());
 
-        // Create new pipeline.
-        if (isEnsemble)
-            initializeLagrantoEnsemblePipeline(
+            // Check parameter validity.
+            if ( name.isEmpty()
+                 || path.isEmpty()
+                 || schedulerID.isEmpty()
+                 || memoryManagerID.isEmpty() )
+            {
+                LOG4CPLUS_WARN(mlog, "invalid parameters encountered; skipping.");
+                continue;
+            }
+
+            // Create new pipeline.
+            if (isEnsemble)
+            {
+                initializePrecomputedTrajectoriesPipeline(
                         name, path, ablTrajectories, schedulerID,
                         memoryManagerID);
+            }
+            else
+            {
+                LOG4CPLUS_WARN(mlog, "deterministic precomputed trajectories"
+                                     " pipeline has not been implemented yet;"
+                                     " skipping.");
+            }
+        }
         else
-            LOG4CPLUS_WARN(mlog, "deterministic LAGRANTO pipeline has not"
-                           "been implemented yet; skipping.");
+        {
+            LOG4CPLUS_DEBUG(mlog,
+                            "initializing trajectory computation pipeline #"
+                            << i << ": ");
+            LOG4CPLUS_DEBUG(mlog, "  name = " << name.toStdString());
+            LOG4CPLUS_DEBUG(mlog, "  "
+                            << (isEnsemble ? "ensemble" : "deterministic"));
+            LOG4CPLUS_DEBUG(mlog, "  type = "
+                            << (ablTrajectories ? "ABL-T" : "DF-T"));
+            LOG4CPLUS_DEBUG(mlog, "  schedulerID = "
+                            << schedulerID.toStdString());
+            LOG4CPLUS_DEBUG(mlog, "  memoryManagerID = "
+                            << memoryManagerID.toStdString());
+            LOG4CPLUS_DEBUG(mlog, "  NWPDataset = "
+                            << NWPDataset.toStdString());
+            LOG4CPLUS_DEBUG(mlog, "  eastward wind variable = "
+                            << windEastwardVariable.toStdString());
+            LOG4CPLUS_DEBUG(mlog, "  northward wind variable = "
+                            << windNorthwardVariable.toStdString());
+            LOG4CPLUS_DEBUG(mlog, "  vertical wind variable = "
+                            << windVerticalVariable.toStdString());
+            LOG4CPLUS_DEBUG(mlog, "  wind vertical level type  = "
+                            << windVarsVerticalLevelTypeString.toStdString());
+
+            MVerticalLevelType windVarsVerticalLevelType =
+                    MStructuredGrid::verticalLevelTypeFromConfigString(
+                        windVarsVerticalLevelTypeString);
+
+            // Check parameter validity.
+            if ( name.isEmpty()
+                 || NWPDataset.isEmpty()
+                 || windEastwardVariable.isEmpty()
+                 || windNorthwardVariable.isEmpty()
+                 || windVerticalVariable.isEmpty()
+                 || schedulerID.isEmpty()
+                 || memoryManagerID.isEmpty()
+                 || ( windVarsVerticalLevelType == SURFACE_2D
+                      || windVarsVerticalLevelType == POTENTIAL_VORTICITY_2D )
+                 || ( !windVarsVerticalLevelTypeString.isEmpty()
+                      && windVarsVerticalLevelType == SIZE_LEVELTYPES ))
+            {
+                LOG4CPLUS_WARN(mlog, "invalid parameters encountered;"
+                                     " skipping.");
+                continue;
+            }
+
+            // Create new pipeline.
+            if (isEnsemble)
+            {
+                initializeTrajectoryComputationPipeline(
+                        name, ablTrajectories, schedulerID,
+                        memoryManagerID, NWPDataset,
+                        windEastwardVariable, windNorthwardVariable,
+                        windVerticalVariable, windVarsVerticalLevelType);
+            }
+            else
+            {
+                LOG4CPLUS_WARN(mlog, "deterministic computed trajectories"
+                                     " pipeline has not been implemented yet;"
+                                     " skipping.");
+            }
+        }
     }
 
     config.endArray();
@@ -487,7 +602,8 @@ void MPipelineConfiguration::initializeNWPPipeline(
     nwpReaderENS->setDataRoot(fileDir, fileFilter);
 
     // (Should the "raw" data reader be selectable as a data source?)
-    // sysMC->registerDataSource(dataSourceId, nwpReaderENS);
+    // Yes it should, for computed trajectories.
+    sysMC->registerDataSource(dataSourceId, nwpReaderENS);
 
     MStructuredGridEnsembleFilter *ensFilter =
             new MStructuredGridEnsembleFilter();
@@ -603,7 +719,7 @@ void MPipelineConfiguration::initializeNWPPipeline(
 }
 
 
-void MPipelineConfiguration::initializeLagrantoEnsemblePipeline(
+void MPipelineConfiguration::initializePrecomputedTrajectoriesPipeline(
         QString name,
         QString fileDir,
         bool boundaryLayerTrajectories,
@@ -616,7 +732,8 @@ void MPipelineConfiguration::initializeLagrantoEnsemblePipeline(
             sysMC->getMemoryManager(memoryManagerID);
 
     const QString dataSourceId = name;
-    LOG4CPLUS_DEBUG(mlog, "Initializing LAGRANTO ensemble pipeline ''"
+    LOG4CPLUS_DEBUG(mlog,
+                    "Initializing precomputed ensemble trajectories pipeline ''"
                     << dataSourceId.toStdString() << "'' ...");
 
     // Trajectory reader.
@@ -628,17 +745,157 @@ void MPipelineConfiguration::initializeLagrantoEnsemblePipeline(
     sysMC->registerDataSource(dataSourceId + QString(" Reader"),
                               trajectoryReader);
 
+    // Initialize trajectory pipeline.
+    initializeEnsemblePipeline(dataSourceId, boundaryLayerTrajectories,
+                               trajectoryReader, scheduler, memoryManager);
+
+    LOG4CPLUS_DEBUG(mlog, "Pipeline ''" << dataSourceId.toStdString()
+                    << "'' has been initialized.");
+}
+
+
+void MPipelineConfiguration::initializeTrajectoryComputationPipeline(
+        QString name,
+        bool boundaryLayerTrajectories,
+        QString schedulerID,
+        QString memoryManagerID,
+        QString NWPDataset,
+        QString windEastwardVariable,
+        QString windNorthwardVariable,
+        QString windVerticalVariable,
+        MVerticalLevelType verticalLevelType)
+{
+    MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
+    MAbstractScheduler* scheduler = sysMC->getScheduler(schedulerID);
+    MAbstractMemoryManager* memoryManager =
+            sysMC->getMemoryManager(memoryManagerID);
+
+    const QString dataSourceId = name;
+    LOG4CPLUS_DEBUG(mlog, "Initializing trajectory computation pipeline ''"
+                          "" << dataSourceId.toStdString() << "'' ...");
+
+    MWeatherPredictionDataSource* NWPDataSource =
+            dynamic_cast<MWeatherPredictionDataSource*>(
+                sysMC->getDataSource(NWPDataset));
+    if (!NWPDataSource)
+    {
+        LOG4CPLUS_WARN(mlog, "MWeatherPredictionDataSource ''"
+                       << NWPDataset.toStdString()
+                       << "'' is invalid; skipping.");
+        return;
+    }
+
+    // If verical level type is not given, search for it.
+    if (verticalLevelType == MVerticalLevelType::SIZE_LEVELTYPES)
+    {
+        QList<MVerticalLevelType> levelTypes =
+                NWPDataSource->availableLevelTypes();
+        foreach (MVerticalLevelType level, levelTypes)
+        {
+            QStringList variables = NWPDataSource->availableVariables(level);
+            if (variables.contains(windEastwardVariable)
+                    && variables.contains(windNorthwardVariable)
+                    && variables.contains(windVerticalVariable))
+            {
+                verticalLevelType = level;
+            }
+        }
+    }
+    else
+    {
+        QList<MVerticalLevelType> levelTypes =
+                NWPDataSource->availableLevelTypes();
+        if (!levelTypes.contains(verticalLevelType))
+        {
+            LOG4CPLUS_WARN(mlog, "MWeatherPredictionDataSource ''"
+                           << NWPDataset.toStdString()
+                           << "'' does NOT contain level type '"
+                           << MStructuredGrid::verticalLevelTypeToString(
+                               verticalLevelType).toStdString()
+                           << "'; skipping.");
+            return;
+        }
+        QStringList variables = NWPDataSource->availableVariables(
+                    verticalLevelType);
+        if (!variables.contains(windEastwardVariable)
+                || !variables.contains(windNorthwardVariable)
+                || !variables.contains(windVerticalVariable))
+        {
+            LOG4CPLUS_WARN(mlog, "MWeatherPredictionDataSource ''"
+                           << NWPDataset.toStdString()
+                           << "'' does NOT contain all wind component variables"
+                              " with vertical level type '"
+                           << MStructuredGrid::verticalLevelTypeToString(
+                               verticalLevelType).toStdString()
+                           << "'; skipping.");
+            return;
+        }
+    }
+
+    if (MClimateForecastReader *netCDFDataSource =
+            dynamic_cast<MClimateForecastReader*>(NWPDataSource))
+    {
+        MHorizontalGridType hGridTypU =
+                netCDFDataSource->variableHorizontalGridType(
+                    verticalLevelType, windEastwardVariable);
+        MHorizontalGridType hGridTypV =
+                netCDFDataSource->variableHorizontalGridType(
+                    verticalLevelType, windNorthwardVariable);
+        MHorizontalGridType hGridTypW =
+                netCDFDataSource->variableHorizontalGridType(
+                    verticalLevelType, windVerticalVariable);
+        if (hGridTypU == MHorizontalGridType::ROTATED_LONLAT
+                || hGridTypV == MHorizontalGridType::ROTATED_LONLAT
+                || hGridTypW == MHorizontalGridType::ROTATED_LONLAT)
+        {
+            LOG4CPLUS_WARN(mlog, "One or more wind variables are defined on"
+                                 " a rotated grid coordinates; skipping.");
+            return;
+        }
+    }
+
+    MTrajectoryComputationSource* trajectoryComputation =
+            new MTrajectoryComputationSource(dataSourceId);
+    trajectoryComputation->setMemoryManager(memoryManager);
+    trajectoryComputation->setScheduler(scheduler);
+    trajectoryComputation->setInputWindVariables(windEastwardVariable,
+                                                 windNorthwardVariable,
+                                                 windVerticalVariable);
+
+    trajectoryComputation-> setVerticalLevelType(verticalLevelType);
+    trajectoryComputation->setInputSource(NWPDataSource);
+    sysMC->registerDataSource(dataSourceId + QString(" Reader"),
+                              trajectoryComputation);
+
+    // Initialize trajectory pipeline.
+    initializeEnsemblePipeline(dataSourceId, boundaryLayerTrajectories,
+                               trajectoryComputation, scheduler, memoryManager);
+
+    LOG4CPLUS_DEBUG(mlog, "Pipeline ''" << dataSourceId.toStdString()
+                    << "'' has been initialized.");
+}
+
+
+void MPipelineConfiguration::initializeEnsemblePipeline(
+        QString dataSourceId,
+        bool boundaryLayerTrajectories,
+        MTrajectoryDataSource* baseDataSource,
+        MAbstractScheduler* scheduler,
+        MAbstractMemoryManager* memoryManager)
+{
+    MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
+
     MDeltaPressurePerTrajectorySource *dpSource =
             new MDeltaPressurePerTrajectorySource();
     dpSource->setMemoryManager(memoryManager);
     dpSource->setScheduler(scheduler);
-    dpSource->setTrajectorySource(trajectoryReader);
+    dpSource->setTrajectorySource(baseDataSource);
 
     MThinOutTrajectoryFilter *thinoutFilter =
             new MThinOutTrajectoryFilter();
     thinoutFilter->setMemoryManager(memoryManager);
     thinoutFilter->setScheduler(scheduler);
-    thinoutFilter->setTrajectorySource(trajectoryReader);
+    thinoutFilter->setTrajectorySource(baseDataSource);
 
     MPressureTimeTrajectoryFilter *dpdtFilter =
             new MPressureTimeTrajectoryFilter();
@@ -652,7 +909,7 @@ void MPipelineConfiguration::initializeLagrantoEnsemblePipeline(
     bboxFilter->setMemoryManager(memoryManager);
     bboxFilter->setScheduler(scheduler);
     bboxFilter->setInputSelectionSource(dpdtFilter);
-    bboxFilter->setTrajectorySource(trajectoryReader);
+    bboxFilter->setTrajectorySource(baseDataSource);
 
     MSingleTimeTrajectoryFilter *timestepFilter =
             new MSingleTimeTrajectoryFilter();
@@ -666,7 +923,7 @@ void MPipelineConfiguration::initializeLagrantoEnsemblePipeline(
             new MTrajectoryNormalsSource();
     trajectoryNormals->setMemoryManager(memoryManager);
     trajectoryNormals->setScheduler(scheduler);
-    trajectoryNormals->setTrajectorySource(trajectoryReader);
+    trajectoryNormals->setTrajectorySource(baseDataSource);
     sysMC->registerDataSource(dataSourceId + QString(" Normals"),
                               trajectoryNormals);
 
@@ -678,7 +935,7 @@ void MPipelineConfiguration::initializeLagrantoEnsemblePipeline(
                 new MProbABLTrajectoriesSource();
         source->setMemoryManager(memoryManager);
         source->setScheduler(scheduler);
-        source->setTrajectorySource(trajectoryReader);
+        source->setTrajectorySource(baseDataSource);
         source->setInputSelectionSource(timestepFilter);
 
         pwcbSource = source;
@@ -689,7 +946,7 @@ void MPipelineConfiguration::initializeLagrantoEnsemblePipeline(
                 new MProbDFTrajectoriesSource();
         source->setMemoryManager(memoryManager);
         source->setScheduler(scheduler);
-        source->setTrajectorySource(trajectoryReader);
+        source->setTrajectorySource(baseDataSource);
         source->setInputSelectionSource(timestepFilter);
 
         pwcbSource = source;
@@ -704,9 +961,6 @@ void MPipelineConfiguration::initializeLagrantoEnsemblePipeline(
     probRegDetector->setInputSource(pwcbSource);
     sysMC->registerDataSource(dataSourceId + QString(" ProbReg"),
                               probRegDetector);
-
-    LOG4CPLUS_DEBUG(mlog, "Pipeline ''" << dataSourceId.toStdString()
-                    << "'' has been initialized.");
 }
 
 
@@ -843,7 +1097,7 @@ void MPipelineConfiguration::initializeDevelopmentDataPipeline()
                new MLRUMemoryManager("Trajectories DF-T psfc_1000hPa_L62",
                                      10.*1024.*1024.));
 
-    initializeLagrantoEnsemblePipeline(
+    initializePrecomputedTrajectoriesPipeline(
                 "Lagranto ENS EUR_LL10 DF-T psfc_1000hPa_L62",
                 "/mnt/ssd/data/trajectories/EUR_LL10/psfc_1000hPa_L62",
                 false,
@@ -854,7 +1108,7 @@ void MPipelineConfiguration::initializeDevelopmentDataPipeline()
                new MLRUMemoryManager("Trajectories  DF-T psfc_min_L62",
                                      12.*1024.*1024.));
 
-    initializeLagrantoEnsemblePipeline(
+    initializePrecomputedTrajectoriesPipeline(
                 "Lagranto ENS EUR_LL10 DF-T psfc_min_L62",
                 "/mnt/ssd/data/trajectories/EUR_LL10/psfc_min_L62",
                 false,
@@ -874,7 +1128,7 @@ void MPipelineConfiguration::initializeDevelopmentDataPipeline()
     sysMC->registerMemoryManager("Trajectories ABL-T psfc_min_L62_abl",
                new MLRUMemoryManager("Trajectories ABL-T psfc_min_L62_abl",
                                      10.*1024.*1024.));
-    initializeLagrantoEnsemblePipeline(
+    initializePrecomputedTrajectoriesPipeline(
                 "Lagranto ENS EUR_LL10 ABL-T psfc_min_L62_abl",
                 "/mnt/ssd/data/trajectories/EUR_LL10/psfc_min_L62_abl",
                 true,
@@ -884,7 +1138,7 @@ void MPipelineConfiguration::initializeDevelopmentDataPipeline()
     sysMC->registerMemoryManager("Trajectories ABL-T 10hPa",
                new MLRUMemoryManager("Trajectories ABL-T 10hPa",
                                      10.*1024.*1024.));
-    initializeLagrantoEnsemblePipeline(
+    initializePrecomputedTrajectoriesPipeline(
                 "Lagranto ENS EUR_LL10 ABL-T 10hPa",
                 "/mnt/ssd/data/trajectories/EUR_LL10/blt_PL10hPa",
                 true,
@@ -938,6 +1192,44 @@ MPipelineConfiguration::configurablePipelineTypeFromString(QString typeName)
     {
         return MConfigurablePipelineType::INVALID_PIPELINE_TYPE;
     }
+}
+
+
+void MPipelineConfiguration::checkAndStoreDefaultPipelineMemoryManager(
+        QString defaultMemoryManager, QString PipelineID,
+        QMap<QString, QString> *defaultMemoryManagers,
+        MSystemManagerAndControl *sysMC)
+{
+    if (defaultMemoryManager.isEmpty())
+    {
+        defaultMemoryManager = sysMC->getMemoryManagerIdentifiers().first();
+
+        LOG4CPLUS_WARN(mlog,
+                       "No memory manager set as default for '"
+                       << PipelineID.toStdString() << "' pipeline.");
+    }
+    else
+    {
+        if (!sysMC->getMemoryManagerIdentifiers().contains(defaultMemoryManager))
+        {
+            defaultMemoryManager = sysMC->getMemoryManagerIdentifiers().first();
+
+            LOG4CPLUS_WARN(mlog,
+                           "Memory manager '"
+                           << defaultMemoryManager.toStdString()
+                           << "' is set as default for '"
+                           << PipelineID.toStdString()
+                           << "' pipeline but it does not exist.");
+        }
+    }
+    if (!defaultMemoryManager.isEmpty())
+    {
+        LOG4CPLUS_DEBUG(mlog,
+                        "Using '" << defaultMemoryManager.toStdString()
+                        << "' as default memory manager for '"
+                        << PipelineID.toStdString() << "' pipeline.");
+    }
+    defaultMemoryManagers->insert(PipelineID, defaultMemoryManager);
 }
 
 
