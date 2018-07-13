@@ -99,15 +99,18 @@ MActor::MActor(QObject *parent)
                                      actorConfigurationSupGroup);
 
     // Rendering properties.
-    actorRenderingSupGroup = addProperty(GROUP_PROPERTY, "rendering",
-                                          propertyGroup);
+    actorRenderingSupGroup = addProperty(
+                GROUP_PROPERTY, "graphics development aids",
+                actorConfigurationSupGroup);
 
-    wireFrameProperty = addProperty(BOOL_PROPERTY, "wire frame",
-                                    actorRenderingSupGroup);
+    wireFrameProperty = addProperty(
+                BOOL_PROPERTY, "wire frame",
+                actorRenderingSupGroup);
     properties->mBool()->setValue(wireFrameProperty, renderAsWireFrame);
 
-    reloadShaderProperty = addProperty(CLICK_PROPERTY, "reload shaders",
-                                       actorRenderingSupGroup);
+    reloadShaderProperty = addProperty(
+                CLICK_PROPERTY, "reload shaders",
+                actorRenderingSupGroup);
 
     // Actor properties.
     actorPropertiesSupGroup = addProperty(GROUP_PROPERTY, "actor properties",
