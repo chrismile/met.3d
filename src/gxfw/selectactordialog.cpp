@@ -5,7 +5,7 @@
 **  prediction data.
 **
 **  Copyright 2017 Philipp Kaiser
-**  Copyright 2017 Marc Rautenhaus
+**  Copyright 2018 Marc Rautenhaus
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -117,7 +117,7 @@ int MSelectActorDialog::exec()
     {
         QMessageBox msgBox;
         msgBox.setIcon(QMessageBox::Warning);
-        msgBox.setText("No actors available to select!");
+        msgBox.setText("No actors available for selection.");
         msgBox.exec();
         return QDialog::Rejected;
     }
@@ -134,11 +134,9 @@ void MSelectActorDialog::createActorEntries(QList<MSelectActorType> types)
     // Set the data field table's header.
     QTableWidget *table = ui->dataFieldTable;
     table->setColumnCount(1);
-    table->setHorizontalHeaderLabels(QStringList("Available Actors"));
+    table->setHorizontalHeaderLabels(QStringList("Available actors"));
 
-    // Loop over all data loaders registered with the resource manager.
     MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
-
     actorsAvailable = false;
 
     // Iterate over all actors.
@@ -159,8 +157,8 @@ void MSelectActorDialog::createActorEntries(QList<MSelectActorType> types)
                     addActor |= dynamic_cast<MMovablePoleActor*>(a) != nullptr;
                     break;
                 case HORIZONTALSECTION_ACTOR:
-                    addActor |=  (dynamic_cast<MNWPHorizontalSectionActor*>(a)
-                                  != nullptr);
+                    addActor |= (dynamic_cast<MNWPHorizontalSectionActor*>(a)
+                                 != nullptr);
                     break;
                 case VERTICALSECTION_ACTOR:
                     addActor |= (dynamic_cast<MNWPVerticalSectionActor*>(a)
@@ -184,9 +182,9 @@ void MSelectActorDialog::createActorEntries(QList<MSelectActorType> types)
             actorsAvailable = true;
         }
 
-    } // for (data loaders)
+    } // for (actors)
 
-    // Resize the table's columns to fit data source names.
+    // Resize the table's columns to fit actor names.
     table->resizeColumnsToContents();
     // Set table width to always fit window size.
     table->horizontalHeader()->setStretchLastSection(true);

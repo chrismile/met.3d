@@ -108,8 +108,6 @@ size=2
 2\schedulerID=MultiThread
 2\memoryManagerID=NWP
 2\fileFormat=CF_NETCDF
-2\enableRegridding=false
-2\enableProbabilityRegionFilter=false
 
 3\name=YOUR CF DATASET
 3\path=/your/path/data/mss/grid/generic/netcdf
@@ -117,8 +115,6 @@ size=2
 3\schedulerID=MultiThread
 3\memoryManagerID=NWP
 3\fileFormat=CF_NETCDF
-3\enableRegridding=false
-3\enableProbabilityRegionFilter=false
 
 
 [TrajectoriesPipeline]
@@ -127,9 +123,10 @@ size=0
 1\name=Precomputed Trajectories
 1\ensemble=true
 1\path=/your/path/data/trajectories/EUR_LL10/psfc_1000hPa_L62
+# Trajectories started in the atmospheric boundary layer? (only for WCB
+# detection via probability regions).
 1\ABLTrajectories=false
 1\schedulerID=MultiThread
-#1\schedulerID=SingleThread
 1\memoryManagerID=Trajectories
 1\precomputed=true
 
@@ -139,7 +136,7 @@ size=0
 2\schedulerID=MultiThread
 2\memoryManagerID=Trajectories
 2\precomputed=false
-2\NWPDataset=ECMWF DET EUR_LL015
+2\NWPDataset=ECMWF ENS EUR_LL10
 2\eastwardWind_ms=u-component_of_wind_hybrid
 2\northwardWind_ms=v-component_of_wind_hybrid
 2\verticalWind_Pas=Vertical_velocity_pressure_hybrid

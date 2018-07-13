@@ -361,7 +361,7 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
 
     config.endArray();
 
-    // Lagranto trajectory pipeline(s).
+    // Trajectory pipeline(s).
     // ================================
     size = config.beginReadArray("TrajectoriesPipeline");
 
@@ -371,13 +371,13 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
 
         // Read settings from file.
         QString name = config.value("name").toString();
-        bool isEnsemble = config.value("ensemble").toBool();
+        bool isEnsemble = config.value("ensemble", true).toBool();
         QString path =
                 expandEnvironmentVariables(config.value("path").toString());
-        bool ablTrajectories = config.value("ABLTrajectories").toBool();
+        bool ablTrajectories = config.value("ABLTrajectories", false).toBool();
         QString schedulerID = config.value("schedulerID").toString();
         QString memoryManagerID = config.value("memoryManagerID").toString();
-        bool precomputed = config.value("precomputed").toBool();
+        bool precomputed = config.value("precomputed", false).toBool();
         QString NWPDataset =
                 config.value("NWPDataset").toString();
         QString windEastwardVariable =
@@ -391,7 +391,7 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
 
         if (precomputed)
         {
-            LOG4CPLUS_DEBUG(mlog, "initializing precomputed LAGRANTO pipeline #"
+            LOG4CPLUS_DEBUG(mlog, "initializing precomputed trajectories pipeline #"
                             << i << ": ");
             LOG4CPLUS_DEBUG(mlog, "  name = " << name.toStdString());
             LOG4CPLUS_DEBUG(mlog, "  "
@@ -732,7 +732,8 @@ void MPipelineConfiguration::initializePrecomputedTrajectoriesPipeline(
             sysMC->getMemoryManager(memoryManagerID);
 
     const QString dataSourceId = name;
-    LOG4CPLUS_DEBUG(mlog, "Initializing LAGRANTO ensemble pipeline ''"
+    LOG4CPLUS_DEBUG(mlog,
+                    "Initializing precomputed ensemble trajectories pipeline ''"
                     << dataSourceId.toStdString() << "'' ...");
 
     // Trajectory reader.
@@ -770,7 +771,7 @@ void MPipelineConfiguration::initializeTrajectoryComputationPipeline(
             sysMC->getMemoryManager(memoryManagerID);
 
     const QString dataSourceId = name;
-    LOG4CPLUS_DEBUG(mlog, "Initializing COMPUTATION pipeline ''"
+    LOG4CPLUS_DEBUG(mlog, "Initializing trajectory computation pipeline ''"
                           "" << dataSourceId.toStdString() << "'' ...");
 
     MWeatherPredictionDataSource* NWPDataSource =

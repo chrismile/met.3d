@@ -5,7 +5,7 @@
 **  prediction data.
 **
 **  Copyright 2017 Philipp Kaiser
-**  Copyright 2017 Marc Rautenhaus
+**  Copyright 2018 Marc Rautenhaus
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -54,7 +54,7 @@ struct MSelectableActor
 
 /**
   @brief MSelectActorDialog implements a dialog from which the user can
-  select an existing actor
+  select an existing actor.
  */
 class MSelectActorDialog : public QDialog
 {
@@ -65,10 +65,10 @@ public:
       Constructs a new dialog. The dialog's data field table is filled with a
       list of the actor registered with @ref MGLResourcesManager.
 
-      Which actors should be available is defined by @p types.
+      Displayed actors are limited to those of the types defined in @p types.
      */
     explicit MSelectActorDialog(QList<MSelectActorType> types,
-                                     QWidget *parent = 0);
+                                QWidget *parent = 0);
 
     ~MSelectActorDialog();
 

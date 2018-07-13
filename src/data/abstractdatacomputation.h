@@ -5,7 +5,7 @@
 **  prediction data.
 **
 **  Copyright 2017 Philipp Kaiser
-**  Copyright 2017 Marc Rautenhaus
+**  Copyright 2018 Marc Rautenhaus
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
