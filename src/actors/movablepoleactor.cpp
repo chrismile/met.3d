@@ -92,13 +92,13 @@ MMovablePoleActor::MMovablePoleActor()
                                          "bottom pressure",
                                          actorPropertiesSupGroup);
     properties->setDDouble(bottomPressureProperty, bottomPressure_hPa,
-                           1050., 20., 1, 10., " hPa");
+                           1050., 0.01, 2, 10., " hPa");
 
     topPressureProperty = addProperty(DECORATEDDOUBLE_PROPERTY,
                                       "top pressure",
                                       actorPropertiesSupGroup);
     properties->setDDouble(topPressureProperty, topPressure_hPa,
-                           1050., 20., 1, 10., " hPa");
+                           1050., 0.01, 2, 10., " hPa");
 
     ticksGroupProperty = addProperty(GROUP_PROPERTY, "tick marks",
                                      actorPropertiesSupGroup);
@@ -157,12 +157,12 @@ MovablePole::MovablePole(MActor *actor)
     bottomPressureProperty = actor->addProperty(DECORATEDDOUBLE_PROPERTY,
                                                 "bottom pressure", groupProperty);
     properties->setDDouble(bottomPressureProperty, 1050.,
-                           1050., 20., 1, 10., " hPa");
+                           1050., 0.01, 2, 10., " hPa");
 
     topPressureProperty = actor->addProperty(DECORATEDDOUBLE_PROPERTY,
                                              "top pressure", groupProperty);
     properties->setDDouble(topPressureProperty, 100,
-                           1050., 20., 1, 10., " hPa");
+                           1050., 0.01, 2, 10., " hPa");
 
     removePoleProperty = actor->addProperty(CLICK_PROPERTY, "remove",
                                             groupProperty);
