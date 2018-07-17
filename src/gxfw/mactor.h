@@ -646,6 +646,13 @@ protected:
     void setActorSupportsMultipleEnsembleMemberVisualization(bool b)
     { actorSupportsMultipleEnsembleMemberVisualization = b; }
 
+    /**
+      Override this method in derived actors to print debug output upon user
+      request.
+     */
+    virtual void printDebugOutputOnUserRequest();
+
+
     // Properties common to all actors.
     //=================================
 
@@ -657,7 +664,7 @@ protected:
                                              additional subgroups for, e.g.,
                                              variables. */
     QtProperty *actorConfigurationSupGroup;
-    QtProperty *actorRenderingSupGroup;
+    QtProperty *actorDevelopmentSupGroup;
 
     bool        actorIsEnabled;           /* Whether actor will be rendered. */
     QtProperty *actorEnabledProperty;
@@ -671,6 +678,7 @@ protected:
     QtProperty *loadConfigProperty;
 
     QtProperty *reloadShaderProperty;
+    QtProperty *printDebugOutputProperty;
 
     QtProperty *labelPropertiesSupGroup;  /* Subgroup for label properties. */
     QtProperty *labelColourProperty;

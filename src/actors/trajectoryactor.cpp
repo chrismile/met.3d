@@ -4,7 +4,7 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2015-2018 Marc Rautenhaus
 **  Copyright 2016-2017 Bianca Tost
 **  Copyright 2017      Philipp Kaiser
 **
@@ -2459,6 +2459,12 @@ void MTrajectoryActor::updateEnsembleProperties()
 }
 
 
+void MTrajectoryActor::printDebugOutputOnUserRequest()
+{
+    debugPrintPendingRequestsQueue();
+}
+
+
 /******************************************************************************
 ***                           PRIVATE METHODS                               ***
 *******************************************************************************/
@@ -2831,8 +2837,9 @@ void MTrajectoryActor::asynchronousDataRequest(bool synchronizationRequest)
             trqi.numPendingRequests++;
         }
 
-        LOG4CPLUS_DEBUG(mlog, "Enqueuing with [" << trqi.numPendingRequests
-                                                 << "] pending requests.");
+        LOG4CPLUS_DEBUG(mlog, "Trajectories asynchronous data request: "
+                              "Enqueuing [" << trqi.numPendingRequests
+                        << "] new pending requests.");
         trajectoryRequests[t].pendingRequestsQueue.enqueue(trqi);
 //        debugPrintPendingRequestsQueue();
 

@@ -98,19 +98,23 @@ MActor::MActor(QObject *parent)
     saveConfigProperty = addProperty(CLICK_PROPERTY, "save",
                                      actorConfigurationSupGroup);
 
-    // Rendering properties.
-    actorRenderingSupGroup = addProperty(
-                GROUP_PROPERTY, "graphics development aids",
+    // Development properties.
+    actorDevelopmentSupGroup = addProperty(
+                GROUP_PROPERTY, "development aids",
                 actorConfigurationSupGroup);
 
     wireFrameProperty = addProperty(
                 BOOL_PROPERTY, "wire frame",
-                actorRenderingSupGroup);
+                actorDevelopmentSupGroup);
     properties->mBool()->setValue(wireFrameProperty, renderAsWireFrame);
 
     reloadShaderProperty = addProperty(
                 CLICK_PROPERTY, "reload shaders",
-                actorRenderingSupGroup);
+                actorDevelopmentSupGroup);
+
+    printDebugOutputProperty = addProperty(
+                CLICK_PROPERTY, "print debug output",
+                actorDevelopmentSupGroup);
 
     // Actor properties.
     actorPropertiesSupGroup = addProperty(GROUP_PROPERTY, "actor properties",
@@ -703,6 +707,10 @@ void MActor::actOnQtPropertyChanged(QtProperty *property)
             emitActorChangedSignal();
         }
     }
+    else if (property == printDebugOutputProperty)
+    {
+        printDebugOutputOnUserRequest();
+    }
 
     // Invoke signal handling of derived classes.
     onQtPropertyChanged(property);
@@ -1001,6 +1009,12 @@ double MActor::computePositionLabelDistanceWeight(
     dist *= dist * 0.00003;
 
     return dist;
+}
+
+
+void MActor::printDebugOutputOnUserRequest()
+{
+    LOG4CPLUS_DEBUG(mlog, "No debug output has been provided for this actor.");
 }
 
 
