@@ -160,7 +160,7 @@ protected:
             QString windVerticalVariable,
             MVerticalLevelType verticalLevelType);
 
-    void initializeEnsemblePipeline(
+    void initializeEnsembleTrajectoriesPipeline(
             QString dataSourceId,
             bool boundaryLayerTrajectories,
             MTrajectoryDataSource* baseDataSource,

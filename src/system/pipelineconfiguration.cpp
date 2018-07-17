@@ -601,10 +601,6 @@ void MPipelineConfiguration::initializeNWPPipeline(
     nwpReaderENS->setScheduler(scheduler);
     nwpReaderENS->setDataRoot(fileDir, fileFilter);
 
-    // (Should the "raw" data reader be selectable as a data source?)
-    // Yes it should, for computed trajectories.
-    sysMC->registerDataSource(dataSourceId, nwpReaderENS);
-
     MStructuredGridEnsembleFilter *ensFilter =
             new MStructuredGridEnsembleFilter();
     ensFilter->setMemoryManager(memoryManager);
@@ -746,8 +742,9 @@ void MPipelineConfiguration::initializePrecomputedTrajectoriesPipeline(
                               trajectoryReader);
 
     // Initialize trajectory pipeline.
-    initializeEnsemblePipeline(dataSourceId, boundaryLayerTrajectories,
-                               trajectoryReader, scheduler, memoryManager);
+    initializeEnsembleTrajectoriesPipeline(
+                dataSourceId, boundaryLayerTrajectories,
+                trajectoryReader, scheduler, memoryManager);
 
     LOG4CPLUS_DEBUG(mlog, "Pipeline ''" << dataSourceId.toStdString()
                     << "'' has been initialized.");
@@ -868,15 +865,16 @@ void MPipelineConfiguration::initializeTrajectoryComputationPipeline(
                               trajectoryComputation);
 
     // Initialize trajectory pipeline.
-    initializeEnsemblePipeline(dataSourceId, boundaryLayerTrajectories,
-                               trajectoryComputation, scheduler, memoryManager);
+    initializeEnsembleTrajectoriesPipeline(
+                dataSourceId, boundaryLayerTrajectories,
+                trajectoryComputation, scheduler, memoryManager);
 
     LOG4CPLUS_DEBUG(mlog, "Pipeline ''" << dataSourceId.toStdString()
                     << "'' has been initialized.");
 }
 
 
-void MPipelineConfiguration::initializeEnsemblePipeline(
+void MPipelineConfiguration::initializeEnsembleTrajectoriesPipeline(
         QString dataSourceId,
         bool boundaryLayerTrajectories,
         MTrajectoryDataSource* baseDataSource,

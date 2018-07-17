@@ -2706,11 +2706,23 @@ void MTrajectoryActor::asynchronousDataRequest(bool synchronizationRequest)
         // If computed dataSource is used, additional information is needed.
         if (!precomputedDataSource)
         {
-            QDateTime endTime = availableStartTimes.at(
-                        properties->mEnum()->value(
-                            computationIntegrationTimeProperty));
             unsigned int lineType = properties->mEnum()->value(
                         computationLineTypeProperty);
+            QDateTime endTime;
+            if (TRAJECTORY_COMPUTATION_LINE_TYPE(lineType) == PATH_LINE)
+            {
+                endTime = availableStartTimes.at(
+                            properties->mEnum()->value(
+                                computationIntegrationTimeProperty));
+            }
+            else
+            {
+                // For streamlines the "end time" is not really required.
+                // The trajectory computation source, however, requests all
+                // time steps between validTime and endTime, hence set it
+                // to the same time. (mr, 17Jul2018 -- could be changed..)
+                endTime = validTime;
+            }
             unsigned int integrationMethod = properties->mEnum()->value(
                         computationIntegrationMethodProperty);
             unsigned int interpolationMethod = properties->mEnum()->value(
@@ -2884,15 +2896,27 @@ void MTrajectoryActor::asynchronousSelectionRequest()
         // If computed dataSource is used, additional information is needed.
         if (!precomputedDataSource)
         {
-            int endTimeIndex =
-                    properties->mEnum()->value(computationIntegrationTimeProperty);
-            if (endTimeIndex < 0)
+            unsigned int lineType = properties->mEnum()->value(
+                        computationLineTypeProperty);
+            QDateTime endTime;
+            if (TRAJECTORY_COMPUTATION_LINE_TYPE(lineType) == PATH_LINE)
             {
-                continue;
+                int endTimeIndex = properties->mEnum()->value(
+                            computationIntegrationTimeProperty);
+                if (endTimeIndex < 0)
+                {
+                    continue;
+                }
+                endTime = availableStartTimes.at(max(0, endTimeIndex));
             }
-            QDateTime endTime = availableStartTimes.at(max(0, endTimeIndex));
-            unsigned int lineType =
-                    properties->mEnum()->value(computationLineTypeProperty);
+            else
+            {
+                // For streamlines the "end time" is not really required.
+                // The trajectory computation source, however, requests all
+                // time steps between validTime and endTime, hence set it
+                // to the same time. (mr, 17Jul2018 -- could be changed..)
+                endTime = validTime;
+            }
             unsigned int integrationMethod = properties->mEnum()->value(
                         computationIntegrationMethodProperty);
             unsigned int interpolatonMethod = properties->mEnum()->value(
