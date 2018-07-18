@@ -1050,6 +1050,12 @@ void MTrajectoryActor::setDataSource(MTrajectoryDataSource *ds)
                    this, SLOT(asynchronousDataAvailable(MDataRequest)));
     }
 
+    bool prevTrajectorySourceComputesInMet3D =
+            (dynamic_cast<MTrajectoryComputationSource*>(
+                 trajectorySource) != nullptr);
+    bool newTrajectorySourceComputesInMet3D =
+            (dynamic_cast<MTrajectoryComputationSource*>(ds) != nullptr);
+
     trajectorySource = ds;
     if (trajectorySource != nullptr)
     {
@@ -1061,6 +1067,27 @@ void MTrajectoryActor::setDataSource(MTrajectoryDataSource *ds)
                 (dynamic_cast<MTrajectoryComputationSource*>(trajectorySource)
                  == nullptr);
         updateActorData();
+    }
+
+    // Connect seed actors change signal to trajectory actor only if the new
+    // connected data source is a computation data source. If the data source
+    // is NO computation data source, the seed actors change signal should not
+    // trigger an update of the trajectory actor, hence disconnect signal.
+    if (!prevTrajectorySourceComputesInMet3D && newTrajectorySourceComputesInMet3D)
+    {
+        for (SeedActorSettings& sas : computationSeedActorProperties)
+        {
+            connect(sas.actor, SIGNAL(actorChanged()),
+                    this, SLOT(onSeedActorChanged()));
+        }
+    }
+    else if (prevTrajectorySourceComputesInMet3D && !newTrajectorySourceComputesInMet3D)
+    {
+        for (SeedActorSettings& sas : computationSeedActorProperties)
+        {
+            disconnect(sas.actor, SIGNAL(actorChanged()),
+                       this, SLOT(onSeedActorChanged()));
+        }
     }
 }
 
@@ -2666,8 +2693,9 @@ void MTrajectoryActor::asynchronousDataRequest(bool synchronizationRequest)
     // No computations necessary if trajectories are not displayed. (Besides
     // data requests not needed lead to predefined trajectory actor not being
     // displayed and system crash due to waiting for a unfinished thread at
-    // program end.)
-    if (getViews().size() == 0)
+    // program end.) Also no computations needed if actor is not connected to a
+    // data source.
+    if (getViews().size() == 0 || trajectorySource == nullptr)
     {
         return;
     }
@@ -3448,8 +3476,13 @@ void MTrajectoryActor::addSeedActor(
         }
     }
 
-    // Connect to actor changed signal.
-    connect(actor, SIGNAL(actorChanged()), this, SLOT(onSeedActorChanged()));
+    // Connect to actor changed signal but only if the trajectory data source
+    // is a computation data source. (Otherwise this connection would lead to
+    // unwanted recomputation requests).
+    if (dynamic_cast<MTrajectoryComputationSource*>(trajectorySource))
+    {
+        connect(actor, SIGNAL(actorChanged()), this, SLOT(onSeedActorChanged()));
+    }
 
     // Create property group for this seed actor.
     SeedActorSettings actorSettings;
