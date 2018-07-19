@@ -2920,7 +2920,16 @@ void MSceneViewGLWidget::loadConfiguration(QSettings *settings)
                 displayDateTimePositionProperty,
                 settings->value("position", QPointF(-0.99, 0.99)).toPointF());
     settings->endGroup(); // display date time
+
     synchronizeWith(sysMC->getSyncControl(syncControlName));
+
+    // Update display time when loading configuration only if the view is
+    // initialised since otherwise adding the text will lead to an
+    // initialisation error when the text is added.
+    if (viewIsInitialised)
+    {
+        updateDisplayTime();
+    }
 
     // Load arrow pointing north properties.
     settings->beginGroup("ArrowPointingNorth");
@@ -2971,6 +2980,7 @@ void MSceneViewGLWidget::onHandleSizeChanged()
 void MSceneViewGLWidget::synchronizeWith(
         MSyncControl *sync, bool updateGUIProperties)
 {
+    Q_UNUSED(updateGUIProperties);
     if (synchronizationControl == sync)
     {
         return;
