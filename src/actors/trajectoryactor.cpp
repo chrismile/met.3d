@@ -1951,8 +1951,8 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
     else if (property == startTimeProperty)
     {
         if (suppressUpdate) return; // ignore if init times are being updated
-        if (suppressActorUpdates()) return;
         updateTrajectoryIntegrationTimeProperty();
+        if (suppressActorUpdates()) return;
         asynchronousDataRequest();
     }
 
@@ -3218,15 +3218,16 @@ void MTrajectoryActor::updateTrajectoryIntegrationTimeProperty()
 
         // Determine possible integration times from available time steps
         // in the NWP data source.
-        QStringList endTimes;
+        QStringList timeIntervals;
         for (QDateTime& time : availableStartTimes)
         {
-           endTimes << QString("%1 hrs").arg(startTime.secsTo(time) / 3600.0);
+            timeIntervals << QString("%1 hrs").arg(
+                                 startTime.secsTo(time) / 3600.0);
         }
 
         // Update items in GUI list.
         properties->updateEnumItems(
-                    computationIntegrationTimeProperty, endTimes);
+                    computationIntegrationTimeProperty, timeIntervals);
     }
 
     suppressUpdate = false;
@@ -3307,41 +3308,53 @@ void MTrajectoryActor::debugPrintPendingRequestsQueue()
 {
     // Debug: Output content of request queue.
 
-    QString str = QString("\n==================\nPending requests queue:\n");
+    QString str = QString("\n==================\nTrajectory Actor :: "
+                          "Pending requests queue:\n");
 
     for (int t = 0; t < (precomputedDataSource ? 1 : seedActorData.size()); t++)
     {
         if (!precomputedDataSource)
-            str += QString("Seed position #%1").arg(t);
+        {
+            str += QString("\n++++++++++++++\nRequests triggered for seed "
+                           "actor #%1:\n").arg(t);
+        }
 
         for (int i = 0; i < trajectoryRequests[t].pendingRequestsQueue.size(); i++)
         {
-            str += QString("Entry #%1 [%2]\n[%3] %4\n[%5] %6\n[%7] %8\n")
+            str += QString("\nRequest queue entry #%1: pending requests=[%2]\n")
                     .arg(i).arg(trajectoryRequests[t].pendingRequestsQueue[i]
-                                .numPendingRequests)
+                                .numPendingRequests);
+
+            str += QString("\nData: available=[%1]\n[%2]\n")
                     .arg(trajectoryRequests[t].pendingRequestsQueue[i]
                          .dataRequest.available)
                     .arg(trajectoryRequests[t].pendingRequestsQueue[i]
-                         .dataRequest.request)
+                         .dataRequest.request);
+
+            str += QString("\nFiler: available=[%1]\n[%2]\n")
                     .arg(trajectoryRequests[t].pendingRequestsQueue[i]
                          .filterRequest.available)
                     .arg(trajectoryRequests[t].pendingRequestsQueue[i]
-                         .filterRequest.request)
+                         .filterRequest.request);
+
+            str += QString("\nSingle time filer: available=[%1]\n[%2]\n")
                     .arg(trajectoryRequests[t].pendingRequestsQueue[i]
                          .singleTimeFilterRequest.available)
                     .arg(trajectoryRequests[t].pendingRequestsQueue[i]
                          .singleTimeFilterRequest.request);
 
-                    foreach (MSceneViewGLWidget *view,
-                             trajectoryRequests[t].pendingRequestsQueue[i]
-                             .normalsRequests.keys())
-                {
-                    str += QString("[%1] %2\n")
-                            .arg(trajectoryRequests[t].pendingRequestsQueue[i]
-                                 .normalsRequests[view].available)
-                            .arg(trajectoryRequests[t].pendingRequestsQueue[i]
-                                 .normalsRequests[view].request);
-                }
+            int sv = 0;
+            foreach (MSceneViewGLWidget *view,
+                     trajectoryRequests[t].pendingRequestsQueue[i]
+                     .normalsRequests.keys())
+            {
+                str += QString("\nScene view [%1] normals: available=[%2]\n[%3]\n")
+                        .arg(sv++)
+                        .arg(trajectoryRequests[t].pendingRequestsQueue[i]
+                             .normalsRequests[view].available)
+                        .arg(trajectoryRequests[t].pendingRequestsQueue[i]
+                             .normalsRequests[view].request);
+            }
         }
     }
 
