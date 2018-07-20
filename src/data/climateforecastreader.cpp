@@ -1135,8 +1135,12 @@ MStructuredGrid *MClimateForecastReader::readGrid(
     }
     catch (MBadDataFieldRequest& e)
     {
-        LOG4CPLUS_ERROR(mlog, "invalid data field requested\n" << flush);
-        throw;
+        LOG4CPLUS_ERROR(mlog, "ERROR: invalid data field requested. There "
+                              "seems to be a problem with your dataset. Please "
+                              "check that all variables are defined for all "
+                              "timesteps and ensemble members. [Returning"
+                              " a nullptr.]\n" << flush);
+        return nullptr;
     }
 
     LOG4CPLUS_DEBUG(mlog, "reading NetCDF data from file "

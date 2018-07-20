@@ -79,6 +79,12 @@ MStructuredGrid* MWeatherPredictionReader::produceData(MDataRequest request)
 
     MStructuredGrid* result = readGrid(levtype, variable, initTime,
                                        validTime, member);
+    if (result == nullptr)
+    {
+        // For some reason (invalid datafield requested, file corrupt) no
+        // grid could be read. Return nullptr.
+        return nullptr;
+    }
 
     result->setHorizontalGridType(variableHorizontalGridType(levtype, variable));
 

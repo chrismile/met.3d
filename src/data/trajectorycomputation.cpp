@@ -500,11 +500,25 @@ void MTrajectoryComputationSource::computeStreamLines(
     // step is required for streamline computation).
     QDateTime timeStep = ch.validTimes.at(ch.startTimeStep);
     rh.insert("VALID_TIME", timeStep);
+    bool allDataFieldsValid = true;
     for (int v = 0; v < ch.varNames.size(); ++v) // v = 0,1,2 => wind u,v,w
     {
         rh.insert("VARIABLE", ch.varNames[v]);
         grids[0][v] = dataSource->getData(rh.request()); // timestep 0
         grids[1][v] = grids[0][v];                       // timestep 1 (link)
+
+        if (grids[0][v] == nullptr)
+        {
+            allDataFieldsValid = false;
+            QString emsg = QString("ERROR: Not all wind components required "
+                                   "for the streamline computation could be "
+                                   "loaded. Please check the console output "
+                                   "and your datasets. Aborting streamline "
+                                   "computation.");
+            LOG4CPLUS_ERROR(mlog, emsg.toStdString());
+//TODO (mr, 20Jul2018) -- see corresponding part in computePathLines().
+//            QMessageBox::critical(nullptr, "Error", emsg, QMessageBox::Ok);
+        }
     }
 
     // cInfo.times contains the list of timesteps that correspond to the
@@ -518,20 +532,22 @@ void MTrajectoryComputationSource::computeStreamLines(
     }
 
     // Compute the streamlines.
-    #pragma omp parallel for
-    for (uint iStreamline = 0; iStreamline < ch.trajectoryCount; ++iStreamline)
+    if (allDataFieldsValid)
     {
-        // Integrate streamline in wind field.
-        for (uint iVertex = 1; iVertex <= cInfo.numStoredVerticesPerTrajectory;
-             ++iVertex)
+#pragma omp parallel for
+        for (uint iStreamline = 0; iStreamline < ch.trajectoryCount; ++iStreamline)
         {
-            // Get current position from vertex buffer.
-            QVector3D currentPosition = cInfo.vertices[iStreamline].back();
-
-            // Compute next vertex with Euler or Runge-Kutta integration.
-            QVector3D nextPos;
-            switch (ch.iterationMethod)
+            // Integrate streamline in wind field.
+            for (uint iVertex = 1; iVertex <= cInfo.numStoredVerticesPerTrajectory;
+                 ++iVertex)
             {
+                // Get current position from vertex buffer.
+                QVector3D currentPosition = cInfo.vertices[iStreamline].back();
+
+                // Compute next vertex with Euler or Runge-Kutta integration.
+                QVector3D nextPos;
+                switch (ch.iterationMethod)
+                {
                 case EULER:
                     nextPos = trajectoryIntegrationEuler(
                                 currentPosition, ch.streamlineDeltaS, 0, 0,
@@ -544,18 +560,19 @@ void MTrajectoryComputationSource::computeStreamLines(
                                 ch.interpolationMethod, grids,
                                 validPosition[iStreamline]);
                     break;
-            }
+                }
 
-            // Check validity of computed vertex position.
-            if (!validPosition[iStreamline])
-            {
-                nextPos = QVector3D(M_INVALID_TRAJECTORY_POS,
-                                    M_INVALID_TRAJECTORY_POS,
-                                    M_INVALID_TRAJECTORY_POS);
-            }
+                // Check validity of computed vertex position.
+                if (!validPosition[iStreamline])
+                {
+                    nextPos = QVector3D(M_INVALID_TRAJECTORY_POS,
+                                        M_INVALID_TRAJECTORY_POS,
+                                        M_INVALID_TRAJECTORY_POS);
+                }
 
-            // Store position in vertex buffer.
-            cInfo.vertices[iStreamline].push_back(nextPos);
+                // Store position in vertex buffer.
+                cInfo.vertices[iStreamline].push_back(nextPos);
+            }
         }
     }
 
@@ -619,6 +636,7 @@ void MTrajectoryComputationSource::computePathLines(
                 / static_cast<float>(ch.subTimeStepsPerDataTimeStep);
 
         // Load wind data (u,v,w components for both data time steps).
+        bool allDataFieldsValid = true;
         for (int t = 0; t < timeSteps.size(); ++t)
         {
             rh.insert("VALID_TIME", timeSteps[t]);
@@ -632,8 +650,27 @@ void MTrajectoryComputationSource::computePathLines(
                     // command below) and set -- hence the check for a valid
                     // pointer above.
                     grids[t][v] = dataSource->getData(rh.request());
+
+                    if (grids[t][v] == nullptr)
+                    {
+                        allDataFieldsValid = false;
+                    }
                 }
             }
+        }
+        if (!allDataFieldsValid)
+        {
+            QString emsg = QString("ERROR: Not all wind components required "
+                                   "for the trajectory computation could be "
+                                   "loaded. Please check the console output "
+                                   "and your datasets. Aborting trajectory "
+                                   "computation.");
+            LOG4CPLUS_ERROR(mlog, emsg.toStdString());
+//TODO (mr, 20Jul2018) -- show QMessageBox at this place to inform the user
+// of the error. Needs a signal/slot construct, see
+// https://stackoverflow.com/questions/3268073/qobject-cannot-create-children-for-a-parent-that-is-in-a-different-thread
+//            QMessageBox::critical(nullptr, "Error", emsg, QMessageBox::Ok);
+            break;
         }
 
         // The "current" timestep for which the new vertex position needs to
