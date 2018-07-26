@@ -156,13 +156,20 @@ MTrajectories* MTrajectoryComputationSource::produceData(MDataRequest request)
         }
     }
 
-    LOG4CPLUS_DEBUG(mlog, "Computing trajectories/streamlines for IT="
-            << initTime.toString(Qt::ISODate).toStdString() << ", VT="
-            << validTime.toString(Qt::ISODate).toStdString() << " ET="
-            << endTime.toString(Qt::ISODate).toStdString() << " MEM="
-            << member << ", INTERVAL=("
-            << startTime.toString(Qt::ISODate).toStdString() << "/"
-            << stopTime.toString(Qt::ISODate).toStdString() << ")");
+    LOG4CPLUS_DEBUG(
+                mlog, "Starting computation of trajectories/streamlines. "
+                      "Forecast IT="
+                << initTime.toString(Qt::ISODate).toStdString()
+                << ", trajectory start="
+                << validTime.toString(Qt::ISODate).toStdString()
+                << ", trajectory end="
+                << endTime.toString(Qt::ISODate).toStdString()
+                << " (i.e., "
+                << validTime.secsTo(endTime) / 3600.
+                << " hours), ensemble member=" << member
+                << ", using time interval=("
+                << startTime.toString(Qt::ISODate).toStdString() << "/"
+                << stopTime.toString(Qt::ISODate).toStdString() << ")");
 
     // Check validity of initTime, startTime and member.
     QReadLocker availableItemsReadLocker(&availableItemsLock);
@@ -204,6 +211,7 @@ MTrajectories* MTrajectoryComputationSource::produceData(MDataRequest request)
     trajectories->copyVertexDataFrom(cInfo.vertices);
     trajectories->setStartGrid(cInfo.startGrid);
 
+    LOG4CPLUS_DEBUG(mlog, "Computation of trajectories/streamlines finished.");
 #ifdef MSTOPWATCH_ENABLED
     stopwatch.split();
     LOG4CPLUS_DEBUG(mlog, "Single ensemble member trajectories computed in "
