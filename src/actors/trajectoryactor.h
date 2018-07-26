@@ -357,8 +357,6 @@ private:
     bool initialDataRequest; // indicator whether the actor loads for the
                              // first time a data source.
 
-    bool suppressUpdate;
-
     /** Render mode (tubes, spheres, etc.). */
     enum TrajectoryRenderType {
         TRAJECTORY_TUBES     = 0,

@@ -70,7 +70,6 @@ MTrajectoryActor::MTrajectoryActor()
       dataSourceID(""),
       precomputedDataSource(false),
       initialDataRequest(true),
-      suppressUpdate(false),
       renderMode(TRAJECTORY_TUBES),
       synchronizationControl(nullptr),
       synchronizeInitTime(true),
@@ -1944,13 +1943,11 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
     {
         if (suppressActorUpdates()) return;
         updateStartTimeProperty();
-
         asynchronousDataRequest();
     }
 
     else if (property == startTimeProperty)
     {
-        if (suppressUpdate) return; // ignore if init times are being updated
         updateTrajectoryIntegrationTimeProperty();
         if (suppressActorUpdates()) return;
         asynchronousDataRequest();
@@ -1961,7 +1958,6 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
         particlePosTimeStep = properties->mEnum()->value(
                     particlePosTimeProperty);
 
-        if (suppressUpdate) return;
         if (suppressActorUpdates()) return;
         asynchronousSelectionRequest();
     }
@@ -1997,8 +1993,6 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
 
     else if (property == computationIntegrationTimeProperty)
     {
-        // Ignore update of init times.
-        if (suppressUpdate) return;
         if (suppressActorUpdates()) return;
         asynchronousDataRequest();
     }
@@ -3029,7 +3023,7 @@ void MTrajectoryActor::asynchronousSelectionRequest()
 
 void MTrajectoryActor::updateInitTimeProperty()
 {
-    suppressUpdate = true;
+    enableActorUpdates(false);
 
     if (trajectorySource == nullptr)
     {
@@ -3059,13 +3053,13 @@ void MTrajectoryActor::updateInitTimeProperty()
         }
     }
 
-    suppressUpdate = false;
+    enableActorUpdates(true);
 }
 
 
 void MTrajectoryActor::updateStartTimeProperty()
 {
-    suppressUpdate = true;
+    enableActorUpdates(false);
 
     if (trajectorySource == nullptr)
     {
@@ -3096,13 +3090,13 @@ void MTrajectoryActor::updateStartTimeProperty()
 
     updateTrajectoryIntegrationTimeProperty();
 
-    suppressUpdate = false;
+    enableActorUpdates(true);
 }
 
 
 void MTrajectoryActor::updateParticlePosTimeProperty()
 {
-    suppressUpdate = true;
+    enableActorUpdates(false);
 
     // All trajectories have the exact same type, find any initialized source.
     int index = -1;
@@ -3165,7 +3159,7 @@ void MTrajectoryActor::updateParticlePosTimeProperty()
         }
     }
 
-    suppressUpdate = false;
+    enableActorUpdates(true);
 }
 
 
@@ -3204,7 +3198,7 @@ bool MTrajectoryActor::updateEnsembleSingleMemberProperty()
 
 void MTrajectoryActor::updateTrajectoryIntegrationTimeProperty()
 {
-    suppressUpdate = true;
+    enableActorUpdates(false);
 
     if (trajectorySource == nullptr || precomputedDataSource)
     {
@@ -3230,7 +3224,7 @@ void MTrajectoryActor::updateTrajectoryIntegrationTimeProperty()
                     computationIntegrationTimeProperty, timeIntervals);
     }
 
-    suppressUpdate = false;
+    enableActorUpdates(true);
 }
 
 
