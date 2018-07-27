@@ -4,11 +4,14 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2017 Philipp Kaiser
-**  Copyright 2017 Marc Rautenhaus
+**  Copyright 2017      Philipp Kaiser [+]
+**  Copyright 2017-2018 Marc Rautenhaus [*, previously +]
 **
-**  Computer Graphics and Visualization Group
+**  + Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
+**
+**  * Regional Computing Center, Visualization
+**  Universitaet Hamburg, Hamburg, Germany
 **
 **  Met.3D is free software: you can redistribute it and/or modify
 **  it under the terms of the GNU General Public License as published by

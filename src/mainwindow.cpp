@@ -4,11 +4,14 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2018 Marc Rautenhaus
-**  Copyright 2016-2018 Bianca Tost
+**  Copyright 2015-2018 Marc Rautenhaus [*, previously +]
+**  Copyright 2016-2018 Bianca Tost [+]
 **
-**  Computer Graphics and Visualization Group
+**  + Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
+**
+**  * Regional Computing Center, Visualization
+**  Universitaet Hamburg, Hamburg, Germany
 **
 **  Met.3D is free software: you can redistribute it and/or modify
 **  it under the terms of the GNU General Public License as published by
@@ -1188,7 +1191,8 @@ void MMainWindow::showAboutDialog()
             "and observations. "
             "In particular, Met.3D features functionality for visualization of "
             "ensemble numerical weather prediction data. Please refer to the "
-            "<a href='https://met3d.readthedocs.io/en/latest/about.html'>online "
+            "<a href='https://met3d.wavestoweather.de'>website</a> and the "
+            "<a href='https://met3d.readthedocs.io'>online "
             "manual</a> for further details.<br><br>"
             "Met.3D is free software under the GNU General Public License.<br>"
             "It is distributed in the hope that it will be useful, but WITHOUT "
@@ -1196,11 +1200,15 @@ void MMainWindow::showAboutDialog()
             "or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public "
             "License for more details.<br><br>"
             "Copyright 2015-2018 Met.3D authors:<br>"
-            "Marc Rautenhaus(1), Bianca Tost(1), Michael Kern(1), Alexander "
-            "Kumpf(1), Fabian Sch&ouml;ttl(1), Christoph Heidelmann(1).<br><br>"
+            "Marc Rautenhaus(2, 1[until 2018]), Bianca Tost(1), Michael Kern(1), "
+            "with contributions by Alexander Kumpf(1), Philipp Kaiser(1), "
+            "Fabian Sch&ouml;ttl(1), Christoph Heidelmann(1).<br><br>"
             "(1) <a href='https://wwwcg.in.tum.de/'>Computer Graphics and "
             "Visualization Group</a>, "
-            "Technical University of Munich, Garching, Germany<br><br>"
+            "Technical University of Munich, Garching, Germany<br>"
+            "(2) <a href='https://www.rrz.uni-hamburg.de/'>Regional Computing "
+            "Center</a>, "
+            "Universitaet Hamburg, Hamburg, Germany<br><br>"
             "See Met.3D source files for license details.<br><hr>"
             "Versions of libraries used to compile Met.3D:<br>"
             "<table> "
@@ -1221,8 +1229,8 @@ void MMainWindow::showAboutDialog()
             " <td> QCustomPlot: %19.%20.%21 </td>"
             "</tr>"
             "</table>"
-            "Note: If a version is listed as x.x.x, Met.3D wasn't able to find"
-            " a version tag for this library."
+            "Note: For versions listed as x.x.x "
+            " no version tag could be identified."
                 ).arg(met3dVersionString).arg(met3dBuildDate)
             .arg(FREETYPE_MAJOR).arg(FREETYPE_MINOR).arg(FREETYPE_PATCH)
             .arg(GDAL_RELEASE_NAME)

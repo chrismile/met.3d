@@ -11,7 +11,7 @@ installed and a few external data packages to be downloaded. Most of these
 packages can be installed via YaST, however, a few have to be downloaded and
 compiled manually.
 
-System requirements: You need an OpenGL 4.3 capable graphics card and an
+System requirements: You need an OpenGL 4.3+ capable graphics card and an
 appropriate Linux driver to run Met.3D. The driver will most likely be a
 proprietary driver (Nvidia or AMD); open-source drivers for Linux currently do
 not provide the required capabilities. Before you continue with the
@@ -85,7 +85,7 @@ qcustomplot/qcustomplot-sharedlib/sharedlib-compilation
 
 and run:
 
-qmake
+qmake-qt5 (or qmake if you use the old Qt4; we recommend Qt5)
 make
 
 Next, copy the resulting libraries and the qcustomplot.h header to directories
