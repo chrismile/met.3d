@@ -409,13 +409,13 @@ private:
     QtProperty *computationIntegrationTimeProperty;
     QtProperty *computationInterpolationMethodProperty;
     QtProperty *computationLineTypeProperty;
-    QtProperty* computationIntegrationMethodProperty;
+    QtProperty *computationIntegrationMethodProperty;
     QtProperty *computationNumSubTimeStepsProperty;
     QtProperty *computationStreamlineDeltaSProperty;
     QtProperty *computationStreamlineLengthProperty;
-    QtProperty* computationSeedPropertyGroup;
-    QtProperty* computationSeedAddActorProperty;
-    QtProperty* computationRecomputeProperty;
+    QtProperty *computationSeedPropertyGroup;
+    QtProperty *computationSeedAddActorProperty;
+    QtProperty *computationRecomputeProperty;
 
     enum SeedActorType
     {
