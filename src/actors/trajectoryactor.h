@@ -231,6 +231,26 @@ protected:
 
     void printDebugOutputOnUserRequest();
 
+    /**
+      Outputs currently available trajectory data to an ASCII file in the
+      format used by the LAGRANTO model:
+
+      "
+      Reference date 20090129_1200 / Time range 2880 min
+
+        time      lon     lat     p
+      -----------------------------
+        0.00   -59.72   30.36   790
+        6.00   -58.22   30.58   795
+       12.00   -56.87   30.76   797
+       ...
+      "
+
+      See https://www.geosci-model-dev.net/8/2569/2015/gmd-8-2569-2015-supplement.pdf
+      for details on LAGRANTO output.
+     */
+    void outputAsLagrantoASCIIFile();
+
 private:
     /**
       Loops over all seed actors and gather the type and region dimensions of
@@ -450,6 +470,10 @@ private:
 
     /** Rendering. */
     QtProperty *renderingGroupProperty;
+
+    /** Analysis. */
+    QtProperty *analysisGroupProperty;
+    QtProperty *outputAsLagrantoASCIIProperty;
 
     /** GLSL shader objects. */
     std::shared_ptr<GL::MShaderEffect> tubeShader;

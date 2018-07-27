@@ -317,6 +317,15 @@ MTrajectoryActor::MTrajectoryActor()
                                        renderingGroupProperty);
     properties->mBool()->setValue(colourShadowProperty, shadowColoured);
 
+    // Property group: Analysis.
+    // ====================================
+    analysisGroupProperty = addProperty(GROUP_PROPERTY, "analysis",
+                                        actorPropertiesSupGroup);
+
+    outputAsLagrantoASCIIProperty = addProperty(
+                CLICK_PROPERTY, "output as LAGRANTO ASCII",
+                analysisGroupProperty);
+
     // ====================================
 
     // Observe the creation/deletion of other actors
@@ -2019,6 +2028,11 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
         onSeedActorChanged();
     }
 
+    else if (property == outputAsLagrantoASCIIProperty)
+    {
+        outputAsLagrantoASCIIFile();
+    }
+
     else
     {
         for (SeedActorSettings& sas : computationSeedActorProperties)
@@ -2456,6 +2470,98 @@ void MTrajectoryActor::updateEnsembleProperties()
 void MTrajectoryActor::printDebugOutputOnUserRequest()
 {
     debugPrintPendingRequestsQueue();
+}
+
+
+void MTrajectoryActor::outputAsLagrantoASCIIFile()
+{
+    LOG4CPLUS_DEBUG(mlog, "Writing trajectory data to an ASCII file in "
+                          "'LAGANRTO.2' format.");
+
+    if (trajectoryRequests.isEmpty() ||
+            trajectoryRequests[0].trajectories == nullptr)
+    {
+        LOG4CPLUS_ERROR(mlog, "ERROR: No trajectory data available.");
+        return;
+    }
+
+    // Let user specify filename.
+    MSystemManagerAndControl* sysMC = MSystemManagerAndControl::getInstance();
+    QString directory = sysMC->getMet3DWorkingDirectory().absolutePath();
+    QString fileName = QFileDialog::getSaveFileName(
+                sysMC->getMainWindow(), tr("Save trajectory file"), directory);
+
+    if (fileName.isEmpty())
+    {
+        LOG4CPLUS_ERROR(mlog, "ERROR: No filename specified.");
+        return;
+    }
+
+    QFile asciiFile(fileName);
+    if (asciiFile.open(QFile::WriteOnly | QFile::Truncate))
+    {
+        QTextStream out(&asciiFile);
+
+        // Shortcut to trajectories.
+        MTrajectories* t = trajectoryRequests.at(0).trajectories;
+
+        // Write header line in the format
+        // Reference date 20090129_0600 / Time range    2880 min
+        out << "Reference date " << t->getValidTime().toString("yyyyMMdd_hhmm")
+            << " / Time range " << QString("%1").arg(
+                   t->getTimes().at(0).secsTo(
+                       t->getTimes().at(t->getTimes().size()-1)) / 60.,
+                   7, 'f', 0)
+            << " min\n\n";
+
+        // Trajectory data are written in the format:
+        // (see https://www.geosci-model-dev.net/8/2569/2015/gmd-8-2569-2015-supplement.pdf)
+        //
+        //   time      lon     lat     p        TH       IWC     LABEL
+        // -----------------------------------------------------------
+        //    0.00   -65.42   42.61   859   293.010     0.000     0.000
+        //    6.00   -58.64   47.48   713   296.745     0.208     1.000
+
+        out << "  time      lon     lat     p\n";
+        out << "-----------------------------\n\n";
+
+        // Loop over all available trajectory data objects and write their
+        // contents to file.
+        int numTrajObjects = precomputedDataSource ? 1 : seedActorData.size();
+        for (int tobj = 0; tobj < numTrajObjects; tobj++)
+        {
+            t = trajectoryRequests.at(tobj).trajectories;
+            if (t == nullptr)
+            {
+                continue;
+            }
+
+            // Loop over all trajectories...
+            for (int iTraj = 0; iTraj < t->getNumTrajectories(); iTraj++)
+            {
+                // ...and over all times steps.
+                for (int iTime = 0; iTime < t->getTimes().size(); iTime++)
+                {
+                    // Get vertex coordinates of current trajectory and time
+                    // step.
+                    QVector3D v = t->getVertices().at(
+                                t->getStartIndices()[iTraj] + iTime);
+                    // Compute time difference to start time in hours.
+                    double tDiff = t->getTimes().at(0).secsTo(
+                                t->getTimes().at(iTime)) / 3600.;
+                    // Dump to file.
+                    QString s = QString("%1 %2 %3 %4")
+                            .arg(tDiff, 7, 'f', 2).arg(v.x(), 8, 'f', 2)
+                            .arg(v.y(), 7, 'f', 2).arg(v.z(), 8, 'f', 2);
+                    out << s << endl;
+                }
+
+                out << endl;
+            }
+        }
+    }
+
+    LOG4CPLUS_DEBUG(mlog, "Trajectory data write completed.");
 }
 
 
