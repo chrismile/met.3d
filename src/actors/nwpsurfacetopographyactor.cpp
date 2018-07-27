@@ -53,14 +53,11 @@ namespace Met3D
 
 MNWPSurfaceTopographyActor::MNWPSurfaceTopographyActor()
     : MNWPMultiVarActor(),
-      MBoundingBoxInterface(this),
+      MBoundingBoxInterface(this, MBoundingBoxConnectionType::HORIZONTAL),
       topographyVariableIndex(0),
       shadingVariableIndex(0),
       updateRenderRegion(false)
 {
-    bBoxConnection = new MBoundingBoxConnection(
-                this, MBoundingBoxConnection::HORIZONTAL);
-
     // Create and initialise QtProperties for the GUI.
     // ===============================================
     beginInitialiseQtProperties();
@@ -75,7 +72,7 @@ MNWPSurfaceTopographyActor::MNWPSurfaceTopographyActor()
                                     actorPropertiesSupGroup);
 
     // Bounding box of the actor.
-    actorPropertiesSupGroup->addSubProperty(bBoxConnection->getProperty());
+    insertBoundingBoxProperty(actorPropertiesSupGroup);
 
     endInitialiseQtProperties();
 }

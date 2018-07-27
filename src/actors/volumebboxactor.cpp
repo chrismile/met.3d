@@ -49,14 +49,12 @@ namespace Met3D
 
 MVolumeBoundingBoxActor::MVolumeBoundingBoxActor()
     : MActor(),
-      MBoundingBoxInterface(this),
+      MBoundingBoxInterface(this, MBoundingBoxConnectionType::VOLUME),
       coordinateVertexBuffer(nullptr),
       axisVertexBuffer(nullptr),
       tickLength(0.8),
       lineColour(QColor(0, 104, 139, 255))
 {
-    bBoxConnection =
-            new MBoundingBoxConnection(this, MBoundingBoxConnection::VOLUME);
     // Create and initialise QtProperties for the GUI.
     // ===============================================
     beginInitialiseQtProperties();
@@ -65,7 +63,7 @@ MVolumeBoundingBoxActor::MVolumeBoundingBoxActor()
     setName(getActorType());
 
     // Bounding box of the actor.
-    actorPropertiesSupGroup->addSubProperty(bBoxConnection->getProperty());
+    insertBoundingBoxProperty(actorPropertiesSupGroup);
 
     tickLengthProperty = addProperty(DECORATEDDOUBLE_PROPERTY,
                                      "tick length",

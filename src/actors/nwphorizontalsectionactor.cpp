@@ -57,7 +57,7 @@ namespace Met3D
 
 MNWPHorizontalSectionActor::MNWPHorizontalSectionActor()
     : MNWPMultiVarActor(),
-      MBoundingBoxInterface(this),
+      MBoundingBoxInterface(this, MBoundingBoxConnectionType::HORIZONTAL),
       slicePosition_hPa(250.),
       slicePositionGranularity_hPa(5.0),
       slicePosSynchronizationActor(nullptr),
@@ -73,8 +73,6 @@ MNWPHorizontalSectionActor::MNWPHorizontalSectionActor()
       offsetPickPositionToHandleCentre(QVector2D(0., 0.))
 {
     enablePicking(true);
-    bBoxConnection =
-            new MBoundingBoxConnection(this, MBoundingBoxConnection::HORIZONTAL);
 
     // Create and initialise QtProperties for the GUI.
     // ===============================================
@@ -120,7 +118,7 @@ MNWPHorizontalSectionActor::MNWPHorizontalSectionActor()
     properties->mEnum()->setEnumNames(differenceModeProperty, differenceModeNames);
 
     // Horizontal bounding box of the actor.
-    actorPropertiesSupGroup->addSubProperty(bBoxConnection->getProperty());
+    insertBoundingBoxProperty(actorPropertiesSupGroup);
 
     // Wind barbs.
     vectorGlyphsSettings = new VectorGlyphsSettings(this);

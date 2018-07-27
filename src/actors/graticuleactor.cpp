@@ -50,7 +50,8 @@ namespace Met3D
 
 MGraticuleActor::MGraticuleActor(MBoundingBoxConnection *boundingBoxConnection)
     : MRotatedGridSupportingActor(),
-      MBoundingBoxInterface(this),
+      MBoundingBoxInterface(this, MBoundingBoxConnectionType::HORIZONTAL,
+                            boundingBoxConnection),
       graticuleVertexBuffer(nullptr),
       numVerticesGraticule(0),
       coastlineVertexBuffer(nullptr),
@@ -63,18 +64,6 @@ MGraticuleActor::MGraticuleActor(MBoundingBoxConnection *boundingBoxConnection)
 {
     naturalEarthDataLoader = MSystemManagerAndControl::getInstance()
             ->getNaturalEarthDataLoader();
-
-    // Use boundingBoxActor of horizontal cross section actor if graticule is
-    // part of it.
-    this->bBoxConnection = boundingBoxConnection;
-    // Created graticule actor as standalone actor and thus it needs its own
-    // bounding box actor. (As part of 2D Horizontal Cross-Section it uses
-    // the bounding box connected to the Horizontal Cross-Section.)
-    if (boundingBoxConnection == nullptr)
-    {
-        this->bBoxConnection = new MBoundingBoxConnection(
-                    this, MBoundingBoxConnection::HORIZONTAL);
-    }
 
     nLats.clear();
     nLats.append(0);
@@ -92,8 +81,10 @@ MGraticuleActor::MGraticuleActor(MBoundingBoxConnection *boundingBoxConnection)
     // section.
     if (boundingBoxConnection == nullptr)
     {
-        actorPropertiesSupGroup->addSubProperty(
-                    this->bBoxConnection->getProperty());
+        // Created graticule actor as standalone actor and thus it needs its
+        // own bounding box actor. (As part of e.g. 2D Horizontal Cross-Section
+        // it uses the bounding box connected to the Horizontal Cross-Section.)
+        insertBoundingBoxProperty(actorPropertiesSupGroup);
     }
 
     spacingProperty = addProperty(POINTF_LONLAT_PROPERTY, "spacing",

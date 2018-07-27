@@ -57,7 +57,7 @@ namespace Met3D
 
 MNWPVolumeRaycasterActor::MNWPVolumeRaycasterActor()
     : MNWPMultiVarActor(),
-      MBoundingBoxInterface(this),
+      MBoundingBoxInterface(this, MBoundingBoxConnectionType::VOLUME),
       updateNextRenderFrame("111"),
       renderMode(RenderMode::Original),
       variableIndex(0),
@@ -68,8 +68,6 @@ MNWPVolumeRaycasterActor::MNWPVolumeRaycasterActor()
       bBoxEnabled(true),
       normalCurveNumVertices(0)
 {
-    bBoxConnection =
-            new MBoundingBoxConnection(this, MBoundingBoxConnection::VOLUME);
     // Enable picking for the scene view's analysis mode. See
     // triggerAnalysisOfObjectAtPos().
     enablePicking(true);
@@ -98,8 +96,8 @@ MNWPVolumeRaycasterActor::MNWPVolumeRaycasterActor()
     rayCasterSettings = new RayCasterSettings(this);
     actorPropertiesSupGroup->addSubProperty(rayCasterSettings->groupProp);
 
-    // Bounding box.
-    actorPropertiesSupGroup->addSubProperty(bBoxConnection->getProperty());
+    // Bounding box of the actor.
+    insertBoundingBoxProperty(actorPropertiesSupGroup);
     bBoxEnabledProperty = addProperty(
                 BOOL_PROPERTY, "draw bounding box", actorPropertiesSupGroup);
     properties->mBool()->setValue(bBoxEnabledProperty, bBoxEnabled);
