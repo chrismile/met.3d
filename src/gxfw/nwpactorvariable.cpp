@@ -1828,10 +1828,23 @@ void MNWPActorVariable::updateInitTimeProperty()
 
     // Get available init times from the data loader. Convert the QDateTime
     // objects to strings for the enum manager.
-    availableInitTimes = dataSource->availableInitTimes(levelType, variableName);
+    if (dataSource != nullptr)
+    {
+        availableInitTimes = dataSource->availableInitTimes(
+                    levelType, variableName);
+    }
+    else
+    {
+        availableInitTimes = QList<QDateTime>();
+        LOG4CPLUS_WARN(mlog, "WARNING: update of available init times failed; "
+                             "no datasource available.");
+    }
+
     QStringList timeStrings;
     for (int i = 0; i < availableInitTimes.size(); i++)
+    {
         timeStrings << availableInitTimes.at(i).toString(Qt::ISODate);
+    }
 
     actor->getQtProperties()->mEnum()->setEnumNames(initTimeProperty,
                                                     timeStrings);
@@ -1852,11 +1865,23 @@ void MNWPActorVariable::updateValidTimeProperty()
 
     // Get a list of the available valid times for the new init time,
     // convert the QDateTime objects to strings for the enum manager.
-    availableValidTimes =
-            dataSource->availableValidTimes(levelType, variableName, initTime);
+    if (dataSource != nullptr)
+    {
+        availableValidTimes = dataSource->availableValidTimes(
+                    levelType, variableName, initTime);
+    }
+    else
+    {
+        availableValidTimes = QList<QDateTime>();
+        LOG4CPLUS_WARN(mlog, "WARNING: update of available valid times failed; "
+                             "no datasource available.");
+    }
+
     QStringList validTimeStrings;
     for (int i = 0; i < availableValidTimes.size(); i++)
+    {
         validTimeStrings << availableValidTimes.at(i).toString(Qt::ISODate);
+    }
 
     actor->getQtProperties()->mEnum()->setEnumNames(validTimeProperty,
                                                     validTimeStrings);
