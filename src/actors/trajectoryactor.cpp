@@ -1577,6 +1577,12 @@ void MTrajectoryActor::onActorDeleted(MActor *actor)
             if (sas.actor == actor)
             {
                 removeSeedActor(sas.actor->getName());
+
+                releaseData();
+                updateActorData();
+
+                asynchronousDataRequest();
+                emitActorChangedSignal();
             }
         }
     }
@@ -1651,10 +1657,20 @@ bool MTrajectoryActor::isConnectedTo(MActor *actor)
     }
 
     // This actor is connected to the argument actor if the argument actor is
-    // the transfer function this actor.
+    // the transfer function of this actor.
     if (transferFunction == actor)
     {
         return true;
+    }
+
+    // This actor is connected to the argument actor if the argument actor is
+    // a seeding actor of this actor.
+    for (SeedActorSettings& sas : computationSeedActorProperties)
+    {
+        if (sas.actor == actor)
+        {
+            return true;
+        }
     }
 
     return false;
