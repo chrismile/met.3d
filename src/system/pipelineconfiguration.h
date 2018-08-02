@@ -194,6 +194,18 @@ protected:
             QString defaultMemoryManager, QString PipelineID,
             QMap<QString, QString> *defaultMemoryManagers,
             MSystemManagerAndControl *sysMC);
+
+    /**
+      Checks if one of the name strings contained in @p dataSources matches the
+      name of any already existing data source.
+
+      If a match can be found, QMessageBox::warning is displayed to inform the
+      user using the name of the data set given by @p dataSetName and the
+      method returns false. If no match can be found no message is displayed
+      and method returns true.
+     */
+    bool checkUniquenessOfDataSourceNames(QString dataSetName,
+                                          QStringList &dataSources) const;
 };
 
 } // namespace Met3D

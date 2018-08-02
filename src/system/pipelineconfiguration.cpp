@@ -572,11 +572,28 @@ void MPipelineConfiguration::initializeNWPPipeline(
         bool disableGridConsistencyCheck,
         QString inputVarsForDerivedVars)
 {
+    const QString dataSourceId = name;
+    const QString dataSourceIdDerived = dataSourceId + " derived";
+
+    QStringList dataSourceIDs = QStringList()
+            << (dataSourceId + QString(" ENSFilter"))
+            << dataSourceIdDerived + QString(" ENSFilter");
+
+    if (enableProbabiltyRegionFilter)
+    {
+        dataSourceIDs << (dataSourceId + QString(" ProbReg"))
+                      << (dataSourceIdDerived + QString(" ProbReg"));
+    }
+
+    if (!checkUniquenessOfDataSourceNames(dataSourceId, dataSourceIDs))
+    {
+        return;
+    }
+
     MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
     MAbstractScheduler* scheduler = sysMC->getScheduler(schedulerID);
     MAbstractMemoryManager* memoryManager = sysMC->getMemoryManager(memoryManagerID);
 
-    const QString dataSourceId = name;
     LOG4CPLUS_DEBUG(mlog, "Initializing NWP pipeline ''"
                     << dataSourceId.toStdString() << "'' ...");
 
@@ -646,8 +663,6 @@ void MPipelineConfiguration::initializeNWPPipeline(
     // the reader and computes derived data fields. The rest of the pipeline
     // is the same as above).
     // =====================================================================
-
-    const QString dataSourceIdDerived = dataSourceId + " derived";
 
     MDerivedMetVarsDataSource *derivedMetVarsSource =
             new MDerivedMetVarsDataSource();
@@ -722,12 +737,28 @@ void MPipelineConfiguration::initializePrecomputedTrajectoriesPipeline(
         QString schedulerID,
         QString memoryManagerID)
 {
+    const QString dataSourceId = name;
+    QStringList dataSourceIDs = QStringList()
+            << (dataSourceId + QString(" Reader"))
+               // Also check the names used in
+               // initializeEnsembleTrajectoriesPipeline() here to avoid the
+               // reader being added while the rest might not be able to be
+               // added.
+            << (dataSourceId + QString(" timestepFilter"))
+            << (dataSourceId + QString(" Normals"))
+            << (dataSourceId)
+            << (dataSourceId + QString(" ProbReg"));
+
+    if (!checkUniquenessOfDataSourceNames(dataSourceId, dataSourceIDs))
+    {
+        return;
+    }
+
     MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
     MAbstractScheduler* scheduler = sysMC->getScheduler(schedulerID);
     MAbstractMemoryManager* memoryManager =
             sysMC->getMemoryManager(memoryManagerID);
 
-    const QString dataSourceId = name;
     LOG4CPLUS_DEBUG(mlog,
                     "Initializing precomputed ensemble trajectories pipeline ''"
                     << dataSourceId.toStdString() << "'' ...");
@@ -762,12 +793,29 @@ void MPipelineConfiguration::initializeTrajectoryComputationPipeline(
         QString windVerticalVariable,
         MVerticalLevelType verticalLevelType)
 {
+    const QString dataSourceId = name;
+
+    QStringList dataSourceIDs = QStringList()
+            << (dataSourceId + QString(" Reader"))
+               // Also check the names used in
+               // initializeEnsembleTrajectoriesPipeline() here to avoid the
+               // reader being added while the rest might not be able to be
+               // added.
+            << (dataSourceId + QString(" timestepFilter"))
+            << (dataSourceId + QString(" Normals"))
+            << (dataSourceId)
+            << (dataSourceId + QString(" ProbReg"));
+
+    if (!checkUniquenessOfDataSourceNames(dataSourceId, dataSourceIDs))
+    {
+        return;
+    }
+
     MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
     MAbstractScheduler* scheduler = sysMC->getScheduler(schedulerID);
     MAbstractMemoryManager* memoryManager =
             sysMC->getMemoryManager(memoryManagerID);
 
-    const QString dataSourceId = name;
     LOG4CPLUS_DEBUG(mlog, "Initializing trajectory computation pipeline ''"
                           "" << dataSourceId.toStdString() << "'' ...");
 
@@ -881,6 +929,17 @@ void MPipelineConfiguration::initializeEnsembleTrajectoriesPipeline(
         MAbstractScheduler* scheduler,
         MAbstractMemoryManager* memoryManager)
 {
+    QStringList dataSourceIDs = QStringList()
+            << (dataSourceId + QString(" timestepFilter"))
+            << (dataSourceId + QString(" Normals"))
+            << (dataSourceId)
+            << (dataSourceId + QString(" ProbReg"));
+
+    if (!checkUniquenessOfDataSourceNames(dataSourceId, dataSourceIDs))
+    {
+        return;
+    }
+
     MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
 
     MDeltaPressurePerTrajectorySource *dpSource =
@@ -985,6 +1044,13 @@ void MPipelineConfiguration::initializeConfigurablePipeline(
     {
     case DIFFERENCE:
     {
+        QStringList dataSourceIDs = QStringList()
+                << (dataSourceId + QString(" ENSFilter"));
+
+        if (!checkUniquenessOfDataSourceNames(dataSourceId, dataSourceIDs))
+        {
+            return;
+        }
         // Pipeline for difference variables.
         // ==================================
         const QString dataSourceIdDifference = dataSourceId;
@@ -1228,6 +1294,33 @@ void MPipelineConfiguration::checkAndStoreDefaultPipelineMemoryManager(
                         << PipelineID.toStdString() << "' pipeline.");
     }
     defaultMemoryManagers->insert(PipelineID, defaultMemoryManager);
+}
+
+
+bool MPipelineConfiguration::checkUniquenessOfDataSourceNames(
+        QString dataSetName,
+        QStringList &dataSources) const
+{
+    MMainWindow *mainWin =
+            MSystemManagerAndControl::getInstance()->getMainWindow();
+    QStringList existingDataSourcesList =
+            MSystemManagerAndControl::getInstance()->getDataSourceIdentifiers();
+
+    for (QString dataSourceID : dataSources)
+    {
+        if (existingDataSourcesList.contains(dataSourceID))
+        {
+            QMessageBox::warning(
+                        mainWin, "Adding data set",
+                        "The name '" + dataSetName
+                        + "'  is already in use by another data set."
+                          "\nPlease choose a different name."
+                          "\n(The data set will NOT be added.)");
+            return false;
+        }
+    }
+
+    return true;
 }
 
 
