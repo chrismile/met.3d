@@ -148,7 +148,7 @@ MNWPPipelineConfigurationInfo MAddDatasetDialog::getNWPPipelineConfigurationInfo
     d.surfacePressureFieldType = ui->surfacePressureTypeComboBox->currentText();
     d.convertGeometricHeightToPressure_ICAOStandard =
             ui->convertGeometricHeightToPressureICAOStandardCheckBox->isChecked();
-    d.auxiliary3DPressureField = ui->useAuxiliary3DPressureLineEdit->text();
+    d.auxiliary3DPressureField = ui->auxiliary3DPressureFieldLineEdit->text();
     d.disableGridConsistencyCheck =
             ui->disableGridConsistencyCheckCheckBox->isChecked();
     d.inputVarsForDerivedVars = ui->inputVarsForDerivedVarsLineEdit->text();
@@ -254,6 +254,13 @@ void MAddDatasetDialog::saveConfiguration(QSettings *settings)
                     ->isChecked());
         settings->setValue("gribSurfacePressureFieldType",
                            ui->surfacePressureTypeComboBox->currentText());
+        settings->setValue("auxiliary3DPressureField",
+                           ui->auxiliary3DPressureFieldLineEdit->text());
+        settings->setValue(
+                    "disableGridConsistencyCheck",
+                    ui->disableGridConsistencyCheckCheckBox->isChecked());
+        settings->setValue("inputVarsForDerivedVars",
+                           ui->inputVarsForDerivedVarsLineEdit->text());
         settings->endGroup();
     }
     // Save configuration for Trajectories Pipeline.
@@ -332,6 +339,13 @@ void MAddDatasetDialog::loadConfiguration(QSettings *settings)
         ui->surfacePressureTypeComboBox->setCurrentText(
                     settings->value("gribSurfacePressureFieldType",
                                     "auto").toString());
+        ui->auxiliary3DPressureFieldLineEdit->setText(
+                    settings->value("auxiliary3DPressureField", "").toString());
+        ui->disableGridConsistencyCheckCheckBox->setChecked(
+                    settings->value("disableGridConsistencyCheck",
+                                    false).toBool());
+        ui->inputVarsForDerivedVarsLineEdit->setText(
+                    settings->value("inputVarsForDerivedVars", "").toString());
 
         settings->endGroup();
     }

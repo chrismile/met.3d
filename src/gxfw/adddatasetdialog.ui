@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>734</width>
-    <height>496</height>
+    <height>525</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -262,7 +262,7 @@
              </widget>
             </item>
             <item>
-             <widget class="QLineEdit" name="useAuxiliary3DPressureLineEdit"/>
+             <widget class="QLineEdit" name="auxiliary3DPressureFieldLineEdit"/>
             </item>
            </layout>
           </item>
