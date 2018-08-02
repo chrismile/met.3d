@@ -279,6 +279,14 @@ shader CSmain()
         // discard all fragments that touch this vertex.
         scalar = MISSING_VALUE;
     }
+    else if (ln_plower > ln_p)
+    {
+        // The requested iso-pressure value is above the uppermost
+        // pressure-value in the model grid (i.e., it is out of the domain). No
+        // valid scalar value can be computed, set the "flag" so the fragment
+        // shader can discard all fragments that touch this vertex.
+        scalar = MISSING_VALUE;
+    }
     else
     {
         // Fetch the scalar values at klower and kupper.
