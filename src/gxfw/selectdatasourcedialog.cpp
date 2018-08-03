@@ -456,15 +456,21 @@ void MSelectDataSourceDialog::createTrajectoryDataSourceEntries()
     {
         QString dataSourceID = dataSources[idl];
 
-        if (checkForTrajectoryDataSource(dataSourceID))
+        // Use Reader to identify trajectory data sources.
+        if (dataSourceID.endsWith(" Reader"))
         {
-            // Add a row to the table..
-            int row = table->rowCount();
-            table->setRowCount(row + 1);
-            // .. and insert the element.
-            table->setItem(row, 0, new QTableWidgetItem(dataSources[idl]));
+            dataSourceID.chop(7);
 
-            dataSourceAvailable = true;
+            if (checkForTrajectoryDataSource(dataSourceID))
+            {
+                // Add a row to the table..
+                int row = table->rowCount();
+                table->setRowCount(row + 1);
+                // .. and insert the element.
+                table->setItem(row, 0, new QTableWidgetItem(dataSourceID));
+
+                dataSourceAvailable = true;
+            }
         }
     } // for (data loaders)
 

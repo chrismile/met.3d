@@ -165,7 +165,8 @@ protected:
             bool boundaryLayerTrajectories,
             MTrajectoryDataSource* baseDataSource,
             MAbstractScheduler* scheduler,
-            MAbstractMemoryManager* memoryManager);
+            MAbstractMemoryManager* memoryManager,
+            bool trajectoriesComputedInMet3D);
 
     /**
      Initializes hard-coded pipelines. Use this method for development
