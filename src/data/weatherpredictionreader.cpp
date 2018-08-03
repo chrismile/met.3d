@@ -133,7 +133,8 @@ MStructuredGrid* MWeatherPredictionReader::produceData(MDataRequest request)
                 static_cast<MRegularLonLatGrid*>(
                     memoryManager->getData(this, psfcRequest)
                     );
-    }    
+    } // HYBRID_SIGMA_PRESSURE_3D
+
     else if (levtype == AUXILIARY_PRESSURE_3D
              && variable != auxiliary3DPressureField)
     {
@@ -178,7 +179,7 @@ MStructuredGrid* MWeatherPredictionReader::produceData(MDataRequest request)
                 static_cast<MLonLatAuxiliaryPressureGrid*>(
                     memoryManager->getData(this, auxPressureFieldRequest)
                     );
-    }
+    } // AUXILIARY_PRESSURE_3D
 
     return result;
 }

@@ -1143,8 +1143,9 @@ MStructuredGrid *MClimateForecastReader::readGrid(
         return nullptr;
     }
 
-    LOG4CPLUS_DEBUG(mlog, "reading NetCDF data from file "
-                    << filename.toStdString());
+    LOG4CPLUS_DEBUG(mlog, "Reading NetCDF data for variable "
+                    << variableName.toStdString() << " from file "
+                    << filename.toStdString() << " ...");
 
     // Is this file opened for the first time? First access to a variable?
     openFilesMutex.lock();
@@ -1177,13 +1178,20 @@ MStructuredGrid *MClimateForecastReader::readGrid(
         }
         catch (NcException& e)
         {
-            LOG4CPLUS_ERROR(mlog, "cannot open file " << filename.toStdString());
+            LOG4CPLUS_ERROR(mlog, "ERROR: cannot open file "
+                            << filename.toStdString());
             throw;
         }
     }
 
     if (initialVariableAccess)
     {
+        // The variable is for this file accessed for the first time --
+        // initialise the shared metadata that can be re-used in future
+        // access to this variable.
+        LOG4CPLUS_DEBUG(mlog, "Initial access to " << variableName.toStdString()
+                        << " in this file. Initialising shared metadata.");
+
         // Get a handle on the NetCDF variable and wrap it in a NcCFVar object.
         QMutexLocker ncAccessMutexLocker(&staticNetCDFAccessMutex);
         shared->cfVar = finfo->ncFile->getVar(variableName.toStdString());
@@ -1206,9 +1214,9 @@ MStructuredGrid *MClimateForecastReader::readGrid(
 
             if (shared->cfVar.isNull())
             {
-                LOG4CPLUS_ERROR(mlog, "cannot find variable "
+                LOG4CPLUS_ERROR(mlog, "ERROR: cannot find variable "
                                 << variableName.toStdString());
-                        throw MBadDataFieldRequest(
+                throw MBadDataFieldRequest(
                             "cannot find variable " + variableName.toStdString(),
                             __FILE__, __LINE__);
             }
@@ -1230,10 +1238,22 @@ MStructuredGrid *MClimateForecastReader::readGrid(
                         << " elements).");
 
         // Query scale and offset, if provided.
-        try { shared->cfVar.getAtt("scale_factor").getValues(&(shared->scale_factor)); }
-        catch (NcException) { shared->scale_factor = 1.; }
-        try { shared->cfVar.getAtt("add_offset").getValues(&(shared->add_offset)); }
-        catch (NcException) { shared->add_offset = 0.; }
+        try
+        {
+            shared->cfVar.getAtt("scale_factor").getValues(&(shared->scale_factor));
+        }
+        catch (NcException)
+        {
+            shared->scale_factor = 1.;
+        }
+        try
+        {
+            shared->cfVar.getAtt("add_offset").getValues(&(shared->add_offset));
+        }
+        catch (NcException)
+        {
+            shared->add_offset = 0.;
+        }
 
         // Have scale and offset been provided? If not, they are not applied.
         shared->scaleAndOffsetProvided =
@@ -1247,18 +1267,20 @@ MStructuredGrid *MClimateForecastReader::readGrid(
                             << ".");
         }
 
-        // Read grid type dependent coordinate data.
-        if (levelType == SURFACE_2D)
+        // Determine grid-type-dependent metadata/settings.
+        // ================================================
+        if (levelType == PRESSURE_LEVELS_3D)
         {
-        }
+            // Pressure levels: Get a link to the variable containing the
+            // vertical coordinate data.
 
-        else if (levelType == PRESSURE_LEVELS_3D)
-        {
             if (convertGeometricHeightToPressure_ICAOStandard)
             {
                 // Special case: If conversion of vertical geometric height
                 // levels to pressure levels is enabled, the grid will appear
                 // in Met.3D as a regular pressure level grid.
+                LOG4CPLUS_DEBUG(mlog, "\tConversion of vertical geometric "
+                                      "height to pressure levels is enabled.");
                 shared->vertVar =
                         shared->cfVar.getVerticalCoordinateGeometricHeight();
             }
@@ -1266,18 +1288,20 @@ MStructuredGrid *MClimateForecastReader::readGrid(
             {
                 shared->vertVar = shared->cfVar.getVerticalCoordinatePressure();
             }
-
         }
 
         else if (levelType == HYBRID_SIGMA_PRESSURE_3D)
         {
+            // Hybrid pressure levels: Get a link to the variable containing the
+            // vertical model level data and load the ak/bk coefficients.
+
             NcVar apVar, bVar;
             QString psName;
             shared->vertVar =
                     shared->cfVar.getVerticalCoordinateHybridSigmaPressure(
                         &apVar, &bVar, &psName);
 
-            // Read hybrid coefficients, if available
+            // Read hybrid coefficients.
             if ( !apVar.isNull() )
             {
                 shared->ak.resize(apVar.getDim(0).getSize());
@@ -1312,109 +1336,112 @@ MStructuredGrid *MClimateForecastReader::readGrid(
                 shared->bk.resize(bVar.getDim(0).getSize());
                 bVar.getVar(shared->bk.data());
             }
-
-        }
+        } // HYBRID_SIGMA_PRESSURE_3D
 
         else if (levelType == POTENTIAL_VORTICITY_2D)
         {
+            // Potential vorticity levels: Get a link to the vertical PV
+            // coordinate variable.
+
             shared->vertVar = shared->cfVar.getVerticalCoordinatePotVort();
-
-        }
-
-        else if (levelType == LOG_PRESSURE_LEVELS_3D)
-        {
         }
 
         else if (levelType == AUXILIARY_PRESSURE_3D)
         {
-            QString pressureName;
-            int levelIndex;
+            // Auxiliary pressure: Determine whether vertical pressure axis
+            // in auxiliary field is correctly ordered.
+            LOG4CPLUS_DEBUG(mlog, "\tChecking auxiliary pressure field.");
+
+            // Obtain link to NcVar that contains the auxiliary pressure field.
+            QString pressureName; int levelIndex;
             NcVar auxPressureVar =
                     shared->cfVar.getVerticalCoordinateAuxiliaryPressure(
                         auxiliary3DPressureField, &pressureName, &levelIndex,
                         disableGridConsistencyCheck);
 
-            // If the auxiliary pressure field variable is stored in the same
-            // file, it can be used to initialise the vertical dimension.
-            // Otherwise, request the grid of the auxiliary pressure field and
-            // use it to initialise the vertical dimension.
             if ( !auxPressureVar.isNull() )
             {
+                // If the auxiliary pressure field variable is stored in the
+                // same NetCDF file, load a single vertical column (at lon/lat
+                // indices 0/0 and timestep 0), then check its ordering.
+
+                int nVerticalLevels = auxPressureVar.getDim(levelIndex).getSize();
+
                 LOG4CPLUS_DEBUG(
                             mlog, "\tVertical dimension is of type "
                             << MStructuredGrid::verticalLevelTypeToString(
                                 levelType).toStdString()
                             << ", vertical variable is '"
                             << auxPressureVar.getName()
-                            << "' (" << auxPressureVar.getDim(levelIndex)
-                            .getSize() << " levels).");
-                shared->levels.resize(auxPressureVar.getDim(levelIndex).getSize());
+                            << "' (" << nVerticalLevels << " levels).");
 
-                // Get the pressure levels field to check whether the levels
-                // need to be reversed.
-                QVector<double> tempDataVec;
-                tempDataVec.resize(1);
-                for (unsigned int i = 0; i < auxPressureVar.getDims().size(); i++)
-                {
-                    tempDataVec.resize(tempDataVec.size()
-                                       * auxPressureVar.getDim(i).getSize());
-                }
-                auxPressureVar.getVar(tempDataVec.data());
+                // The values of the "real" vertical coordinate axis of the
+                // data field don't matter for aux-p treatment: Instead, the
+                // pressure values stored in the aux-p field will be used.
+                shared->levels.fill(M_MISSING_VALUE, nVerticalLevels);
 
-                // To check if the pressure field levels need to be reversed,
-                // get the first and last value of the first column as
-                // representatives for the bottom and top pressure level of a
-                // column respectively. Since the values of one column of the
-                // pressure field might not be stored side by side in the
-                // array, the distance between the first and last value needs
-                // to be determined in "number of array elements".
+                // Load a single data column.
+                QVector<double> singleDataColumn(nVerticalLevels);
+                if (auxPressureVar.getDimCount() == 4)
+                {
+                    // No ensemble dimension, only time/lev/lat/lon.
+                    vector<size_t> start(4);
+                    start.assign(4, 0);
+                    vector<size_t> count(4);
+                    count.assign(4, 1);
+                    count[1] = nVerticalLevels;
+                    auxPressureVar.getVar(start, count, singleDataColumn.data());
+                }
+                else if (auxPressureVar.getDimCount() == 5)
+                {
+                    // Ensemble dimension present.
+                    vector<size_t> start(5);
+                    start.assign(5, 0);
+                    vector<size_t> count(5);
+                    count.assign(5, 1);
+                    count[2] = nVerticalLevels;
+                    auxPressureVar.getVar(start, count, singleDataColumn.data());
+                }
 
-                // Determine the distance.
-                int distFirstToLastColValue = 1;
-                for (int i = auxPressureVar.getDims().size() - 1;
-                     i > levelIndex; i--)
-                {
-                    distFirstToLastColValue *= auxPressureVar.getDim(i).getSize();
-                }
-                distFirstToLastColValue *=
-                        auxPressureVar.getDim(levelIndex).getSize() - 1;
-                // Get first and last value of the first column.
-                double lev_bot = tempDataVec[0];
-                double lev_top = tempDataVec[distFirstToLastColValue];
-                // Determine whether the grid's vertical levels must be reversed.
-                if (lev_bot > lev_top)
-                {
-                    LOG4CPLUS_DEBUG(mlog, "\tReversing levels.");
-                    shared->reverseLevels = true;
-                }
-                else
-                {
-                    shared->reverseLevels = false;
-                }
+                // Do the grid's vertical levels need to be reversed?
+                // (Index 0 should be at the top of the atmosphere and have
+                // the smaller pressure value).
+                shared->reverseLevels =
+                        singleDataColumn[0] > singleDataColumn[nVerticalLevels-1];
             }
             else
             {
+                // The auxiliary pressure field variable is stored in a
+                // different NetCDF file.
+                // Current solution: Read the ENTIRE aux-p grid, just to
+                // copy its "reverseLevels" flag...
+//TODO (mr, 03Aug2018) -- this is a very inefficient way of determining the
+// direction of the vertical aux-p axis -- this needs to be refactored!
+
+                LOG4CPLUS_DEBUG(mlog, "\tNeed to access aux-p field in "
+                                      "separate file.");
+
                 ncAccessMutexLocker.unlock();
                 MLonLatAuxiliaryPressureGrid *auxPGrid =
                         dynamic_cast<MLonLatAuxiliaryPressureGrid*>(
-                            readGrid( levelType, auxiliary3DPressureField,
-                                      initTime, validTime, ensembleMember));
+                            readGrid(levelType, auxiliary3DPressureField,
+                                     initTime, validTime, ensembleMember));
                 ncAccessMutexLocker.relock();
 
                 shared->reverseLevels = auxPGrid->getReverseLevels();
+                shared->levels.fill(M_MISSING_VALUE, auxPGrid->getNumLevels());
 
-                shared->levels.resize(auxPGrid->getNumLevels());
-
-                const double *auxLevels = auxPGrid->getLevels();
-
-                for (unsigned int i = 0; i < auxPGrid->getNumLevels(); i++)
-                {
-                    shared->levels[i] = auxLevels[i];
-                }
+                delete auxPGrid;
             }
-        }
 
-        // Read coordinate variables.
+            if (shared->reverseLevels)
+            {
+                LOG4CPLUS_DEBUG(mlog, "\tReversing vertical levels.");
+            }
+        } // AUXILIARY_PRESSURE_3D
+        // END (grid-type-dependent stuff).
+
+        // Read lon/lat coordinate variable data.
         shared->lons.resize(shared->lonVar.getDim(0).getSize());
         shared->lonVar.getVar(shared->lons.data());
         shared->lats.resize(shared->latVar.getDim(0).getSize());
@@ -1450,13 +1477,15 @@ MStructuredGrid *MClimateForecastReader::readGrid(
             shared->reverseLatitudes = false;
         }
 
-
         if ( !shared->vertVar.isNull() )
         {
             LOG4CPLUS_DEBUG(mlog, "\tVertical dimension is of type "
-                            << MStructuredGrid::verticalLevelTypeToString(levelType).toStdString()
-                            << ", vertical variable is '" << shared->vertVar.getName()
-                            << "' (" << shared->vertVar.getDim(0).getSize() << " elements).");
+                            << MStructuredGrid::verticalLevelTypeToString(
+                                levelType).toStdString()
+                            << ", vertical variable is '"
+                            << shared->vertVar.getName() << "' ("
+                            << shared->vertVar.getDim(0).getSize()
+                            << " elements).");
             shared->levels.resize(shared->vertVar.getDim(0).getSize());
             shared->vertVar.getVar(shared->levels.data());
 
@@ -1520,7 +1549,8 @@ MStructuredGrid *MClimateForecastReader::readGrid(
         }
         else
         {
-            LOG4CPLUS_DEBUG(mlog, "\tNo vertical dimension.");
+            LOG4CPLUS_DEBUG(mlog, "\tNo vertical dimension or auxiliary "
+                                  "pressure field used.");
         }
 
         // Get time values of this variable.
