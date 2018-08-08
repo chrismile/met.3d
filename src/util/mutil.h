@@ -44,7 +44,7 @@
 // Fill this with your own ID, e.g., "-research-my-name".
 const QString met3dVersionBranchID = "";
 // Set to "-devel" for development versions.
-const QString met3dVersionDevelID = "-RC1";
+const QString met3dVersionDevelID = "-RC2";
 
 const QString met3dVersionString = "1.4.0" + met3dVersionDevelID
         + met3dVersionBranchID;
