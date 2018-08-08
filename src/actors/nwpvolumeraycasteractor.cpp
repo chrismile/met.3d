@@ -1478,13 +1478,13 @@ void MNWPVolumeRaycasterActor::onQtPropertyChanged(QtProperty* property)
 
         if (suppressActorUpdates()) return;
 
-        var = dynamic_cast<MNWP3DVolumeActorVariable*>(variables[variableIndex]);
-        shadingVar = dynamic_cast<MNWP3DVolumeActorVariable*>(variables[shadingVariableIndex]);
+        if (var == nullptr || shadingVar == nullptr) return;
 
         switch (renderMode)
         {
         case RenderMode::Original:
         case RenderMode::DVR:
+            normalCurveSettings->groupProp->setEnabled(true);
             var->ensembleSingleMemberProperty->setEnabled(true);
             var->setEnsembleMember(properties->getEnumItem(
                                        var->ensembleSingleMemberProperty).toInt());
