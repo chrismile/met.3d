@@ -775,7 +775,7 @@ void MPipelineConfiguration::initializePrecomputedTrajectoriesPipeline(
     // Initialize trajectory pipeline.
     initializeEnsembleTrajectoriesPipeline(
                 dataSourceId, boundaryLayerTrajectories,
-                trajectoryReader, scheduler, memoryManager);
+                trajectoryReader, scheduler, memoryManager, false);
 
     LOG4CPLUS_DEBUG(mlog, "Pipeline ''" << dataSourceId.toStdString()
                     << "'' has been initialized.");
@@ -915,7 +915,7 @@ void MPipelineConfiguration::initializeTrajectoryComputationPipeline(
     // Initialize trajectory pipeline.
     initializeEnsembleTrajectoriesPipeline(
                 dataSourceId, boundaryLayerTrajectories,
-                trajectoryComputation, scheduler, memoryManager);
+                trajectoryComputation, scheduler, memoryManager, true);
 
     LOG4CPLUS_DEBUG(mlog, "Pipeline ''" << dataSourceId.toStdString()
                     << "'' has been initialized.");
@@ -927,7 +927,8 @@ void MPipelineConfiguration::initializeEnsembleTrajectoriesPipeline(
         bool boundaryLayerTrajectories,
         MTrajectoryDataSource* baseDataSource,
         MAbstractScheduler* scheduler,
-        MAbstractMemoryManager* memoryManager)
+        MAbstractMemoryManager* memoryManager,
+        bool trajectoriesComputedInMet3D)
 {
     QStringList dataSourceIDs = QStringList()
             << (dataSourceId + QString(" timestepFilter"))
@@ -983,6 +984,15 @@ void MPipelineConfiguration::initializeEnsembleTrajectoriesPipeline(
     trajectoryNormals->setTrajectorySource(baseDataSource);
     sysMC->registerDataSource(dataSourceId + QString(" Normals"),
                               trajectoryNormals);
+
+// TODO (bt, 03Aug2018): Remove this when trajectories probability data sources
+// are implemented for trajectories computed in Met.3D.
+    // Trajectories probability data sources are not implemented yet for
+    // trajectories computed in Met.3D.
+    if (trajectoriesComputedInMet3D)
+    {
+        return;
+    }
 
     // Probability filter.
     MWeatherPredictionDataSource* pwcbSource;
