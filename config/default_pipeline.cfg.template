@@ -4,17 +4,17 @@
 [MemoryManager]
 size=3
 
-# Numerical weather prediction memory manager gets 10 GB system memory.
+# Numerical weather prediction memory manager gets 16 GB system memory.
 1\name=NWP
-1\size_MB=10240
+1\size_MB=16384
 
-# Memory manager that caches analysis results (10 MB are sufficient).
+# Memory manager that caches analysis results (16 MB are sufficient).
 2\name=Analysis
-2\size_MB=10
+2\size_MB=16
 
 # Memory manager for trajectory data.
-#3\name=Trajectories
-#3\size_MB=10240
+3\name=Trajectories
+3\size_MB=16384
 
 
 [DefaultMemoryManagers]
@@ -22,7 +22,7 @@ size=3
 # in the "New Dataset"-dialog in Met.3D.
 defaultNWPMemoryManager=NWP
 defaultAnalysisMemoryManager=Analysis
-#defaultTrajectoryMemoryManager=Trajectories
+defaultTrajectoryMemoryManager=Trajectories
 
 
 
@@ -30,7 +30,7 @@ defaultAnalysisMemoryManager=Analysis
 # =============================================================================
 
 [NWPPipeline]
-size=2
+size=0
 
 # Example configuration for a dataset.
 # ------------------------------------
