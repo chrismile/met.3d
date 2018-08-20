@@ -67,7 +67,7 @@ public:
       The file paths are stored to @p availableFiles.
 
       For searching a filter is used with the ensemble member identifier place
-      holder "\\e" replaced by "*".
+      holder "%m" replaced by "*".
      */
     void getAvailableFilesFromFilters(QStringList &availableFiles);
 
@@ -77,11 +77,11 @@ public:
       their file or subdirectory names (e.g., "my_forecast.004.grb" or
       "member_004/temperature.nc"), gets the ensemble member identifier form @p
       fileName by applying @ref dirFileFilters (the position of the ensemble ID
-      is specified by "\\e" placed in the file filter string. Example:
-      "my_forecast.\\e.grb" or "member_\\e/temperature.nc").
+      is specified by "%m" placed in the file filter string. Example:
+      "my_forecast.%m.grb" or "member_%m/temperature.nc").
 
       For searching, a regular expression is built from @ref dirFileFilters in
-      which the ensemble member identifier place holder "\\e" is replaced by
+      which the ensemble member identifier place holder "%m" is replaced by
       "\d+".
 
       @return the ensemble member identifier if found and -1 otherwise.

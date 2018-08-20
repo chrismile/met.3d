@@ -669,7 +669,7 @@ void MGribReader::scanDataRoot()
     QStringList availableFiles;
     getAvailableFilesFromFilters(availableFiles);
 
-    ensembleIDIsSpecifiedInFileName = dirFileFilters.contains("\\e");
+    ensembleIDIsSpecifiedInFileName = dirFileFilters.contains("%m");
     int  ensembleIDFromFile = -1;
 
     // Create and initialise progress bar.

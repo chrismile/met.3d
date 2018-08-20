@@ -76,7 +76,7 @@ void MAbstractDataReader::getAvailableFilesFromFilters(QStringList &availableFil
     availableFiles.clear();
     QString rootPath = dataRoot.absolutePath();
     QString filters = dirFileFilters;
-    filters.replace("\\e", "*");
+    filters.replace("%m", "*");
     QStringList dirFilters = filters.split("/", QString::SkipEmptyParts);
     // Take the last part of the filters list as file filter.
     QString fileFilter = dirFilters.takeLast();
@@ -140,7 +140,7 @@ int MAbstractDataReader::getEnsembleMemberIDFromFileName(QString fileName)
 {
     QString ensembleNameFilter = QRegExp::escape(dirFileFilters);
     ensembleNameFilter.replace("\\*", ".*");
-    ensembleNameFilter.replace("\\\\e", "(\\d+)");
+    ensembleNameFilter.replace("%m", "(\\d+)");
 
     QRegExp findEnsemble(ensembleNameFilter);
 
