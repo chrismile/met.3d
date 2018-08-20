@@ -103,11 +103,12 @@ void MPipelineConfiguration::configure()
     }
 
     QString errMsg = "";
-    // If Met.3D is called by Metview and no configuration files are given,
-    // use default configuration files stored at
-    // $MET3D_HOME/config/metview/default_pipeline.cfg .
+
     if (sysMC->isConnectedToMetview() && filename.isEmpty())
     {
+        // If Met.3D is called by Metview and no configuration files are given,
+        // use default configuration files stored at
+        // $MET3D_HOME/config/metview/default_pipeline.cfg .
         filename = "$MET3D_HOME/config/metview/default_pipeline.cfg";
         filename = expandEnvironmentVariables(filename);
         QFileInfo fileInfo(filename);
@@ -116,6 +117,28 @@ void MPipelineConfiguration::configure()
             errMsg = QString(
                         "ERROR: Default Metview pipeline configuration file"
                         " does not exist. Location: ") + filename;
+            filename = "";
+        }
+        LOG4CPLUS_ERROR(mlog, errMsg.toStdString());
+    }
+    else if (filename.isEmpty())
+    {
+        // No pipeline file has been specified. Try to access default
+        // pipeline.
+        LOG4CPLUS_WARN(mlog, "WARNING: No data pipeline configuration "
+                             "file has been specified. Using default pipeline "
+                             "instead. To specify a custom file, use the "
+                             "'--pipeline=<file>' command line argument.");
+
+        filename = "$MET3D_HOME/config/default_pipeline.cfg.template";
+        filename = expandEnvironmentVariables(filename);
+        QFileInfo fileInfo(filename);
+        if (!fileInfo.isFile())
+        {
+            errMsg = QString(
+                        "ERROR: Default pipeline configuration file"
+                        " does not exist. Location: ") + filename;
+            filename = "";
         }
         LOG4CPLUS_ERROR(mlog, errMsg.toStdString());
     }
@@ -128,13 +151,7 @@ void MPipelineConfiguration::configure()
         initializeDataPipelineFromConfigFile(filename);
         return;
     }
-    else
-    {
-        errMsg = QString(
-                    "ERROR: No data pipeline configuration file specified. "
-                    "Use the '--pipeline=<file>' command line argument.");
-        LOG4CPLUS_ERROR(mlog, errMsg.toStdString());
-    }
+
     throw MInitialisationError(errMsg.toStdString(), __FILE__, __LINE__);
 }
 

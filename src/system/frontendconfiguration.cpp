@@ -84,48 +84,66 @@ void MFrontendConfiguration::configure()
 //    initializeDevelopmentFrontend();
 //    return;
 
+    QString filename = "";
+
     // Scan global application command line arguments for pipeline definitions.
     MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
     foreach (QString arg, sysMC->getApplicationCommandLineArguments())
     {
         if (arg.startsWith("--frontend="))
         {
-            QString filename = arg.remove("--frontend=");
+            filename = arg.remove("--frontend=");
 			filename = expandEnvironmentVariables(filename);
-
-            // Production builds should use the config-from-file mechanism.
-            initializeFrontendFromConfigFile(filename);
-            return;
         }
     }
 
     QString errMsg = "";
-    // If Met.3D is called by Metview and no configuration files are given,
-    // use default configuration files stored at
-    // $MET3D_HOME/config/metview/default_frontend.cfg .
-    if (sysMC->isConnectedToMetview())
+
+    if (sysMC->isConnectedToMetview() && filename.isEmpty())
     {
+        // If Met.3D is called by Metview and no configuration files are given,
+        // use default configuration files stored at
+        // $MET3D_HOME/config/metview/default_frontend.cfg .
         QString filename = "$MET3D_HOME/config/metview/default_frontend.cfg";
         filename = expandEnvironmentVariables(filename);
         QFileInfo fileInfo(filename);
-        if (fileInfo.isFile())
+        if (!fileInfo.isFile())
         {
-            // Production builds should use the config-from-file mechanism.
-            initializeFrontendFromConfigFile(filename);
-            return;
+            errMsg = QString(
+                        "ERROR: Default Metview frontend configuration file does"
+                        " not exist. Location: ") + filename;
+            filename = "";
         }
-        errMsg = QString(
-                    "ERROR: Default Metview frontend configuration file does"
-                    " not exist. Location: ") + filename;
         LOG4CPLUS_ERROR(mlog, errMsg.toStdString());
     }
-    else
+    else if (filename.isEmpty())
     {
-        errMsg = QString(
-                    "ERROR: No frontend configuration file specified."
-                    "Use the '--frontend=<file>' command line argument.");
+        // No frontend file has been specified. Try to access default
+        // frontend.
+        LOG4CPLUS_WARN(mlog, "WARNING: No frontend configuration "
+                             "file has been specified. Using default frontend "
+                             "instead. To specify a custom file, use the "
+                             "'--frontend=<file>' command line argument.");
+
+        filename = "$MET3D_HOME/config/default_frontend.cfg.template";
+        filename = expandEnvironmentVariables(filename);
+        QFileInfo fileInfo(filename);
+        if (!fileInfo.isFile())
+        {
+            errMsg = QString(
+                        "ERROR: Default frontend configuration file"
+                        " does not exist. Location: ") + filename;
+            filename = "";
+        }
         LOG4CPLUS_ERROR(mlog, errMsg.toStdString());
     }
+
+    if (!filename.isEmpty())
+    {
+        initializeFrontendFromConfigFile(filename);
+        return;
+    }
+
     throw MInitialisationError(errMsg.toStdString(), __FILE__, __LINE__);
 }
 
