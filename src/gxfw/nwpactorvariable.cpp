@@ -2872,7 +2872,8 @@ bool MNWP2DSectionActorVariable::parseContourLevelString(
         if (step > 0)
             for (double d = from; d <= to; d += step) *contourSet << d;
         else if (step < 0)
-            for (double d = from; d >= to; d += step) *contourSet << d;
+            // Sort iso values by ascending order (reason see below).
+            for (double d = to; d <= from; d -= step) *contourSet << d;
 
         contours->stopIndex = contourSet->size();
         return true;
@@ -2885,6 +2886,11 @@ bool MNWP2DSectionActorVariable::parseContourLevelString(
         for (int i = 0; i < listValues.size(); i++)
             *contourSet << listValues.value(i).toDouble(&ok);
 
+        // Sort contour levels to avoid all levels disappearing if the user
+        // ends the sequence with a iso value smaller than the minimum value of
+        // the data field or starts the sequence with a level greater than the
+        // maximum.
+        std::sort(contourSet->begin(), contourSet->end());
         contours->stopIndex = contourSet->size();
         return true;
     }
