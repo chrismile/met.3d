@@ -171,6 +171,8 @@ public:
      */
     bool hasData();
 
+    QString debugOutputAsString();
+
     /* Data loader and variable specifications. */
     QString                       dataSourceID;
     MWeatherPredictionDataSource *dataSource;

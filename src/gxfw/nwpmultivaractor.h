@@ -136,6 +136,8 @@ public:
 
     bool isConnectedTo(MActor *actor) override;
 
+    void printDebugOutputOnUserRequest();
+
 protected:
     friend class MNWPActorVariable;
 

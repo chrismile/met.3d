@@ -1379,6 +1379,26 @@ bool MNWPActorVariable::hasData()
 }
 
 
+QString MNWPActorVariable::debugOutputAsString()
+{
+    QString str = QString("==================\nNWPActorVariable :: "
+                          "%1 of %2:\n").arg(variableName).arg(dataSourceID);
+
+    str += QString("Number of pending requests: %1\n").arg(pendingRequests.size());
+    str += QString("Entries in the queue of pending requests:\n");
+    for (int i = 0; i < pendingRequestsQueue.size(); i++)
+    {
+        str += QString("  ++ entry #%1: available=%2, request=%2").arg(i)
+                .arg(pendingRequestsQueue[i].available)
+                .arg(pendingRequestsQueue[i].request);
+    }
+
+    str += QString("==================\n");
+
+    return str;
+}
+
+
 /******************************************************************************
 ***                             PUBLIC SLOTS                                ***
 *******************************************************************************/

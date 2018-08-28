@@ -383,6 +383,22 @@ bool MNWPMultiVarActor::isConnectedTo(MActor *actor)
 }
 
 
+void MNWPMultiVarActor::printDebugOutputOnUserRequest()
+{
+    QString str = QString("\n==================\nNWPMultiVarActor :: "
+                          "%1\n\n").arg(getName());
+
+    for (MNWPActorVariable* var : variables)
+    {
+        str += var->debugOutputAsString();
+    }
+
+    str += QString("==================\n");
+
+    LOG4CPLUS_DEBUG(mlog, str.toStdString());
+}
+
+
 /******************************************************************************
 ***                             PUBLIC SLOTS                                ***
 *******************************************************************************/
