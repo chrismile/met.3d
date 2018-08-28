@@ -67,6 +67,7 @@ namespace Met3D
 MTrajectoryActor::MTrajectoryActor()
     : MActor(),
       MBoundingBoxInterface(this, MBoundingBoxConnectionType::HORIZONTAL),
+      globalRequestIDCounter(0),
       trajectorySource(nullptr),
       normalsSource(nullptr),
       trajectoryFilter(nullptr),
@@ -1497,10 +1498,17 @@ void MTrajectoryActor::prepareAvailableDataForRendering(uint slot)
         }
 
 #ifdef DIRECT_SYNCHRONIZATION
-        // If this was a synchronization request signal to the sync control
-        // that it has been completed.
+        // If this was a synchronization request, check if the request was
+        // the last request due to the sync sent by any seed actor -- if
+        // yes, signal to the sync control that the sync has been completed.
         if (trqi.syncchronizationRequest)
-            synchronizationControl->synchronizationCompleted(this);
+        {
+            numSeedActorsForRequestEvent[trqi.requestID] -= 1;
+            if (numSeedActorsForRequestEvent[trqi.requestID] == 0)
+            {
+                synchronizationControl->synchronizationCompleted(this);
+            }
+        }
 #endif
     }
 
@@ -2824,6 +2832,22 @@ void MTrajectoryActor::asynchronousDataRequest(bool synchronizationRequest)
 
 #ifndef DIRECT_SYNCHRONIZATION
     Q_UNUSED(synchronizationRequest);
+#else
+    unsigned int requestID = ++globalRequestIDCounter;
+    if (synchronizationRequest)
+    {
+        // Due to the current implementation of having multiple request queues
+        // for multiple seed actors, we need to keep track of how many
+        // requests have been sent for a given sync event. For this, each
+        // request is assigned a unique "request ID"; the map
+        // "numSeedActorsForRequestEvent" stores how many "seed actors" have
+        // caused requests. In prepareAvailableDataForRendering(), this
+        // counter is checked before the "sync completed" signal is sent
+        // to the sync control.
+//NOTE (mr, 28Aug2018) -- a better way to implement this would probably be to
+// signal back to the sync control //which// sync signal has been completed...
+        numSeedActorsForRequestEvent.insert(requestID, 0);
+    }
 #endif
 
     for (int t = 0; t < (precomputedDataSource ? 1 : seedActorData.size()); t++)
@@ -2839,6 +2863,11 @@ void MTrajectoryActor::asynchronousDataRequest(bool synchronizationRequest)
         trqi.numPendingRequests = 0;
 #ifdef DIRECT_SYNCHRONIZATION
         trqi.syncchronizationRequest = synchronizationRequest;
+        trqi.requestID = requestID;
+        if (synchronizationRequest)
+        {
+            numSeedActorsForRequestEvent[requestID] += 1;
+        }
 #endif
 
         // Request 1: Trajectories for the current time and ensemble settings.

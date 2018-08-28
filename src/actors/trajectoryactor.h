@@ -334,6 +334,7 @@ private:
         int numPendingRequests;
 #ifdef DIRECT_SYNCHRONIZATION
         bool syncchronizationRequest;
+        unsigned int requestID;
 #endif
     };
 
@@ -358,6 +359,12 @@ private:
         QQueue<MTrajectoryRequestQueueInfo> pendingRequestsQueue;
     };
     QVector<MTrajectoryRequestBuffer> trajectoryRequests;
+
+    /** Counter to keep track of requests for correct handling of sync
+        events with multiple seed actors present. See comment in
+        asynchronousDataRequest(). */
+    unsigned int globalRequestIDCounter;
+    QMap<unsigned int, unsigned int> numSeedActorsForRequestEvent;
 
     MTrajectoryDataSource *trajectorySource;
     MTrajectories *trajectories;
