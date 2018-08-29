@@ -1388,7 +1388,7 @@ QString MNWPActorVariable::debugOutputAsString()
     str += QString("Entries in the queue of pending requests:\n");
     for (int i = 0; i < pendingRequestsQueue.size(); i++)
     {
-        str += QString("  ++ entry #%1: available=%2, request=%2").arg(i)
+        str += QString("  ++ entry #%1: available=%2, request=%3\n").arg(i)
                 .arg(pendingRequestsQueue[i].available)
                 .arg(pendingRequestsQueue[i].request);
     }
@@ -1704,6 +1704,15 @@ void MNWPActorVariable::asynchronousDataAvailable(MDataRequest request)
 
             // Acquire the new ones.
             grid = dataSource->getData(processRequest);
+            if (grid == nullptr)
+            {
+//TODO (29Aug2018, mr) -- how should we handle errors in the pipeline that
+// lead to a nullptr instead of a valid grid being returned?
+                LOG4CPLUS_ERROR(mlog, "FATAL ERROR: something went wrong "
+                                "in the data pipeline -- no grid data available "
+                                "... don't know what to do.");
+            }
+
             textureDataField  = grid->getTexture();
             textureLonLatLevAxes = grid->getLonLatLevTexture();
 

@@ -77,8 +77,18 @@ MStructuredGrid* MWeatherPredictionReader::produceData(MDataRequest request)
         levtype  = SURFACE_2D;
     }
 
-    MStructuredGrid* result = readGrid(levtype, variable, initTime,
-                                       validTime, member);
+    MStructuredGrid* result = nullptr;
+    try
+    {
+        result = readGrid(levtype, variable, initTime, validTime, member);
+    }
+    catch (const std::exception& e)
+    {
+        LOG4CPLUS_ERROR(mlog, "ERROR: failed to read variable data from file "
+                              "-- " << e.what());
+        result = nullptr;
+    }
+
     if (result == nullptr)
     {
         // For some reason (invalid datafield requested, file corrupt) no

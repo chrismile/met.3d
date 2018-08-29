@@ -428,8 +428,42 @@ NcVar NcCFVar::getVerticalCoordinateGeometricHeight()
 {
     // The vertical z coordinate is identifyable by units of geometric height,
     // cf. http://cfconventions.org/cf-conventions/v1.6.0/cf-conventions.html#vertical-coordinate
-    vector<string> units = {"m", "metre"};
+    vector<string> units = {"m", "metre", "metres", "meter", "meters"};
     return getCFCoordinateVar(units, {""}, true);
+}
+
+
+QSet<QString> NcCFVar::validUnitsVerticalCoordinate(
+        NcCFVar::NcVariableGridType gridType)
+{
+    switch (gridType)
+    {
+    case LAT_LON_P:
+        return QSet<QString>() << "Pa" << "hPa";
+        break;
+    case LAT_LON_PVU:
+        return QSet<QString>() << "10-6Km2/kgs";
+        break;
+    case LAT_LON_Z:
+        return QSet<QString>() << "m" << "metre" << "metres" << "meter"
+                               << "meters";
+        break;
+    default:
+        return QSet<QString>();
+        break;
+    }
+}
+
+
+QString NcCFVar::validUnitsVerticalCoordinateAsString(
+        NcCFVar::NcVariableGridType gridType)
+{
+    QString str = "";
+    for (QString unit : validUnitsVerticalCoordinate(gridType))
+    {
+        str += QString("%1/").arg(unit);
+    }
+    return str;
 }
 
 
@@ -944,6 +978,32 @@ bool NcCFVar::getRotatedNorthPoleCoordinates(const NcVar& gridMappingVar,
         return false;
     }
 
+}
+
+
+QString NcCFVar::ncVariableGridTypeToString(NcCFVar::NcVariableGridType type)
+{
+    switch (type)
+    {
+    case UNDEFINED:
+        return QString("WARNING: undefined, grid type could not be detected");
+    case ALL:
+        return QString("generic grid");
+    case LAT_LON:
+        return QString("regular 2D lat/lon grid");
+    case LAT_LON_P:
+        return QString("regular lat/lon grid with pressure levels");
+    case LAT_LON_HYBRID:
+        return QString("regular lat/lon grid with hybrid model levels");
+    case LAT_LON_PVU:
+        return QString("regular lat/lon grid with PV levels");
+    case LAT_LON_Z:
+        return QString("regular lat/lon grid with geometric height levels");
+    case LAT_LON_AUXP3D:
+        return QString("regular lat/lon grid with auxiliary 3D pressure field");
+    default:
+        return QString("ERROR: no valid grid type");
+    }
 }
 
 

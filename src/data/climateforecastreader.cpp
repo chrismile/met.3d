@@ -493,6 +493,19 @@ void MClimateForecastReader::scanDataRoot()
                     << dataRoot.absolutePath().toStdString() << " "
                     << "for files with NetCDF-CF forecast data.");
     LOG4CPLUS_DEBUG(mlog, "Using file filter: " << dirFileFilters.toStdString());
+    LOG4CPLUS_DEBUG(mlog, "Parameters: "
+                    << "treat rotated grid as regular grid="
+                    << (treatRotatedGridAsRegularGrid ? "enabled" : "disabled")
+                    << "; convert geometric height to pressure (using standard ICAO)="
+                    << (convertGeometricHeightToPressure_ICAOStandard ? "enabled" : "disabled")
+                    << "; grid consistency check="
+                    << (!disableGridConsistencyCheck ? "enabled" : "disabled")
+                    << "; use auxiliary 3D pressure field="
+                    << (auxiliary3DPressureField != "" ?
+                "enabled (name= " + (auxiliary3DPressureField.toStdString())
+                + ")" : "disabled")
+                    );
+
     LOG4CPLUS_DEBUG(mlog, "Available files with forecast data:");
 
     // Get a list of all files in the directory that match the wildcard name
@@ -602,6 +615,9 @@ void MClimateForecastReader::scanDataRoot()
                 // it in a NcCFVar object.
                 NcCFVar currCFVar(ncFile->getVar(varName.toStdString()));
 
+                LOG4CPLUS_DEBUG(mlog, "\tChecking variable <"
+                                << varName.toStdString() << "> ...");
+
                 // Read the variable's long_name, standard_name and units
                 // attributes, if present. If they are not present, leave the
                 // corresponding variables empty.
@@ -667,8 +683,14 @@ void MClimateForecastReader::scanDataRoot()
 
                 // Determin the type of the vertical level of the variable.
                 MVerticalLevelType levelType;
-                switch (currCFVar.getGridType(auxiliary3DPressureField,
-                                              disableGridConsistencyCheck))
+                NcCFVar::NcVariableGridType gridType = currCFVar.getGridType(
+                            auxiliary3DPressureField, disableGridConsistencyCheck);
+
+                LOG4CPLUS_DEBUG(mlog, "\t--detected grid type: "
+                                << NcCFVar::ncVariableGridTypeToString(
+                                    gridType).toStdString());
+
+                switch (gridType)
                 {
                 case NcCFVar::LAT_LON:
                     levelType = SURFACE_2D;
@@ -716,13 +738,22 @@ void MClimateForecastReader::scanDataRoot()
                                     << "> is defined on a grid using vertical"
                                        " geometric height levels, and"
                                        " conversion to pressure coordinates is"
-                                       " disabled  -- skipping variable.");
+                                       " disabled -- Met.3D can currently only"
+                                       " handle pressure coordinates internally;"
+                                       " skipping variable.");
                         continue;
                     }
                     break;
                 default:
                     // If neither of the above choices could be matched,
                     // discard this variable and continue.
+                    LOG4CPLUS_WARN(
+                                mlog,
+                                "WARNING: identified variable <"
+                                << varName.toStdString()
+                                << "> is defined on a grid that Met.3D "
+                                   "currently does not understand -- skipping "
+                                   "variable.");
                     continue;
                     break;
                 }
@@ -1179,7 +1210,7 @@ MStructuredGrid *MClimateForecastReader::readGrid(
         catch (NcException& e)
         {
             LOG4CPLUS_ERROR(mlog, "ERROR: cannot open file "
-                            << filename.toStdString());
+                            << filename.toStdString() << " -- " << e.what());
             throw;
         }
     }
@@ -1216,6 +1247,9 @@ MStructuredGrid *MClimateForecastReader::readGrid(
             {
                 LOG4CPLUS_ERROR(mlog, "ERROR: cannot find variable "
                                 << variableName.toStdString());
+                // Cannot recover from this error; delete shared
+                // data read so far and break.
+                finfo->sharedData[levelType].remove(variableName);
                 throw MBadDataFieldRequest(
                             "cannot find variable " + variableName.toStdString(),
                             __FILE__, __LINE__);
@@ -1324,10 +1358,14 @@ MStructuredGrid *MClimateForecastReader::readGrid(
                 {
                     // .. and if they're in completely different units, raise an
                     // exception.
-                    throw MNcException(
-                            "NcException",
-                            "invalid units for ak coefficients (must be Pa or hPa)",
-                            __FILE__, __LINE__);
+                    // Cannot recover from this error; delete shared
+                    // data read so far and break.
+                    finfo->sharedData[levelType].remove(variableName);
+                    QString err = QString(
+                                "invalid units '%1' for ak coefficients "
+                                "(must be Pa or hPa)").arg(units.c_str());
+                    throw MNcException("NcException", err.toStdString(),
+                                       __FILE__, __LINE__);
                 }
             }
 
@@ -1496,20 +1534,14 @@ MStructuredGrid *MClimateForecastReader::readGrid(
                 try { shared->vertVar.getAtt("units").getValues(units); }
                 catch (NcException) {}
 
-                if (units == "Pa")
+                if (convertGeometricHeightToPressure_ICAOStandard)
                 {
-                    for (int i = 0; i < shared->levels.size(); i++)
-                    {
-                        shared->levels[i] /= 100.;
-                    }
-                }
-                else if (units != "hPa")
-                {
-                    // If vertical levels are specified in metres and
-                    // convertion flag is set, convert metres to pressure with
-                    // standard ICAO field.
-                    if ((units == "m" || units == "metre")
-                            && convertGeometricHeightToPressure_ICAOStandard)
+                    // Conversion flag "geometric height -> pressure" has
+                    // been set. The units of this variable are expected to be
+                    // metres, i.e., geometric height.
+
+                    if (NcCFVar::validUnitsVerticalCoordinate(
+                                NcCFVar::LAT_LON_Z).contains(units.c_str()))
                     {
                         for (int i = 0; i < shared->levels.size(); i++)
                         {
@@ -1519,12 +1551,40 @@ MStructuredGrid *MClimateForecastReader::readGrid(
                     }
                     else
                     {
-                        throw MNcException(
-                                    "NcException",
-                                    "invalid units for pressure levels (must be"
-                                    " Pa or hPa)",
-                                    __FILE__, __LINE__);
+                        // Cannot recover from this error; delete shared
+                        // data read so far and break.
+                        finfo->sharedData[levelType].remove(variableName);
+                        QString err = QString(
+                                    "invalid units '%1' for geometric "
+                                    "height levels in variable %2 "
+                                    "(must be one of "
+                                    "%3)").arg(units.c_str()).arg(
+                                    shared->vertVar.getName().c_str()).arg(
+                                    NcCFVar::validUnitsVerticalCoordinateAsString(
+                                        NcCFVar::LAT_LON_Z));
+                        throw MNcException("NcException",  err.toStdString(),
+                                           __FILE__, __LINE__);
                     }
+                }
+
+                else if (units == "Pa")
+                {
+                    for (int i = 0; i < shared->levels.size(); i++)
+                    {
+                        shared->levels[i] /= 100.;
+                    }
+                }
+                else if (units != "hPa")
+                {
+                    // Cannot recover from this error; delete shared
+                    // data read so far and break.
+                    finfo->sharedData[levelType].remove(variableName);
+                    QString err = QString(
+                                "invalid units '%1' for pressure "
+                                "levels (must be "
+                                "Pa or hPa)").arg(units.c_str());
+                    throw MNcException("NcException",  err.toStdString(),
+                                       __FILE__, __LINE__);
                 }
             }
 
@@ -1550,7 +1610,9 @@ MStructuredGrid *MClimateForecastReader::readGrid(
         else
         {
             LOG4CPLUS_DEBUG(mlog, "\tNo vertical dimension or auxiliary "
-                                  "pressure field used.");
+                                  "pressure field detected (if there should be "
+                                  "one: are the 'units' "
+                                  "and 'positive' attributes set correctly?).");
         }
 
         // Get time values of this variable.
@@ -1659,7 +1721,9 @@ MStructuredGrid *MClimateForecastReader::readGrid(
     // Store metadata in grid object.
     grid->setMetaData(initTime, validTime, variableName, ensembleMember);
     foreach (unsigned int m, shared->availableMembers)
+    {
         grid->setAvailableMember(m);
+    }
 
     // Load the data field.
     switch (levelType)
@@ -1955,11 +2019,11 @@ MStructuredGrid *MClimateForecastReader::readGrid(
         }
         else if (units != "hPa")
         {
-            throw MNcException(
-                        "NcException",
-                        "invalid units for pressure levels of auxiliary"
-                        " pressure field (must be Pa or hPa)",
-                        __FILE__, __LINE__);
+            QString err = QString(
+                        "invalid units '%1' for pressure levels of auxiliary "
+                        "pressure field (must be Pa or hPa)").arg(units.c_str());
+            throw MNcException("NcException", err.toStdString(),
+                               __FILE__, __LINE__);
         }
     }
 
@@ -2238,7 +2302,8 @@ bool MClimateForecastReader::checkSharedVariableDataConsistency(
                 // If vertical levels are specified in metres and convertion
                 // flag is set, convert metres to pressure with standard ICAO
                 // field.
-                if ((units == "m" || units == "metre")
+                if (NcCFVar::validUnitsVerticalCoordinate(
+                            NcCFVar::LAT_LON_Z).contains(units.c_str())
                         && convertGeometricHeightToPressure_ICAOStandard)
                 {
                     for (int i = 0; i < current.levels.size(); i++)

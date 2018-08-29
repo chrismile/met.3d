@@ -196,6 +196,10 @@ public:
       */
     NcVar getVerticalCoordinateGeometricHeight();
 
+    static QSet<QString> validUnitsVerticalCoordinate(NcVariableGridType gridType);
+
+    static QString validUnitsVerticalCoordinateAsString(NcVariableGridType gridType);
+
     /**
       Returns TRUE if this CF variable has an ensemble dimension.
      */
@@ -310,6 +314,12 @@ public:
     static bool getRotatedNorthPoleCoordinates(const NcVar& gridMappingVar,
                                                float *rotatedNorthPoleLon,
                                                float *rotatedNorthPoleLat);
+
+    /**
+      Static function that converts an @ref NcVariableGridType enum to
+      a string.
+     */
+    static QString ncVariableGridTypeToString(NcVariableGridType type);
 
 private:
     /**
