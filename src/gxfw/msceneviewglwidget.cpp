@@ -64,12 +64,13 @@ MSceneViewGLWidget::MSceneViewGLWidget()
       scene(nullptr),
       lastPoint(QVector3D(0,0,0)),
       sceneNavigationMode(MOVE_CAMERA),
-      sceneNavigationMode_NoActorInteraction(MOVE_CAMERA),
       sceneRotationCentre(QVector3D(0,0,1020)),
       cameraAutorotationMode(false),
       freezeMode(0),
+      fullScreenActor(nullptr),
       sceneNavigationSensitivity(1.),
       posLabelIsEnabled(true),
+      farPlaneDistance(500.f),
       multisamplingEnabled(true),
       antialiasingEnabled(false),
       synchronizationControl(nullptr),
@@ -215,7 +216,7 @@ MSceneViewGLWidget::MSceneViewGLWidget()
     systemControl->getEnumPropertyManager()->setEnumNames(
                 sceneNavigationModeProperty,
                 QStringList() << "move camera" << "rotate scene"
-                << "2D top view");
+                << "2D top view" << "single full-screen actor");
     interactionGroupProperty->addSubProperty(sceneNavigationModeProperty);
 
     sceneRotationCenterProperty = systemControl->getGroupPropertyManager()
@@ -246,6 +247,25 @@ MSceneViewGLWidget::MSceneViewGLWidget()
             ->addProperty("interactively select rotation centre");
     sceneRotationCenterProperty->addSubProperty(selectSceneRotationCentreProperty);
     selectSceneRotationCentreProperty->setEnabled(false);
+
+    fullScreenActorProperty = systemControl->getEnumPropertyManager()
+            ->addProperty("full-screen actor");
+    // Scan currently available actors supporting full-screen mode. Add Actors
+    // to the list displayed in the combo box of the fullScreenActorProperty.
+    QStringList availableFullScreenActors;
+    availableFullScreenActors << "None";
+    MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
+    foreach (MActor *mactor, glRM->getActors())
+    {
+        if (mactor->supportsFullScreenVisualisation())
+        {
+            availableFullScreenActors << mactor->getName();
+        }
+    }
+    systemControl->getEnumPropertyManager()->setEnumNames(
+                fullScreenActorProperty, QStringList() << "None");
+    fullScreenActorProperty->setEnabled(false);
+    interactionGroupProperty->addSubProperty(fullScreenActorProperty);
 
     sceneNavigationSensitivityProperty = systemControl->getDecoratedDoublePropertyManager()
             ->addProperty("navigation sensitivity");
@@ -305,6 +325,14 @@ MSceneViewGLWidget::MSceneViewGLWidget()
     systemControl->getColorPropertyManager()
             ->setValue(backgroundColourProperty, backgroundColour);
     renderingGroupProperty->addSubProperty(backgroundColourProperty);
+
+    farPlaneDistanceProperty = systemControl->getDecoratedDoublePropertyManager()
+            ->addProperty("far plane");
+    systemControl->getDecoratedDoublePropertyManager()
+            ->setValue(farPlaneDistanceProperty, farPlaneDistance);
+    systemControl->getDecoratedDoublePropertyManager()
+            ->setMinimum(farPlaneDistanceProperty, 0.01);
+    renderingGroupProperty->addSubProperty(farPlaneDistanceProperty);
 
     multisamplingProperty = systemControl->getBoolPropertyManager()
             ->addProperty("multisampling");
@@ -524,6 +552,13 @@ MSceneViewGLWidget::MSceneViewGLWidget()
             SIGNAL(propertyChanged(QtProperty*)),
             SLOT(onPropertyChanged(QtProperty*)));
 
+    // Observe the creation/deletion of actors -- if these support full-screen
+    // mode, add to the list displayed in the full-screen actor property.
+    connect(glRM, SIGNAL(actorCreated(MActor*)), SLOT(onActorCreated(MActor*)));
+    connect(glRM, SIGNAL(actorDeleted(MActor*)), SLOT(onActorDeleted(MActor*)));
+    connect(glRM, SIGNAL(actorRenamed(MActor*, QString)),
+            SLOT(onActorRenamed(MActor*, QString)));
+
     // Set up a timer for camera auto-rotation.
     cameraAutoRotationTimer = new QTimer();
     cameraAutoRotationTimer->setInterval(20);
@@ -710,6 +745,12 @@ void MSceneViewGLWidget::setVerticalScaling(float scaling)
 
 void MSceneViewGLWidget::setInteractionMode(bool enabled)
 {
+    // Don't change interaction mode if property is disabled.
+    if (!actorInteractionProperty->isEnabled())
+    {
+        return;
+    }
+
     // Analysis mode cannot be active at the same time.
     if (enabled && analysisMode)
         MSystemManagerAndControl::getInstance()->getBoolPropertyManager()
@@ -722,6 +763,12 @@ void MSceneViewGLWidget::setInteractionMode(bool enabled)
 
 void MSceneViewGLWidget::setAnalysisMode(bool enabled)
 {
+    // Don't change analysis mode if property is disabled.
+    if (!analysisModeProperty->isEnabled())
+    {
+        return;
+    }
+
     // Interaction mode cannot be active at the same time.
     if (enabled && actorInteractionMode)
         MSystemManagerAndControl::getInstance()->getBoolPropertyManager()
@@ -768,7 +815,16 @@ void MSceneViewGLWidget::executeCameraAction(int action,
                                              bool ignoreWithoutFocus)
 {
     // Only act on this signal if we have input focus.
-    if ( ignoreWithoutFocus && (!hasFocus()) ) return;
+    if ( ignoreWithoutFocus && (!hasFocus()) )
+    {
+        return;
+    }
+
+    // If in full-screen mode, don't move camera.
+    if (sceneNavigationMode == SINGLE_FULLSCREEN_ACTOR)
+    {
+        return;
+    }
 
     // Get current camera axes.
     QVector3D yAxis = camera.getYAxis();
@@ -831,29 +887,11 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
         // Toggle actor interaction mode.
         actorInteractionMode = MSystemManagerAndControl::getInstance()
                 ->getBoolPropertyManager()->value(actorInteractionProperty);
-
-        if ( actorInteractionMode )
+        // Analysis mode cannot be active at the same time.
+        if (actorInteractionMode && analysisMode)
         {
-            // "actorInteractionMode" was switched from "false" to "true". Save
-            // the current scene navigation mode and switch to MOVE_CAMERA.
-            sceneNavigationMode_NoActorInteraction = sceneNavigationMode;
-
-            if (sceneNavigationMode == ROTATE_SCENE)
-            {
-                sceneNavigationMode = MOVE_CAMERA;
-                sceneNavigationModeProperty->setEnabled(false);
-                selectSceneRotationCentreProperty->setEnabled(false);
-                sceneRotationCenterProperty->setEnabled(false);
-            }
-        }
-        else
-        {
-            // "actorInteractionMode" was switched from "true" to "false".
-            // Restore scene navigation mode.
-            sceneNavigationMode = sceneNavigationMode_NoActorInteraction;
-            sceneNavigationModeProperty->setEnabled(true);
-            MSystemManagerAndControl::getInstance()->getEnumPropertyManager()
-                    ->setValue(sceneNavigationModeProperty, sceneNavigationMode);
+            MSystemManagerAndControl::getInstance()->getBoolPropertyManager()
+                    ->setValue(analysisModeProperty, false);
         }
 
         // In actor interaction mode, mouse tracking is enabled to have
@@ -868,8 +906,14 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
 
     else if (property == analysisModeProperty)
     {
-        analysisMode = MSystemManagerAndControl::getInstance()->getBoolPropertyManager()
-                ->value(analysisModeProperty);
+        analysisMode = MSystemManagerAndControl::getInstance()
+                ->getBoolPropertyManager()->value(analysisModeProperty);
+        // Interaction mode cannot be active at the same time.
+        if (analysisMode && actorInteractionMode)
+        {
+            MSystemManagerAndControl::getInstance()->getBoolPropertyManager()
+                    ->setValue(actorInteractionProperty, false);
+        }
         updateSceneLabel();
 #ifndef CONTINUOUS_GL_UPDATE
         updateGL();
@@ -881,6 +925,16 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
         setBackgroundColour(
                 MSystemManagerAndControl::getInstance()
                 ->getColorPropertyManager()->value(backgroundColourProperty));
+    }
+
+    else if (property == farPlaneDistanceProperty)
+    {
+        farPlaneDistance = MSystemManagerAndControl::getInstance()
+                ->getDecoratedDoublePropertyManager()
+                ->value(farPlaneDistanceProperty);
+#ifndef CONTINUOUS_GL_UPDATE
+        updateGL();
+#endif
     }
 
     else if (property == multisamplingProperty)
@@ -1004,21 +1058,35 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
         sceneNavigationMode = (SceneNavigationMode)MSystemManagerAndControl::getInstance()
                 ->getEnumPropertyManager()->value(sceneNavigationModeProperty);
 
+        // Disconnect full-screen actor to directly update connected scene view.
+        if (fullScreenActor && sceneNavigationMode != SINGLE_FULLSCREEN_ACTOR)
+        {
+            fullScreenActor->onFullScreenModeSwitch(this, false);
+            disconnect(fullScreenActor, SIGNAL(actorChanged()),
+                       this, SLOT(onFullScreenActorUpdate()));
+        }
+
         enablePropertyEvents = false;
         if (sceneNavigationMode == MOVE_CAMERA)
         {
             sceneRotationCenterProperty->setEnabled(false);
             selectSceneRotationCentreProperty->setEnabled(false);
             cameraAutoRotationModeProperty->setEnabled(false);
+            fullScreenActorProperty->setEnabled(false);
         }
         else if (sceneNavigationMode == ROTATE_SCENE)
         {
             sceneRotationCenterProperty->setEnabled(true);
             selectSceneRotationCentreProperty->setEnabled(true);
             cameraAutoRotationModeProperty->setEnabled(true);
+            fullScreenActorProperty->setEnabled(false);
         }
         else if (sceneNavigationMode == TOPVIEW_2D)
         {
+            sceneRotationCenterProperty->setEnabled(false);
+            selectSceneRotationCentreProperty->setEnabled(false);
+            cameraAutoRotationModeProperty->setEnabled(false);
+            fullScreenActorProperty->setEnabled(false);
             // !TODO: disable camera zooming
 
             QVector3D eyePos = QVector3D(-10, 50, 100);//camera.getOrigin();
@@ -1026,6 +1094,21 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
             camera.setOrigin(eyePos);
             camera.setZAxis(QVector3D(0, 0, -1));
             camera.setYAxis(QVector3D(0, 1, 0));
+        }
+        else if (sceneNavigationMode == SINGLE_FULLSCREEN_ACTOR)
+        {
+            fullScreenActorProperty->setEnabled(true);
+            sceneRotationCenterProperty->setEnabled(false);
+            selectSceneRotationCentreProperty->setEnabled(false);
+            cameraAutoRotationModeProperty->setEnabled(false);
+
+            // Connect full-screen actor to directly update connected scene view.
+            if (fullScreenActor)
+            {
+                fullScreenActor->onFullScreenModeSwitch(this, true);
+                connect(fullScreenActor, SIGNAL(actorChanged()),
+                        this, SLOT(onFullScreenActorUpdate()));
+            }
         }
 
         enablePropertyEvents = true;
@@ -1050,6 +1133,7 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
     {
 
         selectSceneRotationCentreProperty->setEnabled(false);
+        sceneNavigationModeProperty->setEnabled(false);
         MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
         MLabel *pickText  = glRM->getSceneRotationCentreSelectionLabel();
         MMovablePoleActor *pickActor = glRM->getSceneRotationCentreSelectionPoleActor();
@@ -1067,6 +1151,39 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
             sceneView->staticLabels.append(pickText);
             sceneView->updateSceneLabel();
         }
+    }
+
+    else if (property == fullScreenActorProperty)
+    {
+        QtEnumPropertyManager *enumPropertyManager =
+                MSystemManagerAndControl::getInstance()->getEnumPropertyManager();
+        int index = enumPropertyManager->value(fullScreenActorProperty);
+        QString actorName = enumPropertyManager->enumNames(
+                    fullScreenActorProperty).at(index);
+        // Disconnect previous full-screen actor.
+        if (fullScreenActor)
+        {
+            fullScreenActor->onFullScreenModeSwitch(this, false);
+            disconnect(fullScreenActor, SIGNAL(actorChanged()),
+                       this, SLOT(onFullScreenActorUpdate()));
+        }
+        fullScreenActor = MGLResourcesManager::getInstance()->getActorByName(
+                    actorName);        
+        // Connect current full-screen actor.
+        if (fullScreenActor)
+        {
+            fullScreenActor->onFullScreenModeSwitch(this, true);
+            connect(fullScreenActor, SIGNAL(actorChanged()),
+                    this, SLOT(onFullScreenActorUpdate()));
+        }
+
+        if (!updatesEnabled())
+        {
+            return;
+        }
+#ifndef CONTINUOUS_GL_UPDATE
+        updateGL();
+#endif
     }
 
     else if (property == cameraAutoRotationModeProperty)
@@ -1550,11 +1667,13 @@ void MSceneViewGLWidget::paintGL()
         float minY = - dyHalf;
         float maxY = + dyHalf;
 
-        modelViewProjectionMatrix.ortho(minX, maxX, minY, maxY, 0., 500.);
+        modelViewProjectionMatrix.ortho(minX, maxX, minY, maxY, 0.,
+                                        farPlaneDistance);
     }
     else
     {
-        modelViewProjectionMatrix.perspective(45., ratio, abs(co.z())/10., 500.);
+        modelViewProjectionMatrix.perspective(45., ratio, abs(co.z())/10.,
+                                              farPlaneDistance);
     }
 
     modelViewProjectionMatrix *= camera.getViewMatrix();
@@ -1565,27 +1684,64 @@ void MSceneViewGLWidget::paintGL()
     if (scene)
     {
         bool _interactionMode = actorInteractionMode;
-        // Get a reference to the scene's render queue and render the actors.
-        // Collect the actor's labels -- they are rendered in the next step.
-        foreach (MActor* actor, scene->getRenderQueue())
+
+        if (sceneNavigationMode == SINGLE_FULLSCREEN_ACTOR)
         {
-            if (singleInteractionActor != nullptr &&
-                    singleInteractionActor->getName() == actor->getName())
+            // If full-screen mode is active, only the selected full-screen
+            // actor should be drawn.
+            if (fullScreenActor != nullptr)
             {
-                actorInteractionMode = true;
-            }
+                if (singleInteractionActor != nullptr &&
+                        (singleInteractionActor->getName()
+                         == fullScreenActor->getName()))
+                {
+                    actorInteractionMode = true;
+                }
 
-            actor->render(this);
-            if (actor == pickedActor.actor)
-            {
-                labelList.append(actor->getPositionLabelToRender());
-            }
-            labelList.append(actor->getLabelsToRender());
+                fullScreenActor->renderToFullScreen(this);
 
-            if (singleInteractionActor != nullptr &&
-                    singleInteractionActor->getName() == actor->getName())
+                if (fullScreenActor == pickedActor.actor)
+                {
+                    labelList.append(fullScreenActor->getPositionLabelToRender());
+                }
+                labelList.append(fullScreenActor->getLabelsToRender());
+
+                if (singleInteractionActor != nullptr &&
+                        (singleInteractionActor->getName()
+                         == fullScreenActor->getName()))
+                {
+                    actorInteractionMode = false;
+                }
+            }
+        }
+        else
+        {
+            // If NOT in full-screen mode, use the render queue of the scene to
+            // render all actors in the scene.
+
+            // Get a reference to the scene's render queue and render the actors.
+            // Collect the actor's labels -- they are rendered in the next step.
+            foreach (MActor* actor, scene->getRenderQueue())
             {
-                actorInteractionMode = false;
+                if (singleInteractionActor != nullptr &&
+                        singleInteractionActor->getName() == actor->getName())
+                {
+                    actorInteractionMode = true;
+                }
+
+                actor->render(this);
+
+                if (actor == pickedActor.actor)
+                {
+                    labelList.append(actor->getPositionLabelToRender());
+                }
+                labelList.append(actor->getLabelsToRender());
+
+                if (singleInteractionActor != nullptr &&
+                        singleInteractionActor->getName() == actor->getName())
+                {
+                    actorInteractionMode = false;
+                }
             }
         }
 
@@ -1791,24 +1947,47 @@ void MSceneViewGLWidget::mouseMoveEvent(QMouseEvent *event)
             pickedActor.actor = 0;
             pickedActor.handleID = -1;
 
-            // Loop over all actors in the scene and let them check whether
-            // the mouse cursor coincides with one of their handles.
-            foreach (MActor* actor, scene->getRenderQueue())
+            // If in full-screen mode, only interact with selected full-screen
+            // actor.
+            if (sceneNavigationMode == SINGLE_FULLSCREEN_ACTOR)
             {
                 // Only check actors that are pickable.
-                if (actor->isPickable())
+                if (fullScreenActor != nullptr && fullScreenActor->isPickable())
                 {
-                    if (singleInteractionActor == nullptr ||
-                           singleInteractionActor->getName() == actor->getName())
+                    pickedActor.handleID =
+                            fullScreenActor->checkIntersectionWithHandle(
+                                this, clipX, clipY);
+                    // If the test returned a valid handle ID, store the actor
+                    // and its handle as the currently picked actor.
+                    if (pickedActor.handleID >= 0)
                     {
-                        pickedActor.handleID = actor->checkIntersectionWithHandle(
-                                    this, clipX, clipY);
-                        // If the test returned a valid handle ID, store the actor
-                        // and its handle as the currently picked actor.
-                        if (pickedActor.handleID >= 0)
+                        pickedActor.actor = fullScreenActor;
+                    }
+                }
+            }
+            else
+            {
+
+                // Loop over all actors in the scene and let them check whether
+                // the mouse cursor coincides with one of their handles.
+                foreach (MActor* actor, scene->getRenderQueue())
+                {
+                    // Only check actors that are pickable.
+                    if (actor->isPickable())
+                    {
+                        if (singleInteractionActor == nullptr ||
+                                singleInteractionActor->getName()
+                                == actor->getName())
                         {
-                            pickedActor.actor = actor;
-                            break;
+                            pickedActor.handleID = actor->checkIntersectionWithHandle(
+                                        this, clipX, clipY);
+                            // If the test returned a valid handle ID, store the actor
+                            // and its handle as the currently picked actor.
+                            if (pickedActor.handleID >= 0)
+                            {
+                                pickedActor.actor = actor;
+                                break;
+                            }
                         }
                     }
                 }
@@ -1826,10 +2005,22 @@ void MSceneViewGLWidget::mouseMoveEvent(QMouseEvent *event)
 
     // B) ANALYSIS MODE.
     // ========================================================================
-    if (analysisMode) return;
+    if (analysisMode)
+    {
+        return;
+    }
 
 
-    // C) CAMERA MOVEMENTS.
+    // C) FULL-SCREEN MODE.
+    // ========================================================================
+    if (sceneNavigationMode == SINGLE_FULLSCREEN_ACTOR)
+    {
+        // If in full-screen mode, don't move camera.
+        return;
+    }
+
+
+    // D) CAMERA MOVEMENTS.
     // ========================================================================
 
     MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
@@ -1985,9 +2176,19 @@ void MSceneViewGLWidget::wheelEvent(QWheelEvent *event)
 {
     MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
 
-    if (actorInteractionMode || analysisMode) return;
-    if (freezeMode) return;
-    if (glRM->globalMouseButtonZoom != Qt::MiddleButton) return;
+    if (actorInteractionMode || analysisMode
+            || sceneNavigationMode == SINGLE_FULLSCREEN_ACTOR)
+    {
+        return;
+    }
+    if (freezeMode)
+    {
+        return;
+    }
+    if (glRM->globalMouseButtonZoom != Qt::MiddleButton)
+    {
+        return;
+    }
     if (event->modifiers() == Qt::ControlModifier)
     {
         // Ctrl + mouse wheel: -- none --
@@ -2091,6 +2292,7 @@ void MSceneViewGLWidget::keyPressEvent(QKeyEvent *event)
                         sceneNavigationModeProperty, sceneNavigationMode);
             enablePropertyEvents = false;
             selectSceneRotationCentreProperty->setEnabled(true);
+            sceneNavigationModeProperty->setEnabled(true);
             enablePropertyEvents = true;
         }
     }
@@ -2270,6 +2472,104 @@ void MSceneViewGLWidget::updateSyncControlProperty()
 }
 
 
+void MSceneViewGLWidget::onActorCreated(MActor *actor)
+{
+    // If the new actor supports full-screen visualisation, add it to the list
+    // of available full-screen actors.
+    if (actor->supportsFullScreenVisualisation())
+    {
+        MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
+        // Don't render while the properties are being updated.
+        setUpdatesEnabled(false);
+
+        int currentIndex = sysMC->getEnumPropertyManager()->value(
+                    fullScreenActorProperty);
+
+        QStringList availableFullScreenActors =
+                sysMC->getEnumPropertyManager()->enumNames(
+                    fullScreenActorProperty);
+        availableFullScreenActors << actor->getName();
+
+        sysMC->getEnumPropertyManager()->setEnumNames(fullScreenActorProperty,
+                                                      availableFullScreenActors);
+
+        sysMC->getEnumPropertyManager()->setValue(fullScreenActorProperty,
+                                                  currentIndex);
+
+        setUpdatesEnabled(true);
+    }
+}
+
+
+void MSceneViewGLWidget::onActorDeleted(MActor *actor)
+{
+    // If the deleted actor supports full-screen visualisation, remove it from
+    // the list of available full-screen actors.
+    if (actor->supportsFullScreenVisualisation())
+    {
+        MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
+        setUpdatesEnabled(false);
+
+        int currentIndex = sysMC->getEnumPropertyManager()->value(
+                    fullScreenActorProperty);
+        QString fullScreenActorName = sysMC->getEnumPropertyManager()->enumNames(
+                    fullScreenActorProperty).at(currentIndex);
+
+        QStringList availableFullScreenActors =
+                sysMC->getEnumPropertyManager()->enumNames(
+                    fullScreenActorProperty);
+        availableFullScreenActors.removeOne(actor->getName());
+
+        sysMC->getEnumPropertyManager()->setEnumNames(fullScreenActorProperty,
+                                                      availableFullScreenActors);
+
+        currentIndex =
+                max(0, availableFullScreenActors.indexOf(fullScreenActorName));
+
+        setUpdatesEnabled(true);
+
+        sysMC->getEnumPropertyManager()->setValue(fullScreenActorProperty,
+                                                  currentIndex);
+    }
+}
+
+
+void MSceneViewGLWidget::onActorRenamed(MActor *actor, QString oldName)
+{
+    // If the renamed actor supports full-screen visualisation, change its name
+    // in the list of available full-screen actors.
+    if (actor->supportsFullScreenVisualisation())
+    {
+        MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
+        // Don't render while the properties are being updated.
+        setUpdatesEnabled(false);
+
+        int currentIndex = sysMC->getEnumPropertyManager()->value(
+                    fullScreenActorProperty);
+
+        QStringList availableFullScreenActors =
+                sysMC->getEnumPropertyManager()->enumNames(
+                    fullScreenActorProperty);
+        availableFullScreenActors[availableFullScreenActors.indexOf(oldName)]
+                = actor->getName();
+
+        sysMC->getEnumPropertyManager()->setEnumNames(fullScreenActorProperty,
+                                                      availableFullScreenActors);
+
+        sysMC->getEnumPropertyManager()->setValue(fullScreenActorProperty,
+                                                  currentIndex);
+
+        setUpdatesEnabled(true);
+    }
+}
+
+
+void MSceneViewGLWidget::onFullScreenActorUpdate()
+{
+    updateGL();
+}
+
+
 void MSceneViewGLWidget::updateCameraPositionDisplay()
 {
     QVector3D co = camera.getOrigin();
@@ -2442,6 +2742,10 @@ void MSceneViewGLWidget::saveConfiguration(QSettings *settings)
     settings->setValue("sceneRotationCentreElevation",
                       sysMC->getDecoratedDoublePropertyManager()->value(
                           sceneRotationCentreElevationProperty));
+    settings->setValue("fullScreenActor", sysMC->getEnumPropertyManager()
+                       ->enumNames(fullScreenActorProperty)
+                       .at(sysMC->getEnumPropertyManager()->value(
+                               fullScreenActorProperty)));
     settings->setValue("NavigationSensitivity",
                       sysMC->getDecoratedDoublePropertyManager()->value(
                           sceneNavigationSensitivityProperty));
@@ -2459,6 +2763,7 @@ void MSceneViewGLWidget::saveConfiguration(QSettings *settings)
     settings->beginGroup("Rendering");
     settings->setValue("backgroundColour",  sysMC->getColorPropertyManager()
                        ->value(backgroundColourProperty));
+    settings->setValue("farPlaneDistance", farPlaneDistance);
     settings->setValue("multisampling", multisamplingEnabled);
     settings->setValue("antialiasing", antialiasingEnabled);
     settings->setValue("depthTestForLabels", renderLabelsWithDepthTest);
@@ -2534,6 +2839,12 @@ void MSceneViewGLWidget::loadConfiguration(QSettings *settings)
                 sceneRotationCentreElevationProperty,
                 settings->value("sceneRotationCentreElevation", 1020.).toDouble());
 
+    enumName = settings->value("fullScreenActor", "None").toString();
+    enumIndex = (sysMC->getEnumPropertyManager()->enumNames(
+                fullScreenActorProperty)).indexOf(enumName);
+    sysMC->getEnumPropertyManager()->setValue(fullScreenActorProperty,
+                                              enumIndex);
+
     sysMC->getDecoratedDoublePropertyManager()->setValue(
                 sceneNavigationSensitivityProperty,
                 settings->value("NavigationSensitivity", 1.).toDouble());
@@ -2564,6 +2875,9 @@ void MSceneViewGLWidget::loadConfiguration(QSettings *settings)
                 backgroundColourProperty,
                 settings->value("backgroundColour", QColor(255, 255, 255))
                 .value<QColor>());
+    sysMC->getDecoratedDoublePropertyManager()->setValue(
+                farPlaneDistanceProperty,
+                settings->value("farPlaneDistance", 500.f).toDouble());
     sysMC->getBoolPropertyManager()->setValue(
                 multisamplingProperty,
                 settings->value("multisampling", true).toBool());
@@ -2606,7 +2920,16 @@ void MSceneViewGLWidget::loadConfiguration(QSettings *settings)
                 displayDateTimePositionProperty,
                 settings->value("position", QPointF(-0.99, 0.99)).toPointF());
     settings->endGroup(); // display date time
+
     synchronizeWith(sysMC->getSyncControl(syncControlName));
+
+    // Update display time when loading configuration only if the view is
+    // initialised since otherwise adding the text will lead to an
+    // initialisation error when the text is added.
+    if (viewIsInitialised)
+    {
+        updateDisplayTime();
+    }
 
     // Load arrow pointing north properties.
     settings->beginGroup("ArrowPointingNorth");
@@ -2657,6 +2980,7 @@ void MSceneViewGLWidget::onHandleSizeChanged()
 void MSceneViewGLWidget::synchronizeWith(
         MSyncControl *sync, bool updateGUIProperties)
 {
+    Q_UNUSED(updateGUIProperties);
     if (synchronizationControl == sync)
     {
         return;

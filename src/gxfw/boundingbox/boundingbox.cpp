@@ -187,9 +187,20 @@ void MBoundingBox::emitPressureLevelChanged()
 ***                     CONSTRUCTOR / DESTRUCTOR                            ***
 *******************************************************************************/
 
-MBoundingBoxInterface::MBoundingBoxInterface(MActor *child)
+MBoundingBoxInterface::MBoundingBoxInterface(
+        MActor *child, MBoundingBoxConnectionType bBoxType,
+        MBoundingBoxConnection *parentBBoxConnection)
     : child(child)
-{}
+{
+    if (parentBBoxConnection == nullptr)
+    {
+        bBoxConnection = new MBoundingBoxConnection(this, bBoxType);
+    }
+    else
+    {
+        bBoxConnection = parentBBoxConnection;
+    }
+}
 
 
 MBoundingBoxInterface::~MBoundingBoxInterface()
@@ -486,6 +497,12 @@ void MBoundingBoxInterface::switchToBoundingBox(QString bBoxName)
 }
 
 
+void MBoundingBoxInterface::insertBoundingBoxProperty(QtProperty *parentGroup)
+{
+    parentGroup->addSubProperty(bBoxConnection->getProperty());
+}
+
+
 /******************************************************************************
 ***                          MBoundingBoxConnection                         ***
 *******************************************************************************/
@@ -493,8 +510,8 @@ void MBoundingBoxInterface::switchToBoundingBox(QString bBoxName)
 ***                     CONSTRUCTOR / DESTRUCTOR                            ***
 *******************************************************************************/
 
-MBoundingBoxConnection::MBoundingBoxConnection(MBoundingBoxInterface *actor,
-                                               ConnectionType type)
+MBoundingBoxConnection::MBoundingBoxConnection(
+        MBoundingBoxInterface *actor, MBoundingBoxConnectionType type)
     : QObject(),
       actor(actor),
       type(type),
@@ -549,15 +566,15 @@ MBoundingBoxConnection::~MBoundingBoxConnection()
     {
         switch (type)
         {
-        case HORIZONTAL:
+        case MBoundingBoxConnectionType::HORIZONTAL:
             disconnect(boundingBox, SIGNAL(horizontal2DCoordsChanged()),
                        this, SLOT(onBoundingBoxChanged()));
             break;
-        case VERTICAL:
+        case MBoundingBoxConnectionType::VERTICAL:
             disconnect(boundingBox, SIGNAL(pressureLevelChanged()),
                        this, SLOT(onBoundingBoxChanged()));
             break;
-        case VOLUME:
+        case MBoundingBoxConnectionType::VOLUME:
             disconnect(boundingBox, SIGNAL(coords3DChanged()),
                        this, SLOT(onBoundingBoxChanged()));
             break;
@@ -706,19 +723,17 @@ void MBoundingBoxConnection::setBoundingBox(QString bBoxID)
     {
         switch (type)
         {
-        case HORIZONTAL:
+        case MBoundingBoxConnectionType::HORIZONTAL:
             disconnect(boundingBox, SIGNAL(horizontal2DCoordsChanged()),
                        this, SLOT(onBoundingBoxChanged()));
             break;
-        case VERTICAL:
+        case MBoundingBoxConnectionType::VERTICAL:
             disconnect(boundingBox, SIGNAL(pressureLevelChanged()),
                        this, SLOT(onBoundingBoxChanged()));
             break;
-        case VOLUME:
+        case MBoundingBoxConnectionType::VOLUME:
             disconnect(boundingBox, SIGNAL(coords3DChanged()),
                        this, SLOT(onBoundingBoxChanged()));
-            break;
-        default:
             break;
         }
     }
@@ -729,19 +744,17 @@ void MBoundingBoxConnection::setBoundingBox(QString bBoxID)
     {
         switch (type)
         {
-        case HORIZONTAL:
+        case MBoundingBoxConnectionType::HORIZONTAL:
             connect(boundingBox, SIGNAL(horizontal2DCoordsChanged()),
                     this, SLOT(onBoundingBoxChanged()));
             break;
-        case VERTICAL:
+        case MBoundingBoxConnectionType::VERTICAL:
             connect(boundingBox, SIGNAL(pressureLevelChanged()),
                     this, SLOT(onBoundingBoxChanged()));
             break;
-        case VOLUME:
+        case MBoundingBoxConnectionType::VOLUME:
             connect(boundingBox, SIGNAL(coords3DChanged()),
                     this, SLOT(onBoundingBoxChanged()));
-            break;
-        default:
             break;
         }
     }

@@ -39,7 +39,7 @@
      <x>0</x>
      <y>0</y>
      <width>800</width>
-     <height>18</height>
+     <height>30</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -56,12 +56,14 @@
       <string>&amp;Revert Current Session</string>
      </property>
     </widget>
-    <addaction name="actionAddDataset"/>
+    <addaction name="actionNewDataset"/>
+    <addaction name="actionOpenDatasetConfiguration"/>
     <addaction name="separator"/>
     <addaction name="menuSessions"/>
     <addaction name="menuRevertCurrentSession"/>
     <addaction name="actionSessionManager"/>
     <addaction name="actionSaveSession"/>
+    <addaction name="actionSaveSessionAs"/>
     <addaction name="separator"/>
     <addaction name="actionExit"/>
    </widget>
@@ -190,9 +192,9 @@
     <string>F11</string>
    </property>
   </action>
-  <action name="actionAddDataset">
+  <action name="actionNewDataset">
    <property name="text">
-    <string>&amp;Add Dataset</string>
+    <string>&amp;New Dataset</string>
    </property>
    <property name="shortcut">
     <string comment="F3"/>
@@ -263,10 +265,23 @@
   </action>
   <action name="actionSaveSession">
    <property name="text">
-    <string>Save Session</string>
+    <string>Sa&amp;ve Session</string>
    </property>
    <property name="shortcut">
     <string>Ctrl+S</string>
+   </property>
+  </action>
+  <action name="actionOpenDatasetConfiguration">
+   <property name="text">
+    <string>&amp;Open Dataset Configuration</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+O</string>
+   </property>
+  </action>
+  <action name="actionSaveSessionAs">
+   <property name="text">
+    <string>Save Session as...</string>
    </property>
   </action>
  </widget>

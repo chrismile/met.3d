@@ -119,6 +119,12 @@ protected:
     QVector<QVector3D> axisTicks;
     GL::MVertexBuffer* axisVertexBuffer;
 
+    // Contain the first and last indices of the values stored in axisTicks
+    // respectively labels vector per pole (pole0First, pole0Last, pole1First,
+    // pole1Last, ...).
+    QVector<int> axisTicksFirstLastIndices;
+    QVector<int> labelsFirstLastIndices;
+
     QtProperty *ticksGroupProperty;
     QtProperty *tickLengthProperty;
     float       tickLength;

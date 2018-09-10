@@ -6,6 +6,7 @@
 **
 **  Copyright 2015-2018 Marc Rautenhaus
 **  Copyright 2017-2018 Bianca Tost
+**  Copyright 2017      Philipp Kaiser
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -30,6 +31,7 @@
 
 // related third party imports
 #include <log4cplus/loggingmacros.h>
+#include <src/data/trajectorycomputation.h>
 
 // local application imports
 #include "util/mutil.h"
@@ -51,6 +53,7 @@
 #include "data/differencedatasource.h"
 
 #include "data/trajectoryreader.h"
+#include "data/trajectorycomputation.h"
 #include "data/trajectorynormalssource.h"
 #include "data/trajectoryselectionsource.h"
 #include "data/deltapressurepertrajectory.h"
@@ -100,11 +103,12 @@ void MPipelineConfiguration::configure()
     }
 
     QString errMsg = "";
-    // If Met.3D is called by Metview and no configuration files are given,
-    // use default configuration files stored at
-    // $MET3D_HOME/config/metview/default_pipeline.cfg .
+
     if (sysMC->isConnectedToMetview() && filename.isEmpty())
     {
+        // If Met.3D is called by Metview and no configuration files are given,
+        // use default configuration files stored at
+        // $MET3D_HOME/config/metview/default_pipeline.cfg .
         filename = "$MET3D_HOME/config/metview/default_pipeline.cfg";
         filename = expandEnvironmentVariables(filename);
         QFileInfo fileInfo(filename);
@@ -113,6 +117,28 @@ void MPipelineConfiguration::configure()
             errMsg = QString(
                         "ERROR: Default Metview pipeline configuration file"
                         " does not exist. Location: ") + filename;
+            filename = "";
+        }
+        LOG4CPLUS_ERROR(mlog, errMsg.toStdString());
+    }
+    else if (filename.isEmpty())
+    {
+        // No pipeline file has been specified. Try to access default
+        // pipeline.
+        LOG4CPLUS_WARN(mlog, "WARNING: No data pipeline configuration "
+                             "file has been specified. Using default pipeline "
+                             "instead. To specify a custom file, use the "
+                             "'--pipeline=<file>' command line argument.");
+
+        filename = "$MET3D_HOME/config/default_pipeline.cfg.template";
+        filename = expandEnvironmentVariables(filename);
+        QFileInfo fileInfo(filename);
+        if (!fileInfo.isFile())
+        {
+            errMsg = QString(
+                        "ERROR: Default pipeline configuration file"
+                        " does not exist. Location: ") + filename;
+            filename = "";
         }
         LOG4CPLUS_ERROR(mlog, errMsg.toStdString());
     }
@@ -125,13 +151,7 @@ void MPipelineConfiguration::configure()
         initializeDataPipelineFromConfigFile(filename);
         return;
     }
-    else
-    {
-        errMsg = QString(
-                    "ERROR: No data pipeline configuration file specified. "
-                    "Use the '--pipeline=<file>' command line argument.");
-        LOG4CPLUS_ERROR(mlog, errMsg.toStdString());
-    }
+
     throw MInitialisationError(errMsg.toStdString(), __FILE__, __LINE__);
 }
 
@@ -166,6 +186,8 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
     initializeScheduler();
 
     MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
+    QMap<QString, QString> *defaultMemoryManagers =
+            sysMC->getDefaultMemoryManagers();
     QSettings config(filename, QSettings::IniFormat);
 
     // Initialize memory manager(s).
@@ -198,6 +220,28 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
     }
 
     config.endArray();
+
+
+    // Default memory managers.
+    // ========================
+    config.beginGroup("DefaultMemoryManagers");
+
+    QString defaultMemoryManager =
+            config.value("defaultNWPMemoryManager", "").toString();
+    checkAndStoreDefaultPipelineMemoryManager(
+            defaultMemoryManager, "NWP", defaultMemoryManagers, sysMC);
+
+    defaultMemoryManager =
+            config.value("defaultAnalysisMemoryManager", "").toString();
+    checkAndStoreDefaultPipelineMemoryManager(
+            defaultMemoryManager, "Analysis", defaultMemoryManagers, sysMC);
+
+    defaultMemoryManager =
+            config.value("defaultTrajectoryMemoryManager", "").toString();
+    checkAndStoreDefaultPipelineMemoryManager(
+            defaultMemoryManager, "Trajectories", defaultMemoryManagers, sysMC);
+
+    config.endGroup();
 
     // NWP pipeline(s).
     // ================
@@ -334,9 +378,9 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
 
     config.endArray();
 
-    // Lagranto trajectory pipeline(s).
+    // Trajectory pipeline(s).
     // ================================
-    size = config.beginReadArray("LagrantoPipeline");
+    size = config.beginReadArray("TrajectoriesPipeline");
 
     for (int i = 0; i < size; i++)
     {
@@ -344,38 +388,126 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
 
         // Read settings from file.
         QString name = config.value("name").toString();
-        bool isEnsemble = config.value("ensemble").toBool();
-        QString path = expandEnvironmentVariables(config.value("path").toString());
-        bool ablTrajectories = config.value("ABLTrajectories").toBool();
+        bool isEnsemble = config.value("ensemble", true).toBool();
+        QString path =
+                expandEnvironmentVariables(config.value("path").toString());
+        bool ablTrajectories = config.value("ABLTrajectories", false).toBool();
         QString schedulerID = config.value("schedulerID").toString();
         QString memoryManagerID = config.value("memoryManagerID").toString();
+        bool precomputed = config.value("precomputed", false).toBool();
+        QString NWPDataset =
+                config.value("NWPDataset").toString();
+        QString windEastwardVariable =
+                config.value("eastwardWind_ms").toString();
+        QString windNorthwardVariable =
+                config.value("northwardWind_ms").toString();
+        QString windVerticalVariable =
+                config.value("verticalWind_Pas").toString();
+        QString windVarsVerticalLevelTypeString =
+                config.value("windComponentVariablesVerticalLevelType").toString();
 
-        LOG4CPLUS_DEBUG(mlog, "initializing LAGRANTO pipeline #" << i << ": ");
-        LOG4CPLUS_DEBUG(mlog, "  name = " << name.toStdString());
-        LOG4CPLUS_DEBUG(mlog, "  " << (isEnsemble ? "ensemble" : "deterministic"));
-        LOG4CPLUS_DEBUG(mlog, "  path = " << path.toStdString());
-        LOG4CPLUS_DEBUG(mlog, "  type = " << (ablTrajectories ? "ABL-T" : "DF-T"));
-        LOG4CPLUS_DEBUG(mlog, "  schedulerID = " << schedulerID.toStdString());
-        LOG4CPLUS_DEBUG(mlog, "  memoryManagerID = " << memoryManagerID.toStdString());
-
-        // Check parameter validity.
-        if ( name.isEmpty()
-             || path.isEmpty()
-             || schedulerID.isEmpty()
-             || memoryManagerID.isEmpty() )
+        if (precomputed)
         {
-            LOG4CPLUS_WARN(mlog, "invalid parameters encountered; skipping.");
-            continue;
-        }
+            LOG4CPLUS_DEBUG(mlog, "initializing precomputed trajectories pipeline #"
+                            << i << ": ");
+            LOG4CPLUS_DEBUG(mlog, "  name = " << name.toStdString());
+            LOG4CPLUS_DEBUG(mlog, "  "
+                            << (isEnsemble ? "ensemble" : "deterministic"));
+            LOG4CPLUS_DEBUG(mlog, "  path = " << path.toStdString());
+            LOG4CPLUS_DEBUG(mlog, "  type = "
+                            << (ablTrajectories ? "ABL-T" : "DF-T"));
+            LOG4CPLUS_DEBUG(mlog, "  schedulerID = "
+                            << schedulerID.toStdString());
+            LOG4CPLUS_DEBUG(mlog, "  memoryManagerID = "
+                            << memoryManagerID.toStdString());
 
-        // Create new pipeline.
-        if (isEnsemble)
-            initializeLagrantoEnsemblePipeline(
+            // Check parameter validity.
+            if ( name.isEmpty()
+                 || path.isEmpty()
+                 || schedulerID.isEmpty()
+                 || memoryManagerID.isEmpty() )
+            {
+                LOG4CPLUS_WARN(mlog, "invalid parameters encountered; skipping.");
+                continue;
+            }
+
+            // Create new pipeline.
+            if (isEnsemble)
+            {
+                initializePrecomputedTrajectoriesPipeline(
                         name, path, ablTrajectories, schedulerID,
                         memoryManagerID);
+            }
+            else
+            {
+                LOG4CPLUS_WARN(mlog, "deterministic precomputed trajectories"
+                                     " pipeline has not been implemented yet;"
+                                     " skipping.");
+            }
+        }
         else
-            LOG4CPLUS_WARN(mlog, "deterministic LAGRANTO pipeline has not"
-                           "been implemented yet; skipping.");
+        {
+            LOG4CPLUS_DEBUG(mlog,
+                            "initializing trajectory computation pipeline #"
+                            << i << ": ");
+            LOG4CPLUS_DEBUG(mlog, "  name = " << name.toStdString());
+            LOG4CPLUS_DEBUG(mlog, "  "
+                            << (isEnsemble ? "ensemble" : "deterministic"));
+            LOG4CPLUS_DEBUG(mlog, "  type = "
+                            << (ablTrajectories ? "ABL-T" : "DF-T"));
+            LOG4CPLUS_DEBUG(mlog, "  schedulerID = "
+                            << schedulerID.toStdString());
+            LOG4CPLUS_DEBUG(mlog, "  memoryManagerID = "
+                            << memoryManagerID.toStdString());
+            LOG4CPLUS_DEBUG(mlog, "  NWPDataset = "
+                            << NWPDataset.toStdString());
+            LOG4CPLUS_DEBUG(mlog, "  eastward wind variable = "
+                            << windEastwardVariable.toStdString());
+            LOG4CPLUS_DEBUG(mlog, "  northward wind variable = "
+                            << windNorthwardVariable.toStdString());
+            LOG4CPLUS_DEBUG(mlog, "  vertical wind variable = "
+                            << windVerticalVariable.toStdString());
+            LOG4CPLUS_DEBUG(mlog, "  wind vertical level type  = "
+                            << windVarsVerticalLevelTypeString.toStdString());
+
+            MVerticalLevelType windVarsVerticalLevelType =
+                    MStructuredGrid::verticalLevelTypeFromConfigString(
+                        windVarsVerticalLevelTypeString);
+
+            // Check parameter validity.
+            if ( name.isEmpty()
+                 || NWPDataset.isEmpty()
+                 || windEastwardVariable.isEmpty()
+                 || windNorthwardVariable.isEmpty()
+                 || windVerticalVariable.isEmpty()
+                 || schedulerID.isEmpty()
+                 || memoryManagerID.isEmpty()
+                 || ( windVarsVerticalLevelType == SURFACE_2D
+                      || windVarsVerticalLevelType == POTENTIAL_VORTICITY_2D )
+                 || ( !windVarsVerticalLevelTypeString.isEmpty()
+                      && windVarsVerticalLevelType == SIZE_LEVELTYPES ))
+            {
+                LOG4CPLUS_WARN(mlog, "invalid parameters encountered;"
+                                     " skipping.");
+                continue;
+            }
+
+            // Create new pipeline.
+            if (isEnsemble)
+            {
+                initializeTrajectoryComputationPipeline(
+                        name, ablTrajectories, schedulerID,
+                        memoryManagerID, NWPDataset,
+                        windEastwardVariable, windNorthwardVariable,
+                        windVerticalVariable, windVarsVerticalLevelType);
+            }
+            else
+            {
+                LOG4CPLUS_WARN(mlog, "deterministic computed trajectories"
+                                     " pipeline has not been implemented yet;"
+                                     " skipping.");
+            }
+        }
     }
 
     config.endArray();
@@ -457,11 +589,28 @@ void MPipelineConfiguration::initializeNWPPipeline(
         bool disableGridConsistencyCheck,
         QString inputVarsForDerivedVars)
 {
+    const QString dataSourceId = name;
+    const QString dataSourceIdDerived = dataSourceId + " derived";
+
+    QStringList dataSourceIDs = QStringList()
+            << (dataSourceId + QString(" ENSFilter"))
+            << dataSourceIdDerived + QString(" ENSFilter");
+
+    if (enableProbabiltyRegionFilter)
+    {
+        dataSourceIDs << (dataSourceId + QString(" ProbReg"))
+                      << (dataSourceIdDerived + QString(" ProbReg"));
+    }
+
+    if (!checkUniquenessOfDataSourceNames(dataSourceId, dataSourceIDs))
+    {
+        return;
+    }
+
     MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
     MAbstractScheduler* scheduler = sysMC->getScheduler(schedulerID);
     MAbstractMemoryManager* memoryManager = sysMC->getMemoryManager(memoryManagerID);
 
-    const QString dataSourceId = name;
     LOG4CPLUS_DEBUG(mlog, "Initializing NWP pipeline ''"
                     << dataSourceId.toStdString() << "'' ...");
 
@@ -485,9 +634,6 @@ void MPipelineConfiguration::initializeNWPPipeline(
     nwpReaderENS->setMemoryManager(memoryManager);
     nwpReaderENS->setScheduler(scheduler);
     nwpReaderENS->setDataRoot(fileDir, fileFilter);
-
-    // (Should the "raw" data reader be selectable as a data source?)
-    // sysMC->registerDataSource(dataSourceId, nwpReaderENS);
 
     MStructuredGridEnsembleFilter *ensFilter =
             new MStructuredGridEnsembleFilter();
@@ -534,8 +680,6 @@ void MPipelineConfiguration::initializeNWPPipeline(
     // the reader and computes derived data fields. The rest of the pipeline
     // is the same as above).
     // =====================================================================
-
-    const QString dataSourceIdDerived = dataSourceId + " derived";
 
     MDerivedMetVarsDataSource *derivedMetVarsSource =
             new MDerivedMetVarsDataSource();
@@ -603,20 +747,37 @@ void MPipelineConfiguration::initializeNWPPipeline(
 }
 
 
-void MPipelineConfiguration::initializeLagrantoEnsemblePipeline(
+void MPipelineConfiguration::initializePrecomputedTrajectoriesPipeline(
         QString name,
         QString fileDir,
         bool boundaryLayerTrajectories,
         QString schedulerID,
         QString memoryManagerID)
 {
+    const QString dataSourceId = name;
+    QStringList dataSourceIDs = QStringList()
+            << (dataSourceId + QString(" Reader"))
+               // Also check the names used in
+               // initializeEnsembleTrajectoriesPipeline() here to avoid the
+               // reader being added while the rest might not be able to be
+               // added.
+            << (dataSourceId + QString(" timestepFilter"))
+            << (dataSourceId + QString(" Normals"))
+            << (dataSourceId)
+            << (dataSourceId + QString(" ProbReg"));
+
+    if (!checkUniquenessOfDataSourceNames(dataSourceId, dataSourceIDs))
+    {
+        return;
+    }
+
     MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
     MAbstractScheduler* scheduler = sysMC->getScheduler(schedulerID);
     MAbstractMemoryManager* memoryManager =
             sysMC->getMemoryManager(memoryManagerID);
 
-    const QString dataSourceId = name;
-    LOG4CPLUS_DEBUG(mlog, "Initializing LAGRANTO ensemble pipeline ''"
+    LOG4CPLUS_DEBUG(mlog,
+                    "Initializing precomputed ensemble trajectories pipeline ''"
                     << dataSourceId.toStdString() << "'' ...");
 
     // Trajectory reader.
@@ -628,17 +789,188 @@ void MPipelineConfiguration::initializeLagrantoEnsemblePipeline(
     sysMC->registerDataSource(dataSourceId + QString(" Reader"),
                               trajectoryReader);
 
+    // Initialize trajectory pipeline.
+    initializeEnsembleTrajectoriesPipeline(
+                dataSourceId, boundaryLayerTrajectories,
+                trajectoryReader, scheduler, memoryManager, false);
+
+    LOG4CPLUS_DEBUG(mlog, "Pipeline ''" << dataSourceId.toStdString()
+                    << "'' has been initialized.");
+}
+
+
+void MPipelineConfiguration::initializeTrajectoryComputationPipeline(
+        QString name,
+        bool boundaryLayerTrajectories,
+        QString schedulerID,
+        QString memoryManagerID,
+        QString NWPDataset,
+        QString windEastwardVariable,
+        QString windNorthwardVariable,
+        QString windVerticalVariable,
+        MVerticalLevelType verticalLevelType)
+{
+    const QString dataSourceId = name;
+
+    QStringList dataSourceIDs = QStringList()
+            << (dataSourceId + QString(" Reader"))
+               // Also check the names used in
+               // initializeEnsembleTrajectoriesPipeline() here to avoid the
+               // reader being added while the rest might not be able to be
+               // added.
+            << (dataSourceId + QString(" timestepFilter"))
+            << (dataSourceId + QString(" Normals"))
+            << (dataSourceId)
+            << (dataSourceId + QString(" ProbReg"));
+
+    if (!checkUniquenessOfDataSourceNames(dataSourceId, dataSourceIDs))
+    {
+        return;
+    }
+
+    MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
+    MAbstractScheduler* scheduler = sysMC->getScheduler(schedulerID);
+    MAbstractMemoryManager* memoryManager =
+            sysMC->getMemoryManager(memoryManagerID);
+
+    LOG4CPLUS_DEBUG(mlog, "Initializing trajectory computation pipeline ''"
+                          "" << dataSourceId.toStdString() << "'' ...");
+
+    MWeatherPredictionDataSource* NWPDataSource =
+            dynamic_cast<MWeatherPredictionDataSource*>(
+                sysMC->getDataSource(NWPDataset));
+    if (!NWPDataSource)
+    {
+        LOG4CPLUS_WARN(mlog, "MWeatherPredictionDataSource ''"
+                       << NWPDataset.toStdString()
+                       << "'' is invalid; skipping.");
+        return;
+    }
+
+    // If verical level type is not given, search for it.
+    if (verticalLevelType == MVerticalLevelType::SIZE_LEVELTYPES)
+    {
+        QList<MVerticalLevelType> levelTypes =
+                NWPDataSource->availableLevelTypes();
+        foreach (MVerticalLevelType level, levelTypes)
+        {
+            QStringList variables = NWPDataSource->availableVariables(level);
+            if (variables.contains(windEastwardVariable)
+                    && variables.contains(windNorthwardVariable)
+                    && variables.contains(windVerticalVariable))
+            {
+                verticalLevelType = level;
+            }
+        }
+    }
+    else
+    {
+        QList<MVerticalLevelType> levelTypes =
+                NWPDataSource->availableLevelTypes();
+        if (!levelTypes.contains(verticalLevelType))
+        {
+            LOG4CPLUS_WARN(mlog, "MWeatherPredictionDataSource ''"
+                           << NWPDataset.toStdString()
+                           << "'' does NOT contain level type '"
+                           << MStructuredGrid::verticalLevelTypeToString(
+                               verticalLevelType).toStdString()
+                           << "'; skipping.");
+            return;
+        }
+        QStringList variables = NWPDataSource->availableVariables(
+                    verticalLevelType);
+        if (!variables.contains(windEastwardVariable)
+                || !variables.contains(windNorthwardVariable)
+                || !variables.contains(windVerticalVariable))
+        {
+            LOG4CPLUS_WARN(mlog, "MWeatherPredictionDataSource ''"
+                           << NWPDataset.toStdString()
+                           << "'' does NOT contain all wind component variables"
+                              " with vertical level type '"
+                           << MStructuredGrid::verticalLevelTypeToString(
+                               verticalLevelType).toStdString()
+                           << "'; skipping.");
+            return;
+        }
+    }
+
+    if (MClimateForecastReader *netCDFDataSource =
+            dynamic_cast<MClimateForecastReader*>(NWPDataSource))
+    {
+        MHorizontalGridType hGridTypU =
+                netCDFDataSource->variableHorizontalGridType(
+                    verticalLevelType, windEastwardVariable);
+        MHorizontalGridType hGridTypV =
+                netCDFDataSource->variableHorizontalGridType(
+                    verticalLevelType, windNorthwardVariable);
+        MHorizontalGridType hGridTypW =
+                netCDFDataSource->variableHorizontalGridType(
+                    verticalLevelType, windVerticalVariable);
+        if (hGridTypU == MHorizontalGridType::ROTATED_LONLAT
+                || hGridTypV == MHorizontalGridType::ROTATED_LONLAT
+                || hGridTypW == MHorizontalGridType::ROTATED_LONLAT)
+        {
+            LOG4CPLUS_WARN(mlog, "One or more wind variables are defined on"
+                                 " a rotated grid coordinates; skipping.");
+            return;
+        }
+    }
+
+    MTrajectoryComputationSource* trajectoryComputation =
+            new MTrajectoryComputationSource(dataSourceId);
+    trajectoryComputation->setMemoryManager(memoryManager);
+    trajectoryComputation->setScheduler(scheduler);
+    trajectoryComputation->setInputWindVariables(windEastwardVariable,
+                                                 windNorthwardVariable,
+                                                 windVerticalVariable);
+
+    trajectoryComputation-> setVerticalLevelType(verticalLevelType);
+    trajectoryComputation->setInputSource(NWPDataSource);
+    sysMC->registerDataSource(dataSourceId + QString(" Reader"),
+                              trajectoryComputation);
+
+    // Initialize trajectory pipeline.
+    initializeEnsembleTrajectoriesPipeline(
+                dataSourceId, boundaryLayerTrajectories,
+                trajectoryComputation, scheduler, memoryManager, true);
+
+    LOG4CPLUS_DEBUG(mlog, "Pipeline ''" << dataSourceId.toStdString()
+                    << "'' has been initialized.");
+}
+
+
+void MPipelineConfiguration::initializeEnsembleTrajectoriesPipeline(
+        QString dataSourceId,
+        bool boundaryLayerTrajectories,
+        MTrajectoryDataSource* baseDataSource,
+        MAbstractScheduler* scheduler,
+        MAbstractMemoryManager* memoryManager,
+        bool trajectoriesComputedInMet3D)
+{
+    QStringList dataSourceIDs = QStringList()
+            << (dataSourceId + QString(" timestepFilter"))
+            << (dataSourceId + QString(" Normals"))
+            << (dataSourceId)
+            << (dataSourceId + QString(" ProbReg"));
+
+    if (!checkUniquenessOfDataSourceNames(dataSourceId, dataSourceIDs))
+    {
+        return;
+    }
+
+    MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
+
     MDeltaPressurePerTrajectorySource *dpSource =
             new MDeltaPressurePerTrajectorySource();
     dpSource->setMemoryManager(memoryManager);
     dpSource->setScheduler(scheduler);
-    dpSource->setTrajectorySource(trajectoryReader);
+    dpSource->setTrajectorySource(baseDataSource);
 
     MThinOutTrajectoryFilter *thinoutFilter =
             new MThinOutTrajectoryFilter();
     thinoutFilter->setMemoryManager(memoryManager);
     thinoutFilter->setScheduler(scheduler);
-    thinoutFilter->setTrajectorySource(trajectoryReader);
+    thinoutFilter->setTrajectorySource(baseDataSource);
 
     MPressureTimeTrajectoryFilter *dpdtFilter =
             new MPressureTimeTrajectoryFilter();
@@ -652,7 +984,7 @@ void MPipelineConfiguration::initializeLagrantoEnsemblePipeline(
     bboxFilter->setMemoryManager(memoryManager);
     bboxFilter->setScheduler(scheduler);
     bboxFilter->setInputSelectionSource(dpdtFilter);
-    bboxFilter->setTrajectorySource(trajectoryReader);
+    bboxFilter->setTrajectorySource(baseDataSource);
 
     MSingleTimeTrajectoryFilter *timestepFilter =
             new MSingleTimeTrajectoryFilter();
@@ -666,9 +998,18 @@ void MPipelineConfiguration::initializeLagrantoEnsemblePipeline(
             new MTrajectoryNormalsSource();
     trajectoryNormals->setMemoryManager(memoryManager);
     trajectoryNormals->setScheduler(scheduler);
-    trajectoryNormals->setTrajectorySource(trajectoryReader);
+    trajectoryNormals->setTrajectorySource(baseDataSource);
     sysMC->registerDataSource(dataSourceId + QString(" Normals"),
                               trajectoryNormals);
+
+// TODO (bt, 03Aug2018): Remove this when trajectories probability data sources
+// are implemented for trajectories computed in Met.3D.
+    // Trajectories probability data sources are not implemented yet for
+    // trajectories computed in Met.3D.
+    if (trajectoriesComputedInMet3D)
+    {
+        return;
+    }
 
     // Probability filter.
     MWeatherPredictionDataSource* pwcbSource;
@@ -678,7 +1019,7 @@ void MPipelineConfiguration::initializeLagrantoEnsemblePipeline(
                 new MProbABLTrajectoriesSource();
         source->setMemoryManager(memoryManager);
         source->setScheduler(scheduler);
-        source->setTrajectorySource(trajectoryReader);
+        source->setTrajectorySource(baseDataSource);
         source->setInputSelectionSource(timestepFilter);
 
         pwcbSource = source;
@@ -689,7 +1030,7 @@ void MPipelineConfiguration::initializeLagrantoEnsemblePipeline(
                 new MProbDFTrajectoriesSource();
         source->setMemoryManager(memoryManager);
         source->setScheduler(scheduler);
-        source->setTrajectorySource(trajectoryReader);
+        source->setTrajectorySource(baseDataSource);
         source->setInputSelectionSource(timestepFilter);
 
         pwcbSource = source;
@@ -704,9 +1045,6 @@ void MPipelineConfiguration::initializeLagrantoEnsemblePipeline(
     probRegDetector->setInputSource(pwcbSource);
     sysMC->registerDataSource(dataSourceId + QString(" ProbReg"),
                               probRegDetector);
-
-    LOG4CPLUS_DEBUG(mlog, "Pipeline ''" << dataSourceId.toStdString()
-                    << "'' has been initialized.");
 }
 
 
@@ -733,6 +1071,13 @@ void MPipelineConfiguration::initializeConfigurablePipeline(
     {
     case DIFFERENCE:
     {
+        QStringList dataSourceIDs = QStringList()
+                << (dataSourceId + QString(" ENSFilter"));
+
+        if (!checkUniquenessOfDataSourceNames(dataSourceId, dataSourceIDs))
+        {
+            return;
+        }
         // Pipeline for difference variables.
         // ==================================
         const QString dataSourceIdDifference = dataSourceId;
@@ -843,7 +1188,7 @@ void MPipelineConfiguration::initializeDevelopmentDataPipeline()
                new MLRUMemoryManager("Trajectories DF-T psfc_1000hPa_L62",
                                      10.*1024.*1024.));
 
-    initializeLagrantoEnsemblePipeline(
+    initializePrecomputedTrajectoriesPipeline(
                 "Lagranto ENS EUR_LL10 DF-T psfc_1000hPa_L62",
                 "/mnt/ssd/data/trajectories/EUR_LL10/psfc_1000hPa_L62",
                 false,
@@ -854,7 +1199,7 @@ void MPipelineConfiguration::initializeDevelopmentDataPipeline()
                new MLRUMemoryManager("Trajectories  DF-T psfc_min_L62",
                                      12.*1024.*1024.));
 
-    initializeLagrantoEnsemblePipeline(
+    initializePrecomputedTrajectoriesPipeline(
                 "Lagranto ENS EUR_LL10 DF-T psfc_min_L62",
                 "/mnt/ssd/data/trajectories/EUR_LL10/psfc_min_L62",
                 false,
@@ -874,7 +1219,7 @@ void MPipelineConfiguration::initializeDevelopmentDataPipeline()
     sysMC->registerMemoryManager("Trajectories ABL-T psfc_min_L62_abl",
                new MLRUMemoryManager("Trajectories ABL-T psfc_min_L62_abl",
                                      10.*1024.*1024.));
-    initializeLagrantoEnsemblePipeline(
+    initializePrecomputedTrajectoriesPipeline(
                 "Lagranto ENS EUR_LL10 ABL-T psfc_min_L62_abl",
                 "/mnt/ssd/data/trajectories/EUR_LL10/psfc_min_L62_abl",
                 true,
@@ -884,7 +1229,7 @@ void MPipelineConfiguration::initializeDevelopmentDataPipeline()
     sysMC->registerMemoryManager("Trajectories ABL-T 10hPa",
                new MLRUMemoryManager("Trajectories ABL-T 10hPa",
                                      10.*1024.*1024.));
-    initializeLagrantoEnsemblePipeline(
+    initializePrecomputedTrajectoriesPipeline(
                 "Lagranto ENS EUR_LL10 ABL-T 10hPa",
                 "/mnt/ssd/data/trajectories/EUR_LL10/blt_PL10hPa",
                 true,
@@ -938,6 +1283,71 @@ MPipelineConfiguration::configurablePipelineTypeFromString(QString typeName)
     {
         return MConfigurablePipelineType::INVALID_PIPELINE_TYPE;
     }
+}
+
+
+void MPipelineConfiguration::checkAndStoreDefaultPipelineMemoryManager(
+        QString defaultMemoryManager, QString PipelineID,
+        QMap<QString, QString> *defaultMemoryManagers,
+        MSystemManagerAndControl *sysMC)
+{
+    if (defaultMemoryManager.isEmpty())
+    {
+        defaultMemoryManager = sysMC->getMemoryManagerIdentifiers().first();
+
+        LOG4CPLUS_WARN(mlog,
+                       "No memory manager set as default for '"
+                       << PipelineID.toStdString() << "' pipeline.");
+    }
+    else
+    {
+        if (!sysMC->getMemoryManagerIdentifiers().contains(defaultMemoryManager))
+        {
+            defaultMemoryManager = sysMC->getMemoryManagerIdentifiers().first();
+
+            LOG4CPLUS_WARN(mlog,
+                           "Memory manager '"
+                           << defaultMemoryManager.toStdString()
+                           << "' is set as default for '"
+                           << PipelineID.toStdString()
+                           << "' pipeline but it does not exist.");
+        }
+    }
+    if (!defaultMemoryManager.isEmpty())
+    {
+        LOG4CPLUS_DEBUG(mlog,
+                        "Using '" << defaultMemoryManager.toStdString()
+                        << "' as default memory manager for '"
+                        << PipelineID.toStdString() << "' pipeline.");
+    }
+    defaultMemoryManagers->insert(PipelineID, defaultMemoryManager);
+}
+
+
+bool MPipelineConfiguration::checkUniquenessOfDataSourceNames(
+        QString dataSetName,
+        QStringList &dataSources) const
+{
+    MMainWindow *mainWin =
+            MSystemManagerAndControl::getInstance()->getMainWindow();
+    QStringList existingDataSourcesList =
+            MSystemManagerAndControl::getInstance()->getDataSourceIdentifiers();
+
+    for (QString dataSourceID : dataSources)
+    {
+        if (existingDataSourcesList.contains(dataSourceID))
+        {
+            QMessageBox::warning(
+                        mainWin, "Adding data set",
+                        "The name '" + dataSetName
+                        + "'  is already in use by another data set."
+                          "\nPlease choose a different name."
+                          "\n(The data set will NOT be added.)");
+            return false;
+        }
+    }
+
+    return true;
 }
 
 

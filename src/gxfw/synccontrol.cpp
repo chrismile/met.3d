@@ -140,14 +140,9 @@ MSyncControl::MSyncControl(QString id, QWidget *parent) :
     // Time control elements.
     // =========================================================================
 
-    // Time steps for navigating valid/init time in seconds (5min, 10min, ..).
-    const int numTimeSteps = 10;
-    int timeStepsSeconds[numTimeSteps] = {60, 300, 600, 900, 1800, 3600, 10800,
-                                          21600, 43200, 86400};
-    timeStepIndexToSeconds = new int[numTimeSteps];
-    for (int i = 0; i < numTimeSteps; i++)
-        timeStepIndexToSeconds[i] = timeStepsSeconds[i];
-    ui->timeStepComboBox->setCurrentIndex(7); // pre-select 6hrs
+    // Time steps for navigating valid/init time. (Default value: 6 hours).
+    ui->timeStepSpinBox->setValue(6);
+    ui->timeUnitsComboBox->setCurrentIndex(2);
 
     restrictControlToDataSources();
 
@@ -407,7 +402,6 @@ MSyncControl::MSyncControl(QString id, QWidget *parent) :
 
 MSyncControl::~MSyncControl()
 {
-    delete[] timeStepIndexToSeconds;
     delete ui;
     selectedDataSourceActionList.clear();
     delete configurationDropdownMenu;
@@ -828,7 +822,8 @@ void MSyncControl::saveConfiguration(QSettings *settings)
                        ui->validTimeEdit->dateTime());
     settings->setValue("stepChooseVtIt",
                       ui->stepChooseVTITComboBox->currentText());
-    settings->setValue("timeStep", ui->timeStepComboBox->currentText());
+    settings->setValue("timeStep", QString::number(ui->timeStepSpinBox->value())
+                       + " " + ui->timeUnitsComboBox->currentText());
     settings->setValue("showMean", ui->showMeanCheckBox->isChecked());
     settings->setValue("dataSources", selectedDataSources);
     settings->setValue("selectedMember",
@@ -863,22 +858,34 @@ void MSyncControl::loadConfiguration(QSettings *settings)
 {
     settings->beginGroup("General");
 
+    ui->stepChooseVTITComboBox->setCurrentIndex(
+                ui->stepChooseVTITComboBox->findText(
+                    settings->value("stepChooseVtIt", "valid").toString()));
+    QStringList timeStep =
+            settings->value("timeStep", "6 hours").toString().split(" ");
+    if (timeStep.size() != 2)
+    {
+        timeStep.clear();
+        timeStep << "6" << "hours";
+    }
+    ui->timeStepSpinBox->setValue(timeStep.first().toInt());
+    ui->timeUnitsComboBox->setCurrentIndex(
+                ui->timeUnitsComboBox->findText(timeStep.last()));
+    ui->showMeanCheckBox->setChecked(settings->value("showMean", false).toBool());
+    selectedDataSources =
+            settings->value("dataSources",
+                            MSystemManagerAndControl::getInstance()
+                            ->getDataSourceIdentifiers()).toStringList();
+    restrictToDataSourcesFromSettings(selectedDataSources);
+
+    // Load times after restricting the sync control since otherwise the times
+    // might not be set correctly.
     ui->initTimeEdit->setDateTime(
                 settings->value("initTime", QDateTime()).value<QDateTime>());
 
     ui->validTimeEdit->setDateTime(
                 settings->value("validTime", QDateTime()).value<QDateTime>());
 
-    ui->stepChooseVTITComboBox->setCurrentIndex(
-                ui->stepChooseVTITComboBox->findText(
-                    settings->value("stepChooseVtIt", "valid").toString()));
-    ui->timeStepComboBox->setCurrentIndex(
-                ui->timeStepComboBox->findText(
-                    settings->value("timeStep", "6 hours").toString()));
-    ui->showMeanCheckBox->setChecked(settings->value("showMean", false).toBool());
-    selectedDataSources =
-            settings->value("dataSources", QStringList("")).toStringList();
-    restrictToDataSourcesFromSettings(selectedDataSources);
     unsigned int selectedMember = settings->value("selectedMember", 0).toUInt();
     if (availableEnsembleMembers.contains(selectedMember))
     {
@@ -1627,8 +1634,47 @@ void MSyncControl::adjustSaveTADirLabelText()
 void MSyncControl::applyTimeStep(QDateTimeEdit *dte, int sign)
 {
     QDateTime time = dte->dateTime();
-    int timeStepIndex = ui->timeStepComboBox->currentIndex();
-    dte->setDateTime(time.addSecs(sign * timeStepIndexToSeconds[timeStepIndex]));
+    int timeUnit = ui->timeUnitsComboBox->currentIndex();
+    int timeStep = ui->timeStepSpinBox->value();
+    switch (timeUnit)
+    {
+    case 0: // seconds
+    {
+        dte->setDateTime(time.addSecs(sign * timeStep));
+        break;
+    }
+    case 1: // minutes
+    {
+        timeStep *= 60;
+        dte->setDateTime(time.addSecs(sign * timeStep));
+        break;
+    }
+    case 2: // hours
+    {
+        timeStep *= 3600;
+        dte->setDateTime(time.addSecs(sign * timeStep));
+        break;
+    }
+    case 3: // days
+    {
+        dte->setDateTime(time.addDays(sign * timeStep));
+        break;
+    }
+    case 4: // months
+    {
+        dte->setDateTime(time.addMonths(sign * timeStep));
+        break;
+    }
+    case 5: // years
+    {
+        dte->setDateTime(time.addYears(sign * timeStep));
+        break;
+    }
+    default:
+    {
+        break;
+    }
+    }
 }
 
 
@@ -1780,7 +1826,8 @@ void MSyncControl::setTimeSynchronizationGUIEnabled(bool enabled)
     ui->validTimeEdit->setEnabled(enabled);
     ui->timeBackwardButton->setEnabled(enabled);
     ui->timeForwardButton->setEnabled(enabled);
-    ui->timeStepComboBox->setEnabled(enabled);
+    ui->timeStepSpinBox->setEnabled(enabled);
+    ui->timeUnitsComboBox->setEnabled(enabled);
     ui->stepChooseVTITComboBox->setEnabled(enabled);
 }
 

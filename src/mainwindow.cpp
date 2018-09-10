@@ -4,11 +4,14 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2018 Marc Rautenhaus
-**  Copyright 2016-2018 Bianca Tost
+**  Copyright 2015-2018 Marc Rautenhaus [*, previously +]
+**  Copyright 2016-2018 Bianca Tost [+]
 **
-**  Computer Graphics and Visualization Group
+**  + Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
+**
+**  * Regional Computing Center, Visualization
+**  Universitaet Hamburg, Hamburg, Germany
 **
 **  Met.3D is free software: you can redistribute it and/or modify
 **  it under the terms of the GNU General Public License as published by
@@ -48,6 +51,7 @@
 #include "ui_scenemanagementdialog.h"
 #include "system/applicationconfiguration.h"
 #include "system/pipelineconfiguration.h"
+#include "data/structuredgrid.h"
 
 using namespace std;
 
@@ -71,6 +75,12 @@ MMainWindow::MMainWindow(QStringList commandLineArguments, QWidget *parent)
 {
     // Qt Designer specific initialization.
     ui->setupUi(this);
+
+    // Create the application window title.
+    QString applicationTitle = QString("Met.3D version %1 (%2)")
+            .arg(met3dVersionString).arg(met3dBuildDate);
+
+    setWindowTitle(applicationTitle);
 
     LOG4CPLUS_DEBUG(mlog, "Initialising Met.3D system ... please wait.");
 
@@ -146,7 +156,7 @@ MMainWindow::MMainWindow(QStringList commandLineArguments, QWidget *parent)
     ui->centralframe->setLayout(layout);
 
     // Initial layout settings.
-    setSceneViewLayout(1);    
+    setSceneViewLayout(1);
 
     // Initialise bounding box dock widget.
     //==========================================================================
@@ -209,8 +219,10 @@ MMainWindow::MMainWindow(QStringList commandLineArguments, QWidget *parent)
             this, SLOT(showBoundingBoxTable(bool)));
     connect(ui->actionSceneManagement, SIGNAL(triggered()),
             this, SLOT(sceneManagement()));
-    connect(ui->actionAddDataset, SIGNAL(triggered()),
+    connect(ui->actionNewDataset, SIGNAL(triggered()),
             this, SLOT(addDataset()));
+    connect(ui->actionOpenDatasetConfiguration, SIGNAL(triggered()),
+            this, SLOT(openDatasetConfiguration()));
     connect(ui->actionResizeWindow, SIGNAL(triggered()),
             this, SLOT(resizeWindow()));
 
@@ -253,6 +265,8 @@ MMainWindow::MMainWindow(QStringList commandLineArguments, QWidget *parent)
             this, SLOT(openSessionManager()));
     connect(ui->actionSaveSession, SIGNAL(triggered()),
             sessionManagerDialog, SLOT(saveSession()));
+    connect(ui->actionSaveSessionAs, SIGNAL(triggered()),
+            sessionManagerDialog, SLOT(saveSessionAs()));
     connect(ui->menuSessions, SIGNAL(triggered(QAction*)),
             this, SLOT(switchSession(QAction*)));
     connect(ui->menuRevertCurrentSession, SIGNAL(triggered(QAction*)),
@@ -880,6 +894,15 @@ void MMainWindow::onSessionSwitch(QString currentSession)
         }
         action->setFont(actionFont);
     }
+
+    // Remove old session name if present and append current session name to
+    // window title.
+    QString newWindowTitle = windowTitle().split(" -- ").last();
+    if (!currentSession.isEmpty())
+    {
+        newWindowTitle.prepend(currentSession + " -- ");
+    }
+    setWindowTitle(newWindowTitle);
 }
 
 
@@ -1111,30 +1134,17 @@ void MMainWindow::addDataset()
 {
     MAddDatasetDialog addDatasetDialog;
 
-    if ( addDatasetDialog.exec() == QDialog::Accepted )
+    openDatasetDialog(addDatasetDialog);
+}
+
+
+void MMainWindow::openDatasetConfiguration()
+{
+    MAddDatasetDialog addDatasetDialog;
+
+    if (addDatasetDialog.loadConfigurationFromFile())
     {
-        MNWPPipelineConfigurationInfo pipelineConfig =
-                addDatasetDialog.getNWPPipelineConfigurationInfo();
-
-        LOG4CPLUS_DEBUG(mlog, "adding new dataset: "
-                        << pipelineConfig.name.toStdString());
-
-        MPipelineConfiguration newPipelineConfig;
-        newPipelineConfig.initializeNWPPipeline(
-                    pipelineConfig.name,
-                    pipelineConfig.fileDir,
-                    pipelineConfig.fileFilter,
-                    pipelineConfig.schedulerID,
-                    pipelineConfig.memoryManagerID,
-                    (MPipelineConfiguration::MNWPReaderFileFormat)pipelineConfig.dataFormat,
-                    pipelineConfig.enableRegridding,
-                    pipelineConfig.enableProbabiltyRegionFilter,
-                    pipelineConfig.treatRotatedGridAsRegularGrid,
-                    pipelineConfig.surfacePressureFieldType,
-                    pipelineConfig.convertGeometricHeightToPressure_ICAOStandard,
-                    pipelineConfig.auxiliary3DPressureField,
-                    pipelineConfig.disableGridConsistencyCheck,
-                    pipelineConfig.inputVarsForDerivedVars);
+        openDatasetDialog(addDatasetDialog);
     }
 }
 
@@ -1181,7 +1191,8 @@ void MMainWindow::showAboutDialog()
             "and observations. "
             "In particular, Met.3D features functionality for visualization of "
             "ensemble numerical weather prediction data. Please refer to the "
-            "<a href='https://met3d.readthedocs.io/en/latest/about.html'>online "
+            "<a href='https://met3d.wavestoweather.de'>website</a> and the "
+            "<a href='https://met3d.readthedocs.io'>online "
             "manual</a> for further details.<br><br>"
             "Met.3D is free software under the GNU General Public License.<br>"
             "It is distributed in the hope that it will be useful, but WITHOUT "
@@ -1189,11 +1200,15 @@ void MMainWindow::showAboutDialog()
             "or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public "
             "License for more details.<br><br>"
             "Copyright 2015-2018 Met.3D authors:<br>"
-            "Marc Rautenhaus(1), Bianca Tost(1), Michael Kern(1), Alexander "
-            "Kumpf(1), Fabian Sch&ouml;ttl(1), Christoph Heidelmann(1).<br><br>"
+            "Marc Rautenhaus(2, 1[until 2018]), Bianca Tost(1), Michael Kern(1), "
+            "with contributions by Alexander Kumpf(1), Philipp Kaiser(1), "
+            "Fabian Sch&ouml;ttl(1), Christoph Heidelmann(1).<br><br>"
             "(1) <a href='https://wwwcg.in.tum.de/'>Computer Graphics and "
             "Visualization Group</a>, "
-            "Technical University of Munich, Garching, Germany<br><br>"
+            "Technical University of Munich, Garching, Germany<br>"
+            "(2) <a href='https://www.rrz.uni-hamburg.de/'>Regional Computing "
+            "Center</a>, "
+            "Universitaet Hamburg, Hamburg, Germany<br><br>"
             "See Met.3D source files for license details.<br><hr>"
             "Versions of libraries used to compile Met.3D:<br>"
             "<table> "
@@ -1214,8 +1229,8 @@ void MMainWindow::showAboutDialog()
             " <td> QCustomPlot: %19.%20.%21 </td>"
             "</tr>"
             "</table>"
-            "Note: If a version is listed as x.x.x, Met.3D wasn't able to find"
-            " a version tag for this library."
+            "Note: For versions listed as x.x.x "
+            " no version tag could be identified."
                 ).arg(met3dVersionString).arg(met3dBuildDate)
             .arg(FREETYPE_MAJOR).arg(FREETYPE_MINOR).arg(FREETYPE_PATCH)
             .arg(GDAL_RELEASE_NAME)
@@ -1293,6 +1308,86 @@ void MMainWindow::keyPressEvent(QKeyEvent *key)
 /******************************************************************************
 ***                           PRIVATE METHODS                               ***
 *******************************************************************************/
+
+void MMainWindow::openDatasetDialog(MAddDatasetDialog &addDatasetDialog)
+{
+    if ( addDatasetDialog.exec() == QDialog::Accepted )
+    {
+        PipelineType pipelineType = addDatasetDialog.getSelectedPipelineType();
+
+        switch (pipelineType)
+        {
+        case NWP_PIPELINE:
+        {
+            MNWPPipelineConfigurationInfo pipelineConfig =
+                    addDatasetDialog.getNWPPipelineConfigurationInfo();
+
+            LOG4CPLUS_DEBUG(mlog, "adding new dataset: "
+                            << pipelineConfig.name.toStdString());
+
+            MPipelineConfiguration newPipelineConfig;
+            newPipelineConfig.initializeNWPPipeline(
+                        pipelineConfig.name,
+                        pipelineConfig.fileDir,
+                        pipelineConfig.fileFilter,
+                        pipelineConfig.schedulerID,
+                        pipelineConfig.memoryManagerID,
+                        (MPipelineConfiguration
+                         ::MNWPReaderFileFormat)pipelineConfig.dataFormat,
+                        pipelineConfig.enableRegridding,
+                        pipelineConfig.enableProbabiltyRegionFilter,
+                        pipelineConfig.treatRotatedGridAsRegularGrid,
+                        pipelineConfig.surfacePressureFieldType,
+                        pipelineConfig
+                        .convertGeometricHeightToPressure_ICAOStandard,
+                        pipelineConfig.auxiliary3DPressureField,
+                        pipelineConfig.disableGridConsistencyCheck,
+                        pipelineConfig.inputVarsForDerivedVars);
+            break;
+        }
+        case TRAJECTORIES_PIPELINE:
+        {
+            MTrajectoriesPipelineConfigurationInfo pipelineConfig =
+                    addDatasetDialog.getTrajectoriesPipelineConfigurationInfo();
+
+            LOG4CPLUS_DEBUG(mlog, "adding new dataset: "
+                            << pipelineConfig.name.toStdString());
+
+            MPipelineConfiguration newPipelineConfig;
+
+            if (pipelineConfig.precomputed)
+            {
+                newPipelineConfig.initializePrecomputedTrajectoriesPipeline(
+                            pipelineConfig.name,
+                            pipelineConfig.fileDir,
+                            pipelineConfig.boundaryLayerTrajectories,
+                            pipelineConfig.schedulerID,
+                            pipelineConfig.memoryManagerID);
+
+            }
+            else
+            {
+                newPipelineConfig.initializeTrajectoryComputationPipeline(
+                            pipelineConfig.name,
+                            pipelineConfig.boundaryLayerTrajectories,
+                            pipelineConfig.schedulerID,
+                            pipelineConfig.memoryManagerID,
+                            pipelineConfig.NWPDataset,
+                            pipelineConfig.windEastwardVariable,
+                            pipelineConfig.windNorthwardVariable,
+                            pipelineConfig.windVerticalVariable,
+                            MStructuredGrid::verticalLevelTypeFromString(
+                                pipelineConfig.verticalLevelType));
+            }
+            break;
+        }
+        default:
+        {
+            break;
+        }
+        }
+    }
+}
 
 
 } // namespace Met3D

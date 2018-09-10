@@ -65,7 +65,8 @@ MClimateForecastReader::MClimateForecastReader(
       treatRotatedGridAsRegularGrid(treatRotatedGridAsRegularGrid),
       convertGeometricHeightToPressure_ICAOStandard(
           convertGeometricHeightToPressure_ICAOStandard),
-      disableGridConsistencyCheck(disableGridConsistencyCheck)
+      disableGridConsistencyCheck(disableGridConsistencyCheck),
+      ensembleIDIsSpecifiedInFileName(false)
 
 {
     // Read mapping "variable name to CF standard name", specific to ECMWF
@@ -99,13 +100,18 @@ QList<MVerticalLevelType> MClimateForecastReader::availableLevelTypes()
 QStringList MClimateForecastReader::availableVariables(
         MVerticalLevelType levelType)
 {
+    // Reading values with []-operator results in non deterministic crashes
+    // when using multi threading and QReadLocker. Thus it is necessary to use
+    // QMap's value()-method or QWriteLocker. But since these operations should
+    // only be reading operations, using the value()-method is prefered.
+
     QReadLocker availableItemsReadLocker(&availableItemsLock);
     if (!availableDataFields.keys().contains(levelType))
         throw MBadDataFieldRequest(
                 "unkown level type requested: " +
                 MStructuredGrid::verticalLevelTypeToString(levelType).toStdString(),
                 __FILE__, __LINE__);
-    return availableDataFields[levelType].keys();
+    return availableDataFields.value(levelType).keys();
 }
 
 
@@ -113,6 +119,7 @@ QSet<unsigned int> MClimateForecastReader::availableEnsembleMembers(
         MVerticalLevelType levelType,
         const QString&     variableName)
 {
+    // cf.  MClimateForecastReader::availableVariables() .
     QReadLocker availableItemsReadLocker(&availableItemsLock);
     if (!availableDataFields.keys().contains(levelType))
         throw MBadDataFieldRequest(
@@ -120,13 +127,16 @@ QSet<unsigned int> MClimateForecastReader::availableEnsembleMembers(
                 MStructuredGrid::verticalLevelTypeToString(levelType).toStdString(),
                 __FILE__, __LINE__);
 
-    if (availableDataFields[levelType].keys().contains(variableName))
+    if (availableDataFields.value(levelType).keys().contains(variableName))
     {
-        return availableDataFields[levelType][variableName]->availableMembers;
+        return availableDataFields.value(levelType).value(variableName)
+                ->availableMembers;
     }
-    else if (availableDataFieldsByStdName[levelType].keys().contains(variableName))
+    else if (availableDataFieldsByStdName.value(levelType).keys().contains(
+                 variableName))
     {
-        return availableDataFieldsByStdName[levelType][variableName]->availableMembers;
+        return availableDataFieldsByStdName.value(levelType).value(variableName)
+                ->availableMembers;
     }
     else
     {
@@ -141,6 +151,7 @@ QList<QDateTime> MClimateForecastReader::availableInitTimes(
         MVerticalLevelType levelType,
         const QString&     variableName)
 {
+    // cf.  MClimateForecastReader::availableVariables() .
     QReadLocker availableItemsReadLocker(&availableItemsLock);
     if (!availableDataFields.keys().contains(levelType))
         throw MBadDataFieldRequest(
@@ -148,13 +159,13 @@ QList<QDateTime> MClimateForecastReader::availableInitTimes(
                 MStructuredGrid::verticalLevelTypeToString(levelType).toStdString(),
                 __FILE__, __LINE__);
 
-    if (availableDataFields[levelType].keys().contains(variableName))
+    if (availableDataFields.value(levelType).keys().contains(variableName))
     {
-        return availableDataFields[levelType][variableName]->timeMap.keys();
+        return availableDataFields.value(levelType).value(variableName)->timeMap.keys();
     }
-    else if (availableDataFieldsByStdName[levelType].keys().contains(variableName))
+    else if (availableDataFieldsByStdName.value(levelType).keys().contains(variableName))
     {
-        return availableDataFieldsByStdName[levelType][variableName]->timeMap.keys();
+        return availableDataFieldsByStdName.value(levelType).value(variableName)->timeMap.keys();
     }
     else
     {
@@ -170,6 +181,7 @@ QList<QDateTime> MClimateForecastReader::availableValidTimes(
         const QString&     variableName,
         const QDateTime&   initTime)
 {
+    // cf.  MClimateForecastReader::availableVariables() .
     QReadLocker availableItemsReadLocker(&availableItemsLock);
     if (!availableDataFields.keys().contains(levelType))
         throw MBadDataFieldRequest(
@@ -177,25 +189,30 @@ QList<QDateTime> MClimateForecastReader::availableValidTimes(
                 MStructuredGrid::verticalLevelTypeToString(levelType).toStdString(),
                 __FILE__, __LINE__);
 
-    if (availableDataFields[levelType].keys().contains(variableName))
+    if (availableDataFields.value(levelType).keys().contains(variableName))
     {
-        if (!availableDataFields[levelType][variableName]->timeMap.keys().contains(initTime))
+        if (!availableDataFields.value(levelType).value(variableName)
+                ->timeMap.keys().contains(initTime))
             throw MBadDataFieldRequest(
                     "unkown init time requested: " +
                     initTime.toString(Qt::ISODate).toStdString(),
                     __FILE__, __LINE__);
         else
-            return availableDataFields[levelType][variableName]->timeMap[initTime].keys();
+            return availableDataFields.value(levelType).value(variableName)
+                    ->timeMap.value(initTime).keys();
     }
-    else if(availableDataFieldsByStdName[levelType].keys().contains(variableName))
+    else if(availableDataFieldsByStdName.value(levelType).keys().contains(
+                variableName))
     {
-        if (!availableDataFieldsByStdName[levelType][variableName]->timeMap.keys().contains(initTime))
+        if (!availableDataFieldsByStdName.value(levelType).value(variableName)
+                ->timeMap.keys().contains(initTime))
             throw MBadDataFieldRequest(
                     "unkown init time requested: " +
                     initTime.toString(Qt::ISODate).toStdString(),
                     __FILE__, __LINE__);
         else
-            return availableDataFieldsByStdName[levelType][variableName]->timeMap[initTime].keys();
+            return availableDataFieldsByStdName.value(levelType)
+                    .value(variableName)->timeMap.value(initTime).keys();
     }
     else
         throw MBadDataFieldRequest(
@@ -208,6 +225,7 @@ QString MClimateForecastReader::variableLongName(
         MVerticalLevelType levelType,
         const QString&     variableName)
 {
+    // cf.  MClimateForecastReader::availableVariables() .
     QReadLocker availableItemsReadLocker(&availableItemsLock);
     if (!availableDataFields.keys().contains(levelType))
         throw MBadDataFieldRequest(
@@ -215,13 +233,16 @@ QString MClimateForecastReader::variableLongName(
                 MStructuredGrid::verticalLevelTypeToString(levelType).toStdString(),
                 __FILE__, __LINE__);
 
-    if (availableDataFields[levelType].keys().contains(variableName))
+    if (availableDataFields.value(levelType).keys().contains(variableName))
     {
-        return availableDataFields[levelType][variableName]->longname;
+        return availableDataFields.value(levelType).value(variableName)
+                ->longname;
     }
-    else if (availableDataFieldsByStdName[levelType].keys().contains(variableName))
+    else if (availableDataFieldsByStdName.value(levelType).keys().contains(
+                 variableName))
     {
-        return availableDataFieldsByStdName[levelType][variableName]->longname;
+        return availableDataFieldsByStdName.value(levelType).value(variableName)
+                ->longname;
     }
     else
     {
@@ -236,6 +257,7 @@ QString MClimateForecastReader::variableStandardName(
         MVerticalLevelType levelType,
         const QString&     variableName)
 {
+    // cf.  MClimateForecastReader::availableVariables() .
     QReadLocker availableItemsReadLocker(&availableItemsLock);
     if (!availableDataFields.keys().contains(levelType))
         throw MBadDataFieldRequest(
@@ -243,13 +265,16 @@ QString MClimateForecastReader::variableStandardName(
                 MStructuredGrid::verticalLevelTypeToString(levelType).toStdString(),
                 __FILE__, __LINE__);
 
-    if (availableDataFields[levelType].keys().contains(variableName))
+    if (availableDataFields.value(levelType).keys().contains(variableName))
     {
-        return availableDataFields[levelType][variableName]->standardname;
+        return availableDataFields.value(levelType).value(variableName)
+                ->standardname;
     }
-    else if (availableDataFieldsByStdName[levelType].keys().contains(variableName))
+    else if (availableDataFieldsByStdName.value(levelType).keys().contains(
+                 variableName))
     {
-        return availableDataFieldsByStdName[levelType][variableName]->standardname;
+        return availableDataFieldsByStdName.value(levelType).value(variableName)
+                ->standardname;
     }
     else
     {
@@ -264,19 +289,22 @@ QString MClimateForecastReader::variableUnits(
         MVerticalLevelType levelType,
         const QString&     variableName)
 {
+    // cf.  MClimateForecastReader::availableVariables() .
     QReadLocker availableItemsReadLocker(&availableItemsLock);
     if (!availableDataFields.keys().contains(levelType))
         throw MBadDataFieldRequest(
                 "unkown level type requested: " +
                 MStructuredGrid::verticalLevelTypeToString(levelType).toStdString(),
                 __FILE__, __LINE__);
-    if (availableDataFields[levelType].keys().contains(variableName))
+    if (availableDataFields.value(levelType).keys().contains(variableName))
     {
-        return availableDataFields[levelType][variableName]->units;
+        return availableDataFields.value(levelType).value(variableName)->units;
     }
-    else if (availableDataFieldsByStdName[levelType].keys().contains(variableName))
+    else if (availableDataFieldsByStdName.value(levelType).keys().contains(
+                 variableName))
     {
-        return availableDataFieldsByStdName[levelType][variableName]->units;
+        return availableDataFieldsByStdName.value(levelType).value(variableName)
+                ->units;
     }
     else
     {
@@ -291,6 +319,7 @@ QString MClimateForecastReader::variableSurfacePressureName(
         MVerticalLevelType levelType,
         const QString&     variableName)
 {
+    // cf.  MClimateForecastReader::availableVariables() .
     QReadLocker availableItemsReadLocker(&availableItemsLock);
     if (!availableDataFields.keys().contains(levelType))
         throw MBadDataFieldRequest(
@@ -298,15 +327,15 @@ QString MClimateForecastReader::variableSurfacePressureName(
                 MStructuredGrid::verticalLevelTypeToString(
                     levelType).toStdString(),
                 __FILE__, __LINE__);
-    if (availableDataFields[levelType].keys().contains(variableName))
+    if (availableDataFields.value(levelType).keys().contains(variableName))
     {
-        return availableDataFields[levelType][variableName]
+        return availableDataFields.value(levelType).value(variableName)
                 ->surfacePressureName;
     }
-    else if (availableDataFieldsByStdName[levelType].keys().contains(
+    else if (availableDataFieldsByStdName.value(levelType).keys().contains(
                  variableName))
     {
-        return availableDataFieldsByStdName[levelType][variableName]
+        return availableDataFieldsByStdName.value(levelType).value(variableName)
                 ->surfacePressureName;
     }
     else
@@ -323,6 +352,7 @@ QString MClimateForecastReader::variableAuxiliaryPressureName(
         MVerticalLevelType levelType,
         const QString&     variableName)
 {
+    // cf.  MClimateForecastReader::availableVariables() .
     QReadLocker availableItemsReadLocker(&availableItemsLock);
     if (!availableDataFields.keys().contains(levelType))
         throw MBadDataFieldRequest(
@@ -330,15 +360,15 @@ QString MClimateForecastReader::variableAuxiliaryPressureName(
                 MStructuredGrid::verticalLevelTypeToString(
                     levelType).toStdString(),
                 __FILE__, __LINE__);
-    if (availableDataFields[levelType].keys().contains(variableName))
+    if (availableDataFields.value(levelType).keys().contains(variableName))
     {
-        return availableDataFields[levelType][variableName]
+        return availableDataFields.value(levelType).value(variableName)
                 ->auxiliaryPressureName;
     }
-    else if (availableDataFieldsByStdName[levelType].keys().contains(
+    else if (availableDataFieldsByStdName.value(levelType).keys().contains(
                  variableName))
     {
-        return availableDataFieldsByStdName[levelType][variableName]
+        return availableDataFieldsByStdName.value(levelType).value(variableName)
                 ->auxiliaryPressureName;
     }
     else
@@ -355,6 +385,7 @@ MHorizontalGridType MClimateForecastReader::variableHorizontalGridType(
         MVerticalLevelType levelType,
         const QString&     variableName)
 {
+    // cf.  MClimateForecastReader::availableVariables() .
     QReadLocker availableItemsReadLocker(&availableItemsLock);
     if (!availableDataFields.keys().contains(levelType))
     {
@@ -364,15 +395,16 @@ MHorizontalGridType MClimateForecastReader::variableHorizontalGridType(
                         levelType).toStdString(),
                     __FILE__, __LINE__);
     }
-    if (availableDataFields[levelType].keys().contains(variableName))
+    if (availableDataFields.value(levelType).keys().contains(variableName))
     {
-        return availableDataFields[levelType][variableName]->horizontalGridType;
+        return availableDataFields.value(levelType).value(variableName)
+                ->horizontalGridType;
     }
-    else if (availableDataFieldsByStdName[levelType].keys().contains(
+    else if (availableDataFieldsByStdName.value(levelType).keys().contains(
                  variableName))
     {
-        return availableDataFieldsByStdName[levelType][
-                variableName]->horizontalGridType;
+        return availableDataFieldsByStdName.value(levelType).value(
+                    variableName)->horizontalGridType;
     }
     else
     {
@@ -388,6 +420,7 @@ QVector2D MClimateForecastReader::variableRotatedNorthPoleCoordinates(
         MVerticalLevelType levelType,
         const QString&     variableName)
 {
+    // cf.  MClimateForecastReader::availableVariables() .
     QReadLocker availableItemsReadLocker(&availableItemsLock);
     if (!availableDataFields.keys().contains(levelType))
     {
@@ -397,17 +430,17 @@ QVector2D MClimateForecastReader::variableRotatedNorthPoleCoordinates(
                         levelType).toStdString(),
                     __FILE__, __LINE__);
     }
-    if (availableDataFields[levelType].keys().contains(variableName))
+    if (availableDataFields.value(levelType).keys().contains(variableName))
     {
-        if (availableDataFields[levelType][variableName]->horizontalGridType
-                == ROTATED_LONLAT)
+        if (availableDataFields.value(levelType).value(variableName)
+                ->horizontalGridType == ROTATED_LONLAT)
         {
             QVector2D coordinates;
             coordinates.setX(
-                        availableDataFields[levelType][variableName]
+                        availableDataFields.value(levelType).value(variableName)
                         ->rotatedNorthPoleLon);
             coordinates.setY(
-                        availableDataFields[levelType][variableName]
+                        availableDataFields.value(levelType).value(variableName)
                         ->rotatedNorthPoleLat);
 
             return coordinates;
@@ -419,19 +452,19 @@ QVector2D MClimateForecastReader::variableRotatedNorthPoleCoordinates(
                         "rotated", __FILE__, __LINE__);
         }
     }
-    else if (availableDataFieldsByStdName[levelType].keys().contains(
+    else if (availableDataFieldsByStdName.value(levelType).keys().contains(
                  variableName))
     {
-        if (availableDataFields[levelType][variableName]->horizontalGridType
-                == ROTATED_LONLAT)
+        if (availableDataFields.value(levelType).value(variableName)
+                ->horizontalGridType == ROTATED_LONLAT)
         {
             QVector2D coordinates;
             coordinates.setX(
-                        availableDataFieldsByStdName[levelType][variableName]
-                        ->rotatedNorthPoleLon);
+                        availableDataFieldsByStdName.value(levelType)
+                        .value(variableName)->rotatedNorthPoleLon);
             coordinates.setY(
-                        availableDataFieldsByStdName[levelType][variableName]
-                        ->rotatedNorthPoleLat);
+                        availableDataFieldsByStdName.value(levelType)
+                        .value(variableName)->rotatedNorthPoleLat);
 
             return coordinates;
         }
@@ -459,13 +492,30 @@ void MClimateForecastReader::scanDataRoot()
     LOG4CPLUS_DEBUG(mlog, "Scanning directory "
                     << dataRoot.absolutePath().toStdString() << " "
                     << "for files with NetCDF-CF forecast data.");
-    LOG4CPLUS_DEBUG(mlog, "Using file filter: " << fileFilter.toStdString());
+    LOG4CPLUS_DEBUG(mlog, "Using file filter: " << dirFileFilters.toStdString());
+    LOG4CPLUS_DEBUG(mlog, "Parameters: "
+                    << "treat rotated grid as regular grid="
+                    << (treatRotatedGridAsRegularGrid ? "enabled" : "disabled")
+                    << "; convert geometric height to pressure (using standard ICAO)="
+                    << (convertGeometricHeightToPressure_ICAOStandard ? "enabled" : "disabled")
+                    << "; grid consistency check="
+                    << (!disableGridConsistencyCheck ? "enabled" : "disabled")
+                    << "; use auxiliary 3D pressure field="
+                    << (auxiliary3DPressureField != "" ?
+                "enabled (name= " + (auxiliary3DPressureField.toStdString())
+                + ")" : "disabled")
+                    );
+
     LOG4CPLUS_DEBUG(mlog, "Available files with forecast data:");
 
     // Get a list of all files in the directory that match the wildcard name
-    // filter given in "fileFilter".
-    QStringList availableFiles = dataRoot.entryList(
-                QStringList(fileFilter), QDir::Files);
+    // filter given in "dirFileFilters".
+
+    QStringList availableFiles;
+    getAvailableFilesFromFilters(availableFiles);
+
+    ensembleIDIsSpecifiedInFileName = dirFileFilters.contains("%m");
+    int  ensembleIDFromFile = -1;
 
     QMap<QString, MNcVarDimensionInfo> auxiliaryVarsDimensionsInfo;
 
@@ -482,10 +532,14 @@ void MClimateForecastReader::scanDataRoot()
     // cleared when starting to read a new file.
     QMap<MVerticalLevelType, QMap<QString, bool>> checkedVariables;
 
+    // Create and initialise progress bar.
+    initializeFileScanProgressDialog(availableFiles.size());
+
     // For each file, open the file and extract information about the contained
     // variables and forecast valid times.
     foreach (QString fileName, availableFiles)
     {
+        updateFileScanProgressDialog();
         LOG4CPLUS_DEBUG(mlog, "\tParsing file "
                         << fileName.toStdString() << " .." << flush);
 
@@ -512,6 +566,21 @@ void MClimateForecastReader::scanDataRoot()
         }
 
         multimap<string, NcVar> ncVariables = ncFile->getVars();
+
+        if (ensembleIDIsSpecifiedInFileName)
+        {
+            ensembleIDFromFile = getEnsembleMemberIDFromFileName(fileName);
+
+            if (ensembleIDFromFile == -1)
+            {
+                LOG4CPLUS_ERROR(mlog, "ERROR: ensemble tag found in file filter "
+                                      " but filter did not match file \""
+                                << fileName.toStdString()
+                                << "\" (currently only integer values are allowed"
+                                   " as ensemble member specifiers)." << flush);
+                continue;
+            }
+        }
 
         QStringList gridMappingVarNames = QStringList();
         // Since we don't know the name of the grid mapping variable, loop over
@@ -545,6 +614,9 @@ void MClimateForecastReader::scanDataRoot()
                 // Get the NcVar object belonging to the variable and wrap
                 // it in a NcCFVar object.
                 NcCFVar currCFVar(ncFile->getVar(varName.toStdString()));
+
+                LOG4CPLUS_DEBUG(mlog, "\tChecking variable <"
+                                << varName.toStdString() << "> ...");
 
                 // Read the variable's long_name, standard_name and units
                 // attributes, if present. If they are not present, leave the
@@ -611,8 +683,14 @@ void MClimateForecastReader::scanDataRoot()
 
                 // Determin the type of the vertical level of the variable.
                 MVerticalLevelType levelType;
-                switch (currCFVar.getGridType(auxiliary3DPressureField,
-                                              disableGridConsistencyCheck))
+                NcCFVar::NcVariableGridType gridType = currCFVar.getGridType(
+                            auxiliary3DPressureField, disableGridConsistencyCheck);
+
+                LOG4CPLUS_DEBUG(mlog, "\t--detected grid type: "
+                                << NcCFVar::ncVariableGridTypeToString(
+                                    gridType).toStdString());
+
+                switch (gridType)
                 {
                 case NcCFVar::LAT_LON:
                     levelType = SURFACE_2D;
@@ -660,13 +738,22 @@ void MClimateForecastReader::scanDataRoot()
                                     << "> is defined on a grid using vertical"
                                        " geometric height levels, and"
                                        " conversion to pressure coordinates is"
-                                       " disabled  -- skipping variable.");
+                                       " disabled -- Met.3D can currently only"
+                                       " handle pressure coordinates internally;"
+                                       " skipping variable.");
                         continue;
                     }
                     break;
                 default:
                     // If neither of the above choices could be matched,
                     // discard this variable and continue.
+                    LOG4CPLUS_WARN(
+                                mlog,
+                                "WARNING: identified variable <"
+                                << varName.toStdString()
+                                << "> is defined on a grid that Met.3D "
+                                   "currently does not understand -- skipping "
+                                   "variable.");
                     continue;
                     break;
                 }
@@ -690,7 +777,8 @@ void MClimateForecastReader::scanDataRoot()
                     {
                         bool consistent = checkSharedVariableDataConsistency(
                                     &sharedVariableInfos[levelType][varName],
-                                    &currCFVar, levelType, false, true);
+                                    &currCFVar, levelType, false,
+                                    !ensembleIDIsSpecifiedInFileName);
                         checkedVariables[levelType][varName] = consistent;
                         if (!consistent)
                         {
@@ -706,6 +794,18 @@ void MClimateForecastReader::scanDataRoot()
                         }
                     }
                     vinfo = availableDataFields[levelType].value(varName);
+                    if (ensembleIDIsSpecifiedInFileName)
+                    {
+                        vinfo->availableMembers.insert(ensembleIDFromFile);
+
+                        foreach (QDateTime validTime, currTimeCoordValues) // in UTC!
+                        {
+                            MDatafieldInfo info;
+                            info.filename = fileName;
+                            vinfo->timeMap[initTime][validTime][ensembleIDFromFile]
+                                    = info;
+                        } // for (valid times)
+                    }
                 }
                 else
                 {
@@ -764,18 +864,25 @@ void MClimateForecastReader::scanDataRoot()
                     }
 
 
-                    // Check if the variable has an ensemble dimension.
-                    if (currCFVar.hasEnsembleDimension())
+                    if (ensembleIDIsSpecifiedInFileName)
                     {
-                        // If yes, get the available ensemble members.
-                        vinfo->availableMembers =
-                                currCFVar.getEnsembleMembers();
+                        vinfo->availableMembers.insert(ensembleIDFromFile);
                     }
                     else
                     {
-                        // No ensemble dimension could be found. List the
-                        // available data field as the "0" member.
-                        vinfo->availableMembers.insert(0);
+                        // Check if the variable has an ensemble dimension.
+                        if (currCFVar.hasEnsembleDimension())
+                        {
+                            // If yes, get the available ensemble members.
+                            vinfo->availableMembers =
+                                    currCFVar.getEnsembleMembers();
+                        }
+                        else
+                        {
+                            // No ensemble dimension could be found. List the
+                            // available data field as the "0" member.
+                            vinfo->availableMembers.insert(0);
+                        }
                     }
 
                     vinfo->horizontalGridType = MHorizontalGridType::REGULAR_LONLAT;
@@ -894,11 +1001,23 @@ void MClimateForecastReader::scanDataRoot()
                     checkedVariables[levelType][varName] = true;
                 }
 
+                unsigned int ensMem;
+                if (ensembleIDIsSpecifiedInFileName)
+                {
+                    ensMem = ensembleIDFromFile;
+                }
+                else
+                {
+                    // If ensemble members are all stored in one file, use 0 to
+                    // represent them to avoid redundant informations stored.
+                    ensMem = 0;
+                }
+
                 foreach (QDateTime validTime, currTimeCoordValues) // in UTC!
                 {
                     MDatafieldInfo info;
                     info.filename = fileName;
-                    vinfo->timeMap[initTime][validTime] = info;
+                    vinfo->timeMap[initTime][validTime][ensMem] = info;
 
 //                        cout << "\t"  << filedomain.toStdString()
 //                             << "  "  << varName.toStdString()
@@ -930,6 +1049,8 @@ void MClimateForecastReader::scanDataRoot()
 
         delete ncFile;
     } // for (files)
+
+    deleteFileScanProgressDialog();
 
     // Some auxiliary pressure variables might NOT have been checked yet if
     // their dimensions match the dimensions of auxiliary pressure field (i.e.
@@ -1030,16 +1151,32 @@ MStructuredGrid *MClimateForecastReader::readGrid(
     QString filename;
     try
     {
-        filename = dataFieldFile(levelType, variableName, initTime, validTime);
+        if (ensembleIDIsSpecifiedInFileName)
+        {
+            filename = dataFieldFile(levelType, variableName, initTime,
+                                     validTime, ensembleMember);
+        }
+        else
+        {
+            // If ensemble members are all stored in one file, 0 is used to
+            // represent them to avoid redundant informations stored.
+            filename = dataFieldFile(levelType, variableName, initTime,
+                                     validTime, 0);
+        }
     }
     catch (MBadDataFieldRequest& e)
     {
-        LOG4CPLUS_ERROR(mlog, "invalid data field requested\n" << flush);
-        throw;
+        LOG4CPLUS_ERROR(mlog, "ERROR: invalid data field requested. There "
+                              "seems to be a problem with your dataset. Please "
+                              "check that all variables are defined for all "
+                              "timesteps and ensemble members. [Returning"
+                              " a nullptr.]\n" << flush);
+        return nullptr;
     }
 
-    LOG4CPLUS_DEBUG(mlog, "reading NetCDF data from file "
-                    << filename.toStdString());
+    LOG4CPLUS_DEBUG(mlog, "Reading NetCDF data for variable "
+                    << variableName.toStdString() << " from file "
+                    << filename.toStdString() << " ...");
 
     // Is this file opened for the first time? First access to a variable?
     openFilesMutex.lock();
@@ -1072,13 +1209,20 @@ MStructuredGrid *MClimateForecastReader::readGrid(
         }
         catch (NcException& e)
         {
-            LOG4CPLUS_ERROR(mlog, "cannot open file " << filename.toStdString());
+            LOG4CPLUS_ERROR(mlog, "ERROR: cannot open file "
+                            << filename.toStdString() << " -- " << e.what());
             throw;
         }
     }
 
     if (initialVariableAccess)
     {
+        // The variable is for this file accessed for the first time --
+        // initialise the shared metadata that can be re-used in future
+        // access to this variable.
+        LOG4CPLUS_DEBUG(mlog, "Initial access to " << variableName.toStdString()
+                        << " in this file. Initialising shared metadata.");
+
         // Get a handle on the NetCDF variable and wrap it in a NcCFVar object.
         QMutexLocker ncAccessMutexLocker(&staticNetCDFAccessMutex);
         shared->cfVar = finfo->ncFile->getVar(variableName.toStdString());
@@ -1101,9 +1245,12 @@ MStructuredGrid *MClimateForecastReader::readGrid(
 
             if (shared->cfVar.isNull())
             {
-                LOG4CPLUS_ERROR(mlog, "cannot find variable "
+                LOG4CPLUS_ERROR(mlog, "ERROR: cannot find variable "
                                 << variableName.toStdString());
-                        throw MBadDataFieldRequest(
+                // Cannot recover from this error; delete shared
+                // data read so far and break.
+                finfo->sharedData[levelType].remove(variableName);
+                throw MBadDataFieldRequest(
                             "cannot find variable " + variableName.toStdString(),
                             __FILE__, __LINE__);
             }
@@ -1125,10 +1272,22 @@ MStructuredGrid *MClimateForecastReader::readGrid(
                         << " elements).");
 
         // Query scale and offset, if provided.
-        try { shared->cfVar.getAtt("scale_factor").getValues(&(shared->scale_factor)); }
-        catch (NcException) { shared->scale_factor = 1.; }
-        try { shared->cfVar.getAtt("add_offset").getValues(&(shared->add_offset)); }
-        catch (NcException) { shared->add_offset = 0.; }
+        try
+        {
+            shared->cfVar.getAtt("scale_factor").getValues(&(shared->scale_factor));
+        }
+        catch (NcException)
+        {
+            shared->scale_factor = 1.;
+        }
+        try
+        {
+            shared->cfVar.getAtt("add_offset").getValues(&(shared->add_offset));
+        }
+        catch (NcException)
+        {
+            shared->add_offset = 0.;
+        }
 
         // Have scale and offset been provided? If not, they are not applied.
         shared->scaleAndOffsetProvided =
@@ -1142,18 +1301,20 @@ MStructuredGrid *MClimateForecastReader::readGrid(
                             << ".");
         }
 
-        // Read grid type dependent coordinate data.
-        if (levelType == SURFACE_2D)
+        // Determine grid-type-dependent metadata/settings.
+        // ================================================
+        if (levelType == PRESSURE_LEVELS_3D)
         {
-        }
+            // Pressure levels: Get a link to the variable containing the
+            // vertical coordinate data.
 
-        else if (levelType == PRESSURE_LEVELS_3D)
-        {
             if (convertGeometricHeightToPressure_ICAOStandard)
             {
                 // Special case: If conversion of vertical geometric height
                 // levels to pressure levels is enabled, the grid will appear
                 // in Met.3D as a regular pressure level grid.
+                LOG4CPLUS_DEBUG(mlog, "\tConversion of vertical geometric "
+                                      "height to pressure levels is enabled.");
                 shared->vertVar =
                         shared->cfVar.getVerticalCoordinateGeometricHeight();
             }
@@ -1161,18 +1322,20 @@ MStructuredGrid *MClimateForecastReader::readGrid(
             {
                 shared->vertVar = shared->cfVar.getVerticalCoordinatePressure();
             }
-
         }
 
         else if (levelType == HYBRID_SIGMA_PRESSURE_3D)
         {
+            // Hybrid pressure levels: Get a link to the variable containing the
+            // vertical model level data and load the ak/bk coefficients.
+
             NcVar apVar, bVar;
             QString psName;
             shared->vertVar =
                     shared->cfVar.getVerticalCoordinateHybridSigmaPressure(
                         &apVar, &bVar, &psName);
 
-            // Read hybrid coefficients, if available
+            // Read hybrid coefficients.
             if ( !apVar.isNull() )
             {
                 shared->ak.resize(apVar.getDim(0).getSize());
@@ -1195,10 +1358,14 @@ MStructuredGrid *MClimateForecastReader::readGrid(
                 {
                     // .. and if they're in completely different units, raise an
                     // exception.
-                    throw MNcException(
-                            "NcException",
-                            "invalid units for ak coefficients (must be Pa or hPa)",
-                            __FILE__, __LINE__);
+                    // Cannot recover from this error; delete shared
+                    // data read so far and break.
+                    finfo->sharedData[levelType].remove(variableName);
+                    QString err = QString(
+                                "invalid units '%1' for ak coefficients "
+                                "(must be Pa or hPa)").arg(units.c_str());
+                    throw MNcException("NcException", err.toStdString(),
+                                       __FILE__, __LINE__);
                 }
             }
 
@@ -1207,109 +1374,112 @@ MStructuredGrid *MClimateForecastReader::readGrid(
                 shared->bk.resize(bVar.getDim(0).getSize());
                 bVar.getVar(shared->bk.data());
             }
-
-        }
+        } // HYBRID_SIGMA_PRESSURE_3D
 
         else if (levelType == POTENTIAL_VORTICITY_2D)
         {
+            // Potential vorticity levels: Get a link to the vertical PV
+            // coordinate variable.
+
             shared->vertVar = shared->cfVar.getVerticalCoordinatePotVort();
-
-        }
-
-        else if (levelType == LOG_PRESSURE_LEVELS_3D)
-        {
         }
 
         else if (levelType == AUXILIARY_PRESSURE_3D)
         {
-            QString pressureName;
-            int levelIndex;
+            // Auxiliary pressure: Determine whether vertical pressure axis
+            // in auxiliary field is correctly ordered.
+            LOG4CPLUS_DEBUG(mlog, "\tChecking auxiliary pressure field.");
+
+            // Obtain link to NcVar that contains the auxiliary pressure field.
+            QString pressureName; int levelIndex;
             NcVar auxPressureVar =
                     shared->cfVar.getVerticalCoordinateAuxiliaryPressure(
                         auxiliary3DPressureField, &pressureName, &levelIndex,
                         disableGridConsistencyCheck);
 
-            // If the auxiliary pressure field variable is stored in the same
-            // file, it can be used to initialise the vertical dimension.
-            // Otherwise, request the grid of the auxiliary pressure field and
-            // use it to initialise the vertical dimension.
             if ( !auxPressureVar.isNull() )
             {
+                // If the auxiliary pressure field variable is stored in the
+                // same NetCDF file, load a single vertical column (at lon/lat
+                // indices 0/0 and timestep 0), then check its ordering.
+
+                int nVerticalLevels = auxPressureVar.getDim(levelIndex).getSize();
+
                 LOG4CPLUS_DEBUG(
                             mlog, "\tVertical dimension is of type "
                             << MStructuredGrid::verticalLevelTypeToString(
                                 levelType).toStdString()
                             << ", vertical variable is '"
                             << auxPressureVar.getName()
-                            << "' (" << auxPressureVar.getDim(levelIndex)
-                            .getSize() << " levels).");
-                shared->levels.resize(auxPressureVar.getDim(levelIndex).getSize());
+                            << "' (" << nVerticalLevels << " levels).");
 
-                // Get the pressure levels field to check whether the levels
-                // need to be reversed.
-                QVector<double> tempDataVec;
-                tempDataVec.resize(1);
-                for (unsigned int i = 0; i < auxPressureVar.getDims().size(); i++)
-                {
-                    tempDataVec.resize(tempDataVec.size()
-                                       * auxPressureVar.getDim(i).getSize());
-                }
-                auxPressureVar.getVar(tempDataVec.data());
+                // The values of the "real" vertical coordinate axis of the
+                // data field don't matter for aux-p treatment: Instead, the
+                // pressure values stored in the aux-p field will be used.
+                shared->levels.fill(M_MISSING_VALUE, nVerticalLevels);
 
-                // To check if the pressure field levels need to be reversed,
-                // get the first and last value of the first column as
-                // representatives for the bottom and top pressure level of a
-                // column respectively. Since the values of one column of the
-                // pressure field might not be stored side by side in the
-                // array, the distance between the first and last value needs
-                // to be determined in "number of array elements".
+                // Load a single data column.
+                QVector<double> singleDataColumn(nVerticalLevels);
+                if (auxPressureVar.getDimCount() == 4)
+                {
+                    // No ensemble dimension, only time/lev/lat/lon.
+                    vector<size_t> start(4);
+                    start.assign(4, 0);
+                    vector<size_t> count(4);
+                    count.assign(4, 1);
+                    count[1] = nVerticalLevels;
+                    auxPressureVar.getVar(start, count, singleDataColumn.data());
+                }
+                else if (auxPressureVar.getDimCount() == 5)
+                {
+                    // Ensemble dimension present.
+                    vector<size_t> start(5);
+                    start.assign(5, 0);
+                    vector<size_t> count(5);
+                    count.assign(5, 1);
+                    count[2] = nVerticalLevels;
+                    auxPressureVar.getVar(start, count, singleDataColumn.data());
+                }
 
-                // Determine the distance.
-                int distFirstToLastColValue = 1;
-                for (int i = auxPressureVar.getDims().size() - 1;
-                     i > levelIndex; i--)
-                {
-                    distFirstToLastColValue *= auxPressureVar.getDim(i).getSize();
-                }
-                distFirstToLastColValue *=
-                        auxPressureVar.getDim(levelIndex).getSize() - 1;
-                // Get first and last value of the first column.
-                double lev_bot = tempDataVec[0];
-                double lev_top = tempDataVec[distFirstToLastColValue];
-                // Determine whether the grid's vertical levels must be reversed.
-                if (lev_bot > lev_top)
-                {
-                    LOG4CPLUS_DEBUG(mlog, "\tReversing levels.");
-                    shared->reverseLevels = true;
-                }
-                else
-                {
-                    shared->reverseLevels = false;
-                }
+                // Do the grid's vertical levels need to be reversed?
+                // (Index 0 should be at the top of the atmosphere and have
+                // the smaller pressure value).
+                shared->reverseLevels =
+                        singleDataColumn[0] > singleDataColumn[nVerticalLevels-1];
             }
             else
             {
+                // The auxiliary pressure field variable is stored in a
+                // different NetCDF file.
+                // Current solution: Read the ENTIRE aux-p grid, just to
+                // copy its "reverseLevels" flag...
+//TODO (mr, 03Aug2018) -- this is a very inefficient way of determining the
+// direction of the vertical aux-p axis -- this needs to be refactored!
+
+                LOG4CPLUS_DEBUG(mlog, "\tNeed to access aux-p field in "
+                                      "separate file.");
+
                 ncAccessMutexLocker.unlock();
                 MLonLatAuxiliaryPressureGrid *auxPGrid =
                         dynamic_cast<MLonLatAuxiliaryPressureGrid*>(
-                            readGrid( levelType, auxiliary3DPressureField,
-                                      initTime, validTime, ensembleMember));
+                            readGrid(levelType, auxiliary3DPressureField,
+                                     initTime, validTime, ensembleMember));
                 ncAccessMutexLocker.relock();
 
                 shared->reverseLevels = auxPGrid->getReverseLevels();
+                shared->levels.fill(M_MISSING_VALUE, auxPGrid->getNumLevels());
 
-                shared->levels.resize(auxPGrid->getNumLevels());
-
-                const double *auxLevels = auxPGrid->getLevels();
-
-                for (unsigned int i = 0; i < auxPGrid->getNumLevels(); i++)
-                {
-                    shared->levels[i] = auxLevels[i];
-                }
+                delete auxPGrid;
             }
-        }
 
-        // Read coordinate variables.
+            if (shared->reverseLevels)
+            {
+                LOG4CPLUS_DEBUG(mlog, "\tReversing vertical levels.");
+            }
+        } // AUXILIARY_PRESSURE_3D
+        // END (grid-type-dependent stuff).
+
+        // Read lon/lat coordinate variable data.
         shared->lons.resize(shared->lonVar.getDim(0).getSize());
         shared->lonVar.getVar(shared->lons.data());
         shared->lats.resize(shared->latVar.getDim(0).getSize());
@@ -1345,13 +1515,15 @@ MStructuredGrid *MClimateForecastReader::readGrid(
             shared->reverseLatitudes = false;
         }
 
-
         if ( !shared->vertVar.isNull() )
         {
             LOG4CPLUS_DEBUG(mlog, "\tVertical dimension is of type "
-                            << MStructuredGrid::verticalLevelTypeToString(levelType).toStdString()
-                            << ", vertical variable is '" << shared->vertVar.getName()
-                            << "' (" << shared->vertVar.getDim(0).getSize() << " elements).");
+                            << MStructuredGrid::verticalLevelTypeToString(
+                                levelType).toStdString()
+                            << ", vertical variable is '"
+                            << shared->vertVar.getName() << "' ("
+                            << shared->vertVar.getDim(0).getSize()
+                            << " elements).");
             shared->levels.resize(shared->vertVar.getDim(0).getSize());
             shared->vertVar.getVar(shared->levels.data());
 
@@ -1362,20 +1534,14 @@ MStructuredGrid *MClimateForecastReader::readGrid(
                 try { shared->vertVar.getAtt("units").getValues(units); }
                 catch (NcException) {}
 
-                if (units == "Pa")
+                if (convertGeometricHeightToPressure_ICAOStandard)
                 {
-                    for (int i = 0; i < shared->levels.size(); i++)
-                    {
-                        shared->levels[i] /= 100.;
-                    }
-                }
-                else if (units != "hPa")
-                {
-                    // If vertical levels are specified in metres and
-                    // convertion flag is set, convert metres to pressure with
-                    // standard ICAO field.
-                    if ((units == "m" || units == "metre")
-                            && convertGeometricHeightToPressure_ICAOStandard)
+                    // Conversion flag "geometric height -> pressure" has
+                    // been set. The units of this variable are expected to be
+                    // metres, i.e., geometric height.
+
+                    if (NcCFVar::validUnitsVerticalCoordinate(
+                                NcCFVar::LAT_LON_Z).contains(units.c_str()))
                     {
                         for (int i = 0; i < shared->levels.size(); i++)
                         {
@@ -1385,12 +1551,40 @@ MStructuredGrid *MClimateForecastReader::readGrid(
                     }
                     else
                     {
-                        throw MNcException(
-                                    "NcException",
-                                    "invalid units for pressure levels (must be"
-                                    " Pa or hPa)",
-                                    __FILE__, __LINE__);
+                        // Cannot recover from this error; delete shared
+                        // data read so far and break.
+                        finfo->sharedData[levelType].remove(variableName);
+                        QString err = QString(
+                                    "invalid units '%1' for geometric "
+                                    "height levels in variable %2 "
+                                    "(must be one of "
+                                    "%3)").arg(units.c_str()).arg(
+                                    shared->vertVar.getName().c_str()).arg(
+                                    NcCFVar::validUnitsVerticalCoordinateAsString(
+                                        NcCFVar::LAT_LON_Z));
+                        throw MNcException("NcException",  err.toStdString(),
+                                           __FILE__, __LINE__);
                     }
+                }
+
+                else if (units == "Pa")
+                {
+                    for (int i = 0; i < shared->levels.size(); i++)
+                    {
+                        shared->levels[i] /= 100.;
+                    }
+                }
+                else if (units != "hPa")
+                {
+                    // Cannot recover from this error; delete shared
+                    // data read so far and break.
+                    finfo->sharedData[levelType].remove(variableName);
+                    QString err = QString(
+                                "invalid units '%1' for pressure "
+                                "levels (must be "
+                                "Pa or hPa)").arg(units.c_str());
+                    throw MNcException("NcException",  err.toStdString(),
+                                       __FILE__, __LINE__);
                 }
             }
 
@@ -1415,7 +1609,10 @@ MStructuredGrid *MClimateForecastReader::readGrid(
         }
         else
         {
-            LOG4CPLUS_DEBUG(mlog, "\tNo vertical dimension.");
+            LOG4CPLUS_DEBUG(mlog, "\tNo vertical dimension or auxiliary "
+                                  "pressure field detected (if there should be "
+                                  "one: are the 'units' "
+                                  "and 'positive' attributes set correctly?).");
         }
 
         // Get time values of this variable.
@@ -1524,7 +1721,9 @@ MStructuredGrid *MClimateForecastReader::readGrid(
     // Store metadata in grid object.
     grid->setMetaData(initTime, validTime, variableName, ensembleMember);
     foreach (unsigned int m, shared->availableMembers)
+    {
         grid->setAvailableMember(m);
+    }
 
     // Load the data field.
     switch (levelType)
@@ -1820,11 +2019,11 @@ MStructuredGrid *MClimateForecastReader::readGrid(
         }
         else if (units != "hPa")
         {
-            throw MNcException(
-                        "NcException",
-                        "invalid units for pressure levels of auxiliary"
-                        " pressure field (must be Pa or hPa)",
-                        __FILE__, __LINE__);
+            QString err = QString(
+                        "invalid units '%1' for pressure levels of auxiliary "
+                        "pressure field (must be Pa or hPa)").arg(units.c_str());
+            throw MNcException("NcException", err.toStdString(),
+                               __FILE__, __LINE__);
         }
     }
 
@@ -1845,10 +2044,11 @@ MStructuredGrid *MClimateForecastReader::readGrid(
 *******************************************************************************/
 
 QString MClimateForecastReader::dataFieldFile(
-        MVerticalLevelType levelType,
-        const QString&     variableName,
-        const QDateTime&   initTime,
-        const QDateTime&   validTime)
+        MVerticalLevelType  levelType,
+        const QString&      variableName,
+        const QDateTime&    initTime,
+        const QDateTime&    validTime,
+        const unsigned int& ensembleMember)
 {
     QString filename = "";
 
@@ -1857,11 +2057,11 @@ QString MClimateForecastReader::dataFieldFile(
     if (availableDataFields.value(levelType).keys().contains(variableName))
         filename = availableDataFields.value(levelType)
                 .value(variableName)->timeMap.value(initTime)
-                .value(validTime).filename;
+                .value(validTime).value(ensembleMember).filename;
     else if (availableDataFieldsByStdName.value(levelType).keys().contains(variableName))
         filename = availableDataFieldsByStdName.value(levelType)
                 .value(variableName)->timeMap.value(initTime)
-                .value(validTime).filename;
+                .value(validTime).value(ensembleMember).filename;
 
     if (filename.length() == 0)
     {
@@ -2102,7 +2302,8 @@ bool MClimateForecastReader::checkSharedVariableDataConsistency(
                 // If vertical levels are specified in metres and convertion
                 // flag is set, convert metres to pressure with standard ICAO
                 // field.
-                if ((units == "m" || units == "metre")
+                if (NcCFVar::validUnitsVerticalCoordinate(
+                            NcCFVar::LAT_LON_Z).contains(units.c_str())
                         && convertGeometricHeightToPressure_ICAOStandard)
                 {
                     for (int i = 0; i < current.levels.size(); i++)

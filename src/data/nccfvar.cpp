@@ -136,6 +136,7 @@ NcVar NcCFVar::getCFCoordinateVar(const vector<string>& units,
             try
             {
                 var.getAtt("positive").getValues(attribute);
+                fixZeroTermination(&attribute);
                 // The 'positive' attribute is present but contains a value
                 // other that 'up' or 'down': Continue with next variable.
                 if (!((attribute == "up") || (attribute == "down")))
@@ -156,6 +157,7 @@ NcVar NcCFVar::getCFCoordinateVar(const vector<string>& units,
         try
         {
             var.getAtt("units").getValues(attribute);
+            fixZeroTermination(&attribute);
             for (unsigned int i = 0; i < units.size(); i++)
             {
                 // degrees attribute is not unique and thus cannot be used to
@@ -175,6 +177,7 @@ NcVar NcCFVar::getCFCoordinateVar(const vector<string>& units,
         try
         {
             var.getAtt("standard_name").getValues(attribute);
+            fixZeroTermination(&attribute);
             for (unsigned int i = 0; i < standardnames.size(); i++)
             {
                 if (attribute == standardnames[i])
@@ -279,6 +282,7 @@ NcVar NcCFVar::getVerticalCoordinateHybridSigmaPressure(NcVar *ap, NcVar *b,
     string formulaTerms = "";
     try { hybridVar.getAtt("formula_terms").getValues(formulaTerms); }
     catch (NcException) {}
+    fixZeroTermination(&formulaTerms);
 
     // Set up a regular expression to match the "formula_terms" attribute.
     QRegExp re("ap: (.+) b: (.+) ps: (.+)");
@@ -334,10 +338,12 @@ NcVar NcCFVar::getVerticalCoordinateAuxiliaryPressure(
         string units = "";
         try { var.getAtt("units").getValues(units); }
         catch (NcException) {}
+        fixZeroTermination(&units);
 
         string axis = "";
         try { var.getAtt("axis").getValues(axis); }
         catch (NcException) {}
+        fixZeroTermination(&axis);
 
         bool isConnectedToAuxiliaryPressureVar = false;
 
@@ -422,8 +428,42 @@ NcVar NcCFVar::getVerticalCoordinateGeometricHeight()
 {
     // The vertical z coordinate is identifyable by units of geometric height,
     // cf. http://cfconventions.org/cf-conventions/v1.6.0/cf-conventions.html#vertical-coordinate
-    vector<string> units = {"m", "metre"};
+    vector<string> units = {"m", "metre", "metres", "meter", "meters"};
     return getCFCoordinateVar(units, {""}, true);
+}
+
+
+QSet<QString> NcCFVar::validUnitsVerticalCoordinate(
+        NcCFVar::NcVariableGridType gridType)
+{
+    switch (gridType)
+    {
+    case LAT_LON_P:
+        return QSet<QString>() << "Pa" << "hPa";
+        break;
+    case LAT_LON_PVU:
+        return QSet<QString>() << "10-6Km2/kgs";
+        break;
+    case LAT_LON_Z:
+        return QSet<QString>() << "m" << "metre" << "metres" << "meter"
+                               << "meters";
+        break;
+    default:
+        return QSet<QString>();
+        break;
+    }
+}
+
+
+QString NcCFVar::validUnitsVerticalCoordinateAsString(
+        NcCFVar::NcVariableGridType gridType)
+{
+    QString str = "";
+    for (QString unit : validUnitsVerticalCoordinate(gridType))
+    {
+        str += QString("%1/").arg(unit);
+    }
+    return str;
 }
 
 
@@ -807,6 +847,7 @@ bool NcCFVar::isCFGridMappingVariable(const NcVar& var)
     try
     {
         var.getAtt("grid_mapping_name").getValues(attribute);
+        fixZeroTermination(&attribute);
         // The 'grid_mapping_name' attribute is present but contains a value
         // other that 'rotated_latitude_longitude': return false.
         if ((attribute != "rotated_latitude_longitude"))
@@ -834,6 +875,7 @@ bool NcCFVar::isDefinedOnRotatedGrid(const NcVar& var,
     try
     {
         var.getAtt("grid_mapping").getValues(attribute);
+        fixZeroTermination(&attribute);
         *gridMappingVarName = "";
         foreach (*gridMappingVarName, gridMappingVarNames)
         {
@@ -893,6 +935,7 @@ bool NcCFVar::getRotatedNorthPoleCoordinates(const NcVar& gridMappingVar,
     try
     {
         gridMappingVar.getAtt("grid_mapping_name").getValues(attribute);
+        fixZeroTermination(&attribute);
         if (attribute != "rotated_latitude_longitude")
         {
             return false;
@@ -909,6 +952,9 @@ bool NcCFVar::getRotatedNorthPoleCoordinates(const NcVar& gridMappingVar,
     {
         gridMappingVar.getAtt("grid_north_pole_longitude").getValues(
                     &coordinate);
+        string attribute = QString::number(coordinate).toStdString();
+        fixZeroTermination(&attribute);
+        coordinate = QString::fromStdString(attribute).toFloat();
         *rotatedNorthPoleLon = coordinate;
 
     }
@@ -921,6 +967,9 @@ bool NcCFVar::getRotatedNorthPoleCoordinates(const NcVar& gridMappingVar,
     {
         gridMappingVar.getAtt("grid_north_pole_latitude").getValues(
                     &coordinate);
+        string attribute = QString::number(coordinate).toStdString();
+        fixZeroTermination(&attribute);
+        coordinate = QString::fromStdString(attribute).toFloat();
         *rotatedNorthPoleLat = coordinate;
         return true;
     }
@@ -929,6 +978,32 @@ bool NcCFVar::getRotatedNorthPoleCoordinates(const NcVar& gridMappingVar,
         return false;
     }
 
+}
+
+
+QString NcCFVar::ncVariableGridTypeToString(NcCFVar::NcVariableGridType type)
+{
+    switch (type)
+    {
+    case UNDEFINED:
+        return QString("WARNING: undefined, grid type could not be detected");
+    case ALL:
+        return QString("generic grid");
+    case LAT_LON:
+        return QString("regular 2D lat/lon grid");
+    case LAT_LON_P:
+        return QString("regular lat/lon grid with pressure levels");
+    case LAT_LON_HYBRID:
+        return QString("regular lat/lon grid with hybrid model levels");
+    case LAT_LON_PVU:
+        return QString("regular lat/lon grid with PV levels");
+    case LAT_LON_Z:
+        return QString("regular lat/lon grid with geometric height levels");
+    case LAT_LON_AUXP3D:
+        return QString("regular lat/lon grid with auxiliary 3D pressure field");
+    default:
+        return QString("ERROR: no valid grid type");
+    }
 }
 
 

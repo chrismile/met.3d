@@ -33,6 +33,7 @@
 // related third party imports
 #include <QDialog>
 #include <QAbstractButton>
+#include <QSettings>
 
 // local application imports
 
@@ -50,6 +51,13 @@ enum MNWPReaderFileFormat
     INVALID_FORMAT  = 0,
     CF_NETCDF       = 1,
     ECMWF_GRIB      = 2
+};
+
+enum PipelineType
+{
+    INVALID_PIPELINE_TYPE  = 0,
+    NWP_PIPELINE           = 1,
+    TRAJECTORIES_PIPELINE  = 2
 };
 
 
@@ -72,6 +80,22 @@ struct MNWPPipelineConfigurationInfo
 };
 
 
+struct MTrajectoriesPipelineConfigurationInfo
+{
+    QString name;
+    bool precomputed;
+    QString fileDir;
+    QString schedulerID;
+    QString memoryManagerID;
+    bool boundaryLayerTrajectories;
+    QString NWPDataset;
+    QString windEastwardVariable;
+    QString windNorthwardVariable;
+    QString windVerticalVariable;
+    QString verticalLevelType;
+};
+
+
 /**
 
  */
@@ -83,17 +107,29 @@ public:
     explicit MAddDatasetDialog(QWidget *parent = 0);
     ~MAddDatasetDialog();
 
+    PipelineType getSelectedPipelineType();
+
     MNWPPipelineConfigurationInfo getNWPPipelineConfigurationInfo();
+
+    MTrajectoriesPipelineConfigurationInfo
+    getTrajectoriesPipelineConfigurationInfo();
+
+    void resetAddDatasetGUI();
+
+    void saveConfiguration(QSettings *settings);
+    void loadConfiguration(QSettings *settings);
+
+public slots:
+    void saveConfigurationToFile(QString filename = "");
+    bool loadConfigurationFromFile(QString filename = "");
 
 private slots:
     void browsePath();
     void inputFieldChanged();
+    void selectedNWPDatasetChanged(QString dataset);
+    void setDefaultMemoryManager();
 
 protected:
-    /**
-      Reimplemented from QDialog::showEvent().
-     */
-    void showEvent(QShowEvent *event) override;
 
 private:
     Ui::MAddDatasetDialog *ui;

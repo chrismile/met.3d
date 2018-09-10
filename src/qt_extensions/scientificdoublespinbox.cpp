@@ -128,8 +128,8 @@ QValidator::State MScientificDoubleSpinBox::validate(QString &text,
             QString powerString = regularExp.capturedTexts().at(0);
             significandString.chop(powerString.length());
             // Remove the base from the power string to get the exponent.
-            powerString.remove(QRegExp(QString(locale().exponential()),
-                                       Qt::CaseInsensitive));
+            powerString.remove(QString(locale().exponential()),
+                               Qt::CaseInsensitive);
             exponent = powerString.toInt();
             // If present, take also the significand into account since it might
             // impact the actual exponent.
@@ -168,11 +168,11 @@ QValidator::State MScientificDoubleSpinBox::validate(QString &text,
         // varSignificantDigits. Leading and trailing zeros have no impact on
         // the length of the significand.
         int indexFirstSignificNumber = significandString.indexOf(
-                    QRegExp(QString("[^0\\") + locale().decimalPoint() + "]"));
+                    QRegExp(QString("[1-9]")));
         if (indexFirstSignificNumber >= 0)
         {
             int indexLastSignificNumber = significandString.lastIndexOf(
-                        QRegExp(QString("[^0\\") + locale().decimalPoint() + "]"));
+                        QRegExp(QString("[1-9]")));
             int indexDecimalPoint = significandString.indexOf(
                         locale().decimalPoint());
             int significandLength =

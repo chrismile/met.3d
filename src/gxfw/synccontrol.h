@@ -141,7 +141,8 @@ public:
 
 public slots:
     /**
-      Advance scene time by the value specified in @p ui->timeStepComboBox.
+      Advance scene time by the value specified in @p ui->timeStepSpinBox and
+      @p ui->timeUnitComboBox.
       */
     void timeForward();
 
@@ -326,10 +327,6 @@ private:
 
     Ui::MSyncControl *ui;
 
-    // Maps index of ui->timeStepComboBox to seconds (see constructor and
-    // applyTimeStep()).
-    int *timeStepIndexToSeconds;
-
     // Properties to control time animations.
     QMenu *timeAnimationDropdownMenu;
     QSpinBox *timeAnimationTimeStepSpinBox;
@@ -364,8 +361,8 @@ private:
     bool synchronizationInProgress;
     bool forwardBackwardButtonClicked;
     /**
-     * Handle sync event if valid and init time should be updated, but only
-     * valid time changes due to restriction to the data set.
+      Handle sync event if valid and init time should be updated, but only
+      valid time changes due to restriction to the data set.
      */
     bool validDateTimeHasChanged;
     QWidget *lastFocusWidget;

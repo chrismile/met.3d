@@ -57,7 +57,7 @@ namespace Met3D
 
 MNWPVolumeRaycasterActor::MNWPVolumeRaycasterActor()
     : MNWPMultiVarActor(),
-      MBoundingBoxInterface(this),
+      MBoundingBoxInterface(this, MBoundingBoxConnectionType::VOLUME),
       updateNextRenderFrame("111"),
       renderMode(RenderMode::Original),
       variableIndex(0),
@@ -68,8 +68,6 @@ MNWPVolumeRaycasterActor::MNWPVolumeRaycasterActor()
       bBoxEnabled(true),
       normalCurveNumVertices(0)
 {
-    bBoxConnection =
-            new MBoundingBoxConnection(this, MBoundingBoxConnection::VOLUME);
     // Enable picking for the scene view's analysis mode. See
     // triggerAnalysisOfObjectAtPos().
     enablePicking(true);
@@ -98,8 +96,8 @@ MNWPVolumeRaycasterActor::MNWPVolumeRaycasterActor()
     rayCasterSettings = new RayCasterSettings(this);
     actorPropertiesSupGroup->addSubProperty(rayCasterSettings->groupProp);
 
-    // Bounding box.
-    actorPropertiesSupGroup->addSubProperty(bBoxConnection->getProperty());
+    // Bounding box of the actor.
+    insertBoundingBoxProperty(actorPropertiesSupGroup);
     bBoxEnabledProperty = addProperty(
                 BOOL_PROPERTY, "draw bounding box", actorPropertiesSupGroup);
     properties->mBool()->setValue(bBoxEnabledProperty, bBoxEnabled);
@@ -675,17 +673,28 @@ void MNWPVolumeRaycasterActor::saveConfiguration(QSettings *settings)
 
 void MNWPVolumeRaycasterActor::loadConfiguration(QSettings *settings)
 {
+    // It is necessary to load the variable indices BEFORE loading the
+    // variables since they might need to be adapted if a variable cannot be
+    // loaded and the user does NOT choose a new one. (Store the loaded indices
+    // separately from the used indices since these are changed when adding,
+    // changing or deleting a variable (which is done during loading of
+    // variables!).)
+    settings->beginGroup(MNWPVolumeRaycasterActor::getSettingsID());
+    loadedVariableIndex = settings->value("varIndex").toInt();
+    loadedShadingVariableIndex = settings->value("shadingVarIndex").toInt();
+    settings->endGroup();
+
     MNWPMultiVarActor::loadConfiguration(settings);
+
+    variableIndex = loadedVariableIndex;
+    shadingVariableIndex = loadedShadingVariableIndex;
 
     settings->beginGroup(MNWPVolumeRaycasterActor::getSettingsID());
 
     properties->setEnumItem(renderModeProp,
                             settings->value("renderMode").toString());
-    variableIndex = settings->value("varIndex").toInt();
     properties->mInt()->setValue(variableIndexProp, variableIndex);
-    shadingVariableIndex = settings->value("shadingVarIndex").toInt();
-    properties->mInt()->setValue(shadingVariableIndexProp,
-                                 shadingVariableIndex);
+    properties->mInt()->setValue(shadingVariableIndexProp, shadingVariableIndex);
     properties->mBool()->setValue(bBoxEnabledProperty,
                                   settings->value("bBoxEnabled", true).toBool());
 
@@ -911,6 +920,11 @@ bool MNWPVolumeRaycasterActor::triggerAnalysisOfObjectAtPos(
     if (bBoxConnection->getBoundingBox() == nullptr)
     {
         LOG4CPLUS_DEBUG(mlog, "No bounding box is set.");
+        return false;
+    }
+    if (var == nullptr)
+    {
+        LOG4CPLUS_DEBUG(mlog, "No variable selected.");
         return false;
     }
 
@@ -1464,13 +1478,13 @@ void MNWPVolumeRaycasterActor::onQtPropertyChanged(QtProperty* property)
 
         if (suppressActorUpdates()) return;
 
-        var = dynamic_cast<MNWP3DVolumeActorVariable*>(variables[variableIndex]);
-        shadingVar = dynamic_cast<MNWP3DVolumeActorVariable*>(variables[shadingVariableIndex]);
+        if (var == nullptr || shadingVar == nullptr) return;
 
         switch (renderMode)
         {
         case RenderMode::Original:
         case RenderMode::DVR:
+            normalCurveSettings->groupProp->setEnabled(true);
             var->ensembleSingleMemberProperty->setEnabled(true);
             var->setEnsembleMember(properties->getEnumItem(
                                        var->ensembleSingleMemberProperty).toInt());
@@ -1501,7 +1515,11 @@ void MNWPVolumeRaycasterActor::onQtPropertyChanged(QtProperty* property)
     else if (property == variableIndexProp)
     {
         variableIndex = properties->mEnum()->value(variableIndexProp);
-        if (variableIndex < 0) return;
+        if (variableIndex < 0)
+        {
+            var = nullptr;
+            return;
+        }
 
         if (variableIndex >= variables.size())
         {
@@ -1819,7 +1837,7 @@ void MNWPVolumeRaycasterActor::renderToCurrentContext(
     // ===============================================================
     if (normalCurveSettings->normalCurvesEnabled)
     {
-        if(updateNextRenderFrame[RecomputeNCLines])
+        if (updateNextRenderFrame[RecomputeNCLines])
         {
             computeNormalCurves(sceneView);
         }
@@ -1900,7 +1918,7 @@ bool MNWPVolumeRaycasterActor::rayBoxIntersection(
 
     QVector3D rayDirInv = QVector3D(1./rayDirection.x(), 1./rayDirection.y(),
                                     1./rayDirection.z());
-    if(rayDirInv.x() >= 0.0)
+    if (rayDirInv.x() >= 0.0)
     {
         tnear = (boxCrnr1.x() - rayOrigin.x()) * rayDirInv.x();
         tfar  = (boxCrnr2.x() - rayOrigin.x()) * rayDirInv.x();
@@ -1911,7 +1929,7 @@ bool MNWPVolumeRaycasterActor::rayBoxIntersection(
         tfar  = (boxCrnr1.x() - rayOrigin.x()) * rayDirInv.x();
     }
 
-    if(rayDirInv.y() >= 0.0)
+    if (rayDirInv.y() >= 0.0)
     {
         tnear = max(tnear, float((boxCrnr1.y() - rayOrigin.y()) * rayDirInv.y()));
         tfar  = min(tfar,  float((boxCrnr2.y() - rayOrigin.y()) * rayDirInv.y()));
@@ -1922,7 +1940,7 @@ bool MNWPVolumeRaycasterActor::rayBoxIntersection(
         tfar  = min(tfar,  float((boxCrnr1.y() - rayOrigin.y()) * rayDirInv.y()));
     }
 
-    if(rayDirInv.z() >= 0.0)
+    if (rayDirInv.z() >= 0.0)
     {
         tnear = max(tnear, float((boxCrnr1.z() - rayOrigin.z()) * rayDirInv.z()));
         tfar  = min(tfar,  float((boxCrnr2.z() - rayOrigin.z()) * rayDirInv.z()));
@@ -2058,6 +2076,27 @@ void MNWPVolumeRaycasterActor::onChangeActorVariable(MNWPActorVariable *var)
     properties->mEnum()->setValue(variableIndexProp, tmpVarIndex);
     properties->mEnum()->setValue(shadingVariableIndexProp, tmpShadingVarIndex);
     enableActorUpdates(true);
+}
+
+
+void MNWPVolumeRaycasterActor::onLoadActorVariableFailure(int varIndex)
+{
+    if (varIndex < loadedVariableIndex)
+    {
+        loadedVariableIndex--;
+    }
+    else if (varIndex == loadedVariableIndex)
+    {
+        loadedVariableIndex = 0;
+    }
+    if (varIndex < loadedShadingVariableIndex)
+    {
+        loadedShadingVariableIndex--;
+    }
+    else if (varIndex == loadedShadingVariableIndex)
+    {
+        loadedShadingVariableIndex = 0;
+    }
 }
 
 
@@ -3248,7 +3287,7 @@ void MNWPVolumeRaycasterActor::computeNormalCurveInitialPoints(
 //    NormalCurveLineSegment* vertices = (NormalCurveLineSegment*) glMapBufferRange(GL_SHADER_STORAGE_BUFFER, 0,
 //                numRays * (normalCurveSettings->numLineSegments + 2) * sizeof(NormalCurveLineSegment), bufMask); CHECK_GL_ERROR;
 
-//    for(int i = 0; i < 200; ++i)
+//    for (int i = 0; i < 200; ++i)
 //    {
 //        lines[i] = vertices[i];
 //    }

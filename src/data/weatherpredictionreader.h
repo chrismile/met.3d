@@ -57,7 +57,8 @@ struct MDatafieldInfo
 // required), or using QDateTime.toISOString() as key (resulting in the
 // overhead of creating the string and computing the hash function from it).
 // See http://doc.qt.nokia.com/4.7/containers.html#algorithmic-complexity.
-typedef QMap<QDateTime, MDatafieldInfo> MValidTimeMap;
+typedef QHash<unsigned int, MDatafieldInfo> MEnsembleMap;
+typedef QMap<QDateTime, MEnsembleMap> MValidTimeMap;
 typedef QMap<QDateTime, MValidTimeMap> MInitTimeMap;
 
 struct MVariableInfo

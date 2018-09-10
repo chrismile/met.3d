@@ -59,7 +59,7 @@ MTrajectoryReader::MTrajectoryReader(QString identifier)
     : MTrajectoryDataSource(),
       MAbstractDataReader(identifier)
 {
-    fileFilter = "*_lagranto_ensemble_forecast__START_*.nc";
+    dirFileFilters = "*_lagranto_ensemble_forecast__START_*.nc";
 }
 
 
@@ -84,32 +84,35 @@ QList<QDateTime> MTrajectoryReader::availableInitTimes()
 QList<QDateTime> MTrajectoryReader::availableValidTimes(
         const QDateTime& initTime)
 {
+    // cf.  MClimateForecastReader::availableVariables() .
     QReadLocker availableItemsReadLocker(&availableItemsLock);
     if (!availableTrajectories.keys().contains(initTime))
         throw MBadDataFieldRequest(
                 "unkown init time requested: " +
                 initTime.toString(Qt::ISODate).toStdString(),
                 __FILE__, __LINE__);
-    return availableTrajectories[initTime].keys();
+    return availableTrajectories.value(initTime).keys();
 }
 
 
 QList<QDateTime> MTrajectoryReader::validTimeOverlap(
         const QDateTime &initTime, const QDateTime &validTime)
 {
+    // cf.  MClimateForecastReader::availableVariables() .
     QReadLocker availableItemsReadLocker(&availableItemsLock);
     if (!availableTrajectories.keys().contains(initTime))
         throw MBadDataFieldRequest(
                 "unkown init time requested: " +
                 initTime.toString(Qt::ISODate).toStdString(),
                 __FILE__, __LINE__);
-    if (!availableTrajectories[initTime].keys().contains(validTime))
+    if (!availableTrajectories.value(initTime).keys().contains(validTime))
         throw MBadDataFieldRequest(
                 "unkown valid time requested: " +
                 validTime.toString(Qt::ISODate).toStdString(),
                 __FILE__, __LINE__);
 
-    return availableTrajectories[initTime][validTime].validTimeOverlap;
+    return availableTrajectories.value(initTime).value(validTime)
+            .validTimeOverlap;
 }
 
 
@@ -155,13 +158,14 @@ MTrajectories* MTrajectoryReader::produceData(MDataRequest request)
                     << stopTime.toString(Qt::ISODate).toStdString() << ")");
 
     // Check validity of initTime and startTime.
+    // cf.  MClimateForecastReader::availableVariables() .
     QReadLocker availableItemsReadLocker(&availableItemsLock);
     if (!availableTrajectories.keys().contains(initTime))
         throw MBadDataFieldRequest(
                 "unkown init time requested: " +
                 initTime.toString(Qt::ISODate).toStdString(),
                 __FILE__, __LINE__);
-    else if (!availableTrajectories[initTime].keys().contains(validTime))
+    else if (!availableTrajectories.value(initTime).keys().contains(validTime))
         throw MBadDataFieldRequest(
                 "unkown start time requested: " +
                 validTime.toString(Qt::ISODate).toStdString(),
@@ -169,7 +173,8 @@ MTrajectories* MTrajectoryReader::produceData(MDataRequest request)
 
     // Get the name of the file that stores the requested init and start times
     // and open the NetCDF file..
-    QString filename = availableTrajectories[initTime][validTime].filename;
+    QString filename = availableTrajectories.value(initTime).value(validTime)
+            .filename;
     availableItemsReadLocker.unlock();
 
     checkFileOpen(filename);
@@ -226,7 +231,7 @@ MTrajectories* MTrajectoryReader::produceData(MDataRequest request)
             new Met3D::MTrajectories(numTrajectories, times);
 
     trajectories->setMetaData(
-                initTime, validTime, "LAGRANTO_trajectories", member);
+                initTime, validTime, "PRECOMPUTED_trajectories", member);
 
     // Copy temporary data fields to return data struct.
     trajectories->copyVertexDataFrom(lons, lats, pres);
@@ -281,13 +286,14 @@ MFloatPerTrajectorySupplement* MTrajectoryReader::readFloatPerTrajectorySuppleme
                     << member);
 
     // Check validity of initTime and validTime.
+    // cf.  MClimateForecastReader::availableVariables() .
     QReadLocker availableItemsReadLocker(&availableItemsLock);
     if (!availableTrajectories.keys().contains(initTime))
         throw MBadDataFieldRequest(
                 "unkown init time requested: " +
                 initTime.toString(Qt::ISODate).toStdString(),
                 __FILE__, __LINE__);
-    else if (!availableTrajectories[initTime].keys().contains(validTime))
+    else if (!availableTrajectories.value(initTime).keys().contains(validTime))
         throw MBadDataFieldRequest(
                 "unkown start time requested: " +
                 validTime.toString(Qt::ISODate).toStdString(),
@@ -295,7 +301,8 @@ MFloatPerTrajectorySupplement* MTrajectoryReader::readFloatPerTrajectorySuppleme
 
     // Get the name of the file that stores the requested init and start times
     // and open the NetCDF file..
-    QString filename = availableTrajectories[initTime][validTime].filename;
+    QString filename = availableTrajectories.value(initTime).value(validTime)
+            .filename;
     availableItemsReadLocker.unlock();
 
     checkFileOpen(filename);
@@ -391,14 +398,18 @@ void MTrajectoryReader::scanDataRoot()
                        dataRoot.absolutePath().toStdString().c_str());
 
     // Get a list of all files in the directory that match the wildcard name
-    // filter in "fileFilter".
-    QStringList availableFiles = dataRoot.entryList(
-                QStringList(fileFilter), QDir::Files);
+    // filter in "dirFileFilters".
+    QStringList availableFiles;
+    getAvailableFilesFromFilters(availableFiles);
+
+    // Create and initialise progress bar.
+    initializeFileScanProgressDialog(availableFiles.size());
 
     // For each file, extract information about the contained start time and
     // valid times. Store these information in "availableTrajectories".
     for (int i = 0; i < availableFiles.size(); i++)
     {
+        updateFileScanProgressDialog();
         QString filename = availableFiles[i];
 
         LOG4CPLUS_DEBUG_FMT(mlog, "\tParsing file %s ..",
@@ -456,6 +467,8 @@ void MTrajectoryReader::scanDataRoot()
 
         delete ncFile;
     } // for (files)
+
+    deleteFileScanProgressDialog();
 
     // After all files have been scanned remove wrong valid times (see above).
     // (Do not use availableInitTimes() and availableValidTimes() as they

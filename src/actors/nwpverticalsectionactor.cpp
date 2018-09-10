@@ -6,6 +6,7 @@
 **
 **  Copyright 2015-2018 Marc Rautenhaus
 **  Copyright 2016-2018 Bianca Tost
+**  Copyright 2017      Philipp Kaiser
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -53,7 +54,7 @@ namespace Met3D
 
 MNWPVerticalSectionActor::MNWPVerticalSectionActor()
     : MNWPMultiVarActor(),
-      MBoundingBoxInterface(this),
+      MBoundingBoxInterface(this, MBoundingBoxConnectionType::VERTICAL),
       labelDistance(1),
       waypointsModel(nullptr),
       modifyWaypoint(-1),
@@ -73,8 +74,6 @@ MNWPVerticalSectionActor::MNWPVerticalSectionActor()
       updatePath(false),
       offsetPickPositionToHandleCentre(QVector2D(0., 0.))
 {
-    bBoxConnection =
-            new MBoundingBoxConnection(this, MBoundingBoxConnection::VERTICAL);
     enablePicking(true);
 
     // Create and initialise QtProperties for the GUI.
@@ -106,7 +105,8 @@ MNWPVerticalSectionActor::MNWPVerticalSectionActor()
         enableActorUpdates(true);
     }
 
-    actorPropertiesSupGroup->addSubProperty(bBoxConnection->getProperty());
+    // Bounding box of the actor.
+    insertBoundingBoxProperty(actorPropertiesSupGroup);
 
     QString defaultPressureLineLevel = QString("1000.,900.,800.,700.,600.,500.")
                                        + QString(",400.,300.,200.,100.,90.,80.")
@@ -116,7 +116,8 @@ MNWPVerticalSectionActor::MNWPVerticalSectionActor()
                                                 actorPropertiesSupGroup);
     properties->mString()->setValue(pressureLineLevelsProperty,
                                     defaultPressureLineLevel);
-    parseIsoPressureLevelString(defaultPressureLineLevel);
+
+    selectedPressureLineLevels = parsePressureLevelString(defaultPressureLineLevel);
 
     opacityProperty = addProperty(DECORATEDDOUBLE_PROPERTY, "opacity",
                                   actorPropertiesSupGroup);
@@ -551,6 +552,24 @@ void MNWPVerticalSectionActor::setWaypointsModel(MWaypointsTableModel *model)
 }
 
 
+MWaypointsTableModel* MNWPVerticalSectionActor::getWaypointsModel()
+{
+    return waypointsModel;
+}
+
+
+double MNWPVerticalSectionActor::getBottomPressure_hPa()
+{
+    return p_bot_hPa;
+}
+
+
+double MNWPVerticalSectionActor::getTopPressure_hPa()
+{
+    return p_top_hPa;
+}
+
+
 const QList<MVerticalLevelType> MNWPVerticalSectionActor::supportedLevelTypes()
 {
     return (QList<MVerticalLevelType>()
@@ -620,7 +639,7 @@ void MNWPVerticalSectionActor::onQtPropertyChanged(QtProperty *property)
     {
         QString pressureLevelStr = properties->mString()->value(
                     pressureLineLevelsProperty);
-        parseIsoPressureLevelString(pressureLevelStr);
+        selectedPressureLineLevels = parsePressureLevelString(pressureLevelStr);
 
         if (suppressActorUpdates()) return;
 
@@ -825,7 +844,7 @@ void MNWPVerticalSectionActor::generatePathFromWaypoints(
         path.append(p);
 
         // Compute segment midpoint for interaction handle.
-        QVector2D p_mid = QVector2D(p1) + (QVector2D(p2)-QVector2D(p1)) / 2.;
+        QVector2D p_mid = p1 + (p2 - p1) / 2.;
         px = p_mid.x();
         if (px < gridLonMin) px += 360.; // see above
         if (px > gridLonMax) px -= 360.;
@@ -1050,6 +1069,12 @@ void MNWPVerticalSectionActor::renderToCurrentContext(MSceneViewGLWidget *sceneV
             if (renderFilledContours)
             {
                 sectionGridShader->bindProgram("Standard");
+
+                // Change the depth function to less and equal. This allows
+                // OpenGL to overwrite fragments with the same depths and thus
+                // allows the vsec actor to draw filled contours of more than
+                // one variable.
+                glDepthFunc(GL_LEQUAL);
             }
             else
             {
@@ -1168,6 +1193,8 @@ void MNWPVerticalSectionActor::renderToCurrentContext(MSceneViewGLWidget *sceneV
                                   2 * var->gridVerticalLevelCount,
                                   path.size() - 1); CHECK_GL_ERROR;
             glDisable(GL_POLYGON_OFFSET_FILL);
+            // Change the depth function back to its default value.
+            glDepthFunc(GL_LESS);
         } // sectionGridShader (interpolation, target grid, filled contours)
 
         // B) Contouring with the GPU Marching Squares implementation, if
@@ -1400,66 +1427,6 @@ void MNWPVerticalSectionActor::dataFieldChangedEvent()
 {
     targetGridToBeUpdated = true;
     emitActorChangedSignal();
-}
-
-
-bool MNWPVerticalSectionActor::parseIsoPressureLevelString(QString pressureLevelStr)
-{
-    // Clear the current list of pressure line levels; if pLevelStr does not
-    // match any accepted format no pressure lines are drawn.
-    selectedPressureLineLevels.clear();
-
-    // Empty strings, i.e. no pressure lines, are accepted.
-    if (pressureLevelStr.isEmpty()) return true;
-
-    // Match strings of format "[0,100,10]" or "[0.5,10,0.5]".
-    QRegExp rxRange("^\\[([\\-|\\+]*\\d+\\.*\\d*),([\\-|\\+]*\\d+\\.*\\d*),"
-                    "([\\-|\\+]*\\d+\\.*\\d*)\\]$");
-    // Match strings of format "1,2,3,4,5" or "0,0.5,1,1.5,5,10" (number of
-    // values is arbitrary).
-    QRegExp rxList("^([\\-|\\+]*\\d+\\.*\\d*,*)+$");
-
-    if (rxRange.exactMatch(pressureLevelStr))
-    {
-        QStringList rangeValues = rxRange.capturedTexts();
-
-        bool ok;
-        double from = rangeValues.value(1).toDouble(&ok);
-        double to   = rangeValues.value(2).toDouble(&ok);
-        double step = rangeValues.value(3).toDouble(&ok);
-
-        if (step > 0)
-        {
-            for (double d = from; d <= to; d += step)
-            {
-                selectedPressureLineLevels << d;
-            }
-        }
-        else if (step < 0)
-        {
-            for (double d = from; d >= to; d += step)
-            {
-                selectedPressureLineLevels << d;
-            }
-        }
-
-        return true;
-    }
-    else if (rxList.exactMatch(pressureLevelStr))
-    {
-        QStringList listValues = pressureLevelStr.split(",");
-
-        bool ok;
-        for (int i = 0; i < listValues.size(); i++)
-        {
-            selectedPressureLineLevels << listValues.value(i).toDouble(&ok);
-        }
-
-        return true;
-    }
-
-    // No RegExp could be matched.
-    return false;
 }
 
 

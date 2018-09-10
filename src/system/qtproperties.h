@@ -39,6 +39,8 @@
 namespace Met3D
 {
 
+class MSceneControl; // forward declaration
+
 enum MQtPropertyType
 {
     GROUP_PROPERTY,
@@ -149,6 +151,30 @@ public:
 
     QStringList getEnumItems(QtProperty* prop);
 
+    /**
+      Updates the list of enum items in @prop and tries to restores the
+      previously set item. If this is successful, @p true is returned; if
+      the previous item cannot be restored, @p false is returned.
+     */
+    bool updateEnumItems(QtProperty* prop, const QStringList& names);
+
+    /**
+      Sets the enum property @p property to that entry in @p availableValues
+      that is closest to @p value. If @p setSyncColour is @p true, property
+      colour will be updated in all @p scenes for which the @p property
+      appears.
+
+      @note As this is a template function its code is contained in the
+      additional header file "qtproperties_templates.h" that needs to be
+      included from any cpp file that uses this function.
+     */
+    template<typename T> bool setEnumPropertyClosest(
+            const QList<T>& availableValues,
+            const T& value,
+            QtProperty* property,
+            bool setSyncColour=true,
+            const QList<MSceneControl*>& scenes = QList<MSceneControl*>());
+
 private:
     QtGroupPropertyManager    *groupPropertyManager;
     QtBoolPropertyManager     *boolPropertyManager;
@@ -171,6 +197,7 @@ private:
 //    QtExtensions::QtConfigurableScientificDoublePropertyManager
 //                              *configurableScientificDoublePropertyManager;
 };
+
 
 } // namespace Met3D
 

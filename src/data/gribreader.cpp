@@ -53,7 +53,8 @@ MGribReader::MGribReader(QString identifier, QString surfacePressureFieldType,
                          bool disableGridConsistencyCheck)
     : MWeatherPredictionReader(identifier),
       surfacePressureFieldType(surfacePressureFieldType),
-      disableGridConsistencyCheck(disableGridConsistencyCheck)
+      disableGridConsistencyCheck(disableGridConsistencyCheck),
+      ensembleIDIsSpecifiedInFileName(false)
 {
     // Name of surface pressure field to reconstruct pressure for hybrid
     // coordinates. If set to "auto" set the string to empty here (will trigger
@@ -89,13 +90,14 @@ QList<MVerticalLevelType> MGribReader::availableLevelTypes()
 QStringList MGribReader::availableVariables(
         MVerticalLevelType levelType)
 {
+    // cf.  MClimateForecastReader::availableVariables() .
     QReadLocker availableItemsReadLocker(&availableItemsLock);
     if (!availableDataFields.keys().contains(levelType))
         throw MBadDataFieldRequest(
                 "unkown level type requested: " +
                 MStructuredGrid::verticalLevelTypeToString(levelType).toStdString(),
                 __FILE__, __LINE__);
-    return availableDataFields[levelType].keys();
+    return availableDataFields.value(levelType).keys();
 }
 
 
@@ -103,17 +105,19 @@ QSet<unsigned int> MGribReader::availableEnsembleMembers(
         MVerticalLevelType levelType,
         const QString&     variableName)
 {
+    // cf.  MClimateForecastReader::availableVariables() .
     QReadLocker availableItemsReadLocker(&availableItemsLock);
     if (!availableDataFields.keys().contains(levelType))
         throw MBadDataFieldRequest(
                 "unkown level type requested: " +
                 MStructuredGrid::verticalLevelTypeToString(levelType).toStdString(),
                 __FILE__, __LINE__);
-    if (!availableDataFields[levelType].keys().contains(variableName))
+    if (!availableDataFields.value(levelType).keys().contains(variableName))
         throw MBadDataFieldRequest(
                 "unkown variable requested: " + variableName.toStdString(),
                 __FILE__, __LINE__);
-    return availableDataFields[levelType][variableName]->availableMembers;
+    return availableDataFields.value(levelType).value(variableName)
+            ->availableMembers;
 }
 
 
@@ -121,17 +125,19 @@ QList<QDateTime> MGribReader::availableInitTimes(
         MVerticalLevelType levelType,
         const QString&     variableName)
 {
+    // cf.  MClimateForecastReader::availableVariables() .
     QReadLocker availableItemsReadLocker(&availableItemsLock);
     if (!availableDataFields.keys().contains(levelType))
         throw MBadDataFieldRequest(
                 "unkown level type requested: " +
                 MStructuredGrid::verticalLevelTypeToString(levelType).toStdString(),
                 __FILE__, __LINE__);
-    if (!availableDataFields[levelType].keys().contains(variableName))
+    if (!availableDataFields.value(levelType).keys().contains(variableName))
         throw MBadDataFieldRequest(
                 "unkown variable requested: " + variableName.toStdString(),
                 __FILE__, __LINE__);
-    return availableDataFields[levelType][variableName]->timeMap.keys();
+    return availableDataFields.value(levelType).value(variableName)
+            ->timeMap.keys();
 }
 
 
@@ -140,22 +146,23 @@ QList<QDateTime> MGribReader::availableValidTimes(
         const QString&     variableName,
         const QDateTime&   initTime)
 {
+    // cf.  MClimateForecastReader::availableVariables() .
     QReadLocker availableItemsReadLocker(&availableItemsLock);
     if (!availableDataFields.keys().contains(levelType))
         throw MBadDataFieldRequest(
                 "unkown level type requested: " +
                 MStructuredGrid::verticalLevelTypeToString(levelType).toStdString(),
                 __FILE__, __LINE__);
-    if (!availableDataFields[levelType].keys().contains(variableName))
+    if (!availableDataFields.value(levelType).keys().contains(variableName))
         throw MBadDataFieldRequest(
                 "unkown variable requested: " + variableName.toStdString(),
                 __FILE__, __LINE__);
-    if (!availableDataFields[levelType][variableName]->timeMap.keys().contains(initTime))
+    if (!availableDataFields.value(levelType).value(variableName)->timeMap.keys().contains(initTime))
         throw MBadDataFieldRequest(
                 "unkown init time requested: " +
                 initTime.toString(Qt::ISODate).toStdString(),
                 __FILE__, __LINE__);
-    return availableDataFields[levelType][variableName]->timeMap[initTime].keys();
+    return availableDataFields.value(levelType).value(variableName)->timeMap.value(initTime).keys();
 }
 
 
@@ -163,17 +170,18 @@ QString MGribReader::variableLongName(
         MVerticalLevelType levelType,
         const QString&     variableName)
 {
+    // cf.  MClimateForecastReader::availableVariables() .
     QReadLocker availableItemsReadLocker(&availableItemsLock);
     if (!availableDataFields.keys().contains(levelType))
         throw MBadDataFieldRequest(
                 "unkown level type requested: " +
                 MStructuredGrid::verticalLevelTypeToString(levelType).toStdString(),
                 __FILE__, __LINE__);
-    if (!availableDataFields[levelType].keys().contains(variableName))
+    if (!availableDataFields.value(levelType).keys().contains(variableName))
         throw MBadDataFieldRequest(
                 "unkown variable requested: " + variableName.toStdString(),
                 __FILE__, __LINE__);
-    return availableDataFields[levelType][variableName]->longname;
+    return availableDataFields.value(levelType).value(variableName)->longname;
 }
 
 
@@ -181,17 +189,19 @@ QString MGribReader::variableStandardName(
         MVerticalLevelType levelType,
         const QString&     variableName)
 {
+    // cf.  MClimateForecastReader::availableVariables() .
     QReadLocker availableItemsReadLocker(&availableItemsLock);
     if (!availableDataFields.keys().contains(levelType))
         throw MBadDataFieldRequest(
                 "unkown level type requested: " +
                 MStructuredGrid::verticalLevelTypeToString(levelType).toStdString(),
                 __FILE__, __LINE__);
-    if (!availableDataFields[levelType].keys().contains(variableName))
+    if (!availableDataFields.value(levelType).keys().contains(variableName))
         throw MBadDataFieldRequest(
                 "unkown variable requested: " + variableName.toStdString(),
                 __FILE__, __LINE__);
-    return availableDataFields[levelType][variableName]->standardname;
+    return availableDataFields.value(levelType).value(variableName)
+            ->standardname;
 }
 
 
@@ -199,17 +209,18 @@ QString MGribReader::variableUnits(
         MVerticalLevelType levelType,
         const QString&     variableName)
 {
+    // cf.  MClimateForecastReader::availableVariables() .
     QReadLocker availableItemsReadLocker(&availableItemsLock);
     if (!availableDataFields.keys().contains(levelType))
         throw MBadDataFieldRequest(
                 "unkown level type requested: " +
                 MStructuredGrid::verticalLevelTypeToString(levelType).toStdString(),
                 __FILE__, __LINE__);
-    if (!availableDataFields[levelType].keys().contains(variableName))
+    if (!availableDataFields.value(levelType).keys().contains(variableName))
         throw MBadDataFieldRequest(
                 "unkown variable requested: " + variableName.toStdString(),
                 __FILE__, __LINE__);
-    return availableDataFields[levelType][variableName]->units;
+    return availableDataFields.value(levelType).value(variableName)->units;
 }
 
 
@@ -221,17 +232,19 @@ QString MGribReader::variableSurfacePressureName(
         MVerticalLevelType levelType,
         const QString&     variableName)
 {
+    // cf.  MClimateForecastReader::availableVariables() .
     QReadLocker availableItemsReadLocker(&availableItemsLock);
     if (!availableDataFields.keys().contains(levelType))
         throw MBadDataFieldRequest(
                 "unkown level type requested: " +
                 MStructuredGrid::verticalLevelTypeToString(levelType).toStdString(),
                 __FILE__, __LINE__);
-    if (!availableDataFields[levelType].keys().contains(variableName))
+    if (!availableDataFields.value(levelType).keys().contains(variableName))
         throw MBadDataFieldRequest(
                 "unkown variable requested: " + variableName.toStdString(),
                 __FILE__, __LINE__);
-    return availableDataFields[levelType][variableName]->surfacePressureName;
+    return availableDataFields.value(levelType).value(variableName)
+            ->surfacePressureName;
 }
 
 
@@ -239,40 +252,45 @@ QString MGribReader::variableAuxiliaryPressureName(
         MVerticalLevelType levelType,
         const QString&     variableName)
 {
+    // cf.  MClimateForecastReader::availableVariables() .
     QReadLocker availableItemsReadLocker(&availableItemsLock);
     if (!availableDataFields.keys().contains(levelType))
         throw MBadDataFieldRequest(
                 "unkown level type requested: " +
                 MStructuredGrid::verticalLevelTypeToString(levelType).toStdString(),
                 __FILE__, __LINE__);
-    if (!availableDataFields[levelType].keys().contains(variableName))
+    if (!availableDataFields.value(levelType).keys().contains(variableName))
         throw MBadDataFieldRequest(
                 "unkown variable requested: " + variableName.toStdString(),
                 __FILE__, __LINE__);
-    return availableDataFields[levelType][variableName]->auxiliaryPressureName;
+    return availableDataFields.value(levelType).value(variableName)
+            ->auxiliaryPressureName;
 }
 
 
 MHorizontalGridType MGribReader::variableHorizontalGridType(MVerticalLevelType levelType,
                                    const QString&     variableName)
 {
+    // cf.  MClimateForecastReader::availableVariables() .
     QReadLocker availableItemsReadLocker(&availableItemsLock);
     if (!availableDataFields.keys().contains(levelType))
         throw MBadDataFieldRequest(
                 "unkown level type requested: " +
                 MStructuredGrid::verticalLevelTypeToString(levelType).toStdString(),
                 __FILE__, __LINE__);
-    if (!availableDataFields[levelType].keys().contains(variableName))
+    if (!availableDataFields.value(levelType).keys().contains(variableName))
         throw MBadDataFieldRequest(
                 "unkown variable requested: " + variableName.toStdString(),
                 __FILE__, __LINE__);
-    return availableDataFields[levelType][variableName]->horizontalGridType;
+    return availableDataFields.value(levelType).value(variableName)
+            ->horizontalGridType;
 }
 
 
 QVector2D MGribReader::variableRotatedNorthPoleCoordinates(
         MVerticalLevelType levelType, const QString& variableName)
 {
+    // cf.  MClimateForecastReader::availableVariables() .
     QReadLocker availableItemsReadLocker(&availableItemsLock);
     if (!availableDataFields.keys().contains(levelType))
     {
@@ -281,14 +299,14 @@ QVector2D MGribReader::variableRotatedNorthPoleCoordinates(
                     MStructuredGrid::verticalLevelTypeToString(levelType).toStdString(),
                     __FILE__, __LINE__);
     }
-    if (!availableDataFields[levelType].keys().contains(variableName))
+    if (!availableDataFields.value(levelType).keys().contains(variableName))
     {
         throw MBadDataFieldRequest(
                     "unkown variable requested: " + variableName.toStdString(),
                     __FILE__, __LINE__);
     }
-    if (availableDataFields[levelType][variableName]->horizontalGridType
-            != ROTATED_LONLAT)
+    if (availableDataFields.value(levelType).value(variableName)
+            ->horizontalGridType != ROTATED_LONLAT)
     {
         throw MBadDataFieldRequest(
                     "Rotated north pole coordinates requested for grid not "
@@ -300,10 +318,10 @@ QVector2D MGribReader::variableRotatedNorthPoleCoordinates(
 
     //    QVector2D coordinates;
     //    coordinates.setX(
-    //                availableDataFields[levelType][variableName]
+    //                availableDataFields.value(levelType).value(variableName)
     //                ->rotatedNorthPoleLon);
     //    coordinates.setY(
-    //                availableDataFields[levelType][variableName]
+    //                availableDataFields.value(levelType).value(variableName)
     //                ->rotatedNorthPoleLat);
     QVector2D coordinates(0.f, 0.f);
     return coordinates;
@@ -642,17 +660,25 @@ void MGribReader::scanDataRoot()
     LOG4CPLUS_DEBUG(mlog, "Scanning directory "
                     << dataRoot.absolutePath().toStdString() << " "
                     << "for grib files with forecast data.");
-    LOG4CPLUS_DEBUG(mlog, "Using file filter: " << fileFilter.toStdString());
+    LOG4CPLUS_DEBUG(mlog, "Using file filter: " << dirFileFilters.toStdString());
     LOG4CPLUS_DEBUG(mlog, "Available files:" << flush);
 
     // Get a list of all files in the directory that match the wildcard name
-    // filter given in "fileFilter".
-    QStringList availableFiles = dataRoot.entryList(
-                QStringList(fileFilter), QDir::Files);
+    // filter given in "dirFileFilters".
+
+    QStringList availableFiles;
+    getAvailableFilesFromFilters(availableFiles);
+
+    ensembleIDIsSpecifiedInFileName = dirFileFilters.contains("%m");
+    int  ensembleIDFromFile = -1;
+
+    // Create and initialise progress bar.
+    initializeFileScanProgressDialog(availableFiles.size());
 
     // Scan all grib files contained in the directory.
     foreach (QString gribFileName, availableFiles)
     {
+        updateFileScanProgressDialog();
         // (Skip index files.)
         if (gribFileName.endsWith("met3d_grib_index")) continue;
 
@@ -830,6 +856,21 @@ void MGribReader::scanDataRoot()
                 continue;
             }
 
+            if (ensembleIDIsSpecifiedInFileName)
+            {
+                ensembleIDFromFile = getEnsembleMemberIDFromFileName(gribFileName);
+
+                if (ensembleIDFromFile == -1)
+                {
+                    LOG4CPLUS_ERROR(mlog, "ERROR: ensemble tag found in file filter "
+                                          " but filter did not match file \""
+                                    << gribFileName.toStdString()
+                                    << "\" (currently only integer values are allowed"
+                                       " as ensemble member specifiers)." << flush);
+                    continue;
+                }
+            }
+
             // Open a new index file.
             QFile indexFile(fileIndexPath);
             indexFile.open(QIODevice::WriteOnly);
@@ -865,11 +906,24 @@ void MGribReader::scanDataRoot()
                 // Determine type of data fields (analysis, deterministic,
                 // ensemble). Append type to variable name so variables with
                 // the same name but different types can be distinguished).
-                QString dataType = getGribStringKey(gribHandle, "ls.dataType");
-                // LOG4CPLUS_DEBUG(mlog, "ls.dataType: " << dataType.toStdString());
-                // Perturbed (pf) and control (cf) forecasts are combined into
-                // "ensemble" (ens) forecasts.
-                if ( (dataType == "pf") || (dataType == "cf") ) dataType = "ens";
+                // If ensemble members are stored implicitly, all variables 
+                // read are of ensemble data type.
+                QString dataType = "";
+                if (!ensembleIDIsSpecifiedInFileName)
+                {
+                    dataType = getGribStringKey(gribHandle, "ls.dataType");
+                    // LOG4CPLUS_DEBUG(mlog, "ls.dataType: " << dataType.toStdString());
+                    // Perturbed (pf) and control (cf) forecasts are combined into
+                    // "ensemble" (ens) forecasts.
+                    if ( (dataType == "pf") || (dataType == "cf"))
+                    {
+                        dataType = "ens";
+                    }
+                }
+                else
+                {
+                    dataType = "ens";
+                }
 
                 // Currently Met.3D can only handle data fields on a regular
                 // lat/lon grid in the horizontal.
@@ -1082,8 +1136,16 @@ void MGribReader::scanDataRoot()
                 long ensMember = 0;
                 if (vinfo->fcType == ENSEMBLE_FORECAST)
                 {
-                    ensMember = getGribLongKey(gribHandle, "perturbationNumber");
-                    // LOG4CPLUS_DEBUG(mlog, "perturbationNumber: " << ensMember);
+                    if (ensembleIDIsSpecifiedInFileName)
+                    {
+                        ensMember = ensembleIDFromFile;
+                    }
+                    else
+                    {
+                        ensMember = getGribLongKey(gribHandle,
+                                                   "perturbationNumber");
+                        // LOG4CPLUS_DEBUG(mlog, "perturbationNumber: " << ensMember);
+                    }
                 }
                 vinfo->availableMembers.insert(ensMember);
                 vinfo->availableMembers_bitfield |= (Q_UINT64_C(1) << ensMember);
@@ -1193,6 +1255,7 @@ void MGribReader::scanDataRoot()
 #endif
     } // for (files)
 
+    deleteFileScanProgressDialog();
 
     QString horizontalRefVarName = "";
     MVerticalLevelType referenceLevelType;
@@ -1695,12 +1758,22 @@ void MGribReader::detectSurfacePressureFieldType(QStringList *availableFiles)
 #ifdef ENABLE_MET3D_STOPWATCH
     MStopwatch stopwatch;
 #endif
-
+        LOG4CPLUS_DEBUG(mlog, "Searching for surface pressure field type..."
+                              " this may take a while... please wait." << flush);
         // Scan all grib files contained in the directory and search for
         // a surface pressure field. (Only use grib files directly
         // since there is no speed up when using index files.)
+
+        initializeFileScanProgressDialog(
+                    availableFiles->size(),
+                    "Scanning grib files to determine surface pressure variable"
+                    " (\"sp\" or \"lnsp\").\nThis scan can be avoided by"
+                    " specifying the variable in the pipeline configuration"
+                    " (currently set to \"auto\")");
+
         foreach (QString gribFileName, *availableFiles)
         {
+            updateFileScanProgressDialog();
             // (Skip index files.)
             if (gribFileName.endsWith("met3d_grib_index")) continue;
             QString filePath = dataRoot.filePath(gribFileName);
@@ -1738,6 +1811,8 @@ void MGribReader::detectSurfacePressureFieldType(QStringList *availableFiles)
             }
             fclose(gribfile);
         } // foreach loop grib files
+
+        deleteFileScanProgressDialog();
 
         // No surface pressure field found.
         if (surfacePressureFieldType == "")

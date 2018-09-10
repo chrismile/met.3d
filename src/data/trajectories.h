@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2015-2018 Marc Rautenhaus
+**  Copyright 2017      Philipp Kaiser
 **  Copyright 2017      Michael Kern
 **
 **  Computer Graphics and Visualization Group
@@ -110,8 +111,8 @@ public:
 protected:
     friend class MIsosurfaceIntersectionSource;
     friend class MLineGeometryFilter;
-    GLint* startIndices;
-    GLsizei* indexCount;
+    GLint   *startIndices;
+    GLsizei *indexCount;
     int      maxNumTrajectories;
 
     QVector<QDateTime> times;
@@ -314,6 +315,16 @@ public:
      */
     void copyVertexDataFrom(float *lons, float *lats, float *pres);
 
+    /**
+      Copies data from the given vector (numTrajectories ->
+      numTimeStepsPerTrajectory -> (longitude in degrees, latitude in degrees,
+      pressure in hPa) to the internal QVector-based vertex array.
+
+      Used to copy vertex data from trajectories variable during trajectory
+      computation.
+    */
+    void copyVertexDataFrom(QVector<QVector<QVector3D>> &vertices);
+
     const QVector<QVector3D>& getVertices() { return vertices; }
 
     /**
@@ -381,6 +392,8 @@ public:
     void releaseVertexBuffer();
 
 private:
+    QVector<QVector3D> vertices;
+    std::shared_ptr<MStructuredGrid> startGrid;
 
     QVector<ArrowHeadVertex> arrowHeads;
 };

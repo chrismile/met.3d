@@ -630,6 +630,32 @@ void MTransferFunction1D::loadConfiguration(QSettings *settings)
 }
 
 
+QColor MTransferFunction1D::getColorValue(const float scalar) const
+{
+    float t = (scalar - minimumValue) / (maximumValue - minimumValue);
+    t = std::min(std::max(t, 0.0f), 1.0f);
+    const int numColors = colorValues.size() / 4;
+
+    float index = 0;
+    float fract = std::modf(t * (numColors - 1), &index);
+    index = std::max(std::min(index, float(numColors - 1)), 0.0f);
+
+    int minIndex = static_cast<int>(index) * 4;
+    int maxIndex = std::min(static_cast<int>(index + 1), numColors - 1) * 4;
+
+    auto r = static_cast<unsigned char>((fract * colorValues[maxIndex++]
+                                 + (1 - fract) * colorValues[minIndex++]));
+    auto g = static_cast<unsigned char>((fract * colorValues[maxIndex++]
+                                 + (1 - fract) * colorValues[minIndex++]));
+    auto b = static_cast<unsigned char>((fract * colorValues[maxIndex++]
+                                 + (1 - fract) * colorValues[minIndex++]));
+    auto a = static_cast<unsigned char>((fract * colorValues[maxIndex]
+                                 + (1 - fract) * colorValues[minIndex]));
+
+    return QColor(r, g, b, a);
+}
+
+
 /******************************************************************************
 ***                          PROTECTED METHODS                              ***
 *******************************************************************************/
@@ -644,7 +670,7 @@ void MTransferFunction1D::generateTransferTexture()
     int numSteps = properties->mInt()->value(numStepsProperty);
 
     // Generate an RGBA * numSteps float array to accomodate the texture.
-    unsigned char *textureImage = new unsigned char[4 * numSteps];
+    colorValues.resize(4 * numSteps);
 
     // Which type of colourmap are we using?
     MColourmapType cmaptype = MColourmapType(
@@ -684,10 +710,10 @@ void MTransferFunction1D::generateTransferTexture()
                         max(min(hslL + lightnessAdjust, 255), 0),
                         alpha);
 
-            textureImage[n++] = (unsigned char)(rgba.redF() * 255);
-            textureImage[n++] = (unsigned char)(rgba.greenF() * 255);
-            textureImage[n++] = (unsigned char)(rgba.blueF() * 255);
-            textureImage[n++] = (unsigned char)(rgba.alphaF() * 255);
+            colorValues[n++] = (unsigned char)(rgba.redF() * 255);
+            colorValues[n++] = (unsigned char)(rgba.greenF() * 255);
+            colorValues[n++] = (unsigned char)(rgba.blueF() * 255);
+            colorValues[n++] = (unsigned char)(rgba.alphaF() * 255);
         }
 
         break;
@@ -741,10 +767,10 @@ void MTransferFunction1D::generateTransferTexture()
         {
             float  scalar = float(i) / float(numSteps-1);
             QColor rgba   = cmap->scalarToColour(reverse ? 1.-scalar : scalar);
-            textureImage[n++] = (unsigned char)(rgba.redF() * 255);
-            textureImage[n++] = (unsigned char)(rgba.greenF() * 255);
-            textureImage[n++] = (unsigned char)(rgba.blueF() * 255);
-            textureImage[n++] = (unsigned char)(rgba.alphaF() * 255);
+            colorValues[n++] = (unsigned char)(rgba.redF() * 255);
+            colorValues[n++] = (unsigned char)(rgba.greenF() * 255);
+            colorValues[n++] = (unsigned char)(rgba.blueF() * 255);
+            colorValues[n++] = (unsigned char)(rgba.alphaF() * 255);
         }
 
         break;
@@ -768,10 +794,10 @@ void MTransferFunction1D::generateTransferTexture()
         {
             float  scalar = float(i) / float(numSteps-1);
             QColor rgba   = cmap->scalarToColour(reverse ? 1.-scalar : scalar);
-            textureImage[n++] = (unsigned char)(rgba.redF() * 255);
-            textureImage[n++] = (unsigned char)(rgba.greenF() * 255);
-            textureImage[n++] = (unsigned char)(rgba.blueF() * 255);
-            textureImage[n++] = (unsigned char)(rgba.alphaF() * 255);
+            colorValues[n++] = (unsigned char)(rgba.redF() * 255);
+            colorValues[n++] = (unsigned char)(rgba.greenF() * 255);
+            colorValues[n++] = (unsigned char)(rgba.blueF() * 255);
+            colorValues[n++] = (unsigned char)(rgba.alphaF() * 255);
         }
 
         break;
@@ -783,10 +809,10 @@ void MTransferFunction1D::generateTransferTexture()
 
         for (int i = 0; i < numSteps; i++)
         {
-            textureImage[i * 4 + 0] = (unsigned char)qRed(tex[i]);
-            textureImage[i * 4 + 1] = (unsigned char)qGreen(tex[i]);
-            textureImage[i * 4 + 2] = (unsigned char)qBlue(tex[i]);
-            textureImage[i * 4 + 3] = (unsigned char)qAlpha(tex[i]);
+            colorValues[i * 4 + 0] = (unsigned char)qRed(tex[i]);
+            colorValues[i * 4 + 1] = (unsigned char)qGreen(tex[i]);
+            colorValues[i * 4 + 2] = (unsigned char)qBlue(tex[i]);
+            colorValues[i * 4 + 3] = (unsigned char)qAlpha(tex[i]);
         }
         break;
     }
@@ -836,10 +862,8 @@ void MTransferFunction1D::generateTransferTexture()
                      0,                         // border
                      GL_RGBA,                   // format
                      GL_UNSIGNED_BYTE,          // data type of the pixel data
-                     textureImage); CHECK_GL_ERROR;
+                     colorValues.data()); CHECK_GL_ERROR;
     }
-
-    delete[] textureImage;
 }
 
 
@@ -964,7 +988,7 @@ void MTransferFunction1D::onQtPropertyChanged(QtProperty *property)
 
     else if (property == valueStepProperty)
     {
-        int step = properties->mSciDouble()->value(valueStepProperty);
+        double step = properties->mSciDouble()->value(valueStepProperty);
         properties->mSciDouble()->setSingleStep(minimumValueProperty, step);
         properties->mSciDouble()->setSingleStep(maximumValueProperty, step);
     }

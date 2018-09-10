@@ -89,6 +89,7 @@ MSessionManagerDialog::MSessionManagerDialog(QWidget *parent) :
     connect(ui->deleteButton, SIGNAL(clicked()), this, SLOT(deleteSession()));
     connect(ui->reloadButton, SIGNAL(clicked()), this, SLOT(reloadSession()));
     connect(ui->saveButton, SIGNAL(clicked()), this, SLOT(saveSession()));
+    connect(ui->saveAsButton, SIGNAL(clicked()), this, SLOT(saveSessionAs()));
     // Double click event on an item of the list widget should lead to rename of
     // the item.
     connect(ui->sessionsListView, SIGNAL(doubleClicked(QModelIndex)),
@@ -303,9 +304,10 @@ void MSessionManagerDialog::changeDirectory()
 }
 
 
-void MSessionManagerDialog::createNewSession()
+void MSessionManagerDialog::createNewSession(bool createEmptySession,
+                                             QString sessionName)
 {
-    // Don't save session if Met.3D hat no write access to directory.
+    // Don't save session if Met.3D has no write access to directory.
     if (!QFileInfo(path).isWritable())
     {
         QMessageBox::information(
@@ -314,28 +316,16 @@ void MSessionManagerDialog::createNewSession()
                     "Please select a different directory.");
         return;
     }
+
     bool ok = false;
-
-    QString sessionName = "defaultSession";
-
-    QDir directory(path);
-
-    // If defaultSession already exists, append smallest index possible to
-    // create a unique name with.
-
-    QStringList sessions =
-            directory.entryList(QStringList("*" + fileExtension),
-                                QDir::Files);
-    if (sessions.contains(sessionName + fileExtension))
-    {
-        int index = getSmallestIndexForUniqueName(sessionName);
-        sessionName = sessionName + QString(" (%1)").arg(index);
-    }
 
     // Let the name input dialog reappear until the user enters a unique,
     // non-empty name or pushes cancel.
     while (sessionName.isEmpty() || !ok)
     {
+        sessionName = sessionName
+                + getAppendixWithSmallestIndexForUniqueName(sessionName);
+
         sessionName = QInputDialog::getText(
                     this, "Create new session",
                     "Please enter a name for the session",
@@ -349,8 +339,17 @@ void MSessionManagerDialog::createNewSession()
 
         ok = isValidSessionName(sessionName);
     }
-    // Save new session file.
-    saveSessionToFile(sessionName);
+
+    if (createEmptySession)
+    {
+        resetSession();
+        saveSessionToFile(sessionName);
+    }
+    else
+    {
+        // Save new session file.
+        saveSessionToFile(sessionName);
+    }
     // Set current to newly created session.
     setSessionToCurrent(sessionName);
 }
@@ -373,7 +372,7 @@ void MSessionManagerDialog::autoSaveSession()
 
 void MSessionManagerDialog::saveSession(bool autoSave)
 {
-    // Don't save session if Met.3D hat no write access to the directory.
+    // Don't save session if Met.3D has no write access to the directory.
     if (!QFileInfo(path).isWritable())
     {
         QMessageBox::warning(
@@ -391,7 +390,22 @@ void MSessionManagerDialog::saveSession(bool autoSave)
     // a new session.
     else
     {
-        createNewSession();
+        createNewSession(false);
+    }
+}
+
+
+void MSessionManagerDialog::saveSessionAs()
+{
+    if (currentSession != "")
+    {
+        // If present, use current session name to create name-suggestion for
+        // new session.
+        createNewSession(false, currentSession);
+    }
+    else
+    {
+        createNewSession(false);
     }
 }
 
@@ -407,28 +421,23 @@ void MSessionManagerDialog::cloneSession()
         msg.exec();
         return;
     }
-
-    bool ok = false;
     QString sessionToClone =
             ui->sessionsListView->currentIndex().data().toString();
 
-    // Get smallest index to append to get unique session name.
-    // =========================================================
+    QString sessionName = sessionToClone;
 
-    int index = getSmallestIndexForUniqueName(sessionToClone);
-
-    // =========================================================
-
-    QString cloneName = sessionToClone + QString(" (%1)").arg(index);
-    QString sessionName = "";
+    bool ok = false;
 
     while (sessionName.isEmpty() || !ok)
     {
+        sessionName = sessionName
+                + getAppendixWithSmallestIndexForUniqueName(sessionName);
+
         sessionName = QInputDialog::getText(
                     this, "Clone session " + sessionToClone,
                     "Please enter a name for the new session",
                     QLineEdit::Normal,
-                    cloneName, &ok);
+                    sessionName, &ok);
 
         if (!ok)
         {
@@ -438,6 +447,27 @@ void MSessionManagerDialog::cloneSession()
         ok = isValidSessionName(sessionName);
     }
 
+    if (currentSession == sessionToClone)
+    {
+        QMessageBox::StandardButton reply =
+                QMessageBox::question(
+                    this, "Clone session " + sessionToClone,
+                    QString("You are cloning the current session."
+                            "\nIts save file might contain an old version of"
+                            " the current session."
+                            "\nDo you want to save the current session '%1'"
+                            " before cloning it?").arg(currentSession),
+                    QMessageBox::Yes|QMessageBox::No|QMessageBox::Cancel,
+                    QMessageBox::No);
+        if (reply == QMessageBox::Yes)
+        {
+            saveSessionToFile(sessionName);
+        }
+        else if (reply == QMessageBox::Cancel)
+        {
+            return;
+        }
+    }
     QFile file(QDir(path).absoluteFilePath(sessionToClone + fileExtension));
     file.copy(QDir(path).absoluteFilePath(sessionName + fileExtension));
 }
@@ -527,7 +557,13 @@ void MSessionManagerDialog::fillSessionsList()
                 sessionFileSystemModel->index(row, 0, rootIndex);
         sessionsList << sessionFileSystemModel->fileName(rowIndex);
     }
-    qSort(sessionsList);
+
+    // Sort list case insensitive (using qSort is case sensitive).
+    std::sort(sessionsList.begin(), sessionsList.end(), [](QString a, QString b)
+    {
+        return a.toLower() <= b.toLower();
+    });
+
     MSystemManagerAndControl::getInstance()->getMainWindow()
             ->onSessionsListChanged(&sessionsList, currentSession);
 }
@@ -699,6 +735,13 @@ void MSessionManagerDialog::deleteSession()
                 QFile file(QDir(path).absoluteFilePath(sessionRevision));
                 file.remove();
             }
+
+            // User deleted current session thus currentSession needs to be
+            // cleared.
+            if (sessionName == currentSession)
+            {
+                setSessionToCurrent("");
+            }
         }
     }
 }
@@ -787,7 +830,7 @@ bool MSessionManagerDialog::saveSessionOnAppExit()
             }
         }
     }
-    // Don't save session if Met.3D hat no write access to the directory.
+    // Don't save session if Met.3D has no write access to the directory.
     while (!QFileInfo(path).isWritable())
     {
         QMessageBox::warning(
@@ -867,6 +910,74 @@ void MSessionManagerDialog::setSessionToCurrent(QString session)
                 currentSession);
 
     fillCurrentSessionHistoryList();
+}
+
+
+void MSessionManagerDialog::resetSession()
+{
+    LOG4CPLUS_DEBUG(mlog, "Resetting session...");
+
+    MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
+    MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
+    QSettings *settings = new QSettings();
+
+    // Reset session to default values by loading empty settings object.
+
+    // General.
+    // ========
+    sysMC->setHandleSize(.5);
+
+    // Sync controls.
+    // ==============
+    QStringList syncNames = sysMC->getSyncControlIdentifiers();
+    // Remove "None" from list of sync control ids.
+    syncNames.removeFirst();
+    foreach (QString syncName, syncNames)
+    {
+        MSyncControl *syncControl = sysMC->getSyncControl(syncName);
+        syncControl->loadConfiguration(settings);
+    }
+
+    // Remove Actors.
+    // ==============
+    // List actor names which are not part of the session.
+    foreach (MActor *actor, glRM->getActors())
+    {
+        // Skip actors not deletable by ths user. (e.g. Labels Actor)
+        if (!actor->getActorIsUserDeletable())
+        {
+            continue;
+        }
+        foreach (MSceneControl *scene, actor->getScenes())
+        {
+            if (glRM->getScenes().contains(scene))
+            {
+                scene->removeActorByName(actor->getName());
+            }
+        }
+        actor->clearScenes();
+        // Delete actor.
+        glRM->deleteActor(actor);
+    }
+
+    // Scene views.
+    // ============
+    QList<MSceneViewGLWidget*> sceneViews = sysMC->getRegisteredViews();
+    QList<MSceneControl *> sceneList = glRM->getScenes();
+    int numSceneViews = sceneViews.size();
+    int numScenes = sceneList.size();
+    for (int i = 0; i < numSceneViews; i++)
+    {
+        sceneViews[i]->loadConfiguration(settings);
+        QString sceneName = sceneList[min(i, numScenes - 1)]->getName();
+        sceneViews[i]->setScene(glRM->getScene(sceneName));
+    }
+
+    // Window Layout.
+    // ==============
+    sysMC->getMainWindow()->loadConfiguration(settings);
+
+    delete settings;
 }
 
 
@@ -1155,8 +1266,8 @@ void MSessionManagerDialog::loadSessionFromFile(QString sessionName,
     settings->beginGroup("MSyncControls");
     QStringList syncControlsToDelete = sysMC->getSyncControlIdentifiers();
     // Remove the "None" synchronisation control from the list of sync controls
-    // to delete.
-    syncControlsToDelete.removeFirst();
+    // to be deleted.
+    syncControlsToDelete.removeOne("None");
     QStringList syncNames = settings->value("syncControls",
                                             QStringList()).toStringList();
     // Get sync controls which are present at the moment but not part of the
@@ -1175,6 +1286,14 @@ void MSessionManagerDialog::loadSessionFromFile(QString sessionName,
 
     foreach (QString syncName, syncNames)
     {
+        // Do not create sync controls with invalid object names.
+        if (!isValidObjectName(syncName))
+        {
+            LOG4CPLUS_WARN(mlog, "'" << syncName.toStdString()
+                           << "' is an invalid sync control name; skipping.");
+            continue;
+        }
+
         MSyncControl *syncControl = sysMC->getSyncControl(syncName);
         // Create new sync control if none with this names exists.
         if (syncControl == nullptr)
@@ -1211,7 +1330,7 @@ void MSessionManagerDialog::loadSessionFromFile(QString sessionName,
     {
         settings->setArrayIndex(i);
         QString waypointsModelID = settings->value("name", "").toString();
-        if (waypointsModelID != "")
+        if (waypointsModelID != "" && isValidObjectName(waypointsModelID))
         {
             sysMC->getWaypointsModel(waypointsModelID)->loadFromSettings(
                         settings);
@@ -1267,10 +1386,18 @@ void MSessionManagerDialog::loadSessionFromFile(QString sessionName,
         settings->beginGroup(QString("MActor_%1").arg(i));
         QString actorName = settings->value("actorName", "").toString();
         QString actorType = settings->value("actorType", "").toString();
-        // Skip actor if it has no name or its type does not fit any present
-        // actor type.
-        if (actorName == "" || !factoryNames.contains(actorType))
+        // Skip actor if it has no name, its type does not fit any present
+        // actor type or its name is invalid.
+        // NOTE: Don't check if the actor name already exists since actors
+        // won't be deleted thereby when e.g. reloading a session actors don't
+        // need to be deleted and recreated but only their configurtation needs
+        // to be loaded.
+        if (actorName == "" || !factoryNames.contains(actorType)
+                || !isValidObjectName(actorName))
         {
+            LOG4CPLUS_WARN(mlog, "'" << actorName.toStdString()
+                           << "': encountered invalid actor name or type;"
+                              " skipping.");
             settings->endGroup();
             continue;
         }
@@ -1598,13 +1725,20 @@ bool MSessionManagerDialog::isValidSessionName(QString sessionName)
 }
 
 
-int MSessionManagerDialog::getSmallestIndexForUniqueName(QString sessionName)
+QString MSessionManagerDialog::getAppendixWithSmallestIndexForUniqueName(
+        QString sessionName)
 {
     QDir directory(path);
     // Get all files with the right file extension.
     QStringList sessions =
             directory.entryList(QStringList("*" + fileExtension),
                                 QDir::Files);
+
+    if (!sessions.contains(sessionName + fileExtension))
+    {
+        return QString();
+    }
+
     // Get regular expression which matches the file extension by escaping
     // special regular expression characters.
     QString regExpFileExt = QRegExp::escape(fileExtension);
@@ -1613,6 +1747,7 @@ int MSessionManagerDialog::getSmallestIndexForUniqueName(QString sessionName)
     sessions = sessions.filter(QRegExp(QRegExp::escape(sessionName)
                                        + "\\s\\((\\d|([1-9]\\d+))\\)"
                                        + regExpFileExt));
+
     QList<int> numbers;
     numbers.clear();
     QRegExp regExpNumbers("\\d+");
@@ -1655,7 +1790,8 @@ int MSessionManagerDialog::getSmallestIndexForUniqueName(QString sessionName)
             }
         }
     }
-    return index;
+
+    return QString(" (%1)").arg(index);
 }
 
 

@@ -43,6 +43,7 @@
 #include "data/structuredgrid.h"
 #include "data/weatherpredictiondatasource.h"
 #include "data/singlevariableanalysis.h"
+#include "data/gridaggregation.h"
 #include "actors/transferfunction1d.h"
 #include "actors/spatial1dtransferfunction.h"
 #include "util/mstopwatch.h"
@@ -171,6 +172,8 @@ public:
      */
     bool hasData();
 
+    QString debugOutputAsString();
+
     /* Data loader and variable specifications. */
     QString                       dataSourceID;
     MWeatherPredictionDataSource *dataSource;
@@ -179,6 +182,17 @@ public:
 
     /* CPU memory object that stores the current data field. */
     MStructuredGrid *grid;
+
+    /**
+      Special case for ensemble mode "multiple members": This NWPActorVariable
+      keeps its own instance of a grid aggregation source that assembles the
+      required set of multiple ensemble member grids.
+     */
+    //TODO (mr, 18Apr2018) -- This architecture should probably be changed to
+    //  aggregation sources in the generic pipelines. May change in the future.
+    MGridAggregationDataSource *aggregationDataSource;
+    MGridAggregation *gridAggregation;
+    bool multipleEnsembleMembersEnabled;
 
     /* OpenGL GPU texture objects and units that belong to this variable. */
     GL::MTexture *textureDataField;
@@ -265,6 +279,7 @@ protected:
     friend class MVerticalRegridProperties;
 
     virtual void releaseDataItems();
+    virtual void releaseAggregatedDataItems();
 
     /**
       Determine the current time value of the given enum property.
@@ -404,13 +419,6 @@ private:
     bool internalSetDateTime(const QList<QDateTime>& availableTimes,
                              const QDateTime& datetime,
                              QtProperty* timeProperty);
-
-
-    template<typename T> bool setEnumPropertyClosest(
-            const QList<T>& availableValues,
-            const T& value,
-            QtProperty* property,
-            bool setSyncColour=true);
 
     void runStatisticalAnalysis(double significantDigits,
                                 int histogramDisplayMode);
@@ -611,10 +619,10 @@ public:
             ContourSettings *contourSet = nullptr);
 
     /**
-     * Returns the contour labels of each variable that can be rendered on the screen.
-     * @p noOverlapping determines if these labels may overlap. Otherwise the pixel
-     * size of each label is computed according to the current @p sceneView and
-     * overlap tests are performed.
+      Returns the contour labels of each variable that can be rendered on the screen.
+      @p noOverlapping determines if these labels may overlap. Otherwise the pixel
+      size of each label is computed according to the current @p sceneView and
+      overlap tests are performed.
      */
     QList<MLabel*> getContourLabels(bool noOverlapping = false,
                                     MSceneViewGLWidget* sceneView = nullptr);
@@ -629,6 +637,7 @@ public:
 
 protected:
     friend class MNWPHorizontalSectionActor;
+    friend class MNWPSurfaceTopographyActor;
 
     void dataFieldChangedEvent() override;
 

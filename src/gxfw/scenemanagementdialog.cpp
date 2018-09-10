@@ -369,8 +369,8 @@ void MSceneManagementDialog::createActor()
 
     const QString actorName = actorCreationDialog.getActorName();
 
-    // if there's already an actor with the same name
-    // do not create a new actor
+    // If there is already an actor with the same name, do not create a new
+    // actor.
     if (glRM->getActorByName(actorName))
     {
         QMessageBox msg;
@@ -380,21 +380,32 @@ void MSceneManagementDialog::createActor()
         msg.exec();
         return;
     }
+    // If the name of the actor is an invalid object name, do not create a new
+    // actor.
+    if (!isValidObjectName(actorName))
+    {
+        QMessageBox msg;
+        msg.setWindowTitle("Error");
+        msg.setText("''" + actorName + "'' is not a valid actor name.");
+        msg.setIcon(QMessageBox::Warning);
+        msg.exec();
+        return;
+    }
 
     MActor* actor = actorCreationDialog.createActorInstance();
 
-    // if no actor was created then return;
+    // If no actor was created then return;
     if (!actor) return;
 
-    // initialize all shaders and graphical resources of actor
+    // Initialize all shaders and graphical resources of actor.
     actor->initialize();
 
-    // register actor in resource manager
+    // Register actor in resource manager.
     glRM->registerActor(actor);
 
-    // update GUI elements
+    // Update GUI elements ..
     QListWidgetItem* item = new QListWidgetItem(actorName, ui->actorPoolListWidget);
-    // and select it in actor pool list
+    // .. and select it in actor pool list.
     ui->actorPoolListWidget->setCurrentItem(item);
 }
 

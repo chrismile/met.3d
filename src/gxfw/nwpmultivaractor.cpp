@@ -251,6 +251,10 @@ void MNWPMultiVarActor::loadConfiguration(QSettings *settings)
 
     LOG4CPLUS_DEBUG(mlog, "Creating new actor variables:");
 
+    // Index of variable with respect to variable list not containing variables
+    // which were not loaded.
+    int varIndex = 0;
+
     for (int vi = 0; vi < numVariables; vi++)
     {
         settings->beginGroup(QString("Variable_%1").arg(vi));
@@ -300,6 +304,7 @@ void MNWPMultiVarActor::loadConfiguration(QSettings *settings)
 //                      here -- this should be fixed (only trigger here!).
 //                      Also see below.
             var->triggerAsynchronousDataRequest(false);
+            ++varIndex;
         }
         else
         {
@@ -331,7 +336,16 @@ void MNWPMultiVarActor::loadConfiguration(QSettings *settings)
                     var->loadConfiguration(settings);
 //TODO -- see above.
                     var->triggerAsynchronousDataRequest(false);
+                    ++varIndex;
                 }
+                else
+                {
+                    onLoadActorVariableFailure(varIndex);
+                }
+            }
+            else
+            {
+                onLoadActorVariableFailure(varIndex);
             }
         }
 
@@ -366,6 +380,22 @@ bool MNWPMultiVarActor::isConnectedTo(MActor *actor)
     }
 
     return false;
+}
+
+
+void MNWPMultiVarActor::printDebugOutputOnUserRequest()
+{
+    QString str = QString("\n==================\nNWPMultiVarActor :: "
+                          "%1\n\n").arg(getName());
+
+    for (MNWPActorVariable* var : variables)
+    {
+        str += var->debugOutputAsString();
+    }
+
+    str += QString("==================\n");
+
+    LOG4CPLUS_DEBUG(mlog, str.toStdString());
 }
 
 

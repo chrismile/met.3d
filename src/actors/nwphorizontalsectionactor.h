@@ -6,7 +6,7 @@
 **
 **  Copyright 2015-2017 Marc Rautenhaus
 **  Copyright 2015      Michael Kern
-**  Copyright 2016-2017 Bianca Tost
+**  Copyright 2015-2017 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -111,6 +111,12 @@ public:
 
     void onBoundingBoxChanged() override;
 
+
+    const QRectF getHorizontalBBox()
+    { return bBoxConnection->horizontal2DCoords(); }
+
+    const double getSectionElevation_hPa() { return slicePosition_hPa; }
+
 public slots:
     /**
       Set the pressure at which the section is rendered.
@@ -158,9 +164,9 @@ protected:
 
 private:
     /** Methods to render the horizontal section. */
-    void renderVerticalInterpolation(MNWP2DHorizontalActorVariable* var);
+    void computeVerticalInterpolation(MNWP2DHorizontalActorVariable* var);
 
-    void renderVerticalInterpolationDifference(
+    void computeVerticalInterpolationDifference(
                                 MNWP2DHorizontalActorVariable* var,
                                 MNWP2DHorizontalActorVariable* varDiff);
 
@@ -176,7 +182,10 @@ private:
     void renderTexturedContours(MSceneViewGLWidget *sceneView,
                              MNWP2DHorizontalActorVariable* var);
 
-    void renderWindBarbs(MSceneViewGLWidget *sceneView);
+    void renderVectorGlyphs(
+            MSceneViewGLWidget *sceneView,
+            std::shared_ptr<GL::MShaderEffect> glyphsShader,
+            bool renderShadow = false);
 
     void renderShadow(MSceneViewGLWidget* sceneView);
 
@@ -190,7 +199,8 @@ private:
     std::shared_ptr<GL::MShaderEffect> glTexturedContoursShader;
     std::shared_ptr<GL::MShaderEffect> glPseudoColourShader;
     std::shared_ptr<GL::MShaderEffect> glMarchingSquaresShader;
-    std::shared_ptr<GL::MShaderEffect> glWindBarbsShader;
+    std::shared_ptr<GL::MShaderEffect> glVectorGlyphsShader;
+    std::shared_ptr<GL::MShaderEffect> gl3DVectorGlyphsShader;
     std::shared_ptr<GL::MShaderEffect> glShadowQuad;
     std::shared_ptr<GL::MShaderEffect> positionSpheresShader;
 
@@ -218,63 +228,118 @@ private:
     MGraticuleActor *graticuleActor;
 
     /** Settings for windbarb labels */
-    GL::MVertexBuffer* windBarbsVertexBuffer;
+    GL::MVertexBuffer* vectorGlyphsVertexBuffer;
 
-    struct WindBarbsSettings
+    struct VectorGlyphsSettings
     {
-        WindBarbsSettings(MNWPHorizontalSectionActor* hostActor);
+        VectorGlyphsSettings(MNWPHorizontalSectionActor* hostActor);
 
-        QtProperty* groupProperty;
+        QtProperty *groupProperty;
 
         bool        enabled;
-        QtProperty* enabledProperty;
+        QtProperty *enabledProperty;
 
-        int8_t      uComponentVarIndex;
-        QtProperty* uComponentVarProperty;
+        int8_t      lonComponentVarIndex;
+        QtProperty *lonComponentVarProperty;
 
-        int8_t      vComponentVarIndex;
-        QtProperty* vComponentVarProperty;
+        int8_t      latComponentVarIndex;
+        QtProperty *latComponentVarProperty;
 
         QList<QString> varNameList;
 
-        QtProperty* appearanceGroupProperty;
+        QtProperty *appearanceGroupProperty;
+
+        enum class GlyphType
+        {
+            Invalid = -1,
+            WindBarbs = 0,
+            Arrows = 1,
+            Arrows3D = 2
+        };
+
+        enum class PivotPos
+        {
+            Invalid = -1,
+            Tip = 0,
+            Centre = 1,
+            Tail = 2
+        };
+
+        GlyphType   glyphType;
+        QtProperty *glyphTypeProperty;
+
+        PivotPos    pivotPosition;
+        QtProperty *pivotPositionProperty;
 
         float       lineWidth;
-        QtProperty* lineWidthProperty;
-
-        int         pennantTilt;
-        QtProperty* pennantTiltProperty;
+        QtProperty *lineWidthProperty;
 
         QColor      color;
-        QtProperty* colorProperty;
+        QtProperty *colorProperty;
 
+        QtProperty *windBarbsGroupProperty;
         bool        showCalmGlyphs;
-        QtProperty* showCalmGlyphsProperty;
+        QtProperty *showCalmGlyphsProperty;
+        int         pennantTilt;
+        QtProperty *pennantTiltProperty;
 
-        float       deltaBarbsLonLat;
-        QtProperty* deltaBarbsLonLatProperty;
+        QtProperty *arrowsGroupProperty;
+        double      arrowHeadHeight;
+        QtProperty *arrowHeadHeightProperty;
+        QtProperty *scaleArrowGroupProperty;
+        bool        scaleArrowWithMagnitude;
+        QtProperty *scaleArrowWithMagnitudeProperty;
+        double      scaleArrowMinScalar;
+        QtProperty *scaleArrowMinScalarProperty;
+        double      scaleArrowMinLength;
+        QtProperty *scaleArrowMinLengthProperty;
+        bool        scaleArrowDiscardBelow;
+        QtProperty *scaleArrowDiscardBelowProperty;
+        double      scaleArrowMaxScalar;
+        QtProperty *scaleArrowMaxScalarProperty;
+        double      scaleArrowMaxLength;
+        QtProperty *scaleArrowMaxLengthProperty;
+        bool        scaleArrowDiscardAbove;
+        QtProperty *scaleArrowDiscardAboveProperty;
 
-        bool        clampDeltaBarbsToGrid;
-        QtProperty* clampDeltaBarbsToGridProperty;
+        QtProperty *arrows2DGroupProperty;
+        bool        arrowDrawOutline;
+        QtProperty *arrowDrawOutlineProperty;
+        double      arrowOutlineWidth;
+        QtProperty *arrowOutlineWidthProperty;
+        QColor      arrowOutlineColour;
+        QtProperty *arrowOutlineColourProperty;
+
+        QtProperty *arrows3DGroupProperty;
+        bool        arrows3DShadowEnabled;
+        QtProperty *arrows3DShadowEnabledProperty;
+        QColor      arrows3DShadowColour;
+        QtProperty *arrows3DShadowColourProperty;
+
+        float       deltaGlyphsLonLat;
+        QtProperty *deltaGlyphsLonLatProperty;
+
+        bool        clampDeltaGlyphsToGrid;
+        QtProperty *clampDeltaGlyphsToGridProperty;
 
         bool        automaticScalingEnabled;
-        QtProperty* automaticScalingEnabledProperty;
+        QtProperty *automaticScalingEnabledProperty;
         float       oldScale;
 
-        QtProperty* scalingGroupProperty;
+        QtProperty *scalingGroupProperty;
 
         float       reduceFactor;
-        QtProperty* reduceFactorProperty;
+        QtProperty *reduceFactorProperty;
 
         float       reduceSlope;
-        QtProperty* reduceSlopeProperty;
+        QtProperty *reduceSlopeProperty;
 
         float       sensitivity;
-        QtProperty* sensitivityProperty;
+        QtProperty *sensitivityProperty;
     };
 
-    friend struct WindBarbsSettings;
-    WindBarbsSettings *windBarbsSettings;
+    friend struct VectorGlyphsSettings;
+    VectorGlyphsSettings *vectorGlyphsSettings;
 
     /** Properties for shadow quad. */
     QtProperty* shadowPropGroup;

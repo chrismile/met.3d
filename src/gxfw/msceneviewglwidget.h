@@ -78,9 +78,10 @@ public:
     };
 
     enum SceneNavigationMode {
-        MOVE_CAMERA  = 0,
-        ROTATE_SCENE = 1,
-        TOPVIEW_2D   = 2
+        MOVE_CAMERA             = 0,
+        ROTATE_SCENE            = 1,
+        TOPVIEW_2D              = 2,
+        SINGLE_FULLSCREEN_ACTOR = 3
     };
 
     enum LightDirection {
@@ -289,6 +290,35 @@ public slots:
 
     void updateSyncControlProperty();
 
+    /**
+     Connects to the MGLResourcesManager::actorCreated() signal. If the new
+     actor supports full-screen mode, it is added to the list of full-screen
+     actors displayed by the fullScreenActorProperty.
+     */
+    void onActorCreated(MActor *actor);
+
+    /**
+     Connects to the MGLResourcesManager::actorDeleted() signal. If the deleted
+     actor supports full-screen mode, update the list of full-screen actors
+     displayed by the fullScreenActorProperty, possibly disconnect from the
+     full-screen actor.
+     */
+    void onActorDeleted(MActor *actor);
+
+    /**
+     Connects to the MGLResourcesManager::actorRenamed() signal. If the renamed
+     actor supports full-screen mode, it is renamed in the list of full-screen
+     actors displayed by the fullScreenActorProperty.
+     */
+    void onActorRenamed(MActor *actor, QString oldName);
+
+    /**
+      Directly connect change signal of full-screen actor to @ref updateGL() to
+      allow the user to select actors as full-screen actors which are not
+      connected to the scene view's scene.
+     */
+    void onFullScreenActorUpdate();
+
 protected:
     void initializeGL();
 
@@ -341,13 +371,13 @@ protected slots:
 
 private:
     /**
-     * Handles opening of file dialog and letting the user choose where to save
-     * the screenshot, how to call it and as which image file type.
+      Handles opening of file dialog and letting the user choose where to save
+      the screenshot, how to call it and as which image file type.
      */
     void saveScreenshot();
 
     /**
-     * Handles taking and saving a screenshot of the scene to @p filename.
+      Handles taking and saving a screenshot of the scene to @p filename.
      */
     void saveScreenshotToFileName(QString filename);
 
@@ -367,7 +397,6 @@ private:
     QMatrix4x4 modelViewProjectionMatrix;
     QMatrix4x4 sceneRotationMatrix;
     SceneNavigationMode sceneNavigationMode;
-    SceneNavigationMode sceneNavigationMode_NoActorInteraction;
     QVector3D sceneRotationCentre;
     QTimer *cameraAutoRotationTimer;
     QVector3D cameraAutoRotationAxis;
@@ -447,6 +476,8 @@ private:
     QtProperty *sceneRotationCentreLonProperty;
     QtProperty *sceneRotationCentreElevationProperty;
     QtProperty *selectSceneRotationCentreProperty;
+    MActor     *fullScreenActor;
+    QtProperty *fullScreenActorProperty;
     float       sceneNavigationSensitivity;
     QtProperty *sceneNavigationSensitivityProperty;
     QtProperty *syncCameraWithViewProperty;
@@ -458,6 +489,8 @@ private:
 
     QtProperty *renderingGroupProperty;
     QtProperty *backgroundColourProperty;
+    QtProperty *farPlaneDistanceProperty;
+    float       farPlaneDistance;
     QtProperty *multisamplingProperty;
     bool        multisamplingEnabled;
     QtProperty *antialiasingProperty;
@@ -509,7 +542,9 @@ private:
     QtProperty *sceneViewLabelGroupProperty;
     QtProperty *sceneViewLabelEnableProperty;
 
-    /** List of static labels to display in this view. */
+    /**
+      List of static labels to display in this view.
+     */
     MLabel *sceneNameLabel;
 
     bool measureFPS;
@@ -524,16 +559,16 @@ private:
     MActor *singleInteractionActor;
 
     /**
-     * If this variable is set to false, the qt property changed events will be
-     * ignored for the instance of the scene.
+      If this variable is set to false, the qt property changed events will be
+      ignored for the instance of the scene.
      */
     bool enablePropertyEvents;
 
     MResizeWindowDialog *resizeViewDialog;
 
     /**
-     * If this variable is set to true, Met.3D will write the files of a time
-     * series without checking if the file name already exists.
+      If this variable is set to true, Met.3D will write the files of a time
+      series without checking if the file name already exists.
      */
     bool overwriteImageSerie;
 };

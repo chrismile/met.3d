@@ -112,7 +112,8 @@ public slots:
 
       Rejects names which already exits in the list view.
      */
-    void createNewSession();
+    void createNewSession(bool createEmptySession=true,
+                          QString sessionName="defaultSession");
 
     /**
       Opens current session.
@@ -129,6 +130,11 @@ public slots:
       saveSession saves the current active session.
      */
     void saveSession(bool autoSave = false);
+
+    /**
+      Saves the current active session and asks the user to enter a new name.
+     */
+    void saveSessionAs();
 
     /**
       cloneSession clones the selected session by asking the user to enter a
@@ -197,6 +203,8 @@ private:
 
     void setSessionToCurrent(QString session);
 
+    void resetSession();
+
     void saveSessionToFile(QString sessionName, bool autoSave = false);
 
     void loadSessionFromFile(QString sessionName, bool appendFileExtension=true);
@@ -214,10 +222,12 @@ private:
     bool isValidSessionName(QString sessionName);
 
     /**
-      Returns smalles index to get a unique name when appending " (index)" to
-      @p sessionName.
+      Returns the appendix " (index)" with index being the smallest, not
+      negative number needed to get a unique name when appending appendix to @p
+      sessionName. If sessionName is already unique, an empty string will be
+      returned.
      */
-    int getSmallestIndexForUniqueName(QString sessionName);
+    QString getAppendixWithSmallestIndexForUniqueName(QString sessionName);
 
     /**
       Updates history of a session by coping the file given by @p filename

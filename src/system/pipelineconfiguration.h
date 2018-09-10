@@ -6,6 +6,7 @@
 **
 **  Copyright 2015-2018 Marc Rautenhaus
 **  Copyright 2017-2018 Bianca Tost
+**  Copyright 2017      Philipp Kaiser
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -34,6 +35,7 @@
 
 // local application imports
 #include "system/applicationconfiguration.h"
+#include "data/trajectorydatasource.h"
 #include "data/structuredgrid.h"
 #include "mainwindow.h"
 
@@ -44,14 +46,14 @@ namespace Met3D
 /**
   @brief MPipelineConfiguration initializes the Met.3D data pipeline. A number
   of predefined pipelines are available (currently for NetCDF-CF and GRIB data,
-  and for LAGRANTO trajectory data. Pipeline parameters are read from a
-  configuration file.
+  and for TRAJECTORY data. Pipeline parameters are read from a configuration
+  file.
 
   Special case: If Met.3D is called with command line argument "--metview",
   it uses directory paths and file filters given by the command line argument
   "--path=" instead of the ones defined in the configuration file. Each
   directory file filter pairing results in its own data source and must be
-  seperated in the path argument by a semicolon from other paths. For file
+  separated in the path argument by a semicolon from other paths. For file
   filters Met.3D supports the use of wildcard expressions. If no configuration
   file is given via the command line, in this mode Met.3D uses a default
   configuration file stored at $MET3D_HOME/config/metview/default_pipeline.cfg
@@ -130,7 +132,7 @@ protected:
                                bool disableGridConsistencyCheck,
                                QString inputVarsForDerivedVars);
 
-    void initializeLagrantoEnsemblePipeline(
+    void initializePrecomputedTrajectoriesPipeline(
             QString name,
             QString fileDir,
             bool boundaryLayerTrajectories,
@@ -147,6 +149,25 @@ protected:
                                         QString memoryManagerID,
                                         bool enableRegridding);
 
+    void initializeTrajectoryComputationPipeline(
+            QString name,
+            bool boundaryLayerTrajectories,
+            QString schedulerID,
+            QString memoryManagerID,
+            QString NWPDataset,
+            QString windEastwardVariable,
+            QString windNorthwardVariable,
+            QString windVerticalVariable,
+            MVerticalLevelType verticalLevelType);
+
+    void initializeEnsembleTrajectoriesPipeline(
+            QString dataSourceId,
+            bool boundaryLayerTrajectories,
+            MTrajectoryDataSource* baseDataSource,
+            MAbstractScheduler* scheduler,
+            MAbstractMemoryManager* memoryManager,
+            bool trajectoriesComputedInMet3D);
+
     /**
      Initializes hard-coded pipelines. Use this method for development
      purposes.
@@ -160,6 +181,32 @@ protected:
     void getMetviewGribFilePaths(QList<MetviewGribFilePath> *gribFilePaths);
 
     MConfigurablePipelineType configurablePipelineTypeFromString(QString typeName);
+
+    /**
+      Checks if the memory manager @p defaultMemoryManager exists and if so,
+      registers it as default memory manager for the pipeline with ID
+      @p PipelineID in @p defaultMemoryManagers.
+
+      If @p defaultMemoryManager is empty or does not exists, the first entry
+      of @ref MSystemManagerAndControl::getMemoryManagerIdentifiers() is used
+      as default memory manager.
+     */
+    void checkAndStoreDefaultPipelineMemoryManager(
+            QString defaultMemoryManager, QString PipelineID,
+            QMap<QString, QString> *defaultMemoryManagers,
+            MSystemManagerAndControl *sysMC);
+
+    /**
+      Checks if one of the name strings contained in @p dataSources matches the
+      name of any already existing data source.
+
+      If a match can be found, QMessageBox::warning is displayed to inform the
+      user using the name of the data set given by @p dataSetName and the
+      method returns false. If no match can be found no message is displayed
+      and method returns true.
+     */
+    bool checkUniquenessOfDataSourceNames(QString dataSetName,
+                                          QStringList &dataSources) const;
 };
 
 } // namespace Met3D

@@ -226,6 +226,9 @@ QWidget *QtDecoratedDoubleSpinBoxFactory::createEditor(QtDecoratedDoubleProperty
     createdEditors[property].append(spinBox);
     editorToProperty[spinBox] = property;
 
+    connect(spinBox, SIGNAL(destroyed(QObject *)),
+            this, SLOT(slotEditorDestroyed(QObject *)));
+
     return spinBox;
 }
 
@@ -251,7 +254,9 @@ void QtDecoratedDoubleSpinBoxFactory::slotPrefixChanged(QtProperty *property, co
     QListIterator<QDoubleSpinBox *> itEditor(editors);
     while (itEditor.hasNext()) {
         QDoubleSpinBox *editor = itEditor.next();
+        editor->blockSignals(true);
         editor->setPrefix(prefix);
+        editor->blockSignals(false);
     }
 }
 
@@ -269,7 +274,9 @@ void QtDecoratedDoubleSpinBoxFactory::slotSuffixChanged(QtProperty *property, co
     QListIterator<QDoubleSpinBox *> itEditor(editors);
     while (itEditor.hasNext()) {
         QDoubleSpinBox *editor = itEditor.next();
+        editor->blockSignals(true);
         editor->setSuffix(prefix);
+        editor->blockSignals(false);
     }
 }
 

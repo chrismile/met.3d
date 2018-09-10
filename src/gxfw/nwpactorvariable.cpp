@@ -49,6 +49,8 @@
 #include "actors/nwphorizontalsectionactor.h"
 #include "mainwindow.h"
 #include "data/structuredgridstatisticsanalysis.h"
+#include "system/qtproperties.h"
+#include "system/qtproperties_templates.h"
 
 using namespace std;
 
@@ -76,6 +78,8 @@ namespace Met3D
 MNWPActorVariable::MNWPActorVariable(MNWPMultiVarActor *actor)
     : dataSource(nullptr),
       grid(nullptr),
+      aggregationDataSource(nullptr),
+      gridAggregation(nullptr),
       textureDataField(nullptr),
       textureUnitDataField(-1),
       textureLonLatLevAxes(nullptr),
@@ -197,6 +201,16 @@ MNWPActorVariable::MNWPActorVariable(MNWPMultiVarActor *actor)
     ensembleModeNames << "member" << "mean" << "standard deviation"
                       << "p(> threshold)" << "p(< threshold)"
                       << "min" << "max" << "max-min";
+    multipleEnsembleMembersEnabled =
+            actor->supportsMultipleEnsembleMemberVisualization();
+    // Check if the actor supports simultaneous visualization of multiple
+    // ensemble members. If yes, the corresponding ensemble mode will trigger
+    // the request of a "grid aggregation" containing all requested members.
+    // Search the code for "if (multipleEnsembleMembersEnabled)...".
+    if (multipleEnsembleMembersEnabled)
+    {
+        ensembleModeNames << "multiple members";
+    }
     ensembleModeProperty = a->addProperty(
                 ENUM_PROPERTY, "ensemble mode", varPropertyGroup);
     properties->mEnum()->setEnumNames(ensembleModeProperty, ensembleModeNames);
@@ -240,6 +254,14 @@ MNWPActorVariable::MNWPActorVariable(MNWPMultiVarActor *actor)
             SLOT(onActorRenamed(MActor*, QString)));
 
     actor->endInitialiseQtProperties();
+
+    if (multipleEnsembleMembersEnabled)
+    {
+        // Create an aggregation source that belongs to this actor variable.
+        aggregationDataSource = new MGridAggregationDataSource();
+        connect(aggregationDataSource, SIGNAL(dataRequestCompleted(MDataRequest)),
+                this, SLOT(asynchronousDataAvailable(MDataRequest)));
+    }
 }
 
 
@@ -247,6 +269,7 @@ MNWPActorVariable::~MNWPActorVariable()
 {
     // Release data fields.
     releaseDataItems();
+    releaseAggregatedDataItems();
 
     // Disconnect signals.
     MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
@@ -260,6 +283,14 @@ MNWPActorVariable::~MNWPActorVariable()
     // Delete synchronization links (don't update the already deleted GUI
     // properties anymore...).
     synchronizeWith(nullptr, false);
+
+    if (multipleEnsembleMembersEnabled)
+    {
+        disconnect(aggregationDataSource,
+                   SIGNAL(dataRequestCompleted(MDataRequest)),
+                   this, SLOT(asynchronousDataAvailable(MDataRequest)));
+        delete aggregationDataSource;
+    }
 
     if (textureUnitDataField >=0)
         actor->releaseTextureUnit(textureUnitDataField);
@@ -358,6 +389,19 @@ void MNWPActorVariable::initialize()
     {
         connect(dataSource, SIGNAL(dataRequestCompleted(MDataRequest)),
                 this, SLOT(asynchronousDataAvailable(MDataRequest)));
+
+        if (multipleEnsembleMembersEnabled)
+        {
+            // Connect the new data source to this variable's aggregation source.
+            // Memory manager may be set only once.
+            if (aggregationDataSource->getMemoryManager() == nullptr)
+            {
+                aggregationDataSource->setMemoryManager(
+                            dataSource->getMemoryManager());
+            }
+            aggregationDataSource->setScheduler(dataSource->getScheduler());
+            aggregationDataSource->setInputSource(dataSource);
+        }
     }
 
     textureDataField = textureHybridCoefficients =
@@ -754,7 +798,8 @@ void MNWPActorVariable::asynchronousDataRequest(bool synchronizationRequest)
     rh.insert("INIT_TIME", initTime);
     rh.insert("VALID_TIME", validTime);
 
-    if (ensembleFilterOperation == "")
+    if ((ensembleFilterOperation == "")
+            || (ensembleFilterOperation == "MULTIPLE_MEMBERS"))
     {
         rh.insert("MEMBER", member);
     }
@@ -789,6 +834,41 @@ void MNWPActorVariable::asynchronousDataRequest(bool synchronizationRequest)
 #endif
 
     dataSource->requestData(r);
+
+    // Special case: If ensemble mode is set to "multiple members". A grid
+    // aggregation containing the required members is requested IN ADDITION to
+    // the single member requested before. The single member request before is
+    // REDUNDANT and should be suppressed in the future.
+
+    //TODO (mr, 18Apr2018) -- Revise this architecture.
+    if (ensembleFilterOperation == "MULTIPLE_MEMBERS")
+    {
+        if (!multipleEnsembleMembersEnabled)
+        {
+            return;
+        }
+        rh.remove("MEMBER");
+        rh.insert("ENS_OPERATION", ensembleFilterOperation);
+        rh.insert("SELECTED_MEMBERS", selectedEnsembleMembers);
+        r = rh.request();
+
+        LOG4CPLUS_DEBUG(mlog, "Emitting additional 'multiple ensemble member'"
+                              " request " << r.toStdString() << " ...");
+
+        pendingRequests.insert(r);
+        MRequestQueueInfo rqi;
+        rqi.request = r;
+        rqi.available = false;
+#ifdef DIRECT_SYNCHRONIZATION
+        rqi.syncchronizationRequest = synchronizationRequest;
+#endif
+        pendingRequestsQueue.enqueue(rqi);
+#ifdef MSTOPWATCH_ENABLED
+        if (!stopwatches.contains(r)) stopwatches[r] = new MStopwatch();
+#endif
+
+        aggregationDataSource->requestData(r);
+    }
 }
 
 
@@ -1300,6 +1380,26 @@ bool MNWPActorVariable::hasData()
 }
 
 
+QString MNWPActorVariable::debugOutputAsString()
+{
+    QString str = QString("==================\nNWPActorVariable :: "
+                          "%1 of %2:\n").arg(variableName).arg(dataSourceID);
+
+    str += QString("Number of pending requests: %1\n").arg(pendingRequests.size());
+    str += QString("Entries in the queue of pending requests:\n");
+    for (int i = 0; i < pendingRequestsQueue.size(); i++)
+    {
+        str += QString("  ++ entry #%1: available=%2, request=%3\n").arg(i)
+                .arg(pendingRequestsQueue[i].available)
+                .arg(pendingRequestsQueue[i].request);
+    }
+
+    str += QString("==================\n");
+
+    return str;
+}
+
+
 /******************************************************************************
 ***                             PUBLIC SLOTS                                ***
 *******************************************************************************/
@@ -1354,9 +1454,10 @@ bool MNWPActorVariable::setEnsembleMember(int member)
 
         if (ensembleFilterOperation != "MEMBER") setEnsembleMode("member");
 
-        setEnumPropertyClosest<unsigned int>(
+        actor->getQtProperties()->setEnumPropertyClosest<unsigned int>(
                     selectedEnsembleMembersAsSortedList, (unsigned int)member,
-                    ensembleSingleMemberProperty);
+                    ensembleSingleMemberProperty, synchronizeEnsemble,
+                    actor->getScenes());
 
 #ifdef DIRECT_SYNCHRONIZATION
         // Does a new data request need to be emitted?
@@ -1579,40 +1680,76 @@ void MNWPActorVariable::asynchronousDataAvailable(MDataRequest request)
         LOG4CPLUS_DEBUG(mlog, "Preparing for rendering: request <"
                         << processRequest.toStdString() << ">.");
 
-        // Release currently used data items.
-        releaseDataItems();
-
-        // Acquire the new ones.
-        grid = dataSource->getData(processRequest);
-        textureDataField  = grid->getTexture();
-        textureLonLatLevAxes = grid->getLonLatLevTexture();
-
-        if (useFlagsIfAvailable && grid->flagsEnabled())
-            textureDataFlags = grid->getFlagsTexture();
+        if (processRequest.contains("MULTIPLE_MEMBERS"))
+        {
+            if (multipleEnsembleMembersEnabled)
+            {
+                // Handle incoming grid aggregation.
+                releaseAggregatedDataItems();
+                gridAggregation = aggregationDataSource->getData(processRequest);
+            }
+        }
         else
-            textureDataFlags = nullptr;
-
-        if (MLonLatHybridSigmaPressureGrid *hgrid =
-                dynamic_cast<MLonLatHybridSigmaPressureGrid*>(grid))
         {
-            textureHybridCoefficients = hgrid->getHybridCoeffTexture();
-            textureSurfacePressure = hgrid->getSurfacePressureGrid()->getTexture();
+            // Release currently used data items.
+            releaseDataItems();
+
+            // If the ensemble mode was "multiple members" before but is not
+            // anymore, the aggregated data grids have not yet been released.
+            // Hence, if the current ensemble more is NOT "multiple members",
+            // release them here.
+            if (ensembleFilterOperation != "MULTIPLE_MEMBERS")
+            {
+                releaseAggregatedDataItems();
+            }
+
+            // Acquire the new ones.
+            grid = dataSource->getData(processRequest);
+            if (grid == nullptr)
+            {
+//TODO (29Aug2018, mr) -- how should we handle errors in the pipeline that
+// lead to a nullptr instead of a valid grid being returned?
+                LOG4CPLUS_ERROR(mlog, "FATAL ERROR: something went wrong "
+                                "in the data pipeline -- no grid data available "
+                                "... don't know what to do.");
+            }
+
+            textureDataField  = grid->getTexture();
+            textureLonLatLevAxes = grid->getLonLatLevTexture();
+
+            if (useFlagsIfAvailable && grid->flagsEnabled())
+            {
+                textureDataFlags = grid->getFlagsTexture();
+            }
+            else
+            {
+                textureDataFlags = nullptr;
+            }
+
+            if (MLonLatHybridSigmaPressureGrid *hgrid =
+                    dynamic_cast<MLonLatHybridSigmaPressureGrid*>(grid))
+            {
+                textureHybridCoefficients = hgrid->getHybridCoeffTexture();
+                textureSurfacePressure = hgrid->getSurfacePressureGrid()->getTexture();
 #ifdef ENABLE_HYBRID_PRESSURETEXCOORDTABLE
-            texturePressureTexCoordTable = hgrid->getPressureTexCoordTexture2D();
+                texturePressureTexCoordTable = hgrid->getPressureTexCoordTexture2D();
 #endif
-        }
+            }
 
-        if (MLonLatAuxiliaryPressureGrid *apgrid =
-                dynamic_cast<MLonLatAuxiliaryPressureGrid*>(grid))
-        {
-            textureAuxiliaryPressure =
-                    apgrid->getAuxiliaryPressureFieldGrid()->getTexture();
-        }
+            if (MLonLatAuxiliaryPressureGrid *apgrid =
+                    dynamic_cast<MLonLatAuxiliaryPressureGrid*>(grid))
+            {
+                textureAuxiliaryPressure =
+                        apgrid->getAuxiliaryPressureFieldGrid()->getTexture();
+            }
 
-        if (MRegularLonLatStructuredPressureGrid *pgrid =
-                dynamic_cast<MRegularLonLatStructuredPressureGrid*>(grid))
-        {
-            texturePressureTexCoordTable = pgrid->getPressureTexCoordTexture1D();
+            if (MRegularLonLatStructuredPressureGrid *pgrid =
+                    dynamic_cast<MRegularLonLatStructuredPressureGrid*>(grid))
+            {
+                texturePressureTexCoordTable = pgrid->getPressureTexCoordTexture1D();
+            }
+
+            asynchronousDataAvailableEvent(grid);
         }
 
         asynchronousDataAvailableEvent(grid);
@@ -1689,6 +1826,16 @@ void MNWPActorVariable::releaseDataItems()
 }
 
 
+void MNWPActorVariable::releaseAggregatedDataItems()
+{
+    if (gridAggregation)
+    {
+        aggregationDataSource->releaseData(gridAggregation);
+        gridAggregation = nullptr;
+    }
+}
+
+
 QDateTime MNWPActorVariable::getPropertyTime(QtProperty *enumProperty)
 {
     MQtProperties *properties = actor->getQtProperties();
@@ -1711,10 +1858,23 @@ void MNWPActorVariable::updateInitTimeProperty()
 
     // Get available init times from the data loader. Convert the QDateTime
     // objects to strings for the enum manager.
-    availableInitTimes = dataSource->availableInitTimes(levelType, variableName);
+    if (dataSource != nullptr)
+    {
+        availableInitTimes = dataSource->availableInitTimes(
+                    levelType, variableName);
+    }
+    else
+    {
+        availableInitTimes = QList<QDateTime>();
+        LOG4CPLUS_WARN(mlog, "WARNING: update of available init times failed; "
+                             "no datasource available.");
+    }
+
     QStringList timeStrings;
     for (int i = 0; i < availableInitTimes.size(); i++)
+    {
         timeStrings << availableInitTimes.at(i).toString(Qt::ISODate);
+    }
 
     actor->getQtProperties()->mEnum()->setEnumNames(initTimeProperty,
                                                     timeStrings);
@@ -1735,11 +1895,23 @@ void MNWPActorVariable::updateValidTimeProperty()
 
     // Get a list of the available valid times for the new init time,
     // convert the QDateTime objects to strings for the enum manager.
-    availableValidTimes =
-            dataSource->availableValidTimes(levelType, variableName, initTime);
+    if (dataSource != nullptr)
+    {
+        availableValidTimes = dataSource->availableValidTimes(
+                    levelType, variableName, initTime);
+    }
+    else
+    {
+        availableValidTimes = QList<QDateTime>();
+        LOG4CPLUS_WARN(mlog, "WARNING: update of available valid times failed; "
+                             "no datasource available.");
+    }
+
     QStringList validTimeStrings;
     for (int i = 0; i < availableValidTimes.size(); i++)
+    {
         validTimeStrings << availableValidTimes.at(i).toString(Qt::ISODate);
+    }
 
     actor->getQtProperties()->mEnum()->setEnumNames(validTimeProperty,
                                                     validTimeStrings);
@@ -1852,7 +2024,7 @@ void MNWPActorVariable::updateEnsembleProperties()
         // multiple members
         ensembleSingleMemberProperty->setEnabled(false);
         ensembleThresholdProperty->setEnabled(false);
-        ensembleFilterOperation = "MULTIPLE";
+        ensembleFilterOperation = "MULTIPLE_MEMBERS";
     }
 
     // If the ensemble is synchronized, disable all properties (they are set
@@ -1904,10 +2076,11 @@ bool MNWPActorVariable::updateEnsembleSingleMemberProperty()
     actor->enableActorUpdates(false);
     properties->mEnum()->setEnumNames(
                 ensembleSingleMemberProperty, selectedMembersAsStringList);
-    setEnumPropertyClosest<unsigned int>(
+    properties->setEnumPropertyClosest<unsigned int>(
                 selectedEnsembleMembersAsSortedList,
                 (unsigned int)prevEnsembleMember,
-                ensembleSingleMemberProperty, synchronizeEnsemble);
+                ensembleSingleMemberProperty, synchronizeEnsemble,
+                actor->getScenes());
     actor->enableActorUpdates(true);
 
     bool displayedMemberHasChanged = (getEnsembleMember() != prevEnsembleMember);
@@ -2036,88 +2209,6 @@ bool MNWPActorVariable::internalSetDateTime(
 }
 
 
-template<typename T> bool MNWPActorVariable::setEnumPropertyClosest(
-        const QList<T>& availableValues, const T& value,
-        QtProperty *property, bool setSyncColour)
-{
-    // Find the value closest to "value" in the list of available values.
-    int i = -1; // use of "++i" below
-    bool exactMatch = false;
-    while (i < availableValues.size()-1)
-    {
-        // Loop as long as "value" is larger that the currently inspected
-        // element (use "++i" to have the same i available for the remaining
-        // statements in this block).
-        if (value > availableValues.at(++i)) continue;
-
-        // We'll only get here if "value" <= availableValues.at(i). If we
-        // have an exact match, break the loop. This is our value.
-        if (availableValues.at(i) == value)
-        {
-            exactMatch = true;
-            break;
-        }
-
-        // If "value" cannot be exactly matched it lies between indices i-1
-        // and i in availableValues. Determine which is closer.
-        if (i == 0) break; // if there's no i-1 we're done
-
-//        LOG4CPLUS_DEBUG(mlog, value << " " << availableValues.at(i-1) << " "
-//                        << availableValues.at(i) << " "
-//                        << abs(value - availableValues.at(i-1)) << " "
-//                        << abs(availableValues.at(i) - value) << " ");
-
-        T v1;
-        if (value < availableValues.at(i-1)) v1 = availableValues.at(i-1) - value;
-        else v1 = value - availableValues.at(i-1);
-
-        T v2;
-        if (availableValues.at(i) < value) v2 = value - availableValues.at(i);
-        else v2 = availableValues.at(i) - value;
-
-        if ( v1 <= v2 ) i--;
-
-        // "i" now contains the index of the closest available value.
-        break;
-    }
-
-    if (i > -1)
-    {
-        // ( Also see updateSyncPropertyColourHints() ).
-
-        // Update background colour of the property in the connected
-        // scene's property browser: green if "value" is an
-        // exact match with one of the available values, red otherwise.
-        if (setSyncColour)
-        {
-            QColor colour = exactMatch ? QColor(0, 255, 0) : QColor(255, 0, 0);
-            foreach (MSceneControl* scene, actor->getScenes())
-                scene->setPropertyColour(property, colour);
-        }
-
-        // Get the currently selected index.
-        int currentIndex = static_cast<QtEnumPropertyManager*> (
-                    property->propertyManager())->value(property);
-
-        if (i == currentIndex)
-        {
-            // Index i is already the current one. Nothing needs to be done.
-            return false;
-        }
-        else
-        {
-            // Set the new value.
-            static_cast<QtEnumPropertyManager*> (property->propertyManager())
-                    ->setValue(property, i);
-            // A new index was set. Return true.
-            return true;
-        }
-    }
-
-    return false;
-}
-
-
 void MNWPActorVariable::runStatisticalAnalysis(double significantDigits,
                                                int histogramDisplayMode)
 {
@@ -2174,6 +2265,7 @@ bool MNWPActorVariable::changeVariable()
     variableName = dsrc.variableName;
 
     releaseDataItems();
+    releaseAggregatedDataItems();
     actor->enableActorUpdates(false);
     initialize();
     actor->enableActorUpdates(true);
@@ -2810,7 +2902,8 @@ bool MNWP2DSectionActorVariable::parseContourLevelString(
         if (step > 0)
             for (double d = from; d <= to; d += step) *contourSet << d;
         else if (step < 0)
-            for (double d = from; d >= to; d += step) *contourSet << d;
+            // Sort iso values by ascending order (reason see below).
+            for (double d = to; d <= from; d -= step) *contourSet << d;
 
         contours->stopIndex = contourSet->size();
         return true;
@@ -2823,6 +2916,11 @@ bool MNWP2DSectionActorVariable::parseContourLevelString(
         for (int i = 0; i < listValues.size(); i++)
             *contourSet << listValues.value(i).toDouble(&ok);
 
+        // Sort contour levels to avoid all levels disappearing if the user
+        // ends the sequence with a iso value smaller than the minimum value of
+        // the data field or starts the sequence with a level greater than the
+        // maximum.
+        std::sort(contourSet->begin(), contourSet->end());
         contours->stopIndex = contourSet->size();
         return true;
     }

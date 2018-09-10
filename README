@@ -28,7 +28,8 @@ Model Development" and is available online:
    Available at: http://www.geosci-model-dev.net/8/2329/2015/gmd-8-2329-2015.html
 
 Met.3D is developed at the Computer Graphics & Visualization Group, Technische
-Universitaet Muenchen, Garching, Germany. We hope you find the tool useful for
+Universitaet Muenchen, Garching, Germany, and at the Regional Computing Center
+of Universitaet Hamburg, Hamburg, Germany. We hope you find the tool useful for
 your work, too. Please let us know about your experiences.
 
 
@@ -52,6 +53,8 @@ fine. Met.3D's current features include:
   deviation, probabilities, ...) of any ensemble data field.
 * 3D trajectory rendering for trajectories computed externally and provided
   in NetCDF format.
+* Computation of 3D streamlines and trajectories from wind fields, following
+  computational schemes in the LAGRANTO model.
 * On-the-fly gridding of ensemble trajectories into 3D probability volumes.
 * Support for 3D model data that is regular in longitude and latitude in the
   horizontal. In the vertical, the following is supported: (a) levels of
@@ -93,6 +96,9 @@ A high-level description of the project can be found in the ECMWF Newsletter:
    "GPU based interactive 3D visualization of ECMWF ensemble forecasts",
    ECMWF Newsletter, vol. 138 (Winter 2014), pp. 34-38, 2014.
    Available at: http://old.ecmwf.int/publications/newsletters/pdf/138.pdf
+
+In addition, Met.3D has been used in a number of scientific publications.
+Please refer to our webpage at http://met3d.wavestoweather.de for a list.
 
 
 Installation and configuration

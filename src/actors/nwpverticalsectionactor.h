@@ -115,6 +115,12 @@ public:
      */
     void setWaypointsModel(MWaypointsTableModel *model);
 
+    MWaypointsTableModel* getWaypointsModel();
+
+    double getBottomPressure_hPa();
+
+    double getTopPressure_hPa();
+
     QString getSettingsID() override { return "NWPVerticalSectionActor"; }
 
     void saveConfiguration(QSettings *settings) override;
@@ -165,12 +171,6 @@ protected:
      updateVerticalLevelRange()).
      */
     void dataFieldChangedEvent();
-
-    /**
-      Parses the string @p pressureLevelStr for pressure level definitions.
-      @see MNWP2DSectionActorVariable::parseContourLevelString().
-     */
-    bool parseIsoPressureLevelString(QString pressureLevelStr);
 
     /**
      Computes a list of pressure levels at which iso-pressure lines are plotted

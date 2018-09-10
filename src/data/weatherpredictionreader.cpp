@@ -77,8 +77,24 @@ MStructuredGrid* MWeatherPredictionReader::produceData(MDataRequest request)
         levtype  = SURFACE_2D;
     }
 
-    MStructuredGrid* result = readGrid(levtype, variable, initTime,
-                                       validTime, member);
+    MStructuredGrid* result = nullptr;
+    try
+    {
+        result = readGrid(levtype, variable, initTime, validTime, member);
+    }
+    catch (const std::exception& e)
+    {
+        LOG4CPLUS_ERROR(mlog, "ERROR: failed to read variable data from file "
+                              "-- " << e.what());
+        result = nullptr;
+    }
+
+    if (result == nullptr)
+    {
+        // For some reason (invalid datafield requested, file corrupt) no
+        // grid could be read. Return nullptr.
+        return nullptr;
+    }
 
     result->setHorizontalGridType(variableHorizontalGridType(levtype, variable));
 
@@ -127,7 +143,8 @@ MStructuredGrid* MWeatherPredictionReader::produceData(MDataRequest request)
                 static_cast<MRegularLonLatGrid*>(
                     memoryManager->getData(this, psfcRequest)
                     );
-    }    
+    } // HYBRID_SIGMA_PRESSURE_3D
+
     else if (levtype == AUXILIARY_PRESSURE_3D
              && variable != auxiliary3DPressureField)
     {
@@ -172,7 +189,7 @@ MStructuredGrid* MWeatherPredictionReader::produceData(MDataRequest request)
                 static_cast<MLonLatAuxiliaryPressureGrid*>(
                     memoryManager->getData(this, auxPressureFieldRequest)
                     );
-    }
+    } // AUXILIARY_PRESSURE_3D
 
     return result;
 }

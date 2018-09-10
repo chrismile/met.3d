@@ -54,7 +54,8 @@ namespace Met3D
   @todo Revise implementation of lighting. (mr, 13Feb2012)
   @todo Make this work with PVU and, in general, ML surfaces! (mr, 13Feb2012)
   */
-class MNWPSurfaceTopographyActor : public MNWPMultiVarActor
+class MNWPSurfaceTopographyActor : public MNWPMultiVarActor,
+        public MBoundingBoxInterface
 {
 public:
     MNWPSurfaceTopographyActor();
@@ -79,6 +80,8 @@ public:
 
     void loadConfiguration(QSettings *settings) override;
 
+    void onBoundingBoxChanged() override;
+
 protected:
     void initializeActorResources() override;
 
@@ -88,6 +91,14 @@ protected:
 
     void dataFieldChangedEvent() override;
 
+    /**
+      Computes the array indices of the data field covered by the current
+      bounding box. Computation is done per-variable.
+
+      @see MNWP2DHorizontalActorVariable::computeRenderRegionParameters()
+      */
+    void computeRenderRegionParameters();
+
     void onDeleteActorVariable(MNWPActorVariable* var) override;
 
     void onAddActorVariable(MNWPActorVariable* var) override;
@@ -96,6 +107,8 @@ protected:
 
     uint8_t topographyVariableIndex;
     uint8_t shadingVariableIndex;
+
+    bool updateRenderRegion;
 
     QList<QString> varNames;
 

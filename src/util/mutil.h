@@ -4,7 +4,7 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2015-2018 Marc Rautenhaus
 **  Copyright 2015-2017 Bianca Tost
 **
 **  Computer Graphics and Visualization Group
@@ -41,7 +41,13 @@
 ***                      VERSION INFORMATION                                ***
 *******************************************************************************/
 
-const QString met3dVersionString = "1.3.0-experimental-jetcores";
+// Fill this with your own ID, e.g., "-research-my-name".
+const QString met3dVersionBranchID = "";
+// Set to "-devel" for development versions.
+const QString met3dVersionDevelID = "-RC3";
+
+const QString met3dVersionString = "1.4.0" + met3dVersionDevelID
+        + met3dVersionBranchID;
 // String containing default value for missing version number in config.
 const QString defaultConfigVersion = "1.0.0";
 const QString met3dBuildDate = QString("built on %1 %2").arg(__DATE__).arg(__TIME__);
@@ -82,6 +88,10 @@ extern log4cplus::Logger mlog;
 
 #define M_MISSING_VALUE -999.E9f
 #define M_INVALID_TRAJECTORY_POS -999.99f
+
+#define IS_MISSING(x) (abs((x) - (M_MISSING_VALUE)) < 0.0001)
+
+#define LAT_TO_METER 1.112e5
 
 //WORKAROUND
     // NOTE (mr, Dec2013): Workaround to fix a float accuracy problem
@@ -129,5 +139,24 @@ QStringList readConfigVersionID(QSettings *settings);
   "/home/user/m3d/config/data".
  */
 QString expandEnvironmentVariables(QString path);
+
+/**
+   @brief Checks if @p name is a valid name for actors, bounding boxes, sync
+   controls or waypoint models. (e.g. "None" is not a valid name.)
+ */
+bool isValidObjectName(QString name);
+
+/**
+  Parse pressure levels string @p levels which should contain pressure levels
+  either given by a range (e.g. "[0, 100, 10]") or by a list of values (e.g.
+  "10, 20, 50, 100, 200, 500, 700, 900").
+ */
+QVector<float> parsePressureLevelString(QString levels);
+
+/**
+  Builds a string containing all values given by @p levels by separating the
+  values by @p delimiter.
+ */
+QString listOfPressureLevelsAsString(QVector<float> levels, QString delimiter);
 
 #endif // MUTIL_H

@@ -32,6 +32,7 @@
 #include <log4cplus/loggingmacros.h>
 
 // local application imports
+#include "gxfw/mscenecontrol.h"
 
 using namespace QtExtensions;
 
@@ -322,6 +323,17 @@ QString MQtProperties::getEnumItem(QtProperty *prop)
 QStringList MQtProperties::getEnumItems(QtProperty *prop)
 {
     return mEnum()->enumNames(prop);
+}
+
+
+bool MQtProperties::updateEnumItems(QtProperty *prop, const QStringList &names)
+{
+    // Remember the item that is selected before the update.
+    QString previouslySelectedItem = getEnumItem(prop);
+    // Update names.
+    mEnum()->setEnumNames(prop, names);
+    // Try to restore previously selected item.
+    return setEnumItem(prop, previouslySelectedItem);
 }
 
 

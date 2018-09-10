@@ -4,11 +4,14 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2018 Marc Rautenhaus
-**  Copyright 2016-2018 Bianca Tost
+**  Copyright 2015-2018 Marc Rautenhaus [*, previously +]
+**  Copyright 2016-2018 Bianca Tost [+]
 **
-**  Computer Graphics and Visualization Group
+**  + Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
+**
+**  * Regional Computing Center, Visualization
+**  Universitaet Hamburg, Hamburg, Germany
 **
 **  Met.3D is free software: you can redistribute it and/or modify
 **  it under the terms of the GNU General Public License as published by
@@ -68,7 +71,9 @@ MActor::MActor(QObject *parent)
       actorIsInitialized(false),
       actorChangedSignalDisabledCounter(0),
       actorUpdatesDisabledCounter(0),
-      actorIsUserDeletable(true)
+      actorIsUserDeletable(true),
+      actorSupportsFullScreenVisualisation(false),
+      actorSupportsMultipleEnsembleMemberVisualization(false)
 {
     // Get a pointer to the property managers used for the GUI properties.
     properties = MSceneControl::getQtProperties();
@@ -96,16 +101,23 @@ MActor::MActor(QObject *parent)
     saveConfigProperty = addProperty(CLICK_PROPERTY, "save",
                                      actorConfigurationSupGroup);
 
-    // Rendering properties.
-    actorRenderingSupGroup = addProperty(GROUP_PROPERTY, "rendering",
-                                          propertyGroup);
+    // Development properties.
+    actorDevelopmentSupGroup = addProperty(
+                GROUP_PROPERTY, "development aids",
+                actorConfigurationSupGroup);
 
-    wireFrameProperty = addProperty(BOOL_PROPERTY, "wire frame",
-                                    actorRenderingSupGroup);
+    wireFrameProperty = addProperty(
+                BOOL_PROPERTY, "wire frame",
+                actorDevelopmentSupGroup);
     properties->mBool()->setValue(wireFrameProperty, renderAsWireFrame);
 
-    reloadShaderProperty = addProperty(CLICK_PROPERTY, "reload shaders",
-                                       actorRenderingSupGroup);
+    reloadShaderProperty = addProperty(
+                CLICK_PROPERTY, "reload shaders",
+                actorDevelopmentSupGroup);
+
+    printDebugOutputProperty = addProperty(
+                CLICK_PROPERTY, "print debug output",
+                actorDevelopmentSupGroup);
 
     // Actor properties.
     actorPropertiesSupGroup = addProperty(GROUP_PROPERTY, "actor properties",
@@ -184,6 +196,16 @@ void MActor::initialize()
         availableImageUnits << u;
     }
 
+    // Get the values of the bounding box connected initially to the actor if
+    // the actor is using bounding boxes.
+    if (MBoundingBoxInterface *bboxInteface =
+            dynamic_cast<MBoundingBoxInterface*>(this))
+    {
+        enableActorUpdates(false);
+        bboxInteface->onBoundingBoxChanged();
+        enableActorUpdates(true);
+    }
+
     initializeActorResources();
 
     actorIsInitialized = true;
@@ -199,9 +221,22 @@ void MActor::render(MSceneViewGLWidget *sceneView)
 }
 
 
+void MActor::renderToFullScreen(MSceneViewGLWidget *sceneView)
+{
+    if (!actorIsEnabled) return;
+    renderToCurrentFullScreenContext(sceneView);
+}
+
+
 bool MActor::isInitialized()
 {
     return actorIsInitialized;
+}
+
+
+bool MActor::isEnabled()
+{
+    return actorIsEnabled;
 }
 
 
@@ -454,7 +489,15 @@ void MActor::loadActorConfiguration(QSettings *settings)
     settings->beginGroup(MActor::getSettingsID());
 
     const QString name = settings->value("actorName").toString();
-    setName(name);
+
+    // Reject new actor name if it is invalid or the name does already exist.
+    // (If the name of the actor stays the same, the name also already exists
+    // but it also does not need to be changed).
+    if (!MGLResourcesManager::getInstance()->getActorByName(name)
+            && isValidObjectName(name))
+    {
+        setName(name);
+    }
 
     properties->mBool()->setValue(
                 actorEnabledProperty,
@@ -666,6 +709,10 @@ void MActor::actOnQtPropertyChanged(QtProperty *property)
             reloadShaderEffects();
             emitActorChangedSignal();
         }
+    }
+    else if (property == printDebugOutputProperty)
+    {
+        printDebugOutputOnUserRequest();
     }
 
     // Invoke signal handling of derived classes.
@@ -965,6 +1012,12 @@ double MActor::computePositionLabelDistanceWeight(
     dist *= dist * 0.00003;
 
     return dist;
+}
+
+
+void MActor::printDebugOutputOnUserRequest()
+{
+    LOG4CPLUS_DEBUG(mlog, "No debug output has been provided for this actor.");
 }
 
 

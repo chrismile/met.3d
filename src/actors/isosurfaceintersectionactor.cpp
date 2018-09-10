@@ -48,7 +48,7 @@ namespace Met3D
 
 MIsosurfaceIntersectionActor::MIsosurfaceIntersectionActor()
     : MNWPMultiVarIsolevelActor(),
-      MBoundingBoxInterface(this),
+      MBoundingBoxInterface(this, MBoundingBoxConnectionType::VOLUME),
       isosurfaceSource(nullptr),
       intersectionLines(nullptr),
       varTrajectoryFilter(nullptr),
@@ -65,9 +65,6 @@ MIsosurfaceIntersectionActor::MIsosurfaceIntersectionActor()
       vboBoundingBox(nullptr),
       iboBoundingBox(0)
 {
-    bBoxConnection =
-            new MBoundingBoxConnection(this, MBoundingBoxConnection::VOLUME);
-
     // Create and initialise QtProperties for the GUI.
     // ===============================================
     beginInitialiseQtProperties();
@@ -115,7 +112,7 @@ MIsosurfaceIntersectionActor::MIsosurfaceIntersectionActor()
 
     // Bounding box.
     boundingBoxSettings = std::make_shared<BoundingBoxSettings>();
-    actorPropertiesSupGroup->addSubProperty(bBoxConnection->getProperty());
+    insertBoundingBoxProperty(actorPropertiesSupGroup);
     boundingBoxSettings->enabledProperty =
             addProperty(BOOL_PROPERTY, "draw bounding box",
                         actorPropertiesSupGroup);

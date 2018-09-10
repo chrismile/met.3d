@@ -56,16 +56,12 @@ namespace Met3D
 
 MBaseMapActor::MBaseMapActor()
     : MRotatedGridSupportingActor(),
-      MBoundingBoxInterface(this),
+      MBoundingBoxInterface(this, MBoundingBoxConnectionType::HORIZONTAL),
       texture(nullptr),
       numVertices(4),
       colourSaturation(0.3)
 {
     GDALAllRegister();
-
-    bBoxConnection = new MBoundingBoxConnection(
-                this, MBoundingBoxConnection::HORIZONTAL);
-
 
     // Create and initialise QtProperties for the GUI.
     // ===============================================
@@ -83,7 +79,7 @@ MBaseMapActor::MBaseMapActor()
     filenameProperty->setEnabled(false);
 
     // Bounding box of the actor.
-    actorPropertiesSupGroup->addSubProperty(bBoxConnection->getProperty());
+    insertBoundingBoxProperty(actorPropertiesSupGroup);
 
     colourSaturationProperty = addProperty(DECORATEDDOUBLE_PROPERTY,
                                            "colour saturation",

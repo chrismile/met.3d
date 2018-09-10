@@ -376,7 +376,7 @@ void MSpatial1DTransferFunction::onQtPropertyChanged(QtProperty *property)
                 // Clear fileNames to store file names in user set order.
                 fileNames.clear();
 
-                for(int index = 0; index < listWidget->count(); index++)
+                for (int index = 0; index < listWidget->count(); index++)
                 {
                   QListWidgetItem *item = listWidget->item(index);
                   fileNames.push_back(item->text());
@@ -479,7 +479,7 @@ void MSpatial1DTransferFunction::onQtPropertyChanged(QtProperty *property)
 
     else if (property == valueStepProperty)
     {
-        int step = properties->mSciDouble()->value(valueStepProperty);
+        double step = properties->mSciDouble()->value(valueStepProperty);
         properties->mSciDouble()->setSingleStep(minimumValueProperty, step);
         properties->mSciDouble()->setSingleStep(maximumValueProperty, step);
         properties->mSciDouble()->setSingleStep(interpolationRangeProperty, step);
