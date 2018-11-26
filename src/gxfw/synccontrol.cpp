@@ -176,7 +176,7 @@ MSyncControl::MSyncControl(QString id, QWidget *parent) :
 
     timeAnimationTimeStepSpinBox = new QSpinBox(this);
     timeAnimationTimeStepSpinBox->setMinimum(10);
-    timeAnimationTimeStepSpinBox->setMaximum(10000);
+    timeAnimationTimeStepSpinBox->setMaximum(100000);
     timeAnimationTimeStepSpinBox->setValue(1000);
     MLabelledWidgetAction *timeStepSpinBoxAction = new MLabelledWidgetAction(
                 "animation time step:", "ms", timeAnimationTimeStepSpinBox, this);
