@@ -1174,9 +1174,14 @@ MStructuredGrid *MClimateForecastReader::readGrid(
         return nullptr;
     }
 
-    LOG4CPLUS_DEBUG(mlog, "Reading NetCDF data for variable "
-                    << variableName.toStdString() << " from file "
-                    << filename.toStdString() << " ...");
+    LOG4CPLUS_DEBUG(mlog, "Reading NetCDF data for variable <"
+                    << "name=" << variableName.toStdString()
+                    << "; leveltype="
+                    << MStructuredGrid::verticalLevelTypeToString(levelType).toStdString()
+                    << "; inittime=" << initTime.toString(Qt::ISODate).toStdString()
+                    << "; validtime=" << validTime.toString(Qt::ISODate).toStdString()
+                    << "> from file <"
+                    << filename.toStdString() << "> ...");
 
     // Is this file opened for the first time? First access to a variable?
     openFilesMutex.lock();
