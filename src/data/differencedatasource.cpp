@@ -4,11 +4,14 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2018 Marc Rautenhaus
-**  Copyright 2018 Bianca Tost
+**  Copyright 2018 Marc Rautenhaus [*, previously +]
+**  Copyright 2018 Bianca Tost [+]
 **
-**  Computer Graphics and Visualization Group
+**  + Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
+**
+**  * Regional Computing Center, Visualization
+**  Universitaet Hamburg, Hamburg, Germany
 **
 **  Met.3D is free software: you can redistribute it and/or modify
 **  it under the terms of the GNU General Public License as published by
@@ -84,46 +87,59 @@ MStructuredGrid* MDifferenceDataSource::produceData(MDataRequest request)
     {
         inputGrids << inputSource[i]->getData(
                           constructInputSourceRequestFromRequest(i, request));
-    }
+    } // inputGrids now contains two entries; if sth went wrong they are nullptr
 
-    // Initialize result grid.
     MStructuredGrid *differenceGrid = nullptr;
-    if ( !inputGrids.isEmpty() && inputGrids.at(0) != nullptr )
+
+    // If all inputs are available and valid, compute the difference
+    // input(0) - input(1). If inputs are missing (i.e., they are nullptr),
+    // a nullptr is returned.
+//TODO (mr, 27Nov2018) -- if the upstream pipeline knows about the available
+// times that can be requested no "nullptr" cases should occure, see
+// availableValidTimes(). Needs to be implemented.
+    if ( inputGrids.at(0) != nullptr && inputGrids.at(1) != nullptr )
     {
         differenceGrid = createAndInitializeResultGrid(inputGrids.at(0));
-    }
-    else return nullptr;
 
-    // Compute difference grid.
-    for (unsigned int k = 0; k < differenceGrid->getNumLevels() ; k++)
-        for (unsigned int j = 0; j < differenceGrid->getNumLats() ; j++)
-            for (unsigned int i = 0; i < differenceGrid->getNumLons() ; i++)
-            {
-                float valueGrid0 = inputGrids.at(0)->getValue(k, j, i);
-                if (valueGrid0 == M_MISSING_VALUE)
+        QString diffVariableName = QString("difference %1 - %2").arg(
+                    inputGrids.at(0)->variableName).arg(
+                    inputGrids.at(1)->variableName);
+        differenceGrid->setMetaData(inputGrids.at(0)->getInitTime(),
+                                    inputGrids.at(0)->getValidTime(),
+                                    diffVariableName,
+                                    inputGrids.at(0)->getEnsembleMember());
+
+        for (unsigned int k = 0; k < differenceGrid->getNumLevels() ; k++)
+            for (unsigned int j = 0; j < differenceGrid->getNumLats() ; j++)
+                for (unsigned int i = 0; i < differenceGrid->getNumLons() ; i++)
                 {
+                    float valueGrid0 = inputGrids.at(0)->getValue(k, j, i);
+                    if (valueGrid0 == M_MISSING_VALUE)
+                    {
+                        differenceGrid->setValue(k, j, i, M_MISSING_VALUE);
+                        continue;
+                    }
+                    float valueGrid1 = inputGrids.at(1)->interpolateValue(
+                                differenceGrid->getLons()[i],
+                                differenceGrid->getLats()[j],
+                                differenceGrid->getPressure(k, j, i));
+                    if (valueGrid1 != M_MISSING_VALUE)
+                    {
+                        differenceGrid->setValue(k, j, i, valueGrid0 - valueGrid1);
+                        continue;
+                    }
                     differenceGrid->setValue(k, j, i, M_MISSING_VALUE);
-                    continue;
                 }
-                float valueGrid1 = inputGrids.at(1)->interpolateValue(
-                            differenceGrid->getLons()[i],
-                            differenceGrid->getLats()[j],
-                            differenceGrid->getPressure(k, j, i));
-                if (valueGrid1 != M_MISSING_VALUE)
-                {
-                    differenceGrid->setValue(k, j, i, valueGrid0 - valueGrid1);
-                    continue;
-                }
-                differenceGrid->setValue(k, j, i, M_MISSING_VALUE);
-            }
+    }
 
     // Release input fields.
     for (int i = 0; i <= 1; i++)
     {
+        if (inputGrids[i] == nullptr) continue;
         inputSource[i]->releaseData(inputGrids[i]);
     }
 
-    return differenceGrid;
+    return differenceGrid; // if inputs have not been available this is a nullptr
 }
 
 
@@ -243,6 +259,19 @@ MDataRequest MDifferenceDataSource::constructInputSourceRequestFromRequest(
         {
             QString key = val.mid(10); // remove "REQUESTED_"
             rhInp.insert(requiredKey, rh.value(key)); // replace by value in "request"
+        }
+        else if (val == "SPECIALCASE_DATE_INIT_TIME_VALID")
+        {
+            // Special case: Use the "data" part of the INIT_TIME and the
+            // "time" part of the VALID_TIME. This is useful, e.g., to compute
+            // a forecast bias: subtract an average analysis for a given
+            // time of the day from an average lead time.
+//TODO (mr, 26Nov2018) -- This should be replaced by a more flexible framework
+// to do computations on the data. Maybe with Python?
+            QDateTime initTime = rh.timeValue("INIT_TIME");
+            QDateTime validTime = rh.timeValue("VALID_TIME");
+            initTime.setTime(validTime.time());
+            rhInp.insert(requiredKey, initTime);
         }
     }
 

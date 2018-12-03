@@ -4,10 +4,14 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2018 Marc Rautenhaus
+**  Copyright 2018 Marc Rautenhaus [*, previously +]
+**  Copyright 2018 Bianca Tost [+]
 **
-**  Computer Graphics and Visualization Group
+**  + Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
+**
+**  * Regional Computing Center, Visualization
+**  Universitaet Hamburg, Hamburg, Germany
 **
 **  Met.3D is free software: you can redistribute it and/or modify
 **  it under the terms of the GNU General Public License as published by
@@ -42,6 +46,39 @@ namespace Met3D
 /**
   @brief MDifferenceDataSource derives meteorological variables from basic
   forecast parameters.
+
+  This class is "work in progress" and not yet documented.
+  If created through a pipeline configuration file, the difference module
+  can be created in the [ConfigurablePipeline] section. Important is that
+  two "base requests" are defined that map the request that this
+  class receives in the pipeline to two input requests that can be passed on
+  to the input sources. See @ref constructInputSourceRequestFromRequest().
+
+      [NWPPipeline]
+      size=2
+
+      1\name=ECMWF ANALYSIS
+      ...
+
+      2\name=ECMWF ENSEMBLE
+      ...
+
+      [ConfigurablePipeline]
+      size=1
+
+      1\type=DIFFERENCE
+      1\name=Difference to z(an)
+      1\input1=ECMWF ENSEMBLE ENSFilter
+      1\input2=ECMWF ANALYSIS ENSFilter
+      1\baseRequest1="LEVELTYPE=REQUESTED_LEVELTYPE;VARIABLE=REQUESTED_VARIABLE;INIT_TIME=REQUESTED_INIT_TIME;VALID_TIME=REQUESTED_VALID_TIME;MEMBER=REQUESTED_MEMBER"
+      1\baseRequest2="LEVELTYPE=1;VARIABLE=z (an);INIT_TIME=REQUESTED_VALID_TIME;VALID_TIME=REQUESTED_VALID_TIME;MEMBER=0"
+      1\schedulerID=MultiThread
+      1\memoryManagerID=NWP
+      1\enableRegridding=false
+
+  @todo Correct determination of available init/valid times is still missing.
+  This can lead to missing input grids and nullptr fields to be returned --
+  potential segmentation faults! See @ref availableValidTimes().
   */
 class MDifferenceDataSource
         : public MProcessingWeatherPredictionDataSource
