@@ -132,7 +132,7 @@
           </property>
           <property name="dateTime">
            <datetime>
-            <hour>11</hour>
+            <hour>9</hour>
             <minute>0</minute>
             <second>0</second>
             <year>2011</year>
@@ -148,7 +148,7 @@
            </date>
           </property>
           <property name="displayFormat">
-           <string>ddd yyyy-MM-dd hh:mm UTC</string>
+           <string>ddd yyyy-MM-dd hh:mm:ss UTC</string>
           </property>
           <property name="calendarPopup">
            <bool>true</bool>
@@ -290,7 +290,7 @@
           </property>
           <property name="dateTime">
            <datetime>
-            <hour>11</hour>
+            <hour>9</hour>
             <minute>0</minute>
             <second>0</second>
             <year>2011</year>
@@ -307,7 +307,7 @@
           </property>
           <property name="minimumDateTime">
            <datetime>
-            <hour>23</hour>
+            <hour>22</hour>
             <minute>0</minute>
             <second>0</second>
             <year>1752</year>
@@ -316,7 +316,7 @@
            </datetime>
           </property>
           <property name="displayFormat">
-           <string>ddd yyyy-MM-dd hh:mm UTC</string>
+           <string>ddd yyyy-MM-dd hh:mm:ss UTC</string>
           </property>
           <property name="calendarPopup">
            <bool>true</bool>

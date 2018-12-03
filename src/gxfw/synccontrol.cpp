@@ -193,7 +193,7 @@ MSyncControl::MSyncControl(QString id, QWidget *parent) :
     timeAnimationFromWidget = new QWidget(this);
 
     timeAnimationFrom = new QDateTimeEdit(timeAnimationFromWidget);
-    timeAnimationFrom->setDisplayFormat("ddd yyyy-MM-dd hh:mm UTC");
+    timeAnimationFrom->setDisplayFormat("ddd yyyy-MM-dd hh:mm:ss UTC");
     timeAnimationFrom->setTimeSpec(Qt::UTC);
     copyInitTimeToAnimationFromButton = new QPushButton("IT", timeAnimationFromWidget);
     copyInitTimeToAnimationFromButton->setMinimumWidth(widthOfCopyButtons);
@@ -226,7 +226,7 @@ MSyncControl::MSyncControl(QString id, QWidget *parent) :
     timeAnimationToWidget = new QWidget(this);
 
     timeAnimationTo = new QDateTimeEdit(timeAnimationToWidget);
-    timeAnimationTo->setDisplayFormat("ddd yyyy-MM-dd hh:mm UTC");
+    timeAnimationTo->setDisplayFormat("ddd yyyy-MM-dd hh:mm:ss UTC");
     timeAnimationTo->setTimeSpec(Qt::UTC);
     copyInitTimeToAnimationToButton = new QPushButton("IT", timeAnimationToWidget);
     copyInitTimeToAnimationToButton->setMinimumWidth(widthOfCopyButtons);
@@ -1682,8 +1682,15 @@ void MSyncControl::updateTimeDifference()
 {
     QDateTime validTime = ui->validTimeEdit->dateTime();
     QDateTime initTime  = ui->initTimeEdit->dateTime();
-    QString s = QString("%1 hrs from").arg(
-                int(initTime.secsTo(validTime) / 3600.));
+    int timeDifferenceSecs = initTime.secsTo(validTime);
+    int timeDifferenceHrs = timeDifferenceSecs / 3600.;
+    timeDifferenceSecs = fmod(timeDifferenceSecs, 3600.);
+    int timeDifferenceMin = timeDifferenceSecs / 60.;
+    timeDifferenceSecs = fmod(timeDifferenceSecs, 60.);
+    QString s = QString("%1:%2:%3 hrs from").arg(
+                timeDifferenceHrs, 2, 10, QLatin1Char('0')).arg(
+                timeDifferenceMin, 2, 10, QLatin1Char('0')).arg(
+                timeDifferenceSecs, 2, 10, QLatin1Char('0'));
     ui->differenceValidInitLabel->setText(s);
 }
 
