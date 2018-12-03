@@ -261,6 +261,14 @@ double windSpeed_ms(double u_ms, double v_ms);
 
 
 /**
+  Computes 3D wind speed (aka magnitude of air velocity in CF naming) in
+  [m.s-1] from eastward wind (@p u_ms), northward wind (@p v_ms) and
+  upward_air_velocity (@p w_ms).
+ */
+double windSpeed3D_ms(double u_ms, double v_ms, double w_ms);
+
+
+/**
   Computes potential temperature in [K] from temperature @p T_K in [K] and
   pressure @p p_Pa in [Pa].
 

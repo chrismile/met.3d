@@ -64,6 +64,7 @@ MDerivedMetVarsDataSource::MDerivedMetVarsDataSource()
 //! and be done outside of the class as a configuration/plug-in mechanism.
 
     registerDerivedDataFieldProcessor(new MHorizontalWindSpeedProcessor());
+    registerDerivedDataFieldProcessor(new MMagnitudeOfAirVelocityProcessor());
     registerDerivedDataFieldProcessor(new MPotentialTemperatureProcessor());
     registerDerivedDataFieldProcessor(new MEquivalentPotentialTemperatureProcessor());
     registerDerivedDataFieldProcessor(new MGeopotentialHeightProcessor());
@@ -615,6 +616,49 @@ void MHorizontalWindSpeedProcessor::compute(
 }
 
 
+// Magnitude of air velocity (3D wind speed; "wind" is defined as 2D only in
+// CF).
+// =========================================================================
+
+MMagnitudeOfAirVelocityProcessor::MMagnitudeOfAirVelocityProcessor()
+    : MDerivedDataFieldProcessor(
+          "magnitude_of_air_velocity",
+          QStringList() << "eastward_wind" << "northward_wind"
+                        << "upward_air_velocity")
+{}
+
+
+void MMagnitudeOfAirVelocityProcessor::compute(
+        QList<MStructuredGrid *> &inputGrids, MStructuredGrid *derivedGrid)
+{
+    // input 0 = "eastward_wind"
+    // input 1 = "northward_wind"
+    // input 2 = "upward_air_velocity"
+
+    for (unsigned int n = 0; n < derivedGrid->getNumValues(); n++)
+    {
+        float u_ms = inputGrids.at(0)->getValue(n);
+        float v_ms = inputGrids.at(1)->getValue(n);
+        float w_ms = inputGrids.at(2)->getValue(n);
+
+        if (u_ms == M_MISSING_VALUE || v_ms == M_MISSING_VALUE
+                || w_ms == M_MISSING_VALUE)
+        {
+            derivedGrid->setValue(n, M_MISSING_VALUE);
+        }
+        else
+        {
+            float windspeed3D = windSpeed3D_ms(u_ms, v_ms, w_ms);
+            derivedGrid->setValue(n, windspeed3D);
+        }
+    }
+}
+
+
+
+// Potential temperature
+// =====================
+
 MPotentialTemperatureProcessor::MPotentialTemperatureProcessor()
     : MDerivedDataFieldProcessor(
           "air_potential_temperature",
@@ -622,9 +666,6 @@ MPotentialTemperatureProcessor::MPotentialTemperatureProcessor()
 {
 }
 
-
-// Potential temperature
-// =====================
 
 void MPotentialTemperatureProcessor::compute(
         QList<MStructuredGrid *> &inputGrids, MStructuredGrid *derivedGrid)

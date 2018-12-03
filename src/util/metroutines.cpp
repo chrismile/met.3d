@@ -442,6 +442,12 @@ double windSpeed_ms(double u_ms, double v_ms)
 }
 
 
+double windSpeed3D_ms(double u_ms, double v_ms, double w_ms)
+{
+    return sqrt(pow(u_ms, 2) + pow(v_ms, 2) + pow(w_ms, 2));
+}
+
+
 double potentialTemperature_K(double T_K, double p_Pa)
 {
     return T_K * pow( 100000. / p_Pa,

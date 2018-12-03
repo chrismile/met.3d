@@ -196,6 +196,17 @@ public:
 };
 
 
+class MMagnitudeOfAirVelocityProcessor
+        : public MDerivedDataFieldProcessor
+{
+public:
+    MMagnitudeOfAirVelocityProcessor();
+
+    void compute(QList<MStructuredGrid*>& inputGrids,
+                 MStructuredGrid *derivedGrid);
+};
+
+
 class MPotentialTemperatureProcessor
         : public MDerivedDataFieldProcessor
 {
