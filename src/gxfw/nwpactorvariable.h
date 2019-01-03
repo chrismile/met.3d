@@ -6,6 +6,7 @@
 **
 **  Copyright 2015-2018 Marc Rautenhaus
 **  Copyright 2016-2018 Bianca Tost
+**  Copyright 2015-2016 Christoph Heidelmann
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -178,6 +179,7 @@ public:
     MWeatherPredictionDataSource *dataSource;
     MVerticalLevelType            levelType;
     QString                       variableName;
+    int                           numEnsembleMembers;
 
     /* CPU memory object that stores the current data field. */
     MStructuredGrid *grid;
@@ -274,6 +276,7 @@ public slots:
 protected:
     friend class MNWPVolumeRaycasterActor;
     friend class MVerticalRegridProperties;
+    friend class MSkewTActor;
 
     virtual void releaseDataItems();
     virtual void releaseAggregatedDataItems();
@@ -765,6 +768,29 @@ protected:
     bool setTransferFunctionFromProperty() override;
 
 private:
+};
+
+
+
+/**
+  @brief Variable properties specific to skew-t-diagram.
+ */
+class MNWPSkewTActorVariable : public MNWPActorVariable
+{
+public:
+    MNWPSkewTActorVariable(MNWPMultiVarActor *actor);
+
+    bool onQtPropertyChanged(QtProperty *property) override;
+
+    void saveConfiguration(QSettings *settings);
+
+    void loadConfiguration(QSettings *settings);
+
+    QtProperty   *colorProperty;
+    QtProperty   *thicknessProperty;
+
+    QColor        color;
+    double        thickness;
 };
 
 } // namespace Met3D

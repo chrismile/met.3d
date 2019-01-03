@@ -118,6 +118,7 @@ HEADERS += \
     src/system/pipelineconfiguration.h \
     src/data/probabltrajectoriessource.h \
     src/gxfw/gl/shaderstoragebufferobject.h \
+    src/actors/skewtactor.h  \
     src/gxfw/memberselectiondialog.h \
     src/gxfw/adddatasetdialog.h \
     src/data/derivedmetvarsdatasource.h \
@@ -222,6 +223,7 @@ SOURCES += \
     src/system/pipelineconfiguration.cpp \
     src/data/probabltrajectoriessource.cpp \
     src/gxfw/gl/shaderstoragebufferobject.cpp \
+    src/actors/skewtactor.cpp  \
     src/gxfw/memberselectiondialog.cpp \
     src/gxfw/adddatasetdialog.cpp \
     src/data/derivedmetvarsdatasource.cpp \
@@ -302,6 +304,7 @@ OTHER_FILES += \
     src/glsl/vsec_marching_squares.fx.glsl \
     src/glsl/volume_normalcurves_initpoints.fx.glsl \
     src/glsl/hsec_texturedcontours.fx.glsl \
+    src/glsl/skewtrendering.fx.glsl \
     config/cf_stdnames.dat \
     config/log4cplus.properties \
     src/glsl/north_arrow.fx.glsl \

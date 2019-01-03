@@ -6,6 +6,7 @@
 **
 **  Copyright 2015-2018 Marc Rautenhaus
 **  Copyright 2015-2018 Michael Kern
+**  Copyright 2015-2016 Christoph Heidelmann
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -529,6 +530,34 @@ double equivalentPotentialTemperature_K_Bolton(
                                                 r * (1 + 0.81E-3 * r));
 
     return thetaE_K;
+}
+
+
+float moistAdiabaticLapseRate_K(float T_K, float p_Pa)
+{
+    float TC = T_K - 273.5f;
+    // Heat of vaporization of water.
+    float H_v = 1000.f * (2500.8f - 2.36f * TC + 0.0016f
+                          * pow(TC, 2.f) - 0.00006f * pow(TC, 3.f));
+    // Specific gas constant of dry air.
+    float R_sd = 287.05f;
+    // Specific gas constant of water vapor.
+    float R_sw = 461.51f;
+    // The dimensionless ratio of the specific gas constant of dry air to the
+    // specific gas constant for water vapor.
+    float epsilon = R_sd / R_sw;
+    // The water vapor pressure of the saturated air.
+    float e =  6.112f * exp(17.67f * TC / (TC + 243.12f)) * 100.f;
+    // The mixing ratio of the mass of water vapor to the mass of dry air.
+    float r = epsilon * (e / (p_Pa - e));
+    // The specific heat of dry air at constant pressure.
+    float c_pd = 1004.6f;
+    float dividend = 1.f + (H_v * r) / ( R_sd * T_K);
+    float divisor = 1.f + (pow(H_v, 2.f) * r * epsilon)
+            / ( c_pd * R_sd * pow(T_K, 2.f));
+    float tempv = T_K * (1.f + 0.6f * r);
+    float Rho = p_Pa / (R_sd * tempv);
+    return (dividend / divisor) / (c_pd * Rho);
 }
 
 

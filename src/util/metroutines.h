@@ -6,6 +6,7 @@
 **
 **  Copyright 2015-2018 Marc Rautenhaus
 **  Copyright 2015-2017 Michael Kern
+**  Copyright 2015-2016 Christoph Heidelmann
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -353,6 +354,15 @@ namespace MetRoutinesTests
 void testEQPT();
 
 }
+
+/**
+  Calculates the moist adiabatic lapse rate. @see http://en.wikipedia.org/wiki/Lapse_rate
+
+  @p T is the temperature in K and @p p the pressure in Pascal.
+
+  @return moist adiabatic lapse rate in T(K).
+*/
+float moistAdiabaticLapseRate_K(float T_K, float p_Pa);
 
 } // namespace Met3D
 

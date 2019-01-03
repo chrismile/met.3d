@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015-2018 Marc Rautenhaus
+**  Copyright 2015-2016 Christoph Heidelmann
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -52,6 +53,8 @@ uniform bool  scaleRadius;           // if true, radius will be scaled with
 uniform vec3  cameraPosition;        // camera position in world space
 uniform vec3  cameraUpDir;           // camera upward axis
 
+uniform vec2  position;           // camera upward axis
+
 uniform int       numObsPerTrajectory; // number of "observations" (i.e. points)
 uniform bool      useTransferFunction; // use transfer function or const col?
 uniform vec4      constColour;
@@ -66,6 +69,12 @@ shader VSmain(in vec3 vertex : 0, out vec4 vs_vertex)
     float worldZ = (log(vertex.z) - pToWorldZParams.x) * pToWorldZParams.y;
     // Convert from world space to clip space.
     vs_vertex = vec4(vertex.xy, worldZ, vertex.z);
+}
+
+shader VSusePosition(in vec3 vertex : 0, out vec4 vs_vertex)
+{
+    // Use 2D position for vertex coordinate
+    vs_vertex = vec4(position, 0, 1);
 }
 
 
@@ -168,7 +177,7 @@ shader FSmain(in GStoFS Input, out vec4 fragColour)
     float b = 2.0 * dot(dir, c2p);
     float c = dot(c2p, c2p) - Input.gs_radius * Input.gs_radius;
     float d = b * b - 4.0 * a * c;
-    if(d <= 0.0) discard;
+    if (d <= 0.0) discard;
 
     float t = (-b - sqrt(d)) / (2.0 * a);
     // Position at which the ray from quad pixel to sphere centre intersects
@@ -196,6 +205,13 @@ shader FSmain(in GStoFS Input, out vec4 fragColour)
 program Normal
 {
     vs(420)=VSmain();
+    gs(420)=GSmain() : in(points), out(triangle_strip, max_vertices = 4);
+    fs(420)=FSmain();
+};
+
+program UsePosition
+{
+    vs(420)=VSusePosition();
     gs(420)=GSmain() : in(points), out(triangle_strip, max_vertices = 4);
     fs(420)=FSmain();
 };
