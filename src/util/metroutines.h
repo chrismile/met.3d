@@ -347,11 +347,25 @@ double equivalentPotentialTemperature_K_Bolton(double T_K, double p_Pa,
                                                double q_kgkg);
 
 
+/**
+  Computes the ambient temperature at pressure @p p_Pa along a saturated
+  adiabat defined by wet-bulb potential temperature @p thetaW_K. Computation
+  uses the (approximative) noniterative approach described by Moisseeva and
+  Stull (ACP, 2017), "Technical note: A noniterative approach to modelling
+  moist thermodynamics".
+ */
+double temperatureAlongSaturatedAdiabat_K_MoisseevaStull(double p_Pa,
+                                                         double thetaW_K);
+
+
 // Test functions for meteorological computations.
 namespace MetRoutinesTests
 {
 
-void testEQPT();
+void test_EQPT();
+void test_temperatureAlongSaturatedAdiabat_K_MoisseevaStull();
+
+void runMetRoutinesTests();
 
 }
 

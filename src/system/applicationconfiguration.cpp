@@ -37,6 +37,7 @@
 
 #include "system/pipelineconfiguration.h"
 #include "system/frontendconfiguration.h"
+#include "system/developmentaidsconfiguration.h"
 
 #include "actors/basemapactor.h"
 #include "actors/graticuleactor.h"
@@ -114,6 +115,7 @@ void MApplicationConfigurationManager::registerApplicationConfigurations()
 {
     appConfigs << new MPipelineConfiguration();
     appConfigs << new MFrontendConfiguration();
+    appConfigs << new MDevelopmentAidsConfiguration();
 }
 
 
