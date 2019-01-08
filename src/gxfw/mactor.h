@@ -788,8 +788,16 @@ public:
 protected:
     virtual MActor* createInstance() = 0;
 
+    /**
+      Call this function in the derived @ref createInstance() method to display
+      a warning that the actor is still in an "experimental" state -- useful
+      for development versions.
+     */
+    void displayWarningExperimentalStatus();
+
     QString name;
     QString settingsID;
+    bool isInitialized;
 };
 
 } // namespace Met3D
