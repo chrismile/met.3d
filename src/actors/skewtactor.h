@@ -4,11 +4,14 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2016 Christoph Heidelmann
-**  Copyright 2018      Bianca Tost
-**  Copyright 2015-2018 Marc Rautenhaus
+**  Copyright 2015-2016 Christoph Heidelmann [+]
+**  Copyright 2018      Bianca Tost [+]
+**  Copyright 2015-2019 Marc Rautenhaus [*, previously +]
 **
-**  Computer Graphics and Visualization Group
+**  * Regional Computing Center, Visualization
+**  Universitaet Hamburg, Hamburg, Germany
+**
+**  + Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
 **
 **  Met.3D is free software: you can redistribute it and/or modify
@@ -53,8 +56,9 @@ namespace Met3D
 {
 
 /**
-  @brief MSkewTActor renders a Skew-T-Diagram based on the vertical column over
-  a choosen point on the basemap.
+  @brief MSkewTActor renders a Skew-T diagram displaying the vertical profile
+  over a choosen geographical position. The diagram can be drawn into the 3D
+  view and additionally be displayed in full screen more in a separate view.
  */
 class MSkewTActor : public MNWPMultiVarActor
 {
@@ -64,11 +68,8 @@ public:
     MSkewTActor();
     ~MSkewTActor() override;
 
-    static QString staticActorType() { return "Skew-T-Diagram"; }
+    static QString staticActorType() { return "Skew-T diagram"; }
 
-    /**
-      Reloads the shader programs.
-     */
     void reloadShaderEffects() override;
 
     void saveConfiguration(QSettings* settings) override;
@@ -97,9 +98,9 @@ public:
 
 protected slots:
     // These two slots are used for downloading the data from the
-    // wyoming web service.
-    void downloadFinished(QNetworkReply* reply);
-    void downloadListFinished(QNetworkReply* reply);
+    // U of Wyoming web service.
+    void downloadOfObservationFromUWyomingFinished(QNetworkReply* reply);
+    void downloadOfObservationListFromUWyomingFinished(QNetworkReply* reply);
 
 protected:
     void initializeActorResources() override;
@@ -108,10 +109,6 @@ protected:
 
     void renderToCurrentFullScreenContext(MSceneViewGLWidget* sceneView) override;
 
-    /**
-      Implements MNWPActor::dataFieldChangedEvent() to update the target grid
-      if the data field has changed.
-     */
     void dataFieldChangedEvent() override;
 
     void onQtPropertyChanged(QtProperty* property) override;
@@ -144,27 +141,27 @@ private:
     };
 
     /**
-      @brief Is used to store a vertice range that has to be drawn by the draw
+      @brief Stores a vertex range that has to be drawn by the draw
       calls for the diagram auxiliary lines.
      */
-    struct VerticeRange
+    struct VertexRange
     {
         int start = 0;
         int size  = 0;
     };
 
     /**
-      @brief Stores the vertice ranges for every differend type of auxiliary
+      @brief Stores the vertex ranges for every different type of auxiliary
       line.
      */
-    struct VerticeRanges
+    struct VertexRanges
     {
-        VerticeRange temperatureMarks;
-        VerticeRange isotherms;
-        VerticeRange dryAdiabates;
-        VerticeRange wetAdiabates;
-        VerticeRange outline;
-        VerticeRange pressure;
+        VertexRange temperatureMarks;
+        VertexRange isotherms;
+        VertexRange dryAdiabates;
+        VertexRange moistAdiabates;
+        VertexRange outline;
+        VertexRange pressure;
     };
 
     struct VARIABLES
@@ -194,7 +191,7 @@ private:
     VARIABLES variablesIndices;
 
     /**
-      @brief Dscribes the drawing area.
+      @brief Describes the drawing area.
      */
     struct Area
     {
@@ -260,15 +257,15 @@ private:
         GLint maxTextureSize;
         bool pressureEqualsWorldPressure = false;
         bool overDragHandle = false;
-        bool showDryAdiabates = true;
-        bool showWetAdiabates = true;
+        bool drawDryAdiabates = true;
+        bool drawMoistAdiabates = true;
         bool regenerateAdiabates = true;
         bool fullscreen = false;
-        bool uprightOrientation = false;
-        VerticeRanges verticeRanges;
+        bool drawInPerspective = false;
+        VertexRanges vertexRanges;
         QVector4D diagramColor;
-        float moistAdiabatDivisions = 10.0;
-        float dryAdiabatDivisions = 10.0;
+        float moistAdiabatInterval = 10.0;
+        float dryAdiabatInterval = 10.0;
         float yOffset = 0;
 
         float skew(float x, float y) const;
@@ -336,9 +333,9 @@ private:
         DiagramConfiguration *dconfig;
 
         bool regenerateAdiabates = true;
-        VerticeRanges verticeRanges;
+        VertexRanges vertexRanges;
         QVector<QVector2D> dryAdiabatesVertices;
-        QVector<QVector2D> wetAdiabatesVertices;
+        QVector<QVector2D> moistAdiabatesVertices;
         QString bufferNameSuffix;
     };
 
@@ -354,25 +351,25 @@ private:
     bool labelBBox;
     QColor labelBBoxColour;
 
-    QtProperty *positionProperty,
+    QtProperty *geoPositionProperty,
                *bottomPressureProperty, *topPressureProperty,
-               *pressureEqualsWorldPressureProperty,
+               *alignWithWorldPressureProperty,
                *wyomingStationsProperty,
                *enableWyomingProperty,
                *dewPointColorWyomingProperty,
                *temperatureColorWyomingProperty, *groupWyoming,
                *temperatureMinProperty, *temperatureMaxProperty,
-               *showDryAdiabatesProperty,
-               *showMoistAdiabatesProperty,
+               *drawDryAdiabatesProperty,
+               *drawMoistAdiabatesProperty,
                *moistAdiabatesDivProperty,
                *dryAdiabatesDivisionsProperty,
-               *groupMoistAdiabates, *groupDryAdiabates,
-               *uprightOrientProperty,
-               *groupVariables, *groupTemperature,
+               *appearanceGroupProperty,
+               *perspectiveRenderingProperty,
+               *groupVariables, *temperatureGroupProperty,
                *temperatureMinMaxVariableColorProperty,
                *temperatureShowProbabilityTubeProperty,
                *temperatureShowDeviationTubeProperty,
-               *groupDewPoint,
+               *humidityGroupProperty,
                *dewPointMinMaxVariableColorProperty,
                *dewPointShowProbabilityTubeProperty,
                *dewPointShowDeviationTubeProperty;
@@ -399,7 +396,7 @@ private:
     GL::MVertexBuffer* vbWyomingVertices;
 
     QVector<QVector2D> dryAdiabatesVertices;
-    QVector<QVector2D> wetAdiabatesVertices;
+    QVector<QVector2D> moistAdiabatesVertices;
     int wyomingVerticesCount;
     QVector<int> wyomingStations;
 
@@ -429,14 +426,14 @@ private:
                      GL::MVertexBuffer *vbDiagramVertices,
                      ModeSpecificDiagramConfiguration *config);
 
-    void loadWyomingData(int stationNum);
-    void loadWyomingList();
+    void loadObservationalDataFromUWyoming(int stationNum);
+    void loadListOfAvailableObservationsFromUWyoming();
 
-    void drawDiagramGeneral(MSceneViewGLWidget* sceneView);
+    void drawDiagram3DView(MSceneViewGLWidget* sceneView);
 
     void drawDiagramFullScreen(MSceneViewGLWidget* sceneView);
 
-    void drawDiagramLabelsGeneral(MSceneViewGLWidget* sceneView);
+    void drawDiagramLabels3DView(MSceneViewGLWidget* sceneView);
 
     void drawDiagramLabelsFullScreen(MSceneViewGLWidget* sceneView);
 
@@ -453,7 +450,8 @@ public:
     MSkewTActorFactory() : MAbstractActorFactory() {}
 
 protected:
-    MActor* createInstance() override { return new MSkewTActor(); }
+    MActor* createInstance() override
+    { displayWarningExperimentalStatus(); return new MSkewTActor(); }
 };
 
 

@@ -4,11 +4,14 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2016 Christoph Heidelmann
-**  Copyright 2018      Bianca Tost
-**  Copyright 2015-2018 Marc Rautenhaus
+**  Copyright 2015-2016 Christoph Heidelmann [+]
+**  Copyright 2018      Bianca Tost [+]
+**  Copyright 2015-2019 Marc Rautenhaus [*, previously +]
 **
-**  Computer Graphics and Visualization Group
+**  * Regional Computing Center, Visualization
+**  Universitaet Hamburg, Hamburg, Germany
+**
+**  + Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
 **
 **  Met.3D is free software: you can redistribute it and/or modify
@@ -69,67 +72,70 @@ MSkewTActor::MSkewTActor() : MNWPMultiVarActor(),
 
     // General actor properties.
     // =========================
-    uprightOrientProperty = addProperty(
-                BOOL_PROPERTY, "upright", actorPropertiesSupGroup);
-    properties->mBool()->setValue(uprightOrientProperty, false);
+    appearanceGroupProperty = addProperty(
+                GROUP_PROPERTY, "appearance", actorPropertiesSupGroup);
+
+    perspectiveRenderingProperty = addProperty(
+                BOOL_PROPERTY, "perspective depiction", appearanceGroupProperty);
+    properties->mBool()->setValue(perspectiveRenderingProperty, false);
+
+    alignWithWorldPressureProperty = addProperty(
+                BOOL_PROPERTY, "align with pressure axis",
+                appearanceGroupProperty);
+    properties->mBool()->setValue(alignWithWorldPressureProperty, true);
+
     bottomPressureProperty = addProperty(
                 DECORATEDDOUBLE_PROPERTY, "bottom pressure",
-                actorPropertiesSupGroup);
+                appearanceGroupProperty);
     properties->setDDouble(bottomPressureProperty, 1050., 0.1, 1050., 2, 10.,
                            " hPa");
     topPressureProperty = addProperty(
                 DECORATEDDOUBLE_PROPERTY, "top pressure",
-                actorPropertiesSupGroup);
+                appearanceGroupProperty);
     properties->setDDouble(topPressureProperty, 20., 0.1, 1050., 2, 10.,
                            " hPa");
     temperatureMinProperty = addProperty(
                 DECORATEDDOUBLE_PROPERTY, "min temperature",
-                actorPropertiesSupGroup);
+                appearanceGroupProperty);
     properties->setDDouble(temperatureMinProperty, -60., -100., 20., 0, 10.,
                            celsiusUnit);
     temperatureMaxProperty = addProperty(
                 DECORATEDDOUBLE_PROPERTY, "max temperature",
-                actorPropertiesSupGroup);
+                appearanceGroupProperty);
     properties->setDDouble(temperatureMaxProperty, 60., 20., 100., 0, 10.,
                            celsiusUnit);
-    pressureEqualsWorldPressureProperty = addProperty(
-                BOOL_PROPERTY, "pressure equals world pressure",
-                actorPropertiesSupGroup);
-    properties->mBool()->setValue(pressureEqualsWorldPressureProperty, true);
-    positionProperty = addProperty(
-                POINTF_PROPERTY, "position", actorPropertiesSupGroup);
-    properties->mPointF()->setValue(positionProperty, QPointF(10.0, 50.0));
-
-    // Moist adiabates.
-    // ================
-    groupMoistAdiabates = addProperty(
-                GROUP_PROPERTY, "moist adiabates", actorPropertiesSupGroup);
-    moistAdiabatesDivProperty = addProperty(
-                DECORATEDDOUBLE_PROPERTY, "temperature steps",
-                groupMoistAdiabates);
-    properties->setDDouble(moistAdiabatesDivProperty, 10., 1., 30., 0, 2.,
-                           celsiusUnit);
-    showMoistAdiabatesProperty = addProperty(
-                BOOL_PROPERTY, "enabled", groupMoistAdiabates);
-    properties->mBool()->setValue(showMoistAdiabatesProperty, true);
 
     // Dry adiabates.
     // ==============
-    groupDryAdiabates = addProperty(
-                GROUP_PROPERTY, "dry adiabates", actorPropertiesSupGroup);
+    drawDryAdiabatesProperty = addProperty(
+                BOOL_PROPERTY, "draw dry adiabates", appearanceGroupProperty);
+    properties->mBool()->setValue(drawDryAdiabatesProperty, true);
     dryAdiabatesDivisionsProperty = addProperty(
-                DECORATEDDOUBLE_PROPERTY, "temperature steps", groupDryAdiabates);
+                DECORATEDDOUBLE_PROPERTY, "dry adiabates interval", appearanceGroupProperty);
     properties->setDDouble(dryAdiabatesDivisionsProperty, 10., 1., 30., 0, 2.,
                            celsiusUnit);
-    showDryAdiabatesProperty = addProperty(
-                BOOL_PROPERTY, "enabled", groupDryAdiabates);
-    properties->mBool()->setValue(showDryAdiabatesProperty, true);
+
+    // Moist adiabates.
+    // ================
+    drawMoistAdiabatesProperty = addProperty(
+                BOOL_PROPERTY, "draw moist adiabates", appearanceGroupProperty);
+    properties->mBool()->setValue(drawMoistAdiabatesProperty, true);
+    moistAdiabatesDivProperty = addProperty(
+                DECORATEDDOUBLE_PROPERTY, "moist adiabates interval",
+                appearanceGroupProperty);
+    properties->setDDouble(moistAdiabatesDivProperty, 10., 1., 30., 0, 2.,
+                           celsiusUnit);
+
+    geoPositionProperty = addProperty(
+                POINTF_LONLAT_PROPERTY, "position", actorPropertiesSupGroup);
+    properties->mPointF()->setValue(geoPositionProperty, QPointF());
+
 
 // TODO (bt, 03Sep2018) Disabled for now, needs to be updated to work again.
-//    // Wyoming.
-//    // ========
+//    // Request observational data from University of Wyoming.
+//    // ======================================================
 //    groupWyoming = addProperty(
-//                GROUP_PROPERTY, "Wyoming", actorPropertiesSupGroup);
+//                GROUP_PROPERTY, "Obs Data UofWyoming", actorPropertiesSupGroup);
 //    wyomingStationsProperty = addProperty(
 //                ENUM_PROPERTY, "Wyoming Station", groupWyoming);
 //    enableWyomingProperty = addProperty(
@@ -148,67 +154,67 @@ MSkewTActor::MSkewTActor() : MNWPMultiVarActor(),
     // ==========
     diagramConfiguration.varConfigs = QVector<VariableConfig>(12);
     groupVariables = addProperty(
-           GROUP_PROPERTY, "variables", actorPropertiesSupGroup);
+           GROUP_PROPERTY, "data variables", actorPropertiesSupGroup);
 
     // Temperature variables.
     // ======================
-    groupTemperature = addProperty(
-                GROUP_PROPERTY, "temperature", groupVariables);
+    temperatureGroupProperty = addProperty(
+                GROUP_PROPERTY, "air temperature", groupVariables);
     diagramConfiguration.varConfigs[variablesIndices.temperature.MEMBER]
-            .property = addProperty(ENUM_PROPERTY, "member", groupTemperature);
+            .property = addProperty(ENUM_PROPERTY, "single member", temperatureGroupProperty);
     diagramConfiguration.varConfigs[variablesIndices.temperature.MEAN]
-            .property = addProperty( ENUM_PROPERTY, "mean", groupTemperature);
+            .property = addProperty( ENUM_PROPERTY, "ensemble mean", temperatureGroupProperty);
     diagramConfiguration.varConfigs[variablesIndices.temperature.MAXIMUM].property
-            = addProperty(ENUM_PROPERTY, "maximum", groupTemperature);
+            = addProperty(ENUM_PROPERTY, "ensemble max", temperatureGroupProperty);
     diagramConfiguration.varConfigs[variablesIndices.temperature.MINIMUM].property
-            = addProperty(ENUM_PROPERTY, "minimum", groupTemperature);
+            = addProperty(ENUM_PROPERTY, "ensemble min", temperatureGroupProperty);
     diagramConfiguration.varConfigs[variablesIndices.temperature.DEVIATION]
-            .property = addProperty(ENUM_PROPERTY, "deviation", groupTemperature);
+            .property = addProperty(ENUM_PROPERTY, "ensemble std.dev.", temperatureGroupProperty);
     diagramConfiguration.varConfigs[variablesIndices.temperature.SPAGHETTI]
-            .property = addProperty(ENUM_PROPERTY, "spaghetti", groupTemperature);
+            .property = addProperty(ENUM_PROPERTY, "multiple members", temperatureGroupProperty);
     temperatureShowProbabilityTubeProperty = addProperty(
-                BOOL_PROPERTY, "show min-max area", groupTemperature);
+                BOOL_PROPERTY, "draw min-max shaded", temperatureGroupProperty);
     properties->mBool()->setValue(temperatureShowProbabilityTubeProperty, true);
     temperatureShowDeviationTubeProperty = addProperty(
-                BOOL_PROPERTY, "show deviation area", groupTemperature);
+                BOOL_PROPERTY, "draw std.dev. shaded", temperatureGroupProperty);
     properties->mBool()->setValue(temperatureShowDeviationTubeProperty, true);
     temperatureMinMaxVariableColorProperty = addProperty(
-                COLOR_PROPERTY, "min-max area colour", groupTemperature);
+                COLOR_PROPERTY, "min-max shade colour", temperatureGroupProperty);
     properties->mColor()->setValue(temperatureMinMaxVariableColorProperty,
                                    QColor(201, 10, 5, 255));
 
     // Dewpoint variables.
     // ===================
-    groupDewPoint = addProperty(
-                GROUP_PROPERTY, "dew-point", groupVariables);
+    humidityGroupProperty = addProperty(
+                GROUP_PROPERTY, "specific humidity", groupVariables);
     diagramConfiguration.varConfigs[variablesIndices.dewPoint.MEMBER].property =
-            addProperty(ENUM_PROPERTY, "member", groupDewPoint);
+            addProperty(ENUM_PROPERTY, "single member", humidityGroupProperty);
     diagramConfiguration.varConfigs[variablesIndices.dewPoint.MEAN].property =
-            addProperty(ENUM_PROPERTY, "mean", groupDewPoint);
+            addProperty(ENUM_PROPERTY, "ensemble mean", humidityGroupProperty);
     diagramConfiguration.varConfigs[variablesIndices.dewPoint.MAXIMUM].property =
-            addProperty(ENUM_PROPERTY, "maximum", groupDewPoint);
+            addProperty(ENUM_PROPERTY, "ensemble max", humidityGroupProperty);
     diagramConfiguration.varConfigs[variablesIndices.dewPoint.MINIMUM].property =
-            addProperty(ENUM_PROPERTY, "minimum", groupDewPoint);
+            addProperty(ENUM_PROPERTY, "ensemble min", humidityGroupProperty);
     diagramConfiguration.varConfigs[variablesIndices.dewPoint.DEVIATION]
-            .property = addProperty(ENUM_PROPERTY, "deviation", groupDewPoint);
+            .property = addProperty(ENUM_PROPERTY, "ensemble std.dev.", humidityGroupProperty);
     diagramConfiguration.varConfigs[variablesIndices.dewPoint.SPAGHETTI]
-            .property = addProperty(ENUM_PROPERTY, "spaghetti", groupDewPoint);
-    dewPointMinMaxVariableColorProperty = addProperty(
-                COLOR_PROPERTY, "min-max area colour", groupDewPoint);
-    properties->mColor()->setValue(dewPointMinMaxVariableColorProperty,
-                                   QColor(17, 98, 208, 255));
+            .property = addProperty(ENUM_PROPERTY, "multiple members", humidityGroupProperty);
     dewPointShowProbabilityTubeProperty = addProperty(
-                BOOL_PROPERTY, "show min-max area", groupDewPoint);
+                BOOL_PROPERTY, "draw min-max shaded", humidityGroupProperty);
     properties->mBool()->setValue(dewPointShowProbabilityTubeProperty, true);
     dewPointShowDeviationTubeProperty = addProperty(
-                BOOL_PROPERTY, "show deviation area", groupDewPoint);
+                BOOL_PROPERTY, "draw std.dev. shaded", humidityGroupProperty);
     properties->mBool()->setValue(dewPointShowDeviationTubeProperty, true);
+    dewPointMinMaxVariableColorProperty = addProperty(
+                COLOR_PROPERTY, "min-max shade colour", humidityGroupProperty);
+    properties->mColor()->setValue(dewPointMinMaxVariableColorProperty,
+                                   QColor(17, 98, 208, 255));
 
     endInitialiseQtProperties();
 
     setDiagramConfiguration();
 
-    loadWyomingList();
+    loadListOfAvailableObservationsFromUWyoming();
 }
 
 
@@ -269,7 +275,7 @@ void MSkewTActor::saveConfiguration(QSettings *settings)
     settings->beginGroup(MSkewTActor::getSettingsID());
 
     settings->setValue("upright",
-                       properties->mBool()->value(uprightOrientProperty));
+                       properties->mBool()->value(perspectiveRenderingProperty));
 
     settings->setValue("bottomPressure",
                        properties->mDDouble()->value(bottomPressureProperty));
@@ -283,20 +289,20 @@ void MSkewTActor::saveConfiguration(QSettings *settings)
 
     settings->setValue("pressureEqualsWorldPressure",
                        properties->mBool()->value(
-                           pressureEqualsWorldPressureProperty));
+                           alignWithWorldPressureProperty));
     settings->setValue("position",
-                       properties->mPointF()->value(positionProperty));
+                       properties->mPointF()->value(geoPositionProperty));
 
     settings->setValue("moistAdiabatesTemperatureSteps",
                        properties->mDDouble()->value(moistAdiabatesDivProperty));
     settings->setValue("moistAdiabatesEnabled",
-                       properties->mBool()->value(showMoistAdiabatesProperty));
+                       properties->mBool()->value(drawMoistAdiabatesProperty));
 
     settings->setValue("dryAdiabatesTemperatureSteps",
                        properties->mDDouble()->value(
                            dryAdiabatesDivisionsProperty));
     settings->setValue("dryAdiabatesEnabled",
-                       properties->mBool()->value(showDryAdiabatesProperty));
+                       properties->mBool()->value(drawDryAdiabatesProperty));
 
     for (int i = 0; i < diagramConfiguration.varConfigs.size(); i++)
     {
@@ -337,7 +343,7 @@ void MSkewTActor::loadConfiguration(QSettings *settings)
 
     settings->beginGroup(MSkewTActor::getSettingsID());
 
-    properties->mBool()->setValue(uprightOrientProperty,
+    properties->mBool()->setValue(perspectiveRenderingProperty,
                                   settings->value("upright", false).toBool());
 
     properties->mDDouble()->setValue(
@@ -357,24 +363,24 @@ void MSkewTActor::loadConfiguration(QSettings *settings)
 
 
     properties->mBool()->setValue(
-        pressureEqualsWorldPressureProperty,
+        alignWithWorldPressureProperty,
         settings->value("pressureEqualsWorldPressure", true).toBool());
 
-    properties->mPointF()->setValue(positionProperty,
+    properties->mPointF()->setValue(geoPositionProperty,
                                     settings->value("position").toPointF());
 
     properties->mDDouble()->setValue(
         moistAdiabatesDivProperty,
         settings->value("moistAdiabatesTemperatureSteps", 10.).toDouble());
     properties->mBool()->setValue(
-        pressureEqualsWorldPressureProperty,
+        alignWithWorldPressureProperty,
         settings->value("moistAdiabatesEnabled", true).toBool());
 
     properties->mDDouble()->setValue(
                 dryAdiabatesDivisionsProperty,
                 settings->value("dryAdiabatesTemperatureSteps", 10.).toDouble());
     properties->mBool()->setValue(
-                pressureEqualsWorldPressureProperty,
+                alignWithWorldPressureProperty,
                 settings->value("dryAdiabatesEnabled", true).toBool());
 
     for (int i = 0; i < diagramConfiguration.varConfigs.size(); i++)
@@ -561,7 +567,7 @@ void MSkewTActor::dragEvent(
 
         QVector3D mousePosWorldSpace = l0 + d * l;
         QPointF p = QPointF(mousePosWorldSpace.x(), mousePosWorldSpace.y());
-        properties->mPointF()->setValue(positionProperty, p);
+        properties->mPointF()->setValue(geoPositionProperty, p);
     }
 }
 
@@ -595,7 +601,7 @@ void MSkewTActor::onFullScreenModeSwitch(MSceneViewGLWidget *sceneView,
 ***                             PROTECTED SLOTS                             ***
 *******************************************************************************/
 
-void MSkewTActor::downloadFinished(
+void MSkewTActor::downloadOfObservationFromUWyomingFinished(
     QNetworkReply *reply)
 {
     if (reply->error() != QNetworkReply::NoError)
@@ -659,11 +665,11 @@ void MSkewTActor::downloadFinished(
                              QString("wyomingVertices_actor#%1").arg(myID),
                              &vbWyomingVertices);
     wyomingVerticesCount = verticesForBuffer.count();
-    properties->mPointF()->setValue(positionProperty, QPointF(lon, lat));
+    properties->mPointF()->setValue(geoPositionProperty, QPointF(lon, lat));
 }
 
 
-void MSkewTActor::downloadListFinished(
+void MSkewTActor::downloadOfObservationListFromUWyomingFinished(
     QNetworkReply *reply)
 {
     if (reply->error() != QNetworkReply::NoError)
@@ -753,7 +759,7 @@ void MSkewTActor::initializeActorResources()
 void MSkewTActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
 {
     sceneViewFullscreenEnabled.insert(sceneView, false);
-    drawDiagramGeneral(sceneView);
+    drawDiagram3DView(sceneView);
     if (sceneView->interactionModeEnabled())
     {
         drawDragPoint(sceneView);
@@ -788,7 +794,7 @@ void MSkewTActor::onQtPropertyChanged(QtProperty *property)
             int index = properties->mEnum()->value(wyomingStationsProperty);
             if (index != -1)
             {
-                loadWyomingData(wyomingStations.at(index));
+                loadObservationalDataFromUWyoming(wyomingStations.at(index));
             }
         }
         else
@@ -799,7 +805,7 @@ void MSkewTActor::onQtPropertyChanged(QtProperty *property)
     }
     else if (property == temperatureMaxProperty
              || property == temperatureMinProperty
-             || property == pressureEqualsWorldPressureProperty
+             || property == alignWithWorldPressureProperty
              || property == moistAdiabatesDivProperty
              || property == dryAdiabatesDivisionsProperty
              || property == bottomPressureProperty
@@ -828,27 +834,27 @@ void MSkewTActor::onQtPropertyChanged(QtProperty *property)
         labelBBoxColour = properties->mColor()->value(labelBBoxColourProperty);
         emitActorChangedSignal();
     }
-    else if (property == positionProperty
-             || property == uprightOrientProperty)
+    else if (property == geoPositionProperty
+             || property == perspectiveRenderingProperty)
     {
-        diagramConfiguration.uprightOrientation
-                = properties->mBool()->value(uprightOrientProperty);
+        diagramConfiguration.drawInPerspective
+                = properties->mBool()->value(perspectiveRenderingProperty);
         diagramConfiguration.position = QVector2D(
-                    float(properties->mPointF()->value(positionProperty).x()),
-                    float(properties->mPointF()->value(positionProperty).y()));
+                    float(properties->mPointF()->value(geoPositionProperty).x()),
+                    float(properties->mPointF()->value(geoPositionProperty).y()));
         emitActorChangedSignal();
     }
-    else if (property == showDryAdiabatesProperty)
+    else if (property == drawDryAdiabatesProperty)
     {
-        diagramConfiguration.showDryAdiabates =
-                properties->mBool()->value(showDryAdiabatesProperty);
+        diagramConfiguration.drawDryAdiabates =
+                properties->mBool()->value(drawDryAdiabatesProperty);
 
-        if (diagramConfiguration.showDryAdiabates)
+        if (diagramConfiguration.drawDryAdiabates)
         {
             // Regenerate dry adiabates only if necessary (first time, pressure
             // drawing type, temperature scale)
             if ((normalscreenDiagrammConfiguration
-                 .verticeRanges.dryAdiabates.size == 0)
+                 .vertexRanges.dryAdiabates.size == 0)
                     || normalscreenDiagrammConfiguration.regenerateAdiabates)
             {
                 generateDiagramVertices(&vbDiagramVertices,
@@ -857,7 +863,7 @@ void MSkewTActor::onQtPropertyChanged(QtProperty *property)
             // Regenerate dry adiabates only if necessary (first time, pressure
             // drawing type, temperature scale)
             if ((fullscreenDiagrammConfiguration
-                 .verticeRanges.dryAdiabates.size == 0)
+                 .vertexRanges.dryAdiabates.size == 0)
                     || fullscreenDiagrammConfiguration.regenerateAdiabates)
             {
                 generateDiagramVertices(&vbDiagramVertices,
@@ -866,17 +872,17 @@ void MSkewTActor::onQtPropertyChanged(QtProperty *property)
         }
         emitActorChangedSignal();
     }
-    else if (property == showMoistAdiabatesProperty)
+    else if (property == drawMoistAdiabatesProperty)
     {
-        diagramConfiguration.showWetAdiabates =
-                properties->mBool()->value(showMoistAdiabatesProperty);
+        diagramConfiguration.drawMoistAdiabates =
+                properties->mBool()->value(drawMoistAdiabatesProperty);
 
-        if (diagramConfiguration.showWetAdiabates)
+        if (diagramConfiguration.drawMoistAdiabates)
         {
             // Regenerate moist adiabates only if necessary (first time,
             // pressure drawing type, temperature scale)
             if ((normalscreenDiagrammConfiguration
-                 .verticeRanges.wetAdiabates.size == 0)
+                 .vertexRanges.moistAdiabates.size == 0)
                     || normalscreenDiagrammConfiguration.regenerateAdiabates)
             {
                 generateDiagramVertices(&vbDiagramVertices,
@@ -885,7 +891,7 @@ void MSkewTActor::onQtPropertyChanged(QtProperty *property)
             // Regenerate moist adiabates only if necessary (first time,
             // pressure drawing type, temperature scale)
             if ((fullscreenDiagrammConfiguration
-                 .verticeRanges.wetAdiabates.size == 0)
+                 .vertexRanges.moistAdiabates.size == 0)
                     || fullscreenDiagrammConfiguration.regenerateAdiabates)
             {
                 generateDiagramVertices(&vbDiagramVertices,
@@ -1062,10 +1068,10 @@ void MSkewTActor::drawDragPoint(MSceneViewGLWidget *sceneView)
 void MSkewTActor::setDiagramConfiguration()
 {
     diagramConfiguration.pressureEqualsWorldPressure =
-            properties->mBool()->value(pressureEqualsWorldPressureProperty);
+            properties->mBool()->value(alignWithWorldPressureProperty);
     diagramConfiguration.position = QVector2D(
-                properties->mPointF()->value(positionProperty).x(),
-                properties->mPointF()->value(positionProperty).y());
+                properties->mPointF()->value(geoPositionProperty).x(),
+                properties->mPointF()->value(geoPositionProperty).y());
     diagramConfiguration.temperature.min =
             properties->mDDouble()->value(temperatureMinProperty);
     diagramConfiguration.temperature.max =
@@ -1074,21 +1080,21 @@ void MSkewTActor::setDiagramConfiguration()
             properties->mDDouble()->value(topPressureProperty);
     diagramConfiguration.pressure.max =
             properties->mDDouble()->value(bottomPressureProperty);
-    diagramConfiguration.showDryAdiabates =
-            properties->mBool()->value(showDryAdiabatesProperty);
-    diagramConfiguration.showWetAdiabates =
-            properties->mBool()->value(showMoistAdiabatesProperty);
-    diagramConfiguration.moistAdiabatDivisions =
+    diagramConfiguration.drawDryAdiabates =
+            properties->mBool()->value(drawDryAdiabatesProperty);
+    diagramConfiguration.drawMoistAdiabates =
+            properties->mBool()->value(drawMoistAdiabatesProperty);
+    diagramConfiguration.moistAdiabatInterval =
             properties->mDDouble()->value(moistAdiabatesDivProperty);
-    diagramConfiguration.dryAdiabatDivisions =
+    diagramConfiguration.dryAdiabatInterval =
             properties->mDDouble()->value(dryAdiabatesDivisionsProperty);
 
     normalscreenDiagrammConfiguration.pressureEqualsWorldPressure =
             diagramConfiguration.pressureEqualsWorldPressure;
     fullscreenDiagrammConfiguration.pressureEqualsWorldPressure = false;
 
-    diagramConfiguration.uprightOrientation
-            = properties->mBool()->value(uprightOrientProperty);
+    diagramConfiguration.drawInPerspective
+            = properties->mBool()->value(perspectiveRenderingProperty);
     diagramConfiguration.init();
     normalscreenDiagrammConfiguration.init(&diagramConfiguration, "_normal");
     fullscreenDiagrammConfiguration.init(&diagramConfiguration, "_fullscreen");
@@ -1102,7 +1108,7 @@ void MSkewTActor::generateDiagramVertices(GL::MVertexBuffer** vbDiagramVertices,
 
     // Generate diagram outline vertices.
     // ==================================
-    config->verticeRanges.outline.start = vertices.size();
+    config->vertexRanges.outline.start = vertices.size();
 
     Outline outline = config->area.outline();
     vertices.append(QVector2D(outline.data[0],
@@ -1122,9 +1128,9 @@ void MSkewTActor::generateDiagramVertices(GL::MVertexBuffer** vbDiagramVertices,
     vertices.append(QVector2D(outline.data[14],
                               config->worldZToPressure(outline.data[15])));
 
-    config->verticeRanges.outline.size =
-            vertices.size() - config->verticeRanges.outline.start;
-    config->verticeRanges.temperatureMarks.start = vertices.size();
+    config->vertexRanges.outline.size =
+            vertices.size() - config->vertexRanges.outline.start;
+    config->vertexRanges.temperatureMarks.start = vertices.size();
 
     QVector2D first, second;
 
@@ -1155,10 +1161,10 @@ void MSkewTActor::generateDiagramVertices(GL::MVertexBuffer** vbDiagramVertices,
         vertices.append(second);
     }
 
-    config->verticeRanges.temperatureMarks.size =
+    config->vertexRanges.temperatureMarks.size =
             vertices.size()
-            - config->verticeRanges.temperatureMarks.start;
-    config->verticeRanges.pressure.start        = vertices.size();
+            - config->vertexRanges.temperatureMarks.start;
+    config->vertexRanges.pressure.start        = vertices.size();
 
     // Pressure
     float pressureOffset = 0.f;
@@ -1202,9 +1208,9 @@ void MSkewTActor::generateDiagramVertices(GL::MVertexBuffer** vbDiagramVertices,
     vertices.append(first);
     vertices.append(second);
 
-    config->verticeRanges.pressure.size =
-            vertices.size() - config->verticeRanges.pressure.start;
-    config->verticeRanges.isotherms.start = vertices.size();
+    config->vertexRanges.pressure.size =
+            vertices.size() - config->vertexRanges.pressure.start;
+    config->vertexRanges.isotherms.start = vertices.size();
 
     // Generate isotherms vertices.
     // ============================
@@ -1217,17 +1223,17 @@ void MSkewTActor::generateDiagramVertices(GL::MVertexBuffer** vbDiagramVertices,
         vertices.append(second);
     }
 
-    config->verticeRanges.isotherms.size =
-            vertices.size() - config->verticeRanges.isotherms.start;
-    config->verticeRanges.dryAdiabates.start = vertices.size();
+    config->vertexRanges.isotherms.size =
+            vertices.size() - config->vertexRanges.isotherms.start;
+    config->vertexRanges.dryAdiabates.start = vertices.size();
 
     // Generate dry adiabates vertices.
     // ================================
-    if (diagramConfiguration.showDryAdiabates)
+    if (diagramConfiguration.drawDryAdiabates)
     {
         // Regenerate dry adiabates only if necessary (first time, pressure
         // drawing type, temperature scale, top and bottom pressure changed).
-        if (config->verticeRanges.dryAdiabates.size == 0
+        if (config->vertexRanges.dryAdiabates.size == 0
                 || config->regenerateAdiabates)
         {
             config->dryAdiabatesVertices.clear();
@@ -1344,27 +1350,27 @@ void MSkewTActor::generateDiagramVertices(GL::MVertexBuffer** vbDiagramVertices,
                         }
                     }
                 }
-                tempCounter += diagramConfiguration.dryAdiabatDivisions;
+                tempCounter += diagramConfiguration.dryAdiabatInterval;
             }
         }
     }
 
     vertices << config->dryAdiabatesVertices;
-    config->verticeRanges.dryAdiabates.size =
+    config->vertexRanges.dryAdiabates.size =
             vertices.size()
-            - config->verticeRanges.dryAdiabates.start;
-    config->verticeRanges.wetAdiabates.start = vertices.size();
+            - config->vertexRanges.dryAdiabates.start;
+    config->vertexRanges.moistAdiabates.start = vertices.size();
 
-    // Generate wet adiabates vertices.
-    // ================================
-    if (diagramConfiguration.showWetAdiabates)
+    // Generate moist adiabates vertices.
+    // ==================================
+    if (diagramConfiguration.drawMoistAdiabates)
     {
         // Regenerate moist adiabates only if necessary (first time, pressure
         // drawing type, temperature scale, top and bottom pressure changed).
-        if (config->verticeRanges.wetAdiabates.size == 0
+        if (config->vertexRanges.moistAdiabates.size == 0
                 || config->regenerateAdiabates)
         {
-            config->wetAdiabatesVertices.clear();
+            config->moistAdiabatesVertices.clear();
 
             QList<float> startPressureList, endPressureList, incrList;
             float startPressure, endPressure, incr;
@@ -1458,7 +1464,7 @@ void MSkewTActor::generateDiagramVertices(GL::MVertexBuffer** vbDiagramVertices,
                         first = QVector2D(x + xShift,
                                           config->worldZToPressure(
                                               y + pressureOffset));
-                        config->wetAdiabatesVertices.append(first);
+                        config->moistAdiabatesVertices.append(first);
 
                         T -= moistAdiabaticLapseRate_K(T, p * 100.f) * incr
                                 * 100.f;
@@ -1475,19 +1481,19 @@ void MSkewTActor::generateDiagramVertices(GL::MVertexBuffer** vbDiagramVertices,
                         // scale is equal world pressure scale or not.
                         second = QVector2D(x + xShift,
                                            config->worldZToPressure(y + pressureOffset));
-                        config->wetAdiabatesVertices.append(second);
+                        config->moistAdiabatesVertices.append(second);
                     }
                 }
-                tempCounter += diagramConfiguration.moistAdiabatDivisions;
+                tempCounter += diagramConfiguration.moistAdiabatInterval;
             }
         }
     }
 
-    vertices << config->wetAdiabatesVertices;
+    vertices << config->moistAdiabatesVertices;
 
-    config->verticeRanges.wetAdiabates.size =
+    config->vertexRanges.moistAdiabates.size =
             vertices.size()
-            - config->verticeRanges.wetAdiabates.start;
+            - config->vertexRanges.moistAdiabates.start;
 
     config->regenerateAdiabates = false;
     uploadVec2ToVertexBuffer(
@@ -1836,8 +1842,8 @@ void MSkewTActor::drawDiagram(MSceneViewGLWidget *sceneView,
     setShaderGeneralVars(sceneView, config);
     skewTShader->setUniformValue("colour", diagramConfiguration.diagramColor);
     glDrawArrays(GL_LINES,
-                 config->verticeRanges.outline.start,
-                 config->verticeRanges.outline.size);
+                 config->vertexRanges.outline.start,
+                 config->vertexRanges.outline.size);
 
 }
 
@@ -2098,43 +2104,43 @@ void MSkewTActor::drawDiagramLabels(MSceneViewGLWidget *sceneView,
     setShaderGeneralVars(sceneView, config);
     skewTShader->setUniformValue("colour", diagramConfiguration.diagramColor);
     glDrawArrays(GL_LINES,
-                 config->verticeRanges.temperatureMarks.start,
-                 config->verticeRanges.temperatureMarks.size);
+                 config->vertexRanges.temperatureMarks.start,
+                 config->vertexRanges.temperatureMarks.size);
 
     skewTShader->bindProgram("DiagramVertices");
     setShaderGeneralVars(sceneView, config);
     // Draw dry adiabates.
     // ===================
-    if (diagramConfiguration.showDryAdiabates)
+    if (diagramConfiguration.drawDryAdiabates)
     {
         skewTShader->setUniformValue("colour", QVector4D(0.8f, 0.8f, 0.f, 1.f));
         glDrawArrays(GL_LINES,
-                     config->verticeRanges.dryAdiabates.start,
-                     config->verticeRanges.dryAdiabates.size);
+                     config->vertexRanges.dryAdiabates.start,
+                     config->vertexRanges.dryAdiabates.size);
     }
 
     // Draw isopressure lines.
     // =======================
     skewTShader->setUniformValue("colour", diagramConfiguration.diagramColor);
     glDrawArrays(GL_LINES,
-                 config->verticeRanges.pressure.start,
-                 config->verticeRanges.pressure.size);
+                 config->vertexRanges.pressure.start,
+                 config->vertexRanges.pressure.size);
 
     // Draw isotherms.
     // ===============
     skewTShader->setUniformValue("colour", QVector4D(1.f, 0.f, 0.f, 1.f));
     glDrawArrays(GL_LINES,
-                 config->verticeRanges.isotherms.start,
-                 config->verticeRanges.isotherms.size);
+                 config->vertexRanges.isotherms.start,
+                 config->vertexRanges.isotherms.size);
 
     // Draw moist adiabates.
     // =====================
-    if (diagramConfiguration.showWetAdiabates)
+    if (diagramConfiguration.drawMoistAdiabates)
     {
         skewTShader->setUniformValue("colour", QVector4D(0.f, 0.8f, 0.f, 1.f));
         glDrawArrays(GL_LINES,
-                     config->verticeRanges.wetAdiabates.start,
-                     config->verticeRanges.wetAdiabates.size);
+                     config->vertexRanges.moistAdiabates.start,
+                     config->vertexRanges.moistAdiabates.size);
     }
 
     // Draw mouse cross and legend in fullscreen mode.
@@ -2351,7 +2357,7 @@ void MSkewTActor::drawDiagramLabels(MSceneViewGLWidget *sceneView,
     QMatrix4x4 view = sceneView->getCamera()->getViewMatrix();
     QVector3D CameraUp;
 
-    if (!diagramConfiguration.uprightOrientation)
+    if (!diagramConfiguration.drawInPerspective)
     {
         CameraUp = QVector3D(view.row(1).x(),
                              view.row(1).y(),
@@ -2558,7 +2564,7 @@ void MSkewTActor::setShaderGeneralVars(
     skewTShader->setUniformValue("fullscreen",
                                  sceneViewFullscreenEnabled.value(sceneView));
     skewTShader->setUniformValue("uprightOrientation",
-                                 diagramConfiguration.uprightOrientation);
+                                 diagramConfiguration.drawInPerspective);
 
     skewTShader->setUniformValue("area.left", config->area.left);
     skewTShader->setUniformValue("area.right", config->area.right);
@@ -2617,20 +2623,20 @@ void MSkewTActor::setShaderGeneralVars(
 }
 
 
-void MSkewTActor::loadWyomingList()
+void MSkewTActor::loadListOfAvailableObservationsFromUWyoming()
 {
     QUrl url = QUrl(QString("http://weather.uwyo.edu/upperair/europe.html"));
     QNetworkAccessManager *m_netwManager = new
     QNetworkAccessManager(this);
     connect(m_netwManager,
             SIGNAL(finished(QNetworkReply *)), this,
-            SLOT(downloadListFinished(QNetworkReply *)));
+            SLOT(downloadOfObservationListFromUWyomingFinished(QNetworkReply *)));
     QNetworkRequest request(url);
     m_netwManager->get(request);
 }
 
 
-void MSkewTActor::loadWyomingData(int stationNum)
+void MSkewTActor::loadObservationalDataFromUWyoming(int stationNum)
 {
     MSystemManagerAndControl *sysMC =
         MSystemManagerAndControl::getInstance();
@@ -2647,7 +2653,7 @@ void MSkewTActor::loadWyomingData(int stationNum)
     QNetworkAccessManager(this);
     connect(m_netwManager,
             SIGNAL(finished(QNetworkReply *)), this,
-            SLOT(downloadFinished(QNetworkReply *)));
+            SLOT(downloadOfObservationFromUWyomingFinished(QNetworkReply *)));
     QNetworkRequest request(url);
     m_netwManager->get(request);
 }
@@ -2835,7 +2841,7 @@ MSkewTActor::ModeSpecificDiagramConfiguration::pressureToWorldZParameters() cons
 }
 
 
-void MSkewTActor::drawDiagramGeneral(MSceneViewGLWidget* sceneView)
+void MSkewTActor::drawDiagram3DView(MSceneViewGLWidget* sceneView)
 {
     normalscreenDiagrammConfiguration.layer = -0.005f;
     drawDiagramLabels(sceneView, vbDiagramVertices, &normalscreenDiagrammConfiguration);
@@ -2860,7 +2866,7 @@ void MSkewTActor::drawDiagramLabelsFullScreen(MSceneViewGLWidget* sceneView)
 }
 
 
-void MSkewTActor::drawDiagramLabelsGeneral(MSceneViewGLWidget* sceneView)
+void MSkewTActor::drawDiagramLabels3DView(MSceneViewGLWidget* sceneView)
 {
     drawDiagramLabels(sceneView, vbDiagramVertices,
                       &normalscreenDiagrammConfiguration);
