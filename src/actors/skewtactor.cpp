@@ -586,8 +586,8 @@ void MSkewTActor::onFullScreenModeSwitch(MSceneViewGLWidget *sceneView,
 //    }
     setDiagramConfiguration();
     diagramConfiguration.regenerateAdiabates = true;
-    normalscreenDiagrammConfiguration.regenerateAdiabates = true;
-    fullscreenDiagrammConfiguration.regenerateAdiabates = true;
+    normalscreenDiagrammConfiguration.recomputeAdiabateGeometries = true;
+    fullscreenDiagrammConfiguration.recomputeAdiabateGeometries = true;
     if (isInitialized())
     {
         generateDiagramVertices(&vbDiagramVertices, &normalscreenDiagrammConfiguration);
@@ -602,7 +602,7 @@ void MSkewTActor::onFullScreenModeSwitch(MSceneViewGLWidget *sceneView,
 *******************************************************************************/
 
 void MSkewTActor::downloadOfObservationFromUWyomingFinished(
-    QNetworkReply *reply)
+        QNetworkReply *reply)
 {
     if (reply->error() != QNetworkReply::NoError)
     {
@@ -670,7 +670,7 @@ void MSkewTActor::downloadOfObservationFromUWyomingFinished(
 
 
 void MSkewTActor::downloadOfObservationListFromUWyomingFinished(
-    QNetworkReply *reply)
+        QNetworkReply *reply)
 {
     if (reply->error() != QNetworkReply::NoError)
     {
@@ -762,7 +762,7 @@ void MSkewTActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
     drawDiagram3DView(sceneView);
     if (sceneView->interactionModeEnabled())
     {
-        drawDragPoint(sceneView);
+        drawDiagramHandle(sceneView);
     }
 }
 
@@ -812,8 +812,8 @@ void MSkewTActor::onQtPropertyChanged(QtProperty *property)
              || property == topPressureProperty)
     {
         diagramConfiguration.regenerateAdiabates = true;
-        normalscreenDiagrammConfiguration.regenerateAdiabates = true;
-        fullscreenDiagrammConfiguration.regenerateAdiabates = true;
+        normalscreenDiagrammConfiguration.recomputeAdiabateGeometries = true;
+        fullscreenDiagrammConfiguration.recomputeAdiabateGeometries = true;
 
         setDiagramConfiguration();
 
@@ -854,8 +854,8 @@ void MSkewTActor::onQtPropertyChanged(QtProperty *property)
             // Regenerate dry adiabates only if necessary (first time, pressure
             // drawing type, temperature scale)
             if ((normalscreenDiagrammConfiguration
-                 .vertexRanges.dryAdiabates.size == 0)
-                    || normalscreenDiagrammConfiguration.regenerateAdiabates)
+                 .vertexArrayDrawRanges.dryAdiabates.indexCount == 0)
+                    || normalscreenDiagrammConfiguration.recomputeAdiabateGeometries)
             {
                 generateDiagramVertices(&vbDiagramVertices,
                                         &normalscreenDiagrammConfiguration);
@@ -863,8 +863,8 @@ void MSkewTActor::onQtPropertyChanged(QtProperty *property)
             // Regenerate dry adiabates only if necessary (first time, pressure
             // drawing type, temperature scale)
             if ((fullscreenDiagrammConfiguration
-                 .vertexRanges.dryAdiabates.size == 0)
-                    || fullscreenDiagrammConfiguration.regenerateAdiabates)
+                 .vertexArrayDrawRanges.dryAdiabates.indexCount == 0)
+                    || fullscreenDiagrammConfiguration.recomputeAdiabateGeometries)
             {
                 generateDiagramVertices(&vbDiagramVertices,
                                         &fullscreenDiagrammConfiguration);
@@ -882,8 +882,8 @@ void MSkewTActor::onQtPropertyChanged(QtProperty *property)
             // Regenerate moist adiabates only if necessary (first time,
             // pressure drawing type, temperature scale)
             if ((normalscreenDiagrammConfiguration
-                 .vertexRanges.moistAdiabates.size == 0)
-                    || normalscreenDiagrammConfiguration.regenerateAdiabates)
+                 .vertexArrayDrawRanges.moistAdiabates.indexCount == 0)
+                    || normalscreenDiagrammConfiguration.recomputeAdiabateGeometries)
             {
                 generateDiagramVertices(&vbDiagramVertices,
                                         &normalscreenDiagrammConfiguration);
@@ -891,8 +891,8 @@ void MSkewTActor::onQtPropertyChanged(QtProperty *property)
             // Regenerate moist adiabates only if necessary (first time,
             // pressure drawing type, temperature scale)
             if ((fullscreenDiagrammConfiguration
-                 .vertexRanges.moistAdiabates.size == 0)
-                    || fullscreenDiagrammConfiguration.regenerateAdiabates)
+                 .vertexArrayDrawRanges.moistAdiabates.indexCount == 0)
+                    || fullscreenDiagrammConfiguration.recomputeAdiabateGeometries)
             {
                 generateDiagramVertices(&vbDiagramVertices,
                                         &fullscreenDiagrammConfiguration);
@@ -1019,7 +1019,7 @@ void MSkewTActor::updateVariableEnums(MNWPActorVariable *deletedVar)
 }
 
 
-void MSkewTActor::drawDragPoint(MSceneViewGLWidget *sceneView)
+void MSkewTActor::drawDiagramHandle(MSceneViewGLWidget *sceneView)
 {
     // Bind shader program.
     positionSpheresShader->bindProgram("UsePosition");
@@ -1061,7 +1061,6 @@ void MSkewTActor::drawDragPoint(MSceneViewGLWidget *sceneView)
     glDrawArrays(GL_POINTS, 0, 1);
     // Unbind VBO
     glBindBuffer(GL_ARRAY_BUFFER, 0);
-
 }
 
 
@@ -1076,9 +1075,9 @@ void MSkewTActor::setDiagramConfiguration()
             properties->mDDouble()->value(temperatureMinProperty);
     diagramConfiguration.temperature.max =
             properties->mDDouble()->value(temperatureMaxProperty);
-    diagramConfiguration.pressure.min =
+    diagramConfiguration.vertical_p_hPa.min =
             properties->mDDouble()->value(topPressureProperty);
-    diagramConfiguration.pressure.max =
+    diagramConfiguration.vertical_p_hPa.max =
             properties->mDDouble()->value(bottomPressureProperty);
     diagramConfiguration.drawDryAdiabates =
             properties->mBool()->value(drawDryAdiabatesProperty);
@@ -1104,137 +1103,150 @@ void MSkewTActor::setDiagramConfiguration()
 void MSkewTActor::generateDiagramVertices(GL::MVertexBuffer** vbDiagramVertices,
                                           ModeSpecificDiagramConfiguration *config)
 {
-    QVector<QVector2D> vertices;
+    // Array with vertex data that will be uploaded to a vertex buffer at the
+    // end of the method.
+    QVector<QVector2D> vertexArray;
 
-    // Generate diagram outline vertices.
-    // ==================================
-    config->vertexRanges.outline.start = vertices.size();
+    // Temporary variables for start and end vertices for a line segment,
+    // reused throughout the method.
+    QVector2D vStart, vEnd;
 
-    Outline outline = config->area.outline();
-    vertices.append(QVector2D(outline.data[0],
-                              config->worldZToPressure(outline.data[1])));
-    vertices.append(QVector2D(outline.data[2],
-                              config->worldZToPressure(outline.data[3])));
-    vertices.append(QVector2D(outline.data[4],
-                              config->worldZToPressure(outline.data[5])));
-    vertices.append(QVector2D(outline.data[6],
-                              config->worldZToPressure(outline.data[7])));
-    vertices.append(QVector2D(outline.data[8],
-                              config->worldZToPressure(outline.data[9])));
-    vertices.append(QVector2D(outline.data[10],
-                              config->worldZToPressure(outline.data[11])));
-    vertices.append(QVector2D(outline.data[12],
-                              config->worldZToPressure(outline.data[13])));
-    vertices.append(QVector2D(outline.data[14],
-                              config->worldZToPressure(outline.data[15])));
+    // Generate vertices for diagram outline (clip space bounding box).
+    // ================================================================
+    config->vertexArrayDrawRanges.outline.startIndex = vertexArray.size();
 
-    config->vertexRanges.outline.size =
-            vertices.size() - config->vertexRanges.outline.start;
-    config->vertexRanges.temperatureMarks.start = vertices.size();
+    Outline outline = config->drawingRegionClipSpace.outline();
+    vertexArray.append(QVector2D(outline.data[0],
+                       config->worldZToPressure(outline.data[1])));
+    vertexArray.append(QVector2D(outline.data[2],
+                       config->worldZToPressure(outline.data[3])));
+    vertexArray.append(QVector2D(outline.data[4],
+                       config->worldZToPressure(outline.data[5])));
+    vertexArray.append(QVector2D(outline.data[6],
+                       config->worldZToPressure(outline.data[7])));
+    vertexArray.append(QVector2D(outline.data[8],
+                       config->worldZToPressure(outline.data[9])));
+    vertexArray.append(QVector2D(outline.data[10],
+                       config->worldZToPressure(outline.data[11])));
+    vertexArray.append(QVector2D(outline.data[12],
+                       config->worldZToPressure(outline.data[13])));
+    vertexArray.append(QVector2D(outline.data[14],
+                       config->worldZToPressure(outline.data[15])));
 
-    QVector2D first, second;
+    config->vertexArrayDrawRanges.outline.indexCount =
+            vertexArray.size() - config->vertexArrayDrawRanges.outline.startIndex;
 
-    // Generate temperature marks vertices.
-    // ====================================
-    float diffBetweenMarks = config->area.width() / 12.f;
-    float tempPosition = config->temperaturePosition();
+
+    // Generate vertices for temperature marks.
+    // ========================================
+    config->vertexArrayDrawRanges.temperatureMarks.startIndex = vertexArray.size();
+
+    float isothermSpacingClipSpace = config->drawingRegionClipSpace.width() / 12.f;
+//TODO (mr 09Jan2019) -- replace by user-definable temperature interval.
+    float worldZTemperatureMarks = config->temperatureReferenceZCoord();
     for (int i = 0; i < 24; i++)
     {
         if (config->pressureEqualsWorldPressure)
         {
-            first  = QVector2D(
-                        config->area.right + 0.01f,
-                        config->worldZToPressure((diffBetweenMarks * i
-                         - config->area.width() / 2.f + 0.05f)));
-            second = QVector2D(config->area.right, first.y());
-
+            vStart  = QVector2D(config->drawingRegionClipSpace.right + 0.01f,
+                                config->worldZToPressure(
+                                    (isothermSpacingClipSpace * i
+                                     - config->drawingRegionClipSpace.width()
+                                     / 2.f + 0.05f)));
+//TODO (mr 09Jan2019) -- make tick length customizable.
+            vEnd = QVector2D(config->drawingRegionClipSpace.right, vStart.y());
         }
         else
         {
-            first  = QVector2D(
-                        diffBetweenMarks * i + config->area.bottom
-                        - config->area.width(),
-                        config->worldZToPressure(tempPosition - 0.01f));
-            second = QVector2D(first.x(), config->worldZToPressure(tempPosition));
+            vStart  = QVector2D(isothermSpacingClipSpace * i
+                                + config->drawingRegionClipSpace.bottom
+                                - config->drawingRegionClipSpace.width(),
+                                config->worldZToPressure(
+                                    worldZTemperatureMarks - 0.01f));
+            vEnd = QVector2D(vStart.x(), config->worldZToPressure(
+                                 worldZTemperatureMarks));
         }
-        vertices.append(first);
-        vertices.append(second);
+        vertexArray << vStart << vEnd;
     }
 
-    config->vertexRanges.temperatureMarks.size =
-            vertices.size()
-            - config->vertexRanges.temperatureMarks.start;
-    config->vertexRanges.pressure.start        = vertices.size();
+    config->vertexArrayDrawRanges.temperatureMarks.indexCount = vertexArray.size()
+            - config->vertexArrayDrawRanges.temperatureMarks.startIndex;
+    config->vertexArrayDrawRanges.isobars.startIndex = vertexArray.size();
 
-    // Pressure
-    float pressureOffset = 0.f;
+
+    // Generate vertices for isobaric lines.
+    // =====================================
+
+    // Vertical diagram offset in worldZ coordinates.
+    float diagramWorldZOffset = 0.f;
     if (!config->pressureEqualsWorldPressure)
     {
-        pressureOffset = 0.05f;
+        diagramWorldZOffset = 0.05f;
     }
 
-    // Generate isopressure vertices.
-    // ==============================
-    float act = config->worldZfromPressure(
-                diagramConfiguration.pressure.min) + pressureOffset;
+    // Bottom line.
+    float worldZOfIsobar = config->worldZfromPressure(
+                diagramConfiguration.vertical_p_hPa.min) + diagramWorldZOffset;
+    vStart  = QVector2D(config->drawingRegionClipSpace.left - 0.01f,
+                        config->worldZToPressure(worldZOfIsobar));
+    vEnd = QVector2D(config->drawingRegionClipSpace.right, vStart.y());
+    vertexArray << vStart << vEnd;
 
-    first  = QVector2D(config->area.left - 0.01f, config->worldZToPressure(act));
-    second = QVector2D(config->area.right       , first.y());
-    vertices.append(first);
-    vertices.append(second);
+    // Lines at given pressure levels.
+//TODO (mr, 09Jan2019) -- make this user-customizable.
     QList<int> pressureLevels;
     pressureLevels << 1 << 10 << 50 << 100 << 200 << 300 << 400 << 500
                    << 600 << 700 << 800 << 900 << 1000;
-    for (int pressureCount : pressureLevels)
+    for (int pLevel : pressureLevels)
     {
-        if (pressureCount > diagramConfiguration.pressure.max)
+        if ((pLevel < diagramConfiguration.vertical_p_hPa.max) &&
+                (pLevel > diagramConfiguration.vertical_p_hPa.min))
         {
-            break;
+            worldZOfIsobar = config->worldZfromPressure(pLevel)
+                    + diagramWorldZOffset;
+            vStart = QVector2D(config->drawingRegionClipSpace.left - 0.01f,
+                               config->worldZToPressure(worldZOfIsobar));
+            vEnd = QVector2D(config->drawingRegionClipSpace.right, vStart.y());
+            vertexArray << vStart << vEnd;
         }
-        if (pressureCount < diagramConfiguration.pressure.min)
-        {
-            continue;
-        }
-        act = config->worldZfromPressure(pressureCount)
-                + pressureOffset;
-        first = QVector2D(config->area.left - 0.01f, config->worldZToPressure(act));
-        second = QVector2D(config->area.right, first.y());
-        vertices.append(first);
-        vertices.append(second);
     }
-    act    = config->area.bottom;
-    first  = QVector2D(config->area.left - 0.01f, config->worldZToPressure(act));
-    second = QVector2D(config->area.right, first.y());
-    vertices.append(first);
-    vertices.append(second);
 
-    config->vertexRanges.pressure.size =
-            vertices.size() - config->vertexRanges.pressure.start;
-    config->vertexRanges.isotherms.start = vertices.size();
+    // Another bottom line?
+    worldZOfIsobar = config->drawingRegionClipSpace.bottom;
+    vStart = QVector2D(config->drawingRegionClipSpace.left - 0.01f,
+                       config->worldZToPressure(worldZOfIsobar));
+    vEnd = QVector2D(config->drawingRegionClipSpace.right, vStart.y());
+    vertexArray << vStart << vEnd;
 
-    // Generate isotherms vertices.
-    // ============================
+    config->vertexArrayDrawRanges.isobars.indexCount =
+            vertexArray.size() - config->vertexArrayDrawRanges.isobars.startIndex;
+    config->vertexArrayDrawRanges.isotherms.startIndex = vertexArray.size();
+
+
+    // Generate vertices for isotherms.
+    // ================================
     for (int i = -20; i < 25; i++)
     {
-        first  = QVector2D(diffBetweenMarks * i
-                           - config->area.width(), config->worldZToPressure(0.f));
-        second = QVector2D(first.x() + 2.5f, config->worldZToPressure(2.5f));
-        vertices.append(first);
-        vertices.append(second);
+        vStart = QVector2D(isothermSpacingClipSpace * i
+                           - config->drawingRegionClipSpace.width(),
+                           config->worldZToPressure(0.f));
+        vEnd = QVector2D(vStart.x() + 2.5f, config->worldZToPressure(2.5f));
+        vertexArray << vStart << vEnd;
     }
 
-    config->vertexRanges.isotherms.size =
-            vertices.size() - config->vertexRanges.isotherms.start;
-    config->vertexRanges.dryAdiabates.start = vertices.size();
+    config->vertexArrayDrawRanges.isotherms.indexCount =
+            vertexArray.size() - config->vertexArrayDrawRanges.isotherms.startIndex;
+    config->vertexArrayDrawRanges.dryAdiabates.startIndex = vertexArray.size();
 
-    // Generate dry adiabates vertices.
-    // ================================
+
+    // Generate vertices for dry adiabates.
+    // ====================================
     if (diagramConfiguration.drawDryAdiabates)
     {
-        // Regenerate dry adiabates only if necessary (first time, pressure
+        // Create dry adiabates only if necessary (first time, pressure
         // drawing type, temperature scale, top and bottom pressure changed).
-        if (config->vertexRanges.dryAdiabates.size == 0
-                || config->regenerateAdiabates)
+        if (config->vertexArrayDrawRanges.dryAdiabates.indexCount == 0
+                || config->recomputeAdiabateGeometries)
         {
             config->dryAdiabatesVertices.clear();
 
@@ -1243,7 +1255,7 @@ void MSkewTActor::generateDiagramVertices(GL::MVertexBuffer** vbDiagramVertices,
             // Use different increments for different sections of the pressure
             // levels ([0.1, 1] -> 1/16; [1, 10] -> 1; [10, 1050] -> 5) but
             // avoid if-clause in the for-loop.
-            switch(int(floor(log10(diagramConfiguration.pressure.min))))
+            switch(int(floor(log10(diagramConfiguration.vertical_p_hPa.min))))
             {
             case -1:
             {
@@ -1251,10 +1263,10 @@ void MSkewTActor::generateDiagramVertices(GL::MVertexBuffer** vbDiagramVertices,
                 // of 2.
                 incrList.append(0.0625f); // 1/16
                 startPressureList.append(
-                            floor(diagramConfiguration.pressure.min * 16.f)
+                            floor(diagramConfiguration.vertical_p_hPa.min * 16.f)
                             / 16.f);
                 endPressureList.append(
-                            min(ceil(diagramConfiguration.pressure.max * 16.f)
+                            min(ceil(diagramConfiguration.vertical_p_hPa.max * 16.f)
                                 / 16.f, 0.9375f)); // 15/16
             }
             case 0:
@@ -1263,14 +1275,14 @@ void MSkewTActor::generateDiagramVertices(GL::MVertexBuffer** vbDiagramVertices,
                 if (startPressureList.size() == 0)
                 {
                     startPressureList.append(
-                                floor(diagramConfiguration.pressure.min));
+                                floor(diagramConfiguration.vertical_p_hPa.min));
                 }
                 else
                 {
                     startPressureList.append(1.f);
                 }
                 endPressureList.append(
-                            min(ceil(diagramConfiguration.pressure.max / 1.f)
+                            min(ceil(diagramConfiguration.vertical_p_hPa.max / 1.f)
                                 * 1.f, 9.f));
             }
             default:
@@ -1279,7 +1291,7 @@ void MSkewTActor::generateDiagramVertices(GL::MVertexBuffer** vbDiagramVertices,
                 if (startPressureList.size() == 0)
                 {
                     startPressureList.append(
-                                floor(diagramConfiguration.pressure.min / 5.f)
+                                floor(diagramConfiguration.vertical_p_hPa.min / 5.f)
                                 * 5.f);
                 }
                 else
@@ -1287,12 +1299,12 @@ void MSkewTActor::generateDiagramVertices(GL::MVertexBuffer** vbDiagramVertices,
                     startPressureList.append(10.f);
                 }
                 endPressureList.append(
-                            ceil(diagramConfiguration.pressure.max / 5.f)
+                            ceil(diagramConfiguration.vertical_p_hPa.max / 5.f)
                             * 5.f);
             }
             }
 
-            float tempCounter = diagramConfiguration.temperature.min;
+            float temperatureDryAdiabat = diagramConfiguration.temperature.min;
             float r_cp = 287.f / 1004.f;
             float xShift = 0.f;
             if (config->pressureEqualsWorldPressure)
@@ -1300,8 +1312,8 @@ void MSkewTActor::generateDiagramVertices(GL::MVertexBuffer** vbDiagramVertices,
                 xShift = config->worldZfromPressure(1000.f) * 2.f;
             }
             while (diagramConfiguration.scaleTemperatureToDiagramSpace(
-                       tempCounter + 273.5f)
-                   < config->area.right * 4.f)
+                       temperatureDryAdiabat + 273.5f)
+                   < config->drawingRegionClipSpace.right * 4.f)
             {
                 for (int i = 0; i < startPressureList.size(); i++)
                 {
@@ -1313,9 +1325,9 @@ void MSkewTActor::generateDiagramVertices(GL::MVertexBuffer** vbDiagramVertices,
                         // Computation of dry adiabates.
                         // (T is temperature in Kelvin).
                         // x = T / (1000hPa / pressure) ^ (287 / 1004)
-                        float x1 = (tempCounter + 273.5f)
+                        float x1 = (temperatureDryAdiabat + 273.5f)
                                 / pow((1000.f / p), r_cp);
-                        float x2 = (tempCounter + 273.5f)
+                        float x2 = (temperatureDryAdiabat + 273.5f)
                                 / pow(1000.f / (p + incr), r_cp);
                         // Scaling to temperature scale.
                         x1 = diagramConfiguration
@@ -1332,34 +1344,33 @@ void MSkewTActor::generateDiagramVertices(GL::MVertexBuffer** vbDiagramVertices,
 
                         // Adding shifts depending on whether the pressure
                         // scale is equal world pressure scale or not.
-                        first = QVector2D(x1 + xShift,
-                                          config->worldZToPressure(
-                                              y1 + pressureOffset));
-                        second = QVector2D(x2 + xShift,
+                        vStart = QVector2D(x1 + xShift,
                                            config->worldZToPressure(
-                                               y2 + pressureOffset));
+                                               y1 + diagramWorldZOffset));
+                        vEnd = QVector2D(x2 + xShift,
+                                         config->worldZToPressure(
+                                             y2 + diagramWorldZOffset));
                         if (p > startPressure)
                         {
-                            config->dryAdiabatesVertices.append(first);
+                            config->dryAdiabatesVertices.append(vStart);
                         }
-                        config->dryAdiabatesVertices.append(first);
-                        config->dryAdiabatesVertices.append(second);
+                        config->dryAdiabatesVertices.append(vStart);
+                        config->dryAdiabatesVertices.append(vEnd);
                         if (p < endPressure)
                         {
-                            config->dryAdiabatesVertices.append(second);
+                            config->dryAdiabatesVertices.append(vEnd);
                         }
                     }
                 }
-                tempCounter += diagramConfiguration.dryAdiabatInterval;
+                temperatureDryAdiabat += diagramConfiguration.dryAdiabatInterval;
             }
         }
     }
 
-    vertices << config->dryAdiabatesVertices;
-    config->vertexRanges.dryAdiabates.size =
-            vertices.size()
-            - config->vertexRanges.dryAdiabates.start;
-    config->vertexRanges.moistAdiabates.start = vertices.size();
+    vertexArray << config->dryAdiabatesVertices;
+    config->vertexArrayDrawRanges.dryAdiabates.indexCount = vertexArray.size()
+            - config->vertexArrayDrawRanges.dryAdiabates.startIndex;
+    config->vertexArrayDrawRanges.moistAdiabates.startIndex = vertexArray.size();
 
     // Generate moist adiabates vertices.
     // ==================================
@@ -1367,8 +1378,8 @@ void MSkewTActor::generateDiagramVertices(GL::MVertexBuffer** vbDiagramVertices,
     {
         // Regenerate moist adiabates only if necessary (first time, pressure
         // drawing type, temperature scale, top and bottom pressure changed).
-        if (config->vertexRanges.moistAdiabates.size == 0
-                || config->regenerateAdiabates)
+        if (config->vertexArrayDrawRanges.moistAdiabates.indexCount == 0
+                || config->recomputeAdiabateGeometries)
         {
             config->moistAdiabatesVertices.clear();
 
@@ -1377,7 +1388,7 @@ void MSkewTActor::generateDiagramVertices(GL::MVertexBuffer** vbDiagramVertices,
             // Use different increments for different sections of the pressure
             // levels ([0.1, 1] -> 1/16; [1, 10] -> 1; [10, 1050] -> 5) but
             // avoid if-clause in the for-loop.
-            switch(int(floor(log10(diagramConfiguration.pressure.min))))
+            switch(int(floor(log10(diagramConfiguration.vertical_p_hPa.min))))
             {
             case -1:
             {
@@ -1385,9 +1396,9 @@ void MSkewTActor::generateDiagramVertices(GL::MVertexBuffer** vbDiagramVertices,
                 // of 2.
                 incrList.append(0.0625f); // 1/16
                 startPressureList.append(
-                            floor(diagramConfiguration.pressure.min * 16.f) / 16.f);
+                            floor(diagramConfiguration.vertical_p_hPa.min * 16.f) / 16.f);
                 endPressureList.append(
-                            min(ceil(diagramConfiguration.pressure.max * 16.f) / 16.f,
+                            min(ceil(diagramConfiguration.vertical_p_hPa.max * 16.f) / 16.f,
                                 1.f));
             }
             case 0:
@@ -1396,14 +1407,14 @@ void MSkewTActor::generateDiagramVertices(GL::MVertexBuffer** vbDiagramVertices,
                 if (startPressureList.size() == 0)
                 {
                     startPressureList.prepend(
-                                floor(diagramConfiguration.pressure.min));
+                                floor(diagramConfiguration.vertical_p_hPa.min));
                 }
                 else
                 {
                     startPressureList.prepend(2.f);
                 }
                 endPressureList.prepend(
-                            min(ceil(diagramConfiguration.pressure.max / 1.f)
+                            min(ceil(diagramConfiguration.vertical_p_hPa.max / 1.f)
                                 * 1.f, 10.f));
             }
             default:
@@ -1412,7 +1423,7 @@ void MSkewTActor::generateDiagramVertices(GL::MVertexBuffer** vbDiagramVertices,
                 if (startPressureList.size() == 0)
                 {
                     startPressureList.prepend(
-                                floor(diagramConfiguration.pressure.min / 5.f)
+                                floor(diagramConfiguration.vertical_p_hPa.min / 5.f)
                                 * 5.f);
                 }
                 else
@@ -1420,22 +1431,22 @@ void MSkewTActor::generateDiagramVertices(GL::MVertexBuffer** vbDiagramVertices,
                     startPressureList.prepend(11.f);
                 }
                 endPressureList.prepend(
-                            ceil(diagramConfiguration.pressure.max / 5.f)
+                            ceil(diagramConfiguration.vertical_p_hPa.max / 5.f)
                             * 5.f);
             }
             }
 
-            float tempCounter = diagramConfiguration.temperature.min;
+            float temperatureMoistAdiabat = diagramConfiguration.temperature.min;
             float xShift = 0.f;
             if (config->pressureEqualsWorldPressure)
             {
                 xShift = config->worldZfromPressure(1000.f) * 2.f;
             }
             while (diagramConfiguration.scaleTemperatureToDiagramSpace(
-                       tempCounter + 273.5f)
-                   < config->area.right + 0.05f)
+                       temperatureMoistAdiabat + 273.5f)
+                   < config->drawingRegionClipSpace.right + 0.05f)
             {
-                float T = tempCounter + 273.5f;
+                float T = temperatureMoistAdiabat + 273.5f;
                 // Calculate shift that is produced when starting with
                 // computation at 1050hPa instead of 1000hPa (not like they do
                 // it at wyoming).
@@ -1461,10 +1472,10 @@ void MSkewTActor::generateDiagramVertices(GL::MVertexBuffer** vbDiagramVertices,
                         x = config->skew(x, y);
                         // Adding shifts depending on whether the pressure
                         // scale is equal world pressure scale or not.
-                        first = QVector2D(x + xShift,
+                        vStart = QVector2D(x + xShift,
                                           config->worldZToPressure(
-                                              y + pressureOffset));
-                        config->moistAdiabatesVertices.append(first);
+                                              y + diagramWorldZOffset));
+                        config->moistAdiabatesVertices.append(vStart);
 
                         T -= moistAdiabaticLapseRate_K(T, p * 100.f) * incr
                                 * 100.f;
@@ -1479,28 +1490,28 @@ void MSkewTActor::generateDiagramVertices(GL::MVertexBuffer** vbDiagramVertices,
                         x = config->skew(x, y);
                         // Adding shifts depending on whether the pressure
                         // scale is equal world pressure scale or not.
-                        second = QVector2D(x + xShift,
-                                           config->worldZToPressure(y + pressureOffset));
-                        config->moistAdiabatesVertices.append(second);
+                        vEnd = QVector2D(x + xShift, config->worldZToPressure(
+                                             y + diagramWorldZOffset));
+                        config->moistAdiabatesVertices.append(vEnd);
                     }
                 }
-                tempCounter += diagramConfiguration.moistAdiabatInterval;
+                temperatureMoistAdiabat += diagramConfiguration.moistAdiabatInterval;
             }
         }
     }
 
-    vertices << config->moistAdiabatesVertices;
+    vertexArray << config->moistAdiabatesVertices;
 
-    config->vertexRanges.moistAdiabates.size =
-            vertices.size()
-            - config->vertexRanges.moistAdiabates.start;
+    config->vertexArrayDrawRanges.moistAdiabates.indexCount = vertexArray.size()
+            - config->vertexArrayDrawRanges.moistAdiabates.startIndex;
 
-    config->regenerateAdiabates = false;
+    config->recomputeAdiabateGeometries = false;
     uploadVec2ToVertexBuffer(
-                vertices, QString("skewTDiagramVertices%1_actor#%2")
+                vertexArray, QString("skewTDiagramVertices%1_actor#%2")
                 .arg(config->bufferNameSuffix).arg(myID),
                 vbDiagramVertices);
-    LOG4CPLUS_DEBUG(mlog, "generateFrameGeo done");
+
+    LOG4CPLUS_DEBUG(mlog, "Generation of Skew-T diagram geometry finished.");
 }
 
 
@@ -1806,8 +1817,8 @@ void MSkewTActor::drawDiagram(MSceneViewGLWidget *sceneView,
         }
     }
 
-    // Draw wyoming data.
-    // ==================
+    // Draw observational data from U of Wyoming web service.
+    // ======================================================
     if (wyomingVerticesCount > 0)
     {
         glEnableVertexAttribArray(SHADER_VERTEX_ATTRIBUTE);
@@ -1842,8 +1853,8 @@ void MSkewTActor::drawDiagram(MSceneViewGLWidget *sceneView,
     setShaderGeneralVars(sceneView, config);
     skewTShader->setUniformValue("colour", diagramConfiguration.diagramColor);
     glDrawArrays(GL_LINES,
-                 config->vertexRanges.outline.start,
-                 config->vertexRanges.outline.size);
+                 config->vertexArrayDrawRanges.outline.startIndex,
+                 config->vertexArrayDrawRanges.outline.indexCount);
 
 }
 
@@ -1921,8 +1932,7 @@ void MSkewTActor::drawProbabilityTube(
                                 max->textureUnitHybridCoefficients);
     }
 
-    if (min->grid->getLevelType() ==
-            HYBRID_SIGMA_PRESSURE_3D)
+    if (min->grid->getLevelType() == HYBRID_SIGMA_PRESSURE_3D)
     {
         // Texture bindings for surface pressure (2D texture) and model
         // level coefficients (1D texture).
@@ -1939,7 +1949,6 @@ void MSkewTActor::drawProbabilityTube(
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
     glDrawArrays(GL_TRIANGLE_STRIP, 0,
                  min->grid->getNumLevels() * 2); CHECK_GL_ERROR;
-
 }
 
 
@@ -2041,9 +2050,9 @@ void MSkewTActor::drawDeviation(
 }
 
 
-void MSkewTActor::drawDiagramLabels(MSceneViewGLWidget *sceneView,
-                                    GL::MVertexBuffer *vbDiagramVertices,
-                                    ModeSpecificDiagramConfiguration *config)
+void MSkewTActor::drawDiagramGeometryAndLabels(
+        MSceneViewGLWidget *sceneView, GL::MVertexBuffer *vbDiagramVertices,
+        ModeSpecificDiagramConfiguration *config)
 {
     removeAllLabels();
     MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
@@ -2078,7 +2087,7 @@ void MSkewTActor::drawDiagramLabels(MSceneViewGLWidget *sceneView,
         SHADER_VERTEX_ATTRIBUTE, 2,
         GL_FALSE, 0, (const GLvoid *)(0 * sizeof(float)));
 
-    float pressureOffset = 0.f;
+    float diagramWorldZOffset = 0.f;
     float yOffset = 0.f;
 
     if (!config->pressureEqualsWorldPressure)
@@ -2097,41 +2106,45 @@ void MSkewTActor::drawDiagramLabels(MSceneViewGLWidget *sceneView,
         glDrawArrays(GL_POINTS, 0, 1);
     }
 
-    // Draw temperature label ticks.
-    // =============================
+    // Bind shader for coordinate axes.
+    // ================================
     glLineWidth(1.f);
     skewTShader->bindProgram("DiagramVerticesVertOrHoriCheck");
     setShaderGeneralVars(sceneView, config);
+
+    // Draw temperature label ticks.
+    // =============================
     skewTShader->setUniformValue("colour", diagramConfiguration.diagramColor);
     glDrawArrays(GL_LINES,
-                 config->vertexRanges.temperatureMarks.start,
-                 config->vertexRanges.temperatureMarks.size);
+                 config->vertexArrayDrawRanges.temperatureMarks.startIndex,
+                 config->vertexArrayDrawRanges.temperatureMarks.indexCount);
 
     skewTShader->bindProgram("DiagramVertices");
     setShaderGeneralVars(sceneView, config);
+
     // Draw dry adiabates.
     // ===================
     if (diagramConfiguration.drawDryAdiabates)
     {
         skewTShader->setUniformValue("colour", QVector4D(0.8f, 0.8f, 0.f, 1.f));
         glDrawArrays(GL_LINES,
-                     config->vertexRanges.dryAdiabates.start,
-                     config->vertexRanges.dryAdiabates.size);
+                     config->vertexArrayDrawRanges.dryAdiabates.startIndex,
+                     config->vertexArrayDrawRanges.dryAdiabates.indexCount);
     }
 
     // Draw isopressure lines.
     // =======================
     skewTShader->setUniformValue("colour", diagramConfiguration.diagramColor);
     glDrawArrays(GL_LINES,
-                 config->vertexRanges.pressure.start,
-                 config->vertexRanges.pressure.size);
+                 config->vertexArrayDrawRanges.isobars.startIndex,
+                 config->vertexArrayDrawRanges.isobars.indexCount);
 
     // Draw isotherms.
     // ===============
     skewTShader->setUniformValue("colour", QVector4D(1.f, 0.f, 0.f, 1.f));
     glDrawArrays(GL_LINES,
-                 config->vertexRanges.isotherms.start,
-                 config->vertexRanges.isotherms.size);
+                 config->vertexArrayDrawRanges.isotherms.startIndex,
+                 config->vertexArrayDrawRanges.isotherms.indexCount);
 
     // Draw moist adiabates.
     // =====================
@@ -2139,8 +2152,8 @@ void MSkewTActor::drawDiagramLabels(MSceneViewGLWidget *sceneView,
     {
         skewTShader->setUniformValue("colour", QVector4D(0.f, 0.8f, 0.f, 1.f));
         glDrawArrays(GL_LINES,
-                     config->vertexRanges.moistAdiabates.start,
-                     config->vertexRanges.moistAdiabates.size);
+                     config->vertexArrayDrawRanges.moistAdiabates.startIndex,
+                     config->vertexArrayDrawRanges.moistAdiabates.indexCount);
     }
 
     // Draw mouse cross and legend in fullscreen mode.
@@ -2148,26 +2161,26 @@ void MSkewTActor::drawDiagramLabels(MSceneViewGLWidget *sceneView,
     if (sceneViewFullscreenEnabled.value(sceneView)
             && sceneView->interactionModeEnabled()
             && (diagramConfiguration.clipTo2D(config->clipPos.x())
-                >= config->area.left)
+                >= config->drawingRegionClipSpace.left)
             && (diagramConfiguration.clipTo2D(config->clipPos.x())
-                <= config->area.right)
+                <= config->drawingRegionClipSpace.right)
             && (diagramConfiguration.clipTo2D(config->clipPos.y())
-                >= config->area.bottom)
+                >= config->drawingRegionClipSpace.bottom)
             && (diagramConfiguration.clipTo2D(config->clipPos.y())
-                <= config->area.top))
+                <= config->drawingRegionClipSpace.top))
     {
         skewTShader->bindProgram("LegendBackground");
         setShaderGeneralVars(sceneView, config);
         glDrawArrays(GL_POINTS, 0, 1);
         float realZ = ((config->clipPos.y() + 1.f) / 2.f -
-                       config->area.bottom) * 36.f;
+                       config->drawingRegionClipSpace.bottom) * 36.f;
         float pressure = config->pressureFromWorldZ(realZ, diagramConfiguration);
         float temperature = (((config->clipPos.x()) + 1.f) / 2.f
-                             + config->area.left
+                             + config->drawingRegionClipSpace.left
                              - (config->clipPos.y() + 1.f) / 2.f
-                             - config->area.bottom) /
-                            (config->area.right
-                             - config->area.left) *
+                             - config->drawingRegionClipSpace.bottom) /
+                            (config->drawingRegionClipSpace.right
+                             - config->drawingRegionClipSpace.left) *
                             diagramConfiguration.temperature.amplitude() -
                             diagramConfiguration.temperature.center();
         glLineWidth(1.f);
@@ -2183,9 +2196,9 @@ void MSkewTActor::drawDiagramLabels(MSceneViewGLWidget *sceneView,
         int tempertureMeanVar = diagramConfiguration.varConfigs[
                 variablesIndices.temperature.MEAN].index;
 //        float tempX = 0.f      , humidityX = 0.f;
-        float tempVal = 0.f    , humidityVal = 0.f;
+        float tempVal = M_MISSING_VALUE, humidityVal = M_MISSING_VALUE;
 //        float tempMeanX = 0.f  , humidityMeanX = 0.f;
-        float tempMeanVal = 0.f, humidityMeanVal = 0.f;
+        float tempMeanVal = M_MISSING_VALUE, humidityMeanVal = M_MISSING_VALUE;
         for (int vi = 0; vi < diagramConfiguration.varConfigs.size(); vi++)
         {
             VariableConfig var = diagramConfiguration.varConfigs.at(vi);
@@ -2266,13 +2279,13 @@ void MSkewTActor::drawDiagramLabels(MSceneViewGLWidget *sceneView,
             QColor tempColor = diagramConfiguration.varConfigs[
                     variablesIndices.temperature.MEMBER].color;
             labels.append(tm->addText(
-                              QString("Temperature: %1 deg C").arg(
+                              QString("Temperature (single member): %1 deg C").arg(
                                   round((tempVal - 273.15f) * 100.f) / 100.f),
                               MTextManager::CLIPSPACE,
-                              config->area.left - 0.9f,
-                              config->area.top - 0.15f + topShift,
+                              config->drawingRegionClipSpace.left - 0.9f,
+                              config->drawingRegionClipSpace.top - 0.15f + topShift,
                               -0.99f, 16.f, tempColor, MTextManager::BASELINELEFT,
-                              false, QColor(100, 100, 100)));
+                              true, QColor(255, 255, 255, 255)));
             topShift = topShift - 0.1f;
         }
 
@@ -2281,14 +2294,14 @@ void MSkewTActor::drawDiagramLabels(MSceneViewGLWidget *sceneView,
             QColor humidityColor = diagramConfiguration.varConfigs[
                     variablesIndices.temperature.MEAN].color;
             labels.append(tm->addText(
-                              QString("Dew point: %1 deg C").arg(
+                              QString("Dew point (single member): %1 deg C").arg(
                                   round((humidityVal) * 100.f) / 100.f),
                               MTextManager::CLIPSPACE,
-                              config->area.left - 0.9f,
-                              config->area.top - 0.15f + topShift,
+                              config->drawingRegionClipSpace.left - 0.9f,
+                              config->drawingRegionClipSpace.top - 0.15f + topShift,
                               -0.99f, 16.f, humidityColor,
-                              MTextManager::BASELINELEFT, false,
-                              QColor(100, 100, 100)));
+                              MTextManager::BASELINELEFT, true,
+                              QColor(255, 255, 255, 255)));
             topShift = topShift - 0.1f;
         }
 
@@ -2297,14 +2310,14 @@ void MSkewTActor::drawDiagramLabels(MSceneViewGLWidget *sceneView,
             QColor tempMeanColor = diagramConfiguration.varConfigs[
                     variablesIndices.dewPoint.MEMBER].color;
             labels.append(tm->addText(
-                              QString("Temperature mean: %1 deg C").arg(
+                              QString("Temperature (ensemble mean): %1 deg C").arg(
                                   round((tempMeanVal - 273.15f) * 100.f) / 100.f),
                               MTextManager::CLIPSPACE,
-                              config->area.left - 0.9f,
-                              config->area.top - 0.15f + topShift,
+                              config->drawingRegionClipSpace.left - 0.9f,
+                              config->drawingRegionClipSpace.top - 0.15f + topShift,
                               -0.99f, 16.f, tempMeanColor,
-                              MTextManager::BASELINELEFT, false,
-                              QColor(100, 100, 100)));
+                              MTextManager::BASELINELEFT, true,
+                              QColor(255, 255, 255, 255)));
             topShift = topShift - 0.1f;
         }
 
@@ -2313,76 +2326,76 @@ void MSkewTActor::drawDiagramLabels(MSceneViewGLWidget *sceneView,
             QColor humidityMeanColor = diagramConfiguration.varConfigs[
                     variablesIndices.dewPoint.MEAN].color;
             labels.append(tm->addText(
-                              QString("Dew point mean: %1 deg C").arg(
+                              QString("Dew point (ensemble mean): %1 deg C").arg(
                                   round((humidityMeanVal) * 100.f) / 100.f),
                               MTextManager::CLIPSPACE,
-                              config->area.left - 0.9f,
-                              config->area.top - 0.15f + topShift,
+                              config->drawingRegionClipSpace.left - 0.9f,
+                              config->drawingRegionClipSpace.top - 0.15f + topShift,
                               -0.99f, 16.f, humidityMeanColor,
-                              MTextManager::BASELINELEFT, false,
-                              QColor(100, 100, 100)));
+                              MTextManager::BASELINELEFT, true,
+                              QColor(255, 255, 255, 255)));
             topShift = topShift - 0.1f;
         }
 
         labels.append(tm->addText(
-                          QString("%1").arg(
+                          QString("p=%1").arg(
                               round((pressure) * 10.f) / 10.f),
                           MTextManager::CLIPSPACE,
-                          config->area.left - 1.05f,
+                          config->drawingRegionClipSpace.left - 1.05f,
                           config->clipPos.y(), -0.99f, 16.f,
-                          QColor(0, 0, 0, 255), MTextManager::BASELINELEFT,
-                          false, QColor(100, 100, 100)));
+                          QColor(170, 0, 0, 255), MTextManager::BASELINELEFT,
+                          true, QColor(255, 255, 255, 255)));
 
         labels.append(tm->addText(
-                          QString("%1").arg(
+                          QString("T=%1").arg(
                               round((temperature) * 10.f) / 10.f),
                           MTextManager::CLIPSPACE,
                           config->clipPos.x()
                           - config->clipPos.y()
-                          - 1.f + config->area.left,
-                          config->area.bottom - 1.035f, -0.99f,
-                          16.f, QColor(0, 0, 0, 255), MTextManager::BASELINELEFT,
-                          false, QColor(100, 100, 100)));
+                          - 1.f + config->drawingRegionClipSpace.left,
+                          config->drawingRegionClipSpace.bottom - 1.035f, -0.99f,
+                          16.f, QColor(170, 0, 0, 255), MTextManager::BASELINELEFT,
+                          true, QColor(255, 255, 255, 255)));
     }
 
     if (config->pressureEqualsWorldPressure)
     {
-        pressureOffset = -0.01f;
+        diagramWorldZOffset = -0.01f;
     }
     else
     {
-        pressureOffset = 0.05f;
+        diagramWorldZOffset = 0.05f;
     }
 
     QMatrix4x4 view = sceneView->getCamera()->getViewMatrix();
-    QVector3D CameraUp;
+    QVector3D cameraUp;
 
     if (!diagramConfiguration.drawInPerspective)
     {
-        CameraUp = QVector3D(view.row(1).x(),
+        cameraUp = QVector3D(view.row(1).x(),
                              view.row(1).y(),
                              view.row(1).z());
     }
     else
     {
-        CameraUp = QVector3D(0.f, 0.f, 1.f);
+        cameraUp = QVector3D(0.f, 0.f, 1.f);
     }
 
-    QVector3D CameraRight = QVector3D(view.row(0).x(),
+    QVector3D cameraRight = QVector3D(view.row(0).x(),
                                       view.row(0).y(),
                                       view.row(0).z());
-    QVector3D CameraFront = QVector3D(view.row(2).x(),
+    QVector3D cameraFront = QVector3D(view.row(2).x(),
                                       view.row(2).y(),
                                       view.row(2).z());
 
     // Draw pressure labels.
     // =====================
-    float act = config->worldZfromPressure(
-                diagramConfiguration.pressure.min) + pressureOffset;
-    QVector3D position = CameraUp * act * 36.f +
+    float worldZOfPressureLabel = config->worldZfromPressure(
+                diagramConfiguration.vertical_p_hPa.min) + diagramWorldZOffset;
+    QVector3D position = cameraUp * worldZOfPressureLabel * 36.f +
                          QVector3D(diagramConfiguration.position, 0.f)
-                        - CameraRight * 0.02f * 36.f
-                        + CameraFront * 0.05f;
+                        - cameraRight * 0.02f * 36.f
+                        + cameraFront * 0.05f;
 
 //    if (sceneViewFullscreenEnabled.value(sceneView))
 //    {
@@ -2403,22 +2416,22 @@ void MSkewTActor::drawDiagramLabels(MSceneViewGLWidget *sceneView,
 //                                  labelBBox, labelBBoxColour));
 //    }
 
-    float bottom =
-            sceneView->worldZfromPressure(diagramConfiguration.pressure.max) / 36.f;
-    float top =
-            sceneView->worldZfromPressure(diagramConfiguration.pressure.min) / 36.f;
+    float bottom = sceneView->worldZfromPressure(
+                diagramConfiguration.vertical_p_hPa.max) / 36.f;
+    float top = sceneView->worldZfromPressure(
+                diagramConfiguration.vertical_p_hPa.min) / 36.f;
     QList<float> pressureLevels;
     QString filler = "  ";
-    pressureLevels << diagramConfiguration.pressure.min
+    pressureLevels << diagramConfiguration.vertical_p_hPa.min
                    << 1 << 10 << 50 << 100 << 200 << 300 << 400 << 500
                    << 600 << 700 << 800 << 900 << 1000;
     for (float pressureCount : pressureLevels)
     {
-        if (pressureCount > diagramConfiguration.pressure.max)
+        if (pressureCount > diagramConfiguration.vertical_p_hPa.max)
         {
             break;
         }
-        if (pressureCount < diagramConfiguration.pressure.min)
+        if (pressureCount < diagramConfiguration.vertical_p_hPa.min)
         {
             continue;
         }
@@ -2426,13 +2439,13 @@ void MSkewTActor::drawDiagramLabels(MSceneViewGLWidget *sceneView,
 
         if (config->pressureEqualsWorldPressure)
         {
-            act = sceneView->worldZfromPressure((double)pressureCount) / 36.;
+            worldZOfPressureLabel = sceneView->worldZfromPressure((double)pressureCount) / 36.;
         }
         else
         {
-            act = config->worldZfromPressure((double)pressureCount);
+            worldZOfPressureLabel = config->worldZfromPressure((double)pressureCount);
         }
-        act += pressureOffset;
+        worldZOfPressureLabel += diagramWorldZOffset;
         if (sceneViewFullscreenEnabled.value(sceneView))
         {
             if (pressureCount < 10.f)
@@ -2448,17 +2461,17 @@ void MSkewTActor::drawDiagramLabels(MSceneViewGLWidget *sceneView,
             }
             labels.append(tm->addText(filler + QString("%1").arg(pressureCount),
                                       MTextManager::CLIPSPACE,
-                                      -0.98f, (act - 0.5f) * 2.f, -0.99f,
+                                      -0.98f, (worldZOfPressureLabel - 0.5f) * 2.f, -0.99f,
                                       labelSize, labelColour,
                                       MTextManager::BASELINELEFT,
                                       labelBBox, labelBBoxColour));
         }
         else
         {
-            position = CameraUp * act * 36.f
+            position = cameraUp * worldZOfPressureLabel * 36.f
                     + QVector3D(diagramConfiguration.position, 0.f)
-                    - CameraRight * 0.02f * 36.f
-                    + CameraFront * 0.05f;
+                    - cameraRight * 0.02f * 36.f
+                    + cameraFront * 0.05f;
             labels.append(tm->addText(QString("%1").arg(pressureCount),
                                       MTextManager::WORLDSPACE,
                                       position.x(), position.y(),
@@ -2470,24 +2483,24 @@ void MSkewTActor::drawDiagramLabels(MSceneViewGLWidget *sceneView,
 
     // Draw temperature labels.
     // ========================
-    float tempCounter      = diagramConfiguration.temperature.max;
-    float diffBetweenMarks = config->area.width() / 12.f;
+    float displayedTemperature = diagramConfiguration.temperature.max;
+    float isothermSpacingClipSpace = config->drawingRegionClipSpace.width() / 12.f;
     for (int i = 48; i > 0; i -= 2)
     {
         float x, y;
         if (config->pressureEqualsWorldPressure)
         {
-            x = config->area.right - 0.01f;
+            x = config->drawingRegionClipSpace.right - 0.01f;
             y = sceneView->worldZfromPressure(
-                        config->worldZToPressure(diffBetweenMarks * (i / 2.f) - config->area.width()
-                                         + 0.045f));
-            if (y >= bottom
-                    && y <= top)
+                        config->worldZToPressure(
+                            isothermSpacingClipSpace * (i / 2.f)
+                            - config->drawingRegionClipSpace.width() + 0.045f));
+            if (y >= bottom && y <= top)
             {
                 if (sceneViewFullscreenEnabled.value(sceneView))
                 {
                     labels.append(tm->addText(
-                                      QString("%1").arg((int) tempCounter),
+                                      QString("%1").arg((int) displayedTemperature),
                                       MTextManager::CLIPSPACE,
                                       (x - 0.46f) * 2.f, (y - 0.5f) * 2.f,
                                       -0.99f, labelSize, labelColour,
@@ -2496,12 +2509,12 @@ void MSkewTActor::drawDiagramLabels(MSceneViewGLWidget *sceneView,
                 }
                 else
                 {
-                    position = CameraUp * y * 36.f
+                    position = cameraUp * y * 36.f
                             + QVector3D(diagramConfiguration.position, 0.f)
-                            + CameraRight * x * 36.f
-                            + CameraFront * 0.05f;
+                            + cameraRight * x * 36.f
+                            + cameraFront * 0.05f;
                     labels.append(tm->addText(
-                                      QString("%1").arg(-(int) tempCounter),
+                                      QString("%1").arg(-(int) displayedTemperature),
                                       MTextManager::WORLDSPACE,
                                       position.x(), position.y(), position.z(),
                                       labelSize, labelColour,
@@ -2512,19 +2525,19 @@ void MSkewTActor::drawDiagramLabels(MSceneViewGLWidget *sceneView,
         }
         else
         {
-            x = diffBetweenMarks * (i / 2.f) - config->area.width()
-                    + config->area.bottom;
-            if (x <= config->area.left - 0.05f)
+            x = isothermSpacingClipSpace * (i / 2.f) - config->drawingRegionClipSpace.width()
+                    + config->drawingRegionClipSpace.bottom;
+            if (x <= config->drawingRegionClipSpace.left - 0.05f)
             {
                 break;
             }
-            if (x >= config->area.left - 0.05f
-                    && x < config->area.right + 0.05f)
+            if (x >= config->drawingRegionClipSpace.left - 0.05f
+                    && x < config->drawingRegionClipSpace.right + 0.05f)
             {
                 if (sceneViewFullscreenEnabled.value(sceneView))
                 {
                     labels.append(tm->addText(
-                                      QString("%1").arg((int) tempCounter),
+                                      QString("%1").arg((int) displayedTemperature),
                                       MTextManager::CLIPSPACE,
                                       (x - 0.5f) * 2.f, (y - 0.5f + 0.0085f)
                                       * 2.f, -0.99f, labelSize, labelColour,
@@ -2533,13 +2546,13 @@ void MSkewTActor::drawDiagramLabels(MSceneViewGLWidget *sceneView,
                 }
                 else
                 {
-                    position = CameraRight * (x - 0.06f) * 36.f
+                    position = cameraRight * (x - 0.06f) * 36.f
                             + QVector3D(diagramConfiguration.position, 0.f)
-                            + CameraUp
-                            * (config->area.bottom - 0.05f) * 36.f
-                            + CameraFront * 0.05f;
+                            + cameraUp
+                            * (config->drawingRegionClipSpace.bottom - 0.05f) * 36.f
+                            + cameraFront * 0.05f;
                     labels.append(tm->addText(
-                                      QString("%1").arg((int) tempCounter),
+                                      QString("%1").arg((int) displayedTemperature),
                                       MTextManager::WORLDSPACE,
                                       position.x(), position.y(), position.z(),
                                       labelSize, labelColour,
@@ -2549,7 +2562,7 @@ void MSkewTActor::drawDiagramLabels(MSceneViewGLWidget *sceneView,
             }
         }
 
-        tempCounter -= diagramConfiguration.temperature.amplitude() / 12.f;
+        displayedTemperature -= diagramConfiguration.temperature.amplitude() / 12.f;
     }
     sceneView->makeCurrent();
 
@@ -2566,28 +2579,28 @@ void MSkewTActor::setShaderGeneralVars(
     skewTShader->setUniformValue("uprightOrientation",
                                  diagramConfiguration.drawInPerspective);
 
-    skewTShader->setUniformValue("area.left", config->area.left);
-    skewTShader->setUniformValue("area.right", config->area.right);
+    skewTShader->setUniformValue("area.left", config->drawingRegionClipSpace.left);
+    skewTShader->setUniformValue("area.right", config->drawingRegionClipSpace.right);
     if (config->pressureEqualsWorldPressure)
     {
-        float p = diagramConfiguration.pressure.min;
+        float p = diagramConfiguration.vertical_p_hPa.min;
         skewTShader->setUniformValue("area.top",
                                      GLfloat(sceneView->worldZfromPressure(p) / 36.0));
-        p = diagramConfiguration.pressure.max;
+        p = diagramConfiguration.vertical_p_hPa.max;
         skewTShader->setUniformValue("area.bottom",
                                      GLfloat(sceneView->worldZfromPressure(p) / 36.0));
     }
     else
     {
-        skewTShader->setUniformValue("area.top", config->area.top);
-        skewTShader->setUniformValue("area.bottom", config->area.bottom);
+        skewTShader->setUniformValue("area.top", config->drawingRegionClipSpace.top);
+        skewTShader->setUniformValue("area.bottom", config->drawingRegionClipSpace.bottom);
     }
     skewTShader->setUniformValue("position",
                                  diagramConfiguration.position);
     skewTShader->setUniformValue("bottomPressure",
-                                 diagramConfiguration.pressure.max);
+                                 diagramConfiguration.vertical_p_hPa.max);
     skewTShader->setUniformValue("topPressure",
-                                 diagramConfiguration.pressure.min);
+                                 diagramConfiguration.vertical_p_hPa.min);
     skewTShader->setUniformValue(
                 "pressureEqualsWorldPressure",
                 config->pressureEqualsWorldPressure);
@@ -2663,8 +2676,8 @@ void MSkewTActor::DiagramConfiguration::init()
 {
     area.left = 0.05;
     area.right = 0.95;
-    area.bottom = worldZfromPressure(pressure.max);
-    area.top = worldZfromPressure(pressure.min);
+    area.bottom = worldZfromPressure(vertical_p_hPa.max);
+    area.top = worldZfromPressure(vertical_p_hPa.min);
     if (!pressureEqualsWorldPressure)
     {
         area.bottom = area.bottom + 0.05;
@@ -2711,7 +2724,7 @@ double MSkewTActor::DiagramConfiguration::pressureFromWorldZ(double z)
 {
     float slopePtoZ = (area.top * 36.0 - area.bottom *36.0) /
             (log(20.) - log(1050.));
-    return exp(z / slopePtoZ + log(pressure.max));
+    return exp(z / slopePtoZ + log(vertical_p_hPa.max));
 }
 
 
@@ -2752,14 +2765,14 @@ void MSkewTActor::ModeSpecificDiagramConfiguration::init(
 {
     this->dconfig = dconfig;
 
-    area.left = 0.05f;
-    area.right = 0.95f;
-    area.bottom = worldZfromPressure(dconfig->pressure.max);
-    area.top = worldZfromPressure(dconfig->pressure.min);
+    drawingRegionClipSpace.left = 0.05f;
+    drawingRegionClipSpace.right = 0.95f;
+    drawingRegionClipSpace.bottom = worldZfromPressure(dconfig->vertical_p_hPa.max);
+    drawingRegionClipSpace.top = worldZfromPressure(dconfig->vertical_p_hPa.min);
     if (!pressureEqualsWorldPressure)
     {
-        area.bottom = area.bottom + 0.05f;
-        area.top = area.top + 0.05f;
+        drawingRegionClipSpace.bottom = drawingRegionClipSpace.bottom + 0.05f;
+        drawingRegionClipSpace.top = drawingRegionClipSpace.top + 0.05f;
     }
     layer = 0;
     this->bufferNameSuffix = bufferNameSuffix;
@@ -2768,26 +2781,26 @@ void MSkewTActor::ModeSpecificDiagramConfiguration::init(
 
 float MSkewTActor::ModeSpecificDiagramConfiguration::skew(float x, float y) const
 {
-    return area.left + (x + y) * area.width();
+    return drawingRegionClipSpace.left + (x + y) * drawingRegionClipSpace.width();
 }
 
 
-float MSkewTActor::ModeSpecificDiagramConfiguration::temperaturePosition() const
+float MSkewTActor::ModeSpecificDiagramConfiguration::temperatureReferenceZCoord() const
 {
     if (pressureEqualsWorldPressure)
     {
-        return area.top;
+        return drawingRegionClipSpace.top;
     }
-    return area.bottom;
+    return drawingRegionClipSpace.bottom;
 }
 
 
 double MSkewTActor::ModeSpecificDiagramConfiguration::pressureFromWorldZ(
         double z, DiagramConfiguration dconfig)
 {
-    float slopePtoZ = (area.top * 36.0 - area.bottom * 36.0) /
-            (log(dconfig.pressure.min) - log(dconfig.pressure.max));
-    return exp(z / slopePtoZ + log(dconfig.pressure.max));
+    float slopePtoZ = (drawingRegionClipSpace.top * 36.0 - drawingRegionClipSpace.bottom * 36.0) /
+            (log(dconfig.vertical_p_hPa.min) - log(dconfig.vertical_p_hPa.max));
+    return exp(z / slopePtoZ + log(dconfig.vertical_p_hPa.max));
 }
 
 
@@ -2797,8 +2810,8 @@ float MSkewTActor::ModeSpecificDiagramConfiguration::worldZfromPressure(
     if (!pressureEqualsWorldPressure)
     {
         float slopePtoZ = (36.0f - 0.1f * 36.0f)
-                / (log(dconfig->pressure.min) - log(dconfig->pressure.max));
-        return ((log(p) - log(dconfig->pressure.max)) * slopePtoZ) / 36.f;
+                / (log(dconfig->vertical_p_hPa.min) - log(dconfig->vertical_p_hPa.max));
+        return ((log(p) - log(dconfig->vertical_p_hPa.max)) * slopePtoZ) / 36.f;
     }
     else
     {
@@ -2813,8 +2826,8 @@ float MSkewTActor::ModeSpecificDiagramConfiguration::worldZToPressure(float z) c
     if (!pressureEqualsWorldPressure)
     {
         float slopePtoZ = (36.0f - 0.1f * 36.0f)
-                / (log(dconfig->pressure.min) - log(dconfig->pressure.max));
-        return exp(((z) / slopePtoZ) + log(dconfig->pressure.max));
+                / (log(dconfig->vertical_p_hPa.min) - log(dconfig->vertical_p_hPa.max));
+        return exp(((z) / slopePtoZ) + log(dconfig->vertical_p_hPa.max));
     }
     else
     {
@@ -2826,12 +2839,12 @@ float MSkewTActor::ModeSpecificDiagramConfiguration::worldZToPressure(float z) c
 
 QVector2D
 MSkewTActor::ModeSpecificDiagramConfiguration::pressureToWorldZParameters() const
-{
+{    
     if (!pressureEqualsWorldPressure)
     {
         float slopePtoZ = (36.0f - 0.1f * 36.0f)
-                / (log(dconfig->pressure.min) - log(dconfig->pressure.max));
-        return QVector2D(log(dconfig->pressure.max), slopePtoZ);
+                / (log(dconfig->vertical_p_hPa.min) - log(dconfig->vertical_p_hPa.max));
+        return QVector2D(log(dconfig->vertical_p_hPa.max), slopePtoZ);
     }
     else
     {
@@ -2844,7 +2857,7 @@ MSkewTActor::ModeSpecificDiagramConfiguration::pressureToWorldZParameters() cons
 void MSkewTActor::drawDiagram3DView(MSceneViewGLWidget* sceneView)
 {
     normalscreenDiagrammConfiguration.layer = -0.005f;
-    drawDiagramLabels(sceneView, vbDiagramVertices, &normalscreenDiagrammConfiguration);
+    drawDiagramGeometryAndLabels(sceneView, vbDiagramVertices, &normalscreenDiagrammConfiguration);
     normalscreenDiagrammConfiguration.layer = -.1f;
     drawDiagram(sceneView, vbDiagramVertices, &normalscreenDiagrammConfiguration);
 }
@@ -2854,22 +2867,22 @@ void MSkewTActor::drawDiagramFullScreen(MSceneViewGLWidget* sceneView)
 {
     glClear(GL_DEPTH_BUFFER_BIT);
     fullscreenDiagrammConfiguration.layer = -0.005f;
-    drawDiagramLabelsFullScreen(sceneView);
+    drawDiagramGeometryAndLabelsFullScreen(sceneView);
     drawDiagram(sceneView, vbDiagramVerticesFS, &fullscreenDiagrammConfiguration);
 }
 
 
-void MSkewTActor::drawDiagramLabelsFullScreen(MSceneViewGLWidget* sceneView)
+void MSkewTActor::drawDiagramGeometryAndLabelsFullScreen(MSceneViewGLWidget* sceneView)
 {
-    drawDiagramLabels(sceneView, vbDiagramVerticesFS,
-                      &fullscreenDiagrammConfiguration);
+    drawDiagramGeometryAndLabels(sceneView, vbDiagramVerticesFS,
+                                 &fullscreenDiagrammConfiguration);
 }
 
 
-void MSkewTActor::drawDiagramLabels3DView(MSceneViewGLWidget* sceneView)
+void MSkewTActor::drawDiagramGeometryAndLabels3DView(MSceneViewGLWidget* sceneView)
 {
-    drawDiagramLabels(sceneView, vbDiagramVertices,
-                      &normalscreenDiagrammConfiguration);
+    drawDiagramGeometryAndLabels(sceneView, vbDiagramVertices,
+                                 &normalscreenDiagrammConfiguration);
 }
 
 

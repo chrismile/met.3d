@@ -171,6 +171,7 @@ float calculateDewpoint(float humidity, float pressure)
 }
 
 
+//TODO (mr 09Jan2019) -- adapt to user-definable isotherm spacing.
 float projection2D(float scalar, float y)
 {
     // (temperature + temperature legend center) / (abs(min) + abs(max))  *
@@ -351,6 +352,8 @@ shader VSVariables(out vec2 worldPos)
 
     if (pressureEqualsWorldPressure)
     {
+//TODO (mr 09Jan2019) -- these hardcoded values must not be used - also at
+//  other locations!
         float slopePtoZ = 36.0f / (log(20.) - log(1050.));
         worldPos.y = exp(((worldPos.y) / slopePtoZ) + log(1050.));
         worldPos.y = ((log(worldPos.y) - pToWorldZParams2.x) * pToWorldZParams2.y);

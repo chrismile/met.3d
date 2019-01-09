@@ -146,8 +146,8 @@ private:
      */
     struct VertexRange
     {
-        int start = 0;
-        int size  = 0;
+        int startIndex = 0;
+        int indexCount  = 0;
     };
 
     /**
@@ -161,7 +161,7 @@ private:
         VertexRange dryAdiabates;
         VertexRange moistAdiabates;
         VertexRange outline;
-        VertexRange pressure;
+        VertexRange isobars;
     };
 
     struct VARIABLES
@@ -251,7 +251,7 @@ private:
         QVector2D clipPos;
         struct Area area;
         float layer;
-        struct Amplitude pressure;
+        struct Amplitude vertical_p_hPa;
         struct Amplitude temperature;
         struct Size offscreenTextureSize;
         GLint maxTextureSize;
@@ -301,7 +301,7 @@ private:
         ModeSpecificDiagramConfiguration() {}
         void init(DiagramConfiguration *dconfig, QString bufferNameSuffix);
         float skew(float x, float y) const;
-        float temperaturePosition() const;
+        float temperatureReferenceZCoord() const;
         /**
           Returns @p z in pressure (hPa) coordinates depending on the actual
           configuration of the diagram @p dconfig.
@@ -326,14 +326,14 @@ private:
 
         bool pressureEqualsWorldPressure = false;
 
-        struct Area area;
+        struct Area drawingRegionClipSpace;
         QVector2D clipPos;
         float layer;
 
         DiagramConfiguration *dconfig;
 
-        bool regenerateAdiabates = true;
-        VertexRanges vertexRanges;
+        bool recomputeAdiabateGeometries = true;
+        VertexRanges vertexArrayDrawRanges;
         QVector<QVector2D> dryAdiabatesVertices;
         QVector<QVector2D> moistAdiabatesVertices;
         QString bufferNameSuffix;
@@ -404,7 +404,7 @@ private:
 
     void updateVariableEnums(MNWPActorVariable *deletedVar = nullptr);
 
-    void drawDragPoint(MSceneViewGLWidget *sceneView);
+    void drawDiagramHandle(MSceneViewGLWidget *sceneView);
     void setShaderGeneralVars(MSceneViewGLWidget *sceneView,
                               ModeSpecificDiagramConfiguration *config);
     void drawProbabilityTube(MNWPSkewTActorVariable *max,
@@ -415,7 +415,7 @@ private:
                        bool isHumidity, QColor deviationColor);
     void setDiagramConfiguration();
 
-    void drawDiagramLabels(MSceneViewGLWidget*sceneView,
+    void drawDiagramGeometryAndLabels(MSceneViewGLWidget*sceneView,
                            GL::MVertexBuffer *vbDiagramVertices,
                            ModeSpecificDiagramConfiguration *config);
 
@@ -433,9 +433,9 @@ private:
 
     void drawDiagramFullScreen(MSceneViewGLWidget* sceneView);
 
-    void drawDiagramLabels3DView(MSceneViewGLWidget* sceneView);
+    void drawDiagramGeometryAndLabels3DView(MSceneViewGLWidget* sceneView);
 
-    void drawDiagramLabelsFullScreen(MSceneViewGLWidget* sceneView);
+    void drawDiagramGeometryAndLabelsFullScreen(MSceneViewGLWidget* sceneView);
 
     // If the user picks the handle not in its centre, we cannot move the handle
     // by setting the centre point to the mouse position so we need this offset
