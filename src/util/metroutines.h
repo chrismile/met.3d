@@ -65,6 +65,14 @@ const double EARTH_RADIUS_km = 6371.; // km
 ***                                METHODS                                  ***
 *******************************************************************************/
 
+inline double kelvinToDegC(double temperature_K)
+{ return temperature_K - 273.15; }
+
+
+inline double degCToKelvin(double temperature_degC)
+{ return temperature_degC + 273.15; }
+
+
 inline double degreesToRadians(double angle);
 
 

@@ -85,24 +85,33 @@ MSkewTActor::MSkewTActor() : MNWPMultiVarActor(),
     properties->mBool()->setValue(alignWithWorldPressureProperty, true);
 
     bottomPressureProperty = addProperty(
-                DECORATEDDOUBLE_PROPERTY, "bottom pressure",
+                DECORATEDDOUBLE_PROPERTY, "pressure bottom",
                 appearanceGroupProperty);
     properties->setDDouble(bottomPressureProperty, 1050., 0.1, 1050., 2, 10.,
                            " hPa");
     topPressureProperty = addProperty(
-                DECORATEDDOUBLE_PROPERTY, "top pressure",
+                DECORATEDDOUBLE_PROPERTY, "pressure top",
                 appearanceGroupProperty);
     properties->setDDouble(topPressureProperty, 20., 0.1, 1050., 2, 10.,
                            " hPa");
     temperatureMinProperty = addProperty(
-                DECORATEDDOUBLE_PROPERTY, "min temperature",
+                DECORATEDDOUBLE_PROPERTY, "temperature min",
                 appearanceGroupProperty);
     properties->setDDouble(temperatureMinProperty, -60., -100., 20., 0, 10.,
                            celsiusUnit);
     temperatureMaxProperty = addProperty(
-                DECORATEDDOUBLE_PROPERTY, "max temperature",
+                DECORATEDDOUBLE_PROPERTY, "temperature max",
                 appearanceGroupProperty);
     properties->setDDouble(temperatureMaxProperty, 60., 20., 100., 0, 10.,
+                           celsiusUnit);
+    skewFactorProperty= addProperty(
+                DECORATEDDOUBLE_PROPERTY, "skew factor",
+                appearanceGroupProperty);
+    properties->setDDouble(skewFactorProperty, 1., 0., 1., 2, 0.1, " (0..1)");
+    isothermsSpacingProperty = addProperty(
+                DECORATEDDOUBLE_PROPERTY, "isotherms spacing",
+                appearanceGroupProperty);
+    properties->setDDouble(isothermsSpacingProperty, 10., 0.1, 100., 1, 1.,
                            celsiusUnit);
 
     // Dry adiabates.
@@ -110,9 +119,10 @@ MSkewTActor::MSkewTActor() : MNWPMultiVarActor(),
     drawDryAdiabatesProperty = addProperty(
                 BOOL_PROPERTY, "draw dry adiabates", appearanceGroupProperty);
     properties->mBool()->setValue(drawDryAdiabatesProperty, true);
-    dryAdiabatesDivisionsProperty = addProperty(
-                DECORATEDDOUBLE_PROPERTY, "dry adiabates interval", appearanceGroupProperty);
-    properties->setDDouble(dryAdiabatesDivisionsProperty, 10., 1., 30., 0, 2.,
+    dryAdiabatesSpacingProperty = addProperty(
+                DECORATEDDOUBLE_PROPERTY, "dry adiabates spacing",
+                appearanceGroupProperty);
+    properties->setDDouble(dryAdiabatesSpacingProperty, 10., 0.1, 100., 1, 1.,
                            celsiusUnit);
 
     // Moist adiabates.
@@ -120,10 +130,10 @@ MSkewTActor::MSkewTActor() : MNWPMultiVarActor(),
     drawMoistAdiabatesProperty = addProperty(
                 BOOL_PROPERTY, "draw moist adiabates", appearanceGroupProperty);
     properties->mBool()->setValue(drawMoistAdiabatesProperty, true);
-    moistAdiabatesDivProperty = addProperty(
-                DECORATEDDOUBLE_PROPERTY, "moist adiabates interval",
+    moistAdiabatesSpcaingProperty = addProperty(
+                DECORATEDDOUBLE_PROPERTY, "moist adiabates spacing",
                 appearanceGroupProperty);
-    properties->setDDouble(moistAdiabatesDivProperty, 10., 1., 30., 0, 2.,
+    properties->setDDouble(moistAdiabatesSpcaingProperty, 10., 0.1, 100., 1, 1.,
                            celsiusUnit);
 
     geoPositionProperty = addProperty(
@@ -212,7 +222,7 @@ MSkewTActor::MSkewTActor() : MNWPMultiVarActor(),
 
     endInitialiseQtProperties();
 
-    setDiagramConfiguration();
+    copyDiagramConfigurationFromQtProperties();
 
     loadListOfAvailableObservationsFromUWyoming();
 }
@@ -287,20 +297,26 @@ void MSkewTActor::saveConfiguration(QSettings *settings)
     settings->setValue("maxTemperature",
                        properties->mDDouble()->value(temperatureMaxProperty));
 
+    settings->setValue("skewFactor",
+                       properties->mDDouble()->value(skewFactorProperty));
+
+    settings->setValue("isothermsSpacing",
+                       properties->mDDouble()->value(isothermsSpacingProperty));
+
     settings->setValue("pressureEqualsWorldPressure",
                        properties->mBool()->value(
                            alignWithWorldPressureProperty));
     settings->setValue("position",
                        properties->mPointF()->value(geoPositionProperty));
 
-    settings->setValue("moistAdiabatesTemperatureSteps",
-                       properties->mDDouble()->value(moistAdiabatesDivProperty));
+    settings->setValue("moistAdiabatesSpacing",
+                       properties->mDDouble()->value(moistAdiabatesSpcaingProperty));
     settings->setValue("moistAdiabatesEnabled",
                        properties->mBool()->value(drawMoistAdiabatesProperty));
 
-    settings->setValue("dryAdiabatesTemperatureSteps",
+    settings->setValue("dryAdiabatesSpacing",
                        properties->mDDouble()->value(
-                           dryAdiabatesDivisionsProperty));
+                           dryAdiabatesSpacingProperty));
     settings->setValue("dryAdiabatesEnabled",
                        properties->mBool()->value(drawDryAdiabatesProperty));
 
@@ -361,24 +377,32 @@ void MSkewTActor::loadConfiguration(QSettings *settings)
         temperatureMaxProperty,
         settings->value("maxTemperature", 60.).toDouble());
 
-
-    properties->mBool()->setValue(
-        alignWithWorldPressureProperty,
-        settings->value("pressureEqualsWorldPressure", true).toBool());
-
-    properties->mPointF()->setValue(geoPositionProperty,
-                                    settings->value("position").toPointF());
+    properties->mDDouble()->setValue(
+        skewFactorProperty,
+        settings->value("skewFactor", 1.).toDouble());
 
     properties->mDDouble()->setValue(
-        moistAdiabatesDivProperty,
-        settings->value("moistAdiabatesTemperatureSteps", 10.).toDouble());
+                isothermsSpacingProperty,
+                settings->value("isothermsSpacing", 10.).toDouble());
+
+    properties->mBool()->setValue(
+                alignWithWorldPressureProperty,
+                settings->value("pressureEqualsWorldPressure", true).toBool());
+
+    properties->mPointF()->setValue(
+                geoPositionProperty,
+                settings->value("position").toPointF());
+
+    properties->mDDouble()->setValue(
+        moistAdiabatesSpcaingProperty,
+        settings->value("moistAdiabatesSpacing", 10.).toDouble());
     properties->mBool()->setValue(
         alignWithWorldPressureProperty,
         settings->value("moistAdiabatesEnabled", true).toBool());
 
     properties->mDDouble()->setValue(
-                dryAdiabatesDivisionsProperty,
-                settings->value("dryAdiabatesTemperatureSteps", 10.).toDouble());
+                dryAdiabatesSpacingProperty,
+                settings->value("dryAdiabatesSpacing", 10.).toDouble());
     properties->mBool()->setValue(
                 alignWithWorldPressureProperty,
                 settings->value("dryAdiabatesEnabled", true).toBool());
@@ -427,7 +451,7 @@ void MSkewTActor::loadConfiguration(QSettings *settings)
                                 QColor(17, 98, 208, 255)).value<QColor>());
 
     settings->endGroup();
-    setDiagramConfiguration();
+    copyDiagramConfigurationFromQtProperties();
     enableActorUpdates(true);
 }
 
@@ -467,8 +491,8 @@ int MSkewTActor::checkIntersectionWithHandle(
                 ->getHandleSize();
 
         QMatrix4x4 *mvpMatrix = sceneView->getModelViewProjectionMatrix();
-        QVector3D p = QVector3D(diagramConfiguration.position.x(),
-                                diagramConfiguration.position.y(), 0.f);
+        QVector3D p = QVector3D(diagramConfiguration.geoPosition.x(),
+                                diagramConfiguration.geoPosition.y(), 0.f);
         QVector3D pClip = *(mvpMatrix) * p; // projection into clipspace
         float dx = pClip.x() - clipX;
         float dy = pClip.y() - clipY;
@@ -584,7 +608,7 @@ void MSkewTActor::onFullScreenModeSwitch(MSceneViewGLWidget *sceneView,
 //    {
 //        diagramConfiguration.fullscreen = false;
 //    }
-    setDiagramConfiguration();
+    copyDiagramConfigurationFromQtProperties();
     diagramConfiguration.regenerateAdiabates = true;
     normalscreenDiagrammConfiguration.recomputeAdiabateGeometries = true;
     fullscreenDiagrammConfiguration.recomputeAdiabateGeometries = true;
@@ -742,7 +766,7 @@ void MSkewTActor::initializeActorResources()
 
     if (loadShaders) reloadShaderEffects();
 
-    setDiagramConfiguration();
+    copyDiagramConfigurationFromQtProperties();
 
     generateDiagramVertices(&vbDiagramVertices, &normalscreenDiagrammConfiguration);
     generateDiagramVertices(&vbDiagramVerticesFS, &fullscreenDiagrammConfiguration);
@@ -806,16 +830,18 @@ void MSkewTActor::onQtPropertyChanged(QtProperty *property)
     else if (property == temperatureMaxProperty
              || property == temperatureMinProperty
              || property == alignWithWorldPressureProperty
-             || property == moistAdiabatesDivProperty
-             || property == dryAdiabatesDivisionsProperty
+             || property == isothermsSpacingProperty
+             || property == moistAdiabatesSpcaingProperty
+             || property == dryAdiabatesSpacingProperty
              || property == bottomPressureProperty
-             || property == topPressureProperty)
+             || property == topPressureProperty
+             || property == skewFactorProperty)
     {
         diagramConfiguration.regenerateAdiabates = true;
         normalscreenDiagrammConfiguration.recomputeAdiabateGeometries = true;
         fullscreenDiagrammConfiguration.recomputeAdiabateGeometries = true;
 
-        setDiagramConfiguration();
+        copyDiagramConfigurationFromQtProperties();
 
         generateDiagramVertices(&vbDiagramVertices,
                                 &normalscreenDiagrammConfiguration);
@@ -839,7 +865,7 @@ void MSkewTActor::onQtPropertyChanged(QtProperty *property)
     {
         diagramConfiguration.drawInPerspective
                 = properties->mBool()->value(perspectiveRenderingProperty);
-        diagramConfiguration.position = QVector2D(
+        diagramConfiguration.geoPosition = QVector2D(
                     float(properties->mPointF()->value(geoPositionProperty).x()),
                     float(properties->mPointF()->value(geoPositionProperty).y()));
         emitActorChangedSignal();
@@ -974,6 +1000,25 @@ void MSkewTActor::onChangeActorVariable(MNWPActorVariable *var)
 }
 
 
+void MSkewTActor::printDebugOutputOnUserRequest()
+{
+    // Debug output to verify Tp->xy transformation matrix.
+    QString str = "\nDEBUG output for verification of (T,p)->(x,y) "
+                  "transformation:\n\n";
+    for (float t = 243.15; t <= 313.15; t += 10.)
+    {
+        for (float p = 1050.; p >= 100.; p -= 50.)
+        {
+            QVector2D tp(t, p);
+            QVector2D xp = transformTp2xy(tp);
+            str += QString("T=%1, p=%2 --> x=%3, p=%4\n")
+                    .arg(tp.x()).arg(tp.y()).arg(xp.x()).arg(xp.y());
+        }
+    }
+    LOG4CPLUS_DEBUG(mlog, str.toStdString());
+}
+
+
 /******************************************************************************
 ***                           PRIVATE METHODS                               ***
 *******************************************************************************/
@@ -1042,7 +1087,7 @@ void MSkewTActor::drawDiagramHandle(MSceneViewGLWidget *sceneView)
     positionSpheresShader->setUniformValue("scaleRadius", GLboolean(true));
 
     positionSpheresShader->setUniformValue("position",
-                                           diagramConfiguration.position);
+                                           diagramConfiguration.geoPosition);
 
     // Texture bindings for transfer function for data scalar (1D texture from
     // transfer function class). The data scalar is stored in the vertex.w
@@ -1064,29 +1109,33 @@ void MSkewTActor::drawDiagramHandle(MSceneViewGLWidget *sceneView)
 }
 
 
-void MSkewTActor::setDiagramConfiguration()
+void MSkewTActor::copyDiagramConfigurationFromQtProperties()
 {
     diagramConfiguration.pressureEqualsWorldPressure =
             properties->mBool()->value(alignWithWorldPressureProperty);
-    diagramConfiguration.position = QVector2D(
+    diagramConfiguration.geoPosition = QVector2D(
                 properties->mPointF()->value(geoPositionProperty).x(),
                 properties->mPointF()->value(geoPositionProperty).y());
-    diagramConfiguration.temperature.min =
+    diagramConfiguration.temperature_degC.min =
             properties->mDDouble()->value(temperatureMinProperty);
-    diagramConfiguration.temperature.max =
+    diagramConfiguration.temperature_degC.max =
             properties->mDDouble()->value(temperatureMaxProperty);
     diagramConfiguration.vertical_p_hPa.min =
             properties->mDDouble()->value(topPressureProperty);
     diagramConfiguration.vertical_p_hPa.max =
             properties->mDDouble()->value(bottomPressureProperty);
+    diagramConfiguration.skewFactor =
+            properties->mDDouble()->value(skewFactorProperty);
+    diagramConfiguration.isothermSpacing =
+            properties->mDDouble()->value(isothermsSpacingProperty);
     diagramConfiguration.drawDryAdiabates =
             properties->mBool()->value(drawDryAdiabatesProperty);
     diagramConfiguration.drawMoistAdiabates =
             properties->mBool()->value(drawMoistAdiabatesProperty);
-    diagramConfiguration.moistAdiabatInterval =
-            properties->mDDouble()->value(moistAdiabatesDivProperty);
-    diagramConfiguration.dryAdiabatInterval =
-            properties->mDDouble()->value(dryAdiabatesDivisionsProperty);
+    diagramConfiguration.moistAdiabatSpacing =
+            properties->mDDouble()->value(moistAdiabatesSpcaingProperty);
+    diagramConfiguration.dryAdiabatSpacing =
+            properties->mDDouble()->value(dryAdiabatesSpacingProperty);
 
     normalscreenDiagrammConfiguration.pressureEqualsWorldPressure =
             diagramConfiguration.pressureEqualsWorldPressure;
@@ -1097,6 +1146,11 @@ void MSkewTActor::setDiagramConfiguration()
     diagramConfiguration.init();
     normalscreenDiagrammConfiguration.init(&diagramConfiguration, "_normal");
     fullscreenDiagrammConfiguration.init(&diagramConfiguration, "_fullscreen");
+
+    // After the configuration has been copied from the properties, recompute
+    // the (T, log(p)) to (x, y) transformation matrix to transform (T, p)
+    // coordinates into (x, y) coordinates.
+    computeTlogp2xyTransformationMatrix();
 }
 
 
@@ -1304,7 +1358,7 @@ void MSkewTActor::generateDiagramVertices(GL::MVertexBuffer** vbDiagramVertices,
             }
             }
 
-            float temperatureDryAdiabat = diagramConfiguration.temperature.min;
+            float temperatureDryAdiabat = diagramConfiguration.temperature_degC.min;
             float r_cp = 287.f / 1004.f;
             float xShift = 0.f;
             if (config->pressureEqualsWorldPressure)
@@ -1362,7 +1416,7 @@ void MSkewTActor::generateDiagramVertices(GL::MVertexBuffer** vbDiagramVertices,
                         }
                     }
                 }
-                temperatureDryAdiabat += diagramConfiguration.dryAdiabatInterval;
+                temperatureDryAdiabat += diagramConfiguration.dryAdiabatSpacing;
             }
         }
     }
@@ -1436,7 +1490,7 @@ void MSkewTActor::generateDiagramVertices(GL::MVertexBuffer** vbDiagramVertices,
             }
             }
 
-            float temperatureMoistAdiabat = diagramConfiguration.temperature.min;
+            float temperatureMoistAdiabat = diagramConfiguration.temperature_degC.min;
             float xShift = 0.f;
             if (config->pressureEqualsWorldPressure)
             {
@@ -1495,7 +1549,7 @@ void MSkewTActor::generateDiagramVertices(GL::MVertexBuffer** vbDiagramVertices,
                         config->moistAdiabatesVertices.append(vEnd);
                     }
                 }
-                temperatureMoistAdiabat += diagramConfiguration.moistAdiabatInterval;
+                temperatureMoistAdiabat += diagramConfiguration.moistAdiabatSpacing;
             }
         }
     }
@@ -2181,8 +2235,8 @@ void MSkewTActor::drawDiagramGeometryAndLabels(
                              - config->drawingRegionClipSpace.bottom) /
                             (config->drawingRegionClipSpace.right
                              - config->drawingRegionClipSpace.left) *
-                            diagramConfiguration.temperature.amplitude() -
-                            diagramConfiguration.temperature.center();
+                            diagramConfiguration.temperature_degC.amplitude() -
+                            diagramConfiguration.temperature_degC.center();
         glLineWidth(1.f);
         skewTShader->bindProgram("MarkingCircles");
         skewTShader->setUniformValue("clipPos", config->clipPos);
@@ -2210,8 +2264,8 @@ void MSkewTActor::drawDiagramGeometryAndLabels(
                     || vi == variablesIndices.dewPoint.MEAN)
             {
                 float q = var.variable->grid->interpolateValue(
-                            diagramConfiguration.position.x(),
-                            diagramConfiguration.position.y(), pressure);
+                            diagramConfiguration.geoPosition.x(),
+                            diagramConfiguration.geoPosition.y(), pressure);
                 // Mixing ratio.
                 float w = q / (1.f - q);
                 // Compute vapour pressure from pressure and mixing ratio
@@ -2242,8 +2296,8 @@ void MSkewTActor::drawDiagramGeometryAndLabels(
                     || vi == variablesIndices.temperature.MEMBER)
             {
                 float val = var.variable->grid->interpolateValue(
-                            diagramConfiguration.position.x(),
-                            diagramConfiguration.position.y(), pressure);
+                            diagramConfiguration.geoPosition.x(),
+                            diagramConfiguration.geoPosition.y(), pressure);
 //                float x = ((val - 273.15f
 //                            + diagramConfiguration.temperature.center())
 //                           / diagramConfiguration.temperature.amplitude())
@@ -2393,7 +2447,7 @@ void MSkewTActor::drawDiagramGeometryAndLabels(
     float worldZOfPressureLabel = config->worldZfromPressure(
                 diagramConfiguration.vertical_p_hPa.min) + diagramWorldZOffset;
     QVector3D position = cameraUp * worldZOfPressureLabel * 36.f +
-                         QVector3D(diagramConfiguration.position, 0.f)
+                         QVector3D(diagramConfiguration.geoPosition, 0.f)
                         - cameraRight * 0.02f * 36.f
                         + cameraFront * 0.05f;
 
@@ -2469,7 +2523,7 @@ void MSkewTActor::drawDiagramGeometryAndLabels(
         else
         {
             position = cameraUp * worldZOfPressureLabel * 36.f
-                    + QVector3D(diagramConfiguration.position, 0.f)
+                    + QVector3D(diagramConfiguration.geoPosition, 0.f)
                     - cameraRight * 0.02f * 36.f
                     + cameraFront * 0.05f;
             labels.append(tm->addText(QString("%1").arg(pressureCount),
@@ -2483,7 +2537,7 @@ void MSkewTActor::drawDiagramGeometryAndLabels(
 
     // Draw temperature labels.
     // ========================
-    float displayedTemperature = diagramConfiguration.temperature.max;
+    float displayedTemperature = diagramConfiguration.temperature_degC.max;
     float isothermSpacingClipSpace = config->drawingRegionClipSpace.width() / 12.f;
     for (int i = 48; i > 0; i -= 2)
     {
@@ -2510,7 +2564,7 @@ void MSkewTActor::drawDiagramGeometryAndLabels(
                 else
                 {
                     position = cameraUp * y * 36.f
-                            + QVector3D(diagramConfiguration.position, 0.f)
+                            + QVector3D(diagramConfiguration.geoPosition, 0.f)
                             + cameraRight * x * 36.f
                             + cameraFront * 0.05f;
                     labels.append(tm->addText(
@@ -2547,7 +2601,7 @@ void MSkewTActor::drawDiagramGeometryAndLabels(
                 else
                 {
                     position = cameraRight * (x - 0.06f) * 36.f
-                            + QVector3D(diagramConfiguration.position, 0.f)
+                            + QVector3D(diagramConfiguration.geoPosition, 0.f)
                             + cameraUp
                             * (config->drawingRegionClipSpace.bottom - 0.05f) * 36.f
                             + cameraFront * 0.05f;
@@ -2562,7 +2616,7 @@ void MSkewTActor::drawDiagramGeometryAndLabels(
             }
         }
 
-        displayedTemperature -= diagramConfiguration.temperature.amplitude() / 12.f;
+        displayedTemperature -= diagramConfiguration.temperature_degC.amplitude() / 12.f;
     }
     sceneView->makeCurrent();
 
@@ -2596,7 +2650,7 @@ void MSkewTActor::setShaderGeneralVars(
         skewTShader->setUniformValue("area.bottom", config->drawingRegionClipSpace.bottom);
     }
     skewTShader->setUniformValue("position",
-                                 diagramConfiguration.position);
+                                 diagramConfiguration.geoPosition);
     skewTShader->setUniformValue("bottomPressure",
                                  diagramConfiguration.vertical_p_hPa.max);
     skewTShader->setUniformValue("topPressure",
@@ -2606,9 +2660,9 @@ void MSkewTActor::setShaderGeneralVars(
                 config->pressureEqualsWorldPressure);
     skewTShader->setUniformValue(
                 "temperatureAmplitude",
-                diagramConfiguration.temperature.amplitude());
+                diagramConfiguration.temperature_degC.amplitude());
     skewTShader->setUniformValue(
-                "temperatureCenter", diagramConfiguration.temperature.center());
+                "temperatureCenter", diagramConfiguration.temperature_degC.center());
     if (config->pressureEqualsWorldPressure)
     {
         skewTShader->setUniformValue(
@@ -2715,8 +2769,8 @@ float MSkewTActor::DiagramConfiguration::temperaturePosition() const
 float MSkewTActor::DiagramConfiguration::scaleTemperatureToDiagramSpace(float T)
 const
 {
-    return (((T - 273.5) + temperature.center()) /
-            temperature.amplitude());
+    return (((T - 273.5) + temperature_degC.center()) /
+            temperature_degC.amplitude());
 }
 
 
@@ -2883,6 +2937,46 @@ void MSkewTActor::drawDiagramGeometryAndLabels3DView(MSceneViewGLWidget* sceneVi
 {
     drawDiagramGeometryAndLabels(sceneView, vbDiagramVertices,
                                  &normalscreenDiagrammConfiguration);
+}
+
+
+void MSkewTActor::computeTlogp2xyTransformationMatrix()
+{
+    // Construct a transformation matrix that transforms (temperature,
+    // log(pressure)) coordinates into a (skewed) (x, y) coordinate system in
+    // the range (0..1).
+
+    float Tmin_K = degCToKelvin(diagramConfiguration.temperature_degC.min);
+    float Tmax_K = degCToKelvin(diagramConfiguration.temperature_degC.max);
+    float logpbot_hPa = log(diagramConfiguration.vertical_p_hPa.max);
+    float logptop_hPa = log(diagramConfiguration.vertical_p_hPa.min);
+    float xShear = diagramConfiguration.skewFactor; // 0..1, where 1 == 45 deg
+
+    // Translate (-Tmin_K, -logpbot_hPa) to the origin.
+    QMatrix4x4 translationMatrix;
+    translationMatrix.translate(-Tmin_K, -logpbot_hPa);
+
+    // Scale so that both T and p become x and y in (0..1) each.
+    QMatrix4x4 scaleMatrix;
+    scaleMatrix.scale(1./(Tmax_K-Tmin_K), 1./(logptop_hPa-logpbot_hPa));
+
+    // Skew temperature axis through shear in x (shear factor 0..1).
+    QTransform shear;
+    shear.shear(xShear, 0.);
+    QMatrix4x4 shearMatrix(shear);
+
+    // Construct transformation matrix that performs all steps above at once.
+    transformationMatrixTlogp2xy = shearMatrix * scaleMatrix * translationMatrix;
+}
+
+
+QVector2D MSkewTActor::transformTp2xy(QVector2D tpCoordinate_K_hPa)
+{
+    QPointF tlogpCoordinate = QPointF(tpCoordinate_K_hPa.x(),
+                                      log(tpCoordinate_K_hPa.y()));
+    QPointF xyCoordinate = transformationMatrixTlogp2xy * tlogpCoordinate;
+
+    return QVector2D(xyCoordinate);
 }
 
 

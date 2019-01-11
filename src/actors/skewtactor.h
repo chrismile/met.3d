@@ -41,6 +41,7 @@
 #include <QtProperty>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
+#include <QMatrix4x4>
 
 // local application imports
 #include "gxfw/nwpmultivaractor.h"
@@ -118,6 +119,8 @@ protected:
     void onAddActorVariable(MNWPActorVariable* var) override;
 
     void onChangeActorVariable(MNWPActorVariable *var) override;
+
+    void printDebugOutputOnUserRequest();
 
 private:
     /**
@@ -238,7 +241,7 @@ private:
     };
 
     /**
-      @brief Stores the actual diagram configuration. This avoids using the
+      @brief Stores the diagram configuration. This avoids using the
       QtProperty getters to retrieve configuration details.
      */
     struct DiagramConfiguration
@@ -247,12 +250,13 @@ private:
         void init();
 
         QVector<VariableConfig> varConfigs;
-        QVector2D position;
+        QVector2D geoPosition;
         QVector2D clipPos;
         struct Area area;
         float layer;
         struct Amplitude vertical_p_hPa;
-        struct Amplitude temperature;
+        struct Amplitude temperature_degC;
+        float skewFactor;
         struct Size offscreenTextureSize;
         GLint maxTextureSize;
         bool pressureEqualsWorldPressure = false;
@@ -264,8 +268,9 @@ private:
         bool drawInPerspective = false;
         VertexRanges vertexRanges;
         QVector4D diagramColor;
-        float moistAdiabatInterval = 10.0;
-        float dryAdiabatInterval = 10.0;
+        float isothermSpacing = 10.;
+        float moistAdiabatSpacing = 10.0;
+        float dryAdiabatSpacing = 10.0;
         float yOffset = 0;
 
         float skew(float x, float y) const;
@@ -359,10 +364,12 @@ private:
                *dewPointColorWyomingProperty,
                *temperatureColorWyomingProperty, *groupWyoming,
                *temperatureMinProperty, *temperatureMaxProperty,
+               *skewFactorProperty,
+               *isothermsSpacingProperty,
                *drawDryAdiabatesProperty,
                *drawMoistAdiabatesProperty,
-               *moistAdiabatesDivProperty,
-               *dryAdiabatesDivisionsProperty,
+               *moistAdiabatesSpcaingProperty,
+               *dryAdiabatesSpacingProperty,
                *appearanceGroupProperty,
                *perspectiveRenderingProperty,
                *groupVariables, *temperatureGroupProperty,
@@ -413,7 +420,12 @@ private:
     void drawDeviation(MNWPSkewTActorVariable *mean,
                        MNWPSkewTActorVariable *deviation,
                        bool isHumidity, QColor deviationColor);
-    void setDiagramConfiguration();
+
+    /**
+      Copies the current user-defined diagram configuration from the
+      GUI properties into the @ref diagramConfiguration struct.
+     */
+    void copyDiagramConfigurationFromQtProperties();
 
     void drawDiagramGeometryAndLabels(MSceneViewGLWidget*sceneView,
                            GL::MVertexBuffer *vbDiagramVertices,
@@ -441,6 +453,28 @@ private:
     // by setting the centre point to the mouse position so we need this offset
     // to place the handle relative to the mouse position.
     QVector2D offsetPickPositionToHandleCentre;
+
+    // Stores the transformation matrix that transforms (T, log(p)) coordinates
+    // into the diagram's (x, y) coordinates. Computed by
+    // computeTlogp2xyTransformationMatrix().
+    QMatrix4x4 transformationMatrixTlogp2xy;
+
+    /**
+      Compute the @ref transformationMatrixTlogp2xy from user settings
+      (temperature and pressure range to be displayed by the diagram).
+
+      @see transformTp2xy()
+     */
+    void computeTlogp2xyTransformationMatrix();
+
+    /**
+      Transform a (temperature, pressure) coordinate into the Skew-T diagram's
+      (x, y) coordinates. Temperature is in K, pressure in hPa, the (x, y)
+      coordinates are in the (0..1) range both. The transformation matrix
+      used in this method needs to be computed first using
+      @ref computeTlogp2xyTransformationMatrix().
+     */
+    QVector2D transformTp2xy(QVector2D tpCoordinate_K_hPa);
 };
 
 
