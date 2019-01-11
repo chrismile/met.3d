@@ -163,7 +163,7 @@ private:
         VertexRange isotherms;
         VertexRange dryAdiabates;
         VertexRange moistAdiabates;
-        VertexRange outline;
+        VertexRange frame;
         VertexRange isobars;
     };
 
@@ -431,7 +431,7 @@ private:
                            GL::MVertexBuffer *vbDiagramVertices,
                            ModeSpecificDiagramConfiguration *config);
 
-    void generateDiagramVertices(GL::MVertexBuffer **vbDiagramVertices,
+    void generateDiagramGeometry(GL::MVertexBuffer **vbDiagramVertices,
                                  ModeSpecificDiagramConfiguration *config);
 
     void drawDiagram(MSceneViewGLWidget* sceneView,

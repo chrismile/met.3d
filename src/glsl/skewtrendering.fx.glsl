@@ -484,6 +484,18 @@ shader VS2D(in vec2 vertexCoord : 0, out vec2 worldPos)
 }
 
 
+shader VSDiagramXYtoFullscreen(in vec2 vertex : 0)
+{
+//TODO (mr, 10Jan2019) -- replace by matrix multiplication.
+    float hPad = 0.1;
+    float vPad = 0.1;
+    vec2 vertexClipSpace = vec2(vertex.x * (2.-2.*hPad) - 1.+hPad,
+                                vertex.y * (2.-2.*vPad) - 1.+vPad);
+
+    gl_Position = vec4(vertexClipSpace.x, vertexClipSpace.y, layer, 1.);
+}
+
+
 shader VS2DVertexYInPressure(in vec2 vertexCoord : 0, out vec2 worldPos)
 {
     worldPos.x = vertexCoord.x;
@@ -970,9 +982,11 @@ program DiagramVerticesVertOrHoriCheck
 
 program DiagramVertices
 {
-    vs(400)=VS2DVertexYInPressure();
-    gs(400)=GSVertices() : in(lines), out(line_strip, max_vertices = 2);
-    fs(400)=FSColourWithAreaTest();
+//    vs(400)=VS2DVertexYInPressure();
+    vs(400)=VSDiagramXYtoFullscreen();
+//    gs(400)=GSVertices() : in(lines), out(line_strip, max_vertices = 2);
+    fs(400)=FSColour();
+//    fs(400)=FSColourWithAreaTest();
 };
 
 program MeasurementPoint

@@ -289,6 +289,17 @@ double potentialTemperature_K(double T_K, double p_Pa);
 
 
 /**
+  Computes ambient temperature in [K] of a given potential temperature in [K]
+  at pressure @p p_Pa in [Pa].
+
+  Method:
+                            T = theta / (p0/p)^(R/cp)
+      with p0 = 100000. Pa, R = 287.058 JK-1kg-1, cp = 1004 JK-1kg-1.
+ */
+double ambientTemperatureOfPotentialTemperature_K(double theta_K, double p_Pa);
+
+
+/**
   Computes the virtual temperature in [K] from temperature @p T_K in [K] and
   specific humidity @p q_kgkg in [kg/kg].
 
@@ -362,9 +373,14 @@ double equivalentPotentialTemperature_K_Bolton(double T_K, double p_Pa,
   Stull (ACP, 2017), "Technical note: A noniterative approach to modelling
   moist thermodynamics".
  */
-double temperatureAlongSaturatedAdiabat_K_MoisseevaStull(double p_Pa,
-                                                         double thetaW_K);
+double temperatureAlongSaturatedAdiabat_K_MoisseevaStull(
+        double thetaW_K, double p_Pa);
 
+/**
+  Inverse of @ref temperatureAlongSaturatedAdiabat_K_MoisseevaStull().
+ */
+double wetBulbPotentialTemperatureOfSaturatedAdiabat_K_MoisseevaStull(
+        double T_K, double p_Pa);
 
 // Test functions for meteorological computations.
 namespace MetRoutinesTests

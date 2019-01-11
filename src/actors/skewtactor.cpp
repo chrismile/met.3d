@@ -107,7 +107,7 @@ MSkewTActor::MSkewTActor() : MNWPMultiVarActor(),
     skewFactorProperty= addProperty(
                 DECORATEDDOUBLE_PROPERTY, "skew factor",
                 appearanceGroupProperty);
-    properties->setDDouble(skewFactorProperty, 1., 0., 1., 2, 0.1, " (0..1)");
+    properties->setDDouble(skewFactorProperty, 1., 0., 2., 2, 0.1, " (0..2)");
     isothermsSpacingProperty = addProperty(
                 DECORATEDDOUBLE_PROPERTY, "isotherms spacing",
                 appearanceGroupProperty);
@@ -614,8 +614,8 @@ void MSkewTActor::onFullScreenModeSwitch(MSceneViewGLWidget *sceneView,
     fullscreenDiagrammConfiguration.recomputeAdiabateGeometries = true;
     if (isInitialized())
     {
-        generateDiagramVertices(&vbDiagramVertices, &normalscreenDiagrammConfiguration);
-        generateDiagramVertices(&vbDiagramVerticesFS, &fullscreenDiagrammConfiguration);
+        generateDiagramGeometry(&vbDiagramVertices, &normalscreenDiagrammConfiguration);
+        generateDiagramGeometry(&vbDiagramVerticesFS, &fullscreenDiagrammConfiguration);
     }
     emitActorChangedSignal();
 }
@@ -768,8 +768,8 @@ void MSkewTActor::initializeActorResources()
 
     copyDiagramConfigurationFromQtProperties();
 
-    generateDiagramVertices(&vbDiagramVertices, &normalscreenDiagrammConfiguration);
-    generateDiagramVertices(&vbDiagramVerticesFS, &fullscreenDiagrammConfiguration);
+    generateDiagramGeometry(&vbDiagramVertices, &normalscreenDiagrammConfiguration);
+    generateDiagramGeometry(&vbDiagramVerticesFS, &fullscreenDiagrammConfiguration);
 
     labelSize       = properties->mInt()->value(labelSizeProperty);
     labelColour     = properties->mColor()->value(labelColourProperty);
@@ -843,9 +843,9 @@ void MSkewTActor::onQtPropertyChanged(QtProperty *property)
 
         copyDiagramConfigurationFromQtProperties();
 
-        generateDiagramVertices(&vbDiagramVertices,
+        generateDiagramGeometry(&vbDiagramVertices,
                                 &normalscreenDiagrammConfiguration);
-        generateDiagramVertices(&vbDiagramVerticesFS,
+        generateDiagramGeometry(&vbDiagramVerticesFS,
                                 &fullscreenDiagrammConfiguration);
         emitActorChangedSignal();
     }
@@ -883,7 +883,7 @@ void MSkewTActor::onQtPropertyChanged(QtProperty *property)
                  .vertexArrayDrawRanges.dryAdiabates.indexCount == 0)
                     || normalscreenDiagrammConfiguration.recomputeAdiabateGeometries)
             {
-                generateDiagramVertices(&vbDiagramVertices,
+                generateDiagramGeometry(&vbDiagramVertices,
                                         &normalscreenDiagrammConfiguration);
             }
             // Regenerate dry adiabates only if necessary (first time, pressure
@@ -892,7 +892,7 @@ void MSkewTActor::onQtPropertyChanged(QtProperty *property)
                  .vertexArrayDrawRanges.dryAdiabates.indexCount == 0)
                     || fullscreenDiagrammConfiguration.recomputeAdiabateGeometries)
             {
-                generateDiagramVertices(&vbDiagramVertices,
+                generateDiagramGeometry(&vbDiagramVertices,
                                         &fullscreenDiagrammConfiguration);
             }
         }
@@ -911,7 +911,7 @@ void MSkewTActor::onQtPropertyChanged(QtProperty *property)
                  .vertexArrayDrawRanges.moistAdiabates.indexCount == 0)
                     || normalscreenDiagrammConfiguration.recomputeAdiabateGeometries)
             {
-                generateDiagramVertices(&vbDiagramVertices,
+                generateDiagramGeometry(&vbDiagramVertices,
                                         &normalscreenDiagrammConfiguration);
             }
             // Regenerate moist adiabates only if necessary (first time,
@@ -920,7 +920,7 @@ void MSkewTActor::onQtPropertyChanged(QtProperty *property)
                  .vertexArrayDrawRanges.moistAdiabates.indexCount == 0)
                     || fullscreenDiagrammConfiguration.recomputeAdiabateGeometries)
             {
-                generateDiagramVertices(&vbDiagramVertices,
+                generateDiagramGeometry(&vbDiagramVertices,
                                         &fullscreenDiagrammConfiguration);
             }
         }
@@ -1154,147 +1154,103 @@ void MSkewTActor::copyDiagramConfigurationFromQtProperties()
 }
 
 
-void MSkewTActor::generateDiagramVertices(GL::MVertexBuffer** vbDiagramVertices,
-                                          ModeSpecificDiagramConfiguration *config)
+void MSkewTActor::generateDiagramGeometry(
+        GL::MVertexBuffer** vbDiagramVertices,
+        ModeSpecificDiagramConfiguration *config)
 {
     // Array with vertex data that will be uploaded to a vertex buffer at the
-    // end of the method.
+    // end of the method. Contains line segments to be rendered with GL_LINES.
+    // NOTE: All geometry stored in this array needs to be mapped to 2D diagram
+    // coordinates (0..1) x (0..1)!
     QVector<QVector2D> vertexArray;
+
+//TODO (mr, 11Jan2019) -- most geometry generated in this method could make
+//    use of line strips (whould make rendering more efficient).
 
     // Temporary variables for start and end vertices for a line segment,
     // reused throughout the method.
     QVector2D vStart, vEnd;
 
-    // Generate vertices for diagram outline (clip space bounding box).
-    // ================================================================
-    config->vertexArrayDrawRanges.outline.startIndex = vertexArray.size();
+    // Generate vertices for diagram frame.
+    // ====================================
+    config->vertexArrayDrawRanges.frame.startIndex = vertexArray.size();
 
-    Outline outline = config->drawingRegionClipSpace.outline();
-    vertexArray.append(QVector2D(outline.data[0],
-                       config->worldZToPressure(outline.data[1])));
-    vertexArray.append(QVector2D(outline.data[2],
-                       config->worldZToPressure(outline.data[3])));
-    vertexArray.append(QVector2D(outline.data[4],
-                       config->worldZToPressure(outline.data[5])));
-    vertexArray.append(QVector2D(outline.data[6],
-                       config->worldZToPressure(outline.data[7])));
-    vertexArray.append(QVector2D(outline.data[8],
-                       config->worldZToPressure(outline.data[9])));
-    vertexArray.append(QVector2D(outline.data[10],
-                       config->worldZToPressure(outline.data[11])));
-    vertexArray.append(QVector2D(outline.data[12],
-                       config->worldZToPressure(outline.data[13])));
-    vertexArray.append(QVector2D(outline.data[14],
-                       config->worldZToPressure(outline.data[15])));
+    vertexArray << QVector2D(0.0, 0.0) << QVector2D(0.0, 1.0);
+    vertexArray << QVector2D(1.0, 0.0) << QVector2D(1.0, 1.0);
+    vertexArray << QVector2D(0.0, 0.0) << QVector2D(1.0, 0.0);
+    vertexArray << QVector2D(0.0, 1.0) << QVector2D(1.0, 1.0);
 
-    config->vertexArrayDrawRanges.outline.indexCount =
-            vertexArray.size() - config->vertexArrayDrawRanges.outline.startIndex;
+    config->vertexArrayDrawRanges.frame.indexCount =
+            vertexArray.size() - config->vertexArrayDrawRanges.frame.startIndex;
 
 
-    // Generate vertices for temperature marks.
-    // ========================================
-    config->vertexArrayDrawRanges.temperatureMarks.startIndex = vertexArray.size();
-
-    float isothermSpacingClipSpace = config->drawingRegionClipSpace.width() / 12.f;
-//TODO (mr 09Jan2019) -- replace by user-definable temperature interval.
-    float worldZTemperatureMarks = config->temperatureReferenceZCoord();
-    for (int i = 0; i < 24; i++)
-    {
-        if (config->pressureEqualsWorldPressure)
-        {
-            vStart  = QVector2D(config->drawingRegionClipSpace.right + 0.01f,
-                                config->worldZToPressure(
-                                    (isothermSpacingClipSpace * i
-                                     - config->drawingRegionClipSpace.width()
-                                     / 2.f + 0.05f)));
-//TODO (mr 09Jan2019) -- make tick length customizable.
-            vEnd = QVector2D(config->drawingRegionClipSpace.right, vStart.y());
-        }
-        else
-        {
-            vStart  = QVector2D(isothermSpacingClipSpace * i
-                                + config->drawingRegionClipSpace.bottom
-                                - config->drawingRegionClipSpace.width(),
-                                config->worldZToPressure(
-                                    worldZTemperatureMarks - 0.01f));
-            vEnd = QVector2D(vStart.x(), config->worldZToPressure(
-                                 worldZTemperatureMarks));
-        }
-        vertexArray << vStart << vEnd;
-    }
-
-    config->vertexArrayDrawRanges.temperatureMarks.indexCount = vertexArray.size()
-            - config->vertexArrayDrawRanges.temperatureMarks.startIndex;
+    // Generate vertices for isobars.
+    // ==============================
     config->vertexArrayDrawRanges.isobars.startIndex = vertexArray.size();
 
-
-    // Generate vertices for isobaric lines.
-    // =====================================
-
-    // Vertical diagram offset in worldZ coordinates.
-    float diagramWorldZOffset = 0.f;
-    if (!config->pressureEqualsWorldPressure)
-    {
-        diagramWorldZOffset = 0.05f;
-    }
-
-    // Bottom line.
-    float worldZOfIsobar = config->worldZfromPressure(
-                diagramConfiguration.vertical_p_hPa.min) + diagramWorldZOffset;
-    vStart  = QVector2D(config->drawingRegionClipSpace.left - 0.01f,
-                        config->worldZToPressure(worldZOfIsobar));
-    vEnd = QVector2D(config->drawingRegionClipSpace.right, vStart.y());
-    vertexArray << vStart << vEnd;
-
-    // Lines at given pressure levels.
-//TODO (mr, 09Jan2019) -- make this user-customizable.
+//TODO (mr, 09Jan2019) -- make levels user-customizable.
     QList<int> pressureLevels;
     pressureLevels << 1 << 10 << 50 << 100 << 200 << 300 << 400 << 500
                    << 600 << 700 << 800 << 900 << 1000;
-    for (int pLevel : pressureLevels)
+    for (int pLevel_hPa : pressureLevels)
     {
-        if ((pLevel < diagramConfiguration.vertical_p_hPa.max) &&
-                (pLevel > diagramConfiguration.vertical_p_hPa.min))
+        if ((pLevel_hPa < diagramConfiguration.vertical_p_hPa.max) &&
+                (pLevel_hPa > diagramConfiguration.vertical_p_hPa.min))
         {
-            worldZOfIsobar = config->worldZfromPressure(pLevel)
-                    + diagramWorldZOffset;
-            vStart = QVector2D(config->drawingRegionClipSpace.left - 0.01f,
-                               config->worldZToPressure(worldZOfIsobar));
-            vEnd = QVector2D(config->drawingRegionClipSpace.right, vStart.y());
+            // We need some temperature for the transformation, not used
+            // any further.
+            QVector2D tpCoordinate(273.15, pLevel_hPa);
+            QVector2D xyCoordinate = transformTp2xy(tpCoordinate);
+            vStart = QVector2D(0., xyCoordinate.y());
+            vEnd = QVector2D(1., xyCoordinate.y());
             vertexArray << vStart << vEnd;
         }
     }
 
-    // Another bottom line?
-    worldZOfIsobar = config->drawingRegionClipSpace.bottom;
-    vStart = QVector2D(config->drawingRegionClipSpace.left - 0.01f,
-                       config->worldZToPressure(worldZOfIsobar));
-    vEnd = QVector2D(config->drawingRegionClipSpace.right, vStart.y());
-    vertexArray << vStart << vEnd;
-
     config->vertexArrayDrawRanges.isobars.indexCount =
             vertexArray.size() - config->vertexArrayDrawRanges.isobars.startIndex;
-    config->vertexArrayDrawRanges.isotherms.startIndex = vertexArray.size();
 
 
     // Generate vertices for isotherms.
     // ================================
-    for (int i = -20; i < 25; i++)
+    config->vertexArrayDrawRanges.isotherms.startIndex = vertexArray.size();
+
+    float diagramTmin_K = config->dconfig->temperature_degC.min + 273.15;
+    float diagramTmax_K = config->dconfig->temperature_degC.max + 273.15;
+    float diagramTRange_K = diagramTmax_K - diagramTmin_K;
+    float skewFactor = config->dconfig->skewFactor;
+
+    // If the diagram is drawn skewed, the isotherms need to continue over the
+    // minimum temperature limit of the diagram. The used factor is a heuristic,
+    // might need to be adjusted later.
+    for (float isothermTemperature = diagramTmin_K - skewFactor * diagramTRange_K;
+         isothermTemperature <= diagramTmax_K;
+         isothermTemperature += config->dconfig->isothermSpacing)
     {
-        vStart = QVector2D(isothermSpacingClipSpace * i
-                           - config->drawingRegionClipSpace.width(),
-                           config->worldZToPressure(0.f));
-        vEnd = QVector2D(vStart.x() + 2.5f, config->worldZToPressure(2.5f));
+        // Generate vertex at (isotherm temperature, bottom pressure).
+        QVector2D tpCoordinate_K_hPa = QVector2D(
+                    isothermTemperature, config->dconfig->vertical_p_hPa.min);
+        vStart = transformTp2xy(tpCoordinate_K_hPa);
+        // Generate vertex at (isotherm temperature, top pressure).
+        tpCoordinate_K_hPa.setY(config->dconfig->vertical_p_hPa.max);
+        vEnd = transformTp2xy(tpCoordinate_K_hPa);
         vertexArray << vStart << vEnd;
     }
 
     config->vertexArrayDrawRanges.isotherms.indexCount =
             vertexArray.size() - config->vertexArrayDrawRanges.isotherms.startIndex;
-    config->vertexArrayDrawRanges.dryAdiabates.startIndex = vertexArray.size();
 
 
     // Generate vertices for dry adiabates.
     // ====================================
+
+    float log_pBot = log(config->dconfig->vertical_p_hPa.max);
+    float log_pTop = log(config->dconfig->vertical_p_hPa.min);
+    int nAdiabatPoints = 100; // number of discrete points to plot adiabat
+    float deltaLogP = (log_pBot - log_pTop) / float(nAdiabatPoints);
+
+    config->vertexArrayDrawRanges.dryAdiabates.startIndex = vertexArray.size();
+
     if (diagramConfiguration.drawDryAdiabates)
     {
         // Create dry adiabates only if necessary (first time, pressure
@@ -1304,119 +1260,36 @@ void MSkewTActor::generateDiagramVertices(GL::MVertexBuffer** vbDiagramVertices,
         {
             config->dryAdiabatesVertices.clear();
 
-            QList<float> startPressureList, endPressureList, incrList;
-            float startPressure, endPressure, incr;
-            // Use different increments for different sections of the pressure
-            // levels ([0.1, 1] -> 1/16; [1, 10] -> 1; [10, 1050] -> 5) but
-            // avoid if-clause in the for-loop.
-            switch(int(floor(log10(diagramConfiguration.vertical_p_hPa.min))))
+            // To fill the diagram with dry adiabates, we need to continue over
+            // the maximimum temperature limit. Again the used factor is a
+            // heuristic value.
+            for (float adiabatTemperature = diagramTmin_K;
+                 adiabatTemperature <= diagramTmax_K + (
+                     2 - skewFactor + 3) * diagramTRange_K;
+                 adiabatTemperature += config->dconfig->dryAdiabatSpacing)
             {
-            case -1:
-            {
-                // Avoid problems due to rounding errors by usinging a multiple
-                // of 2.
-                incrList.append(0.0625f); // 1/16
-                startPressureList.append(
-                            floor(diagramConfiguration.vertical_p_hPa.min * 16.f)
-                            / 16.f);
-                endPressureList.append(
-                            min(ceil(diagramConfiguration.vertical_p_hPa.max * 16.f)
-                                / 16.f, 0.9375f)); // 15/16
-            }
-            case 0:
-            {
-                incrList.append(1.f);
-                if (startPressureList.size() == 0)
-                {
-                    startPressureList.append(
-                                floor(diagramConfiguration.vertical_p_hPa.min));
-                }
-                else
-                {
-                    startPressureList.append(1.f);
-                }
-                endPressureList.append(
-                            min(ceil(diagramConfiguration.vertical_p_hPa.max / 1.f)
-                                * 1.f, 9.f));
-            }
-            default:
-            {
-                incrList.append(5.f);
-                if (startPressureList.size() == 0)
-                {
-                    startPressureList.append(
-                                floor(diagramConfiguration.vertical_p_hPa.min / 5.f)
-                                * 5.f);
-                }
-                else
-                {
-                    startPressureList.append(10.f);
-                }
-                endPressureList.append(
-                            ceil(diagramConfiguration.vertical_p_hPa.max / 5.f)
-                            * 5.f);
-            }
-            }
+                // First vertex of adiabat.
+                float p_hPa = exp(log_pBot);
+                float potT_K = ambientTemperatureOfPotentialTemperature_K(
+                            adiabatTemperature, p_hPa * 100.);
 
-            float temperatureDryAdiabat = diagramConfiguration.temperature_degC.min;
-            float r_cp = 287.f / 1004.f;
-            float xShift = 0.f;
-            if (config->pressureEqualsWorldPressure)
-            {
-                xShift = config->worldZfromPressure(1000.f) * 2.f;
-            }
-            while (diagramConfiguration.scaleTemperatureToDiagramSpace(
-                       temperatureDryAdiabat + 273.5f)
-                   < config->drawingRegionClipSpace.right * 4.f)
-            {
-                for (int i = 0; i < startPressureList.size(); i++)
-                {
-                    startPressure = startPressureList.at(i);
-                    endPressure   = endPressureList.at(i);
-                    incr          = incrList.at(i);
-                    for (float p = startPressure; p <= endPressure; p += incr)
-                    {
-                        // Computation of dry adiabates.
-                        // (T is temperature in Kelvin).
-                        // x = T / (1000hPa / pressure) ^ (287 / 1004)
-                        float x1 = (temperatureDryAdiabat + 273.5f)
-                                / pow((1000.f / p), r_cp);
-                        float x2 = (temperatureDryAdiabat + 273.5f)
-                                / pow(1000.f / (p + incr), r_cp);
-                        // Scaling to temperature scale.
-                        x1 = diagramConfiguration
-                                .scaleTemperatureToDiagramSpace(x1);
-                        x2 = diagramConfiguration
-                                .scaleTemperatureToDiagramSpace(x2);
-                        // Get y coordinate without shifts.
-                        float y1 = config->worldZfromPressure(p);
-                        float y2 = config->worldZfromPressure(p + incr);
-                        // Scale and move to drawing area and adding y to get
-                        // the skewed x.
-                        x1 = config->skew(x1, y1);
-                        x2 = config->skew(x2, y2);
+                QVector2D tpCoordinate_K_hPa = QVector2D(potT_K, p_hPa);
+                vStart = transformTp2xy(tpCoordinate_K_hPa);
 
-                        // Adding shifts depending on whether the pressure
-                        // scale is equal world pressure scale or not.
-                        vStart = QVector2D(x1 + xShift,
-                                           config->worldZToPressure(
-                                               y1 + diagramWorldZOffset));
-                        vEnd = QVector2D(x2 + xShift,
-                                         config->worldZToPressure(
-                                             y2 + diagramWorldZOffset));
-                        if (p > startPressure)
-                        {
-                            config->dryAdiabatesVertices.append(vStart);
-                        }
-                        config->dryAdiabatesVertices.append(vStart);
-                        config->dryAdiabatesVertices.append(vEnd);
-                        if (p < endPressure)
-                        {
-                            config->dryAdiabatesVertices.append(vEnd);
-                        }
-                    }
+                // Remaining vertices.
+                for (float log_p_hPa = log_pBot; log_p_hPa > log_pTop;
+                     log_p_hPa -= deltaLogP)
+                {
+                    float p_hPa = exp(log_p_hPa);
+                    float potT_K = ambientTemperatureOfPotentialTemperature_K(
+                                adiabatTemperature, p_hPa * 100.);
+
+                    QVector2D tpCoordinate_K_hPa = QVector2D(potT_K, p_hPa);
+                    vEnd = transformTp2xy(tpCoordinate_K_hPa);
+
+                    config->dryAdiabatesVertices << vStart << vEnd;
+                    vStart = vEnd;
                 }
-                temperatureDryAdiabat += diagramConfiguration.dryAdiabatSpacing;
             }
         }
     }
@@ -1424,10 +1297,12 @@ void MSkewTActor::generateDiagramVertices(GL::MVertexBuffer** vbDiagramVertices,
     vertexArray << config->dryAdiabatesVertices;
     config->vertexArrayDrawRanges.dryAdiabates.indexCount = vertexArray.size()
             - config->vertexArrayDrawRanges.dryAdiabates.startIndex;
-    config->vertexArrayDrawRanges.moistAdiabates.startIndex = vertexArray.size();
+
 
     // Generate moist adiabates vertices.
     // ==================================
+    config->vertexArrayDrawRanges.moistAdiabates.startIndex = vertexArray.size();
+
     if (diagramConfiguration.drawMoistAdiabates)
     {
         // Regenerate moist adiabates only if necessary (first time, pressure
@@ -1437,119 +1312,40 @@ void MSkewTActor::generateDiagramVertices(GL::MVertexBuffer** vbDiagramVertices,
         {
             config->moistAdiabatesVertices.clear();
 
-            QList<float> startPressureList, endPressureList, incrList;
-            float startPressure, endPressure, incr;
-            // Use different increments for different sections of the pressure
-            // levels ([0.1, 1] -> 1/16; [1, 10] -> 1; [10, 1050] -> 5) but
-            // avoid if-clause in the for-loop.
-            switch(int(floor(log10(diagramConfiguration.vertical_p_hPa.min))))
+            for (float adiabatTemperature = diagramTmin_K;
+                 adiabatTemperature <= diagramTmax_K;
+                 adiabatTemperature += config->dconfig->moistAdiabatSpacing)
             {
-            case -1:
-            {
-                // Avoid problems due to rounding errors by usinging a multiple
-                // of 2.
-                incrList.append(0.0625f); // 1/16
-                startPressureList.append(
-                            floor(diagramConfiguration.vertical_p_hPa.min * 16.f) / 16.f);
-                endPressureList.append(
-                            min(ceil(diagramConfiguration.vertical_p_hPa.max * 16.f) / 16.f,
-                                1.f));
-            }
-            case 0:
-            {
-                incrList.prepend(1.f);
-                if (startPressureList.size() == 0)
+                // NOTE that the Moisseeva & Stull (2017) implementation for
+                // saturated adiabats is only valid for a thetaW range of
+                // -70 degC to +40 degC. Hence limit to this range.
+                if (adiabatTemperature < 203.15 || adiabatTemperature > 313.15)
                 {
-                    startPressureList.prepend(
-                                floor(diagramConfiguration.vertical_p_hPa.min));
+                    continue;
                 }
-                else
-                {
-                    startPressureList.prepend(2.f);
-                }
-                endPressureList.prepend(
-                            min(ceil(diagramConfiguration.vertical_p_hPa.max / 1.f)
-                                * 1.f, 10.f));
-            }
-            default:
-            {
-                incrList.prepend(5.f);
-                if (startPressureList.size() == 0)
-                {
-                    startPressureList.prepend(
-                                floor(diagramConfiguration.vertical_p_hPa.min / 5.f)
-                                * 5.f);
-                }
-                else
-                {
-                    startPressureList.prepend(11.f);
-                }
-                endPressureList.prepend(
-                            ceil(diagramConfiguration.vertical_p_hPa.max / 5.f)
-                            * 5.f);
-            }
-            }
 
-            float temperatureMoistAdiabat = diagramConfiguration.temperature_degC.min;
-            float xShift = 0.f;
-            if (config->pressureEqualsWorldPressure)
-            {
-                xShift = config->worldZfromPressure(1000.f) * 2.f;
-            }
-            while (diagramConfiguration.scaleTemperatureToDiagramSpace(
-                       temperatureMoistAdiabat + 273.5f)
-                   < config->drawingRegionClipSpace.right + 0.05f)
-            {
-                float T = temperatureMoistAdiabat + 273.5f;
-                // Calculate shift that is produced when starting with
-                // computation at 1050hPa instead of 1000hPa (not like they do
-                // it at wyoming).
-                for (float p = 1050.f; p > 1000.f; p = p - 5.f)
+                // First vertex of adiabat.
+                float p_hPa = exp(log_pBot);
+                float potT_K = temperatureAlongSaturatedAdiabat_K_MoisseevaStull(
+                            adiabatTemperature, p_hPa * 100.);
+
+                QVector2D tpCoordinate_K_hPa = QVector2D(potT_K, p_hPa);
+                vStart = transformTp2xy(tpCoordinate_K_hPa);
+
+                // Remaining vertices.
+                for (float log_p_hPa = log_pBot; log_p_hPa > log_pTop;
+                     log_p_hPa -= deltaLogP)
                 {
-                    T += moistAdiabaticLapseRate_K(T, p * 100.f) * 5.f * 100.f;
+                    float p_hPa = exp(log_p_hPa);
+                    float potT_K = temperatureAlongSaturatedAdiabat_K_MoisseevaStull(
+                                adiabatTemperature, p_hPa * 100.);
+
+                    QVector2D tpCoordinate_K_hPa = QVector2D(potT_K, p_hPa);
+                    vEnd = transformTp2xy(tpCoordinate_K_hPa);
+
+                    config->moistAdiabatesVertices << vStart << vEnd;
+                    vStart = vEnd;
                 }
-                float x, y;
-
-                for (int i = 0; i < startPressureList.size(); i++)
-                {
-                    startPressure = startPressureList.at(i);
-                    endPressure   = endPressureList.at(i);
-                    incr          = incrList.at(i);
-                    for (float p = endPressure; p >= startPressure; p = p - incr)
-                    {
-                        x = diagramConfiguration.scaleTemperatureToDiagramSpace(
-                                    T);
-                        // Get y coordinate without shifts.
-                        y = config->worldZfromPressure(p);
-                        // Scale and move to drawing area and adding y to get
-                        // the skewed x.
-                        x = config->skew(x, y);
-                        // Adding shifts depending on whether the pressure
-                        // scale is equal world pressure scale or not.
-                        vStart = QVector2D(x + xShift,
-                                          config->worldZToPressure(
-                                              y + diagramWorldZOffset));
-                        config->moistAdiabatesVertices.append(vStart);
-
-                        T -= moistAdiabaticLapseRate_K(T, p * 100.f) * incr
-                                * 100.f;
-                        // Scaling to temperature scale.
-                        x = diagramConfiguration.scaleTemperatureToDiagramSpace(
-                                    T);
-
-                        // Get y coordinate without shifts.
-                        y = config->worldZfromPressure(p - incr);
-                        // Scale and move to drawing area and adding y to get
-                        // the skewed x.
-                        x = config->skew(x, y);
-                        // Adding shifts depending on whether the pressure
-                        // scale is equal world pressure scale or not.
-                        vEnd = QVector2D(x + xShift, config->worldZToPressure(
-                                             y + diagramWorldZOffset));
-                        config->moistAdiabatesVertices.append(vEnd);
-                    }
-                }
-                temperatureMoistAdiabat += diagramConfiguration.moistAdiabatSpacing;
             }
         }
     }
@@ -1559,6 +1355,7 @@ void MSkewTActor::generateDiagramVertices(GL::MVertexBuffer** vbDiagramVertices,
     config->vertexArrayDrawRanges.moistAdiabates.indexCount = vertexArray.size()
             - config->vertexArrayDrawRanges.moistAdiabates.startIndex;
 
+    // Upload geometry to vertex buffer.
     config->recomputeAdiabateGeometries = false;
     uploadVec2ToVertexBuffer(
                 vertexArray, QString("skewTDiagramVertices%1_actor#%2")
@@ -1895,21 +1692,6 @@ void MSkewTActor::drawDiagram(MSceneViewGLWidget *sceneView,
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
         glDrawArrays(GL_LINE_STRIP, 0, wyomingVerticesCount);
     }
-
-    // Draw the outer line of the diagram.
-    // ===================================
-    glEnableVertexAttribArray(SHADER_VERTEX_ATTRIBUTE);
-    vbDiagramVertices->attachToVertexAttribute(
-                SHADER_VERTEX_ATTRIBUTE, 2, GL_FALSE, 0,
-                (const GLvoid *)(0 * sizeof(float)));
-    glLineWidth(3);
-    skewTShader->bindProgram("DiagramVerticesWithoutAreaCheck");
-    setShaderGeneralVars(sceneView, config);
-    skewTShader->setUniformValue("colour", diagramConfiguration.diagramColor);
-    glDrawArrays(GL_LINES,
-                 config->vertexArrayDrawRanges.outline.startIndex,
-                 config->vertexArrayDrawRanges.outline.indexCount);
-
 }
 
 
@@ -2160,21 +1942,20 @@ void MSkewTActor::drawDiagramGeometryAndLabels(
         glDrawArrays(GL_POINTS, 0, 1);
     }
 
-    // Bind shader for coordinate axes.
-    // ================================
-    glLineWidth(1.f);
-    skewTShader->bindProgram("DiagramVerticesVertOrHoriCheck");
-    setShaderGeneralVars(sceneView, config);
-
-    // Draw temperature label ticks.
-    // =============================
-    skewTShader->setUniformValue("colour", diagramConfiguration.diagramColor);
-    glDrawArrays(GL_LINES,
-                 config->vertexArrayDrawRanges.temperatureMarks.startIndex,
-                 config->vertexArrayDrawRanges.temperatureMarks.indexCount);
-
+    // Bind shader for diagram geometry.
+    // =================================
     skewTShader->bindProgram("DiagramVertices");
     setShaderGeneralVars(sceneView, config);
+
+    // Draw diagram frame.
+    // ===================
+    glLineWidth(3);
+    skewTShader->setUniformValue("colour", diagramConfiguration.diagramColor);
+    glDrawArrays(GL_LINES,
+                 config->vertexArrayDrawRanges.frame.startIndex,
+                 config->vertexArrayDrawRanges.frame.indexCount);
+
+    glLineWidth(1.f);
 
     // Draw dry adiabates.
     // ===================
@@ -2186,8 +1967,8 @@ void MSkewTActor::drawDiagramGeometryAndLabels(
                      config->vertexArrayDrawRanges.dryAdiabates.indexCount);
     }
 
-    // Draw isopressure lines.
-    // =======================
+    // Draw isobars.
+    // =============
     skewTShader->setUniformValue("colour", diagramConfiguration.diagramColor);
     glDrawArrays(GL_LINES,
                  config->vertexArrayDrawRanges.isobars.startIndex,
@@ -2209,6 +1990,7 @@ void MSkewTActor::drawDiagramGeometryAndLabels(
                      config->vertexArrayDrawRanges.moistAdiabates.startIndex,
                      config->vertexArrayDrawRanges.moistAdiabates.indexCount);
     }
+
 
     // Draw mouse cross and legend in fullscreen mode.
     // ===============================================

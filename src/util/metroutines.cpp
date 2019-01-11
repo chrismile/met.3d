@@ -457,6 +457,14 @@ double potentialTemperature_K(double T_K, double p_Pa)
 }
 
 
+double ambientTemperatureOfPotentialTemperature_K(double theta_K, double p_Pa)
+{
+    return theta_K / pow( 100000. / p_Pa,
+                          MetConstants::GAS_CONSTANT_DRY_AIR /
+                          MetConstants::SPECIFIC_HEAT_DRYAIR_CONST_PRESSURE );
+}
+
+
 double virtualTemperature_K(double T_K, double q_kgkg)
 {
     return T_K * (q_kgkg + 0.622*(1.-q_kgkg)) / 0.622;
@@ -571,8 +579,8 @@ const double coefficients_ambientT_thetaRef_MoisseevaStull[21] = {
     3.833143316160573733e+01
 };
 
-double temperatureAlongSaturatedAdiabat_K_MoisseevaStull(double p_Pa,
-                                                         double thetaW_K)
+double temperatureAlongSaturatedAdiabat_K_MoisseevaStull(double thetaW_K,
+                                                         double p_Pa)
 {
     // This implementation directly follows Moisseeva and Stull (ACP, 2017),
     // Section 4.1.
@@ -653,7 +661,7 @@ const double coefficients_thetaW_TRef_MoisseevaStull[21] = {
 
 
 double wetBulbPotentialTemperatureOfSaturatedAdiabat_K_MoisseevaStull(
-        double p_Pa, double T_K)
+        double T_K, double p_Pa)
 {
     // This implementation directly follows Moisseeva and Stull (ACP, 2017),
     // Section 4.2.
@@ -806,7 +814,7 @@ void test_temperatureAlongSaturatedAdiabat_K_MoisseevaStull()
         double thetaW_K = values_p_thW_T[i][1] + 273.15;
         double ambientT_K_target = values_p_thW_T[i][2] + 273.15;
         double ambientT_K_computed =
-                temperatureAlongSaturatedAdiabat_K_MoisseevaStull(p_Pa, thetaW_K);
+                temperatureAlongSaturatedAdiabat_K_MoisseevaStull(thetaW_K, p_Pa);
 
         QString s = QString("(%1) p_Pa = %2  thetaW_K = %3  target T_K = %4  computed T_K = %5")
                 .arg(i).arg(p_Pa).arg(thetaW_K).arg(ambientT_K_target).arg(ambientT_K_computed);
@@ -847,7 +855,8 @@ void test_wetBulbPotentialTemperatureOfSaturatedAdiabat_K_MoisseevaStull()
         double T_K = values_p_T_thW[i][1] + 273.15;
         double thetaW_K_target = values_p_T_thW[i][2] + 273.15;
         double thetaW_K_computed =
-                wetBulbPotentialTemperatureOfSaturatedAdiabat_K_MoisseevaStull(p_Pa, T_K);
+                wetBulbPotentialTemperatureOfSaturatedAdiabat_K_MoisseevaStull(
+                    T_K, p_Pa);
 
         QString s = QString("(%1) p_Pa = %2  T_K = %3  target thetaW_K = %4  computed thetaW_K = %5")
                 .arg(i).arg(p_Pa).arg(T_K).arg(thetaW_K_target).arg(thetaW_K_computed);
@@ -865,6 +874,8 @@ void runMetRoutinesTests()
     test_wetBulbPotentialTemperatureOfSaturatedAdiabat_K_MoisseevaStull();
 }
 
-} // namespace MetRoutinesTests
+}
+
+// namespace MetRoutinesTests
 
 } // namespace Met3D
