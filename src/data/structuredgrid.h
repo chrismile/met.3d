@@ -4,10 +4,13 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2018 Marc Rautenhaus
-**  Copyright 2017-2018 Bianca Tost
+**  Copyright 2015-2019 Marc Rautenhaus [*, previously +]
+**  Copyright 2017-2018 Bianca Tost [+]
 **
-**  Computer Graphics and Visualization Group
+**  * Regional Computing Center, Visualization
+**  Universitaet Hamburg, Hamburg, Germany
+**
+**  + Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
 **
 **  Met.3D is free software: you can redistribute it and/or modify
@@ -276,7 +279,16 @@ public:
     { return lats[j] - getDeltaLat()/2.; }
 
     /**
+      Determine the horizontal grid indices @p i, @p j, @p i1, @p j1 that
+      enclose the position given by @p lon, @p lat.
+     */
+    void findEnclosingHorizontalIndices(float lon, float lat, int *i, int *j,
+                                    int *i1, int *j1, float *mixI, float *mixJ);
+
+    /**
       Sample the data grid at lon, lat and p, using trilinear interpolation.
+      Uses @ref interpolateGridColumnToPressure(). For derived grid classes
+      that are only two-dimensional, the @p p_hPa parameter is ignored.
      */
     float interpolateValue(float lon, float lat, float p_hPa);
 
@@ -284,11 +296,33 @@ public:
 
     /**
       Implement this method in derived classes that know about their vertical
-      coordinate. It is used by @ref interpolateValue().
+      coordinate. It is used by @ref interpolateValue(). If the derived class
+      is two-dimensional, the @p p_hPa parameter can be ignored.
      */
     virtual float interpolateGridColumnToPressure(
             unsigned int j, unsigned int i, float p_hPa)
     { Q_UNUSED(j); Q_UNUSED(i); Q_UNUSED(p_hPa); return M_MISSING_VALUE; }
+
+    /**
+      Computes the pressure on grid level @p k at position (@p lon, @p lat).
+
+      Implement this method in derived classes.
+     */
+    virtual float levelPressureAtLonLat_hPa(float lon, float lat, unsigned int k)
+    { Q_UNUSED(lon); Q_UNUSED(lat); Q_UNUSED(k); return M_MISSING_VALUE; }
+
+    /**
+      Samples the data grid on vertical level k and at position (@p lon, @p lat)
+      using bi-linear interpolation.
+     */
+    float interpolateValueOnLevel(float lon, float lat, unsigned int k);
+
+    /**
+      Extracts a vertical profile of (scalar, p_hPa) tuples from the data
+      field at position (@p lon, @p lat). Uses @ref interpolateValueOnLevel()
+      and @ref levelPressureAtLonLat_hPa().
+     */
+    QVector<QVector2D> extractVerticalProfile(float lon, float lat);
 
     /**
       Determine the four grid indices that horizontally bound the grid cell
@@ -598,6 +632,8 @@ public:
     float interpolateGridColumnToPressure(unsigned int j, unsigned int i,
                                           float p_hPa);
 
+    float levelPressureAtLonLat_hPa(float lon, float lat, unsigned int k) override;
+
     int findLevel(unsigned int j, unsigned int i, float p_hPa);
 
     float getPressure(unsigned int k, unsigned int j, unsigned int i);
@@ -636,6 +672,8 @@ public:
     float interpolateGridColumnToPressure(unsigned int j, unsigned int i,
                                           float p_hPa);
 
+    float levelPressureAtLonLat_hPa(float lon, float lat, unsigned int k) override;
+
     int findLevel(unsigned int j, unsigned int i, float p_hPa);
 
     float getPressure(unsigned int k, unsigned int j, unsigned int i);
@@ -668,6 +706,14 @@ public:
 
     inline float getValue(unsigned int j, unsigned int i) const
     { return data[INDEX2yx(j, i, nlons)]; }
+
+    /**
+      2D special case: ignore @p p_hPa parameter and simply map to getValue().
+      Implementation required for @ref MStructuredGrid::interpolateValue().
+     */
+    float interpolateGridColumnToPressure(unsigned int j, unsigned int i,
+                                          float p_hPa)
+    { Q_UNUSED(p_hPa); return getValue(j, i); }
 
     GL::MTexture* getTexture(QGLWidget *currentGLContext = nullptr,
                             bool nullTexture = false);
@@ -714,6 +760,8 @@ public:
 
     float interpolateGridColumnToPressure(unsigned int j, unsigned int i,
                                           float p_hPa);
+
+    float levelPressureAtLonLat_hPa(float lon, float lat, unsigned int k) override;
 
     int findLevel(unsigned int j, unsigned int i, float p_hPa);
 
@@ -780,6 +828,8 @@ public:
 
     float interpolateGridColumnToPressure(unsigned int j, unsigned int i,
                                           float p_hPa);
+
+    float levelPressureAtLonLat_hPa(float lon, float lat, unsigned int k) override;
 
     int findLevel(unsigned int j, unsigned int i, float p_hPa);
 

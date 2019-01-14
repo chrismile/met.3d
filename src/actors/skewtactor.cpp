@@ -1015,6 +1015,31 @@ void MSkewTActor::printDebugOutputOnUserRequest()
                     .arg(tp.x()).arg(tp.y()).arg(xp.x()).arg(xp.y());
         }
     }
+
+    // Print (T, p) profile at current (lon, lat) position.
+    float lon = diagramConfiguration.geoPosition.x();
+    float lat = diagramConfiguration.geoPosition.y();
+    str += "\n\n\nDEBUG output, vertical (T, p) profile at current location: ";
+    str += QString("(%1, %2).\n").arg(lon).arg(lat);
+
+    for (int vi = 0; vi < variables.size(); vi++)
+    {
+        MNWPSkewTActorVariable* var =
+                static_cast<MNWPSkewTActorVariable*> (variables.at(vi));
+
+        if ( !var->hasData() ) continue;
+
+        QVector<QVector2D> profile = var->grid->extractVerticalProfile(lon, lat);
+
+        str += QString("\nGRID: %1\n").arg(var->grid->getGeneratingRequest());
+        for (QVector2D tpCoordinate : profile)
+        {
+            str += QString("T=%1, p=%2\n")
+                    .arg(tpCoordinate.x()).arg(tpCoordinate.y());
+        }
+    }
+
+    str += "DEBUG output end.\n";
     LOG4CPLUS_DEBUG(mlog, str.toStdString());
 }
 
