@@ -423,7 +423,7 @@ void MSkewTActor::loadConfiguration(QSettings *settings)
         {
             var->variable = dynamic_cast<MNWPSkewTActorVariable*>(
                         variables.at(index - 1));
-            properties->mColor()->setValue(var->variable->colorProperty, color);
+            properties->mColor()->setValue(var->variable->profileColourProperty, color);
         }
     }
 
@@ -452,6 +452,7 @@ void MSkewTActor::loadConfiguration(QSettings *settings)
 
     settings->endGroup();
     copyDiagramConfigurationFromQtProperties();
+    updateVerticalProfiles();
     enableActorUpdates(true);
 }
 
@@ -860,14 +861,18 @@ void MSkewTActor::onQtPropertyChanged(QtProperty *property)
         labelBBoxColour = properties->mColor()->value(labelBBoxColourProperty);
         emitActorChangedSignal();
     }
-    else if (property == geoPositionProperty
-             || property == perspectiveRenderingProperty)
+    else if (property == geoPositionProperty)
     {
-        diagramConfiguration.drawInPerspective
-                = properties->mBool()->value(perspectiveRenderingProperty);
         diagramConfiguration.geoPosition = QVector2D(
                     float(properties->mPointF()->value(geoPositionProperty).x()),
                     float(properties->mPointF()->value(geoPositionProperty).y()));
+        updateVerticalProfiles();
+        emitActorChangedSignal();
+    }
+    else if (property == perspectiveRenderingProperty)
+    {
+        diagramConfiguration.drawInPerspective
+                = properties->mBool()->value(perspectiveRenderingProperty);
         emitActorChangedSignal();
     }
     else if (property == drawDryAdiabatesProperty)
@@ -944,13 +949,13 @@ void MSkewTActor::onQtPropertyChanged(QtProperty *property)
                 continue;
             }
             if (property == var->property
-                    || property == var->variable->colorProperty
-                    || property == var->variable->thicknessProperty)
+                    || property == var->variable->profileColourProperty
+                    || property == var->variable->lineThicknessProperty)
             {
                 var->variable = dynamic_cast<MNWPSkewTActorVariable*>(
                             variables.at(var->index - 1));
-                var->color = var->variable->color;
-                var->thickness = var->variable->thickness;
+                var->color = var->variable->profileColour;
+                var->thickness = var->variable->lineThickness;
                 emitActorChangedSignal();
                 return;
             }
@@ -1532,8 +1537,8 @@ void MSkewTActor::drawDiagram(MSceneViewGLWidget *sceneView,
                     skewTShader->setUniformValue("drawHumidity"   , false);
                     skewTShader->setUniformValue("drawTemperature", true);
                 }
-                skewTShader->setUniformValue("colour", var->color);
-                glLineWidth(float(var->thickness));
+                skewTShader->setUniformValue("colour", var->profileColour);
+                glLineWidth(float(var->lineThickness));
                 config->layer -= 0.001f;
                 skewTShader->setUniformValue("layer",
                                              config->layer);
@@ -1591,7 +1596,7 @@ void MSkewTActor::drawDiagram(MSceneViewGLWidget *sceneView,
                                 "numberOfLevels", grid->getNumLevels());
                     skewTShader->setUniformValue(
                                 "numberOfLats"  , grid->getNumLats());
-                    glLineWidth(float(var->thickness));
+                    glLineWidth(float(var->lineThickness));
 
                     if (var->transferFunction != nullptr)
                     {
@@ -1615,7 +1620,7 @@ void MSkewTActor::drawDiagram(MSceneViewGLWidget *sceneView,
                                     "useTransferFunction", true);
                          skewTShader->setUniformValue("scalarMinimum", 0.f);
                          skewTShader->setUniformValue("scalarMaximum", 0.f);
-                         skewTShader->setUniformValue("colour", var->color);
+                         skewTShader->setUniformValue("colour", var->profileColour);
                     }
                     // To avoid z fighting first render all spaghetti contours
                     // into the stencil buffer and updating the depth buffer
@@ -1716,6 +1721,35 @@ void MSkewTActor::drawDiagram(MSceneViewGLWidget *sceneView,
         skewTShader->setUniformValue("drawHumidity"   , true);
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
         glDrawArrays(GL_LINE_STRIP, 0, wyomingVerticesCount);
+    }
+}
+
+
+void MSkewTActor::drawDiagram2(
+        MSceneViewGLWidget *sceneView,
+        GL::MVertexBuffer *vbDiagramVertices,
+        MSkewTActor::ModeSpecificDiagramConfiguration *config)
+{
+    skewTShader->bindProgram("DiagramData");
+    setShaderGeneralVars(sceneView, config);
+    skewTShader->setUniformValue("tlogp2xyMatrix", transformationMatrixTlogp2xy);
+
+    for (MNWPActorVariable* avar : variables)
+    {
+        MNWPSkewTActorVariable* var =
+                static_cast<MNWPSkewTActorVariable*> (avar);
+
+        if ( !var->hasData() ) continue;
+
+        var->profileVertexBuffer->attachToVertexAttribute(
+                    SHADER_VERTEX_ATTRIBUTE, 2,
+                    GL_FALSE, 0, (const GLvoid *)(0 * sizeof(float)));
+
+        skewTShader->setUniformValue("colour", var->profileColour);
+
+        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+        glLineWidth(float(var->lineThickness));
+        glDrawArrays(GL_LINE_STRIP, 0, var->profile.getScalarPressureData().size());
     }
 }
 
@@ -2729,7 +2763,7 @@ void MSkewTActor::drawDiagramFullScreen(MSceneViewGLWidget* sceneView)
     glClear(GL_DEPTH_BUFFER_BIT);
     fullscreenDiagrammConfiguration.layer = -0.005f;
     drawDiagramGeometryAndLabelsFullScreen(sceneView);
-    drawDiagram(sceneView, vbDiagramVerticesFS, &fullscreenDiagrammConfiguration);
+    drawDiagram2(sceneView, vbDiagramVerticesFS, &fullscreenDiagrammConfiguration);
 }
 
 
@@ -2784,6 +2818,20 @@ QVector2D MSkewTActor::transformTp2xy(QVector2D tpCoordinate_K_hPa)
     QPointF xyCoordinate = transformationMatrixTlogp2xy * tlogpCoordinate;
 
     return QVector2D(xyCoordinate);
+}
+
+
+void MSkewTActor::updateVerticalProfiles()
+{
+    // Tell all actor variables to update their vertical profile data to the
+    // current geographical location.
+    for (MNWPActorVariable* avar : variables)
+    {
+        MNWPSkewTActorVariable* var =
+                static_cast<MNWPSkewTActorVariable*> (avar);
+
+        var->updateProfile(diagramConfiguration.geoPosition);
+    }
 }
 
 

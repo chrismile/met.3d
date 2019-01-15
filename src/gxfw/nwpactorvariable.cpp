@@ -3957,8 +3957,9 @@ bool MNWP3DVolumeActorVariable::setTransferFunctionFromProperty()
 
 MNWPSkewTActorVariable::MNWPSkewTActorVariable(MNWPMultiVarActor *actor)
     : MNWPActorVariable(actor),
-      color(QColor(0, 0, 0, 255)),
-      thickness(2.)
+      profileColour(QColor(0, 0, 0, 255)),
+      lineThickness(2.),
+      profileVertexBuffer(nullptr)
 {
     assert(actor != nullptr);
     MQtProperties *properties = actor->getQtProperties();
@@ -3970,14 +3971,24 @@ MNWPSkewTActorVariable::MNWPSkewTActorVariable(MNWPMultiVarActor *actor)
     QtProperty* renderGroup = getPropertyGroup("rendering");
     assert(renderGroup != nullptr);
 
-    colorProperty = actor->addProperty(COLOR_PROPERTY, "colour", renderGroup);
-    properties->mColor()->setValue(colorProperty, color);
+    profileColourProperty = actor->addProperty(
+                COLOR_PROPERTY, "line colour", renderGroup);
+    properties->mColor()->setValue(profileColourProperty, profileColour);
 
-    thicknessProperty = actor->addProperty(DOUBLE_PROPERTY, "line thickness",
-                                           renderGroup);
-    properties->setDouble(thicknessProperty, thickness, 0., 10., 2, 0.1);
+    lineThicknessProperty = actor->addProperty(
+                DOUBLE_PROPERTY, "line thickness", renderGroup);
+    properties->setDouble(lineThicknessProperty, lineThickness, 0., 10., 2, 0.1);
 
     actor->endInitialiseQtProperties();
+}
+
+
+MNWPSkewTActorVariable::~MNWPSkewTActorVariable()
+{
+    if (profileVertexBuffer != nullptr)
+    {
+        profile.releaseVertexBuffer();
+    }
 }
 
 
@@ -3992,14 +4003,14 @@ bool MNWPSkewTActorVariable::onQtPropertyChanged(QtProperty *property)
 
     MQtProperties *properties = actor->getQtProperties();
 
-    if (property == colorProperty)
+    if (property == profileColourProperty)
     {
-        color = properties->mColor()->value(colorProperty);
+        profileColour = properties->mColor()->value(profileColourProperty);
         return true;
     }
-    else if (property == thicknessProperty)
+    else if (property == lineThicknessProperty)
     {
-        thickness = properties->mDouble()->value(thicknessProperty);
+        lineThickness = properties->mDouble()->value(lineThicknessProperty);
         return true;
     }
 
@@ -4011,8 +4022,8 @@ void MNWPSkewTActorVariable::saveConfiguration(QSettings *settings)
 {
     MNWPActorVariable::saveConfiguration(settings);
 
-    settings->setValue("colour", color);
-    settings->setValue("thickness", thickness);
+    settings->setValue("lineColour", profileColour);
+    settings->setValue("lineThickness", lineThickness);
 }
 
 
@@ -4022,10 +4033,35 @@ void MNWPSkewTActorVariable::loadConfiguration(QSettings *settings)
 
     MQtProperties *properties = actor->getQtProperties();
 
-    properties->mColor()->setValue(colorProperty,
-                                   settings->value("colour").value<QColor>());
-    properties->mDouble()->setValue(thicknessProperty,
-                                    settings->value("thickness", 2.).toDouble());
+    properties->mColor()->setValue(
+                profileColourProperty,
+                settings->value("lineColour").value<QColor>());
+    properties->mDouble()->setValue(
+                lineThicknessProperty,
+                settings->value("lineThickness", 2.).toDouble());
+}
+
+
+void MNWPSkewTActorVariable::dataFieldChangedEvent()
+{
+    updateProfile(profile.getLonLatLocation());
+}
+
+
+void MNWPSkewTActorVariable::updateProfile(QVector2D lonLatLocation)
+{
+    QVector<QVector2D> profileData;
+    if (grid != nullptr)
+    {
+        profileData = grid->extractVerticalProfile(
+                    lonLatLocation.x(), lonLatLocation.y());
+    }
+    profile.updateData(lonLatLocation, profileData);
+
+    if (profileVertexBuffer == nullptr)
+    {
+        profileVertexBuffer = profile.getVertexBuffer();
+    }
 }
 
 

@@ -47,6 +47,7 @@
 #include "actors/transferfunction1d.h"
 #include "actors/spatial1dtransferfunction.h"
 #include "util/mstopwatch.h"
+#include "data/verticalprofile.h"
 
 #define MSTOPWATCH_ENABLED
 
@@ -780,17 +781,30 @@ class MNWPSkewTActorVariable : public MNWPActorVariable
 public:
     MNWPSkewTActorVariable(MNWPMultiVarActor *actor);
 
+    ~MNWPSkewTActorVariable();
+
     bool onQtPropertyChanged(QtProperty *property) override;
 
     void saveConfiguration(QSettings *settings);
 
     void loadConfiguration(QSettings *settings);
 
-    QtProperty   *colorProperty;
-    QtProperty   *thicknessProperty;
+protected:
+    friend class MSkewTActor;
 
-    QColor        color;
-    double        thickness;
+    void dataFieldChangedEvent() override;
+
+    /* Rendering properties. **/
+    QColor profileColour;
+    QtProperty *profileColourProperty;
+    double lineThickness;
+    QtProperty *lineThicknessProperty;
+
+    /* Profile data (CPU and vertex buffer). */
+    MVerticalProfile profile;
+    GL::MVertexBuffer *profileVertexBuffer;
+
+    void updateProfile(QVector2D lonLatLocation);
 };
 
 } // namespace Met3D

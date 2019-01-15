@@ -79,6 +79,7 @@ uniform float  topPressure;
 uniform float  bottomPressure;
 uniform struct Area area;           // diagram outline
 uniform mat4   mvpMatrix;           // model-view-projection
+uniform mat4   tlogp2xyMatrix;
 uniform vec2   pToWorldZParams;     // convert pressure to y axis
 uniform vec2   pToWorldZParams2;     // convert pressure to y axis
 uniform vec4   colour;
@@ -491,6 +492,21 @@ shader VSDiagramXYtoFullscreen(in vec2 vertex : 0)
     float vPad = 0.1;
     vec2 vertexClipSpace = vec2(vertex.x * (2.-2.*hPad) - 1.+hPad,
                                 vertex.y * (2.-2.*vPad) - 1.+vPad);
+
+    gl_Position = vec4(vertexClipSpace.x, vertexClipSpace.y, layer, 1.);
+}
+
+
+shader VSTPtoFullscreen(in vec2 vertex : 0)
+{
+    vec4 tlogp = vec4(vertex.x, log(vertex.y), 0, 1);
+    vec4 vertexDiagramXY = tlogp2xyMatrix * tlogp;
+
+//TODO (mr, 10Jan2019) -- replace by matrix multiplication.
+    float hPad = 0.1;
+    float vPad = 0.1;
+    vec2 vertexClipSpace = vec2(vertexDiagramXY.x * (2.-2.*hPad) - 1.+hPad,
+                                vertexDiagramXY.y * (2.-2.*vPad) - 1.+vPad);
 
     gl_Position = vec4(vertexClipSpace.x, vertexClipSpace.y, layer, 1.);
 }
@@ -988,6 +1004,13 @@ program DiagramVertices
     fs(400)=FSColour();
 //    fs(400)=FSColourWithAreaTest();
 };
+
+program DiagramData
+{
+    vs(400)=VSTPtoFullscreen();
+    fs(400)=FSColour();
+};
+
 
 program MeasurementPoint
 {

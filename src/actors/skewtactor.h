@@ -438,6 +438,10 @@ private:
                      GL::MVertexBuffer *vbDiagramVertices,
                      ModeSpecificDiagramConfiguration *config);
 
+    void drawDiagram2(MSceneViewGLWidget* sceneView,
+                      GL::MVertexBuffer *vbDiagramVertices,
+                      ModeSpecificDiagramConfiguration *config);
+
     void loadObservationalDataFromUWyoming(int stationNum);
     void loadListOfAvailableObservationsFromUWyoming();
 
@@ -475,6 +479,12 @@ private:
       @ref computeTlogp2xyTransformationMatrix().
      */
     QVector2D transformTp2xy(QVector2D tpCoordinate_K_hPa);
+
+    /**
+      Updates (recomputes) the vertical profiles of the actor variables, e.g.
+      after the position of the diagram handle has been changed.
+     */
+    void updateVerticalProfiles();
 };
 
 
