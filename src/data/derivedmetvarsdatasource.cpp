@@ -69,6 +69,7 @@ MDerivedMetVarsDataSource::MDerivedMetVarsDataSource()
     registerDerivedDataFieldProcessor(new MEquivalentPotentialTemperatureProcessor());
     registerDerivedDataFieldProcessor(new MGeopotentialHeightProcessor());
     registerDerivedDataFieldProcessor(new MGeopotentialHeightFromGeopotentialProcessor());
+    registerDerivedDataFieldProcessor(new MDewPointTemperatureProcessor());
 
     registerDerivedDataFieldProcessor(
                 new MMagnitudeOfVerticallyIntegratedMoistureFluxProcessor(
@@ -912,6 +913,43 @@ void MGeopotentialHeightFromGeopotentialProcessor::compute(
                                   MetConstants::GRAVITY_ACCELERATION);
         }
     }
+}
+
+
+// Dew point temperature
+// =====================
+
+MDewPointTemperatureProcessor::MDewPointTemperatureProcessor()
+    : MDerivedDataFieldProcessor(
+          "dew_point_temperature",
+          QStringList() << "specific_humidity")
+{}
+
+
+void MDewPointTemperatureProcessor::compute(
+        QList<MStructuredGrid *> &inputGrids, MStructuredGrid *derivedGrid)
+{
+    // input 0 = "specific_humidity"
+
+    // Requires nested k/j/i loops to access pressure at grid point.
+    for (unsigned int k = 0; k < derivedGrid->getNumLevels(); k++)
+        for (unsigned int j = 0; j < derivedGrid->getNumLats(); j++)
+            for (unsigned int i = 0; i < derivedGrid->getNumLons(); i++)
+            {
+                float q_kgkg = inputGrids.at(0)->getValue(k, j, i);
+
+                if (q_kgkg == M_MISSING_VALUE)
+                {
+                    derivedGrid->setValue(k, j, i, M_MISSING_VALUE);
+                }
+                else
+                {
+                    float dewPoint_K = dewPointTemperature_K_Bolton(
+                                inputGrids.at(0)->getPressure(k, j, i) * 100.,
+                                q_kgkg);
+                    derivedGrid->setValue(k, j, i, dewPoint_K);
+                }
+            }
 }
 
 
