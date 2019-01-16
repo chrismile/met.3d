@@ -6,6 +6,7 @@
 **
 **  Copyright 2015-2018 Marc Rautenhaus
 **  Copyright 2017-2018  Bianca Tost
+**  Copyright 2017      Michael Kern
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -318,8 +319,8 @@ void MStructuredGrid::setToValue(float val)
 float MStructuredGrid::interpolateValue(float lon, float lat, float p_hPa)
 {
     // Find horizontal indices i,i+1 and j,j+1 that enclose lon, lat.
-    float mixI = MMOD(lon - lons[0], 360.) / abs(lons[1]-lons[0]);
-    float mixJ = (lats[0] - lat) / abs(lats[1]-lats[0]);
+    float mixI = MMOD(lon - lons[0], 360.) / std::fabs(lons[1]-lons[0]);
+    float mixJ = (lats[0] - lat) / std::fabs(lats[1]-lats[0]);
     int i = int(mixI);
     int j = int(mixJ);
 
@@ -362,6 +363,10 @@ bool MStructuredGrid::findTopGridIndices(
     // Find horizontal indices i,i+1 and j,j+1 that enclose lon, lat.
     float mixI = MMOD(lon - lons[0], 360.) / abs(lons[1]-lons[0]);
     float mixJ = (lats[0] - lat) / abs(lats[1]-lats[0]);
+
+    mixI = std::min(static_cast<float>(nlons - 1), std::max(0.0f, mixI));
+    mixJ = std::min(static_cast<float>(nlats - 1), std::max(0.0f, mixJ));
+
     int i = int(mixI);
     int j = int(mixJ);
 
@@ -474,6 +479,114 @@ bool MStructuredGrid::gridIsCyclicInLongitude()
     // for potentially better solutions.
 
     return ( fabs(lon_west - lon_east) < M_LONLAT_RESOLUTION );
+}
+
+
+void MStructuredGrid::applyBlur(const double sigma,
+                                unsigned int kernelSize)
+{
+    // Create a new grid with the same topology as the input grid
+    QVector<float> result(this->getNumValues());
+    QVector<float> intermediate(this->getNumValues());
+
+    if (kernelSize < 3)
+    {
+        return;
+    }
+
+    if (kernelSize % 2 == 0)
+    {
+        kernelSize -= 1;
+    }
+
+    const auto computeKernel1D =
+            [](const double sigma, const unsigned int kernelSize)
+    {
+        QVector<double> kernel(kernelSize);
+
+        const int offset = kernelSize / 2;
+        const double s = 2 * sigma * sigma;
+        const double sqrtPISigma = std::sqrt(2 * M_PI) * sigma;
+
+        double minGauss = std::numeric_limits<double>::max();
+
+        for (int x = -offset; x <= offset; ++x)
+        {
+            int i = x + offset;
+            const double r = x * x;
+
+            const double gauss = 10 * std::exp(-r / s) / sqrtPISigma;
+            kernel[i] = gauss;
+            minGauss = std::min(gauss, minGauss);
+        }
+
+        const double scaleFactor = 1.0 / minGauss;
+
+        for (int i = 0; i < kernel.size(); ++i)
+        {
+            kernel[i] = std::floor(kernel[i] * scaleFactor);
+        }
+
+        return kernel;
+    };
+
+    QVector<double> kernel = computeKernel1D(sigma, kernelSize);
+
+    const int offset = kernelSize / 2;
+
+    for (int k = 0; k < static_cast<int>(this->getNumLevels()); ++k)
+    {
+        for (int j = 0; j < static_cast<int>(this->getNumLats()); ++j)
+        {
+            // Since the gauss filter is separable
+            // first apply the filter in x-direction (in 1D)
+            for (int i = 0; i < static_cast<int>(this->getNumLons()); ++i)
+            {
+                double kernelSum = 0;
+                double value = 0;
+
+                for (int offsetX = -offset; offsetX <= offset; ++offsetX)
+                {
+                    int iN = std::max(0, std::min(int(this->getNumLons() - 1),
+                                                  i + offsetX));
+
+                    double weight = kernel[offsetX + offset];
+                    value += weight * this->getValue(k, j, iN);
+                    kernelSum += weight;
+                }
+
+                intermediate[INDEX3zyx_2(k, j, i, nlatsnlons, nlons)] =
+                                    static_cast<float>(value / kernelSum);
+            }
+        }
+
+        // And then apply the filter in y-direction to the intermediate result
+        for (int j = 0; j < static_cast<int>(this->getNumLats()); ++j)
+        {
+            for (int i = 0; i < static_cast<int>(this->getNumLons()); ++i)
+            {
+                double kernelSum = 0;
+                double value = 0;
+
+                for (int offsetY = -offset; offsetY <= offset; ++offsetY)
+                {
+                    int jN = std::max(0, std::min(int(this->getNumLats() - 1),
+                                                  j + offsetY));
+
+                    double weight = kernel[offsetY + offset];
+                    value += weight * intermediate[INDEX3zyx_2(k, jN, i,
+                                                               nlatsnlons,
+                                                               nlons)];
+                    kernelSum += weight;
+                }
+
+                result[INDEX3zyx_2(k, j, i, nlatsnlons, nlons)] =
+                                    static_cast<float>(value / kernelSum);
+            }
+        }
+    }
+
+    std::copy(result.constBegin(), result.constEnd(), this->data);
 }
 
 

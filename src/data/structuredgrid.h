@@ -6,6 +6,7 @@
 **
 **  Copyright 2015-2018 Marc Rautenhaus
 **  Copyright 2017-2018 Bianca Tost
+**  Copyright 2017      Michael Kern
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -327,6 +328,8 @@ public:
 
     bool gridIsCyclicInLongitude();
 
+    void applyBlur(const double sigma, unsigned int kernelSize);
+
     /**
       Allows a number of texture parameters to be modified. Call this function
       before you call @ref getTexture().
@@ -553,6 +556,8 @@ protected:
     friend class MGribReader;
     friend class MDifferenceDataSource;
     friend class MProcessingWeatherPredictionDataSource;
+    friend class MIsosurfaceIntersectionSource;
+    friend class MLineGeomoetryFilter;
 
     /** Sizes of the dimensions. */
     unsigned int nlevs, nlats, nlons;
@@ -745,6 +750,8 @@ protected:
     friend class MGribReader;
     friend class MDifferenceDataSource;
     friend class MProcessingWeatherPredictionDataSource;
+    friend class MIsosurfaceIntersectionSource;
+    friend class MLineGeometryFilter;
 
     void allocateInterfaceCoefficients();
 

@@ -6,6 +6,7 @@
 **
 **  Copyright 2015-2018 Marc Rautenhaus
 **  Copyright 2017      Philipp Kaiser
+**  Copyright 2017      Michael Kern
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -92,6 +93,27 @@ unsigned int MTrajectorySelection::getMemorySize_kb()
              ) / 1024.;
 }
 
+/******************************************************************************
+***                     CONSTRUCTOR / DESTRUCTOR                            ***
+*******************************************************************************/
+
+MTrajectoryEnsembleSelection::MTrajectoryEnsembleSelection(
+        MDataRequest requestToReferTo,
+        unsigned int numTrajectories,
+        QVector<QDateTime> timeValues,
+        QVector3D startGridStride,
+        unsigned int numEnsembles)
+    : MTrajectorySelection(requestToReferTo, numTrajectories, timeValues,
+                           startGridStride),
+      ensembleStartIndices(numEnsembles),
+      ensembleIndexCount(numEnsembles),
+      numEnsembleMembers(numEnsembles)
+{
+}
+
+MTrajectoryEnsembleSelection::~MTrajectoryEnsembleSelection()
+{
+}
 
 /******************************************************************************
 ***                     CONSTRUCTOR / DESTRUCTOR                            ***
@@ -113,6 +135,43 @@ void MWritableTrajectorySelection::decreaseNumSelectedTrajectories(int n)
     else
         throw MValueError("number of selected trajectories cannot be increased",
                           __FILE__, __LINE__);
+}
+
+void MWritableTrajectorySelection::increaseNumSelectedTrajectories(int n)
+{
+    numTrajectories = n;
+}
+
+/******************************************************************************
+***                     CONSTRUCTOR / DESTRUCTOR                            ***
+*******************************************************************************/
+
+MWritableTrajectoryEnsembleSelection::MWritableTrajectoryEnsembleSelection(
+        MDataRequest requestToReferTo,
+        unsigned int numTrajectories,
+        QVector<QDateTime> timeValues,
+        QVector3D startGridStride,
+        unsigned int numEnsembles) :
+    MTrajectoryEnsembleSelection(requestToReferTo, numTrajectories,
+                                 timeValues, startGridStride,
+                                 numEnsembles)
+{
+}
+
+void MWritableTrajectoryEnsembleSelection::decreaseNumSelectedTrajectories(
+        int n)
+{
+    if (n <= numTrajectories)
+        numTrajectories = n;
+    else
+        throw MValueError("number of selected trajectories cannot be increased",
+                          __FILE__, __LINE__);
+}
+
+void MWritableTrajectoryEnsembleSelection::increaseNumSelectedTrajectories(
+        int n)
+{
+    numTrajectories = n;
 }
 
 
@@ -146,6 +205,14 @@ MTrajectoryNormals::MTrajectoryNormals(MDataRequest requestToReferTo,
     : MSupplementalTrajectoryData(requestToReferTo, numTrajectories)
 {
     normals.resize(numTrajectories*numTimeStepsPerTrajectory);
+}
+
+
+MTrajectoryNormals::MTrajectoryNormals(MDataRequest requestToReferTo,
+                                       unsigned int numVertices)
+    : MSupplementalTrajectoryData(requestToReferTo, 0)
+{
+    normals.resize(numVertices);
 }
 
 
@@ -199,7 +266,7 @@ void MTrajectoryNormals::releaseVertexBuffer()
 
 MTrajectories::MTrajectories(
         unsigned int numTrajectories, QVector<QDateTime> timeValues)
-    : MTrajectorySelection(MDataRequest(), numTrajectories, timeValues),
+    : MTrajectoryEnsembleSelection(MDataRequest(), numTrajectories, timeValues),
       MWeatherPredictionMetaData()
 {
     int numTimeStepsPerTrajectory = times.size();
@@ -311,5 +378,141 @@ void MTrajectories::dumpStartVerticesToLog(int num,
     }
 }
 
+
+GL::MVertexBuffer* MIsosurfaceIntersectionLines::getStartPointsVertexBuffer(
+        QGLWidget *currentGLContext)
+{
+    MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
+
+    // Check if a texture with this item's data already exists in GPU memory.
+    GL::MVertexBuffer *vb = static_cast<GL::MVertexBuffer*>(
+                glRM->getGPUItem(getID() + "startPoints"));
+    if (vb)
+    {
+        return vb;
+    }
+
+    // No texture with this item's data exists. Create a new one.
+    GL::MBooleanVertexBuffer *newVB = new GL::MBooleanVertexBuffer(
+                getID() + "startPoints", firstVerticesOfLines.size());
+
+    if (glRM->tryStoreGPUItem(newVB))
+    {
+        newVB->upload(firstVerticesOfLines, currentGLContext);
+    }
+    else
+    {
+        delete newVB;
+    }
+
+    return static_cast<GL::MVertexBuffer*>(
+                glRM->getGPUItem(getID() + "startPoints"));
+}
+
+
+void MIsosurfaceIntersectionLines::releaseStartPointsVertexBuffer()
+{
+    MGLResourcesManager::getInstance()->releaseGPUItem(getID() + "startPoints");
+}
+
+
+/******************************************************************************
+***                     CONSTRUCTOR / DESTRUCTOR                            ***
+*******************************************************************************/
+
+
+MTrajectoryArrowHeads::MTrajectoryArrowHeads(const int numArrows)
+    : arrowHeads(numArrows)
+{
+}
+
+
+MTrajectoryArrowHeads::~MTrajectoryArrowHeads()
+{
+}
+
+/******************************************************************************
+***                            PUBLIC METHODS                               ***
+*******************************************************************************/
+
+unsigned int MTrajectoryArrowHeads::getMemorySize_kb()
+{
+    return arrowHeads.size() * sizeof(ArrowHeadVertex) / 1024.;
+}
+
+
+void MTrajectoryArrowHeads::setVertex(const int index,
+                                      const ArrowHeadVertex& arrow)
+{
+    arrowHeads[index] = arrow;
+}
+
+
+GL::MVertexBuffer* MTrajectoryArrowHeads::getVertexBuffer(
+        QGLWidget *currentGLContext)
+{
+    MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
+
+    const QString vbKey = getID() + "arrowHeads";
+    const uint32_t numFloats = 7;
+
+    // Check if a texture with this item's data already exists in GPU memory.
+    GL::MVertexBuffer *vb = static_cast<GL::MVertexBuffer*>(
+                glRM->getGPUItem(vbKey));
+    if (vb) return vb;
+
+    // No texture with this item's data exists. Create a new one.
+    GL::MFloatVertexBuffer *newVB = new GL::MFloatVertexBuffer(
+                vbKey, arrowHeads.size() * numFloats);
+
+    if (glRM->tryStoreGPUItem(newVB))
+    {
+        newVB->upload(reinterpret_cast<GLfloat*>(arrowHeads.data()),
+                      arrowHeads.size() * numFloats, currentGLContext);
+    }
+    else
+    {
+        delete newVB;
+    }
+
+    return static_cast<GL::MVertexBuffer*>(glRM->getGPUItem(vbKey));
+}
+
+
+void MTrajectoryArrowHeads::releaseVertexBuffer()
+{
+    const QString vbKey = getID() + "arrowHeads";
+    MGLResourcesManager::getInstance()->releaseGPUItem(vbKey);
+}
+
+
+/******************************************************************************
+***                     CONSTRUCTOR / DESTRUCTOR                            ***
+*******************************************************************************/
+
+MTrajectoryValues::MTrajectoryValues(const int numValues)
+    : values(numValues)
+{
+}
+
+
+MTrajectoryValues::~MTrajectoryValues()
+{
+}
+
+/******************************************************************************
+***                            PUBLIC METHODS                               ***
+*******************************************************************************/
+
+unsigned int MTrajectoryValues::getMemorySize_kb()
+{
+    return values.size() * sizeof(float);
+}
+
+
+void MTrajectoryValues::setVertex(const int index, const float value)
+{
+    values[index] = value;
+}
 
 } // namespace Met3D

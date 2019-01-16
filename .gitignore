@@ -12,6 +12,10 @@ Makefile
 met3D
 config/*.cfg
 config/*.actor.conf
+config/*.camera.conf
+.idea
+build
+Met3D
 CMakeCache.txt
 CMakeFiles
 Met.3D.cbp

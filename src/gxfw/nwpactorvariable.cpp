@@ -6,6 +6,7 @@
 **
 **  Copyright 2015-2018 Marc Rautenhaus
 **  Copyright 2016-2018 Bianca Tost
+**  Copyright 2017      Michael Kern
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -1223,7 +1224,7 @@ void MNWPActorVariable::loadConfiguration(QSettings *settings)
 
     // Load rendering properties.
     // ==========================
-    QString tfName = settings->value("transferFunction").toString();
+    QString tfName = settings->value("transferFunction", "None").toString();
     while (!setTransferFunction(tfName))
     {
         if (!MTransferFunction::loadMissingTransferFunction(

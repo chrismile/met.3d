@@ -6,6 +6,7 @@
 **
 **  Copyright 2015-2018 Marc Rautenhaus
 **  Copyright 2016-2018 Bianca Tost
+**  Copyright 2017      Michael Kern
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -273,6 +274,8 @@ public slots:
 
 protected:
     friend class MNWPVolumeRaycasterActor;
+    friend class MIsosurfaceIntersectionActor;
+    friend class MJetcoreDetectionActor;
     friend class MVerticalRegridProperties;
 
     virtual void releaseDataItems();

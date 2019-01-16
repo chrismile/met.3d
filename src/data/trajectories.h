@@ -6,6 +6,7 @@
 **
 **  Copyright 2015-2018 Marc Rautenhaus
 **  Copyright 2017      Philipp Kaiser
+**  Copyright 2017      Michael Kern
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -108,6 +109,8 @@ public:
     inline const QVector3D getStartGridStride() const { return startGridStride; }
 
 protected:
+    friend class MIsosurfaceIntersectionSource;
+    friend class MLineGeometryFilter;
     GLint   *startIndices;
     GLsizei *indexCount;
     int      maxNumTrajectories;
@@ -116,6 +119,35 @@ protected:
 
     QVector3D startGridStride; // this is 1 for each coordinate unless
                                // trajectories have been thinned out
+};
+
+/**
+  @brief Defines a selection of a trajectory dataset.
+ */
+class MTrajectoryEnsembleSelection : public MTrajectorySelection
+{
+public:
+    MTrajectoryEnsembleSelection(MDataRequest requestToReferTo,
+                                 unsigned int numTrajectories,
+                                 QVector<QDateTime> timeValues,
+                                 QVector3D startGridStride = QVector3D(1, 1, 1),
+                                 unsigned int numEnsembles = 1);
+
+    ~MTrajectoryEnsembleSelection();
+
+    inline const QVector<GLint> getEnsembleStartIndices() const
+    { return ensembleStartIndices; }
+
+    inline const QVector<GLsizei> getEnsembleIndexCount() const
+    { return ensembleIndexCount; }
+
+    inline const unsigned int getNumEnsembleMembers() const
+    { return numEnsembleMembers; }
+
+protected:
+    QVector<GLint> ensembleStartIndices;
+    QVector<GLsizei> ensembleIndexCount;
+    unsigned int numEnsembleMembers;
 };
 
 
@@ -147,6 +179,48 @@ public:
       smaller than the number of trajectories specified in the constructor.
      */
     void decreaseNumSelectedTrajectories(int n);
+
+    void increaseNumSelectedTrajectories(int n);
+
+};
+
+/**
+@brief As @ref MTrajectorySelection, but can be written.
+*/
+class MWritableTrajectoryEnsembleSelection : public MTrajectoryEnsembleSelection
+{
+public:
+    MWritableTrajectoryEnsembleSelection(MDataRequest requestToReferTo,
+                                         unsigned int numTrajectories,
+                                         QVector<QDateTime> timeValues,
+                                         QVector3D startGridStride,
+                                         unsigned int numEnsembles);
+
+    inline void setStartIndex(unsigned int i, int value)
+    { startIndices[i] = value; }
+
+    inline void setIndexCount(unsigned int i, int value)
+    { indexCount[i] = value; }
+
+    inline void setEnsembleStartIndex(unsigned int i, int value)
+    { ensembleStartIndices[i] = value; }
+
+    inline void setEnsembleIndexCount(unsigned int i, int value)
+    { ensembleIndexCount[i] = value; }
+
+    /**
+      Only modify start grid stride if trajectories have been thinned out!
+     */
+    inline void setStartGridStride(QVector3D stride)
+    { startGridStride = stride; }
+
+    /**
+      Decrease the number of selected trajectories to @p n. @p n needs to be
+      smaller than the number of trajectories specified in the constructor.
+     */
+    void decreaseNumSelectedTrajectories(int n);
+
+    void increaseNumSelectedTrajectories(int n);
 
 };
 
@@ -185,6 +259,10 @@ public:
                        unsigned int numTrajectories,
                        unsigned int numTimeStepsPerTrajectory);
 
+    // When trajectories have different lengths.
+    MTrajectoryNormals(MDataRequest requestToReferTo,
+                       unsigned int numVertices);
+
     ~MTrajectoryNormals();
 
     unsigned int getMemorySize_kb();
@@ -195,8 +273,6 @@ public:
     inline void setNormal(unsigned int i, QVector3D normal)
     { normals[i] = normal; }
 
-    /**
-     */
     GL::MVertexBuffer *getVertexBuffer(QGLWidget *currentGLContext = 0);
 
     void releaseVertexBuffer();
@@ -212,7 +288,7 @@ private:
  timestep. The smallest entitiy that can be read from disk.
  */
 class MTrajectories :
-        public MTrajectorySelection, public MWeatherPredictionMetaData
+        public MTrajectoryEnsembleSelection, public MWeatherPredictionMetaData
 {
 public:
     /**
@@ -285,9 +361,89 @@ public:
      */
     void dumpStartVerticesToLog(int num, MTrajectorySelection *selection=nullptr);
 
+protected:
+    friend class MLineGeometryFilter;
+    friend class MIsosurfaceIntersectionSource;
+    std::shared_ptr<MStructuredGrid> startGrid;
+    QVector<QVector3D> vertices;
+};
+
+
+class MTrajectoryArrowHeads : public MAbstractDataItem
+{
+public:
+    struct ArrowHeadVertex
+    {
+        QVector3D   pos;
+        QVector3D   direction;
+        float       value;
+    };
+
+    explicit MTrajectoryArrowHeads(const int numArrows);
+    ~MTrajectoryArrowHeads();
+
+    unsigned int getMemorySize_kb();
+
+    const QVector<ArrowHeadVertex>& getVertices() const { return arrowHeads; }
+    void setVertex(const int index, const ArrowHeadVertex& arrow);
+
+    GL::MVertexBuffer *getVertexBuffer(QGLWidget *currentGLContext = 0);
+
+    void releaseVertexBuffer();
+
 private:
     QVector<QVector3D> vertices;
     std::shared_ptr<MStructuredGrid> startGrid;
+
+    QVector<ArrowHeadVertex> arrowHeads;
+};
+
+class MTrajectoryValues : public MAbstractDataItem
+{
+public:
+    explicit MTrajectoryValues(const int numValues);
+    ~MTrajectoryValues();
+
+    unsigned int getMemorySize_kb();
+
+    const QVector<float>& getValues() const { return values; }
+    void setVertex(const int index, const float value);
+
+private:
+    QVector<float> values;
+
+};
+
+/**
+ @brief Stores the isosurface intersection lines in a @ref MTrajectories.
+ */
+class MIsosurfaceIntersectionLines : public MTrajectories
+{
+public:
+    MIsosurfaceIntersectionLines():
+        MTrajectories(0, QVector<QDateTime>()) {}
+    GL::MVertexBuffer* getStartPointsVertexBuffer(
+            QGLWidget *currentGLContext = 0);
+    void releaseStartPointsVertexBuffer();
+
+protected:
+    friend class MIsosurfaceIntersectionSource;
+    friend class MIsosurfaceIntersectionActor;
+    friend class MLineGeometryFilter;
+    friend class MVariableTrajectoryFilter;
+    friend class MRawLineGeometryFilter;
+    QVector<GLboolean> firstVerticesOfLines;
+    QVector<QVector<QVector3D>*> *lines;
+    QVector<float>  values;
+
+    //        struct ArrowHeadVertex
+    //        {
+    //            QVector3D   pos;
+    //            QVector3D   direction;
+    //            float       value;
+    //        };
+
+    //        QVector<ArrowHeadVertex> arrowHeads;
 
 };
 

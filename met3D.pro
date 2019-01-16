@@ -137,7 +137,20 @@ HEADERS += \
     src/data/structuredgridstatisticsanalysis.h \
     src/qt_extensions/scientificdoublespinbox.h \
     src/data/differencedatasource.h \
-    src/data/processingwpdatasource.h
+    src/data/processingwpdatasource.h \
+    src/actors/isosurfaceintersectionactor.h \
+    src/actors/jetcoredetectionactor.h \
+    src/data/angletrajectoryfilter.h \
+    src/data/endpressuredifferencetrajectoryfilter.h \
+    src/data/geometriclengthtrajectoryfilter.h \
+    src/data/hessiantrajectoryfilter.h \
+    src/data/isosurfaceintersectionsource.h \
+    src/data/lines.h \
+    src/data/multivarpartialderivativefilter.h \
+    src/data/partialderivativefilter.h \
+    src/data/trajectoryarrowheadssource.h \
+    src/data/trajectoryvaluesource.h \
+    src/data/variabletrajectoryfilter.h
 
 SOURCES += \
     src/main.cpp \
@@ -241,7 +254,20 @@ SOURCES += \
     src/data/structuredgridstatisticsanalysis.cpp \
     src/qt_extensions/scientificdoublespinbox.cpp \
     src/data/differencedatasource.cpp \
-    src/data/processingwpdatasource.cpp
+    src/data/processingwpdatasource.cpp \
+    src/actors/isosurfaceintersectionactor.cpp \
+    src/actors/jetcoredetectionactor.cpp \
+    src/data/angletrajectoryfilter.cpp \
+    src/data/endpressuredifferencetrajectoryfilter.cpp \
+    src/data/geometriclengthtrajectoryfilter.cpp \
+    src/data/hessiantrajectoryfilter.cpp \
+    src/data/isosurfaceintersectionsource.cpp \
+    src/data/lines.cpp \
+    src/data/multivarpartialderivativefilter.cpp \
+    src/data/partialderivativefilter.cpp \
+    src/data/trajectoryarrowheadssource.cpp \
+    src/data/trajectoryvaluesource.cpp \
+    src/data/variabletrajectoryfilter.cpp
 
 FORMS += \
     src/mainwindow.ui \
@@ -302,6 +328,7 @@ OTHER_FILES += \
     src/glsl/vsec_marching_squares.fx.glsl \
     src/glsl/volume_normalcurves_initpoints.fx.glsl \
     src/glsl/hsec_texturedcontours.fx.glsl \
+    src/glsl/simple_geometry_generation.fx.glsl \
     config/cf_stdnames.dat \
     config/log4cplus.properties \
     src/glsl/north_arrow.fx.glsl \

@@ -6,6 +6,7 @@
 **
 **  Copyright 2015-2017 Marc Rautenhaus
 **  Copyright 2017      Bianca Tost
+**  Copyright 2017      Michael Kern
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -147,7 +148,7 @@ protected:
       methods of the registered @ref NWPActorVariable instances. This method
       has to be called from derived classes.
       */
-    void initializeActorResources();
+    virtual void initializeActorResources();
 
     void onQtPropertyChanged(QtProperty *property);
 
@@ -198,6 +199,23 @@ protected:
     // Properties for the property browser.
     QtProperty *variablePropertiesGroup;
 };
+
+/**
+  @brief MNWPMultiVarIsolevelActor serves as base class for actors
+  that use the isolevel property of the variables.
+ */
+class MNWPMultiVarIsolevelActor : public MNWPMultiVarActor
+{
+Q_OBJECT
+public slots:
+
+    /**
+      @brief isoValueOfVariableChanged is triggered when the isolevel property
+      of a connected variable has been changed.
+     */
+    virtual void isoValueOfVariableChanged() = 0;
+};
+
 
 } // namespace Met3D
 

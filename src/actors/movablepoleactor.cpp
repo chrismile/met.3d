@@ -6,6 +6,7 @@
 **
 **  Copyright 2015-2017 Marc Rautenhaus
 **  Copyright 2016-2017 Bianca Tost
+**  Copyright 2017      Michael Kern
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -37,9 +38,7 @@
 #include "gxfw/msceneviewglwidget.h"
 
 using namespace std;
-
-namespace Met3D
-{
+using namespace Met3D;
 
 /******************************************************************************
 ***                     CONSTRUCTOR / DESTRUCTOR                            ***
@@ -804,6 +803,12 @@ void MMovablePoleActor::setMovement(bool enabled)
 }
 
 
+void MMovablePoleActor::setIndividualPoleHeightsEnabled(bool enabled)
+{
+    individualPoleHeightsEnabled = enabled;
+    properties->mBool()->setValue(individualPoleHeightsProperty, enabled);
+}
+
 /******************************************************************************
 ***                             PUBLIC SLOTS                                ***
 *******************************************************************************/
@@ -1060,5 +1065,3 @@ void MMovablePoleActor::generateGeometry()
     uploadVec3ToVertexBuffer(axisTicks, axisRequestKey, &axisVertexBuffer);
 }
 
-
-} // namespace Met3D

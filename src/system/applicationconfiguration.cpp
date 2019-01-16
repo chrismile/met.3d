@@ -4,8 +4,9 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2016 Marc Rautenhaus
+**  Copyright 2015-2017 Marc Rautenhaus
 **  Copyright 2016      Bianca Tost
+**  Copyright 2017      Michael Kern
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -48,6 +49,8 @@
 #include "actors/nwpvolumeraycasteractor.h"
 #include "actors/nwpsurfacetopographyactor.h"
 #include "actors/spatial1dtransferfunction.h"
+#include "actors/isosurfaceintersectionactor.h"
+#include "actors/jetcoredetectionactor.h"
 
 
 namespace Met3D
@@ -103,6 +106,8 @@ void MApplicationConfigurationManager::registerActorFactories()
     glRM->registerActorFactory(new MNWPSurfaceTopographyActorFactory());
     glRM->registerActorFactory(new MNWPVolumeRaycasterActorFactory());
     glRM->registerActorFactory(new MTransferFunction1DFactory());
+    glRM->registerActorFactory(new MJetcoreDetectionActorFactory());
+    glRM->registerActorFactory(new MIsosurfaceIntersectionActorFactory());
     glRM->registerActorFactory(new MSpatial1DTransferFunctionFactory());
     glRM->registerActorFactory(new MTrajectoryActorFactory());
 }
