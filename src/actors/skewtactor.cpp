@@ -1252,8 +1252,13 @@ void MSkewTActor::generateDiagramGeometry(
 
     // If the diagram is drawn skewed, the isotherms need to continue over the
     // minimum temperature limit of the diagram. The used factor is a heuristic,
-    // might need to be adjusted later.
-    for (float isothermTemperature = diagramTmin_K - skewFactor * diagramTRange_K;
+    // might need to be adjusted later. Note that the offset needs to be a
+    // multiple of the isotherm spacing value so that the temperature values
+    // of the isotherms are not affected by the scaling factor.
+    float tMinOffset = ceil((skewFactor * diagramTRange_K) /
+                            config->dconfig->isothermSpacing) *
+            config->dconfig->isothermSpacing;
+    for (float isothermTemperature = diagramTmin_K - tMinOffset;
          isothermTemperature <= diagramTmax_K;
          isothermTemperature += config->dconfig->isothermSpacing)
     {
