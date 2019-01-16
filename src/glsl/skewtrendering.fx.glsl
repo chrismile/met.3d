@@ -79,7 +79,11 @@ uniform float  topPressure;
 uniform float  bottomPressure;
 uniform struct Area area;           // diagram outline
 uniform mat4   mvpMatrix;           // model-view-projection
+
 uniform mat4   tlogp2xyMatrix;
+uniform mat4   xy2worldMatrix;
+uniform bool   verticesInTPSpace;
+
 uniform vec2   pToWorldZParams;     // convert pressure to y axis
 uniform vec2   pToWorldZParams2;     // convert pressure to y axis
 uniform vec4   colour;
@@ -484,33 +488,53 @@ shader VS2D(in vec2 vertexCoord : 0, out vec2 worldPos)
     worldPos = vertexCoord;
 }
 
+// ===
 
-shader VSDiagramXYtoFullscreen(in vec2 vertex : 0)
+vec2 mapDiagramXYToClipSpace(vec2 diagramXY)
 {
 //TODO (mr, 10Jan2019) -- replace by matrix multiplication.
     float hPad = 0.1;
     float vPad = 0.1;
-    vec2 vertexClipSpace = vec2(vertex.x * (2.-2.*hPad) - 1.+hPad,
-                                vertex.y * (2.-2.*vPad) - 1.+vPad);
-
-    gl_Position = vec4(vertexClipSpace.x, vertexClipSpace.y, layer, 1.);
+    return vec2(diagramXY.x * (2.-2.*hPad) - 1.+hPad,
+                diagramXY.y * (2.-2.*vPad) - 1.+vPad);
 }
 
 
-shader VSTPtoFullscreen(in vec2 vertex : 0)
+shader VSDiagramContent(in vec2 vertex : 0, out vec2 diagramXY)
 {
-    vec4 tlogp = vec4(vertex.x, log(vertex.y), 0, 1);
-    vec4 vertexDiagramXY = tlogp2xyMatrix * tlogp;
+    if (verticesInTPSpace)
+    {
+        // Map (T, p) coordinates into the diagram's (x, y) space (0..1 each).
+        vec4 tlogp = vec4(vertex.x, log(vertex.y), 0, 1);
+        vec4 vertexDiagramXY = tlogp2xyMatrix * tlogp;
 
-//TODO (mr, 10Jan2019) -- replace by matrix multiplication.
-    float hPad = 0.1;
-    float vPad = 0.1;
-    vec2 vertexClipSpace = vec2(vertexDiagramXY.x * (2.-2.*hPad) - 1.+hPad,
-                                vertexDiagramXY.y * (2.-2.*vPad) - 1.+vPad);
+        // Pass diagram coordinates on to fragment shader to discard fragments
+        // outside of the drawing region.
+        diagramXY = vec2(vertexDiagramXY.x, vertexDiagramXY.y);
+    }
+    else
+    {
+        // Vertex is already in (x,y) coordinates.
+        diagramXY = vertex;
+    }
 
-    gl_Position = vec4(vertexClipSpace.x, vertexClipSpace.y, layer, 1.);
+    if (fullscreen)
+    {
+        // Map the diagram's (x,y) coordinates to full screen clip space.
+        vec2 vertexClipSpace = mapDiagramXYToClipSpace(diagramXY);
+        gl_Position = vec4(vertexClipSpace.x, vertexClipSpace.y, layer, 1.);
+    }
+    else
+    {
+        // Map the diagram's (x,y) coordinates to world space...
+        vec4 vertexWorldSpace = vec4(diagramXY.x, 0., diagramXY.y, 1.);
+        vertexWorldSpace = xy2worldMatrix * vertexWorldSpace;
+        // ...and map world space to view space.
+        gl_Position = mvpMatrix * vertexWorldSpace;
+    }
 }
 
+// ===
 
 shader VS2DVertexYInPressure(in vec2 vertexCoord : 0, out vec2 worldPos)
 {
@@ -850,11 +874,19 @@ shader FSDiagramFrame(in vec2 texCoord, out vec4 fragColour)
 }
 
 
-shader FSColour(in vec4 worldPos, out vec4 fragColour)
+// ===
+
+shader FSColour(in vec2 diagramXY, out vec4 fragColour)
 {
+    // Discard fragments outside of the diagram drawing area.
+    if (diagramXY.x < 0. || diagramXY.x > 1.
+            || diagramXY.y < 0. || diagramXY.y > 1.) discard;
+
     fragColour = colour;
 }
 
+
+// ===
 
 shader FSVertOrHoriCheck(in vec4 worldPos, out vec4 fragColour)
 {
@@ -996,21 +1028,15 @@ program DiagramVerticesVertOrHoriCheck
     fs(400)=FSVertOrHoriCheck();
 };
 
-program DiagramVertices
-{
-//    vs(400)=VS2DVertexYInPressure();
-    vs(400)=VSDiagramXYtoFullscreen();
-//    gs(400)=GSVertices() : in(lines), out(line_strip, max_vertices = 2);
-    fs(400)=FSColour();
-//    fs(400)=FSColourWithAreaTest();
-};
+// ***
 
-program DiagramData
+program DiagramGeometry
 {
-    vs(400)=VSTPtoFullscreen();
+    vs(400)=VSDiagramContent();
     fs(400)=FSColour();
 };
 
+// ***
 
 program MeasurementPoint
 {

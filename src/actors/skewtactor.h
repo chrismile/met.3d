@@ -259,7 +259,8 @@ private:
         float skewFactor;
         struct Size offscreenTextureSize;
         GLint maxTextureSize;
-        bool pressureEqualsWorldPressure = false;
+        bool alignWithCamera = false;
+        double diagramWidth3D = 15.;
         bool overDragHandle = false;
         bool drawDryAdiabates = true;
         bool drawMoistAdiabates = true;
@@ -358,7 +359,7 @@ private:
 
     QtProperty *geoPositionProperty,
                *bottomPressureProperty, *topPressureProperty,
-               *alignWithWorldPressureProperty,
+               *alignWithCameraProperty,
                *wyomingStationsProperty,
                *enableWyomingProperty,
                *dewPointColorWyomingProperty,
@@ -371,7 +372,7 @@ private:
                *moistAdiabatesSpcaingProperty,
                *dryAdiabatesSpacingProperty,
                *appearanceGroupProperty,
-               *perspectiveRenderingProperty,
+               *diagramWidth3DProperty,
                *groupVariables, *temperatureGroupProperty,
                *temperatureMinMaxVariableColorProperty,
                *temperatureShowProbabilityTubeProperty,
@@ -479,6 +480,15 @@ private:
       @ref computeTlogp2xyTransformationMatrix().
      */
     QVector2D transformTp2xy(QVector2D tpCoordinate_K_hPa);
+
+    /**
+      Computes a view-dependent transformation matrix to transform coordinates
+      in the diagram's (x, y) space into a scene view's world space.
+      Coordinates are mapped to an upright plane anchored at the vertical
+      profile's location.
+     */
+    QMatrix4x4 computeXY2WorldSpaceTransformationMatrix(
+            MSceneViewGLWidget* sceneView);
 
     /**
       Updates (recomputes) the vertical profiles of the actor variables, e.g.

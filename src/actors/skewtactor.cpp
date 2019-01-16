@@ -4,9 +4,9 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
+**  Copyright 2015-2019 Marc Rautenhaus [*, previously +]
 **  Copyright 2015-2016 Christoph Heidelmann [+]
 **  Copyright 2018      Bianca Tost [+]
-**  Copyright 2015-2019 Marc Rautenhaus [*, previously +]
 **
 **  * Regional Computing Center, Visualization
 **  Universitaet Hamburg, Hamburg, Germany
@@ -75,14 +75,15 @@ MSkewTActor::MSkewTActor() : MNWPMultiVarActor(),
     appearanceGroupProperty = addProperty(
                 GROUP_PROPERTY, "appearance", actorPropertiesSupGroup);
 
-    perspectiveRenderingProperty = addProperty(
-                BOOL_PROPERTY, "perspective depiction", appearanceGroupProperty);
-    properties->mBool()->setValue(perspectiveRenderingProperty, false);
-
-    alignWithWorldPressureProperty = addProperty(
-                BOOL_PROPERTY, "align with pressure axis",
+    alignWithCameraProperty = addProperty(
+                BOOL_PROPERTY, "align with camera",
                 appearanceGroupProperty);
-    properties->mBool()->setValue(alignWithWorldPressureProperty, true);
+    properties->mBool()->setValue(alignWithCameraProperty, true);
+
+    diagramWidth3DProperty = addProperty(
+                DECORATEDDOUBLE_PROPERTY, "3D diagram width",
+                appearanceGroupProperty);
+    properties->setDDouble(diagramWidth3DProperty, 15., 0., 360., 2, 1., "");
 
     bottomPressureProperty = addProperty(
                 DECORATEDDOUBLE_PROPERTY, "pressure bottom",
@@ -284,9 +285,6 @@ void MSkewTActor::saveConfiguration(QSettings *settings)
 
     settings->beginGroup(MSkewTActor::getSettingsID());
 
-    settings->setValue("upright",
-                       properties->mBool()->value(perspectiveRenderingProperty));
-
     settings->setValue("bottomPressure",
                        properties->mDDouble()->value(bottomPressureProperty));
     settings->setValue("topPressure",
@@ -303,9 +301,13 @@ void MSkewTActor::saveConfiguration(QSettings *settings)
     settings->setValue("isothermsSpacing",
                        properties->mDDouble()->value(isothermsSpacingProperty));
 
-    settings->setValue("pressureEqualsWorldPressure",
+    settings->setValue("alignWithCamera",
                        properties->mBool()->value(
-                           alignWithWorldPressureProperty));
+                           alignWithCameraProperty));
+    settings->setValue("diagramWidth3D",
+                       properties->mDDouble()->value(
+                           diagramWidth3DProperty));
+
     settings->setValue("position",
                        properties->mPointF()->value(geoPositionProperty));
 
@@ -359,9 +361,6 @@ void MSkewTActor::loadConfiguration(QSettings *settings)
 
     settings->beginGroup(MSkewTActor::getSettingsID());
 
-    properties->mBool()->setValue(perspectiveRenderingProperty,
-                                  settings->value("upright", false).toBool());
-
     properties->mDDouble()->setValue(
         bottomPressureProperty,
         settings->value("bottomPressure", 1050.).toDouble());
@@ -386,8 +385,11 @@ void MSkewTActor::loadConfiguration(QSettings *settings)
                 settings->value("isothermsSpacing", 10.).toDouble());
 
     properties->mBool()->setValue(
-                alignWithWorldPressureProperty,
-                settings->value("pressureEqualsWorldPressure", true).toBool());
+                alignWithCameraProperty,
+                settings->value("alignWithCamera", true).toBool());
+    properties->mDDouble()->setValue(
+                diagramWidth3DProperty,
+                settings->value("diagramWidth3D", 15.).toDouble());
 
     properties->mPointF()->setValue(
                 geoPositionProperty,
@@ -397,14 +399,14 @@ void MSkewTActor::loadConfiguration(QSettings *settings)
         moistAdiabatesSpcaingProperty,
         settings->value("moistAdiabatesSpacing", 10.).toDouble());
     properties->mBool()->setValue(
-        alignWithWorldPressureProperty,
+        drawMoistAdiabatesProperty,
         settings->value("moistAdiabatesEnabled", true).toBool());
 
     properties->mDDouble()->setValue(
                 dryAdiabatesSpacingProperty,
                 settings->value("dryAdiabatesSpacing", 10.).toDouble());
     properties->mBool()->setValue(
-                alignWithWorldPressureProperty,
+                drawDryAdiabatesProperty,
                 settings->value("dryAdiabatesEnabled", true).toBool());
 
     for (int i = 0; i < diagramConfiguration.varConfigs.size(); i++)
@@ -828,9 +830,14 @@ void MSkewTActor::onQtPropertyChanged(QtProperty *property)
         }
         emitActorChangedSignal();
     }
+    else if (property == diagramWidth3DProperty
+             || property == alignWithCameraProperty)
+    {
+        copyDiagramConfigurationFromQtProperties();
+        emitActorChangedSignal();
+    }
     else if (property == temperatureMaxProperty
              || property == temperatureMinProperty
-             || property == alignWithWorldPressureProperty
              || property == isothermsSpacingProperty
              || property == moistAdiabatesSpcaingProperty
              || property == dryAdiabatesSpacingProperty
@@ -867,12 +874,6 @@ void MSkewTActor::onQtPropertyChanged(QtProperty *property)
                     float(properties->mPointF()->value(geoPositionProperty).x()),
                     float(properties->mPointF()->value(geoPositionProperty).y()));
         updateVerticalProfiles();
-        emitActorChangedSignal();
-    }
-    else if (property == perspectiveRenderingProperty)
-    {
-        diagramConfiguration.drawInPerspective
-                = properties->mBool()->value(perspectiveRenderingProperty);
         emitActorChangedSignal();
     }
     else if (property == drawDryAdiabatesProperty)
@@ -1141,8 +1142,10 @@ void MSkewTActor::drawDiagramHandle(MSceneViewGLWidget *sceneView)
 
 void MSkewTActor::copyDiagramConfigurationFromQtProperties()
 {
-    diagramConfiguration.pressureEqualsWorldPressure =
-            properties->mBool()->value(alignWithWorldPressureProperty);
+    diagramConfiguration.alignWithCamera =
+            properties->mBool()->value(alignWithCameraProperty);
+    diagramConfiguration.diagramWidth3D =
+            properties->mDDouble()->value(diagramWidth3DProperty);
     diagramConfiguration.geoPosition = QVector2D(
                 properties->mPointF()->value(geoPositionProperty).x(),
                 properties->mPointF()->value(geoPositionProperty).y());
@@ -1168,11 +1171,9 @@ void MSkewTActor::copyDiagramConfigurationFromQtProperties()
             properties->mDDouble()->value(dryAdiabatesSpacingProperty);
 
     normalscreenDiagrammConfiguration.pressureEqualsWorldPressure =
-            diagramConfiguration.pressureEqualsWorldPressure;
+            diagramConfiguration.alignWithCamera;
     fullscreenDiagrammConfiguration.pressureEqualsWorldPressure = false;
 
-    diagramConfiguration.drawInPerspective
-            = properties->mBool()->value(perspectiveRenderingProperty);
     diagramConfiguration.init();
     normalscreenDiagrammConfiguration.init(&diagramConfiguration, "_normal");
     fullscreenDiagrammConfiguration.init(&diagramConfiguration, "_fullscreen");
@@ -1735,8 +1736,9 @@ void MSkewTActor::drawDiagram2(
         GL::MVertexBuffer *vbDiagramVertices,
         MSkewTActor::ModeSpecificDiagramConfiguration *config)
 {
-    skewTShader->bindProgram("DiagramData");
+    skewTShader->bindProgram("DiagramGeometry");
     setShaderGeneralVars(sceneView, config);
+    skewTShader->setUniformValue("verticesInTPSpace", GLboolean(true));
     skewTShader->setUniformValue("tlogp2xyMatrix", transformationMatrixTlogp2xy);
 
     for (MNWPActorVariable* avar : variables)
@@ -2008,8 +2010,13 @@ void MSkewTActor::drawDiagramGeometryAndLabels(
 
     // Bind shader for diagram geometry.
     // =================================
-    skewTShader->bindProgram("DiagramVertices");
+    skewTShader->bindProgram("DiagramGeometry");
     setShaderGeneralVars(sceneView, config);
+
+    skewTShader->setUniformValue("verticesInTPSpace", GLboolean(false));
+
+    skewTShader->setUniformValue("xy2worldMatrix",
+                                 computeXY2WorldSpaceTransformationMatrix(sceneView));
 
     // Draw diagram frame.
     // ===================
@@ -2578,7 +2585,7 @@ void MSkewTActor::DiagramConfiguration::init()
     area.right = 0.95;
     area.bottom = worldZfromPressure(vertical_p_hPa.max);
     area.top = worldZfromPressure(vertical_p_hPa.min);
-    if (!pressureEqualsWorldPressure)
+    if (!alignWithCamera)
     {
         area.bottom = area.bottom + 0.05;
         area.top = area.top + 0.05;
@@ -2604,7 +2611,7 @@ float MSkewTActor::DiagramConfiguration::clipTo2D(float v) const
 
 float MSkewTActor::DiagramConfiguration::temperaturePosition() const
 {
-    if (pressureEqualsWorldPressure)
+    if (alignWithCamera)
     {
         return area.top;
     }
@@ -2630,7 +2637,7 @@ double MSkewTActor::DiagramConfiguration::pressureFromWorldZ(double z)
 
 float MSkewTActor::DiagramConfiguration::worldZfromPressure(float p) const
 {
-    if (!pressureEqualsWorldPressure)
+    if (!alignWithCamera)
     {
         float slopePtoZ = (36.0f - 0.1f * 36.0f) / (log(
                               20.) - log(1050.));
@@ -2646,7 +2653,7 @@ float MSkewTActor::DiagramConfiguration::worldZfromPressure(float p) const
 
 QVector2D MSkewTActor::DiagramConfiguration::pressureToWorldZParameters() const
 {
-    if (!pressureEqualsWorldPressure)
+    if (!alignWithCamera)
     {
         float slopePtoZ = (36.0f - 0.1f * 36.0f) / (log(
                               20.) - log(1050.));
@@ -2759,7 +2766,7 @@ void MSkewTActor::drawDiagram3DView(MSceneViewGLWidget* sceneView)
     normalscreenDiagrammConfiguration.layer = -0.005f;
     drawDiagramGeometryAndLabels(sceneView, vbDiagramVertices, &normalscreenDiagrammConfiguration);
     normalscreenDiagrammConfiguration.layer = -.1f;
-    drawDiagram(sceneView, vbDiagramVertices, &normalscreenDiagrammConfiguration);
+    drawDiagram2(sceneView, vbDiagramVertices, &normalscreenDiagrammConfiguration);
 }
 
 
@@ -2806,7 +2813,7 @@ void MSkewTActor::computeTlogp2xyTransformationMatrix()
     QMatrix4x4 scaleMatrix;
     scaleMatrix.scale(1./(Tmax_K-Tmin_K), 1./(logptop_hPa-logpbot_hPa));
 
-    // Skew temperature axis through shear in x (shear factor 0..1).
+    // Skew temperature axis through shear in x (shear factor 0..2 works well).
     QTransform shear;
     shear.shear(xShear, 0.);
     QMatrix4x4 shearMatrix(shear);
@@ -2823,6 +2830,51 @@ QVector2D MSkewTActor::transformTp2xy(QVector2D tpCoordinate_K_hPa)
     QPointF xyCoordinate = transformationMatrixTlogp2xy * tlogpCoordinate;
 
     return QVector2D(xyCoordinate);
+}
+
+
+QMatrix4x4 MSkewTActor::computeXY2WorldSpaceTransformationMatrix(
+        MSceneViewGLWidget* sceneView)
+{
+    // Input are (x, y) coordinates ("diagram space") in 0..1 each.
+    // Transformation to a scene view's world space requires:
+    // 0. Interpret (x, y) as (lon, z) in world space.
+    // 1. Scale x(lon) to a user-defined width in "degrees", and scale
+    //    z to the world-Z range given by pbot and ptop.
+    // 2. If the diagram plane should be oriented with the camera (so that
+    //    the user is always looking straight at the diagram, rotate by
+    //    using the camera's "up" and "right" vectors (build a new
+    //    orthonormal coordinate system and simply put that into a matrix).
+    // 3. Translate the result to the location of the diagram probe.
+
+    float worldZbot = sceneView->worldZfromPressure(
+                diagramConfiguration.vertical_p_hPa.max);
+    float worldZtop = sceneView->worldZfromPressure(
+                diagramConfiguration.vertical_p_hPa.min);
+
+    QMatrix4x4 scaleMatrix;
+    scaleMatrix.scale(diagramConfiguration.diagramWidth3D,
+                      1.,
+                      worldZtop-worldZbot);
+
+    QMatrix4x4 rotationMatrix;
+    rotationMatrix.setToIdentity();
+    if (diagramConfiguration.alignWithCamera)
+    {
+        QVector3D up = QVector3D(0., 0., 1);
+        QVector3D right = sceneView->getCamera()->getXAxis();
+        QVector3D front = QVector3D::crossProduct(up, right);
+        rotationMatrix.setColumn(0, QVector4D(right));
+        rotationMatrix.setColumn(1, QVector4D(front));
+        rotationMatrix.setColumn(2, QVector4D(up));
+    }
+
+    QMatrix4x4 translationMatrix;
+    translationMatrix.translate(diagramConfiguration.geoPosition.x(),
+                                diagramConfiguration.geoPosition.y(),
+                                worldZbot);
+
+    return translationMatrix * rotationMatrix * scaleMatrix;
 }
 
 
