@@ -1314,8 +1314,8 @@ void MNWPHorizontalSectionActor::renderToCurrentContext(MSceneViewGLWidget *scen
         // fields to there data volume pressure since this is zero and thus
         // surface fields won't be drawn anymore.
         if (var->grid->getLevelType() != MVerticalLevelType::SURFACE_2D
-                && (var->grid->getBottomDataVolumePressure() < slicePosition_hPa
-                    || var->grid->getTopDataVolumePressure() > slicePosition_hPa))
+                && (var->grid->getBottomDataVolumePressure_hPa() < slicePosition_hPa
+                    || var->grid->getTopDataVolumePressure_hPa() > slicePosition_hPa))
         {
             continue;
         }
@@ -1341,9 +1341,9 @@ void MNWPHorizontalSectionActor::renderToCurrentContext(MSceneViewGLWidget *scen
 
                 // If the slice position is outside the model grid domain of the
                 // 2nd variable, there is nothing to render.
-                if ((varDiff->grid->getBottomDataVolumePressure()
+                if ((varDiff->grid->getBottomDataVolumePressure_hPa()
                      < slicePosition_hPa)
-                        || (varDiff->grid->getTopDataVolumePressure()
+                        || (varDiff->grid->getTopDataVolumePressure_hPa()
                             > slicePosition_hPa))
                 {
                     continue;
@@ -2454,8 +2454,8 @@ void MNWPHorizontalSectionActor::renderVectorGlyphs(
     // Don't render vector glyphs if horizontal slice position is outside the
     // data domain (assuming longitudial/latitudial are on the same grid).
     if (varLatitudinal->grid->getLevelType() != SURFACE_2D &&
-            (varLatitudinal->grid->getBottomDataVolumePressure() < slicePosition_hPa
-             || varLatitudinal->grid->getTopDataVolumePressure() > slicePosition_hPa))
+            (varLatitudinal->grid->getBottomDataVolumePressure_hPa() < slicePosition_hPa
+             || varLatitudinal->grid->getTopDataVolumePressure_hPa() > slicePosition_hPa))
     {
         return;
     }
@@ -2867,8 +2867,8 @@ void MNWPHorizontalSectionActor::renderContourLabels(
     // to there data volume pressure since this is zero and thus surface
     // fields won't be drawn anymore.
     if (var->grid->getLevelType() != MVerticalLevelType::SURFACE_2D
-            && (var->grid->getBottomDataVolumePressure() < slicePosition_hPa
-                || var->grid->getTopDataVolumePressure() > slicePosition_hPa))
+            && (var->grid->getBottomDataVolumePressure_hPa() < slicePosition_hPa
+                || var->grid->getTopDataVolumePressure_hPa() > slicePosition_hPa))
     {
         return;
     }

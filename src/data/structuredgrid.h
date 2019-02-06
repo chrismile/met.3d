@@ -321,9 +321,23 @@ public:
 
     QVector3D getSouthEastBottomDataVolumeCorner_lonlatp();
 
-    virtual float getTopDataVolumePressure() { return 0.; }
+    /**
+      Returns the topmost pressure elevation of the data volume. If
+      @p useCachedValue is set to @p true (default), the value is computed
+      once and reused (i.e., the vertical levels are assumed to be static).
+      If you change the vertical levels and need to update this value,
+      set @p useCachedValue to @p false.
+     */
+    virtual float getTopDataVolumePressure_hPa(bool useCachedValue=true)
+    { Q_UNUSED(useCachedValue); return 0.; }
 
-    virtual float getBottomDataVolumePressure() { return 0.; }
+    /**
+      Returns the bottommost pressure elevation of the data volume.
+      See @see getTopDataVolumePressure_hPa() for the meaning of the
+      @p useCachedValue parameter.
+     */
+    virtual float getBottomDataVolumePressure_hPa(bool useCachedValue=true)
+    { Q_UNUSED(useCachedValue); return 0.; }
 
     bool gridIsCyclicInLongitude();
 
@@ -608,9 +622,11 @@ public:
     float getTopInterfacePressure(
             unsigned int k, unsigned int j, unsigned int i);
 
-    float getTopDataVolumePressure() override { return exp(levels[0]); }
+    float getTopDataVolumePressure_hPa(bool useCachedValue=true) override
+    { Q_UNUSED(useCachedValue); return exp(levels[0]); }
 
-    float getBottomDataVolumePressure() override { return exp(levels[nlevs-1]); }
+    float getBottomDataVolumePressure_hPa(bool useCachedValue=true) override
+    { Q_UNUSED(useCachedValue); return exp(levels[nlevs-1]); }
 
 protected:
 
@@ -646,9 +662,11 @@ public:
     float getTopInterfacePressure(
             unsigned int k, unsigned int j, unsigned int i);
 
-    float getTopDataVolumePressure() override { return levels[0]; }
+    float getTopDataVolumePressure_hPa(bool useCachedValue=true) override
+    { Q_UNUSED(useCachedValue); return levels[0]; }
 
-    float getBottomDataVolumePressure() override { return levels[nlevs-1]; }
+    float getBottomDataVolumePressure_hPa(bool useCachedValue=true) override
+    { Q_UNUSED(useCachedValue); return levels[nlevs-1]; }
 
 protected:
 
@@ -727,9 +745,9 @@ public:
     float getTopInterfacePressure(
             unsigned int k, unsigned int j, unsigned int i);
 
-    float getTopDataVolumePressure() override;
+    float getTopDataVolumePressure_hPa(bool useCachedValue=true) override;
 
-    float getBottomDataVolumePressure() override;
+    float getBottomDataVolumePressure_hPa(bool useCachedValue=true) override;
 
     void dumpGridData(unsigned int maxValues=50);
 
@@ -764,6 +782,8 @@ protected:
 
 private:
     QString pressureTexCoordID;
+    double cachedTopDataVolumePressure_hPa;
+    double cachedBottomDataVolumePressure_hPa;
 };
 
 
@@ -791,9 +811,9 @@ public:
     float getTopInterfacePressure(
             unsigned int k, unsigned int j, unsigned int i);
 
-    float getTopDataVolumePressure() override;
+    float getTopDataVolumePressure_hPa(bool useCachedValue=true) override;
 
-    float getBottomDataVolumePressure() override;
+    float getBottomDataVolumePressure_hPa(bool useCachedValue=true) override;
 
     /**
       Returns the reverseLevels-Flag.
@@ -815,6 +835,10 @@ protected:
     MLonLatAuxiliaryPressureGrid *auxPressureField_hPa;
 
     bool reverseLevels;
+
+private:
+    double cachedTopDataVolumePressure_hPa;
+    double cachedBottomDataVolumePressure_hPa;
 };
 
 

@@ -444,13 +444,13 @@ MIndex3D MStructuredGrid::maxNeighbouringGridPoint(QVector3D vec3_lonLatP)
 
 QVector3D MStructuredGrid::getNorthWestTopDataVolumeCorner_lonlatp()
 {
-    return QVector3D(lons[0], lats[0], getTopDataVolumePressure());
+    return QVector3D(lons[0], lats[0], getTopDataVolumePressure_hPa());
 }
 
 
 QVector3D MStructuredGrid::getSouthEastBottomDataVolumeCorner_lonlatp()
 {
-    return QVector3D(lons[nlons-1], lats[nlats-1], getBottomDataVolumePressure());
+    return QVector3D(lons[nlons-1], lats[nlats-1], getBottomDataVolumePressure_hPa());
 }
 
 
@@ -1489,7 +1489,9 @@ MLonLatHybridSigmaPressureGrid::MLonLatHybridSigmaPressureGrid(
       bk(new double[nlevs]),
       aki_hPa(nullptr),
       bki(nullptr),
-      surfacePressure(nullptr)
+      surfacePressure(nullptr),
+      cachedTopDataVolumePressure_hPa(M_MISSING_VALUE),
+      cachedBottomDataVolumePressure_hPa(M_MISSING_VALUE)
 {
     akbkID = getID() + "hyb";
 }
@@ -1909,17 +1911,36 @@ float MLonLatHybridSigmaPressureGrid::getTopInterfacePressure(
 }
 
 
-float MLonLatHybridSigmaPressureGrid::getTopDataVolumePressure()
+float MLonLatHybridSigmaPressureGrid::getTopDataVolumePressure_hPa(
+        bool useCachedValue)
 {
-    float psfc_min = surfacePressure->min() / 100.;
-    return (ak_hPa[0] + bk[0] * psfc_min);
+    if (cachedTopDataVolumePressure_hPa == M_MISSING_VALUE || !useCachedValue)
+    {
+        // Update cached value upon first call or if explicity requested by
+        // caller.
+        float psfc_min = surfacePressure->min() / 100.;
+        cachedTopDataVolumePressure_hPa = (ak_hPa[0] + bk[0] * psfc_min);
+    }
+
+    // Return cached value.
+    return cachedTopDataVolumePressure_hPa;
 }
 
 
-float MLonLatHybridSigmaPressureGrid::getBottomDataVolumePressure()
+float MLonLatHybridSigmaPressureGrid::getBottomDataVolumePressure_hPa(
+        bool useCachedValue)
 {
-    float psfc_max = surfacePressure->max() / 100.;
-    return (ak_hPa[nlevs-1] + bk[nlevs-1] * psfc_max);
+    if (cachedBottomDataVolumePressure_hPa == M_MISSING_VALUE || !useCachedValue)
+    {
+        // Update cached value upon first call or if explicity requested by
+        // caller.
+        float psfc_max = surfacePressure->max() / 100.;
+        cachedBottomDataVolumePressure_hPa =
+                (ak_hPa[nlevs-1] + bk[nlevs-1] * psfc_max);
+    }
+
+    // Return cached value.
+    return cachedBottomDataVolumePressure_hPa;
 }
 
 
@@ -2024,7 +2045,9 @@ MLonLatAuxiliaryPressureGrid::MLonLatAuxiliaryPressureGrid(
         bool reverseLevels)
     : MStructuredGrid(AUXILIARY_PRESSURE_3D, nlevs, nlats, nlons),
       auxPressureField_hPa(nullptr),
-      reverseLevels(reverseLevels)
+      reverseLevels(reverseLevels),
+      cachedTopDataVolumePressure_hPa(M_MISSING_VALUE),
+      cachedBottomDataVolumePressure_hPa(M_MISSING_VALUE)
 {}
 
 
@@ -2170,15 +2193,33 @@ float MLonLatAuxiliaryPressureGrid::getTopInterfacePressure(
 }
 
 
-float MLonLatAuxiliaryPressureGrid::getTopDataVolumePressure()
+float MLonLatAuxiliaryPressureGrid::getTopDataVolumePressure_hPa(
+        bool useCachedValue)
 {
-    return auxPressureField_hPa->min();
+    if (cachedTopDataVolumePressure_hPa == M_MISSING_VALUE || !useCachedValue)
+    {
+        // Update cached value upon first call or if explicity requested by
+        // caller.
+        cachedTopDataVolumePressure_hPa = auxPressureField_hPa->min();
+    }
+
+    // Return cached value.
+    return cachedTopDataVolumePressure_hPa;
 }
 
 
-float MLonLatAuxiliaryPressureGrid::getBottomDataVolumePressure()
+float MLonLatAuxiliaryPressureGrid::getBottomDataVolumePressure_hPa(
+        bool useCachedValue)
 {
-    return auxPressureField_hPa->max();
+    if (cachedBottomDataVolumePressure_hPa == M_MISSING_VALUE || !useCachedValue)
+    {
+        // Update cached value upon first call or if explicity requested by
+        // caller.
+        cachedBottomDataVolumePressure_hPa = auxPressureField_hPa->max();
+    }
+
+    // Return cached value.
+    return cachedBottomDataVolumePressure_hPa;
 }
 
 
