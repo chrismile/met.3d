@@ -2030,6 +2030,21 @@ MStructuredGrid *MClimateForecastReader::readGrid(
             throw MNcException("NcException", err.toStdString(),
                                __FILE__, __LINE__);
         }
+
+        // Check for zero pressure values in grid. If these are present,
+        // problems will likely arise when the data is used (e.g. interpolation
+        // or shaders including the raycaster may crash).
+        if (grid->min() == 0.)
+        {
+            LOG4CPLUS_WARN(mlog,
+                           "SEVERE WARNING: auxiliary pressure field "
+                           "contains '0' values. This may lead to rendering "
+                           "problems up to program crashes. Please fix your "
+                           "data and remove all entries with '0' pressure. "
+                           "If the '0' entries are located along a domain "
+                           "border, you can use the 'ncks' utility, e.g. "
+                           "'ncks -d lat,<min>,<max> in.nc out.nc'.");
+        }
     }
 
 #ifdef MSTOPWATCH_ENABLED

@@ -2246,6 +2246,17 @@ void MLonLatAuxiliaryPressureGrid::dumpGridData(unsigned int maxValues)
     str += QString("\n\ndata (column at i=0,j=0): ");
     for (uint k = 0; k < nlevs; k++) str += QString("%1/").arg(getValue(k, 0, 0));
 
+//    str += QString("\n\nZeros at index positions (k,j,i): ");
+//    for (uint k = 0; k < nlevs; k++)
+//        for (uint j = 0; j < nlats; j++)
+//            for (uint i = 0; i < nlons; i++)
+//            {
+//                if (getValue(k, j, i) == 0.)
+//                {
+//                    str += QString("%1,%2,%3/").arg(k).arg(j).arg(i);
+//                }
+//            }
+
     nv = std::min(auxPressureField_hPa->getNumValues(), maxValues);
     str += QString("\n\naux-p data (first %1 values): ").arg(nv);
     for (uint i = 0; i < nv; i++) str += QString("%1/").arg(auxPressureField_hPa->getValue(i));
