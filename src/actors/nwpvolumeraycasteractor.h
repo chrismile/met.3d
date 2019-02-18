@@ -41,6 +41,7 @@
 #include <QVector>
 #include <QVector3D>
 #include <QMatrix4x4>
+#include <QHash>
 
 // local application imports
 #include "gxfw/nwpmultivaractor.h"
@@ -258,6 +259,8 @@ private:
 
     void renderToDepthTexture(MSceneViewGLWidget* sceneView);
 
+    void mirrorDepthBufferToTexture(MSceneViewGLWidget* sceneView);
+
     // Class members.
     // ==============
 
@@ -331,6 +334,14 @@ private:
         // contains depth data (useful for normal curves)
         GL::MTexture*  tex2DDepthBuffer;
         GLint         texUnitDepthBuffer;
+
+        // Texture that mirrors the OpenGL depth buffer. Used for DVR to
+        // store the depths before the raycaster is started, so that the ray
+        // can be terminated at the corresponding fragment depth. Each scene
+        // view gets its own framebuffer object.
+        GL::MTexture* textureDepthBufferMirror;
+        GLint         textureUnitDepthBufferMirror;
+        QHash<MSceneViewGLWidget*, GLuint> fboDepthBuffer;
 
         // Subroutines.
         // ============

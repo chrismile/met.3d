@@ -153,7 +153,9 @@ MNWPVolumeRaycasterActor::OpenGL::OpenGL()
       tex2DShadowImage(nullptr),
       texUnitShadowImage(-1),
       tex2DDepthBuffer(nullptr),
-      texUnitDepthBuffer(-1)
+      texUnitDepthBuffer(-1),
+      textureDepthBufferMirror(nullptr),
+      textureUnitDepthBufferMirror(-1)
 {
 }
 
@@ -520,6 +522,12 @@ MNWPVolumeRaycasterActor::~MNWPVolumeRaycasterActor()
     if (gl.ssboNormalCurves != nullptr) glRM->releaseGPUItem(gl.ssboNormalCurves);
     if (gl.texUnitShadowImage >=0) releaseTextureUnit(gl.texUnitShadowImage);
     if (gl.texUnitDepthBuffer >=0) releaseTextureUnit(gl.texUnitDepthBuffer);
+
+    for (GLuint fbo : gl.fboDepthBuffer)
+    {
+        // Delete framebiffers allocated in mirrorDepthBufferToTexture().
+        glDeleteFramebuffers(1, &fbo); CHECK_GL_ERROR;
+    }
 
     delete lightingSettings;
     delete rayCasterSettings;
@@ -1152,6 +1160,12 @@ void MNWPVolumeRaycasterActor::initializeActorResources()
 
     if (gl.texUnitDepthBuffer >=0) releaseTextureUnit(gl.texUnitDepthBuffer);
     gl.texUnitDepthBuffer = assignTextureUnit();
+
+    if (gl.textureUnitDepthBufferMirror >= 0)
+    {
+        releaseTextureUnit(gl.textureUnitDepthBufferMirror);
+    }
+    gl.textureUnitDepthBufferMirror = assignTextureUnit();
 }
 
 
@@ -2450,6 +2464,9 @@ void MNWPVolumeRaycasterActor::setCommonShaderVars(
     shader->setUniformValue(
                 "mvpMatrix", *(sceneView->getModelViewProjectionMatrix()));  CHECK_GL_ERROR;
     shader->setUniformValue(
+                "mvpMatrixInverted",
+                *(sceneView->getModelViewProjectionMatrixInverted())); CHECK_GL_ERROR;
+    shader->setUniformValue(
                 "cameraPosition", sceneView->getCamera()->getOrigin());  CHECK_GL_ERROR;
     shader->setUniformValue(
                 "lightDirection", sceneView->getLightDirection());  CHECK_GL_ERROR;
@@ -2503,10 +2520,19 @@ void MNWPVolumeRaycasterActor::setRayCasterShaderVars(
 
 
     // 1) Bind the depth buffer texture to the current program.
+
+    // Depth buffer for normal curves, rendered by renderToDepthTexture().
     if (gl.tex2DDepthBuffer)
     {
         gl.tex2DDepthBuffer->bindToTextureUnit(gl.texUnitDepthBuffer);
         shader->setUniformValue("depthTex", gl.texUnitDepthBuffer);
+    }
+
+    // OpenGL depth buffer, mirrored by mirrorDepthBufferToTexture(). [for DVR]
+    if (gl.textureDepthBufferMirror)
+    {
+        gl.textureDepthBufferMirror->bindToTextureUnit(gl.textureUnitDepthBufferMirror);
+        shader->setUniformValue("depthBufferMirror", gl.textureUnitDepthBufferMirror);
     }
 
     // 2) Set lighting params variables.
@@ -2549,6 +2575,11 @@ void MNWPVolumeRaycasterActor::setRayCasterShaderVars(
 
     shader->setUniformValue(
                 "renderingMode", GLint(renderMode)); CHECK_GL_ERROR;
+
+    GLint width = sceneView->getViewPortWidth();
+    GLint height = sceneView->getViewPortHeight();
+    shader->setUniformValue("viewPortWidth", GLint(width) ); CHECK_GL_ERROR;
+    shader->setUniformValue("viewPortHeight", GLint(height) ); CHECK_GL_ERROR;
 
     // 4) Set shadow setting variables.
 
@@ -2617,7 +2648,6 @@ void MNWPVolumeRaycasterActor::renderBoundingBox(
 }
 
 
-
 void MNWPVolumeRaycasterActor::renderPositionCross(
         MSceneViewGLWidget *sceneView)
 {
@@ -2630,6 +2660,7 @@ void MNWPVolumeRaycasterActor::renderPositionCross(
 
     glDrawArrays(GL_LINES, 0, 6); CHECK_GL_ERROR;
 }
+
 
 void MNWPVolumeRaycasterActor::renderRayCaster(
         std::shared_ptr<GL::MShaderEffect>& effect, MSceneViewGLWidget* sceneView)
@@ -2644,6 +2675,10 @@ void MNWPVolumeRaycasterActor::renderRayCaster(
     }
 
     effect->bindProgram("Volume");
+
+    // Mirror current depth buffer for access in shader (cannot be accessed
+    // directly) for correct ray termination in DVR.
+    mirrorDepthBufferToTexture(sceneView);
 
     setRayCasterShaderVars(effect, sceneView); CHECK_GL_ERROR;
 
@@ -2860,6 +2895,16 @@ void MNWPVolumeRaycasterActor::createShadowImage(
     }
 
     pEffect->bindProgram("Shadow");
+
+    //NOTE: The glDrawArrays() call below fails if no "depth mirror" texture
+    // is bound to the shader, although the texture is not used for shadow
+    // mapping. Hence, we need to create and bind the texture by calling the
+    // mirror funtion. Since that function binds another framebuffer object,
+    // re-bind the shadow map framebuffer afterwards.
+//TODO (mr, 18Feb2019) -- would be great if this could be avoided...
+    mirrorDepthBufferToTexture(sceneView);
+    glBindFramebuffer(GL_FRAMEBUFFER, tempFBO);
+
     setRayCasterShaderVars(pEffect, sceneView);
     pEffect->setUniformValue("shadowMode", GLint(RenderMode::ShadowMap));
     pEffect->setUniformValue("stepSize", rayCasterSettings->stepSize);
@@ -3651,6 +3696,75 @@ void MNWPVolumeRaycasterActor::renderToDepthTexture(
     glDeleteFramebuffers(1, &tempFBO);
 
     //sceneView->makeCurrent();
+}
+
+
+void MNWPVolumeRaycasterActor::mirrorDepthBufferToTexture(
+        MSceneViewGLWidget *sceneView)
+{
+    // Get extent of current viewport.
+    const GLint width = sceneView->getViewPortWidth();
+    const GLint height = sceneView->getViewPortHeight();
+
+    if (!gl.textureDepthBufferMirror)
+    {
+        // First call: no framebuffer object and no mirror texture exists.
+
+        // Generate a texture into which the depth buffer is mirrored.
+        const QString depthBufferID = QString("textureDepthBuffer_#%1").arg(myID);
+        gl.textureDepthBufferMirror = new GL::MTexture(
+                    depthBufferID, GL_TEXTURE_2D, GL_DEPTH_COMPONENT32,
+                    width, height);
+
+        MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
+        if (glRM->tryStoreGPUItem(gl.textureDepthBufferMirror))
+        {
+            gl.textureDepthBufferMirror = dynamic_cast<GL::MTexture *>(
+                        glRM->getGPUItem(depthBufferID));
+        }
+        else
+        {
+            delete gl.textureDepthBufferMirror;
+            gl.textureDepthBufferMirror = nullptr;
+        }
+    }
+
+    if (!gl.fboDepthBuffer.contains(sceneView))
+    {
+        // If not yet existing, generate a framebuffer object for this scene's
+        // GL context to which the depth buffer can be bound.
+        // NOTE: Do we really need a separate FBO for each scene view (i.e.
+        // for each OpenGL context)?
+        // See: https://www.khronos.org/opengl/wiki/Framebuffer_Object
+        glGenFramebuffers(1, &gl.fboDepthBuffer[sceneView]);
+        CHECK_GL_ERROR;
+    }
+
+    if (gl.textureDepthBufferMirror)
+    {
+        // Depth buffer mirror already exists, delete its contents.
+        gl.textureDepthBufferMirror->bindToLastTextureUnit();
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        CHECK_GL_ERROR;
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        CHECK_GL_ERROR;
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32, width, height, 0,
+                     GL_DEPTH_COMPONENT, GL_FLOAT, 0);
+        CHECK_GL_ERROR;
+        glBindTexture(GL_TEXTURE_2D, 0);
+    }
+
+    // Attach the "mirror" texture to the depth buffer and copy its content,
+    // leaving all data on the GPU (we don't need the depth data on the CPU).
+    glBindFramebuffer(GL_FRAMEBUFFER, gl.fboDepthBuffer[sceneView]);
+    CHECK_GL_ERROR;
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D,
+                           gl.textureDepthBufferMirror->getTextureObject(), 0);
+    CHECK_GL_ERROR;
+    glBlitNamedFramebuffer(0, gl.fboDepthBuffer[sceneView], 0, 0, width, height, 0, 0,
+                           width, height, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+    CHECK_GL_ERROR;
+    glBindFramebuffer(GL_FRAMEBUFFER,0); CHECK_GL_ERROR;
 }
 
 } // namespace Met3D
