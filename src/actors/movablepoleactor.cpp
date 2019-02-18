@@ -569,9 +569,10 @@ int MMovablePoleActor::checkIntersectionWithHandle(MSceneViewGLWidget *sceneView
         // Scale the radius (in world space) with respect to the viewer distance
         float radius = static_cast<float>(clipRadius * viewDir.length() / 100.0);
 
-        QMatrix4x4 *mvpMatrix = sceneView->getModelViewProjectionMatrix();
+        QMatrix4x4 *mvpMatrixInverted =
+                sceneView->getModelViewProjectionMatrixInverted();
         // Compute the world position of the current mouse position
-        QVector3D mouseWorldPos = mvpMatrix->inverted() * QVector3D(clipX, clipY, 1);
+        QVector3D mouseWorldPos = *mvpMatrixInverted * QVector3D(clipX, clipY, 1);
 
         // Get the ray direction from the camera to the mouse position
         QVector3D l = mouseWorldPos - cameraPos;
@@ -594,7 +595,7 @@ int MMovablePoleActor::checkIntersectionWithHandle(MSceneViewGLWidget *sceneView
         if (root >= 0)
         {
             highlightPole = i;
-            mvpMatrix = sceneView->getModelViewProjectionMatrix();
+            QMatrix4x4 *mvpMatrix = sceneView->getModelViewProjectionMatrix();
             QVector3D posPoleClip = *mvpMatrix * posPole;
             offsetPickPositionToHandleCentre = QVector2D(posPoleClip.x() - clipX,
                                      posPoleClip.y() - clipY);
@@ -645,8 +646,9 @@ void MMovablePoleActor::addPositionLabel(MSceneViewGLWidget *sceneView,
     //       http://en.wikipedia.org/wiki/Line-plane_intersection
 
     // To compute l0, the MVP matrix has to be inverted.
-    QMatrix4x4 *mvpMatrix = sceneView->getModelViewProjectionMatrix();
-    QVector3D l0 = mvpMatrix->inverted() * mousePosClipSpace;
+    QMatrix4x4 *mvpMatrixInverted =
+            sceneView->getModelViewProjectionMatrixInverted();
+    QVector3D l0 = *mvpMatrixInverted * mousePosClipSpace;
 
     // Compute l as the vector from l0 to the camera origin.
     QVector3D cameraPosWorldSpace = sceneView->getCamera()->getOrigin();
@@ -699,8 +701,9 @@ void MMovablePoleActor::dragEvent(MSceneViewGLWidget *sceneView,
     //       http://en.wikipedia.org/wiki/Line-plane_intersection
 
     // To compute l0, the MVP matrix has to be inverted.
-    QMatrix4x4 *mvpMatrix = sceneView->getModelViewProjectionMatrix();
-    QVector3D l0 = mvpMatrix->inverted() * mousePosClipSpace;
+    QMatrix4x4 *mvpMatrixInverted =
+            sceneView->getModelViewProjectionMatrixInverted();
+    QVector3D l0 = *mvpMatrixInverted * mousePosClipSpace;
 
     // Compute l as the vector from l0 to the camera origin.
     QVector3D cameraPosWorldSpace = sceneView->getCamera()->getOrigin();
