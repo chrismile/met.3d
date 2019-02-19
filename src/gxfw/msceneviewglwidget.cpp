@@ -698,7 +698,7 @@ QVector3D MSceneViewGLWidget::lonLatPToClipSpace(const QVector3D& lonlatp)
 
 QVector3D MSceneViewGLWidget::clipSpaceToLonLatWorldZ(const QVector3D &clipPos)
 {
-    QVector3D worldSpacePos = modelViewProjectionMatrix.inverted() * clipPos;
+    QVector3D worldSpacePos = modelViewProjectionMatrixInverted * clipPos;
     return worldSpacePos;
 }
 
@@ -1677,6 +1677,7 @@ void MSceneViewGLWidget::paintGL()
     }
 
     modelViewProjectionMatrix *= camera.getViewMatrix();
+    modelViewProjectionMatrixInverted = modelViewProjectionMatrix.inverted();
 
     QList<MLabel*> labelList;
     labelList.append(staticLabels);
@@ -1853,6 +1854,7 @@ void MSceneViewGLWidget::resizeGL(int width, int height)
     }
 
     modelViewProjectionMatrix *= camera.getViewMatrix();
+    modelViewProjectionMatrixInverted = modelViewProjectionMatrix.inverted();
 }
 
 

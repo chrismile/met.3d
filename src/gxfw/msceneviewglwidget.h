@@ -119,6 +119,12 @@ public:
     { return &modelViewProjectionMatrix; }
 
     /**
+      Returns the current inverted model-view-projection matrix.
+      */
+    QMatrix4x4* getModelViewProjectionMatrixInverted()
+    { return &modelViewProjectionMatrixInverted; }
+
+    /**
       Compute a world z-coordinate from a pressure value @p p_hPa (in hPa).
       */
     double worldZfromPressure(double p_hPa);
@@ -395,6 +401,7 @@ private:
 
     MCamera camera;
     QMatrix4x4 modelViewProjectionMatrix;
+    QMatrix4x4 modelViewProjectionMatrixInverted;
     QMatrix4x4 sceneRotationMatrix;
     SceneNavigationMode sceneNavigationMode;
     QVector3D sceneRotationCentre;

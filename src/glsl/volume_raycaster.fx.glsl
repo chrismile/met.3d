@@ -105,6 +105,8 @@ uniform sampler3D minMaxAccel3DShV;
 #endif
 
 uniform sampler2D depthTex; // for normal curve integration
+uniform sampler2D depthBufferMirror; // mirrored OpenGL depth buffer for
+                                     // DVR ray termination
 
 uniform sampler3D dataVolume;
 uniform sampler3D dataVolumeShV; // shading var data
@@ -114,6 +116,7 @@ uniform sampler1D lonLatLevAxesShV;
 // matrices
 // ========
 uniform mat4    mvpMatrix;
+uniform mat4    mvpMatrixInverted;
 
 // vectors
 // =======
@@ -125,6 +128,10 @@ uniform vec3    volumeTopNWCrnr;
 // =======
 uniform float   stepSize;
 uniform uint    bisectionSteps;
+
+uniform int     viewPortWidth;
+uniform int     viewPortHeight;
+
 
 // Multi-isosurface settings
 // =========================
@@ -921,6 +928,35 @@ shader FSmain(in VStoFS Input, out vec4 fragColor : 0)
     vec3 crossingPosition;
     vec3 depthPosition;
 
+    if ((renderingMode == RENDER_DVR) && (shadowMode != SHADOWS_MAP))
+    {
+        // For direct volume rendering (not necessary for shadow map generation
+        // and also breaks shadow map code..):
+        // Correct "far" lambda so that the raycaster terminates at the depth
+        // that is stored in the depth buffer *before* this raycaster shader is
+        // started. Read the current depth from the depth buffer texture that
+        // mirrors the depth buffer (see CPP code, method
+        // mirrorDepthBufferToTexture()), reconstruct its world space position
+        // (assuming that the existing "back" fragment is located on the ray)
+        // and compute its distance to the ray origin. Since ray.direction is
+        // if unit length, the distance is the lambda value.
+        // References:
+        // https://forums.khronos.org/showthread.php/79310-Convert-to-Worldspace-from-depth-buffer
+        // https://www.khronos.org/opengl/wiki/Compute_eye_space_from_window_space
+        vec2 texCoordDepthBuffer = vec2(gl_FragCoord.x / viewPortWidth,
+                                        gl_FragCoord.y / viewPortHeight);
+        float depthFromBuffer = texture(depthBufferMirror, texCoordDepthBuffer, 0).x;
+        // For DEBUG see: http://glampert.com/2014/01-26/visualizing-the-depth-buffer/
+        // rayColor = vec4((depthFromBuffer-0.95)/0.05, 0., 0., 1.); break;
+        vec4 posBackFragment = vec4(texCoordDepthBuffer.xy * 2. - 1.,
+                                    depthFromBuffer * 2. - 1., 1.);
+        posBackFragment = mvpMatrixInverted * posBackFragment;
+        posBackFragment /= posBackFragment.w;
+        float lambdaDepth = distance(posBackFragment.xyz, ray.origin);
+        lambdaNearFar.y = min(lambdaNearFar.y, lambdaDepth);
+    }
+
+    // Invoke Raycaster.
     raycaster(h_gradient, ray, lambdaNearFar, rayColor, rayPosition,
               crossingPosition);
 
