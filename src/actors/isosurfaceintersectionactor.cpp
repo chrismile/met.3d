@@ -148,6 +148,12 @@ MIsosurfaceIntersectionActor::MIsosurfaceIntersectionActor()
 
 MIsosurfaceIntersectionActor::~MIsosurfaceIntersectionActor()
 {
+    for (GLuint fbo : shadowMapFBO)
+    {
+        // Delete framebiffers allocated in renderToCurrentContext().
+        glDeleteFramebuffers(1, &fbo); CHECK_GL_ERROR;
+    }
+
     if (appearanceSettings->textureUnitTransferFunction >= 0)
     {
         releaseTextureUnit(appearanceSettings->textureUnitTransferFunction);
@@ -1970,9 +1976,6 @@ void MIsosurfaceIntersectionActor::renderToCurrentContext(
         {
             MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
 
-            glGenFramebuffers(1, &shadowMapFBO);
-            CHECK_GL_ERROR;
-
             shadowMapTexUnit = assignTextureUnit();
             const QString shadowMapID = QString("shadow_map_#%1").arg(myID);
 
@@ -2008,7 +2011,13 @@ void MIsosurfaceIntersectionActor::renderToCurrentContext(
             }
         }
 
-        glBindFramebuffer(GL_FRAMEBUFFER, shadowMapFBO);
+        if (!shadowMapFBO.contains(sceneView))
+        {
+            glGenFramebuffers(1, &shadowMapFBO[sceneView]);
+            CHECK_GL_ERROR;
+        }
+
+        glBindFramebuffer(GL_FRAMEBUFFER, shadowMapFBO[sceneView]);
         CHECK_GL_ERROR;
         // Attach the shadow map texture to the depth buffer
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
@@ -2028,7 +2037,7 @@ void MIsosurfaceIntersectionActor::renderToCurrentContext(
         // Set the viewport size to the size of our shadow map texture.
         glViewport(0, 0, shadowMapRes, shadowMapRes);
         CHECK_GL_ERROR;
-        glBindFramebuffer(GL_FRAMEBUFFER, shadowMapFBO);
+        glBindFramebuffer(GL_FRAMEBUFFER, shadowMapFBO[sceneView]);
         CHECK_GL_ERROR;
         // Clear all set depth values in the framebuffer.
         glClear(GL_DEPTH_BUFFER_BIT);

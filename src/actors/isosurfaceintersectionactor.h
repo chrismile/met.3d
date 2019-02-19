@@ -415,7 +415,7 @@ protected:
     std::shared_ptr<GL::MShaderEffect> lineTubeShader;
     GL::MTexture*                      shadowMap;
     int                                shadowMapTexUnit;
-    unsigned int                       shadowMapFBO;
+    QHash<MSceneViewGLWidget*, GLuint> shadowMapFBO;
     GL::MVertexBuffer*                 shadowImageVBO;
     unsigned int                       shadowMapRes;
     QMatrix4x4                         lightMVP;
