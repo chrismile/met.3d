@@ -1990,23 +1990,6 @@ void MSkewTActor::drawDiagramGeometryAndLabels(
         GL_FALSE, 0, (const GLvoid *)(0 * sizeof(float)));
 
     float diagramWorldZOffset = 0.f;
-    float yOffset = 0.f;
-
-    if (!config->pressureEqualsWorldPressure)
-    {
-        yOffset = 0.1f;
-    }
-
-    // Draw background of diagram.
-    // ===========================
-    if (!renderAsWireFrame)
-    {
-        skewTShader->bindProgram("DiagramBackground");
-        skewTShader->setUniformValue("yOffset", (GLfloat)yOffset);
-        setShaderGeneralVars(sceneView, config);
-        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-        glDrawArrays(GL_POINTS, 0, 1);
-    }
 
     // Bind shader for diagram geometry.
     // =================================
@@ -2018,15 +2001,28 @@ void MSkewTActor::drawDiagramGeometryAndLabels(
     skewTShader->setUniformValue("xy2worldMatrix",
                                  computeXY2WorldSpaceTransformationMatrix(sceneView));
 
-    // Draw diagram frame.
-    // ===================
+    // Draw diagram background and frame.
+    // ==================================
+
+    // The first four vertices of the frame, drawn as a triangle strip,
+    // represent the diagram background.
+    skewTShader->setUniformValue("colour", QVector4D(1.f, 1.f, 1.f, 1.f));
+    skewTShader->setUniformValue("depthOffset", 0.001f); // draw in background
+    glLineWidth(1);
+    glPolygonMode(GL_FRONT_AND_BACK, renderAsWireFrame ? GL_LINE : GL_FILL);
+    glDrawArrays(GL_TRIANGLE_STRIP,
+                 config->vertexArrayDrawRanges.frame.startIndex, 4);
+
+    // Render the frame as thick lines.
     glLineWidth(3);
     skewTShader->setUniformValue("colour", diagramConfiguration.diagramColor);
+    skewTShader->setUniformValue("depthOffset", 0.f);
     glDrawArrays(GL_LINES,
                  config->vertexArrayDrawRanges.frame.startIndex,
                  config->vertexArrayDrawRanges.frame.indexCount);
 
-    glLineWidth(1.f);
+    glLineWidth(1);
+
 
     // Draw dry adiabates.
     // ===================

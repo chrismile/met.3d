@@ -97,6 +97,7 @@ uniform float actTemperature, actPressure;
 uniform float humidityVal, temperatureVal;
 uniform vec4  humidityColour, temperatureColour;
 uniform float layer;
+uniform float depthOffset;
 uniform int   ensemble;
 uniform int   numberOfLevels;
 uniform int   numberOfLats;
@@ -522,12 +523,12 @@ shader VSDiagramContent(in vec2 vertex : 0, out vec2 diagramXY)
     {
         // Map the diagram's (x,y) coordinates to full screen clip space.
         vec2 vertexClipSpace = mapDiagramXYToClipSpace(diagramXY);
-        gl_Position = vec4(vertexClipSpace.x, vertexClipSpace.y, layer, 1.);
+        gl_Position = vec4(vertexClipSpace.x, vertexClipSpace.y, depthOffset, 1.);
     }
     else
     {
         // Map the diagram's (x,y) coordinates to world space...
-        vec4 vertexWorldSpace = vec4(diagramXY.x, 0., diagramXY.y, 1.);
+        vec4 vertexWorldSpace = vec4(diagramXY.x, depthOffset, diagramXY.y, 1.);
         vertexWorldSpace = xy2worldMatrix * vertexWorldSpace;
         // ...and map world space to view space.
         gl_Position = mvpMatrix * vertexWorldSpace;
@@ -756,70 +757,6 @@ shader GSTubes(in vec2 worldPos[])
 }
 
 
-shader GSBackground(in vec4 worldPos[])
-{
-    if (fullscreen)
-    {
-        gl_Position = vec4(-1.0, -1.0, 0, 1);
-        EmitVertex();
-
-        gl_Position = vec4(-1.0, 1.0, 0, 1);
-        EmitVertex();
-
-        gl_Position = vec4(1.0, -1.0, 0, 1);
-        EmitVertex();
-
-        gl_Position = vec4(1.0, 1.0, 0, 1);
-        EmitVertex();
-
-        EndPrimitive();
-    }
-    else
-    {
-        vec3 CameraRight = vec3(viewMatrix[0][0], viewMatrix[1][0],
-                viewMatrix[2][0]);
-        vec3 CameraUp;
-        if (!uprightOrientation)
-        {
-            CameraUp = vec3(viewMatrix[0][1], viewMatrix[1][1],
-                    viewMatrix[2][1]);
-        }
-        else
-        {
-            CameraUp = vec3(0, 0, 1.0);
-        }
-        vec3 CameraFront = vec3(viewMatrix[0][2], viewMatrix[1][2],
-                viewMatrix[2][2]);
-
-        float size =  36;
-
-        gl_Position = mvpMatrix
-                * vec4((CameraRight * size * (area.right - 0.05)
-                        + CameraUp * size * area.bottom)
-                       + vec3(position.x, position.y, 0.)
-                       - CameraFront * layer, 1.);
-        EmitVertex();
-
-        gl_Position = mvpMatrix
-                * vec4((CameraRight * size * (area.right - 0.05)
-                        + CameraUp * size  * area.top)
-                       + vec3(position.x, position.y, 0.)
-                       - CameraFront * layer, 1.);
-        EmitVertex();
-
-        gl_Position = mvpMatrix * vec4((CameraUp * size * area.bottom)
-                                       + vec3(position.x, position.y, 0.), 1.);
-        EmitVertex();
-
-        gl_Position = mvpMatrix * vec4((CameraUp * size * area.top)
-                                       + vec3(position.x, position.y, 0.), 1.);
-        EmitVertex();
-
-        EndPrimitive();
-    }
-}
-
-
 shader GSMeasurementPoint(in vec4 worldPos[])
 {
     // getting camera up vector
@@ -1006,13 +943,6 @@ shader FSEmpty()
 /*****************************************************************************
  ***                             PROGRAMS
  *****************************************************************************/
-
-program DiagramBackground
-{
-    vs(400)=VSWorld();
-    gs(400)=GSBackground() : in(points), out(triangle_strip, max_vertices = 4);
-    fs(400)=FSColourWhite();
-};
 
 program DiagramVerticesWithoutAreaCheck
 {
