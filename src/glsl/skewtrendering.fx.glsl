@@ -491,7 +491,7 @@ shader VS2D(in vec2 vertexCoord : 0, out vec2 worldPos)
 
 // ===
 
-vec2 mapDiagramXYToClipSpace(vec2 diagramXY)
+vec2 transformDiagramXYToClipSpace(vec2 diagramXY)
 {
 //TODO (mr, 10Jan2019) -- replace by matrix multiplication.
     float hPad = 0.1;
@@ -522,7 +522,7 @@ shader VSDiagramContent(in vec2 vertex : 0, out vec2 diagramXY)
     if (fullscreen)
     {
         // Map the diagram's (x,y) coordinates to full screen clip space.
-        vec2 vertexClipSpace = mapDiagramXYToClipSpace(diagramXY);
+        vec2 vertexClipSpace = transformDiagramXYToClipSpace(diagramXY);
         gl_Position = vec4(vertexClipSpace.x, vertexClipSpace.y, depthOffset, 1.);
     }
     else

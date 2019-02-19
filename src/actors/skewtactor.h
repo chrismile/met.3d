@@ -350,12 +350,8 @@ private:
 
     QMap<MSceneViewGLWidget*, bool> sceneViewFullscreenEnabled;
 
-    QMap<MSceneViewGLWidget*, QList<MLabel*>> skewTLabels;
-
-    float labelSize;
-    QColor labelColour;
-    bool labelBBox;
-    QColor labelBBoxColour;
+    QList<MLabel*> labelsFullScreen;
+    QList<MLabel*> labels3D;
 
     QtProperty *geoPositionProperty,
                *bottomPressureProperty, *topPressureProperty,
@@ -482,6 +478,16 @@ private:
     QVector2D transformTp2xy(QVector2D tpCoordinate_K_hPa);
 
     /**
+      Transform a Skew-T diagram's (x, y) coordinate into full-screen clip
+      space coordinates.
+
+      @note There is an equivalent function with the same name in the GLSL
+      shader; if this function is modified the shader function needs to be
+      modified as well.
+     */
+    QVector2D transformXY2ClipSpace(QVector2D xyCoordinate);
+
+    /**
       Computes a view-dependent transformation matrix to transform coordinates
       in the diagram's (x, y) space into a scene view's world space.
       Coordinates are mapped to an upright plane anchored at the vertical
@@ -494,7 +500,9 @@ private:
       Updates (recomputes) the vertical profiles of the actor variables, e.g.
       after the position of the diagram handle has been changed.
      */
-    void updateVerticalProfiles();
+    void updateVerticalProfilesAndLabels();
+
+    void removeAllSkewTLabels();
 };
 
 

@@ -105,15 +105,15 @@ MSkewTActor::MSkewTActor() : MNWPMultiVarActor(),
                 appearanceGroupProperty);
     properties->setDDouble(temperatureMaxProperty, 60., 20., 100., 0, 10.,
                            celsiusUnit);
+    isothermsSpacingProperty = addProperty(
+                DECORATEDDOUBLE_PROPERTY, "isotherms spacing",
+                appearanceGroupProperty);
+    properties->setDDouble(isothermsSpacingProperty, 10., 1., 100., 0, 1.,
+                           celsiusUnit);
     skewFactorProperty= addProperty(
                 DECORATEDDOUBLE_PROPERTY, "skew factor",
                 appearanceGroupProperty);
     properties->setDDouble(skewFactorProperty, 1., 0., 2., 2, 0.1, " (0..2)");
-    isothermsSpacingProperty = addProperty(
-                DECORATEDDOUBLE_PROPERTY, "isotherms spacing",
-                appearanceGroupProperty);
-    properties->setDDouble(isothermsSpacingProperty, 10., 0.1, 100., 1, 1.,
-                           celsiusUnit);
 
     // Dry adiabates.
     // ==============
@@ -123,7 +123,7 @@ MSkewTActor::MSkewTActor() : MNWPMultiVarActor(),
     dryAdiabatesSpacingProperty = addProperty(
                 DECORATEDDOUBLE_PROPERTY, "dry adiabates spacing",
                 appearanceGroupProperty);
-    properties->setDDouble(dryAdiabatesSpacingProperty, 10., 0.1, 100., 1, 1.,
+    properties->setDDouble(dryAdiabatesSpacingProperty, 10., 1., 100., 0, 1.,
                            celsiusUnit);
 
     // Moist adiabates.
@@ -134,7 +134,7 @@ MSkewTActor::MSkewTActor() : MNWPMultiVarActor(),
     moistAdiabatesSpcaingProperty = addProperty(
                 DECORATEDDOUBLE_PROPERTY, "moist adiabates spacing",
                 appearanceGroupProperty);
-    properties->setDDouble(moistAdiabatesSpcaingProperty, 10., 0.1, 100., 1, 1.,
+    properties->setDDouble(moistAdiabatesSpcaingProperty, 10., 1., 100., 0, 1.,
                            celsiusUnit);
 
     geoPositionProperty = addProperty(
@@ -243,20 +243,8 @@ MSkewTActor::~MSkewTActor()
     {
         delete vbDiagramVerticesFS;
     }
-    MTextManager *tm = MGLResourcesManager::getInstance()->getTextManager();
-    if (tm != nullptr)
-    {
-        for (QList<MLabel*> labels : skewTLabels)
-        {
-            // Remove all labels from text manager.
-            const int numLabels = labels.size();
 
-            for (int i = 0; i < numLabels; ++i)
-            {
-                tm->removeText(labels.takeLast());
-            }
-        }
-    }
+    removeAllSkewTLabels();
 }
 
 
@@ -454,7 +442,7 @@ void MSkewTActor::loadConfiguration(QSettings *settings)
 
     settings->endGroup();
     copyDiagramConfigurationFromQtProperties();
-    updateVerticalProfiles();
+    updateVerticalProfilesAndLabels();
     enableActorUpdates(true);
 }
 
@@ -774,11 +762,6 @@ void MSkewTActor::initializeActorResources()
     generateDiagramGeometry(&vbDiagramVertices, &normalscreenDiagrammConfiguration);
     generateDiagramGeometry(&vbDiagramVerticesFS, &fullscreenDiagrammConfiguration);
 
-    labelSize       = properties->mInt()->value(labelSizeProperty);
-    labelColour     = properties->mColor()->value(labelColourProperty);
-    labelBBox       = properties->mBool()->value(labelBBoxProperty);
-    labelBBoxColour = properties->mColor()->value(labelBBoxColourProperty);
-
     LOG4CPLUS_DEBUG(mlog, "done");
 }
 
@@ -862,10 +845,11 @@ void MSkewTActor::onQtPropertyChanged(QtProperty *property)
              || property == labelBBoxProperty
              || property == labelBBoxColourProperty)
     {
-        labelSize       = properties->mInt()->value(labelSizeProperty);
-        labelColour     = properties->mColor()->value(labelColourProperty);
-        labelBBox       = properties->mBool()->value(labelBBoxProperty);
-        labelBBoxColour = properties->mColor()->value(labelBBoxColourProperty);
+        if (suppressActorUpdates()) return;
+        generateDiagramGeometry(&vbDiagramVertices,
+                                &normalscreenDiagrammConfiguration);
+        generateDiagramGeometry(&vbDiagramVerticesFS,
+                                &fullscreenDiagrammConfiguration);
         emitActorChangedSignal();
     }
     else if (property == geoPositionProperty)
@@ -873,7 +857,7 @@ void MSkewTActor::onQtPropertyChanged(QtProperty *property)
         diagramConfiguration.geoPosition = QVector2D(
                     float(properties->mPointF()->value(geoPositionProperty).x()),
                     float(properties->mPointF()->value(geoPositionProperty).y()));
-        updateVerticalProfiles();
+        updateVerticalProfilesAndLabels();
         emitActorChangedSignal();
     }
     else if (property == drawDryAdiabatesProperty)
@@ -1189,6 +1173,16 @@ void MSkewTActor::generateDiagramGeometry(
         GL::MVertexBuffer** vbDiagramVertices,
         ModeSpecificDiagramConfiguration *config)
 {
+    // Clear list of existing labels and get settings for label display.
+    removeAllSkewTLabels();
+
+    MGLResourcesManager* glRM = MGLResourcesManager::getInstance();
+    MTextManager* tm = glRM->getTextManager();
+    int labelsize = properties->mInt()->value(labelSizeProperty);
+    QColor labelColour = properties->mColor()->value(labelColourProperty);
+    bool labelbbox = properties->mBool()->value(labelBBoxProperty);
+    QColor labelBBoxColour = properties->mColor()->value(labelBBoxColourProperty);
+
     // Array with vertex data that will be uploaded to a vertex buffer at the
     // end of the method. Contains line segments to be rendered with GL_LINES.
     // NOTE: All geometry stored in this array needs to be mapped to 2D diagram
@@ -1235,6 +1229,28 @@ void MSkewTActor::generateDiagramGeometry(
             vStart = QVector2D(0., xyCoordinate.y());
             vEnd = QVector2D(1., xyCoordinate.y());
             vertexArray << vStart << vEnd;
+
+            // Add label for this isobaric line.
+            QVector2D clipSpaceCoordinate = transformXY2ClipSpace(vStart);
+            labelsFullScreen.append(
+                        tm->addText(
+                            QString("%1").arg(pLevel_hPa),
+                            MTextManager::CLIPSPACE,
+                            clipSpaceCoordinate.x(), clipSpaceCoordinate.y(),
+                            -0.99,
+                            labelsize, labelColour, MTextManager::MIDDLECENTRE,
+                            labelbbox, labelBBoxColour)
+                        );
+            labels3D.append(
+                        tm->addText(
+                            QString("%1").arg(pLevel_hPa),
+                            MTextManager::LONLATP,
+                            diagramConfiguration.geoPosition.x(),
+                            diagramConfiguration.geoPosition.y(),
+                            pLevel_hPa,
+                            labelsize, labelColour, MTextManager::MIDDLERIGHT,
+                            labelbbox, labelBBoxColour)
+                        );
         }
     }
 
@@ -1259,18 +1275,40 @@ void MSkewTActor::generateDiagramGeometry(
     float tMinOffset = ceil((skewFactor * diagramTRange_K) /
                             config->dconfig->isothermSpacing) *
             config->dconfig->isothermSpacing;
-    for (float isothermTemperature = diagramTmin_K - tMinOffset;
-         isothermTemperature <= diagramTmax_K;
-         isothermTemperature += config->dconfig->isothermSpacing)
+    for (float isothermTemperature_K = diagramTmin_K - tMinOffset;
+         isothermTemperature_K <= diagramTmax_K;
+         isothermTemperature_K += config->dconfig->isothermSpacing)
     {
         // Generate vertex at (isotherm temperature, bottom pressure).
         QVector2D tpCoordinate_K_hPa = QVector2D(
-                    isothermTemperature, config->dconfig->vertical_p_hPa.min);
+                    isothermTemperature_K, config->dconfig->vertical_p_hPa.min);
         vStart = transformTp2xy(tpCoordinate_K_hPa);
         // Generate vertex at (isotherm temperature, top pressure).
         tpCoordinate_K_hPa.setY(config->dconfig->vertical_p_hPa.max);
         vEnd = transformTp2xy(tpCoordinate_K_hPa);
         vertexArray << vStart << vEnd;
+
+        // Add label for this isotherm at bottom and top of diagram.
+        QVector2D clipSpaceCoordinate = transformXY2ClipSpace(vEnd);
+        labelsFullScreen.append(
+                    tm->addText(
+                        QString("%1").arg(round(isothermTemperature_K - 273.15)),
+                        MTextManager::CLIPSPACE,
+                        clipSpaceCoordinate.x(), clipSpaceCoordinate.y(),
+                        -0.99,
+                        labelsize, labelColour, MTextManager::UPPERCENTRE,
+                        labelbbox, labelBBoxColour)
+                    );
+        clipSpaceCoordinate = transformXY2ClipSpace(vStart);
+        labelsFullScreen.append(
+                    tm->addText(
+                        QString("%1").arg(round(isothermTemperature_K - 273.15)),
+                        MTextManager::CLIPSPACE,
+                        clipSpaceCoordinate.x(), clipSpaceCoordinate.y(),
+                        -0.99,
+                        labelsize, labelColour, MTextManager::LOWERCENTRE,
+                        labelbbox, labelBBoxColour)
+                    );
     }
 
     config->vertexArrayDrawRanges.isotherms.indexCount =
@@ -1956,43 +1994,16 @@ void MSkewTActor::drawDiagramGeometryAndLabels(
         MSceneViewGLWidget *sceneView, GL::MVertexBuffer *vbDiagramVertices,
         ModeSpecificDiagramConfiguration *config)
 {
-    removeAllLabels();
     MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
     MTextManager *tm = glRM->getTextManager();
 
-    // Changing the member variable "labels" during a render call seems to
-    // cause a segmentation fault during the call of renderLabelList()
-    // sometimes. Thus use own label-lists for skew-t actors (one per scene
-    // view, since every scene view might place the labels differently).
-    QList<MLabel*> labels = skewTLabels[sceneView];
-    // Remove all labels from text manager.
-    const int numLabels = labels.size();
-
-    for (int i = 0; i < numLabels; ++i)
-    {
-        tm->removeText(labels.takeLast());
-    }
-
-    if (!properties->mBool()->value(labelsEnabledProperty))
-    {
-        return;
-    }
-
-    // Somehow when using the member variables directly, some labels are missing.
-    int labelSize   = this->labelSize;
-    QColor labelColour = this->labelColour;
-    bool labelBBox       = this->labelBBox;
-    QColor labelBBoxColour = this->labelBBoxColour;
-
+    // Bind vertex array and shader for diagram geometry.
+    // ==================================================
     glEnableVertexAttribArray(SHADER_VERTEX_ATTRIBUTE);
     vbDiagramVertices->attachToVertexAttribute(
         SHADER_VERTEX_ATTRIBUTE, 2,
         GL_FALSE, 0, (const GLvoid *)(0 * sizeof(float)));
 
-    float diagramWorldZOffset = 0.f;
-
-    // Bind shader for diagram geometry.
-    // =================================
     skewTShader->bindProgram("DiagramGeometry");
     setShaderGeneralVars(sceneView, config);
 
@@ -2022,7 +2033,6 @@ void MSkewTActor::drawDiagramGeometryAndLabels(
                  config->vertexArrayDrawRanges.frame.indexCount);
 
     glLineWidth(1);
-
 
     // Draw dry adiabates.
     // ===================
@@ -2261,216 +2271,17 @@ void MSkewTActor::drawDiagramGeometryAndLabels(
                           true, QColor(255, 255, 255, 255)));
     }
 
-    if (config->pressureEqualsWorldPressure)
+
+    // Copy render-mode-dependent labels (3D vs. fullscreen).
+    // ======================================================
+    if (sceneViewFullscreenEnabled.value(sceneView))
     {
-        diagramWorldZOffset = -0.01f;
+        labels = labelsFullScreen;
     }
     else
     {
-        diagramWorldZOffset = 0.05f;
+        labels = labels3D;
     }
-
-    QMatrix4x4 view = sceneView->getCamera()->getViewMatrix();
-    QVector3D cameraUp;
-
-    if (!diagramConfiguration.drawInPerspective)
-    {
-        cameraUp = QVector3D(view.row(1).x(),
-                             view.row(1).y(),
-                             view.row(1).z());
-    }
-    else
-    {
-        cameraUp = QVector3D(0.f, 0.f, 1.f);
-    }
-
-    QVector3D cameraRight = QVector3D(view.row(0).x(),
-                                      view.row(0).y(),
-                                      view.row(0).z());
-    QVector3D cameraFront = QVector3D(view.row(2).x(),
-                                      view.row(2).y(),
-                                      view.row(2).z());
-
-    // Draw pressure labels.
-    // =====================
-    float worldZOfPressureLabel = config->worldZfromPressure(
-                diagramConfiguration.vertical_p_hPa.min) + diagramWorldZOffset;
-    QVector3D position = cameraUp * worldZOfPressureLabel * 36.f +
-                         QVector3D(diagramConfiguration.geoPosition, 0.f)
-                        - cameraRight * 0.02f * 36.f
-                        + cameraFront * 0.05f;
-
-//    if (sceneViewFullscreenEnabled.value(sceneView))
-//    {
-//        labels.append(tm->addText(QString("%1").arg(
-//                                      (int) diagramConfiguration.pressure.min),
-//                                  MTextManager::CLIPSPACE, -0.96f,
-//                                  (act - 0.5f) * 2.f, -0.99f, labelSize,
-//                                  labelColour, MTextManager::BASELINELEFT,
-//                                  labelBBox, labelBBoxColour));
-//    }
-//    else
-//    {
-//        labels.append(tm->addText(QString("%1").arg(
-//                                      (int) diagramConfiguration.pressure.min),
-//                                  MTextManager::WORLDSPACE, position.x(),
-//                                  position.y(), position.z(), labelSize,
-//                                  labelColour, MTextManager::BASELINERIGHT,
-//                                  labelBBox, labelBBoxColour));
-//    }
-
-    float bottom = sceneView->worldZfromPressure(
-                diagramConfiguration.vertical_p_hPa.max) / 36.f;
-    float top = sceneView->worldZfromPressure(
-                diagramConfiguration.vertical_p_hPa.min) / 36.f;
-    QList<float> pressureLevels;
-    QString filler = "  ";
-    pressureLevels << diagramConfiguration.vertical_p_hPa.min
-                   << 1 << 10 << 50 << 100 << 200 << 300 << 400 << 500
-                   << 600 << 700 << 800 << 900 << 1000;
-    for (float pressureCount : pressureLevels)
-    {
-        if (pressureCount > diagramConfiguration.vertical_p_hPa.max)
-        {
-            break;
-        }
-        if (pressureCount < diagramConfiguration.vertical_p_hPa.min)
-        {
-            continue;
-        }
-
-
-        if (config->pressureEqualsWorldPressure)
-        {
-            worldZOfPressureLabel = sceneView->worldZfromPressure((double)pressureCount) / 36.;
-        }
-        else
-        {
-            worldZOfPressureLabel = config->worldZfromPressure((double)pressureCount);
-        }
-        worldZOfPressureLabel += diagramWorldZOffset;
-        if (sceneViewFullscreenEnabled.value(sceneView))
-        {
-            if (pressureCount < 10.f)
-            {
-                filler = "      ";
-            } else if (pressureCount < 100.f)
-            {
-                filler = "   ";
-            }
-            else
-            {
-                filler = "";
-            }
-            labels.append(tm->addText(filler + QString("%1").arg(pressureCount),
-                                      MTextManager::CLIPSPACE,
-                                      -0.98f, (worldZOfPressureLabel - 0.5f) * 2.f, -0.99f,
-                                      labelSize, labelColour,
-                                      MTextManager::BASELINELEFT,
-                                      labelBBox, labelBBoxColour));
-        }
-        else
-        {
-            position = cameraUp * worldZOfPressureLabel * 36.f
-                    + QVector3D(diagramConfiguration.geoPosition, 0.f)
-                    - cameraRight * 0.02f * 36.f
-                    + cameraFront * 0.05f;
-            labels.append(tm->addText(QString("%1").arg(pressureCount),
-                                      MTextManager::WORLDSPACE,
-                                      position.x(), position.y(),
-                                      position.z(), labelSize, labelColour,
-                                      MTextManager::BASELINERIGHT,
-                                      labelBBox, labelBBoxColour));
-        }
-    }
-
-    // Draw temperature labels.
-    // ========================
-    float displayedTemperature = diagramConfiguration.temperature_degC.max;
-    float isothermSpacingClipSpace = config->drawingRegionClipSpace.width() / 12.f;
-    for (int i = 48; i > 0; i -= 2)
-    {
-        float x, y;
-        if (config->pressureEqualsWorldPressure)
-        {
-            x = config->drawingRegionClipSpace.right - 0.01f;
-            y = sceneView->worldZfromPressure(
-                        config->worldZToPressure(
-                            isothermSpacingClipSpace * (i / 2.f)
-                            - config->drawingRegionClipSpace.width() + 0.045f));
-            if (y >= bottom && y <= top)
-            {
-                if (sceneViewFullscreenEnabled.value(sceneView))
-                {
-                    labels.append(tm->addText(
-                                      QString("%1").arg((int) displayedTemperature),
-                                      MTextManager::CLIPSPACE,
-                                      (x - 0.46f) * 2.f, (y - 0.5f) * 2.f,
-                                      -0.99f, labelSize, labelColour,
-                                      MTextManager::BASELINELEFT,
-                                      labelBBox, labelBBoxColour));
-                }
-                else
-                {
-                    position = cameraUp * y * 36.f
-                            + QVector3D(diagramConfiguration.geoPosition, 0.f)
-                            + cameraRight * x * 36.f
-                            + cameraFront * 0.05f;
-                    labels.append(tm->addText(
-                                      QString("%1").arg(-(int) displayedTemperature),
-                                      MTextManager::WORLDSPACE,
-                                      position.x(), position.y(), position.z(),
-                                      labelSize, labelColour,
-                                      MTextManager::BASELINELEFT,
-                                      labelBBox, labelBBoxColour));
-                }
-            }
-        }
-        else
-        {
-            x = isothermSpacingClipSpace * (i / 2.f) - config->drawingRegionClipSpace.width()
-                    + config->drawingRegionClipSpace.bottom;
-            if (x <= config->drawingRegionClipSpace.left - 0.05f)
-            {
-                break;
-            }
-            if (x >= config->drawingRegionClipSpace.left - 0.05f
-                    && x < config->drawingRegionClipSpace.right + 0.05f)
-            {
-                if (sceneViewFullscreenEnabled.value(sceneView))
-                {
-                    labels.append(tm->addText(
-                                      QString("%1").arg((int) displayedTemperature),
-                                      MTextManager::CLIPSPACE,
-                                      (x - 0.5f) * 2.f, (y - 0.5f + 0.0085f)
-                                      * 2.f, -0.99f, labelSize, labelColour,
-                                      MTextManager::BASELINELEFT,
-                                      labelBBox, labelBBoxColour));
-                }
-                else
-                {
-                    position = cameraRight * (x - 0.06f) * 36.f
-                            + QVector3D(diagramConfiguration.geoPosition, 0.f)
-                            + cameraUp
-                            * (config->drawingRegionClipSpace.bottom - 0.05f) * 36.f
-                            + cameraFront * 0.05f;
-                    labels.append(tm->addText(
-                                      QString("%1").arg((int) displayedTemperature),
-                                      MTextManager::WORLDSPACE,
-                                      position.x(), position.y(), position.z(),
-                                      labelSize, labelColour,
-                                      MTextManager::BASELINELEFT,
-                                      labelBBox, labelBBoxColour));
-                }
-            }
-        }
-
-        displayedTemperature -= diagramConfiguration.temperature_degC.amplitude() / 12.f;
-    }
-    sceneView->makeCurrent();
-
-    skewTLabels.insert(sceneView, labels);
-    tm->renderLabelList(sceneView, labels);
 }
 
 
@@ -2829,6 +2640,20 @@ QVector2D MSkewTActor::transformTp2xy(QVector2D tpCoordinate_K_hPa)
 }
 
 
+QVector2D MSkewTActor::transformXY2ClipSpace(QVector2D xyCoordinate)
+{
+    // NOTE: There is an equivalent function with the same name in the GLSL
+    // shader; if this function is modified the shader function needs to be
+    // modified as well.
+
+//TODO (mr, 10Jan2019) -- replace by matrix multiplication.
+    float hPad = 0.1;
+    float vPad = 0.1;
+    return QVector2D(xyCoordinate.x() * (2.-2.*hPad) - 1.+hPad,
+                     xyCoordinate.y() * (2.-2.*vPad) - 1.+vPad);
+}
+
+
 QMatrix4x4 MSkewTActor::computeXY2WorldSpaceTransformationMatrix(
         MSceneViewGLWidget* sceneView)
 {
@@ -2874,7 +2699,7 @@ QMatrix4x4 MSkewTActor::computeXY2WorldSpaceTransformationMatrix(
 }
 
 
-void MSkewTActor::updateVerticalProfiles()
+void MSkewTActor::updateVerticalProfilesAndLabels()
 {
     // Tell all actor variables to update their vertical profile data to the
     // current geographical location.
@@ -2885,6 +2710,42 @@ void MSkewTActor::updateVerticalProfiles()
 
         var->updateProfile(diagramConfiguration.geoPosition);
     }
+
+    // Update the geographical locations of the labels in the 3D view.
+    for (MLabel* label : labels3D)
+    {
+        label->anchor.setX(diagramConfiguration.geoPosition.x());
+        label->anchor.setY(diagramConfiguration.geoPosition.y());
+    }
+}
+
+
+void MSkewTActor::removeAllSkewTLabels()
+{
+    // Remove all text labels.
+    MTextManager* tm = MGLResourcesManager::getInstance()->getTextManager();
+    if (tm == nullptr)
+    {
+        // When Met.3D is closed, the text manager may be deleted before this
+        // actor is deleted. In that case labels will be freed by the text
+        // manager's destructor.
+        return;
+    }
+
+    while ( !labelsFullScreen.isEmpty() )
+    {
+        tm->removeText(labelsFullScreen.takeLast());
+    }
+    while ( !labels3D.isEmpty() )
+    {
+        tm->removeText(labels3D.takeLast());
+    }
+
+    //NOTE: The inherited list "labels" should only contain labels copied from
+    // one of the two above lists in "drawDiagramGeometryAndLabels()". Since
+    // all labels are deleted in the loops above we need to clear the "labels"
+    // list. **THIS ASSUMES THAT NO OTHER LABELS ARE CONTAINED IN THIS LIST!**
+    labels.clear();
 }
 
 
