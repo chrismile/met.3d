@@ -47,9 +47,8 @@
 #include "gxfw/nwpmultivaractor.h"
 #include "gxfw/nwpactorvariable.h"
 #include "gxfw/gl/shadereffect.h"
-#include "actors/transferfunction1d.h"
-#include "actors/graticuleactor.h"
 #include "gxfw/textmanager.h"
+#include "actors/movablepoleactor.h"
 
 class MSceneViewGLWidget;
 
@@ -84,12 +83,19 @@ public:
     MNWPActorVariable* createActorVariable(
             const MSelectableDataSource& dataSource) override;
 
-    virtual int checkIntersectionWithHandle(
+    int checkIntersectionWithHandle(
             MSceneViewGLWidget* sceneView, float clipX, float clipY) override;
 
-    virtual void dragEvent(MSceneViewGLWidget*
-                           sceneView, int handleID, float clipX,
-                           float clipY) override;
+    void addPositionLabel(MSceneViewGLWidget *sceneView, int handleID,
+                          float clipX, float clipY);
+
+    void dragEvent(MSceneViewGLWidget*
+                   sceneView, int handleID, float clipX,
+                   float clipY) override;
+
+    QList<MLabel*> getPositionLabelToRender() override;
+
+    void removePositionLabel() override;
 
     virtual bool supportsMultipleEnsembleMemberVisualization() override
     { return true; }
@@ -408,7 +414,6 @@ private:
 
     void updateVariableEnums(MNWPActorVariable *deletedVar = nullptr);
 
-    void drawDiagramHandle(MSceneViewGLWidget *sceneView);
     void setShaderGeneralVars(MSceneViewGLWidget *sceneView,
                               ModeSpecificDiagramConfiguration *config);
     void drawProbabilityTube(MNWPSkewTActorVariable *max,
@@ -503,6 +508,9 @@ private:
     void updateVerticalProfilesAndLabels();
 
     void removeAllSkewTLabels();
+
+    MMovablePoleActor *poleActor;
+    bool dragEventActive;
 };
 
 

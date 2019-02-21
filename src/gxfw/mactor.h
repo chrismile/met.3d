@@ -221,7 +221,7 @@ public:
     /**
       Returns the position labe in a list if it shall be rendered for this actor.
       */
-    QList<MLabel*> getPositionLabelToRender();
+    virtual QList<MLabel*> getPositionLabelToRender();
 
     /**
       Returns @p true if the actor can be picked and dragged in modify mode.
@@ -263,7 +263,7 @@ public:
 
       Called by a @ref MSceneViewGLWidget in modification mode.
       */
-    void removePositionLabel();
+    virtual void removePositionLabel();
 
     /**
       Drags the handle with ID @p handleID to the clip space point (@p clipX,

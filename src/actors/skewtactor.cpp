@@ -58,7 +58,8 @@ MSkewTActor::MSkewTActor() : MNWPMultiVarActor(),
     vbDiagramVerticesFS(nullptr),
     vbWyomingVertices(nullptr),
     wyomingVerticesCount(0),
-    offsetPickPositionToHandleCentre(QVector2D(0., 0.))
+    offsetPickPositionToHandleCentre(QVector2D(0., 0.)),
+    dragEventActive(false)
 {
     enablePicking(true);
     setActorSupportsFullScreenVisualisation(true);
@@ -137,9 +138,25 @@ MSkewTActor::MSkewTActor() : MNWPMultiVarActor(),
     properties->setDDouble(moistAdiabatesSpcaingProperty, 10., 1., 100., 0, 1.,
                            celsiusUnit);
 
+
+    // Geographical position of profile.
+    // =================================
+
+    QPointF initialPosition = QPointF(0., 0.);
     geoPositionProperty = addProperty(
                 POINTF_LONLAT_PROPERTY, "position", actorPropertiesSupGroup);
-    properties->mPointF()->setValue(geoPositionProperty, QPointF());
+    properties->mPointF()->setValue(geoPositionProperty, initialPosition);
+
+    // Keep an instance of a MMovablePoleActor as a "subactor" to draw the
+    // pole at which the vertical profile is taken.
+    poleActor = new MMovablePoleActor();
+    poleActor->setName("profile pole");
+    poleActor->addPole(initialPosition);
+    poleActor->enablePoleProperties(false); // only allow a single pole
+    poleActor->setTubeRadius(0.2);
+    poleActor->setVerticalExtent(1050., 20.);
+    poleActor->setTicksOnRightSide(false);
+    actorPropertiesSupGroup->addSubProperty(poleActor->getPropertyGroup());
 
 
 // TODO (bt, 03Sep2018) Disabled for now, needs to be updated to work again.
@@ -244,6 +261,9 @@ MSkewTActor::~MSkewTActor()
         delete vbDiagramVerticesFS;
     }
 
+//TODO (mr, 20Feb2019) -- Deleting the poleActor causes a segmentation fault.. why?
+    // delete poleActor;
+
     removeAllSkewTLabels();
 }
 
@@ -256,12 +276,10 @@ void MSkewTActor::reloadShaderEffects()
 {
     LOG4CPLUS_DEBUG(mlog, "loading shader programs" << flush);
 
-    beginCompileShaders(2);
+    beginCompileShaders(1);
 
     compileShadersFromFileWithProgressDialog(
                 skewTShader, "src/glsl/skewtrendering.fx.glsl");
-    compileShadersFromFileWithProgressDialog(
-                positionSpheresShader, "src/glsl/trajectory_positions.fx.glsl");
 
     endCompileShaders();
 }
@@ -337,6 +355,7 @@ void MSkewTActor::saveConfiguration(QSettings *settings)
                        properties->mColor()->value(
                            dewPointMinMaxVariableColorProperty));
 
+    poleActor->saveConfiguration(settings);
     settings->endGroup();
 }
 
@@ -348,6 +367,9 @@ void MSkewTActor::loadConfiguration(QSettings *settings)
     enableActorUpdates(false);
 
     settings->beginGroup(MSkewTActor::getSettingsID());
+
+    poleActor->loadConfiguration(settings);
+    poleActor->enablePoleProperties(false); // only allow a single pole
 
     properties->mDDouble()->setValue(
         bottomPressureProperty,
@@ -478,112 +500,49 @@ int MSkewTActor::checkIntersectionWithHandle(
     }
     else
     {
-        float clipRadius = MSystemManagerAndControl::getInstance()
-                ->getHandleSize();
-
-        QMatrix4x4 *mvpMatrix = sceneView->getModelViewProjectionMatrix();
-        QVector3D p = QVector3D(diagramConfiguration.geoPosition.x(),
-                                diagramConfiguration.geoPosition.y(), 0.f);
-        QVector3D pClip = *(mvpMatrix) * p; // projection into clipspace
-        float dx = pClip.x() - clipX;
-        float dy = pClip.y() - clipY;
-        offsetPickPositionToHandleCentre = QVector2D(dx, dy);
-
-        // Obtain the camera position and the view direction
-        const QVector3D& cameraPos = sceneView->getCamera()->getOrigin();
-        QVector3D viewDir = p - cameraPos;
-
-        // Scale the radius (in world space) with respect to the viewer distance
-        float radius = static_cast<float>(clipRadius * viewDir.length() / 100.f);
-
-        // Compute the world position of the current mouse position
-        QVector3D mouseWorldPos = mvpMatrix->inverted()
-                * QVector3D(clipX, clipY, 1.f);
-
-        // Get the ray direction from the camera to the mouse position
-        QVector3D l = mouseWorldPos - cameraPos;
-        l.normalize();
-
-        // Compute (o - c) // ray origin (o) - sphere center (c)
-        QVector3D oc = cameraPos - p;
-        // Length of (o - c) = || o - c ||
-        float lenOC = static_cast<float>(oc.length());
-        // Compute l * (o - c)
-        float loc = static_cast<float>(QVector3D::dotProduct(l, oc));
-
-        // Solve equation:
-        // d = - (l * (o - c) +- sqrt( (l * (o - c))² - || o - c ||² + r² )
-        // Since the equation can be solved only if root discriminant is >= 0
-        // just compute the discriminant
-        float root = loc * loc - lenOC * lenOC + radius * radius;
-
-        // If root discriminant is positive or zero, there's an intersection
-        if (root >= 0.f)
-        {
-            mvpMatrix = sceneView->getModelViewProjectionMatrix();
-            QVector3D posCentreClip = *mvpMatrix * p;
-            offsetPickPositionToHandleCentre =
-                    QVector2D(posCentreClip.x() - clipX,
-                              posCentreClip.y() - clipY);
-            diagramConfiguration.overDragHandle = true;
-            return 1;
-        }
-
-        diagramConfiguration.overDragHandle = false;
+        return poleActor->checkIntersectionWithHandle(sceneView, clipX, clipY);
     }
     return -1;
+}
+
+
+void MSkewTActor::addPositionLabel(
+        MSceneViewGLWidget *sceneView, int handleID, float clipX, float clipY)
+{
+    if (!sceneViewFullscreenEnabled.value(sceneView))
+    {
+        poleActor->addPositionLabel(sceneView, handleID, clipX, clipY);
+    }
 }
 
 
 void MSkewTActor::dragEvent(
      MSceneViewGLWidget *sceneView, int handleID, float clipX, float clipY)
 {
-    Q_UNUSED(handleID);
     if (!sceneViewFullscreenEnabled.value(sceneView))
     {
-        // Select an arbitrary z-value to construct a point in clip space that,
-        // transformed to world space, lies on the ray passing through the camera
-        // and the location on the worldZ==0 plane "picked" by the mouse.
-        // (See notes 22-23Feb2012).
-        QVector3D mousePosClipSpace =
-                QVector3D(clipX + offsetPickPositionToHandleCentre.x(),
-                          clipY + offsetPickPositionToHandleCentre.y(),
-                          0.f);
+        dragEventActive = true;
 
-        // The point p at which the ray intersects the worldZ==0 plane is found
-        // by computing the value d in p = d * l + l0, where l0 is a point on
-        // the ray and l is a vector in the direction of the ray. d can be
-        // found with
-        //        (p0 - l0) * n
-        //   d = ----------------
-        //            l * n
-        // where p0 is a point on the worldZ==0 plane and n is the normal vector
-        // of the plane.
-        //       http://en.wikipedia.org/wiki/Line-plane_intersection
+        poleActor->dragEvent(sceneView, handleID, clipX, clipY);
 
-        // To compute l0, the MVP matrix has to be inverted.
-        QMatrix4x4 *mvpMatrix =
-            sceneView->getModelViewProjectionMatrix();
-        QVector3D l0 = mvpMatrix->inverted() *
-                       mousePosClipSpace;
+        properties->mPointF()->setValue(
+                    geoPositionProperty,
+                    poleActor->getPoleVertices().at(0).toPointF());
 
-        // Compute l as the vector from l0 to the camera origin.
-        QVector3D cameraPosWorldSpace =
-            sceneView->getCamera()->getOrigin();
-        QVector3D l = (l0 - cameraPosWorldSpace);
-
-        // The plane's normal vector simply points upward, the origin in world
-        // space is located on the plane.
-        QVector3D n = QVector3D(0.f, 0.f, 1.f);
-        QVector3D p0 = QVector3D(0.f, 0.f, 0.f);
-
-        // Compute the mouse position in world space.
-        float d = QVector3D::dotProduct(p0 - l0, n) / QVector3D::dotProduct(l, n);
-
-        QVector3D mousePosWorldSpace = l0 + d * l;
-        QPointF p = QPointF(mousePosWorldSpace.x(), mousePosWorldSpace.y());
-        properties->mPointF()->setValue(geoPositionProperty, p);
+        dragEventActive = false;
     }
+}
+
+
+QList<MLabel*> MSkewTActor::getPositionLabelToRender()
+{
+    return poleActor->getPositionLabelToRender();
+}
+
+
+void MSkewTActor::removePositionLabel()
+{
+    poleActor->removePositionLabel();
 }
 
 
@@ -752,10 +711,9 @@ void MSkewTActor::initializeActorResources()
     bool loadShaders = false;
     loadShaders |= glRM->generateEffectProgram("skewtrendering", skewTShader);
 
-    loadShaders |= glRM->generateEffectProgram("skewt_spheres",
-                                               positionSpheresShader);
-
     if (loadShaders) reloadShaderEffects();
+
+    poleActor->initialize();
 
     copyDiagramConfigurationFromQtProperties();
 
@@ -770,10 +728,6 @@ void MSkewTActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
 {
     sceneViewFullscreenEnabled.insert(sceneView, false);
     drawDiagram3DView(sceneView);
-    if (sceneView->interactionModeEnabled())
-    {
-        drawDiagramHandle(sceneView);
-    }
 }
 
 
@@ -833,6 +787,8 @@ void MSkewTActor::onQtPropertyChanged(QtProperty *property)
         fullscreenDiagrammConfiguration.recomputeAdiabateGeometries = true;
 
         copyDiagramConfigurationFromQtProperties();
+        poleActor->setVerticalExtent(diagramConfiguration.vertical_p_hPa.max,
+                                     diagramConfiguration.vertical_p_hPa.min);
 
         generateDiagramGeometry(&vbDiagramVertices,
                                 &normalscreenDiagrammConfiguration);
@@ -1079,51 +1035,6 @@ void MSkewTActor::updateVariableEnums(MNWPActorVariable *deletedVar)
 }
 
 
-void MSkewTActor::drawDiagramHandle(MSceneViewGLWidget *sceneView)
-{
-    // Bind shader program.
-    positionSpheresShader->bindProgram("UsePosition");
-
-    // Set MVP-matrix and parameters to map pressure to world space in the
-    // vertex shader.
-    positionSpheresShader->setUniformValue("mvpMatrix",
-                           *(sceneView->getModelViewProjectionMatrix()));
-    positionSpheresShader->setUniformValue("pToWorldZParams",
-                           sceneView->pressureToWorldZParameters());
-    positionSpheresShader->setUniformValue("lightDirection",
-                           sceneView->getLightDirection());
-    positionSpheresShader->setUniformValue("cameraPosition",
-                           sceneView->getCamera()->getOrigin());
-    positionSpheresShader->setUniformValue("cameraUpDir",
-                           sceneView->getCamera()->getYAxis());
-    positionSpheresShader->setUniformValue(
-                "radius", GLfloat(MSystemManagerAndControl::getInstance()
-                                  ->getHandleSize()));
-    positionSpheresShader->setUniformValue("scaleRadius", GLboolean(true));
-
-    positionSpheresShader->setUniformValue("position",
-                                           diagramConfiguration.geoPosition);
-
-    // Texture bindings for transfer function for data scalar (1D texture from
-    // transfer function class). The data scalar is stored in the vertex.w
-    // component passed to the vertex shader.
-    positionSpheresShader->setUniformValue("useTransferFunction",
-                                           GLboolean(false));
-
-    positionSpheresShader->setUniformValue("constColour", QColor(Qt::white));
-    if (diagramConfiguration.overDragHandle)
-    {
-        positionSpheresShader->setUniformValue("constColour", QColor(Qt::red));
-    }
-
-    glPolygonMode(GL_FRONT_AND_BACK, renderAsWireFrame ? GL_LINE : GL_FILL);
-    glLineWidth(1);
-    glDrawArrays(GL_POINTS, 0, 1);
-    // Unbind VBO
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-}
-
-
 void MSkewTActor::copyDiagramConfigurationFromQtProperties()
 {
     diagramConfiguration.alignWithCamera =
@@ -1213,10 +1124,12 @@ void MSkewTActor::generateDiagramGeometry(
     // ==============================
     config->vertexArrayDrawRanges.isobars.startIndex = vertexArray.size();
 
-//TODO (mr, 09Jan2019) -- make levels user-customizable.
     QList<int> pressureLevels;
-    pressureLevels << 1 << 10 << 50 << 100 << 200 << 300 << 400 << 500
-                   << 600 << 700 << 800 << 900 << 1000;
+    for (QVector3D axisTick : poleActor->getAxisTicks())
+    {
+        // Draw isobaric lines at tick positions of associated pole actor.
+        pressureLevels.append(axisTick.z());
+    }
     for (int pLevel_hPa : pressureLevels)
     {
         if ((pLevel_hPa < diagramConfiguration.vertical_p_hPa.max) &&
@@ -1241,16 +1154,18 @@ void MSkewTActor::generateDiagramGeometry(
                             labelsize, labelColour, MTextManager::MIDDLECENTRE,
                             labelbbox, labelBBoxColour)
                         );
-            labels3D.append(
-                        tm->addText(
-                            QString("%1").arg(pLevel_hPa),
-                            MTextManager::LONLATP,
-                            diagramConfiguration.geoPosition.x(),
-                            diagramConfiguration.geoPosition.y(),
-                            pLevel_hPa,
-                            labelsize, labelColour, MTextManager::MIDDLERIGHT,
-                            labelbbox, labelBBoxColour)
-                        );
+            // We could generate labels for the 3D scene at this place;
+            // currently the labels provided by the pole are used.
+            // labels3D.append(
+            //             tm->addText(
+            //                 QString("%1").arg(pLevel_hPa),
+            //                 MTextManager::LONLATP,
+            //                 diagramConfiguration.geoPosition.x(),
+            //                 diagramConfiguration.geoPosition.y(),
+            //                 pLevel_hPa,
+            //                 labelsize, labelColour, MTextManager::MIDDLERIGHT,
+            //                 labelbbox, labelBBoxColour)
+            //             );
         }
     }
 
@@ -1795,6 +1710,9 @@ void MSkewTActor::drawDiagram2(
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
         glLineWidth(float(var->lineThickness));
         glDrawArrays(GL_LINE_STRIP, 0, var->profile.getScalarPressureData().size());
+
+        // Unbind VBO.
+        glBindBuffer(GL_ARRAY_BUFFER, 0); CHECK_GL_ERROR;
     }
 }
 
@@ -2272,6 +2190,9 @@ void MSkewTActor::drawDiagramGeometryAndLabels(
     }
 
 
+    // Unbind VBO.
+    glBindBuffer(GL_ARRAY_BUFFER, 0); CHECK_GL_ERROR;
+
     // Copy render-mode-dependent labels (3D vs. fullscreen).
     // ======================================================
     if (sceneViewFullscreenEnabled.value(sceneView))
@@ -2281,6 +2202,8 @@ void MSkewTActor::drawDiagramGeometryAndLabels(
     else
     {
         labels = labels3D;
+        labels.append(poleActor->getLabelsToRender());
+//        poleActor->render(sceneView);
     }
 }
 
@@ -2574,6 +2497,7 @@ void MSkewTActor::drawDiagram3DView(MSceneViewGLWidget* sceneView)
     drawDiagramGeometryAndLabels(sceneView, vbDiagramVertices, &normalscreenDiagrammConfiguration);
     normalscreenDiagrammConfiguration.layer = -.1f;
     drawDiagram2(sceneView, vbDiagramVertices, &normalscreenDiagrammConfiguration);
+    poleActor->render(sceneView);
 }
 
 
@@ -2716,6 +2640,13 @@ void MSkewTActor::updateVerticalProfilesAndLabels()
     {
         label->anchor.setX(diagramConfiguration.geoPosition.x());
         label->anchor.setY(diagramConfiguration.geoPosition.y());
+    }
+
+    // Update vertical position of the attached pole actor.
+    if (!dragEventActive)
+    {
+        poleActor->setPolePosition(
+                    0, diagramConfiguration.geoPosition.toPointF());
     }
 }
 
