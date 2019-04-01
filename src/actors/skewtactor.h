@@ -166,7 +166,6 @@ private:
     struct VertexRanges
     {
         int lineWidth = 1;
-        VertexRange temperatureMarks;
         VertexRange isotherms;
         VertexRange dryAdiabates;
         VertexRange moistAdiabates;
@@ -354,8 +353,7 @@ private:
         VertexRanges highlightGeometryDrawRanges;
     };
 
-    ModeSpecificDiagramConfiguration normalscreenDiagrammConfiguration;
-    ModeSpecificDiagramConfiguration fullscreenDiagrammConfiguration;
+    ModeSpecificDiagramConfiguration skewTDiagramConfiguration;
 
     QMap<MSceneViewGLWidget*, bool> sceneViewFullscreenEnabled;
 
@@ -401,7 +399,6 @@ private:
       @brief Buffer used for the diagram auxiliary lines.
      */
     GL::MVertexBuffer* vbDiagramVertices;
-    GL::MVertexBuffer* vbDiagramVerticesFS;
     GL::MVertexBuffer* vbHighlightVertices;
 
     /**

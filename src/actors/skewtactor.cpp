@@ -55,7 +55,6 @@ namespace Met3D
 *******************************************************************************/
 MSkewTActor::MSkewTActor() : MNWPMultiVarActor(),
     vbDiagramVertices(nullptr),
-    vbDiagramVerticesFS(nullptr),
     vbHighlightVertices(nullptr),
     vbWyomingVertices(nullptr),
     wyomingVerticesCount(0),
@@ -256,10 +255,6 @@ MSkewTActor::~MSkewTActor()
     if (vbDiagramVertices)
     {
         delete vbDiagramVertices;
-    }
-    if (vbDiagramVerticesFS)
-    {
-        delete vbDiagramVerticesFS;
     }
     if (vbHighlightVertices)
     {
@@ -504,8 +499,6 @@ int MSkewTActor::checkIntersectionWithHandle(
         // move event" that determines the (T,p) coordinate at which the mouse
         // pointer currently hovers and generates some geometry (isobaric,
         // isothermal etc. lines) that highlight the current coordinate.
-        fullscreenDiagrammConfiguration.clipPos.setX(clipX);
-        fullscreenDiagrammConfiguration.clipPos.setY(clipY);
 
         // Compute (T,p) coordinate from clip space (x,y) coordinate.
         QVector2D clipSpaceCoordinate = QVector2D(clipX, clipY);
@@ -515,7 +508,7 @@ int MSkewTActor::checkIntersectionWithHandle(
         // Generate highlight geometry.
         generateFullScreenHighlightGeometry(tpCoordinate,
                                             &vbHighlightVertices,
-                                            &fullscreenDiagrammConfiguration);
+                                            &skewTDiagramConfiguration);
     }
     else
     {
@@ -569,24 +562,6 @@ void MSkewTActor::onFullScreenModeSwitch(MSceneViewGLWidget *sceneView,
                                          bool fullScreenEnabled)
 {
     sceneViewFullscreenEnabled.insert(sceneView, fullScreenEnabled);
-//    if (fullScreenEnabled)
-//    {
-//        diagramConfiguration.fullscreen = true;
-//    }
-//    else
-//    {
-//        diagramConfiguration.fullscreen = false;
-//    }
-    copyDiagramConfigurationFromQtProperties();
-    diagramConfiguration.regenerateAdiabates = true;
-    normalscreenDiagrammConfiguration.recomputeAdiabateGeometries = true;
-    fullscreenDiagrammConfiguration.recomputeAdiabateGeometries = true;
-    if (isInitialized())
-    {
-        generateDiagramGeometry(&vbDiagramVertices, &normalscreenDiagrammConfiguration);
-        generateDiagramGeometry(&vbDiagramVerticesFS, &fullscreenDiagrammConfiguration);
-    }
-    emitActorChangedSignal();
 }
 
 
@@ -735,9 +710,7 @@ void MSkewTActor::initializeActorResources()
     poleActor->initialize();
 
     copyDiagramConfigurationFromQtProperties();
-
-    generateDiagramGeometry(&vbDiagramVertices, &normalscreenDiagrammConfiguration);
-    generateDiagramGeometry(&vbDiagramVerticesFS, &fullscreenDiagrammConfiguration);
+    generateDiagramGeometry(&vbDiagramVertices, &skewTDiagramConfiguration);
 
     LOG4CPLUS_DEBUG(mlog, "done");
 }
@@ -745,14 +718,12 @@ void MSkewTActor::initializeActorResources()
 
 void MSkewTActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
 {
-    sceneViewFullscreenEnabled.insert(sceneView, false);
     drawDiagram3DView(sceneView);
 }
 
 
 void MSkewTActor::renderToCurrentFullScreenContext(MSceneViewGLWidget *sceneView)
 {
-    sceneViewFullscreenEnabled.insert(sceneView, true);
     drawDiagramFullScreen(sceneView);
 }
 
@@ -802,17 +773,14 @@ void MSkewTActor::onQtPropertyChanged(QtProperty *property)
              || property == skewFactorProperty)
     {
         diagramConfiguration.regenerateAdiabates = true;
-        normalscreenDiagrammConfiguration.recomputeAdiabateGeometries = true;
-        fullscreenDiagrammConfiguration.recomputeAdiabateGeometries = true;
+        skewTDiagramConfiguration.recomputeAdiabateGeometries = true;
 
         copyDiagramConfigurationFromQtProperties();
         poleActor->setVerticalExtent(diagramConfiguration.vertical_p_hPa.max,
                                      diagramConfiguration.vertical_p_hPa.min);
 
         generateDiagramGeometry(&vbDiagramVertices,
-                                &normalscreenDiagrammConfiguration);
-        generateDiagramGeometry(&vbDiagramVerticesFS,
-                                &fullscreenDiagrammConfiguration);
+                                &skewTDiagramConfiguration);
         emitActorChangedSignal();
     }
     else if (property == labelSizeProperty
@@ -822,9 +790,7 @@ void MSkewTActor::onQtPropertyChanged(QtProperty *property)
     {
         if (suppressActorUpdates()) return;
         generateDiagramGeometry(&vbDiagramVertices,
-                                &normalscreenDiagrammConfiguration);
-        generateDiagramGeometry(&vbDiagramVerticesFS,
-                                &fullscreenDiagrammConfiguration);
+                                &skewTDiagramConfiguration);
         emitActorChangedSignal();
     }
     else if (property == geoPositionProperty)
@@ -844,21 +810,12 @@ void MSkewTActor::onQtPropertyChanged(QtProperty *property)
         {
             // Regenerate dry adiabates only if necessary (first time, pressure
             // drawing type, temperature scale)
-            if ((normalscreenDiagrammConfiguration
+            if ((skewTDiagramConfiguration
                  .vertexArrayDrawRanges.dryAdiabates.indexCount == 0)
-                    || normalscreenDiagrammConfiguration.recomputeAdiabateGeometries)
+                    || skewTDiagramConfiguration.recomputeAdiabateGeometries)
             {
                 generateDiagramGeometry(&vbDiagramVertices,
-                                        &normalscreenDiagrammConfiguration);
-            }
-            // Regenerate dry adiabates only if necessary (first time, pressure
-            // drawing type, temperature scale)
-            if ((fullscreenDiagrammConfiguration
-                 .vertexArrayDrawRanges.dryAdiabates.indexCount == 0)
-                    || fullscreenDiagrammConfiguration.recomputeAdiabateGeometries)
-            {
-                generateDiagramGeometry(&vbDiagramVertices,
-                                        &fullscreenDiagrammConfiguration);
+                                        &skewTDiagramConfiguration);
             }
         }
         emitActorChangedSignal();
@@ -872,21 +829,12 @@ void MSkewTActor::onQtPropertyChanged(QtProperty *property)
         {
             // Regenerate moist adiabates only if necessary (first time,
             // pressure drawing type, temperature scale)
-            if ((normalscreenDiagrammConfiguration
+            if ((skewTDiagramConfiguration
                  .vertexArrayDrawRanges.moistAdiabates.indexCount == 0)
-                    || normalscreenDiagrammConfiguration.recomputeAdiabateGeometries)
+                    || skewTDiagramConfiguration.recomputeAdiabateGeometries)
             {
                 generateDiagramGeometry(&vbDiagramVertices,
-                                        &normalscreenDiagrammConfiguration);
-            }
-            // Regenerate moist adiabates only if necessary (first time,
-            // pressure drawing type, temperature scale)
-            if ((fullscreenDiagrammConfiguration
-                 .vertexArrayDrawRanges.moistAdiabates.indexCount == 0)
-                    || fullscreenDiagrammConfiguration.recomputeAdiabateGeometries)
-            {
-                generateDiagramGeometry(&vbDiagramVertices,
-                                        &fullscreenDiagrammConfiguration);
+                                        &skewTDiagramConfiguration);
             }
         }
         emitActorChangedSignal();
@@ -1084,13 +1032,11 @@ void MSkewTActor::copyDiagramConfigurationFromQtProperties()
     diagramConfiguration.dryAdiabatSpacing =
             properties->mDDouble()->value(dryAdiabatesSpacingProperty);
 
-    normalscreenDiagrammConfiguration.pressureEqualsWorldPressure =
+    skewTDiagramConfiguration.pressureEqualsWorldPressure =
             diagramConfiguration.alignWithCamera;
-    fullscreenDiagrammConfiguration.pressureEqualsWorldPressure = false;
 
     diagramConfiguration.init();
-    normalscreenDiagrammConfiguration.init(&diagramConfiguration, "_normal");
-    fullscreenDiagrammConfiguration.init(&diagramConfiguration, "_fullscreen");
+    skewTDiagramConfiguration.init(&diagramConfiguration, "_normal");
 
     // After the configuration has been copied from the properties, recompute
     // the (T, log(p)) to (x, y) transformation matrix to transform (T, p)
@@ -2091,9 +2037,6 @@ void MSkewTActor::drawDiagramGeometryAndLabels(
         MSceneViewGLWidget *sceneView, GL::MVertexBuffer *vbDiagramVertices,
         ModeSpecificDiagramConfiguration *config, VertexRanges *vertexRanges)
 {
-    MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
-    MTextManager *tm = glRM->getTextManager();
-
     // Bind vertex array and shader for diagram geometry.
     // ==================================================
     glEnableVertexAttribArray(SHADER_VERTEX_ATTRIBUTE);
@@ -2468,11 +2411,11 @@ MSkewTActor::ModeSpecificDiagramConfiguration::pressureToWorldZParameters() cons
 
 void MSkewTActor::drawDiagram3DView(MSceneViewGLWidget* sceneView)
 {
-    normalscreenDiagrammConfiguration.layer = -0.005f;
-    drawDiagramGeometryAndLabels(sceneView, vbDiagramVertices, &normalscreenDiagrammConfiguration,
-                                 &normalscreenDiagrammConfiguration.vertexArrayDrawRanges);
-    normalscreenDiagrammConfiguration.layer = -.1f;
-    drawDiagram2(sceneView, vbDiagramVertices, &normalscreenDiagrammConfiguration);
+    skewTDiagramConfiguration.layer = -0.005f;
+    drawDiagramGeometryAndLabels(sceneView, vbDiagramVertices, &skewTDiagramConfiguration,
+                                 &skewTDiagramConfiguration.vertexArrayDrawRanges);
+    skewTDiagramConfiguration.layer = -.1f;
+    drawDiagram2(sceneView, vbDiagramVertices, &skewTDiagramConfiguration);
     poleActor->render(sceneView);
 }
 
@@ -2480,23 +2423,24 @@ void MSkewTActor::drawDiagram3DView(MSceneViewGLWidget* sceneView)
 void MSkewTActor::drawDiagramFullScreen(MSceneViewGLWidget* sceneView)
 {
     glClear(GL_DEPTH_BUFFER_BIT);
-    fullscreenDiagrammConfiguration.layer = -0.005f;
     drawDiagramGeometryAndLabelsFullScreen(sceneView);
-    drawDiagram2(sceneView, vbDiagramVerticesFS, &fullscreenDiagrammConfiguration);
+    drawDiagram2(sceneView, vbDiagramVertices, &skewTDiagramConfiguration);
 }
 
 
 void MSkewTActor::drawDiagramGeometryAndLabelsFullScreen(MSceneViewGLWidget* sceneView)
 {
-    drawDiagramGeometryAndLabels(sceneView, vbDiagramVerticesFS,
-                                 &fullscreenDiagrammConfiguration,
-                                 &fullscreenDiagrammConfiguration.vertexArrayDrawRanges);
+    drawDiagramGeometryAndLabels(sceneView, vbDiagramVertices,
+                                 &skewTDiagramConfiguration,
+                                 &skewTDiagramConfiguration.vertexArrayDrawRanges);
 
+    // In interaction mode, draw highlighting coordinate axes and adiabates
+    // for the current mouse position.
     if (sceneView->interactionModeEnabled() && vbHighlightVertices)
     {
         drawDiagramGeometryAndLabels(sceneView, vbHighlightVertices,
-                                     &fullscreenDiagrammConfiguration,
-                                     &fullscreenDiagrammConfiguration.highlightGeometryDrawRanges);
+                                     &skewTDiagramConfiguration,
+                                     &skewTDiagramConfiguration.highlightGeometryDrawRanges);
     }
 }
 
@@ -2504,8 +2448,8 @@ void MSkewTActor::drawDiagramGeometryAndLabelsFullScreen(MSceneViewGLWidget* sce
 void MSkewTActor::drawDiagramGeometryAndLabels3DView(MSceneViewGLWidget* sceneView)
 {
     drawDiagramGeometryAndLabels(sceneView, vbDiagramVertices,
-                                 &normalscreenDiagrammConfiguration,
-                                 &normalscreenDiagrammConfiguration.vertexArrayDrawRanges);
+                                 &skewTDiagramConfiguration,
+                                 &skewTDiagramConfiguration.vertexArrayDrawRanges);
 }
 
 
