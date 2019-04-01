@@ -120,12 +120,6 @@ protected:
 
     void onQtPropertyChanged(QtProperty* property) override;
 
-    void onDeleteActorVariable(MNWPActorVariable* var) override;
-
-    void onAddActorVariable(MNWPActorVariable* var) override;
-
-    void onChangeActorVariable(MNWPActorVariable *var) override;
-
     void printDebugOutputOnUserRequest();
 
 private:
@@ -279,62 +273,12 @@ private:
         float moistAdiabatSpacing = 10.0;
         float dryAdiabatSpacing = 10.0;
         float yOffset = 0;
-
-        float skew(float x, float y) const;
-
-        float clipTo2D(float v) const;
-
-        float temperaturePosition() const;
-
-        /**
-          Scales the temperature value @p T (in Kelvin) to the diagram space.
-         */
-        float scaleTemperatureToDiagramSpace(float T) const;
-        /**
-          Returns @p z in pressure (hPa) coordinates depending on the actual
-          configuration of the diagram @p dconfig.
-         */
-        double pressureFromWorldZ(double z);
-        /**
-          Returns @p p (hPa) in world coordinates depending on the actual
-          configuration of the diagram.
-         */
-        float worldZfromPressure(float p) const;
-        /**
-          @brief Returns the pressureToWorldZParameters depending on the actual
-          configuration of the diagram.
-          @return QVector2D(log(maxPressure), slopeToZ)
-         */
-        QVector2D pressureToWorldZParameters() const;
     };
 
     struct ModeSpecificDiagramConfiguration
     {
         ModeSpecificDiagramConfiguration() {}
         void init(DiagramConfiguration *dconfig, QString bufferNameSuffix);
-        float skew(float x, float y) const;
-        float temperatureReferenceZCoord() const;
-        /**
-          Returns @p z in pressure (hPa) coordinates depending on the actual
-          configuration of the diagram @p dconfig.
-         */
-        double pressureFromWorldZ(double z, DiagramConfiguration dconfig);
-        /**
-          Returns @p p (hPa) in world coordinates depending on the actual
-          configuration of the mode specific diagram.
-         */
-        float worldZfromPressure(float p) const;
-        /**
-          Returns @p z in pressure coordinates depending on the mode specific
-          configuration of the diagram.
-         */
-        float worldZToPressure(float z) const;
-        /**
-          @brief Returns the pressureToWorldZParameters depending on the actual
-          configuration of the diagram.
-          @return QVector2D(log(maxPressure), slopeToZ)
-         */
-        QVector2D pressureToWorldZParameters() const;
 
         bool pressureEqualsWorldPressure = false;
 
@@ -413,17 +357,6 @@ private:
 
     DiagramConfiguration diagramConfiguration;
 
-    void updateVariableEnums(MNWPActorVariable *deletedVar = nullptr);
-
-    void setShaderGeneralVars(MSceneViewGLWidget *sceneView,
-                              ModeSpecificDiagramConfiguration *config);
-    void drawProbabilityTube(MNWPSkewTActorVariable *max,
-                             MNWPSkewTActorVariable *min,
-                             bool isHumidity, QColor color);
-    void drawDeviation(MNWPSkewTActorVariable *mean,
-                       MNWPSkewTActorVariable *deviation,
-                       bool isHumidity, QColor deviationColor);
-
     /**
       Copies the current user-defined diagram configuration from the
       GUI properties into the @ref diagramConfiguration struct.
@@ -432,7 +365,6 @@ private:
 
     void drawDiagramGeometryAndLabels(MSceneViewGLWidget*sceneView,
                                       GL::MVertexBuffer *vbDiagramVertices,
-                                      ModeSpecificDiagramConfiguration *config,
                                       VertexRanges *vertexRanges);
 
     void generateDiagramGeometry(GL::MVertexBuffer **vbDiagramVertices,
@@ -447,9 +379,7 @@ private:
                      GL::MVertexBuffer *vbDiagramVertices,
                      ModeSpecificDiagramConfiguration *config);
 
-    void drawDiagram2(MSceneViewGLWidget* sceneView,
-                      GL::MVertexBuffer *vbDiagramVertices,
-                      ModeSpecificDiagramConfiguration *config);
+    void drawDiagram2(MSceneViewGLWidget* sceneView);
 
     void loadObservationalDataFromUWyoming(int stationNum);
     void loadListOfAvailableObservationsFromUWyoming();

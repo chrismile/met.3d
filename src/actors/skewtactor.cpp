@@ -178,66 +178,6 @@ MSkewTActor::MSkewTActor() : MNWPMultiVarActor(),
 //    properties->mColor()->setValue(temperatureColorWyomingProperty,
 //                                   QColor(255, 0, 80, 255));
 
-    // Variables.
-    // ==========
-    diagramConfiguration.varConfigs = QVector<VariableConfig>(12);
-    groupVariables = addProperty(
-           GROUP_PROPERTY, "data variables", actorPropertiesSupGroup);
-
-    // Temperature variables.
-    // ======================
-    temperatureGroupProperty = addProperty(
-                GROUP_PROPERTY, "air temperature", groupVariables);
-    diagramConfiguration.varConfigs[variablesIndices.temperature.MEMBER]
-            .property = addProperty(ENUM_PROPERTY, "single member", temperatureGroupProperty);
-    diagramConfiguration.varConfigs[variablesIndices.temperature.MEAN]
-            .property = addProperty( ENUM_PROPERTY, "ensemble mean", temperatureGroupProperty);
-    diagramConfiguration.varConfigs[variablesIndices.temperature.MAXIMUM].property
-            = addProperty(ENUM_PROPERTY, "ensemble max", temperatureGroupProperty);
-    diagramConfiguration.varConfigs[variablesIndices.temperature.MINIMUM].property
-            = addProperty(ENUM_PROPERTY, "ensemble min", temperatureGroupProperty);
-    diagramConfiguration.varConfigs[variablesIndices.temperature.DEVIATION]
-            .property = addProperty(ENUM_PROPERTY, "ensemble std.dev.", temperatureGroupProperty);
-    diagramConfiguration.varConfigs[variablesIndices.temperature.SPAGHETTI]
-            .property = addProperty(ENUM_PROPERTY, "multiple members", temperatureGroupProperty);
-    temperatureShowProbabilityTubeProperty = addProperty(
-                BOOL_PROPERTY, "draw min-max shaded", temperatureGroupProperty);
-    properties->mBool()->setValue(temperatureShowProbabilityTubeProperty, true);
-    temperatureShowDeviationTubeProperty = addProperty(
-                BOOL_PROPERTY, "draw std.dev. shaded", temperatureGroupProperty);
-    properties->mBool()->setValue(temperatureShowDeviationTubeProperty, true);
-    temperatureMinMaxVariableColorProperty = addProperty(
-                COLOR_PROPERTY, "min-max shade colour", temperatureGroupProperty);
-    properties->mColor()->setValue(temperatureMinMaxVariableColorProperty,
-                                   QColor(201, 10, 5, 255));
-
-    // Dewpoint variables.
-    // ===================
-    humidityGroupProperty = addProperty(
-                GROUP_PROPERTY, "specific humidity", groupVariables);
-    diagramConfiguration.varConfigs[variablesIndices.dewPoint.MEMBER].property =
-            addProperty(ENUM_PROPERTY, "single member", humidityGroupProperty);
-    diagramConfiguration.varConfigs[variablesIndices.dewPoint.MEAN].property =
-            addProperty(ENUM_PROPERTY, "ensemble mean", humidityGroupProperty);
-    diagramConfiguration.varConfigs[variablesIndices.dewPoint.MAXIMUM].property =
-            addProperty(ENUM_PROPERTY, "ensemble max", humidityGroupProperty);
-    diagramConfiguration.varConfigs[variablesIndices.dewPoint.MINIMUM].property =
-            addProperty(ENUM_PROPERTY, "ensemble min", humidityGroupProperty);
-    diagramConfiguration.varConfigs[variablesIndices.dewPoint.DEVIATION]
-            .property = addProperty(ENUM_PROPERTY, "ensemble std.dev.", humidityGroupProperty);
-    diagramConfiguration.varConfigs[variablesIndices.dewPoint.SPAGHETTI]
-            .property = addProperty(ENUM_PROPERTY, "multiple members", humidityGroupProperty);
-    dewPointShowProbabilityTubeProperty = addProperty(
-                BOOL_PROPERTY, "draw min-max shaded", humidityGroupProperty);
-    properties->mBool()->setValue(dewPointShowProbabilityTubeProperty, true);
-    dewPointShowDeviationTubeProperty = addProperty(
-                BOOL_PROPERTY, "draw std.dev. shaded", humidityGroupProperty);
-    properties->mBool()->setValue(dewPointShowDeviationTubeProperty, true);
-    dewPointMinMaxVariableColorProperty = addProperty(
-                COLOR_PROPERTY, "min-max shade colour", humidityGroupProperty);
-    properties->mColor()->setValue(dewPointMinMaxVariableColorProperty,
-                                   QColor(17, 98, 208, 255));
-
     endInitialiseQtProperties();
 
     copyDiagramConfigurationFromQtProperties();
@@ -868,48 +808,7 @@ void MSkewTActor::onQtPropertyChanged(QtProperty *property)
                 return;
             }
         }
-        // A variable might have changed its ensemble mode thus update the variable
-        // enum property names.
-        for (MNWPActorVariable *var : variables)
-        {
-            if (property == var->ensembleModeProperty)
-            {
-                updateVariableEnums();
-                emitActorChangedSignal();
-            }
-        }
     }
-}
-
-
-void MSkewTActor::onDeleteActorVariable(MNWPActorVariable *var)
-{
-    for (int i = 0; i < diagramConfiguration.varConfigs.size(); i++)
-    {
-        VariableConfig *varConfig = &diagramConfiguration.varConfigs[i];
-        if (varConfig->variable == var)
-        {
-            varConfig->index = -1;
-            varConfig->variable = nullptr;
-            varConfig->color = QColor(0, 0, 0, 255);
-            break;
-        }
-    }
-    updateVariableEnums(var);
-}
-
-
-void MSkewTActor::onAddActorVariable(MNWPActorVariable *var)
-{
-    Q_UNUSED(var);
-    updateVariableEnums();
-}
-
-
-void MSkewTActor::onChangeActorVariable(MNWPActorVariable *var)
-{
-    Q_UNUSED(var);
-    updateVariableEnums();
 }
 
 
@@ -960,47 +859,6 @@ void MSkewTActor::printDebugOutputOnUserRequest()
 /******************************************************************************
 ***                           PRIVATE METHODS                               ***
 *******************************************************************************/
-
-void MSkewTActor::updateVariableEnums(MNWPActorVariable *deletedVar)
-{
-    // In the following the list of variable names will be updated.
-    varNameList.clear();
-    varNameList << "-";
-    int deletedVarIndex = variables.size();
-    for (MNWPActorVariable *var : variables)
-    {
-        if (var == deletedVar)
-        {
-            deletedVarIndex = varNameList.size();
-            continue;
-        }
-        QStringList ensembleModes =
-                properties->mEnum()->enumNames(var->ensembleModeProperty);
-        int ensembleMode =
-                properties->mEnum()->value(var->ensembleModeProperty);
-        varNameList << var->variableName + "(" +
-                       ensembleModes.at(ensembleMode) + ")";
-    }
-
-    // In the following the variable list properties are updated.
-    enableActorUpdates(false);
-    for (int i = 0; i < diagramConfiguration.varConfigs.size(); i++)
-    {
-        VariableConfig var = diagramConfiguration.varConfigs.at(i);
-
-        // When deleting a variable, the indices of all variables which were
-        // listed below that variable will decrease by one to fill the "free
-        // space".
-        if (var.index > deletedVarIndex)
-        {
-            var.index--;
-        }
-        properties->mEnum()->setEnumNames(var.property, varNameList);
-        properties->mEnum()->setValue(var.property, var.index);
-    }
-    enableActorUpdates(true);
-}
-
 
 void MSkewTActor::copyDiagramConfigurationFromQtProperties()
 {
@@ -1483,339 +1341,13 @@ void MSkewTActor::generateFullScreenHighlightGeometry(
 #define SHADER_VERTEX_ATTRIBUTE 0
 #define SHADER_TEXTURE_ATTRIBUTE 1
 
-void MSkewTActor::drawDiagram(MSceneViewGLWidget *sceneView,
-                              GL::MVertexBuffer* vbDiagramVertices,
-                              ModeSpecificDiagramConfiguration *config)
-{
-    glLineWidth(2.f);
-    skewTShader->bindProgram("DiagramTubes");
-    setShaderGeneralVars(sceneView, config);
-    if (properties->mBool()->value(dewPointShowProbabilityTubeProperty))
-    {
-        if ((diagramConfiguration.varConfigs[variablesIndices.dewPoint.MINIMUM]
-             .index > 0)
-                && (diagramConfiguration.varConfigs[
-                    variablesIndices.dewPoint.MAXIMUM].index > 0))
-        {
-            QColor color = properties->mColor()->value(
-                               dewPointMinMaxVariableColorProperty);
-            drawProbabilityTube(
-                        diagramConfiguration.varConfigs[
-                        variablesIndices.dewPoint.MAXIMUM].variable,
-                    diagramConfiguration.varConfigs[
-                    variablesIndices.dewPoint.MINIMUM].variable,
-                    true, color);
-        }
-    }
-    config->layer -= 0.001f;
-    skewTShader->setUniformValue("layer", GLfloat(config->layer));
-    if (properties->mBool()->value(temperatureShowProbabilityTubeProperty))
-    {
-        if ((diagramConfiguration.varConfigs[
-             variablesIndices.temperature.MINIMUM].index > 0 )
-                && (diagramConfiguration.varConfigs[
-                    variablesIndices.temperature.MAXIMUM].index > 0))
-        {
-            QColor color = properties->mColor()->value(
-                        temperatureMinMaxVariableColorProperty);
-            drawProbabilityTube(
-                        diagramConfiguration.varConfigs[
-                        variablesIndices.temperature.MAXIMUM].variable,
-                    diagramConfiguration.varConfigs[
-                    variablesIndices.temperature.MINIMUM].variable,
-                    false, color);
-        }
-    }
-    skewTShader->bindProgram("DiagramDeviation");
-    setShaderGeneralVars(sceneView, config);
-    if (properties->mBool()->value(
-                dewPointShowDeviationTubeProperty))
-    {
-        if ((diagramConfiguration.varConfigs[variablesIndices.dewPoint.DEVIATION]
-             .index > 0)
-                && (diagramConfiguration.varConfigs[
-                    variablesIndices.dewPoint.MEAN].index > 0))
-        {
-            QColor cDeviation = diagramConfiguration.varConfigs[
-                    variablesIndices.dewPoint.DEVIATION].color;
-            drawDeviation(diagramConfiguration.varConfigs[
-                           variablesIndices.dewPoint.MEAN].variable,
-                          diagramConfiguration.varConfigs[
-                           variablesIndices.dewPoint.DEVIATION].variable,
-                          true, cDeviation);
-        }
-    }
-    config->layer -= 0.001f;
-    skewTShader->setUniformValue("layer", GLfloat(config->layer));
-    if (properties->mBool()->value(temperatureShowDeviationTubeProperty))
-    {
-        if ((diagramConfiguration.varConfigs[
-             variablesIndices.temperature.DEVIATION].index > 0)
-                && (diagramConfiguration.varConfigs[
-                    variablesIndices.temperature.MEAN].index > 0))
-        {
-            QColor cDeviation = diagramConfiguration.varConfigs[
-                    variablesIndices.temperature.DEVIATION].color;
-            drawDeviation(diagramConfiguration.varConfigs[
-                           variablesIndices.temperature.MEAN].variable,
-                          diagramConfiguration.varConfigs[
-                           variablesIndices.temperature.DEVIATION].variable,
-                          false, cDeviation);
-        }
-    }
-
-    skewTShader->bindProgram("DiagramVariables");
-    setShaderGeneralVars(sceneView, config);
-    skewTShader->setUniformValue("drawHumidity"   , false);
-    skewTShader->setUniformValue("drawTemperature", false);
-    // Refering the structured grid differs for spaghetti plots and all other
-    // plots thus a variable is used to store the pointer to the grid used.
-    MStructuredGrid *grid;
-    // List of ensemble member grids (needed to draw spaghetti plots).
-    QList<MStructuredGrid*> grids;
-    for (int vi = 0; vi < diagramConfiguration.varConfigs.size(); vi++)
-    {
-        VariableConfig vc = diagramConfiguration.varConfigs.at(vi);
-        int variableIndex = vc.index;
-        if (variableIndex <= 0) continue;
-        if (vi != variablesIndices.dewPoint.DEVIATION
-                && vi != variablesIndices.temperature.DEVIATION)
-        {
-            MNWPSkewTActorVariable *var = vc.variable;
-            if (var != nullptr)
-            {
-                if ((vi == variablesIndices.dewPoint.SPAGHETTI
-                        || vi == variablesIndices.temperature.SPAGHETTI))
-                {
-                    if (var->gridAggregation == nullptr)
-                    {
-                        continue;
-                    }
-                    else
-                    {
-                        grids = var->gridAggregation->getGrids();
-                        // Use first grid as reference for everything needed
-                        // and which is the same for all members.
-                        grid = grids.at(0);
-                    }
-                }
-                else
-                {
-                    grid = var->grid;
-                }
-
-                if (grid == nullptr)
-                {
-                    continue;
-                }
-
-                if (vi >= variablesIndices.dewPoint.MEMBER
-                        && vi <= variablesIndices.dewPoint.SPAGHETTI)
-                {
-                    skewTShader->setUniformValue("drawHumidity"   , true);
-                    skewTShader->setUniformValue("drawTemperature", false);
-                }
-                if (vi >= variablesIndices.temperature.MEMBER
-                        && vi <= variablesIndices.temperature.SPAGHETTI)
-                {
-                    skewTShader->setUniformValue("drawHumidity"   , false);
-                    skewTShader->setUniformValue("drawTemperature", true);
-                }
-                skewTShader->setUniformValue("colour", var->profileColour);
-                glLineWidth(float(var->lineThickness));
-                config->layer -= 0.001f;
-                skewTShader->setUniformValue("layer",
-                                             config->layer);
-                skewTShader->setUniformValue("levelType",
-                                             int(grid->getLevelType()));
-                // Texture bindings for coordinate axes (1D texture).
-                var->textureLonLatLevAxes->bindToTextureUnit(
-                            var->textureUnitLonLatLevAxes);
-
-                skewTShader->setUniformValue(
-                            "lonLatLevAxes", var->textureUnitLonLatLevAxes);
-
-                if (grid->getLevelType() == HYBRID_SIGMA_PRESSURE_3D)
-                {
-                    // Texture bindings for surface pressure (2D texture) and
-                    // model level coefficients (1D texture).
-                    var->textureSurfacePressure->bindToTextureUnit(
-                                var->textureUnitSurfacePressure);
-                    skewTShader->setUniformValue(
-                                "surfacePressure",
-                                var->textureUnitSurfacePressure);
-                    var->textureHybridCoefficients->bindToTextureUnit(
-                                var->textureUnitHybridCoefficients);
-                    skewTShader->setUniformValue(
-                                "hybridCoefficients",
-                                var->textureUnitHybridCoefficients);
-                }
-                if ((vi != variablesIndices.dewPoint.SPAGHETTI
-                        && vi != variablesIndices.temperature.SPAGHETTI))
-                {
-                    if (grid->getLevelType() == SURFACE_2D)
-                    {
-                        // Texture bindings for data field (2D texture).
-                        var->textureDataField->bindToTextureUnit(
-                                    var->textureUnitDataField);
-                        skewTShader->setUniformValue(
-                                    "dataField2D", var->textureUnitDataField);
-
-                    }
-                    else
-                    {
-                        glEnable(GL_LINE_SMOOTH);
-                        glHint(GL_LINE_SMOOTH_HINT, GL_DONT_CARE);
-                        // Texture bindings for data field (3D texture).
-                        var->textureDataField->bindToTextureUnit(
-                                    var->textureUnitDataField);
-                        skewTShader->setUniformValue(
-                                    "dataField", var->textureUnitDataField);
-                    }
-                }
-                if (vi == variablesIndices.dewPoint.SPAGHETTI
-                        || vi == variablesIndices.temperature.SPAGHETTI)
-                {
-                    skewTShader->setUniformValue(
-                                "numberOfLevels", grid->getNumLevels());
-                    skewTShader->setUniformValue(
-                                "numberOfLats"  , grid->getNumLats());
-                    glLineWidth(float(var->lineThickness));
-
-                    if (var->transferFunction != nullptr)
-                    {
-                        var->transferFunction->getTexture()->bindToTextureUnit(
-                                    var->textureUnitTransferFunction);
-                        skewTShader->setUniformValue(
-                                    "useTransferFunction", true);
-                        skewTShader->setUniformValue(
-                                    "transferFunction",
-                                    var->textureUnitTransferFunction);
-                        skewTShader->setUniformValue(
-                                    "scalarMinimum",
-                                    var->transferFunction->getMinimumValue());
-                        skewTShader->setUniformValue(
-                                    "scalarMaximum",
-                                    var->transferFunction->getMaximumValue());
-                    }
-                    else
-                    {
-                        skewTShader->setUniformValue(
-                                    "useTransferFunction", true);
-                         skewTShader->setUniformValue("scalarMinimum", 0.f);
-                         skewTShader->setUniformValue("scalarMaximum", 0.f);
-                         skewTShader->setUniformValue("colour", var->profileColour);
-                    }
-                    // To avoid z fighting first render all spaghetti contours
-                    // into the stencil buffer and updating the depth buffer
-                    // but without changing the colour buffer. In a second
-                    // render pass update the colour buffer using stencil test
-                    // but without performing depth test and writes.
-                    // (as mentioned here: https://stackoverflow.com/questions/14842808/preventing-z-fighting-on-coplanar-polygons#14843885)
-                    glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
-                    for (int i = 0; i < grids.size(); i++)
-                    {
-                        if (grid->getLevelType() == SURFACE_2D)
-                        {
-                            // Texture bindings for data field (2D texture).
-                            grids.at(i)->getTexture()->bindToTextureUnit(
-                                        var->textureUnitDataField);
-                            skewTShader->setUniformValue(
-                                        "dataField2D", var->textureUnitDataField);
-
-                        }
-                        else
-                        {
-                            // Texture bindings for data field (3D texture).
-                            grids.at(i)->getTexture()->bindToTextureUnit(
-                                        var->textureUnitDataField);
-                            skewTShader->setUniformValue(
-                                        "dataField", var->textureUnitDataField);
-                        }
-                        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-                        skewTShader->setUniformValue("ensemble", i);
-                        glDrawArrays(GL_LINE_STRIP, 0, grid->getNumLevels());
-                        grids.at(i)->releaseTexture();
-                    }
-                    glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
-                    glEnable(GL_STENCIL_TEST);
-                    glDisable(GL_DEPTH_TEST);
-                    glDepthMask(GL_FALSE);
-                    for (int i = 0; i < grids.size(); i++)
-                    {
-                        if (grid->getLevelType() == SURFACE_2D)
-                        {
-                            // Texture bindings for data field (2D texture).
-                            grids.at(i)->getTexture()->bindToTextureUnit(
-                                        var->textureUnitDataField);
-                            skewTShader->setUniformValue(
-                                        "dataField2D", var->textureUnitDataField);
-
-                        }
-                        else
-                        {
-                            // Texture bindings for data field (3D texture).
-                            grids.at(i)->getTexture()->bindToTextureUnit(
-                                        var->textureUnitDataField);
-                            skewTShader->setUniformValue(
-                                        "dataField", var->textureUnitDataField);
-                        }
-                        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-                        skewTShader->setUniformValue("ensemble", i);
-                        glMemoryBarrier(GL_FRAMEBUFFER_BARRIER_BIT);
-                        glDrawArrays(GL_LINE_STRIP, 0, grid->getNumLevels());
-                        glMemoryBarrier(GL_FRAMEBUFFER_BARRIER_BIT);
-                        grids.at(i)->releaseTexture();
-                    }
-                    glEnable(GL_DEPTH_TEST);
-                    glDepthMask(GL_TRUE);
-                    glDisable(GL_STENCIL_TEST);
-                }
-                else
-                {
-
-                    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-                    glDrawArrays(GL_LINE_STRIP, 0,
-                                 grid->getNumLevels()); CHECK_GL_ERROR;
-                }
-            }
-        }
-    }
-
-    // Draw observational data from U of Wyoming web service.
-    // ======================================================
-    if (wyomingVerticesCount > 0)
-    {
-        glEnableVertexAttribArray(SHADER_VERTEX_ATTRIBUTE);
-
-        vbWyomingVertices->attachToVertexAttribute(
-            SHADER_VERTEX_ATTRIBUTE, 3,
-            GL_FALSE, 0, (const GLvoid *)(0 * sizeof(float)));
-        skewTShader->bindProgram("WyomingTestData");
-        setShaderGeneralVars(sceneView, config);
-        skewTShader->setUniformValue("colour", QVector4D(0.f, 128.f, 0.f, 1.f));
-        skewTShader->setUniformValue("drawHumidity"   , false);
-        skewTShader->setUniformValue("drawTemperature", true);
-        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-        glDrawArrays(GL_LINE_STRIP, 0, wyomingVerticesCount);
-
-        skewTShader->setUniformValue("colour",
-                                     QVector4D(128.f, 128.f, 0.f, 1.f));
-        skewTShader->setUniformValue("drawTemperature", false);
-        skewTShader->setUniformValue("drawHumidity"   , true);
-        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-        glDrawArrays(GL_LINE_STRIP, 0, wyomingVerticesCount);
-    }
-}
-
-
-void MSkewTActor::drawDiagram2(
-        MSceneViewGLWidget *sceneView,
-        GL::MVertexBuffer *vbDiagramVertices,
-        MSkewTActor::ModeSpecificDiagramConfiguration *config)
+void MSkewTActor::drawDiagram2(MSceneViewGLWidget *sceneView)
 {
     skewTShader->bindProgram("DiagramGeometry");
-    setShaderGeneralVars(sceneView, config);
+    skewTShader->setUniformValue("fullscreen",
+                                 sceneViewFullscreenEnabled.value(sceneView));
+    skewTShader->setUniformValue("mvpMatrix",
+                                 *(sceneView->getModelViewProjectionMatrix()));
     skewTShader->setUniformValue("verticesInTPSpace", GLboolean(true));
     skewTShader->setUniformValue("tlogp2xyMatrix", transformationMatrixTlogp2xy);
 
@@ -1842,200 +1374,9 @@ void MSkewTActor::drawDiagram2(
 }
 
 
-void MSkewTActor::drawProbabilityTube(
-    MNWPSkewTActorVariable *max, MNWPSkewTActorVariable *min, bool isHumidity,
-    QColor color)
-{
-    if (min->grid == nullptr || max->grid == nullptr)
-    {
-        return;
-    }
-    skewTShader->setUniformValue("ensemble", -1);
-
-    if (isHumidity)
-    {
-        skewTShader->setUniformValue("drawHumidity"   , true);
-        skewTShader->setUniformValue("drawTemperature", false);
-    }
-    else
-    {
-        skewTShader->setUniformValue("drawHumidity"   , false);
-        skewTShader->setUniformValue("drawTemperature", true);
-    }
-
-    skewTShader->setUniformValue("colour", color);
-
-    skewTShader->setUniformValue("levelTypeMax", int(max->grid->getLevelType()));
-    skewTShader->setUniformValue("levelTypeMin", int(min->grid->getLevelType()));
-
-    max->textureLonLatLevAxes->bindToTextureUnit( max->textureUnitLonLatLevAxes);
-    min->textureLonLatLevAxes->bindToTextureUnit( min->textureUnitLonLatLevAxes);
-
-    skewTShader->setUniformValue("lonLatLevAxesMax",
-                                 max->textureUnitLonLatLevAxes);
-    skewTShader->setUniformValue("lonLatLevAxesMin",
-                                 max->textureUnitLonLatLevAxes);
-    if (max->grid->getLevelType() == SURFACE_2D)
-    {
-        // Texture bindings for data field (2D texture).
-        max->textureDataField->bindToTextureUnit(max->textureUnitDataField);
-        skewTShader->setUniformValue("dataField2DMax", max->textureUnitDataField);
-    }
-    else
-    {
-        // Texture bindings for data field (3D texture).
-        max->textureDataField->bindToTextureUnit(max->textureUnitDataField);
-        skewTShader->setUniformValue("dataFieldMax", max->textureUnitDataField);
-    }
-
-    if (min->grid->getLevelType() == SURFACE_2D)
-    {
-        // Texture bindings for data field (2D texture).
-        min->textureDataField->bindToTextureUnit(min->textureUnitDataField);
-        skewTShader->setUniformValue("dataField2DMin", min->textureUnitDataField);
-    }
-    else
-    {
-        // Texture bindings for data field (3D texture).
-        min->textureDataField->bindToTextureUnit(min->textureUnitDataField);
-        skewTShader->setUniformValue("dataFieldMin", min->textureUnitDataField);
-    }
-
-    if (max->grid->getLevelType() == HYBRID_SIGMA_PRESSURE_3D)
-    {
-        // Texture bindings for surface pressure (2D texture) and model
-        // level coefficients (1D texture).
-        max->textureSurfacePressure->bindToTextureUnit(
-                                max->textureUnitSurfacePressure);
-        max->textureHybridCoefficients->bindToTextureUnit(
-                                max->textureUnitHybridCoefficients);
-        skewTShader->setUniformValue("surfacePressureMax",
-                                max->textureUnitSurfacePressure);
-        skewTShader->setUniformValue("hybridCoefficientsMax",
-                                max->textureUnitHybridCoefficients);
-    }
-
-    if (min->grid->getLevelType() == HYBRID_SIGMA_PRESSURE_3D)
-    {
-        // Texture bindings for surface pressure (2D texture) and model
-        // level coefficients (1D texture).
-        min->textureSurfacePressure->bindToTextureUnit(
-                                min->textureUnitSurfacePressure);
-        min->textureHybridCoefficients->bindToTextureUnit(
-                                min->textureUnitHybridCoefficients);
-        skewTShader->setUniformValue("surfacePressureMin",
-                                min->textureUnitSurfacePressure);
-        skewTShader->setUniformValue("hybridCoefficientsMin",
-                                min->textureUnitHybridCoefficients);
-    }
-
-    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-    glDrawArrays(GL_TRIANGLE_STRIP, 0,
-                 min->grid->getNumLevels() * 2); CHECK_GL_ERROR;
-}
-
-
-void MSkewTActor::drawDeviation(
-    MNWPSkewTActorVariable *mean, MNWPSkewTActorVariable *deviation,
-    bool isHumidity, QColor deviationColor)
-{
-    skewTShader->setUniformValue("ensemble", -1);
-
-    if (isHumidity)
-    {
-        skewTShader->setUniformValue("drawHumidity"   , true);
-        skewTShader->setUniformValue("drawTemperature", false);
-    }
-    else
-    {
-        skewTShader->setUniformValue("drawHumidity"   , false);
-        skewTShader->setUniformValue("drawTemperature", true);
-    }
-
-    skewTShader->setUniformValue("colour", deviationColor);
-
-    skewTShader->setUniformValue("levelTypeMean",
-                                 int(mean->grid->getLevelType()));
-    skewTShader->setUniformValue("levelTypeDeviation",
-                                 int(deviation->grid->getLevelType()));
-    mean->textureLonLatLevAxes->bindToTextureUnit(
-                mean->textureUnitLonLatLevAxes);
-    deviation->textureLonLatLevAxes->bindToTextureUnit(
-                deviation->textureUnitLonLatLevAxes);
-    skewTShader->setUniformValue("lonLatLevAxesMean",
-                                 mean->textureUnitLonLatLevAxes);
-    skewTShader->setUniformValue("lonLatLevAxesDeviation",
-                                 deviation->textureUnitLonLatLevAxes);
-    if (mean->grid->getLevelType() == SURFACE_2D)
-    {
-        // Texture bindings for data field (2D texture).
-        mean->textureDataField->bindToTextureUnit(
-                    mean->textureUnitDataField);
-        skewTShader->setUniformValue(
-                    "dataField2DMean", mean->textureUnitDataField);
-    }
-    else
-    {
-        // Texture bindings for data field (3D texture).
-        mean->textureDataField->bindToTextureUnit(
-                    mean->textureUnitDataField);
-        skewTShader->setUniformValue(
-                    "dataFieldMean", mean->textureUnitDataField);
-    }
-
-    if (deviation->grid->getLevelType() == SURFACE_2D)
-    {
-        // Texture bindings for data field (2D texture).
-        deviation->textureDataField->bindToTextureUnit(
-                    deviation->textureUnitDataField);
-        skewTShader->setUniformValue(
-                    "dataField2DDeviation", deviation->textureUnitDataField);
-    }
-    else
-    {
-        // Texture bindings for data field (3D texture).
-        deviation->textureDataField->bindToTextureUnit(
-                    deviation->textureUnitDataField);
-        skewTShader->setUniformValue(
-                    "dataFieldDeviation", deviation->textureUnitDataField);
-    }
-
-    if (mean->grid->getLevelType() == HYBRID_SIGMA_PRESSURE_3D)
-    {
-        // Texture bindings for surface pressure (2D texture) and model
-        // level coefficients (1D texture).
-        mean->textureSurfacePressure->bindToTextureUnit(
-                    mean->textureUnitSurfacePressure);
-        mean->textureHybridCoefficients->bindToTextureUnit(
-                    mean->textureUnitHybridCoefficients);
-        skewTShader->setUniformValue("surfacePressureMean",
-                                     mean->textureUnitSurfacePressure);
-        skewTShader->setUniformValue("hybridCoefficientsMean",
-                                     mean->textureUnitHybridCoefficients);
-    }
-
-    if (deviation->grid->getLevelType() == HYBRID_SIGMA_PRESSURE_3D)
-    {
-        // Texture bindings for surface pressure (2D texture) and model
-        // level coefficients (1D texture).
-        deviation->textureSurfacePressure->bindToTextureUnit(
-                    deviation->textureUnitSurfacePressure);
-        deviation->textureHybridCoefficients->bindToTextureUnit(
-                    deviation->textureUnitHybridCoefficients);
-        skewTShader->setUniformValue("surfacePressureDeviation",
-                                     deviation->textureUnitSurfacePressure);
-        skewTShader->setUniformValue("hybridCoefficientsDeviation",
-                                     deviation->textureUnitHybridCoefficients);
-    }
-
-    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-    glDrawArrays(GL_TRIANGLE_STRIP, 0, mean->grid->getNumLevels() * 2);
-}
-
-
 void MSkewTActor::drawDiagramGeometryAndLabels(
         MSceneViewGLWidget *sceneView, GL::MVertexBuffer *vbDiagramVertices,
-        ModeSpecificDiagramConfiguration *config, VertexRanges *vertexRanges)
+        VertexRanges *vertexRanges)
 {
     // Bind vertex array and shader for diagram geometry.
     // ==================================================
@@ -2045,10 +1386,12 @@ void MSkewTActor::drawDiagramGeometryAndLabels(
         GL_FALSE, 0, (const GLvoid *)(0 * sizeof(float)));
 
     skewTShader->bindProgram("DiagramGeometry");
-    setShaderGeneralVars(sceneView, config);
 
+    skewTShader->setUniformValue("fullscreen",
+                                 sceneViewFullscreenEnabled.value(sceneView));
+    skewTShader->setUniformValue("mvpMatrix",
+                                 *(sceneView->getModelViewProjectionMatrix()));
     skewTShader->setUniformValue("verticesInTPSpace", GLboolean(false));
-
     skewTShader->setUniformValue("xy2worldMatrix",
                                  computeXY2WorldSpaceTransformationMatrix(sceneView));
 
@@ -2126,71 +1469,6 @@ void MSkewTActor::drawDiagramGeometryAndLabels(
 }
 
 
-void MSkewTActor::setShaderGeneralVars(
-    MSceneViewGLWidget *sceneView, ModeSpecificDiagramConfiguration *config)
-{
-    skewTShader->setUniformValue("fullscreen",
-                                 sceneViewFullscreenEnabled.value(sceneView));
-    skewTShader->setUniformValue("uprightOrientation",
-                                 diagramConfiguration.drawInPerspective);
-
-    skewTShader->setUniformValue("area.left", config->drawingRegionClipSpace.left);
-    skewTShader->setUniformValue("area.right", config->drawingRegionClipSpace.right);
-    if (config->pressureEqualsWorldPressure)
-    {
-        float p = diagramConfiguration.vertical_p_hPa.min;
-        skewTShader->setUniformValue("area.top",
-                                     GLfloat(sceneView->worldZfromPressure(p) / 36.0));
-        p = diagramConfiguration.vertical_p_hPa.max;
-        skewTShader->setUniformValue("area.bottom",
-                                     GLfloat(sceneView->worldZfromPressure(p) / 36.0));
-    }
-    else
-    {
-        skewTShader->setUniformValue("area.top", config->drawingRegionClipSpace.top);
-        skewTShader->setUniformValue("area.bottom", config->drawingRegionClipSpace.bottom);
-    }
-    skewTShader->setUniformValue("position",
-                                 diagramConfiguration.geoPosition);
-    skewTShader->setUniformValue("bottomPressure",
-                                 diagramConfiguration.vertical_p_hPa.max);
-    skewTShader->setUniformValue("topPressure",
-                                 diagramConfiguration.vertical_p_hPa.min);
-    skewTShader->setUniformValue(
-                "pressureEqualsWorldPressure",
-                config->pressureEqualsWorldPressure);
-    skewTShader->setUniformValue(
-                "temperatureAmplitude",
-                diagramConfiguration.temperature_degC.amplitude());
-    skewTShader->setUniformValue(
-                "temperatureCenter", diagramConfiguration.temperature_degC.center());
-    if (config->pressureEqualsWorldPressure)
-    {
-        skewTShader->setUniformValue(
-                    "pToWorldZParams2", sceneView->pressureToWorldZParameters());
-    }
-    else
-    {
-        skewTShader->setUniformValue(
-                    "pToWorldZParams2", config->pressureToWorldZParameters());
-    }
-    skewTShader->setUniformValue(
-                "pToWorldZParams", config->pressureToWorldZParameters());
-
-    skewTShader->setUniformValue("mvpMatrix",
-                                 *(sceneView->getModelViewProjectionMatrix()));
-    skewTShader->setUniformValue("viewMatrix",
-                                 sceneView->getCamera()->getViewMatrix());
-    skewTShader->setUniformValue("numberOfLevels", -1);
-    skewTShader->setUniformValue("numberOfLats"  , -1);
-    skewTShader->setUniformValue("ensemble"      , -1);
-    skewTShader->setUniformValue("scalarMinimum" ,  0.f);
-    skewTShader->setUniformValue("scalarMaximum" ,  0.f);
-    config->layer -= 0.001f;
-    skewTShader->setUniformValue("layer"         , config->layer);
-}
-
-
 void MSkewTActor::loadListOfAvailableObservationsFromUWyoming()
 {
     QUrl url = QUrl(QString("http://weather.uwyo.edu/upperair/europe.html"));
@@ -2229,89 +1507,7 @@ void MSkewTActor::loadObservationalDataFromUWyoming(int stationNum)
 
 void MSkewTActor::DiagramConfiguration::init()
 {
-    area.left = 0.05;
-    area.right = 0.95;
-    area.bottom = worldZfromPressure(vertical_p_hPa.max);
-    area.top = worldZfromPressure(vertical_p_hPa.min);
-    if (!alignWithCamera)
-    {
-        area.bottom = area.bottom + 0.05;
-        area.top = area.top + 0.05;
-    }
     diagramColor = QVector4D(0, 0, 0, 1);
-    offscreenTextureSize.width = 512;
-    offscreenTextureSize.height = 512;
-    layer = 0;
-}
-
-
-float MSkewTActor::DiagramConfiguration::skew(float x, float y) const
-{
-    return area.left + (x + y) * area.width();
-}
-
-
-float MSkewTActor::DiagramConfiguration::clipTo2D(float v) const
-{
-    return (v + 1.0) / 2.0;
-}
-
-
-float MSkewTActor::DiagramConfiguration::temperaturePosition() const
-{
-    if (alignWithCamera)
-    {
-        return area.top;
-    }
-    return area.bottom;
-}
-
-
-float MSkewTActor::DiagramConfiguration::scaleTemperatureToDiagramSpace(float T)
-const
-{
-    return (((T - 273.5) + temperature_degC.center()) /
-            temperature_degC.amplitude());
-}
-
-
-double MSkewTActor::DiagramConfiguration::pressureFromWorldZ(double z)
-{
-    float slopePtoZ = (area.top * 36.0 - area.bottom *36.0) /
-            (log(20.) - log(1050.));
-    return exp(z / slopePtoZ + log(vertical_p_hPa.max));
-}
-
-
-float MSkewTActor::DiagramConfiguration::worldZfromPressure(float p) const
-{
-    if (!alignWithCamera)
-    {
-        float slopePtoZ = (36.0f - 0.1f * 36.0f) / (log(
-                              20.) - log(1050.));
-        return ((log(p) - log(1050.)) * slopePtoZ) / 36.0;
-    }
-    else
-    {
-        float slopePtoZ = 36.0f / (log(20.) - log(1050.));
-        return ((log(p) - log(1050.)) * slopePtoZ) / 36.0;
-    }
-}
-
-
-QVector2D MSkewTActor::DiagramConfiguration::pressureToWorldZParameters() const
-{
-    if (!alignWithCamera)
-    {
-        float slopePtoZ = (36.0f - 0.1f * 36.0f) / (log(
-                              20.) - log(1050.));
-        return QVector2D(log(1050.), slopePtoZ);
-    }
-    else
-    {
-        float slopePtoZ = 36.0f / (log(20.) - log(1050.));
-        return QVector2D(log(1050.), slopePtoZ);
-    }
 }
 
 
@@ -2319,103 +1515,18 @@ void MSkewTActor::ModeSpecificDiagramConfiguration::init(
         DiagramConfiguration *dconfig, QString bufferNameSuffix)
 {
     this->dconfig = dconfig;
-
-    drawingRegionClipSpace.left = 0.05f;
-    drawingRegionClipSpace.right = 0.95f;
-    drawingRegionClipSpace.bottom = worldZfromPressure(dconfig->vertical_p_hPa.max);
-    drawingRegionClipSpace.top = worldZfromPressure(dconfig->vertical_p_hPa.min);
-    if (!pressureEqualsWorldPressure)
-    {
-        drawingRegionClipSpace.bottom = drawingRegionClipSpace.bottom + 0.05f;
-        drawingRegionClipSpace.top = drawingRegionClipSpace.top + 0.05f;
-    }
-    layer = 0;
     this->bufferNameSuffix = bufferNameSuffix;
-}
-
-
-float MSkewTActor::ModeSpecificDiagramConfiguration::skew(float x, float y) const
-{
-    return drawingRegionClipSpace.left + (x + y) * drawingRegionClipSpace.width();
-}
-
-
-float MSkewTActor::ModeSpecificDiagramConfiguration::temperatureReferenceZCoord() const
-{
-    if (pressureEqualsWorldPressure)
-    {
-        return drawingRegionClipSpace.top;
-    }
-    return drawingRegionClipSpace.bottom;
-}
-
-
-double MSkewTActor::ModeSpecificDiagramConfiguration::pressureFromWorldZ(
-        double z, DiagramConfiguration dconfig)
-{
-    float slopePtoZ = (drawingRegionClipSpace.top * 36.0 - drawingRegionClipSpace.bottom * 36.0) /
-            (log(dconfig.vertical_p_hPa.min) - log(dconfig.vertical_p_hPa.max));
-    return exp(z / slopePtoZ + log(dconfig.vertical_p_hPa.max));
-}
-
-
-float MSkewTActor::ModeSpecificDiagramConfiguration::worldZfromPressure(
-        float p) const
-{
-    if (!pressureEqualsWorldPressure)
-    {
-        float slopePtoZ = (36.0f - 0.1f * 36.0f)
-                / (log(dconfig->vertical_p_hPa.min) - log(dconfig->vertical_p_hPa.max));
-        return ((log(p) - log(dconfig->vertical_p_hPa.max)) * slopePtoZ) / 36.f;
-    }
-    else
-    {
-        float slopePtoZ = 36.f / (log(20.f) - log(1050.f));
-        return ((log(p) - log(1050.)) * slopePtoZ) / 36.f;
-    }
-}
-
-
-float MSkewTActor::ModeSpecificDiagramConfiguration::worldZToPressure(float z) const
-{
-    if (!pressureEqualsWorldPressure)
-    {
-        float slopePtoZ = (36.0f - 0.1f * 36.0f)
-                / (log(dconfig->vertical_p_hPa.min) - log(dconfig->vertical_p_hPa.max));
-        return exp(((z) / slopePtoZ) + log(dconfig->vertical_p_hPa.max));
-    }
-    else
-    {
-        float slopePtoZ = 36.0f / (log(20.) - log(1050.));
-        return exp(((z) / slopePtoZ) + log(1050.));
-    }
-}
-
-
-QVector2D
-MSkewTActor::ModeSpecificDiagramConfiguration::pressureToWorldZParameters() const
-{    
-    if (!pressureEqualsWorldPressure)
-    {
-        float slopePtoZ = (36.0f - 0.1f * 36.0f)
-                / (log(dconfig->vertical_p_hPa.min) - log(dconfig->vertical_p_hPa.max));
-        return QVector2D(log(dconfig->vertical_p_hPa.max), slopePtoZ);
-    }
-    else
-    {
-        float slopePtoZ = 36.0f / (log(20.) - log(1050.));
-        return QVector2D(log(1050.), slopePtoZ);
-    }
 }
 
 
 void MSkewTActor::drawDiagram3DView(MSceneViewGLWidget* sceneView)
 {
     skewTDiagramConfiguration.layer = -0.005f;
-    drawDiagramGeometryAndLabels(sceneView, vbDiagramVertices, &skewTDiagramConfiguration,
-                                 &skewTDiagramConfiguration.vertexArrayDrawRanges);
+    drawDiagramGeometryAndLabels(
+                sceneView, vbDiagramVertices,
+                &skewTDiagramConfiguration.vertexArrayDrawRanges);
     skewTDiagramConfiguration.layer = -.1f;
-    drawDiagram2(sceneView, vbDiagramVertices, &skewTDiagramConfiguration);
+    drawDiagram2(sceneView);
     poleActor->render(sceneView);
 }
 
@@ -2424,32 +1535,34 @@ void MSkewTActor::drawDiagramFullScreen(MSceneViewGLWidget* sceneView)
 {
     glClear(GL_DEPTH_BUFFER_BIT);
     drawDiagramGeometryAndLabelsFullScreen(sceneView);
-    drawDiagram2(sceneView, vbDiagramVertices, &skewTDiagramConfiguration);
+    drawDiagram2(sceneView);
 }
 
 
-void MSkewTActor::drawDiagramGeometryAndLabelsFullScreen(MSceneViewGLWidget* sceneView)
+void MSkewTActor::drawDiagramGeometryAndLabelsFullScreen(
+        MSceneViewGLWidget* sceneView)
 {
-    drawDiagramGeometryAndLabels(sceneView, vbDiagramVertices,
-                                 &skewTDiagramConfiguration,
-                                 &skewTDiagramConfiguration.vertexArrayDrawRanges);
+    drawDiagramGeometryAndLabels(
+                sceneView, vbDiagramVertices,
+                &skewTDiagramConfiguration.vertexArrayDrawRanges);
 
     // In interaction mode, draw highlighting coordinate axes and adiabates
     // for the current mouse position.
     if (sceneView->interactionModeEnabled() && vbHighlightVertices)
     {
-        drawDiagramGeometryAndLabels(sceneView, vbHighlightVertices,
-                                     &skewTDiagramConfiguration,
-                                     &skewTDiagramConfiguration.highlightGeometryDrawRanges);
+        drawDiagramGeometryAndLabels(
+                    sceneView, vbHighlightVertices,
+                    &skewTDiagramConfiguration.highlightGeometryDrawRanges);
     }
 }
 
 
-void MSkewTActor::drawDiagramGeometryAndLabels3DView(MSceneViewGLWidget* sceneView)
+void MSkewTActor::drawDiagramGeometryAndLabels3DView(
+        MSceneViewGLWidget* sceneView)
 {
-    drawDiagramGeometryAndLabels(sceneView, vbDiagramVertices,
-                                 &skewTDiagramConfiguration,
-                                 &skewTDiagramConfiguration.vertexArrayDrawRanges);
+    drawDiagramGeometryAndLabels(
+                sceneView, vbDiagramVertices,
+                &skewTDiagramConfiguration.vertexArrayDrawRanges);
 }
 
 
