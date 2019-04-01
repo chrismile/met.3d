@@ -165,6 +165,7 @@ private:
      */
     struct VertexRanges
     {
+        int lineWidth = 1;
         VertexRange temperatureMarks;
         VertexRange isotherms;
         VertexRange dryAdiabates;
@@ -349,6 +350,8 @@ private:
         QVector<QVector2D> dryAdiabatesVertices;
         QVector<QVector2D> moistAdiabatesVertices;
         QString bufferNameSuffix;
+
+        VertexRanges highlightGeometryDrawRanges;
     };
 
     ModeSpecificDiagramConfiguration normalscreenDiagrammConfiguration;
@@ -399,6 +402,7 @@ private:
      */
     GL::MVertexBuffer* vbDiagramVertices;
     GL::MVertexBuffer* vbDiagramVerticesFS;
+    GL::MVertexBuffer* vbHighlightVertices;
 
     /**
       @brief Buffer used for the actual wyoming station.
@@ -430,11 +434,17 @@ private:
     void copyDiagramConfigurationFromQtProperties();
 
     void drawDiagramGeometryAndLabels(MSceneViewGLWidget*sceneView,
-                           GL::MVertexBuffer *vbDiagramVertices,
-                           ModeSpecificDiagramConfiguration *config);
+                                      GL::MVertexBuffer *vbDiagramVertices,
+                                      ModeSpecificDiagramConfiguration *config,
+                                      VertexRanges *vertexRanges);
 
     void generateDiagramGeometry(GL::MVertexBuffer **vbDiagramVertices,
                                  ModeSpecificDiagramConfiguration *config);
+
+    void generateFullScreenHighlightGeometry(
+            QVector2D tpCoordinate,
+            GL::MVertexBuffer** vbDiagramVertices,
+            ModeSpecificDiagramConfiguration *config);
 
     void drawDiagram(MSceneViewGLWidget* sceneView,
                      GL::MVertexBuffer *vbDiagramVertices,
@@ -464,6 +474,7 @@ private:
     // into the diagram's (x, y) coordinates. Computed by
     // computeTlogp2xyTransformationMatrix().
     QMatrix4x4 transformationMatrixTlogp2xy;
+    QMatrix4x4 transformationMatrixXY2Tlogp; // inverse matrix
 
     /**
       Compute the @ref transformationMatrixTlogp2xy from user settings
@@ -483,6 +494,11 @@ private:
     QVector2D transformTp2xy(QVector2D tpCoordinate_K_hPa);
 
     /**
+      Inverse of @ref transformTp2xy().
+     */
+    QVector2D transformXY2Tp(QVector2D xyCoordinate);
+
+    /**
       Transform a Skew-T diagram's (x, y) coordinate into full-screen clip
       space coordinates.
 
@@ -491,6 +507,11 @@ private:
       modified as well.
      */
     QVector2D transformXY2ClipSpace(QVector2D xyCoordinate);
+
+    /**
+      Inverse of transformXY2ClipSpace
+     */
+    QVector2D transformClipSpace2xy(QVector2D clipCoordinate);
 
     /**
       Computes a view-dependent transformation matrix to transform coordinates

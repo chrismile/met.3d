@@ -56,6 +56,7 @@ namespace Met3D
 MSkewTActor::MSkewTActor() : MNWPMultiVarActor(),
     vbDiagramVertices(nullptr),
     vbDiagramVerticesFS(nullptr),
+    vbHighlightVertices(nullptr),
     vbWyomingVertices(nullptr),
     wyomingVerticesCount(0),
     offsetPickPositionToHandleCentre(QVector2D(0., 0.)),
@@ -259,6 +260,10 @@ MSkewTActor::~MSkewTActor()
     if (vbDiagramVerticesFS)
     {
         delete vbDiagramVerticesFS;
+    }
+    if (vbHighlightVertices)
+    {
+        delete vbHighlightVertices;
     }
 
 //TODO (mr, 20Feb2019) -- Deleting the poleActor causes a segmentation fault.. why?
@@ -495,8 +500,22 @@ int MSkewTActor::checkIntersectionWithHandle(
 {
     if (sceneViewFullscreenEnabled.value(sceneView))
     {
+        // In fullscreen mode, this function implements a classical "mouse
+        // move event" that determines the (T,p) coordinate at which the mouse
+        // pointer currently hovers and generates some geometry (isobaric,
+        // isothermal etc. lines) that highlight the current coordinate.
         fullscreenDiagrammConfiguration.clipPos.setX(clipX);
         fullscreenDiagrammConfiguration.clipPos.setY(clipY);
+
+        // Compute (T,p) coordinate from clip space (x,y) coordinate.
+        QVector2D clipSpaceCoordinate = QVector2D(clipX, clipY);
+        QVector2D xyCoordinate = transformClipSpace2xy(clipSpaceCoordinate);
+        QVector2D tpCoordinate = transformXY2Tp(xyCoordinate);
+
+        // Generate highlight geometry.
+        generateFullScreenHighlightGeometry(tpCoordinate,
+                                            &vbHighlightVertices,
+                                            &fullscreenDiagrammConfiguration);
     }
     else
     {
@@ -1355,6 +1374,166 @@ void MSkewTActor::generateDiagramGeometry(
 }
 
 
+void MSkewTActor::generateFullScreenHighlightGeometry(
+        QVector2D tpCoordinate,
+        GL::MVertexBuffer** vbDiagramVertices,
+        ModeSpecificDiagramConfiguration *config)
+{
+    config->highlightGeometryDrawRanges.lineWidth = 3;
+
+    // Array with vertex data that will be uploaded to a vertex buffer at the
+    // end of the method. Contains line segments to be rendered with GL_LINES.
+    // NOTE: All geometry stored in this array needs to be mapped to 2D diagram
+    // coordinates (0..1) x (0..1)!
+    QVector<QVector2D> vertexArray;
+
+//TODO (mr, 11Jan2019) -- most geometry generated in this method could make
+//    use of line strips (whould make rendering more efficient).
+
+    // Temporary variables for start and end vertices for a line segment,
+    // reused throughout the method.
+    QVector2D vStart, vEnd;
+
+    // Omit diagram frame.
+    // ====================================
+    config->highlightGeometryDrawRanges.frame.startIndex = 0;
+    config->highlightGeometryDrawRanges.frame.indexCount = 0;
+
+
+    // Generate vertices for isobar.
+    // =============================
+    config->highlightGeometryDrawRanges.isobars.startIndex = vertexArray.size();
+
+    float pLevel_hPa = tpCoordinate.y();
+    if ((pLevel_hPa < diagramConfiguration.vertical_p_hPa.max) &&
+            (pLevel_hPa > diagramConfiguration.vertical_p_hPa.min))
+    {
+        // We need some temperature for the transformation, not used
+        // any further.
+        QVector2D tpCoordinate(273.15, pLevel_hPa);
+        QVector2D xyCoordinate = transformTp2xy(tpCoordinate);
+        vStart = QVector2D(0., xyCoordinate.y());
+        vEnd = QVector2D(1., xyCoordinate.y());
+        vertexArray << vStart << vEnd;
+    }
+
+    config->highlightGeometryDrawRanges.isobars.indexCount =
+            vertexArray.size() - config->highlightGeometryDrawRanges.isobars.startIndex;
+
+
+    // Generate vertices for isotherm.
+    // ===============================
+    config->highlightGeometryDrawRanges.isotherms.startIndex = vertexArray.size();
+
+    float isothermTemperature_K = tpCoordinate.x();
+    // Generate vertex at (isotherm temperature, bottom pressure).
+    QVector2D tpCoordinate_K_hPa = QVector2D(
+                isothermTemperature_K, config->dconfig->vertical_p_hPa.min);
+    vStart = transformTp2xy(tpCoordinate_K_hPa);
+    // Generate vertex at (isotherm temperature, top pressure).
+    tpCoordinate_K_hPa.setY(config->dconfig->vertical_p_hPa.max);
+    vEnd = transformTp2xy(tpCoordinate_K_hPa);
+    vertexArray << vStart << vEnd;
+
+    config->highlightGeometryDrawRanges.isotherms.indexCount =
+            vertexArray.size() - config->highlightGeometryDrawRanges.isotherms.startIndex;
+
+
+    // Generate vertices for dry adiabate.
+    // ===================================
+
+    float log_pBot = log(config->dconfig->vertical_p_hPa.max);
+    float log_pTop = log(config->dconfig->vertical_p_hPa.min);
+    int nAdiabatPoints = 100; // number of discrete points to plot adiabat
+    float deltaLogP = (log_pBot - log_pTop) / float(nAdiabatPoints);
+
+    config->highlightGeometryDrawRanges.dryAdiabates.startIndex = vertexArray.size();
+
+    if (diagramConfiguration.drawDryAdiabates)
+    {
+        float adiabatTemperature = potentialTemperature_K(
+                    tpCoordinate.x(), tpCoordinate.y() * 100.);
+
+        // First vertex of adiabat.
+        float p_hPa = exp(log_pBot);
+        float potT_K = ambientTemperatureOfPotentialTemperature_K(
+                    adiabatTemperature, p_hPa * 100.);
+
+        QVector2D tpCoordinate_K_hPa = QVector2D(potT_K, p_hPa);
+        vStart = transformTp2xy(tpCoordinate_K_hPa);
+
+        // Remaining vertices.
+        for (float log_p_hPa = log_pBot; log_p_hPa > log_pTop;
+             log_p_hPa -= deltaLogP)
+        {
+            float p_hPa = exp(log_p_hPa);
+            float potT_K = ambientTemperatureOfPotentialTemperature_K(
+                        adiabatTemperature, p_hPa * 100.);
+
+            QVector2D tpCoordinate_K_hPa = QVector2D(potT_K, p_hPa);
+            vEnd = transformTp2xy(tpCoordinate_K_hPa);
+
+            vertexArray << vStart << vEnd;
+            vStart = vEnd;
+        }
+    }
+
+    config->highlightGeometryDrawRanges.dryAdiabates.indexCount = vertexArray.size()
+            - config->highlightGeometryDrawRanges.dryAdiabates.startIndex;
+
+
+    // Generate moist adiabate vertices.
+    // =================================
+    config->highlightGeometryDrawRanges.moistAdiabates.startIndex = vertexArray.size();
+
+    if (diagramConfiguration.drawMoistAdiabates)
+    {
+            // NOTE that the Moisseeva & Stull (2017) implementation for
+            // saturated adiabats is only valid for a temperature range of
+            // -100 degC to +40 degC. Hence limit to this range.
+            if (tpCoordinate.x() >= 173.15 && tpCoordinate.x() < 313.15)
+            {
+                float adiabatTemperature =
+                        wetBulbPotentialTemperatureOfSaturatedAdiabat_K_MoisseevaStull(
+                            tpCoordinate.x(), tpCoordinate.y() * 100.);
+
+                // First vertex of adiabat.
+                float p_hPa = exp(log_pBot);
+                float moistPotT_K =
+                        temperatureAlongSaturatedAdiabat_K_MoisseevaStull(
+                            adiabatTemperature, p_hPa * 100.);
+
+                QVector2D tpCoordinate_K_hPa = QVector2D(moistPotT_K, p_hPa);
+                vStart = transformTp2xy(tpCoordinate_K_hPa);
+
+                // Remaining vertices.
+                for (float log_p_hPa = log_pBot; log_p_hPa > log_pTop;
+                     log_p_hPa -= deltaLogP)
+                {
+                    float p_hPa = exp(log_p_hPa);
+                    float potT_K = temperatureAlongSaturatedAdiabat_K_MoisseevaStull(
+                                adiabatTemperature, p_hPa * 100.);
+
+                    QVector2D tpCoordinate_K_hPa = QVector2D(potT_K, p_hPa);
+                    vEnd = transformTp2xy(tpCoordinate_K_hPa);
+
+                    vertexArray << vStart << vEnd;
+                    vStart = vEnd;
+                }
+            }
+    }
+
+    config->highlightGeometryDrawRanges.moistAdiabates.indexCount = vertexArray.size()
+            - config->highlightGeometryDrawRanges.moistAdiabates.startIndex;
+
+    // Upload geometry to vertex buffer.
+    uploadVec2ToVertexBuffer(
+                vertexArray, QString("skewTHighlightVertices%1_actor#%2")
+                .arg(config->bufferNameSuffix).arg(myID),
+                vbDiagramVertices);
+}
+
+
 #define SHADER_VERTEX_ATTRIBUTE 0
 #define SHADER_TEXTURE_ATTRIBUTE 1
 
@@ -1910,7 +2089,7 @@ void MSkewTActor::drawDeviation(
 
 void MSkewTActor::drawDiagramGeometryAndLabels(
         MSceneViewGLWidget *sceneView, GL::MVertexBuffer *vbDiagramVertices,
-        ModeSpecificDiagramConfiguration *config)
+        ModeSpecificDiagramConfiguration *config, VertexRanges *vertexRanges)
 {
     MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
     MTextManager *tm = glRM->getTextManager();
@@ -1940,17 +2119,17 @@ void MSkewTActor::drawDiagramGeometryAndLabels(
     glLineWidth(1);
     glPolygonMode(GL_FRONT_AND_BACK, renderAsWireFrame ? GL_LINE : GL_FILL);
     glDrawArrays(GL_TRIANGLE_STRIP,
-                 config->vertexArrayDrawRanges.frame.startIndex, 4);
+                 vertexRanges->frame.startIndex, 4);
 
     // Render the frame as thick lines.
     glLineWidth(3);
     skewTShader->setUniformValue("colour", diagramConfiguration.diagramColor);
     skewTShader->setUniformValue("depthOffset", 0.f);
     glDrawArrays(GL_LINES,
-                 config->vertexArrayDrawRanges.frame.startIndex,
-                 config->vertexArrayDrawRanges.frame.indexCount);
+                 vertexRanges->frame.startIndex,
+                 vertexRanges->frame.indexCount);
 
-    glLineWidth(1);
+    glLineWidth(vertexRanges->lineWidth);
 
     // Draw dry adiabates.
     // ===================
@@ -1958,23 +2137,23 @@ void MSkewTActor::drawDiagramGeometryAndLabels(
     {
         skewTShader->setUniformValue("colour", QVector4D(0.8f, 0.8f, 0.f, 1.f));
         glDrawArrays(GL_LINES,
-                     config->vertexArrayDrawRanges.dryAdiabates.startIndex,
-                     config->vertexArrayDrawRanges.dryAdiabates.indexCount);
+                     vertexRanges->dryAdiabates.startIndex,
+                     vertexRanges->dryAdiabates.indexCount);
     }
 
     // Draw isobars.
     // =============
     skewTShader->setUniformValue("colour", diagramConfiguration.diagramColor);
     glDrawArrays(GL_LINES,
-                 config->vertexArrayDrawRanges.isobars.startIndex,
-                 config->vertexArrayDrawRanges.isobars.indexCount);
+                 vertexRanges->isobars.startIndex,
+                 vertexRanges->isobars.indexCount);
 
     // Draw isotherms.
     // ===============
     skewTShader->setUniformValue("colour", QVector4D(1.f, 0.f, 0.f, 1.f));
     glDrawArrays(GL_LINES,
-                 config->vertexArrayDrawRanges.isotherms.startIndex,
-                 config->vertexArrayDrawRanges.isotherms.indexCount);
+                 vertexRanges->isotherms.startIndex,
+                 vertexRanges->isotherms.indexCount);
 
     // Draw moist adiabates.
     // =====================
@@ -1982,213 +2161,9 @@ void MSkewTActor::drawDiagramGeometryAndLabels(
     {
         skewTShader->setUniformValue("colour", QVector4D(0.f, 0.8f, 0.f, 1.f));
         glDrawArrays(GL_LINES,
-                     config->vertexArrayDrawRanges.moistAdiabates.startIndex,
-                     config->vertexArrayDrawRanges.moistAdiabates.indexCount);
+                     vertexRanges->moistAdiabates.startIndex,
+                     vertexRanges->moistAdiabates.indexCount);
     }
-
-
-    // Draw mouse cross and legend in fullscreen mode.
-    // ===============================================
-    if (sceneViewFullscreenEnabled.value(sceneView)
-            && sceneView->interactionModeEnabled()
-            && (diagramConfiguration.clipTo2D(config->clipPos.x())
-                >= config->drawingRegionClipSpace.left)
-            && (diagramConfiguration.clipTo2D(config->clipPos.x())
-                <= config->drawingRegionClipSpace.right)
-            && (diagramConfiguration.clipTo2D(config->clipPos.y())
-                >= config->drawingRegionClipSpace.bottom)
-            && (diagramConfiguration.clipTo2D(config->clipPos.y())
-                <= config->drawingRegionClipSpace.top))
-    {
-        skewTShader->bindProgram("LegendBackground");
-        setShaderGeneralVars(sceneView, config);
-        glDrawArrays(GL_POINTS, 0, 1);
-        float realZ = ((config->clipPos.y() + 1.f) / 2.f -
-                       config->drawingRegionClipSpace.bottom) * 36.f;
-        float pressure = config->pressureFromWorldZ(realZ, diagramConfiguration);
-        float temperature = (((config->clipPos.x()) + 1.f) / 2.f
-                             + config->drawingRegionClipSpace.left
-                             - (config->clipPos.y() + 1.f) / 2.f
-                             - config->drawingRegionClipSpace.bottom) /
-                            (config->drawingRegionClipSpace.right
-                             - config->drawingRegionClipSpace.left) *
-                            diagramConfiguration.temperature_degC.amplitude() -
-                            diagramConfiguration.temperature_degC.center();
-        glLineWidth(1.f);
-        skewTShader->bindProgram("MarkingCircles");
-        skewTShader->setUniformValue("clipPos", config->clipPos);
-        setShaderGeneralVars(sceneView, config);
-        int humidityVar       = diagramConfiguration.varConfigs[
-                variablesIndices.dewPoint.MEMBER].index;
-        int tempertureVar     = diagramConfiguration.varConfigs[
-                variablesIndices.temperature.MEMBER].index;
-        int humidityMeanVar   = diagramConfiguration.varConfigs[
-                variablesIndices.dewPoint.MEAN].index;
-        int tempertureMeanVar = diagramConfiguration.varConfigs[
-                variablesIndices.temperature.MEAN].index;
-//        float tempX = 0.f      , humidityX = 0.f;
-        float tempVal = M_MISSING_VALUE, humidityVal = M_MISSING_VALUE;
-//        float tempMeanX = 0.f  , humidityMeanX = 0.f;
-        float tempMeanVal = M_MISSING_VALUE, humidityMeanVal = M_MISSING_VALUE;
-        for (int vi = 0; vi < diagramConfiguration.varConfigs.size(); vi++)
-        {
-            VariableConfig var = diagramConfiguration.varConfigs.at(vi);
-            if (var.variable == nullptr)
-            {
-                continue;
-            }
-            if (vi == variablesIndices.dewPoint.MEMBER
-                    || vi == variablesIndices.dewPoint.MEAN)
-            {
-                float q = var.variable->grid->interpolateValue(
-                            diagramConfiguration.geoPosition.x(),
-                            diagramConfiguration.geoPosition.y(), pressure);
-                // Mixing ratio.
-                float w = q / (1.f - q);
-                // Compute vapour pressure from pressure and mixing ratio
-                // (Wallace and Hobbs 2nd ed. eq. 3.59).
-                // (p_hPa * 100) = conversion to pascal
-                float e_q = w / (w + 0.622f) * (pressure * 100.f);
-                // Method is Bolton.
-                float td = 243.5f / (17.67f / log(e_q / 100.f / 6.112f) - 1.f);
-//                float x = diagramConfiguration.scaleTemperatureToDiagramSpace(
-//                            td + 273.5f) * config->area.width();
-                if (vi == variablesIndices.dewPoint.MEAN)
-                {
-                    humidityMeanVal = td;
-//                    humidityMeanX = (x * 2.f) - 0.1f;
-                }
-                if (vi == variablesIndices.dewPoint.MEMBER)
-                {
-                    humidityVal = td;
-//                    humidityX = (x * 2.f) - 0.1f;
-                }
-                skewTShader->setUniformValue("humidityColour" , var.color);
-                skewTShader->setUniformValue("humidityVal"    , td);
-                skewTShader->setUniformValue("drawHumidity"   , true);
-                skewTShader->setUniformValue("drawTemperature", false);
-                glDrawArrays(GL_POINTS, 0, 1);
-            }
-            if (vi == variablesIndices.temperature.MEAN
-                    || vi == variablesIndices.temperature.MEMBER)
-            {
-                float val = var.variable->grid->interpolateValue(
-                            diagramConfiguration.geoPosition.x(),
-                            diagramConfiguration.geoPosition.y(), pressure);
-//                float x = ((val - 273.15f
-//                            + diagramConfiguration.temperature.center())
-//                           / diagramConfiguration.temperature.amplitude())
-//                        * (config->area.right
-//                           - config->area.left);
-                if (vi == variablesIndices.temperature.MEAN)
-                {
-                    tempMeanVal = val;
-//                    tempMeanX = (x * 2.f) - 0.1f;
-                }
-                if (vi == variablesIndices.temperature.MEMBER)
-                {
-                    tempVal = val;
-//                    tempX = (x * 2.f) - 0.1f;
-                }
-                skewTShader->setUniformValue("temperatureVal"   , val);
-                skewTShader->setUniformValue("drawHumidity"     , false);
-                skewTShader->setUniformValue("drawTemperature"  , true);
-                skewTShader->setUniformValue("temperatureColour", var.color);
-                glDrawArrays(GL_POINTS, 0, 1);
-            }
-        }
-
-        skewTShader->bindProgram("MouseOverCross");
-        setShaderGeneralVars(sceneView, config);
-        skewTShader->setUniformValue("clipPos", config->clipPos);
-        skewTShader->setUniformValue("colour" , QVector4D(0.f, 1.f, 0.f, 1.f));
-        glDrawArrays(GL_LINES, 0, 2);
-
-        float topShift = 0.f;
-        if (tempertureVar != -1)
-        {
-            QColor tempColor = diagramConfiguration.varConfigs[
-                    variablesIndices.temperature.MEMBER].color;
-            labels.append(tm->addText(
-                              QString("Temperature (single member): %1 deg C").arg(
-                                  round((tempVal - 273.15f) * 100.f) / 100.f),
-                              MTextManager::CLIPSPACE,
-                              config->drawingRegionClipSpace.left - 0.9f,
-                              config->drawingRegionClipSpace.top - 0.15f + topShift,
-                              -0.99f, 16.f, tempColor, MTextManager::BASELINELEFT,
-                              true, QColor(255, 255, 255, 255)));
-            topShift = topShift - 0.1f;
-        }
-
-        if (humidityVar != -1)
-        {
-            QColor humidityColor = diagramConfiguration.varConfigs[
-                    variablesIndices.temperature.MEAN].color;
-            labels.append(tm->addText(
-                              QString("Dew point (single member): %1 deg C").arg(
-                                  round((humidityVal) * 100.f) / 100.f),
-                              MTextManager::CLIPSPACE,
-                              config->drawingRegionClipSpace.left - 0.9f,
-                              config->drawingRegionClipSpace.top - 0.15f + topShift,
-                              -0.99f, 16.f, humidityColor,
-                              MTextManager::BASELINELEFT, true,
-                              QColor(255, 255, 255, 255)));
-            topShift = topShift - 0.1f;
-        }
-
-        if (tempertureMeanVar != -1)
-        {
-            QColor tempMeanColor = diagramConfiguration.varConfigs[
-                    variablesIndices.dewPoint.MEMBER].color;
-            labels.append(tm->addText(
-                              QString("Temperature (ensemble mean): %1 deg C").arg(
-                                  round((tempMeanVal - 273.15f) * 100.f) / 100.f),
-                              MTextManager::CLIPSPACE,
-                              config->drawingRegionClipSpace.left - 0.9f,
-                              config->drawingRegionClipSpace.top - 0.15f + topShift,
-                              -0.99f, 16.f, tempMeanColor,
-                              MTextManager::BASELINELEFT, true,
-                              QColor(255, 255, 255, 255)));
-            topShift = topShift - 0.1f;
-        }
-
-        if (humidityMeanVar != -1)
-        {
-            QColor humidityMeanColor = diagramConfiguration.varConfigs[
-                    variablesIndices.dewPoint.MEAN].color;
-            labels.append(tm->addText(
-                              QString("Dew point (ensemble mean): %1 deg C").arg(
-                                  round((humidityMeanVal) * 100.f) / 100.f),
-                              MTextManager::CLIPSPACE,
-                              config->drawingRegionClipSpace.left - 0.9f,
-                              config->drawingRegionClipSpace.top - 0.15f + topShift,
-                              -0.99f, 16.f, humidityMeanColor,
-                              MTextManager::BASELINELEFT, true,
-                              QColor(255, 255, 255, 255)));
-            topShift = topShift - 0.1f;
-        }
-
-        labels.append(tm->addText(
-                          QString("p=%1").arg(
-                              round((pressure) * 10.f) / 10.f),
-                          MTextManager::CLIPSPACE,
-                          config->drawingRegionClipSpace.left - 1.05f,
-                          config->clipPos.y(), -0.99f, 16.f,
-                          QColor(170, 0, 0, 255), MTextManager::BASELINELEFT,
-                          true, QColor(255, 255, 255, 255)));
-
-        labels.append(tm->addText(
-                          QString("T=%1").arg(
-                              round((temperature) * 10.f) / 10.f),
-                          MTextManager::CLIPSPACE,
-                          config->clipPos.x()
-                          - config->clipPos.y()
-                          - 1.f + config->drawingRegionClipSpace.left,
-                          config->drawingRegionClipSpace.bottom - 1.035f, -0.99f,
-                          16.f, QColor(170, 0, 0, 255), MTextManager::BASELINELEFT,
-                          true, QColor(255, 255, 255, 255)));
-    }
-
 
     // Unbind VBO.
     glBindBuffer(GL_ARRAY_BUFFER, 0); CHECK_GL_ERROR;
@@ -2494,7 +2469,8 @@ MSkewTActor::ModeSpecificDiagramConfiguration::pressureToWorldZParameters() cons
 void MSkewTActor::drawDiagram3DView(MSceneViewGLWidget* sceneView)
 {
     normalscreenDiagrammConfiguration.layer = -0.005f;
-    drawDiagramGeometryAndLabels(sceneView, vbDiagramVertices, &normalscreenDiagrammConfiguration);
+    drawDiagramGeometryAndLabels(sceneView, vbDiagramVertices, &normalscreenDiagrammConfiguration,
+                                 &normalscreenDiagrammConfiguration.vertexArrayDrawRanges);
     normalscreenDiagrammConfiguration.layer = -.1f;
     drawDiagram2(sceneView, vbDiagramVertices, &normalscreenDiagrammConfiguration);
     poleActor->render(sceneView);
@@ -2513,14 +2489,23 @@ void MSkewTActor::drawDiagramFullScreen(MSceneViewGLWidget* sceneView)
 void MSkewTActor::drawDiagramGeometryAndLabelsFullScreen(MSceneViewGLWidget* sceneView)
 {
     drawDiagramGeometryAndLabels(sceneView, vbDiagramVerticesFS,
-                                 &fullscreenDiagrammConfiguration);
+                                 &fullscreenDiagrammConfiguration,
+                                 &fullscreenDiagrammConfiguration.vertexArrayDrawRanges);
+
+    if (sceneView->interactionModeEnabled() && vbHighlightVertices)
+    {
+        drawDiagramGeometryAndLabels(sceneView, vbHighlightVertices,
+                                     &fullscreenDiagrammConfiguration,
+                                     &fullscreenDiagrammConfiguration.highlightGeometryDrawRanges);
+    }
 }
 
 
 void MSkewTActor::drawDiagramGeometryAndLabels3DView(MSceneViewGLWidget* sceneView)
 {
     drawDiagramGeometryAndLabels(sceneView, vbDiagramVertices,
-                                 &normalscreenDiagrammConfiguration);
+                                 &normalscreenDiagrammConfiguration,
+                                 &normalscreenDiagrammConfiguration.vertexArrayDrawRanges);
 }
 
 
@@ -2551,6 +2536,7 @@ void MSkewTActor::computeTlogp2xyTransformationMatrix()
 
     // Construct transformation matrix that performs all steps above at once.
     transformationMatrixTlogp2xy = shearMatrix * scaleMatrix * translationMatrix;
+    transformationMatrixXY2Tlogp = transformationMatrixTlogp2xy.inverted();
 }
 
 
@@ -2561,6 +2547,14 @@ QVector2D MSkewTActor::transformTp2xy(QVector2D tpCoordinate_K_hPa)
     QPointF xyCoordinate = transformationMatrixTlogp2xy * tlogpCoordinate;
 
     return QVector2D(xyCoordinate);
+}
+
+
+QVector2D MSkewTActor::transformXY2Tp(QVector2D xyCoordinate)
+{
+    QPointF tlogpCoordinate =
+            transformationMatrixXY2Tlogp * xyCoordinate.toPointF();
+    return QVector2D(tlogpCoordinate.x(), exp(tlogpCoordinate.y()));
 }
 
 
@@ -2575,6 +2569,16 @@ QVector2D MSkewTActor::transformXY2ClipSpace(QVector2D xyCoordinate)
     float vPad = 0.1;
     return QVector2D(xyCoordinate.x() * (2.-2.*hPad) - 1.+hPad,
                      xyCoordinate.y() * (2.-2.*vPad) - 1.+vPad);
+}
+
+
+QVector2D MSkewTActor::transformClipSpace2xy(QVector2D clipCoordinate)
+{
+    // NOTE: see transformXY2ClipSpace().
+    float hPad = 0.1;
+    float vPad = 0.1;
+    return QVector2D((clipCoordinate.x() + 1.-hPad) / (2.-2.*hPad),
+                     (clipCoordinate.y() + 1.-vPad) / (2.-2.*vPad));
 }
 
 
