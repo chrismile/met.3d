@@ -54,9 +54,9 @@ namespace Met3D
 ***                     CONSTRUCTOR / DESTRUCTOR                            ***
 *******************************************************************************/
 MSkewTActor::MSkewTActor() : MNWPMultiVarActor(),
-    vbDiagramVertices(nullptr),
-    vbHighlightVertices(nullptr),
-    vbWyomingVertices(nullptr),
+    vbDiagramGeometry(nullptr),
+    vbFullscreenMouseOverGeometry(nullptr),
+    vbWyomingProfiles(nullptr),
     wyomingVerticesCount(0),
     dragEventActive(false)
 {
@@ -187,17 +187,17 @@ MSkewTActor::MSkewTActor() : MNWPMultiVarActor(),
 
 MSkewTActor::~MSkewTActor()
 {
-    if (vbWyomingVertices)
+    if (vbWyomingProfiles)
     {
-        delete vbWyomingVertices;
+        delete vbWyomingProfiles;
     }
-    if (vbDiagramVertices)
+    if (vbDiagramGeometry)
     {
-        delete vbDiagramVertices;
+        delete vbDiagramGeometry;
     }
-    if (vbHighlightVertices)
+    if (vbFullscreenMouseOverGeometry)
     {
-        delete vbHighlightVertices;
+        delete vbFullscreenMouseOverGeometry;
     }
 
 //TODO (mr, 20Feb2019) -- Deleting the poleActor causes a segmentation fault.. why?
@@ -375,8 +375,8 @@ int MSkewTActor::checkIntersectionWithHandle(
 
         // Generate highlight geometry.
         generateFullScreenHighlightGeometry(tpCoordinate,
-                                            &vbHighlightVertices,
-                                            &skewTDiagramConfiguration);
+                                            &vbFullscreenMouseOverGeometry,
+                                            &diagramConfig);
     }
     else
     {
@@ -499,7 +499,7 @@ void MSkewTActor::downloadOfObservationFromUWyomingFinished(
     }
     uploadVec3ToVertexBuffer(verticesForBuffer,
                              QString("wyomingVertices_actor#%1").arg(myID),
-                             &vbWyomingVertices);
+                             &vbWyomingProfiles);
     wyomingVerticesCount = verticesForBuffer.count();
     properties->mPointF()->setValue(geoPositionProperty, QPointF(lon, lat));
 }
@@ -578,7 +578,7 @@ void MSkewTActor::initializeActorResources()
     poleActor->initialize();
 
     copyDiagramConfigurationFromQtProperties();
-    generateDiagramGeometry(&vbDiagramVertices, &skewTDiagramConfiguration);
+    generateDiagramGeometry(&vbDiagramGeometry, &diagramConfig);
 
     LOG4CPLUS_DEBUG(mlog, "done");
 }
@@ -586,13 +586,19 @@ void MSkewTActor::initializeActorResources()
 
 void MSkewTActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
 {
-    drawDiagram3DView(sceneView);
+    drawDiagramGeometryAndLabels(
+                sceneView, vbDiagramGeometry,
+                &diagramConfig.coordinateGeometryDrawRanges);
+    drawDiagram(sceneView);
+    poleActor->render(sceneView);
 }
 
 
 void MSkewTActor::renderToCurrentFullScreenContext(MSceneViewGLWidget *sceneView)
 {
-    drawDiagramFullScreen(sceneView);
+    glClear(GL_DEPTH_BUFFER_BIT);
+    drawDiagramGeometryAndLabelsFullScreen(sceneView);
+    drawDiagram(sceneView);
 }
 
 
@@ -642,15 +648,15 @@ void MSkewTActor::onQtPropertyChanged(QtProperty *property)
              || property == topPressureProperty
              || property == skewFactorProperty)
     {
-        skewTDiagramConfiguration.regenerateAdiabates = true;
-        skewTDiagramConfiguration.recomputeAdiabateGeometries = true;
+        diagramConfig.regenerateAdiabates = true;
+        diagramConfig.recomputeAdiabateGeometries = true;
 
         copyDiagramConfigurationFromQtProperties();
-        poleActor->setVerticalExtent(skewTDiagramConfiguration.vertical_p_hPa.max,
-                                     skewTDiagramConfiguration.vertical_p_hPa.min);
+        poleActor->setVerticalExtent(diagramConfig.verticalRange_p_hPa.max,
+                                     diagramConfig.verticalRange_p_hPa.min);
 
-        generateDiagramGeometry(&vbDiagramVertices,
-                                &skewTDiagramConfiguration);
+        generateDiagramGeometry(&vbDiagramGeometry,
+                                &diagramConfig);
         emitActorChangedSignal();
     }
 
@@ -660,14 +666,14 @@ void MSkewTActor::onQtPropertyChanged(QtProperty *property)
              || property == labelBBoxColourProperty)
     {
         if (suppressActorUpdates()) return;
-        generateDiagramGeometry(&vbDiagramVertices,
-                                &skewTDiagramConfiguration);
+        generateDiagramGeometry(&vbDiagramGeometry,
+                                &diagramConfig);
         emitActorChangedSignal();
     }
 
     else if (property == geoPositionProperty)
     {
-        skewTDiagramConfiguration.geoPosition = QVector2D(
+        diagramConfig.lonLatPosition = QVector2D(
                     float(properties->mPointF()->value(geoPositionProperty).x()),
                     float(properties->mPointF()->value(geoPositionProperty).y()));
         updateVerticalProfilesAndLabels();
@@ -676,19 +682,19 @@ void MSkewTActor::onQtPropertyChanged(QtProperty *property)
 
     else if (property == drawDryAdiabatesProperty)
     {
-        skewTDiagramConfiguration.drawDryAdiabates =
+        diagramConfig.drawDryAdiabates =
                 properties->mBool()->value(drawDryAdiabatesProperty);
 
-        if (skewTDiagramConfiguration.drawDryAdiabates)
+        if (diagramConfig.drawDryAdiabates)
         {
             // Regenerate dry adiabates only if necessary (first time, pressure
             // drawing type, temperature scale)
-            if ((skewTDiagramConfiguration
-                 .vertexArrayDrawRanges.dryAdiabates.indexCount == 0)
-                    || skewTDiagramConfiguration.recomputeAdiabateGeometries)
+            if ((diagramConfig
+                 .coordinateGeometryDrawRanges.dryAdiabates.indexCount == 0)
+                    || diagramConfig.recomputeAdiabateGeometries)
             {
-                generateDiagramGeometry(&vbDiagramVertices,
-                                        &skewTDiagramConfiguration);
+                generateDiagramGeometry(&vbDiagramGeometry,
+                                        &diagramConfig);
             }
         }
         emitActorChangedSignal();
@@ -696,19 +702,19 @@ void MSkewTActor::onQtPropertyChanged(QtProperty *property)
 
     else if (property == drawMoistAdiabatesProperty)
     {
-        skewTDiagramConfiguration.drawMoistAdiabates =
+        diagramConfig.drawMoistAdiabates =
                 properties->mBool()->value(drawMoistAdiabatesProperty);
 
-        if (skewTDiagramConfiguration.drawMoistAdiabates)
+        if (diagramConfig.drawMoistAdiabates)
         {
             // Regenerate moist adiabates only if necessary (first time,
             // pressure drawing type, temperature scale)
-            if ((skewTDiagramConfiguration
-                 .vertexArrayDrawRanges.moistAdiabates.indexCount == 0)
-                    || skewTDiagramConfiguration.recomputeAdiabateGeometries)
+            if ((diagramConfig
+                 .coordinateGeometryDrawRanges.moistAdiabates.indexCount == 0)
+                    || diagramConfig.recomputeAdiabateGeometries)
             {
-                generateDiagramGeometry(&vbDiagramVertices,
-                                        &skewTDiagramConfiguration);
+                generateDiagramGeometry(&vbDiagramGeometry,
+                                        &diagramConfig);
             }
         }
         emitActorChangedSignal();
@@ -733,8 +739,8 @@ void MSkewTActor::printDebugOutputOnUserRequest()
     }
 
     // Print (T, p) profile at current (lon, lat) position.
-    float lon = skewTDiagramConfiguration.geoPosition.x();
-    float lat = skewTDiagramConfiguration.geoPosition.y();
+    float lon = diagramConfig.lonLatPosition.x();
+    float lat = diagramConfig.lonLatPosition.y();
     str += "\n\n\nDEBUG output, vertical (T, p) profile at current location: ";
     str += QString("(%1, %2).\n").arg(lon).arg(lat);
 
@@ -766,35 +772,35 @@ void MSkewTActor::printDebugOutputOnUserRequest()
 
 void MSkewTActor::copyDiagramConfigurationFromQtProperties()
 {
-    skewTDiagramConfiguration.alignWithCamera =
+    diagramConfig.alignWithCamera =
             properties->mBool()->value(alignWithCameraProperty);
-    skewTDiagramConfiguration.diagramWidth3D =
+    diagramConfig.diagramWidth3D =
             properties->mDDouble()->value(diagramWidth3DProperty);
-    skewTDiagramConfiguration.geoPosition = QVector2D(
+    diagramConfig.lonLatPosition = QVector2D(
                 properties->mPointF()->value(geoPositionProperty).x(),
                 properties->mPointF()->value(geoPositionProperty).y());
-    skewTDiagramConfiguration.temperature_degC.min =
+    diagramConfig.temperatureRange_degC.min =
             properties->mDDouble()->value(temperatureMinProperty);
-    skewTDiagramConfiguration.temperature_degC.max =
+    diagramConfig.temperatureRange_degC.max =
             properties->mDDouble()->value(temperatureMaxProperty);
-    skewTDiagramConfiguration.vertical_p_hPa.min =
+    diagramConfig.verticalRange_p_hPa.min =
             properties->mDDouble()->value(topPressureProperty);
-    skewTDiagramConfiguration.vertical_p_hPa.max =
+    diagramConfig.verticalRange_p_hPa.max =
             properties->mDDouble()->value(bottomPressureProperty);
-    skewTDiagramConfiguration.skewFactor =
+    diagramConfig.skewFactor =
             properties->mDDouble()->value(skewFactorProperty);
-    skewTDiagramConfiguration.isothermSpacing =
+    diagramConfig.isothermSpacing =
             properties->mDDouble()->value(isothermsSpacingProperty);
-    skewTDiagramConfiguration.drawDryAdiabates =
+    diagramConfig.drawDryAdiabates =
             properties->mBool()->value(drawDryAdiabatesProperty);
-    skewTDiagramConfiguration.drawMoistAdiabates =
+    diagramConfig.drawMoistAdiabates =
             properties->mBool()->value(drawMoistAdiabatesProperty);
-    skewTDiagramConfiguration.moistAdiabatSpacing =
+    diagramConfig.moistAdiabatSpacing =
             properties->mDDouble()->value(moistAdiabatesSpcaingProperty);
-    skewTDiagramConfiguration.dryAdiabatSpacing =
+    diagramConfig.dryAdiabatSpacing =
             properties->mDDouble()->value(dryAdiabatesSpacingProperty);
 
-    skewTDiagramConfiguration.init();
+    diagramConfig.backgroundColor = QVector4D(0, 0, 0, 1);
 
     // After the configuration has been copied from the properties, recompute
     // the (T, log(p)) to (x, y) transformation matrix to transform (T, p)
@@ -805,7 +811,7 @@ void MSkewTActor::copyDiagramConfigurationFromQtProperties()
 
 void MSkewTActor::generateDiagramGeometry(
         GL::MVertexBuffer** vbDiagramVertices,
-        ModeSpecificDiagramConfiguration *config)
+        SkewTDiagramConfiguration *config)
 {
     // Clear list of existing labels and get settings for label display.
     removeAllSkewTLabels();
@@ -832,20 +838,20 @@ void MSkewTActor::generateDiagramGeometry(
 
     // Generate vertices for diagram frame.
     // ====================================
-    config->vertexArrayDrawRanges.frame.startIndex = vertexArray.size();
+    config->coordinateGeometryDrawRanges.diagramFrame.startIndex = vertexArray.size();
 
     vertexArray << QVector2D(0.0, 0.0) << QVector2D(0.0, 1.0);
     vertexArray << QVector2D(1.0, 0.0) << QVector2D(1.0, 1.0);
     vertexArray << QVector2D(0.0, 0.0) << QVector2D(1.0, 0.0);
     vertexArray << QVector2D(0.0, 1.0) << QVector2D(1.0, 1.0);
 
-    config->vertexArrayDrawRanges.frame.indexCount =
-            vertexArray.size() - config->vertexArrayDrawRanges.frame.startIndex;
+    config->coordinateGeometryDrawRanges.diagramFrame.indexCount =
+            vertexArray.size() - config->coordinateGeometryDrawRanges.diagramFrame.startIndex;
 
 
     // Generate vertices for isobars.
     // ==============================
-    config->vertexArrayDrawRanges.isobars.startIndex = vertexArray.size();
+    config->coordinateGeometryDrawRanges.isobars.startIndex = vertexArray.size();
 
     QList<int> pressureLevels;
     for (QVector3D axisTick : poleActor->getAxisTicks())
@@ -855,8 +861,8 @@ void MSkewTActor::generateDiagramGeometry(
     }
     for (int pLevel_hPa : pressureLevels)
     {
-        if ((pLevel_hPa < config->vertical_p_hPa.max) &&
-                (pLevel_hPa > config->vertical_p_hPa.min))
+        if ((pLevel_hPa < config->verticalRange_p_hPa.max) &&
+                (pLevel_hPa > config->verticalRange_p_hPa.min))
         {
             // We need some temperature for the transformation, not used
             // any further.
@@ -892,16 +898,16 @@ void MSkewTActor::generateDiagramGeometry(
         }
     }
 
-    config->vertexArrayDrawRanges.isobars.indexCount =
-            vertexArray.size() - config->vertexArrayDrawRanges.isobars.startIndex;
+    config->coordinateGeometryDrawRanges.isobars.indexCount =
+            vertexArray.size() - config->coordinateGeometryDrawRanges.isobars.startIndex;
 
 
     // Generate vertices for isotherms.
     // ================================
-    config->vertexArrayDrawRanges.isotherms.startIndex = vertexArray.size();
+    config->coordinateGeometryDrawRanges.isotherms.startIndex = vertexArray.size();
 
-    float diagramTmin_K = config->temperature_degC.min + 273.15;
-    float diagramTmax_K = config->temperature_degC.max + 273.15;
+    float diagramTmin_K = config->temperatureRange_degC.min + 273.15;
+    float diagramTmax_K = config->temperatureRange_degC.max + 273.15;
     float diagramTRange_K = diagramTmax_K - diagramTmin_K;
     float skewFactor = config->skewFactor;
 
@@ -919,10 +925,10 @@ void MSkewTActor::generateDiagramGeometry(
     {
         // Generate vertex at (isotherm temperature, bottom pressure).
         QVector2D tpCoordinate_K_hPa = QVector2D(
-                    isothermTemperature_K, config->vertical_p_hPa.min);
+                    isothermTemperature_K, config->verticalRange_p_hPa.min);
         vStart = transformTp2xy(tpCoordinate_K_hPa);
         // Generate vertex at (isotherm temperature, top pressure).
-        tpCoordinate_K_hPa.setY(config->vertical_p_hPa.max);
+        tpCoordinate_K_hPa.setY(config->verticalRange_p_hPa.max);
         vEnd = transformTp2xy(tpCoordinate_K_hPa);
         vertexArray << vStart << vEnd;
 
@@ -949,25 +955,25 @@ void MSkewTActor::generateDiagramGeometry(
                     );
     }
 
-    config->vertexArrayDrawRanges.isotherms.indexCount =
-            vertexArray.size() - config->vertexArrayDrawRanges.isotherms.startIndex;
+    config->coordinateGeometryDrawRanges.isotherms.indexCount =
+            vertexArray.size() - config->coordinateGeometryDrawRanges.isotherms.startIndex;
 
 
     // Generate vertices for dry adiabates.
     // ====================================
 
-    float log_pBot = log(config->vertical_p_hPa.max);
-    float log_pTop = log(config->vertical_p_hPa.min);
+    float log_pBot = log(config->verticalRange_p_hPa.max);
+    float log_pTop = log(config->verticalRange_p_hPa.min);
     int nAdiabatPoints = 100; // number of discrete points to plot adiabat
     float deltaLogP = (log_pBot - log_pTop) / float(nAdiabatPoints);
 
-    config->vertexArrayDrawRanges.dryAdiabates.startIndex = vertexArray.size();
+    config->coordinateGeometryDrawRanges.dryAdiabates.startIndex = vertexArray.size();
 
     if (config->drawDryAdiabates)
     {
         // Create dry adiabates only if necessary (first time, pressure
         // drawing type, temperature scale, top and bottom pressure changed).
-        if (config->vertexArrayDrawRanges.dryAdiabates.indexCount == 0
+        if (config->coordinateGeometryDrawRanges.dryAdiabates.indexCount == 0
                 || config->recomputeAdiabateGeometries)
         {
             config->dryAdiabatesVertices.clear();
@@ -1007,19 +1013,19 @@ void MSkewTActor::generateDiagramGeometry(
     }
 
     vertexArray << config->dryAdiabatesVertices;
-    config->vertexArrayDrawRanges.dryAdiabates.indexCount = vertexArray.size()
-            - config->vertexArrayDrawRanges.dryAdiabates.startIndex;
+    config->coordinateGeometryDrawRanges.dryAdiabates.indexCount = vertexArray.size()
+            - config->coordinateGeometryDrawRanges.dryAdiabates.startIndex;
 
 
     // Generate moist adiabates vertices.
     // ==================================
-    config->vertexArrayDrawRanges.moistAdiabates.startIndex = vertexArray.size();
+    config->coordinateGeometryDrawRanges.moistAdiabates.startIndex = vertexArray.size();
 
     if (config->drawMoistAdiabates)
     {
         // Regenerate moist adiabates only if necessary (first time, pressure
         // drawing type, temperature scale, top and bottom pressure changed).
-        if (config->vertexArrayDrawRanges.moistAdiabates.indexCount == 0
+        if (config->coordinateGeometryDrawRanges.moistAdiabates.indexCount == 0
                 || config->recomputeAdiabateGeometries)
         {
             config->moistAdiabatesVertices.clear();
@@ -1064,8 +1070,8 @@ void MSkewTActor::generateDiagramGeometry(
 
     vertexArray << config->moistAdiabatesVertices;
 
-    config->vertexArrayDrawRanges.moistAdiabates.indexCount = vertexArray.size()
-            - config->vertexArrayDrawRanges.moistAdiabates.startIndex;
+    config->coordinateGeometryDrawRanges.moistAdiabates.indexCount = vertexArray.size()
+            - config->coordinateGeometryDrawRanges.moistAdiabates.startIndex;
 
     // Upload geometry to vertex buffer.
     config->recomputeAdiabateGeometries = false;
@@ -1080,7 +1086,7 @@ void MSkewTActor::generateDiagramGeometry(
 void MSkewTActor::generateFullScreenHighlightGeometry(
         QVector2D tpCoordinate,
         GL::MVertexBuffer** vbDiagramVertices,
-        ModeSpecificDiagramConfiguration *config)
+        SkewTDiagramConfiguration *config)
 {
     config->highlightGeometryDrawRanges.lineWidth = 3;
 
@@ -1099,8 +1105,8 @@ void MSkewTActor::generateFullScreenHighlightGeometry(
 
     // Omit diagram frame.
     // ====================================
-    config->highlightGeometryDrawRanges.frame.startIndex = 0;
-    config->highlightGeometryDrawRanges.frame.indexCount = 0;
+    config->highlightGeometryDrawRanges.diagramFrame.startIndex = 0;
+    config->highlightGeometryDrawRanges.diagramFrame.indexCount = 0;
 
 
     // Generate vertices for isobar.
@@ -1108,8 +1114,8 @@ void MSkewTActor::generateFullScreenHighlightGeometry(
     config->highlightGeometryDrawRanges.isobars.startIndex = vertexArray.size();
 
     float pLevel_hPa = tpCoordinate.y();
-    if ((pLevel_hPa < config->vertical_p_hPa.max) &&
-            (pLevel_hPa > config->vertical_p_hPa.min))
+    if ((pLevel_hPa < config->verticalRange_p_hPa.max) &&
+            (pLevel_hPa > config->verticalRange_p_hPa.min))
     {
         // We need some temperature for the transformation, not used
         // any further.
@@ -1131,10 +1137,10 @@ void MSkewTActor::generateFullScreenHighlightGeometry(
     float isothermTemperature_K = tpCoordinate.x();
     // Generate vertex at (isotherm temperature, bottom pressure).
     QVector2D tpCoordinate_K_hPa = QVector2D(
-                isothermTemperature_K, config->vertical_p_hPa.min);
+                isothermTemperature_K, config->verticalRange_p_hPa.min);
     vStart = transformTp2xy(tpCoordinate_K_hPa);
     // Generate vertex at (isotherm temperature, top pressure).
-    tpCoordinate_K_hPa.setY(config->vertical_p_hPa.max);
+    tpCoordinate_K_hPa.setY(config->verticalRange_p_hPa.max);
     vEnd = transformTp2xy(tpCoordinate_K_hPa);
     vertexArray << vStart << vEnd;
 
@@ -1145,8 +1151,8 @@ void MSkewTActor::generateFullScreenHighlightGeometry(
     // Generate vertices for dry adiabate.
     // ===================================
 
-    float log_pBot = log(config->vertical_p_hPa.max);
-    float log_pTop = log(config->vertical_p_hPa.min);
+    float log_pBot = log(config->verticalRange_p_hPa.max);
+    float log_pTop = log(config->verticalRange_p_hPa.min);
     int nAdiabatPoints = 100; // number of discrete points to plot adiabat
     float deltaLogP = (log_pBot - log_pTop) / float(nAdiabatPoints);
 
@@ -1239,7 +1245,7 @@ void MSkewTActor::generateFullScreenHighlightGeometry(
 #define SHADER_VERTEX_ATTRIBUTE 0
 #define SHADER_TEXTURE_ATTRIBUTE 1
 
-void MSkewTActor::drawDiagram2(MSceneViewGLWidget *sceneView)
+void MSkewTActor::drawDiagram(MSceneViewGLWidget *sceneView)
 {
     skewTShader->bindProgram("DiagramGeometry");
     skewTShader->setUniformValue("fullscreen",
@@ -1274,7 +1280,7 @@ void MSkewTActor::drawDiagram2(MSceneViewGLWidget *sceneView)
 
 void MSkewTActor::drawDiagramGeometryAndLabels(
         MSceneViewGLWidget *sceneView, GL::MVertexBuffer *vbDiagramVertices,
-        VertexRanges *vertexRanges)
+        SkewTCoordinateLinesVertexRanges *vertexRanges)
 {
     // Bind vertex array and shader for diagram geometry.
     // ==================================================
@@ -1303,21 +1309,21 @@ void MSkewTActor::drawDiagramGeometryAndLabels(
     glLineWidth(1);
     glPolygonMode(GL_FRONT_AND_BACK, renderAsWireFrame ? GL_LINE : GL_FILL);
     glDrawArrays(GL_TRIANGLE_STRIP,
-                 vertexRanges->frame.startIndex, 4);
+                 vertexRanges->diagramFrame.startIndex, 4);
 
     // Render the frame as thick lines.
     glLineWidth(3);
-    skewTShader->setUniformValue("colour", skewTDiagramConfiguration.diagramColor);
+    skewTShader->setUniformValue("colour", diagramConfig.backgroundColor);
     skewTShader->setUniformValue("depthOffset", 0.f);
     glDrawArrays(GL_LINES,
-                 vertexRanges->frame.startIndex,
-                 vertexRanges->frame.indexCount);
+                 vertexRanges->diagramFrame.startIndex,
+                 vertexRanges->diagramFrame.indexCount);
 
     glLineWidth(vertexRanges->lineWidth);
 
     // Draw dry adiabates.
     // ===================
-    if (skewTDiagramConfiguration.drawDryAdiabates)
+    if (diagramConfig.drawDryAdiabates)
     {
         skewTShader->setUniformValue("colour", QVector4D(0.8f, 0.8f, 0.f, 1.f));
         glDrawArrays(GL_LINES,
@@ -1327,7 +1333,7 @@ void MSkewTActor::drawDiagramGeometryAndLabels(
 
     // Draw isobars.
     // =============
-    skewTShader->setUniformValue("colour", skewTDiagramConfiguration.diagramColor);
+    skewTShader->setUniformValue("colour", diagramConfig.backgroundColor);
     glDrawArrays(GL_LINES,
                  vertexRanges->isobars.startIndex,
                  vertexRanges->isobars.indexCount);
@@ -1341,7 +1347,7 @@ void MSkewTActor::drawDiagramGeometryAndLabels(
 
     // Draw moist adiabates.
     // =====================
-    if (skewTDiagramConfiguration.drawMoistAdiabates)
+    if (diagramConfig.drawMoistAdiabates)
     {
         skewTShader->setUniformValue("colour", QVector4D(0.f, 0.8f, 0.f, 1.f));
         glDrawArrays(GL_LINES,
@@ -1403,54 +1409,21 @@ void MSkewTActor::loadObservationalDataFromUWyoming(int stationNum)
 }
 
 
-void MSkewTActor::ModeSpecificDiagramConfiguration::init()
-{
-    diagramColor = QVector4D(0, 0, 0, 1);
-}
-
-
-void MSkewTActor::drawDiagram3DView(MSceneViewGLWidget* sceneView)
-{
-    drawDiagramGeometryAndLabels(
-                sceneView, vbDiagramVertices,
-                &skewTDiagramConfiguration.vertexArrayDrawRanges);
-    drawDiagram2(sceneView);
-    poleActor->render(sceneView);
-}
-
-
-void MSkewTActor::drawDiagramFullScreen(MSceneViewGLWidget* sceneView)
-{
-    glClear(GL_DEPTH_BUFFER_BIT);
-    drawDiagramGeometryAndLabelsFullScreen(sceneView);
-    drawDiagram2(sceneView);
-}
-
-
 void MSkewTActor::drawDiagramGeometryAndLabelsFullScreen(
         MSceneViewGLWidget* sceneView)
 {
     drawDiagramGeometryAndLabels(
-                sceneView, vbDiagramVertices,
-                &skewTDiagramConfiguration.vertexArrayDrawRanges);
+                sceneView, vbDiagramGeometry,
+                &diagramConfig.coordinateGeometryDrawRanges);
 
     // In interaction mode, draw highlighting coordinate axes and adiabates
     // for the current mouse position.
-    if (sceneView->interactionModeEnabled() && vbHighlightVertices)
+    if (sceneView->interactionModeEnabled() && vbFullscreenMouseOverGeometry)
     {
         drawDiagramGeometryAndLabels(
-                    sceneView, vbHighlightVertices,
-                    &skewTDiagramConfiguration.highlightGeometryDrawRanges);
+                    sceneView, vbFullscreenMouseOverGeometry,
+                    &diagramConfig.highlightGeometryDrawRanges);
     }
-}
-
-
-void MSkewTActor::drawDiagramGeometryAndLabels3DView(
-        MSceneViewGLWidget* sceneView)
-{
-    drawDiagramGeometryAndLabels(
-                sceneView, vbDiagramVertices,
-                &skewTDiagramConfiguration.vertexArrayDrawRanges);
 }
 
 
@@ -1460,11 +1433,11 @@ void MSkewTActor::computeTlogp2xyTransformationMatrix()
     // log(pressure)) coordinates into a (skewed) (x, y) coordinate system in
     // the range (0..1).
 
-    float Tmin_K = degCToKelvin(skewTDiagramConfiguration.temperature_degC.min);
-    float Tmax_K = degCToKelvin(skewTDiagramConfiguration.temperature_degC.max);
-    float logpbot_hPa = log(skewTDiagramConfiguration.vertical_p_hPa.max);
-    float logptop_hPa = log(skewTDiagramConfiguration.vertical_p_hPa.min);
-    float xShear = skewTDiagramConfiguration.skewFactor; // 0..1, where 1 == 45 deg
+    float Tmin_K = degCToKelvin(diagramConfig.temperatureRange_degC.min);
+    float Tmax_K = degCToKelvin(diagramConfig.temperatureRange_degC.max);
+    float logpbot_hPa = log(diagramConfig.verticalRange_p_hPa.max);
+    float logptop_hPa = log(diagramConfig.verticalRange_p_hPa.min);
+    float xShear = diagramConfig.skewFactor; // 0..1, where 1 == 45 deg
 
     // Translate (-Tmin_K, -logpbot_hPa) to the origin.
     QMatrix4x4 translationMatrix;
@@ -1542,18 +1515,18 @@ QMatrix4x4 MSkewTActor::computeXY2WorldSpaceTransformationMatrix(
     // 3. Translate the result to the location of the diagram probe.
 
     float worldZbot = sceneView->worldZfromPressure(
-                skewTDiagramConfiguration.vertical_p_hPa.max);
+                diagramConfig.verticalRange_p_hPa.max);
     float worldZtop = sceneView->worldZfromPressure(
-                skewTDiagramConfiguration.vertical_p_hPa.min);
+                diagramConfig.verticalRange_p_hPa.min);
 
     QMatrix4x4 scaleMatrix;
-    scaleMatrix.scale(skewTDiagramConfiguration.diagramWidth3D,
+    scaleMatrix.scale(diagramConfig.diagramWidth3D,
                       1.,
                       worldZtop-worldZbot);
 
     QMatrix4x4 rotationMatrix;
     rotationMatrix.setToIdentity();
-    if (skewTDiagramConfiguration.alignWithCamera)
+    if (diagramConfig.alignWithCamera)
     {
         QVector3D up = QVector3D(0., 0., 1);
         QVector3D right = sceneView->getCamera()->getXAxis();
@@ -1564,8 +1537,8 @@ QMatrix4x4 MSkewTActor::computeXY2WorldSpaceTransformationMatrix(
     }
 
     QMatrix4x4 translationMatrix;
-    translationMatrix.translate(skewTDiagramConfiguration.geoPosition.x(),
-                                skewTDiagramConfiguration.geoPosition.y(),
+    translationMatrix.translate(diagramConfig.lonLatPosition.x(),
+                                diagramConfig.lonLatPosition.y(),
                                 worldZbot);
 
     return translationMatrix * rotationMatrix * scaleMatrix;
@@ -1581,21 +1554,21 @@ void MSkewTActor::updateVerticalProfilesAndLabels()
         MNWPSkewTActorVariable* var =
                 static_cast<MNWPSkewTActorVariable*> (avar);
 
-        var->updateProfile(skewTDiagramConfiguration.geoPosition);
+        var->updateProfile(diagramConfig.lonLatPosition);
     }
 
     // Update the geographical locations of the labels in the 3D view.
     for (MLabel* label : labels3D)
     {
-        label->anchor.setX(skewTDiagramConfiguration.geoPosition.x());
-        label->anchor.setY(skewTDiagramConfiguration.geoPosition.y());
+        label->anchor.setX(diagramConfig.lonLatPosition.x());
+        label->anchor.setY(diagramConfig.lonLatPosition.y());
     }
 
     // Update vertical position of the attached pole actor.
     if (!dragEventActive)
     {
         poleActor->setPolePosition(
-                    0, skewTDiagramConfiguration.geoPosition.toPointF());
+                    0, diagramConfig.lonLatPosition.toPointF());
     }
 }
 

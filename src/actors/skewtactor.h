@@ -123,66 +123,56 @@ protected:
     void printDebugOutputOnUserRequest();
 
 private:
-    /**
-      @brief Stores a vertex range that has to be drawn by the draw
-      calls for the diagram auxiliary lines.
-     */
+    // Start index and index count for vertices to be drawn from a vertex array.
     struct VertexRange
     {
         int startIndex = 0;
         int indexCount  = 0;
     };
 
-    /**
-      @brief Stores the vertex ranges for every different type of auxiliary
-      line.
-     */
-    struct VertexRanges
+    // Vertex ranges for coordinate lines of the diagram; all vertices are
+    // stored in a shared vertex buffer.
+    struct SkewTCoordinateLinesVertexRanges
     {
         int lineWidth = 1;
+        VertexRange diagramFrame;
+        VertexRange isobars;
         VertexRange isotherms;
         VertexRange dryAdiabates;
         VertexRange moistAdiabates;
-        VertexRange frame;
-        VertexRange isobars;
     };
 
-    struct Amplitude
+    struct CoordinateRange
     {
         float min, max;
     };
 
-    struct ModeSpecificDiagramConfiguration
+    struct SkewTDiagramConfiguration
     {
-        ModeSpecificDiagramConfiguration() {}
-        void init();
+        SkewTDiagramConfiguration() {}
 
-        QVector2D geoPosition;
-        struct Amplitude vertical_p_hPa;
-        struct Amplitude temperature_degC;
-        float skewFactor;
+        QVector4D backgroundColor;
+        QVector2D lonLatPosition;
+        struct CoordinateRange verticalRange_p_hPa;
+        struct CoordinateRange temperatureRange_degC;
+        float skewFactor = 1.;
         bool alignWithCamera = false;
         double diagramWidth3D = 15.;
         bool drawDryAdiabates = true;
         bool drawMoistAdiabates = true;
         bool regenerateAdiabates = true;
         bool fullscreen = false;
-        VertexRanges vertexRanges;
-        QVector4D diagramColor;
         float isothermSpacing = 10.;
         float moistAdiabatSpacing = 10.0;
         float dryAdiabatSpacing = 10.0;
-
-
         bool recomputeAdiabateGeometries = true;
-        VertexRanges vertexArrayDrawRanges;
         QVector<QVector2D> dryAdiabatesVertices;
         QVector<QVector2D> moistAdiabatesVertices;
-
-        VertexRanges highlightGeometryDrawRanges;
+        SkewTCoordinateLinesVertexRanges coordinateGeometryDrawRanges;
+        SkewTCoordinateLinesVertexRanges highlightGeometryDrawRanges;
     };
 
-    ModeSpecificDiagramConfiguration skewTDiagramConfiguration;
+    SkewTDiagramConfiguration diagramConfig;
 
     QMap<MSceneViewGLWidget*, bool> sceneViewFullscreenEnabled;
 
@@ -203,50 +193,43 @@ private:
 
     std::shared_ptr<GL::MShaderEffect> skewTShader;
 
-    /**
-      @brief Buffer used for the diagram auxiliary lines.
-     */
-    GL::MVertexBuffer* vbDiagramVertices;
-    GL::MVertexBuffer* vbHighlightVertices;
-
-    /**
-      @brief Buffer used for the actual wyoming station.
-     */
-    GL::MVertexBuffer* vbWyomingVertices;
-
+    // Vertex buffers for diagram geometry and for "highlight geometry" in
+    // fullscreen interaction mode.
+    GL::MVertexBuffer* vbDiagramGeometry;
+    GL::MVertexBuffer* vbFullscreenMouseOverGeometry;
     QVector<QVector2D> dryAdiabatesVertices;
     QVector<QVector2D> moistAdiabatesVertices;
+
+    // Vertex buffer for profiles retrieved from the UoWyoming webservice.
+    GL::MVertexBuffer* vbWyomingProfiles;
     int wyomingVerticesCount;
     QVector<int> wyomingStations;
 
     /**
       Copies the current user-defined diagram configuration from the
-      GUI properties into the @ref diagramConfiguration struct.
+      GUI properties into the @ref SkewTDiagramConfiguration struct.
      */
     void copyDiagramConfigurationFromQtProperties();
 
-    void drawDiagramGeometryAndLabels(MSceneViewGLWidget*sceneView,
-                                      GL::MVertexBuffer *vbDiagramVertices,
-                                      VertexRanges *vertexRanges);
+    void drawDiagramGeometryAndLabels(
+            MSceneViewGLWidget*sceneView,
+            GL::MVertexBuffer *vbDiagramGeometry,
+            SkewTCoordinateLinesVertexRanges *vertexRanges);
 
-    void generateDiagramGeometry(GL::MVertexBuffer **vbDiagramVertices,
-                                 ModeSpecificDiagramConfiguration *config);
+    void generateDiagramGeometry(
+            GL::MVertexBuffer **vbDiagramGeometry,
+            SkewTDiagramConfiguration *config);
 
     void generateFullScreenHighlightGeometry(
             QVector2D tpCoordinate,
-            GL::MVertexBuffer** vbDiagramVertices,
-            ModeSpecificDiagramConfiguration *config);
+            GL::MVertexBuffer** vbDiagramGeometry,
+            SkewTDiagramConfiguration *config);
 
-    void drawDiagram2(MSceneViewGLWidget* sceneView);
+    void drawDiagram(MSceneViewGLWidget* sceneView);
 
     void loadObservationalDataFromUWyoming(int stationNum);
+
     void loadListOfAvailableObservationsFromUWyoming();
-
-    void drawDiagram3DView(MSceneViewGLWidget* sceneView);
-
-    void drawDiagramFullScreen(MSceneViewGLWidget* sceneView);
-
-    void drawDiagramGeometryAndLabels3DView(MSceneViewGLWidget* sceneView);
 
     void drawDiagramGeometryAndLabelsFullScreen(MSceneViewGLWidget* sceneView);
 
