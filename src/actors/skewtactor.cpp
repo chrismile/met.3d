@@ -375,7 +375,7 @@ int MSkewTActor::checkIntersectionWithHandle(
         QVector2D tpCoordinate = transformXY2Tp(xyCoordinate);
 
         // Generate highlight geometry.
-        generateFullScreenHighlightGeometry(tpCoordinate,
+        generateFullScreenMouseOverGeometry(tpCoordinate,
                                             &vbFullscreenMouseOverGeometry,
                                             &diagramConfig);
     }
@@ -1020,10 +1020,10 @@ void MSkewTActor::generateDiagramGeometry(
             {
                 // First vertex of adiabat.
                 float p_hPa = exp(log_pBot);
-                float potT_K = ambientTemperatureOfPotentialTemperature_K(
+                float temp_K = ambientTemperatureOfPotentialTemperature_K(
                             adiabatTemperature, p_hPa * 100.);
 
-                QVector2D tpCoordinate_K_hPa = QVector2D(potT_K, p_hPa);
+                QVector2D tpCoordinate_K_hPa = QVector2D(temp_K, p_hPa);
                 vStart = transformTp2xy(tpCoordinate_K_hPa);
 
                 // Remaining vertices.
@@ -1031,10 +1031,10 @@ void MSkewTActor::generateDiagramGeometry(
                      log_p_hPa -= deltaLogP)
                 {
                     float p_hPa = exp(log_p_hPa);
-                    float potT_K = ambientTemperatureOfPotentialTemperature_K(
+                    float temp_K = ambientTemperatureOfPotentialTemperature_K(
                                 adiabatTemperature, p_hPa * 100.);
 
-                    QVector2D tpCoordinate_K_hPa = QVector2D(potT_K, p_hPa);
+                    QVector2D tpCoordinate_K_hPa = QVector2D(temp_K, p_hPa);
                     vEnd = transformTp2xy(tpCoordinate_K_hPa);
 
                     config->dryAdiabatesVertices << vStart << vEnd;
@@ -1076,10 +1076,10 @@ void MSkewTActor::generateDiagramGeometry(
 
                 // First vertex of adiabat.
                 float p_hPa = exp(log_pBot);
-                float potT_K = temperatureAlongSaturatedAdiabat_K_MoisseevaStull(
+                float temp_K = temperatureAlongSaturatedAdiabat_K_MoisseevaStull(
                             adiabatTemperature, p_hPa * 100.);
 
-                QVector2D tpCoordinate_K_hPa = QVector2D(potT_K, p_hPa);
+                QVector2D tpCoordinate_K_hPa = QVector2D(temp_K, p_hPa);
                 vStart = transformTp2xy(tpCoordinate_K_hPa);
 
                 // Remaining vertices.
@@ -1087,10 +1087,10 @@ void MSkewTActor::generateDiagramGeometry(
                      log_p_hPa -= deltaLogP)
                 {
                     float p_hPa = exp(log_p_hPa);
-                    float potT_K = temperatureAlongSaturatedAdiabat_K_MoisseevaStull(
+                    float temp_K = temperatureAlongSaturatedAdiabat_K_MoisseevaStull(
                                 adiabatTemperature, p_hPa * 100.);
 
-                    QVector2D tpCoordinate_K_hPa = QVector2D(potT_K, p_hPa);
+                    QVector2D tpCoordinate_K_hPa = QVector2D(temp_K, p_hPa);
                     vEnd = transformTp2xy(tpCoordinate_K_hPa);
 
                     config->moistAdiabatesVertices << vStart << vEnd;
@@ -1115,7 +1115,7 @@ void MSkewTActor::generateDiagramGeometry(
 }
 
 
-void MSkewTActor::generateFullScreenHighlightGeometry(
+void MSkewTActor::generateFullScreenMouseOverGeometry(
         QVector2D tpCoordinate,
         GL::MVertexBuffer** vbDiagramVertices,
         SkewTDiagramConfiguration *config)
@@ -1229,22 +1229,26 @@ void MSkewTActor::generateFullScreenHighlightGeometry(
 
     if (config->drawMoistAdiabates)
     {
-            // NOTE that the Moisseeva & Stull (2017) implementation for
-            // saturated adiabats is only valid for a temperature range of
-            // -100 degC to +40 degC. Hence limit to this range.
-            if (tpCoordinate.x() >= 173.15 && tpCoordinate.x() < 313.15)
+        // NOTE: the Moisseeva & Stull (2017) implementation for
+        // saturated adiabats is only valid for:
+        //  * temperature: -100 degC to +40 degC
+        //  * theta_w: -70 degC to +40 degC
+        //  * pressure: 1050 hPa to 10 hPa.
+        // Hence limit to this range.
+
+        float thetaW = wetBulbPotentialTemperatureOfSaturatedAdiabat_K_MoisseevaStull(
+                    tpCoordinate.x(), tpCoordinate.y() * 100.);
+
+        if (tpCoordinate.x() >= 173.15 && tpCoordinate.x() < 313.15
+                && tpCoordinate.y() >= 10. && tpCoordinate.y() < 1050.
+                && thetaW >= 203.15 && thetaW < 313.15)
             {
-                float adiabatTemperature =
-                        wetBulbPotentialTemperatureOfSaturatedAdiabat_K_MoisseevaStull(
-                            tpCoordinate.x(), tpCoordinate.y() * 100.);
-
-                // First vertex of adiabat.
+                // First vertex of moist adiabat.
                 float p_hPa = exp(log_pBot);
-                float moistPotT_K =
-                        temperatureAlongSaturatedAdiabat_K_MoisseevaStull(
-                            adiabatTemperature, p_hPa * 100.);
+                float temp_K = temperatureAlongSaturatedAdiabat_K_MoisseevaStull(
+                            thetaW, p_hPa * 100.);
 
-                QVector2D tpCoordinate_K_hPa = QVector2D(moistPotT_K, p_hPa);
+                QVector2D tpCoordinate_K_hPa = QVector2D(temp_K, p_hPa);
                 vStart = transformTp2xy(tpCoordinate_K_hPa);
 
                 // Remaining vertices.
@@ -1252,10 +1256,10 @@ void MSkewTActor::generateFullScreenHighlightGeometry(
                      log_p_hPa -= deltaLogP)
                 {
                     float p_hPa = exp(log_p_hPa);
-                    float potT_K = temperatureAlongSaturatedAdiabat_K_MoisseevaStull(
-                                adiabatTemperature, p_hPa * 100.);
+                    float temp_K = temperatureAlongSaturatedAdiabat_K_MoisseevaStull(
+                                thetaW, p_hPa * 100.);
 
-                    QVector2D tpCoordinate_K_hPa = QVector2D(potT_K, p_hPa);
+                    QVector2D tpCoordinate_K_hPa = QVector2D(temp_K, p_hPa);
                     vEnd = transformTp2xy(tpCoordinate_K_hPa);
 
                     vertexArray << vStart << vEnd;

@@ -218,7 +218,7 @@ private:
             GL::MVertexBuffer **vbDiagramGeometry,
             SkewTDiagramConfiguration *config);
 
-    void generateFullScreenHighlightGeometry(
+    void generateFullScreenMouseOverGeometry(
             QVector2D tpCoordinate,
             GL::MVertexBuffer** vbDiagramGeometry,
             SkewTDiagramConfiguration *config);
