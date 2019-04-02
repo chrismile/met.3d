@@ -152,17 +152,12 @@ private:
         float min, max;
     };
 
-    /**
-      @brief Stores the diagram configuration. This avoids using the
-      QtProperty getters to retrieve configuration details.
-     */
-    struct DiagramConfiguration
+    struct ModeSpecificDiagramConfiguration
     {
-        DiagramConfiguration() {}
+        ModeSpecificDiagramConfiguration() {}
         void init();
 
         QVector2D geoPosition;
-
         struct Amplitude vertical_p_hPa;
         struct Amplitude temperature_degC;
         float skewFactor;
@@ -177,13 +172,7 @@ private:
         float isothermSpacing = 10.;
         float moistAdiabatSpacing = 10.0;
         float dryAdiabatSpacing = 10.0;
-    };
 
-    struct ModeSpecificDiagramConfiguration
-    {
-        ModeSpecificDiagramConfiguration() {}
-        void init(DiagramConfiguration *dconfig);
-        DiagramConfiguration *dconfig;
 
         bool recomputeAdiabateGeometries = true;
         VertexRanges vertexArrayDrawRanges;
@@ -229,8 +218,6 @@ private:
     QVector<QVector2D> moistAdiabatesVertices;
     int wyomingVerticesCount;
     QVector<int> wyomingStations;
-
-    DiagramConfiguration diagramConfiguration;
 
     /**
       Copies the current user-defined diagram configuration from the
