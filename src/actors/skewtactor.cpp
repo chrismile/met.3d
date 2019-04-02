@@ -187,21 +187,18 @@ MSkewTActor::MSkewTActor() : MNWPMultiVarActor(),
 
 MSkewTActor::~MSkewTActor()
 {
-    if (vbDiagramGeometry)
-    {
-        delete vbDiagramGeometry;
-    }
-    if (vbFullscreenMouseOverGeometry)
-    {
-        delete vbFullscreenMouseOverGeometry;
-    }
-
-    if (vbWyomingProfiles)
-    {
-        delete vbWyomingProfiles;
-    }
+    // Release all vertex buffers.
+    MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
+    glRM->releaseAllGPUItemReferences(
+                QString("skewTDiagramVertices_actor#%2").arg(myID));
+    glRM->releaseAllGPUItemReferences(
+                QString("skewTMouseOverVertices_actor#%2").arg(myID));
+    glRM->releaseAllGPUItemReferences(
+                QString("wyomingVertices_actor#%1").arg(myID));
 
 //TODO (mr, 20Feb2019) -- Deleting the poleActor causes a segmentation fault.. why?
+// This currently results in the pole actor's vertex buffer remaining in
+// GPU memory.. :/
     // delete poleActor;
 
     removeAllSkewTLabels();
@@ -1106,9 +1103,10 @@ void MSkewTActor::generateDiagramGeometry(
             - config->coordinateGeometryDrawRanges.moistAdiabates.startIndex;
 
     // Upload geometry to vertex buffer.
+    // NOTE: needs to be released in destructor!
     config->recomputeAdiabateGeometries = false;
     uploadVec2ToVertexBuffer(
-                vertexArray, QString("skewTDiagramVertices%1_actor#%2").arg(myID),
+                vertexArray, QString("skewTDiagramVertices_actor#%2").arg(myID),
                 vbDiagramVertices);
 
     LOG4CPLUS_DEBUG(mlog, "Generation of Skew-T diagram geometry finished.");
@@ -1272,8 +1270,9 @@ void MSkewTActor::generateFullScreenMouseOverGeometry(
             - config->mouseOverGeometryDrawRanges.moistAdiabates.startIndex;
 
     // Upload geometry to vertex buffer.
+    // NOTE: needs to be released in destructor!
     uploadVec2ToVertexBuffer(
-                vertexArray, QString("skewTHighlightVertices%1_actor#%2").arg(myID),
+                vertexArray, QString("skewTMouseOverVertices_actor#%2").arg(myID),
                 vbDiagramVertices);
 }
 

@@ -146,6 +146,14 @@ MMovablePoleActor::MMovablePoleActor()
 
 MMovablePoleActor::~MMovablePoleActor()
 {
+    // Release all vertex buffers.
+    MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
+    const QString axisRequestKey = "axis_vertices_actor#"
+                                   + QString::number(getID());
+    glRM->releaseAllGPUItemReferences(axisRequestKey);
+    const QString poleRequestKey = "pole_vertices_actor#"
+                                   + QString::number(getID());
+    glRM->releaseAllGPUItemReferences(poleRequestKey);
 }
 
 
@@ -760,11 +768,13 @@ void MMovablePoleActor::dragEvent(MSceneViewGLWidget *sceneView,
 
     const QString poleRequestKey = "pole_vertices_actor#"
                                    + QString::number(getID());
+    // NOTE: needs to be released in destructor.
     uploadVec3ToVertexBuffer(poleVertices, poleRequestKey, &poleVertexBuffer,
                              sceneView);
 
     const QString axisRequestKey = "axis_vertices_actor#"
                                    + QString::number(getID());
+    // NOTE: needs to be released in destructor.
     uploadVec3ToVertexBuffer(axisTicks, axisRequestKey, &axisVertexBuffer,
                              sceneView);
 
@@ -1129,10 +1139,12 @@ void MMovablePoleActor::generateGeometry()
 
     const QString poleRequestKey = "pole_vertices_actor#"
                                    + QString::number(getID());
+    // NOTE: needs to be released in destructor.
     uploadVec3ToVertexBuffer(poleVertices, poleRequestKey, &poleVertexBuffer);
 
     const QString axisRequestKey = "axis_vertices_actor#"
                                    + QString::number(getID());
+    // NOTE: needs to be released in destructor.
     uploadVec3ToVertexBuffer(axisTicks, axisRequestKey, &axisVertexBuffer);
 }
 
