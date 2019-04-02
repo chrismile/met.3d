@@ -804,6 +804,9 @@ protected:
     MVerticalProfile profile;
     GL::MVertexBuffer *profileVertexBuffer;
 
+    QMap<int, MVerticalProfile> profileAggregation;
+    QMap<int, GL::MVertexBuffer*> profileVertexBufferAggregation;
+
     void updateProfile(QVector2D lonLatLocation);
 };
 

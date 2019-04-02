@@ -1297,18 +1297,53 @@ void MSkewTActor::drawProfiles(MSceneViewGLWidget *sceneView)
 
         if ( !var->hasData() ) continue;
 
-        var->profileVertexBuffer->attachToVertexAttribute(
-                    SHADER_VERTEX_ATTRIBUTE, 2,
-                    GL_FALSE, 0, (const GLvoid *)(0 * sizeof(float)));
-
         skewTShader->setUniformValue("colour", var->profileColour);
 
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
         glLineWidth(float(var->lineThickness));
-        glDrawArrays(GL_LINE_STRIP, 0, var->profile.getScalarPressureData().size());
 
-        // Unbind VBO.
-        glBindBuffer(GL_ARRAY_BUFFER, 0); CHECK_GL_ERROR;
+        int numVertices = var->profile.getScalarPressureData().size();
+
+        // Distinguish between single-profile and multi-member modes:
+        // ==========================================================
+        if (var->ensembleFilterOperation != "MULTIPLE_MEMBERS")
+        {
+            // Draw a single profile (no multi-member mode).
+            // =============================================
+
+            var->profileVertexBuffer->attachToVertexAttribute(
+                        SHADER_VERTEX_ATTRIBUTE, 2,
+                        GL_FALSE, 0, (const GLvoid *)(0 * sizeof(float)));
+
+            glDrawArrays(GL_LINE_STRIP, 0, numVertices);
+
+            // Unbind VBO.
+            glBindBuffer(GL_ARRAY_BUFFER, 0); CHECK_GL_ERROR;
+        }
+        else
+        {
+            // Multi-member mode: Draw spaghetti plot.
+            // =======================================
+
+//NOTE (mr, 2019Apr02): This is a "poor-man's" version of spaghetti plot
+// rendering. Having a separate vertex buffer for each member profile could
+// easily be avoided and all profiles could be combined into a single vb to
+// improve performance. Possibly refactor this part once more ensemble vis
+// techniques are being implemented.
+
+            for (GL::MVertexBuffer* vb : var->profileVertexBufferAggregation)
+            {
+                vb->attachToVertexAttribute(
+                            SHADER_VERTEX_ATTRIBUTE, 2,
+                            GL_FALSE, 0, (const GLvoid *)(0 * sizeof(float)));
+
+                // Assume all profiles have the same length.
+                glDrawArrays(GL_LINE_STRIP, 0, numVertices);
+
+                // Unbind VBO.
+                glBindBuffer(GL_ARRAY_BUFFER, 0); CHECK_GL_ERROR;
+            }
+        }
     }
 }
 

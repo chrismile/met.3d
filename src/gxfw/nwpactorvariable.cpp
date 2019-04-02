@@ -3989,6 +3989,11 @@ MNWPSkewTActorVariable::~MNWPSkewTActorVariable()
     {
         profile.releaseVertexBuffer();
     }
+
+    for (int m : profileVertexBufferAggregation.keys())
+    {
+        profileAggregation[m].releaseVertexBuffer();
+    }
 }
 
 
@@ -4044,6 +4049,15 @@ void MNWPSkewTActorVariable::loadConfiguration(QSettings *settings)
 
 void MNWPSkewTActorVariable::dataFieldChangedEvent()
 {
+    // Remove all shortcut pointers to vertex buffers in case the set of
+    // selected members has changed (otherwise removed members would remain
+    // in the set).
+    for (int m : profileVertexBufferAggregation.keys())
+    {
+        profileAggregation[m].releaseVertexBuffer();
+        profileVertexBufferAggregation.remove(m);
+    }
+
     updateProfile(profile.getLonLatLocation());
 }
 
@@ -4061,6 +4075,33 @@ void MNWPSkewTActorVariable::updateProfile(QVector2D lonLatLocation)
     if (profileVertexBuffer == nullptr)
     {
         profileVertexBuffer = profile.getVertexBuffer();
+    }
+
+    // If multiple member mode is active (ensemble displays, e.g. spaghettis):
+    // =======================================================================
+    if (ensembleFilterOperation == "MULTIPLE_MEMBERS"
+            && gridAggregation != nullptr)
+    {
+        // For each member grid in the grid aggregation, extract the vertical
+        // profile and obtain a vertex buffer.
+        for (MStructuredGrid* g : gridAggregation->getGrids())
+        {
+            profileData = g->extractVerticalProfile(
+                        lonLatLocation.x(), lonLatLocation.y());
+
+//NOTE (mr, 2019Apr02): This implementation could be improved by combining
+// all profiles into a single vertex buffer. Also see comment in
+// MSkewTActor::drawProfiles().
+
+            int m = g->getEnsembleMember();
+            profileAggregation[m].updateData(lonLatLocation, profileData);
+
+            if (!profileVertexBufferAggregation.contains(m))
+            {
+                profileVertexBufferAggregation.insert(
+                            m, profileAggregation[m].getVertexBuffer());
+            }
+        }
     }
 }
 
