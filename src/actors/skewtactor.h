@@ -4,9 +4,9 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
+**  Copyright 2015-2019 Marc Rautenhaus [*, previously +]
 **  Copyright 2015-2016 Christoph Heidelmann [+]
 **  Copyright 2018      Bianca Tost [+]
-**  Copyright 2015-2019 Marc Rautenhaus [*, previously +]
 **
 **  * Regional Computing Center, Visualization
 **  Universitaet Hamburg, Hamburg, Germany
@@ -124,26 +124,6 @@ protected:
 
 private:
     /**
-      @brief Stores the current variable index and color of a variable.
-     */
-    struct VariableConfig
-    {
-        QtProperty *property = nullptr;
-        MNWPSkewTActorVariable *variable = nullptr;
-        int index = 0;
-        QColor color;
-        double thickness;
-    };
-
-    /**
-      @brief Stores the coordinates of the diagram outline.
-     */
-    struct Outline
-    {
-        float data[16];
-    };
-
-    /**
       @brief Stores a vertex range that has to be drawn by the draw
       calls for the diagram auxiliary lines.
      */
@@ -167,77 +147,9 @@ private:
         VertexRange isobars;
     };
 
-    struct VARIABLES
-    {
-        struct TEMPERATURE
-        {
-            int MEMBER = 0;
-            int MEAN = 1;
-            int MINIMUM = 2;
-            int MAXIMUM = 3;
-            int DEVIATION = 4;
-            int SPAGHETTI = 5;
-        };
-        TEMPERATURE temperature;
-
-        struct DEWPOINT
-        {
-            int MEMBER = 6;
-            int MEAN = 7;
-            int MINIMUM = 8;
-            int MAXIMUM = 9;
-            int DEVIATION = 10;
-            int SPAGHETTI = 11;
-        };
-        DEWPOINT dewPoint;
-    };
-    VARIABLES variablesIndices;
-
-    /**
-      @brief Describes the drawing area.
-     */
-    struct Area
-    {
-        float top, bottom;
-        float left, right;
-        float width() const
-        {
-            return right - left;
-        }
-        float height() const
-        {
-            return top - bottom;
-        }
-        struct Outline outline() const
-        {
-            Outline outline;
-            float data[16] = { left , top   , left , 0.0,
-                               left , bottom, right, bottom,
-                               left , top   , right, top,
-                               right, bottom, right, top
-                             };
-            std::copy(std::begin(data), std::end(data),
-                      std::begin(outline.data));
-            return outline;
-        }
-    };
-
     struct Amplitude
     {
         float min, max;
-        float amplitude() const
-        {
-            return std::abs(max) + std::abs(min);
-        }
-        float center() const
-        {
-            return amplitude() / 2.f;
-        }
-    };
-
-    struct Size
-    {
-        float width, height;
     };
 
     /**
@@ -249,50 +161,34 @@ private:
         DiagramConfiguration() {}
         void init();
 
-        QVector<VariableConfig> varConfigs;
         QVector2D geoPosition;
-        QVector2D clipPos;
-        struct Area area;
-        float layer;
+
         struct Amplitude vertical_p_hPa;
         struct Amplitude temperature_degC;
         float skewFactor;
-        struct Size offscreenTextureSize;
-        GLint maxTextureSize;
         bool alignWithCamera = false;
         double diagramWidth3D = 15.;
-        bool overDragHandle = false;
         bool drawDryAdiabates = true;
         bool drawMoistAdiabates = true;
         bool regenerateAdiabates = true;
         bool fullscreen = false;
-        bool drawInPerspective = false;
         VertexRanges vertexRanges;
         QVector4D diagramColor;
         float isothermSpacing = 10.;
         float moistAdiabatSpacing = 10.0;
         float dryAdiabatSpacing = 10.0;
-        float yOffset = 0;
     };
 
     struct ModeSpecificDiagramConfiguration
     {
         ModeSpecificDiagramConfiguration() {}
-        void init(DiagramConfiguration *dconfig, QString bufferNameSuffix);
-
-        bool pressureEqualsWorldPressure = false;
-
-        struct Area drawingRegionClipSpace;
-        QVector2D clipPos;
-        float layer;
-
+        void init(DiagramConfiguration *dconfig);
         DiagramConfiguration *dconfig;
 
         bool recomputeAdiabateGeometries = true;
         VertexRanges vertexArrayDrawRanges;
         QVector<QVector2D> dryAdiabatesVertices;
         QVector<QVector2D> moistAdiabatesVertices;
-        QString bufferNameSuffix;
 
         VertexRanges highlightGeometryDrawRanges;
     };
@@ -305,39 +201,18 @@ private:
     QList<MLabel*> labels3D;
 
     QtProperty *geoPositionProperty,
+               *appearanceGroupProperty, *alignWithCameraProperty,
                *bottomPressureProperty, *topPressureProperty,
-               *alignWithCameraProperty,
-               *wyomingStationsProperty,
-               *enableWyomingProperty,
-               *dewPointColorWyomingProperty,
-               *temperatureColorWyomingProperty, *groupWyoming,
                *temperatureMinProperty, *temperatureMaxProperty,
-               *skewFactorProperty,
-               *isothermsSpacingProperty,
-               *drawDryAdiabatesProperty,
-               *drawMoistAdiabatesProperty,
-               *moistAdiabatesSpcaingProperty,
-               *dryAdiabatesSpacingProperty,
-               *appearanceGroupProperty,
+               *isothermsSpacingProperty, *skewFactorProperty,
+               *drawDryAdiabatesProperty, *dryAdiabatesSpacingProperty,
+               *drawMoistAdiabatesProperty, *moistAdiabatesSpcaingProperty,
                *diagramWidth3DProperty,
-               *groupVariables, *temperatureGroupProperty,
-               *temperatureMinMaxVariableColorProperty,
-               *temperatureShowProbabilityTubeProperty,
-               *temperatureShowDeviationTubeProperty,
-               *humidityGroupProperty,
-               *dewPointMinMaxVariableColorProperty,
-               *dewPointShowProbabilityTubeProperty,
-               *dewPointShowDeviationTubeProperty;
-
-    /**
-      @brief Stores the names of the variables.
-     */
-    QList<QString> varNameList;
-
-    QHash<QString, int> varNamesIndices;
+               *temperatureColorWyomingProperty, *groupWyoming,
+               *wyomingStationsProperty, *enableWyomingProperty,
+               *dewPointColorWyomingProperty;
 
     std::shared_ptr<GL::MShaderEffect> skewTShader;
-    std::shared_ptr<GL::MShaderEffect> positionSpheresShader;
 
     /**
       @brief Buffer used for the diagram auxiliary lines.
@@ -375,10 +250,6 @@ private:
             GL::MVertexBuffer** vbDiagramVertices,
             ModeSpecificDiagramConfiguration *config);
 
-    void drawDiagram(MSceneViewGLWidget* sceneView,
-                     GL::MVertexBuffer *vbDiagramVertices,
-                     ModeSpecificDiagramConfiguration *config);
-
     void drawDiagram2(MSceneViewGLWidget* sceneView);
 
     void loadObservationalDataFromUWyoming(int stationNum);
@@ -391,11 +262,6 @@ private:
     void drawDiagramGeometryAndLabels3DView(MSceneViewGLWidget* sceneView);
 
     void drawDiagramGeometryAndLabelsFullScreen(MSceneViewGLWidget* sceneView);
-
-    // If the user picks the handle not in its centre, we cannot move the handle
-    // by setting the centre point to the mouse position so we need this offset
-    // to place the handle relative to the mouse position.
-    QVector2D offsetPickPositionToHandleCentre;
 
     // Stores the transformation matrix that transforms (T, log(p)) coordinates
     // into the diagram's (x, y) coordinates. Computed by
@@ -468,8 +334,7 @@ public:
     MSkewTActorFactory() : MAbstractActorFactory() {}
 
 protected:
-    MActor* createInstance() override
-    { displayWarningExperimentalStatus(); return new MSkewTActor(); }
+    MActor* createInstance() override { return new MSkewTActor(); }
 };
 
 

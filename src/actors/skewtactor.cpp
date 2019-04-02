@@ -58,7 +58,6 @@ MSkewTActor::MSkewTActor() : MNWPMultiVarActor(),
     vbHighlightVertices(nullptr),
     vbWyomingVertices(nullptr),
     wyomingVerticesCount(0),
-    offsetPickPositionToHandleCentre(QVector2D(0., 0.)),
     dragEventActive(false)
 {
     enablePicking(true);
@@ -268,33 +267,6 @@ void MSkewTActor::saveConfiguration(QSettings *settings)
     settings->setValue("dryAdiabatesEnabled",
                        properties->mBool()->value(drawDryAdiabatesProperty));
 
-    for (int i = 0; i < diagramConfiguration.varConfigs.size(); i++)
-    {
-        VariableConfig var = diagramConfiguration.varConfigs.at(i);
-        settings->setValue(QString("%1VariableIndex").arg(i), var.index);
-        settings->setValue(QString("%1VariableColor").arg(i), var.color);
-    }
-
-    settings->setValue("temperatureShowMinMaxProperty",
-                       properties->mBool()->value(
-                       temperatureShowProbabilityTubeProperty));
-    settings->setValue("temperatureShowDeviationProperty",
-                       properties->mBool()->value(
-                           temperatureShowDeviationTubeProperty));
-    settings->setValue("temperatureMinMaxColourProperty",
-                       properties->mColor()->value(
-                           temperatureMinMaxVariableColorProperty));
-
-    settings->setValue("humidityShowMinMaxProperty",
-                       properties->mBool()->value(
-                       dewPointShowProbabilityTubeProperty));
-    settings->setValue("humidityShowDeviationProperty",
-                       properties->mBool()->value(
-                           dewPointShowDeviationTubeProperty));
-    settings->setValue("humidityMinMaxColourProperty",
-                       properties->mColor()->value(
-                           dewPointMinMaxVariableColorProperty));
-
     poleActor->saveConfiguration(settings);
     settings->endGroup();
 }
@@ -359,49 +331,6 @@ void MSkewTActor::loadConfiguration(QSettings *settings)
                 drawDryAdiabatesProperty,
                 settings->value("dryAdiabatesEnabled", true).toBool());
 
-    for (int i = 0; i < diagramConfiguration.varConfigs.size(); i++)
-    {
-        int index = settings->value(
-                       QString("%1VariableIndex").arg(i)).toInt();
-        QColor color = settings->value(QString("%1VariableColor").arg(i),
-                                       QColor(0, 0, 0, 255)).value<QColor>();
-
-        VariableConfig *var = &diagramConfiguration.varConfigs.data()[i];
-        var->color = color;
-        var->index = index;
-        properties->mEnum()->setEnumNames(var->property, varNameList);
-        properties->mEnum()->setValue(var->property, index);
-        if (index > 0 && index <= variables.size())
-        {
-            var->variable = dynamic_cast<MNWPSkewTActorVariable*>(
-                        variables.at(index - 1));
-            properties->mColor()->setValue(var->variable->profileColourProperty, color);
-        }
-    }
-
-    properties->mBool()->setValue(
-                temperatureShowProbabilityTubeProperty,
-                settings->value("temperatureShowMinMaxProperty", true).toBool());
-    properties->mBool()->setValue(
-                temperatureShowDeviationTubeProperty,
-                settings->value("temperatureShowDeviationProperty",
-                                true).toBool());
-    properties->mColor()->setValue(
-                temperatureMinMaxVariableColorProperty,
-                settings->value("temperatureMinMaxColourProperty",
-                                QColor(201, 10, 5, 255)).value<QColor>());
-
-    properties->mBool()->setValue(
-                dewPointShowProbabilityTubeProperty,
-                settings->value("humidityShowMinMaxProperty", true).toBool());
-    properties->mBool()->setValue(
-                dewPointShowDeviationTubeProperty,
-                settings->value("humidityShowDeviationProperty", true).toBool());
-    properties->mColor()->setValue(
-                dewPointMinMaxVariableColorProperty,
-                settings->value("humidityMinMaxColourProperty",
-                                QColor(17, 98, 208, 255)).value<QColor>());
-
     settings->endGroup();
     copyDiagramConfigurationFromQtProperties();
     updateVerticalProfilesAndLabels();
@@ -411,9 +340,8 @@ void MSkewTActor::loadConfiguration(QSettings *settings)
 
 const QList<MVerticalLevelType> MSkewTActor::supportedLevelTypes()
 {
-    return (QList<MVerticalLevelType>() <<
-            HYBRID_SIGMA_PRESSURE_3D <<
-            PRESSURE_LEVELS_3D);
+    return (QList<MVerticalLevelType>() << HYBRID_SIGMA_PRESSURE_3D <<
+            PRESSURE_LEVELS_3D << AUXILIARY_PRESSURE_3D);
 }
 
 
@@ -779,36 +707,6 @@ void MSkewTActor::onQtPropertyChanged(QtProperty *property)
         }
         emitActorChangedSignal();
     }
-    else
-    {
-        for (int i = 0; i < diagramConfiguration.varConfigs.size(); i++)
-        {
-            VariableConfig *var = &diagramConfiguration.varConfigs[i];
-            int index = properties->mEnum()->value(var->property);
-            var->index = index;
-            if (var->index <= 0)
-            {
-                if (property == var->property)
-                {
-                    var->variable = nullptr;
-                    emitActorChangedSignal();
-                    return;
-                }
-                continue;
-            }
-            if (property == var->property
-                    || property == var->variable->profileColourProperty
-                    || property == var->variable->lineThicknessProperty)
-            {
-                var->variable = dynamic_cast<MNWPSkewTActorVariable*>(
-                            variables.at(var->index - 1));
-                var->color = var->variable->profileColour;
-                var->thickness = var->variable->lineThickness;
-                emitActorChangedSignal();
-                return;
-            }
-        }
-    }
 }
 
 
@@ -890,11 +788,8 @@ void MSkewTActor::copyDiagramConfigurationFromQtProperties()
     diagramConfiguration.dryAdiabatSpacing =
             properties->mDDouble()->value(dryAdiabatesSpacingProperty);
 
-    skewTDiagramConfiguration.pressureEqualsWorldPressure =
-            diagramConfiguration.alignWithCamera;
-
     diagramConfiguration.init();
-    skewTDiagramConfiguration.init(&diagramConfiguration, "_normal");
+    skewTDiagramConfiguration.init(&diagramConfiguration);
 
     // After the configuration has been copied from the properties, recompute
     // the (T, log(p)) to (x, y) transformation matrix to transform (T, p)
@@ -1170,8 +1065,7 @@ void MSkewTActor::generateDiagramGeometry(
     // Upload geometry to vertex buffer.
     config->recomputeAdiabateGeometries = false;
     uploadVec2ToVertexBuffer(
-                vertexArray, QString("skewTDiagramVertices%1_actor#%2")
-                .arg(config->bufferNameSuffix).arg(myID),
+                vertexArray, QString("skewTDiagramVertices%1_actor#%2").arg(myID),
                 vbDiagramVertices);
 
     LOG4CPLUS_DEBUG(mlog, "Generation of Skew-T diagram geometry finished.");
@@ -1332,8 +1226,7 @@ void MSkewTActor::generateFullScreenHighlightGeometry(
 
     // Upload geometry to vertex buffer.
     uploadVec2ToVertexBuffer(
-                vertexArray, QString("skewTHighlightVertices%1_actor#%2")
-                .arg(config->bufferNameSuffix).arg(myID),
+                vertexArray, QString("skewTHighlightVertices%1_actor#%2").arg(myID),
                 vbDiagramVertices);
 }
 
@@ -1512,20 +1405,17 @@ void MSkewTActor::DiagramConfiguration::init()
 
 
 void MSkewTActor::ModeSpecificDiagramConfiguration::init(
-        DiagramConfiguration *dconfig, QString bufferNameSuffix)
+        DiagramConfiguration *dconfig)
 {
     this->dconfig = dconfig;
-    this->bufferNameSuffix = bufferNameSuffix;
 }
 
 
 void MSkewTActor::drawDiagram3DView(MSceneViewGLWidget* sceneView)
 {
-    skewTDiagramConfiguration.layer = -0.005f;
     drawDiagramGeometryAndLabels(
                 sceneView, vbDiagramVertices,
                 &skewTDiagramConfiguration.vertexArrayDrawRanges);
-    skewTDiagramConfiguration.layer = -.1f;
     drawDiagram2(sceneView);
     poleActor->render(sceneView);
 }
