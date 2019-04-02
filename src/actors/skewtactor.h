@@ -160,7 +160,6 @@ private:
         double diagramWidth3D = 15.;
         bool drawDryAdiabates = true;
         bool drawMoistAdiabates = true;
-        bool regenerateAdiabates = true;
         bool fullscreen = false;
         float isothermSpacing = 10.;
         float moistAdiabatSpacing = 10.0;
@@ -169,7 +168,7 @@ private:
         QVector<QVector2D> dryAdiabatesVertices;
         QVector<QVector2D> moistAdiabatesVertices;
         SkewTCoordinateLinesVertexRanges coordinateGeometryDrawRanges;
-        SkewTCoordinateLinesVertexRanges highlightGeometryDrawRanges;
+        SkewTCoordinateLinesVertexRanges mouseOverGeometryDrawRanges;
     };
 
     SkewTDiagramConfiguration diagramConfig;
@@ -205,16 +204,15 @@ private:
     int wyomingVerticesCount;
     QVector<int> wyomingStations;
 
+    void loadObservationalDataFromUWyoming(int stationNum);
+
+    void loadListOfAvailableObservationsFromUWyoming();
+
     /**
       Copies the current user-defined diagram configuration from the
       GUI properties into the @ref SkewTDiagramConfiguration struct.
      */
     void copyDiagramConfigurationFromQtProperties();
-
-    void drawDiagramGeometryAndLabels(
-            MSceneViewGLWidget*sceneView,
-            GL::MVertexBuffer *vbDiagramGeometry,
-            SkewTCoordinateLinesVertexRanges *vertexRanges);
 
     void generateDiagramGeometry(
             GL::MVertexBuffer **vbDiagramGeometry,
@@ -225,13 +223,15 @@ private:
             GL::MVertexBuffer** vbDiagramGeometry,
             SkewTDiagramConfiguration *config);
 
-    void drawDiagram(MSceneViewGLWidget* sceneView);
+    void drawProfiles(MSceneViewGLWidget* sceneView);
 
-    void loadObservationalDataFromUWyoming(int stationNum);
+    void drawDiagramGeometryAndLabels(
+            MSceneViewGLWidget*sceneView,
+            GL::MVertexBuffer *vbDiagramGeometry,
+            SkewTCoordinateLinesVertexRanges *vertexRanges);
 
-    void loadListOfAvailableObservationsFromUWyoming();
-
-    void drawDiagramGeometryAndLabelsFullScreen(MSceneViewGLWidget* sceneView);
+    void drawDiagramGeometryAndLabelsFullScreen(
+            MSceneViewGLWidget* sceneView);
 
     // Stores the transformation matrix that transforms (T, log(p)) coordinates
     // into the diagram's (x, y) coordinates. Computed by

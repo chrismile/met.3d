@@ -187,10 +187,6 @@ MSkewTActor::MSkewTActor() : MNWPMultiVarActor(),
 
 MSkewTActor::~MSkewTActor()
 {
-    if (vbWyomingProfiles)
-    {
-        delete vbWyomingProfiles;
-    }
     if (vbDiagramGeometry)
     {
         delete vbDiagramGeometry;
@@ -198,6 +194,11 @@ MSkewTActor::~MSkewTActor()
     if (vbFullscreenMouseOverGeometry)
     {
         delete vbFullscreenMouseOverGeometry;
+    }
+
+    if (vbWyomingProfiles)
+    {
+        delete vbWyomingProfiles;
     }
 
 //TODO (mr, 20Feb2019) -- Deleting the poleActor causes a segmentation fault.. why?
@@ -589,7 +590,7 @@ void MSkewTActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
     drawDiagramGeometryAndLabels(
                 sceneView, vbDiagramGeometry,
                 &diagramConfig.coordinateGeometryDrawRanges);
-    drawDiagram(sceneView);
+    drawProfiles(sceneView);
     poleActor->render(sceneView);
 }
 
@@ -598,7 +599,7 @@ void MSkewTActor::renderToCurrentFullScreenContext(MSceneViewGLWidget *sceneView
 {
     glClear(GL_DEPTH_BUFFER_BIT);
     drawDiagramGeometryAndLabelsFullScreen(sceneView);
-    drawDiagram(sceneView);
+    drawProfiles(sceneView);
 }
 
 
@@ -648,15 +649,13 @@ void MSkewTActor::onQtPropertyChanged(QtProperty *property)
              || property == topPressureProperty
              || property == skewFactorProperty)
     {
-        diagramConfig.regenerateAdiabates = true;
         diagramConfig.recomputeAdiabateGeometries = true;
 
         copyDiagramConfigurationFromQtProperties();
         poleActor->setVerticalExtent(diagramConfig.verticalRange_p_hPa.max,
                                      diagramConfig.verticalRange_p_hPa.min);
 
-        generateDiagramGeometry(&vbDiagramGeometry,
-                                &diagramConfig);
+        generateDiagramGeometry(&vbDiagramGeometry, &diagramConfig);
         emitActorChangedSignal();
     }
 
@@ -666,8 +665,7 @@ void MSkewTActor::onQtPropertyChanged(QtProperty *property)
              || property == labelBBoxColourProperty)
     {
         if (suppressActorUpdates()) return;
-        generateDiagramGeometry(&vbDiagramGeometry,
-                                &diagramConfig);
+        generateDiagramGeometry(&vbDiagramGeometry,  &diagramConfig);
         emitActorChangedSignal();
     }
 
@@ -693,8 +691,7 @@ void MSkewTActor::onQtPropertyChanged(QtProperty *property)
                  .coordinateGeometryDrawRanges.dryAdiabates.indexCount == 0)
                     || diagramConfig.recomputeAdiabateGeometries)
             {
-                generateDiagramGeometry(&vbDiagramGeometry,
-                                        &diagramConfig);
+                generateDiagramGeometry(&vbDiagramGeometry, &diagramConfig);
             }
         }
         emitActorChangedSignal();
@@ -713,8 +710,7 @@ void MSkewTActor::onQtPropertyChanged(QtProperty *property)
                  .coordinateGeometryDrawRanges.moistAdiabates.indexCount == 0)
                     || diagramConfig.recomputeAdiabateGeometries)
             {
-                generateDiagramGeometry(&vbDiagramGeometry,
-                                        &diagramConfig);
+                generateDiagramGeometry(&vbDiagramGeometry, &diagramConfig);
             }
         }
         emitActorChangedSignal();
@@ -769,6 +765,42 @@ void MSkewTActor::printDebugOutputOnUserRequest()
 /******************************************************************************
 ***                           PRIVATE METHODS                               ***
 *******************************************************************************/
+
+void MSkewTActor::loadListOfAvailableObservationsFromUWyoming()
+{
+    QUrl url = QUrl(QString("http://weather.uwyo.edu/upperair/europe.html"));
+    QNetworkAccessManager *m_netwManager = new
+    QNetworkAccessManager(this);
+    connect(m_netwManager,
+            SIGNAL(finished(QNetworkReply *)), this,
+            SLOT(downloadOfObservationListFromUWyomingFinished(QNetworkReply *)));
+    QNetworkRequest request(url);
+    m_netwManager->get(request);
+}
+
+
+void MSkewTActor::loadObservationalDataFromUWyoming(int stationNum)
+{
+    MSystemManagerAndControl *sysMC =
+        MSystemManagerAndControl::getInstance();
+    MSyncControl *sync =
+        sysMC->getSyncControl("Synchronization");
+    QUrl url = QUrl(
+                   QString(
+                    "http://weather.uwyo.edu/cgi-bin/sounding?region=europe"
+                    "&TYPE=TEXT:LIST&YEAR=%1&MONTH=%2&FROM=1712&TO=1712&STNM=%3")
+                   .arg(sync->validDateTime().date().year())
+                   .arg(sync->validDateTime().date().month())
+                   .arg(stationNum));
+    QNetworkAccessManager *m_netwManager = new
+    QNetworkAccessManager(this);
+    connect(m_netwManager,
+            SIGNAL(finished(QNetworkReply *)), this,
+            SLOT(downloadOfObservationFromUWyomingFinished(QNetworkReply *)));
+    QNetworkRequest request(url);
+    m_netwManager->get(request);
+}
+
 
 void MSkewTActor::copyDiagramConfigurationFromQtProperties()
 {
@@ -1088,7 +1120,7 @@ void MSkewTActor::generateFullScreenHighlightGeometry(
         GL::MVertexBuffer** vbDiagramVertices,
         SkewTDiagramConfiguration *config)
 {
-    config->highlightGeometryDrawRanges.lineWidth = 3;
+    config->mouseOverGeometryDrawRanges.lineWidth = 3;
 
     // Array with vertex data that will be uploaded to a vertex buffer at the
     // end of the method. Contains line segments to be rendered with GL_LINES.
@@ -1105,13 +1137,13 @@ void MSkewTActor::generateFullScreenHighlightGeometry(
 
     // Omit diagram frame.
     // ====================================
-    config->highlightGeometryDrawRanges.diagramFrame.startIndex = 0;
-    config->highlightGeometryDrawRanges.diagramFrame.indexCount = 0;
+    config->mouseOverGeometryDrawRanges.diagramFrame.startIndex = 0;
+    config->mouseOverGeometryDrawRanges.diagramFrame.indexCount = 0;
 
 
     // Generate vertices for isobar.
     // =============================
-    config->highlightGeometryDrawRanges.isobars.startIndex = vertexArray.size();
+    config->mouseOverGeometryDrawRanges.isobars.startIndex = vertexArray.size();
 
     float pLevel_hPa = tpCoordinate.y();
     if ((pLevel_hPa < config->verticalRange_p_hPa.max) &&
@@ -1126,13 +1158,13 @@ void MSkewTActor::generateFullScreenHighlightGeometry(
         vertexArray << vStart << vEnd;
     }
 
-    config->highlightGeometryDrawRanges.isobars.indexCount =
-            vertexArray.size() - config->highlightGeometryDrawRanges.isobars.startIndex;
+    config->mouseOverGeometryDrawRanges.isobars.indexCount =
+            vertexArray.size() - config->mouseOverGeometryDrawRanges.isobars.startIndex;
 
 
     // Generate vertices for isotherm.
     // ===============================
-    config->highlightGeometryDrawRanges.isotherms.startIndex = vertexArray.size();
+    config->mouseOverGeometryDrawRanges.isotherms.startIndex = vertexArray.size();
 
     float isothermTemperature_K = tpCoordinate.x();
     // Generate vertex at (isotherm temperature, bottom pressure).
@@ -1144,8 +1176,8 @@ void MSkewTActor::generateFullScreenHighlightGeometry(
     vEnd = transformTp2xy(tpCoordinate_K_hPa);
     vertexArray << vStart << vEnd;
 
-    config->highlightGeometryDrawRanges.isotherms.indexCount =
-            vertexArray.size() - config->highlightGeometryDrawRanges.isotherms.startIndex;
+    config->mouseOverGeometryDrawRanges.isotherms.indexCount =
+            vertexArray.size() - config->mouseOverGeometryDrawRanges.isotherms.startIndex;
 
 
     // Generate vertices for dry adiabate.
@@ -1156,7 +1188,7 @@ void MSkewTActor::generateFullScreenHighlightGeometry(
     int nAdiabatPoints = 100; // number of discrete points to plot adiabat
     float deltaLogP = (log_pBot - log_pTop) / float(nAdiabatPoints);
 
-    config->highlightGeometryDrawRanges.dryAdiabates.startIndex = vertexArray.size();
+    config->mouseOverGeometryDrawRanges.dryAdiabates.startIndex = vertexArray.size();
 
     if (config->drawDryAdiabates)
     {
@@ -1187,13 +1219,13 @@ void MSkewTActor::generateFullScreenHighlightGeometry(
         }
     }
 
-    config->highlightGeometryDrawRanges.dryAdiabates.indexCount = vertexArray.size()
-            - config->highlightGeometryDrawRanges.dryAdiabates.startIndex;
+    config->mouseOverGeometryDrawRanges.dryAdiabates.indexCount = vertexArray.size()
+            - config->mouseOverGeometryDrawRanges.dryAdiabates.startIndex;
 
 
     // Generate moist adiabate vertices.
     // =================================
-    config->highlightGeometryDrawRanges.moistAdiabates.startIndex = vertexArray.size();
+    config->mouseOverGeometryDrawRanges.moistAdiabates.startIndex = vertexArray.size();
 
     if (config->drawMoistAdiabates)
     {
@@ -1232,8 +1264,8 @@ void MSkewTActor::generateFullScreenHighlightGeometry(
             }
     }
 
-    config->highlightGeometryDrawRanges.moistAdiabates.indexCount = vertexArray.size()
-            - config->highlightGeometryDrawRanges.moistAdiabates.startIndex;
+    config->mouseOverGeometryDrawRanges.moistAdiabates.indexCount = vertexArray.size()
+            - config->mouseOverGeometryDrawRanges.moistAdiabates.startIndex;
 
     // Upload geometry to vertex buffer.
     uploadVec2ToVertexBuffer(
@@ -1245,7 +1277,7 @@ void MSkewTActor::generateFullScreenHighlightGeometry(
 #define SHADER_VERTEX_ATTRIBUTE 0
 #define SHADER_TEXTURE_ATTRIBUTE 1
 
-void MSkewTActor::drawDiagram(MSceneViewGLWidget *sceneView)
+void MSkewTActor::drawProfiles(MSceneViewGLWidget *sceneView)
 {
     skewTShader->bindProgram("DiagramGeometry");
     skewTShader->setUniformValue("fullscreen",
@@ -1373,56 +1405,21 @@ void MSkewTActor::drawDiagramGeometryAndLabels(
 }
 
 
-void MSkewTActor::loadListOfAvailableObservationsFromUWyoming()
-{
-    QUrl url = QUrl(QString("http://weather.uwyo.edu/upperair/europe.html"));
-    QNetworkAccessManager *m_netwManager = new
-    QNetworkAccessManager(this);
-    connect(m_netwManager,
-            SIGNAL(finished(QNetworkReply *)), this,
-            SLOT(downloadOfObservationListFromUWyomingFinished(QNetworkReply *)));
-    QNetworkRequest request(url);
-    m_netwManager->get(request);
-}
-
-
-void MSkewTActor::loadObservationalDataFromUWyoming(int stationNum)
-{
-    MSystemManagerAndControl *sysMC =
-        MSystemManagerAndControl::getInstance();
-    MSyncControl *sync =
-        sysMC->getSyncControl("Synchronization");
-    QUrl url = QUrl(
-                   QString(
-                    "http://weather.uwyo.edu/cgi-bin/sounding?region=europe"
-                    "&TYPE=TEXT:LIST&YEAR=%1&MONTH=%2&FROM=1712&TO=1712&STNM=%3")
-                   .arg(sync->validDateTime().date().year())
-                   .arg(sync->validDateTime().date().month())
-                   .arg(stationNum));
-    QNetworkAccessManager *m_netwManager = new
-    QNetworkAccessManager(this);
-    connect(m_netwManager,
-            SIGNAL(finished(QNetworkReply *)), this,
-            SLOT(downloadOfObservationFromUWyomingFinished(QNetworkReply *)));
-    QNetworkRequest request(url);
-    m_netwManager->get(request);
-}
-
-
 void MSkewTActor::drawDiagramGeometryAndLabelsFullScreen(
         MSceneViewGLWidget* sceneView)
 {
+    // Draw diagram geometry as in 3D mode.
     drawDiagramGeometryAndLabels(
                 sceneView, vbDiagramGeometry,
                 &diagramConfig.coordinateGeometryDrawRanges);
 
-    // In interaction mode, draw highlighting coordinate axes and adiabates
-    // for the current mouse position.
+    // Additionally in fullscreen interaction mode: draw "mouse over"
+    // coordinate axes and adiabates for the current mouse position.
     if (sceneView->interactionModeEnabled() && vbFullscreenMouseOverGeometry)
     {
         drawDiagramGeometryAndLabels(
                     sceneView, vbFullscreenMouseOverGeometry,
-                    &diagramConfig.highlightGeometryDrawRanges);
+                    &diagramConfig.mouseOverGeometryDrawRanges);
     }
 }
 
