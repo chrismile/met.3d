@@ -105,7 +105,8 @@ public:
 
 protected slots:
     // These two slots are used for downloading the data from the
-    // U of Wyoming web service.
+    // U of Wyoming web service. TODO: Need to be revised, currently not
+    // functional.
     void downloadOfObservationFromUWyomingFinished(QNetworkReply* reply);
     void downloadOfObservationListFromUWyomingFinished(QNetworkReply* reply);
 
@@ -204,8 +205,14 @@ private:
     int wyomingVerticesCount;
     QVector<int> wyomingStations;
 
+    /**
+      @todo This method needs to be revised, currently not functional.
+     */
     void loadObservationalDataFromUWyoming(int stationNum);
 
+    /**
+      @todo This method needs to be revised, currently not functional.
+     */
     void loadListOfAvailableObservationsFromUWyoming();
 
     /**
@@ -214,22 +221,41 @@ private:
      */
     void copyDiagramConfigurationFromQtProperties();
 
+    /**
+      Generates geometry for the diagram: isobars, skewed isotherms,
+      dry and moist adiabates. Geometry is uploaded to a vertex buffer.
+     */
     void generateDiagramGeometry(
             GL::MVertexBuffer **vbDiagramGeometry,
             SkewTDiagramConfiguration *config);
 
+    /**
+      Similar to generateDiagramGeometry() but generates geometry only for
+      a single isobar, isotherm, dry and moist adiabate that in fullscreen
+      mode all "meet" at the current mouse position.
+     */
     void generateFullScreenMouseOverGeometry(
             QVector2D tpCoordinate,
             GL::MVertexBuffer** vbDiagramGeometry,
             SkewTDiagramConfiguration *config);
 
+    /**
+      Draw the data (temperature, dew point) profiles to the current rendering
+      context.
+     */
     void drawProfiles(MSceneViewGLWidget* sceneView);
 
+    /**
+      Draw diagram geometry and associated labels for 3D views.
+     */
     void drawDiagramGeometryAndLabels(
             MSceneViewGLWidget*sceneView,
             GL::MVertexBuffer *vbDiagramGeometry,
             SkewTCoordinateLinesVertexRanges *vertexRanges);
 
+    /**
+      Draw diagram geometry and associated labels for fullscreen views.
+     */
     void drawDiagramGeometryAndLabelsFullScreen(
             MSceneViewGLWidget* sceneView);
 
