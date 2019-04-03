@@ -4,9 +4,9 @@
 [MemoryManager]
 size=3
 
-# Numerical weather prediction memory manager gets 16 GB system memory.
+# Numerical weather prediction memory manager gets 32 GB system memory.
 1\name=NWP
-1\size_MB=16384
+1\size_MB=32768
 
 # Memory manager that caches analysis results (16 MB are sufficient).
 2\name=Analysis
