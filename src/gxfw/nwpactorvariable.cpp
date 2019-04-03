@@ -1633,7 +1633,7 @@ void MNWPActorVariable::asynchronousDataAvailable(MDataRequest request)
 
     LOG4CPLUS_DEBUG(mlog, "Accepting received data for request <"
                     << request.toStdString() << ">.");
-    LOG4CPLUS_DEBUG(mlog, "Number of pending requests: "
+    LOG4CPLUS_DEBUG(mlog, "Number of additionally remaining pending requests: "
                     << pendingRequests.size());
 
 #ifdef MSTOPWATCH_ENABLED
@@ -1752,17 +1752,23 @@ void MNWPActorVariable::asynchronousDataAvailable(MDataRequest request)
             asynchronousDataAvailableEvent(grid);
         }
 
-        asynchronousDataAvailableEvent(grid);
-
-        dataFieldChangedEvent();
-        actor->dataFieldChangedEvent();
+        // If the last requested data item has been processed, notify dependent
+        // modules that data fields have changed and the sync request has been
+        // completed.
+        if (pendingRequestsQueue.isEmpty())
+        {
+            dataFieldChangedEvent();
+            actor->dataFieldChangedEvent();
 
 #ifdef DIRECT_SYNCHRONIZATION
-        // If this was a synchronization request signal to the sync control
-        // that it has been completed.
-        if (rqi.syncchronizationRequest)
-            synchronizationControl->synchronizationCompleted(this);
+            // If this was a synchronization request signal to the sync control
+            // that it has been completed.
+            if (rqi.syncchronizationRequest)
+            {
+                synchronizationControl->synchronizationCompleted(this);
+            }
 #endif
+        }
     }
 }
 
