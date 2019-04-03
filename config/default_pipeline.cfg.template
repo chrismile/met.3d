@@ -46,8 +46,8 @@ size=0
 # NetCDF/GRIB files but instead have the ensemble member ID encoded in their 
 # file or subdirectory names (e.g., "my_forecast.004.grb" or
 # "member_004/temperature.nc"), the position of the ensemble ID can be specified
-# by placing "\\e" in the file filter string. Example: "my_forecast.\\e.grb" or
-# "member_\\e/temperature.nc". Note: At the moment Met.3D only allows positive
+# by placing "%m" in the file filter string. Example: "my_forecast.%m.grb" or
+# "member_%m/temperature.nc". Note: At the moment Met.3D only allows positive
 # integers as ensemble identifiers (leading zeros allowed).
 1\path=/your/path/data/mss/grid/ecmwf/netcdf
 1\fileFilter=*ecmwf_forecast*EUR_LL015*.nc
