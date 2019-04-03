@@ -6,6 +6,7 @@
 **
 **  Copyright 2015-2018 Marc Rautenhaus
 **  Copyright 2016-2018 Bianca Tost
+**  Copyright 2015-2016 Christoph Heidelmann
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -46,6 +47,7 @@
 #include "actors/transferfunction1d.h"
 #include "actors/spatial1dtransferfunction.h"
 #include "util/mstopwatch.h"
+#include "data/verticalprofile.h"
 
 #define MSTOPWATCH_ENABLED
 
@@ -178,6 +180,7 @@ public:
     MWeatherPredictionDataSource *dataSource;
     MVerticalLevelType            levelType;
     QString                       variableName;
+    int                           numEnsembleMembers;
 
     /* CPU memory object that stores the current data field. */
     MStructuredGrid *grid;
@@ -274,6 +277,7 @@ public slots:
 protected:
     friend class MNWPVolumeRaycasterActor;
     friend class MVerticalRegridProperties;
+    friend class MSkewTActor;
 
     virtual void releaseDataItems();
     virtual void releaseAggregatedDataItems();
@@ -765,6 +769,45 @@ protected:
     bool setTransferFunctionFromProperty() override;
 
 private:
+};
+
+
+
+/**
+  @brief Variable properties specific to skew-t-diagram.
+ */
+class MNWPSkewTActorVariable : public MNWPActorVariable
+{
+public:
+    MNWPSkewTActorVariable(MNWPMultiVarActor *actor);
+
+    ~MNWPSkewTActorVariable();
+
+    bool onQtPropertyChanged(QtProperty *property) override;
+
+    void saveConfiguration(QSettings *settings);
+
+    void loadConfiguration(QSettings *settings);
+
+protected:
+    friend class MSkewTActor;
+
+    void dataFieldChangedEvent() override;
+
+    /* Rendering properties. **/
+    QColor profileColour;
+    QtProperty *profileColourProperty;
+    double lineThickness;
+    QtProperty *lineThicknessProperty;
+
+    /* Profile data (CPU and vertex buffer). */
+    MVerticalProfile profile;
+    GL::MVertexBuffer *profileVertexBuffer;
+
+    QMap<int, MVerticalProfile> profileAggregation;
+    QMap<int, GL::MVertexBuffer*> profileVertexBufferAggregation;
+
+    void updateProfile(QVector2D lonLatLocation);
 };
 
 } // namespace Met3D

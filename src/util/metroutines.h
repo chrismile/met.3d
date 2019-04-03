@@ -6,6 +6,7 @@
 **
 **  Copyright 2015-2018 Marc Rautenhaus
 **  Copyright 2015-2017 Michael Kern
+**  Copyright 2015-2016 Christoph Heidelmann
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -63,6 +64,14 @@ const double EARTH_RADIUS_km = 6371.; // km
 /******************************************************************************
 ***                                METHODS                                  ***
 *******************************************************************************/
+
+inline double kelvinToDegC(double temperature_K)
+{ return temperature_K - 273.15; }
+
+
+inline double degCToKelvin(double temperature_degC)
+{ return temperature_degC + 273.15; }
+
 
 inline double degreesToRadians(double angle);
 
@@ -280,6 +289,17 @@ double potentialTemperature_K(double T_K, double p_Pa);
 
 
 /**
+  Computes ambient temperature in [K] of a given potential temperature in [K]
+  at pressure @p p_Pa in [Pa].
+
+  Method:
+                            T = theta / (p0/p)^(R/cp)
+      with p0 = 100000. Pa, R = 287.058 JK-1kg-1, cp = 1004 JK-1kg-1.
+ */
+double ambientTemperatureOfPotentialTemperature_K(double theta_K, double p_Pa);
+
+
+/**
   Computes the virtual temperature in [K] from temperature @p T_K in [K] and
   specific humidity @p q_kgkg in [kg/kg].
 
@@ -346,13 +366,41 @@ double equivalentPotentialTemperature_K_Bolton(double T_K, double p_Pa,
                                                double q_kgkg);
 
 
+/**
+  Computes the ambient temperature at pressure @p p_Pa along a saturated
+  adiabat defined by wet-bulb potential temperature @p thetaW_K. Computation
+  uses the (approximative) noniterative approach described by Moisseeva and
+  Stull (ACP, 2017), "Technical note: A noniterative approach to modelling
+  moist thermodynamics".
+ */
+double temperatureAlongSaturatedAdiabat_K_MoisseevaStull(
+        double thetaW_K, double p_Pa);
+
+/**
+  Inverse of @ref temperatureAlongSaturatedAdiabat_K_MoisseevaStull().
+ */
+double wetBulbPotentialTemperatureOfSaturatedAdiabat_K_MoisseevaStull(
+        double T_K, double p_Pa);
+
 // Test functions for meteorological computations.
 namespace MetRoutinesTests
 {
 
-void testEQPT();
+void test_EQPT();
+void test_temperatureAlongSaturatedAdiabat_K_MoisseevaStull();
+
+void runMetRoutinesTests();
 
 }
+
+/**
+  Calculates the moist adiabatic lapse rate. @see http://en.wikipedia.org/wiki/Lapse_rate
+
+  @p T is the temperature in K and @p p the pressure in Pascal.
+
+  @return moist adiabatic lapse rate in T(K).
+*/
+float moistAdiabaticLapseRate_K(float T_K, float p_Pa);
 
 } // namespace Met3D
 

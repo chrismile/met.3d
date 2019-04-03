@@ -44,6 +44,9 @@
 
 using namespace std;
 
+// Uncomment the following define to enable debug output for sync events.
+//#define SYNC_DEBUG_OUTPUT
+
 namespace Met3D
 {
 
@@ -482,6 +485,25 @@ void MSyncControl::deregisterSynchronizedClass(MSynchronizedObject *object)
 
 void MSyncControl::synchronizationCompleted(MSynchronizedObject *object)
 {
+#ifdef SYNC_DEBUG_OUTPUT
+    LOG4CPLUS_DEBUG(mlog, "SYNC: synchronizationCompleted() called by object "
+                    << object);
+    debugOutputSyncStatus("start of synchronizationCompleted()");
+#endif
+
+//NOTE: Each object to which in processSynchronizationEvent() a synchronization
+// event was sent is allowed to call synchronizationCompleted() exactly ONCE.
+// It is the responsibility of the synchronized object to make sure that no
+// multiple calls are issued. In case a synchronized object calls this method
+// twice, its pointer will be stored in earlyCompletedSynchronizations but never
+// be removed (first call: remove from pendingSynchronizations as intended,
+// second call: not contained in pendingSynchronizations anymore, stored in
+// earlyCompletedSynchronizations). Then, the sync GUI is not enabled anymore
+// and the system is "locked".
+// HINT for DEBUGGING: enable "SYNC_DEBUG_OUTPUT" and make sure that both
+// pendingSynchronizations and earlyCompletedSynchronizations are empty after
+// all computations have finished. -- (mr, 03Apr2019)
+
     if (object != nullptr)
     {
         if (pendingSynchronizations.contains(object))
@@ -517,6 +539,9 @@ void MSyncControl::synchronizationCompleted(MSynchronizedObject *object)
         emitSaveImageSignal();
         synchronizationInProgress = false;
     }
+#ifdef SYNC_DEBUG_OUTPUT
+    debugOutputSyncStatus("end of synchronizationCompleted()");
+#endif
 }
 
 
@@ -1775,6 +1800,10 @@ void MSyncControl::endSceneSynchronization()
 void MSyncControl::processSynchronizationEvent(MSynchronizationType syncType,
                                                QVariant syncVariant)
 {
+#ifdef SYNC_DEBUG_OUTPUT
+    debugOutputSyncStatus("start of processSynchronizationEvent()");
+#endif
+
     // Begin synchronization: disable sync GUI (unless the event is caused by
     // the animationTimer; in this case the GUI remains active so the user can
     // stop the animation), tell scenes that sync begins (so they can block
@@ -1806,9 +1835,16 @@ void MSyncControl::processSynchronizationEvent(MSynchronizationType syncType,
     // objects that will process the sync request (they return true).
     foreach (MSynchronizedObject *syncObj, synchronizedObjects)
     {
+#ifdef SYNC_DEBUG_OUTPUT
+        LOG4CPLUS_DEBUG(mlog, "SYNC: sending sync info to object " << syncObj);
+#endif
         if ( syncObj->synchronizationEvent(syncType, syncVariantVector) )
         {
             pendingSynchronizations.insert(syncObj);
+#ifdef SYNC_DEBUG_OUTPUT
+            LOG4CPLUS_DEBUG(mlog, "SYNC: object " << syncObj << " accepted "
+                            "sync info.");
+#endif
         }
     }
 
@@ -1824,6 +1860,10 @@ void MSyncControl::processSynchronizationEvent(MSynchronizationType syncType,
 
     // If no object accepted the sync event we can finish the sync.
     if (pendingSynchronizations.empty()) synchronizationCompleted(nullptr);
+
+#ifdef SYNC_DEBUG_OUTPUT
+    debugOutputSyncStatus("end of processSynchronizationEvent()");
+#endif
 }
 
 
@@ -1893,6 +1933,40 @@ void MSyncControl::setAnimationTimeToStartTime(QDateTime startDateTime)
 
     // Save image of current time step.
     saveTimeAnimation();
+}
+
+
+void MSyncControl::debugOutputSyncStatus(QString callPoint)
+{
+    QString s = QString("SYNC: status at call point %1:\n").arg(callPoint);
+
+    s += QString("\ncurrent sync type: %1\n").arg(currentSyncType);
+
+    s += "\nregistered synchronized objects:\n";
+    for (MSynchronizedObject* o : synchronizedObjects)
+    {
+        // https://stackoverflow.com/questions/8881923/how-to-convert-a-pointer-value-to-qstring
+        s += QString("%1 / ").arg((quintptr)o, QT_POINTER_SIZE * 2, 16,
+                                  QChar('0'));
+    }
+
+    s += "\npending synchronizations:\n";
+    for (MSynchronizedObject* o : pendingSynchronizations)
+    {
+        s += QString("%1 / ").arg((quintptr)o, QT_POINTER_SIZE * 2, 16,
+                                  QChar('0'));
+    }
+
+    s += "\nearly completed synchronizations:\n";
+    for (MSynchronizedObject* o : earlyCompletedSynchronizations)
+    {
+        s += QString("%1 / ").arg((quintptr)o, QT_POINTER_SIZE * 2, 16,
+                                  QChar('0'));
+    }
+
+    s += "\n\n";
+
+    LOG4CPLUS_DEBUG(mlog, s.toStdString());
 }
 
 } // namespace Met3D

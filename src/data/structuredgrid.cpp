@@ -4,10 +4,13 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2018 Marc Rautenhaus
-**  Copyright 2017-2018  Bianca Tost
+**  Copyright 2015-2019 Marc Rautenhaus [*, previously +]
+**  Copyright 2017-2018 Bianca Tost [+]
 **
-**  Computer Graphics and Visualization Group
+**  * Regional Computing Center, Visualization
+**  Universitaet Hamburg, Hamburg, Germany
+**
+**  + Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
 **
 **  Met.3D is free software: you can redistribute it and/or modify
@@ -315,17 +318,27 @@ void MStructuredGrid::setToValue(float val)
 }
 
 
-float MStructuredGrid::interpolateValue(float lon, float lat, float p_hPa)
+void MStructuredGrid::findEnclosingHorizontalIndices(
+        float lon, float lat, int *i, int *j, int *i1, int *j1,
+        float *mixI, float *mixJ)
 {
     // Find horizontal indices i,i+1 and j,j+1 that enclose lon, lat.
-    float mixI = MMOD(lon - lons[0], 360.) / abs(lons[1]-lons[0]);
-    float mixJ = (lats[0] - lat) / abs(lats[1]-lats[0]);
-    int i = int(mixI);
-    int j = int(mixJ);
+    *mixI = MMOD(lon - lons[0], 360.) / abs(lons[1]-lons[0]);
+    *mixJ = (lats[0] - lat) / abs(lats[1]-lats[0]);
+    *i = int(*mixI);
+    *j = int(*mixJ);
 
-    int i1 = i+1;
-    if (gridIsCyclicInLongitude()) i1 %= nlons;
-    int j1 = j+1;
+    *i1 = (*i)+1;
+    if (gridIsCyclicInLongitude()) *i1 %= nlons;
+    *j1 = (*j)+1;
+}
+
+
+float MStructuredGrid::interpolateValue(float lon, float lat, float p_hPa)
+{
+    int i, j, i1, j1;
+    float mixI, mixJ;
+    findEnclosingHorizontalIndices(lon, lat, &i, &j, &i1, &j1, &mixI, &mixJ);
 
     if ((i < 0) || (j < 0) || (i1 >= int(nlons)) || (j1 >= int(nlats)))
         return M_MISSING_VALUE;
@@ -355,19 +368,56 @@ float MStructuredGrid::interpolateValue(QVector3D vec3_lonLatP)
 }
 
 
+float MStructuredGrid::interpolateValueOnLevel(
+        float lon, float lat, unsigned int k)
+{
+    int i, j, i1, j1;
+    float mixI, mixJ;
+    findEnclosingHorizontalIndices(lon, lat, &i, &j, &i1, &j1, &mixI, &mixJ);
+
+    if ((i < 0) || (j < 0) || (i1 >= int(nlons)) || (j1 >= int(nlats)))
+        return M_MISSING_VALUE;
+
+    // Get scalar values at the four surrounding grid points of the level.
+    float scalar_i0j0 = getValue(k, j , i);
+    float scalar_i1j0 = getValue(k, j , i1);
+    float scalar_i0j1 = getValue(k, j1, i);
+    float scalar_i1j1 = getValue(k, j1, i1);
+
+    // Interpolate horizontally.
+    mixJ = MFRACT(mixJ); // fract(mixJ) in GLSL
+    float scalar_i0 = MMIX(scalar_i0j0, scalar_i0j1, mixJ);
+    float scalar_i1 = MMIX(scalar_i1j0, scalar_i1j1, mixJ);
+
+    mixI = MFRACT(mixI);
+    float scalar = MMIX(scalar_i0, scalar_i1, mixI);
+
+    return scalar;
+}
+
+
+QVector<QVector2D> MStructuredGrid::extractVerticalProfile(float lon, float lat)
+{
+    QVector<QVector2D> profile;
+
+    for (unsigned int k = 0; k < nlevs; k++)
+    {
+        float scalar = interpolateValueOnLevel(lon, lat, k);
+        float pressure_hPa = levelPressureAtLonLat_hPa(lon, lat, k);
+        profile.append(QVector2D(scalar, pressure_hPa));
+    }
+
+    return profile;
+}
+
+
 bool MStructuredGrid::findTopGridIndices(
         float lon, float lat, float p_hPa,
         MIndex3D *nw, MIndex3D *ne, MIndex3D *sw, MIndex3D *se)
 {
-    // Find horizontal indices i,i+1 and j,j+1 that enclose lon, lat.
-    float mixI = MMOD(lon - lons[0], 360.) / abs(lons[1]-lons[0]);
-    float mixJ = (lats[0] - lat) / abs(lats[1]-lats[0]);
-    int i = int(mixI);
-    int j = int(mixJ);
-
-    int i1 = i+1;
-    if (gridIsCyclicInLongitude()) i1 %= nlons;
-    int j1 = j+1;
+    int i, j, i1, j1;
+    float mixI, mixJ;
+    findEnclosingHorizontalIndices(lon, lat, &i, &j, &i1, &j1, &mixI, &mixJ);
 
     nw->i = i;  nw->j = j;  nw->k = findLevel(nw->j, nw->i, p_hPa);
     ne->i = i1; ne->j = j;  ne->k = findLevel(ne->j, ne->i, p_hPa);
@@ -1100,6 +1150,15 @@ float MRegularLonLatLnPGrid::interpolateGridColumnToPressure(
 }
 
 
+float MRegularLonLatLnPGrid::levelPressureAtLonLat_hPa(
+        float lon, float lat, unsigned int k)
+{
+    Q_UNUSED(lon);
+    Q_UNUSED(lat);
+    return exp(levels[k]);
+}
+
+
 int MRegularLonLatLnPGrid::findLevel(
         unsigned int j, unsigned int i, float p_hPa)
 {
@@ -1302,6 +1361,15 @@ float MRegularLonLatStructuredPressureGrid::interpolateGridColumnToPressure(
     float scalar_k1 = getValue(k1, j, i);
 
     return MMIX(scalar_k, scalar_k1, mixK);
+}
+
+
+float MRegularLonLatStructuredPressureGrid::levelPressureAtLonLat_hPa(
+        float lon, float lat, unsigned int k)
+{
+    Q_UNUSED(lon);
+    Q_UNUSED(lat);
+    return levels[k];
 }
 
 
@@ -1837,6 +1905,18 @@ float MLonLatHybridSigmaPressureGrid::interpolateGridColumnToPressure(
 }
 
 
+float MLonLatHybridSigmaPressureGrid::levelPressureAtLonLat_hPa(
+        float lon, float lat, unsigned int k)
+{
+    // Interpolate surface pressure to lon/lat position (pressure value is
+    // ignored by interpolateValue() since surface pressure is a 2D field), ..
+    float psfc_hPa = surfacePressure->interpolateValue(lon, lat, 0.) / 100.;
+    // .. then compute pressure of level.
+    float p_hPa = ak_hPa[k] + bk[k] * psfc_hPa;
+    return p_hPa;
+}
+
+
 int MLonLatHybridSigmaPressureGrid::findLevel(
         unsigned int j, unsigned int i, float p_hPa)
 {
@@ -2140,6 +2220,13 @@ float MLonLatAuxiliaryPressureGrid::interpolateGridColumnToPressure(
     // return mix(scalar_kupper, scalar_klower, a);
     // GLSL mix(x,y,a) = x * (1.-a) + y*a
     return (scalar_kupper * (1. - a) + scalar_klower * a);
+}
+
+
+float MLonLatAuxiliaryPressureGrid::levelPressureAtLonLat_hPa(
+        float lon, float lat, unsigned int k)
+{
+    return auxPressureField_hPa->interpolateValueOnLevel(lon, lat, k);
 }
 
 

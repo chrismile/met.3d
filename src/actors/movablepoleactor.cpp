@@ -48,6 +48,7 @@ namespace Met3D
 MMovablePoleActor::MMovablePoleActor()
     : MActor(),
       tickLength(0.8),
+      ticksOnRightSide(true),
       lineColour(QColor(0, 104, 139, 255)),
       bottomPressure_hPa(1050.f),
       topPressure_hPa(100.f),
@@ -109,6 +110,11 @@ MMovablePoleActor::MMovablePoleActor()
     properties->setDDouble(tickLengthProperty, tickLength,
                            0.05, 20., 2, 0.05, " (world space)");
 
+    ticksOnRightSideProperty = addProperty(BOOL_PROPERTY,
+                                     "ticks on right side",
+                                     ticksGroupProperty);
+    properties->mBool()->setValue(ticksOnRightSideProperty, ticksOnRightSide);
+
     tickPressureThresholdProperty = addProperty(DECORATEDDOUBLE_PROPERTY,
                                                 "tick interval threshold",
                                                 ticksGroupProperty);
@@ -140,6 +146,14 @@ MMovablePoleActor::MMovablePoleActor()
 
 MMovablePoleActor::~MMovablePoleActor()
 {
+    // Release all vertex buffers.
+    MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
+    const QString axisRequestKey = "axis_vertices_actor#"
+                                   + QString::number(getID());
+    glRM->releaseAllGPUItemReferences(axisRequestKey);
+    const QString poleRequestKey = "pole_vertices_actor#"
+                                   + QString::number(getID());
+    glRM->releaseAllGPUItemReferences(poleRequestKey);
 }
 
 
@@ -246,6 +260,9 @@ void MMovablePoleActor::saveConfiguration(QSettings *settings)
     settings->setValue("tickLength",
                        properties->mDDouble()->value(tickLengthProperty));
 
+    settings->setValue("ticksOnRightSide",
+                       properties->mBool()->value(ticksOnRightSideProperty));
+
     settings->setValue("lineColour",
                        properties->mColor()->value(colourProperty));
 
@@ -299,6 +316,10 @@ void MMovablePoleActor::loadConfiguration(QSettings *settings)
 
     properties->mDDouble()->setValue(tickLengthProperty,
                 settings->value("tickLength", 0.8).toDouble());
+
+    properties->mBool()->setValue(
+                ticksOnRightSideProperty,
+                settings->value("ticksOnRightSide", true).toBool());
 
     properties->mColor()->setValue(
                 colourProperty,
@@ -416,6 +437,9 @@ void MMovablePoleActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL); CHECK_GL_ERROR;
     glDrawArrays(GL_LINES, 0, poleVertices.size()); CHECK_GL_ERROR;
 
+    // Unbind VBO.
+    glBindBuffer(GL_ARRAY_BUFFER, 0); CHECK_GL_ERROR;
+
     // B) Render tick marks and adjust label positions.
     // ================================================
 
@@ -448,7 +472,8 @@ void MMovablePoleActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
 
     // Offset for the "other end" of the tick line and anchor offset for
     // the labels.
-    QVector3D anchorOffset = tickLength * sceneView->getCamera()->getXAxis();
+    QVector3D anchorOffset = (ticksOnRightSide ? 1 : -1) *
+            tickLength * sceneView->getCamera()->getXAxis();
 
     simpleGeometryEffect->setUniformValue(
             "offsetDirection", anchorOffset);
@@ -457,7 +482,8 @@ void MMovablePoleActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
     for (int i = 0; i < labels.size(); i++)
     {
         labels[i]->anchorOffset = anchorOffset
-                + tubeRadius * sceneView->getCamera()->getXAxis();
+                + ((ticksOnRightSide ? 1 : -1) * tubeRadius)
+                * sceneView->getCamera()->getXAxis();
     }
 
     // Render tick marks.
@@ -478,7 +504,7 @@ void MMovablePoleActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
     if (sceneView->interactionModeEnabled() && movementEnabled)
     {
         // Bind shader program.
-        positionSpheresShader->bind();
+        positionSpheresShader->bindProgram("Normal");
 
         // Set MVP-matrix and parameters to map pressure to world space in the
         // vertex shader.
@@ -745,11 +771,13 @@ void MMovablePoleActor::dragEvent(MSceneViewGLWidget *sceneView,
 
     const QString poleRequestKey = "pole_vertices_actor#"
                                    + QString::number(getID());
+    // NOTE: needs to be released in destructor.
     uploadVec3ToVertexBuffer(poleVertices, poleRequestKey, &poleVertexBuffer,
                              sceneView);
 
     const QString axisRequestKey = "axis_vertices_actor#"
                                    + QString::number(getID());
+    // NOTE: needs to be released in destructor.
     uploadVec3ToVertexBuffer(axisTicks, axisRequestKey, &axisVertexBuffer,
                              sceneView);
 
@@ -807,6 +835,51 @@ void MMovablePoleActor::setMovement(bool enabled)
 }
 
 
+void MMovablePoleActor::enablePoleProperties(bool enabled)
+{
+    addPoleProperty->setEnabled(enabled);
+    individualPoleHeightsProperty->setEnabled(enabled);
+    bottomPressureProperty->setEnabled(enabled);
+    topPressureProperty->setEnabled(enabled);
+
+    for (int i = 0; i < poles.size(); i++)
+    {
+        poles.at(i)->groupProperty->setEnabled(enabled);
+    }
+}
+
+
+void MMovablePoleActor::setTubeRadius(float radius)
+{
+    properties->mDouble()->setValue(tubeRadiusProperty, radius);
+}
+
+
+void MMovablePoleActor::setVerticalExtent(float pbot_hPa, float ptop_hPa)
+{
+    enableActorUpdates(false);
+    properties->mDDouble()->setValue(bottomPressureProperty, pbot_hPa);
+    enableActorUpdates(true);
+    properties->mDDouble()->setValue(topPressureProperty, ptop_hPa);
+}
+
+
+void MMovablePoleActor::setPolePosition(int index, QPointF lonlatPos)
+{
+    if (index < poles.size())
+    {
+        properties->mPointF()->setValue(poles[index]->positionProperty,
+                                        lonlatPos);
+    }
+}
+
+
+void MMovablePoleActor::setTicksOnRightSide(bool rightSide)
+{
+    properties->mBool()->setValue(ticksOnRightSideProperty, rightSide);
+}
+
+
 /******************************************************************************
 ***                             PUBLIC SLOTS                                ***
 *******************************************************************************/
@@ -849,12 +922,23 @@ void MMovablePoleActor::onQtPropertyChanged(QtProperty *property)
         emitActorChangedSignal();
     }
 
-    else if (property == addPoleProperty)
+    else if (property == ticksOnRightSideProperty)
     {
-        generatePole();
+        ticksOnRightSide = properties->mBool()->value(ticksOnRightSideProperty);
         if (suppressActorUpdates()) return;
         generateGeometry();
         emitActorChangedSignal();
+    }
+
+    else if (property == addPoleProperty)
+    {
+        if (addPoleProperty->isEnabled())
+        {
+            generatePole();
+            if (suppressActorUpdates()) return;
+            generateGeometry();
+            emitActorChangedSignal();
+        }
     }
 
     else if (property == tickPressureThresholdProperty
@@ -1039,7 +1123,9 @@ void MMovablePoleActor::generateGeometry()
                         QString("%1").arg(p),
                         MTextManager::LONLATP,
                         polePos.x(), polePos.y(), p,
-                        labelsize, labelColour, MTextManager::MIDDLELEFT,
+                        labelsize, labelColour, (ticksOnRightSide ?
+                                                     MTextManager::MIDDLELEFT :
+                                                     MTextManager::MIDDLERIGHT),
                         labelbbox, labelBBoxColour)
                 );
             }
@@ -1056,10 +1142,12 @@ void MMovablePoleActor::generateGeometry()
 
     const QString poleRequestKey = "pole_vertices_actor#"
                                    + QString::number(getID());
+    // NOTE: needs to be released in destructor.
     uploadVec3ToVertexBuffer(poleVertices, poleRequestKey, &poleVertexBuffer);
 
     const QString axisRequestKey = "axis_vertices_actor#"
                                    + QString::number(getID());
+    // NOTE: needs to be released in destructor.
     uploadVec3ToVertexBuffer(axisTicks, axisRequestKey, &axisVertexBuffer);
 }
 

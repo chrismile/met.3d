@@ -1033,6 +1033,7 @@ void MActor::printDebugOutputOnUserRequest()
 *******************************************************************************/
 
 MAbstractActorFactory::MAbstractActorFactory()
+    : isInitialized(false)
 {
 }
 
@@ -1052,6 +1053,7 @@ void MAbstractActorFactory::initialize()
         name = actor->getActorType();
         settingsID = actor->getSettingsID();
         delete actor;
+        isInitialized = true;
     }
 }
 
@@ -1091,6 +1093,24 @@ bool MAbstractActorFactory::acceptSettings(const QString& configfile)
     bool accept = acceptSettings(settings);
     delete settings;
     return accept;
+}
+
+
+void MAbstractActorFactory::displayWarningExperimentalStatus()
+{
+    if (isInitialized)
+    {
+        QString text = QString(
+                    "Actors of type '%1' are still in experimental "
+                    "status. Some options may not yet be fully functional, "
+                    "there also may be bugs. Please double-check "
+                    "when interpreting the displayed data.").arg(getName());
+        QMessageBox msg;
+        msg.setWindowTitle("Warning");
+        msg.setText(text);
+        msg.setIcon(QMessageBox::Warning);
+        msg.exec();
+    }
 }
 
 

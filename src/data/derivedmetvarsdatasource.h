@@ -251,6 +251,17 @@ public:
 };
 
 
+class MDewPointTemperatureProcessor
+        : public MDerivedDataFieldProcessor
+{
+public:
+    MDewPointTemperatureProcessor();
+
+    void compute(QList<MStructuredGrid*>& inputGrids,
+                 MStructuredGrid *derivedGrid);
+};
+
+
 class MTHourlyTotalPrecipitationProcessor
         : public MDerivedDataFieldProcessor
 {
