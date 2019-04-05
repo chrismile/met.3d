@@ -323,8 +323,8 @@ void MStructuredGrid::findEnclosingHorizontalIndices(
         float *mixI, float *mixJ)
 {
     // Find horizontal indices i,i+1 and j,j+1 that enclose lon, lat.
-    *mixI = MMOD(lon - lons[0], 360.) / abs(lons[1]-lons[0]);
-    *mixJ = (lats[0] - lat) / abs(lats[1]-lats[0]);
+    *mixI = MMOD(lon - lons[0], 360.) / fabs(lons[1]-lons[0]);
+    *mixJ = (lats[0] - lat) / fabs(lats[1]-lats[0]);
     *i = int(*mixI);
     *j = int(*mixJ);
 
@@ -454,7 +454,7 @@ int MStructuredGrid::findClosestLevel(
     float p_k = getPressure(k, j, i);
     float p_k1 = getPressure(k+1, j, i);
 
-    return (abs(p_k - p_hPa) < abs(p_k1 - p_hPa)) ? k : k+1;
+    return (fabs(p_k - p_hPa) < fabs(p_k1 - p_hPa)) ? k : k+1;
 }
 
 
@@ -1246,9 +1246,9 @@ GL::MTexture *MRegularLonLatStructuredPressureGrid::getPressureTexCoordTexture1D
     // 1) Compute texture coordinates for each p-level. For e.g. 6 levels,
     // texture coordinates will be 1/12, 3/12, 5/12, ...
 
-	// double lnPLevels[nlevs], texCoordsPLevels[nlevs]; VLAs not supported in msvc
-	double* lnPLevels = new double[nlevs];
-	double* texCoordsPLevels = new double[nlevs];
+    // double lnPLevels[nlevs], texCoordsPLevels[nlevs]; VLAs not supported in msvc
+    double* lnPLevels = new double[nlevs];
+    double* texCoordsPLevels = new double[nlevs];
     for (uint i = 0; i < nlevs; ++i)
     {
         lnPLevels[i] = log(levels[i]);
@@ -1272,7 +1272,7 @@ GL::MTexture *MRegularLonLatStructuredPressureGrid::getPressureTexCoordTexture1D
     double lnPtop = log(levels[0]);
     double dlnp   = (lnPbot - lnPtop) / (nTable-1);
 
-	// float texCoordsTable[nTable]; VLAs not supported in msvc
+    // float texCoordsTable[nTable]; VLAs not supported in msvc
     float* texCoordsTable = new float[nTable];
 
     for (uint i = 0; i< nTable; i++)
@@ -1320,9 +1320,9 @@ GL::MTexture *MRegularLonLatStructuredPressureGrid::getPressureTexCoordTexture1D
         delete t;
     }
 
-	delete[] lnPLevels;
-	delete[] texCoordsPLevels;
-	delete[] texCoordsTable;
+    delete[] lnPLevels;
+    delete[] texCoordsPLevels;
+    delete[] texCoordsTable;
 
     return static_cast<GL::MTexture*>(glRM->getGPUItem(pressureTableID));
 }
@@ -1739,7 +1739,7 @@ GL::MTexture *MLonLatHybridSigmaPressureGrid::getPressureTexCoordTexture2D(
         // shader. Store the two values at the first two texture indices.
         // They can be retrieved in the shader.
         double lnPtop_table = lnPtop - dlnp/2.;
-        double lnp_vertExtent = abs(lnPtop - lnPbot) + dlnp;
+        double lnp_vertExtent = fabs(lnPtop - lnPbot) + dlnp;
         texCoordsTable[INDEX2yx(0, ipsfc, nPsfcTableEntries)] = lnPtop_table;
         texCoordsTable[INDEX2yx(1, ipsfc, nPsfcTableEntries)] = lnp_vertExtent;
 

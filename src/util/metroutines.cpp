@@ -402,7 +402,7 @@ double columnAirmass(double pbot_Pa, double ptop_Pa, double area_m2)
     double g = MetConstants::GRAVITY_ACCELERATION;
 
     // m*g = dp*A --> m = dp/g * A
-    double mass_kg = abs(pbot_Pa - ptop_Pa) / g * area_m2;
+    double mass_kg = fabs(pbot_Pa - ptop_Pa) / g * area_m2;
     return mass_kg;
 }
 
