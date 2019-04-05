@@ -4,11 +4,13 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2018 Marc Rautenhaus
-**  Copyright 2015-2017 Michael Kern
-**  Copyright 2015-2016 Christoph Heidelmann
+**  Copyright 2015-2019 Marc Rautenhaus [*, previously +]
+**  Copyright 2015-2017 Michael Kern [+]
 **
-**  Computer Graphics and Visualization Group
+**  * Regional Computing Center, Visualization
+**  Universitaet Hamburg, Hamburg, Germany
+**
+**  + Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
 **
 **  Met.3D is free software: you can redistribute it and/or modify
@@ -392,15 +394,6 @@ void test_temperatureAlongSaturatedAdiabat_K_MoisseevaStull();
 void runMetRoutinesTests();
 
 }
-
-/**
-  Calculates the moist adiabatic lapse rate. @see http://en.wikipedia.org/wiki/Lapse_rate
-
-  @p T is the temperature in K and @p p the pressure in Pascal.
-
-  @return moist adiabatic lapse rate in T(K).
-*/
-float moistAdiabaticLapseRate_K(float T_K, float p_Pa);
 
 } // namespace Met3D
 
