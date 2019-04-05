@@ -4,10 +4,13 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2018 Marc Rautenhaus
-**  Copyright 2015-2017 Michael Kern
+**  Copyright 2015-2019 Marc Rautenhaus [*, previously +]
+**  Copyright 2015-2017 Michael Kern [+]
 **
-**  Computer Graphics and Visualization Group
+**  * Regional Computing Center, Visualization
+**  Universitaet Hamburg, Hamburg, Germany
+**
+**  + Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
 **
 **  Met.3D is free software: you can redistribute it and/or modify
@@ -64,6 +67,14 @@ const double EARTH_RADIUS_km = 6371.; // km
 /******************************************************************************
 ***                                METHODS                                  ***
 *******************************************************************************/
+
+inline double kelvinToDegC(double temperature_K)
+{ return temperature_K - 273.15; }
+
+
+inline double degCToKelvin(double temperature_degC)
+{ return temperature_degC + 273.15; }
+
 
 inline double degreesToRadians(double angle);
 
@@ -158,6 +169,25 @@ double gcQuadrilateralArea(const double lon1, const double lat1,
                            const double lon3, const double lat3,
                            const double lon4, const double lat4,
                            const double radius);
+
+
+inline double crossProduct(const QVector2D& a, const QVector2D& b)
+{
+    return a.x() * b.y() - a.y() * b.x();
+}
+
+
+/**
+  Calculates the intersecton between two line segments in 2D
+
+   @p p,@p p2: end points of the first line
+   @p q,@p q2: end points of the second line
+
+  @return intersection point
+ */
+QVector2D getLineSegmentsIntersectionPoint(
+        const QVector2D& p, const QVector2D& p2,
+        const QVector2D& q, const QVector2D& q2);
 
 
 /**
@@ -281,6 +311,17 @@ double potentialTemperature_K(double T_K, double p_Pa);
 
 
 /**
+  Computes ambient temperature in [K] of a given potential temperature in [K]
+  at pressure @p p_Pa in [Pa].
+
+  Method:
+                            T = theta / (p0/p)^(R/cp)
+      with p0 = 100000. Pa, R = 287.058 JK-1kg-1, cp = 1004 JK-1kg-1.
+ */
+double ambientTemperatureOfPotentialTemperature_K(double theta_K, double p_Pa);
+
+
+/**
   Computes the virtual temperature in [K] from temperature @p T_K in [K] and
   specific humidity @p q_kgkg in [kg/kg].
 
@@ -347,32 +388,32 @@ double equivalentPotentialTemperature_K_Bolton(double T_K, double p_Pa,
                                                double q_kgkg);
 
 
+/**
+  Computes the ambient temperature at pressure @p p_Pa along a saturated
+  adiabat defined by wet-bulb potential temperature @p thetaW_K. Computation
+  uses the (approximative) noniterative approach described by Moisseeva and
+  Stull (ACP, 2017), "Technical note: A noniterative approach to modelling
+  moist thermodynamics".
+ */
+double temperatureAlongSaturatedAdiabat_K_MoisseevaStull(
+        double thetaW_K, double p_Pa);
+
+/**
+  Inverse of @ref temperatureAlongSaturatedAdiabat_K_MoisseevaStull().
+ */
+double wetBulbPotentialTemperatureOfSaturatedAdiabat_K_MoisseevaStull(
+        double T_K, double p_Pa);
+
 // Test functions for meteorological computations.
 namespace MetRoutinesTests
 {
 
-void testEQPT();
+void test_EQPT();
+void test_temperatureAlongSaturatedAdiabat_K_MoisseevaStull();
+
+void runMetRoutinesTests();
 
 }
-
-
-inline double crossProduct(const QVector2D& a, const QVector2D& b)
-{
-    return a.x() * b.y() - a.y() * b.x();
-}
-
-
-/**
-  Calculates the intersecton between two line segments in 2D
-
-   @p p,@p p2: end points of the first line
-   @p q,@p q2: end points of the second line
-
-  @return intersection point
- */
-QVector2D getLineSegmentsIntersectionPoint(
-        const QVector2D& p, const QVector2D& p2,
-        const QVector2D& q, const QVector2D& q2);
 
 } // namespace Met3D
 

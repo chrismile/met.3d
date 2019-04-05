@@ -4,9 +4,9 @@
 [MemoryManager]
 size=3
 
-# Numerical weather prediction memory manager gets 16 GB system memory.
+# Numerical weather prediction memory manager gets 32 GB system memory.
 1\name=NWP
-1\size_MB=16384
+1\size_MB=32768
 
 # Memory manager that caches analysis results (16 MB are sufficient).
 2\name=Analysis
@@ -46,8 +46,8 @@ size=0
 # NetCDF/GRIB files but instead have the ensemble member ID encoded in their 
 # file or subdirectory names (e.g., "my_forecast.004.grb" or
 # "member_004/temperature.nc"), the position of the ensemble ID can be specified
-# by placing "\\e" in the file filter string. Example: "my_forecast.\\e.grb" or
-# "member_\\e/temperature.nc". Note: At the moment Met.3D only allows positive
+# by placing "%m" in the file filter string. Example: "my_forecast.%m.grb" or
+# "member_%m/temperature.nc". Note: At the moment Met.3D only allows positive
 # integers as ensemble identifiers (leading zeros allowed).
 1\path=/your/path/data/mss/grid/ecmwf/netcdf
 1\fileFilter=*ecmwf_forecast*EUR_LL015*.nc

@@ -325,6 +325,14 @@ private:
 
     void setAnimationTimeToStartTime(QDateTime startDateTime);
 
+    /**
+      Prints information about the current synchronization status (contents of
+      @ref pendingSynchronizations, etc.).
+      Specify the @p callPoint to identify the part of the code from which
+      the function was called.
+     */
+    void debugOutputSyncStatus(QString callPoint);
+
     Ui::MSyncControl *ui;
 
     // Properties to control time animations.

@@ -102,6 +102,24 @@ public:
 
     void setIndividualPoleHeightsEnabled(bool enabled);
 
+    /**
+      Programatically enable/disable the "add pole" property and the properties
+      that control position and vertical extent of a pole. Used e.g. by the
+      SkewT-Actor that keep a pole as a subactor that should only have exactly
+      one pole.
+     */
+    void enablePoleProperties(bool enabled);
+
+    void setTubeRadius(float radius);
+
+    void setVerticalExtent(float pbot_hPa, float ptop_hPa);
+
+    void setPolePosition(int index, QPointF lonlatPos);
+
+    void setTicksOnRightSide(bool rightSide);
+
+    const QVector<QVector3D>& getAxisTicks() { return axisTicks; }
+
 protected:
     void initializeActorResources();
 
@@ -128,6 +146,8 @@ protected:
     QtProperty *ticksGroupProperty;
     QtProperty *tickLengthProperty;
     float       tickLength;
+    QtProperty *ticksOnRightSideProperty;
+    bool        ticksOnRightSide;
 
     QtProperty *colourProperty;
     QColor      lineColour;

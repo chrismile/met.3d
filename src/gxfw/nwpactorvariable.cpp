@@ -7,6 +7,7 @@
 **  Copyright 2015-2018 Marc Rautenhaus
 **  Copyright 2016-2018 Bianca Tost
 **  Copyright 2017      Michael Kern
+**  Copyright 2015-2016 Christoph Heidelmann
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -1633,7 +1634,7 @@ void MNWPActorVariable::asynchronousDataAvailable(MDataRequest request)
 
     LOG4CPLUS_DEBUG(mlog, "Accepting received data for request <"
                     << request.toStdString() << ">.");
-    LOG4CPLUS_DEBUG(mlog, "Number of pending requests: "
+    LOG4CPLUS_DEBUG(mlog, "Number of additionally remaining pending requests: "
                     << pendingRequests.size());
 
 #ifdef MSTOPWATCH_ENABLED
@@ -1752,17 +1753,23 @@ void MNWPActorVariable::asynchronousDataAvailable(MDataRequest request)
             asynchronousDataAvailableEvent(grid);
         }
 
-        asynchronousDataAvailableEvent(grid);
-
-        dataFieldChangedEvent();
-        actor->dataFieldChangedEvent();
+        // If the last requested data item has been processed, notify dependent
+        // modules that data fields have changed and the sync request has been
+        // completed.
+        if (pendingRequestsQueue.isEmpty())
+        {
+            dataFieldChangedEvent();
+            actor->dataFieldChangedEvent();
 
 #ifdef DIRECT_SYNCHRONIZATION
-        // If this was a synchronization request signal to the sync control
-        // that it has been completed.
-        if (rqi.syncchronizationRequest)
-            synchronizationControl->synchronizationCompleted(this);
+            // If this was a synchronization request signal to the sync control
+            // that it has been completed.
+            if (rqi.syncchronizationRequest)
+            {
+                synchronizationControl->synchronizationCompleted(this);
+            }
 #endif
+        }
     }
 }
 
@@ -3940,6 +3947,169 @@ bool MNWP3DVolumeActorVariable::setTransferFunctionFromProperty()
     }
 
     return returnValue;
+}
+
+
+/******************************************************************************
+*******************************************************************************/
+/******************************************************************************
+*******************************************************************************/
+
+/******************************************************************************
+***                         MNWPSkewTActorVariable                          ***
+*******************************************************************************/
+/******************************************************************************
+***                     CONSTRUCTOR / DESTRUCTOR                            ***
+*******************************************************************************/
+
+MNWPSkewTActorVariable::MNWPSkewTActorVariable(MNWPMultiVarActor *actor)
+    : MNWPActorVariable(actor),
+      profileColour(QColor(0, 0, 0, 255)),
+      lineThickness(2.),
+      profileVertexBuffer(nullptr)
+{
+    assert(actor != nullptr);
+    MQtProperties *properties = actor->getQtProperties();
+
+    // Create and initialise QtProperties for the GUI.
+    // ===============================================
+    actor->beginInitialiseQtProperties();
+
+    QtProperty* renderGroup = getPropertyGroup("rendering");
+    assert(renderGroup != nullptr);
+
+    profileColourProperty = actor->addProperty(
+                COLOR_PROPERTY, "line colour", renderGroup);
+    properties->mColor()->setValue(profileColourProperty, profileColour);
+
+    lineThicknessProperty = actor->addProperty(
+                DOUBLE_PROPERTY, "line thickness", renderGroup);
+    properties->setDouble(lineThicknessProperty, lineThickness, 0., 10., 2, 0.1);
+
+    actor->endInitialiseQtProperties();
+}
+
+
+MNWPSkewTActorVariable::~MNWPSkewTActorVariable()
+{
+    if (profileVertexBuffer != nullptr)
+    {
+        profile.releaseVertexBuffer();
+    }
+
+    for (int m : profileVertexBufferAggregation.keys())
+    {
+        profileAggregation[m].releaseVertexBuffer();
+    }
+}
+
+
+/******************************************************************************
+***                            PUBLIC METHODS                               ***
+*******************************************************************************/
+
+bool MNWPSkewTActorVariable::onQtPropertyChanged(QtProperty *property)
+{
+
+    if (MNWPActorVariable::onQtPropertyChanged(property)) return true;
+
+    MQtProperties *properties = actor->getQtProperties();
+
+    if (property == profileColourProperty)
+    {
+        profileColour = properties->mColor()->value(profileColourProperty);
+        return true;
+    }
+    else if (property == lineThicknessProperty)
+    {
+        lineThickness = properties->mDouble()->value(lineThicknessProperty);
+        return true;
+    }
+
+    return false;
+}
+
+
+void MNWPSkewTActorVariable::saveConfiguration(QSettings *settings)
+{
+    MNWPActorVariable::saveConfiguration(settings);
+
+    settings->setValue("lineColour", profileColour);
+    settings->setValue("lineThickness", lineThickness);
+}
+
+
+void MNWPSkewTActorVariable::loadConfiguration(QSettings *settings)
+{
+    MNWPActorVariable::loadConfiguration(settings);
+
+    MQtProperties *properties = actor->getQtProperties();
+
+    properties->mColor()->setValue(
+                profileColourProperty,
+                settings->value("lineColour").value<QColor>());
+    properties->mDouble()->setValue(
+                lineThicknessProperty,
+                settings->value("lineThickness", 2.).toDouble());
+}
+
+
+void MNWPSkewTActorVariable::dataFieldChangedEvent()
+{
+    // Remove all shortcut pointers to vertex buffers in case the set of
+    // selected members has changed (otherwise removed members would remain
+    // in the set).
+    for (int m : profileVertexBufferAggregation.keys())
+    {
+        profileAggregation[m].releaseVertexBuffer();
+        profileVertexBufferAggregation.remove(m);
+    }
+
+    updateProfile(profile.getLonLatLocation());
+}
+
+
+void MNWPSkewTActorVariable::updateProfile(QVector2D lonLatLocation)
+{
+    QVector<QVector2D> profileData;
+    if (grid != nullptr)
+    {
+        profileData = grid->extractVerticalProfile(
+                    lonLatLocation.x(), lonLatLocation.y());
+    }
+    profile.updateData(lonLatLocation, profileData);
+
+    if (profileVertexBuffer == nullptr)
+    {
+        profileVertexBuffer = profile.getVertexBuffer();
+    }
+
+    // If multiple member mode is active (ensemble displays, e.g. spaghettis):
+    // =======================================================================
+    if (ensembleFilterOperation == "MULTIPLE_MEMBERS"
+            && gridAggregation != nullptr)
+    {
+        // For each member grid in the grid aggregation, extract the vertical
+        // profile and obtain a vertex buffer.
+        for (MStructuredGrid* g : gridAggregation->getGrids())
+        {
+            profileData = g->extractVerticalProfile(
+                        lonLatLocation.x(), lonLatLocation.y());
+
+//NOTE (mr, 2019Apr02): This implementation could be improved by combining
+// all profiles into a single vertex buffer. Also see comment in
+// MSkewTActor::drawProfiles().
+
+            int m = g->getEnsembleMember();
+            profileAggregation[m].updateData(lonLatLocation, profileData);
+
+            if (!profileVertexBufferAggregation.contains(m))
+            {
+                profileVertexBufferAggregation.insert(
+                            m, profileAggregation[m].getVertexBuffer());
+            }
+        }
+    }
 }
 
 

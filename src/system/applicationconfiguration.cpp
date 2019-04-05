@@ -7,6 +7,7 @@
 **  Copyright 2015-2017 Marc Rautenhaus
 **  Copyright 2016      Bianca Tost
 **  Copyright 2017      Michael Kern
+**  Copyright 2015-2016 Christoph Heidelmann
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -37,6 +38,7 @@
 
 #include "system/pipelineconfiguration.h"
 #include "system/frontendconfiguration.h"
+#include "system/developmentaidsconfiguration.h"
 
 #include "actors/basemapactor.h"
 #include "actors/graticuleactor.h"
@@ -51,7 +53,7 @@
 #include "actors/spatial1dtransferfunction.h"
 #include "actors/isosurfaceintersectionactor.h"
 #include "actors/jetcoredetectionactor.h"
-
+#include "actors/skewtactor.h"
 
 namespace Met3D
 {
@@ -110,6 +112,7 @@ void MApplicationConfigurationManager::registerActorFactories()
     glRM->registerActorFactory(new MIsosurfaceIntersectionActorFactory());
     glRM->registerActorFactory(new MSpatial1DTransferFunctionFactory());
     glRM->registerActorFactory(new MTrajectoryActorFactory());
+    glRM->registerActorFactory(new MSkewTActorFactory());
 }
 
 
@@ -117,6 +120,7 @@ void MApplicationConfigurationManager::registerApplicationConfigurations()
 {
     appConfigs << new MPipelineConfiguration();
     appConfigs << new MFrontendConfiguration();
+    appConfigs << new MDevelopmentAidsConfiguration();
 }
 
 
