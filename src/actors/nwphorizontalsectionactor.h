@@ -109,6 +109,26 @@ public:
 
     bool isConnectedTo(MActor *actor) override;
 
+    bool supportsMultipleEnsembleMemberVisualization() override { return true; }
+
+    /**
+      Get pointers to certain shaders to gain access in @ref MPlotCollection.
+     */
+    std::shared_ptr<GL::MShaderEffect> getGlMarchingSquaresShader()
+    { return glMarchingSquaresShader; }
+    std::shared_ptr<GL::MShaderEffect> getGlContourPlotsShader()
+    { return glContourPlotsShader; }
+    std::shared_ptr<GL::MShaderEffect> getGlCSContourPlotsShader()
+    { return glCSContourPlotsShader; }
+    std::shared_ptr<GL::MShaderEffect> getGlVariabilityPlotsShader()
+    { return glVariabilityPlotsShader; }
+
+    double getSlicePosition_hPa(){ return slicePosition_hPa; }
+
+    double getLlcrnrlon(){ return bBoxConnection->westLon(); }
+    double getUrcrnrlon(){ return bBoxConnection->eastLon(); }
+    double getRenderAsWireFrame(){ return renderAsWireFrame; }
+
     void onBoundingBoxChanged() override;
 
 
@@ -170,6 +190,10 @@ private:
                                 MNWP2DHorizontalActorVariable* var,
                                 MNWP2DHorizontalActorVariable* varDiff);
 
+
+    void computeGridVerticalInterpolation(MNWP2DHorizontalActorVariable *var);
+
+
     void renderFilledContours(MSceneViewGLWidget *sceneView,
                               MNWP2DHorizontalActorVariable* var);
 
@@ -203,6 +227,10 @@ private:
     std::shared_ptr<GL::MShaderEffect> gl3DVectorGlyphsShader;
     std::shared_ptr<GL::MShaderEffect> glShadowQuad;
     std::shared_ptr<GL::MShaderEffect> positionSpheresShader;
+    // Plot collection shaders.
+    std::shared_ptr<GL::MShaderEffect> glContourPlotsShader;
+    std::shared_ptr<GL::MShaderEffect> glCSContourPlotsShader;
+    std::shared_ptr<GL::MShaderEffect> glVariabilityPlotsShader;
 
     QtProperty *slicePosProperty;
     double      slicePosition_hPa;
