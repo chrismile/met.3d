@@ -1294,13 +1294,13 @@ MStructuredGrid *MClimateForecastReader::readGrid(
             shared->add_offset = 0.;
         }
 
-        // Have scale and offset been provided? If not, they are not applied.
+        // Have scale and/or offset been provided? If not, they are not applied.
         shared->scaleAndOffsetProvided =
-                (shared->scale_factor != 1.) && (shared->add_offset != 0.);
+                (shared->scale_factor != 1.) || (shared->add_offset != 0.);
 
         if (shared->scaleAndOffsetProvided)
         {
-            LOG4CPLUS_DEBUG(mlog, "\tScale and offset have been provided:"
+            LOG4CPLUS_DEBUG(mlog, "\tScale and/or offset have been provided:"
                             << " scale = " << shared->scale_factor
                             << " offset = " << shared->add_offset
                             << ".");
