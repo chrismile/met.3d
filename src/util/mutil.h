@@ -29,6 +29,7 @@
 
 // standard library imports
 #include <typeinfo>
+#include <float.h>
 
 // related third party imports
 #include <QtCore>
@@ -89,7 +90,9 @@ extern log4cplus::Logger mlog;
 #define M_MISSING_VALUE -999.E9f
 #define M_INVALID_TRAJECTORY_POS -999.99f
 
-#define IS_MISSING(x) (abs((x) - (M_MISSING_VALUE)) < 0.0001)
+// Be careful when using these macros -- see floatIsAlmostEqualRelativeAndAbs()
+#define MISSING_VALUE_TOLERANCE 1.E-5f
+#define IS_MISSING(x) (fabs((x) - (M_MISSING_VALUE)) < MISSING_VALUE_TOLERANCE)
 
 #define LAT_TO_METER 1.112e5
 
@@ -105,7 +108,7 @@ extern log4cplus::Logger mlog;
     // THIS WORKAROUND NEEDS TO BE REMOVED WHEN HIGHER RESOLUTIONS THAN 0.00001
     // ARE HANDLED BY MET.3D.
     // Cf. http://randomascii.wordpress.com/2012/02/25/comparing-floating-point-numbers-2012-edition/
-    // for potentially better solutions.
+    // for potentially better solutions. -- see below.
 #define M_LONLAT_RESOLUTION 0.00001
 
 
@@ -158,5 +161,18 @@ QVector<float> parsePressureLevelString(QString levels);
   values by @p delimiter.
  */
 QString listOfPressureLevelsAsString(QVector<float> levels, QString delimiter);
+
+/**
+  Combined relative and absolute float comparison. Be careful when using this
+  method!
+
+  The method has been taken from
+  https://randomascii.wordpress.com/2012/02/25/comparing-floating-point-numbers-2012-edition/
+
+  Many details can be found on the webpage.
+ */
+bool floatIsAlmostEqualRelativeAndAbs(
+        float floatA, float floatB,
+        float maxDiff, float maxRelDiff = FLT_EPSILON);
 
 #endif // MUTIL_H

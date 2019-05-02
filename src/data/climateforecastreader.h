@@ -59,6 +59,9 @@ struct MVariableDataSharedPerFile
     bool scaleAndOffsetProvided;
     double scale_factor, add_offset;
 
+    bool missingValueProvided;
+    float missingValue; // store as float to correspond with data fields
+
     bool reverseLatitudes;
     bool reverseLevels;
 };
