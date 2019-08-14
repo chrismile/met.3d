@@ -1,12 +1,12 @@
-Met.3D -- 3D visualization of numerical ensemble weather prediction data
-========================================================================
+Met.3D -- 3D visualization of atmospheric ensemble simulation data
+==================================================================
 
 *********************************************************************
-Current, up-to-date information and documentation is available online at
+Documentation is available online at
 
   http://met3d.wavestoweather.de   and   http://met3d.readthedocs.org/
 
-Please refer to these websites for the latest documentation version.
+Please refer to these websites for more details.
 *********************************************************************
 
 Met.3D is an open-source visualization tool for interactive, three-dimensional
@@ -27,9 +27,9 @@ Model Development" and is available online:
    2329-2353, doi:10.5194/gmd-8-2329-2015, 2015.
    Available at: http://www.geosci-model-dev.net/8/2329/2015/gmd-8-2329-2015.html
 
-Met.3D is developed at the Computer Graphics & Visualization Group, Technische
-Universitaet Muenchen, Garching, Germany, and at the Regional Computing Center
-of Universitaet Hamburg, Hamburg, Germany. We hope you find the tool useful for
+Met.3D is developed at the Regional Computing Center of Universitaet Hamburg,
+Hamburg, Germany, and at the Computer Graphics & Visualization Group, Technische
+Universitaet Muenchen, Garching, Germany. We hope you find the tool useful for
 your work, too. Please let us know about your experiences.
 
 
@@ -46,13 +46,13 @@ fine. Met.3D's current features include:
   including filled and line contours.
 * 3D isosurface volume renderer that supports multiple isosurfaces. Isosurfaces
   can be coloured according to an auxiliary variable.
-* 3D direct volume rendering (DVR).
+* 3D direct volume rendering (DVR) with an interactive transfer function editor.
 * Surface shadows and interactive vertical axes to improve spatial perception.
 * Navigation for forecast initialisation and valid time and ensemble member.
 * Interactive computation of ensemble statistical quantities (mean, standard
   deviation, probabilities, ...) of any ensemble data field.
-* 3D trajectory rendering for trajectories computed externally and provided
-  in NetCDF format.
+* 3D trajectory rendering for trajectories computed internally or externally
+  (the latter provided in NetCDF format).
 * Computation of 3D streamlines and trajectories from wind fields, following
   computational schemes in the LAGRANTO model.
 * On-the-fly gridding of ensemble trajectories into 3D probability volumes.
@@ -61,8 +61,10 @@ fine. Met.3D's current features include:
   constant pressure, (b) sigma-hybrid-pressure-levels (ECMWF model), (c) any
   type of structured grid as long as a 3D field with pressure values is
   available (this can be used, e.g. for data on geometric height levels).
-* Limited support for COSMO data on rotated grids (data can be displayed but
-  not overlaid with data defined on geographic lon/lat coordinates).
+* Limited support for data on rotated grids (e.g., by the DWD COSMO model;
+  data can be displayed but not overlaid with data defined on geographic
+  lon/lat coordinates).
+* Interactive ensemble Skew-T diagrams for analysis of vertical profiles.
 * Data can be read from CF-compliant NetCDF files and from ECMWF GRIB files.
 * A comprehensive session manager to save the current state of the program
   and to revert earlier visualization steps.
@@ -75,10 +77,11 @@ fine. Met.3D's current features include:
 Documentation:
 ==============
 
-User guide: An evolving user guide is available online at
+An evolving USER GUIDE is available online at
 
                       http://met3d.readthedocs.org/
 
+(and yes, any help with this is highly appreciated).
 
 In addition to the reference publication, a second paper available online from
 Geoscientific Model Development describes the specific application case of
@@ -90,19 +93,22 @@ forecasting warm conveyor belt situations with Met.3D:
    Geosci. Model Dev., 8, 2355-2377, doi:10.5194/gmd-8-2355-2015, 2015.
    Available at: http://www.geosci-model-dev.net/8/2355/2015/gmd-8-2355-2015.html
 
-A high-level description of the project can be found in the ECMWF Newsletter:
-
-   Rautenhaus, M., Grams, C. M., Schäfler, A., and Westermann, R.:
-   "GPU based interactive 3D visualization of ECMWF ensemble forecasts",
-   ECMWF Newsletter, vol. 138 (Winter 2014), pp. 34-38, 2014.
-   Available at: http://old.ecmwf.int/publications/newsletters/pdf/138.pdf
-
 In addition, Met.3D has been used in a number of scientific publications.
-Please refer to our webpage at http://met3d.wavestoweather.de for a list.
+Please refer to https://met3d.wavestoweather.de/publications.html for a list.
 
 
-Installation and configuration
-==============================
+Installation and configuration from source code:
+================================================
 
 Installation and configuration notes can be found online in the user
 documentation at http://met3d.readthedocs.org/.
+
+
+Binary distribution:
+====================
+
+We provide a Linux binary distribution of Met.3D, please see
+https://met3d.wavestoweather.de/downloads.html
+
+To run Met.3D from this distribution, simply unpack the archive and
+run "met3d". Please let us know if you encounter any problems.
