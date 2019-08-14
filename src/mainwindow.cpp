@@ -4,7 +4,7 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2018 Marc Rautenhaus [*, previously +]
+**  Copyright 2015-2019 Marc Rautenhaus [*, previously +]
 **  Copyright 2016-2018 Bianca Tost [+]
 **
 **  + Computer Graphics and Visualization Group
@@ -1199,18 +1199,18 @@ void MMainWindow::showAboutDialog()
             "ANY WARRANTY; without even the implied warranty of MERCHANTABILITY "
             "or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public "
             "License for more details.<br><br>"
-            "Copyright 2015-2018 Met.3D authors:<br>"
+            "Copyright 2015-2019 Met.3D authors:<br>"
             "Marc Rautenhaus(2, 1[until 2018]), Bianca Tost(1), Michael Kern(1), "
             "with contributions by Alexander Kumpf(1), Philipp Kaiser(1), "
             "Fabian Sch&ouml;ttl(1), Christoph Heidelmann(1).<br><br>"
-            "(1) <a href='https://wwwcg.in.tum.de/'>Computer Graphics and "
+            "(1) <a href='https://www.in.tum.de/cg/'>Computer Graphics and "
             "Visualization Group</a>, "
             "Technical University of Munich, Garching, Germany<br>"
             "(2) <a href='https://www.rrz.uni-hamburg.de/'>Regional Computing "
             "Center</a>, "
             "Universitaet Hamburg, Hamburg, Germany<br><br>"
             "See Met.3D source files for license details.<br><hr>"
-            "Versions of libraries used to compile Met.3D:<br>"
+            "Met.3D uses Qt (see 'About Qt') and the following open-source libraries:<br>"
             "<table> "
             "<tr> "
             "<td> freetype: %3.%4.%5 </td> <td> GDAL: %6 </td>"
@@ -1229,8 +1229,8 @@ void MMainWindow::showAboutDialog()
             " <td> QCustomPlot: %19.%20.%21 </td>"
             "</tr>"
             "</table>"
-            "Note: For versions listed as x.x.x "
-            " no version tag could be identified."
+            "(Note: For versions listed as x.x.x "
+            " no version tag could be identified.)"
                 ).arg(met3dVersionString).arg(met3dBuildDate)
             .arg(FREETYPE_MAJOR).arg(FREETYPE_MINOR).arg(FREETYPE_PATCH)
             .arg(GDAL_RELEASE_NAME)

@@ -221,3 +221,22 @@ QString listOfPressureLevelsAsString(QVector<float> levels, QString delimiter)
 
     return stringValue;
 }
+
+
+// The following method has been adapted  from
+// https://randomascii.wordpress.com/2012/02/25/comparing-floating-point-numbers-2012-edition/
+bool floatIsAlmostEqualRelativeAndAbs(float floatA, float floatB,
+                                      float maxDiff, float maxRelDiff)
+{
+    // Check if the numbers are really close -- needed
+    // when comparing numbers near zero.
+    float diff = fabs(floatA - floatB);
+    if (diff <= maxDiff) return true;
+
+    floatA = fabs(floatA);
+    floatB = fabs(floatB);
+    float largest = (floatB > floatA) ? floatB : floatA;
+
+    if (diff <= largest * maxRelDiff) return true;
+    return false;
+}

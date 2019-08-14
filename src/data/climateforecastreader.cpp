@@ -1294,15 +1294,34 @@ MStructuredGrid *MClimateForecastReader::readGrid(
             shared->add_offset = 0.;
         }
 
-        // Have scale and offset been provided? If not, they are not applied.
+        // Have scale and/or offset been provided? If not, they are not applied.
         shared->scaleAndOffsetProvided =
-                (shared->scale_factor != 1.) && (shared->add_offset != 0.);
+                (shared->scale_factor != 1.) || (shared->add_offset != 0.);
 
         if (shared->scaleAndOffsetProvided)
         {
-            LOG4CPLUS_DEBUG(mlog, "\tScale and offset have been provided:"
+            LOG4CPLUS_DEBUG(mlog, "\tScale and/or offset have been provided:"
                             << " scale = " << shared->scale_factor
                             << " offset = " << shared->add_offset
+                            << ".");
+        }
+
+        // Query missing value, if provided.
+        try
+        {
+            shared->cfVar.getAtt("missing_value").getValues(&(shared->missingValue));
+            shared->missingValueProvided = true;
+        }
+        catch (NcException)
+        {
+            shared->missingValue = M_MISSING_VALUE;
+            shared->missingValueProvided = false;
+        }
+
+        if (shared->missingValueProvided)
+        {
+            LOG4CPLUS_DEBUG(mlog, "\tMissing value has been provided:"
+                            << " missing value = " << shared->missingValue
                             << ".");
         }
 
@@ -1999,12 +2018,29 @@ MStructuredGrid *MClimateForecastReader::readGrid(
 
     } // switch
 
+    // Check for missing value, if provided (apply BEFORE scale and offset!):
+    // replace with M_MISSING_VALUE.
+    if (shared->missingValueProvided)
+    {
+        for (unsigned int i = 0; i < grid->nvalues; i++)
+        {
+            if (floatIsAlmostEqualRelativeAndAbs(
+                        grid->getValue(i), shared->missingValue, 1.E-6f))
+            {
+                grid->setValue(i, M_MISSING_VALUE);
+            }
+        }
+    }
+
     // Apply offset and scale, if provided.
     if (shared->scaleAndOffsetProvided)
     {
         for (unsigned int i = 0; i < grid->nvalues; i++)
+        {
+            if (grid->getValue(i) == M_MISSING_VALUE) continue;
             grid->setValue(i, grid->getValue(i)
                            * shared->scale_factor + shared->add_offset);
+        }
     }
 
     if (!auxiliary3DPressureField.isEmpty()
@@ -2168,7 +2204,7 @@ bool MClimateForecastReader::checkSharedVariableDataConsistency(
 
     // Have scale and offset been provided? If not, they are not applied.
     current.scaleAndOffsetProvided =
-            (current.scale_factor != 1.) && (current.add_offset != 0.);
+            (current.scale_factor != 1.) || (current.add_offset != 0.);
 
     if (!initialiseConsistencyData
             && (current.scale_factor != shared->scale_factor)
