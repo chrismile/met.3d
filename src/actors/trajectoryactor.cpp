@@ -2001,8 +2001,8 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
     // The init time has been changed. Reload start times.
     else if (property == initTimeProperty)
     {
-        if (suppressActorUpdates()) return;
         updateStartTimeProperty();
+        if (suppressActorUpdates()) return;
         asynchronousDataRequest();
     }
 
