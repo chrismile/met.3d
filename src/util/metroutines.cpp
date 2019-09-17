@@ -704,6 +704,13 @@ double wetBulbPotentialTemperatureOfSaturatedAdiabat_K_MoisseevaStull(
 }
 
 
+double coriolisParameter_deg(double lat)
+{
+    return 2. * MetConstants::EARTHS_ANGULAR_SPEED_OF_ROTATION
+            * sin(degreesToRadians(lat));
+}
+
+
 // Test functions for meteorological computations.
 namespace MetRoutinesTests
 {
