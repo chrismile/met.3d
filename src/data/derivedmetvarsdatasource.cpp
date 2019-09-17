@@ -70,6 +70,7 @@ MDerivedMetVarsDataSource::MDerivedMetVarsDataSource()
     registerDerivedDataFieldProcessor(new MGeopotentialHeightProcessor());
     registerDerivedDataFieldProcessor(new MGeopotentialHeightFromGeopotentialProcessor());
     registerDerivedDataFieldProcessor(new MDewPointTemperatureProcessor());
+    registerDerivedDataFieldProcessor(new MPressureProcessor());
 
     registerDerivedDataFieldProcessor(
                 new MMagnitudeOfVerticallyIntegratedMoistureFluxProcessor(
@@ -656,7 +657,6 @@ void MMagnitudeOfAirVelocityProcessor::compute(
 }
 
 
-
 // Potential temperature
 // =====================
 
@@ -1076,5 +1076,31 @@ void MMagnitudeOfVerticallyIntegratedMoistureFluxProcessor::compute(
         }
 }
 
+
+// Pressure
+// ========
+
+MPressureProcessor::MPressureProcessor()
+    : MDerivedDataFieldProcessor(
+          "air_pressure",
+          QStringList() << "air_temperature")
+{
+}
+
+
+void MPressureProcessor::compute(
+        QList<MStructuredGrid *> &inputGrids, MStructuredGrid *derivedGrid)
+{
+    // input 0 = "air_temperature"
+
+    // Requires nested k/j/i loops to access pressure at grid point.
+    for (unsigned int k = 0; k < derivedGrid->getNumLevels(); k++)
+        for (unsigned int j = 0; j < derivedGrid->getNumLats(); j++)
+            for (unsigned int i = 0; i < derivedGrid->getNumLons(); i++)
+            {
+                float p_Pa = inputGrids.at(0)->getPressure(k, j, i) * 100.;
+                derivedGrid->setValue(k, j, i, p_Pa);
+            }
+}
 
 } // namespace Met3D
