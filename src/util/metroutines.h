@@ -61,6 +61,9 @@ const double SPECIFIC_HEAT_DRYAIR_CONST_PRESSURE = 1004.; // J K^-1 kg^-1
 // Earth and sun
 const double GRAVITY_ACCELERATION = 9.80665; // m s^-2
 const double EARTH_RADIUS_km = 6371.; // km
+
+// Source: http://hpiers.obspm.fr/eop-pc/models/constants.html
+const double EARTHS_ANGULAR_SPEED_OF_ROTATION = 7.292115E-5; // rad/s
 }
 
 
@@ -403,6 +406,12 @@ double temperatureAlongSaturatedAdiabat_K_MoisseevaStull(
  */
 double wetBulbPotentialTemperatureOfSaturatedAdiabat_K_MoisseevaStull(
         double T_K, double p_Pa);
+
+/**
+  Coriolis parameter at specified latitude @p lat (in degrees).
+ */
+double coriolisParameter_deg(double lat);
+
 
 // Test functions for meteorological computations.
 namespace MetRoutinesTests

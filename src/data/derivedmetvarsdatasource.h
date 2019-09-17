@@ -284,6 +284,17 @@ public:
                  MStructuredGrid *derivedGrid);
 };
 
+
+class MPressureProcessor
+        : public MDerivedDataFieldProcessor
+{
+public:
+    MPressureProcessor();
+
+    void compute(QList<MStructuredGrid*>& inputGrids,
+                 MStructuredGrid *derivedGrid);
+};
+
 } // namespace Met3D
 
 #endif // DERIVEDMETVARSDATASOURCE_H
