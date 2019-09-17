@@ -71,6 +71,7 @@ MDerivedMetVarsDataSource::MDerivedMetVarsDataSource()
     registerDerivedDataFieldProcessor(new MGeopotentialHeightFromGeopotentialProcessor());
     registerDerivedDataFieldProcessor(new MDewPointTemperatureProcessor());
     registerDerivedDataFieldProcessor(new MPressureProcessor());
+    registerDerivedDataFieldProcessor(new MPotentialVorticityProcessor());
 
     registerDerivedDataFieldProcessor(
                 new MMagnitudeOfVerticallyIntegratedMoistureFluxProcessor(
@@ -1100,6 +1101,116 @@ void MPressureProcessor::compute(
             {
                 float p_Pa = inputGrids.at(0)->getPressure(k, j, i) * 100.;
                 derivedGrid->setValue(k, j, i, p_Pa);
+            }
+}
+
+
+// Potential vorticity
+// ===================
+
+MPotentialVorticityProcessor::MPotentialVorticityProcessor()
+    : MDerivedDataFieldProcessor(
+          "ertel_potential_vorticity",
+          QStringList() << "air_temperature"
+                        << "atmosphere_relative_vorticity")
+{
+}
+
+
+void MPotentialVorticityProcessor::compute(
+        QList<MStructuredGrid *> &inputGrids, MStructuredGrid *derivedGrid)
+{
+    // input 0 = "air_temperature"
+    // input 1 = "atmosphere_relative_vorticity"
+
+    // Potential vorticity is computed from relative vorticity (available
+    // from ECMWF) and the potential temperature gradient w.r.t. pressure:
+    //
+    //    PV = (vo + f) * dtheta/dp * -g
+    //
+    // where vo = relative vorticity (s-1), f = Coriolis parameter (s-1),
+    // theta = potential temperature (K), p = pressure (Pa), g = graviational
+    // constant (ms-2).
+    //
+    // Reference: See Holton (Introduction to Dynamic Meteorology), 4th ed.,
+    //            Ch. 4.3 (Eq. 4.12 on p. 96).
+    //
+    // NOTE:
+    // This is an *approximate PV* as the "vo" parameter from MARS is
+    // defined on model levels. A correct implementation would use vo
+    // computed on an isentropic surface (see Holton).
+    // Also, finite differencing is approximate, as the vertical levels
+    // are not evenly spaced but standard central differences are used here.
+
+    // Requires nested k/j/i loops to access pressure at grid point.
+    unsigned int maxLevel = derivedGrid->getNumLevels()-1;
+    for (unsigned int k = 0; k <= maxLevel; k++)
+        for (unsigned int j = 0; j < derivedGrid->getNumLats(); j++)
+            for (unsigned int i = 0; i < derivedGrid->getNumLons(); i++)
+            {
+                // 1. Compute absolute vorticity.
+                float vo = inputGrids.at(1)->getValue(k, j, i);
+                if (vo == M_MISSING_VALUE)
+                {
+                    derivedGrid->setValue(k, j, i, M_MISSING_VALUE);
+                    continue;
+                }
+
+                float corParam = coriolisParameter_deg(
+                            inputGrids.at(1)->getLats()[j]);
+                float absVo = vo + corParam;
+
+                // 2. Compute potential temperature gradient.
+                float T_K_k0 = 0.;
+                float T_K_k1 = 0.;
+                float p_Pa_k0 = 0.;
+                float p_Pa_k1 = 0.;
+
+                if (k == 0)
+                {
+                    // Forward/backward differences for boundary grid points.
+                    T_K_k0 = inputGrids.at(0)->getValue(k  , j, i);
+                    T_K_k1 = inputGrids.at(0)->getValue(k+1, j, i);
+                    p_Pa_k0 = inputGrids.at(0)->getPressure(k  , j, i) * 100.;
+                    p_Pa_k1 = inputGrids.at(0)->getPressure(k+1, j, i) * 100.;
+
+                }
+                else if (k == maxLevel)
+                {
+                    // Forward/backward differences for boundary grid points.
+                    T_K_k0 = inputGrids.at(0)->getValue(k-1, j, i);
+                    T_K_k1 = inputGrids.at(0)->getValue(k  , j, i);
+                    p_Pa_k0 = inputGrids.at(0)->getPressure(k-1, j, i) * 100.;
+                    p_Pa_k1 = inputGrids.at(0)->getPressure(k  , j, i) * 100.;
+                }
+                else
+                {
+//!TODO (mr, 16Sept2019): improve computation of central differences by
+//!  accounting for unevenly spaced model levels.
+//! See e.g. Singh and Bhadauria (2009): Finite Difference Formulae for Unequal...
+//! https://www.researchgate.net/profile/Ashok_kumar_Singh/publication/229045683_Finite_Difference_Formulae_for_Unequal_Sub-Intervals_Using_Lagrange's_Interpolation_Formula/links/0deec52f49b9b28940000000/Finite-Difference-Formulae-for-Unequal-Sub-Intervals-Using-Lagranges-Interpolation-Formula.pdf
+                    // Central differences.
+                    T_K_k0 = inputGrids.at(0)->getValue(k-1, j, i);
+                    T_K_k1 = inputGrids.at(0)->getValue(k+1, j, i);
+                    p_Pa_k0 = inputGrids.at(0)->getPressure(k-1, j, i) * 100.;
+                    p_Pa_k1 = inputGrids.at(0)->getPressure(k+1, j, i) * 100.;
+                }
+
+                if (T_K_k0 == M_MISSING_VALUE || T_K_k1 == M_MISSING_VALUE)
+                {
+                    derivedGrid->setValue(k, j, i, M_MISSING_VALUE);
+                    continue;
+                }
+
+                float theta_K_k0 = potentialTemperature_K(T_K_k0, p_Pa_k0);
+                float theta_K_k1 = potentialTemperature_K(T_K_k1, p_Pa_k1);
+                float dtheta_dp = (theta_K_k1-theta_K_k0) / (p_Pa_k1-p_Pa_k0);
+
+                // 3. Compute PV from previous quantities.
+                float pv = absVo * dtheta_dp
+                        * (-1. * MetConstants::GRAVITY_ACCELERATION);
+
+                derivedGrid->setValue(k, j, i, pv);
             }
 }
 

@@ -295,6 +295,17 @@ public:
                  MStructuredGrid *derivedGrid);
 };
 
+
+class MPotentialVorticityProcessor
+        : public MDerivedDataFieldProcessor
+{
+public:
+    MPotentialVorticityProcessor();
+
+    void compute(QList<MStructuredGrid*>& inputGrids,
+                 MStructuredGrid *derivedGrid);
+};
+
 } // namespace Met3D
 
 #endif // DERIVEDMETVARSDATASOURCE_H
