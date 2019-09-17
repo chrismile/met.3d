@@ -1919,7 +1919,7 @@ void MIsosurfaceIntersectionActor::renderShadows(MSceneViewGLWidget *sceneView)
     lineTubeShader->setUniformValue("shadowMap", shadowMapTexUnit);
     CHECK_GL_ERROR;
 
-    lineTubeShader->setUniformValue("shadowColor", QColor(100, 100, 100, 155));
+    lineTubeShader->setUniformValue("shadowColor", QColor(20, 20, 20, 155));
 
     glBindBuffer(GL_ARRAY_BUFFER, shadowImageVBO->getVertexBufferObject());
     shadowImageVBO->attachToVertexAttribute(0, 3, false, 5 * sizeof(float),
