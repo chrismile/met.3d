@@ -33,7 +33,7 @@
 #include <chrono>
 
 // local application imports
-#include "data/lines.h"
+#include "lines.h"
 #include "util/metroutines.h"
 
 //#define TIME_MEASUREMENT

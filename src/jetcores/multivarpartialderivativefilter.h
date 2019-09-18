@@ -32,9 +32,9 @@
 // related third party imports
 
 // local application imports
-#include "structuredgridensemblefilter.h"
-#include "structuredgrid.h"
-#include "datarequest.h"
+#include "data/structuredgridensemblefilter.h"
+#include "data/structuredgrid.h"
+#include "data/datarequest.h"
 
 
 namespace Met3D

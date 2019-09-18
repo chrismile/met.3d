@@ -33,10 +33,10 @@
 // related third party imports
 
 // local application imports
-#include "weatherpredictiondatasource.h"
-#include "structuredgrid.h"
-#include "datarequest.h"
-#include "trajectorydatasource.h"
+#include "data/weatherpredictiondatasource.h"
+#include "data/structuredgrid.h"
+#include "data/datarequest.h"
+#include "data/trajectorydatasource.h"
 
 
 namespace Met3D

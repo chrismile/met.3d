@@ -51,8 +51,8 @@
 #include "actors/nwpvolumeraycasteractor.h"
 #include "actors/nwpsurfacetopographyactor.h"
 #include "actors/spatial1dtransferfunction.h"
-#include "actors/isosurfaceintersectionactor.h"
-#include "actors/jetcoredetectionactor.h"
+#include "jetcores/isosurfaceintersectionactor.h"
+#include "jetcores/jetcoredetectionactor.h"
 #include "actors/skewtactor.h"
 
 namespace Met3D

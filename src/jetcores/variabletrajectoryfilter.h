@@ -24,50 +24,56 @@
 **  along with Met.3D.  If not, see <http://www.gnu.org/licenses/>.
 **
 *******************************************************************************/
-#ifndef ANGLETRAJECTORYFILTER_H
-#define ANGLETRAJECTORYFILTER_H
+#ifndef MVARIABLETRAJECTORYFILTER_H
+#define MVARIABLETRAJECTORYFILTER_H
 
 // standard library imports
 
 // related third party imports
 
 // local application imports
-#include "trajectoryfilter.h"
+#include "data/weatherpredictiondatasource.h"
+#include "data/structuredgrid.h"
+#include "data/datarequest.h"
 #include "isosurfaceintersectionsource.h"
-
+#include "data/trajectoryfilter.h"
 
 namespace Met3D
 {
 /**
- * Computes the angles between two line segments and removes vertices where
- * the angle between the two adjacent line segments is too sharp.
+ * Filters the trajectory by the scalar value from a certain scalar
+ * field (corresponding to a selected variable) at each trajectory vertex.
  */
-class MAngleTrajectoryFilter : public MTrajectoryFilter
+class MVariableTrajectoryFilter : public MTrajectoryFilter
 {
 public:
-    explicit MAngleTrajectoryFilter();
+    explicit MVariableTrajectoryFilter();
 
     /** Input source for intersection lines. */
     void setIsosurfaceSource(MIsosurfaceIntersectionSource* s);
+
+    /** Input source for the variable used to filter the lines. */
+    void setFilterVariableInputSource(MWeatherPredictionDataSource* s);
 
     /** Set the request that produced the trajectories in the pipeline. */
     void setLineRequest(const QString& request) { lineRequest = request; }
 
     /**
-     * Overloads @ref MMemoryManagedDataSource::getData() to cast the returned
-     * @ref MAbstractDataItem to @ref MTrajectoryEnsembleSelection that contains
-     * the intersection lines filtered by the line segment angle.
+     * Overloads @ref MMemoryManagedDataSource::getData() to cast
+     * the returned @ref MAbstractDataItem to @ref MTrajectoryEnsembleSelection
+     * that contains the intersection lines filtered by variable value at
+     * each vertex position.
     */
     MTrajectoryEnsembleSelection* getData(MDataRequest request)
     {
         return static_cast<MTrajectoryEnsembleSelection*>
-                (MTrajectoryFilter::getData(request));
+        (MTrajectoryFilter::getData(request));
     }
 
     /**
-     * Computes the angle between the two adjacent line segment at a vertex and
-     * returns a selection of lines for each ensemble member that does not
-     * exceed a user-defined angle threshold.
+     * Obtains the value of the chosen variable at each core line vertex and
+     * returns a selection of lines for each ensemble member based on the
+     * corresponding request.
      */
     MTrajectoryEnsembleSelection* produceData(MDataRequest request);
 
@@ -80,11 +86,17 @@ private:
     /** Pointer to input source of intersection lines. */
     MIsosurfaceIntersectionSource* isoSurfaceIntersectionSource;
 
+    /** Pointer to input source of the variable used for filtering. */
+    MWeatherPredictionDataSource* filterVariableInputSource;
+
     /** Line producing request. */
     QString lineRequest;
+
+    /** Request for each variable. */
+    QVector<QString> varRequests;
 };
 
 
 } // namespace Met3D
 
-#endif //ANGLETRAJECTORYFILTER_H
+#endif //MVARIABLETRAJECTORYFILTER_H

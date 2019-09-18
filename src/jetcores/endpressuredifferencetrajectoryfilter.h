@@ -32,7 +32,7 @@
 // related third party imports
 
 // local application imports
-#include "trajectoryfilter.h"
+#include "data/trajectoryfilter.h"
 #include "isosurfaceintersectionsource.h"
 
 

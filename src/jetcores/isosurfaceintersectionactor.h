@@ -39,17 +39,19 @@
 #include "actors/transferfunction1d.h"
 
 #include "data/datarequest.h"
-#include "data/isosurfaceintersectionsource.h"
 #include "data/trajectorynormalssource.h"
-#include "data/variabletrajectoryfilter.h"
-#include "data/geometriclengthtrajectoryfilter.h"
-#include "data/multivarpartialderivativefilter.h"
-#include "data/trajectoryvaluesource.h"
+
+#include "isosurfaceintersectionsource.h"
+#include "variabletrajectoryfilter.h"
+#include "geometriclengthtrajectoryfilter.h"
+#include "multivarpartialderivativefilter.h"
+#include "trajectoryvaluesource.h"
 
 #include "gxfw/nwpmultivaractor.h"
 #include "gxfw/synccontrol.h"
 #include "gxfw/gl/texture.h"
 #include "gxfw/gl/shadereffect.h"
+
 
 namespace Met3D
 {

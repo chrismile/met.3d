@@ -24,59 +24,51 @@
 **  along with Met.3D.  If not, see <http://www.gnu.org/licenses/>.
 **
 *******************************************************************************/
-#ifndef MTRAJECTORYVALUES_H
-#define MTRAJECTORYVALUES_H
+#ifndef MGEOMETRICLENGTHTRAJECTORYFILTER_H
+#define MGEOMETRICLENGTHTRAJECTORYFILTER_H
 
 // standard library imports
 
 // related third party imports
 
 // local application imports
-#include "scheduleddatasource.h"
-#include "weatherpredictiondatasource.h"
-#include "datarequest.h"
-#include "trajectoryarrowheadssource.h"
+#include "data/weatherpredictiondatasource.h"
+#include "data/structuredgrid.h"
+#include "data/datarequest.h"
 #include "isosurfaceintersectionsource.h"
-#include "trajectoryselectionsource.h"
+#include "data/trajectoryfilter.h"
 
 
 namespace Met3D
 {
-/**
- * Obtains information at each trajectory vertex position, such as
- * the value at the vertices for a given variable, tube thickness, ...
- */
-class MTrajectoryValueSource : public MScheduledDataSource
+class MGeometricLengthTrajectoryFilter : public MTrajectoryFilter
 {
 public:
-    explicit MTrajectoryValueSource();
-    ~MTrajectoryValueSource() {}
+    MGeometricLengthTrajectoryFilter();
 
-    /** Input sources for each variable. */
+    /** Input source for intersection lines. */
     void setIsosurfaceSource(MIsosurfaceIntersectionSource* s);
-    void setInputSelectionSource(MTrajectorySelectionSource* s);
-    void setInputSourceValueVar(MWeatherPredictionDataSource *inputSource);
-    void setInputSourceThicknessVar(MWeatherPredictionDataSource *inputSource);
 
     /** Set the request that produced the trajectories in the pipeline. */
     void setLineRequest(const QString& request) { lineRequest = request; }
 
     /**
-     * Overloads @ref MMemoryManagedDataSource::getData() to cast the result
-     * to the type @ref MTrajectoryValues.
-    */
-    MTrajectoryValues* getData(MDataRequest request)
+     * Overloads @ref MMemoryManagedDataSource::getData() to cast
+     * the returned @ref MAbstractDataItem to @ref MTrajectoryEnsembleSelection
+     * that contains the intersection lines filtered by geometric length.
+     */
+    MTrajectoryEnsembleSelection* getData(MDataRequest request)
     {
-        return static_cast<MTrajectoryValues*>
-                (MScheduledDataSource::getData(request));
+        return static_cast<MTrajectoryEnsembleSelection*>
+                (MTrajectoryFilter::getData(request));
     }
 
     /**
      * Gathers all value information at each core line vertex and returns
-     * an array of floats as @ref MTrajectoryValues based on the corresponding
+     * a selection of lines for each ensemble member based on the corresponding
      * request.
      */
-    MTrajectoryValues* produceData(MDataRequest request);
+    MTrajectoryEnsembleSelection* produceData(MDataRequest request);
 
     MTask *createTaskGraph(MDataRequest request);
 
@@ -87,22 +79,11 @@ private:
     /** Pointer to input source of intersection lines. */
     MIsosurfaceIntersectionSource* isoSurfaceIntersectionSource;
 
-    /** Pointer to the currently selected trajectories. */
-    MTrajectorySelectionSource* inputSelectionSource;
-
-    /** Pointer to the source to sample for values at each vertex. */
-    MWeatherPredictionDataSource* valueSource;
-
-    /** Pointer to the source to sample for tube thickness computation. */
-    MWeatherPredictionDataSource* thicknessSource;
-
     /** Line producing request. */
     QString lineRequest;
-    /** Request for each variable. */
-    QVector<QString> varRequests;
 };
 
 
 } // namespace Met3D
 
-#endif //MTRAJECTORYVALUES_H
+#endif //MGEOMETRICLENGTHTRAJECTORYFILTER_H

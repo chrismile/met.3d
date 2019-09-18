@@ -33,11 +33,11 @@
 
 // local application imports
 #include "isosurfaceintersectionactor.h"
-#include "data/multivarpartialderivativefilter.h"
-#include "data/hessiantrajectoryfilter.h"
-#include "data/angletrajectoryfilter.h"
-#include "data/endpressuredifferencetrajectoryfilter.h"
-#include "data/trajectoryarrowheadssource.h"
+#include "multivarpartialderivativefilter.h"
+#include "hessiantrajectoryfilter.h"
+#include "angletrajectoryfilter.h"
+#include "endpressuredifferencetrajectoryfilter.h"
+#include "trajectoryarrowheadssource.h"
 
 
 namespace Met3D
