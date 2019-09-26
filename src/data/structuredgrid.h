@@ -601,6 +601,7 @@ protected:
     friend class MGribReader;
     friend class MDifferenceDataSource;
     friend class MProcessingWeatherPredictionDataSource;
+    friend class MPotentialVorticityProcessor_LAGRANTOcalvar;
 
     /** Sizes of the dimensions. */
     unsigned int nlevs, nlats, nlons;
@@ -811,6 +812,7 @@ protected:
     friend class MGribReader;
     friend class MDifferenceDataSource;
     friend class MProcessingWeatherPredictionDataSource;
+    friend class MPotentialVorticityProcessor_LAGRANTOcalvar;
 
     void allocateInterfaceCoefficients();
 

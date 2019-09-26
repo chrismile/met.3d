@@ -42,7 +42,7 @@ set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 project(Met.3D)
 # Set version number 
 set(Met3D_VERSION_MAJOR 1)
-set(Met3D_VERSION_MINOR 1)
+set(Met3D_VERSION_MINOR 5)
 
 # Add global defines
 add_definitions(-DENABLE_MET3D_STOPWATCH
@@ -54,6 +54,8 @@ add_definitions(-DENABLE_MET3D_STOPWATCH
 
 set(CMAKE_CXX_STANDARD 11)
 
+# Enable Fortran support to include calvar routines from the LAGRANTO package.
+enable_language(Fortran)
 
 # Add global options
 option(USE_CLANG "Build application with clang" OFF)
@@ -254,6 +256,7 @@ endif()
 file (GLOB_RECURSE  Met3D_Header    src/*.h)
 file (GLOB_RECURSE  Met3D_Source    src/*.cpp)
 file (GLOB_RECURSE  Met3D_Source_C  src/*.c)
+file (GLOB_RECURSE  Met3D_Source_F  src/*.f)
 file (GLOB          Met3D_Shaders   src/glsl/*)
 file (GLOB          Met3D_Configs   config/*)
 
@@ -288,7 +291,8 @@ add_executable(Met3D # executable name
                 ${Met3D_Source} # cpp source files
                 ${Met3D_Header} # h header files
                 ${Met3D_Source_C} # c source files
-               
+                ${Met3D_Source_F} # Fortran source files
+
                 ${QT_PROPERTYBROWSER_Source}
                 ${MET3D_UIS_H} # add qt uis to the executable
                 ${MET3D_RC_SRCS}

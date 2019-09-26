@@ -393,7 +393,72 @@ double wetBulbPotentialTemperatureOfSaturatedAdiabat_K_MoisseevaStull(
 double coriolisParameter_deg(double lat);
 
 
-// Test functions for meteorological computations.
+/******************************************************************************
+***            WRAPPER for LAGRANTO LIBCALVAR FORTRAN FUNCTIONS             ***
+*******************************************************************************/
+
+/**
+  Wrapper for Fortran implementation of potential temperature in the LAGRANTO
+  package (libcalvar.f; https://svn.iac.ethz.ch/websvn/pub/wsvn/lagranto.ecmwf/).
+
+  See http://www.yolinux.com/TUTORIALS/LinuxTutorialMixingFortranAndC.html
+  for information about how to mix Fortran and C++. In particular the index
+  dimension of the arrays is of importance. However, the methods in libcalvar
+  are conveniently written so that arrays are accessed in FORTRAN i,j,k order,
+  which corresponds to the k,j,i oder used in thje C++ code of Met.3D.
+
+  @note All fields below are in the index order that is used in MStructuredGrid
+  EXCEPT the lat dimension, which needs to be reversed prior to calling this
+  method.
+
+  @param[out] pt Potential temperature in K; pointer to 3D field.
+  @param[in] t Temperature in K; pointer to 3D field.
+  @param[in] sp Surface pressure in hPa; pointer to 2D field.
+  @param ie Array size in lon dimension.
+  @param je Array size in lat dimension.
+  @param ke Array size in lev dimension.
+  @param[in] ak Hybrid coefficients.
+  @param[in] bk Hybrid coefficients.
+ */
+void potentialTemperature_K_calvar(
+        float *pt, float *t, float *sp,
+        int ie, int je, int ke,
+        float *ak, float *bk);
+
+
+/**
+  Wrapper for Fortran implementation of potential vorticity in the LAGRANTO
+  package (libcalvar.f; https://svn.iac.ethz.ch/websvn/pub/wsvn/lagranto.ecmwf/).
+
+  See above comment of @ref potentialTemperature_K_calvar.
+
+  @param[out] pv Potential vorticity in PVU; pointer to 3D field.
+  @param[in] uu u-wind in ms-1; pointer to 3D field.
+  @param[in] vv v-wind in ms-1; pointer to 3D field.
+  @param[in] th Potential temperature in K; pointer to 3D field.
+  @param[in] sp Surface pressure in hPa; pointer to 2D field.
+  @param[in] cl cos(lat); pointer to 2D field.
+  @param[in] f Coriolis parameter; pointer to 2D field.
+  @param ie Array size in lon dimension.
+  @param je Array size in lat dimension.
+  @param ke Array size in lev dimension.
+  @param[in] ak Hybrid coefficients.
+  @param[in] bk Hybrid coefficients.
+  @param[in] vmin 4-element array containing [min lon, min lat, ?, ?]
+  @param[in] vmax 4-element array containing [max lon, max lat, ?, ?]
+ */
+void potentialVorticity_PVU_calvar(
+        float *pv, float *uu, float *vv, float *th,
+        float *sp, float *cl, float *f,
+        int ie, int je, int ke,
+        float *ak, float *bk,
+        float *vmin, float *vmax);
+
+
+/******************************************************************************
+***            Test functions for meteorological computations.              ***
+*******************************************************************************/
+
 namespace MetRoutinesTests
 {
 
@@ -402,7 +467,7 @@ void test_temperatureAlongSaturatedAdiabat_K_MoisseevaStull();
 
 void runMetRoutinesTests();
 
-}
+} // namespace MetRoutinesTests
 
 } // namespace Met3D
 
