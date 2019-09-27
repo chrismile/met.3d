@@ -4,9 +4,12 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2018 Marc Rautenhaus
+**  Copyright 2015-2019 Marc Rautenhaus [*, previously +]
 **
-**  Computer Graphics and Visualization Group
+**  * Regional Computing Center, Visualization
+**  Universitaet Hamburg, Hamburg, Germany
+**
+**  + Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
 **
 **  Met.3D is free software: you can redistribute it and/or modify
@@ -71,6 +74,7 @@ MDerivedMetVarsDataSource::MDerivedMetVarsDataSource()
     registerDerivedDataFieldProcessor(new MGeopotentialHeightFromGeopotentialProcessor());
     registerDerivedDataFieldProcessor(new MDewPointTemperatureProcessor());
     registerDerivedDataFieldProcessor(new MPressureProcessor());
+    registerDerivedDataFieldProcessor(new MPotentialVorticityProcessor_LAGRANTOcalvar);
 
     registerDerivedDataFieldProcessor(
                 new MMagnitudeOfVerticallyIntegratedMoistureFluxProcessor(
@@ -737,6 +741,197 @@ void MEquivalentPotentialTemperatureProcessor::compute(
                     derivedGrid->setValue(k, j, i, thetaE_K);
                 }
             }
+}
+
+
+// Potential vorticity (LAGRANTO libcalvar implementation)
+// =======================================================
+
+MPotentialVorticityProcessor_LAGRANTOcalvar
+::MPotentialVorticityProcessor_LAGRANTOcalvar()
+    : MDerivedDataFieldProcessor(
+          "ertel_potential_vorticity",
+          QStringList() << "eastward_wind"
+                        << "northward_wind"
+                        << "air_temperature"
+                        << "surface_air_pressure/SURFACE_2D")
+{
+}
+
+
+//#define CALVAR_DEBUG
+void MPotentialVorticityProcessor_LAGRANTOcalvar::compute(
+        QList<MStructuredGrid *> &inputGrids, MStructuredGrid *derivedGrid)
+{
+    // input 0 = "eastward_wind"
+    // input 1 = "northward_wind"
+    // input 2 = "air_temperature"
+    // input 3 = "surface_air_pressure"
+
+    // This method uses the LAGRANTO.ECMWF libcalvar funcation "potvort" to
+    // compute potential vorticity. To call the FORTRAN function "potvort",
+    // the data contained in the MStructuredGrid classes needs to be
+    // restructed:
+    // * libcalvar requires float arrays that contain the full 3D variable
+    //   fields.
+    // * libcalvar requires the lat dimension to be reversed (in increasing
+    //   lat order) in all spatial fields.
+    // * surface pressure needs to be passed in hPa.
+    // * ak and bk coefficients need to be passed as float arrays.
+    //
+    // Also compare to libcalvar usage in ppecmwf.py in the met.dp repository.
+
+    // Grid sizes.
+    int nlev = derivedGrid->getNumLevels();
+    int nlat = derivedGrid->getNumLats();
+    int nlon = derivedGrid->getNumLons();
+    int nlatnlon = nlat*nlon;
+
+    // Convert surface pressure from Pa to hPa; reverse lat dimension.
+    float *psfc_hPa_revLat = new float[nlat*nlon];
+    for (int j = 0; j < nlat; j++)
+        for (int i = 0; i < nlon; i++)
+        {
+            psfc_hPa_revLat[INDEX2yx(j, i, nlon)] = inputGrids.at(3)->getValue(
+                        INDEX2yx(nlat-1-j, i, nlon)) / 100.;
+        }
+
+    // Cast derived grid to hybrid sigma pressure grid to access ak/bk
+    // coefficients; convert the double arrays in MLonLatHybridSigmaPressureGrid
+    // to float arrays.
+    MLonLatHybridSigmaPressureGrid *derivedHybridGrid =
+            dynamic_cast<MLonLatHybridSigmaPressureGrid*>(derivedGrid);
+
+    float *ak_hPa_float = new float[nlev];
+    float *bk_float = new float[nlev];
+    for (int k = 0; k < nlev; k++)
+    {
+        ak_hPa_float[k] = derivedHybridGrid->ak_hPa[k];
+        bk_float[k] = derivedHybridGrid->bk[k];
+    }
+
+#ifdef CALVAR_DEBUG
+    // DEBUG section to check correct return values from FORTRAN module.
+    // Compare potential temperature computed by libcalvar with Met.3D method.
+    float *T_revLat = new float[nlev*nlat*nlon];
+    for (int k = 0; k < nlev; k++)
+        for (int j = 0; j < nlat; j++)
+            for (int i = 0; i < nlon; i++)
+            {
+                T_revLat[INDEX3zyx_2(k, j, i, nlatnlon, nlon)] =
+                        inputGrids.at(2)->data[INDEX3zyx_2(k, nlat-1-j, i,
+                                                           nlatnlon, nlon)];
+            }
+
+    float *pottemp_calvar_levLat = new float[nlev*nlat*nlon];
+    potentialTemperature_K_calvar(pottemp_calvar_levLat, T_revLat,
+                                psfc_hPa_revLat, nlon, nlat, nlev,
+                                ak_hPa_float, bk_float);
+#endif
+
+    // "potvort" requires potential temperature as input; compute this field
+    // and reverse lat dimension.
+    float *pottemp_K_revLat = new float[nlev*nlat*nlon];
+    for (int k = 0; k < nlev; k++)
+        for (int j = 0; j < nlat; j++)
+            for (int i = 0; i < nlon; i++)
+            {
+                float T_K = inputGrids.at(2)->getValue(k, nlat-1-j, i);
+                float p_Pa = inputGrids.at(2)->getPressure(k, nlat-1-j, i) * 100.;
+                pottemp_K_revLat[INDEX3zyx_2(k, j, i, nlatnlon, nlon)] =
+                        potentialTemperature_K(T_K, p_Pa);
+#ifdef CALVAR_DEBUG
+                cout << "PotTemp Met.3D: "
+                     << pottemp_K_revLat[INDEX3zyx_2(k, j, i, nlatnlon, nlon)]
+                     << " vs. libcalvar: "
+                     << pottemp_calvar_levLat[INDEX3zyx_2(k, j, i, nlatnlon, nlon)]
+                     << "\n" << flush;
+#endif
+            }
+
+#ifdef CALVAR_DEBUG
+    delete[] pottemp_calvar_levLat;
+#endif
+
+    // Compute two more input fields required by "potvort": a 2D field of
+    // cos(lat) and a 2D field of the Coriolis parameter f. Reverse lat
+    // dimension.
+    float *coslat_revLat = new float[nlat*nlon];
+    for (int j = 0; j < nlat; j++)
+        for (int i = 0; i < nlon; i++)
+        {
+            coslat_revLat[INDEX2yx(j, i, nlon)] =
+                    cos(derivedGrid->getLats()[nlat-1-j] / 180. * M_PI);
+        }
+
+    float *coriolis_revLat = new float[nlat*nlon];
+    for (int j = 0; j < nlat; j++)
+        for (int i = 0; i < nlon; i++)
+        {
+            coriolis_revLat[INDEX2yx(j, i, nlon)] =
+                    coriolisParameter_deg(derivedGrid->getLats()[nlat-1-j]);
+        }
+
+    // "potvort" requires two 4-element vectors that contain the lon/lat range.
+    // Compare to the Python implementation in ppecmwf.py.
+    float *varmin = new float[4];
+    varmin[0] = derivedGrid->getLons()[0]; // min lon
+    varmin[1] = derivedGrid->getLats()[nlat-1]; // min lat
+    varmin[2] = 0.;
+    varmin[3] = 0.;
+    float *varmax = new float[4];
+    varmax[0] = derivedGrid->getLons()[nlon-1]; // max lon
+    varmax[1] = derivedGrid->getLats()[0]; // max lat
+    varmax[2] = 0.;
+    varmax[3] = 0.;
+
+    // Reverse the lat dimension of the u and v wind component fields.
+    float *u_revLat = new float[nlev*nlat*nlon];
+    float *v_revLat = new float[nlev*nlat*nlon];
+    for (int k = 0; k < nlev; k++)
+        for (int j = 0; j < nlat; j++)
+            for (int i = 0; i < nlon; i++)
+            {
+                u_revLat[INDEX3zyx_2(k, j, i, nlatnlon, nlon)] =
+                        inputGrids.at(0)->data[INDEX3zyx_2(k, nlat-1-j, i,
+                                                           nlatnlon, nlon)];
+                v_revLat[INDEX3zyx_2(k, j, i, nlatnlon, nlon)] =
+                        inputGrids.at(1)->data[INDEX3zyx_2(k, nlat-1-j, i,
+                                                           nlatnlon, nlon)];
+            }
+
+    // Call the "potvort" LAGRANTO function in the FORTRAN libcalvar library.
+    float *potvort_revLat = new float[nlev*nlat*nlon];
+    potentialVorticity_PVU_calvar(
+                potvort_revLat, u_revLat, v_revLat, pottemp_K_revLat,
+                psfc_hPa_revLat, coslat_revLat, coriolis_revLat,
+                nlon, nlat, nlev, ak_hPa_float, bk_float, varmin, varmax);
+
+    // Reverse the lat dimension of the computed PV field and store PV in
+    // derived grid. Change units from PVU to SI units (* 1.E-6).
+    for (int k = 0; k < nlev; k++)
+        for (int j = 0; j < nlat; j++)
+            for (int i = 0; i < nlon; i++)
+            {
+                derivedGrid->setValue(k, j, i,
+                                      potvort_revLat[INDEX3zyx_2(
+                            k, nlat-1-j, i, nlatnlon, nlon)] * 1.E-6);
+            }
+
+    // [Check for missing values in input and correct output.]
+
+    // Delete temporary memory.
+    delete[] pottemp_K_revLat;
+    delete[] coslat_revLat;
+    delete[] coriolis_revLat;
+    delete[] varmin;
+    delete[] varmax;
+    delete[] ak_hPa_float;
+    delete[] bk_float;
+    delete[] psfc_hPa_revLat;
+    delete[] potvort_revLat;
+    delete[] u_revLat;
+    delete[] v_revLat;
 }
 
 

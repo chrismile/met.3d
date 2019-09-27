@@ -606,6 +606,7 @@ protected:
     friend class MProcessingWeatherPredictionDataSource;
     friend class MIsosurfaceIntersectionSource;
     friend class MLineGeomoetryFilter;
+    friend class MPotentialVorticityProcessor_LAGRANTOcalvar;
 
     /** Sizes of the dimensions. */
     unsigned int nlevs, nlats, nlons;
@@ -818,6 +819,7 @@ protected:
     friend class MProcessingWeatherPredictionDataSource;
     friend class MIsosurfaceIntersectionSource;
     friend class MLineGeometryFilter;
+    friend class MPotentialVorticityProcessor_LAGRANTOcalvar;
 
     void allocateInterfaceCoefficients();
 

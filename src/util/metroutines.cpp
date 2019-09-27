@@ -738,7 +738,43 @@ double coriolisParameter_deg(double lat)
 }
 
 
-// Test functions for meteorological computations.
+/******************************************************************************
+***            WRAPPER for LAGRANTO LIBCALVAR FORTRAN FUNCTIONS             ***
+*******************************************************************************/
+
+extern "C" {
+void pottemp_(float *pt, float *t, float *sp,
+              int *ie, int *je, int *ke, float *ak, float *bk);
+}
+
+
+void potentialTemperature_K_calvar(float *pt, float *t, float *sp,
+                                 int ie, int je, int ke, float *ak, float *bk)
+{
+    pottemp_(pt, t, sp, &ie, &je, &ke, ak, bk);
+}
+
+
+extern "C" {
+void potvort_(float *pv, float *uu, float *vv, float *th, float *sp, float *cl,
+              float *f, int *ie, int *je, int *ke, float *ak, float *bk,
+              float *vmin, float *vmax);
+}
+
+
+void potentialVorticity_PVU_calvar(float *pv, float *uu, float *vv, float *th,
+                               float *sp, float *cl, float *f, int ie, int je,
+                               int ke, float *ak, float *bk, float *vmin,
+                               float *vmax)
+{
+    potvort_(pv, uu, vv, th, sp, cl, f, &ie, &je, &ke, ak, bk, vmin, vmax);
+}
+
+
+/******************************************************************************
+***            Test functions for meteorological computations.              ***
+*******************************************************************************/
+
 namespace MetRoutinesTests
 {
 
@@ -882,8 +918,6 @@ void runMetRoutinesTests()
     test_wetBulbPotentialTemperatureOfSaturatedAdiabat_K_MoisseevaStull();
 }
 
-}
-
-// namespace MetRoutinesTests
+} // namespace MetRoutinesTests
 
 } // namespace Met3D
