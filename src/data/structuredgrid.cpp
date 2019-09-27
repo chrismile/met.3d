@@ -83,6 +83,7 @@ MStructuredGrid::MStructuredGrid(MVerticalLevelType leveltype,
       minMaxAccel(nullptr)
 {
     lonlatID = getID() + "ll";
+    field2DID = getID() + "f2d";
     flagsID = getID() + "fl";
     minMaxAccelID = getID() + "accel";
     setTextureParameters();
@@ -779,6 +780,56 @@ GL::MTexture *MStructuredGrid::getLonLatLevTexture(QGLWidget *currentGLContext)
 void MStructuredGrid::releaseLonLatLevTexture()
 {
     MGLResourcesManager::getInstance()->releaseGPUItem(lonlatID);
+}
+
+
+GL::MTexture* MStructuredGrid::get2DFieldTexture(QGLWidget *currentGLContext)
+{
+    MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
+
+    // Check if a texture with this item's data already exists in GPU memory.
+    GL::MTexture *t = static_cast<GL::MTexture*>(glRM->getGPUItem(field2DID));
+    if (t) return t;
+
+    // No texture with this item's data exists. Create a new one.
+    t = new GL::MTexture(field2DID, GL_TEXTURE_2D, GL_R32F,
+                         nlons, nlats);
+
+    if ( glRM->tryStoreGPUItem(t) )
+    {
+        // The new texture was successfully stored in the GPU memory manger.
+        // We can now upload the data.
+        glRM->makeCurrent();
+
+        t->bindToLastTextureUnit();
+
+        // Set texture parameters: wrap mode and filtering (RTVG p. 64).
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F,
+                     nlons, nlats, 0, GL_RED, GL_FLOAT, NULL);
+        CHECK_GL_ERROR;
+
+        if (currentGLContext)
+        {
+            currentGLContext->makeCurrent();
+        }
+    }
+    else
+    {
+        delete t;
+    }
+
+    return static_cast<GL::MTexture*>(glRM->getGPUItem(field2DID));
+}
+
+
+void MStructuredGrid::release2DFieldTexture()
+{
+    MGLResourcesManager::getInstance()->releaseGPUItem(field2DID);
 }
 
 

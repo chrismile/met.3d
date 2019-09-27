@@ -4,8 +4,9 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
-**  Copyright 2015 Michael Kern
+**  Copyright 2015-2017 Marc Rautenhaus
+**  Copyright 2015      Michael Kern
+**  Copyright 2016      Bianca Tost
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -1030,6 +1031,26 @@ void MShaderEffect
 
     uniform->setUniform(GL_FLOAT_VEC2, floatData, count, 2);
 	delete[] floatData;
+}
+
+
+
+// Can handle a 64 bit values as vec2
+void MShaderEffect
+::setUniformValueArray(const QString name, const GLuint64* data,
+const int8_t count )
+{
+    if (currentProgram.second == -1) 
+    {
+        return;
+    }
+
+    std::shared_ptr<Uniform>& uniform = getUniform(name);
+
+    GLenum type = GL_UNSIGNED_INT_VEC2;
+
+
+    uniform->setUniform(type, (GLuint*)data, count,2);
 }
 
 

@@ -124,6 +124,10 @@ HEADERS += \
     src/data/derivedmetvarsdatasource.h \
     src/data/bboxtrajectoryfilter.h \
     src/data/gridaggregation.h \
+    src/util/heap.h \
+    src/util/vector.h \
+    src/util/fastmarch.h \
+    src/gxfw/plotcollection.h \
     src/gxfw/mresizewindowdialog.h \
     src/actors/spatial1dtransferfunction.h \
     src/actors/transferfunctioneditor/transferfunctioneditor.h \
@@ -242,6 +246,8 @@ SOURCES += \
     src/data/derivedmetvarsdatasource.cpp \
     src/data/bboxtrajectoryfilter.cpp \
     src/data/gridaggregation.cpp \
+    src/util/fastmarch.cpp \
+    src/gxfw/plotcollection.cpp \
     src/gxfw/mresizewindowdialog.cpp \
     src/actors/spatial1dtransferfunction.cpp \
     src/actors/transferfunctioneditor/transferfunctioneditor.cpp \
@@ -332,6 +338,10 @@ OTHER_FILES += \
     src/glsl/hsec_texturedcontours.fx.glsl \
     src/glsl/simple_geometry_generation.fx.glsl \
     src/glsl/skewtrendering.fx.glsl \
+    src/glsl/hsec_contourboxplots.fx.glsl \
+    src/glsl/colourbar.fx.glsl \
+    src/glsl/hsec_variabilityplots.fx.glsl \
+    src/glsl/hsec_cscontourboxplots.fx.glsl \
     config/cf_stdnames.dat \
     config/log4cplus.properties \
     src/glsl/north_arrow.fx.glsl \
@@ -368,6 +378,12 @@ CONFIG(debug, release|debug) {
 # to modify paths, so do in the met3D_inclib.pri.user.
 include(met3D_inclib.pri.user)
 
+LIBS += \
+# Add OpenMP.
+    -fopenmp
+
 QMAKE_CXXFLAGS += \
 # Enable the C++11 standard support (e.g. extended initialiser lists).
-    -std=c++11
+    -std=c++11 \
+# Enable OpenMP.
+    -fopenmp

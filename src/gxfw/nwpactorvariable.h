@@ -49,6 +49,7 @@
 #include "actors/spatial1dtransferfunction.h"
 #include "util/mstopwatch.h"
 #include "data/verticalprofile.h"
+#include "gxfw/plotcollection.h"
 
 #define MSTOPWATCH_ENABLED
 
@@ -281,6 +282,7 @@ protected:
     friend class MJetcoreDetectionActor;
     friend class MVerticalRegridProperties;
     friend class MSkewTActor;
+    friend class MPlotCollection;
 
     virtual void releaseDataItems();
     virtual void releaseAggregatedDataItems();
@@ -518,7 +520,12 @@ public:
             LineAndTexturedContours = 8,
             PseudoColourAndTexturedContours = 9,
             FilledAndLineAndTexturedContours = 10,
-            PseudoColourAndLineAndTexturedContours = 11
+            PseudoColourAndLineAndTexturedContours = 11,
+            SpaghettiPlot = 12,
+            ContourBoxplot = 13,
+            ContourProbabilityPlot = 14,
+            DistanceVariabilityPlot = 15,
+            ScalarVariabilityPlot = 16
         };
     };
 
@@ -531,7 +538,13 @@ public:
         exists with the given name. */
     virtual RenderMode::Type stringToRenderMode(QString renderModeName);
 
+    QStringList* getContourSetStringList() { return &contourSetStringList; }
+
+    /** Variable providing various plotting techniques */
+    MPlotCollection *plotCollection;
+
 protected:
+    friend class MPlotCollection;
     /**
       Parses the string @p cLevelStr for contour level definitions. The string
       can either define a range of values as "[from,to,step]", e.g.
@@ -568,6 +581,7 @@ protected:
 
     RenderSettings renderSettings;    
     QVector<ContourSettings> contourSetList;
+    QStringList contourSetStringList;
 
 private:
     QtProperty *saveXSecGridProperty;
@@ -642,6 +656,7 @@ public:
 protected:
     friend class MNWPHorizontalSectionActor;
     friend class MNWPSurfaceTopographyActor;
+    friend class MPlotCollection;
 
     void dataFieldChangedEvent() override;
 

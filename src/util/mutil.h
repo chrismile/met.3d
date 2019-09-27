@@ -43,7 +43,8 @@
 *******************************************************************************/
 
 // Fill this with your own ID, e.g., "-research-my-name".
-const QString met3dVersionBranchID = "-experimental-jetcores";
+const QString met3dVersionBranchID = "-experimental-jetcores"
+        + QString("-experimental-spaghetti-alternatives");
 // Set to "-devel" for development versions.
 const QString met3dVersionDevelID = "";
 
