@@ -4,9 +4,12 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2018 Marc Rautenhaus
+**  Copyright 2015-2019 Marc Rautenhaus [*, previously +]
 **
-**  Computer Graphics and Visualization Group
+**  * Regional Computing Center, Visualization
+**  Universitaet Hamburg, Hamburg, Germany
+**
+**  + Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
 **
 **  Met.3D is free software: you can redistribute it and/or modify
@@ -223,6 +226,17 @@ class MEquivalentPotentialTemperatureProcessor
 {
 public:
     MEquivalentPotentialTemperatureProcessor();
+
+    void compute(QList<MStructuredGrid*>& inputGrids,
+                 MStructuredGrid *derivedGrid);
+};
+
+
+class MPotentialVorticityProcessor_LAGRANTOcalvar
+        : public MDerivedDataFieldProcessor
+{
+public:
+    MPotentialVorticityProcessor_LAGRANTOcalvar();
 
     void compute(QList<MStructuredGrid*>& inputGrids,
                  MStructuredGrid *derivedGrid);

@@ -612,6 +612,7 @@ protected:
     friend class MGribReader;
     friend class MDifferenceDataSource;
     friend class MProcessingWeatherPredictionDataSource;
+    friend class MPotentialVorticityProcessor_LAGRANTOcalvar;
 
     friend class MPlotCollection;
 
@@ -825,6 +826,7 @@ protected:
     friend class MGribReader;
     friend class MDifferenceDataSource;
     friend class MProcessingWeatherPredictionDataSource;
+    friend class MPotentialVorticityProcessor_LAGRANTOcalvar;
 
     void allocateInterfaceCoefficients();
 

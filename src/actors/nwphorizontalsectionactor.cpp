@@ -476,7 +476,11 @@ void MNWPHorizontalSectionActor::saveConfiguration(QSettings *settings)
 
     settings->endGroup(); // Windbarbs = Vector Glyphs
 
-    graticuleActor->saveConfiguration(settings);
+    // Store the properties of the graticule subactor in a separate subgroup.
+    settings->beginGroup("SubActor_Graticule");
+    graticuleActor->saveActorConfiguration(settings);
+    settings->endGroup();
+
     settings->endGroup(); // MNWPHorizontalSectionActor
 }
 
@@ -635,7 +639,19 @@ void MNWPHorizontalSectionActor::loadConfiguration(QSettings *settings)
 
     settings->endGroup(); // Windbarbs = Vector Glyphs
 
-    graticuleActor->loadConfiguration(settings);
+    settings->beginGroup("SubActor_Graticule");
+    graticuleActor->loadActorConfiguration(settings);
+    settings->endGroup();
+    // Old sessions have not stored the graticule name; fix to not display
+    // an empty actor name.
+    if (graticuleActor->getName().isEmpty())
+    {
+        graticuleActor->setName("section graticule");
+    }
+    // Old sessions have stored the graticule properties in a different
+    // subgroup; restore vertical position to avoid user confusion.
+    graticuleActor->setVerticalPosition(slicePosition_hPa);
+
     settings->endGroup(); // MNWPHorizontalSectionActor
 }
 

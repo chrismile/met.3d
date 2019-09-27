@@ -265,7 +265,11 @@ void MSkewTActor::saveConfiguration(QSettings *settings)
     settings->setValue("dryAdiabatesEnabled",
                        properties->mBool()->value(drawDryAdiabatesProperty));
 
-    poleActor->saveConfiguration(settings);
+    // Store the properties of the pole subactor in a separate subgroup.
+    settings->beginGroup("SubActor_Pole");
+    poleActor->saveActorConfiguration(settings);
+    settings->endGroup();
+
     settings->endGroup();
 }
 
@@ -278,7 +282,9 @@ void MSkewTActor::loadConfiguration(QSettings *settings)
 
     settings->beginGroup(MSkewTActor::getSettingsID());
 
-    poleActor->loadConfiguration(settings);
+    settings->beginGroup("SubActor_Pole");
+    poleActor->loadActorConfiguration(settings);
+    settings->endGroup();
     poleActor->enablePoleProperties(false); // only allow a single pole
 
     properties->mDDouble()->setValue(
