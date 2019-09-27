@@ -122,7 +122,7 @@ MIsosurfaceIntersectionActor::MIsosurfaceIntersectionActor()
     // along jetstream core lines. This makes it easier for scientists to
     // infer the actual height of these lines in pressure.
     poleActor = std::make_shared<MMovablePoleActor>();
-    poleActor->setName("Pole Actor");
+    poleActor->setName("dropline poles");
     poleActor->setMovement(false);
 
     actorPropertiesSupGroup->addSubProperty(poleActor->getPropertyGroup());
@@ -442,7 +442,11 @@ void MIsosurfaceIntersectionActor::saveConfiguration(QSettings *settings)
     MBoundingBoxInterface::saveConfiguration(settings);
     settings->setValue("drawBBox", boundingBoxSettings->enabled);
 
-    poleActor->saveConfiguration(settings);
+    // Store the properties of the pole subactor in a separate subgroup.
+    settings->beginGroup("SubActor_Pole");
+    poleActor->saveActorConfiguration(settings);
+    settings->endGroup();
+
     settings->endGroup();
 }
 
@@ -539,8 +543,6 @@ void MIsosurfaceIntersectionActor::loadConfiguration(QSettings *settings)
         {
             break;
         }
-
-
     }
 
     thicknessMode = settings->value("thicknessMode", 0).toInt();
@@ -618,7 +620,12 @@ void MIsosurfaceIntersectionActor::loadConfiguration(QSettings *settings)
     properties->mBool()->setValue(boundingBoxSettings->enabledProperty,
                                   settings->value("drawBBox", true).toBool());
 
-    poleActor->loadConfiguration(settings);
+    settings->beginGroup("SubActor_Pole");
+    poleActor->loadActorConfiguration(settings);
+    settings->endGroup();
+    // Old sessions have not stored the pole actor name; fix to not display
+    // an empty actor name.
+    poleActor->setName("dropline poles");
 
     if (isInitialized())
     {
@@ -2253,12 +2260,14 @@ bool MIsosurfaceIntersectionActor::setTransferFunction(const QString &tfName)
     {
         properties->mEnum()->setValue(
                     appearanceSettings->transferFunctionProperty, tfIndex);
+        setTransferFunctionFromProperty();
         return true;
     }
 
     // Set transfer function property to "None".
     properties->mEnum()->setValue(appearanceSettings->transferFunctionProperty,
                                   0);
+    setTransferFunctionFromProperty();
 
     return false; // The given tf name could not be found.
 }
