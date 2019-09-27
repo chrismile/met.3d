@@ -1513,6 +1513,8 @@ void MIsosurfaceIntersectionActor::addFilter(
 void MIsosurfaceIntersectionActor::placePoleActors(
         MIsosurfaceIntersectionLines *intersectionLines)
 {
+    enableActorUpdates(false);
+
     poleActor->removeAllPoles();
 
     MNWPActorVariable *varSource = nullptr;
@@ -1600,6 +1602,8 @@ void MIsosurfaceIntersectionActor::placePoleActors(
             break;
         }
     }
+
+    enableActorUpdates(true);
 }
 
 
