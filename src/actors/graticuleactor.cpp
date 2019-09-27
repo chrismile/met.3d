@@ -109,7 +109,7 @@ MGraticuleActor::MGraticuleActor(MBoundingBoxConnection *boundingBoxConnection)
 
     actorPropertiesSupGroup->addSubProperty(rotatedGridPropertiesSubGroup);
 
-    // Default vertical position is at 1050 hPa.
+    // Default vertical position is at 1049 hPa.
     setVerticalPosition(1049.);
 
     endInitialiseQtProperties();
@@ -163,7 +163,7 @@ void MGraticuleActor::loadConfiguration(QSettings *settings)
         MBoundingBoxInterface::loadConfiguration(settings);
     }
 
-    QPointF spacing = settings->value("spacing").toPointF();
+    QPointF spacing = settings->value("spacing", QPointF(10., 5.)).toPointF();
     properties->mPointF()->setValue(spacingProperty, spacing);
 
     QColor color = settings->value("colour").value<QColor>();
@@ -178,7 +178,7 @@ void MGraticuleActor::loadConfiguration(QSettings *settings)
     drawBorderLines = settings->value("drawBorderLines", true).toBool();
     properties->mBool()->setValue(drawBorderLinesProperty, drawBorderLines);
 
-    verticalPosition_hPa = settings->value("verticalPosition").toFloat();
+    verticalPosition_hPa = settings->value("verticalPosition", 1049.).toFloat();
 
     settings->endGroup();
 }
