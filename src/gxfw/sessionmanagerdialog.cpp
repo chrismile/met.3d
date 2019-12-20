@@ -1313,6 +1313,7 @@ void MSessionManagerDialog::loadSessionFromFile(QString sessionName,
         syncControl->loadConfiguration(settings);
 
         settings->endGroup();
+
     }
     settings->endGroup();
     progressDialog->setValue(++loadingProgress);
@@ -1622,6 +1623,7 @@ void MSessionManagerDialog::loadSessionFromFile(QString sessionName,
     LOG4CPLUS_DEBUG(mlog, "... session has been loaded.");
 
     unblockGUIElements();
+
     return;
 }
 

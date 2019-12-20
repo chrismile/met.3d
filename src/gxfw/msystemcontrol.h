@@ -190,6 +190,16 @@ public:
     QMap<QString, QString> *getDefaultMemoryManagers()
     { return &defaultMemoryManagers; }
 
+    void setBatchMode(bool isActive);
+
+    bool isInBatchMode();
+
+    void setBatchModeAnimationType(QString animType);
+
+    QString getBatchModeAnimationType();
+
+    void executeBatchModeIfActive();
+
 signals:
     void boundingBoxCreated();
     void boundingBoxDeleted(QString name);
@@ -231,6 +241,9 @@ private:
 
     bool met3dAppIsInitialized;
     bool connectedToMetview;
+
+    bool batchModeIsActive;
+    QString batchModeAnimationType;
 
     QStringList commandLineArguments;
     QDir met3DHomeDir;

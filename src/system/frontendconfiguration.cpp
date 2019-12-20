@@ -788,6 +788,25 @@ void MFrontendConfiguration::initializeFrontendFromConfigFile(
         config.endArray();
     }
 
+    // Initialize BatchMode.
+    // ==========================
+
+    // Read the 'runInBatch' and 'batchAnimType' from '*frontend.cfg'
+
+    config.beginGroup("BatchMode");
+
+    bool batchModeFlag;
+    QString batchAnimationType;
+
+    batchModeFlag      = config.value("runInBatch").toBool();
+    batchAnimationType = config.value("batchAnimType").toString();
+
+    sysMC->setBatchMode( batchModeFlag );
+    sysMC->setBatchModeAnimationType( batchAnimationType );
+
+    config.endGroup();
+
+
     LOG4CPLUS_INFO(mlog, "Frontend has been configured.");
 }
 

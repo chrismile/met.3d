@@ -574,6 +574,60 @@ MNaturalEarthDataLoader *MSystemManagerAndControl::getNaturalEarthDataLoader()
 }
 
 
+// MKM  image save in BatchMode    -- begin
+void MSystemManagerAndControl::setBatchMode(bool isActive)
+{
+    batchModeIsActive = isActive;
+}
+
+
+bool MSystemManagerAndControl::isInBatchMode()
+{
+    return batchModeIsActive;
+}
+
+
+void MSystemManagerAndControl::setBatchModeAnimationType(QString animType)
+{
+    batchModeAnimationType = animType;
+}
+
+
+QString MSystemManagerAndControl::getBatchModeAnimationType()
+{
+    return batchModeAnimationType;
+}
+
+
+void MSystemManagerAndControl::executeBatchModeIfActive()
+{
+    // MKM as of now only one synchronization namely "Synchronization",
+    //if multiple exist, then pass the appropriate name as argument.
+    MSyncControl *syncControl = getSyncControl("Synchronization");
+
+    // If running in BatchMode, trigger the image saving option
+    if (isInBatchMode())
+    {
+        // Currently only 'timeAnimation' option is provided
+        if (getBatchModeAnimationType() == "timeAnimation")
+        {
+
+            //  Set the save screen shot option to 'true'
+                syncControl->setSaveTimeAnimationCheckBox(true);
+
+            //  Start the Animation with some sufficient delay to ensure
+            //  that all the 'actors' are ready before the 'camera' triggers
+                syncControl->setTimeAnimationTimeStepSpinBox(1500);
+                syncControl->setAnimationPlayButton(true);
+
+                syncControl->startTimeAnimation();
+        }
+    }
+
+}
+// MKM  image save in BatchMode    -- end
+
+
 /******************************************************************************
 ***                             PUBLIC SLOTS                                ***
 *******************************************************************************/

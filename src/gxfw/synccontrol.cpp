@@ -555,6 +555,26 @@ void MSyncControl::disconnectSynchronizedObjects()
 }
 
 
+// MKM for image save in batchMode  -- begin
+void MSyncControl::setSaveTimeAnimationCheckBox(bool flag)
+{
+    saveTimeAnimationCheckBox->setChecked(flag);
+}
+
+
+void MSyncControl::setTimeAnimationTimeStepSpinBox(int delay)
+{
+    timeAnimationTimeStepSpinBox->setValue(delay);
+}
+
+
+void MSyncControl::setAnimationPlayButton(bool flag)
+{
+    ui->animationPlayButton->setChecked(flag);
+}
+// MKM for image save in batchMode  -- end
+
+
 /******************************************************************************
 ***                             PUBLIC SLOTS                                ***
 *******************************************************************************/

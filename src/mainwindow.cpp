@@ -935,6 +935,11 @@ void MMainWindow::show()
     {
         sessionAutoSaveTimer->start();
     }
+
+    // MKM image save in BatchMode
+    MSystemManagerAndControl::getInstance()->executeBatchModeIfActive();
+
+
 }
 
 

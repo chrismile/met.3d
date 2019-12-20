@@ -139,6 +139,14 @@ public:
      */
     void disconnectSynchronizedObjects();
 
+    // MKM for image save in batchMode --  begin
+    void setSaveTimeAnimationCheckBox(bool flag);
+
+    void setTimeAnimationTimeStepSpinBox(int delay);
+
+    void setAnimationPlayButton(bool flag);
+    // MKM for image save in batchMode  -- end
+
 public slots:
     /**
       Advance scene time by the value specified in @p ui->timeStepSpinBox and
