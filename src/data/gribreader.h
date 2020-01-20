@@ -228,7 +228,7 @@ protected:
 
     void debugPrintLevelTypeMap(MGribLevelTypeMap& m);
 
-    bool checkIndexForVariable(MGribVariableInfo* vinfo);
+    bool checkInternalConsistencyOfVariableIndex(MGribVariableInfo* vinfo);
 
     QString forecastTypeToString(MECMWFForecastType type);
 
@@ -265,7 +265,7 @@ protected:
      grid spacing in lon and lat direction, number of lons and lats and one
      vector containing all longitudes and one containing all latitudes.
      */
-    bool checkConsistencyOfVariable(MGribVariableInfo *referenceVInfo,
+    bool checkHorizontalConsistencyOfVariableToReference(MGribVariableInfo *referenceVInfo,
                                     MGribVariableInfo *currentVInfo);
 
     MGribLevelTypeMap availableDataFields;

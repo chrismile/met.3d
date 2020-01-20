@@ -1016,7 +1016,7 @@ void MGribReader::scanDataRoot()
                     currentVInfo.dlat = getGribDoubleKey(
                                 gribHandle, "jDirectionIncrementInDegrees");
 
-                    if (!checkConsistencyOfVariable(vinfo, &currentVInfo))
+                    if (!checkHorizontalConsistencyOfVariableToReference(vinfo, &currentVInfo))
                     {
                         LOG4CPLUS_ERROR(mlog, "found different geographical "
                                         "region than previously used for "
@@ -1279,11 +1279,22 @@ void MGribReader::scanDataRoot()
         QVector<double> referenceLevels;
         foreach (QString varName, varNames)
         {
-            if (!checkIndexForVariable(availableDataFields[levelType][varName]))
+            // 1. Check if variable index is consistent in itself (i.e.
+            // the variable's vertical levels, time steps, etc. are all
+            // consistent.
+            // =========================================================
+            if (!checkInternalConsistencyOfVariableIndex(
+                        availableDataFields[levelType][varName]))
             {
                 delete availableDataFields[levelType].take(varName);
                 continue;
             }
+
+            // 2. Check if the variable is consistent to the "reference
+            // variable" (i.e. the first variable encountered) in this dataset
+            // (to make sure that all data fields of the data set are defined
+            // on the same grid etc.).
+            // ================================================================
             else if ( !disableGridConsistencyCheck )
             {
                 if (horizontalRefVarName.isEmpty())
@@ -1298,12 +1309,22 @@ void MGribReader::scanDataRoot()
                             availableDataFields[levelType][referenceVarName]
                             ->levels;
                 }
+
+                LOG4CPLUS_DEBUG(mlog, "Checking if variable '"
+                                << varName.toStdString()
+                                << "' ("
+                                << MStructuredGrid::verticalLevelTypeToString(
+                                    levelType).toStdString()
+                                << ") is consistent to the reference variable(s) '"
+                                << horizontalRefVarName.toStdString() << "'/'"
+                                << referenceVarName.toStdString() << "'...");
+
                 // Check consistency of vertical levels.
-                else if (availableDataFields[levelType][varName]->levels
-                         != referenceLevels)
+                if (availableDataFields[levelType][varName]->levels
+                        != referenceLevels)
                 {
                     LOG4CPLUS_ERROR(mlog,
-                                    "found difference in vertical levels to"
+                                    "ERROR: found difference in vertical levels to"
                                     " reference variable '"
                                     + referenceVarName.toStdString()
                                     + "'; discarding variable: '"
@@ -1313,21 +1334,25 @@ void MGribReader::scanDataRoot()
                     continue;
                 }
                 // Check consistency of horizontal coordinates.
-                else if (!checkConsistencyOfVariable(
-                            availableDataFields[referenceLevelType]
-                            [horizontalRefVarName],
+                else if (!checkHorizontalConsistencyOfVariableToReference(
+                             availableDataFields[referenceLevelType]
+                             [horizontalRefVarName],
                              availableDataFields[levelType][varName]))
                 {
                     LOG4CPLUS_ERROR(mlog,
-                                    "found difference to reference"
+                                    "ERROR: found difference to reference"
                                     " variable '"
-                                    + referenceVarName.toStdString()
+                                    + horizontalRefVarName.toStdString()
                                     + "'; discarding variable: '"
                                     + varName.toStdString() + "' [Dataset: "
                                     + getIdentifier().toStdString() + "]");
                     delete availableDataFields[levelType].take(varName);
                     continue;
                 }
+
+                LOG4CPLUS_DEBUG(mlog, "... OK: variable '"
+                                << varName.toStdString()
+                                << "' is consistent to the reference variable(s).");
             }
         }
     }
@@ -1608,10 +1633,13 @@ void MGribReader::debugPrintLevelTypeMap(MGribLevelTypeMap &m)
 }
 
 
-bool MGribReader::checkIndexForVariable(MGribVariableInfo *vinfo)
+bool MGribReader::checkInternalConsistencyOfVariableIndex(
+        MGribVariableInfo *vinfo)
 {
-    LOG4CPLUS_DEBUG(mlog, "Checking variable "
-                    << vinfo->longname.toStdString() << "...");
+    LOG4CPLUS_DEBUG(mlog, "Checking if variable '"
+                    << vinfo->variablename.toStdString() << "' ("
+                    << vinfo->longname.toStdString() << ") is consistent "
+                    "in itself (vertical levels, time steps, etc.)...");
 
     // Sort discovered levels.
     qSort(vinfo->levels);
@@ -1772,8 +1800,9 @@ bool MGribReader::checkIndexForVariable(MGribVariableInfo *vinfo)
 
 
     // Everything is ok.
-    LOG4CPLUS_DEBUG(mlog, "... variable '"
-                    << vinfo->longname.toStdString() << "' is ok.");
+    LOG4CPLUS_DEBUG(mlog, "... OK: variable '"
+                    << vinfo->variablename.toStdString()
+                    << "' is is consistent in itself.");
     return true;
 }
 
@@ -1899,57 +1928,57 @@ void MGribReader::setSurfacePressureFieldType(QString surfacePressureFieldType)
 }
 
 
-bool MGribReader::checkConsistencyOfVariable(MGribVariableInfo *referenceVInfo,
-                                             MGribVariableInfo *currentVInfo)
+bool MGribReader::checkHorizontalConsistencyOfVariableToReference(
+        MGribVariableInfo *referenceVInfo,  MGribVariableInfo *currentVInfo)
 {
     // Get geographical region of the data field & check that
     // all messages of this 3D field have the same bounds.
     if ( referenceVInfo->nlons != currentVInfo->nlons )
     {
-        LOG4CPLUS_ERROR(mlog, "detected inconsistency in 'number of longitudes'");
+        LOG4CPLUS_ERROR(mlog, "ERROR: detected inconsistency in 'number of longitudes'");
         return false;
     }
     if ( referenceVInfo->nlats != currentVInfo->nlats )
     {
-        LOG4CPLUS_ERROR(mlog, "detected inconsistency in 'number of longitudes'");
+        LOG4CPLUS_ERROR(mlog, "ERROR: detected inconsistency in 'number of longitudes'");
         return false;
     }
     if ( MMOD(referenceVInfo->lon0, 360.) != MMOD(currentVInfo->lon0, 360.) )
     {
         LOG4CPLUS_ERROR(mlog,
-                        "detected inconsistency in 'longitude of first grid"
+                        "ERROR: detected inconsistency in 'longitude of first grid"
                         " point'");
         return false;
     }
     if ( referenceVInfo->lat0 != currentVInfo->lat0 )
     {
         LOG4CPLUS_ERROR(mlog,
-                        "detected inconsistency in 'latitude of first grid"
+                        "ERROR: detected inconsistency in 'latitude of first grid"
                         " point'");
         return false;
     }
     if ( MMOD(referenceVInfo->lon1, 360.) != MMOD(currentVInfo->lon1, 360.) )
     {
         LOG4CPLUS_ERROR(mlog,
-                        "detected inconsistency in 'longitude of last grid"
+                        "ERROR: detected inconsistency in 'longitude of last grid"
                         " point'");
         return false;
     }
     if ( referenceVInfo->lat1 != currentVInfo->lat1 )
     {
         LOG4CPLUS_ERROR(mlog,
-                        "detected inconsistency in 'latitude of last grid"
+                        "ERROR: detected inconsistency in 'latitude of last grid"
                         " point'");
         return false;
     }
     if ( referenceVInfo->dlon != currentVInfo->dlon )
     {
-        LOG4CPLUS_ERROR(mlog, "detected inconsistency in 'i direction increment'");
+        LOG4CPLUS_ERROR(mlog, "ERROR: detected inconsistency in 'i direction increment'");
         return false;
     }
     if ( referenceVInfo->dlat != currentVInfo->dlat )
     {
-        LOG4CPLUS_ERROR(mlog, "detected inconsistency in 'j direction increment'");
+        LOG4CPLUS_ERROR(mlog, "ERROR: detected inconsistency in 'j direction increment'");
         return false;
     }
     return true;
