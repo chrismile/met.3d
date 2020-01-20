@@ -911,7 +911,17 @@ void MGribReader::scanDataRoot()
                 QString dataType = "";
                 if (!ensembleIDIsSpecifiedInFileName)
                 {
-                    dataType = getGribStringKey(gribHandle, "ls.dataType");
+                    try {
+                        dataType = getGribStringKey(gribHandle, "ls.dataType");
+                    }
+                    catch (MGribError& e)
+                    {
+                        LOG4CPLUS_WARN(mlog, "Unable to determine dataType of "
+                                             "grid (ECMWF uses an, fc, pf, cf), "
+                                             "skipping this field.");
+                        grib_handle_delete(gribHandle);
+                        continue;
+                    }
                     // LOG4CPLUS_DEBUG(mlog, "ls.dataType: " << dataType.toStdString());
                     // Perturbed (pf) and control (cf) forecasts are combined into
                     // "ensemble" (ens) forecasts.
@@ -1445,7 +1455,21 @@ QString MGribReader::getGribStringKey(grib_handle *gh, QString key)
     const int MAX_CHAR_LEN = 64;
     char cval[MAX_CHAR_LEN];
     size_t vlen = MAX_CHAR_LEN;
-    GRIB_CHECK(grib_get_string(gh, keyAsCString, cval, &vlen), 0);
+
+    int errorCode = grib_get_string(gh, keyAsCString, cval, &vlen);
+    if (errorCode != 0)
+    {
+        QString errorMsg = QString(
+                    "ERROR: cannot access grib key '%1'. Met.3D requires the "
+                    "value of this key, please make sure that the "
+                    "key/value pair is correctly defined in your grib "
+                    "file. ECCODES error code is %2, message is: %3")
+                .arg(keyAsCString).arg(errorCode)
+                .arg(grib_get_error_message(errorCode));
+
+        LOG4CPLUS_ERROR(mlog, errorMsg.toStdString());
+        throw MGribError(errorMsg.toStdString(), __FILE__, __LINE__);
+    }
 
     return QString(cval);
 }
@@ -1458,7 +1482,21 @@ long MGribReader::getGribLongKey(grib_handle *gh, QString key)
     char* keyAsCString = ba.data();
 
     long value;
-    GRIB_CHECK(grib_get_long(gh, keyAsCString, &value), 0);
+
+    int errorCode = grib_get_long(gh, keyAsCString, &value);
+    if (errorCode != 0)
+    {
+        QString errorMsg = QString(
+                    "ERROR: cannot access grib key '%1'. Met.3D requires the "
+                    "value of this key, please make sure that the "
+                    "key/value pair is correctly defined in your grib "
+                    "file. ECCODES error code is %2, message is: %3")
+                .arg(keyAsCString).arg(errorCode)
+                .arg(grib_get_error_message(errorCode));
+
+        LOG4CPLUS_ERROR(mlog, errorMsg.toStdString());
+        throw MGribError(errorMsg.toStdString(), __FILE__, __LINE__);
+    }
 
     return value;
 }
@@ -1471,7 +1509,21 @@ double MGribReader::getGribDoubleKey(grib_handle *gh, QString key)
     char* keyAsCString = ba.data();
 
     double value;
-    GRIB_CHECK(grib_get_double(gh, keyAsCString, &value), 0);
+
+    int errorCode = grib_get_double(gh, keyAsCString, &value);
+    if (errorCode != 0)
+    {
+        QString errorMsg = QString(
+                    "ERROR: cannot access grib key '%1'. Met.3D requires the "
+                    "value of this key, please make sure that the "
+                    "key/value pair is correctly defined in your grib "
+                    "file. ECCODES error code is %2, message is: %3")
+                .arg(keyAsCString).arg(errorCode)
+                .arg(grib_get_error_message(errorCode));
+
+        LOG4CPLUS_ERROR(mlog, errorMsg.toStdString());
+        throw MGribError(errorMsg.toStdString(), __FILE__, __LINE__);
+    }
 
     return value;
 }
