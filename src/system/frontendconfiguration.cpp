@@ -791,18 +791,26 @@ void MFrontendConfiguration::initializeFrontendFromConfigFile(
     // Initialize BatchMode.
     // ==========================
 
-    // Read the 'runInBatch' and 'batchAnimType' from '*frontend.cfg'
+    // Read the 'runInBatchMode' and 'batchModeAnimationType' from '*frontend.cfg'
 
     config.beginGroup("BatchMode");
 
     bool batchModeFlag;
-    QString batchAnimationType;
+    QString batchModeAnimationType;
+    QString batchModeSychronizationName;
+    QString batchModeDataSource;
 
-    batchModeFlag      = config.value("runInBatch").toBool();
-    batchAnimationType = config.value("batchAnimType").toString();
+    batchModeFlag      = config.value("runInBatchMode").toBool();
+    batchModeAnimationType = config.value("batchModeAnimationType").toString();
+    batchModeSychronizationName=config.value("batchModeSychronizationName").toString();
+    batchModeDataSource=config.value("useAnimationTimeRangeFromDataSource").toString();
 
     sysMC->setBatchMode( batchModeFlag );
-    sysMC->setBatchModeAnimationType( batchAnimationType );
+    sysMC->setBatchModeAnimationType( batchModeAnimationType );
+    sysMC->setBatchModeSychronizationName( batchModeSychronizationName );
+    sysMC->setUseAnimationTimeRangeFromDataSource(batchModeDataSource);
+    // read in name of dataset , pass to batch function
+    // in batch function: update time range from dataset, then run
 
     config.endGroup();
 

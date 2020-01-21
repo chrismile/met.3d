@@ -937,9 +937,8 @@ void MMainWindow::show()
     }
 
     // MKM image save in BatchMode
-    MSystemManagerAndControl::getInstance()->executeBatchModeIfActive();
-
-
+    if( MSystemManagerAndControl::getInstance()->isInBatchMode() )
+        MSystemManagerAndControl::getInstance()->executeBatchMode();
 }
 
 

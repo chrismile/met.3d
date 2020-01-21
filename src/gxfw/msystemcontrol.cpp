@@ -574,7 +574,7 @@ MNaturalEarthDataLoader *MSystemManagerAndControl::getNaturalEarthDataLoader()
 }
 
 
-// MKM  image save in BatchMode    -- begin
+//Updates for image save in BatchMode    -- begin
 void MSystemManagerAndControl::setBatchMode(bool isActive)
 {
     batchModeIsActive = isActive;
@@ -593,39 +593,72 @@ void MSystemManagerAndControl::setBatchModeAnimationType(QString animType)
 }
 
 
+void MSystemManagerAndControl::setBatchModeSychronizationName(QString syncName)
+{
+    batchModeSychronizationName = syncName;
+}
+
+
+void MSystemManagerAndControl::setUseAnimationTimeRangeFromDataSource(QString dataSrcName)
+{
+    useAnimationTimeRangeFromDataSource = dataSrcName;
+}
+
+
 QString MSystemManagerAndControl::getBatchModeAnimationType()
 {
     return batchModeAnimationType;
 }
 
 
-void MSystemManagerAndControl::executeBatchModeIfActive()
+QString MSystemManagerAndControl::getBatchModeSychronizationName()
 {
-    // MKM as of now only one synchronization namely "Synchronization",
-    //if multiple exist, then pass the appropriate name as argument.
-    MSyncControl *syncControl = getSyncControl("Synchronization");
+    return batchModeSychronizationName;
+}
 
+
+QString MSystemManagerAndControl::getUseAnimationTimeRangeFromDataSource()
+{
+    return useAnimationTimeRangeFromDataSource;
+}
+
+
+void MSystemManagerAndControl::executeBatchMode()
+{
     // If running in BatchMode, trigger the image saving option
-    if (isInBatchMode())
+
+    QString synchronizationName = getBatchModeSychronizationName();
+    QStringList dataSources;
+    dataSources.append(getUseAnimationTimeRangeFromDataSource());
+    MSyncControl *syncControl = getSyncControl(synchronizationName);
+
+    if ( syncControl == nullptr )
     {
-        // Currently only 'timeAnimation' option is provided
-        if (getBatchModeAnimationType() == "timeAnimation")
-        {
+        QMessageBox::warning(this, "Warning",
+                             "'"+synchronizationName+"'is not available!\n");
+        return;
+    }
 
-            //  Set the save screen shot option to 'true'
-                syncControl->setSaveTimeAnimationCheckBox(true);
+    syncControl->restrictControlToDataSources(dataSources);
 
-            //  Start the Animation with some sufficient delay to ensure
-            //  that all the 'actors' are ready before the 'camera' triggers
-                syncControl->setTimeAnimationTimeStepSpinBox(1500);
-                syncControl->setAnimationPlayButton(true);
+    // Currently only 'timeAnimation' option is provided
+    if (getBatchModeAnimationType() == "timeAnimation")
+    {
 
-                syncControl->startTimeAnimation();
-        }
+        //  Set the save screen shot option to 'true'
+        syncControl->setSaveTimeAnimationCheckBox(true);
+
+        //  Start the Animation with some sufficient delay to ensure
+        //  that all the 'actors' are ready before the 'camera' triggers
+
+        syncControl->setTimeAnimationTimeStepSpinBox(1500);
+        syncControl->setAnimationPlayButton(true);
+
+        syncControl->startTimeAnimation();
     }
 
 }
-// MKM  image save in BatchMode    -- end
+// Updates for image save in BatchMode    -- end
 
 
 /******************************************************************************

@@ -196,9 +196,17 @@ public:
 
     void setBatchModeAnimationType(QString animType);
 
+    void setBatchModeSychronizationName(QString syncName);
+
+    void setUseAnimationTimeRangeFromDataSource(QString dataSrcName);
+
     QString getBatchModeAnimationType();
 
-    void executeBatchModeIfActive();
+    QString getBatchModeSychronizationName();
+
+    QString getUseAnimationTimeRangeFromDataSource();
+
+    void executeBatchMode();
 
 signals:
     void boundingBoxCreated();
@@ -244,6 +252,8 @@ private:
 
     bool batchModeIsActive;
     QString batchModeAnimationType;
+    QString batchModeSychronizationName;
+    QString useAnimationTimeRangeFromDataSource;
 
     QStringList commandLineArguments;
     QDir met3DHomeDir;

@@ -1096,7 +1096,6 @@ void MSyncControl::restrictControlToDataSources(QStringList selectedDataSources)
 {
 
     MSystemManagerAndControl* sysMC = MSystemManagerAndControl::getInstance();
-    // Remove Actions displaying names of lastly selected data sources.
     foreach (QAction *action, selectedDataSourceActionList)
     {
         configurationDropdownMenu->removeAction(action);
@@ -1221,7 +1220,7 @@ void MSyncControl::restrictControlToDataSources(QStringList selectedDataSources)
         } // levelTypes
     } // dataSources
 
-    // Search for minium and maximum date values to restrict the time edits to
+    // Search for minimum and maximum date values to restrict the time edits to
     // them respectively.
     QDateTime minTime = availableInitDatetimes.first();
     QDateTime maxTime = minTime;
@@ -1308,6 +1307,10 @@ void MSyncControl::startTimeAnimation()
             }
         }
 
+        // MKM Calling the save time animation here
+        // For First Frame in BatchMode
+        if ( MSystemManagerAndControl::getInstance()->isInBatchMode() )
+            QTimer::singleShot(2500,this,SLOT(saveTimeAnimation));
         // Start the animation timer.
         animationTimer->start(timeAnimationTimeStepSpinBox->value());
     }
@@ -1951,8 +1954,6 @@ void MSyncControl::setAnimationTimeToStartTime(QDateTime startDateTime)
         ui->validTimeEdit->setDateTime(startDateTime);
     }
 
-    // Save image of current time step.
-    saveTimeAnimation();
 }
 
 
