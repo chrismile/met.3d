@@ -91,6 +91,7 @@ MSyncControl::MSyncControl(QString id, QWidget *parent) :
 {
     lastInitDatetime = QDateTime();
     lastValidDatetime = QDateTime();
+
     selectedDataSourceActionList.clear();
     synchronizedObjects = QSet<MSynchronizedObject*>();
     synchronizedObjects.clear();
@@ -231,6 +232,10 @@ MSyncControl::MSyncControl(QString id, QWidget *parent) :
     timeAnimationTo = new QDateTimeEdit(timeAnimationToWidget);
     timeAnimationTo->setDisplayFormat("ddd yyyy-MM-dd hh:mm:ss UTC");
     timeAnimationTo->setTimeSpec(Qt::UTC);
+
+    copyInitToFrom();
+    copyValidToTo();
+
     copyInitTimeToAnimationToButton = new QPushButton("IT", timeAnimationToWidget);
     copyInitTimeToAnimationToButton->setMinimumWidth(widthOfCopyButtons);
     copyInitTimeToAnimationToButton->setMaximumWidth(widthOfCopyButtons);
@@ -407,8 +412,12 @@ MSyncControl::~MSyncControl()
 {
     delete ui;
     selectedDataSourceActionList.clear();
+    selectedDataSources.clear();
+
     delete configurationDropdownMenu;
     delete selectDataSourcesAction;
+
+
     // Deregister all registered synchronized object since otherwise this might
     // lead to a system crash if the actor is deleted later.
     disconnectSynchronizedObjects();
@@ -763,6 +772,8 @@ void MSyncControl::selectDataSources()
     }
 
     restrictControlToDataSources(selectedDataSources);
+    copyInitToFrom();
+    copyValidToTo();
 }
 
 
@@ -1089,6 +1100,8 @@ void MSyncControl::restrictToDataSourcesFromSettings(
 
     // Use the suitable data sources set to setup the sync control.
     restrictControlToDataSources(suitableDataSources);
+    copyInitToFrom();
+    copyValidToTo();
 }
 
 
@@ -1106,9 +1119,12 @@ void MSyncControl::restrictControlToDataSources(QStringList selectedDataSources)
 // lists and contains since for version 4.8 there is no qHash method for QDateTime
 // and thus it is not possible to use toSet on QList<QDateTime>.
 // (See: http://doc.qt.io/qt-5/qhash.html#qHashx)
-    availableInitDatetimes.clear();
-    availableValidDatetimes.clear();
-    availableEnsembleMembers.clear();
+        if(availableInitDatetimes.count())
+            availableInitDatetimes.clear();
+        if(availableValidDatetimes.count())
+            availableValidDatetimes.clear();
+        if(availableEnsembleMembers.count())
+            availableEnsembleMembers.clear();
 
     // Use all data sources if no data sources are given.
     if (selectedDataSources.empty())
@@ -1146,6 +1162,7 @@ void MSyncControl::restrictControlToDataSources(QStringList selectedDataSources)
     variables.clear();
     currentInitTimes.clear();
     currentValidTimes.clear();
+
     this->selectedDataSources = selectedDataSources;
 
 // TODO (bt, 23Feb2017): If updated to Qt 5.0 use QSets and unite instead of
@@ -1220,6 +1237,10 @@ void MSyncControl::restrictControlToDataSources(QStringList selectedDataSources)
         } // levelTypes
     } // dataSources
 
+    // Store previous date times of init/valid GUI fields.
+    QDateTime previousInitTime = ui->initTimeEdit->dateTime();
+    QDateTime previousValidTime = ui->validTimeEdit->dateTime();
+
     // Search for minimum and maximum date values to restrict the time edits to
     // them respectively.
     QDateTime minTime = availableInitDatetimes.first();
@@ -1246,6 +1267,18 @@ void MSyncControl::restrictControlToDataSources(QStringList selectedDataSources)
     // the time properly for the first and last day of the range.
     ui->validTimeEdit->setTimeRange(QTime(0,0,0), QTime(23,59,59));
     lastValidDatetime = minTime;
+
+    // Check if previous init/valid times are still in new range of available
+    // times -- if not, reset to first available init/valid time.
+    if (!availableInitDatetimes.contains(previousInitTime))
+    {
+       ui->initTimeEdit->setDateTime(lastInitDatetime);
+    }
+    if (!availableValidDatetimes.contains(previousValidTime))
+    {
+       ui->validTimeEdit->setDateTime(lastValidDatetime);
+    }
+    updateTimeDifference();
 
     QStringList memberList;
     QList<unsigned int> intMemberList;
