@@ -627,22 +627,38 @@ void MSystemManagerAndControl::executeBatchMode()
 {
     // If running in BatchMode, trigger the image saving option
 
+    QString animationType = getBatchModeAnimationType();
     QString synchronizationName = getBatchModeSychronizationName();
-    QStringList dataSources;
-    dataSources.append(getUseAnimationTimeRangeFromDataSource());
-    MSyncControl *syncControl = getSyncControl(synchronizationName);
+    QString dataSourceName = getUseAnimationTimeRangeFromDataSource();
 
+    MSyncControl *syncControl = getSyncControl(synchronizationName);
     if ( syncControl == nullptr )
     {
-        QMessageBox::warning(this, "Warning",
-                             "'"+synchronizationName+"'is not available!\n");
+        QMessageBox msgBox;
+        msgBox.setIcon(QMessageBox::Warning);
+        msgBox.setText("Batch mode execution: Synchronization '"+synchronizationName+
+                       "' specified in frontend configuration is not available!\n");
+        msgBox.exec();
         return;
     }
 
+
+    if( getDataSource(dataSourceName) == nullptr)
+    {
+            QMessageBox msgBox;
+            msgBox.setIcon(QMessageBox::Warning);
+            msgBox.setText("Batch mode execution: Data source '"+dataSourceName+
+                           "' specified in frontend configuration is not available!\n");
+            msgBox.exec();
+            return;
+    }
+
+    QStringList dataSources;
+    dataSources.append(dataSourceName);
     syncControl->restrictControlToDataSources(dataSources);
 
     // Currently only 'timeAnimation' option is provided
-    if (getBatchModeAnimationType() == "timeAnimation")
+    if ( animationType == "timeAnimation")
     {
 
         //  Set the save screen shot option to 'true'
@@ -656,7 +672,17 @@ void MSystemManagerAndControl::executeBatchMode()
 
         syncControl->startTimeAnimation();
     }
+    else
+    {
+        QMessageBox msgBox;
+        msgBox.setIcon(QMessageBox::Warning);
+        msgBox.setText("Animation type '"+animationType+
+                       "' is not Supported!\n"
+                       "Only 'timeAnimation' is supported.");
+        msgBox.exec();
+        return;
 
+    }
 }
 // Updates for image save in BatchMode    -- end
 
