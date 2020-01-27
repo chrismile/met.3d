@@ -788,29 +788,37 @@ void MFrontendConfiguration::initializeFrontendFromConfigFile(
         config.endArray();
     }
 
-    // Initialize BatchMode.
-    // ==========================
+    // Read optional BatchMode configuration.
+    // ======================================
 
-    // Read the 'runInBatchMode' and 'batchModeAnimationType' from '*frontend.cfg'
+    // Batch mode configuration is passed to the system manager; if batch
+    // mode is enabled, it will be started from the MMainWindow::show()
+    // method.
 
     config.beginGroup("BatchMode");
 
-    bool batchModeFlag;
-    QString batchModeAnimationType;
-    QString batchModeSychronizationName;
-    QString batchModeDataSource;
+    bool batchModeFlag = config.value("runInBatchMode", false).toBool();
+    QString batchModeAnimationType =
+            config.value("batchModeAnimationType", "").toString();
+    QString batchModeSychronizationName =
+            config.value("batchModeSychronizationName", "").toString();
+    QString batchModeDataSource =
+            config.value("useAnimationTimeRangeFromDataSource", "").toString();
 
-    batchModeFlag      = config.value("runInBatchMode").toBool();
-    batchModeAnimationType = config.value("batchModeAnimationType").toString();
-    batchModeSychronizationName=config.value("batchModeSychronizationName").toString();
-    batchModeDataSource=config.value("useAnimationTimeRangeFromDataSource").toString();
+    LOG4CPLUS_DEBUG(mlog, "initialising batch mode.");
+    LOG4CPLUS_DEBUG(mlog, "  batch mode is "
+                    << (batchModeFlag ? "enabled" : "disabled"));
+    LOG4CPLUS_DEBUG(mlog, "  batch mode animation type: "
+                    << batchModeAnimationType.toStdString());
+    LOG4CPLUS_DEBUG(mlog, "  batch mode using sync control: "
+                    << batchModeSychronizationName.toStdString());
+    LOG4CPLUS_DEBUG(mlog, "  batch mode using time range from dataset: "
+                    << batchModeDataSource.toStdString());
 
-    sysMC->setBatchMode( batchModeFlag );
-    sysMC->setBatchModeAnimationType( batchModeAnimationType );
-    sysMC->setBatchModeSychronizationName( batchModeSychronizationName );
-    sysMC->setUseAnimationTimeRangeFromDataSource(batchModeDataSource);
-    // read in name of dataset , pass to batch function
-    // in batch function: update time range from dataset, then run
+    sysMC->setBatchMode(batchModeFlag);
+    sysMC->setBatchModeAnimationType(batchModeAnimationType);
+    sysMC->setBatchModeSynchronizationControl(batchModeSychronizationName);
+    sysMC->setDataSourceForBatchModeAnimationTimeRange(batchModeDataSource);
 
     config.endGroup();
 

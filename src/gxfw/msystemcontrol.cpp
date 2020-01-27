@@ -57,6 +57,7 @@ MSystemManagerAndControl::MSystemManagerAndControl(QWidget *parent) :
     ui(new Ui::MSystemControl),
     met3dAppIsInitialized(false),
     connectedToMetview(false),
+    batchModeIsActive(false),
     handleSize(.5),
     mainWindow(nullptr),
     naturalEarthDataLoader(nullptr)
@@ -574,7 +575,6 @@ MNaturalEarthDataLoader *MSystemManagerAndControl::getNaturalEarthDataLoader()
 }
 
 
-//Updates for image save in BatchMode    -- begin
 void MSystemManagerAndControl::setBatchMode(bool isActive)
 {
     batchModeIsActive = isActive;
@@ -593,98 +593,91 @@ void MSystemManagerAndControl::setBatchModeAnimationType(QString animType)
 }
 
 
-void MSystemManagerAndControl::setBatchModeSychronizationName(QString syncName)
+void MSystemManagerAndControl::setBatchModeSynchronizationControl(QString syncName)
 {
-    batchModeSychronizationName = syncName;
+    syncControlForBatchModeAnimation = syncName;
 }
 
 
-void MSystemManagerAndControl::setUseAnimationTimeRangeFromDataSource(QString dataSrcName)
+void MSystemManagerAndControl::setDataSourceForBatchModeAnimationTimeRange(
+        QString dataSrcName)
 {
-    useAnimationTimeRangeFromDataSource = dataSrcName;
-}
-
-
-QString MSystemManagerAndControl::getBatchModeAnimationType()
-{
-    return batchModeAnimationType;
-}
-
-
-QString MSystemManagerAndControl::getBatchModeSychronizationName()
-{
-    return batchModeSychronizationName;
-}
-
-
-QString MSystemManagerAndControl::getUseAnimationTimeRangeFromDataSource()
-{
-    return useAnimationTimeRangeFromDataSource;
+    dataSourceForBatchModeAnimationTimeRange = dataSrcName;
 }
 
 
 void MSystemManagerAndControl::executeBatchMode()
 {
-    // If running in BatchMode, trigger the image saving option
+    LOG4CPLUS_DEBUG(mlog, "Starting batch mode execution.");
 
-    QString animationType = getBatchModeAnimationType();
-    QString synchronizationName = getBatchModeSychronizationName();
-    QString dataSourceName = getUseAnimationTimeRangeFromDataSource();
-
-    MSyncControl *syncControl = getSyncControl(synchronizationName);
-    if ( syncControl == nullptr )
+    // Check if sync control and data source configured for batch mode exist.
+    MSyncControl *syncControl = getSyncControl(syncControlForBatchModeAnimation);
+    if (syncControl == nullptr)
     {
         QMessageBox msgBox;
         msgBox.setIcon(QMessageBox::Warning);
-        msgBox.setText("Batch mode execution: Synchronization '"+synchronizationName+
-                       "' specified in frontend configuration is not available!\n");
+        msgBox.setText("Batch mode execution: Synchronization control'"
+                       + syncControlForBatchModeAnimation +
+                       "' specified in frontend configuration is not available. "
+                       "Batch mode will NOT be executed.");
         msgBox.exec();
         return;
     }
 
-
-    if( getDataSource(dataSourceName) == nullptr)
+    if (getDataSource(dataSourceForBatchModeAnimationTimeRange) == nullptr)
     {
-            QMessageBox msgBox;
-            msgBox.setIcon(QMessageBox::Warning);
-            msgBox.setText("Batch mode execution: Data source '"+dataSourceName+
-                           "' specified in frontend configuration is not available!\n");
-            msgBox.exec();
-            return;
+        QMessageBox msgBox;
+        msgBox.setIcon(QMessageBox::Warning);
+        msgBox.setText("Batch mode execution: Data source '"
+                       + dataSourceForBatchModeAnimationTimeRange +
+                       "' specified in frontend configuration is not available. "
+                       "Batch mode will NOT be executed.");
+        msgBox.exec();
+        return;
     }
 
+    // Restrict the sync control's allowed init/valid time to those available
+    // from the data source.
     QStringList dataSources;
-    dataSources.append(dataSourceName);
+    dataSources.append(dataSourceForBatchModeAnimationTimeRange);
     syncControl->restrictControlToDataSources(dataSources);
 
-    // Currently only 'timeAnimation' option is provided
-    if ( animationType == "timeAnimation")
+    // W.r.t. animation type, currently only the 'timeAnimation' option is
+    // implemented.
+    if (batchModeAnimationType == "timeAnimation")
     {
+        // WORKAROUNG to avoid black images stored of first time step.
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // NOTE: If this method is called from MMainWindow::show(), the data
+        // requests emitted by the actor initalizations triggered from
+        // MGLResourcesManager::initializeGL() may NOT HAVE COMPLETED at this
+        // time! Unfortunately, if we store the first image as implemented in
+        // MSyncControl::synchronizationCompleted() and ::startTimeAnimation()
+        // after this first sync request has been completed, the image store
+        // method is called before rendering has finished. As a workaround, we
+        // delay the start of the animation by the animation delay specified
+        // by the user in the animation pane in the sync control.
 
-        //  Set the save screen shot option to 'true'
-        syncControl->setSaveTimeAnimationCheckBox(true);
-
-        //  Start the Animation with some sufficient delay to ensure
-        //  that all the 'actors' are ready before the 'camera' triggers
-
-        syncControl->setTimeAnimationTimeStepSpinBox(1500);
-        syncControl->setAnimationPlayButton(true);
-
-        syncControl->startTimeAnimation();
+        // Start the time animation, delayed.
+        unsigned int delay_ms = syncControl->getAnimationDelay_ms();
+        LOG4CPLUS_DEBUG(mlog, "Delaying start of batch animation by "
+                        << delay_ms << " ms so that first rendering cycle is "
+                        "completed and first image is produced correctly.");
+        QTimer::singleShot(delay_ms, syncControl,
+                           SLOT(startTimeAnimationProgrammatically()));
     }
     else
     {
         QMessageBox msgBox;
         msgBox.setIcon(QMessageBox::Warning);
-        msgBox.setText("Animation type '"+animationType+
-                       "' is not Supported!\n"
-                       "Only 'timeAnimation' is supported.");
+        msgBox.setText("Batch mode execution: Animation type '"
+                       + batchModeAnimationType +
+                       "' is not supported ('timeAnimation' is supported.). "
+                       "Batch mode will NOT be executed.");
         msgBox.exec();
         return;
-
     }
 }
-// Updates for image save in BatchMode    -- end
 
 
 /******************************************************************************

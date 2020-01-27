@@ -196,15 +196,9 @@ public:
 
     void setBatchModeAnimationType(QString animType);
 
-    void setBatchModeSychronizationName(QString syncName);
+    void setBatchModeSynchronizationControl(QString syncName);
 
-    void setUseAnimationTimeRangeFromDataSource(QString dataSrcName);
-
-    QString getBatchModeAnimationType();
-
-    QString getBatchModeSychronizationName();
-
-    QString getUseAnimationTimeRangeFromDataSource();
+    void setDataSourceForBatchModeAnimationTimeRange(QString dataSrcName);
 
     void executeBatchMode();
 
@@ -252,8 +246,8 @@ private:
 
     bool batchModeIsActive;
     QString batchModeAnimationType;
-    QString batchModeSychronizationName;
-    QString useAnimationTimeRangeFromDataSource;
+    QString syncControlForBatchModeAnimation;
+    QString dataSourceForBatchModeAnimationTimeRange;
 
     QStringList commandLineArguments;
     QDir met3DHomeDir;

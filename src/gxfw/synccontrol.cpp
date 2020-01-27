@@ -232,10 +232,6 @@ MSyncControl::MSyncControl(QString id, QWidget *parent) :
     timeAnimationTo = new QDateTimeEdit(timeAnimationToWidget);
     timeAnimationTo->setDisplayFormat("ddd yyyy-MM-dd hh:mm:ss UTC");
     timeAnimationTo->setTimeSpec(Qt::UTC);
-
-    copyInitToFrom();
-    copyValidToTo();
-
     copyInitTimeToAnimationToButton = new QPushButton("IT", timeAnimationToWidget);
     copyInitTimeToAnimationToButton->setMinimumWidth(widthOfCopyButtons);
     copyInitTimeToAnimationToButton->setMaximumWidth(widthOfCopyButtons);
@@ -260,6 +256,9 @@ MSyncControl::MSyncControl(QString id, QWidget *parent) :
     connect(copyValidTimeToAnimationToButton, SIGNAL(clicked()),
             SLOT(copyValidToTo()));
 
+    // As default, copy current init/valid times to from/to fields.
+    copyInitToFrom();
+    copyValidToTo();
 
     timeAnimationDropdownMenu->addSeparator();
 
@@ -413,10 +412,8 @@ MSyncControl::~MSyncControl()
     delete ui;
     selectedDataSourceActionList.clear();
     selectedDataSources.clear();
-
     delete configurationDropdownMenu;
     delete selectDataSourcesAction;
-
 
     // Deregister all registered synchronized object since otherwise this might
     // lead to a system crash if the actor is deleted later.
@@ -545,7 +542,11 @@ void MSyncControl::synchronizationCompleted(MSynchronizedObject *object)
         currentSyncType = SYNC_UNKNOWN;
 
         endSceneSynchronization();
+
+        // Save the just completed image to file, if applicable in animation
+        // mode.
         emitSaveImageSignal();
+
         synchronizationInProgress = false;
     }
 #ifdef SYNC_DEBUG_OUTPUT
@@ -564,24 +565,10 @@ void MSyncControl::disconnectSynchronizedObjects()
 }
 
 
-// MKM for image save in batchMode  -- begin
-void MSyncControl::setSaveTimeAnimationCheckBox(bool flag)
+unsigned int MSyncControl::getAnimationDelay_ms()
 {
-    saveTimeAnimationCheckBox->setChecked(flag);
+    return timeAnimationTimeStepSpinBox->value();
 }
-
-
-void MSyncControl::setTimeAnimationTimeStepSpinBox(int delay)
-{
-    timeAnimationTimeStepSpinBox->setValue(delay);
-}
-
-
-void MSyncControl::setAnimationPlayButton(bool flag)
-{
-    ui->animationPlayButton->setChecked(flag);
-}
-// MKM for image save in batchMode  -- end
 
 
 /******************************************************************************
@@ -771,6 +758,9 @@ void MSyncControl::selectDataSources()
         return;
     }
 
+    // Restrict the sync control's allowed init/valid times to those available
+    // from the selected data sources; also update the current from/to times
+    // in the animation menu.
     restrictControlToDataSources(selectedDataSources);
     copyInitToFrom();
     copyValidToTo();
@@ -1098,7 +1088,9 @@ void MSyncControl::restrictToDataSourcesFromSettings(
         }
     }
 
-    // Use the suitable data sources set to setup the sync control.
+    // Restrict the sync control's allowed init/valid times to those available
+    // from the selected data sources; also update the current from/to times
+    // in the animation menu.
     restrictControlToDataSources(suitableDataSources);
     copyInitToFrom();
     copyValidToTo();
@@ -1119,12 +1111,9 @@ void MSyncControl::restrictControlToDataSources(QStringList selectedDataSources)
 // lists and contains since for version 4.8 there is no qHash method for QDateTime
 // and thus it is not possible to use toSet on QList<QDateTime>.
 // (See: http://doc.qt.io/qt-5/qhash.html#qHashx)
-        if(availableInitDatetimes.count())
-            availableInitDatetimes.clear();
-        if(availableValidDatetimes.count())
-            availableValidDatetimes.clear();
-        if(availableEnsembleMembers.count())
-            availableEnsembleMembers.clear();
+    availableInitDatetimes.clear();
+    availableValidDatetimes.clear();
+    availableEnsembleMembers.clear();
 
     // Use all data sources if no data sources are given.
     if (selectedDataSources.empty())
@@ -1147,7 +1136,6 @@ void MSyncControl::restrictControlToDataSources(QStringList selectedDataSources)
                 selectedDataSources.append(dataSourceID);
             }
         }
-
     }
 
     // Return if no data sources are available.
@@ -1164,14 +1152,6 @@ void MSyncControl::restrictControlToDataSources(QStringList selectedDataSources)
     currentValidTimes.clear();
 
     this->selectedDataSources = selectedDataSources;
-
-// TODO (bt, 23Feb2017): If updated to Qt 5.0 use QSets and unite instead of
-// lists and contains since for version 4.8 there is no qHash method for QDateTime
-// and thus it is not possible to use toSet on QList<QDateTime>.
-// (See: http://doc.qt.io/qt-5/qhash.html#qHashx)
-    availableInitDatetimes.clear();
-    availableValidDatetimes.clear();
-    availableEnsembleMembers.clear();
 
     foreach (QString dataSourceID, selectedDataSources)
     {
@@ -1240,6 +1220,7 @@ void MSyncControl::restrictControlToDataSources(QStringList selectedDataSources)
     // Store previous date times of init/valid GUI fields.
     QDateTime previousInitTime = ui->initTimeEdit->dateTime();
     QDateTime previousValidTime = ui->validTimeEdit->dateTime();
+    int previousEnsembleMember = ensembleMember();
 
     // Search for minimum and maximum date values to restrict the time edits to
     // them respectively.
@@ -1293,6 +1274,8 @@ void MSyncControl::restrictControlToDataSources(QStringList selectedDataSources)
         memberList.append(QString("%1").arg(member));
     }
     ui->ensembleMemberComboBox->addItems(memberList);
+    // Restore previous ensemble member, if possible.
+    setEnsembleMember(previousEnsembleMember);
 
     // Disable all data source entries since they are supposed to be just labels.
     foreach (QAction *action, selectedDataSourceActionList)
@@ -1304,16 +1287,26 @@ void MSyncControl::restrictControlToDataSources(QStringList selectedDataSources)
 
 void MSyncControl::timeAnimationAdvanceTimeStep()
 {
+    // This method is called by the animationTimer to advance the animation
+    // to the next time step.
+
 #ifdef DIRECT_SYNCHRONIZATION
-    // Don't apply the time change if the previous request hasn't been
-    // completed.
-    if (synchronizationInProgress) return;
+    // In case the previous request hasn't been completed yet, do nothing!
+    // We will advance the time step the next time the timer times out.
+    if (synchronizationInProgress)
+    {
+        return;
+    }
 #endif
 
-    if ( timeAnimationReverseTimeDirectionAction->isChecked() )
+    if (timeAnimationReverseTimeDirectionAction->isChecked())
+    {
         timeBackward();
+    }
     else
+    {
         timeForward();
+    }
 }
 
 
@@ -1340,11 +1333,18 @@ void MSyncControl::startTimeAnimation()
             }
         }
 
-        // MKM Calling the save time animation here
-        // For First Frame in BatchMode
-        if ( MSystemManagerAndControl::getInstance()->isInBatchMode() )
-            QTimer::singleShot(2500,this,SLOT(saveTimeAnimation));
-        // Start the animation timer.
+        // Save the current image (the next image will be stored after the next
+        // synchronization event, triggered by the animationTimer, has
+        // completed) UNLESS the previous synchronization request is still in
+        // progress -- in this case the image will be stored upon completion
+        // of synchronization (see synchronizationCompleted()).
+        if (!synchronizationInProgress)
+        {
+            emitSaveImageSignal();
+        }
+
+        // Start the animation timer. It will periodically call
+        // timeAnimationAdvanceTimeStep().
         animationTimer->start(timeAnimationTimeStepSpinBox->value());
     }
 }
@@ -1361,6 +1361,15 @@ void MSyncControl::stopTimeAnimation()
     timeAnimationDropdownMenu->setEnabled(true);
     setTimeSynchronizationGUIEnabled(true);
     ui->animationStopButton->setEnabled(false);
+}
+
+
+void MSyncControl::startTimeAnimationProgrammatically(bool saveImages)
+{
+    saveTimeAnimationCheckBox->setChecked(saveImages);
+
+    ui->animationPlayButton->setChecked(true);
+    startTimeAnimation();
 }
 
 
@@ -1582,7 +1591,7 @@ void MSyncControl::activateTimeAnimationImageSaving(bool activate)
         // Connect editable save animation gui elements to achieve saving if
         // one is changed.
         connect(saveTAFileNameLineEdit, SIGNAL(returnPressed()),
-                this, SLOT(saveTimeAnimation()));
+                this, SLOT(emitSaveImageSignal()));
 
         if (!currentSceneView->isVisible())
         {
@@ -1603,19 +1612,9 @@ void MSyncControl::activateTimeAnimationImageSaving(bool activate)
 
         // Disconnect editable save animation gui elements.
         disconnect(saveTAFileNameLineEdit, SIGNAL(returnPressed()),
-                   this, SLOT(saveTimeAnimation()));
+                   this, SLOT(emitSaveImageSignal()));
 
         currentSceneView->setOverwriteImageSerie(false);
-    }
-}
-
-
-void MSyncControl::saveTimeAnimation()
-{
-    if (saveTimeAnimationCheckBox->isChecked())
-    {
-        // Write first image.
-        emitSaveImageSignal();
     }
 }
 
@@ -1945,6 +1944,11 @@ void MSyncControl::setSynchronizationGUIEnabled(bool enabled)
 
 void MSyncControl::emitSaveImageSignal()
 {
+    if (!saveTimeAnimationCheckBox->isChecked())
+    {
+        return;
+    }
+
     // Get content of file name line edit.
     QString filename = saveTAFileNameLineEdit->text();
 

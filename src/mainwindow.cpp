@@ -921,6 +921,12 @@ void MMainWindow::updateSessionTimerInterval(int interval)
 
 void MMainWindow::show()
 {
+    LOG4CPLUS_DEBUG(mlog, "Showing main application window." << flush);
+
+    // NOTE! Showing this main window will trigger MGLResourcesManager::initializeGL()
+    // being executed -- thus on initialization all actors etc will be
+    // initialized from here!
+
     QWidget::show();
     // TODO (bt, 14Mar2017) Why need to set view layout after showing the window?
     // Need to set scene view layout after show since otherwise black lines are
@@ -936,9 +942,14 @@ void MMainWindow::show()
         sessionAutoSaveTimer->start();
     }
 
-    // MKM image save in BatchMode
-    if( MSystemManagerAndControl::getInstance()->isInBatchMode() )
-        MSystemManagerAndControl::getInstance()->executeBatchMode();
+    // If batch mode has been enabled in the configuration stage, start
+    // batch mode execution.
+    MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
+    if (sysMC->isInBatchMode())
+    {
+        LOG4CPLUS_DEBUG(mlog, "Batch mode is enabled. Invoking batch execution.");
+        sysMC->executeBatchMode();
+    }
 }
 
 

@@ -139,13 +139,11 @@ public:
      */
     void disconnectSynchronizedObjects();
 
-    // MKM for image save in batchMode --  begin
-    void setSaveTimeAnimationCheckBox(bool flag);
-
-    void setTimeAnimationTimeStepSpinBox(int delay);
-
-    void setAnimationPlayButton(bool flag);
-    // MKM for image save in batchMode  -- end
+    /**
+      Returns the delay between two animation steps in milliseconds, as
+      specified by the user in the animation pane.
+     */
+    unsigned int getAnimationDelay_ms();
 
 public slots:
     /**
@@ -230,6 +228,12 @@ public slots:
       */
     void stopTimeAnimation();
 
+    /**
+      Programmatically start the time animation. If @p saveImages is @p true,
+      image saving will be enabled.
+     */
+    void startTimeAnimationProgrammatically(bool saveImages=true);
+
 signals:
     /**
      Emitted before any of the synchronization signals below are emitted. Can
@@ -290,7 +294,12 @@ protected slots:
     void onAnimationLoopGroupChanged(QAction *action);
 
     void activateTimeAnimationImageSaving(bool activate);
-    void saveTimeAnimation();
+
+    /**
+      Emit signal so that connected scene view can save the current image.
+     */
+    void emitSaveImageSignal();
+
     void switchSelectedView(QString viewID);
 
     void changeSaveTADirectory();
@@ -328,8 +337,6 @@ private:
     void setTimeSynchronizationGUIEnabled(bool enabled);
 
     void setSynchronizationGUIEnabled(bool enabled);
-
-    void emitSaveImageSignal();
 
     void setAnimationTimeToStartTime(QDateTime startDateTime);
 
