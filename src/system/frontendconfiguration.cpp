@@ -804,6 +804,8 @@ void MFrontendConfiguration::initializeFrontendFromConfigFile(
             config.value("batchModeSychronizationName", "").toString();
     QString batchModeDataSource =
             config.value("useAnimationTimeRangeFromDataSource", "").toString();
+    bool batchModeQuitWhenCompleted =
+            config.value("batchModeQuitWhenCompleted", false).toBool();
 
     LOG4CPLUS_DEBUG(mlog, "initialising batch mode.");
     LOG4CPLUS_DEBUG(mlog, "  batch mode is "
@@ -814,11 +816,12 @@ void MFrontendConfiguration::initializeFrontendFromConfigFile(
                     << batchModeSychronizationName.toStdString());
     LOG4CPLUS_DEBUG(mlog, "  batch mode using time range from dataset: "
                     << batchModeDataSource.toStdString());
+    LOG4CPLUS_DEBUG(mlog, "  quit Met.3D when batch mode has completed: "
+                    << (batchModeQuitWhenCompleted ? "yes" : "no"));
 
-    sysMC->setBatchMode(batchModeFlag);
-    sysMC->setBatchModeAnimationType(batchModeAnimationType);
-    sysMC->setBatchModeSynchronizationControl(batchModeSychronizationName);
-    sysMC->setDataSourceForBatchModeAnimationTimeRange(batchModeDataSource);
+    sysMC->setBatchMode(batchModeFlag, batchModeAnimationType,
+                        batchModeSychronizationName, batchModeDataSource,
+                        batchModeQuitWhenCompleted);
 
     config.endGroup();
 

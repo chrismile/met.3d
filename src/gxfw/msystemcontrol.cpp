@@ -58,6 +58,7 @@ MSystemManagerAndControl::MSystemManagerAndControl(QWidget *parent) :
     met3dAppIsInitialized(false),
     connectedToMetview(false),
     batchModeIsActive(false),
+    batchModeQuitWhenCompleted(false),
     handleSize(.5),
     mainWindow(nullptr),
     naturalEarthDataLoader(nullptr)
@@ -575,34 +576,21 @@ MNaturalEarthDataLoader *MSystemManagerAndControl::getNaturalEarthDataLoader()
 }
 
 
-void MSystemManagerAndControl::setBatchMode(bool isActive)
+void MSystemManagerAndControl::setBatchMode(
+        bool isActive, QString animType, QString syncName, QString dataSrcName,
+        bool quitWhenCompleted)
 {
     batchModeIsActive = isActive;
+    batchModeAnimationType = animType;
+    syncControlForBatchModeAnimation = syncName;
+    dataSourceForBatchModeAnimationTimeRange = dataSrcName;
+    batchModeQuitWhenCompleted = quitWhenCompleted;
 }
 
 
 bool MSystemManagerAndControl::isInBatchMode()
 {
     return batchModeIsActive;
-}
-
-
-void MSystemManagerAndControl::setBatchModeAnimationType(QString animType)
-{
-    batchModeAnimationType = animType;
-}
-
-
-void MSystemManagerAndControl::setBatchModeSynchronizationControl(QString syncName)
-{
-    syncControlForBatchModeAnimation = syncName;
-}
-
-
-void MSystemManagerAndControl::setDataSourceForBatchModeAnimationTimeRange(
-        QString dataSrcName)
-{
-    dataSourceForBatchModeAnimationTimeRange = dataSrcName;
 }
 
 
@@ -646,6 +634,17 @@ void MSystemManagerAndControl::executeBatchMode()
     // implemented.
     if (batchModeAnimationType == "timeAnimation")
     {
+        // If configured so, connect the sync control's "timeAnimationEnds"
+        // signal to the "closeMainWindow" slot to automatically quit the
+        // application after the batch animation has finished. Use
+        // "Qt::QueuedConnection" as described here:
+        // https://doc.qt.io/qt-5/qcoreapplication.html#quit
+        if (batchModeQuitWhenCompleted)
+        {
+            connect(syncControl, SIGNAL(timeAnimationEnds()), this,
+                    SLOT(closeMainWindow()), Qt::QueuedConnection);
+        }
+
         // WORKAROUNG to avoid black images stored of first time step.
         // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         // NOTE: If this method is called from MMainWindow::show(), the data
@@ -703,6 +702,15 @@ void MSystemManagerAndControl::actOnQtPropertyChanged(QtProperty *property)
             sceneView->onHandleSizeChanged();
         }
     }
+}
+
+
+void MSystemManagerAndControl::closeMainWindow()
+{
+    LOG4CPLUS_DEBUG(mlog, "System manager received command to quit the "
+                    " application. Closing main window... ");
+
+    mainWindow->close();
 }
 
 

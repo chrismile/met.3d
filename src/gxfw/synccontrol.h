@@ -264,6 +264,10 @@ signals:
 
     void imageOfTimeAnimationReady(QString path, QString fileName);
 
+    void timeAnimationBegins();
+
+    void timeAnimationEnds();
+
 protected slots:
     void onValidDateTimeChange(const QDateTime &datetime);
 

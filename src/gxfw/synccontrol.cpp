@@ -1333,6 +1333,9 @@ void MSyncControl::startTimeAnimation()
             }
         }
 
+        // Emit the "timeAnimationBegins" signal.
+        emit timeAnimationBegins();
+
         // Save the current image (the next image will be stored after the next
         // synchronization event, triggered by the animationTimer, has
         // completed) UNLESS the previous synchronization request is still in
@@ -1361,6 +1364,9 @@ void MSyncControl::stopTimeAnimation()
     timeAnimationDropdownMenu->setEnabled(true);
     setTimeSynchronizationGUIEnabled(true);
     ui->animationStopButton->setEnabled(false);
+
+    // Emit the "timeAnimationEnds" signal.
+    emit timeAnimationEnds();
 }
 
 
