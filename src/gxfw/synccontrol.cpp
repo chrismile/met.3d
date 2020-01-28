@@ -584,11 +584,11 @@ void MSyncControl::setOverwriteAnimationImageSequence(bool overwrite)
 
 void MSyncControl::setAnimationTimeRange(int timeRange_sec)
 {
-    if (!availableInitDatetimes.empty())
+    if (!availableInitDateTimes.empty())
     {
-        timeAnimationFrom->setDateTime(availableInitDatetimes.at(0));
+        timeAnimationFrom->setDateTime(availableInitDateTimes.at(0));
         timeAnimationTo->setDateTime(
-                    availableInitDatetimes.at(0).addSecs(timeRange_sec));
+                    availableInitDateTimes.at(0).addSecs(timeRange_sec));
     }
 }
 
@@ -1122,9 +1122,10 @@ void MSyncControl::restrictToDataSourcesFromSettings(
 void MSyncControl::restrictControlToDataSources(
         QStringList selectedDataSources, bool resetInitValidToFirstAvailable)
 {
-
     MSystemManagerAndControl* sysMC = MSystemManagerAndControl::getInstance();
-    foreach (QAction *action, selectedDataSourceActionList)
+
+    // Clear GUI drop down menu displaying selected data sources.
+    for (QAction *action : selectedDataSourceActionList)
     {
         configurationDropdownMenu->removeAction(action);
     }
@@ -1134,11 +1135,12 @@ void MSyncControl::restrictControlToDataSources(
 // lists and contains since for version 4.8 there is no qHash method for QDateTime
 // and thus it is not possible to use toSet on QList<QDateTime>.
 // (See: http://doc.qt.io/qt-5/qhash.html#qHashx)
-    availableInitDatetimes.clear();
-    availableValidDatetimes.clear();
+    availableInitDateTimes.clear();
+    availableValidDateTimes.clear();
     availableEnsembleMembers.clear();
 
-    // Use all data sources if no data sources are given.
+    // If no list of data sources is passed to this function, use all data
+    // sources registered in the system.
     if (selectedDataSources.empty())
     {
         QStringList availableDataSources = sysMC->getDataSourceIdentifiers();
@@ -1146,7 +1148,7 @@ void MSyncControl::restrictControlToDataSources(
         // Check for each data sourcs if it is suitable to restrict control.
         // Since in the list of all data sources might be data sources without
         // time and member informations.
-        foreach (QString dataSourceID, availableDataSources)
+        for (QString dataSourceID : availableDataSources)
         {
             MWeatherPredictionDataSource* source =
                     dynamic_cast<MWeatherPredictionDataSource*>
@@ -1161,7 +1163,7 @@ void MSyncControl::restrictControlToDataSources(
         }
     }
 
-    // Return if no data sources are available.
+    // If no data sources are available return from this method.
     if (selectedDataSources.empty())
     {
         return;
@@ -1176,7 +1178,9 @@ void MSyncControl::restrictControlToDataSources(
 
     this->selectedDataSources = selectedDataSources;
 
-    foreach (QString dataSourceID, selectedDataSources)
+    // From each data source in the list, determine the available init and
+    // valid times.
+    for (QString dataSourceID : selectedDataSources)
     {
         MWeatherPredictionDataSource* source =
                 dynamic_cast<MWeatherPredictionDataSource*>
@@ -1187,55 +1191,50 @@ void MSyncControl::restrictControlToDataSources(
                     configurationDropdownMenu->addAction(dataSourceID));
 
         QList<MVerticalLevelType> levelTypes = source->availableLevelTypes();
-        for (int ilvl = 0; ilvl < levelTypes.size(); ilvl++)
+        for (MVerticalLevelType levelType : levelTypes)
         {
-            MVerticalLevelType levelType = levelTypes.at(ilvl);
-
             QStringList variables = source->availableVariables(levelType);
 
-            for (int ivar = 0; ivar < variables.size(); ivar++)
+            for (QString var : variables)
             {
-                QString var = variables.at(ivar);
-                currentInitTimes =
-                        source->availableInitTimes(levelType, var);
+                currentInitTimes = source->availableInitTimes(levelType, var);
+
                 if (currentInitTimes.empty())
                 {
                     continue;
                 }
 
-                for (int iInitTime = 0; iInitTime < currentInitTimes.size();
-                     iInitTime++)
+                for (QDateTime initTime : currentInitTimes)
                 {
-                    QDateTime initTime = currentInitTimes.at(iInitTime);
-                    if (!availableInitDatetimes.contains(initTime))
+                    if (!availableInitDateTimes.contains(initTime))
                     {
-                        availableInitDatetimes.append(initTime);
+                        availableInitDateTimes.append(initTime);
                     }
-                    currentValidTimes = source->availableValidTimes(levelType,
-                                                                    var,
-                                                                    initTime);
+
+                    currentValidTimes = source->availableValidTimes(
+                                levelType, var, initTime);
                     if (currentValidTimes.empty())
                     {
                         continue;
                     }
 
-                    for (int iValidTime = 0; iValidTime < currentValidTimes.size();
-                         iValidTime++)
+                    for (QDateTime validTime : currentValidTimes)
                     {
-                        QDateTime validTime = currentValidTimes[iValidTime];
-                        if (!availableValidDatetimes.contains(validTime))
+                        if (!availableValidDateTimes.contains(validTime))
                         {
-                            availableValidDatetimes.append(validTime);
+                            availableValidDateTimes.append(validTime);
                         }
                     } // validTimes
                 } // initTimes
+
                 availableEnsembleMembers =
                         availableEnsembleMembers.unite(
                             source->availableEnsembleMembers(levelType, var));
+
                 // Sort available times for finding the nearest time if the
                 // user selects a missing time.
-                qSort(availableInitDatetimes);
-                qSort(availableValidDatetimes);
+                qSort(availableInitDateTimes);
+                qSort(availableValidDateTimes);
             } // variables
         } // levelTypes
     } // dataSources
@@ -1245,43 +1244,44 @@ void MSyncControl::restrictControlToDataSources(
     QDateTime previousValidTime = ui->validTimeEdit->dateTime();
     int previousEnsembleMember = ensembleMember();
 
-    // Search for minimum and maximum date values to restrict the time edits to
-    // them respectively.
-    QDateTime minTime = availableInitDatetimes.first();
-    QDateTime maxTime = minTime;
-    foreach (QDateTime time, availableInitDatetimes)
+    // Search for earliest and latest init date values to restrict the init
+    // time edits to them.
+    QDateTime earliestDateTime = availableInitDateTimes.first();
+    QDateTime latestDateTime = earliestDateTime;
+    foreach (QDateTime dateTime, availableInitDateTimes)
     {
-        minTime = min(time, minTime);
-        maxTime = max(time, maxTime);
+        earliestDateTime = min(dateTime, earliestDateTime);
+        latestDateTime = max(dateTime, latestDateTime);
     }
-    ui->initTimeEdit->setDateRange(minTime.date(), maxTime.date());
+    ui->initTimeEdit->setDateRange(earliestDateTime.date(), latestDateTime.date());
     // Set time range to full day since otherwise it is not possible to change
     // the time properly for the first and last day of the range.
     ui->initTimeEdit->setTimeRange(QTime(0,0,0), QTime(23,59,59));
-    lastInitDatetime = minTime;
+    lastInitDatetime = earliestDateTime;
 
-    minTime = availableValidDatetimes.first();
-    maxTime = minTime;
-    foreach (QDateTime time, availableValidDatetimes)
+    // The same for valid times.
+    earliestDateTime = availableValidDateTimes.first();
+    latestDateTime = earliestDateTime;
+    foreach (QDateTime dateTime, availableValidDateTimes)
     {
-        minTime = min(time, minTime);
-        maxTime = max(time, maxTime);
+        earliestDateTime = min(dateTime, earliestDateTime);
+        latestDateTime = max(dateTime, latestDateTime);
     }
-    ui->validTimeEdit->setDateRange(minTime.date(), maxTime.date());
+    ui->validTimeEdit->setDateRange(earliestDateTime.date(), latestDateTime.date());
     // Set time range to full day since otherwise it is not possible to change
     // the time properly for the first and last day of the range.
     ui->validTimeEdit->setTimeRange(QTime(0,0,0), QTime(23,59,59));
-    lastValidDatetime = minTime;
+    lastValidDatetime = earliestDateTime;
 
     // Check if previous init/valid times are still in new range of available
     // times -- if not, reset to first available init/valid time. Also reset
     // to first available if "resetInitValidToFirstAvailable" is true.
-    if (!availableInitDatetimes.contains(previousInitTime)
+    if (!availableInitDateTimes.contains(previousInitTime)
             || resetInitValidToFirstAvailable)
     {
        ui->initTimeEdit->setDateTime(lastInitDatetime);
     }
-    if (!availableValidDatetimes.contains(previousValidTime)
+    if (!availableValidDateTimes.contains(previousValidTime)
             || resetInitValidToFirstAvailable)
     {
        ui->validTimeEdit->setDateTime(lastValidDatetime);
@@ -1296,7 +1296,7 @@ void MSyncControl::restrictControlToDataSources(
     // value.
     intMemberList = availableEnsembleMembers.toList();
     qSort(intMemberList);
-    foreach (unsigned int member, intMemberList)
+    for (unsigned int member : intMemberList)
     {
         memberList.append(QString("%1").arg(member));
     }
@@ -1305,7 +1305,7 @@ void MSyncControl::restrictControlToDataSources(
     setEnsembleMember(previousEnsembleMember);
 
     // Disable all data source entries since they are supposed to be just labels.
-    foreach (QAction *action, selectedDataSourceActionList)
+    for (QAction *action : selectedDataSourceActionList)
     {
         action->setEnabled(false);
     }
@@ -1418,7 +1418,7 @@ void MSyncControl::startTimeAnimationProgrammatically(bool saveImages)
 void MSyncControl::onValidDateTimeChange(const QDateTime &datetime)
 {
     // Only restrict valid time to available valid if times they are set yet.
-    if (!availableValidDatetimes.empty())
+    if (!availableValidDateTimes.empty())
     {
         // Reseting to previous time - do nothing.
         if (lastValidDatetime == datetime)
@@ -1427,9 +1427,9 @@ void MSyncControl::onValidDateTimeChange(const QDateTime &datetime)
         }
         // Check if selected time is part of available times. If not, reset to
         // previous time.
-        if (!availableValidDatetimes.contains(datetime))
+        if (!availableValidDateTimes.contains(datetime))
         {
-            handleMissingDateTime(ui->validTimeEdit, &availableValidDatetimes,
+            handleMissingDateTime(ui->validTimeEdit, &availableValidDateTimes,
                                   datetime, &lastValidDatetime);
             return;
         }
@@ -1479,7 +1479,7 @@ void MSyncControl::onValidDateTimeChange(const QDateTime &datetime)
 void MSyncControl::onInitDateTimeChange(const QDateTime &datetime)
 {
     // Only restrict init time to available init times if they are set yet.
-    if (!availableInitDatetimes.empty())
+    if (!availableInitDateTimes.empty())
     {
         // Reseting to previous time - do nothing.
         if (lastInitDatetime == datetime)
@@ -1494,9 +1494,9 @@ void MSyncControl::onInitDateTimeChange(const QDateTime &datetime)
         }
         // Check if selected time is part of available times. If not, reset to
         // previous time.
-        if (!availableInitDatetimes.contains(datetime))
+        if (!availableInitDateTimes.contains(datetime))
         {
-            handleMissingDateTime(ui->initTimeEdit, &availableInitDatetimes,
+            handleMissingDateTime(ui->initTimeEdit, &availableInitDateTimes,
                                   datetime, &lastInitDatetime);
             return;
         }

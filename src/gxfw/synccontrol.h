@@ -426,8 +426,8 @@ private:
     QAction *selectDataSourcesAction;
     QDateTime lastInitDatetime;
     QDateTime lastValidDatetime;
-    QList<QDateTime> availableInitDatetimes;
-    QList<QDateTime> availableValidDatetimes;
+    QList<QDateTime> availableInitDateTimes;
+    QList<QDateTime> availableValidDateTimes;
     QSet<unsigned int> availableEnsembleMembers;
     QList<QAction*> selectedDataSourceActionList;
     QStringList selectedDataSources;
