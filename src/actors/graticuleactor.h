@@ -87,6 +87,10 @@ public:
 
     void onBoundingBoxChanged() override;
 
+    float computeDistanceBetween2DVectors(QVector2D p1, QVector2D p2);
+    int reorganizeGroupWithUnevenPointSpacing(int global_max_group, QVector<QVector2D> verticesVector);
+    void checkDistanceViolationInPointSpacing( QVector<QVector2D> verticesVector );
+
 protected:
     /**
       Loads the shader programs and generates the graticule geometry. The
@@ -173,6 +177,10 @@ private:
     // program crash.
     bool coastLinesCountIsValid;
     bool borderLinesCountIsValid;
+
+    // To store the maximum distance between two successive points
+    // in each group
+    QVector<float> group_max_distance;
 };
 
 

@@ -1050,6 +1050,12 @@ void MGraticuleActor::generateGeometry()
                                &coastlineStartIndices, &coastlineVertexCount);
     }
 
+    // As long as there exists a group with max. distance between two
+    // successive points greater than 10.0 (delta lon in graticule)
+    // keep subdividing the group and adding new groups.
+    // This check was neeeded to avoid large jumps
+    checkDistanceViolationInPointSpacing( verticesCoastlines );
+
     const QString coastRequestKey = "graticule_coastlines_actor#"
                                     + QString::number(getID());
     uploadVec2ToVertexBuffer(verticesCoastlines, coastRequestKey,
@@ -1118,6 +1124,117 @@ void MGraticuleActor::generateGeometry()
             break;
         }
     }
+}
+
+
+int MGraticuleActor::reorganizeGroupWithUnevenPointSpacing(int global_max_group, QVector<QVector2D> verticesVector)
+{
+    int original_group_start_index = coastlineStartIndices[global_max_group];
+    int original_group_count = coastlineVertexCount[global_max_group];
+
+    float reference_distance=10.0f; // chosen because that's the  delta lon in graticule
+    float previous_max_distance=-999.9f;// To begin with
+
+    int original_group_end_index = original_group_start_index + original_group_count - 1;
+
+    int new_group_start_index = original_group_start_index; // To begin with
+    int current_group=global_max_group;// To begin with
+
+    int new_group =global_max_group + 1; // To begin with
+    bool is_new_group = false; // To begin with
+    int new_group_count = 0;
+
+    for (int i = new_group_start_index;i<original_group_end_index;i++)
+    {
+        float dist = computeDistanceBetween2DVectors( verticesVector[i],verticesVector[i+1] );
+        if(is_new_group)
+        {
+           if(dist >group_max_distance[current_group])
+               group_max_distance.replace(current_group,dist);
+        }
+        if(dist > reference_distance)
+        {
+            // Check for dangling point, a point which is far from
+            // both the neighbours, raise a warning and stop
+            if( previous_max_distance < 0.0f )
+            {
+                QMessageBox msgBox;
+                msgBox.setIcon(QMessageBox::Warning);
+                msgBox.setWindowTitle("Error");
+                msgBox.setText( "Dangling point encountered\n" );
+                msgBox.exec();
+            }
+
+            // Update the current group max. distance
+            group_max_distance.replace(current_group,previous_max_distance);
+
+            // Update the current group coastlineVertexCount to 'i'
+            coastlineVertexCount.replace(current_group,i-new_group_start_index+1);
+
+            // Update the coastlineStartIndices array by inserting
+            // a 'new group' starting at index 'i+1'
+            coastlineStartIndices.insert(new_group,i+1);
+
+            // Initialize the 'new group' group_max_distance as 0.0f
+            group_max_distance.insert(new_group,0.0f);
+
+            // Update the coastlineVertexCount array by inserting
+            // a 'new group' with count by dedecuting index '(i-new_start_index+1)'
+            // from the original count
+            coastlineVertexCount.insert(new_group,original_group_count-(i-new_group_start_index+1));
+
+            current_group=new_group;
+            new_group+= 1;
+            new_group_start_index = i+1;
+            is_new_group = true;
+            new_group_count++;
+        }
+        previous_max_distance=dist;
+    }
+    return  new_group_count;
+}
+
+
+void MGraticuleActor::checkDistanceViolationInPointSpacing( QVector<QVector2D> verticesVector )
+{
+    int total_groups = coastlineStartIndices.count();//To being with
+    float global_max_limit=10.0f;// chosen because that's the  delta lon in graticule
+    int global_max_distance_group_index = -1;//To begin with
+    int count_of_new_groups =0;// To begin with
+
+    group_max_distance.clear();
+    for (int i = 0; i< total_groups; i++)
+    {
+
+        int group_start_index = coastlineStartIndices[i];
+        int group_end_index = coastlineStartIndices[i]+coastlineVertexCount[i]-1;
+        float max_dist=-9999.9999f;//To begin with,a large negative distance
+
+        for (int j=group_start_index; j<group_end_index; j++)
+        {
+
+            float dist = computeDistanceBetween2DVectors( verticesVector[j],
+                                          verticesVector[j+1] );
+            if( dist > max_dist)
+                max_dist = dist;
+        }
+        group_max_distance.append(max_dist);
+
+        if(max_dist > global_max_limit)
+        {
+            global_max_distance_group_index = i;
+            count_of_new_groups = reorganizeGroupWithUnevenPointSpacing(global_max_distance_group_index, verticesVector);
+            total_groups = coastlineVertexCount.count();
+            i=i+count_of_new_groups;
+        }
+    }
+    return;
+}
+
+
+float MGraticuleActor::computeDistanceBetween2DVectors(QVector2D p1, QVector2D p2)
+{
+    return ( p1.distanceToPoint(p2));
 }
 
 
