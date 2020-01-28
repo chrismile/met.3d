@@ -314,8 +314,9 @@ protected slots:
 
     void switchSelectedView(QString viewID);
 
-    void changeSaveTADirectory();
-    void adjustSaveTADirLabelText();
+    void changeSaveAnimationDirectory();
+
+    void adjustSaveAnimationDirectoryLabelText();
 
 private:
     /**
@@ -364,7 +365,7 @@ private:
 
     // Properties to control time animations.
     QMenu *timeAnimationDropdownMenu;
-    QSpinBox *timeAnimationTimeStepSpinBox;
+    QSpinBox *timeAnimationDelaySpinBox;
     QWidget *timeAnimationFromWidget;
     QWidget *timeAnimationToWidget;
     QHBoxLayout *timeAnimationFromLayout;
@@ -383,13 +384,13 @@ private:
     QTimer *animationTimer;
 
     // Properties to control saving of images of time serie.
-    QCheckBox          *saveTimeAnimationCheckBox;
-    QLineEdit          *saveTAFileNameLineEdit;
-    QComboBox          *saveTAFileExtensionComboBox;
-    QLabel             *saveTADirectoryLabel;
-    QPushButton        *saveTADirectoryChangeButton;
-    QComboBox          *saveTASceneViewsComboBox;
-    MSceneViewGLWidget *saveTASceneView;
+    QCheckBox *saveAnimationImagesCheckBox;
+    QLineEdit *saveAnimationFileNameLineEdit;
+    QComboBox *saveAnimationFileExtensionComboBox;
+    QLabel *saveAnimationDirectoryLabel;
+    QPushButton *saveAnimationDirectoryChangeButton;
+    QComboBox *saveAnimationSceneViewsComboBox;
+    MSceneViewGLWidget *saveAnimationSceneView;
     bool overwriteAnimationImageSequence;
 
     QString syncID;
