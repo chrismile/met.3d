@@ -191,7 +191,8 @@ public:
     { return &defaultMemoryManagers; }
 
     void setBatchMode(bool isActive, QString animType, QString syncName,
-                      QString dataSrcName, bool quitWhenCompleted);
+                      QString dataSrcName, bool quitWhenCompleted,
+                      bool overwriteImages);
 
     bool isInBatchMode();
 
@@ -248,6 +249,7 @@ private:
     QString syncControlForBatchModeAnimation;
     QString dataSourceForBatchModeAnimationTimeRange;
     bool batchModeQuitWhenCompleted;
+    bool batchModeOverwriteImages;
 
     QStringList commandLineArguments;
     QDir met3DHomeDir;

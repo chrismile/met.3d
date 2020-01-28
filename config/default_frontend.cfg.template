@@ -220,3 +220,5 @@ batchModeSychronizationName=Synchronization
 useAnimationTimeRangeFromDataSource=
 # Tell the application to quit after the animation has completed?
 batchModeQuitWhenCompleted=true
+# Overwrite image files if already present?
+overwriteExistingImageFiles=true

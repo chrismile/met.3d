@@ -59,6 +59,7 @@ MSystemManagerAndControl::MSystemManagerAndControl(QWidget *parent) :
     connectedToMetview(false),
     batchModeIsActive(false),
     batchModeQuitWhenCompleted(false),
+    batchModeOverwriteImages(true),
     handleSize(.5),
     mainWindow(nullptr),
     naturalEarthDataLoader(nullptr)
@@ -578,13 +579,14 @@ MNaturalEarthDataLoader *MSystemManagerAndControl::getNaturalEarthDataLoader()
 
 void MSystemManagerAndControl::setBatchMode(
         bool isActive, QString animType, QString syncName, QString dataSrcName,
-        bool quitWhenCompleted)
+        bool quitWhenCompleted, bool overwriteImages)
 {
     batchModeIsActive = isActive;
     batchModeAnimationType = animType;
     syncControlForBatchModeAnimation = syncName;
     dataSourceForBatchModeAnimationTimeRange = dataSrcName;
     batchModeQuitWhenCompleted = quitWhenCompleted;
+    batchModeOverwriteImages = overwriteImages;
 }
 
 
@@ -644,6 +646,9 @@ void MSystemManagerAndControl::executeBatchMode()
             connect(syncControl, SIGNAL(timeAnimationEnds()), this,
                     SLOT(closeMainWindow()), Qt::QueuedConnection);
         }
+
+        // Force to overwrite image files that already exist?
+        syncControl->setOverwriteAnimationImageSequence(batchModeOverwriteImages);
 
         // WORKAROUNG to avoid black images stored of first time step.
         // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

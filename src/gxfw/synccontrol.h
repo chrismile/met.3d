@@ -145,6 +145,12 @@ public:
      */
     unsigned int getAnimationDelay_ms();
 
+    /**
+      Enable/disable whether images written to disk in animation mode should
+      automatically be overwritten in case the files already exist.
+     */
+    void setOverwriteAnimationImageSequence(bool overwrite);
+
 public slots:
     /**
       Advance scene time by the value specified in @p ui->timeStepSpinBox and
@@ -297,6 +303,8 @@ protected slots:
 
     void onAnimationLoopGroupChanged(QAction *action);
 
+    MSceneViewGLWidget* getSceneViewChosenInAnimationPane();
+
     void activateTimeAnimationImageSaving(bool activate);
 
     /**
@@ -382,6 +390,7 @@ private:
     QPushButton        *saveTADirectoryChangeButton;
     QComboBox          *saveTASceneViewsComboBox;
     MSceneViewGLWidget *saveTASceneView;
+    bool overwriteAnimationImageSequence;
 
     QString syncID;
 

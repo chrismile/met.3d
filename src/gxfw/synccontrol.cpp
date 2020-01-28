@@ -82,6 +82,7 @@ MLabelledWidgetAction::MLabelledWidgetAction(
 MSyncControl::MSyncControl(QString id, QWidget *parent) :
     QWidget(parent),
     ui(new Ui::MSyncControl),
+    overwriteAnimationImageSequence(false),
     syncID(id),
     synchronizationInProgress(false),
     forwardBackwardButtonClicked(false),
@@ -568,6 +569,12 @@ void MSyncControl::disconnectSynchronizedObjects()
 unsigned int MSyncControl::getAnimationDelay_ms()
 {
     return timeAnimationTimeStepSpinBox->value();
+}
+
+
+void MSyncControl::setOverwriteAnimationImageSequence(bool overwrite)
+{
+    overwriteAnimationImageSequence = overwrite;
 }
 
 
@@ -1333,6 +1340,11 @@ void MSyncControl::startTimeAnimation()
             }
         }
 
+        // Pass to scene view that generates animation images: Force to
+        // overwrite images in case files already exist?
+        getSceneViewChosenInAnimationPane()->setOverwriteImageSerie(
+                    overwriteAnimationImageSequence);
+
         // Emit the "timeAnimationBegins" signal.
         emit timeAnimationBegins();
 
@@ -1364,6 +1376,9 @@ void MSyncControl::stopTimeAnimation()
     timeAnimationDropdownMenu->setEnabled(true);
     setTimeSynchronizationGUIEnabled(true);
     ui->animationStopButton->setEnabled(false);
+
+    // Reset option to overwrite existing images.
+    getSceneViewChosenInAnimationPane()->setOverwriteImageSerie(false);
 
     // Emit the "timeAnimationEnds" signal.
     emit timeAnimationEnds();
@@ -1569,6 +1584,24 @@ void MSyncControl::onAnimationLoopGroupChanged(QAction *action)
         }
         saveTimeAnimationCheckBox->setEnabled(false);
     }
+}
+
+
+MSceneViewGLWidget* MSyncControl::getSceneViewChosenInAnimationPane()
+{
+    unsigned int sceneViewID =
+            saveTASceneViewsComboBox->currentText().split("#").at(1).toUInt();
+
+    MSceneViewGLWidget *sView = nullptr;
+    foreach (sView, MSystemManagerAndControl::getInstance()->getRegisteredViews())
+    {
+        if (sView->getID() + 1 == sceneViewID)
+        {
+            break;
+        }
+    }
+
+    return sView;
 }
 
 

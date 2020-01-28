@@ -806,6 +806,8 @@ void MFrontendConfiguration::initializeFrontendFromConfigFile(
             config.value("useAnimationTimeRangeFromDataSource", "").toString();
     bool batchModeQuitWhenCompleted =
             config.value("batchModeQuitWhenCompleted", false).toBool();
+    bool batchModeOverwriteImages =
+            config.value("overwriteExistingImageFiles", false).toBool();
 
     LOG4CPLUS_DEBUG(mlog, "initialising batch mode.");
     LOG4CPLUS_DEBUG(mlog, "  batch mode is "
@@ -818,10 +820,12 @@ void MFrontendConfiguration::initializeFrontendFromConfigFile(
                     << batchModeDataSource.toStdString());
     LOG4CPLUS_DEBUG(mlog, "  quit Met.3D when batch mode has completed: "
                     << (batchModeQuitWhenCompleted ? "yes" : "no"));
+    LOG4CPLUS_DEBUG(mlog, "  overwrite image files if already present: "
+                    << (batchModeOverwriteImages ? "yes" : "no"));
 
     sysMC->setBatchMode(batchModeFlag, batchModeAnimationType,
                         batchModeSychronizationName, batchModeDataSource,
-                        batchModeQuitWhenCompleted);
+                        batchModeQuitWhenCompleted, batchModeOverwriteImages);
 
     config.endGroup();
 
