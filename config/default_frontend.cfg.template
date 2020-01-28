@@ -215,9 +215,12 @@ runInBatchMode=false
 batchModeAnimationType=timeAnimation
 # Specify the name of the sync control to be used for the animation.
 batchModeSychronizationName=Synchronization
-# Specify the name of the data source from whose init/valid times imagary
-# shall be produced.
-useAnimationTimeRangeFromDataSource=
+# Start the animation at the first available init time of the specified
+# data source, then advance the animation until the start time plus the
+# specified number of seconds has been reached. For example, to create
+# imagery in the range (init time .. +120hours) specify 120*3600s = 432000 sec.
+startAnimationAtFirstInitTimeOfDataSource=ECMWF ENS ENSFilter
+animationTimeRangeSeconds=+432000
 # Tell the application to quit after the animation has completed?
 batchModeQuitWhenCompleted=true
 # Overwrite image files if already present?

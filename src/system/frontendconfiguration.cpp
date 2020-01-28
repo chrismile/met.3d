@@ -802,8 +802,10 @@ void MFrontendConfiguration::initializeFrontendFromConfigFile(
             config.value("batchModeAnimationType", "").toString();
     QString batchModeSychronizationName =
             config.value("batchModeSychronizationName", "").toString();
-    QString batchModeDataSource =
-            config.value("useAnimationTimeRangeFromDataSource", "").toString();
+    QString batchModeAnimationStartTimeDataSource =
+            config.value("startAnimationAtFirstInitTimeOfDataSource", "").toString();
+    int batchModeAnimationTimeRange_sec =
+            config.value("animationTimeRangeSeconds", 0).toInt();
     bool batchModeQuitWhenCompleted =
             config.value("batchModeQuitWhenCompleted", false).toBool();
     bool batchModeOverwriteImages =
@@ -816,15 +818,20 @@ void MFrontendConfiguration::initializeFrontendFromConfigFile(
                     << batchModeAnimationType.toStdString());
     LOG4CPLUS_DEBUG(mlog, "  batch mode using sync control: "
                     << batchModeSychronizationName.toStdString());
-    LOG4CPLUS_DEBUG(mlog, "  batch mode using time range from dataset: "
-                    << batchModeDataSource.toStdString());
+    LOG4CPLUS_DEBUG(mlog, "  batch mode animation starts at first available "
+                          "init time of data source "
+                    << batchModeAnimationStartTimeDataSource.toStdString()
+                    << " and stops after "
+                    << batchModeAnimationTimeRange_sec << " seconds");
     LOG4CPLUS_DEBUG(mlog, "  quit Met.3D when batch mode has completed: "
                     << (batchModeQuitWhenCompleted ? "yes" : "no"));
     LOG4CPLUS_DEBUG(mlog, "  overwrite image files if already present: "
                     << (batchModeOverwriteImages ? "yes" : "no"));
 
     sysMC->setBatchMode(batchModeFlag, batchModeAnimationType,
-                        batchModeSychronizationName, batchModeDataSource,
+                        batchModeSychronizationName,
+                        batchModeAnimationStartTimeDataSource,
+                        batchModeAnimationTimeRange_sec,
                         batchModeQuitWhenCompleted, batchModeOverwriteImages);
 
     config.endGroup();

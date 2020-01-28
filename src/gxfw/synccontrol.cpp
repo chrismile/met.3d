@@ -582,6 +582,17 @@ void MSyncControl::setOverwriteAnimationImageSequence(bool overwrite)
 }
 
 
+void MSyncControl::setAnimationTimeRange(int timeRange_sec)
+{
+    if (!availableInitDatetimes.empty())
+    {
+        timeAnimationFrom->setDateTime(availableInitDatetimes.at(0));
+        timeAnimationTo->setDateTime(
+                    availableInitDatetimes.at(0).addSecs(timeRange_sec));
+    }
+}
+
+
 /******************************************************************************
 ***                             PUBLIC SLOTS                                ***
 *******************************************************************************/
@@ -1108,7 +1119,8 @@ void MSyncControl::restrictToDataSourcesFromSettings(
 }
 
 
-void MSyncControl::restrictControlToDataSources(QStringList selectedDataSources)
+void MSyncControl::restrictControlToDataSources(
+        QStringList selectedDataSources, bool resetInitValidToFirstAvailable)
 {
 
     MSystemManagerAndControl* sysMC = MSystemManagerAndControl::getInstance();
@@ -1247,6 +1259,7 @@ void MSyncControl::restrictControlToDataSources(QStringList selectedDataSources)
     // the time properly for the first and last day of the range.
     ui->initTimeEdit->setTimeRange(QTime(0,0,0), QTime(23,59,59));
     lastInitDatetime = minTime;
+
     minTime = availableValidDatetimes.first();
     maxTime = minTime;
     foreach (QDateTime time, availableValidDatetimes)
@@ -1261,12 +1274,15 @@ void MSyncControl::restrictControlToDataSources(QStringList selectedDataSources)
     lastValidDatetime = minTime;
 
     // Check if previous init/valid times are still in new range of available
-    // times -- if not, reset to first available init/valid time.
-    if (!availableInitDatetimes.contains(previousInitTime))
+    // times -- if not, reset to first available init/valid time. Also reset
+    // to first available if "resetInitValidToFirstAvailable" is true.
+    if (!availableInitDatetimes.contains(previousInitTime)
+            || resetInitValidToFirstAvailable)
     {
        ui->initTimeEdit->setDateTime(lastInitDatetime);
     }
-    if (!availableValidDatetimes.contains(previousValidTime))
+    if (!availableValidDatetimes.contains(previousValidTime)
+            || resetInitValidToFirstAvailable)
     {
        ui->validTimeEdit->setDateTime(lastValidDatetime);
     }
@@ -1331,6 +1347,7 @@ void MSyncControl::startTimeAnimation()
         timeAnimationDropdownMenu->setEnabled(false);
         setTimeSynchronizationGUIEnabled(false);
 
+        // Set the init/valid datetime edits to the animation start time.
         if (timeAnimationLoopGroup->checkedAction()
                 == timeAnimationSinglePassAction)
         {

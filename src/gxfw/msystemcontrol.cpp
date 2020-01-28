@@ -58,6 +58,7 @@ MSystemManagerAndControl::MSystemManagerAndControl(QWidget *parent) :
     met3dAppIsInitialized(false),
     connectedToMetview(false),
     batchModeIsActive(false),
+    batchModeTimeRange_sec(0),
     batchModeQuitWhenCompleted(false),
     batchModeOverwriteImages(true),
     handleSize(.5),
@@ -577,14 +578,15 @@ MNaturalEarthDataLoader *MSystemManagerAndControl::getNaturalEarthDataLoader()
 }
 
 
-void MSystemManagerAndControl::setBatchMode(
-        bool isActive, QString animType, QString syncName, QString dataSrcName,
+void MSystemManagerAndControl::setBatchMode(bool isActive, QString animType, QString syncName,
+        QString dataSourceIDForStartTime, int timeRange_sec,
         bool quitWhenCompleted, bool overwriteImages)
 {
     batchModeIsActive = isActive;
     batchModeAnimationType = animType;
     syncControlForBatchModeAnimation = syncName;
-    dataSourceForBatchModeAnimationTimeRange = dataSrcName;
+    batchModeDataSourceIDToGetStartTime = dataSourceIDForStartTime;
+    batchModeTimeRange_sec = timeRange_sec;
     batchModeQuitWhenCompleted = quitWhenCompleted;
     batchModeOverwriteImages = overwriteImages;
 }
@@ -614,12 +616,12 @@ void MSystemManagerAndControl::executeBatchMode()
         return;
     }
 
-    if (getDataSource(dataSourceForBatchModeAnimationTimeRange) == nullptr)
+    if (getDataSource(batchModeDataSourceIDToGetStartTime) == nullptr)
     {
         QMessageBox msgBox;
         msgBox.setIcon(QMessageBox::Warning);
         msgBox.setText("Batch mode execution: Data source '"
-                       + dataSourceForBatchModeAnimationTimeRange +
+                       + batchModeDataSourceIDToGetStartTime +
                        "' specified in frontend configuration is not available. "
                        "Batch mode will NOT be executed.");
         msgBox.exec();
@@ -627,10 +629,14 @@ void MSystemManagerAndControl::executeBatchMode()
     }
 
     // Restrict the sync control's allowed init/valid time to those available
-    // from the data source.
+    // from the data source. Also reset the init/valid time GUI elements to
+    // the first available init/valid time of the data source (the second
+    // "true" argument), and set the animation time range to the specified
+    // value in seconds.
     QStringList dataSources;
-    dataSources.append(dataSourceForBatchModeAnimationTimeRange);
-    syncControl->restrictControlToDataSources(dataSources);
+    dataSources.append(batchModeDataSourceIDToGetStartTime);
+    syncControl->restrictControlToDataSources(dataSources, true);
+    syncControl->setAnimationTimeRange(batchModeTimeRange_sec);
 
     // W.r.t. animation type, currently only the 'timeAnimation' option is
     // implemented.

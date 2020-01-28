@@ -191,8 +191,8 @@ public:
     { return &defaultMemoryManagers; }
 
     void setBatchMode(bool isActive, QString animType, QString syncName,
-                      QString dataSrcName, bool quitWhenCompleted,
-                      bool overwriteImages);
+                      QString dataSourceIDForStartTime, int timeRange_sec,
+                      bool quitWhenCompleted, bool overwriteImages);
 
     bool isInBatchMode();
 
@@ -247,7 +247,8 @@ private:
     bool batchModeIsActive;
     QString batchModeAnimationType;
     QString syncControlForBatchModeAnimation;
-    QString dataSourceForBatchModeAnimationTimeRange;
+    QString batchModeDataSourceIDToGetStartTime;
+    int batchModeTimeRange_sec;
     bool batchModeQuitWhenCompleted;
     bool batchModeOverwriteImages;
 

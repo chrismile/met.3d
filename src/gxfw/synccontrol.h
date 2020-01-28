@@ -151,6 +151,14 @@ public:
      */
     void setOverwriteAnimationImageSequence(bool overwrite);
 
+    /**
+      Sets the "begin"/"end" animation GUI elements in the animation pane
+      to the first init time in the current list of available init times,
+      and to this time plus the given time range in seconds specified in
+      @p timeRange_sec.
+     */
+    void setAnimationTimeRange(int timeRange_sec);
+
 public slots:
     /**
       Advance scene time by the value specified in @p ui->timeStepSpinBox and
@@ -214,9 +222,14 @@ public slots:
       members. But if loadDataSourcesTimesAndMembers uses all available data
       sources, it checks whether they contain init times, valid times and
       ensemble members and quits quietly if no suitable data source was found.
+
+      If @p resetInitValidToFirstAvailable is @p true, the sync control's init
+      and valid datetime-edits will be reset to the first available init and
+      valid times in the list of allowed times generated from the data sources.
      */
     void restrictControlToDataSources(
-            QStringList selectedDataSources = QStringList());
+            QStringList selectedDataSources=QStringList(),
+            bool resetInitValidToFirstAvailable=false);
 
     /**
       Advance time (forward or backward, depending on settings) in animation
