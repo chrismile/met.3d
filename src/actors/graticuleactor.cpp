@@ -1048,13 +1048,14 @@ void MGraticuleActor::generateGeometry()
         loadCyclicLineGeometry(MNaturalEarthDataLoader::COASTLINES,
                                cornerRect, &verticesCoastlines,
                                &coastlineStartIndices, &coastlineVertexCount);
+
+        // As long as there exists a group with max. distance between two
+        // successive points greater than 10.0 (delta lon in graticule)
+        // keep subdividing the group and adding new groups.
+        // This check was neeeded to avoid large jumps
+        checkDistanceViolationInPointSpacing( verticesCoastlines );
     }
 
-    // As long as there exists a group with max. distance between two
-    // successive points greater than 10.0 (delta lon in graticule)
-    // keep subdividing the group and adding new groups.
-    // This check was neeeded to avoid large jumps
-    checkDistanceViolationInPointSpacing( verticesCoastlines );
 
     const QString coastRequestKey = "graticule_coastlines_actor#"
                                     + QString::number(getID());
