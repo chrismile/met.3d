@@ -374,6 +374,12 @@ private:
      */
     void debugOutputSyncStatus(QString callPoint);
 
+    bool animationIsActiveAndForwardDateTimeLimitHasBeenReached(
+            QDateTimeEdit *dateTimeEdit);
+
+    bool animationIsActiveAndBackwardDateTimeLimitHasBeenReached(
+            QDateTimeEdit *dateTimeEdit);
+
     Ui::MSyncControl *ui;
 
     // Properties to control time animations.

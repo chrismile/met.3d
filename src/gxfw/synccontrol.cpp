@@ -597,6 +597,62 @@ void MSyncControl::setAnimationTimeRange(int timeRange_sec)
 ***                             PUBLIC SLOTS                                ***
 *******************************************************************************/
 
+bool MSyncControl::animationIsActiveAndForwardDateTimeLimitHasBeenReached(
+        QDateTimeEdit* dateTimeEdit)
+{
+    if (animationTimer->isActive())
+    {
+        if (dateTimeEdit->dateTime() >= timeAnimationTo->dateTime())
+        {
+            if (timeAnimationLoopTimeAction->isChecked())
+            {
+                dateTimeEdit->setDateTime(timeAnimationFrom->dateTime());
+            }
+            else if (timeAnimationBackForthTimeAction->isChecked())
+            {
+                timeAnimationReverseTimeDirectionAction->toggle();
+            }
+            else
+            {
+                stopTimeAnimation();
+            }
+
+            return true;
+        }
+    }
+
+    return false;
+}
+
+
+bool MSyncControl::animationIsActiveAndBackwardDateTimeLimitHasBeenReached(
+        QDateTimeEdit* dateTimeEdit)
+{
+    if (animationTimer->isActive())
+    {
+        if (dateTimeEdit->dateTime() <= timeAnimationFrom->dateTime())
+        {
+            if (timeAnimationLoopTimeAction->isChecked())
+            {
+                dateTimeEdit->setDateTime(timeAnimationTo->dateTime());
+            }
+            else if (timeAnimationBackForthTimeAction->isChecked())
+            {
+                timeAnimationReverseTimeDirectionAction->toggle();
+            }
+            else
+            {
+                stopTimeAnimation();
+            }
+
+            return true;
+        }
+    }
+
+    return false;
+}
+
+
 void MSyncControl::timeForward()
 {
     if (ui->stepChooseVTITComboBox->currentIndex() == 0)
@@ -604,18 +660,11 @@ void MSyncControl::timeForward()
         // Index 0 of stepChooseVTITComboBox means that the valid time should
         // be modified by the time navigation buttons.
 
-        if ( animationTimer->isActive() )
-            if (ui->validTimeEdit->dateTime() >= timeAnimationTo->dateTime() )
-            {
-                if ( timeAnimationLoopTimeAction->isChecked() )
-                    ui->validTimeEdit->setDateTime(timeAnimationFrom->dateTime());
-                else if ( timeAnimationBackForthTimeAction->isChecked() )
-                    timeAnimationReverseTimeDirectionAction->toggle();
-                else
-                    stopTimeAnimation();
-
-                return;
-            }
+        if (animationIsActiveAndForwardDateTimeLimitHasBeenReached(
+                    ui->validTimeEdit))
+        {
+            return;
+        }
 
         applyTimeStep(ui->validTimeEdit, 1);
     }
@@ -623,18 +672,11 @@ void MSyncControl::timeForward()
     {
         // Modify initialisation time.
 
-        if ( animationTimer->isActive() )
-            if (ui->initTimeEdit->dateTime() >= timeAnimationTo->dateTime() )
-            {
-                if ( timeAnimationLoopTimeAction->isChecked() )
-                    ui->initTimeEdit->setDateTime(timeAnimationFrom->dateTime());
-                else if ( timeAnimationBackForthTimeAction->isChecked() )
-                    timeAnimationReverseTimeDirectionAction->toggle();
-                else
-                    stopTimeAnimation();
-
-                return;
-            }
+        if (animationIsActiveAndForwardDateTimeLimitHasBeenReached(
+                    ui->initTimeEdit))
+        {
+            return;
+        }
 
         applyTimeStep(ui->initTimeEdit, 1);
     }
@@ -642,31 +684,12 @@ void MSyncControl::timeForward()
     {
         // Both valid and init time should be changed simultaniously.
 
-        if ( animationTimer->isActive() )
+        if (animationIsActiveAndForwardDateTimeLimitHasBeenReached(
+                    ui->validTimeEdit)
+                || animationIsActiveAndForwardDateTimeLimitHasBeenReached(
+                    ui->initTimeEdit))
         {
-            if (ui->validTimeEdit->dateTime() >= timeAnimationTo->dateTime() )
-            {
-                if ( timeAnimationLoopTimeAction->isChecked() )
-                    ui->validTimeEdit->setDateTime(timeAnimationFrom->dateTime());
-                else if ( timeAnimationBackForthTimeAction->isChecked() )
-                    timeAnimationReverseTimeDirectionAction->toggle();
-                else
-                    stopTimeAnimation();
-
-                return;
-            }
-
-            if (ui->initTimeEdit->dateTime() >= timeAnimationTo->dateTime() )
-            {
-                if ( timeAnimationLoopTimeAction->isChecked() )
-                    ui->initTimeEdit->setDateTime(timeAnimationFrom->dateTime());
-                else if ( timeAnimationBackForthTimeAction->isChecked() )
-                    timeAnimationReverseTimeDirectionAction->toggle();
-                else
-                    stopTimeAnimation();
-
-                return;
-            }
+            return;
         }
 
         forwardBackwardButtonClicked = true;
@@ -681,73 +704,34 @@ void MSyncControl::timeBackward()
 {
     if (ui->stepChooseVTITComboBox->currentIndex() == 0)
     {
-        // Index 0 of stepChooseVTITComboBox means that the valid time should
-        // be modified by the time navigation buttons.
-
-        if ( animationTimer->isActive() )
-            if (ui->validTimeEdit->dateTime() <= timeAnimationFrom->dateTime() )
-            {
-                if ( timeAnimationLoopTimeAction->isChecked() )
-                    ui->validTimeEdit->setDateTime(timeAnimationTo->dateTime());
-                else if ( timeAnimationBackForthTimeAction->isChecked() )
-                    timeAnimationReverseTimeDirectionAction->toggle();
-                else
-                    stopTimeAnimation();
-
-                return;
-            }
+        if (animationIsActiveAndBackwardDateTimeLimitHasBeenReached(
+                    ui->validTimeEdit))
+        {
+            return;
+        }
 
         applyTimeStep(ui->validTimeEdit, -1);
     }
     else if (ui->stepChooseVTITComboBox->currentIndex() == 1)
     {
-        // Modify initialisation time.
-
-        if ( animationTimer->isActive() )
-            if (ui->initTimeEdit->dateTime() <= timeAnimationFrom->dateTime() )
-            {
-                if ( timeAnimationLoopTimeAction->isChecked() )
-                    ui->initTimeEdit->setDateTime(timeAnimationTo->dateTime());
-                else if ( timeAnimationBackForthTimeAction->isChecked() )
-                    timeAnimationReverseTimeDirectionAction->toggle();
-                else
-                    stopTimeAnimation();
-
-                return;
-            }
+        if (animationIsActiveAndBackwardDateTimeLimitHasBeenReached(
+                    ui->initTimeEdit))
+        {
+            return;
+        }
 
         applyTimeStep(ui->initTimeEdit, -1);
     }
     else
     {
-        // Both valid and init time should be changed simultaniously.
-
-        if ( animationTimer->isActive() )
+        if (animationIsActiveAndBackwardDateTimeLimitHasBeenReached(
+                    ui->validTimeEdit)
+                || animationIsActiveAndBackwardDateTimeLimitHasBeenReached(
+                    ui->initTimeEdit))
         {
-            if (ui->validTimeEdit->dateTime() <= timeAnimationTo->dateTime() )
-            {
-                if ( timeAnimationLoopTimeAction->isChecked() )
-                    ui->validTimeEdit->setDateTime(timeAnimationFrom->dateTime());
-                else if ( timeAnimationBackForthTimeAction->isChecked() )
-                    timeAnimationReverseTimeDirectionAction->toggle();
-                else
-                    stopTimeAnimation();
-
-                return;
-            }
-
-            if (ui->initTimeEdit->dateTime() <= timeAnimationTo->dateTime() )
-            {
-                if ( timeAnimationLoopTimeAction->isChecked() )
-                    ui->initTimeEdit->setDateTime(timeAnimationFrom->dateTime());
-                else if ( timeAnimationBackForthTimeAction->isChecked() )
-                    timeAnimationReverseTimeDirectionAction->toggle();
-                else
-                    stopTimeAnimation();
-
-                return;
-            }
+            return;
         }
+
         forwardBackwardButtonClicked = true;
 
         applyTimeStep(ui->validTimeEdit, -1);
