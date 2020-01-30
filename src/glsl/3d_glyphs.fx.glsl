@@ -68,7 +68,6 @@ uniform int thinOutRateY;
 uniform int minSelection;
 uniform int maxSelection;
 
-#extension GL_EXT_gpu_shader4 : enable
 uniform sampler2D altitudeBuffer;
 uniform sampler1D inSituDataBuffer;
 uniform sampler2D curtainDataBuffer;
