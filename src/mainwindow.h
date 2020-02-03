@@ -168,6 +168,17 @@ public slots:
 
     void revertCurrentSession(QAction *sessionAction);
 
+    /**
+      Invoke this slot to inform the main window that a part of the application
+      is busy. The @ref appIsBusyLabel will be displayed in the top right
+      corner of the window.
+
+       @note Callers are responsible to call this slot twice: one with @p isBusy
+       set to @p true when processing starts, and once with @p false after
+       processing has ended.
+     */
+    void partOfApplicationIsBusyEvent(bool isBusy);
+
 protected:
     virtual void keyPressEvent(QKeyEvent *);
 
@@ -179,6 +190,10 @@ private:
     QSplitter *rightSplitter;
     QSplitter *topSplitter;
     QSplitter *bottomSplitter;
+
+    // Label to display that the application is currently busy.
+    QLabel *appIsBusyLabel;
+    int applicationIsBusyCounter;
 
     /** Hidden QGLWidget whose GL context is used to manage all resources. */
     MGLResourcesManager *glResourcesManager;

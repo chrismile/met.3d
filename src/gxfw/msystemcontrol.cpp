@@ -390,6 +390,10 @@ void MSystemManagerAndControl::registerScheduler(
         const QString &id, MAbstractScheduler *scheduler)
 {
     schedulerPool.insert(id, scheduler);
+
+    // Let the main window monitor whether the schedule is busy.
+    connect(scheduler, SIGNAL(schedulerIsProcessing(bool)),
+            mainWindow, SLOT(partOfApplicationIsBusyEvent(bool)));
 }
 
 

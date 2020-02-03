@@ -42,8 +42,10 @@ namespace Met3D
   @brief MAbstractScheduler is the base class for task schedulers. Derived
   classes must implement @ref scheduleTaskGraph().
   */
-class MAbstractScheduler
+class MAbstractScheduler : public QObject
 {
+    Q_OBJECT
+
 public:
     MAbstractScheduler() {}
 
@@ -66,6 +68,16 @@ public:
      */
     virtual MTask* isScheduled(MScheduledDataSource* dataSource,
                                MDataRequest request) = 0;
+
+signals:
+    /**
+      Needs to be emitted by derived classes with @p isProcessing = @p true
+      when processing starts, and with @p isProcessing = @p false after
+      processing has ended. Is monitored, e.g., by the main window to display
+      the "processing" label.
+     */
+    void schedulerIsProcessing(bool isProcessing);
+
 };
 
 
@@ -153,6 +165,18 @@ private:
     int currentlyActiveDiskReaderTasks;
     int maxActiveGPUTasks;
     int currentlyActiveGPUTasks;
+
+    /**
+      Updates the scheduler's busy status by checking if
+      @ref numCurrentlyActiveTasks is 0. If yes AND @ref busyStatus is @p true,
+      a @ref schedulerIsProcessing(false) signal is emitted. If no AND
+      @ref busyStatus is @p false, a @ref schedulerIsProcessing(true) signal
+      is emitted.
+     */
+    void updateBusyStatus();
+    bool busyStatus;
+    QMutex busyStatusMutex;
+    QAtomicInteger<int> numCurrentlyActiveTasks;
 
     /**
       Print the contents of the task queue to the log. For debug purposes.
