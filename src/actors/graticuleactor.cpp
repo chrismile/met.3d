@@ -1049,7 +1049,6 @@ void MGraticuleActor::generateGeometry()
                                MNaturalEarthDataLoader::COASTLINES,
                                cornerRect, &verticesCoastlines,
                                &coastlineStartIndices, &coastlineVertexCount);
-
     }
 
 
