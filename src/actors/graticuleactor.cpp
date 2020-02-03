@@ -1053,7 +1053,7 @@ void MGraticuleActor::generateGeometry()
         // successive points greater than 10.0 (delta lon in graticule)
         // keep subdividing the group and adding new groups.
         // This check was neeeded to avoid large jumps
-        checkDistanceViolationInPointSpacing( verticesCoastlines );
+        checkDistanceViolationInPointSpacing(verticesCoastlines);
     }
 
 
