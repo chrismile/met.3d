@@ -65,6 +65,30 @@ public:
                           bool append=true, double offset=0.,
                           int copies=0);
 
+    void loadCyclicLineGeometry(GeometryType geometryType,
+                                QRectF cornerRect,
+                                QVector<QVector2D> *vertices,
+                                QVector<int> *startIndices,
+                                QVector<int> *vertexCount);
+
+    // This method checks, if the distance between two successive points
+    //(i.e., length of a single line segment) in a group(collection of
+    // continuous line segments) of the 'verticesvector' is greater than a
+    // threshold value.
+    void checkDistanceViolationInPointSpacing(QVector<QVector2D> *vertices,
+                                  QVector<int> *startIndices,
+                                  QVector<int> *vertexCount);
+
+    // This method reogranizes the points in a group, if the distance between
+    // two successive points is greater than a threshold value.The present group
+    // is terminated at the first occurence of the violation of the threshold
+    // and a new group is created starting with the subsequent points
+    int reorganizeGroupWithUnevenPointSpacing(int global_maximum_distance_group,
+                            QVector<float> group_maximum_distance,
+                            QVector<QVector2D> *vertices,
+                            QVector<int> *startIndices,
+                            QVector<int> *vertexCount);
+
     /**
      @brief loadAndRotateLineGeometry loads the line geometry and rotates it
      according to the given rotated north pole coordinates @p poleLat and

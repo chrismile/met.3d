@@ -36,6 +36,7 @@
 #include <log4cplus/loggingmacros.h>
 #include <QVector>
 #include <QVector2D>
+#include<QMessageBox>
 
 // local application imports
 #include "util/mutil.h"
@@ -233,6 +234,205 @@ void MNaturalEarthDataLoader::loadLineGeometry(GeometryType        type,
     }
     // Clean up.
 	OGRGeometryFactory::destroyGeometry(bboxPolygon);
+}
+
+
+void MNaturalEarthDataLoader::loadCyclicLineGeometry(
+        MNaturalEarthDataLoader::GeometryType geometryType,
+        QRectF cornerRect,
+        QVector<QVector2D> *vertices,
+        QVector<int> *startIndices,
+        QVector<int> *vertexCount)
+{
+    // Region parameters.
+    float westernLon = cornerRect.x();
+    float easternLon = cornerRect.x() + cornerRect.width();
+    float width = cornerRect.width();
+    width = min(360.0f - MMOD(westernLon + 180.f, 360.f), width);
+    // Offset which needs to be added to place the [westmost] region correctly.
+    double offset = static_cast<double>(floor((westernLon + 180.f) / 360.f)
+                                        * 360.f);
+    // Load geometry of westmost region separately only if its width is smaller
+    // than 360 degrees (i.e. "not complete") otherwise skip this first step.
+    bool firstStep = width < 360.f;
+    if (firstStep)
+    {
+        cornerRect.setX(MMOD(westernLon + 180.f, 360.f) - 180.f);
+        cornerRect.setWidth(width);
+        loadLineGeometry(geometryType, cornerRect, vertices, startIndices,
+                         vertexCount, false,  // clear vectors
+                         offset);     // shift
+        // Increment offset to suit the next region.
+        offset += 360.;
+        // "Shift" westernLon to western border of the bounding box domain not
+        // treated yet.
+        westernLon += width;
+    }
+
+    // Amount of regions with a width of 360 degrees.
+    int completeRegionsCount =
+            static_cast<int>((easternLon - westernLon) / 360.f);
+    // Load "complete" regions only if we have at least one. If the first step
+    // was skipped, we need to clear the vectors before loading the line
+    // geometry otherwise we need to append the computed vertices.
+    if (completeRegionsCount > 0)
+    {
+        cornerRect.setX(-180.f);
+        cornerRect.setWidth(360.f);
+        loadLineGeometry(geometryType, cornerRect, vertices, startIndices,
+                    vertexCount, firstStep,//clear vectors if it wasn't done before
+                    offset, // shift
+                    completeRegionsCount - 1);
+        // "Shift" westernLon to western border of the bounding box domain not
+        // treated yet.
+        westernLon += static_cast<float>(completeRegionsCount) * 360.f;
+        // Increment offset to suit the last region if one is left.
+        offset += static_cast<double>(completeRegionsCount) * 360.;
+    }
+
+    // Load geometry of eastmost region separately only if it isn't the same as
+    // the westmost region and its width is smaller than 360 degrees and thus it
+    // wasn't loaded in one of the steps before.
+    if (westernLon < easternLon)
+    {
+        cornerRect.setX(-180.f);
+        cornerRect.setWidth(easternLon - westernLon);
+        loadLineGeometry(geometryType, cornerRect, vertices, startIndices,
+                         vertexCount, true,    // append to vectors
+                         offset); // shift
+    }
+
+    // When loading Natural earth, certain random lines appeared.These were
+    // traced to the presence of large jumps in the co-ordinates between
+    // successive points in a given group of vertices.To avoid these jumps,
+    // as long as there exists a group with maximum distance between two
+    // successive points greater than 10.0 (deltalon of the graticule) keep
+    // subdividing the group and adding new groups.This check was
+    // neeeded to eliminate the large jumps and thereby also the random lines.
+
+    checkDistanceViolationInPointSpacing(vertices, startIndices, vertexCount);
+}
+
+
+int MNaturalEarthDataLoader::reorganizeGroupWithUnevenPointSpacing(
+                        int global_maximum_distance_group,
+                        QVector<float> group_maximum_distance,
+                        QVector<QVector2D> *vertices,
+                        QVector<int> *startIndices,
+                        QVector<int> *vertexCount)
+{
+    int original_group_start_index =
+            startIndices->at(global_maximum_distance_group);
+    int original_group_count = vertexCount->at(global_maximum_distance_group);
+
+    float reference_distance = 10.0f;//The deltalon of the graticule.
+    float previous_maximum_distance = -999.9f;//To begin with.
+
+    int original_group_end_index = original_group_start_index
+                                 + original_group_count - 1;
+
+    int new_group_start_index = original_group_start_index;//To begin with.
+    int current_group = global_maximum_distance_group;//To begin with.
+
+    int new_group = global_maximum_distance_group + 1; //To begin with.
+    bool is_new_group = false; //To begin with.
+    int new_group_count = 0;
+
+    for (int i = new_group_start_index; i < original_group_end_index; i++)
+    {
+        float distance = vertices->at(i).distanceToPoint(vertices->at(i + 1));
+        if (is_new_group)
+        {
+            group_maximum_distance.replace(current_group,
+                max(distance, group_maximum_distance.at(current_group)));
+        }
+        if (distance > reference_distance)
+        {
+            // Check for dangling point, a point which is far from
+            // both the neighbours, raise a warning and stop.
+            if ( previous_maximum_distance < 0.0f )
+            {
+                QMessageBox msgBox;
+                msgBox.setIcon(QMessageBox::Warning);
+                msgBox.setWindowTitle("Error");
+                msgBox.setText( "Dangling point encountered\n" );
+                msgBox.exec();
+            }
+
+            // Update the current group maximum distance.
+            group_maximum_distance.replace(current_group, previous_maximum_distance);
+
+            // Update the current group 'vertexCount' to 'i'.
+            vertexCount->replace(current_group,
+                        i - new_group_start_index + 1);
+
+            // Update the 'startIndices' array by inserting
+            // a 'new group' starting at index 'i+1'.
+            startIndices->insert(new_group, i + 1);
+
+            // Initialize the 'new group' group_max_distance as 0.0f.
+            group_maximum_distance.insert(new_group, 0.0f);
+
+            // Update the coastlineVertexCount array by inserting
+            // a 'new group' with count, by deducting index
+            //'(i-new_start_index+1)' from the original count.
+            vertexCount->insert(new_group, original_group_count
+                        - (i - new_group_start_index + 1));
+
+            current_group = new_group;
+            new_group += 1;
+            new_group_start_index = i + 1;
+            is_new_group = true;
+            new_group_count++;
+        }
+        previous_maximum_distance = distance;
+    }
+    return  new_group_count;
+}
+
+
+void MNaturalEarthDataLoader::checkDistanceViolationInPointSpacing(
+                              QVector<QVector2D> *vertices,
+                              QVector<int> *startIndices,
+                              QVector<int> *vertexCount)
+{
+    int total_groups = startIndices->count();//To being with.
+    float global_maximum_distance_limit = 10.0f;//The deltalon of the graticule.
+    int global_max_distance_group_index = -1;//To begin with.
+    int count_of_new_groups = 0;// To begin with.
+
+    //To store the maximum distance between two successive points in each group.
+    QVector<float> group_max_distance;
+
+    group_max_distance.clear();
+    for (int i = 0; i < total_groups; i++)
+    {
+
+        int group_start_index = startIndices->at(i);
+        int group_end_index = startIndices->at(i)
+                            + vertexCount->at(i) - 1;
+        float maximum_distance = -9999.9999f;//A large negative distance.
+
+        for (int j = group_start_index; j < group_end_index; j++)
+        {
+
+            float distance = vertices->at(j).distanceToPoint(
+                             vertices->at(j + 1));
+            maximum_distance = max(distance, maximum_distance);
+        }
+        group_max_distance.append(maximum_distance);
+
+        if (maximum_distance > global_maximum_distance_limit)
+        {
+            global_max_distance_group_index = i;
+            count_of_new_groups = reorganizeGroupWithUnevenPointSpacing(
+                        global_max_distance_group_index, group_max_distance,
+                        vertices, startIndices, vertexCount);
+            total_groups = vertexCount->count();
+            i = i + count_of_new_groups;
+        }
+    }
+    return;
 }
 
 

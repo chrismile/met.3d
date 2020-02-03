@@ -87,10 +87,6 @@ public:
 
     void onBoundingBoxChanged() override;
 
-    float computeDistanceBetween2DVectors(QVector2D p1, QVector2D p2);
-    int reorganizeGroupWithUnevenPointSpacing(int global_max_group, QVector<QVector2D> verticesVector);
-    void checkDistanceViolationInPointSpacing( QVector<QVector2D> verticesVector );
-
 protected:
     /**
       Loads the shader programs and generates the graticule geometry. The
@@ -135,10 +131,6 @@ private:
       box and the shift parameters of
       @ref MNaturalEarthDataLoader::loadLineGeometry() to the region[s] needed.
       */
-    void loadCyclicLineGeometry(
-            MNaturalEarthDataLoader::GeometryType geometryType,
-            QRectF cornerRect, QVector<QVector2D> *vertices,
-            QVector<int> *startIndices, QVector<int> *vertexCount);
 
     std::shared_ptr<GL::MShaderEffect> shaderProgram;
 
@@ -178,9 +170,6 @@ private:
     bool coastLinesCountIsValid;
     bool borderLinesCountIsValid;
 
-    // To store the maximum distance between two successive points
-    // in each group
-    QVector<float> group_max_distance;
 };
 
 
