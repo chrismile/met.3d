@@ -83,8 +83,8 @@ public:
     // two successive points is greater than a threshold value.The present group
     // is terminated at the first occurence of the violation of the threshold
     // and a new group is created starting with the subsequent points
-    int reorganizeGroupWithUnevenPointSpacing(int global_maximum_distance_group,
-                            QVector<float> group_maximum_distance,
+    int reorganizeGroupWithUnevenPointSpacing(int globalMaximumDistanceGroup,
+                            QVector<float> groupMaximumDistance,
                             QVector<QVector2D> *vertices,
                             QVector<int> *startIndices,
                             QVector<int> *vertexCount);

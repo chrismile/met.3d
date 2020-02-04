@@ -315,42 +315,42 @@ void MNaturalEarthDataLoader::loadCyclicLineGeometry(
 
 
 int MNaturalEarthDataLoader::reorganizeGroupWithUnevenPointSpacing(
-                        int global_maximum_distance_group,
-                        QVector<float> group_maximum_distance,
+                        int globalMaximumDistanceGroup,
+                        QVector<float> groupMaximumDistance,
                         QVector<QVector2D> *vertices,
                         QVector<int> *startIndices,
                         QVector<int> *vertexCount)
 {
-    int original_group_start_index =
-            startIndices->at(global_maximum_distance_group);
-    int original_group_count = vertexCount->at(global_maximum_distance_group);
+    int originalGroupStartIndex =
+            startIndices->at(globalMaximumDistanceGroup);
+    int originalGroupCount = vertexCount->at(globalMaximumDistanceGroup);
 
-    float reference_distance = 10.0f;//The deltalon of the graticule.
-    float previous_maximum_distance = -999.9f;//To begin with.
+    float referenceDistance = 10.0f;//The deltalon of the graticule.
+    float previousMaximumDistance = -999.9f;//To begin with.
 
-    int original_group_end_index = original_group_start_index
-                                 + original_group_count - 1;
+    int originalGroupEndIndex = originalGroupStartIndex
+                                 + originalGroupCount - 1;
 
-    int new_group_start_index = original_group_start_index;//To begin with.
-    int current_group = global_maximum_distance_group;//To begin with.
+    int newGroupStartIndex = originalGroupStartIndex;//To begin with.
+    int currentGroup = globalMaximumDistanceGroup;//To begin with.
 
-    int new_group = global_maximum_distance_group + 1; //To begin with.
-    bool is_new_group = false; //To begin with.
-    int new_group_count = 0;
+    int newGroup = globalMaximumDistanceGroup + 1; //To begin with.
+    bool isNewGroup = false; //To begin with.
+    int newGroupCount = 0;
 
-    for (int i = new_group_start_index; i < original_group_end_index; i++)
+    for (int i = newGroupStartIndex; i < originalGroupEndIndex; i++)
     {
         float distance = vertices->at(i).distanceToPoint(vertices->at(i + 1));
-        if (is_new_group)
+        if (isNewGroup)
         {
-            group_maximum_distance.replace(current_group,
-                max(distance, group_maximum_distance.at(current_group)));
+            groupMaximumDistance.replace(currentGroup,
+                max(distance, groupMaximumDistance.at(currentGroup)));
         }
-        if (distance > reference_distance)
+        if (distance > referenceDistance)
         {
             // Check for dangling point, a point which is far from
             // both the neighbours, raise a warning and stop.
-            if ( previous_maximum_distance < 0.0f )
+            if ( previousMaximumDistance < 0.0f )
             {
                 QMessageBox msgBox;
                 msgBox.setIcon(QMessageBox::Warning);
@@ -360,34 +360,34 @@ int MNaturalEarthDataLoader::reorganizeGroupWithUnevenPointSpacing(
             }
 
             // Update the current group maximum distance.
-            group_maximum_distance.replace(current_group, previous_maximum_distance);
+            groupMaximumDistance.replace(currentGroup, previousMaximumDistance);
 
             // Update the current group 'vertexCount' to 'i'.
-            vertexCount->replace(current_group,
-                        i - new_group_start_index + 1);
+            vertexCount->replace(currentGroup,
+                        i - newGroupStartIndex + 1);
 
             // Update the 'startIndices' array by inserting
             // a 'new group' starting at index 'i+1'.
-            startIndices->insert(new_group, i + 1);
+            startIndices->insert(newGroup, i + 1);
 
             // Initialize the 'new group' group_max_distance as 0.0f.
-            group_maximum_distance.insert(new_group, 0.0f);
+            groupMaximumDistance.insert(newGroup, 0.0f);
 
             // Update the coastlineVertexCount array by inserting
             // a 'new group' with count, by deducting index
             //'(i-new_start_index+1)' from the original count.
-            vertexCount->insert(new_group, original_group_count
-                        - (i - new_group_start_index + 1));
+            vertexCount->insert(newGroup, originalGroupCount
+                        - (i - newGroupStartIndex + 1));
 
-            current_group = new_group;
-            new_group += 1;
-            new_group_start_index = i + 1;
-            is_new_group = true;
-            new_group_count++;
+            currentGroup = newGroup;
+            newGroup += 1;
+            newGroupStartIndex = i + 1;
+            isNewGroup = true;
+            newGroupCount++;
         }
-        previous_maximum_distance = distance;
+        previousMaximumDistance = distance;
     }
-    return  new_group_count;
+    return  newGroupCount;
 }
 
 
@@ -396,40 +396,40 @@ void MNaturalEarthDataLoader::checkDistanceViolationInPointSpacing(
                               QVector<int> *startIndices,
                               QVector<int> *vertexCount)
 {
-    int total_groups = startIndices->count();//To being with.
-    float global_maximum_distance_limit = 10.0f;//The deltalon of the graticule.
-    int global_max_distance_group_index = -1;//To begin with.
-    int count_of_new_groups = 0;// To begin with.
+    int totalGroups = startIndices->count();//To being with.
+    float globalMaximumDistanceLimit = 10.0f;//The deltalon of the graticule.
+    int globalMaximumDistanceGroupIndex = -1;//To begin with.
+    int countOfNewGroups = 0;// To begin with.
 
     //To store the maximum distance between two successive points in each group.
-    QVector<float> group_max_distance;
+    QVector<float> groupMaximumDistance;
 
-    group_max_distance.clear();
-    for (int i = 0; i < total_groups; i++)
+    groupMaximumDistance.clear();
+    for (int i = 0; i < totalGroups; i++)
     {
 
-        int group_start_index = startIndices->at(i);
-        int group_end_index = startIndices->at(i)
+        int groupStartIndex = startIndices->at(i);
+        int groupEndIndex = startIndices->at(i)
                             + vertexCount->at(i) - 1;
-        float maximum_distance = -9999.9999f;//A large negative distance.
+        float maximumDistance = -9999.9999f;//A large negative distance.
 
-        for (int j = group_start_index; j < group_end_index; j++)
+        for (int j = groupStartIndex; j < groupEndIndex; j++)
         {
 
             float distance = vertices->at(j).distanceToPoint(
                              vertices->at(j + 1));
-            maximum_distance = max(distance, maximum_distance);
+            maximumDistance = max(distance, maximumDistance);
         }
-        group_max_distance.append(maximum_distance);
+        groupMaximumDistance.append(maximumDistance);
 
-        if (maximum_distance > global_maximum_distance_limit)
+        if (maximumDistance > globalMaximumDistanceLimit)
         {
-            global_max_distance_group_index = i;
-            count_of_new_groups = reorganizeGroupWithUnevenPointSpacing(
-                        global_max_distance_group_index, group_max_distance,
+            globalMaximumDistanceGroupIndex = i;
+            countOfNewGroups = reorganizeGroupWithUnevenPointSpacing(
+                        globalMaximumDistanceGroupIndex, groupMaximumDistance,
                         vertices, startIndices, vertexCount);
-            total_groups = vertexCount->count();
-            i = i + count_of_new_groups;
+            totalGroups = vertexCount->count();
+            i = i + countOfNewGroups;
         }
     }
     return;
