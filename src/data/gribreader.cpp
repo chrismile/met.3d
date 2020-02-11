@@ -328,6 +328,58 @@ QVector2D MGribReader::variableRotatedNorthPoleCoordinates(
 }
 
 
+inline int shiftedLonIndex(int i, MGribVariableInfo* vinfo)
+{
+    // Compute the shifted index for the lon array. Variables need to be cast
+    // to double so that MMOD works (the fraction computed in floor() could
+    // otherwise be zero instead of -1 for negative longitudinalIndexShiftForCyclicGrid).
+    // Equation: (i + i_offset) % nlons
+    //   with i_offset = longitudinalIndexShiftForCyclicGrid
+    return MMOD(double(i + vinfo->longitudinalIndexShiftForCyclicGrid),
+                double(vinfo->nlons));
+}
+
+
+inline double adaptShiftedLonToReferenceLon0(double lon, MGribVariableInfo* vinfo)
+{
+    // Adapt shifted lon to range [lon0_ref .. lon0_ref+360.] so that the
+    // shifted lons also start with lon0_ref (e.g., if the old lon range was
+    // from 0..360, the new could be from -180..180 or from 90..450).
+    // Equation: [ (lon - lon0_ref) % 360. ] + lon0_ref
+    return MMOD(lon - vinfo->lon0ShiftedReference, 360.) + vinfo->lon0ShiftedReference;
+}
+
+
+void MGribReader::copyLonLatCoordinateDataToGridObject(
+        MStructuredGrid *grid, MGribVariableInfo* vinfo)
+{
+    // Copy lon coordinte data. If grid is cyclic in longitude and needs to
+    // be shifted, apply shift.
+    if (vinfo->gridIsCyclicInLongitude
+            && vinfo->longitudinalIndexShiftForCyclicGrid != 0)
+    {
+        for (uint i = 0; i < grid->nlons; i++)
+        {
+            double shiftedLon = vinfo->lons[shiftedLonIndex(i, vinfo)];
+            grid->lons[i] = adaptShiftedLonToReferenceLon0(shiftedLon, vinfo);
+        }
+    }
+    else
+    {
+        for (uint i = 0; i < grid->nlons; i++)
+        {
+            grid->lons[i] = vinfo->lons[i];
+        }
+    }
+
+    // Copy lat coordinte data.
+    for (uint i = 0; i < grid->nlats; i++)
+    {
+        grid->lats[i] = vinfo->lats[i];
+    }
+}
+
+
 MStructuredGrid *MGribReader::readGrid(
         MVerticalLevelType levelType,
         const QString &variableName,
@@ -401,11 +453,8 @@ MStructuredGrid *MGribReader::readGrid(
     {
         grid = new MRegularLonLatGrid(vinfo->nlats, vinfo->nlons);
 
-        // Copy coordinate data.
-        for (unsigned int i = 0; i < grid->nlons; i++)
-            grid->lons[i] = vinfo->lons[i];
-        for (unsigned int i = 0; i < grid->nlats; i++)
-            grid->lats[i] = vinfo->lats[i];
+        // Copy lon/lat coordinate data.
+        copyLonLatCoordinateDataToGridObject(grid, vinfo);
 
         // Store metadata in grid object.
         grid->setMetaData(initTime, validTime, variableName, ensembleMember);
@@ -440,18 +489,32 @@ MStructuredGrid *MGribReader::readGrid(
             GRIB_CHECK(grib_get_double_array(gribHandle, "values", values,
                                              &nGribValues), 0);
 
-            // Copy double data to MStructuredGrid float array.
             if (dinfo.applyExp)
             {
                 // If surface pressure is specified as lnsp, apply exponential
                 // function to reconstruct surface pressure "sp".
                 for (uint n = 0; n < nGribValues; n++)
                 {
-                    grid->data[n] = exp(values[n]);
+                    values[n] = exp(values[n]);
                 }
+            }
+
+            // Copy double data to MStructuredGrid float array.
+            if (vinfo->gridIsCyclicInLongitude
+                    && vinfo->longitudinalIndexShiftForCyclicGrid != 0)
+            {
+                // Shift in longitude required.
+                for (uint j = 0; j < grid->nlats; j++)
+                    for (uint i = 0; i < grid->nlons; i++)
+                    {
+                        grid->data[INDEX2yx(j, i, grid->nlons)] =
+                                values[INDEX2yx(j, shiftedLonIndex(i, vinfo),
+                                                grid->nlons)];
+                    }
             }
             else
             {
+                // No shift requried, direct copy.
                 for (uint n = 0; n < nGribValues; n++)
                 {
                     grid->data[n] = values[n];
@@ -473,13 +536,12 @@ MStructuredGrid *MGribReader::readGrid(
         grid = new MRegularLonLatStructuredPressureGrid(
                     vinfo->levels.size(), vinfo->nlats, vinfo->nlons);
 
-        // Copy coordinate data.
-        for (unsigned int i = 0; i < grid->nlons; i++)
-            grid->lons[i] = vinfo->lons[i];
-        for (unsigned int i = 0; i < grid->nlats; i++)
-            grid->lats[i] = vinfo->lats[i];
+        // Copy lon/lat/lev coordinate data.
+        copyLonLatCoordinateDataToGridObject(grid, vinfo);
         for (unsigned int i = 0; i < grid->nlevs; i++)
+        {
             grid->levels[i] = vinfo->levels[i];
+        }
 
         // Store metadata in grid object.
         grid->setMetaData(initTime, validTime, variableName, ensembleMember);
@@ -520,8 +582,27 @@ MStructuredGrid *MGribReader::readGrid(
                                                  &nGribValues), 0);
 
                 // Copy double data to MStructuredGrid float array.
-                for (uint n = 0; n < nGribValues; n++)
-                    grid->data[il*nGribValues + n] = values[n];
+                if (vinfo->gridIsCyclicInLongitude
+                        && vinfo->longitudinalIndexShiftForCyclicGrid != 0)
+                {
+                    // Shift in longitude required.
+                    for (uint j = 0; j < grid->nlats; j++)
+                        for (uint i = 0; i < grid->nlons; i++)
+                        {
+                            grid->data[INDEX3zyx_2(il, j, i,
+                                                   grid->nlatsnlons, grid->nlons)] =
+                                    values[INDEX2yx(j, shiftedLonIndex(i, vinfo),
+                                                    grid->nlons)];
+                        }
+                }
+                else
+                {
+                    // No shift requried, direct copy.
+                    for (uint n = 0; n < nGribValues; n++)
+                    {
+                        grid->data[il*nGribValues + n] = values[n];
+                    }
+                }
 
                 delete[] values;
 
@@ -542,10 +623,12 @@ MStructuredGrid *MGribReader::readGrid(
 
         grid = sigpgrid;
 
-        // Copy coordinate data.
-        for (uint i = 0; i < grid->nlons; i++) grid->lons[i] = vinfo->lons[i];
-        for (uint i = 0; i < grid->nlats; i++) grid->lats[i] = vinfo->lats[i];
-        for (uint i = 0; i < grid->nlevs; i++) grid->levels[i] = vinfo->levels[i];
+        // Copy lon/lat/lev coordinate data.
+        copyLonLatCoordinateDataToGridObject(grid, vinfo);
+        for (uint i = 0; i < grid->nlevs; i++)
+        {
+            grid->levels[i] = vinfo->levels[i];
+        }
 
         // Copy ak/bk coefficients. If not all levels are stored in the dataset,
         // make sure that the correct ak/bk are copied (-> levelOffset).
@@ -604,8 +687,27 @@ MStructuredGrid *MGribReader::readGrid(
                                                  &nGribValues), 0);
 
                 // Copy double data to MStructuredGrid float array.
-                for (uint n = 0; n < nGribValues; n++)
-                    grid->data[il*nGribValues + n] = values[n];
+                if (vinfo->gridIsCyclicInLongitude
+                        && vinfo->longitudinalIndexShiftForCyclicGrid != 0)
+                {
+                    // Shift in longitude required.
+                    for (uint j = 0; j < grid->nlats; j++)
+                        for (uint i = 0; i < grid->nlons; i++)
+                        {
+                            grid->data[INDEX3zyx_2(il, j, i,
+                                                   grid->nlatsnlons, grid->nlons)] =
+                                    values[INDEX2yx(j, shiftedLonIndex(i, vinfo),
+                                                    grid->nlons)];
+                        }
+                }
+                else
+                {
+                    // No shift requried, direct copy.
+                    for (uint n = 0; n < nGribValues; n++)
+                    {
+                        grid->data[il*nGribValues + n] = values[n];
+                    }
+                }
 
                 delete[] values;
 
@@ -691,6 +793,9 @@ void MGribReader::scanDataRoot()
         QString filePath = dataRoot.filePath(gribFileName);
         QString fileIndexPath = QString("%1.met3d_grib_index").arg(filePath);
 
+        // A) GRIB index file exists. Read from index.
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
         // If the grib index exists, read it. Otherwise, create it and store it.
         if (QFile::exists(fileIndexPath))
         {
@@ -754,11 +859,19 @@ void MGribReader::scanDataRoot()
                     vinfo->dlon = gmiInfo.dlon;
                     vinfo->dlat = gmiInfo.dlat;
 
-                    // Fill lat/lon arrays.
+                    // Fill lat/lon arrays (QVector copy).
                     vinfo->lons = gmiInfo.lons;
                     vinfo->lats = gmiInfo.lats;
                     // TODO (bt, 08FEB2017) Adapt to set type according to the data read.
                     vinfo->horizontalGridType = MHorizontalGridType::REGULAR_LONLAT;
+
+                    // Check if grid spans globe in longitude (cyclic in lon).
+                    double lonWest = MMOD(vinfo->lon0, 360.);
+                    double lonEast = MMOD(vinfo->lon1 + vinfo->dlon, 360.);
+                    vinfo->gridIsCyclicInLongitude =
+                            floatIsAlmostEqualRelativeAndAbs(
+                                lonWest, lonEast, M_LONLAT_RESOLUTION);
+                    vinfo->longitudinalIndexShiftForCyclicGrid = 0;
 
                     if (levelType == HYBRID_SIGMA_PRESSURE_3D)
                     {
@@ -841,6 +954,10 @@ void MGribReader::scanDataRoot()
                 // That's it!
             }
         } // read index
+
+        // B) GRIB index file does not exist. Scan grib file and create index.
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
         else
         { // read from grib file and create new index
             LOG4CPLUS_DEBUG(mlog, "Creating new index... please wait." << flush);
@@ -911,7 +1028,17 @@ void MGribReader::scanDataRoot()
                 QString dataType = "";
                 if (!ensembleIDIsSpecifiedInFileName)
                 {
-                    dataType = getGribStringKey(gribHandle, "ls.dataType");
+                    try {
+                        dataType = getGribStringKey(gribHandle, "ls.dataType");
+                    }
+                    catch (MGribError& e)
+                    {
+                        LOG4CPLUS_WARN(mlog, "Unable to determine dataType of "
+                                             "grid (ECMWF uses an, fc, pf, cf), "
+                                             "skipping this field.");
+                        grib_handle_delete(gribHandle);
+                        continue;
+                    }
                     // LOG4CPLUS_DEBUG(mlog, "ls.dataType: " << dataType.toStdString());
                     // Perturbed (pf) and control (cf) forecasts are combined into
                     // "ensemble" (ens) forecasts.
@@ -1006,7 +1133,8 @@ void MGribReader::scanDataRoot()
                     currentVInfo.dlat = getGribDoubleKey(
                                 gribHandle, "jDirectionIncrementInDegrees");
 
-                    if (!checkConsistencyOfVariable(vinfo, &currentVInfo))
+                    if (!checkHorizontalConsistencyOfVariableToReference(
+                                vinfo, &currentVInfo))
                     {
                         LOG4CPLUS_ERROR(mlog, "found different geographical "
                                         "region than previously used for "
@@ -1057,6 +1185,14 @@ void MGribReader::scanDataRoot()
                                 gribHandle, "iDirectionIncrementInDegrees");
                     vinfo->dlat = gmiInfo.dlat = getGribDoubleKey(
                                 gribHandle, "jDirectionIncrementInDegrees");
+
+                    // Check if grid spans globe in longitude (cyclic in lon).
+                    double lonWest = MMOD(vinfo->lon0, 360.);
+                    double lonEast = MMOD(vinfo->lon1 + vinfo->dlon, 360.);
+                    vinfo->gridIsCyclicInLongitude =
+                            floatIsAlmostEqualRelativeAndAbs(
+                                lonWest, lonEast, M_LONLAT_RESOLUTION);
+                    vinfo->longitudinalIndexShiftForCyclicGrid = 0;
 
                     // Fill lat/lon arrays.
                     vinfo->lons.resize(vinfo->nlons);
@@ -1257,10 +1393,12 @@ void MGribReader::scanDataRoot()
 
     deleteFileScanProgressDialog();
 
-    QString horizontalRefVarName = "";
-    MVerticalLevelType referenceLevelType;
     // Perform checks, e.g. to make sure that for each data field all levels
     // are present.
+    // =====================================================================
+
+    QString horizontalRefVarName = "";
+    MVerticalLevelType referenceLevelType;
     LOG4CPLUS_DEBUG(mlog, "Checking consistency of indexed data fields...");
     foreach (MVerticalLevelType levelType, availableDataFields.keys())
     {
@@ -1269,11 +1407,22 @@ void MGribReader::scanDataRoot()
         QVector<double> referenceLevels;
         foreach (QString varName, varNames)
         {
-            if (!checkIndexForVariable(availableDataFields[levelType][varName]))
+            // 1. Check if variable index is consistent in itself (i.e.
+            // the variable's vertical levels, time steps, etc. are all
+            // consistent.
+            // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            if (!checkInternalConsistencyOfVariableIndex(
+                        availableDataFields[levelType][varName]))
             {
                 delete availableDataFields[levelType].take(varName);
                 continue;
             }
+
+            // 2. Check if the variable is consistent to the "reference
+            // variable" (i.e. the first variable encountered) in this dataset
+            // (to make sure that all data fields of the data set are defined
+            // on the same grid etc.).
+            // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             else if ( !disableGridConsistencyCheck )
             {
                 if (horizontalRefVarName.isEmpty())
@@ -1281,19 +1430,29 @@ void MGribReader::scanDataRoot()
                     horizontalRefVarName = varName;
                     referenceLevelType = levelType;
                 }
+
                 if (referenceLevels.isEmpty())
                 {
                     referenceVarName = varName;
-                    referenceLevels =
-                            availableDataFields[levelType][referenceVarName]
-                            ->levels;
+                    referenceLevels = availableDataFields[levelType][
+                            referenceVarName]->levels; // QVector copy
                 }
-                // Check consistency of vertical levels.
-                else if (availableDataFields[levelType][varName]->levels
-                         != referenceLevels)
+
+                LOG4CPLUS_DEBUG(mlog, "Checking if variable '"
+                                << varName.toStdString()
+                                << "' ("
+                                << MStructuredGrid::verticalLevelTypeToString(
+                                    levelType).toStdString()
+                                << ") is consistent to the reference variable(s) '"
+                                << horizontalRefVarName.toStdString() << "'/'"
+                                << referenceVarName.toStdString() << "'...");
+
+                // Check consistency of vertical levels (QVector comparison).
+                if (availableDataFields[levelType][varName]->levels
+                        != referenceLevels)
                 {
                     LOG4CPLUS_ERROR(mlog,
-                                    "found difference in vertical levels to"
+                                    "ERROR: found difference in vertical levels to"
                                     " reference variable '"
                                     + referenceVarName.toStdString()
                                     + "'; discarding variable: '"
@@ -1302,22 +1461,30 @@ void MGribReader::scanDataRoot()
                     delete availableDataFields[levelType].take(varName);
                     continue;
                 }
+
                 // Check consistency of horizontal coordinates.
-                else if (!checkConsistencyOfVariable(
-                            availableDataFields[referenceLevelType]
-                            [horizontalRefVarName],
-                             availableDataFields[levelType][varName]))
+                // NOTE: Here we also determine a possible index shift in
+                // longitude for cyclic grids (last parameter set to "true").
+                else if (!checkHorizontalConsistencyOfVariableToReference(
+                             availableDataFields[referenceLevelType]
+                             [horizontalRefVarName],
+                             availableDataFields[levelType][varName],
+                             true))
                 {
                     LOG4CPLUS_ERROR(mlog,
-                                    "found difference to reference"
+                                    "ERROR: found difference to reference"
                                     " variable '"
-                                    + referenceVarName.toStdString()
+                                    + horizontalRefVarName.toStdString()
                                     + "'; discarding variable: '"
                                     + varName.toStdString() + "' [Dataset: "
                                     + getIdentifier().toStdString() + "]");
                     delete availableDataFields[levelType].take(varName);
                     continue;
                 }
+
+                LOG4CPLUS_DEBUG(mlog, "... OK: variable '"
+                                << varName.toStdString()
+                                << "' is consistent to the reference variable(s).");
             }
         }
     }
@@ -1445,7 +1612,21 @@ QString MGribReader::getGribStringKey(grib_handle *gh, QString key)
     const int MAX_CHAR_LEN = 64;
     char cval[MAX_CHAR_LEN];
     size_t vlen = MAX_CHAR_LEN;
-    GRIB_CHECK(grib_get_string(gh, keyAsCString, cval, &vlen), 0);
+
+    int errorCode = grib_get_string(gh, keyAsCString, cval, &vlen);
+    if (errorCode != 0)
+    {
+        QString errorMsg = QString(
+                    "ERROR: cannot access grib key '%1'. Met.3D requires the "
+                    "value of this key, please make sure that the "
+                    "key/value pair is correctly defined in your grib "
+                    "file. ECCODES error code is %2, message is: %3")
+                .arg(keyAsCString).arg(errorCode)
+                .arg(grib_get_error_message(errorCode));
+
+        LOG4CPLUS_ERROR(mlog, errorMsg.toStdString());
+        throw MGribError(errorMsg.toStdString(), __FILE__, __LINE__);
+    }
 
     return QString(cval);
 }
@@ -1458,7 +1639,21 @@ long MGribReader::getGribLongKey(grib_handle *gh, QString key)
     char* keyAsCString = ba.data();
 
     long value;
-    GRIB_CHECK(grib_get_long(gh, keyAsCString, &value), 0);
+
+    int errorCode = grib_get_long(gh, keyAsCString, &value);
+    if (errorCode != 0)
+    {
+        QString errorMsg = QString(
+                    "ERROR: cannot access grib key '%1'. Met.3D requires the "
+                    "value of this key, please make sure that the "
+                    "key/value pair is correctly defined in your grib "
+                    "file. ECCODES error code is %2, message is: %3")
+                .arg(keyAsCString).arg(errorCode)
+                .arg(grib_get_error_message(errorCode));
+
+        LOG4CPLUS_ERROR(mlog, errorMsg.toStdString());
+        throw MGribError(errorMsg.toStdString(), __FILE__, __LINE__);
+    }
 
     return value;
 }
@@ -1471,7 +1666,21 @@ double MGribReader::getGribDoubleKey(grib_handle *gh, QString key)
     char* keyAsCString = ba.data();
 
     double value;
-    GRIB_CHECK(grib_get_double(gh, keyAsCString, &value), 0);
+
+    int errorCode = grib_get_double(gh, keyAsCString, &value);
+    if (errorCode != 0)
+    {
+        QString errorMsg = QString(
+                    "ERROR: cannot access grib key '%1'. Met.3D requires the "
+                    "value of this key, please make sure that the "
+                    "key/value pair is correctly defined in your grib "
+                    "file. ECCODES error code is %2, message is: %3")
+                .arg(keyAsCString).arg(errorCode)
+                .arg(grib_get_error_message(errorCode));
+
+        LOG4CPLUS_ERROR(mlog, errorMsg.toStdString());
+        throw MGribError(errorMsg.toStdString(), __FILE__, __LINE__);
+    }
 
     return value;
 }
@@ -1556,10 +1765,13 @@ void MGribReader::debugPrintLevelTypeMap(MGribLevelTypeMap &m)
 }
 
 
-bool MGribReader::checkIndexForVariable(MGribVariableInfo *vinfo)
+bool MGribReader::checkInternalConsistencyOfVariableIndex(
+        MGribVariableInfo *vinfo)
 {
-    LOG4CPLUS_DEBUG(mlog, "Checking variable "
-                    << vinfo->longname.toStdString() << "...");
+    LOG4CPLUS_DEBUG(mlog, "Checking if variable '"
+                    << vinfo->variablename.toStdString() << "' ("
+                    << vinfo->longname.toStdString() << ") is consistent "
+                    "in itself (vertical levels, time steps, etc.)...");
 
     // Sort discovered levels.
     qSort(vinfo->levels);
@@ -1720,8 +1932,9 @@ bool MGribReader::checkIndexForVariable(MGribVariableInfo *vinfo)
 
 
     // Everything is ok.
-    LOG4CPLUS_DEBUG(mlog, "... variable '"
-                    << vinfo->longname.toStdString() << "' is ok.");
+    LOG4CPLUS_DEBUG(mlog, "... OK: variable '"
+                    << vinfo->variablename.toStdString()
+                    << "' is is consistent in itself.");
     return true;
 }
 
@@ -1847,59 +2060,118 @@ void MGribReader::setSurfacePressureFieldType(QString surfacePressureFieldType)
 }
 
 
-bool MGribReader::checkConsistencyOfVariable(MGribVariableInfo *referenceVInfo,
-                                             MGribVariableInfo *currentVInfo)
+bool MGribReader::checkHorizontalConsistencyOfVariableToReference(
+        MGribVariableInfo *referenceVInfo,  MGribVariableInfo *currentVInfo,
+        bool determineLonIndexShiftForCyclicGrid)
 {
     // Get geographical region of the data field & check that
     // all messages of this 3D field have the same bounds.
     if ( referenceVInfo->nlons != currentVInfo->nlons )
     {
-        LOG4CPLUS_ERROR(mlog, "detected inconsistency in 'number of longitudes'");
+        LOG4CPLUS_ERROR(mlog, "ERROR: detected inconsistency in 'number of longitudes'");
         return false;
     }
+
     if ( referenceVInfo->nlats != currentVInfo->nlats )
     {
-        LOG4CPLUS_ERROR(mlog, "detected inconsistency in 'number of longitudes'");
+        LOG4CPLUS_ERROR(mlog, "ERROR: detected inconsistency in 'number of longitudes'");
         return false;
     }
-    if ( MMOD(referenceVInfo->lon0, 360.) != MMOD(currentVInfo->lon0, 360.) )
+
+    if (currentVInfo->gridIsCyclicInLongitude && determineLonIndexShiftForCyclicGrid)
+    {
+        // If both grids are cyclic in longitude, test if the current grid
+        // is shifted in lon w.r.t. reference grid. If yes, determine the
+        // index shift that is required to shift the current grid to the lon
+        // range of the reference grid.
+
+        if (!referenceVInfo->gridIsCyclicInLongitude)
+        {
+            LOG4CPLUS_ERROR(mlog,
+                            "ERROR: grid is cyclic, but reference grid is not");
+            return false;
+        }
+
+        if (currentVInfo->lon0 != referenceVInfo->lon0)
+        {
+            // Determine index shift and store reference lon0. Required in
+            // readGrid().
+            currentVInfo->longitudinalIndexShiftForCyclicGrid =
+                    (referenceVInfo->lon0 - currentVInfo->lon0)
+                    / currentVInfo->dlon;
+
+            currentVInfo->lon0ShiftedReference = referenceVInfo->lon0;
+
+            LOG4CPLUS_DEBUG(mlog,
+                            "INFO: longitudinal shift required to match reference "
+                            "grid (this western lon = "
+                            << currentVInfo->lon0
+                            << " vs. reference western lon = "
+                            << currentVInfo->lon0ShiftedReference
+                            << "), index shift is computed to be "
+                            << currentVInfo->longitudinalIndexShiftForCyclicGrid
+                            << " (dlon is "
+                            << currentVInfo->dlon
+                            << ")");
+        }
+    }
+    else if ( MMOD(referenceVInfo->lon0, 360.) != MMOD(currentVInfo->lon0, 360.) )
     {
         LOG4CPLUS_ERROR(mlog,
-                        "detected inconsistency in 'longitude of first grid"
+                        "ERROR: detected inconsistency in 'longitude of first grid"
                         " point'");
         return false;
     }
+
     if ( referenceVInfo->lat0 != currentVInfo->lat0 )
     {
         LOG4CPLUS_ERROR(mlog,
-                        "detected inconsistency in 'latitude of first grid"
+                        "ERROR: detected inconsistency in 'latitude of first grid"
                         " point'");
         return false;
     }
-    if ( MMOD(referenceVInfo->lon1, 360.) != MMOD(currentVInfo->lon1, 360.) )
+
+    if (currentVInfo->gridIsCyclicInLongitude)
+    {
+        double currentLon1 = currentVInfo->lon1 + (
+                    currentVInfo->longitudinalIndexShiftForCyclicGrid
+                    * currentVInfo->dlon);
+        if ( MMOD(referenceVInfo->lon1, 360.) != MMOD(currentLon1, 360.) )
+            {
+                LOG4CPLUS_ERROR(mlog,
+                                "ERROR: detected inconsistency in 'longitude of last grid"
+                                " point'");
+                return false;
+            }
+    }
+    else if ( MMOD(referenceVInfo->lon1, 360.) != MMOD(currentVInfo->lon1, 360.) )
     {
         LOG4CPLUS_ERROR(mlog,
-                        "detected inconsistency in 'longitude of last grid"
+                        "ERROR: detected inconsistency in 'longitude of last grid"
                         " point'");
         return false;
     }
+
     if ( referenceVInfo->lat1 != currentVInfo->lat1 )
     {
         LOG4CPLUS_ERROR(mlog,
-                        "detected inconsistency in 'latitude of last grid"
+                        "ERROR: detected inconsistency in 'latitude of last grid"
                         " point'");
         return false;
     }
+
     if ( referenceVInfo->dlon != currentVInfo->dlon )
     {
-        LOG4CPLUS_ERROR(mlog, "detected inconsistency in 'i direction increment'");
+        LOG4CPLUS_ERROR(mlog, "ERROR: detected inconsistency in 'i direction increment'");
         return false;
     }
+
     if ( referenceVInfo->dlat != currentVInfo->dlat )
     {
-        LOG4CPLUS_ERROR(mlog, "detected inconsistency in 'j direction increment'");
+        LOG4CPLUS_ERROR(mlog, "ERROR: detected inconsistency in 'j direction increment'");
         return false;
     }
+
     return true;
 }
 

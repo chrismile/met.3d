@@ -86,4 +86,11 @@ MMemoryError::MMemoryError(const std::string &complaint,
 {
 }
 
+
+MGribError::MGribError(const std::string &complaint,
+                       const char *file, int line)
+    : MException("MGribError", complaint, file, line)
+{
+}
+
 } // namespace Met3D
