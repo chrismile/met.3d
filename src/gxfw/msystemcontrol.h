@@ -190,6 +190,14 @@ public:
     QMap<QString, QString> *getDefaultMemoryManagers()
     { return &defaultMemoryManagers; }
 
+    void setBatchMode(bool isActive, QString animType, QString syncName,
+                      QString dataSourceIDForStartTime, int timeRange_sec,
+                      bool quitWhenCompleted, bool overwriteImages);
+
+    bool isInBatchMode();
+
+    void executeBatchMode();   
+
 signals:
     void boundingBoxCreated();
     void boundingBoxDeleted(QString name);
@@ -201,6 +209,10 @@ public slots:
      */
     void actOnQtPropertyChanged(QtProperty *property);
 
+    /**
+      Closes the Met.3D main window, thus quitting the application.
+     */
+    void closeMainWindow();
 
 protected:
     friend class MGLResourcesManager;
@@ -231,6 +243,14 @@ private:
 
     bool met3dAppIsInitialized;
     bool connectedToMetview;
+
+    bool batchModeIsActive;
+    QString batchModeAnimationType;
+    QString syncControlForBatchModeAnimation;
+    QString batchModeDataSourceIDToGetStartTime;
+    int batchModeTimeRange_sec;
+    bool batchModeQuitWhenCompleted;
+    bool batchModeOverwriteImages;
 
     QStringList commandLineArguments;
     QDir met3DHomeDir;

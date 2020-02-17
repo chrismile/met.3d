@@ -139,6 +139,26 @@ public:
      */
     void disconnectSynchronizedObjects();
 
+    /**
+      Returns the delay between two animation steps in milliseconds, as
+      specified by the user in the animation pane.
+     */
+    unsigned int getAnimationDelay_ms();
+
+    /**
+      Enable/disable whether images written to disk in animation mode should
+      automatically be overwritten in case the files already exist.
+     */
+    void setOverwriteAnimationImageSequence(bool overwrite);
+
+    /**
+      Sets the "begin"/"end" animation GUI elements in the animation pane
+      to the first init time in the current list of available init times,
+      and to this time plus the given time range in seconds specified in
+      @p timeRange_sec.
+     */
+    void setAnimationTimeRange(int timeRange_sec);
+
 public slots:
     /**
       Advance scene time by the value specified in @p ui->timeStepSpinBox and
@@ -202,9 +222,14 @@ public slots:
       members. But if loadDataSourcesTimesAndMembers uses all available data
       sources, it checks whether they contain init times, valid times and
       ensemble members and quits quietly if no suitable data source was found.
+
+      If @p resetInitValidToFirstAvailable is @p true, the sync control's init
+      and valid datetime-edits will be reset to the first available init and
+      valid times in the list of allowed times generated from the data sources.
      */
     void restrictControlToDataSources(
-            QStringList selectedDataSources = QStringList());
+            QStringList selectedDataSources=QStringList(),
+            bool resetInitValidToFirstAvailable=false);
 
     /**
       Advance time (forward or backward, depending on settings) in animation
@@ -221,6 +246,12 @@ public slots:
       Stop animation over time.
       */
     void stopTimeAnimation();
+
+    /**
+      Programmatically start the time animation. If @p saveImages is @p true,
+      image saving will be enabled.
+     */
+    void startTimeAnimationProgrammatically(bool saveImages=true);
 
 signals:
     /**
@@ -252,6 +283,10 @@ signals:
 
     void imageOfTimeAnimationReady(QString path, QString fileName);
 
+    void timeAnimationBegins();
+
+    void timeAnimationEnds();
+
 protected slots:
     void onValidDateTimeChange(const QDateTime &datetime);
 
@@ -281,12 +316,20 @@ protected slots:
 
     void onAnimationLoopGroupChanged(QAction *action);
 
+    MSceneViewGLWidget* getSceneViewChosenInAnimationPane();
+
     void activateTimeAnimationImageSaving(bool activate);
-    void saveTimeAnimation();
+
+    /**
+      Emit signal so that connected scene view can save the current image.
+     */
+    void emitSaveImageSignal();
+
     void switchSelectedView(QString viewID);
 
-    void changeSaveTADirectory();
-    void adjustSaveTADirLabelText();
+    void changeSaveAnimationDirectory();
+
+    void adjustSaveAnimationDirectoryLabelText();
 
 private:
     /**
@@ -321,8 +364,6 @@ private:
 
     void setSynchronizationGUIEnabled(bool enabled);
 
-    void emitSaveImageSignal();
-
     void setAnimationTimeToStartTime(QDateTime startDateTime);
 
     /**
@@ -333,11 +374,17 @@ private:
      */
     void debugOutputSyncStatus(QString callPoint);
 
+    bool animationIsActiveAndForwardDateTimeLimitHasBeenReached(
+            QDateTimeEdit *dateTimeEdit);
+
+    bool animationIsActiveAndBackwardDateTimeLimitHasBeenReached(
+            QDateTimeEdit *dateTimeEdit);
+
     Ui::MSyncControl *ui;
 
     // Properties to control time animations.
     QMenu *timeAnimationDropdownMenu;
-    QSpinBox *timeAnimationTimeStepSpinBox;
+    QSpinBox *timeAnimationDelaySpinBox;
     QWidget *timeAnimationFromWidget;
     QWidget *timeAnimationToWidget;
     QHBoxLayout *timeAnimationFromLayout;
@@ -356,13 +403,14 @@ private:
     QTimer *animationTimer;
 
     // Properties to control saving of images of time serie.
-    QCheckBox          *saveTimeAnimationCheckBox;
-    QLineEdit          *saveTAFileNameLineEdit;
-    QComboBox          *saveTAFileExtensionComboBox;
-    QLabel             *saveTADirectoryLabel;
-    QPushButton        *saveTADirectoryChangeButton;
-    QComboBox          *saveTASceneViewsComboBox;
-    MSceneViewGLWidget *saveTASceneView;
+    QCheckBox *saveAnimationImagesCheckBox;
+    QLineEdit *saveAnimationFileNameLineEdit;
+    QComboBox *saveAnimationFileExtensionComboBox;
+    QLabel *saveAnimationDirectoryLabel;
+    QPushButton *saveAnimationDirectoryChangeButton;
+    QComboBox *saveAnimationSceneViewsComboBox;
+    MSceneViewGLWidget *saveAnimationSceneView;
+    bool overwriteAnimationImageSequence;
 
     QString syncID;
 
@@ -384,8 +432,8 @@ private:
     QAction *selectDataSourcesAction;
     QDateTime lastInitDatetime;
     QDateTime lastValidDatetime;
-    QList<QDateTime> availableInitDatetimes;
-    QList<QDateTime> availableValidDatetimes;
+    QList<QDateTime> availableInitDateTimes;
+    QList<QDateTime> availableValidDateTimes;
     QSet<unsigned int> availableEnsembleMembers;
     QList<QAction*> selectedDataSourceActionList;
     QStringList selectedDataSources;

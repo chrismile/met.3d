@@ -788,6 +788,55 @@ void MFrontendConfiguration::initializeFrontendFromConfigFile(
         config.endArray();
     }
 
+    // Read optional BatchMode configuration.
+    // ======================================
+
+    // Batch mode configuration is passed to the system manager; if batch
+    // mode is enabled, it will be started from the MMainWindow::show()
+    // method.
+
+    config.beginGroup("BatchMode");
+
+    bool batchModeFlag = config.value("runInBatchMode", false).toBool();
+    QString batchModeAnimationType =
+            config.value("batchModeAnimationType", "").toString();
+    QString batchModeSychronizationName =
+            config.value("batchModeSychronizationName", "").toString();
+    QString batchModeAnimationStartTimeDataSource =
+            config.value("startAnimationAtFirstInitTimeOfDataSource", "").toString();
+    int batchModeAnimationTimeRange_sec =
+            config.value("animationTimeRangeSeconds", 0).toInt();
+    bool batchModeQuitWhenCompleted =
+            config.value("batchModeQuitWhenCompleted", false).toBool();
+    bool batchModeOverwriteImages =
+            config.value("overwriteExistingImageFiles", false).toBool();
+
+    LOG4CPLUS_DEBUG(mlog, "initialising batch mode.");
+    LOG4CPLUS_DEBUG(mlog, "  batch mode is "
+                    << (batchModeFlag ? "enabled" : "disabled"));
+    LOG4CPLUS_DEBUG(mlog, "  batch mode animation type: "
+                    << batchModeAnimationType.toStdString());
+    LOG4CPLUS_DEBUG(mlog, "  batch mode using sync control: "
+                    << batchModeSychronizationName.toStdString());
+    LOG4CPLUS_DEBUG(mlog, "  batch mode animation starts at first available "
+                          "init time of data source "
+                    << batchModeAnimationStartTimeDataSource.toStdString()
+                    << " and stops after "
+                    << batchModeAnimationTimeRange_sec << " seconds");
+    LOG4CPLUS_DEBUG(mlog, "  quit Met.3D when batch mode has completed: "
+                    << (batchModeQuitWhenCompleted ? "yes" : "no"));
+    LOG4CPLUS_DEBUG(mlog, "  overwrite image files if already present: "
+                    << (batchModeOverwriteImages ? "yes" : "no"));
+
+    sysMC->setBatchMode(batchModeFlag, batchModeAnimationType,
+                        batchModeSychronizationName,
+                        batchModeAnimationStartTimeDataSource,
+                        batchModeAnimationTimeRange_sec,
+                        batchModeQuitWhenCompleted, batchModeOverwriteImages);
+
+    config.endGroup();
+
+
     LOG4CPLUS_INFO(mlog, "Frontend has been configured.");
 }
 

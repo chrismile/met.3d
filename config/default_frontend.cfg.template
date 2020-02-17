@@ -199,3 +199,29 @@ size=0
 #10\dataSource=ECMWF ENS EUR_LL10 ENSFilter
 #10\bbox=-60./30./100./40.
 #10\scenes=Scene 1
+
+
+# Configure batch mode.
+# =============================================================================
+
+[BatchMode]
+# Enable batch mode: If true, also make sure that a pipeline is loaded on
+# startup and a session is loaded (see "loadSessionOnStart" above). Met.3D
+# will load pipeline and session, then trigger the sync control's time
+# animation and write out the generated images.
+runInBatchMode=false
+# Specify the animation type to be used in batch mode. Currently, only
+# "timeAnimation" is available.
+batchModeAnimationType=timeAnimation
+# Specify the name of the sync control to be used for the animation.
+batchModeSychronizationName=Synchronization
+# Start the animation at the first available init time of the specified
+# data source, then advance the animation until the start time plus the
+# specified number of seconds has been reached. For example, to create
+# imagery in the range (init time .. +120hours) specify 120*3600s = 432000 sec.
+startAnimationAtFirstInitTimeOfDataSource=ECMWF ENS ENSFilter
+animationTimeRangeSeconds=+432000
+# Tell the application to quit after the animation has completed?
+batchModeQuitWhenCompleted=true
+# Overwrite image files if already present?
+overwriteExistingImageFiles=true

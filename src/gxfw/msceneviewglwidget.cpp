@@ -85,7 +85,7 @@ MSceneViewGLWidget::MSceneViewGLWidget()
       singleInteractionActor(nullptr),
       enablePropertyEvents(true),
       resizeViewDialog(new MResizeWindowDialog),
-      overwriteImageSerie(false)
+      overwriteImageSequence(false)
 {
     viewIsInitialised = false;
     focusShader = nullptr;
@@ -2423,7 +2423,7 @@ void MSceneViewGLWidget::saveTimeAnimationImage(QString path, QString filename)
 {
     filename = QDir(path).absoluteFilePath(filename);
     QFileInfo checkFile(filename);
-    if (!overwriteImageSerie && checkFile.exists())
+    if (!overwriteImageSequence && checkFile.exists())
     {
 // TODO (bt, 17Oct2016) Use operating system dependend filename splitting.
         QMessageBox::StandardButton reply = QMessageBox::question(
@@ -2441,7 +2441,7 @@ void MSceneViewGLWidget::saveTimeAnimationImage(QString path, QString filename)
         }
         if (reply == QMessageBox::YesAll)
         {
-            overwriteImageSerie = true;
+            overwriteImageSequence = true;
         }
     }
     saveScreenshotToFileName(filename);
