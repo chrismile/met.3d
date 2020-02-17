@@ -82,6 +82,7 @@ MLabelledWidgetAction::MLabelledWidgetAction(
 MSyncControl::MSyncControl(QString id, QWidget *parent) :
     QWidget(parent),
     ui(new Ui::MSyncControl),
+    overwriteAnimationImageSequence(false),
     syncID(id),
     synchronizationInProgress(false),
     forwardBackwardButtonClicked(false),
@@ -91,6 +92,7 @@ MSyncControl::MSyncControl(QString id, QWidget *parent) :
 {
     lastInitDatetime = QDateTime();
     lastValidDatetime = QDateTime();
+
     selectedDataSourceActionList.clear();
     synchronizedObjects = QSet<MSynchronizedObject*>();
     synchronizedObjects.clear();
@@ -177,13 +179,14 @@ MSyncControl::MSyncControl(QString id, QWidget *parent) :
     // ==================================================================
     timeAnimationDropdownMenu = new QMenu(this);
 
-    timeAnimationTimeStepSpinBox = new QSpinBox(this);
-    timeAnimationTimeStepSpinBox->setMinimum(10);
-    timeAnimationTimeStepSpinBox->setMaximum(100000);
-    timeAnimationTimeStepSpinBox->setValue(1000);
-    MLabelledWidgetAction *timeStepSpinBoxAction = new MLabelledWidgetAction(
-                "animation time step:", "ms", timeAnimationTimeStepSpinBox, this);
-    timeAnimationDropdownMenu->addAction(timeStepSpinBoxAction);
+    timeAnimationDelaySpinBox = new QSpinBox(this);
+    timeAnimationDelaySpinBox->setMinimum(10);
+    timeAnimationDelaySpinBox->setMaximum(100000);
+    timeAnimationDelaySpinBox->setValue(1000);
+    MLabelledWidgetAction *animationDelaySpinBoxAction =
+            new MLabelledWidgetAction("delay between animation steps:", "ms",
+                                      timeAnimationDelaySpinBox, this);
+    timeAnimationDropdownMenu->addAction(animationDelaySpinBoxAction);
 
     timeAnimationDropdownMenu->addSeparator();
 
@@ -201,11 +204,11 @@ MSyncControl::MSyncControl(QString id, QWidget *parent) :
     copyInitTimeToAnimationFromButton = new QPushButton("IT", timeAnimationFromWidget);
     copyInitTimeToAnimationFromButton->setMinimumWidth(widthOfCopyButtons);
     copyInitTimeToAnimationFromButton->setMaximumWidth(widthOfCopyButtons);
-    copyInitTimeToAnimationFromButton->setToolTip("set \"from\" to init time");
+    copyInitTimeToAnimationFromButton->setToolTip("copy current init time");
     copyValidTimeToAnimationFromButton = new QPushButton("VT", timeAnimationFromWidget);
     copyValidTimeToAnimationFromButton->setMinimumWidth(widthOfCopyButtons);
     copyValidTimeToAnimationFromButton->setMaximumWidth(widthOfCopyButtons);
-    copyValidTimeToAnimationFromButton->setToolTip("set \"from\" to valid time");
+    copyValidTimeToAnimationFromButton->setToolTip("copy current valid time");
 
     timeAnimationFromLayout = new QHBoxLayout();
     timeAnimationFromLayout->addWidget(timeAnimationFrom);
@@ -234,11 +237,11 @@ MSyncControl::MSyncControl(QString id, QWidget *parent) :
     copyInitTimeToAnimationToButton = new QPushButton("IT", timeAnimationToWidget);
     copyInitTimeToAnimationToButton->setMinimumWidth(widthOfCopyButtons);
     copyInitTimeToAnimationToButton->setMaximumWidth(widthOfCopyButtons);
-    copyInitTimeToAnimationToButton->setToolTip("set \"to\" to init time");
+    copyInitTimeToAnimationToButton->setToolTip("copy current init time");
     copyValidTimeToAnimationToButton = new QPushButton("VT", timeAnimationToWidget);
     copyValidTimeToAnimationToButton->setMinimumWidth(widthOfCopyButtons);
     copyValidTimeToAnimationToButton->setMaximumWidth(widthOfCopyButtons);
-    copyValidTimeToAnimationToButton->setToolTip("set \"to\" to valid time");
+    copyValidTimeToAnimationToButton->setToolTip("copy current valid time");
 
     timeAnimationToLayout = new QHBoxLayout();
     timeAnimationToLayout->addWidget(timeAnimationTo);
@@ -255,6 +258,9 @@ MSyncControl::MSyncControl(QString id, QWidget *parent) :
     connect(copyValidTimeToAnimationToButton, SIGNAL(clicked()),
             SLOT(copyValidToTo()));
 
+    // As default, copy current init/valid times to from/to fields.
+    copyInitToFrom();
+    copyValidToTo();
 
     timeAnimationDropdownMenu->addSeparator();
 
@@ -292,58 +298,78 @@ MSyncControl::MSyncControl(QString id, QWidget *parent) :
     // ===============
     timeAnimationDropdownMenu->addSeparator();
 
-    saveTimeAnimationCheckBox = new QCheckBox("Automatically save screenshots");
-    saveTimeAnimationCheckBox->setToolTip("Activate this to save an image of\n"
-                                          "the selected view after each\n"
-                                          "synchronisation event.");
-    QHBoxLayout *saveTALayout = new QHBoxLayout();
-    saveTALayout->addWidget(saveTimeAnimationCheckBox);
-    saveTALayout->setAlignment(saveTALayout, Qt::AlignLeft);
-    QWidget *saveTAWidget = new QWidget();
-    saveTAWidget->setLayout(saveTALayout);
-    QWidgetAction *saveTAAction = new QWidgetAction(this);
-    saveTAAction->setDefaultWidget(saveTAWidget);
-    timeAnimationDropdownMenu->addAction(saveTAAction);
+    saveAnimationImagesCheckBox = new QCheckBox("Save images to files");
+    saveAnimationImagesCheckBox->setToolTip(
+                "Activate to automatically save an image of\n"
+                "the selected view after each\n"
+                "synchronisation event.");
+    QHBoxLayout *saveAnimationLayout = new QHBoxLayout();
+    saveAnimationLayout->addWidget(saveAnimationImagesCheckBox);
+    saveAnimationLayout->setAlignment(saveAnimationLayout, Qt::AlignLeft);
+    QWidget *saveAnimationWidget = new QWidget();
+    saveAnimationWidget->setLayout(saveAnimationLayout);
+    QWidgetAction *saveAnimationAction = new QWidgetAction(this);
+    saveAnimationAction->setDefaultWidget(saveAnimationWidget);
+    timeAnimationDropdownMenu->addAction(saveAnimationAction);
 
-    saveTADirectoryLabel = new QLabel(QDir::home().absoluteFilePath(
-                                          "met3d/screenshots"));
-    // Create default directory to save screenshots to if it does not exist
-    // already.
-    QDir().mkpath(saveTADirectoryLabel->text());
-    saveTADirectoryLabel->setFixedWidth(175);
+    saveAnimationSceneViewsComboBox = new QComboBox();
+    QStringList sceneViewsIdentifiers;
+    foreach (MSceneViewGLWidget *sceneView,
+             MSystemManagerAndControl::getInstance()->getRegisteredViews())
+    {
+        sceneViewsIdentifiers << QString("view #%1").arg(sceneView->getID()+1);
+    }
+    saveAnimationSceneViewsComboBox->addItems(sceneViewsIdentifiers);
+    QHBoxLayout *sceneViewLayout = new QHBoxLayout();
+    sceneViewLayout->addWidget(saveAnimationSceneViewsComboBox);
+    QWidget *sceneViewWidget = new QWidget();
+    sceneViewWidget->setLayout(sceneViewLayout);
+    MLabelledWidgetAction *sceneViewAction =
+            new MLabelledWidgetAction("Save images of scene view:", "",
+                                      sceneViewWidget, this);
+    timeAnimationDropdownMenu->addAction(sceneViewAction);
+
+    saveAnimationDirectoryLabel = new QLabel(
+                MSystemManagerAndControl::getInstance()
+                ->getMet3DWorkingDirectory().absoluteFilePath("images")
+                );
+    // Create directory to save images to if it does not exist.
+    QDir().mkpath(saveAnimationDirectoryLabel->text());
+    saveAnimationDirectoryLabel->setFixedWidth(175);
     // Set fixed size so the label won't expand the menu.
-    saveTADirectoryLabel->setToolTip(saveTADirectoryLabel->text());
-    adjustSaveTADirLabelText();
-    saveTADirectoryChangeButton = new QPushButton("...");
+    saveAnimationDirectoryLabel->setToolTip(saveAnimationDirectoryLabel->text());
+    adjustSaveAnimationDirectoryLabelText();
+    saveAnimationDirectoryChangeButton = new QPushButton("...");
     QHBoxLayout *directoryLayout = new QHBoxLayout();
-    directoryLayout->addWidget(saveTADirectoryLabel);
-    directoryLayout->addWidget(saveTADirectoryChangeButton);
+    directoryLayout->addWidget(saveAnimationDirectoryLabel);
+    directoryLayout->addWidget(saveAnimationDirectoryChangeButton);
     QWidget *directoryWidget = new QWidget();
     directoryWidget->setLayout(directoryLayout);
     MLabelledWidgetAction *directoryAction =
-            new MLabelledWidgetAction("directory:", "", directoryWidget, this);
+            new MLabelledWidgetAction("to directory:", "", directoryWidget, this);
     timeAnimationDropdownMenu->addAction(directoryAction);
 
-    saveTAFileNameLineEdit = new QLineEdit();
-    saveTAFileNameLineEdit->setFixedWidth(190);
-    saveTAFileNameLineEdit->setText("met3d-image.%it.%vt.%m");
-    saveTAFileNameLineEdit->setToolTip("Press return to save image. "
-                                       "(Only if save animation is active.)");
-    saveTAFileExtensionComboBox = new QComboBox();
+    saveAnimationFileNameLineEdit = new QLineEdit();
+    saveAnimationFileNameLineEdit->setFixedWidth(190);
+    saveAnimationFileNameLineEdit->setText("met3d-image.%it.%vt.%m");
+    saveAnimationFileNameLineEdit->setToolTip(
+                "Press return to save image. "
+                "(Only if 'save animation' is active.)");
+    saveAnimationFileExtensionComboBox = new QComboBox();
     QStringList imageFileExtensions;
     imageFileExtensions << ".png" << ".jpg" << ".bmp" << ".jpeg";
-    saveTAFileExtensionComboBox->addItems(imageFileExtensions);
+    saveAnimationFileExtensionComboBox->addItems(imageFileExtensions);
     QHBoxLayout *fileNameLayout = new QHBoxLayout();
-    fileNameLayout->addWidget(saveTAFileNameLineEdit);
-    fileNameLayout->addWidget(saveTAFileExtensionComboBox);
+    fileNameLayout->addWidget(saveAnimationFileNameLineEdit);
+    fileNameLayout->addWidget(saveAnimationFileExtensionComboBox);
     QWidget *fileNameWidget = new QWidget();
     fileNameWidget->setLayout(fileNameLayout);
     MLabelledWidgetAction *fileNameAction =
-            new MLabelledWidgetAction("file name:", "", fileNameWidget, this);
+            new MLabelledWidgetAction("file names:", "", fileNameWidget, this);
     timeAnimationDropdownMenu->addAction(fileNameAction);
 
     QLabel *fileNameLabel = new QLabel(
-                "[%vt:valid time, %it:init time, %m: member]");
+                "Use placeholder: %vt=valid time, %it=init time, %m=member");
     fileNameLabel->setToolTip("Use these placeholders to insert the according "
                               "values into the filename-string.");
     QHBoxLayout *fileNameLabelLayout = new QHBoxLayout();
@@ -355,28 +381,11 @@ MSyncControl::MSyncControl(QString id, QWidget *parent) :
     fileNameLabelAction->setDefaultWidget(fileNameLabelWidget);
     timeAnimationDropdownMenu->addAction(fileNameLabelAction);
 
-    saveTASceneViewsComboBox = new QComboBox();
-    QStringList sceneViewsIdentifiers;
-    foreach (MSceneViewGLWidget *sceneView,
-             MSystemManagerAndControl::getInstance()->getRegisteredViews())
-    {
-        sceneViewsIdentifiers << QString("view #%1").arg(sceneView->getID() + 1);
-    }
-    saveTASceneViewsComboBox->addItems(sceneViewsIdentifiers);
-    QHBoxLayout *sceneViewLayout = new QHBoxLayout();
-    sceneViewLayout->addWidget(saveTASceneViewsComboBox);
-    QWidget *sceneViewWidget = new QWidget();
-    sceneViewWidget->setLayout(sceneViewLayout);
-    MLabelledWidgetAction *sceneViewAction =
-            new MLabelledWidgetAction("Save image series of scene view:", "",
-                                      sceneViewWidget, this);
-    timeAnimationDropdownMenu->addAction(sceneViewAction);
-
-    connect(saveTADirectoryChangeButton, SIGNAL(clicked()),
-            SLOT(changeSaveTADirectory()));
-    connect(saveTimeAnimationCheckBox, SIGNAL(toggled(bool)),
+    connect(saveAnimationDirectoryChangeButton, SIGNAL(clicked()),
+            SLOT(changeSaveAnimationDirectory()));
+    connect(saveAnimationImagesCheckBox, SIGNAL(toggled(bool)),
             SLOT(activateTimeAnimationImageSaving(bool)));
-    connect(saveTASceneViewsComboBox, SIGNAL(currentIndexChanged(QString)),
+    connect(saveAnimationSceneViewsComboBox, SIGNAL(currentIndexChanged(QString)),
             this, SLOT(switchSelectedView(QString)));
     ui->animationPlayButton->setMenu(timeAnimationDropdownMenu);
 
@@ -407,8 +416,10 @@ MSyncControl::~MSyncControl()
 {
     delete ui;
     selectedDataSourceActionList.clear();
+    selectedDataSources.clear();
     delete configurationDropdownMenu;
     delete selectDataSourcesAction;
+
     // Deregister all registered synchronized object since otherwise this might
     // lead to a system crash if the actor is deleted later.
     disconnectSynchronizedObjects();
@@ -536,7 +547,11 @@ void MSyncControl::synchronizationCompleted(MSynchronizedObject *object)
         currentSyncType = SYNC_UNKNOWN;
 
         endSceneSynchronization();
+
+        // Save the just completed image to file, if applicable in animation
+        // mode.
         emitSaveImageSignal();
+
         synchronizationInProgress = false;
     }
 #ifdef SYNC_DEBUG_OUTPUT
@@ -555,9 +570,88 @@ void MSyncControl::disconnectSynchronizedObjects()
 }
 
 
+unsigned int MSyncControl::getAnimationDelay_ms()
+{
+    return timeAnimationDelaySpinBox->value();
+}
+
+
+void MSyncControl::setOverwriteAnimationImageSequence(bool overwrite)
+{
+    overwriteAnimationImageSequence = overwrite;
+}
+
+
+void MSyncControl::setAnimationTimeRange(int timeRange_sec)
+{
+    if (!availableInitDateTimes.empty())
+    {
+        timeAnimationFrom->setDateTime(availableInitDateTimes.at(0));
+        timeAnimationTo->setDateTime(
+                    availableInitDateTimes.at(0).addSecs(timeRange_sec));
+    }
+}
+
+
 /******************************************************************************
 ***                             PUBLIC SLOTS                                ***
 *******************************************************************************/
+
+bool MSyncControl::animationIsActiveAndForwardDateTimeLimitHasBeenReached(
+        QDateTimeEdit* dateTimeEdit)
+{
+    if (animationTimer->isActive())
+    {
+        if (dateTimeEdit->dateTime() >= timeAnimationTo->dateTime())
+        {
+            if (timeAnimationLoopTimeAction->isChecked())
+            {
+                dateTimeEdit->setDateTime(timeAnimationFrom->dateTime());
+            }
+            else if (timeAnimationBackForthTimeAction->isChecked())
+            {
+                timeAnimationReverseTimeDirectionAction->toggle();
+            }
+            else
+            {
+                stopTimeAnimation();
+            }
+
+            return true;
+        }
+    }
+
+    return false;
+}
+
+
+bool MSyncControl::animationIsActiveAndBackwardDateTimeLimitHasBeenReached(
+        QDateTimeEdit* dateTimeEdit)
+{
+    if (animationTimer->isActive())
+    {
+        if (dateTimeEdit->dateTime() <= timeAnimationFrom->dateTime())
+        {
+            if (timeAnimationLoopTimeAction->isChecked())
+            {
+                dateTimeEdit->setDateTime(timeAnimationTo->dateTime());
+            }
+            else if (timeAnimationBackForthTimeAction->isChecked())
+            {
+                timeAnimationReverseTimeDirectionAction->toggle();
+            }
+            else
+            {
+                stopTimeAnimation();
+            }
+
+            return true;
+        }
+    }
+
+    return false;
+}
+
 
 void MSyncControl::timeForward()
 {
@@ -566,18 +660,11 @@ void MSyncControl::timeForward()
         // Index 0 of stepChooseVTITComboBox means that the valid time should
         // be modified by the time navigation buttons.
 
-        if ( animationTimer->isActive() )
-            if (ui->validTimeEdit->dateTime() >= timeAnimationTo->dateTime() )
-            {
-                if ( timeAnimationLoopTimeAction->isChecked() )
-                    ui->validTimeEdit->setDateTime(timeAnimationFrom->dateTime());
-                else if ( timeAnimationBackForthTimeAction->isChecked() )
-                    timeAnimationReverseTimeDirectionAction->toggle();
-                else
-                    stopTimeAnimation();
-
-                return;
-            }
+        if (animationIsActiveAndForwardDateTimeLimitHasBeenReached(
+                    ui->validTimeEdit))
+        {
+            return;
+        }
 
         applyTimeStep(ui->validTimeEdit, 1);
     }
@@ -585,18 +672,11 @@ void MSyncControl::timeForward()
     {
         // Modify initialisation time.
 
-        if ( animationTimer->isActive() )
-            if (ui->initTimeEdit->dateTime() >= timeAnimationTo->dateTime() )
-            {
-                if ( timeAnimationLoopTimeAction->isChecked() )
-                    ui->initTimeEdit->setDateTime(timeAnimationFrom->dateTime());
-                else if ( timeAnimationBackForthTimeAction->isChecked() )
-                    timeAnimationReverseTimeDirectionAction->toggle();
-                else
-                    stopTimeAnimation();
-
-                return;
-            }
+        if (animationIsActiveAndForwardDateTimeLimitHasBeenReached(
+                    ui->initTimeEdit))
+        {
+            return;
+        }
 
         applyTimeStep(ui->initTimeEdit, 1);
     }
@@ -604,31 +684,12 @@ void MSyncControl::timeForward()
     {
         // Both valid and init time should be changed simultaniously.
 
-        if ( animationTimer->isActive() )
+        if (animationIsActiveAndForwardDateTimeLimitHasBeenReached(
+                    ui->validTimeEdit)
+                || animationIsActiveAndForwardDateTimeLimitHasBeenReached(
+                    ui->initTimeEdit))
         {
-            if (ui->validTimeEdit->dateTime() >= timeAnimationTo->dateTime() )
-            {
-                if ( timeAnimationLoopTimeAction->isChecked() )
-                    ui->validTimeEdit->setDateTime(timeAnimationFrom->dateTime());
-                else if ( timeAnimationBackForthTimeAction->isChecked() )
-                    timeAnimationReverseTimeDirectionAction->toggle();
-                else
-                    stopTimeAnimation();
-
-                return;
-            }
-
-            if (ui->initTimeEdit->dateTime() >= timeAnimationTo->dateTime() )
-            {
-                if ( timeAnimationLoopTimeAction->isChecked() )
-                    ui->initTimeEdit->setDateTime(timeAnimationFrom->dateTime());
-                else if ( timeAnimationBackForthTimeAction->isChecked() )
-                    timeAnimationReverseTimeDirectionAction->toggle();
-                else
-                    stopTimeAnimation();
-
-                return;
-            }
+            return;
         }
 
         forwardBackwardButtonClicked = true;
@@ -643,73 +704,34 @@ void MSyncControl::timeBackward()
 {
     if (ui->stepChooseVTITComboBox->currentIndex() == 0)
     {
-        // Index 0 of stepChooseVTITComboBox means that the valid time should
-        // be modified by the time navigation buttons.
-
-        if ( animationTimer->isActive() )
-            if (ui->validTimeEdit->dateTime() <= timeAnimationFrom->dateTime() )
-            {
-                if ( timeAnimationLoopTimeAction->isChecked() )
-                    ui->validTimeEdit->setDateTime(timeAnimationTo->dateTime());
-                else if ( timeAnimationBackForthTimeAction->isChecked() )
-                    timeAnimationReverseTimeDirectionAction->toggle();
-                else
-                    stopTimeAnimation();
-
-                return;
-            }
+        if (animationIsActiveAndBackwardDateTimeLimitHasBeenReached(
+                    ui->validTimeEdit))
+        {
+            return;
+        }
 
         applyTimeStep(ui->validTimeEdit, -1);
     }
     else if (ui->stepChooseVTITComboBox->currentIndex() == 1)
     {
-        // Modify initialisation time.
-
-        if ( animationTimer->isActive() )
-            if (ui->initTimeEdit->dateTime() <= timeAnimationFrom->dateTime() )
-            {
-                if ( timeAnimationLoopTimeAction->isChecked() )
-                    ui->initTimeEdit->setDateTime(timeAnimationTo->dateTime());
-                else if ( timeAnimationBackForthTimeAction->isChecked() )
-                    timeAnimationReverseTimeDirectionAction->toggle();
-                else
-                    stopTimeAnimation();
-
-                return;
-            }
+        if (animationIsActiveAndBackwardDateTimeLimitHasBeenReached(
+                    ui->initTimeEdit))
+        {
+            return;
+        }
 
         applyTimeStep(ui->initTimeEdit, -1);
     }
     else
     {
-        // Both valid and init time should be changed simultaniously.
-
-        if ( animationTimer->isActive() )
+        if (animationIsActiveAndBackwardDateTimeLimitHasBeenReached(
+                    ui->validTimeEdit)
+                || animationIsActiveAndBackwardDateTimeLimitHasBeenReached(
+                    ui->initTimeEdit))
         {
-            if (ui->validTimeEdit->dateTime() <= timeAnimationTo->dateTime() )
-            {
-                if ( timeAnimationLoopTimeAction->isChecked() )
-                    ui->validTimeEdit->setDateTime(timeAnimationFrom->dateTime());
-                else if ( timeAnimationBackForthTimeAction->isChecked() )
-                    timeAnimationReverseTimeDirectionAction->toggle();
-                else
-                    stopTimeAnimation();
-
-                return;
-            }
-
-            if (ui->initTimeEdit->dateTime() <= timeAnimationTo->dateTime() )
-            {
-                if ( timeAnimationLoopTimeAction->isChecked() )
-                    ui->initTimeEdit->setDateTime(timeAnimationFrom->dateTime());
-                else if ( timeAnimationBackForthTimeAction->isChecked() )
-                    timeAnimationReverseTimeDirectionAction->toggle();
-                else
-                    stopTimeAnimation();
-
-                return;
-            }
+            return;
         }
+
         forwardBackwardButtonClicked = true;
 
         applyTimeStep(ui->validTimeEdit, -1);
@@ -742,7 +764,12 @@ void MSyncControl::selectDataSources()
         return;
     }
 
+    // Restrict the sync control's allowed init/valid times to those available
+    // from the selected data sources; also update the current from/to times
+    // in the animation menu.
     restrictControlToDataSources(selectedDataSources);
+    copyInitToFrom();
+    copyValidToTo();
 }
 
 
@@ -857,7 +884,7 @@ void MSyncControl::saveConfiguration(QSettings *settings)
 
     settings->beginGroup("Animation");
     settings->setValue("animationTimeStep",
-                      timeAnimationTimeStepSpinBox->value());
+                      timeAnimationDelaySpinBox->value());
     settings->setValue("fromTime",
                       timeAnimationFrom->dateTime());
     settings->setValue("toTime",
@@ -870,11 +897,11 @@ void MSyncControl::saveConfiguration(QSettings *settings)
     settings->endGroup();
 
     settings->beginGroup("TimeSeries");
-    settings->setValue("fileName", saveTAFileNameLineEdit->text());
+    settings->setValue("fileName", saveAnimationFileNameLineEdit->text());
     settings->setValue("fileExtension",
-                       saveTAFileExtensionComboBox->currentText());
-    settings->setValue("sceneView", saveTASceneViewsComboBox->currentText());
-    settings->setValue("directory", saveTADirectoryLabel->toolTip());
+                       saveAnimationFileExtensionComboBox->currentText());
+    settings->setValue("sceneView", saveAnimationSceneViewsComboBox->currentText());
+    settings->setValue("directory", saveAnimationDirectoryLabel->toolTip());
     settings->endGroup();
 }
 
@@ -926,7 +953,7 @@ void MSyncControl::loadConfiguration(QSettings *settings)
     settings->endGroup();
 
     settings->beginGroup("Animation");
-    timeAnimationTimeStepSpinBox->setValue(
+    timeAnimationDelaySpinBox->setValue(
                 settings->value("animationTimeStep", 1000).toInt());
     timeAnimationFrom->setDateTime(settings->value("fromTime").toDateTime());
     timeAnimationTo->setDateTime(settings->value("toTime").toDateTime());
@@ -938,11 +965,11 @@ void MSyncControl::loadConfiguration(QSettings *settings)
 
     settings->beginGroup("TimeSeries");
 
-    saveTAFileNameLineEdit->setText(
+    saveAnimationFileNameLineEdit->setText(
                 settings->value("fileName",
                                 "met3d-image.%it.%vt.%m").toString());
 
-    int index = saveTAFileExtensionComboBox->findText(
+    int index = saveAnimationFileExtensionComboBox->findText(
             settings->value("fileExtension", ".png").toString());
     if (index < 0)
     {
@@ -951,12 +978,12 @@ void MSyncControl::loadConfiguration(QSettings *settings)
                              "The file extension '" + fileExt
                              + "' is invalid.\n"
                                "Setting file extension to '.png'.");
-        index = saveTAFileExtensionComboBox->findText(".png");
+        index = saveAnimationFileExtensionComboBox->findText(".png");
     }
-    saveTAFileExtensionComboBox->setCurrentIndex(index);
+    saveAnimationFileExtensionComboBox->setCurrentIndex(index);
 
-    QString sceneView0 = saveTASceneViewsComboBox->itemText(0);
-    index = saveTASceneViewsComboBox->findText(
+    QString sceneView0 = saveAnimationSceneViewsComboBox->itemText(0);
+    index = saveAnimationSceneViewsComboBox->findText(
                 settings->value("sceneView", sceneView0).toString());
     if (index < 0)
     {
@@ -967,7 +994,7 @@ void MSyncControl::loadConfiguration(QSettings *settings)
                              + sceneView0 + "'.");
         index = 0;
     }
-    saveTASceneViewsComboBox->setCurrentIndex(index);
+    saveAnimationSceneViewsComboBox->setCurrentIndex(index);
 
     QString defaultDir = QDir::home().absoluteFilePath("met3d/screenshots");
     QString dir = settings->value("directory", defaultDir).toString();
@@ -984,9 +1011,9 @@ void MSyncControl::loadConfiguration(QSettings *settings)
         // already.
         QDir().mkpath(defaultDir);
     }
-    saveTADirectoryLabel->setToolTip(dir);
-    saveTADirectoryLabel->setText(dir);
-    adjustSaveTADirLabelText();
+    saveAnimationDirectoryLabel->setToolTip(dir);
+    saveAnimationDirectoryLabel->setText(dir);
+    adjustSaveAnimationDirectoryLabelText();
 
     settings->endGroup();
 }
@@ -1067,17 +1094,22 @@ void MSyncControl::restrictToDataSourcesFromSettings(
         }
     }
 
-    // Use the suitable data sources set to setup the sync control.
+    // Restrict the sync control's allowed init/valid times to those available
+    // from the selected data sources; also update the current from/to times
+    // in the animation menu.
     restrictControlToDataSources(suitableDataSources);
+    copyInitToFrom();
+    copyValidToTo();
 }
 
 
-void MSyncControl::restrictControlToDataSources(QStringList selectedDataSources)
+void MSyncControl::restrictControlToDataSources(
+        QStringList selectedDataSources, bool resetInitValidToFirstAvailable)
 {
-
     MSystemManagerAndControl* sysMC = MSystemManagerAndControl::getInstance();
-    // Remove Actions displaying names of lastly selected data sources.
-    foreach (QAction *action, selectedDataSourceActionList)
+
+    // Clear GUI drop down menu displaying selected data sources.
+    for (QAction *action : selectedDataSourceActionList)
     {
         configurationDropdownMenu->removeAction(action);
     }
@@ -1087,11 +1119,12 @@ void MSyncControl::restrictControlToDataSources(QStringList selectedDataSources)
 // lists and contains since for version 4.8 there is no qHash method for QDateTime
 // and thus it is not possible to use toSet on QList<QDateTime>.
 // (See: http://doc.qt.io/qt-5/qhash.html#qHashx)
-    availableInitDatetimes.clear();
-    availableValidDatetimes.clear();
+    availableInitDateTimes.clear();
+    availableValidDateTimes.clear();
     availableEnsembleMembers.clear();
 
-    // Use all data sources if no data sources are given.
+    // If no list of data sources is passed to this function, use all data
+    // sources registered in the system.
     if (selectedDataSources.empty())
     {
         QStringList availableDataSources = sysMC->getDataSourceIdentifiers();
@@ -1099,7 +1132,7 @@ void MSyncControl::restrictControlToDataSources(QStringList selectedDataSources)
         // Check for each data sourcs if it is suitable to restrict control.
         // Since in the list of all data sources might be data sources without
         // time and member informations.
-        foreach (QString dataSourceID, availableDataSources)
+        for (QString dataSourceID : availableDataSources)
         {
             MWeatherPredictionDataSource* source =
                     dynamic_cast<MWeatherPredictionDataSource*>
@@ -1112,10 +1145,9 @@ void MSyncControl::restrictControlToDataSources(QStringList selectedDataSources)
                 selectedDataSources.append(dataSourceID);
             }
         }
-
     }
 
-    // Return if no data sources are available.
+    // If no data sources are available return from this method.
     if (selectedDataSources.empty())
     {
         return;
@@ -1127,17 +1159,12 @@ void MSyncControl::restrictControlToDataSources(QStringList selectedDataSources)
     variables.clear();
     currentInitTimes.clear();
     currentValidTimes.clear();
+
     this->selectedDataSources = selectedDataSources;
 
-// TODO (bt, 23Feb2017): If updated to Qt 5.0 use QSets and unite instead of
-// lists and contains since for version 4.8 there is no qHash method for QDateTime
-// and thus it is not possible to use toSet on QList<QDateTime>.
-// (See: http://doc.qt.io/qt-5/qhash.html#qHashx)
-    availableInitDatetimes.clear();
-    availableValidDatetimes.clear();
-    availableEnsembleMembers.clear();
-
-    foreach (QString dataSourceID, selectedDataSources)
+    // From each data source in the list, determine the available init and
+    // valid times.
+    for (QString dataSourceID : selectedDataSources)
     {
         MWeatherPredictionDataSource* source =
                 dynamic_cast<MWeatherPredictionDataSource*>
@@ -1148,85 +1175,102 @@ void MSyncControl::restrictControlToDataSources(QStringList selectedDataSources)
                     configurationDropdownMenu->addAction(dataSourceID));
 
         QList<MVerticalLevelType> levelTypes = source->availableLevelTypes();
-        for (int ilvl = 0; ilvl < levelTypes.size(); ilvl++)
+        for (MVerticalLevelType levelType : levelTypes)
         {
-            MVerticalLevelType levelType = levelTypes.at(ilvl);
-
             QStringList variables = source->availableVariables(levelType);
 
-            for (int ivar = 0; ivar < variables.size(); ivar++)
+            for (QString var : variables)
             {
-                QString var = variables.at(ivar);
-                currentInitTimes =
-                        source->availableInitTimes(levelType, var);
+                currentInitTimes = source->availableInitTimes(levelType, var);
+
                 if (currentInitTimes.empty())
                 {
                     continue;
                 }
 
-                for (int iInitTime = 0; iInitTime < currentInitTimes.size();
-                     iInitTime++)
+                for (QDateTime initTime : currentInitTimes)
                 {
-                    QDateTime initTime = currentInitTimes.at(iInitTime);
-                    if (!availableInitDatetimes.contains(initTime))
+                    if (!availableInitDateTimes.contains(initTime))
                     {
-                        availableInitDatetimes.append(initTime);
+                        availableInitDateTimes.append(initTime);
                     }
-                    currentValidTimes = source->availableValidTimes(levelType,
-                                                                    var,
-                                                                    initTime);
+
+                    currentValidTimes = source->availableValidTimes(
+                                levelType, var, initTime);
                     if (currentValidTimes.empty())
                     {
                         continue;
                     }
 
-                    for (int iValidTime = 0; iValidTime < currentValidTimes.size();
-                         iValidTime++)
+                    for (QDateTime validTime : currentValidTimes)
                     {
-                        QDateTime validTime = currentValidTimes[iValidTime];
-                        if (!availableValidDatetimes.contains(validTime))
+                        if (!availableValidDateTimes.contains(validTime))
                         {
-                            availableValidDatetimes.append(validTime);
+                            availableValidDateTimes.append(validTime);
                         }
                     } // validTimes
                 } // initTimes
+
                 availableEnsembleMembers =
                         availableEnsembleMembers.unite(
                             source->availableEnsembleMembers(levelType, var));
+
                 // Sort available times for finding the nearest time if the
                 // user selects a missing time.
-                qSort(availableInitDatetimes);
-                qSort(availableValidDatetimes);
+                qSort(availableInitDateTimes);
+                qSort(availableValidDateTimes);
             } // variables
         } // levelTypes
     } // dataSources
 
-    // Search for minium and maximum date values to restrict the time edits to
-    // them respectively.
-    QDateTime minTime = availableInitDatetimes.first();
-    QDateTime maxTime = minTime;
-    foreach (QDateTime time, availableInitDatetimes)
+    // Store previous date times of init/valid GUI fields.
+    QDateTime previousInitTime = ui->initTimeEdit->dateTime();
+    QDateTime previousValidTime = ui->validTimeEdit->dateTime();
+    int previousEnsembleMember = ensembleMember();
+
+    // Search for earliest and latest init date values to restrict the init
+    // time edits to them.
+    QDateTime earliestDateTime = availableInitDateTimes.first();
+    QDateTime latestDateTime = earliestDateTime;
+    foreach (QDateTime dateTime, availableInitDateTimes)
     {
-        minTime = min(time, minTime);
-        maxTime = max(time, maxTime);
+        earliestDateTime = min(dateTime, earliestDateTime);
+        latestDateTime = max(dateTime, latestDateTime);
     }
-    ui->initTimeEdit->setDateRange(minTime.date(), maxTime.date());
+    ui->initTimeEdit->setDateRange(earliestDateTime.date(), latestDateTime.date());
     // Set time range to full day since otherwise it is not possible to change
     // the time properly for the first and last day of the range.
     ui->initTimeEdit->setTimeRange(QTime(0,0,0), QTime(23,59,59));
-    lastInitDatetime = minTime;
-    minTime = availableValidDatetimes.first();
-    maxTime = minTime;
-    foreach (QDateTime time, availableValidDatetimes)
+    lastInitDatetime = earliestDateTime;
+
+    // The same for valid times.
+    earliestDateTime = availableValidDateTimes.first();
+    latestDateTime = earliestDateTime;
+    foreach (QDateTime dateTime, availableValidDateTimes)
     {
-        minTime = min(time, minTime);
-        maxTime = max(time, maxTime);
+        earliestDateTime = min(dateTime, earliestDateTime);
+        latestDateTime = max(dateTime, latestDateTime);
     }
-    ui->validTimeEdit->setDateRange(minTime.date(), maxTime.date());
+    ui->validTimeEdit->setDateRange(earliestDateTime.date(), latestDateTime.date());
     // Set time range to full day since otherwise it is not possible to change
     // the time properly for the first and last day of the range.
     ui->validTimeEdit->setTimeRange(QTime(0,0,0), QTime(23,59,59));
-    lastValidDatetime = minTime;
+    lastValidDatetime = earliestDateTime;
+
+    // Check if previous init/valid times are still in new range of available
+    // times -- if not, reset to first available init/valid time. Also reset
+    // to first available if "resetInitValidToFirstAvailable" is true.
+    if (!availableInitDateTimes.contains(previousInitTime)
+            || resetInitValidToFirstAvailable)
+    {
+       ui->initTimeEdit->setDateTime(lastInitDatetime);
+    }
+    if (!availableValidDateTimes.contains(previousValidTime)
+            || resetInitValidToFirstAvailable)
+    {
+       ui->validTimeEdit->setDateTime(lastValidDatetime);
+    }
+    updateTimeDifference();
 
     QStringList memberList;
     QList<unsigned int> intMemberList;
@@ -1236,14 +1280,16 @@ void MSyncControl::restrictControlToDataSources(QStringList selectedDataSources)
     // value.
     intMemberList = availableEnsembleMembers.toList();
     qSort(intMemberList);
-    foreach (unsigned int member, intMemberList)
+    for (unsigned int member : intMemberList)
     {
         memberList.append(QString("%1").arg(member));
     }
     ui->ensembleMemberComboBox->addItems(memberList);
+    // Restore previous ensemble member, if possible.
+    setEnsembleMember(previousEnsembleMember);
 
     // Disable all data source entries since they are supposed to be just labels.
-    foreach (QAction *action, selectedDataSourceActionList)
+    for (QAction *action : selectedDataSourceActionList)
     {
         action->setEnabled(false);
     }
@@ -1252,16 +1298,26 @@ void MSyncControl::restrictControlToDataSources(QStringList selectedDataSources)
 
 void MSyncControl::timeAnimationAdvanceTimeStep()
 {
+    // This method is called by the animationTimer to advance the animation
+    // to the next time step.
+
 #ifdef DIRECT_SYNCHRONIZATION
-    // Don't apply the time change if the previous request hasn't been
-    // completed.
-    if (synchronizationInProgress) return;
+    // In case the previous request hasn't been completed yet, do nothing!
+    // We will advance the time step the next time the timer times out.
+    if (synchronizationInProgress)
+    {
+        return;
+    }
 #endif
 
-    if ( timeAnimationReverseTimeDirectionAction->isChecked() )
+    if (timeAnimationReverseTimeDirectionAction->isChecked())
+    {
         timeBackward();
+    }
     else
+    {
         timeForward();
+    }
 }
 
 
@@ -1275,6 +1331,7 @@ void MSyncControl::startTimeAnimation()
         timeAnimationDropdownMenu->setEnabled(false);
         setTimeSynchronizationGUIEnabled(false);
 
+        // Set the init/valid datetime edits to the animation start time.
         if (timeAnimationLoopGroup->checkedAction()
                 == timeAnimationSinglePassAction)
         {
@@ -1288,8 +1345,27 @@ void MSyncControl::startTimeAnimation()
             }
         }
 
-        // Start the animation timer.
-        animationTimer->start(timeAnimationTimeStepSpinBox->value());
+        // Pass to scene view that generates animation images: Force to
+        // overwrite images in case files already exist?
+        getSceneViewChosenInAnimationPane()->forceOverwriteImageSequence(
+                    overwriteAnimationImageSequence);
+
+        // Emit the "timeAnimationBegins" signal.
+        emit timeAnimationBegins();
+
+        // Save the current image (the next image will be stored after the next
+        // synchronization event, triggered by the animationTimer, has
+        // completed) UNLESS the previous synchronization request is still in
+        // progress -- in this case the image will be stored upon completion
+        // of synchronization (see synchronizationCompleted()).
+        if (!synchronizationInProgress)
+        {
+            emitSaveImageSignal();
+        }
+
+        // Start the animation timer. It will periodically call
+        // timeAnimationAdvanceTimeStep().
+        animationTimer->start(timeAnimationDelaySpinBox->value());
     }
 }
 
@@ -1305,13 +1381,28 @@ void MSyncControl::stopTimeAnimation()
     timeAnimationDropdownMenu->setEnabled(true);
     setTimeSynchronizationGUIEnabled(true);
     ui->animationStopButton->setEnabled(false);
+
+    // Reset option to overwrite existing images.
+    getSceneViewChosenInAnimationPane()->forceOverwriteImageSequence(false);
+
+    // Emit the "timeAnimationEnds" signal.
+    emit timeAnimationEnds();
+}
+
+
+void MSyncControl::startTimeAnimationProgrammatically(bool saveImages)
+{
+    saveAnimationImagesCheckBox->setChecked(saveImages);
+
+    ui->animationPlayButton->setChecked(true);
+    startTimeAnimation();
 }
 
 
 void MSyncControl::onValidDateTimeChange(const QDateTime &datetime)
 {
     // Only restrict valid time to available valid if times they are set yet.
-    if (!availableValidDatetimes.empty())
+    if (!availableValidDateTimes.empty())
     {
         // Reseting to previous time - do nothing.
         if (lastValidDatetime == datetime)
@@ -1320,9 +1411,9 @@ void MSyncControl::onValidDateTimeChange(const QDateTime &datetime)
         }
         // Check if selected time is part of available times. If not, reset to
         // previous time.
-        if (!availableValidDatetimes.contains(datetime))
+        if (!availableValidDateTimes.contains(datetime))
         {
-            handleMissingDateTime(ui->validTimeEdit, &availableValidDatetimes,
+            handleMissingDateTime(ui->validTimeEdit, &availableValidDateTimes,
                                   datetime, &lastValidDatetime);
             return;
         }
@@ -1372,7 +1463,7 @@ void MSyncControl::onValidDateTimeChange(const QDateTime &datetime)
 void MSyncControl::onInitDateTimeChange(const QDateTime &datetime)
 {
     // Only restrict init time to available init times if they are set yet.
-    if (!availableInitDatetimes.empty())
+    if (!availableInitDateTimes.empty())
     {
         // Reseting to previous time - do nothing.
         if (lastInitDatetime == datetime)
@@ -1387,9 +1478,9 @@ void MSyncControl::onInitDateTimeChange(const QDateTime &datetime)
         }
         // Check if selected time is part of available times. If not, reset to
         // previous time.
-        if (!availableInitDatetimes.contains(datetime))
+        if (!availableInitDateTimes.contains(datetime))
         {
-            handleMissingDateTime(ui->initTimeEdit, &availableInitDatetimes,
+            handleMissingDateTime(ui->initTimeEdit, &availableInitDateTimes,
                                   datetime, &lastInitDatetime);
             return;
         }
@@ -1488,85 +1579,83 @@ void MSyncControl::onAnimationLoopGroupChanged(QAction *action)
 {
     if (action == timeAnimationSinglePassAction)
     {
-        saveTimeAnimationCheckBox->setEnabled(true);
+        saveAnimationImagesCheckBox->setEnabled(true);
     }
     else
     {
-        if (saveTimeAnimationCheckBox->isChecked())
+        if (saveAnimationImagesCheckBox->isChecked())
         {
-            saveTimeAnimationCheckBox->setChecked(false);
+            saveAnimationImagesCheckBox->setChecked(false);
         }
-        saveTimeAnimationCheckBox->setEnabled(false);
+        saveAnimationImagesCheckBox->setEnabled(false);
     }
 }
 
 
-void MSyncControl::activateTimeAnimationImageSaving(bool activate)
+MSceneViewGLWidget* MSyncControl::getSceneViewChosenInAnimationPane()
 {
     unsigned int sceneViewID =
-            saveTASceneViewsComboBox->currentText().split("#").at(1).toUInt();
-    MSceneViewGLWidget *currentSceneView;
-    foreach (currentSceneView,
-             MSystemManagerAndControl::getInstance()->getRegisteredViews())
+            saveAnimationSceneViewsComboBox->currentText().split("#").at(1).toUInt();
+
+    MSceneViewGLWidget *sView = nullptr;
+    foreach (sView, MSystemManagerAndControl::getInstance()->getRegisteredViews())
     {
-        if (currentSceneView->getID() + 1 == sceneViewID)
+        if (sView->getID() + 1 == sceneViewID)
         {
             break;
         }
     }
 
+    return sView;
+}
+
+
+void MSyncControl::activateTimeAnimationImageSaving(bool activate)
+{
+    MSceneViewGLWidget *animSceneView = getSceneViewChosenInAnimationPane();
+
     if (activate)
     {
-        saveTASceneView = currentSceneView;
+        saveAnimationSceneView = animSceneView;
 
         connect(this, SIGNAL(imageOfTimeAnimationReady(QString, QString)),
-                saveTASceneView,
+                saveAnimationSceneView,
                 SLOT(saveTimeAnimationImage(QString, QString)));
 
         // Connect editable save animation gui elements to achieve saving if
         // one is changed.
-        connect(saveTAFileNameLineEdit, SIGNAL(returnPressed()),
-                this, SLOT(saveTimeAnimation()));
+        connect(saveAnimationFileNameLineEdit, SIGNAL(returnPressed()),
+                this, SLOT(emitSaveImageSignal()));
 
-        if (!currentSceneView->isVisible())
+        if (!animSceneView->isVisible())
         {
             QMessageBox::warning(
                         this, "Warning",
-                        QString("View #%1 is not visible.\n"
+                        QString("View #%1 selected in time animation pane is not visible.\n"
                                 "Please select another view or view layout.\n"
-                                "(No images will be saved.)").arg(sceneViewID));
-            saveTimeAnimationCheckBox->setChecked(false);
+                                "(No images will be saved.)").arg(animSceneView->getID()+1));
+            saveAnimationImagesCheckBox->setChecked(false);
             return;
         }
     }
     else
     {
         disconnect(this, SIGNAL(imageOfTimeAnimationReady(QString, QString)),
-                   saveTASceneView,
+                   saveAnimationSceneView,
                    SLOT(saveTimeAnimationImage(QString, QString)));
 
         // Disconnect editable save animation gui elements.
-        disconnect(saveTAFileNameLineEdit, SIGNAL(returnPressed()),
-                   this, SLOT(saveTimeAnimation()));
+        disconnect(saveAnimationFileNameLineEdit, SIGNAL(returnPressed()),
+                   this, SLOT(emitSaveImageSignal()));
 
-        currentSceneView->setOverwriteImageSerie(false);
-    }
-}
-
-
-void MSyncControl::saveTimeAnimation()
-{
-    if (saveTimeAnimationCheckBox->isChecked())
-    {
-        // Write first image.
-        emitSaveImageSignal();
+        animSceneView->forceOverwriteImageSequence(false);
     }
 }
 
 
 void MSyncControl::switchSelectedView(QString viewID)
 {
-    if (saveTimeAnimationCheckBox->isChecked())
+    if (saveAnimationImagesCheckBox->isChecked())
     {
         unsigned int sceneViewID = viewID.split("#").at(1).toUInt();
         MSceneViewGLWidget *currentSceneView;
@@ -1589,36 +1678,37 @@ void MSyncControl::switchSelectedView(QString viewID)
                         QString("View #%1 is not visible.\n"
                                 "Please select another view or view layout.\n"
                                 "(No images will be saved.)").arg(sceneViewID));
-            saveTimeAnimationCheckBox->setChecked(false);
+            saveAnimationImagesCheckBox->setChecked(false);
             return;
         }
         // Disconnect previous scene view.
         disconnect(this, SIGNAL(imageOfTimeAnimationReady(QString, QString)),
-                   saveTASceneView,
+                   saveAnimationSceneView,
                    SLOT(saveTimeAnimationImage(QString, QString)));
 
-        saveTASceneView = currentSceneView;
+        saveAnimationSceneView = currentSceneView;
 
         // Connect selected scene view.
         connect(this, SIGNAL(imageOfTimeAnimationReady(QString, QString)),
-                saveTASceneView,
+                saveAnimationSceneView,
                 SLOT(saveTimeAnimationImage(QString, QString)));
     }
 }
 
 
-void MSyncControl::changeSaveTADirectory()
+void MSyncControl::changeSaveAnimationDirectory()
 {
     QString path = QFileDialog::getExistingDirectory(
-                this, "Select save directory", saveTADirectoryLabel->toolTip());
+                this, "Select directory in which image file shall be stored",
+                saveAnimationDirectoryLabel->toolTip());
     if (path != "")
     {
         // Only change to directory to which Met.3D has write access.
         if (QFileInfo(path).isWritable())
         {
-            saveTADirectoryLabel->setText(path);
-            saveTADirectoryLabel->setToolTip(path);
-            adjustSaveTADirLabelText();
+            saveAnimationDirectoryLabel->setText(path);
+            saveAnimationDirectoryLabel->setToolTip(path);
+            adjustSaveAnimationDirectoryLabelText();
         }
         else
         {
@@ -1633,21 +1723,21 @@ void MSyncControl::changeSaveTADirectory()
 }
 
 
-void MSyncControl::adjustSaveTADirLabelText()
+void MSyncControl::adjustSaveAnimationDirectoryLabelText()
 {
-    QString path = saveTADirectoryLabel->text();
-    int textWidth = saveTADirectoryLabel->fontMetrics().width(path);
-    if (textWidth > saveTADirectoryLabel->width())
+    QString path = saveAnimationDirectoryLabel->text();
+    int textWidth = saveAnimationDirectoryLabel->fontMetrics().width(path);
+    if (textWidth > saveAnimationDirectoryLabel->width())
     {
         int dotsWidth =
-                saveTADirectoryLabel->fontMetrics().width("...");
-        while (textWidth + dotsWidth > saveTADirectoryLabel->width())
+                saveAnimationDirectoryLabel->fontMetrics().width("...");
+        while (textWidth + dotsWidth > saveAnimationDirectoryLabel->width())
         {
             path.chop(1);
             textWidth =
-                    saveTADirectoryLabel->fontMetrics().width(path);
+                    saveAnimationDirectoryLabel->fontMetrics().width(path);
         }
-        saveTADirectoryLabel->setText(path + "...");
+        saveAnimationDirectoryLabel->setText(path + "...");
     }
 }
 
@@ -1889,8 +1979,13 @@ void MSyncControl::setSynchronizationGUIEnabled(bool enabled)
 
 void MSyncControl::emitSaveImageSignal()
 {
+    if (!saveAnimationImagesCheckBox->isChecked())
+    {
+        return;
+    }
+
     // Get content of file name line edit.
-    QString filename = saveTAFileNameLineEdit->text();
+    QString filename = saveAnimationFileNameLineEdit->text();
 
     // Replace placeholders with their according values.
     filename.replace("%it", QString("IT%1").arg(
@@ -1907,8 +2002,8 @@ void MSyncControl::emitSaveImageSignal()
     // Use tool tip to get directory since the text of the label might be
     // shorten and only the tool tip holds the whole path.
     emit imageOfTimeAnimationReady(
-                saveTADirectoryLabel->toolTip(),
-                filename + saveTAFileExtensionComboBox->currentText());
+                saveAnimationDirectoryLabel->toolTip(),
+                filename + saveAnimationFileExtensionComboBox->currentText());
 }
 
 
@@ -1931,8 +2026,6 @@ void MSyncControl::setAnimationTimeToStartTime(QDateTime startDateTime)
         ui->validTimeEdit->setDateTime(startDateTime);
     }
 
-    // Save image of current time step.
-    saveTimeAnimation();
 }
 
 
