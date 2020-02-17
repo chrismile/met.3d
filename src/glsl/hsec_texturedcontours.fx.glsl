@@ -77,7 +77,7 @@ uniform float     shiftForWesternLon; // shift in multiples of 360 to get the
                                       // the distance between the left border of
                                       // the grid and the left border of the bbox)
 
-shader VSmain(out VStoFS output)
+shader VSmain(out VStoFS outStruct)
 {
     // Compute grid indices (i, j) of the this vertex from vertex and instance
     // ID (see notes 09Feb2012).
@@ -111,11 +111,11 @@ shader VSmain(out VStoFS output)
     // layout qualifier, otherwise an error "..no overload function can
     // be found: imageLoad(struct image2D, ivec2).." is raised.
     vec4 data = imageLoad(crossSectionGrid, ivec2(i, j));
-    output.scalar = data.r;
-    output.pos = vec2(i, j);
-    output.lon = lon;
+    outStruct.scalar = data.r;
+    outStruct.pos = vec2(i, j);
+    outStruct.lon = lon;
 
-    if (output.scalar != MISSING_VALUE) output.flag = 0.; else output.flag = -100.;
+    if (outStruct.scalar != MISSING_VALUE) outStruct.flag = 0.; else outStruct.flag = -100.;
 }
 
 
@@ -151,14 +151,14 @@ uniform bool      isCyclicGrid;   // indicates whether the grid is cyclic or not
 uniform float     leftGridLon;    // leftmost longitude of the grid
 uniform float     eastGridLon;    // eastmost longitude of the grid
 
-shader FSmain(in VStoFS input, out vec4 fragColour)
+shader FSmain(in VStoFS inStruct, out vec4 fragColour)
 {
     // Discard the element if it is outside the model domain (no scalar value)
     // or outside the scalar range or outside of the bounding box.
-    if ((input.flag < 0.)
-            || (scalarMinimum > input.scalar)
-            || (!clampMaximum && (scalarMaximum < input.scalar))
-            || input.lon < bboxLons.x || input.lon > bboxLons.y)
+    if ((inStruct.flag < 0.)
+            || (scalarMinimum > inStruct.scalar)
+            || (!clampMaximum && (scalarMaximum < inStruct.scalar))
+            || inStruct.lon < bboxLons.x || inStruct.lon > bboxLons.y)
     {
         discard;
     }
@@ -169,7 +169,7 @@ shader FSmain(in VStoFS input, out vec4 fragColour)
     // (cf. computeRenderRegionParameters of MNWP2DHorizontalActorVariable in
     // nwpactorvariable.cpp).
     if (!isCyclicGrid
-            && (mod(input.lon - leftGridLon, 360.) >= (eastGridLon - leftGridLon)))
+            && (mod(inStruct.lon - leftGridLon, 360.) >= (eastGridLon - leftGridLon)))
     {
         discard;
     }
@@ -178,10 +178,10 @@ shader FSmain(in VStoFS input, out vec4 fragColour)
     vec2 scale = vec2(scaleWidth, scaleWidth * aspectRatio * gridAspectRatio);
 
     // Scalar value mapped to range: [0, max-min].
-    float scalar = input.scalar - scalarMinimum;
+    float scalar = inStruct.scalar - scalarMinimum;
 
     // Flip y direction to obtain right orientation of texture.
-    vec2 pos = vec2(input.pos.x, height - input.pos.y);
+    vec2 pos = vec2(inStruct.pos.x, height - inStruct.pos.y);
 
     float scalarRange = scalarMaximum - scalarMinimum;
     // Distribute texture levels equidistantly over scalar range.

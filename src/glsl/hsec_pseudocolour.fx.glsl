@@ -74,7 +74,6 @@ uniform float     shiftForWesternLon; // shift in multiples of 360 to get the
                                       // the grid and the left border of the bbox)
 uniform bool      isCyclicGrid;       // indicates whether the grid is cyclic or not
 
-// bug if 'out GStoFS output' is used?
 shader GSmain(out GStoFS vertex)
 {
     // gl_Position.xy encodes the i and j grid indices of the grid point
@@ -195,14 +194,14 @@ uniform sampler1D transferFunction; // 1D transfer function
 uniform float     scalarMinimum;    // min/max data values to scale to 0..1
 uniform float     scalarMaximum;
 
-shader FSmain(in GStoFS input, out vec4 fragColour)
+shader FSmain(in GStoFS inStruct, out vec4 fragColour)
 {
 
     // Discard the element if it is outside the model domain (no scalar value).
-    if (input.flag < 0.) discard;
+    if (inStruct.flag < 0.) discard;
 
     // Scale the scalar range to 0..1.
-    float scalar_ = (input.scalar - scalarMinimum) / (scalarMaximum - scalarMinimum);
+    float scalar_ = (inStruct.scalar - scalarMinimum) / (scalarMaximum - scalarMinimum);
 
     // Fetch colour from the transfer function and apply shading term.
     fragColour = texture(transferFunction, scalar_);
