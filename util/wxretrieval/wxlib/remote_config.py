@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 """
-
     wxlib.remote_config
     ~~~~~~~~~~~~~~~~~~~
 
@@ -30,43 +29,39 @@
     along with Met.3D.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-
-import os
-import sys
-
-verbose = False
+verbose = True
 debug = False
 
-local_base_directory =''
+local_base_directory = ''
 
 dwd_base_url = "opendata.dwd.de"
 dwd_base_dir = "/weather/nwp/"
-dwd_nwp_models = ["cosmo-d2","icon-eu","icon"]
+dwd_nwp_models = ["cosmo-d2", "icon-eu", "icon"]
 
 dwd_nwp_models_grid_types = {
-                     "cosmo-d2":
-                     ["regular-lat-lon_pressure-level",
-                      "regular-lat-lon_model-level",
-                      "regular-lat-lon_single-level",
-                      "regular-lat-lon_time-invariant",
-                      "rotated-lat-lon_pressure-level",
-                      "rotated-lat-lon_model-level",
-                      "rotated-lat-lon_single-level",
-                      "rotated-lat-lon_time-invariant"
-                     ],
+    "cosmo-d2":
+        ["regular-lat-lon_pressure-level",
+         "regular-lat-lon_model-level",
+         "regular-lat-lon_single-level",
+         "regular-lat-lon_time-invariant",
+         "rotated-lat-lon_pressure-level",
+         "rotated-lat-lon_model-level",
+         "rotated-lat-lon_single-level",
+         "rotated-lat-lon_time-invariant"
+         ],
 
-                     "icon-eu":
-                     ["regular-lat-lon_pressure-level",
-                     "regular-lat-lon_model-level",
-                     "regular-lat-lon_single-level",
-                     "regular-lat-lon_time-invariant"
-                     ],
+    "icon-eu":
+        ["regular-lat-lon_pressure-level",
+         "regular-lat-lon_model-level",
+         "regular-lat-lon_single-level",
+         "regular-lat-lon_time-invariant"
+         ],
 
-                     "icon":
-                     [
-                      "icosahedral_pressure-level",
-                      "icosahedral_model-level",
-                      "icosahedral_single-level",
-                      "icosahedral_time-invariant"
-                     ]
-                   }
+    "icon":
+        [
+            "icosahedral_pressure-level",
+            "icosahedral_model-level",
+            "icosahedral_single-level",
+            "icosahedral_time-invariant"
+        ]
+}

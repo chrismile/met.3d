@@ -1,7 +1,5 @@
 # -*- coding: utf-8 -*-
-
 """
-
     wxlib.retrieve_dwd_example
     ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -32,39 +30,34 @@
 
 """
 
-import os
 import sys
-import ftplib
-
-import wxlib.remote_config
 import wxlib.retrieve_nwp
 
-download = True
-processdata = True
+download_data = True
+process_data = True
 
 variable = "p"
 model_name = "cosmo-d2"
-leadtime_list = ["001","010"]
-basetimedate = "20200217"
+leadtime_list = ["001", "010"]
+basetimedate = "20200218"
 basetimehour = "00"
-basetime_string = basetimedate + basetimehour #2020021300
+basetime_string = basetimedate + basetimehour  # 2020021300
 grid_type = "rotated-lat-lon_model-level"
-#specified below are model levels, if querying for a pressure level diagnostic,
-#then specify pressure level values
-level_list = ["1","2","3","4","7","10"]
+# The following list of vertical levels contains model levels; if querying for a pressure level diagnostic,
+# then specify pressure level values instead.
+level_list = ["1", "2", "3", "4", "7", "10"]
 
-#None       --- prepares catalogue for all the models from DWD
-#input_list --- prepares catalogue for the models in input_list
-wxlib.retrieve_nwp.prepare_catalogue_of_available_dwd_data (["cosmo-d2"])
+# None       --- prepares catalogue for all the models from DWD
+# input_list --- prepares catalogue for the models in input_list
+wxlib.retrieve_nwp.prepare_catalogue_of_available_dwd_data(["cosmo-d2"])
 
-local_data_dir_path='/mnt/data1/Met3D/DATA/FORECASTS/TEST_DATALIB'
-wxlib.retrieve_nwp.set_local_base_directory (local_data_dir_path)
+local_data_dir_path = '/mnt/data1/wxretrieval'
+wxlib.retrieve_nwp.set_local_base_directory(local_data_dir_path)
 
 queried_dataset = dict()
-filtered_list = wxlib.retrieve_nwp. \
-                determine_remote_files_to_retrieve_dwd_fcvariable \
-                 (variable, model_name, basetime_string, grid_type, \
-                leadtime_list, level_list)
+filtered_list = wxlib.retrieve_nwp.determine_remote_files_to_retrieve_dwd_fcvariable(
+    variable, model_name, basetime_string, grid_type, leadtime_list, level_list)
+
 if not filtered_list:
     queried_dataset = None
     sys.exit()
@@ -72,10 +65,9 @@ else:
     queried_dataset[variable] = dict()
     queried_dataset[variable][grid_type] = filtered_list
 
-if (download):
-    wxlib.retrieve_nwp.download_forecast_data (model_name, basetime_string, \
-                                        queried_dataset)
+if download_data:
+    wxlib.retrieve_nwp.download_forecast_data(model_name, basetime_string, queried_dataset)
 
-if (processdata):
-    wxlib.retrieve_nwp.merge_and_convert_downloaded_files (model_name, \
-                                   basetime_string, queried_dataset)
+if process_data:
+    wxlib.retrieve_nwp.merge_and_convert_downloaded_files(model_name,
+                                                          basetime_string, queried_dataset)
