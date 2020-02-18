@@ -67,10 +67,10 @@ def set_local_base_directory(local_path):
     :param local_path: The path of the local base directory to store the data.
 
     Returns: If the input variable 'local_path' is not a valid directory, then
-    prmopt and exit.
+    prompt and exit.
     """
     if not os.path.isdir(local_path):
-        print('The specfied path ' + local_path + 'is not a valid directory')
+        print('The specified path ' + local_path + 'is not a valid directory')
         sys.exit()
     wxlib.config.local_base_directory = local_path
 
@@ -92,7 +92,7 @@ def prepare_catalogue_of_available_dwd_data(queried_model_list):
 
     Arg:
     :param queried_model_list : List of model names.e.g., ["icon","icon-eu"],if
-    None specfied, then the catalogue is updated for all the available models in
+    None specified, then the catalogue is updated for all the available models in
     the repository.
     """
 
@@ -120,7 +120,7 @@ def prepare_catalogue_of_available_dwd_data(queried_model_list):
         model_dir = wxlib.config.dwd_base_dir + "/" + nwp_model + "/grib/"
 
         if wxlib.config.verbose:
-            print(model_dir)
+            print("\n\n******\nChecking for NWP model directory: ", model_dir)
 
         repository.cwd(model_dir)
         basetimehour_list = repository.nlst()
@@ -129,7 +129,7 @@ def prepare_catalogue_of_available_dwd_data(queried_model_list):
         for basetimehour in basetimehour_list:
 
             if wxlib.config.verbose:
-                print(basetimehour)
+                print("\n\nChecking for base time hour: ", basetimehour)
 
             basetimehour_dir = model_dir + basetimehour
 
@@ -140,7 +140,7 @@ def prepare_catalogue_of_available_dwd_data(queried_model_list):
             for variable in variable_list:
 
                 if wxlib.config.verbose:
-                    print(variable)
+                    print("Checking for forecast variable: ", variable)
 
                 variable_dir = basetimehour_dir + "/" + variable
 
@@ -168,7 +168,7 @@ def determine_remote_files_to_retrieve_dwd_fcvariable(
         variable, model_name, basetime_string, grid_type, leadtime_list, level_list):
     """
     Function to get the list of available files for a given variable from in a
-    given model for a specified grid type and leadtimes as well as levels.
+    given model for a specified grid type and lead times as well as levels.
 
     Args:
     :param variable: model diagnostic name
@@ -302,7 +302,7 @@ def download_forecast_data(model_name, basetime_string, queried_dataset):
             repository.cwd(variable_dir)
             for single_grb_file in file_list:
                 if wxlib.config.debug:
-                    print(single_grb_file)
+                    print("Downloading file: ", single_grb_file)
                 fptr = open(single_grb_file, 'wb')
                 repository.retrbinary('RETR ' + single_grb_file, fptr.write)
 
@@ -325,8 +325,11 @@ def merge_and_convert_downloaded_files(model_name, basetime_string, queried_data
                     corresponding list of files names to download
     """
     if not queried_dataset:
-        print("Input dataset containes no Files.")
+        print("Input dataset contains no files.")
         sys.exit()
+
+    if wxlib.config.verbose:
+        print("\n\nUncompressing, merging and converting downloaded data...")
 
     local_base_directory = get_local_base_directory()
     basetimehour = basetime_string[-2:]
@@ -343,6 +346,9 @@ def merge_and_convert_downloaded_files(model_name, basetime_string, queried_data
 
     for variable, grid_type_file_list_dictionary in queried_dataset.items():
         for grid_type, file_list in grid_type_file_list_dictionary.items():
+
+            if wxlib.config.verbose:
+                print("* ", variable, " (", grid_type, ") ..")
 
             temp_file_name = file_list[0]
             # 'cosmo-d2_germany_rotated-lat-lon_model-level_2020021300_001_7_P.\
@@ -369,3 +375,7 @@ def merge_and_convert_downloaded_files(model_name, basetime_string, queried_data
             command = "rm " + "*" + grid_type + '_' + basetime_string \
                       + '_*_*_' + variable.upper() + '.grib2*'
             os.system(command)
+
+            if wxlib.config.verbose:
+                print("    .. done")
+
