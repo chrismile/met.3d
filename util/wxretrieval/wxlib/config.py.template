@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-    wxlib.remote_config
-    ~~~~~~~~~~~~~~~~~~~
+    wxlib.config
+    ~~~~~~~~~~~~
 
-    Collection of remote configuration details. 
+    Retrieval configuration file.
 
     This file is part of Met.3D -- a research environment for the
     three-dimensional visual exploration of numerical ensemble weather
@@ -32,7 +32,7 @@
 verbose = True
 debug = False
 
-local_base_directory = ''
+local_base_directory = "/path/to/local/storage"
 
 dwd_base_url = "opendata.dwd.de"
 dwd_base_dir = "/weather/nwp/"

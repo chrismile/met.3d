@@ -34,16 +34,13 @@ import ftplib
 import bz2
 import cdo
 import sys
-import wxlib.remote_config
+import wxlib.config
 
+# Initialize a CDO instance (used to convert grib to NetCDF files).
 cdo_instance = cdo.Cdo()
-verbose = wxlib.remote_config.verbose
-debug = wxlib.remote_config.debug
-base_url = wxlib.remote_config.dwd_base_url
-base_dir = wxlib.remote_config.dwd_base_dir
-model_list = wxlib.remote_config.dwd_nwp_models
-model_grid_types = wxlib.remote_config.dwd_nwp_models_grid_types
-catalogue = dict.fromkeys(model_list)
+
+# Initialize the global "catalogue" dictionary with the list of models specified in the config file.
+catalogue = dict.fromkeys(wxlib.config.dwd_nwp_models)
 
 
 def connect_to_dwd_opendata_ftpserver():
@@ -53,12 +50,12 @@ def connect_to_dwd_opendata_ftpserver():
     Returns: The pointer to the repository object.The quit() method of this
     object should be called to terminate the FTP connection.
     """
-    repository = ftplib.FTP(base_url)
+    repository = ftplib.FTP(wxlib.config.dwd_base_url)
     if not repository:
-        print("Unable to connect to: " + base_url)
+        print("Unable to connect to: " + wxlib.config.dwd_base_url)
         sys.exit()
     repository.login()
-    repository.cwd(base_dir)
+    repository.cwd(wxlib.config.dwd_base_dir)
     return repository
 
 
@@ -75,7 +72,7 @@ def set_local_base_directory(local_path):
     if not os.path.isdir(local_path):
         print('The specfied path ' + local_path + 'is not a valid directory')
         sys.exit()
-    wxlib.remote_config.local_base_directory = local_path
+    wxlib.config.local_base_directory = local_path
 
 
 def get_local_base_directory():
@@ -84,7 +81,7 @@ def get_local_base_directory():
 
     Returns: The path of the local base directory to store the data.
     """
-    return wxlib.remote_config.local_base_directory
+    return wxlib.config.local_base_directory
 
 
 def prepare_catalogue_of_available_dwd_data(queried_model_list):
@@ -100,12 +97,12 @@ def prepare_catalogue_of_available_dwd_data(queried_model_list):
     """
 
     if queried_model_list is None:
-        queried_model_list = model_list
+        queried_model_list = wxlib.config.dwd_nwp_models
 
-    if debug:
+    if wxlib.config.debug:
         print(queried_model_list)
 
-    if verbose:
+    if wxlib.config.verbose:
         print("Scanning remote ftp server at DWD to assemble catalogue...:")
 
     repository = connect_to_dwd_opendata_ftpserver()
@@ -120,9 +117,9 @@ def prepare_catalogue_of_available_dwd_data(queried_model_list):
 
     for nwp_model in queried_model_list:
 
-        model_dir = base_dir + "/" + nwp_model + "/grib/"
+        model_dir = wxlib.config.dwd_base_dir + "/" + nwp_model + "/grib/"
 
-        if verbose:
+        if wxlib.config.verbose:
             print(model_dir)
 
         repository.cwd(model_dir)
@@ -131,7 +128,7 @@ def prepare_catalogue_of_available_dwd_data(queried_model_list):
 
         for basetimehour in basetimehour_list:
 
-            if verbose:
+            if wxlib.config.verbose:
                 print(basetimehour)
 
             basetimehour_dir = model_dir + basetimehour
@@ -142,7 +139,7 @@ def prepare_catalogue_of_available_dwd_data(queried_model_list):
 
             for variable in variable_list:
 
-                if verbose:
+                if wxlib.config.verbose:
                     print(variable)
 
                 variable_dir = basetimehour_dir + "/" + variable
@@ -150,7 +147,7 @@ def prepare_catalogue_of_available_dwd_data(queried_model_list):
                 repository.cwd(variable_dir)
                 file_list = repository.nlst()
 
-                grid_type_list = model_grid_types[nwp_model]
+                grid_type_list = wxlib.config.dwd_nwp_models_grid_types[nwp_model]
 
                 catalogue[nwp_model][basetimehour][variable] = \
                     dict.fromkeys(grid_type_list)
@@ -180,7 +177,7 @@ def determine_remote_files_to_retrieve_dwd_fcvariable(
     simulation was started,eg., '2020022300' for forecast starting on
     2020 February 23rd at 00 hrs
     :param grid_type: Grid type eg.,'rotated-lat-lon_model-level', a complete
-    list of available grid types for each model is in 'remote_config.py'
+    list of available grid types for each model is in 'config.py'
     :param leadtime_list:Lead time in hours(xxx), eg., '001'
     :param level_list:List of levels (pressure e.g.,'200',300'
                                       model e.g., '1','2' )
@@ -228,13 +225,13 @@ def determine_remote_files_to_retrieve_dwd_fcvariable(
 
     leadtimelev_list_flag = dict.fromkeys(leadtimelev_list, False)
 
-    if debug:
+    if wxlib.config.debug:
         print(leadtimelev_list_flag)
 
     for single_grb_file in complete_file_list:
         if leadtimelev_list is not None:
             if any(leadtimelevel in single_grb_file for leadtimelevel in leadtimelev_list):
-                if verbose:
+                if wxlib.config.verbose:
                     print(single_grb_file)
 
                 queried_file_list.append(single_grb_file)
@@ -254,13 +251,13 @@ def determine_remote_files_to_retrieve_dwd_fcvariable(
     # available, then return 'None' and exit.
     if False in leadtimelev_list_flag.values():
 
-        if debug:
+        if wxlib.config.debug:
             print(leadtimelev_list_flag)
 
         failed_list = [leadtimelev for leadtimelev, flag in
                        leadtimelev_list_flag.items() if flag is False]
 
-        if debug:
+        if wxlib.config.debug:
             print(failed_list)
 
         print("Data not available for: " + (','.join(failed_list)))
@@ -295,7 +292,7 @@ def download_forecast_data(model_name, basetime_string, queried_dataset):
     if not os.path.exists(download_path):
         os.makedirs(download_path)
     os.chdir(download_path)
-    model_dir = base_dir + "/" + model_name.lower() + "/grib/"
+    model_dir = wxlib.config.dwd_base_dir + "/" + model_name.lower() + "/grib/"
     basetimehour_dir = model_dir + basetimehour
     repository = connect_to_dwd_opendata_ftpserver()
 
@@ -304,7 +301,7 @@ def download_forecast_data(model_name, basetime_string, queried_dataset):
             variable_dir = basetimehour_dir + "/" + variable
             repository.cwd(variable_dir)
             for single_grb_file in file_list:
-                if debug:
+                if wxlib.config.debug:
                     print(single_grb_file)
                 fptr = open(single_grb_file, 'wb')
                 repository.retrbinary('RETR ' + single_grb_file, fptr.write)

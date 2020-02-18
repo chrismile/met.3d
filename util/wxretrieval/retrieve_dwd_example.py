@@ -51,8 +51,8 @@ level_list = ["1", "2", "3", "4", "7", "10"]
 # input_list --- prepares catalogue for the models in input_list
 wxlib.retrieve_nwp.prepare_catalogue_of_available_dwd_data(["cosmo-d2"])
 
-local_data_dir_path = '/mnt/data1/wxretrieval'
-wxlib.retrieve_nwp.set_local_base_directory(local_data_dir_path)
+# Overwrite standard directory to store retrieved files.
+wxlib.retrieve_nwp.set_local_base_directory("/mnt/data1/wxretrieval")
 
 queried_dataset = dict()
 filtered_list = wxlib.retrieve_nwp.determine_remote_files_to_retrieve_dwd_fcvariable(
