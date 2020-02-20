@@ -84,7 +84,7 @@ def get_local_base_directory():
     return wxlib.config.local_base_directory
 
 
-def prepare_catalogue_of_available_dwd_data(queried_model_list):
+def prepare_catalogue_of_available_dwd_data(queried_model_list, basetimehour_list, variable_list):
     """
     Function to prepare a catalogue (nested dictionaries), for the list of
     models queried. Updates the global variable 'catalogue' with the file
@@ -94,6 +94,11 @@ def prepare_catalogue_of_available_dwd_data(queried_model_list):
     :param queried_model_list : List of model names.e.g., ["icon","icon-eu"],if
     None specified, then the catalogue is updated for all the available models in
     the repository.
+    :param basetimehour_list : List of basetime hours for which the data is needed, e.g., ["00","06"],if
+    None specified, then the catalogue is updated for all the available basetime hours, for each of the models in the
+    'queried_model_list'
+    :param variable_list : List of variable names.e.g., ["p","t"],if None specified, then the catalogue is updated for
+    all the available variables, for each basetime hour in the 'basetimehour_list'
     """
 
     if queried_model_list is None:
@@ -123,7 +128,9 @@ def prepare_catalogue_of_available_dwd_data(queried_model_list):
             print("\n\n******\nChecking for NWP model directory: ", model_dir)
 
         repository.cwd(model_dir)
-        basetimehour_list = repository.nlst()
+
+        if basetimehour_list is None:
+            basetimehour_list = repository.nlst()
         catalogue[nwp_model] = dict.fromkeys(basetimehour_list)
 
         for basetimehour in basetimehour_list:
@@ -134,7 +141,9 @@ def prepare_catalogue_of_available_dwd_data(queried_model_list):
             basetimehour_dir = model_dir + basetimehour
 
             repository.cwd(basetimehour_dir)
-            variable_list = repository.nlst()
+
+            if variable_list is None:
+                variable_list = repository.nlst()
             catalogue[nwp_model][basetimehour] = dict.fromkeys(variable_list)
 
             for variable in variable_list:
@@ -146,9 +155,7 @@ def prepare_catalogue_of_available_dwd_data(queried_model_list):
 
                 repository.cwd(variable_dir)
                 file_list = repository.nlst()
-
                 grid_type_list = wxlib.config.dwd_nwp_models_grid_types[nwp_model]
-
                 catalogue[nwp_model][basetimehour][variable] = \
                     dict.fromkeys(grid_type_list)
 
@@ -161,7 +168,7 @@ def prepare_catalogue_of_available_dwd_data(queried_model_list):
                             catalogue[nwp_model][basetimehour][variable][grid_type].append(file)
 
     repository.quit()
-    return
+    return catalogue
 
 
 def determine_remote_files_to_retrieve_dwd_fcvariable(
@@ -188,7 +195,6 @@ def determine_remote_files_to_retrieve_dwd_fcvariable(
     """
     queried_file_list = []
     basetimehour = basetime_string[-2:]
-    basetimedate = basetime_string[0:8]
     complete_file_list = catalogue[model_name.lower()][basetimehour][variable.lower()][grid_type]
     if len(complete_file_list) == 0:
         print('No files found for ' + model_name + ' ' + variable + ' ' + basetime_string)

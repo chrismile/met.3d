@@ -36,10 +36,10 @@ import wxlib.retrieve_nwp
 download_data = True
 process_data = True
 
-variable = "p"
+variable = ["p","t"]
 model_name = "cosmo-d2"
 leadtime_list = ["001", "010"]
-basetimedate = "20200218"
+basetimedate = "20200220"
 basetimehour = "00"
 basetime_string = basetimedate + basetimehour  # 2020021300
 grid_type = "rotated-lat-lon_model-level"
@@ -49,21 +49,25 @@ level_list = ["1", "2", "3", "4", "7", "10"]
 
 # None       --- prepares catalogue for all the models from DWD
 # input_list --- prepares catalogue for the models in input_list
-wxlib.retrieve_nwp.prepare_catalogue_of_available_dwd_data(["cosmo-d2"])
+catalogue = None
+catalogue = wxlib.retrieve_nwp.prepare_catalogue_of_available_dwd_data([model_name],[basetimehour], variable_list)
 
 # Overwrite standard directory to store retrieved files.
-wxlib.retrieve_nwp.set_local_base_directory("/mnt/data1/wxretrieval")
+local_data_dir_path = '/mnt/data1/wxretrieval'
+wxlib.retrieve_nwp.set_local_base_directory(local_data_dir_path)
 
 queried_dataset = dict()
-filtered_list = wxlib.retrieve_nwp.determine_remote_files_to_retrieve_dwd_fcvariable(
-    variable, model_name, basetime_string, grid_type, leadtime_list, level_list)
+for variable in variable_list:
+    filtered_list = None
+    filtered_list = wxlib.retrieve_nwp.determine_remote_files_to_retrieve_dwd_fcvariable(
+        variable, model_name, basetime_string, grid_type, leadtime_list, level_list)
 
-if not filtered_list:
-    queried_dataset = None
-    sys.exit()
-else:
-    queried_dataset[variable] = dict()
-    queried_dataset[variable][grid_type] = filtered_list
+    if not filtered_list:
+        queried_dataset = None
+        sys.exit()
+    else:
+        queried_dataset[variable] = dict()
+        queried_dataset[variable][grid_type] = filtered_list
 
 if download_data:
     wxlib.retrieve_nwp.download_forecast_data(model_name, basetime_string, queried_dataset)
