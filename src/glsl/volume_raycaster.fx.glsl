@@ -232,6 +232,7 @@ bool traverseSectionOfDataVolume(
     // Main ray caster loop. Advance the current position along the ray
     // direction through the volume, fetching scalar values from texture memory
     // and testing for isosurface crossing.
+    bool prevSampleIsValid = true;
     while (lambda < lambdaExit)
     {
         float scalar = sampleDataAtPos(rayPosition);
@@ -239,7 +240,7 @@ bool traverseSectionOfDataVolume(
         if (scalar != M_MISSING_VALUE)
         {
             crossingLevelFront = computeCrossingLevel(scalar);
-            if (crossingLevelFront != crossingLevelBack)
+            if ((crossingLevelFront != crossingLevelBack) && (prevSampleIsValid == true))
             {
                 vec3 gradient = vec3(0);
                 if (!shadowRay)
@@ -266,6 +267,11 @@ bool traverseSectionOfDataVolume(
                 rayColor.rgb += (1 - rayColor.a) * blendColor.rgb;
                 rayColor.a += (1 - rayColor.a) * blendColor.a;
             }
+            prevSampleIsValid=true;
+        }
+        else
+        {
+            prevSampleIsValid=false;
         }
         
         prevLambda  = lambda;

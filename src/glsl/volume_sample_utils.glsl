@@ -123,12 +123,32 @@ vec3 gradientAtPos(in vec3 pos, in vec3 h, float ztop, float zbot)
 
     float x1 = sampleDataAtPos(pos_east);
     float x2 = sampleDataAtPos(pos_west);
+    if (x1 == M_MISSING_VALUE)
+        {
+            pos_east = pos;
+            x1 = sampleDataAtPos(pos_east);
+        }
+    if (x2 == M_MISSING_VALUE)
+        {
+            pos_west = pos;
+            x2 = sampleDataAtPos(pos_west);
+        }
     float hx = pos_east.x - pos_west.x;
 
     vec3 pos_north = vec3(pos.x, min(pos.y + h.y, dataExtent.dataNWCrnr.y), pos.z);
     vec3 pos_south = vec3(pos.x, max(pos.y - h.y, dataExtent.dataSECrnr.y), pos.z);
     float y1 = sampleDataAtPos(pos_north);
     float y2 = sampleDataAtPos(pos_south);
+    if (y1 == M_MISSING_VALUE)
+        {
+            pos_north = vec3(pos.x, min(pos.y, dataExtent.dataNWCrnr.y), pos.z);
+            y1 = sampleDataAtPos(pos_north);
+        }
+    if (y2 == M_MISSING_VALUE)
+        {
+            pos_south = vec3(pos.x, max(pos.y, dataExtent.dataSECrnr.y), pos.z);
+            y2 = sampleDataAtPos(pos_south);
+        }
     float hy = pos_north.y - pos_south.y;
 
     // 2. Sample with vertical displacement, considering data volume
@@ -138,6 +158,16 @@ vec3 gradientAtPos(in vec3 pos, in vec3 h, float ztop, float zbot)
     vec3 pos_bot = vec3(pos.xy, max(pos.z - h.z, zbot));
     float z1 = sampleDataAtPos(pos_top);
     float z2 = sampleDataAtPos(pos_bot);
+    if (z1 == M_MISSING_VALUE)
+        {
+            pos_top = vec3(pos.xy, min(pos.z, ztop));
+            z1= sampleDataAtPos(pos_top);
+        }
+    if (z2 == M_MISSING_VALUE)
+        {
+            pos_bot = vec3(pos.xy, max(pos.z, zbot));
+            z2= sampleDataAtPos(pos_bot);
+        }
     float hz = pos_top.z - pos_bot.z;
 
     // 3. Compute gradient.
