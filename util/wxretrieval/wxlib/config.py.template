@@ -29,9 +29,6 @@
     along with Met.3D.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-verbose = True
-debug = False
-
 local_base_directory = "/path/to/local/storage"
 
 dwd_base_url = "opendata.dwd.de"

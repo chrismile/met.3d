@@ -34,6 +34,8 @@ import ftplib
 import bz2
 import cdo
 import sys
+import pickle
+import logging
 import wxlib.config
 
 # Initialize a CDO instance (used to convert grib to NetCDF files).
@@ -41,7 +43,8 @@ cdo_instance = cdo.Cdo()
 
 # Initialize the global "catalogue" dictionary with the list of models specified in the config file.
 catalogue = dict.fromkeys(wxlib.config.dwd_nwp_models)
-
+log = None
+console = None
 
 def connect_to_dwd_opendata_ftpserver():
     """
@@ -52,7 +55,7 @@ def connect_to_dwd_opendata_ftpserver():
     """
     repository = ftplib.FTP(wxlib.config.dwd_base_url)
     if not repository:
-        print("Unable to connect to: " + wxlib.config.dwd_base_url)
+        log.critical("Unable to connect to: " + wxlib.config.dwd_base_url)
         sys.exit()
     repository.login()
     repository.cwd(wxlib.config.dwd_base_dir)
@@ -70,7 +73,8 @@ def set_local_base_directory(local_path):
     prompt and exit.
     """
     if not os.path.isdir(local_path):
-        print('The specified path ' + local_path + 'is not a valid directory')
+        message = 'The specified path ' + local_path + 'is not a valid directory'
+        log.critical(message)
         sys.exit()
     wxlib.config.local_base_directory = local_path
 
@@ -82,6 +86,97 @@ def get_local_base_directory():
     Returns: The path of the local base directory to store the data.
     """
     return wxlib.config.local_base_directory
+
+
+def store_catalogue_in_local_base_directory(catalogue_object, catalogue_name):
+    """
+        Function to store the catalogue (binary file) in the 'local_base_directory'.
+
+        Arg:
+        :param catalogue_object : Dictionary object of the catalogue file.
+        :param catalogue_name : Desired name of the catalogue file.
+    """
+    if catalogue_object is None:
+        log.critical('Input catalogue has no valid entries')
+        sys.exit()
+
+    catalogue_path = get_local_base_directory()
+    catalogue_file_path = catalogue_path + '/' + catalogue_name
+    if not os.path.isdir(catalogue_path):
+        message = 'Creating the directory: ' + catalogue_path
+        log.warning(message)
+        os.makedirs(catalogue_path)
+    if os.path.exists(catalogue_file_path):
+        message = 'Overwriting the existing catalogue : ' + catalogue_name
+        log.warning(message)
+    with open(catalogue_file_path,'wb') as handle:
+        pickle.dump(catalogue_object, handle)
+
+
+def read_catalogue_from_local_base_directory(catalogue_name):
+    """
+        Function to read the catalogue (binary file) from the 'local_base_directory' and set it to the global catalogue.
+
+        Arg:
+        :param catalogue_name : Name of the catalogue file.
+    """
+    catalogue_path = get_local_base_directory()
+    catalogue_file_path = catalogue_path + '/' + catalogue_name
+    if not os.path.exists(catalogue_path):
+        message = "Catalogue doesn't exist in the path: " + catalogue_file_path
+        log.critical(message)
+        sys.exit()
+    with open(catalogue_file_path,'rb') as handle:
+        catalogue = pickle.loads(handle.read())
+        log.debug(catalogue)
+    return
+
+
+def initialize_logging():
+    """
+        Function to create the logger along with a 'console' handler, with default logging level set to 'INFO'
+        Returns: 'log' object
+    """
+    global log, console
+    if not log:
+        log = logging.getLogger()
+    if not console:
+        console = logging.StreamHandler()
+        log.addHandler(console)
+    log.setLevel(logging.INFO)
+    console.setLevel(logging.INFO)
+    return log
+
+
+# NOTE: logging levels in descending order of severity :
+#    logging.CRITICAL > logging.ERROR > logging.WARNING > logging.INFO > logging.DEBUG > logging.NOTSET
+def set_logging_level(logger_level):
+    """
+        Function to set the logging level. If 'INFO' level, print 'info' messages. If 'DEBUG' levele, then additionally
+        print the debug messages and  also to a log file named 'wxretrieval.log'.
+        Arg:
+        :param level : Mode to be set , any of 'CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG' or 'NOTSET'
+    """
+    global log, console
+    if not log or not console:
+        initialize_logging()
+
+    log.setLevel(logger_level)
+    console.setLevel(logger_level)
+    log.addHandler(console)
+    # NOTE: For Complete list of format directives refer https://docs.python.org/3/library/time.html#time.strftime
+    datefmt = '%Y-%b-%d %H:%M:%S'
+    formatter = logging.Formatter('%(asctime)s %(levelname)s: %(message)s',datefmt)
+    console.setFormatter(formatter)
+
+    if logger_level is logging.DEBUG:
+        # Additionally write the log to a file named 'wxretieval.log' for debugging purposes.
+        logfile_name = 'wxretrieval.log'
+        if os.path.exists(logfile_name):
+            os.remove(logfile_name)
+        handler = logging.FileHandler(logfile_name)
+        log.addHandler(handler)
+        handler.setFormatter(formatter)
 
 
 def prepare_catalogue_of_available_dwd_data(queried_model_list, basetimehour_list, variable_list):
@@ -100,15 +195,12 @@ def prepare_catalogue_of_available_dwd_data(queried_model_list, basetimehour_lis
     :param variable_list : List of variable names.e.g., ["p","t"],if None specified, then the catalogue is updated for
     all the available variables, for each basetime hour in the 'basetimehour_list'
     """
-
+    global log, console
     if queried_model_list is None:
         queried_model_list = wxlib.config.dwd_nwp_models
 
-    if wxlib.config.debug:
-        print(queried_model_list)
-
-    if wxlib.config.verbose:
-        print("Scanning remote ftp server at DWD to assemble catalogue...:")
+    log.debug(queried_model_list)
+    log.info("Scanning remote ftp server at DWD to assemble catalogue...:")
 
     repository = connect_to_dwd_opendata_ftpserver()
 
@@ -124,9 +216,9 @@ def prepare_catalogue_of_available_dwd_data(queried_model_list, basetimehour_lis
 
         model_dir = wxlib.config.dwd_base_dir + "/" + nwp_model + "/grib/"
 
-        if wxlib.config.verbose:
-            print("\n\n******\nChecking for NWP model directory: ", model_dir)
 
+        message = "\n\n******\nChecking for NWP model '" + nwp_model + "' in the directory : " + model_dir
+        log.info(message)
         repository.cwd(model_dir)
 
         if basetimehour_list is None:
@@ -135,11 +227,10 @@ def prepare_catalogue_of_available_dwd_data(queried_model_list, basetimehour_lis
 
         for basetimehour in basetimehour_list:
 
-            if wxlib.config.verbose:
-                print("\n\nChecking for base time hour: ", basetimehour)
 
+            message = "\n\nChecking for base time hour: " + basetimehour
+            log.info(message)
             basetimehour_dir = model_dir + basetimehour
-
             repository.cwd(basetimehour_dir)
 
             if variable_list is None:
@@ -148,9 +239,8 @@ def prepare_catalogue_of_available_dwd_data(queried_model_list, basetimehour_lis
 
             for variable in variable_list:
 
-                if wxlib.config.verbose:
-                    print("Checking for forecast variable: ", variable)
-
+                message = "Checking for forecast variable: " + variable
+                log.info(message)
                 variable_dir = basetimehour_dir + "/" + variable
 
                 repository.cwd(variable_dir)
@@ -193,17 +283,21 @@ def determine_remote_files_to_retrieve_dwd_fcvariable(
     Returns:
         The list of files passing the input criteria.
     """
+    global log, console
     queried_file_list = []
     basetimehour = basetime_string[-2:]
     complete_file_list = catalogue[model_name.lower()][basetimehour][variable.lower()][grid_type]
     if len(complete_file_list) == 0:
-        print('No files found for ' + model_name + ' ' + variable + ' ' + basetime_string)
+        message = "No suitable files found for variable : '" + variable + "' and grid type : '" + grid_type + \
+                  "' \nin NWP model : '" + model_name + "' for basetime: " + basetime_string
+        log.critical(message)
         sys.exit()
 
     # Check if the files are available for the input 'basetime_string'
     for single_grb_file in complete_file_list:
         if basetime_string not in single_grb_file:
-            print('No files found for ' + basetime_string)
+            message = 'No files found for ' + basetime_string
+            log.critical(message)
             sys.exit()
 
     # NOTE: concatenate 'level' and 'leadtime' strings, as they appear adjacent
@@ -231,16 +325,12 @@ def determine_remote_files_to_retrieve_dwd_fcvariable(
 
     leadtimelev_list_flag = dict.fromkeys(leadtimelev_list, False)
 
-    if wxlib.config.debug:
-        print(leadtimelev_list_flag)
-
     for single_grb_file in complete_file_list:
         if leadtimelev_list is not None: # If user specified leadtime and/or level list exists,
                                          # then filter files accordingly
             if any(leadtimelevel in single_grb_file for leadtimelevel in leadtimelev_list):
-                if wxlib.config.verbose:
-                    print(single_grb_file)
-
+                message = "Found file: " + single_grb_file
+                log.info(message)
                 queried_file_list.append(single_grb_file)
 
                 for leadtimelevel in leadtimelev_list:
@@ -252,22 +342,24 @@ def determine_remote_files_to_retrieve_dwd_fcvariable(
         else: # If user doesn't specify any leadtime and level list, then all files of the given variable are selected
             queried_file_list.append(single_grb_file)
 
-    # If any of the 'leadtimes' or 'levels' queried by the user are not
-    # available, then return 'None' and exit.
+    message= "The 'leadtime_lev_list_flag' entries, 'True' if any file found satisfying the user specification:\n" \
+             + str(leadtimelev_list_flag)
+    log.debug(message)
+
     if leadtimelev_list is not None:  # If user specified leadtime and/or level list exists
         # If any of the 'leadtimes' or 'levels' queried by the user are not
         # available, then return 'None' and exit.
         if False in leadtimelev_list_flag.values():
-            if wxlib.config.debug:
-                print(leadtimelev_list_flag)
+            log.debug(leadtimelev_list_flag)
             failed_list = [leadtimelev for leadtimelev, flag in
-                       leadtimelev_list_flag.items() if flag is False]
+                           leadtimelev_list_flag.items() if flag is False]
 
-        if wxlib.config.debug:
-            print(failed_list)
-        print("Data not available for: " + (','.join(failed_list)))
-        return None
-
+            log.debug(failed_list)
+            message = "Data not available for *_leadtime_levels_* : " + (','.join(failed_list))
+            log.warning(message)
+            return None
+    log.debug(" The list of files satisfying the user specifications:\n")
+    log.debug("\n\t".join(queried_file_list))
     return queried_file_list
 
 
@@ -284,8 +376,9 @@ def download_forecast_data(model_name, basetime_string, queried_dataset):
     :param queried_dataset: Dictionary of model diagnostic variable names and
                     corresponding list of files names to download
     """
+    global log, console
     if not queried_dataset:
-        print("Input dataset containes no Files.")
+        log.critical("Input dataset contains no Files.")
         sys.exit()
 
     local_base_directory = get_local_base_directory()
@@ -306,8 +399,8 @@ def download_forecast_data(model_name, basetime_string, queried_dataset):
             variable_dir = basetimehour_dir + "/" + variable
             repository.cwd(variable_dir)
             for single_grb_file in file_list:
-                if wxlib.config.debug:
-                    print("Downloading file: ", single_grb_file)
+                message = "Downloading file: " + single_grb_file
+                log.info(message)
                 fptr = open(single_grb_file, 'wb')
                 repository.retrbinary('RETR ' + single_grb_file, fptr.write)
 
@@ -329,12 +422,13 @@ def merge_and_convert_downloaded_files(model_name, basetime_string, queried_data
     :param queried_dataset: Dictionary of model diagnostic variable names and
                     corresponding list of files names to download
     """
+    global log,console
     if not queried_dataset:
-        print("Input dataset contains no files.")
+        log.critical("Input dataset contains no files.")
         sys.exit()
 
-    if wxlib.config.verbose:
-        print("\n\nUncompressing, merging and converting downloaded data...")
+
+    log.info("\n\nUncompressing, merging and converting downloaded data...")
 
     local_base_directory = get_local_base_directory()
     basetimehour = basetime_string[-2:]
@@ -344,7 +438,8 @@ def merge_and_convert_downloaded_files(model_name, basetime_string, queried_data
     queried_dataset_path = local_base_directory + '/' + model_name.upper() + '/' + basetimedate
 
     if not os.path.exists(queried_dataset_path):
-        print("The local dataset path" + queried_dataset_path + " doesn't exist.")
+        message = "The local dataset path" + queried_dataset_path + " doesn't exist."
+        log.critical(message)
         sys.exit()
 
     os.chdir(queried_dataset_path)
@@ -352,18 +447,23 @@ def merge_and_convert_downloaded_files(model_name, basetime_string, queried_data
     for variable, grid_type_file_list_dictionary in queried_dataset.items():
         for grid_type, file_list in grid_type_file_list_dictionary.items():
 
-            if wxlib.config.verbose:
-                print("* ", variable, " (", grid_type, ") ..")
+            message = "* " + variable + " (" + grid_type + ") .."
+            log.info(message)
 
             temp_file_name = file_list[0]
-            # 'cosmo-d2_germany_rotated-lat-lon_model-level_2020021300_001_7_P.\
-            # grib2.bz2'
+            # 'cosmo-d2_germany_rotated-lat-lon_model-level_2020021300_001_7_P.grib2.bz2'
             file_name = temp_file_name.split('_')[0:5]
             # cosmo-d2_germany_rotated-lat-lon_model-level_2020021300
             file_name.append(variable.upper())
             file_name = '_'.join(file_name)
             grib_file_name = file_name + '.grib2'
             nc_file_name = file_name + '.nc'
+
+            if os.path.exists(grib_file_name) or os.path.exists(nc_file_name):
+                message = 'Overwriting the existing files for ' + "'"+ variable + "'"
+                log.info(message)
+                os.remove(grib_file_name)
+                os.remove(nc_file_name)
 
             # Uncompress the files of each 'variable' and for given 'grid type', using bz2 module.
             with open(temp_file_name[:-4], 'wb') as out_file, bz2.BZ2File(temp_file_name, 'rb') as zip_file:
@@ -380,7 +480,4 @@ def merge_and_convert_downloaded_files(model_name, basetime_string, queried_data
             command = "rm " + "*" + grid_type + '_' + basetime_string \
                       + '_*_*_' + variable.upper() + '.grib2*'
             os.system(command)
-
-            if wxlib.config.verbose:
-                print("    .. done")
-
+            log.info("    .. done")

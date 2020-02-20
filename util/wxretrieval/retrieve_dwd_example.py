@@ -31,6 +31,7 @@
 """
 
 import sys
+import logging
 import wxlib.retrieve_nwp
 
 download_data = True
@@ -47,6 +48,12 @@ grid_type = "rotated-lat-lon_model-level"
 # then specify pressure level values instead.
 level_list = ["1", "2", "3", "4", "7", "10"]
 
+
+log = wxlib.retrieve_nwp.initialize_logging()
+# NOTE: logging levels in descending order of severity :
+#    logging.CRITICAL > logging.ERROR > logging.WARNING > logging.INFO > logging.DEBUG > logging.NOTSET
+wxlib.retrieve_nwp.set_logging_level(logging.INFO)
+
 # None       --- prepares catalogue for all the models from DWD
 # input_list --- prepares catalogue for the models in input_list
 catalogue = None
@@ -56,6 +63,15 @@ catalogue = wxlib.retrieve_nwp.prepare_catalogue_of_available_dwd_data([model_na
 local_data_dir_path = '/mnt/data1/wxretrieval'
 wxlib.retrieve_nwp.set_local_base_directory(local_data_dir_path)
 
+catalogue_file_name='catalogue.bin'
+if catalogue is not None:
+    wxlib.retrieve_nwp.store_catalogue_in_local_base_directory(catalogue, catalogue_file_name)
+else:
+    log.warning('Catalogue has no valid entries')
+    os.sys.exit()
+
+wxlib.retrieve_nwp.read_catalogue_from_local_base_directory(catalogue_file_name)
+
 queried_dataset = dict()
 for variable in variable_list:
     filtered_list = None
@@ -64,6 +80,9 @@ for variable in variable_list:
 
     if not filtered_list:
         queried_dataset = None
+        log.critical("No suitable files found for variable : '" + variable + "' and grid type : '" + grid_type \
+              + "' \nin NWP model : '" + model_name + "' for basetime: " + basetime_string + " leadtimes : '" \
+              +  ",".join(leadtime_list) + "' levels : '" + ",".join(level_list) + "'" )
         sys.exit()
     else:
         queried_dataset[variable] = dict()
