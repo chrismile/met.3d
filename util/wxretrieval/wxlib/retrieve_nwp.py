@@ -235,7 +235,8 @@ def determine_remote_files_to_retrieve_dwd_fcvariable(
         print(leadtimelev_list_flag)
 
     for single_grb_file in complete_file_list:
-        if leadtimelev_list is not None:
+        if leadtimelev_list is not None: # If user specified leadtime and/or level list exists,
+                                         # then filter files accordingly
             if any(leadtimelevel in single_grb_file for leadtimelevel in leadtimelev_list):
                 if wxlib.config.verbose:
                     print(single_grb_file)
@@ -248,24 +249,22 @@ def determine_remote_files_to_retrieve_dwd_fcvariable(
                         # for the leadtimelevel.
                         leadtimelev_list_flag[leadtimelevel] = True
                         break
-        else:
+        else: # If user doesn't specify any leadtime and level list, then all files of the given variable are selected
             queried_file_list.append(single_grb_file)
-            for leadtimelevel in leadtimelev_list:
-                leadtimelev_list_flag[leadtimelevel] = True
 
     # If any of the 'leadtimes' or 'levels' queried by the user are not
     # available, then return 'None' and exit.
-    if False in leadtimelev_list_flag.values():
-
-        if wxlib.config.debug:
-            print(leadtimelev_list_flag)
-
-        failed_list = [leadtimelev for leadtimelev, flag in
+    if leadtimelev_list is not None:  # If user specified leadtime and/or level list exists
+        # If any of the 'leadtimes' or 'levels' queried by the user are not
+        # available, then return 'None' and exit.
+        if False in leadtimelev_list_flag.values():
+            if wxlib.config.debug:
+                print(leadtimelev_list_flag)
+            failed_list = [leadtimelev for leadtimelev, flag in
                        leadtimelev_list_flag.items() if flag is False]
 
         if wxlib.config.debug:
             print(failed_list)
-
         print("Data not available for: " + (','.join(failed_list)))
         return None
 
