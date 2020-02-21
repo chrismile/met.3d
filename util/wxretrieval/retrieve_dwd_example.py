@@ -55,10 +55,10 @@ grid_type = "rotated-lat-lon_model-level"
 # then specify pressure level values instead.
 level_list = ["1", "2", "3", "4", "7", "10"]
 
-log = wxlib.retrieve_nwp.initialize_logging()
+log = wxlib.retrieve_nwp.log
 # NOTE: logging levels in descending order of severity :
 #    logging.CRITICAL > logging.ERROR > logging.WARNING > logging.INFO > logging.DEBUG > logging.NOTSET
-wxlib.retrieve_nwp.set_logging_level(logging.INFO)
+#wxlib.retrieve_nwp.set_logging_level(logging.DEBUG, 'test.log')
 
 local_data_dir_path = '/mnt/data1/wxretrieval'
 wxlib.retrieve_nwp.set_local_base_directory(local_data_dir_path)

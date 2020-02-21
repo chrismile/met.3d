@@ -86,33 +86,37 @@ def initialize_logging():
         log.addHandler(console)
     log.setLevel(logging.INFO)
     console.setLevel(logging.INFO)
+    set_logging_level(logging.INFO, None)
     return log
 
 
 # NOTE: logging levels in descending order of severity :
 #    logging.CRITICAL > logging.ERROR > logging.WARNING > logging.INFO > logging.DEBUG > logging.NOTSET
-def set_logging_level(logger_level):
+def set_logging_level(logger_level, logfile_name = None):
     """
         Function to set the logging level. If 'INFO' level, print 'info' messages. If 'DEBUG' levele, then additionally
         print the debug messages and  also to a log file named 'wxretrieval.log'.
         Arg:
         :param level : Mode to be set , any of 'CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG' or 'NOTSET'
+        :param logfile_name :File name(including path) to write out log.
     """
     global log, console
-    if not log or not console:
-        initialize_logging()
-
+    level_list = [logging.CRITICAL, logging.ERROR, logging.WARNING, logging.INFO, logging.DEBUG, logging.NOTSET]
+    if logger_level not in level_list:
+        message = "Input logger level is invalid,choose from: '" + ",".join(level_list) + "'"
+        log.warning(message)
+        
     log.setLevel(logger_level)
     console.setLevel(logger_level)
     log.addHandler(console)
+
     # NOTE: For Complete list of format directives refer https://docs.python.org/3/library/time.html#time.strftime
     datefmt = '%Y-%b-%d %H:%M:%S'
     formatter = logging.Formatter('%(asctime)s %(levelname)s: %(message)s',datefmt)
     console.setFormatter(formatter)
 
-    if logger_level is logging.DEBUG:
-        # Additionally write the log to a file named 'wxretieval.log' for debugging purposes.
-        logfile_name = 'wxretrieval.log'
+    if logfile_name is not None:
+        #Write the log to  logfile_name, overwrite if exists.
         if os.path.exists(logfile_name):
             os.remove(logfile_name)
         handler = logging.FileHandler(logfile_name)
@@ -135,9 +139,9 @@ def connect_to_dwd_opendata_ftpserver():
         repository.login()
         repository.cwd(wxlib.config.dwd_base_dir)
     except ftplib.all_errors as error_message:
-        log.critical(error_message)
+        log.error(error_message)
         message = "Cannot connect to : " + wxlib.config.dwd_base_url
-        log.critical(message)
+        log.error(message)
     return repository
 
 
@@ -171,6 +175,62 @@ def get_local_base_directory():
     return wxlib.config.local_base_directory
 
 
+def write_dictionary_to_file(dictionary_object, dictionary_file_path):
+    """
+    Function to write a dictionary to a give file and path.
+
+    Arg:
+    :param dictionary_object: The dictionary object to be written out.
+    :param dictionary_file_path: The file name and path to store the dictionary.
+
+    Returns: True if successful else False
+    """
+    if dictionary_object is None:
+        log.error('Input dictionary object has no valid entries')
+        return False
+
+    if not os.path.isdir(dictionary_file_path):
+        message = "The input directory: '" + dictionary_file_path + "'" + "doesn' exist."
+        log.warning(message)
+
+    if os.path.exists(dictionary_file_path):
+        message = "Overwriting the existing dictonary file: '" + dictionary_file_path + "'"
+        log.warning(message)
+
+    try:
+        with open(dictionary_file_path,'wb') as handle:
+            pickle.dump(dictionary_object, handle)
+    except (IOError, OSError, pickle.PickleError, pickle.UnpicklingError):
+        message = "Unable to write dictionary file: '" + dictionary_file_path + "'"
+        log.error(message)
+        return False
+    return True
+
+
+def read_dictionary_from_file(dictionary_file_path):
+    """
+    Function to read a dictionary from a given path and file.
+
+    Arg:
+    :param dictionary_file_path: The file name and path to read the dictionary.
+
+    Returns: If successful returns the dictionary object read in from file, else None.
+    """
+    dictionary_object = None
+    if not os.path.exists(dictionary_file_path):
+        message = "Dictionary file doesn't exist in the path: '" + dictionary_file_path + "'"
+        log.error(message)
+        return None
+    try:
+        with open(dictionary_file_path,'rb') as handle:
+            dictionary_object = pickle.loads(handle.read())
+    except (IOError, OSError, pickle.PickleError, pickle.UnpicklingError):
+        message = "Unable to read dictionary file: '" + dictionary_file_path + "'"
+        log.error(message)
+        return None
+    return dictionary_object
+
+
 def store_catalogue_in_local_base_directory(catalogue_object, catalogue_name):
     """
         Function to store the catalogue (binary file) in the 'local_base_directory'.
@@ -186,23 +246,13 @@ def store_catalogue_in_local_base_directory(catalogue_object, catalogue_name):
 
     catalogue_path = get_local_base_directory()
     catalogue_file_path = catalogue_path + '/' + catalogue_name
+
     if not os.path.isdir(catalogue_path):
         message = "Creating the directory: '" + catalogue_path + "'"
         log.warning(message)
         os.makedirs(catalogue_path)
 
-    if os.path.exists(catalogue_file_path):
-        message = "Overwriting the existing catalogue: '" + catalogue_file_path + "'"
-        log.warning(message)
-
-    try:
-        with open(catalogue_file_path,'wb') as handle:
-            pickle.dump(catalogue_object, handle)
-    except (IOError, OSError, pickle.PickleError, pickle.UnpicklingError):
-        message = "Unable to write catalogue file: '" + catalogue_file_path + "'"
-        log.critical(message)
-        return False
-    return True
+    return write_dictionary_to_file(catalogue_object, catalogue_file_path)
 
 
 def read_catalogue_from_local_base_directory(catalogue_name):
@@ -218,16 +268,11 @@ def read_catalogue_from_local_base_directory(catalogue_name):
     catalogue_file_path = catalogue_path + '/' + catalogue_name
     message = "Reading catalogue: '" + catalogue_file_path + "'"
     log.info(message)
-    if not os.path.exists(catalogue_path):
-        message = "Catalogue doesn't exist in the path: '" + catalogue_file_path + "'"
-        log.critical(message)
-        return False
-    try:
-        with open(catalogue_file_path,'rb') as handle:
-            catalogue = pickle.loads(handle.read())
-    except (IOError, OSError, pickle.PickleError, pickle.UnpicklingError):
-        message = "Unable to read catalogue file: '" + catalogue_file_path + "'"
-        log.critical(message)
+
+
+    catalogue = None
+    catalogue = read_dictionary_from_file(catalogue_file_path)
+    if catalogue is None:
         return False
     return True
 
@@ -563,3 +608,4 @@ def merge_and_convert_downloaded_files(model_name, basetime_string, queried_data
             log.info("    .. done")
 
     return True
+initialize_logging()
