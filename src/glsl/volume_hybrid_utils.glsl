@@ -113,9 +113,8 @@ float sampleHybridSigmaVolumeAtPos(in sampler3D sampler,
     float scalar_i1j1 = sampleHybridSigmaColumnAtP(sampler, dve, sfcSampler,
                                                    hybCoeffSampler, i1, j1, p);
 
-    // Check for missing values.
-    // TODO: Why is this not working with computeGradient()? (mr, 03Aug2014)
-    // it appears to be fixed now (mm+mr,feb2020)
+    // Check for missing values. If one of the four surrounding grid points
+    // is missing, the interpolated value is undefined.
     if (scalar_i0j0 == M_MISSING_VALUE) return M_MISSING_VALUE;
     if (scalar_i1j0 == M_MISSING_VALUE) return M_MISSING_VALUE;
     if (scalar_i0j1 == M_MISSING_VALUE) return M_MISSING_VALUE;
@@ -438,8 +437,6 @@ float sampleHybridSigmaVolumeAtPos_LUT(in sampler3D sampler,
 
     // Check for missing values. Due to consistency of the acceleration
     // structures, this is done after all four columns have been retrieved.
-    // TODO: Why is this not working with computeGradient()? (mr, 03Aug2014)
-    // it appears to be fixed now (mm+mr,feb2020)
     if (scalar_i0j0 == M_MISSING_VALUE) return M_MISSING_VALUE;
     if (scalar_i1j0 == M_MISSING_VALUE) return M_MISSING_VALUE;
     if (scalar_i0j1 == M_MISSING_VALUE) return M_MISSING_VALUE;

@@ -93,7 +93,7 @@ float sampleAuxiliaryPressure(in vec3 pos)
   Central differences are used for the computation, except for positions close
   to the boundaries of the data volume. Here, h is scaled and reduced to
   simple forward differences for positions less than one grid size away from
-  the boundary.
+  the boundary. Also, correction is performed for missing values.
 
   For pressure level and hybrid sigma pressure level grids, the vertical
   difference hz used to compute the central/forward differences are scaled
@@ -124,15 +124,21 @@ vec3 gradientAtPos(in vec3 pos, in vec3 h, float ztop, float zbot)
     float x1 = sampleDataAtPos(pos_east);
     float x2 = sampleDataAtPos(pos_west);
     if (x1 == M_MISSING_VALUE)
-        {
-            pos_east = pos;
-            x1 = sampleDataAtPos(pos_east);
-        }
+    {
+        // Missing value correction: If the grid sampled at position pos.x + h.x
+        // is missing, "fall back" to position pos.x. The gradient reduces to
+        // a simple forward difference.
+        pos_east = pos;
+        x1 = sampleDataAtPos(pos_east);
+    }
     if (x2 == M_MISSING_VALUE)
-        {
-            pos_west = pos;
-            x2 = sampleDataAtPos(pos_west);
-        }
+    {
+//CHECKME (mr, 21Feb2020) -- in rare cases both sampled values could be
+// missing. In such cases the gradient would be zero and we'd have a division
+// by zero..
+        pos_west = pos;
+        x2 = sampleDataAtPos(pos_west);
+    }
     float hx = pos_east.x - pos_west.x;
 
     vec3 pos_north = vec3(pos.x, min(pos.y + h.y, dataExtent.dataNWCrnr.y), pos.z);
@@ -140,15 +146,15 @@ vec3 gradientAtPos(in vec3 pos, in vec3 h, float ztop, float zbot)
     float y1 = sampleDataAtPos(pos_north);
     float y2 = sampleDataAtPos(pos_south);
     if (y1 == M_MISSING_VALUE)
-        {
-            pos_north = vec3(pos.x, min(pos.y, dataExtent.dataNWCrnr.y), pos.z);
-            y1 = sampleDataAtPos(pos_north);
-        }
+    {
+        pos_north = pos;
+        y1 = sampleDataAtPos(pos_north);
+    }
     if (y2 == M_MISSING_VALUE)
-        {
-            pos_south = vec3(pos.x, max(pos.y, dataExtent.dataSECrnr.y), pos.z);
-            y2 = sampleDataAtPos(pos_south);
-        }
+    {
+        pos_south = pos;
+        y2 = sampleDataAtPos(pos_south);
+    }
     float hy = pos_north.y - pos_south.y;
 
     // 2. Sample with vertical displacement, considering data volume
@@ -159,15 +165,15 @@ vec3 gradientAtPos(in vec3 pos, in vec3 h, float ztop, float zbot)
     float z1 = sampleDataAtPos(pos_top);
     float z2 = sampleDataAtPos(pos_bot);
     if (z1 == M_MISSING_VALUE)
-        {
-            pos_top = vec3(pos.xy, min(pos.z, ztop));
-            z1= sampleDataAtPos(pos_top);
-        }
+    {
+        pos_top = pos;
+        z1= sampleDataAtPos(pos_top);
+    }
     if (z2 == M_MISSING_VALUE)
-        {
-            pos_bot = vec3(pos.xy, max(pos.z, zbot));
-            z2= sampleDataAtPos(pos_bot);
-        }
+    {
+        pos_bot = pos;
+        z2= sampleDataAtPos(pos_bot);
+    }
     float hz = pos_top.z - pos_bot.z;
 
     // 3. Compute gradient.

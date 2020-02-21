@@ -240,7 +240,16 @@ bool traverseSectionOfDataVolume(
         if (scalar != M_MISSING_VALUE)
         {
             crossingLevelFront = computeCrossingLevel(scalar);
-            if ((crossingLevelFront != crossingLevelBack) && (prevSampleIsValid == true))
+
+            // Missing value handling: in cases in which the ray passes through
+            // regions of missing data (e.g., cuts through terrain) and
+            // re-enters the "valid" data volume we need to skip the crossing
+            // test for the first new valid sample. Otherwise the code below
+            // will search for an isosurface crossing between the last valid
+            // sample before the missing data and the first valid sample behind.
+            // This leads to the bisection correction searching in missing data
+            // space, incorrect surfaces are the result. (mm&mr, 21Feb2020)
+            if (prevSampleIsValid && (crossingLevelFront != crossingLevelBack))
             {
                 vec3 gradient = vec3(0);
                 if (!shadowRay)
@@ -267,11 +276,14 @@ bool traverseSectionOfDataVolume(
                 rayColor.rgb += (1 - rayColor.a) * blendColor.rgb;
                 rayColor.a += (1 - rayColor.a) * blendColor.a;
             }
-            prevSampleIsValid=true;
+
+            prevSampleIsValid = true;
         }
         else
         {
-            prevSampleIsValid=false;
+            // Missing value has been encountered, set flag to ensure correct
+            // handling if ray re-enters the data volume (see above).
+            prevSampleIsValid = false;
         }
         
         prevLambda  = lambda;
