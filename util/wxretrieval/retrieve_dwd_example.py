@@ -27,81 +27,75 @@
 
     You should have received a copy of the GNU General Public License
     along with Met.3D.  If not, see <http://www.gnu.org/licenses/>.
-
 """
-import sys
 
-try:
-    import logging
-except ImportError:
-    print("Module 'logging' not available")
+import wxlib.retrieve_nwp
 
-try:
-    import wxlib.retrieve_nwp
-except ImportError:
-    print("Module 'wxlib.retrieve_nwp' not available")
+# CONFIGURATION
+# =============================================================================
 
-download_data = True
-process_data = True
-
-variable_list = ["p","t"]
+# Model and parameters to be retrieved.
 model_name = "cosmo-d2"
-leadtime_list = ["001", "010"]
-basetimedate = "20200221"
+grid_type = "rotated-lat-lon_model-level"
+
+basetimedate = "20200224"
 basetimehour = "00"
 basetime_string = basetimedate + basetimehour  # 2020021300
-grid_type = "rotated-lat-lon_model-level"
-# The following list of vertical levels contains model levels; if querying for a pressure level diagnostic,
-# then specify pressure level values instead.
+
+variable_list = ["p", "t"]
+leadtime_list = ["001", "010"]
+# List of vertical levels can contain either model levels or pressure levels.
 level_list = ["1", "2", "3", "4", "7", "10"]
 
-log = wxlib.retrieve_nwp.log
-# NOTE: logging levels in descending order of severity :
-#    logging.CRITICAL > logging.ERROR > logging.WARNING > logging.INFO > logging.DEBUG > logging.NOTSET
-#wxlib.retrieve_nwp.set_logging_level(logging.DEBUG, 'test.log')
-
+# Directory in which data will be stored.
 local_data_dir_path = '/mnt/data1/wxretrieval'
+
+# RETRIEVAL
+# =============================================================================
+
+log = wxlib.retrieve_nwp.log
+# Optionally set logging level and specify a file to which logging output is written.
+# (logging.CRITICAL > logging.ERROR > logging.WARNING > logging.INFO > logging.DEBUG > logging.NOTSET)
+# wxlib.retrieve_nwp.set_logging_level(logging.DEBUG, 'test.log')
+
 wxlib.retrieve_nwp.set_local_base_directory(local_data_dir_path)
 
-# None       --- prepares catalogue for all the models from DWD
-# input_list --- prepares catalogue for the models in input_list
-catalogue = wxlib.retrieve_nwp.prepare_catalogue_of_available_dwd_data([model_name],[basetimehour], variable_list)
+# Prepare catalogue of remotely available data: check which data is available on the remote
+# server and which variables are stored in which files.
+catalogue = wxlib.retrieve_nwp.prepare_catalogue_of_available_dwd_data([model_name], [basetimehour], variable_list)
 if catalogue is None:
+    log.warning('Catalogue is not valid.')
     exit()
 
-# Overwrite standard directory to store retrieved files.
-catalogue_file_name='catalogue.bin'
-if catalogue is not None:
-    if not wxlib.retrieve_nwp.store_catalogue_in_local_base_directory(catalogue, catalogue_file_name):
+# Optionally you can store the catalogue in a file to be used by different scripts.
+test_catalogue_storage = False
+if test_catalogue_storage:
+    catalogue_file_name = 'dwd_opendata_catalogue.bin'
+    if catalogue is not None:
+        if not wxlib.retrieve_nwp.store_catalogue_in_local_base_directory(catalogue, catalogue_file_name):
+            exit()
+    else:
+        log.warning('Catalogue has no valid entries.')
         exit()
-else:
-    log.warning('Catalogue has no valid entries')
-    exit()
 
-catalogue_file_name='catalogue.bin'
+    if not wxlib.retrieve_nwp.read_catalogue_from_local_base_directory(catalogue_file_name):
+        exit()
 
-if not wxlib.retrieve_nwp.read_catalogue_from_local_base_directory(catalogue_file_name):
-    exit()
-
-queried_dataset = dict()
+remote_datafiles = dict()
 for variable in variable_list:
-    filtered_list = wxlib.retrieve_nwp.determine_remote_files_to_retrieve_dwd_fcvariable(
+    remote_files_for_variable = wxlib.retrieve_nwp.determine_remote_files_to_retrieve_dwd_fcvariable(
         variable, model_name, basetime_string, grid_type, leadtime_list, level_list)
 
-    if filtered_list is None:
-        queried_dataset = None
-        log.critical("No suitable files found for variable : '" + variable + "' and grid type : '" + grid_type \
-              + "' \nin NWP model : '" + model_name + "' for basetime: " + basetime_string + " leadtimes : '" \
-              +  ",".join(leadtime_list) + "' levels : '" + ",".join(level_list) + "'" )
+    if remote_files_for_variable is None:
+        remote_datafiles = None
+        log.critical("No remote data files discovered for variable : '" + variable + "' and grid type : '" + grid_type
+                     + "' \nin NWP model : '" + model_name + "' for basetime: " + basetime_string + " leadtimes : '"
+                     + ",".join(leadtime_list) + "' levels : '" + ",".join(level_list) + "'")
         exit()
     else:
-        queried_dataset[variable] = dict()
-        queried_dataset[variable][grid_type] = filtered_list
+        remote_datafiles[variable] = dict()
+        remote_datafiles[variable][grid_type] = remote_files_for_variable
 
-if download_data:
-    if not wxlib.retrieve_nwp.download_forecast_data(model_name, basetime_string, queried_dataset):
-        exit()
-
-if process_data:
-    if not wxlib.retrieve_nwp.merge_and_convert_downloaded_files(model_name, basetime_string, queried_dataset):
-        exit()
+# Download forecast data, merge the individual GRIB file and convert to a NetCDF file.
+wxlib.retrieve_nwp.download_forecast_data(model_name, basetime_string, remote_datafiles)
+wxlib.retrieve_nwp.merge_and_convert_downloaded_files(model_name, basetime_string, remote_datafiles)
