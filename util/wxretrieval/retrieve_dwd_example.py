@@ -43,9 +43,9 @@ basetimehour = "00"
 basetime_string = basetimedate + basetimehour  # 2020021300
 
 variable_list = ["p", "t"]
-leadtime_list = ["001", "010"]
+leadtime_list = [1, 10]
 # List of vertical levels can contain either model levels or pressure levels.
-level_list = ["1", "2", "3", "4", "7", "10"]
+level_list = [1, 2, 3, 4, 7, 10]
 
 # Directory in which data will be stored.
 local_data_dir_path = '/mnt/data1/wxretrieval'

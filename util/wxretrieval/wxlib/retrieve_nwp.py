@@ -352,9 +352,8 @@ def determine_remote_files_to_retrieve_dwd_fcvariable(
     2020 February 23rd at 00 hrs
     :param grid_type: Grid type eg.,'rotated-lat-lon_model-level', a complete
     list of available grid types for each model is in 'config.py'
-    :param leadtime_list:Lead time in hours(xxx), eg., '001'
-    :param level_list:List of levels (pressure e.g.,'200',300'
-                                      model e.g., '1','2' )
+    :param leadtime_list: Lead time in hours(xxx), e.g. [3, 6, 9, 12]
+    :param level_list: List of levels (pressure, e.g. [200, 300] or model level, e.g. [1, 2, 3, 4])
 
 
     Returns:
@@ -383,9 +382,9 @@ def determine_remote_files_to_retrieve_dwd_fcvariable(
 
     leadtimelev_list = []
     if leadtime_list is not None:
-        leadtime_list = ['_' + str(x) + '_' for x in leadtime_list]
+        leadtime_list = ["_%03i_" % x for x in leadtime_list]
         if level_list is not None:
-            level_list = [str(x) + '_' for x in level_list]
+            level_list = ["%i_" % x for x in level_list]
             for leadtime in leadtime_list:
                 for level in level_list:
                     leadtimelev_list.append(leadtime + level)
@@ -393,7 +392,7 @@ def determine_remote_files_to_retrieve_dwd_fcvariable(
             leadtimelev_list = leadtime_list
     else:
         if level_list is not None:
-            leadtimelev_list = ['_' + str(x) + '_' for x in level_list]
+            leadtimelev_list = ["_%i_" % x for x in level_list]
         else:
             leadtimelev_list = None
 
