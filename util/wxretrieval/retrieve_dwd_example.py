@@ -30,6 +30,7 @@
 """
 
 import logging
+import datetime
 import wxlib.retrieve_nwp
 
 # CONFIGURATION
@@ -39,9 +40,10 @@ import wxlib.retrieve_nwp
 model_name = "cosmo-d2"
 grid_type = "rotated-lat-lon_model-level"
 
-basetimedate = "20200225"
-basetimehour = "00"
-basetime_string = basetimedate + basetimehour  # 2020021300
+# Get the current UTC data at 00Z and use it as base time.
+base_time = datetime.datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+# .. or explicitly set a date:
+# base_time = datetime.datetime(2020, 2, 25, 0)
 
 variable_list = ["p", "t"]
 leadtime_list = [1, 10]
@@ -65,7 +67,7 @@ wxlib.retrieve_nwp.set_local_base_directory(local_data_dir_path)
 
 # Prepare catalogue of remotely available data: check which data is available on the remote
 # server and which variables are stored in which files.
-catalogue = wxlib.retrieve_nwp.prepare_catalogue_of_available_dwd_data([model_name], [basetimehour], variable_list)
+catalogue = wxlib.retrieve_nwp.prepare_catalogue_of_available_dwd_data([model_name], [base_time], variable_list)
 if catalogue is None:
     logging.warning('Catalogue is not valid.')
     exit()
@@ -87,14 +89,13 @@ if test_catalogue_storage:
 remote_datafiles = dict()
 for variable in variable_list:
     remote_files_for_variable = wxlib.retrieve_nwp.determine_remote_files_to_retrieve_dwd_fcvariable(
-        variable, model_name, basetime_string, grid_type, leadtime_list, level_list)
+        variable, model_name, base_time, grid_type, leadtime_list, level_list)
 
     if remote_files_for_variable is None:
-        remote_datafiles = None
         logging.critical(
             "No remote data files were discovered for variable '%s', grid type '%s', for NWP model '%s'"
             " at base time '%s' at lead times '%s' and vertical levels '%s'." % (
-                variable, grid_type, model_name, basetime_string,
+                variable, grid_type, model_name, base_time.isoformat(),
                 ",".join([str(x) for x in leadtime_list]), ",".join([str(x) for x in level_list])))
         exit()
     else:
@@ -102,5 +103,5 @@ for variable in variable_list:
         remote_datafiles[variable][grid_type] = remote_files_for_variable
 
 # Download forecast data, merge the individual GRIB file and convert to a NetCDF file.
-wxlib.retrieve_nwp.download_forecast_data(model_name, basetime_string, remote_datafiles)
-wxlib.retrieve_nwp.merge_and_convert_downloaded_files(model_name, basetime_string, remote_datafiles)
+wxlib.retrieve_nwp.download_forecast_data(model_name, base_time, remote_datafiles)
+wxlib.retrieve_nwp.merge_and_convert_downloaded_files(model_name, base_time, remote_datafiles)

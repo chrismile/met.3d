@@ -180,7 +180,7 @@ def read_catalogue_from_local_base_directory(catalogue_name):
     return catalogue is not None
 
 
-def prepare_catalogue_of_available_dwd_data(queried_model_list, basetimehour_list, variable_list):
+def prepare_catalogue_of_available_dwd_data(queried_model_list, basetimes_list, variable_list):
     """
     Function to prepare a catalogue (nested dictionaries), for the list of
     models queried. Updates the global variable 'catalogue' with the file
@@ -190,11 +190,10 @@ def prepare_catalogue_of_available_dwd_data(queried_model_list, basetimehour_lis
     :param queried_model_list : List of model names.e.g., ["icon","icon-eu"],if
     None specified, then the catalogue is updated for all the available models in
     the repository.
-    :param basetimehour_list : List of basetime hours for which the data is needed, e.g., ["00","06"],if
-    None specified, then the catalogue is updated for all the available basetime hours, for each of the models in the
-    'queried_model_list'
+    :param basetimes_list : List of base times (datetime.datetime). If 'None' specified, the catalogue
+    is updated for all base times available on the remote server.
     :param variable_list : List of variable names.e.g., ["p","t"],if None specified, then the catalogue is updated for
-    all the available variables, for each basetime hour in the 'basetimehour_list'
+    all the available variables, for each base time in 'basetimes_list'
 
     Returns: catalogue object if successful else None
     """
@@ -207,9 +206,10 @@ def prepare_catalogue_of_available_dwd_data(queried_model_list, basetimehour_lis
         queried_model_list = wxlib.config.dwd_nwp_models
 
     logging.info("***** Scanning remote ftp server at DWD to assemble catalogue...:")
-    logging.debug("[List of models to be queried: %s]" % ", ".join(queried_model_list))
+    logging.info("[Models to be queried: %s]" % ", ".join(queried_model_list))
+    logging.info("[Base times to be queried: %s]" % ", ".join([t.isoformat() for t in basetimes_list]))
 
-    # On the remote DWD server, for a given 'model', 'basetimehour' and
+    # On the remote DWD server, for a given 'model', 'base_hour_str' and
     # 'variable', the directories are structured in the order e.g.,for 'cosmo-
     # d2' model 'https://opendata.dwd.de/weather/nwp/cosmo-d2/grib/basetimehour/
     # variable/', followed by the list of files.Hence, here we recursively query
@@ -223,18 +223,23 @@ def prepare_catalogue_of_available_dwd_data(queried_model_list, basetimehour_lis
         logging.info("**** Checking for NWP model '%s' in remote directory '%s'..." % (nwp_model, model_dir))
         repository.cwd(model_dir)
 
-        if basetimehour_list is None:
-            basetimehour_list = repository.nlst()
-        catalogue[nwp_model] = dict.fromkeys(basetimehour_list)
+        # Create list of strings representing the base times, to be used as subdirectory names
+        # on the DWD opendata server.
+        if basetimes_list is None:
+            basetimes_strlist = repository.nlst()
+        else:
+            basetimes_strlist = [t.strftime("%H") for t in basetimes_list]
 
-        for basetimehour in basetimehour_list:
-            logging.info("*** Checking for base time hour '%s'." % basetimehour)
-            basetimehour_dir = os.path.join(model_dir, basetimehour)
+        catalogue[nwp_model] = dict.fromkeys(basetimes_strlist)
+
+        for base_hour_str in basetimes_strlist:
+            logging.info("*** Checking for base time hour '%s'." % base_hour_str)
+            basetimehour_dir = os.path.join(model_dir, base_hour_str)
             repository.cwd(basetimehour_dir)
 
             if variable_list is None:
                 variable_list = repository.nlst()
-            catalogue[nwp_model][basetimehour] = dict.fromkeys(variable_list)
+            catalogue[nwp_model][base_hour_str] = dict.fromkeys(variable_list)
 
             for variable in variable_list:
                 logging.info("** Checking for forecast variable '%s'." % variable)
@@ -243,16 +248,16 @@ def prepare_catalogue_of_available_dwd_data(queried_model_list, basetimehour_lis
                 repository.cwd(variable_dir)
                 file_list = repository.nlst()
                 grid_type_list = wxlib.config.dwd_nwp_models_grid_types[nwp_model]
-                catalogue[nwp_model][basetimehour][variable] = \
+                catalogue[nwp_model][base_hour_str][variable] = \
                     dict.fromkeys(grid_type_list)
 
                 for grid_type in grid_type_list:
-                    catalogue[nwp_model][basetimehour][variable][grid_type] = []
+                    catalogue[nwp_model][base_hour_str][variable][grid_type] = []
 
                 for file in file_list:
                     for grid_type in grid_type_list:
                         if grid_type in file:
-                            catalogue[nwp_model][basetimehour][variable][grid_type].append(file)
+                            catalogue[nwp_model][base_hour_str][variable][grid_type].append(file)
 
     repository.quit()
     logging.info("Catalogue of remote data files has been prepared.")
@@ -260,7 +265,7 @@ def prepare_catalogue_of_available_dwd_data(queried_model_list, basetimehour_lis
 
 
 def determine_remote_files_to_retrieve_dwd_fcvariable(
-        variable, model_name, basetime_string, grid_type, leadtime_list, level_list):
+        variable, model_name, basetime, grid_type, leadtime_list, level_list):
     """
     Function to get the list of available files for a given variable from in a
     given model for a specified grid type and lead times as well as levels.
@@ -268,30 +273,28 @@ def determine_remote_files_to_retrieve_dwd_fcvariable(
     Args:
     :param variable: model diagnostic name
     :param model_name: model name
-    :param basetime_string: Date and Hour(YYYYMMDDHH) at which the forecast
-    simulation was started,eg., '2020022300' for forecast starting on
-    2020 February 23rd at 00 hrs
+    :param basetime: Datetime object specifying forecast base time
     :param grid_type: Grid type eg.,'rotated-lat-lon_model-level', a complete
     list of available grid types for each model is in 'config.py'
     :param leadtime_list: Lead time in hours(xxx), e.g. [3, 6, 9, 12]
     :param level_list: List of levels (pressure, e.g. [200, 300] or model level, e.g. [1, 2, 3, 4])
 
-
     Returns:
     If successful, the list of files passing the input criteria, else None
     """
     queried_file_list = []
-    basetimehour = basetime_string[-2:]
-    complete_file_list = catalogue[model_name.lower()][basetimehour][variable.lower()][grid_type]
+    base_hour_str = basetime.strftime("%H")
+    basetime_str = basetime.strftime("%Y%m%d%H")
+    complete_file_list = catalogue[model_name.lower()][base_hour_str][variable.lower()][grid_type]
     if len(complete_file_list) == 0:
         logging.error("No data files found for variable '%s', grid type '%s', for NWP model '%s' at base time '%s'."
-                      % (variable, grid_type, model_name, basetime_string))
+                      % (variable, grid_type, model_name, basetime_str))
         return None
 
-    # Check if the files are available for the input 'basetime_string'
+    # Check if the files are available for the input 'basetime_str'
     for single_grb_file in complete_file_list:
-        if basetime_string not in single_grb_file:
-            logging.error("No data files found for base time '%s'." % basetime_string)
+        if basetime_str not in single_grb_file:
+            logging.error("No data files found for base time '%s'." % basetime_str)
             return None
 
     # NOTE: concatenate 'level' and 'leadtime' strings, as they appear adjacent
@@ -354,7 +357,7 @@ def determine_remote_files_to_retrieve_dwd_fcvariable(
     return queried_file_list
 
 
-def download_forecast_data(model_name, basetime_string, queried_dataset):
+def download_forecast_data(model_name, basetime, queried_dataset):
     """
     Function to download a given set of files, for a given model and for
     forecast simulation started at a particular hour using ftp. If any error occurs during download
@@ -362,9 +365,7 @@ def download_forecast_data(model_name, basetime_string, queried_dataset):
 
     Args:
     :param model_name: Name of the model.
-    :param basetime_string: Date and Hour(YYYYMMDDHH) at which the forecast.
-    simulation was started,eg., '2020022300' for forecast starting on
-    2020 February 23rd at 00 hrs.
+    :param basetime: Datetime object specifying forecast base time
     :param queried_dataset: Dictionary of model diagnostic variable names and
                     corresponding list of files names to download.
 
@@ -377,21 +378,21 @@ def download_forecast_data(model_name, basetime_string, queried_dataset):
         return False
 
     local_base_directory = get_local_base_directory()
-    basetimehour = basetime_string[-2:]
-    basetimedate = basetime_string[0:8]
+    base_hour_str = basetime.strftime("%H")
+    base_date_str = basetime.strftime("%Y%m%d")
     os.chdir(local_base_directory)
-    download_path = os.path.join(local_base_directory, model_name.upper(), basetimedate)
+    download_path = os.path.join(local_base_directory, model_name.upper(), base_date_str)
     if not os.path.exists(download_path):
         os.makedirs(download_path)
     os.chdir(download_path)
 
     model_dir = os.path.join(wxlib.config.dwd_base_dir, model_name.lower(), "grib")
-    basetimehour_dir = os.path.join(model_dir, basetimehour)
+    base_hour_dir = os.path.join(model_dir, base_hour_str)
     repository = connect_to_dwd_opendata_ftpserver()
 
     for variable, grid_type_file_list_dictionary in queried_dataset.items():
         for grid_type, file_list in grid_type_file_list_dictionary.items():
-            variable_dir = os.path.join(basetimehour_dir, variable)
+            variable_dir = os.path.join(base_hour_dir, variable)
             repository.cwd(variable_dir)
             logging.debug(",".join(file_list))
             for single_grb_file in file_list:
@@ -412,7 +413,7 @@ def download_forecast_data(model_name, basetime_string, queried_dataset):
     return True
 
 
-def merge_and_convert_downloaded_files(model_name, basetime_string, queried_dataset):
+def merge_and_convert_downloaded_files(model_name, basetime, queried_dataset):
     """
     Function to process the download set of files, for a given model and for
     forecast simulation started at a particular hour. The processing consists of
@@ -421,9 +422,7 @@ def merge_and_convert_downloaded_files(model_name, basetime_string, queried_data
 
     Args:
     :param model_name: Name of the model
-    :param basetime_string: Date and Hour(YYYYMMDDHH) at which the forecast
-    simulation was started,eg., '2020022300' for forecast starting on
-    2020 February 23rd at 00 hrs
+    :param basetime: Datetime object specifying forecast base time
     :param queried_dataset: Dictionary of model diagnostic variable names and
                     corresponding list of files names to download
 
@@ -436,10 +435,11 @@ def merge_and_convert_downloaded_files(model_name, basetime_string, queried_data
         return False
 
     local_base_directory = get_local_base_directory()
-    basetimedate = basetime_string[0:8]
+    basetime_str = basetime.strftime("%Y%m%d%H")
+    base_date_str = basetime.strftime("%Y%m%d")
 
     os.chdir(local_base_directory)
-    queried_dataset_path = os.path.join(local_base_directory, model_name.upper(), basetimedate)
+    queried_dataset_path = os.path.join(local_base_directory, model_name.upper(), base_date_str)
 
     if not os.path.exists(queried_dataset_path):
         logging.error("The local dataset path '%s' doesn't exist." % queried_dataset_path)
@@ -487,7 +487,7 @@ def merge_and_convert_downloaded_files(model_name, basetime_string, queried_data
             # Create the NetCDF file from the concatenated file.
             cdo_instance.copy(input=grib_file_name, output=nc_file_name, options='-f nc')
             # Clean up the unzipped individual files.
-            command = "rm " + "*" + grid_type + '_' + basetime_string \
+            command = "rm " + "*" + grid_type + '_' + basetime_str \
                       + '_*_*_' + variable.upper() + '.grib2*'
             os.system(command)
             logging.info("    .. done")
