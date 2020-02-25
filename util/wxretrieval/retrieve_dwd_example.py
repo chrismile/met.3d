@@ -29,6 +29,7 @@
     along with Met.3D.  If not, see <http://www.gnu.org/licenses/>.
 """
 
+import logging
 import wxlib.retrieve_nwp
 
 # CONFIGURATION
@@ -38,7 +39,7 @@ import wxlib.retrieve_nwp
 model_name = "cosmo-d2"
 grid_type = "rotated-lat-lon_model-level"
 
-basetimedate = "20200224"
+basetimedate = "20200225"
 basetimehour = "00"
 basetime_string = basetimedate + basetimehour  # 2020021300
 
@@ -53,18 +54,20 @@ local_data_dir_path = '/mnt/data1/wxretrieval'
 # RETRIEVAL
 # =============================================================================
 
-log = wxlib.retrieve_nwp.log
-# Optionally set logging level and specify a file to which logging output is written.
-# (logging.CRITICAL > logging.ERROR > logging.WARNING > logging.INFO > logging.DEBUG > logging.NOTSET)
-# wxlib.retrieve_nwp.set_logging_level(logging.DEBUG, 'test.log')
+# Initialize logging system.
+# See https://docs.python.org/3/howto/logging.html#logging-basic-tutorial
+logging.basicConfig(level=logging.INFO,
+                    format="[%(asctime)s %(filename)s:%(lineno)s %(levelname)s] %(message)s",
+                    datefmt="%Y-%m-%d %H:%M:%S")
 
+# Tell retrieval library to store files in the directory specified above.
 wxlib.retrieve_nwp.set_local_base_directory(local_data_dir_path)
 
 # Prepare catalogue of remotely available data: check which data is available on the remote
 # server and which variables are stored in which files.
 catalogue = wxlib.retrieve_nwp.prepare_catalogue_of_available_dwd_data([model_name], [basetimehour], variable_list)
 if catalogue is None:
-    log.warning('Catalogue is not valid.')
+    logging.warning('Catalogue is not valid.')
     exit()
 
 # Optionally you can store the catalogue in a file to be used by different scripts.
@@ -75,7 +78,7 @@ if test_catalogue_storage:
         if not wxlib.retrieve_nwp.store_catalogue_in_local_base_directory(catalogue, catalogue_file_name):
             exit()
     else:
-        log.warning('Catalogue has no valid entries.')
+        logging.warning('Catalogue has no valid entries.')
         exit()
 
     if not wxlib.retrieve_nwp.read_catalogue_from_local_base_directory(catalogue_file_name):
@@ -88,9 +91,11 @@ for variable in variable_list:
 
     if remote_files_for_variable is None:
         remote_datafiles = None
-        log.critical("No remote data files discovered for variable : '" + variable + "' and grid type : '" + grid_type
-                     + "' \nin NWP model : '" + model_name + "' for basetime: " + basetime_string + " leadtimes : '"
-                     + ",".join(leadtime_list) + "' levels : '" + ",".join(level_list) + "'")
+        logging.critical(
+            "No remote data files were discovered for variable '%s', grid type '%s', for NWP model '%s'"
+            " at base time '%s' at lead times '%s' and vertical levels '%s'." % (
+                variable, grid_type, model_name, basetime_string,
+                ",".join([str(x) for x in leadtime_list]), ",".join([str(x) for x in level_list])))
         exit()
     else:
         remote_datafiles[variable] = dict()
