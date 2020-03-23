@@ -37,28 +37,114 @@ dwd_nwp_models = ["cosmo-d2", "icon-eu", "icon"]
 
 dwd_nwp_models_grid_types = {
     "cosmo-d2":
-        ["regular-lat-lon_pressure-level",
-         "regular-lat-lon_model-level",
-         "regular-lat-lon_single-level",
-         "regular-lat-lon_time-invariant",
-         "rotated-lat-lon_pressure-level",
-         "rotated-lat-lon_model-level",
-         "rotated-lat-lon_single-level",
-         "rotated-lat-lon_time-invariant"
+        [
+         [
+             # List of variables for each available grid type
+             {"regular-lat-lon_model-level": ['clc', 'p', 'qv', 't', 'tke', 'u', 'v', 'w']},
+             {"regular-lat-lon_pressure-level": ['fi', 'omega', 'relhum', 't', 'u', 'v']},
+             {"regular-lat-lon_soil-level": ['t_so', 'w_so']},
+             {"regular-lat-lon_single-level": ['alb_rad', 'alhfl_s', 'ashfl_s', 'asob_s', 'asob_t', 'aswdifd_s',
+                                               'aswdifu_s', 'aswdir_s', 'cape_ml', 'cin_ml', 'clch', 'clcl', 'clcm',
+                                               'clct', 'clct_mod', 'cldepth', 'dbz_850', 'dbz_cmax', 'grau_gsp',
+                                               'h_snow', 'hzerocl', 'mh', 'pmsl', 'prs_gsp', 'ps', 'qv_s', 'rain_gsp',
+                                               'relhum_2m', 'rho_snow', 'runoff_g', 'runoff_s', 'sdi_1', 'sdi_2',
+                                               'snow_gsp', 'snowlmt', 't_2m', 't_g', 't_s', 't_snow', 'tch', 'tcm',
+                                               'td_2m', 'tmax_2m', 'tmin_2m', 'tot_prec', 'u_10m', 'v_10m', 'vmax_10m',
+                                               'w_snow', 'ww', 'z0']},
+             {"regular-lat-lon_time-invariant": ['fc', 'fis', 'fr_land', 'hhl', 'hsurf', 'plcov', 'rlat', 'rlon',
+                                                 'rootdp', 'soiltyp']},
+             {"rotated-lat-lon_model-level": ['clc', 'p', 'qv', 't', 'tke', 'u', 'v', 'w']},
+             {"rotated-lat-lon_pressure-level": ['fi', 'omega', 'relhum', 't', 'u', 'v']},
+             {"rotated-lat-lon_single-level": ['alb_rad', 'alhfl_s', 'ashfl_s', 'asob_s', 'asob_t', 'aswdifd_s',
+                                               'aswdifu_s', 'aswdir_s', 'cape_ml', 'cin_ml', 'clch', 'clcl', 'clcm',
+                                               'clct', 'clct_mod', 'cldepth', 'dbz_850', 'dbz_cmax', 'grau_gsp',
+                                               'h_snow', 'hzerocl', 'mh', 'pmsl', 'prs_gsp', 'ps', 'qv_s', 'rain_gsp',
+                                               'relhum_2m', 'rho_snow', 'runoff_g', 'runoff_s', 'sdi_1', 'sdi_2',
+                                               'snow_gsp', 'snowlmt', 't_2m', 't_g', 't_s', 't_snow', 'tch', 'tcm',
+                                               'td_2m', 'tmax_2m', 'tmin_2m', 'tot_prec', 'u_10m', 'v_10m', 'vmax_10m',
+                                               'w_snow', 'ww', 'z0']},
+             {"rotated-lat-lon_time-invariant": ['fc', 'fis', 'fr_land', 'hhl', 'hsurf', 'plcov', 'rlat', 'rlon',
+                                               'rootdp', 'soiltyp']},
+             {"rotated-lat-lon_soil-level": ['t_so', 'w_so']}
          ],
+         65, # Number of model levels
+         [200, 300, 400, 500, 700, 850, 950, 975, 1000],# List of available pressure levels
+
+        ],
 
     "icon-eu":
-        ["regular-lat-lon_pressure-level",
-         "regular-lat-lon_model-level",
-         "regular-lat-lon_single-level",
-         "regular-lat-lon_time-invariant"
+        [
+         [
+             {"regular-lat-lon_model-level": ['tke', 'v', 'u', 'clc', 'qv', 'p', 't', 'w']},
+             {"regular-lat-lon_pressure-level": ['v', 'u', 'clc', 'fi', 'relhum', 'omega', 't']},
+             {"regular-lat-lon_single-level": ['rho_snow', 'hbas_con', 'rain_con', 'qv_2m', 'cldepth', 'asob_s',
+                                               'asob_t', 'tch', 'htop_dc', 'aswdir_s', 'relhum_2m', 'u_10m', 'hzerocl',
+                                               'ps', 'tmin_2m', 'htop_con', 'z0', 't_g', 'ashfl_s', 'cape_ml',
+                                               'alhfl_s', 'aswdifd_s', 't_snow', 'w_snow', 'runoff_g', 'snow_con',
+                                               'snowlmt', 'alb_rad', 'td_2m', 'tmax_2m', 'v_10m', 'ww', 'runoff_s',
+                                               'snow_gsp', 'mh', 't_2m', 'rain_gsp', 'h_snow', 'clct_mod', 'vmax_10m',
+                                               'pmsl', 'athb_s', 'clch', 'tot_prec', 'qv_s', 'clcl', 'clcm',
+                                               'aswdifu_s', 'tcm', 'clct', 'cape_con']},
+             {"regular-lat-lon_soil-level": ['w_so', 't_so']},
+             {"regular-lat-lon_time-invariant": ['plcov', 'fr_lake', 'hhl', 'hsurf', 'fr_land', 'rootdp', 'rlat',
+                                                 'rlon', 'soiltyp']}
          ],
+         60,
+         [50, 70, 100, 150, 200, 250, 300, 400, 500, 600, 700, 775, 800, 825, 850, 875, 900, 925, 950, 1000],
 
+        ],
     "icon":
         [
-            "icosahedral_pressure-level",
-            "icosahedral_model-level",
-            "icosahedral_single-level",
-            "icosahedral_time-invariant"
+         [
+             {"icosahedral_model-level": ['tke', 'u', 'v', 'clc', 'qv', 'p', 't', 'w']},
+             {"icosahedral_pressure-level": ['u', 'v', 'fi', 'relhum', 't']},
+             {"icosahedral_time-invariant": ['elat', 'clon', 'plcov', 'fr_lake', 'elon', 'hhl', 'hsurf', 'fr_land',
+                                             'soiltyp', 'clat']},
+             {"icosahedral_single-level": ['rho_snow', 'hbas_con', 'rain_con', 'snow_gsp', 'cldepth', 'asob_s',
+                                           'asob_t', 'htop_dc', 'aswdir_s', 'relhum_2m', 'fr_ice', 'hzerocl', 'ps',
+                                           'u_10m', 'tmin_2m', 'htop_con', 't_g', 'cape_ml', 'alhfl_s', 'aswdifd_s',
+                                           't_snow', 'w_snow', 'snow_con', 'alb_rad', 'td_2m', 'tmax_2m', 'v_10m',
+                                           'ww', 't_2m', 'z0', 'vmax_10m', 'h_snow', 'clct_mod', 'pmsl', 'rain_gsp',
+                                           'clch', 'tot_prec', 'qv_s', 'clcl', 'clcm', 'aswdifu_s', 'clct', 'cape_con']},
+             {"icosahedral_soil-level": ['t_so', 'w_so']}
+         ],
+         90,
+         [50, 70, 100, 150, 200, 250, 300, 400, 500, 600, 700, 775, 800, 825, 850, 875, 900, 925, 950, 1000],
+
         ]
+}
+
+dwd_nwp_models_leadtimes = {
+    "cosmo-d2":
+    {
+         # Number of available leadtimes for each base time hour
+         '00' : 27,
+         '03' : 45,
+         '06' : 27,
+         '09' : 27,
+         '12' : 27,
+         '15' : 27,
+         '18' : 27,
+         '21' : 27
+    },
+
+    "icon-eu":
+    {
+         '00' : 92,
+         '03' : 30,
+         '06' : 92,
+         '09' : 30,
+         '12' : 92,
+         '15' : 30,
+         '18' : 92,
+         '21' : 30
+    },
+
+    "icon":
+    {
+         '00' : 112,
+         '06' : 92,
+         '12' : 112,
+         '18' : 92
+    }
 }

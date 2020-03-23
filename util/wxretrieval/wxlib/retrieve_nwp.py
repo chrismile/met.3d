@@ -199,7 +199,10 @@ def prepare_catalogue_of_available_dwd_data(queried_model_list, basetimes_list, 
     """
     global catalogue
     repository = connect_to_dwd_opendata_ftpserver()
-    if not repository:
+    if repository is None:
+        return None
+    if basetimes_list is None:
+        logging.error("Basetimes not specified. Catalogue preparation aborted.")
         return None
 
     if queried_model_list is None:
@@ -225,14 +228,12 @@ def prepare_catalogue_of_available_dwd_data(queried_model_list, basetimes_list, 
 
         # Create list of strings representing the base times, to be used as subdirectory names
         # on the DWD opendata server.
-        if basetimes_list is None:
-            basetimes_strlist = repository.nlst()
-        else:
-            basetimes_strlist = [t.strftime("%H") for t in basetimes_list]
-
+        basetimes_strlist = [t.strftime("%H") for t in basetimes_list]
         catalogue[nwp_model] = dict.fromkeys(basetimes_strlist)
 
-        for base_hour_str in basetimes_strlist:
+        for basetime in basetimes_list:
+            base_time_str = basetime.strftime("%Y%m%d%H")
+            base_hour_str = basetime.strftime("%H")
             logging.info("*** Checking for base time hour '%s'." % base_hour_str)
             basetimehour_dir = os.path.join(model_dir, base_hour_str)
             repository.cwd(basetimehour_dir)
@@ -247,20 +248,61 @@ def prepare_catalogue_of_available_dwd_data(queried_model_list, basetimes_list, 
 
                 repository.cwd(variable_dir)
                 file_list = repository.nlst()
-                grid_type_list = wxlib.config.dwd_nwp_models_grid_types[nwp_model]
-                catalogue[nwp_model][base_hour_str][variable] = \
-                    dict.fromkeys(grid_type_list)
+                model_grid_types_dict_list = (wxlib.config.dwd_nwp_models_grid_types[nwp_model])[0]
+                grid_type_list = [key for grid_type_dict in model_grid_types_dict_list for (key, value) in
+                                  grid_type_dict.items() if variable in value]
+                logging.info("Grid type list %s" % str(grid_type_list))
+                if not grid_type_list:
+                    logging.error("Variable %s doesn't exist in the grid types %s available in the model %s" % (
+                    variable, model_grid_types_dict_list, nwp_model))
+                    logging.error("Check in data_config.py")
+                    return None
+
+                catalogue[nwp_model][base_hour_str][variable] = dict.fromkeys(grid_type_list)
 
                 for grid_type in grid_type_list:
+
+                    logging.info("Checking for grid type %s" % grid_type)
                     catalogue[nwp_model][base_hour_str][variable][grid_type] = []
+                    number_of_leadtimes = wxlib.config.dwd_nwp_models_leadtimes[nwp_model][base_hour_str]
 
-                for file in file_list:
-                    for grid_type in grid_type_list:
-                        if grid_type in file:
-                            catalogue[nwp_model][base_hour_str][variable][grid_type].append(file)
+                    if "pressure-level" in grid_type:
+                        logging.info("Pressure level")
+                        number_of_levels = len((wxlib.config.dwd_nwp_models_grid_types[nwp_model])[2])
+                    elif "model-level" in grid_type:
+                        logging.info("Model level")
+                        number_of_levels = (wxlib.config.dwd_nwp_models_grid_types[nwp_model])[1]
+                    elif "single-level" in grid_type:
+                        logging.info("Single level")
+                        number_of_levels = 1
+                    elif "time-invariant" in grid_type:
+                        logging.info("Time invariant")
+                        number_of_levels = 1
+                        number_of_leadtimes = 1
+                    elif "soil-level" in grid_type:
+                        logging.info("Soil level")
+                        number_of_levels = 1  # Check with Marc
 
+                    # number_of_leadtimes incremented by '1' because the file exist for leadtime '000' also
+                    # A variable can exist in multiple grid types, hence divide by the length of grid_type_list
+                    expected_file_count = ((number_of_leadtimes + 1) * number_of_levels)
+                    file_count = 0
+                    for varaiable_file in file_list:
+                        logging.info("Checking for %s %s in %s" % (grid_type, base_time_str, varaiable_file))
+                        if grid_type in varaiable_file and (base_time_str in varaiable_file):
+                            # logging.info("Checking for %s %s in %s" %(grid_type, base_time_str, varaiable_file))
+                            catalogue[nwp_model][base_hour_str][variable][grid_type].append(varaiable_file)
+                            file_count = file_count + 1
+                    if file_count != expected_file_count:
+                        logging.info("leadtimes %s levels %s" % (number_of_leadtimes, number_of_levels))
+                        logging.error("Catalogue has total %s files, suitable files %s  but expected number is %s" % (
+                        len(file_list), file_count, expected_file_count))
+                        repository.quit()
+                        return None
     repository.quit()
     logging.info("Catalogue of remote data files has been prepared.")
+    if file_count == 0:
+        return None
     return catalogue
 
 
@@ -382,7 +424,7 @@ def download_forecast_data(model_name, basetime, queried_dataset):
     base_date_str = basetime.strftime("%Y%m%d")
     os.chdir(local_base_directory)
     download_path = os.path.join(local_base_directory, model_name.upper(), base_date_str)
-    if not os.path.exists(download_path):
+    if os.path.isdir(download_path) is False:
         os.makedirs(download_path)
     os.chdir(download_path)
 
@@ -450,35 +492,40 @@ def merge_and_convert_downloaded_files(model_name, basetime, queried_dataset):
     for variable, grid_type_file_list_dictionary in queried_dataset.items():
         for grid_type, file_list in grid_type_file_list_dictionary.items():
             logging.info("* %s (%s) .." % (variable, grid_type))
+            for variable_file in file_list:
+                logging.info('Uncompressing file %s' % variable_file)
+                zip_file_name = variable_file
+                # 'cosmo-d2_germany_rotated-lat-lon_model-level_2020021300_001_7_P.grib2.bz2'
+                unzip_file_name = zip_file_name[:-4]
 
-            zip_file_name = file_list[0]
-            unzip_file_name = zip_file_name[:-4]
-            # 'cosmo-d2_germany_rotated-lat-lon_model-level_2020021300_001_7_P.grib2.bz2'
-            file_name = zip_file_name.split('_')[0:5]
+                try:
+                    # Uncompress the files of each 'variable' and for given 'grid type', using bz2 module.
+                    with open(unzip_file_name, 'wb') as unzip_file_pointer, bz2.BZ2File(zip_file_name,
+                                                                                        'rb') as zip_file_pointer:
+                        for data in iter(lambda: zip_file_pointer.read(), b''):
+                            unzip_file_pointer.write(data)
+                        unzip_file_pointer.close()
+                        zip_file_pointer.close()
+                except (IOError, EOFError):
+                    logging.error("Unable to uncompress file '%s'." % variable)
+                    unzip_file_pointer.close()
+                    zip_file_pointer.close()
+                    os.unlink(unzip_file_name)
+                    return False
+
+            file_name = file_list[0].split('_')[0:5]
             # cosmo-d2_germany_rotated-lat-lon_model-level_2020021300
             file_name.append(variable.upper())
             file_name = '_'.join(file_name)
             grib_file_name = file_name + '.grib2'
             nc_file_name = file_name + '.nc'
 
-            if os.path.exists(grib_file_name) or os.path.exists(nc_file_name):
-                logging.info("Overwriting existing files for variable '%s'." % variable)
+            if os.path.exists(grib_file_name):
                 os.remove(grib_file_name)
+                logging.info("Overwriting existing file %s for variable '%s'." % (grib_file_name, variable))
+            if os.path.exists(nc_file_name):
                 os.remove(nc_file_name)
-            try:
-                # Uncompress the files of each 'variable' and for given 'grid type', using bz2 module.
-                with open(unzip_file_name, 'wb') as unzip_file_pointer, bz2.BZ2File(zip_file_name,
-                                                                                    'rb') as zip_file_pointer:
-                    for data in iter(lambda: zip_file_pointer.read(), b''):
-                        unzip_file_pointer.write(data)
-                    unzip_file_pointer.close()
-                    zip_file_pointer.close()
-            except (IOError, EOFError):
-                logging.error("Unable to uncompress file '%s'." % variable)
-                unzip_file_pointer.close()
-                zip_file_pointer.close()
-                os.unlink(unzip_file_name)
-                return False
+                logging.info("Overwriting existing file %s for variable '%s'." % (nc_file_name, variable))
 
             # Create a single file for each variable and for given grid type.
             command = "cat " + "*" + grid_type + "*" + variable.upper() + \
@@ -488,7 +535,8 @@ def merge_and_convert_downloaded_files(model_name, basetime, queried_dataset):
             cdo_instance.copy(input=grib_file_name, output=nc_file_name, options='-f nc')
             # Clean up the unzipped individual files.
             command = "rm " + "*" + grid_type + '_' + basetime_str \
-                      + '_*_*_' + variable.upper() + '.grib2*'
+                      + '*_' + variable.upper() + '.grib2*'
+            #          + '_*_*_' + variable.upper() + '.grib2*'
             os.system(command)
             logging.info("    .. done")
 
