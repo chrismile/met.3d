@@ -21,3 +21,5 @@ __
 build
 .idea
 cmake-build-*
+*.pyc
+config.py
