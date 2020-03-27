@@ -352,12 +352,8 @@ int MNaturalEarthDataLoader::reorganizeGroupWithUnevenPointSpacing(
             // both the neighbours, raise a warning and stop.
             if ( previousMaximumDistance < 0.0f )
             {
-                QMessageBox msgBox;
-                msgBox.setIcon(QMessageBox::Warning);
-                msgBox.setWindowTitle("Error");
-                msgBox.setText( "Adjusting widely spaced points, encountered \
-                                while rendering the basemap\n" );
-                msgBox.exec();
+                LOG4CPLUS_WARN(mlog, "WARNING: Adjusting widely spaced points,"
+                               "encountered while rendering the basemap");
             }
 
             // Update the current group maximum distance.
