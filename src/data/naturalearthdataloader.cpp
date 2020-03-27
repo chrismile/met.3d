@@ -36,7 +36,7 @@
 #include <log4cplus/loggingmacros.h>
 #include <QVector>
 #include <QVector2D>
-#include<QMessageBox>
+#include <QMessageBox>
 
 // local application imports
 #include "util/mutil.h"
@@ -301,14 +301,14 @@ void MNaturalEarthDataLoader::loadCyclicLineGeometry(
                          vertexCount, true,    // append to vectors
                          offset); // shift
     }
-
-    // When loading Natural earth, certain random lines appeared.These were
+    // When loading Natural earth, certain random lines appeared. These were
     // traced to the presence of large jumps in the co-ordinates between
-    // successive points in a given group of vertices.To avoid these jumps,
-    // as long as there exists a group with maximum distance between two
-    // successive points greater than 10.0 (deltalon of the graticule) keep
-    // subdividing the group and adding new groups.This check was
-    // neeeded to eliminate the large jumps and thereby also the random lines.
+    // successive points in a given group of vertices. To avoid these jumps,
+    // as long as there exists a group, with maximum distance between two
+    // successive points greater than 10.0 deg.(deltalon of the graticule), keep
+    // subdividing the group and adding new groups. This check was neeeded
+    // to eliminate the large jumps (greater than graticule deltalatlon) and
+    // thereby also the random lines.
 
     checkDistanceViolationInPointSpacing(vertices, startIndices, vertexCount);
 }
@@ -325,17 +325,17 @@ int MNaturalEarthDataLoader::reorganizeGroupWithUnevenPointSpacing(
             startIndices->at(globalMaximumDistanceGroup);
     int originalGroupCount = vertexCount->at(globalMaximumDistanceGroup);
 
-    float referenceDistance = 10.0f;//The deltalon of the graticule.
-    float previousMaximumDistance = -999.9f;//To begin with.
+    float referenceDistance = 10.0f; // The deltalon of the graticule in deg.
+    float previousMaximumDistance = -999.9f; // Initial value.
 
     int originalGroupEndIndex = originalGroupStartIndex
                                  + originalGroupCount - 1;
 
-    int newGroupStartIndex = originalGroupStartIndex;//To begin with.
-    int currentGroup = globalMaximumDistanceGroup;//To begin with.
+    int newGroupStartIndex = originalGroupStartIndex; // Initial value.
+    int currentGroup = globalMaximumDistanceGroup; // Initial value.
 
-    int newGroup = globalMaximumDistanceGroup + 1; //To begin with.
-    bool isNewGroup = false; //To begin with.
+    int newGroup = globalMaximumDistanceGroup + 1; // Initial value.
+    bool isNewGroup = false; // Initial value.
     int newGroupCount = 0;
 
     for (int i = newGroupStartIndex; i < originalGroupEndIndex; i++)
@@ -355,7 +355,8 @@ int MNaturalEarthDataLoader::reorganizeGroupWithUnevenPointSpacing(
                 QMessageBox msgBox;
                 msgBox.setIcon(QMessageBox::Warning);
                 msgBox.setWindowTitle("Error");
-                msgBox.setText( "Dangling point encountered\n" );
+                msgBox.setText( "Adjusting widely spaced points, encountered \
+                                while rendering the basemap\n" );
                 msgBox.exec();
             }
 
@@ -387,7 +388,7 @@ int MNaturalEarthDataLoader::reorganizeGroupWithUnevenPointSpacing(
         }
         previousMaximumDistance = distance;
     }
-    return  newGroupCount;
+    return newGroupCount;
 }
 
 
@@ -396,10 +397,10 @@ void MNaturalEarthDataLoader::checkDistanceViolationInPointSpacing(
                               QVector<int> *startIndices,
                               QVector<int> *vertexCount)
 {
-    int totalGroups = startIndices->count();//To being with.
-    float globalMaximumDistanceLimit = 10.0f;//The deltalon of the graticule.
-    int globalMaximumDistanceGroupIndex = -1;//To begin with.
-    int countOfNewGroups = 0;// To begin with.
+    int totalGroups = startIndices->count(); // Initial value.
+    float globalMaximumDistanceLimit = 10.0f; // The deltalon of the graticule.
+    int globalMaximumDistanceGroupIndex = -1; // Initial value.
+    int countOfNewGroups = 0; // Initial value.
 
     //To store the maximum distance between two successive points in each group.
     QVector<float> groupMaximumDistance;

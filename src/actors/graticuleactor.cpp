@@ -1050,8 +1050,6 @@ void MGraticuleActor::generateGeometry()
                                cornerRect, &verticesCoastlines,
                                &coastlineStartIndices, &coastlineVertexCount);
     }
-
-
     const QString coastRequestKey = "graticule_coastlines_actor#"
                                     + QString::number(getID());
     uploadVec2ToVertexBuffer(verticesCoastlines, coastRequestKey,

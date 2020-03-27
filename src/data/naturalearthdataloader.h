@@ -58,6 +58,34 @@ public:
 
     void setDataSources(QString coastlinesfile, QString borderlinesfile);
 
+    /**
+      Loads line geometry of @p geometryType while considering cyclic
+      repetitions in longitude direction. Results are stored in @p vertices,
+      @p startIndices and @p vertexCount. @p cornerRect contains the world
+      coordinates of the bounding box.
+
+      Generates the vertices of the geometry in at most three steps by dividing
+      the bounding box domain into regions which on a sphere are equal to region
+      with longitudes in the range of [-180, 180] which is the domain the coast-
+      and borderlines to be loaded are defined on:
+
+      1) Determines the west-most of the regions described above and tests if
+         its west-east-extend is smaller than 360:
+         If yes: Compue it seperately.
+         If no: It will be considered in the second step.
+      2) Tells @ref MNaturalEarthDataLoader::loadLineGeometry() to load the
+         complete line geometry and to make a shifted copy of if for each
+         360-degree-region.
+         [Considerss all of the regions described above with west-east-extend
+          equal to 360.]
+      3) Loads the remaining region if not all of the geometry was loaded in the
+         steps before.
+
+      The line geometry in all three steps is loaded by adapting the bounding
+      box and the shift parameters of
+      @ref MNaturalEarthDataLoader::loadLineGeometry() to the region[s] needed.
+    */
+
     void loadLineGeometry(GeometryType type, QRectF bbox,
                           QVector<QVector2D> *vertices,
                           QVector<int> *startIndices,
@@ -70,19 +98,24 @@ public:
                                 QVector<QVector2D> *vertices,
                                 QVector<int> *startIndices,
                                 QVector<int> *vertexCount);
+    /**
+     @brief checkDistanceViolationInPointSpacing checks, if the distance between
+     two successive points (i.e., length of a single line segment) in a group
+     (collection of continuous line segments) of the @p vertices vector is greater
+     than a threshold value.
+    */
 
-    // This method checks, if the distance between two successive points
-    //(i.e., length of a single line segment) in a group(collection of
-    // continuous line segments) of the 'verticesvector' is greater than a
-    // threshold value.
     void checkDistanceViolationInPointSpacing(QVector<QVector2D> *vertices,
                                   QVector<int> *startIndices,
                                   QVector<int> *vertexCount);
+    /**
+     @brief reorganizeGroupWithUnevenPointSpacing reogranizes the points in a
+     group, if the distance between two successive points is greater than a
+     threshold value.The present group is terminated at the first occurence of
+     the violation of the threshold and a new group is created starting with the
+     subsequent points
+    */
 
-    // This method reogranizes the points in a group, if the distance between
-    // two successive points is greater than a threshold value.The present group
-    // is terminated at the first occurence of the violation of the threshold
-    // and a new group is created starting with the subsequent points
     int reorganizeGroupWithUnevenPointSpacing(int globalMaximumDistanceGroup,
                             QVector<float> groupMaximumDistance,
                             QVector<QVector2D> *vertices,
