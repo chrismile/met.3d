@@ -4,10 +4,14 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2017 Marc Rautenhaus
-**  Copyright 2015-2017 Bianca Tost
+**  Copyright 2015-2020 Marc Rautenhaus [*, previously +]
+**  Copyright 2015-2017 Bianca Tost [+]
+**  Copyright 2020-     Kameswarrao Modali [*]
 **
-**  Computer Graphics and Visualization Group
+**  * Regional Computing Center, Visualization
+**  Universitaet Hamburg, Hamburg, Germany
+**
+**  + Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
 **
 **  Met.3D is free software: you can redistribute it and/or modify
@@ -58,6 +62,13 @@ public:
 
     void setDataSources(QString coastlinesfile, QString borderlinesfile);
 
+    void loadLineGeometry(GeometryType type, QRectF bbox,
+                          QVector<QVector2D> *vertices,
+                          QVector<int> *startIndices,
+                          QVector<int> *count,
+                          bool append=true, double offset=0.,
+                          int copies=0);
+
     /**
       Loads line geometry of @p geometryType while considering cyclic
       repetitions in longitude direction. Results are stored in @p vertices,
@@ -85,42 +96,36 @@ public:
       box and the shift parameters of
       @ref MNaturalEarthDataLoader::loadLineGeometry() to the region[s] needed.
     */
-
-    void loadLineGeometry(GeometryType type, QRectF bbox,
-                          QVector<QVector2D> *vertices,
-                          QVector<int> *startIndices,
-                          QVector<int> *count,
-                          bool append=true, double offset=0.,
-                          int copies=0);
-
     void loadCyclicLineGeometry(GeometryType geometryType,
                                 QRectF cornerRect,
                                 QVector<QVector2D> *vertices,
                                 QVector<int> *startIndices,
                                 QVector<int> *vertexCount);
+
     /**
-     @brief checkDistanceViolationInPointSpacing checks, if the distance between
-     two successive points (i.e., length of a single line segment) in a group
-     (collection of continuous line segments) of the @p vertices vector is greater
-     than a threshold value.
+     Checks if the distance between two successive points (i.e., length of a
+     single line segment) in a group (collection of continuous line segments)
+     of the @p vertices vector is greater than the threshold value
+     @ref maxAllowedDistance_deg -- if yes, subdivide into smaller groups.
+    */
+    void restrictDistanceBetweenSubsequentVertices(QVector<QVector2D> *vertices,
+                                                   QVector<int> *startIndices,
+                                                   QVector<int> *vertexCount,
+                                                   float maxAllowedDistance_deg);
+    /**
+     Reogranizes the points in a group if the distance between two successive
+     points is greater than the threshold value @ref maxAllowedDistance_deg.
+     The present group is terminated at the first occurence of the violation of
+     the threshold and a new group is created starting with the subsequent
+     point.
     */
 
-    void checkDistanceViolationInPointSpacing(QVector<QVector2D> *vertices,
-                                  QVector<int> *startIndices,
-                                  QVector<int> *vertexCount);
-    /**
-     @brief reorganizeGroupWithUnevenPointSpacing reogranizes the points in a
-     group, if the distance between two successive points is greater than a
-     threshold value.The present group is terminated at the first occurence of
-     the violation of the threshold and a new group is created starting with the
-     subsequent points
-    */
-
-    int reorganizeGroupWithUnevenPointSpacing(int globalMaximumDistanceGroup,
-                            QVector<float> groupMaximumDistance,
-                            QVector<QVector2D> *vertices,
-                            QVector<int> *startIndices,
-                            QVector<int> *vertexCount);
+    int subdivideVertexGroup(float maxAllowedDistance_deg,
+                             int globalMaximumDistanceGroup,
+                             QVector<float> groupMaximumDistance,
+                             QVector<QVector2D> *vertices,
+                             QVector<int> *startIndices,
+                             QVector<int> *vertexCount);
 
     /**
      @brief loadAndRotateLineGeometry loads the line geometry and rotates it
