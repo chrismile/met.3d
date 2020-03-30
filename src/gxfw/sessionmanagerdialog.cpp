@@ -1263,6 +1263,7 @@ void MSessionManagerDialog::loadSessionFromFile(QString sessionName,
 
     // Sync controls.
     // ==========================================
+    LOG4CPLUS_DEBUG(mlog, "Session load: Initializing synchronization controls.");
     settings->beginGroup("MSyncControls");
     QStringList syncControlsToDelete = sysMC->getSyncControlIdentifiers();
     // Remove the "None" synchronisation control from the list of sync controls
@@ -1286,6 +1287,9 @@ void MSessionManagerDialog::loadSessionFromFile(QString sessionName,
 
     foreach (QString syncName, syncNames)
     {
+        LOG4CPLUS_DEBUG(mlog, "Checking if sync control "
+                        << syncName.toStdString() << " already exists..");
+
         // Do not create sync controls with invalid object names.
         if (!isValidObjectName(syncName))
         {
@@ -1298,6 +1302,9 @@ void MSessionManagerDialog::loadSessionFromFile(QString sessionName,
         // Create new sync control if none with this names exists.
         if (syncControl == nullptr)
         {
+            LOG4CPLUS_DEBUG(mlog, ".. sync control "
+                            << syncName.toStdString()
+                            << " does not exist, creating new instance.");
             syncControl = new MSyncControl(syncName, sysMC->getMainWindow());
             sysMC->registerSyncControl(syncControl);
             sysMC->getMainWindow()->dockSyncControl(syncControl);
@@ -1350,6 +1357,8 @@ void MSessionManagerDialog::loadSessionFromFile(QString sessionName,
 
     // Actors.
     // ==========================================
+    LOG4CPLUS_DEBUG(mlog, "Session load: Initializing actors.");
+
     MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
     settings->beginGroup("MActors");
     // List actor names which are not part of the session.
@@ -1473,6 +1482,8 @@ void MSessionManagerDialog::loadSessionFromFile(QString sessionName,
 
     // Scenes.
     // ==========================================
+    LOG4CPLUS_DEBUG(mlog, "Session load: Initializing scenes.");
+
     // Remove scene view - scene connection.
     foreach (MSceneViewGLWidget *sceneView,  sysMC->getRegisteredViews())
     {
@@ -1555,6 +1566,7 @@ void MSessionManagerDialog::loadSessionFromFile(QString sessionName,
 
     // Scene views.
     // ==========================================
+    LOG4CPLUS_DEBUG(mlog, "Session load: Initializing scene views.");
     QList<MSceneViewGLWidget*> sceneViews = sysMC->getRegisteredViews();
     int numSceneViews = 0;
     settings->beginGroup("MSceneViews");

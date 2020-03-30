@@ -79,7 +79,7 @@ uniform bool      fetchFromTarget;   // do not compute the scalar from the data
                                      // instead
 
 
-shader VSmain(out VStoFS Output)
+shader VSmain(out VStoFS outStruct)
 {
     // m = index of point in "path" (horizontal dimension); k = index of model
     // level (vertical dimension).
@@ -106,8 +106,8 @@ shader VSmain(out VStoFS Output)
     if (mixI < 0)
     {
         gl_Position = mvpMatrix * vec4(lon, lat, 0, 1);
-        Output.scalar      = 0.;
-        Output.flag        = -100.;
+        outStruct.scalar      = 0.;
+        outStruct.flag        = -100.;
         return;
     }
 
@@ -121,11 +121,11 @@ shader VSmain(out VStoFS Output)
         // be found: imageLoad(struct image2D, ivec2).." is raised.
         vec4 data = imageLoad(targetGrid, ivec2(m,k));
         // The scalar value is stored in the "R" channel, ..
-        Output.scalar = data.r;
+        outStruct.scalar = data.r;
         // .. the log(p) coordinate in the "G" channel.
-        Output.worldZ = (data.g - pToWorldZParams.x) * pToWorldZParams.y;
-        gl_Position = mvpMatrix * vec4(lon, lat, Output.worldZ, 1);
-        Output.flag = 0.;
+        outStruct.worldZ = (data.g - pToWorldZParams.x) * pToWorldZParams.y;
+        gl_Position = mvpMatrix * vec4(lon, lat, outStruct.worldZ, 1);
+        outStruct.flag = 0.;
         return;
     }
 
@@ -187,8 +187,8 @@ shader VSmain(out VStoFS Output)
     
     // Convert pressure to world Z coordinate to get the vertex positon.
     float log_p = log(p_hPa);
-    Output.worldZ = (log_p - pToWorldZParams.x) * pToWorldZParams.y;
-    vec3 vertexPosition = vec3(lon, lat, Output.worldZ);
+    outStruct.worldZ = (log_p - pToWorldZParams.x) * pToWorldZParams.y;
+    vec3 vertexPosition = vec3(lon, lat, outStruct.worldZ);
 
     // Convert the position from world to clip space.
     gl_Position = mvpMatrix * vec4(vertexPosition, 1);
@@ -202,17 +202,17 @@ shader VSmain(out VStoFS Output)
 
     float scalar_j0 = mix(scalar_i0j0, scalar_i1j0, mixI);
     float scalar_j1 = mix(scalar_i0j1, scalar_i1j1, mixI);
-    Output.scalar   = mix(scalar_j0, scalar_j1, mixJ);
+    outStruct.scalar   = mix(scalar_j0, scalar_j1, mixJ);
 
     // Store the computed vertex (= grid point) scalar value and worldZ
     // coordinate into the texture "targetGrid" for further processing (e.g.
     // contouring, CPU read-back).
-    imageStore(targetGrid, ivec2(m, k), vec4(Output.scalar, log_p, 0, 0));
+    imageStore(targetGrid, ivec2(m, k), vec4(outStruct.scalar, log_p, 0, 0));
 
     // If we have arrived here, the vertex is inside the domain. Set flag to 0,
     // so that all fragments resulting from this vertex are kept by the fragment
     // shader.
-    Output.flag = 0.;
+    outStruct.flag = 0.;
 }
 
 
@@ -230,16 +230,16 @@ uniform float     opacity;          // Multiply the colour obtained from the
                                     // transfer function with this alpha value
 
 
-shader FSmain(in VStoFS input, out vec4 fragColour)
+shader FSmain(in VStoFS inStruct, out vec4 fragColour)
 {
     // Discard the element if it is outside the model domain (no scalar value).
-    if (input.flag < 0.) discard;
+    if (inStruct.flag < 0.) discard;
 
     // Also discard if the fragment is outside the vertical bounds of the section.
-    if ((input.worldZ < verticalBounds.x) || (input.worldZ > verticalBounds.y)) discard;
+    if ((inStruct.worldZ < verticalBounds.x) || (inStruct.worldZ > verticalBounds.y)) discard;
 
     // Scale the scalar range to 0..1.
-    float scalar_ = (input.scalar - scalarMinimum) / (scalarMaximum - scalarMinimum);
+    float scalar_ = (inStruct.scalar - scalarMinimum) / (scalarMaximum - scalarMinimum);
 
     // Fetch colour from the transfer function and apply shading term.
     fragColour = texture(transferFunction, scalar_);
@@ -247,7 +247,7 @@ shader FSmain(in VStoFS input, out vec4 fragColour)
 }
 
 
-shader FSdoNotRender(in VStoFS input, out vec4 fragColour)
+shader FSdoNotRender(in VStoFS inStruct, out vec4 fragColour)
 {    
     // Discard fragments since otherwise transparent fragments would be "drawn"
     // and would write to the depth buffer. Because of that variables of the

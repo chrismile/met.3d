@@ -66,11 +66,15 @@ MSingleThreadScheduler::~MSingleThreadScheduler()
 
 void MSingleThreadScheduler::scheduleTaskGraph(MTask *task)
 {
+    emit schedulerIsProcessing(true);
+
     LOG4CPLUS_DEBUG(mlog, "Scheduling task graph for execution: "
                     << task->getRequest().toStdString());
 
 //    printTaskGraphDepthFirst(task, 0);
     executeTaskGraphDepthFirst(task, 0);
+
+    emit schedulerIsProcessing(false);
 }
 
 
@@ -167,6 +171,10 @@ MMultiThreadScheduler::MMultiThreadScheduler()
     // signals work correctly.
     qRegisterMetaType<MDataRequest>("MDataRequest");
 
+    // Initialize monitoring of current processing status.
+    busyStatus = false;
+    numCurrentlyActiveTasks = 0;
+
     // Let a different thread from the global thread pool traverse the task
     // graph and schedule the individual tasks for execution after a new
     // task graph has been scheduled in scheduleTaskGraph().
@@ -225,6 +233,9 @@ void MMultiThreadScheduler::scheduleTaskGraph(MTask *task)
     taskGraphQueueMutex.lock();
     taskGraphQueue.append(task);
     taskGraphQueueMutex.unlock();
+
+    // Notify listening objects that the scheduler is processing tasks now.
+    updateBusyStatus();
 
     // Tell task graph traversal thread that new items have been added to the
     // queue.
@@ -427,6 +438,33 @@ void MMultiThreadScheduler::deleteUnscheduledTaskGraph(MTask *task)
 }
 
 
+void MMultiThreadScheduler::updateBusyStatus()
+{
+    QMutexLocker locker(&busyStatusMutex);
+
+    if (busyStatus)
+    {
+        if (numCurrentlyActiveTasks == 0)
+        {
+            busyStatus = false;
+            emit schedulerIsProcessing(false);
+        }
+    }
+    else
+    {
+        QMutexLocker tgLocker(&taskGraphQueueMutex);
+        QMutexLocker tqLocker(&taskQueueMutex);
+
+        if (numCurrentlyActiveTasks > 0 || !taskGraphQueue.isEmpty()
+                || !taskQueue.isEmpty())
+        {
+            busyStatus = true;
+            emit schedulerIsProcessing(true);
+        }
+    }
+}
+
+
 void MMultiThreadScheduler::debugPrintTaskQueue()
 {
     QString str = "\n\nTASK QUEUE:\n\n";
@@ -543,6 +581,7 @@ MTask *MMultiThreadScheduler::dequeueFirstTaskWithoutDependency(uint execThreadI
             // remove it from the queue and return.
             currentlyActiveTasks[task->getDataSource()].insert(
                         task->getRequest(), task);
+            numCurrentlyActiveTasks.ref(); // increment num of active tasks
             taskQueue.removeAt(i);
             currentlyEnqueuedTasks[task->getDataSource()].remove(
                         task->getRequest());
@@ -582,6 +621,7 @@ void MMultiThreadScheduler::executeTasks(uint execThreadID)
         {
             // No task without dependencies is currently available from the
             // queue -- wait until one becomes available.
+            updateBusyStatus(); // this could be the last task to finish execution
             localWaitConditionMutex.lock();
             taskExecutionWaitCondition.wait(&localWaitConditionMutex);
             localWaitConditionMutex.unlock();
@@ -600,6 +640,7 @@ void MMultiThreadScheduler::executeTasks(uint execThreadID)
             taskQueueMutex.lock();
             currentlyActiveTasks[task->getDataSource()].remove(
                         task->getRequest());
+            numCurrentlyActiveTasks.deref(); // decrement num of active tasks
             if (task->isDiskReaderTask()) currentlyActiveDiskReaderTasks--;
             if (task->isGPUTask()) currentlyActiveGPUTasks--;
             task->removeFromTaskGraph();

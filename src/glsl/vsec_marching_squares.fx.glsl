@@ -78,7 +78,7 @@ vec4 computeVertexClipSpaceCoordinates(
 }
 
 
-shader GSmain(out GStoFS Output)
+shader GSmain(out GStoFS outStruct)
 {
     // Based on code from this (http://www.twodee.org/blog/?p=805) website.
 
@@ -153,77 +153,77 @@ shader GSmain(out GStoFS Output)
     {
         gl_Position = computeVertexClipSpaceCoordinates(
                     ll_worldposition, ul_worldposition, ll_intensity,
-                    ul_intensity, isoValue, Output.worldZ); EmitVertex();
+                    ul_intensity, isoValue, outStruct.worldZ); EmitVertex();
         gl_Position = computeVertexClipSpaceCoordinates(
                     ll_worldposition, lr_worldposition, ll_intensity,
-                    lr_intensity, isoValue, Output.worldZ); EmitVertex();
+                    lr_intensity, isoValue, outStruct.worldZ); EmitVertex();
         EndPrimitive();
     }
     else if (bitfield == 2)
     {
         gl_Position = computeVertexClipSpaceCoordinates(
                     ll_worldposition, lr_worldposition, ll_intensity,
-                    lr_intensity, isoValue, Output.worldZ); EmitVertex();
+                    lr_intensity, isoValue, outStruct.worldZ); EmitVertex();
         gl_Position = computeVertexClipSpaceCoordinates(
                     lr_worldposition, ur_worldposition, lr_intensity,
-                    ur_intensity, isoValue, Output.worldZ); EmitVertex();
+                    ur_intensity, isoValue, outStruct.worldZ); EmitVertex();
         EndPrimitive();
     }
     else if (bitfield == 3)
     {
         gl_Position = computeVertexClipSpaceCoordinates(
                     ll_worldposition, ul_worldposition, ll_intensity,
-                    ul_intensity, isoValue, Output.worldZ); EmitVertex();
+                    ul_intensity, isoValue, outStruct.worldZ); EmitVertex();
         gl_Position = computeVertexClipSpaceCoordinates(
                     lr_worldposition, ur_worldposition, lr_intensity,
-                    ur_intensity, isoValue, Output.worldZ); EmitVertex();
+                    ur_intensity, isoValue, outStruct.worldZ); EmitVertex();
         EndPrimitive();
     }
     else if (bitfield == 4)
     {
         gl_Position = computeVertexClipSpaceCoordinates(
                     ll_worldposition, ul_worldposition, ll_intensity,
-                    ul_intensity, isoValue, Output.worldZ); EmitVertex();
+                    ul_intensity, isoValue, outStruct.worldZ); EmitVertex();
         gl_Position = computeVertexClipSpaceCoordinates(
                     ul_worldposition, ur_worldposition, ul_intensity,
-                    ur_intensity, isoValue, Output.worldZ); EmitVertex();
+                    ur_intensity, isoValue, outStruct.worldZ); EmitVertex();
         EndPrimitive();
     }
     else if (bitfield == 5)
     {
         gl_Position = computeVertexClipSpaceCoordinates(
                     ll_worldposition, lr_worldposition, ll_intensity,
-                    lr_intensity, isoValue, Output.worldZ); EmitVertex();
+                    lr_intensity, isoValue, outStruct.worldZ); EmitVertex();
         gl_Position = computeVertexClipSpaceCoordinates(
                     ul_worldposition, ur_worldposition, ul_intensity,
-                    ur_intensity, isoValue, Output.worldZ); EmitVertex();
+                    ur_intensity, isoValue, outStruct.worldZ); EmitVertex();
         EndPrimitive();
     }
     else if (bitfield == 6)
     {
         gl_Position = computeVertexClipSpaceCoordinates(
                     ll_worldposition, ul_worldposition, ll_intensity,
-                    ul_intensity, isoValue, Output.worldZ); EmitVertex();
+                    ul_intensity, isoValue, outStruct.worldZ); EmitVertex();
         gl_Position = computeVertexClipSpaceCoordinates(
                     ll_worldposition, lr_worldposition, ll_intensity,
-                    lr_intensity, isoValue, Output.worldZ); EmitVertex();
+                    lr_intensity, isoValue, outStruct.worldZ); EmitVertex();
         EndPrimitive();
         gl_Position = computeVertexClipSpaceCoordinates(
                     ul_worldposition, ur_worldposition, ul_intensity,
-                    ur_intensity, isoValue, Output.worldZ); EmitVertex();
+                    ur_intensity, isoValue, outStruct.worldZ); EmitVertex();
         gl_Position = computeVertexClipSpaceCoordinates(
                     lr_worldposition, ur_worldposition, lr_intensity,
-                    ur_intensity, isoValue, Output.worldZ); EmitVertex();
+                    ur_intensity, isoValue, outStruct.worldZ); EmitVertex();
         EndPrimitive();
     }
     else if (bitfield == 7)
     {
         gl_Position = computeVertexClipSpaceCoordinates(
                     ul_worldposition, ur_worldposition, ul_intensity,
-                    ur_intensity, isoValue, Output.worldZ); EmitVertex();
+                    ur_intensity, isoValue, outStruct.worldZ); EmitVertex();
         gl_Position = computeVertexClipSpaceCoordinates(
                     lr_worldposition, ur_worldposition, lr_intensity,
-                    ur_intensity, isoValue, Output.worldZ); EmitVertex();
+                    ur_intensity, isoValue, outStruct.worldZ); EmitVertex();
         EndPrimitive();
     }
 }
@@ -245,9 +245,9 @@ uniform float     scalarMinimum;    // min/max data values to scale to 0..1
 uniform float     scalarMaximum;
 
 
-shader FSmain(in GStoFS input, out vec4 fragColour)
+shader FSmain(in GStoFS inStruct, out vec4 fragColour)
 {
-    if ((input.worldZ < verticalBounds.x) || (input.worldZ > verticalBounds.y))
+    if ((inStruct.worldZ < verticalBounds.x) || (inStruct.worldZ > verticalBounds.y))
     {
         discard;
     }

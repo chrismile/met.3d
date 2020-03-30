@@ -94,6 +94,15 @@ struct MGribVariableInfo
     QVector<double> levels, lats, lons, aki_hPa, bki, ak_hPa, bk;
     QSet<unsigned int> availableMembers;
     quint64 availableMembers_bitfield;
+
+    // In grib files that contain hemispheric data, different variable may
+    // be stored on grids in which the longitudinal dimension is shifted
+    // (e.g. some vars on 0..360deg, others on -180..180deg). The following
+    // parameters control shifting the grids so that internally all are
+    // available on the same grid.
+    bool gridIsCyclicInLongitude; // the grid spans entire parallels
+    int longitudinalIndexShiftForCyclicGrid; // on data read, shift the lon dimension
+    double lon0ShiftedReference; // in case of shift: shift lon to this lon0
 };
 
 typedef QMap<QString, MGribVariableInfo*> MGribVariableNameMap;
@@ -202,6 +211,13 @@ protected:
     QVector2D variableRotatedNorthPoleCoordinates(MVerticalLevelType levelType,
                                                   const QString& variableName);
 
+    /**
+      Helper method for @ref readGrid() to copy lon/lat coordinate data
+      into grid objects.
+     */
+    void copyLonLatCoordinateDataToGridObject(
+            MStructuredGrid *grid, MGribVariableInfo* vinfo);
+
     MStructuredGrid* readGrid(MVerticalLevelType levelType,
                               const QString&     variableName,
                               const QDateTime&   initTime,
@@ -228,7 +244,7 @@ protected:
 
     void debugPrintLevelTypeMap(MGribLevelTypeMap& m);
 
-    bool checkIndexForVariable(MGribVariableInfo* vinfo);
+    bool checkInternalConsistencyOfVariableIndex(MGribVariableInfo* vinfo);
 
     QString forecastTypeToString(MECMWFForecastType type);
 
@@ -265,8 +281,10 @@ protected:
      grid spacing in lon and lat direction, number of lons and lats and one
      vector containing all longitudes and one containing all latitudes.
      */
-    bool checkConsistencyOfVariable(MGribVariableInfo *referenceVInfo,
-                                    MGribVariableInfo *currentVInfo);
+    bool checkHorizontalConsistencyOfVariableToReference(
+            MGribVariableInfo *referenceVInfo,
+            MGribVariableInfo *currentVInfo,
+            bool determineLonIndexShiftForCyclicGrid=false);
 
     MGribLevelTypeMap availableDataFields;
     MGribLevelTypeMap availableDataFieldsByStdName;

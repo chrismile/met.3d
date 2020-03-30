@@ -59,7 +59,6 @@ MTrajectoryReader::MTrajectoryReader(QString identifier)
     : MTrajectoryDataSource(),
       MAbstractDataReader(identifier)
 {
-    dirFileFilters = "*_lagranto_ensemble_forecast__START_*.nc";
 }
 
 

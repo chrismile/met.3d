@@ -82,6 +82,17 @@ MMainWindow::MMainWindow(QStringList commandLineArguments, QWidget *parent)
 
     setWindowTitle(applicationTitle);
 
+    // Initialize and display "application is busy" label.
+    appIsBusyLabel = new QLabel(this);
+    appIsBusyLabel->setText("processing..");
+    // Configure style of label, see https://doc.qt.io/qt-5/stylesheet-examples.html
+    appIsBusyLabel->setStyleSheet("QLabel { background-color : rgb(203,117,82); "
+                                  "border-style: outset; border-width: 1px; "
+                                  "border-radius: 10px; border-color: beige; "
+                                  "font: bold; padding: 5px; }");
+    ui->menubar->setCornerWidget(appIsBusyLabel);
+    applicationIsBusyCounter = 1; // app is busy until after initialization
+
     LOG4CPLUS_DEBUG(mlog, "Initialising Met.3D system ... please wait.");
 
     // Timer used to handle automatic saving of current session.
@@ -921,6 +932,12 @@ void MMainWindow::updateSessionTimerInterval(int interval)
 
 void MMainWindow::show()
 {
+    LOG4CPLUS_DEBUG(mlog, "Showing main application window." << flush);
+
+    // NOTE! Showing this main window will trigger MGLResourcesManager::initializeGL()
+    // being executed -- thus on initialization all actors etc will be
+    // initialized from here!
+
     QWidget::show();
     // TODO (bt, 14Mar2017) Why need to set view layout after showing the window?
     // Need to set scene view layout after show since otherwise black lines are
@@ -934,6 +951,18 @@ void MMainWindow::show()
     if (sessionManagerDialog->getAutoSaveSession())
     {
         sessionAutoSaveTimer->start();
+    }
+
+    // Initialization of application has finished at this time.
+    partOfApplicationIsBusyEvent(false);
+
+    // If batch mode has been enabled in the configuration stage, start
+    // batch mode execution.
+    MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
+    if (sysMC->isInBatchMode())
+    {
+        LOG4CPLUS_DEBUG(mlog, "Batch mode is enabled. Invoking batch execution.");
+        sysMC->executeBatchMode();
     }
 }
 
@@ -1292,6 +1321,24 @@ void MMainWindow::revertCurrentSession(QAction *sessionAction)
     sessionNumber = sessionNumber.split(":").first();
     sessionNumber.replace(QRegExp("\\D*"), "");
     sessionManagerDialog->revertCurrentSessionToRevision(sessionNumber);
+}
+
+
+void MMainWindow::partOfApplicationIsBusyEvent(bool isBusy)
+{
+    if (isBusy)
+    {
+        applicationIsBusyCounter++;
+    }
+    else
+    {
+        applicationIsBusyCounter = max(0, applicationIsBusyCounter - 1);
+    }
+
+//    LOG4CPLUS_DEBUG(mlog, "applicationIsBusyCounter: "
+//                    << applicationIsBusyCounter);
+
+    appIsBusyLabel->setVisible(applicationIsBusyCounter > 0);
 }
 
 
