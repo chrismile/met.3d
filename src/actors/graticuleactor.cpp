@@ -1045,11 +1045,11 @@ void MGraticuleActor::generateGeometry()
     }
     else
     {
-        loadCyclicLineGeometry(MNaturalEarthDataLoader::COASTLINES,
+        naturalEarthDataLoader->loadCyclicLineGeometry(
+                               MNaturalEarthDataLoader::COASTLINES,
                                cornerRect, &verticesCoastlines,
                                &coastlineStartIndices, &coastlineVertexCount);
     }
-
     const QString coastRequestKey = "graticule_coastlines_actor#"
                                     + QString::number(getID());
     uploadVec2ToVertexBuffer(verticesCoastlines, coastRequestKey,
@@ -1084,7 +1084,8 @@ void MGraticuleActor::generateGeometry()
     }
     else
     {
-        loadCyclicLineGeometry(MNaturalEarthDataLoader::BORDERLINES,
+        naturalEarthDataLoader->loadCyclicLineGeometry(
+                               MNaturalEarthDataLoader::BORDERLINES,
                                cornerRect, &verticesBorderlines,
                                &borderlineStartIndices, &borderlineVertexCount);
     }
@@ -1117,86 +1118,6 @@ void MGraticuleActor::generateGeometry()
             borderLinesCountIsValid = true;
             break;
         }
-    }
-}
-
-
-void MGraticuleActor::loadCyclicLineGeometry(
-        MNaturalEarthDataLoader::GeometryType geometryType,
-        QRectF cornerRect,
-        QVector<QVector2D> *vertices,
-        QVector<int> *startIndices,
-        QVector<int> *vertexCount)
-{
-    // Region parameters.
-    float westernLon = cornerRect.x();
-    float easternLon = cornerRect.x() + cornerRect.width();
-    float width = cornerRect.width();
-    width = min(360.0f - MMOD(westernLon + 180.f, 360.f), width);
-    // Offset which needs to be added to place the [westmost] region correctly.
-    double offset = static_cast<double>(floor((westernLon + 180.f) / 360.f)
-                                        * 360.f);
-    // Load geometry of westmost region separately only if its width is smaller
-    // than 360 degrees (i.e. "not complete") otherwise skip this first step.
-    bool firstStep = width < 360.f;
-    if (firstStep)
-    {
-        cornerRect.setX(MMOD(westernLon + 180.f, 360.f) - 180.f);
-        cornerRect.setWidth(width);
-        naturalEarthDataLoader->loadLineGeometry(geometryType,
-                                                 cornerRect,
-                                                 vertices,
-                                                 startIndices,
-                                                 vertexCount,
-                                                 false,       // clear vectors
-                                                 offset);     // shift
-        // Increment offset to suit the next region.
-        offset += 360.;
-        // "Shift" westernLon to western border of the bounding box domain not
-        // treated yet.
-        westernLon += width;
-    }
-
-    // Amount of regions with a width of 360 degrees.
-    int completeRegionsCount =
-            static_cast<int>((easternLon - westernLon) / 360.f);
-    // Load "complete" regions only if we have at least one. If the first step
-    // was skipped, we need to clear the vectors before loading the line
-    // geometry otherwise we need to append the computed vertices.
-    if (completeRegionsCount > 0)
-    {
-        cornerRect.setX(-180.f);
-        cornerRect.setWidth(360.f);
-        naturalEarthDataLoader->loadLineGeometry(
-                    geometryType,
-                    cornerRect,
-                    vertices,
-                    startIndices,
-                    vertexCount,
-                    firstStep, // clear vectors if it wasn't done before
-                    offset, // shift
-                    completeRegionsCount - 1);
-        // "Shift" westernLon to western border of the bounding box domain not
-        // treated yet.
-        westernLon += static_cast<float>(completeRegionsCount) * 360.f;
-        // Increment offset to suit the last region if one is left.
-        offset += static_cast<double>(completeRegionsCount) * 360.;
-    }
-
-    // Load geometry of eastmost region separately only if it isn't the same as
-    // the westmost region and its width is smaller than 360 degrees and thus it
-    // wasn't loaded in one of the steps before.
-    if (westernLon < easternLon)
-    {
-        cornerRect.setX(-180.f);
-        cornerRect.setWidth(easternLon - westernLon);
-        naturalEarthDataLoader->loadLineGeometry(geometryType,
-                                                 cornerRect,
-                                                 vertices,
-                                                 startIndices,
-                                                 vertexCount,
-                                                 true,    // append to vectors
-                                                 offset); // shift
     }
 }
 
