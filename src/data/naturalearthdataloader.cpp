@@ -378,6 +378,9 @@ int MNaturalEarthDataLoader::subdivideVertexGroup(
             vertexCount->insert(newGroup, originalGroupCount - (
                                     i - newGroupStartIndex + 1));
 
+            originalGroupCount = originalGroupCount -
+                                         (i - newGroupStartIndex + 1);
+
             currentGroup = newGroup;
             newGroup += 1;
             newGroupStartIndex = i + 1;
