@@ -421,7 +421,7 @@ void MNaturalEarthDataLoader::restrictDistanceBetweenSubsequentVertices(
 
         if (maxDistance_deg > maxAllowedDistance_deg)
         {
-            globalMaximumDistanceGroupIndex = i;
+            globalMaximumDistanceGroupIndex = groupMaximumDistance.length()-1;
             countOfNewGroups = subdivideVertexGroup(
                         maxAllowedDistance_deg,
                         globalMaximumDistanceGroupIndex, groupMaximumDistance,
