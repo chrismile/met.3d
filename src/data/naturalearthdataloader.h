@@ -112,20 +112,6 @@ public:
                                                    QVector<int> *startIndices,
                                                    QVector<int> *vertexCount,
                                                    float maxAllowedDistance_deg);
-    /**
-     Reogranizes the points in a group if the distance between two successive
-     points is greater than the threshold value @ref maxAllowedDistance_deg.
-     The present group is terminated at the first occurence of the violation of
-     the threshold and a new group is created starting with the subsequent
-     point.
-    */
-
-    int subdivideVertexGroup(float maxAllowedDistance_deg,
-                             int globalMaximumDistanceGroup,
-                             QVector<float> groupMaximumDistance,
-                             QVector<QVector2D> *vertices,
-                             QVector<int> *startIndices,
-                             QVector<int> *vertexCount);
 
     /**
      @brief loadAndRotateLineGeometry loads the line geometry and rotates it

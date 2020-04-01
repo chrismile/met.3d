@@ -305,7 +305,7 @@ void MNaturalEarthDataLoader::loadCyclicLineGeometry(
                          offset); // shift
     }
 
-//WORKAROUND/CHECKME (km, 30Mar2020) --
+//WORKAROUND/CHECKME (km&mr, 30Mar2020) --
     // When loading natural earth coast and borderline data, some incorrect
     // (long) lines appear. These are charcterized by large jumps in the
     // coordinates between successive points in a given group of vertices. To
@@ -319,118 +319,50 @@ void MNaturalEarthDataLoader::loadCyclicLineGeometry(
 }
 
 
-int MNaturalEarthDataLoader::subdivideVertexGroup(
-        float maxAllowedDistance_deg,
-        int globalMaximumDistanceGroup,
-        QVector<float> groupMaximumDistance,
-        QVector<QVector2D> *vertices,
-        QVector<int> *startIndices,
-        QVector<int> *vertexCount)
-{
-    int originalGroupStartIndex = startIndices->at(globalMaximumDistanceGroup);
-    int originalGroupCount = vertexCount->at(globalMaximumDistanceGroup);
-    int originalGroupEndIndex = originalGroupStartIndex + originalGroupCount - 1;
-
-    int newGroupStartIndex = originalGroupStartIndex;
-    int currentGroup = globalMaximumDistanceGroup;
-
-    int newGroup = globalMaximumDistanceGroup + 1;
-    bool isNewGroup = false;
-    int newGroupCount = 0;
-
-    float previousMaximumDistance = numeric_limits<float>::lowest();
-
-    for (int i = newGroupStartIndex; i < originalGroupEndIndex; i++)
-    {
-        float distance = vertices->at(i).distanceToPoint(vertices->at(i + 1));
-
-        if (isNewGroup)
-        {
-            groupMaximumDistance.replace(
-                        currentGroup,
-                        max(distance, groupMaximumDistance.at(currentGroup)));
-        }
-
-        if (distance > maxAllowedDistance_deg)
-        {
-            LOG4CPLUS_WARN(mlog, "WARNING: While loading coastline and borderline "
-                           << "geometry, subsequent vertices with a spacing "
-                           << "of more than " << maxAllowedDistance_deg
-                           << " deg were discovered. "
-                           << "These are classified as incorrect and eliminated.");
-
-            // Update the current group maximum distance.
-            groupMaximumDistance.replace(currentGroup, previousMaximumDistance);
-
-            // Update the current group 'vertexCount' to 'i'.
-            vertexCount->replace(currentGroup, i - newGroupStartIndex + 1);
-
-            // Update the 'startIndices' array by inserting a 'new group'
-            // starting at index 'i+1'.
-            startIndices->insert(newGroup, i + 1);
-
-            // Initialize the 'new group' group_max_distance as 0.0f.
-            groupMaximumDistance.insert(newGroup, 0.0f);
-
-            // Update the coastlineVertexCount array by inserting a 'new group'
-            // with count, by deducting index '(i-new_start_index+1)' from
-            // the original count.
-            vertexCount->insert(newGroup, originalGroupCount - (
-                                    i - newGroupStartIndex + 1));
-
-            originalGroupCount = originalGroupCount -
-                                         (i - newGroupStartIndex + 1);
-
-            currentGroup = newGroup;
-            newGroup += 1;
-            newGroupStartIndex = i + 1;
-            isNewGroup = true;
-            newGroupCount++;
-        }
-
-        previousMaximumDistance = distance;
-    }
-
-    return newGroupCount;
-}
-
-
 void MNaturalEarthDataLoader::restrictDistanceBetweenSubsequentVertices(
         QVector<QVector2D> *vertices,
         QVector<int> *startIndices,
         QVector<int> *vertexCount,
         float maxAllowedDistance_deg)
 {
-    int numGroups = startIndices->count();
-    int globalMaximumDistanceGroupIndex = -1;
-    int countOfNewGroups = 0;
-
-    // Stores the maximum distance between two successive points in each group.
-    QVector<float> groupMaximumDistance;
-
-    groupMaximumDistance.clear();
-    for (int i = 0; i < numGroups; i++)
+    // Loop over all groups (number of groups = entries in e.g. vertexCount;
+    // if new groups are added that size is automatically updated).
+    for (int iGroup = 0; iGroup < vertexCount->count(); iGroup++)
     {
-        int groupStartIndex = startIndices->at(i);
-        int groupEndIndex = startIndices->at(i) + vertexCount->at(i) - 1;
-        float maxDistance_deg = numeric_limits<float>::lowest();
+        int vertexStartIndex = startIndices->at(iGroup);
+        int vertexEndIndex = startIndices->at(iGroup) + vertexCount->at(iGroup) - 1;
 
-        for (int j = groupStartIndex; j < groupEndIndex; j++)
+        for (int iVertex = vertexStartIndex; iVertex < vertexEndIndex; iVertex++)
         {
-            float distance = vertices->at(j).distanceToPoint(vertices->at(j + 1));
-            maxDistance_deg = max(distance, maxDistance_deg);
-        }
-        groupMaximumDistance.append(maxDistance_deg);
+            float distance = vertices->at(iVertex).distanceToPoint(vertices->at(iVertex + 1));
 
-        if (maxDistance_deg > maxAllowedDistance_deg)
-        {
-            globalMaximumDistanceGroupIndex = groupMaximumDistance.length()-1;
-            countOfNewGroups = subdivideVertexGroup(
-                        maxAllowedDistance_deg,
-                        globalMaximumDistanceGroupIndex, groupMaximumDistance,
-                        vertices, startIndices, vertexCount);
-            numGroups = vertexCount->count();
-            i += countOfNewGroups;
+            if (distance > maxAllowedDistance_deg)
+            {
+                // Split the group.
+
+                LOG4CPLUS_WARN(mlog, "WARNING: While loading coastline and borderline "
+                               << "geometry, connected vertices with a spacing "
+                               << "of " << distance << " (max. allowed is "
+                               << maxAllowedDistance_deg << " deg) were discovered. "
+                               << "The connection is classified as incorrect and eliminated.");
+
+                // Update the current, now shortened, group's 'vertexCount'.
+                int shortenedGroupVertexCount = iVertex - vertexStartIndex + 1;
+                int remainingVertexCount = vertexCount->at(iGroup)
+                        - shortenedGroupVertexCount;
+                vertexCount->replace(iGroup, shortenedGroupVertexCount);
+
+                // Inserting a new group at group index 'i+1' into the two
+                // relevant arrays.
+                int iGroupNew = iGroup + 1;
+                startIndices->insert(iGroupNew, iVertex + 1);
+                vertexCount->insert(iGroupNew, remainingVertexCount);
+
+                // Break inner loop over vertices and continue with loop over
+                // groups -- this will pick up the new group as the next group
+                // and continue checking.
+                break;
+            }
         }
     }
 
