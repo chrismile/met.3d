@@ -5,7 +5,7 @@
 **  prediction data.
 **
 **  Copyright 2015-2020 Marc Rautenhaus [*, previously +]
-**  Copyright 2020 Marcel Meyer
+**  Copyright 2020 Marcel Meyer [*]
 **
 **  * Regional Computing Center, Visualization
 **  Universitaet Hamburg, Hamburg, Germany
@@ -27,6 +27,7 @@
 **  along with Met.3D.  If not, see <http://www.gnu.org/licenses/>.
 **
 *******************************************************************************/
+#include "derivedmetvarsdatasource.h"
 
 // standard library imports
 #include <iostream>
@@ -39,10 +40,9 @@
 #include "util/mutil.h"
 #include "util/metroutines.h"
 #include "util/metroutines_experimental.h"
+#include "derivedmetvars_standard.h"
+#include "derivedmetvars_mcaoindicator.h"
 
-#include "derivedmetvarsdatasource.h"
-#include "derived_standard.h"
-#include "mcao_indicator.h"
 
 using namespace std;
 
@@ -92,10 +92,15 @@ MDerivedMetVarsDataSource::MDerivedMetVarsDataSource()
     registerDerivedDataFieldProcessor(new MTHourlyTotalPrecipitationProcessor(12));
     registerDerivedDataFieldProcessor(new MTHourlyTotalPrecipitationProcessor(24));
 
-    // MM: test mcao implementation
+
+    // Register experimental data field processors.
+    // ============================================
+
+#ifdef ENABLE_EXPERIMENTAL_DERIVEDVARS
     registerDerivedDataFieldProcessor(new MMCAOIndexProcessor_Papritz2015());
     registerDerivedDataFieldProcessor(new MMCAOIndexProcessor_Kolstad2008());
-    registerDerivedDataFieldProcessor(new MMCAOIndexProcessor_Gray2008());
+    // MMCAOIndexProcessor_BracegirdleGray2008 needs to be fixed -- do not use!
+//    registerDerivedDataFieldProcessor(new MMCAOIndexProcessor_BracegirdleGray2008());
     registerDerivedDataFieldProcessor(
                 new MMCAOIndex2DProcessor_YuliaP(
                     "HYBRID_SIGMA_PRESSURE_3D"));
@@ -105,9 +110,7 @@ MDerivedMetVarsDataSource::MDerivedMetVarsDataSource()
     registerDerivedDataFieldProcessor(
                 new MMCAOIndex2DProcessor_YuliaP(
                     "AUXILIARY_PRESSURE_3D"));
-
-    // Register experimental data field processors.
-    // ============================================
+#endif
 
     // ... <add registration commands here> ...
 }

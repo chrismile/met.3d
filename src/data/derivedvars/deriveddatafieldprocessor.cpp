@@ -5,7 +5,7 @@
 **  prediction data.
 **
 **  Copyright 2015-2020 Marc Rautenhaus [*, previously +]
-**  Copyright 2020 Marcel Meyer
+**  Copyright 2020 Marcel Meyer [*]
 **
 **  * Regional Computing Center, Visualization
 **  Universitaet Hamburg, Hamburg, Germany
@@ -27,6 +27,7 @@
 **  along with Met.3D.  If not, see <http://www.gnu.org/licenses/>.
 **
 *******************************************************************************/
+#include "deriveddatafieldprocessor.h"
 
 // standard library imports
 #include <iostream>
@@ -40,7 +41,6 @@
 #include "util/metroutines.h"
 #include "util/metroutines_experimental.h"
 
-#include "deriveddatafieldprocessor.h"
 
 namespace Met3D
 {

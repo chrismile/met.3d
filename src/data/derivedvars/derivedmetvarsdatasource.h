@@ -5,7 +5,7 @@
 **  prediction data.
 **
 **  Copyright 2015-2020 Marc Rautenhaus [*, previously +]
-**  Copyright 2020 Marcel Meyer
+**  Copyright 2020 Marcel Meyer [*]
 **
 **  * Regional Computing Center, Visualization
 **  Universitaet Hamburg, Hamburg, Germany
@@ -30,6 +30,7 @@
 #ifndef DERIVEDMETVARSDATASOURCE_H
 #define DERIVEDMETVARSDATASOURCE_H
 
+// standard library imports
 
 // related third party imports
 #include <QtCore>
@@ -38,8 +39,8 @@
 #include "data/processingwpdatasource.h"
 #include "data/structuredgrid.h"
 #include "data/datarequest.h"
-
 #include "deriveddatafieldprocessor.h"
+
 
 namespace Met3D
 {
@@ -147,7 +148,6 @@ protected:
     QMap<QString, QStringList> requiredInputVariablesList;
     QMap<QString, QString> variableStandardNameToInputNameMapping;
 };
-
 
 } // namespace Met3D
 

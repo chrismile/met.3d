@@ -5,7 +5,7 @@
 **  prediction data.
 **
 **  Copyright 2015-2020 Marc Rautenhaus [*, previously +]
-**  Copyright 2020 Marcel Meyer
+**  Copyright 2020 Marcel Meyer [*]
 **
 **  * Regional Computing Center, Visualization
 **  Universitaet Hamburg, Hamburg, Germany
@@ -27,8 +27,8 @@
 **  along with Met.3D.  If not, see <http://www.gnu.org/licenses/>.
 **
 *******************************************************************************/
-#ifndef DERIVED_STANDARD_H
-#define DERIVED_STANDARD_H
+#ifndef DERIVEDMETVARS_STANDARD_H
+#define DERIVEDMETVARS_STANDARD_H
 
 // standard library imports
 
@@ -39,13 +39,11 @@
 #include "data/processingwpdatasource.h"
 #include "data/structuredgrid.h"
 #include "data/datarequest.h"
-
 #include "data/derivedvars/derivedmetvarsdatasource.h"
 
 
 namespace Met3D
 {
-
 
 /******************************************************************************
 ***                            DATA PROCESSORS                              ***
@@ -174,4 +172,4 @@ public:
 
 }
 
-#endif // DERIVED_STANDARD_H
+#endif // DERIVEDMETVARS_STANDARD_H

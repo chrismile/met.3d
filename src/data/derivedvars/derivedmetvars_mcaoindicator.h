@@ -4,8 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
+**  Copyright 2020 Marcel Meyer [*]
 **  Copyright 2015-2020 Marc Rautenhaus [*, previously +]
-**  Copyright 2020 Marcel Meyer
 **
 **  * Regional Computing Center, Visualization
 **  Universitaet Hamburg, Hamburg, Germany
@@ -27,15 +27,8 @@
 **  along with Met.3D.  If not, see <http://www.gnu.org/licenses/>.
 **
 *******************************************************************************/
-#ifndef MCAO_INDICATOR_H
-#define MCAO_INDICATOR_H
-
-// Summary:
-// Each of the classes MMCAOIndexProcessor_xyz computes an index that indicates
-// the occurence of a Marine Cold Air Outbreak (MCAO).
-// Different variants (_xyz) of the MCAO index are calculated corresponding to
-// different MCAO indicators that have been used in the literature on MCAOs
-
+#ifndef DERIVEDMETVARS_MCAOINDICATOR_H
+#define DERIVEDMETVARS_MCAOINDICATOR_H
 
 // standard library imports
 
@@ -53,6 +46,11 @@
 namespace Met3D
 {
 
+// Summary:
+// Each of the classes MMCAOIndexProcessor_xyz computes an index that indicates
+// the occurence of a Marine Cold Air Outbreak (MCAO).
+// Different variants (_xyz) of the MCAO index are calculated corresponding to
+// different MCAO indicators that have been used in the literature on MCAOs
 
 /**
  @brief MCAO Index 1: Difference in Potential Temperature (PT) at the sea surface
@@ -75,6 +73,7 @@ public:
     void compute(QList<MStructuredGrid*>& inputGrids,
                  MStructuredGrid *derivedGrid);
 };
+
 
 /**
  @brief MCAO Index 2: Difference in Potential Temperature (PT) at the sea
@@ -100,22 +99,24 @@ public:
                  MStructuredGrid *derivedGrid);
 };
 
+
 /**
  @brief MCAO Index 3: Difference in potential wet bulb temperature (PT_wet) and
  temperature at the sea surface (PT_wet_pressureLevel - SST)
  We compute the index
-  - (Gray, 2008; Int. J. Clim.): Theta_wet_700hPa - SST
+  - (Bracegirdle and Gray, 2008; Int. J. Clim.): Theta_wet_700hPa - SST
  for all pressure levels.
 */
-class MMCAOIndexProcessor_Gray2008
+class MMCAOIndexProcessor_BracegirdleGray2008
         : public MDerivedDataFieldProcessor
 {
 public:
-    MMCAOIndexProcessor_Gray2008();
+    MMCAOIndexProcessor_BracegirdleGray2008();
 
     void compute(QList<MStructuredGrid*>& inputGrids,
                  MStructuredGrid *derivedGrid);
 };
+
 
 /**
  @brief MCAO Index 4: Difference in Potential Temperature (PT) at the sea
@@ -138,4 +139,4 @@ public:
 
 }
 
-#endif // MCAO_INDICATOR_H
+#endif // DERIVEDMETVARS_MCAOINDICATOR_H
