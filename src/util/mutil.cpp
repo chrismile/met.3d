@@ -86,6 +86,7 @@ QStringList readConfigVersionID(QSettings *settings)
 
     // Remove appendix.
     QStringList versionList = versionString.split("-");
+    versionList = versionList.first().split("/");
     versionList = versionList.first().split(".");
 
     // Restore group state from before entering this function.
