@@ -313,7 +313,7 @@ void MGraticuleActor::onQtPropertyChanged(QtProperty *property)
             stereoBBoxProperty->setEnabled(false);
             stereoProjLonProperty->setEnabled(true);
             stereoProjLatProperty->setEnabled(true);
-            stereoGridUnitProperty->setEnabled(true);
+            stereoGridUnitProperty->setEnabled(false);
             break;
         }
     }
@@ -1167,6 +1167,7 @@ void MGraticuleActor::generateGeometry()
         // for representing stereographic data. The bounding box
         // is needed to compute the intersection with the graticule lines.
         QRectF cornerRect = bBoxConnection->horizontal2DCoords();
+        stereoGridScaleFactor = 1.0f;
         cornerRect.setX( llcrnrlon * stereoGridScaleFactor);
         cornerRect.setY( llcrnrlat * stereoGridScaleFactor);
         cornerRect.setWidth( ( urcrnrlon - llcrnrlon ) * stereoGridScaleFactor );
@@ -1520,9 +1521,10 @@ void MGraticuleActor::updateLatLonLines(QRectF cornerRect)
 		naturalEarthDataLoader->convertRegularLatLonToPolarStereographicCoords(
                     verticesGraticule,
                     this->stereoStandardLat,
-                    this->stereoStraightLon,
-                    stereoGridScaleFactor,
-                    stereoGridUnit_m);
+                    this->stereoStraightLon//,
+                    //stereoGridScaleFactor,
+                    //stereoGridUnit_m
+                    );
 
         // generate data item key for every vertex buffer object wrt the actor
         const QString graticuleRequestKey = QString("graticule_vertices_actor#")
@@ -1552,9 +1554,10 @@ void MGraticuleActor::updateLatLonLines(QRectF cornerRect)
 		naturalEarthDataLoader->convertRegularLatLonToPolarStereographicCoords(
                     labelAnchorVector,
                     this->stereoStandardLat,
-                    this->stereoStraightLon,
-                    stereoGridScaleFactor,
-                    stereoGridUnit_m);
+                    this->stereoStraightLon//,
+                    //stereoGridScaleFactor,
+                    //stereoGridUnit_m
+                    );
 
         foreach (MLabel* label, labels)
         {
@@ -1661,6 +1664,7 @@ void MGraticuleActor::cutWithBoundingBox(QRectF cornerRect)
     float deltaLabelPosition = 10.0f;      // Tolerance to avoid overlap with
                                            // lat lon labels.
 
+    stereoGridScaleFactor = 1.0f;
     // Append vertices of rectangular bounding box to the vertices list for
     // drawing the bounding box, i.e, the rectangle surrounding the graticule lines.
     verticesGraticule.append(QVector2D(cornerRect.x(),cornerRect.y()));
@@ -1753,9 +1757,10 @@ void MGraticuleActor::cutWithBoundingBox(QRectF cornerRect)
             stereopoint = naturalEarthDataLoader->convertRegularLatLonToPolarStereographicCoords(
                         regularpoint,
                         stereoStandardLat,
-                        stereoStraightLon,
-                        stereoGridScaleFactor,
-                        stereoGridUnit_m);
+                        stereoStraightLon//,
+                        //stereoGridScaleFactor,
+                        //stereoGridUnit_m
+                        );
 
 
             lineStringList.append(new OGRLineString());
@@ -1782,9 +1787,10 @@ void MGraticuleActor::cutWithBoundingBox(QRectF cornerRect)
             stereopoint = naturalEarthDataLoader->convertRegularLatLonToPolarStereographicCoords(
                         regularpoint,
                         stereoStandardLat,
-                        stereoStraightLon,
-                        stereoGridScaleFactor,
-                        stereoGridUnit_m);
+                        stereoStraightLon//,
+                        //stereoGridScaleFactor,
+                        //stereoGridUnit_m
+                        );
 
             lineStringList.append(new OGRLineString());
             lineString = lineStringList.last();
@@ -1918,9 +1924,10 @@ void MGraticuleActor::cutWithBoundingBox(QRectF cornerRect)
             stereopoint = naturalEarthDataLoader->convertRegularLatLonToPolarStereographicCoords(
                         regularpoint,
                         stereoStandardLat,
-                        stereoStraightLon,
-                        stereoGridScaleFactor,
-                        stereoGridUnit_m);
+                        stereoStraightLon//,
+                        //stereoGridScaleFactor,
+                        //stereoGridUnit_m
+                        );
 
             lineString->addPoint(stereopoint[0].x(), stereopoint[0].y());
         }

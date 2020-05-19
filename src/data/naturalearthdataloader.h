@@ -288,9 +288,10 @@ public:
     QVector<QVector2D> convertRegularLatLonToPolarStereographicCoords(
             QVector<QVector2D> verticesVector,
             float stereoStandardLat,
-            float stereoStraightLon,
-            float stereoScaleFactor,
-            float stereoGridUnit_m);
+            float stereoStraightLon//,
+            //float stereoScaleFactor,
+            //float stereoGridUnit_m
+            );
 
 
 

@@ -790,9 +790,10 @@ void MNaturalEarthDataLoader::loadAndTransformStereographicLineGeometryAndCutUsi
             stereopoint = convertRegularLatLonToPolarStereographicCoords(
                         regularpoint,
                         stereoStandardLat,
-                        stereoStraightLon,
-                        stereoGridScaleFactor,
-                        stereoGridUnit_m);
+                        stereoStraightLon//,
+                        //stereoGridScaleFactor,
+                        //stereoGridUnit_m
+                        );
 
 
             //geographicalToRotatedCoords(point, poleLat, poleLon);
@@ -810,9 +811,10 @@ void MNaturalEarthDataLoader::loadAndTransformStereographicLineGeometryAndCutUsi
                 stereopoint = convertRegularLatLonToPolarStereographicCoords(
                             regularpoint,
                             stereoStandardLat,
-                            stereoStraightLon,
-                            stereoGridScaleFactor,
-                            stereoGridUnit_m);
+                            stereoStraightLon//,
+                            //stereoGridScaleFactor,
+                            //stereoGridUnit_m
+                            );
 
 
 //                if (!validConnectionBetweenPositions(
@@ -1430,9 +1432,10 @@ QVector<QVector2D> MNaturalEarthDataLoader::convertPolarStereographicToRegularLa
 QVector<QVector2D> MNaturalEarthDataLoader::convertRegularLatLonToPolarStereographicCoords(
         QVector<QVector2D> verticesVector,
         float stereoStandardLat,
-        float stereoStraightLon,
-        float stereoScaleFactor,
-        float stereoGridUnit_m)
+        float stereoStraightLon//,
+        //float stereoScaleFactor,
+        //float stereoGridUnit_m
+        )
 
 {
 
@@ -1451,13 +1454,14 @@ QVector<QVector2D> MNaturalEarthDataLoader::convertRegularLatLonToPolarStereogra
     float T, TC, RHO, RE, MC;
 
     // projection parameters
-    float DELTA_LON = stereoStraightLon - 90;
+    float DELTA_LON = stereoStraightLon - 90.0f;
     float REF_LAT = stereoStandardLat;
     float REF_LAT_RAD;
 
     // rescale radius of Earth to units of stereographic grid coords
     float EARTH_RADIUS_km = 6378.3;
-    RE = EARTH_RADIUS_km*(1000/stereoGridUnit_m);
+    float stereoScaleFactor = 1000.0f;
+    RE = EARTH_RADIUS_km * stereoScaleFactor;
 
     for (int i = 0; i <verticesVector.size() ; i++)
     {
@@ -1503,8 +1507,8 @@ QVector<QVector2D> MNaturalEarthDataLoader::convertRegularLatLonToPolarStereogra
             cur_stereo_y  =  RHO * sin( cur_reg_lon );
         }
 
-        stereographic_point.setX(cur_stereo_x * stereoScaleFactor);
-        stereographic_point.setY(cur_stereo_y * stereoScaleFactor);
+        stereographic_point.setX(cur_stereo_x  / (stereoScaleFactor * stereoScaleFactor));
+        stereographic_point.setY(cur_stereo_y  / (stereoScaleFactor * stereoScaleFactor));
         stereographicVerticesVector.append(stereographic_point);
     }
     return stereographicVerticesVector;

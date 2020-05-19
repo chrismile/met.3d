@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>734</width>
-    <height>525</height>
+    <height>556</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -184,6 +184,13 @@
            <widget class="QCheckBox" name="treatRotatedAsRegularCheckBox">
             <property name="text">
              <string>treat rotated grid as regular grid</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QCheckBox" name="treatStereographicAsRegularCheckBox">
+            <property name="text">
+             <string>treat stereographic grid as regular grid</string>
             </property>
            </widget>
           </item>
