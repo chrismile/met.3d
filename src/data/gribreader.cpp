@@ -327,6 +327,46 @@ QVector2D MGribReader::variableRotatedNorthPoleCoordinates(
     return coordinates;
 }
 
+// Get parameters of stereographic projection from data file.
+// This method is implemented in analogy to above method
+// "variableRotatedNorthPoleCoordinates()". Both do not actually
+// do anything meaningful yet, but instead set the projection parameters
+// to 0, i.e. DO NOT USE THESE: Data on a stereographic grid stored in
+// a grib file cannot be processed at the moment.
+QVector4D MGribReader::variableStereographicCoordinates(
+        MVerticalLevelType levelType, const QString& variableName)
+{
+    // cf.  MClimateForecastReader::availableVariables() .
+    QReadLocker availableItemsReadLocker(&availableItemsLock);
+    if (!availableDataFields.keys().contains(levelType))
+    {
+        throw MBadDataFieldRequest(
+                    "unkown level type requested: " +
+                    MStructuredGrid::verticalLevelTypeToString(levelType).toStdString(),
+                    __FILE__, __LINE__);
+    }
+    if (!availableDataFields.value(levelType).keys().contains(variableName))
+    {
+        throw MBadDataFieldRequest(
+                    "unkown variable requested: " + variableName.toStdString(),
+                    __FILE__, __LINE__);
+    }
+    if (availableDataFields.value(levelType).value(variableName)
+            ->horizontalGridType != STEREOGRAPHIC_PROJ)
+    {
+        throw MBadDataFieldRequest(
+                    "Stereographic projection params requested for grid not "
+                    "stereographic", __FILE__, __LINE__);
+    }
+    // TODO (mm, May2020): adapt to get stereographic proj. coordinates
+    // from grib file or throw some error so the program crashes because
+    // this routine does not do anything meaningful.
+    // Set to dummy values for now.
+    QVector4D coordinates(0.f, 0.f, 0.f, 0.f);
+    return coordinates;
+}
+
+
 
 inline int shiftedLonIndex(int i, MGribVariableInfo* vinfo)
 {

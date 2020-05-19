@@ -137,6 +137,14 @@ public:
             QVector<int> *count, bool append=true,
             double poleLat=90., double poleLon=-180.);
 
+    // ToDo: add short summary / documentation
+    void loadAndTransformStereographicLineGeometryAndCutUsingBBox(
+            GeometryType type, QRectF bbox, QVector<QVector2D> *vertices,
+            QVector<int> *startIndices, QVector<int> *count, bool append,
+            double poleLat, double poleLon,
+            float stereoStandardLat, float stereoStraightLon,
+            float stereoGridUnit_m, float stereoGridScaleFactor);
+
     /**
      @brief geographicalToRotatedCoords transforms @p point according to the
      given rotated north pole coordinates @p poleLat and @p poleLon.
@@ -248,6 +256,43 @@ public:
      getBBoxPolygon builds and returns a OGRPolygon representing  @p bbox.
      */
     static OGRPolygon *getBBoxPolygon(QRectF *bbox);
+
+    // method to compute a scale-factor required for squashing stereographic
+    // grid coordinates (in meters or kilometers) into the internal
+    // Met3D grid (defined as a regular lat-lon grids with fixed extend).
+    float computeScalingFromStereographicToMet3DGridCoords(QString stereoGridUnit);
+
+    // method to get the grid-spacing of the stereographic grid in meters
+    float computeUnitOfStereographicGridCoordinatesInMeters(QString stereoGridUnit);
+
+    // method to convert from regular lat-lon coorindates to polar
+    // stereographic grid coordinates.
+    // Based on formulae in (Snyder, 1987: Map projections, around p. 160) and
+    // implementations here:
+    // https://nsidc.org/data/polar-stereo/tools_geo_pixel.html#geolocate
+    // ftp://sidads.colorado.edu/pub/DATASETS/brightness-temperatures/polar-stereo/tools/geo-coord/fortran/
+    QVector<QVector2D> convertPolarStereographicToRegularLatLonCoords(
+            QVector<QVector2D> polarStereographicCoords,
+            float stereoStandardLat,
+            float stereoStraightLon,
+            float stereoScaleFactor,
+            float stereoGridUnit_m);
+
+
+    // method to convert from regular lat-lon coordinates to polar stereographic
+    // projection grid coordinates.
+    // Based on formulae in (Snyder, 1987: Map projections, around p. 160) and
+    // implementations here:
+    // https://nsidc.org/data/polar-stereo/tools_geo_pixel.html#geolocate
+    // ftp://sidads.colorado.edu/pub/DATASETS/brightness-temperatures/polar-stereo/tools/geo-coord/fortran/
+    QVector<QVector2D> convertRegularLatLonToPolarStereographicCoords(
+            QVector<QVector2D> verticesVector,
+            float stereoStandardLat,
+            float stereoStraightLon,
+            float stereoScaleFactor,
+            float stereoGridUnit_m);
+
+
 
 private:
     /**

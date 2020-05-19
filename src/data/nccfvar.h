@@ -34,6 +34,7 @@
 #include <QtCore>
 
 // local application imports
+#include "data/naturalearthdataloader.h"
 
 using namespace std;
 
@@ -129,6 +130,12 @@ public:
     NcVar getRotatedLatitudeVar();
 
     /**
+      Returns the stereographic grid coordinate along the latitude direction
+      of the variable corresponding to the CF variable represented by this object.
+      */
+    NcVar getStereographicLatitudeVar();
+
+    /**
       Returns the longitude variable corresponding to the CF variable
       represented by this object.
       */
@@ -142,6 +149,12 @@ public:
        chapter 3.3)
       */
     NcVar getRotatedLongitudeVar();
+
+    /**
+      Returns the stereographic grid coordinate along the longitude direction
+      of the variable corresponding to the CF variable represented by this object.
+      */
+    NcVar getStereographicLongitudeVar();
 
     /**
       If the CF variable represented by this object has a pressure dimension,
@@ -305,6 +318,17 @@ public:
                                        QString *gridMappingVarName);
 
     /**
+      Static function that checks if the specified @p var is a CF variable
+      defined on a stereographic grid with a mapping defined by one of the variables
+      with their names stored in @p gridMappingVarNames. If so,
+      @p gridMappingVarName holds the name of the corresponding grid mapping
+      variable.
+      */
+    static bool isDefinedOnStereographicGrid(const NcVar& var,
+                                       const QStringList gridMappingVarNames,
+                                       QString *gridMappingVarName);
+
+    /**
       Static function that gets the rotated north pole coordinates for a given
       grid mapping variable @p gridMappingVar. The results are stored in
       @p rotatedNorthPoleLon and @p rotatedNorthPoleLat respectively.
@@ -316,10 +340,32 @@ public:
                                                float *rotatedNorthPoleLat);
 
     /**
+      Static function that gets the standard parallel latitude and the
+      straight longitude from pole for a given
+      grid mapping variable @p gridMappingVar. The results are stored in
+      @p stereoStandardLat and @p stereoStraightLon respectively.
+      The function returns true if gridMappingVar is stereographic
+      and all required projection parameters are available.
+      */
+    static bool getStereographicProjCoordinates(const NcVar& gridMappingVar,
+                                                const NcVar& var,
+                                                float *stereoStraightLon,
+                                                float *stereoStandardLat,
+                                                QString *stereoGridUnit,
+                                                float *stereoGridUnit_m,
+                                                float *stereoGridScaleFactor);
+
+
+    // get unit of stereographic grid coordinates from data file
+    NcVar getStereographicUnitVar(QString *stereoGridUnit,
+                                 float *stereoGridUnit_m);
+
+    /**
       Static function that converts an @ref NcVariableGridType enum to
       a string.
      */
     static QString ncVariableGridTypeToString(NcVariableGridType type);
+
 
 private:
     /**

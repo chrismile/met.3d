@@ -104,6 +104,12 @@ MStructuredGrid* MWeatherPredictionReader::produceData(MDataRequest request)
                     variableRotatedNorthPoleCoordinates(levtype, variable));
     }
 
+    if (result->getHorizontalGridType() == STEREOGRAPHIC_PROJ)
+    {
+        result->setStereographicProjCoordinates(
+                    variableStereographicCoordinates(levtype, variable));
+    }
+
     if (levtype == HYBRID_SIGMA_PRESSURE_3D)
     {
         // Special treatment for hybrid model levels: Also load the required

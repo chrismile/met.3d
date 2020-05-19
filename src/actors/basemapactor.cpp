@@ -87,7 +87,7 @@ MBaseMapActor::MBaseMapActor()
     properties->setDDouble(colourSaturationProperty, colourSaturation,
                            0., 1., 2., 0.1, " (0..1)");
 
-    actorPropertiesSupGroup->addSubProperty(rotatedGridPropertiesSubGroup);
+    actorPropertiesSupGroup->addSubProperty(gridProjectionPropertiesSubGroup);
 
     endInitialiseQtProperties();
 }

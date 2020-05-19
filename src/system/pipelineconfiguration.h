@@ -126,6 +126,7 @@ protected:
                                bool enableRegridding,
                                bool enableProbabiltyRegionFilter,
                                bool treatRotatedGridAsRegularGrid,
+                               bool treatStereographicGridAsRegularGrid,
                                QString surfacePressureFieldType,
                                bool convertGeometricHeightToPressure_ICAOStandard,
                                QString auxiliary3DPressureField,

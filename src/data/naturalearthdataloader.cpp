@@ -706,6 +706,208 @@ void MNaturalEarthDataLoader::loadAndRotateLineGeometryUsingRotatedBBox(
 }
 
 
+void MNaturalEarthDataLoader::loadAndTransformStereographicLineGeometryAndCutUsingBBox(
+        GeometryType type, QRectF bbox, QVector<QVector2D> *vertices,
+        QVector<int> *startIndices, QVector<int> *count, bool append,
+        double poleLat, double poleLon, float stereoStandardLat,
+        float stereoStraightLon, float stereoGridUnit_m,
+        float stereoGridScaleFactor)
+{
+    if (gdalDataSet.size() < 2)
+    {
+        QString msg = QString("ERROR: NaturalEarthDataLoader not yet "
+                              "initilised.");
+        LOG4CPLUS_ERROR(mlog, msg.toStdString());
+        throw MInitialisationError(msg.toStdString(), __FILE__, __LINE__);
+    }
+
+    string typeStr = type == COASTLINES ? "COASTLINES": "BORDERLINES";
+    LOG4CPLUS_DEBUG(mlog, "loading " << typeStr << " geometry..");
+
+    if ( !append )
+    {
+        vertices->clear();
+        startIndices->clear();;
+        count->clear();
+    }
+
+    // NaturalEarth shapefiles only contain one layer. (Do shapefiles in
+    // general contain only one layer?)
+    OGRLayer *layer;
+    layer = gdalDataSet[type]->GetLayer(0);
+
+    OGRPolygon *bboxPolygonRot = getBBoxPolygon(&bbox);
+
+    // Filter the layer on-load: Only load those geometries that intersect
+    // with the bounding box. (Somehow it does not load the whole geometry if
+    // we don't set the filter, thus it is necessary to set the filter to a
+    // polygon covering the whole region.)
+    //layer->SetSpatialFilter(bboxPolygon);
+
+    OGRPoint *point = new OGRPoint;
+
+    QList<OGRLineString*> lineStringList;
+    OGRLineString * lineString;
+
+    // Variables used to get rid of lines crossing the whole domain.
+    // (Conntection of the right most and the left most vertex)
+
+    // ToDo: check if this is needed and clean up if not
+    QVector2D centreLons(0., 0.);
+    getCentreLons(&centreLons, poleLat, poleLon);
+
+    // Loop over all features contained in the layer.
+    layer->ResetReading();
+    OGRFeature *feature;
+    while ((feature = layer->GetNextFeature()) != NULL)
+    {
+        startIndices->append(vertices->size());
+
+        QList<OGRLineString*> lineStrings;
+        // Get the geometry associated with the current feature.
+        getLineStringFeatures(&lineStrings, feature->GetGeometryRef());
+
+        // Loop over the list, rotate each vertex of the current line and check
+        // for connections from the right domain side to the left. Separate the
+        // line to two lines at these connections. Afterwards intersect the set
+        // of lines gotten with the bounding box.
+        for (int l = 0; l < lineStrings.size(); l++)
+        {
+            OGRLineString *originalLineString = lineStrings.at(l);
+            // Use string list to distinguish between different lines since
+            // rotation of the coast- and borderlines can lead to lines
+            // crossing the whole domain (connection between right side and
+            // left side).
+            lineStringList.append(new OGRLineString());
+            lineString = lineStringList.at(0);
+
+            originalLineString->getPoint(0, point);
+
+            QVector<QVector2D> regularpoint;
+            QVector<QVector2D> stereopoint;
+            regularpoint.append(QVector2D(point->getX(),point->getY()));
+
+            stereopoint = convertRegularLatLonToPolarStereographicCoords(
+                        regularpoint,
+                        stereoStandardLat,
+                        stereoStraightLon,
+                        stereoGridScaleFactor,
+                        stereoGridUnit_m);
+
+
+            //geographicalToRotatedCoords(point, poleLat, poleLon);
+            //prevPosition.setX(point->getX());
+
+            // For rotation loop over all vertices of the current lineString,
+            // apply the rotation and store the point in a new line string.
+            for (int i = 0; i < originalLineString->getNumPoints(); i++)
+            {
+                originalLineString->getPoint(i, point);
+                QVector<QVector2D> regularpoint;
+                QVector<QVector2D> stereopoint;
+                regularpoint.append(QVector2D(point->getX(),point->getY()));
+
+                stereopoint = convertRegularLatLonToPolarStereographicCoords(
+                            regularpoint,
+                            stereoStandardLat,
+                            stereoStraightLon,
+                            stereoGridScaleFactor,
+                            stereoGridUnit_m);
+
+
+//                if (!validConnectionBetweenPositions(
+//                            &prevPosition, &currPosition, point,
+//                            poleLat, poleLon, &centreLons))
+                {
+                    // Start new line.
+                    lineStringList.append(new OGRLineString());
+                    lineString = lineStringList.last();
+                }
+                //lineString->addPoint(currPosition.x(), currPosition.y());
+                lineString->addPoint(stereopoint[0].x(), stereopoint[0].y());
+
+                //MKM  addthe point also to the previous line string as second point.
+                lineString = lineStringList.at(lineStringList.count()-2);
+                lineString->addPoint(stereopoint[0].x(), stereopoint[0].y());
+            }
+
+            // Loop over all separated lines and intersect each with the
+            // bounding box.
+            foreach (lineString, lineStringList)
+            {
+                // Only use valid lines with more than one vertex.
+                if (lineString->getNumPoints() <= 1 || !lineString->IsValid())
+                {
+                    count->append(vertices->size() - startIndices->last());
+                    startIndices->append(vertices->size());
+                    delete lineString;
+                    continue;
+                }
+
+                // Compute intersection with bbox.
+                OGRGeometry *iGeometry = lineString->Intersection(bboxPolygonRot);
+
+                // The intersection can be either a single line string, or a
+                // collection of line strings.
+
+                if (iGeometry->getGeometryType() == wkbLineString)
+                {
+                    // Get all points from the intersected line string and append
+                    // them to the "vertices" vector.
+                    OGRLineString *iLine = (OGRLineString *) iGeometry;
+                    int numLinePoints = iLine->getNumPoints();
+                    OGRRawPoint *v = new OGRRawPoint[numLinePoints];
+                    iLine->getPoints(v);
+                    for (int i = 0; i < numLinePoints; i++)
+                    {
+                        vertices->append(QVector2D(v[i].x, v[i].y));
+                    }
+                    delete[] v;
+                }
+                else if (iGeometry->getGeometryType() == wkbMultiLineString)
+                {
+                    // Loop over all line strings in the collection, appending
+                    // their points to "vertices" as above.
+                    OGRGeometryCollection *geomCollection =
+                            (OGRGeometryCollection *) iGeometry;
+
+                    for (int g = 0; g < geomCollection->getNumGeometries(); g++)
+                    {
+                        OGRLineString *iLine =
+                                (OGRLineString *) geomCollection->getGeometryRef(g);
+                        int numLinePoints = iLine->getNumPoints();
+                        OGRRawPoint *v = new OGRRawPoint[numLinePoints];
+                        iLine->getPoints(v);
+                        for (int i = 0; i < numLinePoints; i++)
+                        {
+                            vertices->append(QVector2D(v[i].x, v[i].y));
+                        }
+                        delete[] v;
+                        // Restart after each line segment to avoid connections
+                        // between line segements separated by intersection
+                        // with bounding box.
+                        count->append(vertices->size() - startIndices->last());
+                        startIndices->append(vertices->size());
+                    }
+                }
+                count->append(vertices->size() - startIndices->last());
+                startIndices->append(vertices->size());
+                delete lineString;
+            }
+            lineStringList.clear();
+        } // while (lineStrings)
+
+        OGRFeature::DestroyFeature(feature);
+        count->append(vertices->size() - startIndices->last());
+    }
+
+    // Clean up.
+    //OGRGeometryFactory::destroyGeometry(bboxPolygon);
+    OGRGeometryFactory::destroyGeometry(bboxPolygonRot);
+    delete point;
+}
+
+
 static const double DEG2RAD = M_PI / 180.0;
 static const double RAD2DEG = 180.0 / M_PI;
 
@@ -933,6 +1135,7 @@ bool MNaturalEarthDataLoader::geographicalToRotatedCoords(
 //   return RAD2DEG*asin(zarg);
 // }
 
+
 bool MNaturalEarthDataLoader::rotatedToGeograhpicalCoords(OGRPoint *point,
                                                           double poleLat,
                                                           double poleLon)
@@ -1067,6 +1270,245 @@ void MNaturalEarthDataLoader::getCentreLons(
         centreLons->setY(point->getX());
     }
     delete point;
+}
+
+
+float MNaturalEarthDataLoader::computeScalingFromStereographicToMet3DGridCoords(
+        QString stereoGridUnit)
+{
+
+    // The coordinate values of polar stereographic grids are usually much
+    // larger than the default extend of the internal Met3D grid. It is
+    // therefore required to re-scale the coordinate values of polar stereo-
+    // graphic grids such that they fit into the default Met3D rectangular grid
+    // domain [-90,90,-180,180]. To ensure that all plausible stereographic
+    // grid coordinates fit into Met3Ds internal grid, we require:
+    // max(c_stereo)*alpha<=90, where alpha is the desired scale factor,
+    // max(c_stereo) denotes the maximum coordinate value of the polar
+    // stereographic grid and 90 is the hard-coded internal Met3D extend from
+    // the center of the regular lat-lon rectangle at (0,0) to the northern
+    // boundary at 90. The value of max(c_stereo) depends on the unit of the
+    // polar stereographic data grid. It could be read from the data-file or
+    // calculated by converting the coordinates of a point at the outer
+    // edge of the polar stereographic grid (e.g. at latitude=0 on the straight
+    // vertical meridian from the pole). For our purposes it suffices to
+    // approximate max(c_stereo) heuristically as 10000 km or 10000*1000 m,
+    // depending on the unit of the coordinates of the stereographic grid. The
+    // choice of 10000 km ensures that data points at low latitudes, with
+    // stereographic grid coordinates that may be larger than Radius-Earth, can
+    // be represented. The approximation works for data in units of
+    // meters or kilometers and standard stereographic projection parameters.
+    // For other units or unusual projection parameters, it needs to be adapted.
+    if ( (stereoGridUnit == "meters") || (stereoGridUnit == "m") )
+    {
+        return 90.0f/(10000.0f*1000.0f);
+    }
+    else if ( (stereoGridUnit == "kilometers") || (stereoGridUnit == "km") )
+    {
+        return 90.0f/10000.0f;
+    }
+    else
+    {
+        return M_MISSING_VALUE;
+    }
+}
+
+
+float MNaturalEarthDataLoader::computeUnitOfStereographicGridCoordinatesInMeters(
+        QString stereoGridUnit)
+{
+
+    if ( (stereoGridUnit == "meters") || (stereoGridUnit == "m") )
+    {
+        return 1;
+    }
+    else if ( (stereoGridUnit == "kilometers") || (stereoGridUnit == "km") )
+    {
+        return  1000;
+    }
+    else
+    {
+        return  M_MISSING_VALUE;
+    }
+
+}
+
+
+QVector<QVector2D> MNaturalEarthDataLoader::convertPolarStereographicToRegularLatLonCoords(
+        QVector<QVector2D> polarStereographicCoords,
+        float stereoStandardLat,
+        float stereoStraightLon,
+        float stereoScaleFactor,
+        float stereoGridUnit_m)
+{
+
+    // define output array
+    QVector<QVector2D> regularLatLonCoords;
+
+    // initialize variables for storing stereographic and lat-lon coordinates
+    float iStereoXCoord, iStereoYCoord, iLat, iLon;
+
+    // define constants required for the coordinate conversion
+    // ToDo: move the def. of constants somewhere more central like metroutines?
+    float E = 0.08182;                           // eccentricity Earth
+    float E2 = E * E;
+    float SL = stereoStandardLat*M_PI/180.;
+    float EARTH_RADIUS_km = 6378.3;              // EARTH_RADIUS_km
+    int SGN=1;                                   // ToDo: this should be made dynamic for southern hemisphere
+
+    // initilize some helperlies
+    float RE, T, CM, CHI, RHO;
+
+    // rescale radius of Earth to units of stereographic grid coords
+    RE = EARTH_RADIUS_km*(1000/stereoGridUnit_m);
+
+    // loop all input coordinate points (x, y coord pairs)
+    for (int i = 0; i <polarStereographicCoords.size() ; i++)
+    {
+
+        // initialize array for holding the resulting lat-lon coords
+        QVector2D latlon_point;
+
+        // get x and y coords (with respect to the internal met3d grid)
+        iStereoXCoord=polarStereographicCoords[i].x();
+        iStereoYCoord=polarStereographicCoords[i].y();
+
+        // re-scale from internal met3d grid coords to actual polar
+        // stereographic coords with meaningful units, i.e. inverse
+        // the scaling of the data coords applied during data reading
+        iStereoXCoord=iStereoXCoord*(1/stereoScaleFactor);
+        iStereoYCoord=iStereoYCoord*(1/stereoScaleFactor);
+
+        // get distance from origin (assumed at pole - 0, 0)
+        RHO=sqrt(pow(iStereoXCoord,2)+pow(iStereoYCoord,2));
+
+        // check if at pole
+        if (RHO < 0.1)
+        {
+            iLat=90.*SGN;
+            iLon=0.0;
+        }
+        // if not at pole, convert from stereo to lat-lon
+        else
+        {
+            CM=cos(SL)/sqrt(1.0-pow(E2*sin(SL),2));
+            T=tan((M_PI/4.0)-(SL/(2.0)))/pow(((1.0-E*sin(SL))/(1.0+E*sin(SL))),(E/2.0));
+
+            if ( abs(stereoStandardLat-90) < 0.00001 )
+            {
+                T=RHO*sqrt(pow((1.+E),(1.+E))*pow((1.-E),(1.-E)))/(2.*RE);
+            }
+            else
+            {
+                T=RHO*T/(RE*CM);
+                CHI=(M_PI/2.0)-2.0*atan(T);
+                iLat=CHI+((E2/2.0)+(5.0*pow(E2,2.0)/24.0)+(pow(E2,3.0)/12.0))*sin(2*CHI)+((7.0*pow(E2,2.0)/48.0)+(29.0*pow(E2,3)/240.0))*sin(4.0*CHI)+(7.0*pow(E2,3.0)/120.0)*sin(6.0*CHI);
+                iLat=SGN*iLat;
+                iLon=atan2(SGN*iStereoXCoord,-SGN*iStereoYCoord);
+                iLon=SGN*iLon;
+
+                // convert from radians to degree and account for
+                // offset of vertical meridian from pole
+                iLat=iLat*180./M_PI;
+                iLon=(iLon*180./M_PI)-stereoStraightLon;
+            }
+        }
+
+        // append lat-lon coords of this point to results-array
+        latlon_point.setX(iLon);
+        latlon_point.setY(iLat);
+        regularLatLonCoords.append(latlon_point);
+
+    } // loop all input points
+
+    // return array with regular lat-lon coords
+    return regularLatLonCoords;
+
+}
+
+
+QVector<QVector2D> MNaturalEarthDataLoader::convertRegularLatLonToPolarStereographicCoords(
+        QVector<QVector2D> verticesVector,
+        float stereoStandardLat,
+        float stereoStraightLon,
+        float stereoScaleFactor,
+        float stereoGridUnit_m)
+
+{
+
+
+    // define output array
+    QVector<QVector2D> stereographicVerticesVector;
+
+    // define constants for coordinate conversion
+    float DEG_TO_RAD = M_PI / 180.0;
+    float E = 0.08182;                 // eccentricity of ellipsoid Earth
+    float ESQUARE = E * E;
+
+    // initialize some helper vars for storing coordinate values
+    float cur_reg_lat, cur_reg_lon;
+    float cur_stereo_x, cur_stereo_y;
+    float T, TC, RHO, RE, MC;
+
+    // projection parameters
+    float DELTA_LON = stereoStraightLon - 90;
+    float REF_LAT = stereoStandardLat;
+    float REF_LAT_RAD;
+
+    // rescale radius of Earth to units of stereographic grid coords
+    float EARTH_RADIUS_km = 6378.3;
+    RE = EARTH_RADIUS_km*(1000/stereoGridUnit_m);
+
+    for (int i = 0; i <verticesVector.size() ; i++)
+    {
+        QVector2D stereographic_point;
+        cur_reg_lat = verticesVector[i].y();
+        cur_reg_lat *= DEG_TO_RAD;
+
+        cur_stereo_x = 0.0f;
+        cur_stereo_y = 0.0f;
+
+        if( fabs(cur_reg_lat) > ( M_PI / 2.0f ) )
+        {
+            cur_stereo_x = 0.0f;
+            cur_stereo_y = 0.0f;
+        }
+        else
+        {
+            cur_reg_lon = verticesVector[i].x();
+            cur_reg_lon = cur_reg_lon + DELTA_LON; // MKM rotate globe
+            cur_reg_lon = 180.0f - cur_reg_lon;
+            cur_reg_lon *= DEG_TO_RAD;
+
+            T = tan( M_PI/4.0f - cur_reg_lat / 2.0f ) /pow( ( (1.0f - E * sin(cur_reg_lat) ) /
+                                                            (1.0f + E * sin(cur_reg_lat) ) ),(E / 2.0f ) );
+
+            if( abs(90.f - REF_LAT) < 1.0e-5f)
+            {
+                RHO = 2.0f * RE * T / pow( ( pow( (1.0f + E),(1.0f + E) ) *
+                                             pow( (1.0f - E),(1.0f - E) )),0.5f);
+            }
+            else
+            {
+                REF_LAT_RAD = REF_LAT * DEG_TO_RAD;
+                float esin1;
+                esin1 = E * sin(REF_LAT_RAD);
+                //TC = tan( M_PI/4.0f - REF_LAT_RAD / 2.0f ) / pow(((1.0f - E * sin(REF_LAT_RAD) ) / (1.0f + E * sin(REF_LAT_RAD))),(E/2.0f));
+                TC = tan( M_PI/4.0f - REF_LAT_RAD / 2.0f ) / pow(((1.0f - esin1 ) / (1.0f + esin1)),(E/2.0f));
+                MC = cos(REF_LAT_RAD) / sqrt(1.0f - ESQUARE * pow(sin(REF_LAT_RAD),2.0f));
+                RHO = RE * MC * T / TC;
+            }
+
+            cur_stereo_x  = -1.0f * RHO * cos( cur_reg_lon );
+            cur_stereo_y  =  RHO * sin( cur_reg_lon );
+        }
+
+        stereographic_point.setX(cur_stereo_x * stereoScaleFactor);
+        stereographic_point.setY(cur_stereo_y * stereoScaleFactor);
+        stereographicVerticesVector.append(stereographic_point);
+    }
+    return stereographicVerticesVector;
+
 }
 
 

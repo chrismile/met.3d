@@ -123,6 +123,7 @@ public:
     MClimateForecastReader(
             QString identifier,
             bool treatRotatedGridAsRegularGrid=false,
+            bool treatStereographicGridAsRegularGrid=false,
             bool convertGeometricHeightToPressure_ICAOStandard=false,
             QString auxiliary3DPressureField="",
             bool disableGridConsistencyCheck=false);
@@ -162,6 +163,9 @@ protected:
     QVector2D variableRotatedNorthPoleCoordinates( MVerticalLevelType levelType,
                                                    const QString& variableName);
 
+    // method to read paraemters of stereographic projection from data file.
+    QVector4D variableStereographicCoordinates( MVerticalLevelType levelType,
+                                                   const QString& variableName);
     void scanDataRoot();
 
     MStructuredGrid* readGrid(MVerticalLevelType levelType,
@@ -170,7 +174,7 @@ protected:
                               const QDateTime&   validTime,
                               unsigned int       ensembleMember);
 
-    // Dictionaries of available data. Access needs to be proteced
+    // Dictionaries of available data. Access needs to be protected
     // by the provided read/write lock.
     MLevelTypeMap availableDataFields;
     MLevelTypeMap availableDataFieldsByStdName;
@@ -230,6 +234,7 @@ protected:
             bool testEnsembleMemberConsistency);
 
     bool treatRotatedGridAsRegularGrid;
+    bool treatStereographicGridAsRegularGrid;
     bool convertGeometricHeightToPressure_ICAOStandard;
     bool disableGridConsistencyCheck;
     bool ensembleIDIsSpecifiedInFileName;

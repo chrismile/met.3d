@@ -68,7 +68,10 @@ enum MHorizontalGridType
     // Rotated north pole coordinates as used by COSMO.
     // (cf. http://www.cosmo-model.org/content/model/documentation/core/cosmoDyncsNumcs.pdf ,
     //  chapter 3.3)
-    ROTATED_LONLAT = 1
+    ROTATED_LONLAT = 1,
+    // MM Stereo
+    // stereographic projection
+    STEREOGRAPHIC_PROJ = 2
 };
 
 
@@ -234,6 +237,12 @@ public:
     { this->rotatedNorthPoleLon = coordinates.x();
         this->rotatedNorthPoleLat = coordinates.y(); }
 
+    inline void setStereographicProjCoordinates(QVector4D coordinates)
+    {   this->stereoStraightLon = coordinates.x();
+        this->stereoStandardLat = coordinates.y();
+        this->stereoGridUnit_m = coordinates.z();
+        this->stereoGridScaleFactor = coordinates.w(); }
+
     inline unsigned int getNumLevels() const { return nlevs; }
     inline unsigned int getNumLats() const { return nlats; }
     inline unsigned int getNumLons() const { return nlons; }
@@ -247,6 +256,12 @@ public:
     { return horizontalGridType; }
     inline float getRotatedNorthPoleLon() { return rotatedNorthPoleLon; }
     inline float getRotatedNorthPoleLat() { return rotatedNorthPoleLat; }
+    // MM Stereo get stereo proj coordinates
+    inline float getStereoStraightLon() { return stereoStraightLon; }
+    inline float getStereoStandardLat() { return stereoStandardLat; }
+    inline float getStereoGridUnit_m() { return stereoGridUnit_m; }
+    inline float getStereoGridScaleFactor() { return stereoGridScaleFactor; }
+
 
     /**
       Returns the pressure (hPa) of grid point at indices @p i, @p j, @p k.
@@ -602,6 +617,7 @@ protected:
     friend class MDifferenceDataSource;
     friend class MProcessingWeatherPredictionDataSource;
     friend class MPotentialVorticityProcessor_LAGRANTOcalvar;
+    friend class MMaskData;
 
     /** Sizes of the dimensions. */
     unsigned int nlevs, nlats, nlons;
@@ -620,7 +636,12 @@ protected:
     MHorizontalGridType horizontalGridType;
     float rotatedNorthPoleLon;
     float rotatedNorthPoleLat;
-
+    // MM Stereo
+    float stereoStraightLon;
+    float stereoStandardLat;
+    QString stereoGridUnit;
+    float stereoGridUnit_m;
+    float stereoGridScaleFactor;
 
     /** Texture parameters. **/
     GLint  textureInternalFormat;

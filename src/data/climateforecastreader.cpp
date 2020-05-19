@@ -59,10 +59,12 @@ namespace Met3D
 
 MClimateForecastReader::MClimateForecastReader(
         QString identifier, bool treatRotatedGridAsRegularGrid,
+        bool treatStereographicGridAsRegularGrid,
         bool convertGeometricHeightToPressure_ICAOStandard,
         QString auxiliary3DPressureField, bool disableGridConsistencyCheck)
     : MWeatherPredictionReader(identifier, auxiliary3DPressureField),
       treatRotatedGridAsRegularGrid(treatRotatedGridAsRegularGrid),
+      treatStereographicGridAsRegularGrid(treatStereographicGridAsRegularGrid),
       convertGeometricHeightToPressure_ICAOStandard(
           convertGeometricHeightToPressure_ICAOStandard),
       disableGridConsistencyCheck(disableGridConsistencyCheck),
@@ -484,6 +486,89 @@ QVector2D MClimateForecastReader::variableRotatedNorthPoleCoordinates(
 }
 
 
+// Get parameters of stereographic projection and store in coordinate array.
+// Implementation in analogy to "variableRotatedNorthPoleCoordinates()".
+QVector4D MClimateForecastReader::variableStereographicCoordinates(
+        MVerticalLevelType levelType,
+        const QString&     variableName)
+{
+
+    QReadLocker availableItemsReadLocker(&availableItemsLock);
+    if (!availableDataFields.keys().contains(levelType))
+    {
+        throw MBadDataFieldRequest(
+                    "unkown level type requested: " +
+                    MStructuredGrid::verticalLevelTypeToString(
+                        levelType).toStdString(),
+                    __FILE__, __LINE__);
+    }
+    if (availableDataFields.value(levelType).keys().contains(variableName))
+    {
+        if (availableDataFields.value(levelType).value(variableName)
+                ->horizontalGridType == STEREOGRAPHIC_PROJ)
+        {
+            QVector4D coordinates;
+            coordinates.setX(
+                        availableDataFields.value(levelType).value(variableName)
+                        ->stereoStraightLon);
+            coordinates.setY(
+                        availableDataFields.value(levelType).value(variableName)
+                        ->stereoStandardLat);
+            coordinates.setZ(
+                        availableDataFields.value(levelType).value(variableName)
+                        ->stereoGridUnit_m);
+            coordinates.setW(
+                        availableDataFields.value(levelType).value(variableName)
+                        ->stereoGridScaleFactor);
+
+            return coordinates;
+        }
+        else
+        {
+            throw MBadDataFieldRequest(
+                        "Stereographic projection parameters requested for a grid "
+                        "that is not stereographic", __FILE__, __LINE__);
+        }
+    }
+    else if (availableDataFieldsByStdName.value(levelType).keys().contains(
+                 variableName))
+    {
+        if (availableDataFields.value(levelType).value(variableName)
+                ->horizontalGridType = STEREOGRAPHIC_PROJ)
+        {
+            QVector4D coordinates;
+            coordinates.setX(
+                        availableDataFieldsByStdName.value(levelType)
+                        .value(variableName)->stereoStraightLon);
+            coordinates.setY(
+                        availableDataFieldsByStdName.value(levelType)
+                        .value(variableName)->stereoStandardLat);
+            coordinates.setZ(
+                        availableDataFields.value(levelType).value(variableName)
+                        ->stereoGridUnit_m);
+            coordinates.setW(
+                        availableDataFields.value(levelType).value(variableName)
+                        ->stereoGridScaleFactor);
+
+            return coordinates;
+        }
+        else
+        {
+            throw MBadDataFieldRequest(
+                        "Stereographic projection parameters requested for a grid "
+                        "that is not stereographic", __FILE__, __LINE__);
+        }
+    }
+    else
+    {
+        throw MBadDataFieldRequest(
+                "unkown variable requested: " + variableName.toStdString(),
+                __FILE__, __LINE__);
+    }
+}
+
+
+
 void MClimateForecastReader::scanDataRoot()
 {
     // Lock access to all availableXX data fields.
@@ -496,6 +581,8 @@ void MClimateForecastReader::scanDataRoot()
     LOG4CPLUS_DEBUG(mlog, "Parameters: "
                     << "treat rotated grid as regular grid="
                     << (treatRotatedGridAsRegularGrid ? "enabled" : "disabled")
+                    << "treat stereographic grid as regular grid="
+                    << (treatStereographicGridAsRegularGrid ? "enabled" : "disabled")
                     << "; convert geometric height to pressure (using standard ICAO)="
                     << (convertGeometricHeightToPressure_ICAOStandard ? "enabled" : "disabled")
                     << "; grid consistency check="
@@ -587,7 +674,7 @@ void MClimateForecastReader::scanDataRoot()
         // all variables, check if variable with grid_mapping_name
         // 'rotated_latitude_longitude' exist and store their names in
         // gridMappingVarNames. Find the grid mapping variables first since
-        // they are needed to check if a variable if defined on a rotated grid.
+        // they are needed to check if a variable is defined on a rotated grid.
         for (multimap<string, NcVar>::iterator gridVar = ncVariables.begin();
              gridVar != ncVariables.end(); gridVar++)
         {
@@ -885,9 +972,13 @@ void MClimateForecastReader::scanDataRoot()
                         }
                     }
 
+                    // Check horizontal grid type. Default grid: regular lat-lon.
                     vinfo->horizontalGridType = MHorizontalGridType::REGULAR_LONLAT;
-                    // Change grid data type to ROTATED_LONLAT if a grid mapping
-                    // variable exists and it is assigned to this variable.
+
+                    // Change grid data type to ROTATED_LONLAT or STEREOGRAPHIC_PROJ
+                    // if a grid mapping variable exists, the data is defined on one
+                    // of these grids and the necessary grid coordinates/parameters
+                    // are available in the data-file.
                     if (!gridMappingVarNames.empty())
                     {
                         QString gridMappingVarName = "";
@@ -905,6 +996,27 @@ void MClimateForecastReader::scanDataRoot()
                                         MHorizontalGridType::ROTATED_LONLAT;
                             }
                         }
+                        // check if data is defined on a stereographic grid
+                        if (NcCFVar::isDefinedOnStereographicGrid(
+                                    ncFile->getVar(varName.toStdString()),
+                                    gridMappingVarNames, &gridMappingVarName))
+                        {
+                            // check if the required stereographic proj coordinates are
+                            // available in the data-file and store their values
+                            if (NcCFVar::getStereographicProjCoordinates(
+                                        ncFile->getVar(
+                                            gridMappingVarName.toStdString()),
+                                        ncFile->getVar(varName.toStdString()),
+                                        &(vinfo->stereoStraightLon),
+                                        &(vinfo->stereoStandardLat),
+                                        &(vinfo->stereoGridUnit),
+                                        &(vinfo->stereoGridUnit_m),
+                                        &(vinfo->stereoGridScaleFactor)))
+                            {
+                                vinfo->horizontalGridType =
+                                        MHorizontalGridType::STEREOGRAPHIC_PROJ;
+                            }
+                        }
 
                         // At the moment, only register rotated_lonlat variable
                         // if the user wants to treat rotated grids as regular
@@ -916,6 +1028,17 @@ void MClimateForecastReader::scanDataRoot()
                         {
                             continue;
                         }
+                        // At the moment, only register stereographic_lonlat variable
+                        // if the user wants to treat stereographic grids as regular
+                        // grids. Handle stereographic grid as we handle rotated grids for now.
+                        if (!treatStereographicGridAsRegularGrid
+                                && (vinfo->horizontalGridType
+                                    == MHorizontalGridType::STEREOGRAPHIC_PROJ))
+                        {
+                            continue;
+                        }
+
+
                     }
                     // Initialise shared data of variable for consistency check.
                     checkSharedVariableDataConsistency(
@@ -1728,12 +1851,26 @@ MStructuredGrid *MClimateForecastReader::readGrid(
         grid = auxGrid;
     }
 
-    // Copy coordinate data.
+    // Copy grid coordinate data.
+    // For the default case of data on regular lat-lon grids and for rotated
+    // lat-lon grids, the grid coordinates can be copied directly from the
+    // input data and no scaling is necessary.
+    float scaleGridCoordinates = 1;
+    // For data on a stereographic grid, the horizontal grid coordinate values
+    // need to be re-scaled to fit into Met3Ds internal data grid (defined as
+    // a rectangle with a default extend of 360 in east-west direction and 180
+    // in south-north direction). For appropriate re-scaling, get the scale
+    // factor computed from the data file.
+    if (this->treatStereographicGridAsRegularGrid)
+    {
+        scaleGridCoordinates = this->availableDataFields.value(levelType).
+                value(variableName)->stereoGridScaleFactor;
+    }
     for (unsigned int i = 0; i < grid->nlons; i++)
-        grid->lons[i] = shared->lons[i];
+        grid->lons[i] = shared->lons[i]*scaleGridCoordinates;
 
     for (unsigned int i = 0; i < grid->nlats; i++)
-        grid->lats[i] = shared->lats[i];
+        grid->lats[i] = shared->lats[i]*scaleGridCoordinates;
 
     if ( !shared->vertVar.isNull() )
         for (unsigned int i = 0; i < grid->nlevs; i++)

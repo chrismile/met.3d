@@ -293,6 +293,8 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
                                                    false).toBool();
         bool treatRotatedGridAsRegularGrid =
                 config.value("treatRotatedGridAsRegularGrid", false).toBool();
+        bool treatStereographicGridAsRegularGrid =
+                config.value("treatStereographicGridAsRegularGrid", false).toBool();
         QString gribSurfacePressureFieldType =
                 config.value("gribSurfacePressureFieldType", "auto").toString();
         bool convertGeometricHeightToPressure_ICAOStandard =
@@ -327,6 +329,8 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
                         << (enableProbRegionFilter ? "enabled" : "disabled"));
         LOG4CPLUS_DEBUG(mlog, "  treat rotated grid as regular grid="
                         << (treatRotatedGridAsRegularGrid ? "enabled" : "disabled"));
+        LOG4CPLUS_DEBUG(mlog, "  treat stereographic grid as regular grid="
+                        << (treatStereographicGridAsRegularGrid ? "enabled" : "disabled"));
         LOG4CPLUS_DEBUG(mlog, "  surfacePressureFieldType="
                         << gribSurfacePressureFieldType.toStdString());
         LOG4CPLUS_DEBUG(mlog, "  convert geometric height to pressure (using"
@@ -370,6 +374,7 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
                     name, path, fileFilter, schedulerID,
                     memoryManagerID, fileFormat, enableRegridding,
                     enableProbRegionFilter, treatRotatedGridAsRegularGrid,
+                    treatStereographicGridAsRegularGrid,
                     gribSurfacePressureFieldType,
                     convertGeometricHeightToPressure_ICAOStandard,
                     auxiliary3DPressureField, disableGridConsistencyCheck,
@@ -583,6 +588,7 @@ void MPipelineConfiguration::initializeNWPPipeline(
         bool enableRegridding,
         bool enableProbabiltyRegionFilter,
         bool treatRotatedGridAsRegularGrid,
+        bool treatStereographicGridAsRegularGrid,
         QString surfacePressureFieldType,
         bool convertGeometricHeightToPressure_ICAOStandard,
         QString auxiliary3DPressureField,
@@ -622,6 +628,7 @@ void MPipelineConfiguration::initializeNWPPipeline(
     {
         nwpReaderENS = new MClimateForecastReader(
                     dataSourceId, treatRotatedGridAsRegularGrid,
+                    treatStereographicGridAsRegularGrid,
                     convertGeometricHeightToPressure_ICAOStandard,
                     auxiliary3DPressureField, disableGridConsistencyCheck);
     }
@@ -1162,6 +1169,7 @@ void MPipelineConfiguration::initializeDevelopmentDataPipeline()
                 false,
                 true,
                 false,
+                false,  // MM Stereo: add default for stereo; needed because expected num arguments
                 "auto",
                 false,
                 "",
@@ -1178,6 +1186,7 @@ void MPipelineConfiguration::initializeDevelopmentDataPipeline()
                 false,
                 true,
                 false,
+                false,  // MM Stereo: add default for stereo; needed because expected num arguments
                 "auto",
                 false,
                 "",

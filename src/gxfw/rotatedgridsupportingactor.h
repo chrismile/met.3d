@@ -70,14 +70,55 @@ public:
 
     void loadConfiguration(QSettings *settings) override;
 
+    // define grid projection types
+    typedef enum {
+        GRIDPROJECTION_DISABLED = 0,
+        GRIDPROJECTION_ROTATEDLATLON = 1,
+        GRIDPROJECTION_STEREOGRAPHIC = 2,
+    } gridProjectionTypes;
+
+    // convert grid projection between enum and string
+    static QString gridProjectionToString(gridProjectionTypes gridProjection);
+    MRotatedGridSupportingActor::gridProjectionTypes stringToGridProjection(QString gridProjection);
+
+
+    // define units of stereographic projection
+    typedef enum {
+        STEREOGRIDUNIT_METERS = 0,
+        STEREOGRIDUNIT_KILOMETERS = 1,
+    } stereoGridUnits;
+
+    // convert units of stereographic projection between enum and string
+    static QString stereoGridUnitsToString(stereoGridUnits stereoGridUnit);
+    MRotatedGridSupportingActor::stereoGridUnits stringToStereoGridUnits(QString stereoGridUnit);
+
 protected:
-    QtProperty *rotatedGridPropertiesSubGroup;
+    // definitions for choosing the type of projection
+    QtProperty *gridProjectionTypesProperty;
+    gridProjectionTypes gridProjection;
+    QtProperty *gridProjectionPropertiesSubGroup;
+
+    // definitions for projection: rotated lat lon
     bool enableGridRotation;
     QtProperty *enableGridRotationProperty;
     bool rotateBBox;
     QtProperty *rotateBBoxProperty;
     QPointF rotatedNorthPole;
     QtProperty *rotatedNorthPoleProperty;
+
+    // definitions for projection: polar stereographic
+    bool enableStereographicGrid;
+    QtProperty *enableStereographicGridProperty;
+    bool stereoBBox;
+    QtProperty *stereoBBoxProperty;
+    float stereoStraightLon;
+    QtProperty *stereoProjLonProperty;
+    float stereoStandardLat;
+    QtProperty *stereoProjLatProperty;
+    QtProperty *stereoGridUnitProperty;
+    stereoGridUnits stereoGridUnit;
+
+
 };
 
 } // namespace Met3D

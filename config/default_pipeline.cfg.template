@@ -66,6 +66,10 @@ size=0
 # grids as regular grids. Setting it to false will cause rejection of data sets
 # with rotated grid coordinates.
 1\treatRotatedGridAsRegularGrid=false
+# Set "treatStereographicGridAsRegularGrid" to "true" if you want to treat stereographic
+# grids as regular grids. Setting it to false will cause rejection of data sets
+# with stereographic grid coordinates.
+1\treatStereographicGridAsRegularGrid=false
 # For ECMWF grib files only: specify type and name of the surface pressure field
 # used to reconstruct pressure for hybrid sigma-pressure coordinates.
 # Can be "sp" (surface pressure), "lnsp" (log of surface pressure) or
