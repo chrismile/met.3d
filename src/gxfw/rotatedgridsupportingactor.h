@@ -81,17 +81,6 @@ public:
     static QString gridProjectionToString(gridProjectionTypes gridProjection);
     MRotatedGridSupportingActor::gridProjectionTypes stringToGridProjection(QString gridProjection);
 
-
-    // define units of stereographic projection
-    typedef enum {
-        STEREOGRIDUNIT_METERS = 0,
-        STEREOGRIDUNIT_KILOMETERS = 1,
-    } stereoGridUnits;
-
-    // convert units of stereographic projection between enum and string
-    static QString stereoGridUnitsToString(stereoGridUnits stereoGridUnit);
-    MRotatedGridSupportingActor::stereoGridUnits stringToStereoGridUnits(QString stereoGridUnit);
-
 protected:
     // definitions for choosing the type of projection
     QtProperty *gridProjectionTypesProperty;
@@ -115,10 +104,6 @@ protected:
     QtProperty *stereoProjLonProperty;
     float stereoStandardLat;
     QtProperty *stereoProjLatProperty;
-    QtProperty *stereoGridUnitProperty;
-    stereoGridUnits stereoGridUnit;
-
-
 };
 
 } // namespace Met3D

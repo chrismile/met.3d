@@ -291,7 +291,6 @@ void MGraticuleActor::onQtPropertyChanged(QtProperty *property)
             stereoBBoxProperty->setEnabled(false);
             stereoProjLonProperty->setEnabled(false);
             stereoProjLatProperty->setEnabled(false);
-            stereoGridUnitProperty->setEnabled(false);
             break;
         case GRIDPROJECTION_ROTATEDLATLON:
             gridProjection = GRIDPROJECTION_ROTATEDLATLON;
@@ -302,7 +301,6 @@ void MGraticuleActor::onQtPropertyChanged(QtProperty *property)
             stereoBBoxProperty->setEnabled(false);
             stereoProjLonProperty->setEnabled(false);
             stereoProjLatProperty->setEnabled(false);
-            stereoGridUnitProperty->setEnabled(false);
             break;
         case GRIDPROJECTION_STEREOGRAPHIC:
             gridProjection = GRIDPROJECTION_STEREOGRAPHIC;
@@ -313,7 +311,6 @@ void MGraticuleActor::onQtPropertyChanged(QtProperty *property)
             stereoBBoxProperty->setEnabled(false);
             stereoProjLonProperty->setEnabled(true);
             stereoProjLatProperty->setEnabled(true);
-            stereoGridUnitProperty->setEnabled(false);
             break;
         }
     }
@@ -383,19 +380,6 @@ void MGraticuleActor::onQtPropertyChanged(QtProperty *property)
             emitActorChangedSignal();
         }
     }
-    else if (property == stereoGridUnitProperty)
-    {
-        stereoGridUnit =
-                stringToStereoGridUnits(properties->getEnumItem(stereoGridUnitProperty));
-        if (suppressActorUpdates()) return;
-        if (enableStereographicGrid)
-        {
-            generateGeometry();
-            emitActorChangedSignal();
-        }
-    }
-
-
 }
 
 
@@ -1150,28 +1134,14 @@ void MGraticuleActor::generateGeometry()
         float urcrnrlat = float(bBoxConnection->northLat());
         float urcrnrlon = float(bBoxConnection->eastLon());
 
-        // For data on a stereographic grid, we need the units of the grid
-        // coordinates as well as some projection parameters for correctly
-        // scaling the grid coordinates such that they fit into Met3Ds internal
-        // grid and for converting regular lat-lon coordinates to polar
-        // stereographic coordinates.
-
-        // Get unit of stereographic grid coordinates and scaling factor
-        // for grid coordinates
-        QString stereoGridUnitStr = stereoGridUnitsToString(this->stereoGridUnit);
-        float stereoGridScaleFactor;
-        Met3D::MNaturalEarthDataLoader NatEarthObj;
-        stereoGridScaleFactor=NatEarthObj.computeScalingFromStereographicToMet3DGridCoords(stereoGridUnitStr);
-
         // Get bounding box as polygon and scale it appropriately
         // for representing stereographic data. The bounding box
         // is needed to compute the intersection with the graticule lines.
         QRectF cornerRect = bBoxConnection->horizontal2DCoords();
-        stereoGridScaleFactor = 1.0f;
-        cornerRect.setX( llcrnrlon * stereoGridScaleFactor);
-        cornerRect.setY( llcrnrlat * stereoGridScaleFactor);
-        cornerRect.setWidth( ( urcrnrlon - llcrnrlon ) * stereoGridScaleFactor );
-        cornerRect.setHeight( ( urcrnrlat - llcrnrlat ) * stereoGridScaleFactor );
+        cornerRect.setX( llcrnrlon );
+        cornerRect.setY( llcrnrlat );
+        cornerRect.setWidth( ( urcrnrlon - llcrnrlon ) );
+        cornerRect.setHeight( ( urcrnrlat - llcrnrlat ) );
 
         // draw lat-lon lines
         updateLatLonLines(cornerRect);
@@ -1502,15 +1472,7 @@ void MGraticuleActor::updateLatLonLines(QRectF cornerRect)
     if(rotateBBox)
     {
 
-        // get unit of stereographic grid in meters and the scale factor
-        // for grid coordinates
-        QString stereoGridUnitStr = stereoGridUnitsToString(this->stereoGridUnit);
-        Met3D::MNaturalEarthDataLoader NatEarthObj;
-        float stereoGridUnit_m = NatEarthObj.computeUnitOfStereographicGridCoordinatesInMeters(stereoGridUnitStr);
-        float stereoGridScaleFactor=NatEarthObj.computeScalingFromStereographicToMet3DGridCoords(stereoGridUnitStr);
-
         QVector<QVector2D> stereographicVerticesGraticule;
-        
 	        
 		//stereographicVerticesGraticule =		
 		// old method for converting stereographic coords by KMK
@@ -1521,10 +1483,7 @@ void MGraticuleActor::updateLatLonLines(QRectF cornerRect)
 		naturalEarthDataLoader->convertRegularLatLonToPolarStereographicCoords(
                     verticesGraticule,
                     this->stereoStandardLat,
-                    this->stereoStraightLon//,
-                    //stereoGridScaleFactor,
-                    //stereoGridUnit_m
-                    );
+                    this->stereoStraightLon);
 
         // generate data item key for every vertex buffer object wrt the actor
         const QString graticuleRequestKey = QString("graticule_vertices_actor#")
@@ -1546,18 +1505,12 @@ void MGraticuleActor::updateLatLonLines(QRectF cornerRect)
             anchorPoint.setY(label->anchor.y());
             labelAnchorVector.append(anchorPoint);
         }
-        
-	// stereographicLabelAnchorVector =
-        // naturalEarthDataLoader->computeStereographicCoordinates(labelAnchorVector);
-		
+
 	stereographicLabelAnchorVector =
 		naturalEarthDataLoader->convertRegularLatLonToPolarStereographicCoords(
                     labelAnchorVector,
                     this->stereoStandardLat,
-                    this->stereoStraightLon//,
-                    //stereoGridScaleFactor,
-                    //stereoGridUnit_m
-                    );
+                    this->stereoStraightLon);
 
         foreach (MLabel* label, labels)
         {
@@ -1581,8 +1534,6 @@ void MGraticuleActor::cutWithBoundingBox(QRectF cornerRect)
     QVector2D currPosition(0., 0.);
     QVector2D centreLons(0., 0.);
 
-//    MNaturalEarthDataLoader::getCentreLons(
-//                &centreLons, rotatedNorthPole.y(), rotatedNorthPole.x());
     int numVertices = 0;
 
     float llcrnrlat = float(bBoxConnection->southLat());
@@ -1597,13 +1548,6 @@ void MGraticuleActor::cutWithBoundingBox(QRectF cornerRect)
 
     float deltalat  = spacing.y();
     float deltalon  = spacing.x();
-
-    // get unit of stereographic grid in meters and the scale factor
-    // for grid coordinates.
-    QString stereoGridUnitStr = stereoGridUnitsToString(this->stereoGridUnit);
-    Met3D::MNaturalEarthDataLoader NatEarthObj;
-    float stereoGridUnit_m = NatEarthObj.computeUnitOfStereographicGridCoordinatesInMeters(stereoGridUnitStr);
-    float stereoGridScaleFactor=NatEarthObj.computeScalingFromStereographicToMet3DGridCoords(stereoGridUnitStr);
 
     // get parameters for converting between lat-lon and stereographic coordinates.
     float stereoStraightLon = this ->stereoStraightLon;
@@ -1624,15 +1568,6 @@ void MGraticuleActor::cutWithBoundingBox(QRectF cornerRect)
 
     // Get bounding box as polygon to compute intersection with the
     // graticule. Old hardcoded bits.
-    /*
-    float RE = 6371.2000f; // Radius of Earth in m
-    float scale_factor = ( 180.0f / RE);
-
-    cornerRect.setX( -3800.0f * scale_factor );
-    cornerRect.setY( -5800.0f * scale_factor);
-    cornerRect.setWidth( 7600.0f * scale_factor);
-    cornerRect.setHeight(11600.0f * scale_factor);
-    */
     OGRPolygon *bboxPolygon =
             MNaturalEarthDataLoader::getBBoxPolygon(&cornerRect);
 
@@ -1664,7 +1599,6 @@ void MGraticuleActor::cutWithBoundingBox(QRectF cornerRect)
     float deltaLabelPosition = 10.0f;      // Tolerance to avoid overlap with
                                            // lat lon labels.
 
-    stereoGridScaleFactor = 1.0f;
     // Append vertices of rectangular bounding box to the vertices list for
     // drawing the bounding box, i.e, the rectangle surrounding the graticule lines.
     verticesGraticule.append(QVector2D(cornerRect.x(),cornerRect.y()));
@@ -1672,11 +1606,9 @@ void MGraticuleActor::cutWithBoundingBox(QRectF cornerRect)
     // require scaling here?
     // verticesGraticule.append(QVector2D(-3800.0f* scale_factor, -5800.0f* scale_factor));
     labels.append(tm->addText(
-                          QString("[x: %1 %2,\n y: %3 %4]").
-                            arg(cornerRect.x()/stereoGridScaleFactor).
-                            arg(stereoGridUnitStr).
-                            arg(cornerRect.y()/stereoGridScaleFactor).
-                            arg(stereoGridUnitStr),
+                          QString("[x: %1 ,\n y: %2]").
+                          arg(cornerRect.x()).
+                          arg(cornerRect.y()),
                           MTextManager::LONLATP, cornerRect.x() - deltaLabelPosition,
                           cornerRect.y() - deltaLabelPosition,
                           verticalPosition_hPa, labelsize,
@@ -1686,11 +1618,9 @@ void MGraticuleActor::cutWithBoundingBox(QRectF cornerRect)
 
     verticesGraticule.append(QVector2D(cornerRect.x(), cornerRect.y() + cornerRect.height()));
     labels.append(tm->addText(
-                          QString("[x: %1 %2,\n y: %3 %4]").
-                            arg(cornerRect.x()/stereoGridScaleFactor).
-                            arg(stereoGridUnitStr).
-                            arg(cornerRect.y()/stereoGridScaleFactor + cornerRect.height()/stereoGridScaleFactor).
-                            arg(stereoGridUnitStr),
+                          QString("[x: %1,\n y: %2]").
+                          arg(cornerRect.x()).
+                          arg(cornerRect.y() + cornerRect.height()),
                           MTextManager::LONLATP, cornerRect.x() - deltaLabelPosition,
                           cornerRect.y() + cornerRect.height() + deltaLabelPosition,
                           verticalPosition_hPa, labelsize,
@@ -1700,11 +1630,9 @@ void MGraticuleActor::cutWithBoundingBox(QRectF cornerRect)
 
     verticesGraticule.append(QVector2D(cornerRect.x()+cornerRect.width(), cornerRect.y() + cornerRect.height()));
     labels.append(tm->addText(
-                          QString("[x: %1 %2,\n y: %3 %4]").
-                            arg(cornerRect.x()/stereoGridScaleFactor+cornerRect.width()/stereoGridScaleFactor).
-                            arg(stereoGridUnitStr).
-                            arg(cornerRect.y()/stereoGridScaleFactor + cornerRect.height()/stereoGridScaleFactor).
-                            arg(stereoGridUnitStr),
+                          QString("[x: %1,\n y:  %2]").
+                          arg(cornerRect.x()+cornerRect.width()).
+                          arg(cornerRect.y() + cornerRect.height()),
                           MTextManager::LONLATP, cornerRect.x() + cornerRect.width()
                           + deltaLabelPosition, cornerRect.y() + cornerRect.height()
                           + deltaLabelPosition, verticalPosition_hPa, labelsize,
@@ -1714,11 +1642,9 @@ void MGraticuleActor::cutWithBoundingBox(QRectF cornerRect)
 
     verticesGraticule.append(QVector2D(cornerRect.x()+cornerRect.width(), cornerRect.y()));
     labels.append(tm->addText(
-                          QString("[x: %1 %2,\n y: %3 %4]").
-                            arg(cornerRect.x()/stereoGridScaleFactor+cornerRect.width()/stereoGridScaleFactor).
-                            arg(stereoGridUnitStr).
-                            arg(cornerRect.y()/stereoGridScaleFactor).
-                            arg(stereoGridUnitStr),
+                          QString("[x: %1,\n y: %2]").
+                          arg(cornerRect.x()+cornerRect.width()).
+                          arg(cornerRect.y()),
                           MTextManager::LONLATP,
                           cornerRect.x() + cornerRect.width() + deltaLabelPosition,
                           cornerRect.y() - deltaLabelPosition,
@@ -1752,16 +1678,10 @@ void MGraticuleActor::cutWithBoundingBox(QRectF cornerRect)
             QVector<QVector2D> stereopoint;
             regularpoint.append(QVector2D(point->getX(),point->getY()));
 
-            // stereopoint = naturalEarthDataLoader->computeStereographicCoordinates(regularpoint);
-
             stereopoint = naturalEarthDataLoader->convertRegularLatLonToPolarStereographicCoords(
                         regularpoint,
                         stereoStandardLat,
-                        stereoStraightLon//,
-                        //stereoGridScaleFactor,
-                        //stereoGridUnit_m
-                        );
-
+                        stereoStraightLon);
 
             lineStringList.append(new OGRLineString());
             lineString = lineStringList.last();
@@ -1782,24 +1702,15 @@ void MGraticuleActor::cutWithBoundingBox(QRectF cornerRect)
             QVector<QVector2D> stereopoint;
             regularpoint.append(QVector2D(point->getX(),point->getY()));
 
-            // stereopoint = naturalEarthDataLoader->computeStereographicCoordinates(regularpoint);
-
             stereopoint = naturalEarthDataLoader->convertRegularLatLonToPolarStereographicCoords(
                         regularpoint,
                         stereoStandardLat,
-                        stereoStraightLon//,
-                        //stereoGridScaleFactor,
-                        //stereoGridUnit_m
-                        );
+                        stereoStraightLon);
 
             lineStringList.append(new OGRLineString());
             lineString = lineStringList.last();
             lineString->addPoint(stereopoint[0].x(), stereopoint[0].y());
 
-            // Added 07 Apr 2020 MKM
-            //MKM  addthe point also to the previous line string as second point.
-            //lineString = lineStringList.at(lineStringList.count()-2);
-            //lineString->addPoint(stereopoint[0].x(), stereopoint[0].y());
         }
 
         foreach (lineString, lineStringList)
@@ -1901,7 +1812,7 @@ void MGraticuleActor::cutWithBoundingBox(QRectF cornerRect)
         }
         label = !label; // alternate labelling of lines
         latStart = llcrnrlat;
-        //lonStart = llcrnrlon;
+        lonStart = llcrnrlon;
     } // for latitudes.
 
     label = false;
@@ -1910,8 +1821,9 @@ void MGraticuleActor::cutWithBoundingBox(QRectF cornerRect)
         lineString = new OGRLineString();
         // Allways use the whole grid to make sure to not miss some grid
         // cells.
-        //for (float lat = -90.f; lat <= 90.f; lat += deltalat)
-        for (float lat = 0; lat <= 90.f; lat += deltalat)
+        // MM + MKM loop from 0.(instead of -90.) to 90.,
+        // to avoid spurious lines being drawn
+        for (float lat = 0.f; lat <= 90.f; lat += deltalat)
         {
             point->setX(lon);
             point->setY(lat);
@@ -1919,15 +1831,10 @@ void MGraticuleActor::cutWithBoundingBox(QRectF cornerRect)
             QVector<QVector2D> stereopoint;
             regularpoint.append(QVector2D(point->getX(),point->getY()));
 
-            // stereopoint = naturalEarthDataLoader->computeStereographicCoordinates(regularpoint);
-
             stereopoint = naturalEarthDataLoader->convertRegularLatLonToPolarStereographicCoords(
                         regularpoint,
                         stereoStandardLat,
-                        stereoStraightLon//,
-                        //stereoGridScaleFactor,
-                        //stereoGridUnit_m
-                        );
+                        stereoStraightLon);
 
             lineString->addPoint(stereopoint[0].x(), stereopoint[0].y());
         }
@@ -2005,8 +1912,6 @@ void MGraticuleActor::cutWithBoundingBox(QRectF cornerRect)
                                         + QString::number(getID());
     uploadVec2ToVertexBuffer(verticesGraticule, graticuleRequestKey,
                              &graticuleVertexBuffer);
-
-
     // Required for the glDrawArrays() call in renderToCurrentContext().
     numVerticesGraticule = verticesGraticule.size();
 }
@@ -2018,7 +1923,6 @@ void MGraticuleActor::updateCoastalLines(QRectF cornerRect)
 
     if(!enableStereographicGrid)
     {
-
         if (enableGridRotation)
         {
             if (rotateBBox)
@@ -2058,63 +1962,44 @@ void MGraticuleActor::updateCoastalLines(QRectF cornerRect)
     }
     else // Stereographic case
     {
-
-        // get unit of stereographic grid in meters and the scale factor
-        // for grid coordinates
-        QString stereoGridUnitStr = stereoGridUnitsToString(this->stereoGridUnit);
-        Met3D::MNaturalEarthDataLoader NatEarthObj;
-        float stereoGridUnit_m = NatEarthObj.computeUnitOfStereographicGridCoordinatesInMeters(stereoGridUnitStr);
-        float stereoGridScaleFactor=NatEarthObj.computeScalingFromStereographicToMet3DGridCoords(stereoGridUnitStr);
-
         // get parameters for converting between lat-lon and stereographic coordinates
         float stereoStraightLon = this ->stereoStraightLon;
         float stereoStandardLat = this -> stereoStandardLat;
 
+        if(rotateBBox)
+        {
+            // this option is disabled, hence should never enter this loop
+            // ToDo: need to correct the flat to stereoBBox
 
-	if(rotateBBox)
-    {
-        // this option is disabled, hence should never enter this loop
-        // ToDo: need to correct the flat to stereoBBox
+//        naturalEarthDataLoader->loadAndRotateLineGeometry(
+//                    MNaturalEarthDataLoader::COASTLINES,
+//                    cornerRect,
+//                    &verticesCoastlines,
+//                    &coastlineStartIndices,
+//                    &coastlineVertexCount,
+//                    false, rotatedNorthPole.y(),
+//                    rotatedNorthPole.x());  // clear vectors
 
-        //            QVector<QVector2D> stereographicVerticesCoastlines;
-//            // stereographicVerticesCoastlines =
-//            //        naturalEarthDataLoader->computeStereographicCoordinates(verticesCoastlines);
-//            stereographicVerticesCoastlines =
-//			naturalEarthDataLoader->convertRegularLatLonToPolarStereographicCoords(
+//        QVector<QVector2D> stereographicVerticesCoastlines;
+//        stereographicVerticesCoastlines =
+//		  naturalEarthDataLoader->convertRegularLatLonToPolarStereographicCoords(
 //                        verticesCoastlines,
 //                        this->stereoStandardLat,
-//                        this->stereoStraightLon,
-//                        stereoGridScaleFactor,
-//                        stereoGridUnit_m);
-
+//                        this->stereoStraightLon);
             
-
-//            //  QVector<QVector2D> stereographicVerticesCoastlines;
-//            //  stereographicVerticesCoastlines =
-//            //  naturalEarthDataLoader->computeStereographicCoordinates(verticesCoastlines);
 
 //            //  generate data item key for every vertex buffer object wrt the actor
 //            const QString coastRequestKey = "graticule_coastlines_actor#"
 //                                   + QString::number(getID());
 //            uploadVec2ToVertexBuffer(stereographicVerticesCoastlines, coastRequestKey,
 //            &coastlineVertexBuffer);
-  }
-  else
-  {
+      }
+      else
+      {
 
             QVector<QVector2D> stereographicVerticesCoastlines;
 	    
-                // old version
-                // stereographicVerticesCoastlines =
-                //    naturalEarthDataLoader->loadAndTransformStereographicLineGeometryAndCutUsingBBox(
-                //        MNaturalEarthDataLoader::COASTLINES,
-                //        cornerRect,
-                //        &stereographicVerticesCoastlines,
-                //        &coastlineStartIndices,
-                //        &coastlineVertexCount,
-                //        false);
-
-		naturalEarthDataLoader->loadAndTransformStereographicLineGeometryAndCutUsingBBox(
+            naturalEarthDataLoader->loadAndTransformStereographicLineGeometryAndCutUsingBBox(
                         MNaturalEarthDataLoader::COASTLINES,
                         cornerRect,
                         &stereographicVerticesCoastlines,
@@ -2123,9 +2008,8 @@ void MGraticuleActor::updateCoastalLines(QRectF cornerRect)
                         false, rotatedNorthPole.y(),
                         rotatedNorthPole.x(),
                         stereoStandardLat,
-                        stereoStraightLon,
-                        stereoGridUnit_m,
-                        stereoGridScaleFactor);  // ToDo: clear rotated pole vectors
+                        stereoStraightLon
+                        );  // ToDo: clear rotated pole vectors
 
 
             // generate data item key for every vertex buffer object wrt the actor
@@ -2150,14 +2034,14 @@ void MGraticuleActor::updateBorderLines(QRectF cornerRect)
         {
             if (rotateBBox)
             {
-            naturalEarthDataLoader->loadAndRotateLineGeometry(
-                        MNaturalEarthDataLoader::BORDERLINES,
-                        cornerRect,
-                        &verticesBorderlines,
-                        &borderlineStartIndices,
-                        &borderlineVertexCount,
-                        false, rotatedNorthPole.y(),
-                        rotatedNorthPole.x());  // clear vectors
+                naturalEarthDataLoader->loadAndRotateLineGeometry(
+                            MNaturalEarthDataLoader::BORDERLINES,
+                            cornerRect,
+                            &verticesBorderlines,
+                            &borderlineStartIndices,
+                            &borderlineVertexCount,
+                            false, rotatedNorthPole.y(),
+                            rotatedNorthPole.x());  // clear vectors
             }
             else
             {
@@ -2176,7 +2060,6 @@ void MGraticuleActor::updateBorderLines(QRectF cornerRect)
             naturalEarthDataLoader->loadCyclicLineGeometry(MNaturalEarthDataLoader::BORDERLINES,
                                    cornerRect, &verticesBorderlines,
                                    &borderlineStartIndices, &borderlineVertexCount);
-
         }
 
         const QString borderRequestKey = "graticule_borderlines_actor#"
@@ -2188,23 +2071,22 @@ void MGraticuleActor::updateBorderLines(QRectF cornerRect)
     else // Stereographic Case
     {
 
-        // get unit of stereographic grid in meters and the scale factor
-        // for grid coordinates
-        QString stereoGridUnitStr = stereoGridUnitsToString(this->stereoGridUnit);
-        Met3D::MNaturalEarthDataLoader NatEarthObj;
-        float stereoGridUnit_m = NatEarthObj.computeUnitOfStereographicGridCoordinatesInMeters(stereoGridUnitStr);
-        float stereoGridScaleFactor=NatEarthObj.computeScalingFromStereographicToMet3DGridCoords(stereoGridUnitStr);
-
         // get parameters for converting between lat-lon and stereographic coordinates
         float stereoStraightLon = this ->stereoStraightLon;
         float stereoStandardLat = this -> stereoStandardLat;
 
-    // this is disabled, as above. ToDo: either enable and fix or delete.
-	if(rotateBBox)
+        // this is disabled, as above. ToDo: either enable and fix or delete.
+        if(rotateBBox)
         {
+//            naturalEarthDataLoader->loadAndRotateLineGeometry(
+//                        MNaturalEarthDataLoader::BORDERLINES,
+//                        cornerRect,
+//                        &verticesBorderlines,
+//                        &borderlineStartIndices,
+//                        &borderlineVertexCount,
+//                        false, rotatedNorthPole.y(),
+//                        rotatedNorthPole.x());  // clear vectors
 //            QVector<QVector2D> stereographicVerticesBorderlines;
-//            stereographicVerticesBorderlines =
-//                    naturalEarthDataLoader->computeStereographicCoordinates(verticesBorderlines);
 //		    //naturalEarthDataLoader->convertRegularLatLonToPolarStereographicCoords(
 //                    //    verticesBorderlines,
 //                    //    this->stereoStandardLat,
@@ -2221,26 +2103,9 @@ void MGraticuleActor::updateBorderLines(QRectF cornerRect)
         }
         else
         {
-           // float RE = 6371.2000f; // Radius of Earth in m
-           // float scale_factor = ( 180.0f / RE);
-
-           // cornerRect.setX( -3800.0f * scale_factor );
-           // cornerRect.setY( -5800.0f * scale_factor);
-           // cornerRect.setWidth( 7600.0f * scale_factor);
-           // cornerRect.setHeight(11600.0f * scale_factor);
 
             QVector<QVector2D> stereographicVerticesBorderlines;
             
-            // old version
-            // naturalEarthDataLoader->loadAndTransformStereographicLineGeometryAndCutUsingBBox(
-            //            MNaturalEarthDataLoader::BORDERLINES,
-            //           cornerRect,
-            //            &stereographicVerticesBorderlines,
-            //            &borderlineStartIndices,
-            //            &borderlineVertexCount,
-            //            false);
-	
-	
             naturalEarthDataLoader->loadAndTransformStereographicLineGeometryAndCutUsingBBox(
                         MNaturalEarthDataLoader::BORDERLINES,
                         cornerRect,
@@ -2250,9 +2115,7 @@ void MGraticuleActor::updateBorderLines(QRectF cornerRect)
                         false, rotatedNorthPole.y(),
                         rotatedNorthPole.x(),
                         stereoStandardLat,
-                        stereoStraightLon,
-                        stereoGridUnit_m,
-                        stereoGridScaleFactor);  // clear vectors
+                        stereoStraightLon);  // clear vectors
 
             const QString borderRequestKey = "graticule_borderlines_actor#"
                                              + QString::number(getID());

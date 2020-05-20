@@ -350,15 +350,13 @@ public:
     static bool getStereographicProjCoordinates(const NcVar& gridMappingVar,
                                                 const NcVar& var,
                                                 float *stereoStraightLon,
-                                                float *stereoStandardLat,
-                                                QString *stereoGridUnit,
-                                                float *stereoGridUnit_m,
-                                                float *stereoGridScaleFactor);
+                                                float *stereoStandardLat
+                                                );
 
 
     // get unit of stereographic grid coordinates from data file
-    NcVar getStereographicUnitVar(QString *stereoGridUnit,
-                                 float *stereoGridUnit_m);
+    //NcVar getStereographicUnitVar(QString *stereoGridUnit,
+    //                             float *stereoGridUnit_m);
 
     /**
       Static function that converts an @ref NcVariableGridType enum to

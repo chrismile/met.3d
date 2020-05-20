@@ -710,8 +710,7 @@ void MNaturalEarthDataLoader::loadAndTransformStereographicLineGeometryAndCutUsi
         GeometryType type, QRectF bbox, QVector<QVector2D> *vertices,
         QVector<int> *startIndices, QVector<int> *count, bool append,
         double poleLat, double poleLon, float stereoStandardLat,
-        float stereoStraightLon, float stereoGridUnit_m,
-        float stereoGridScaleFactor)
+        float stereoStraightLon)
 {
     if (gdalDataSet.size() < 2)
     {
@@ -790,14 +789,7 @@ void MNaturalEarthDataLoader::loadAndTransformStereographicLineGeometryAndCutUsi
             stereopoint = convertRegularLatLonToPolarStereographicCoords(
                         regularpoint,
                         stereoStandardLat,
-                        stereoStraightLon//,
-                        //stereoGridScaleFactor,
-                        //stereoGridUnit_m
-                        );
-
-
-            //geographicalToRotatedCoords(point, poleLat, poleLon);
-            //prevPosition.setX(point->getX());
+                        stereoStraightLon);
 
             // For rotation loop over all vertices of the current lineString,
             // apply the rotation and store the point in a new line string.
@@ -811,21 +803,11 @@ void MNaturalEarthDataLoader::loadAndTransformStereographicLineGeometryAndCutUsi
                 stereopoint = convertRegularLatLonToPolarStereographicCoords(
                             regularpoint,
                             stereoStandardLat,
-                            stereoStraightLon//,
-                            //stereoGridScaleFactor,
-                            //stereoGridUnit_m
-                            );
+                            stereoStraightLon);
 
-
-//                if (!validConnectionBetweenPositions(
-//                            &prevPosition, &currPosition, point,
-//                            poleLat, poleLon, &centreLons))
-                {
-                    // Start new line.
-                    lineStringList.append(new OGRLineString());
-                    lineString = lineStringList.last();
-                }
-                //lineString->addPoint(currPosition.x(), currPosition.y());
+                // Start new line.
+                lineStringList.append(new OGRLineString());
+                lineString = lineStringList.last();
                 lineString->addPoint(stereopoint[0].x(), stereopoint[0].y());
 
                 //MKM  addthe point also to the previous line string as second point.
@@ -1275,75 +1257,11 @@ void MNaturalEarthDataLoader::getCentreLons(
 }
 
 
-float MNaturalEarthDataLoader::computeScalingFromStereographicToMet3DGridCoords(
-        QString stereoGridUnit)
-{
-
-    // The coordinate values of polar stereographic grids are usually much
-    // larger than the default extend of the internal Met3D grid. It is
-    // therefore required to re-scale the coordinate values of polar stereo-
-    // graphic grids such that they fit into the default Met3D rectangular grid
-    // domain [-90,90,-180,180]. To ensure that all plausible stereographic
-    // grid coordinates fit into Met3Ds internal grid, we require:
-    // max(c_stereo)*alpha<=90, where alpha is the desired scale factor,
-    // max(c_stereo) denotes the maximum coordinate value of the polar
-    // stereographic grid and 90 is the hard-coded internal Met3D extend from
-    // the center of the regular lat-lon rectangle at (0,0) to the northern
-    // boundary at 90. The value of max(c_stereo) depends on the unit of the
-    // polar stereographic data grid. It could be read from the data-file or
-    // calculated by converting the coordinates of a point at the outer
-    // edge of the polar stereographic grid (e.g. at latitude=0 on the straight
-    // vertical meridian from the pole). For our purposes it suffices to
-    // approximate max(c_stereo) heuristically as 10000 km or 10000*1000 m,
-    // depending on the unit of the coordinates of the stereographic grid. The
-    // choice of 10000 km ensures that data points at low latitudes, with
-    // stereographic grid coordinates that may be larger than Radius-Earth, can
-    // be represented. The approximation works for data in units of
-    // meters or kilometers and standard stereographic projection parameters.
-    // For other units or unusual projection parameters, it needs to be adapted.
-    if ( (stereoGridUnit == "meters") || (stereoGridUnit == "m") )
-    {
-        return 90.0f/(10000.0f*1000.0f);
-    }
-    else if ( (stereoGridUnit == "kilometers") || (stereoGridUnit == "km") )
-    {
-        return 90.0f/10000.0f;
-    }
-    else
-    {
-        return M_MISSING_VALUE;
-    }
-}
-
-
-float MNaturalEarthDataLoader::computeUnitOfStereographicGridCoordinatesInMeters(
-        QString stereoGridUnit)
-{
-
-    if ( (stereoGridUnit == "meters") || (stereoGridUnit == "m") )
-    {
-        return 1;
-    }
-    else if ( (stereoGridUnit == "kilometers") || (stereoGridUnit == "km") )
-    {
-        return  1000;
-    }
-    else
-    {
-        return  M_MISSING_VALUE;
-    }
-
-}
-
-
 QVector<QVector2D> MNaturalEarthDataLoader::convertPolarStereographicToRegularLatLonCoords(
         QVector<QVector2D> polarStereographicCoords,
         float stereoStandardLat,
-        float stereoStraightLon,
-        float stereoScaleFactor,
-        float stereoGridUnit_m)
+        float stereoStraightLon)
 {
-
     // define output array
     QVector<QVector2D> regularLatLonCoords;
 
@@ -1362,7 +1280,7 @@ QVector<QVector2D> MNaturalEarthDataLoader::convertPolarStereographicToRegularLa
     float RE, T, CM, CHI, RHO;
 
     // rescale radius of Earth to units of stereographic grid coords
-    RE = EARTH_RADIUS_km*(1000/stereoGridUnit_m);
+    RE = EARTH_RADIUS_km * 1000;
 
     // loop all input coordinate points (x, y coord pairs)
     for (int i = 0; i <polarStereographicCoords.size() ; i++)
@@ -1374,12 +1292,6 @@ QVector<QVector2D> MNaturalEarthDataLoader::convertPolarStereographicToRegularLa
         // get x and y coords (with respect to the internal met3d grid)
         iStereoXCoord=polarStereographicCoords[i].x();
         iStereoYCoord=polarStereographicCoords[i].y();
-
-        // re-scale from internal met3d grid coords to actual polar
-        // stereographic coords with meaningful units, i.e. inverse
-        // the scaling of the data coords applied during data reading
-        iStereoXCoord=iStereoXCoord*(1/stereoScaleFactor);
-        iStereoYCoord=iStereoYCoord*(1/stereoScaleFactor);
 
         // get distance from origin (assumed at pole - 0, 0)
         RHO=sqrt(pow(iStereoXCoord,2)+pow(iStereoYCoord,2));
@@ -1432,14 +1344,8 @@ QVector<QVector2D> MNaturalEarthDataLoader::convertPolarStereographicToRegularLa
 QVector<QVector2D> MNaturalEarthDataLoader::convertRegularLatLonToPolarStereographicCoords(
         QVector<QVector2D> verticesVector,
         float stereoStandardLat,
-        float stereoStraightLon//,
-        //float stereoScaleFactor,
-        //float stereoGridUnit_m
-        )
-
+        float stereoStraightLon)
 {
-
-
     // define output array
     QVector<QVector2D> stereographicVerticesVector;
 

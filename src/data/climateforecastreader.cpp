@@ -514,13 +514,6 @@ QVector4D MClimateForecastReader::variableStereographicCoordinates(
             coordinates.setY(
                         availableDataFields.value(levelType).value(variableName)
                         ->stereoStandardLat);
-            coordinates.setZ(
-                        availableDataFields.value(levelType).value(variableName)
-                        ->stereoGridUnit_m);
-            coordinates.setW(
-                        availableDataFields.value(levelType).value(variableName)
-                        ->stereoGridScaleFactor);
-
             return coordinates;
         }
         else
@@ -534,7 +527,7 @@ QVector4D MClimateForecastReader::variableStereographicCoordinates(
                  variableName))
     {
         if (availableDataFields.value(levelType).value(variableName)
-                ->horizontalGridType = STEREOGRAPHIC_PROJ)
+                ->horizontalGridType == STEREOGRAPHIC_PROJ)
         {
             QVector4D coordinates;
             coordinates.setX(
@@ -543,12 +536,6 @@ QVector4D MClimateForecastReader::variableStereographicCoordinates(
             coordinates.setY(
                         availableDataFieldsByStdName.value(levelType)
                         .value(variableName)->stereoStandardLat);
-            coordinates.setZ(
-                        availableDataFields.value(levelType).value(variableName)
-                        ->stereoGridUnit_m);
-            coordinates.setW(
-                        availableDataFields.value(levelType).value(variableName)
-                        ->stereoGridScaleFactor);
 
             return coordinates;
         }
@@ -1008,10 +995,8 @@ void MClimateForecastReader::scanDataRoot()
                                             gridMappingVarName.toStdString()),
                                         ncFile->getVar(varName.toStdString()),
                                         &(vinfo->stereoStraightLon),
-                                        &(vinfo->stereoStandardLat),
-                                        &(vinfo->stereoGridUnit),
-                                        &(vinfo->stereoGridUnit_m),
-                                        &(vinfo->stereoGridScaleFactor)))
+                                        &(vinfo->stereoStandardLat)
+                                        ))
                             {
                                 vinfo->horizontalGridType =
                                         MHorizontalGridType::STEREOGRAPHIC_PROJ;
@@ -1632,6 +1617,30 @@ MStructuredGrid *MClimateForecastReader::readGrid(
         shared->lats.resize(shared->latVar.getDim(0).getSize());
         shared->latVar.getVar(shared->lats.data());
 
+
+        // MKM Read units from the input file and then find the factor to divide
+        // 10^3(if input  data in "km") or 10^6(if input  data in "m")
+         if (treatStereographicGridAsRegularGrid)
+         {
+            string units = "";
+            float scale_factor = 1.0f;
+            shared->lonVar.getAtt("units").getValues(units);
+            if(units == "m")
+                scale_factor = 1000000.0f;
+            else if(units == "km")
+                scale_factor = 1000.0f;
+            int size = shared->lats.size();
+            for (int i = 0; i < size; i++)
+            {
+                shared->lats[i] /= scale_factor;
+            }
+            size = shared->lons.size();
+            for (int i = 0; i < size; i++)
+            {
+                shared->lons[i] /= scale_factor;
+            }
+         }
+
         // Check if longitudes are cyclic (0..360 or -180..180 etc) and OVERLAP
         // (e.g. starts with -180 and ends with +180). In these cases we don't
         // need the redundant longitude.
@@ -1851,26 +1860,12 @@ MStructuredGrid *MClimateForecastReader::readGrid(
         grid = auxGrid;
     }
 
-    // Copy grid coordinate data.
-    // For the default case of data on regular lat-lon grids and for rotated
-    // lat-lon grids, the grid coordinates can be copied directly from the
-    // input data and no scaling is necessary.
-    float scaleGridCoordinates = 1;
-    // For data on a stereographic grid, the horizontal grid coordinate values
-    // need to be re-scaled to fit into Met3Ds internal data grid (defined as
-    // a rectangle with a default extend of 360 in east-west direction and 180
-    // in south-north direction). For appropriate re-scaling, get the scale
-    // factor computed from the data file.
-    if (this->treatStereographicGridAsRegularGrid)
-    {
-        scaleGridCoordinates = this->availableDataFields.value(levelType).
-                value(variableName)->stereoGridScaleFactor;
-    }
+    // Copy coordinate data.
     for (unsigned int i = 0; i < grid->nlons; i++)
-        grid->lons[i] = shared->lons[i]*scaleGridCoordinates;
+        grid->lons[i] = shared->lons[i];
 
     for (unsigned int i = 0; i < grid->nlats; i++)
-        grid->lats[i] = shared->lats[i]*scaleGridCoordinates;
+        grid->lats[i] = shared->lats[i];
 
     if ( !shared->vertVar.isNull() )
         for (unsigned int i = 0; i < grid->nlevs; i++)

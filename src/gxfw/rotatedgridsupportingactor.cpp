@@ -60,8 +60,7 @@ MRotatedGridSupportingActor::MRotatedGridSupportingActor()
       enableStereographicGrid(false),
       stereoBBox(false),
       stereoStraightLon(0),
-      stereoStandardLat(70),
-      stereoGridUnit(STEREOGRIDUNIT_KILOMETERS)
+      stereoStandardLat(70)
 {
     // Create and initialise QtProperties for the GUI.
     // ===============================================
@@ -125,15 +124,6 @@ MRotatedGridSupportingActor::MRotatedGridSupportingActor()
     properties->setDouble(stereoProjLatProperty,stereoStandardLat,-90,90,1,1);
     stereoProjLatProperty->setEnabled(false);
 
-    QStringList gridUnitNames;
-    gridUnitNames << stereoGridUnitsToString(STEREOGRIDUNIT_METERS)
-                  << stereoGridUnitsToString(STEREOGRIDUNIT_KILOMETERS);
-    stereoGridUnitProperty = addProperty(
-                ENUM_PROPERTY, "unit of stereographic grid", gridProjectionPropertiesSubGroup);
-    properties->mEnum()->setEnumNames(stereoGridUnitProperty, gridUnitNames);
-    properties->mEnum()->setValue(stereoGridUnitProperty, stereoGridUnit);
-    stereoGridUnitProperty->setEnabled(false);
-
     // ToDo (MM, 05/2020): define stuff for southern hemisphere and possibly also other projection params
 
     endInitialiseQtProperties();
@@ -160,7 +150,6 @@ void MRotatedGridSupportingActor::saveConfiguration(QSettings *settings)
     settings->setValue("stereoBoundingBox", stereoBBox);
     settings->setValue("stereoStraightLon", stereoStraightLon);
     settings->setValue("stereoStandardLat", stereoStandardLat);
-    settings->setValue("stereoGridUnit", stereoGridUnitsToString(stereoGridUnit));
     settings->endGroup();
 }
 
@@ -198,12 +187,6 @@ void MRotatedGridSupportingActor::loadConfiguration(QSettings *settings)
                stereoProjLatProperty,
                settings->value("stereoStandardLat",
                                0.).toDouble());
-   properties->mEnum()->setValue(
-               stereoGridUnitProperty, stringToStereoGridUnits(
-                   (settings->value("stereoGridUnit",
-                                    stereoGridUnitsToString(STEREOGRIDUNIT_KILOMETERS))
-                    ).toString()));
-
     settings->endGroup();
 }
 
@@ -239,31 +222,6 @@ QString MRotatedGridSupportingActor::gridProjectionToString(
         case GRIDPROJECTION_STEREOGRAPHIC: return "polar stereographic";
     }
     return "disabled";
-}
-
-
-MRotatedGridSupportingActor::stereoGridUnits MRotatedGridSupportingActor::stringToStereoGridUnits(
-        QString stereoGridUnitName)
-{
-    if (stereoGridUnitName == "m")
-    {
-        return STEREOGRIDUNIT_METERS;
-    }
-    else if (stereoGridUnitName == "km")
-    {
-        return STEREOGRIDUNIT_KILOMETERS;
-    }
-}
-
-
-QString MRotatedGridSupportingActor::stereoGridUnitsToString(
-        stereoGridUnits stereoGridUnit)
-{
-    switch (stereoGridUnit)
-    {
-        case STEREOGRIDUNIT_METERS: return "m";
-        case STEREOGRIDUNIT_KILOMETERS: return "km";
-    }
 }
 
 

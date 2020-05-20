@@ -240,8 +240,7 @@ public:
     inline void setStereographicProjCoordinates(QVector4D coordinates)
     {   this->stereoStraightLon = coordinates.x();
         this->stereoStandardLat = coordinates.y();
-        this->stereoGridUnit_m = coordinates.z();
-        this->stereoGridScaleFactor = coordinates.w(); }
+    }
 
     inline unsigned int getNumLevels() const { return nlevs; }
     inline unsigned int getNumLats() const { return nlats; }
@@ -259,8 +258,6 @@ public:
     // MM Stereo get stereo proj coordinates
     inline float getStereoStraightLon() { return stereoStraightLon; }
     inline float getStereoStandardLat() { return stereoStandardLat; }
-    inline float getStereoGridUnit_m() { return stereoGridUnit_m; }
-    inline float getStereoGridScaleFactor() { return stereoGridScaleFactor; }
 
 
     /**
@@ -639,9 +636,6 @@ protected:
     // MM Stereo
     float stereoStraightLon;
     float stereoStandardLat;
-    QString stereoGridUnit;
-    float stereoGridUnit_m;
-    float stereoGridScaleFactor;
 
     /** Texture parameters. **/
     GLint  textureInternalFormat;

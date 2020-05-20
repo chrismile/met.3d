@@ -87,11 +87,6 @@ struct MVariableInfo
 
     float         stereoStraightLon;       // straight vertical longitude from pole
     float         stereoStandardLat;       // standard latitude of stereographic projection
-    float         stereoGridScaleFactor;   // scale-factor for representing stereographic data on Met3Ds
-                                           // regular lat-lon gridgrid (meter, kilometer)
-    QString stereoGridUnit;                // unit of stereographic grid coordinates
-    float     stereoGridUnit_m;            // unit of stereographic grid coordinates in units meters
-
 };
 
 typedef QMap<QString, MVariableInfo*> MVariableNameMap;

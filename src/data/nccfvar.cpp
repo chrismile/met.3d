@@ -1086,7 +1086,7 @@ bool NcCFVar::getRotatedNorthPoleCoordinates(const NcVar& gridMappingVar,
 
 }
 
-
+/*
 NcVar NcCFVar::getStereographicUnitVar(QString *stereoGridUnit,
                                           float *stereoGridUnit_m)
 {
@@ -1141,15 +1141,13 @@ NcVar NcCFVar::getStereographicUnitVar(QString *stereoGridUnit,
                       __FILE__, __LINE__);
 
 }
+*/
 
 
 bool NcCFVar::getStereographicProjCoordinates(const NcVar& gridMappingVar,
                                         const NcVar& var,
                                         float *stereoStraightLon,
-                                        float *stereoStandardLat,
-                                        QString *stereoGridUnit,
-                                        float *stereoGridUnit_m,
-                                        float *stereoGridScaleFactor)
+                                        float *stereoStandardLat)
 {
     string attribute;   
 
@@ -1165,6 +1163,7 @@ bool NcCFVar::getStereographicProjCoordinates(const NcVar& gridMappingVar,
         {
             return false;
         }
+        return true;
     }
     catch (NcException)
     {
@@ -1182,7 +1181,7 @@ bool NcCFVar::getStereographicProjCoordinates(const NcVar& gridMappingVar,
         fixZeroTermination(&attribute);
         coordinate = QString::fromStdString(attribute).toFloat();
         *stereoStraightLon = coordinate;
-
+        return true;
     }
     catch (NcException)
     {
@@ -1198,6 +1197,7 @@ bool NcCFVar::getStereographicProjCoordinates(const NcVar& gridMappingVar,
         fixZeroTermination(&attribute);
         coordinate = QString::fromStdString(attribute).toFloat();
         *stereoStandardLat = coordinate;
+        return true;
     }
     catch (NcException)
     {
@@ -1205,6 +1205,7 @@ bool NcCFVar::getStereographicProjCoordinates(const NcVar& gridMappingVar,
     }
 
     // projection parameter: unit and scale factor of stereographic grid
+    /*
     try
     {
 
@@ -1214,8 +1215,8 @@ bool NcCFVar::getStereographicProjCoordinates(const NcVar& gridMappingVar,
 
         // compute scale factor to squash stereographic grid coords into
         // the internal Met3D grid
-        Met3D::MNaturalEarthDataLoader NatEarthObj;
-        *stereoGridScaleFactor=NatEarthObj.computeScalingFromStereographicToMet3DGridCoords(*stereoGridUnit);
+        //Met3D::MNaturalEarthDataLoader NatEarthObj;
+        // *stereoGridScaleFactor=NatEarthObj.computeScalingFromStereographicToMet3DGridCoords(*stereoGridUnit);
 
         // return true as all necessary parameters have been identified and stored
         return true;
@@ -1224,7 +1225,7 @@ bool NcCFVar::getStereographicProjCoordinates(const NcVar& gridMappingVar,
     {
         return false;
     }
-
+    */
 }
 
 
