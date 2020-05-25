@@ -741,7 +741,9 @@ void MNaturalEarthDataLoader::loadAndTransformStereographicLineGeometryAndCutUsi
     // with the bounding box. (Somehow it does not load the whole geometry if
     // we don't set the filter, thus it is necessary to set the filter to a
     // polygon covering the whole region.)
-    //layer->SetSpatialFilter(bboxPolygon);
+    QRectF bboxGlobal(-180., -90., 360., 180.);
+    OGRPolygon *bboxPolygon = getBBoxPolygon(&bboxGlobal);
+    layer->SetSpatialFilter(bboxPolygon);
 
     OGRPoint *point = new OGRPoint;
 
