@@ -58,11 +58,11 @@ namespace Met3D
 
   It is used by @ref MBaseMapActor and @ref MGraticuleActor .
   */
-class MRotatedGridSupportingActor : public MActor
+class MMapProjectionSupportingActor : public MActor
 {
 public:
-    MRotatedGridSupportingActor();
-    ~MRotatedGridSupportingActor();
+    MMapProjectionSupportingActor();
+    ~MMapProjectionSupportingActor();
 
     QString getSettingsID() override { return "RotatedGridEnablingActor"; }
 
@@ -72,14 +72,14 @@ public:
 
     // define grid projection types
     typedef enum {
-        GRIDPROJECTION_DISABLED = 0,
+        GRIDPROJECTION_CYLINDRICAL = 0,
         GRIDPROJECTION_ROTATEDLATLON = 1,
         GRIDPROJECTION_STEREOGRAPHIC = 2,
     } gridProjectionTypes;
 
     // convert grid projection between enum and string
     static QString gridProjectionToString(gridProjectionTypes gridProjection);
-    MRotatedGridSupportingActor::gridProjectionTypes stringToGridProjection(QString gridProjection);
+    MMapProjectionSupportingActor::gridProjectionTypes stringToGridProjection(QString gridProjection);
 
 protected:
     // definitions for choosing the type of projection
@@ -89,7 +89,6 @@ protected:
 
     // definitions for projection: rotated lat lon
     bool enableGridRotation;
-    QtProperty *enableGridRotationProperty;
     bool rotateBBox;
     QtProperty *rotateBBoxProperty;
     QPointF rotatedNorthPole;
@@ -97,7 +96,6 @@ protected:
 
     // definitions for projection: polar stereographic
     bool enableStereographicGrid;
-    QtProperty *enableStereographicGridProperty;
     bool stereoBBox;
     QtProperty *stereoBBoxProperty;
     float stereoStraightLon;

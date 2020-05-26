@@ -42,7 +42,7 @@
 //#include "gxfw/msceneviewglwidget.h"
 
 // MM
-//#include "gxfw/rotatedgridsupportingactor.h"
+//#include "gxfw/mapprojectionsupportingactor.h"
 
 using namespace std;
 using namespace netCDF;

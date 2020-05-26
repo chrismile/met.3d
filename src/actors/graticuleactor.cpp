@@ -49,7 +49,7 @@ namespace Met3D
 *******************************************************************************/
 
 MGraticuleActor::MGraticuleActor(MBoundingBoxConnection *boundingBoxConnection)
-    : MRotatedGridSupportingActor(),
+    : MMapProjectionSupportingActor(),
       MBoundingBoxInterface(this, MBoundingBoxConnectionType::HORIZONTAL,
                             boundingBoxConnection),
       graticuleVertexBuffer(nullptr),
@@ -127,7 +127,7 @@ MGraticuleActor::~MGraticuleActor()
 
 void MGraticuleActor::saveConfiguration(QSettings *settings)
 {
-    MRotatedGridSupportingActor::saveConfiguration(settings);
+    MMapProjectionSupportingActor::saveConfiguration(settings);
 
     settings->beginGroup(MGraticuleActor::getSettingsID());
 
@@ -151,7 +151,7 @@ void MGraticuleActor::saveConfiguration(QSettings *settings)
 
 void MGraticuleActor::loadConfiguration(QSettings *settings)
 {
-    MRotatedGridSupportingActor::loadConfiguration(settings);
+    MMapProjectionSupportingActor::loadConfiguration(settings);
 
     settings->beginGroup(MGraticuleActor::getSettingsID());
 
@@ -282,48 +282,47 @@ void MGraticuleActor::onQtPropertyChanged(QtProperty *property)
                                                    gridProjectionTypesProperty));
         switch (projIndex)
         {
-        case GRIDPROJECTION_DISABLED:
-            gridProjection = GRIDPROJECTION_DISABLED;
-            enableGridRotationProperty->setEnabled(false);
+        case GRIDPROJECTION_CYLINDRICAL:
+            gridProjection = GRIDPROJECTION_CYLINDRICAL;
             rotateBBoxProperty->setEnabled(false);
             rotatedNorthPoleProperty->setEnabled(false);
-            enableStereographicGridProperty->setEnabled(false);
             stereoBBoxProperty->setEnabled(false);
             stereoProjLonProperty->setEnabled(false);
             stereoProjLatProperty->setEnabled(false);
+            enableStereographicGrid = false;
+            enableGridRotation = false;
+            if (suppressActorUpdates()) return;
+            generateGeometry();
+            emitActorChangedSignal();
             break;
         case GRIDPROJECTION_ROTATEDLATLON:
             gridProjection = GRIDPROJECTION_ROTATEDLATLON;
-            enableGridRotationProperty->setEnabled(true);
             rotateBBoxProperty->setEnabled(true);
             rotatedNorthPoleProperty->setEnabled(true);
-            enableStereographicGridProperty->setEnabled(false);
             stereoBBoxProperty->setEnabled(false);
             stereoProjLonProperty->setEnabled(false);
             stereoProjLatProperty->setEnabled(false);
+            enableGridRotation = true;
+            enableStereographicGrid = false;
+            if (suppressActorUpdates()) return;
+            generateGeometry();
+            emitActorChangedSignal();
             break;
         case GRIDPROJECTION_STEREOGRAPHIC:
             gridProjection = GRIDPROJECTION_STEREOGRAPHIC;
-            enableGridRotationProperty->setEnabled(false);
             rotateBBoxProperty->setEnabled(false);
             rotatedNorthPoleProperty->setEnabled(false);
-            enableStereographicGridProperty->setEnabled(true);
             stereoBBoxProperty->setEnabled(false);
             stereoProjLonProperty->setEnabled(true);
             stereoProjLatProperty->setEnabled(true);
+            enableGridRotation = false;
+            enableStereographicGrid = true;
+            if (suppressActorUpdates()) return;
+            generateGeometry();
+            emitActorChangedSignal();
             break;
         }
     }
-
-    else if (property == enableGridRotationProperty)
-    {
-        enableGridRotation =
-                properties->mBool()->value(enableGridRotationProperty);
-        if (suppressActorUpdates()) return;
-        generateGeometry();
-        emitActorChangedSignal();
-    }
-
     else if (property == rotateBBoxProperty)
     {
         rotateBBox = properties->mBool()->value(rotateBBoxProperty);
@@ -331,7 +330,6 @@ void MGraticuleActor::onQtPropertyChanged(QtProperty *property)
         generateGeometry();
         emitActorChangedSignal();
     }
-
     else if (property == rotatedNorthPoleProperty)
     {
         rotatedNorthPole =
@@ -342,14 +340,6 @@ void MGraticuleActor::onQtPropertyChanged(QtProperty *property)
             generateGeometry();
             emitActorChangedSignal();
         }
-    }
-    else if (property == enableStereographicGridProperty)
-    {
-        enableStereographicGrid =
-                properties->mBool()->value(enableStereographicGridProperty);
-        if (suppressActorUpdates()) return;
-        generateGeometry();
-        emitActorChangedSignal();
     }
     else if (property == stereoBBoxProperty)
     {
@@ -1599,59 +1589,67 @@ void MGraticuleActor::cutWithBoundingBox(QRectF cornerRect)
     float deltaLabelPosition = 10.0f;      // Tolerance to avoid overlap with
                                            // lat lon labels.
 
+    bool cornerLabelDisplay = false; // Flag to switch on/off Rectangle Corner
+                                    // labels(corner labels are intended to
+                                    // display the co-ordinates when not in
+                                    // regular lat lon projection).
     // Append vertices of rectangular bounding box to the vertices list for
     // drawing the bounding box, i.e, the rectangle surrounding the graticule lines.
     verticesGraticule.append(QVector2D(cornerRect.x(),cornerRect.y()));
     
     // require scaling here?
     // verticesGraticule.append(QVector2D(-3800.0f* scale_factor, -5800.0f* scale_factor));
-    labels.append(tm->addText(
-                          QString("[x: %1 ,\n y: %2]").
-                          arg(cornerRect.x()).
-                          arg(cornerRect.y()),
-                          MTextManager::LONLATP, cornerRect.x() - deltaLabelPosition,
-                          cornerRect.y() - deltaLabelPosition,
-                          verticalPosition_hPa, labelsize,
-                          labelColour, MTextManager::BASELINECENTRE,
-                          labelbbox, labelBBoxColour)
-                      );
+    if(cornerLabelDisplay)
+        labels.append(tm->addText(
+                              QString("[x: %1 ,\n y: %2]").
+                              arg(cornerRect.x()).
+                              arg(cornerRect.y()),
+                              MTextManager::LONLATP, cornerRect.x() - deltaLabelPosition,
+                              cornerRect.y() - deltaLabelPosition,
+                              verticalPosition_hPa, labelsize,
+                              labelColour, MTextManager::BASELINECENTRE,
+                              labelbbox, labelBBoxColour)
+                          );
 
     verticesGraticule.append(QVector2D(cornerRect.x(), cornerRect.y() + cornerRect.height()));
-    labels.append(tm->addText(
-                          QString("[x: %1,\n y: %2]").
-                          arg(cornerRect.x()).
-                          arg(cornerRect.y() + cornerRect.height()),
-                          MTextManager::LONLATP, cornerRect.x() - deltaLabelPosition,
-                          cornerRect.y() + cornerRect.height() + deltaLabelPosition,
-                          verticalPosition_hPa, labelsize,
-                          labelColour, MTextManager::BASELINECENTRE,
-                          labelbbox, labelBBoxColour)
-                      );
+    if(cornerLabelDisplay)
+        labels.append(tm->addText(
+                              QString("[x: %1,\n y: %2]").
+                              arg(cornerRect.x()).
+                              arg(cornerRect.y() + cornerRect.height()),
+                              MTextManager::LONLATP, cornerRect.x() - deltaLabelPosition,
+                              cornerRect.y() + cornerRect.height() + deltaLabelPosition,
+                              verticalPosition_hPa, labelsize,
+                              labelColour, MTextManager::BASELINECENTRE,
+                              labelbbox, labelBBoxColour)
+                          );
 
     verticesGraticule.append(QVector2D(cornerRect.x()+cornerRect.width(), cornerRect.y() + cornerRect.height()));
-    labels.append(tm->addText(
-                          QString("[x: %1,\n y:  %2]").
-                          arg(cornerRect.x()+cornerRect.width()).
-                          arg(cornerRect.y() + cornerRect.height()),
-                          MTextManager::LONLATP, cornerRect.x() + cornerRect.width()
-                          + deltaLabelPosition, cornerRect.y() + cornerRect.height()
-                          + deltaLabelPosition, verticalPosition_hPa, labelsize,
-                          labelColour, MTextManager::BASELINECENTRE,
-                          labelbbox, labelBBoxColour)
-                      );
+    if(cornerLabelDisplay)
+        labels.append(tm->addText(
+                              QString("[x: %1,\n y:  %2]").
+                              arg(cornerRect.x()+cornerRect.width()).
+                              arg(cornerRect.y() + cornerRect.height()),
+                              MTextManager::LONLATP, cornerRect.x() + cornerRect.width()
+                              + deltaLabelPosition, cornerRect.y() + cornerRect.height()
+                              + deltaLabelPosition, verticalPosition_hPa, labelsize,
+                              labelColour, MTextManager::BASELINECENTRE,
+                              labelbbox, labelBBoxColour)
+                          );
 
     verticesGraticule.append(QVector2D(cornerRect.x()+cornerRect.width(), cornerRect.y()));
-    labels.append(tm->addText(
-                          QString("[x: %1,\n y: %2]").
-                          arg(cornerRect.x()+cornerRect.width()).
-                          arg(cornerRect.y()),
-                          MTextManager::LONLATP,
-                          cornerRect.x() + cornerRect.width() + deltaLabelPosition,
-                          cornerRect.y() - deltaLabelPosition,
-                          verticalPosition_hPa, labelsize,
-                          labelColour, MTextManager::BASELINECENTRE,
-                          labelbbox, labelBBoxColour)
-                      );
+    if(cornerLabelDisplay)
+        labels.append(tm->addText(
+                              QString("[x: %1,\n y: %2]").
+                              arg(cornerRect.x()+cornerRect.width()).
+                              arg(cornerRect.y()),
+                              MTextManager::LONLATP,
+                              cornerRect.x() + cornerRect.width() + deltaLabelPosition,
+                              cornerRect.y() - deltaLabelPosition,
+                              verticalPosition_hPa, labelsize,
+                              labelColour, MTextManager::BASELINECENTRE,
+                              labelbbox, labelBBoxColour)
+                          );
 
     verticesGraticule.append(QVector2D(cornerRect.x(), cornerRect.y()));
     nLats.append(5);

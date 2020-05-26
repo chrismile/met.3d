@@ -55,7 +55,7 @@ namespace Met3D
 *******************************************************************************/
 
 MBaseMapActor::MBaseMapActor()
-    : MRotatedGridSupportingActor(),
+    : MMapProjectionSupportingActor(),
       MBoundingBoxInterface(this, MBoundingBoxConnectionType::HORIZONTAL),
       texture(nullptr),
       numVertices(4),
@@ -114,7 +114,7 @@ void MBaseMapActor::reloadShaderEffects()
 
 void MBaseMapActor::saveConfiguration(QSettings *settings)
 {
-    MRotatedGridSupportingActor::saveConfiguration(settings);
+    MMapProjectionSupportingActor::saveConfiguration(settings);
 
     settings->beginGroup(MBaseMapActor::getSettingsID());
 
@@ -130,7 +130,7 @@ void MBaseMapActor::saveConfiguration(QSettings *settings)
 
 void MBaseMapActor::loadConfiguration(QSettings *settings)
 {
-    MRotatedGridSupportingActor::loadConfiguration(settings);
+    MMapProjectionSupportingActor::loadConfiguration(settings);
 
     settings->beginGroup(MBaseMapActor::getSettingsID());
 
@@ -227,13 +227,13 @@ void MBaseMapActor::onQtPropertyChanged(QtProperty* property)
         emitActorChangedSignal();
     }
 
-    if (property == enableGridRotationProperty)
-    {
-        enableGridRotation =
-                properties->mBool()->value(enableGridRotationProperty);
-        if (suppressActorUpdates()) return;
-        emitActorChangedSignal();
-    }
+//    if (property == enableGridRotationProperty)
+//    {
+//        enableGridRotation =
+//                properties->mBool()->value(enableGridRotationProperty);
+//        if (suppressActorUpdates()) return;
+//        emitActorChangedSignal();
+//    }
 
     else if (property == rotateBBoxProperty)
     {

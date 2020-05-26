@@ -37,7 +37,7 @@
 #include <QtProperty>
 
 // local application imports
-#include "gxfw/rotatedgridsupportingactor.h"
+#include "gxfw/mapprojectionsupportingactor.h"
 #include "gxfw/gl/shadereffect.h"
 #include "gxfw/gl/vertexbuffer.h"
 #include "data/naturalearthdataloader.h"
@@ -57,7 +57,7 @@ namespace Met3D
   (cannot be changed by the user; the method is to sync a graticule with
   an hsec actor).
   */
-class MGraticuleActor : public MRotatedGridSupportingActor,
+class MGraticuleActor : public MMapProjectionSupportingActor,
         public MBoundingBoxInterface
 {
 public:

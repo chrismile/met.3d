@@ -24,7 +24,7 @@
 **  along with Met.3D.  If not, see <http://www.gnu.org/licenses/>.
 **
 *******************************************************************************/
-#include "rotatedgridsupportingactor.h"
+#include "mapprojectionsupportingactor.h"
 
 // standard library imports
 #include <iostream>
@@ -51,9 +51,9 @@ namespace Met3D
 ***                     CONSTRUCTOR / DESTRUCTOR                            ***
 *******************************************************************************/
 
-MRotatedGridSupportingActor::MRotatedGridSupportingActor()
+MMapProjectionSupportingActor::MMapProjectionSupportingActor()
     : MActor(),
-      gridProjection(GRIDPROJECTION_DISABLED),
+      gridProjection(GRIDPROJECTION_CYLINDRICAL),
       enableGridRotation(false),
       rotateBBox(false),
       rotatedNorthPole(QPointF(-180., 90.)),
@@ -74,7 +74,7 @@ MRotatedGridSupportingActor::MRotatedGridSupportingActor()
 
     // drop-down list for choosing type of projection
     QStringList gridProjectionNames;
-    gridProjectionNames << gridProjectionToString(GRIDPROJECTION_DISABLED)
+    gridProjectionNames << gridProjectionToString(GRIDPROJECTION_CYLINDRICAL)
                         << gridProjectionToString(GRIDPROJECTION_ROTATEDLATLON)
                         << gridProjectionToString(GRIDPROJECTION_STEREOGRAPHIC);
     gridProjectionTypesProperty = addProperty(
@@ -83,12 +83,6 @@ MRotatedGridSupportingActor::MRotatedGridSupportingActor()
     properties->mEnum()->setValue(gridProjectionTypesProperty, gridProjection);
 
     // inputs for grid projection: rotated lat lon
-    enableGridRotationProperty = addProperty(BOOL_PROPERTY, "enable rotation",
-                                             gridProjectionPropertiesSubGroup);
-    properties->mBool()->setValue(enableGridRotationProperty,
-                                  enableGridRotation);
-    enableGridRotationProperty->setEnabled(false);
-
     rotateBBoxProperty = addProperty(BOOL_PROPERTY, "rotate bounding box",
                                      gridProjectionPropertiesSubGroup);
     properties->mBool()->setValue(rotateBBoxProperty, rotateBBox);
@@ -100,13 +94,7 @@ MRotatedGridSupportingActor::MRotatedGridSupportingActor()
     properties->mPointF()->setValue(rotatedNorthPoleProperty, rotatedNorthPole);
     rotatedNorthPoleProperty->setEnabled(false);
 
-    // inputs for grid projection: polar stereographic
-    enableStereographicGridProperty = addProperty(BOOL_PROPERTY, "polar stereographic graticule",
-                                                 gridProjectionPropertiesSubGroup);
-    properties->mBool()->setValue(enableStereographicGridProperty,
-                                    enableStereographicGrid);
-    enableStereographicGridProperty->setEnabled(false);
-
+    // inputs for grid projection: rotated lat lon
     stereoBBoxProperty = addProperty(BOOL_PROPERTY, "polar stereographic bounding box",
                                      gridProjectionPropertiesSubGroup);
     properties->mBool()->setValue(stereoBBoxProperty, stereoBBox);
@@ -130,7 +118,7 @@ MRotatedGridSupportingActor::MRotatedGridSupportingActor()
 }
 
 
-MRotatedGridSupportingActor::~MRotatedGridSupportingActor()
+MMapProjectionSupportingActor::~MMapProjectionSupportingActor()
 {
 }
 
@@ -139,9 +127,9 @@ MRotatedGridSupportingActor::~MRotatedGridSupportingActor()
 ***                            PUBLIC METHODS                               ***
 *******************************************************************************/
 
-void MRotatedGridSupportingActor::saveConfiguration(QSettings *settings)
+void MMapProjectionSupportingActor::saveConfiguration(QSettings *settings)
 {
-    settings->beginGroup(MRotatedGridSupportingActor::getSettingsID());
+    settings->beginGroup(MMapProjectionSupportingActor::getSettingsID());
     settings->setValue("gridProjection",gridProjectionToString(gridProjection));
     settings->setValue("useRotation", enableGridRotation);
     settings->setValue("rotateBoundingBox", rotateBBox);
@@ -154,18 +142,15 @@ void MRotatedGridSupportingActor::saveConfiguration(QSettings *settings)
 }
 
 
-void MRotatedGridSupportingActor::loadConfiguration(QSettings *settings)
+void MMapProjectionSupportingActor::loadConfiguration(QSettings *settings)
 {
-    settings->beginGroup(MRotatedGridSupportingActor::getSettingsID());
+    settings->beginGroup(MMapProjectionSupportingActor::getSettingsID());
 
     properties->mEnum()->setValue(
                 gridProjectionTypesProperty, stringToGridProjection(
                     (settings->value("gridProjection",
-                                     gridProjectionToString(GRIDPROJECTION_DISABLED))
+                                     gridProjectionToString(GRIDPROJECTION_CYLINDRICAL))
                      ).toString()));
-    properties->mBool()->setValue(
-                enableGridRotationProperty,
-                settings->value("useRotation", false).toBool());
     properties->mBool()->setValue(
                 rotateBBoxProperty,
                 settings->value("rotateBoundingBox", false).toBool());
@@ -173,9 +158,6 @@ void MRotatedGridSupportingActor::loadConfiguration(QSettings *settings)
                 rotatedNorthPoleProperty,
                 settings->value("rotatedNorthPole",
                                 QPointF(-180., 90.)).toPointF());
-   properties->mBool()->setValue(
-               enableStereographicGridProperty,
-               settings->value("useStereographic", false).toBool());
    properties->mBool()->setValue(
                stereoBBoxProperty,
                settings->value("stereoBoundingBox", false).toBool());
@@ -190,12 +172,12 @@ void MRotatedGridSupportingActor::loadConfiguration(QSettings *settings)
     settings->endGroup();
 }
 
-MRotatedGridSupportingActor::gridProjectionTypes MRotatedGridSupportingActor::stringToGridProjection(
+MMapProjectionSupportingActor::gridProjectionTypes MMapProjectionSupportingActor::stringToGridProjection(
         QString gridProjectionName)
 {
-    if (gridProjectionName == "disabled")
+    if (gridProjectionName == "cylindrical")
     {
-        return GRIDPROJECTION_DISABLED;
+        return GRIDPROJECTION_CYLINDRICAL;
     }
     else if (gridProjectionName == "rotated lat.-lon.")
     {
@@ -207,21 +189,21 @@ MRotatedGridSupportingActor::gridProjectionTypes MRotatedGridSupportingActor::st
     }
     else
     {
-        return GRIDPROJECTION_DISABLED;
+        return GRIDPROJECTION_CYLINDRICAL;
     }
 }
 
 
-QString MRotatedGridSupportingActor::gridProjectionToString(
+QString MMapProjectionSupportingActor::gridProjectionToString(
         gridProjectionTypes gridProjection)
 {
     switch (gridProjection)
     {
-        case GRIDPROJECTION_DISABLED: return "disabled";
+        case GRIDPROJECTION_CYLINDRICAL: return "cylindrical";
         case GRIDPROJECTION_ROTATEDLATLON: return "rotated lat.-lon.";
         case GRIDPROJECTION_STEREOGRAPHIC: return "polar stereographic";
     }
-    return "disabled";
+    return "cylindrical";
 }
 
 

@@ -37,7 +37,7 @@
 #include <ogr_geometry.h>
 
 // local application imports
-#include "gxfw/rotatedgridsupportingactor.h"
+#include "gxfw/mapprojectionsupportingactor.h"
 #include "gxfw/gl/shadereffect.h"
 #include "gxfw/gl/texture.h"
 #include "gxfw/boundingbox/boundingbox.h"
@@ -53,7 +53,7 @@ namespace Met3D
   @brief MBaseMapActor draws a map into the scene. Map raster data is loaded
   from a GeoTiff file.
   */
-class MBaseMapActor : public MRotatedGridSupportingActor,
+class MBaseMapActor : public MMapProjectionSupportingActor,
         public MBoundingBoxInterface
 {
 public:
