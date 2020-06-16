@@ -20,6 +20,7 @@ set (COMMON_INSTALL_DIRS
         /home/local/sw/qt5
         /home/local/sw/ecmwf
         /project/meteo/w2w/Z2b/local/sw
+        ~/met.3d-base/local
     )
 
 if (UNIX)

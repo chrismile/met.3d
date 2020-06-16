@@ -250,8 +250,8 @@ public:
      */
     void loadConfiguration(QSettings *settings);
 
-    void setOverwriteImageSerie(bool overwriteImageSerie)
-    { this->overwriteImageSerie = overwriteImageSerie; }
+    void forceOverwriteImageSequence(bool overwrite)
+    { overwriteImageSequence = overwrite; }
 
     void onHandleSizeChanged();
 
@@ -573,11 +573,9 @@ private:
 
     MResizeWindowDialog *resizeViewDialog;
 
-    /**
-      If this variable is set to true, Met.3D will write the files of a time
-      series without checking if the file name already exists.
-     */
-    bool overwriteImageSerie;
+    // Overwrite already existing image files of a time series without
+    // asking the user.
+    bool overwriteImageSequence;
 };
 
 } // namespace Met3D

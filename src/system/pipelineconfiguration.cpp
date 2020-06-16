@@ -49,7 +49,7 @@
 #include "data/verticalregridder.h"
 #include "data/structuredgridensemblefilter.h"
 #include "data/probabilityregiondetector.h"
-#include "data/derivedmetvarsdatasource.h"
+#include "data/derivedvars/derivedmetvarsdatasource.h"
 #include "data/differencedatasource.h"
 
 #include "data/trajectoryreader.h"

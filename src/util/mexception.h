@@ -107,6 +107,17 @@ public:
                  const char* file, int line);
 };
 
+
+/**
+  Something goes wrong when accessing a Grib file.
+  */
+class MGribError : public MException
+{
+public:
+    MGribError(const std::string& complaint,
+               const char* file, int line);
+};
+
 } // namespace Met3D
 
 #endif // MEXCEPTION_H

@@ -4,10 +4,14 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2017 Marc Rautenhaus
-**  Copyright 2015-2017 Bianca Tost
+**  Copyright 2015-2020 Marc Rautenhaus [*, previously +]
+**  Copyright 2015-2017 Bianca Tost [+]
+**  Copyright 2020-     Kameswarrao Modali [*]
 **
-**  Computer Graphics and Visualization Group
+**  * Regional Computing Center, Visualization
+**  Universitaet Hamburg, Hamburg, Germany
+**
+**  + Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
 **
 **  Met.3D is free software: you can redistribute it and/or modify
@@ -233,6 +237,136 @@ void MNaturalEarthDataLoader::loadLineGeometry(GeometryType        type,
     }
     // Clean up.
 	OGRGeometryFactory::destroyGeometry(bboxPolygon);
+}
+
+
+void MNaturalEarthDataLoader::loadCyclicLineGeometry(
+        MNaturalEarthDataLoader::GeometryType geometryType,
+        QRectF cornerRect,
+        QVector<QVector2D> *vertices,
+        QVector<int> *startIndices,
+        QVector<int> *vertexCount)
+{
+    // Region parameters.
+    float westernLon = cornerRect.x();
+    float easternLon = cornerRect.x() + cornerRect.width();
+    float width = cornerRect.width();
+    width = min(360.0f - MMOD(westernLon + 180.f, 360.f), width);
+    // Offset which needs to be added to place the [westmost] region correctly.
+    double offset = static_cast<double>(floor((westernLon + 180.f) / 360.f)
+                                        * 360.f);
+    // Load geometry of westmost region separately only if its width is smaller
+    // than 360 degrees (i.e. "not complete") otherwise skip this first step.
+    bool firstStep = width < 360.f;
+    if (firstStep)
+    {
+        cornerRect.setX(MMOD(westernLon + 180.f, 360.f) - 180.f);
+        cornerRect.setWidth(width);
+        loadLineGeometry(geometryType, cornerRect, vertices, startIndices,
+                         vertexCount, false,  // clear vectors
+                         offset);     // shift
+        // Increment offset to suit the next region.
+        offset += 360.;
+        // "Shift" westernLon to western border of the bounding box domain not
+        // treated yet.
+        westernLon += width;
+    }
+
+    // Amount of regions with a width of 360 degrees.
+    int completeRegionsCount =
+            static_cast<int>((easternLon - westernLon) / 360.f);
+    // Load "complete" regions only if we have at least one. If the first step
+    // was skipped, we need to clear the vectors before loading the line
+    // geometry otherwise we need to append the computed vertices.
+    if (completeRegionsCount > 0)
+    {
+        cornerRect.setX(-180.f);
+        cornerRect.setWidth(360.f);
+        loadLineGeometry(geometryType, cornerRect, vertices, startIndices,
+                    vertexCount, firstStep,//clear vectors if it wasn't done before
+                    offset, // shift
+                    completeRegionsCount - 1);
+        // "Shift" westernLon to western border of the bounding box domain not
+        // treated yet.
+        westernLon += static_cast<float>(completeRegionsCount) * 360.f;
+        // Increment offset to suit the last region if one is left.
+        offset += static_cast<double>(completeRegionsCount) * 360.;
+    }
+
+    // Load geometry of eastmost region separately only if it isn't the same as
+    // the westmost region and its width is smaller than 360 degrees and thus it
+    // wasn't loaded in one of the steps before.
+    if (westernLon < easternLon)
+    {
+        cornerRect.setX(-180.f);
+        cornerRect.setWidth(easternLon - westernLon);
+        loadLineGeometry(geometryType, cornerRect, vertices, startIndices,
+                         vertexCount, true,    // append to vectors
+                         offset); // shift
+    }
+
+//WORKAROUND/CHECKME (km&mr, 30Mar2020) --
+    // When loading natural earth coast and borderline data, some incorrect
+    // (long) lines appear. These are charcterized by large jumps in the
+    // coordinates between successive points in a given group of vertices. To
+    // avoid these jumps, as long as there exists a group with maximum distance
+    // between two successive points greater than an (arbitrarily defined)
+    // "lon-lat-distance" of 10 deg, keep subdividing the group into smaller
+    // vertex groups. This workaround eliminates the large jumps (greater than
+    // graticule deltalatlon) and thereby also the incorrect lines.
+    restrictDistanceBetweenSubsequentVertices(vertices, startIndices,
+                                              vertexCount, 10.);
+}
+
+
+void MNaturalEarthDataLoader::restrictDistanceBetweenSubsequentVertices(
+        QVector<QVector2D> *vertices,
+        QVector<int> *startIndices,
+        QVector<int> *vertexCount,
+        float maxAllowedDistance_deg)
+{
+    // Loop over all groups (number of groups = entries in e.g. vertexCount;
+    // if new groups are added that size is automatically updated).
+    for (int iGroup = 0; iGroup < vertexCount->count(); iGroup++)
+    {
+        int vertexStartIndex = startIndices->at(iGroup);
+        int vertexEndIndex = startIndices->at(iGroup) + vertexCount->at(iGroup) - 1;
+
+        for (int iVertex = vertexStartIndex; iVertex < vertexEndIndex; iVertex++)
+        {
+            float distance = vertices->at(iVertex).distanceToPoint(vertices->at(iVertex + 1));
+
+            if (distance > maxAllowedDistance_deg)
+            {
+                // Split the group.
+
+                LOG4CPLUS_WARN(mlog, "WARNING: While loading coastline and borderline "
+                               << "geometry, connected vertices with a spacing "
+                               << "of " << distance << " (max. allowed is "
+                               << maxAllowedDistance_deg << " deg) were discovered. "
+                               << "The connection is classified as incorrect and eliminated.");
+
+                // Update the current, now shortened, group's 'vertexCount'.
+                int shortenedGroupVertexCount = iVertex - vertexStartIndex + 1;
+                int remainingVertexCount = vertexCount->at(iGroup)
+                        - shortenedGroupVertexCount;
+                vertexCount->replace(iGroup, shortenedGroupVertexCount);
+
+                // Inserting a new group at group index 'i+1' into the two
+                // relevant arrays.
+                int iGroupNew = iGroup + 1;
+                startIndices->insert(iGroupNew, iVertex + 1);
+                vertexCount->insert(iGroupNew, remainingVertexCount);
+
+                // Break inner loop over vertices and continue with loop over
+                // groups -- this will pick up the new group as the next group
+                // and continue checking.
+                break;
+            }
+        }
+    }
+
+    return;
 }
 
 

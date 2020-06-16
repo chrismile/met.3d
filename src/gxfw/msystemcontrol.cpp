@@ -57,6 +57,10 @@ MSystemManagerAndControl::MSystemManagerAndControl(QWidget *parent) :
     ui(new Ui::MSystemControl),
     met3dAppIsInitialized(false),
     connectedToMetview(false),
+    batchModeIsActive(false),
+    batchModeTimeRange_sec(0),
+    batchModeQuitWhenCompleted(false),
+    batchModeOverwriteImages(true),
     handleSize(.5),
     mainWindow(nullptr),
     naturalEarthDataLoader(nullptr)
@@ -390,6 +394,10 @@ void MSystemManagerAndControl::registerScheduler(
         const QString &id, MAbstractScheduler *scheduler)
 {
     schedulerPool.insert(id, scheduler);
+
+    // Let the main window monitor whether the schedule is busy.
+    connect(scheduler, SIGNAL(schedulerIsProcessing(bool)),
+            mainWindow, SLOT(partOfApplicationIsBusyEvent(bool)));
 }
 
 
@@ -574,6 +582,118 @@ MNaturalEarthDataLoader *MSystemManagerAndControl::getNaturalEarthDataLoader()
 }
 
 
+void MSystemManagerAndControl::setBatchMode(bool isActive, QString animType, QString syncName,
+        QString dataSourceIDForStartTime, int timeRange_sec,
+        bool quitWhenCompleted, bool overwriteImages)
+{
+    batchModeIsActive = isActive;
+    batchModeAnimationType = animType;
+    syncControlForBatchModeAnimation = syncName;
+    batchModeDataSourceIDToGetStartTime = dataSourceIDForStartTime;
+    batchModeTimeRange_sec = timeRange_sec;
+    batchModeQuitWhenCompleted = quitWhenCompleted;
+    batchModeOverwriteImages = overwriteImages;
+}
+
+
+bool MSystemManagerAndControl::isInBatchMode()
+{
+    return batchModeIsActive;
+}
+
+
+void MSystemManagerAndControl::executeBatchMode()
+{
+    LOG4CPLUS_DEBUG(mlog, "Starting batch mode execution.");
+
+    // Check if sync control and data source configured for batch mode exist.
+    MSyncControl *syncControl = getSyncControl(syncControlForBatchModeAnimation);
+    if (syncControl == nullptr)
+    {
+        QMessageBox msgBox;
+        msgBox.setIcon(QMessageBox::Warning);
+        msgBox.setText("Batch mode execution: Synchronization control'"
+                       + syncControlForBatchModeAnimation +
+                       "' specified in frontend configuration is not available. "
+                       "Batch mode will NOT be executed.");
+        msgBox.exec();
+        return;
+    }
+
+    if (getDataSource(batchModeDataSourceIDToGetStartTime) == nullptr)
+    {
+        QMessageBox msgBox;
+        msgBox.setIcon(QMessageBox::Warning);
+        msgBox.setText("Batch mode execution: Data source '"
+                       + batchModeDataSourceIDToGetStartTime +
+                       "' specified in frontend configuration is not available. "
+                       "Batch mode will NOT be executed.");
+        msgBox.exec();
+        return;
+    }
+
+    // Restrict the sync control's allowed init/valid time to those available
+    // from the data source. Also reset the init/valid time GUI elements to
+    // the first available init/valid time of the data source (the second
+    // "true" argument), and set the animation time range to the specified
+    // value in seconds.
+    QStringList dataSources;
+    dataSources.append(batchModeDataSourceIDToGetStartTime);
+    syncControl->restrictControlToDataSources(dataSources, true);
+    syncControl->setAnimationTimeRange(batchModeTimeRange_sec);
+
+    // W.r.t. animation type, currently only the 'timeAnimation' option is
+    // implemented.
+    if (batchModeAnimationType == "timeAnimation")
+    {
+        // If configured so, connect the sync control's "timeAnimationEnds"
+        // signal to the "closeMainWindow" slot to automatically quit the
+        // application after the batch animation has finished. Use
+        // "Qt::QueuedConnection" as described here:
+        // https://doc.qt.io/qt-5/qcoreapplication.html#quit
+        if (batchModeQuitWhenCompleted)
+        {
+            connect(syncControl, SIGNAL(timeAnimationEnds()), this,
+                    SLOT(closeMainWindow()), Qt::QueuedConnection);
+        }
+
+        // Force to overwrite image files that already exist?
+        syncControl->setOverwriteAnimationImageSequence(batchModeOverwriteImages);
+
+        // WORKAROUNG to avoid black images stored of first time step.
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // NOTE: If this method is called from MMainWindow::show(), the data
+        // requests emitted by the actor initalizations triggered from
+        // MGLResourcesManager::initializeGL() may NOT HAVE COMPLETED at this
+        // time! Unfortunately, if we store the first image as implemented in
+        // MSyncControl::synchronizationCompleted() and ::startTimeAnimation()
+        // after this first sync request has been completed, the image store
+        // method is called before rendering has finished. As a workaround, we
+        // delay the start of the animation by the animation delay specified
+        // by the user in the animation pane in the sync control.
+
+        // Start the time animation, delayed.
+        unsigned int delay_ms = syncControl->getAnimationDelay_ms();
+        LOG4CPLUS_DEBUG(mlog, "Delaying start of batch animation by "
+                        << delay_ms << " ms so that first rendering cycle is "
+                        "completed and first image is produced correctly.");
+        QTimer::singleShot(delay_ms, syncControl,
+                           SLOT(startTimeAnimationProgrammatically()));
+    }
+    else
+    {
+        QMessageBox msgBox;
+        msgBox.setIcon(QMessageBox::Warning);
+        msgBox.setText("Batch mode execution: Animation type '"
+                       + batchModeAnimationType +
+                       "' is not supported ('timeAnimation' is supported.). "
+                       "Batch mode will NOT be executed.");
+        msgBox.exec();
+        return;
+    }
+}
+
+
 /******************************************************************************
 ***                             PUBLIC SLOTS                                ***
 *******************************************************************************/
@@ -597,6 +717,15 @@ void MSystemManagerAndControl::actOnQtPropertyChanged(QtProperty *property)
             sceneView->onHandleSizeChanged();
         }
     }
+}
+
+
+void MSystemManagerAndControl::closeMainWindow()
+{
+    LOG4CPLUS_DEBUG(mlog, "System manager received command to quit the "
+                    " application. Closing main window... ");
+
+    mainWindow->close();
 }
 
 

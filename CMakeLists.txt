@@ -42,7 +42,7 @@ set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 project(Met.3D)
 # Set version number 
 set(Met3D_VERSION_MAJOR 1)
-set(Met3D_VERSION_MINOR 5)
+set(Met3D_VERSION_MINOR 6)
 
 # Add global defines
 add_definitions(-DENABLE_MET3D_STOPWATCH
@@ -60,6 +60,13 @@ enable_language(Fortran)
 # Add global options
 option(USE_CLANG "Build application with clang" OFF)
 
+option(ENABLE_EXPERIMENTAL_DERIVEDVARS "Enable derived variables that are experimental and have not been tested well." OFF)
+if (ENABLE_EXPERIMENTAL_DERIVEDVARS)
+    add_definitions(-DENABLE_EXPERIMENTAL_DERIVEDVARS)
+endif (ENABLE_EXPERIMENTAL_DERIVEDVARS)
+
+
+# Operating-system specific settings.
 if (WIN32)
 	add_definitions(-DWIN32)
 

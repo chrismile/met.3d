@@ -4,7 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2019 Marc Rautenhaus [*, previously +]
+**  Copyright 2015-2020 Marc Rautenhaus [*, previously +]
+**  Copyright 2020 Marcel Meyer [*]
 **
 **  * Regional Computing Center, Visualization
 **  Universitaet Hamburg, Hamburg, Germany
@@ -35,49 +36,14 @@
 #include <QtCore>
 
 // local application imports
-#include "processingwpdatasource.h"
-#include "structuredgrid.h"
-#include "datarequest.h"
+#include "data/processingwpdatasource.h"
+#include "data/structuredgrid.h"
+#include "data/datarequest.h"
+#include "deriveddatafieldprocessor.h"
+
 
 namespace Met3D
 {
-
-/**
- @brief The MDerivedDataFieldProcessor class is the abstract base class for all
- classes that derive a data field, e.g., wind speed or potential temperature.
- */
-class MDerivedDataFieldProcessor
-{
-public:
-    MDerivedDataFieldProcessor(QString standardName,
-                               QStringList requiredInputVariables);
-
-    virtual ~MDerivedDataFieldProcessor() {}
-
-    QString getStandardName() { return standardName; }
-
-    QStringList getRequiredInputVariables() { return requiredInputVariables; }
-
-    /**
-      This method computes the derived data field and needs to be implemented
-      in any derived class.
-
-      It is called from @ref MDerivedMetVarsDataSource::produceData() if the
-      corresponding variable is requested.
-
-      @p inputGrids contains the required input data fields in the order
-      specified in @ref requiredInputVariables. @p derivedGrid contains
-      a pre-initialized result grid that already contains lon/lat/lev etc.
-      information copied from the first grid in @p inputGrids.
-     */
-    virtual void compute(QList<MStructuredGrid*>& inputGrids,
-                         MStructuredGrid *derivedGrid) = 0;
-
-private:
-    QString standardName;
-    QStringList requiredInputVariables;
-};
-
 
 /**
   @brief MDerivedMetVarsDataSource derives meteorological variables from basic
@@ -181,132 +147,6 @@ protected:
     QMap<QString, MDerivedDataFieldProcessor*> registeredDerivedDataProcessors;
     QMap<QString, QStringList> requiredInputVariablesList;
     QMap<QString, QString> variableStandardNameToInputNameMapping;
-};
-
-
-/******************************************************************************
-***                            DATA PROCESSORS                              ***
-*******************************************************************************/
-
-class MHorizontalWindSpeedProcessor
-        : public MDerivedDataFieldProcessor
-{
-public:
-    MHorizontalWindSpeedProcessor();
-
-    void compute(QList<MStructuredGrid*>& inputGrids,
-                 MStructuredGrid *derivedGrid);
-};
-
-
-class MMagnitudeOfAirVelocityProcessor
-        : public MDerivedDataFieldProcessor
-{
-public:
-    MMagnitudeOfAirVelocityProcessor();
-
-    void compute(QList<MStructuredGrid*>& inputGrids,
-                 MStructuredGrid *derivedGrid);
-};
-
-
-class MPotentialTemperatureProcessor
-        : public MDerivedDataFieldProcessor
-{
-public:
-    MPotentialTemperatureProcessor();
-
-    void compute(QList<MStructuredGrid*>& inputGrids,
-                 MStructuredGrid *derivedGrid);
-};
-
-
-class MEquivalentPotentialTemperatureProcessor
-        : public MDerivedDataFieldProcessor
-{
-public:
-    MEquivalentPotentialTemperatureProcessor();
-
-    void compute(QList<MStructuredGrid*>& inputGrids,
-                 MStructuredGrid *derivedGrid);
-};
-
-
-class MPotentialVorticityProcessor_LAGRANTOcalvar
-        : public MDerivedDataFieldProcessor
-{
-public:
-    MPotentialVorticityProcessor_LAGRANTOcalvar();
-
-    void compute(QList<MStructuredGrid*>& inputGrids,
-                 MStructuredGrid *derivedGrid);
-};
-
-
-class MGeopotentialHeightProcessor
-        : public MDerivedDataFieldProcessor
-{
-public:
-    MGeopotentialHeightProcessor();
-
-    void compute(QList<MStructuredGrid*>& inputGrids,
-                 MStructuredGrid *derivedGrid);
-};
-
-
-class MGeopotentialHeightFromGeopotentialProcessor
-        : public MDerivedDataFieldProcessor
-{
-public:
-    MGeopotentialHeightFromGeopotentialProcessor();
-
-    void compute(QList<MStructuredGrid*>& inputGrids,
-                 MStructuredGrid *derivedGrid);
-};
-
-
-class MDewPointTemperatureProcessor
-        : public MDerivedDataFieldProcessor
-{
-public:
-    MDewPointTemperatureProcessor();
-
-    void compute(QList<MStructuredGrid*>& inputGrids,
-                 MStructuredGrid *derivedGrid);
-};
-
-
-class MTHourlyTotalPrecipitationProcessor
-        : public MDerivedDataFieldProcessor
-{
-public:
-    MTHourlyTotalPrecipitationProcessor(int hours);
-
-    void compute(QList<MStructuredGrid*>& inputGrids,
-                 MStructuredGrid *derivedGrid);
-};
-
-
-class MMagnitudeOfVerticallyIntegratedMoistureFluxProcessor
-        : public MDerivedDataFieldProcessor
-{
-public:
-    MMagnitudeOfVerticallyIntegratedMoistureFluxProcessor(
-            QString levelTypeString);
-
-    void compute(QList<MStructuredGrid*>& inputGrids,
-                 MStructuredGrid *derivedGrid);
-};
-
-
-class MPressureProcessor
-        : public MDerivedDataFieldProcessor
-{
-public:
-    MPressureProcessor();
-
-    void compute(QList<MStructuredGrid*>& inputGrids,
-                 MStructuredGrid *derivedGrid);
 };
 
 } // namespace Met3D
