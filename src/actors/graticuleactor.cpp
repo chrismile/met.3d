@@ -286,11 +286,9 @@ void MGraticuleActor::onQtPropertyChanged(QtProperty *property)
             gridProjection = GRIDPROJECTION_CYLINDRICAL;
             rotateBBoxProperty->setEnabled(false);
             rotatedNorthPoleProperty->setEnabled(false);
-            stereoBBoxProperty->setEnabled(false);
-            stereoProjLonProperty->setEnabled(false);
-            stereoProjLatProperty->setEnabled(false);
-            enableStereographicGrid = false;
             enableGridRotation = false;
+            enableProjLibraryProjection = false;
+            projLibraryStringProperty->setEnabled(false);
             if (suppressActorUpdates()) return;
             generateGeometry();
             emitActorChangedSignal();
@@ -299,24 +297,20 @@ void MGraticuleActor::onQtPropertyChanged(QtProperty *property)
             gridProjection = GRIDPROJECTION_ROTATEDLATLON;
             rotateBBoxProperty->setEnabled(true);
             rotatedNorthPoleProperty->setEnabled(true);
-            stereoBBoxProperty->setEnabled(false);
-            stereoProjLonProperty->setEnabled(false);
-            stereoProjLatProperty->setEnabled(false);
             enableGridRotation = true;
-            enableStereographicGrid = false;
+            enableProjLibraryProjection = false;
+            projLibraryStringProperty->setEnabled(false);
             if (suppressActorUpdates()) return;
             generateGeometry();
             emitActorChangedSignal();
             break;
-        case GRIDPROJECTION_STEREOGRAPHIC:
-            gridProjection = GRIDPROJECTION_STEREOGRAPHIC;
+        case GRIDPROJECTION_PROJ_LIBRARY:
+            gridProjection = GRIDPROJECTION_PROJ_LIBRARY;
             rotateBBoxProperty->setEnabled(false);
             rotatedNorthPoleProperty->setEnabled(false);
-            stereoBBoxProperty->setEnabled(false);
-            stereoProjLonProperty->setEnabled(true);
-            stereoProjLatProperty->setEnabled(true);
             enableGridRotation = false;
-            enableStereographicGrid = true;
+            enableProjLibraryProjection = true;
+            projLibraryStringProperty->setEnabled(true);
             if (suppressActorUpdates()) return;
             generateGeometry();
             emitActorChangedSignal();
@@ -341,30 +335,12 @@ void MGraticuleActor::onQtPropertyChanged(QtProperty *property)
             emitActorChangedSignal();
         }
     }
-    else if (property == stereoBBoxProperty)
+    else if (property == projLibraryStringProperty)
     {
-        stereoBBox = properties->mBool()->value(stereoBBoxProperty);
+        projLibraryString =
+                properties->mString()->value(projLibraryStringProperty);
         if (suppressActorUpdates()) return;
-        generateGeometry();
-        emitActorChangedSignal();
-    }
-    else if (property == stereoProjLonProperty)
-    {
-        stereoStraightLon =
-                properties->mDouble()->value(stereoProjLonProperty);
-        if (suppressActorUpdates()) return;
-        if (enableStereographicGrid)
-        {
-            generateGeometry();
-            emitActorChangedSignal();
-        }
-    }
-    else if (property == stereoProjLatProperty)
-    {
-        stereoStandardLat =
-                properties->mDouble()->value(stereoProjLatProperty);
-        if (suppressActorUpdates()) return;
-        if (enableStereographicGrid)
+        if (enableProjLibraryProjection)
         {
             generateGeometry();
             emitActorChangedSignal();
@@ -432,7 +408,7 @@ void MGraticuleActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
             }
         }
 
-        else if(enableStereographicGrid)
+        else if(enableProjLibraryProjection)
         {
             int startIndex = 0;
             for (int i = 0; i < nLats.size(); i++)
@@ -555,7 +531,7 @@ void MGraticuleActor::generateGeometry()
 
     // Append all graticule lines to this vector.
     QVector<QVector2D> verticesGraticule;
-    if (!enableStereographicGrid)
+    if (!enableProjLibraryProjection)
     {
         if (!enableGridRotation)
         {
@@ -1470,10 +1446,8 @@ void MGraticuleActor::updateLatLonLines(QRectF cornerRect)
 		
 		// revised version MM and KMK; 
 		stereographicVerticesGraticule =
-		naturalEarthDataLoader->convertRegularLatLonToPolarStereographicCoords(
-                    verticesGraticule,
-                    this->stereoStandardLat,
-                    this->stereoStraightLon);
+        naturalEarthDataLoader->convertRegularLatLonToPolarStereographicCoordsUsingProj(
+                    verticesGraticule,this->projLibraryString);
 
         // generate data item key for every vertex buffer object wrt the actor
         const QString graticuleRequestKey = QString("graticule_vertices_actor#")
@@ -1497,10 +1471,8 @@ void MGraticuleActor::updateLatLonLines(QRectF cornerRect)
         }
 
 	stereographicLabelAnchorVector =
-		naturalEarthDataLoader->convertRegularLatLonToPolarStereographicCoords(
-                    labelAnchorVector,
-                    this->stereoStandardLat,
-                    this->stereoStraightLon);
+    naturalEarthDataLoader->convertRegularLatLonToPolarStereographicCoordsUsingProj(
+                labelAnchorVector, this->projLibraryString);
 
         foreach (MLabel* label, labels)
         {
@@ -1539,9 +1511,6 @@ void MGraticuleActor::cutWithBoundingBox(QRectF cornerRect)
     float deltalat  = spacing.y();
     float deltalon  = spacing.x();
 
-    // get parameters for converting between lat-lon and stereographic coordinates.
-    float stereoStraightLon = this ->stereoStraightLon;
-    float stereoStandardLat = this -> stereoStandardLat;
 
     MGLResourcesManager* glRM = MGLResourcesManager::getInstance();
     glRM->makeCurrent();
@@ -1656,10 +1625,10 @@ void MGraticuleActor::cutWithBoundingBox(QRectF cornerRect)
     nLons.append(5);
 
     // Use the whole grid to make sure to not miss some grid cells.
-    // for (float lat = -90.f; lat <= 90.f; lat += deltalat)
+     for (float lat = -90.f; lat <= 90.f; lat += deltalat)
     // ToDo: for polar stereographic projections of the souther hemisphere
     // we need to change the latitude loop
-    for (float lat = 0; lat <= 90.f; lat += deltalat)
+    //for (float lat = 0.f; lat <= 90.f; lat += deltalat)
     {
         numVertices = 0;
         lineStringList.append(new OGRLineString());
@@ -1676,10 +1645,8 @@ void MGraticuleActor::cutWithBoundingBox(QRectF cornerRect)
             QVector<QVector2D> stereopoint;
             regularpoint.append(QVector2D(point->getX(),point->getY()));
 
-            stereopoint = naturalEarthDataLoader->convertRegularLatLonToPolarStereographicCoords(
-                        regularpoint,
-                        stereoStandardLat,
-                        stereoStraightLon);
+            stereopoint = naturalEarthDataLoader->convertRegularLatLonToPolarStereographicCoordsUsingProj(
+                        regularpoint, this->projLibraryString);
 
             lineStringList.append(new OGRLineString());
             lineString = lineStringList.last();
@@ -1692,6 +1659,7 @@ void MGraticuleActor::cutWithBoundingBox(QRectF cornerRect)
         // Add missing connection line for spacing between first and
         // last lon smaller than deltalon.
         // ToDo: is this necessary in stereographic case?
+        /*
         if (lon > 180.f)
         {
             point->setX(-180.f);
@@ -1700,17 +1668,15 @@ void MGraticuleActor::cutWithBoundingBox(QRectF cornerRect)
             QVector<QVector2D> stereopoint;
             regularpoint.append(QVector2D(point->getX(),point->getY()));
 
-            stereopoint = naturalEarthDataLoader->convertRegularLatLonToPolarStereographicCoords(
-                        regularpoint,
-                        stereoStandardLat,
-                        stereoStraightLon);
+            stereopoint = naturalEarthDataLoader->convertRegularLatLonToPolarStereographicCoordsUsingProj(
+                        regularpoint, this->projLibraryString);
 
             lineStringList.append(new OGRLineString());
             lineString = lineStringList.last();
             lineString->addPoint(stereopoint[0].x(), stereopoint[0].y());
 
         }
-
+        */
         foreach (lineString, lineStringList)
         {
 
@@ -1821,7 +1787,8 @@ void MGraticuleActor::cutWithBoundingBox(QRectF cornerRect)
         // cells.
         // MM + MKM loop from 0.(instead of -90.) to 90.,
         // to avoid spurious lines being drawn
-        for (float lat = 0.f; lat <= 90.f; lat += deltalat)
+        //for (float lat = 0.f; lat <= 90.f; lat += deltalat)
+        for (float lat = -90.f; lat <= 90.f; lat += deltalat)
         {
             point->setX(lon);
             point->setY(lat);
@@ -1829,10 +1796,8 @@ void MGraticuleActor::cutWithBoundingBox(QRectF cornerRect)
             QVector<QVector2D> stereopoint;
             regularpoint.append(QVector2D(point->getX(),point->getY()));
 
-            stereopoint = naturalEarthDataLoader->convertRegularLatLonToPolarStereographicCoords(
-                        regularpoint,
-                        stereoStandardLat,
-                        stereoStraightLon);
+            stereopoint = naturalEarthDataLoader->convertRegularLatLonToPolarStereographicCoordsUsingProj(
+                        regularpoint, this->projLibraryString);
 
             lineString->addPoint(stereopoint[0].x(), stereopoint[0].y());
         }
@@ -1919,7 +1884,7 @@ void MGraticuleActor::updateCoastalLines(QRectF cornerRect)
 {
     QVector<QVector2D> verticesCoastlines;
 
-    if(!enableStereographicGrid)
+    if(!enableProjLibraryProjection)
     {
         if (enableGridRotation)
         {
@@ -1960,9 +1925,6 @@ void MGraticuleActor::updateCoastalLines(QRectF cornerRect)
     }
     else // Stereographic case
     {
-        // get parameters for converting between lat-lon and stereographic coordinates
-        float stereoStraightLon = this ->stereoStraightLon;
-        float stereoStandardLat = this -> stereoStandardLat;
 
         if(rotateBBox)
         {
@@ -2005,8 +1967,7 @@ void MGraticuleActor::updateCoastalLines(QRectF cornerRect)
                         &coastlineVertexCount,
                         false, rotatedNorthPole.y(),
                         rotatedNorthPole.x(),
-                        stereoStandardLat,
-                        stereoStraightLon
+                        this->projLibraryString
                         );  // ToDo: clear rotated pole vectors
 
 
@@ -2026,7 +1987,7 @@ void MGraticuleActor::updateBorderLines(QRectF cornerRect)
 {
     QVector<QVector2D> verticesBorderlines;
 
-    if(!enableStereographicGrid)
+    if(!enableProjLibraryProjection)
     {
         if (enableGridRotation)
         {
@@ -2069,9 +2030,6 @@ void MGraticuleActor::updateBorderLines(QRectF cornerRect)
     else // Stereographic Case
     {
 
-        // get parameters for converting between lat-lon and stereographic coordinates
-        float stereoStraightLon = this ->stereoStraightLon;
-        float stereoStandardLat = this -> stereoStandardLat;
 
         // this is disabled, as above. ToDo: either enable and fix or delete.
         if(rotateBBox)
@@ -2111,9 +2069,8 @@ void MGraticuleActor::updateBorderLines(QRectF cornerRect)
                         &borderlineStartIndices,
                         &borderlineVertexCount,
                         false, rotatedNorthPole.y(),
-                        rotatedNorthPole.x(),
-                        stereoStandardLat,
-                        stereoStraightLon);  // clear vectors
+                        rotatedNorthPole.x(),this->projLibraryString
+                        );  // clear vectors
 
             const QString borderRequestKey = "graticule_borderlines_actor#"
                                              + QString::number(getID());

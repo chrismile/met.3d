@@ -42,6 +42,8 @@
 #include "gxfw/gl/texture.h"
 #include "gxfw/boundingbox/boundingbox.h"
 
+#include "gdal_priv.h"
+
 
 class MGLResourcesManager;
 class MSceneViewGLWidget;
@@ -90,6 +92,8 @@ protected:
 
 private:
     void loadMap(std::string filename);
+
+    void LoadGDALDataset(GDALDataset* dataset);
     /**
       @brief getBBoxOfRotatedBBox calcuates a rectangle bounding box in
       rotated coordinates covering the region of a complete map.
@@ -135,6 +139,7 @@ private:
     // Map image colour (de)saturation.
     GLfloat     colourSaturation;
     QtProperty *colourSaturationProperty;
+
 };
 
 

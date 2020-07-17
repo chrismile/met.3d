@@ -1623,21 +1623,25 @@ MStructuredGrid *MClimateForecastReader::readGrid(
          if (treatStereographicGridAsRegularGrid)
          {
             string units = "";
-            float scale_factor = 1.0f;
+            float scaleFactor = MetConstants::scaleFactorToFitStereoCoordsTo360;
             shared->lonVar.getAtt("units").getValues(units);
-            if(units == "m")
-                scale_factor = 1000000.0f;
-            else if(units == "km")
-                scale_factor = 1000.0f;
+            if (units == "m")
+            {
+                scaleFactor *= 1000.0f;
+            }
+            else if (units != "km")
+            {
+                LOG4CPLUS_ERROR(mlog, "Stereographic coordinates x,y have unknown units!");
+            }
             int size = shared->lats.size();
             for (int i = 0; i < size; i++)
             {
-                shared->lats[i] /= scale_factor;
+                shared->lats[i] /= scaleFactor;
             }
             size = shared->lons.size();
             for (int i = 0; i < size; i++)
             {
-                shared->lons[i] /= scale_factor;
+                shared->lons[i] /= scaleFactor;
             }
          }
 

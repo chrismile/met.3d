@@ -1,3 +1,4 @@
+*.tif
 *.o
 *.swp
 Debug

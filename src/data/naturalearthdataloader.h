@@ -141,8 +141,7 @@ public:
     void loadAndTransformStereographicLineGeometryAndCutUsingBBox(
             GeometryType type, QRectF bbox, QVector<QVector2D> *vertices,
             QVector<int> *startIndices, QVector<int> *count, bool append,
-            double poleLat, double poleLon,
-            float stereoStandardLat, float stereoStraightLon);
+            double poleLat, double poleLon,QString proj4_string);
 
     /**
      @brief geographicalToRotatedCoords transforms @p point according to the
@@ -275,11 +274,14 @@ public:
     // implementations here:
     // https://nsidc.org/data/polar-stereo/tools_geo_pixel.html#geolocate
     // ftp://sidads.colorado.edu/pub/DATASETS/brightness-temperatures/polar-stereo/tools/geo-coord/fortran/
-    QVector<QVector2D> convertRegularLatLonToPolarStereographicCoords(
-            QVector<QVector2D> verticesVector,
-            float stereoStandardLat,
-            float stereoStraightLon
-            );
+//    QVector<QVector2D> convertRegularLatLonToPolarStereographicCoords(
+//            QVector<QVector2D> verticesVector,
+//            float stereoStandardLat,
+//            float stereoStraightLon
+//            );
+
+    QVector<QVector2D> convertRegularLatLonToPolarStereographicCoordsUsingProj(
+            QVector<QVector2D> verticesVector,QString proj4_string);
 
 private:
     /**

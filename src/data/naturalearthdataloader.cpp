@@ -41,9 +41,14 @@
 #include <QVector>
 #include <QVector2D>
 
+#ifdef ACCEPT_USE_OF_DEPRECATED_PROJ_API_H
+#include <proj_api.h>
+#endif
+
 // local application imports
 #include "util/mutil.h"
 #include "util/mexception.h"
+#include "util/metroutines.h"
 
 using namespace std;
 
@@ -709,8 +714,7 @@ void MNaturalEarthDataLoader::loadAndRotateLineGeometryUsingRotatedBBox(
 void MNaturalEarthDataLoader::loadAndTransformStereographicLineGeometryAndCutUsingBBox(
         GeometryType type, QRectF bbox, QVector<QVector2D> *vertices,
         QVector<int> *startIndices, QVector<int> *count, bool append,
-        double poleLat, double poleLon, float stereoStandardLat,
-        float stereoStraightLon)
+        double poleLat, double poleLon,QString proj4_string)
 {
     if (gdalDataSet.size() < 2)
     {
@@ -788,10 +792,8 @@ void MNaturalEarthDataLoader::loadAndTransformStereographicLineGeometryAndCutUsi
             QVector<QVector2D> stereopoint;
             regularpoint.append(QVector2D(point->getX(),point->getY()));
 
-            stereopoint = convertRegularLatLonToPolarStereographicCoords(
-                        regularpoint,
-                        stereoStandardLat,
-                        stereoStraightLon);
+            stereopoint = convertRegularLatLonToPolarStereographicCoordsUsingProj(
+                        regularpoint, proj4_string);
 
             // For rotation loop over all vertices of the current lineString,
             // apply the rotation and store the point in a new line string.
@@ -802,10 +804,8 @@ void MNaturalEarthDataLoader::loadAndTransformStereographicLineGeometryAndCutUsi
                 QVector<QVector2D> stereopoint;
                 regularpoint.append(QVector2D(point->getX(),point->getY()));
 
-                stereopoint = convertRegularLatLonToPolarStereographicCoords(
-                            regularpoint,
-                            stereoStandardLat,
-                            stereoStraightLon);
+                stereopoint = convertRegularLatLonToPolarStereographicCoordsUsingProj(
+                            regularpoint, proj4_string);
 
                 // Start new line.
                 lineStringList.append(new OGRLineString());
@@ -1324,7 +1324,7 @@ QVector<QVector2D> MNaturalEarthDataLoader::convertPolarStereographicToRegularLa
                 iLon=SGN*iLon;
 
                 // convert from radians to degree and account for
-                // offset of vertical meridian from pole
+                // offset of vertical meridian from pole undefined
                 iLat=iLat*180./M_PI;
                 iLon=(iLon*180./M_PI)-stereoStraightLon;
             }
@@ -1342,7 +1342,74 @@ QVector<QVector2D> MNaturalEarthDataLoader::convertPolarStereographicToRegularLa
 
 }
 
+/*
+double x = 138494.92605;
+  double y = 467792.640021;
 
+  char *srid28992 = "+proj=sterea +lat_0=52.15616055555555 +lon_0=5.38763888888889 +k=0.9999079 +x_0=155000 +y_0=463000 +ellps=bessel +towgs84=565.04,49.91,465.84,-1.9848,1.7439,-9.0587,4.0772 +units=m +no_defs";
+  char *srid4326 = "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs";
+
+  projPJ source = pj_init_plus(srid28992);
+  projPJ target = pj_init_plus(srid4326);
+
+  if(source==NULL || target==NULL)
+    return false;
+
+  int success = pj_transform(source, target, 1, 1, &x, &y, NULL );
+
+  x *= RAD_TO_DEG;
+  y *= RAD_TO_DEG;
+*/
+
+
+QVector<QVector2D> MNaturalEarthDataLoader::convertRegularLatLonToPolarStereographicCoordsUsingProj(
+        QVector<QVector2D> verticesVector,QString proj4_string)
+{
+    // define output array
+    QVector<QVector2D> stereographicVerticesVector;
+    double cur_reg_lat, cur_reg_lon;
+    float stereoScaleFactor = MetConstants::scaleFactorToFitStereoCoordsTo360;
+    int errorCodeProjLibrary;
+
+    // Proj4 variables
+    projPJ pj_stereo, pj_latlong;
+
+    pj_stereo = pj_init_plus(proj4_string.toStdString().c_str());
+    //pj_stereo  = pj_init_plus("+proj=stere +a=6378273 +b=6356889.44891 +lat_0=90 +lat_ts=70 +lon_0=0"); //ups
+    //pj_stereo  = pj_init_plus("+proj=robin +lon_0=0 +x_0=0 +y_0=0 +a=6371000 +b=6371000 +units=m +no_defs"); //ups
+    //pj_stereo = pj_init_plus("+proj=merc +lat_ts=0 +lon_0=0 +k=1.000000 +x_0=0 +y_0=0 +ellps=WGS84 +datum=WGS84 +units=m +no_defs");
+    pj_latlong = pj_init_plus("+proj=latlong");
+
+    for (int i = 0; i <verticesVector.size() ; i++)
+    {
+        QVector2D stereographic_point;
+
+        cur_reg_lat = verticesVector[i].y();
+        cur_reg_lat = degreesToRadians(cur_reg_lat);
+
+        cur_reg_lon = verticesVector[i].x();
+        cur_reg_lon = degreesToRadians(cur_reg_lon);
+
+        errorCodeProjLibrary = pj_transform(pj_latlong, pj_stereo, 1, 1, &cur_reg_lon, &cur_reg_lat, NULL );
+        stereographic_point.setX(cur_reg_lon/
+        (stereoScaleFactor * stereoScaleFactor));
+        stereographic_point.setY(cur_reg_lat/
+        (stereoScaleFactor * stereoScaleFactor));
+        stereographicVerticesVector.append(stereographic_point);
+
+        if(errorCodeProjLibrary)
+        {
+            // In later version of proj, const char* proj_errno_string(int err)
+            // is available to get the text corresponding to the error code to.
+            LOG4CPLUS_ERROR(mlog,"Error " << errorCodeProjLibrary <<
+                            "encountered during transformation using Proj library\n");
+        }
+    }
+    return stereographicVerticesVector;
+}
+
+
+/*
 QVector<QVector2D> MNaturalEarthDataLoader::convertRegularLatLonToPolarStereographicCoords(
         QVector<QVector2D> verticesVector,
         float stereoStandardLat,
@@ -1352,7 +1419,6 @@ QVector<QVector2D> MNaturalEarthDataLoader::convertRegularLatLonToPolarStereogra
     QVector<QVector2D> stereographicVerticesVector;
 
     // define constants for coordinate conversion
-    float DEG_TO_RAD = M_PI / 180.0;
     float E = 0.08182;                 // eccentricity of ellipsoid Earth
     float ESQUARE = E * E;
 
@@ -1368,14 +1434,14 @@ QVector<QVector2D> MNaturalEarthDataLoader::convertRegularLatLonToPolarStereogra
 
     // rescale radius of Earth to units of stereographic grid coords
     float EARTH_RADIUS_km = 6378.3;
-    float stereoScaleFactor = 1000.0f;
+    float stereoScaleFactor = MetConstants::scaleFactorToFitStereoCoordsTo360;
     RE = EARTH_RADIUS_km * stereoScaleFactor;
 
     for (int i = 0; i <verticesVector.size() ; i++)
     {
         QVector2D stereographic_point;
         cur_reg_lat = verticesVector[i].y();
-        cur_reg_lat *= DEG_TO_RAD;
+        cur_reg_lat = degreesToRadians(cur_reg_lat);
 
         cur_stereo_x = 0.0f;
         cur_stereo_y = 0.0f;
@@ -1390,7 +1456,7 @@ QVector<QVector2D> MNaturalEarthDataLoader::convertRegularLatLonToPolarStereogra
             cur_reg_lon = verticesVector[i].x();
             cur_reg_lon = cur_reg_lon + DELTA_LON; // MKM rotate globe
             cur_reg_lon = 180.0f - cur_reg_lon;
-            cur_reg_lon *= DEG_TO_RAD;
+            cur_reg_lon = degreesToRadians(cur_reg_lon);
 
             T = tan( M_PI/4.0f - cur_reg_lat / 2.0f ) /pow( ( (1.0f - E * sin(cur_reg_lat) ) /
                                                             (1.0f + E * sin(cur_reg_lat) ) ),(E / 2.0f ) );
@@ -1402,7 +1468,7 @@ QVector<QVector2D> MNaturalEarthDataLoader::convertRegularLatLonToPolarStereogra
             }
             else
             {
-                REF_LAT_RAD = REF_LAT * DEG_TO_RAD;
+                REF_LAT_RAD = degreesToRadians(REF_LAT);
                 float esin1;
                 esin1 = E * sin(REF_LAT_RAD);
                 //TC = tan( M_PI/4.0f - REF_LAT_RAD / 2.0f ) / pow(((1.0f - E * sin(REF_LAT_RAD) ) / (1.0f + E * sin(REF_LAT_RAD))),(E/2.0f));
@@ -1422,6 +1488,7 @@ QVector<QVector2D> MNaturalEarthDataLoader::convertRegularLatLonToPolarStereogra
     return stereographicVerticesVector;
 
 }
+*/
 
 
 /******************************************************************************

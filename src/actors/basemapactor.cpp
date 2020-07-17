@@ -33,7 +33,6 @@
 
 // related third party imports
 #include <log4cplus/loggingmacros.h>
-#include <gdal_priv.h>
 #include <QString>
 #include <QFileDialog>
 
@@ -226,15 +225,46 @@ void MBaseMapActor::onQtPropertyChanged(QtProperty* property)
                 properties->mDDouble()->value(colourSaturationProperty);
         emitActorChangedSignal();
     }
+    // enable/disable GUI options for grid projections
+    else if ( ( property == gridProjectionTypesProperty))
+    {
 
-//    if (property == enableGridRotationProperty)
-//    {
-//        enableGridRotation =
-//                properties->mBool()->value(enableGridRotationProperty);
-//        if (suppressActorUpdates()) return;
-//        emitActorChangedSignal();
-//    }
-
+        gridProjectionTypes projIndex = stringToGridProjection(properties->getEnumItem(
+                                                   gridProjectionTypesProperty));
+        switch (projIndex)
+        {
+        case GRIDPROJECTION_CYLINDRICAL:
+            gridProjection = GRIDPROJECTION_CYLINDRICAL;
+            rotateBBoxProperty->setEnabled(false);
+            rotatedNorthPoleProperty->setEnabled(false);
+            enableGridRotation = false;
+            projLibraryStringProperty->setEnabled(false);
+            enableProjLibraryProjection = false;
+            if (suppressActorUpdates()) return;
+            emitActorChangedSignal();
+            break;
+        case GRIDPROJECTION_ROTATEDLATLON:
+            gridProjection = GRIDPROJECTION_ROTATEDLATLON;
+            rotateBBoxProperty->setEnabled(true);
+            rotatedNorthPoleProperty->setEnabled(true);
+            enableGridRotation = true;
+            projLibraryStringProperty->setEnabled(false);
+            enableProjLibraryProjection = false;
+            if (suppressActorUpdates()) return;
+            emitActorChangedSignal();
+            break;
+        case GRIDPROJECTION_PROJ_LIBRARY:
+            gridProjection = GRIDPROJECTION_PROJ_LIBRARY;
+            rotateBBoxProperty->setEnabled(false);
+            rotatedNorthPoleProperty->setEnabled(false);
+            enableGridRotation = false;
+            projLibraryStringProperty->setEnabled(true);
+            enableProjLibraryProjection = true;
+            if (suppressActorUpdates()) return;
+            emitActorChangedSignal();
+            break;
+        }
+    }
     else if (property == rotateBBoxProperty)
     {
         rotateBBox = properties->mBool()->value(rotateBBoxProperty);
@@ -262,7 +292,7 @@ void MBaseMapActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
         QVector4D bboxVec4(bBoxConnection->westLon(), bBoxConnection->southLat(),
                            bBoxConnection->eastLon(), bBoxConnection->northLat());
         // Bind shader program.
-        if (enableGridRotation)
+        if (enableGridRotation) // Rotated 
         {
             // Bounding box is given in coordinates of the real geographical
             // system.
@@ -287,7 +317,10 @@ void MBaseMapActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
             shaderProgram->setUniformValue(
                         "poleLon", GLfloat(rotatedNorthPole.x()));
         }
-        else
+        /*else if(enableProjLibraryProjection) //Stereographic
+        {
+        }*/
+        else // Cylindrical
         {
             shaderProgram->bindProgram("Basemap");
             shaderProgram->setUniformValue("cornersBox", bboxVec4);
@@ -378,10 +411,16 @@ void MBaseMapActor::loadMap(std::string filename)
     const int32_t latitudeDim = tiffData->GetRasterYSize();
     const int32_t colorDim = tiffData->GetRasterCount();
 
-    llcrnrlat = geoData[3] + geoData[5] * latitudeDim;
-    llcrnrlon = geoData[0];
-    urcrnrlat = geoData[3];
-    urcrnrlon = geoData[0] + geoData[1] * longitudeDim;
+    float scaleFactor =  1.0f;
+    if( gridProjection == GRIDPROJECTION_PROJ_LIBRARY)
+    {
+        scaleFactor =  1.0e+6f;
+    }
+
+    llcrnrlat = (geoData[3] + geoData[5] * latitudeDim) / scaleFactor;
+    llcrnrlon = geoData[0] / scaleFactor;
+    urcrnrlat = geoData[3] / scaleFactor;
+    urcrnrlon = (geoData[0] + geoData[1] * longitudeDim) / scaleFactor;
 
     LOG4CPLUS_DEBUG(mlog, "\tLongitude range: " << llcrnrlon << " - "
                     << urcrnrlon << flush);
@@ -522,6 +561,172 @@ void MBaseMapActor::loadMap(std::string filename)
     }
 }
 
+
+void MBaseMapActor::LoadGDALDataset(GDALDataset* tiffData)
+{
+
+#ifdef ENABLE_MET3D_STOPWATCH
+    MStopwatch stopwatch;
+#endif
+    // get the geo-spatial translation of the current raster dataset
+    QVector<double> geoData(6);
+    // 0 - top left x
+    // 1 - w-e pixel resolution
+    // 2 - 0
+    // 3 - top left y
+    // 4 - 0
+    // 5 - n-s pixel resolution (negative)
+
+    tiffData->GetGeoTransform(&geoData[0]);
+
+    // calculate lat/lon corners of loaded map and store them in class
+    const int32_t longitudeDim = tiffData->GetRasterXSize();
+    const int32_t latitudeDim = tiffData->GetRasterYSize();
+    const int32_t colorDim = tiffData->GetRasterCount();
+
+    llcrnrlat = geoData[3] + geoData[5] * latitudeDim;
+    llcrnrlon = geoData[0];
+    urcrnrlat = geoData[3];
+    urcrnrlon = geoData[0] + geoData[1] * longitudeDim;
+
+    LOG4CPLUS_DEBUG(mlog, "\tLongitude range: " << llcrnrlon << " - "
+                    << urcrnrlon << flush);
+    LOG4CPLUS_DEBUG(mlog, "\tLatitude range: " << llcrnrlat << " - "
+                    << urcrnrlat << flush);
+
+    // read the color data by using bands
+    // we need three bands for every color channel
+    GDALRasterBand* bandRed;
+    GDALRasterBand* bandGreen;
+    GDALRasterBand* bandBlue;
+
+    bandRed = tiffData->GetRasterBand(1);
+    bandGreen = tiffData->GetRasterBand(2);
+    bandBlue = tiffData->GetRasterBand(3);
+
+    // GDALGetDataTypeName(band->GetRasterDataType()) <- datatype
+    // DALGetColorInterpretationName(band->GetColorInterpretation()) <- color channel
+
+    std::string dataType = GDALGetDataTypeName(bandRed->GetRasterDataType());
+
+    if (dataType != "Byte")
+    {
+        LOG4CPLUS_ERROR(mlog, "Raster dataset has no data of type Byte.");
+        return;
+    }
+
+    // image data
+    const int32_t imgSizeX = longitudeDim * colorDim;
+    const int32_t imgSize = imgSizeX * latitudeDim;
+
+    std::vector<GLbyte> tiffImg;
+    // changed reserve to resize because of "vector subscript out of range"
+    // error on windows
+    tiffImg.resize(imgSize * sizeof(GLbyte));
+    //GLbyte* tiffImg = new GLbyte[imgSize * sizeof(GLbyte)];
+
+//    std::string file = filename.substr(0, filename.find_last_of("."));
+//    std::string cacheFilename = file + ".ctif";
+
+    // print out some information
+    LOG4CPLUS_DEBUG(mlog, "\tMap texture size (lon/lat/col): " << longitudeDim
+                    << "x" << latitudeDim << "x" << colorDim);
+
+    // print out some information
+    LOG4CPLUS_DEBUG(mlog, "\tParsing color data..." << flush);
+
+
+    // if we can found a cache file
+//    FILE* cacheFile = fopen(cacheFilename.c_str(), "rb");
+//    if (cacheFile != nullptr)
+//    {
+//        LOG4CPLUS_DEBUG(mlog, "\tFound and using cache color data <"
+//                        << cacheFilename << ">...");
+
+//        // obtain binary data from the exisiting file
+//        fread(&tiffImg[0], sizeof(GLbyte), imgSize, cacheFile);
+//        fclose(cacheFile);
+//    }
+//    else
+//    {
+        // fetch the raster data of all color components
+        std::vector<GLbyte> rasterRed(longitudeDim * latitudeDim);
+        std::vector<GLbyte> rasterGreen(longitudeDim * latitudeDim);
+        std::vector<GLbyte> rasterBlue(longitudeDim * latitudeDim);
+        // load whole raster data into buffers
+        bandRed->RasterIO(GF_Read, 0, 0, longitudeDim, latitudeDim, &rasterRed[0], longitudeDim, latitudeDim, GDT_Byte, 0, 0);
+        bandGreen->RasterIO(GF_Read, 0, 0, longitudeDim, latitudeDim, &rasterGreen[0], longitudeDim, latitudeDim, GDT_Byte, 0, 0);
+        bandBlue->RasterIO(GF_Read, 0, 0, longitudeDim, latitudeDim, &rasterBlue[0], longitudeDim, latitudeDim, GDT_Byte, 0, 0);
+
+        // copy the color components into the image buffer
+        for (int i = 0; i < longitudeDim * latitudeDim; ++i)
+        {
+            const uint32_t tiffID = i * colorDim;
+
+            tiffImg[tiffID + 0] = rasterRed[i];
+            tiffImg[tiffID + 1] = rasterGreen[i];
+            tiffImg[tiffID + 2] = rasterBlue[i];
+        }
+
+//        LOG4CPLUS_DEBUG(mlog, "\tCaching color data into file <"
+//                        << cacheFilename << ">...");
+
+//        // write out a cache file to enhance the loading process
+//        cacheFile = fopen(cacheFilename.c_str(), "wb");
+//        fwrite(&tiffImg[0], sizeof(GLbyte), imgSize, cacheFile);
+//        fclose(cacheFile);
+//    }
+
+#ifdef ENABLE_MET3D_STOPWATCH
+    stopwatch.split();
+    LOG4CPLUS_DEBUG(mlog, "GeoTIFF read in "
+                    << stopwatch.getLastSplitTime(MStopwatch::SECONDS)
+                    << " seconds.\n" << flush);
+#endif
+
+    // at the end close the tiff file
+    //GDALClose(tiffData);
+
+    MGLResourcesManager* glRM = MGLResourcesManager::getInstance();
+
+    if (texture == nullptr)
+    {
+        QString textureID = QString("baseMap_#%1").arg(getID());
+        texture = new GL::MTexture(textureID, GL_TEXTURE_2D, GL_RGB8,
+                                   longitudeDim, latitudeDim);
+
+        if (!glRM->tryStoreGPUItem(texture))
+        {
+            delete texture;
+            texture = nullptr;
+        }
+    }
+
+    if (texture)
+    {
+        texture->updateSize(longitudeDim, latitudeDim);
+
+        glRM->makeCurrent();
+        texture->bindToLastTextureUnit();
+
+        // Set texture parameters: wrap mode and filtering (RTVG p. 64).
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+
+        // DEBUG
+        //std::cout << longitudeDim * latitudeDim * colorDim << std::endl;
+        //GLint size;
+        //glGetIntegerv(GL_MAX_TEXTURE_SIZE,&size);
+        //std::cout << size << std::endl << flush;
+
+        // Upload data array to GPU.
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB,
+                     longitudeDim, latitudeDim,
+                     0, GL_RGB, GL_UNSIGNED_BYTE, &tiffImg[0]); CHECK_GL_ERROR;
+    }
+}
 
 QVector4D MBaseMapActor::getBBoxOfRotatedBBox()
 {

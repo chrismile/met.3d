@@ -63,6 +63,9 @@ const double EARTH_RADIUS_km = 6371.; // km
 
 // Source: http://hpiers.obspm.fr/eop-pc/models/constants.html
 const double EARTHS_ANGULAR_SPEED_OF_ROTATION = 7.292115E-5; // rad/s
+
+// Scaling factor for projections
+const double scaleFactorToFitStereoCoordsTo360 = 1000.0;
 }
 
 

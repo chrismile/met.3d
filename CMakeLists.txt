@@ -50,6 +50,7 @@ add_definitions(-DENABLE_MET3D_STOPWATCH
                 -DENABLE_RAYCASTER_ACCELERATION
                 -DDIRECT_SYNCHRONIZATION
                 -DQCUSTOMPLOT_USE_LIBRARY
+                -DACCEPT_USE_OF_DEPRECATED_PROJ_API_H
                 -DNOMINMAX) # required for windows support
 
 set(CMAKE_CXX_STANDARD 11)
@@ -242,6 +243,13 @@ endif()
 #find_package(Eigen3 REQUIRED)
 #include_directories(${EIGEN3_INCLUDE_DIR})
 
+# proj
+find_package(proj REQUIRED)
+include_directories(${proj_INCLUDE_DIR})
+# Add PROJ library version as preprocessor definitions.
+add_definitions(-DPROJ_MAJOR_VERSION=${proj_MAJOR_VERSION})
+add_definitions(-DPROJ_MINOR_VERSION=${proj_MINOR_VERSION})
+add_definitions(-DPROJ_PATCH_VERSION=${proj_PATCH_VERSION})
 
 ##############################################################################
 #                      Configure Other Projects                              #
@@ -319,6 +327,7 @@ target_link_libraries(Met3D
                         ${netcdf_cxx4_C_LIBRARIES}
                         ${qcustomplot_LIBRARIES}
                         ${glfx_LIBRARIES}
+			${proj_LIBRARIES}
                         #${EIGEN3_LIBRARIES}
   )
 
@@ -414,6 +423,7 @@ if(WIN32)
   find_dll_for_package(glfx)
   find_dll_for_package(GLEW)
   find_dll_for_package(qcustomplot)
+  find_dll_for_package(proj)
   
   find_dll_dummy(GEOS)
   find_dll_dummy(GEOS_C)

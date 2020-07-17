@@ -57,10 +57,7 @@ MMapProjectionSupportingActor::MMapProjectionSupportingActor()
       enableGridRotation(false),
       rotateBBox(false),
       rotatedNorthPole(QPointF(-180., 90.)),
-      enableStereographicGrid(false),
-      stereoBBox(false),
-      stereoStraightLon(0),
-      stereoStandardLat(70)
+      enableProjLibraryProjection(false)
 {
     // Create and initialise QtProperties for the GUI.
     // ===============================================
@@ -76,7 +73,7 @@ MMapProjectionSupportingActor::MMapProjectionSupportingActor()
     QStringList gridProjectionNames;
     gridProjectionNames << gridProjectionToString(GRIDPROJECTION_CYLINDRICAL)
                         << gridProjectionToString(GRIDPROJECTION_ROTATEDLATLON)
-                        << gridProjectionToString(GRIDPROJECTION_STEREOGRAPHIC);
+                        << gridProjectionToString(GRIDPROJECTION_PROJ_LIBRARY);
     gridProjectionTypesProperty = addProperty(
                 ENUM_PROPERTY, "type of projection", gridProjectionPropertiesSubGroup);
     properties->mEnum()->setEnumNames(gridProjectionTypesProperty, gridProjectionNames);
@@ -94,23 +91,13 @@ MMapProjectionSupportingActor::MMapProjectionSupportingActor()
     properties->mPointF()->setValue(rotatedNorthPoleProperty, rotatedNorthPole);
     rotatedNorthPoleProperty->setEnabled(false);
 
-    // inputs for grid projection: rotated lat lon
-    stereoBBoxProperty = addProperty(BOOL_PROPERTY, "polar stereographic bounding box",
-                                     gridProjectionPropertiesSubGroup);
-    properties->mBool()->setValue(stereoBBoxProperty, stereoBBox);
-    stereoBBoxProperty->setEnabled(false);
-
-    stereoProjLonProperty = addProperty(
-                DOUBLE_PROPERTY, "stereo. proj.: vertical longitude from pole",
-                gridProjectionPropertiesSubGroup);
-    properties->setDouble(stereoProjLonProperty,stereoStraightLon,-180,180,1,1);
-    stereoProjLonProperty->setEnabled(false);
-
-    stereoProjLatProperty = addProperty(
-                DOUBLE_PROPERTY, "stereo. proj.: standard parallel latitude",
-                gridProjectionPropertiesSubGroup);
-    properties->setDouble(stereoProjLatProperty,stereoStandardLat,-90,90,1,1);
-    stereoProjLatProperty->setEnabled(false);
+    projLibraryStringProperty = addProperty(
+                    STRING_PROPERTY, "Proj Library Settings String",
+                    gridProjectionPropertiesSubGroup);
+    properties->mString()->setValue(projLibraryStringProperty,
+    "+proj=stere +a=6378273 +b=6356889.44891 +lat_0=90 +lat_ts=70 +lon_0=0");
+    projLibraryStringProperty->setToolTip("https://proj.org/usage/projections.html");
+    projLibraryStringProperty->setEnabled(false);
 
     // ToDo (MM, 05/2020): define stuff for southern hemisphere and possibly also other projection params
 
@@ -134,10 +121,8 @@ void MMapProjectionSupportingActor::saveConfiguration(QSettings *settings)
     settings->setValue("useRotation", enableGridRotation);
     settings->setValue("rotateBoundingBox", rotateBBox);
     settings->setValue("rotatedNorthPole", rotatedNorthPole);
-    settings->setValue("useStereographic", enableStereographicGrid);
-    settings->setValue("stereoBoundingBox", stereoBBox);
-    settings->setValue("stereoStraightLon", stereoStraightLon);
-    settings->setValue("stereoStandardLat", stereoStandardLat);
+
+    settings->setValue("enableProjLibraryProjection",enableProjLibraryProjection);
     settings->endGroup();
 }
 
@@ -158,17 +143,9 @@ void MMapProjectionSupportingActor::loadConfiguration(QSettings *settings)
                 rotatedNorthPoleProperty,
                 settings->value("rotatedNorthPole",
                                 QPointF(-180., 90.)).toPointF());
-   properties->mBool()->setValue(
-               stereoBBoxProperty,
-               settings->value("stereoBoundingBox", false).toBool());
-   properties->mDouble()->setValue(
-               stereoProjLonProperty,
-               settings->value("stereoStraightLon",
-                               0.).toDouble());
-   properties->mDouble()->setValue(
-               stereoProjLatProperty,
-               settings->value("stereoStandardLat",
-                               0.).toDouble());
+   properties->mString()->setValue(
+                   projLibraryStringProperty,
+                   settings->value("enableProjLibraryProjection","").toString());
     settings->endGroup();
 }
 
@@ -183,9 +160,9 @@ MMapProjectionSupportingActor::gridProjectionTypes MMapProjectionSupportingActor
     {
         return GRIDPROJECTION_ROTATEDLATLON;
     }
-    else if (gridProjectionName == "polar stereographic")
+    else if (gridProjectionName == "proj'-library supported projection")
     {
-        return GRIDPROJECTION_STEREOGRAPHIC;
+        return GRIDPROJECTION_PROJ_LIBRARY;
     }
     else
     {
@@ -201,7 +178,7 @@ QString MMapProjectionSupportingActor::gridProjectionToString(
     {
         case GRIDPROJECTION_CYLINDRICAL: return "cylindrical";
         case GRIDPROJECTION_ROTATEDLATLON: return "rotated lat.-lon.";
-        case GRIDPROJECTION_STEREOGRAPHIC: return "polar stereographic";
+        case GRIDPROJECTION_PROJ_LIBRARY: return "proj'-library supported projection";
     }
     return "cylindrical";
 }

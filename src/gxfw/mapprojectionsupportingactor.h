@@ -74,7 +74,7 @@ public:
     typedef enum {
         GRIDPROJECTION_CYLINDRICAL = 0,
         GRIDPROJECTION_ROTATEDLATLON = 1,
-        GRIDPROJECTION_STEREOGRAPHIC = 2,
+        GRIDPROJECTION_PROJ_LIBRARY = 2,
     } gridProjectionTypes;
 
     // convert grid projection between enum and string
@@ -94,14 +94,10 @@ protected:
     QPointF rotatedNorthPole;
     QtProperty *rotatedNorthPoleProperty;
 
-    // definitions for projection: polar stereographic
-    bool enableStereographicGrid;
-    bool stereoBBox;
-    QtProperty *stereoBBoxProperty;
-    float stereoStraightLon;
-    QtProperty *stereoProjLonProperty;
-    float stereoStandardLat;
-    QtProperty *stereoProjLatProperty;
+    // definitions for projection: Proj Library based projection
+    bool enableProjLibraryProjection;
+    QtProperty *projLibraryStringProperty;
+    QString projLibraryString;
 };
 
 } // namespace Met3D
