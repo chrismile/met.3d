@@ -318,6 +318,9 @@ protected:
         QtProperty* enableShadowsProperty;
         bool        enableShadows;
 
+        QtProperty* shadowMapElevationProp;
+        float       shadowMapElevation_hPa;
+
         QtProperty* enableSelfShadowingProperty;
         bool        enableSelfShadowing;
 

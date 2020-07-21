@@ -229,6 +229,7 @@ MIsosurfaceIntersectionActor::AppearanceSettings::AppearanceSettings(
     transferFunction(nullptr),
     textureUnitTransferFunction(-1),
     enableShadows(true),
+    shadowMapElevation_hPa(1049.7),
     enableSelfShadowing(true),
     polesEnabled(false),
     dropMode(3)
@@ -280,6 +281,12 @@ MIsosurfaceIntersectionActor::AppearanceSettings::AppearanceSettings(
     enableShadowsProperty = a->addProperty(BOOL_PROPERTY, "render shadows",
                                            groupProp);
     properties->mBool()->setValue(enableShadowsProperty, enableShadows);
+
+    shadowMapElevationProp = a->addProperty(DECORATEDDOUBLE_PROPERTY,
+                                            "shadow map elevation",
+                                            groupProp);
+    properties->setDDouble(shadowMapElevationProp, shadowMapElevation_hPa,
+                           1., 1060., 2, 0.1, " hPa");
 
     enableSelfShadowingProperty = a->addProperty(BOOL_PROPERTY,
                                                  "enable self shadowing",
@@ -414,6 +421,7 @@ void MIsosurfaceIntersectionActor::saveConfiguration(QSettings *settings)
     settings->setValue("thicknessMode", thicknessMode);
 
     settings->setValue("enableShadows", appearanceSettings->enableShadows);
+    settings->setValue("shadowElevation_hPa", appearanceSettings->shadowMapElevation_hPa);
     settings->setValue("enableSelfShadowing",
                        appearanceSettings->enableSelfShadowing);
     settings->setValue("polesEnabled", appearanceSettings->polesEnabled);
@@ -552,6 +560,12 @@ void MIsosurfaceIntersectionActor::loadConfiguration(QSettings *settings)
                 "enableShadows", true).toBool();
     properties->mBool()->setValue(appearanceSettings->enableShadowsProperty,
                                   appearanceSettings->enableShadows);
+
+    appearanceSettings->shadowMapElevation_hPa = settings->value(
+                "shadowElevation_hPa", 1049.7).toFloat();
+    properties->mDDouble()->setValue(
+                appearanceSettings->shadowMapElevationProp,
+                appearanceSettings->shadowMapElevation_hPa);
 
     appearanceSettings->enableSelfShadowing = settings->value(
                 "enableSelfShadowing", true).toBool();
@@ -945,7 +959,8 @@ void MIsosurfaceIntersectionActor::onQtPropertyChanged(QtProperty *property)
     }
     // Enable shadow map.
     else if (property == appearanceSettings->enableShadowsProperty
-             || property == appearanceSettings->enableSelfShadowingProperty)
+             || property == appearanceSettings->enableSelfShadowingProperty
+             || property == appearanceSettings->shadowMapElevationProp)
     {
         appearanceSettings->enableShadows =
                 properties->mBool()->value(
@@ -953,6 +968,8 @@ void MIsosurfaceIntersectionActor::onQtPropertyChanged(QtProperty *property)
         appearanceSettings->enableSelfShadowing =
                 properties->mBool()->value(
                     appearanceSettings->enableSelfShadowingProperty);
+        appearanceSettings->shadowMapElevation_hPa = properties->mDecoratedDouble()
+                        ->value(appearanceSettings->shadowMapElevationProp);
         emitActorChangedSignal();
     }
     // Enable pole placements along intersection lines.
@@ -1881,16 +1898,18 @@ void MIsosurfaceIntersectionActor::renderShadows(MSceneViewGLWidget *sceneView)
         MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
         //glRM->makeCurrent();
 
+        float shadowMapWorldZ = sceneView->worldZfromPressure(
+                    appearanceSettings->shadowMapElevation_hPa);
         float quadData[] =
         {
             boundingBoxSettings->llcrnLon,
-            boundingBoxSettings->llcrnLat, 0.1, 0, 0,
+            boundingBoxSettings->llcrnLat, shadowMapWorldZ, 0, 0,
             boundingBoxSettings->llcrnLon,
-            boundingBoxSettings->urcrnLat, 0.1, 0, 1,
+            boundingBoxSettings->urcrnLat, shadowMapWorldZ, 0, 1,
             boundingBoxSettings->urcrnLon,
-            boundingBoxSettings->llcrnLat, 0.1, 1, 0,
+            boundingBoxSettings->llcrnLat, shadowMapWorldZ, 1, 0,
             boundingBoxSettings->urcrnLon,
-            boundingBoxSettings->urcrnLat, 0.1, 1, 1
+            boundingBoxSettings->urcrnLat, shadowMapWorldZ, 1, 1
         };
 
         if (!shadowImageVBO)
