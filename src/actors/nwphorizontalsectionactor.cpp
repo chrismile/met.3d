@@ -69,7 +69,7 @@ MNWPHorizontalSectionActor::MNWPHorizontalSectionActor()
       vectorGlyphsSettings(),
       renderShadowQuad(true),
       shadowColor(QColor(60, 60, 60, 70)),
-      shadowHeight(0.01f),
+      shadowElevation_hPa(1049.7),
       offsetPickPositionToHandleCentre(QVector2D(0., 0.))
 {
     enablePicking(true);
@@ -134,8 +134,10 @@ MNWPHorizontalSectionActor::MNWPHorizontalSectionActor()
     shadowColorProp = addProperty(COLOR_PROPERTY, "colour", shadowPropGroup);
     properties->mColor()->setValue(shadowColorProp, shadowColor);
 
-    shadowHeightProp = addProperty(DOUBLE_PROPERTY, "height", shadowPropGroup);
-    properties->setDouble(shadowHeightProp, 0.01, 0, 100, 3, 0.01);
+    shadowElevationProperty = addProperty(DECORATEDDOUBLE_PROPERTY,
+                                          "shadow elevation", shadowPropGroup);
+    properties->setDDouble(shadowElevationProperty, shadowElevation_hPa,
+                           1., 1060., 2, 0.1, " hPa");
 
     // Keep an instance of GraticuleActor as a "subactor" to draw a graticule
     // on top of the section. The graticule's vertical position and bounding
@@ -417,7 +419,7 @@ void MNWPHorizontalSectionActor::saveConfiguration(QSettings *settings)
     MBoundingBoxInterface::saveConfiguration(settings);
     settings->setValue("shadowEnabled", renderShadowQuad);
     settings->setValue("shadowColor", shadowColor);
-    settings->setValue("shadowHeight", shadowHeight);
+    settings->setValue("shadowElevation_hPa", shadowElevation_hPa);
 
     settings->beginGroup("Windbarbs");
 
@@ -533,9 +535,9 @@ void MNWPHorizontalSectionActor::loadConfiguration(QSettings *settings)
     properties->mColor()->setValue(
                 shadowColorProp,
                 settings->value("shadowColor", QColor(60,60,60,70)).value<QColor>());
-    properties->mBool()->setValue(
-                shadowHeightProp,
-                settings->value("shadowHeight", 0.01f).toFloat());
+    properties->mDDouble()->setValue(
+                shadowElevationProperty,
+                settings->value("shadowElevation_hPa", 1049.7).toFloat());
 
     settings->beginGroup("Windbarbs");
 
@@ -1221,11 +1223,11 @@ void MNWPHorizontalSectionActor::onQtPropertyChanged(QtProperty *property)
 
     else if (property == shadowEnabledProp ||
              property == shadowColorProp ||
-             property == shadowHeightProp)
+             property == shadowElevationProperty)
     {
         renderShadowQuad = properties->mBool()->value(shadowEnabledProp);
         shadowColor = properties->mColor()->value(shadowColorProp);
-        shadowHeight = properties->mDouble()->value(shadowHeightProp);
+        shadowElevation_hPa = properties->mDDouble()->value(shadowElevationProperty);
 
         emitActorChangedSignal();
     }
@@ -2867,7 +2869,11 @@ void MNWPHorizontalSectionActor::renderShadow(MSceneViewGLWidget* sceneView)
 
     glShadowQuad->setUniformValue("cornersSection", corners);
     glShadowQuad->setUniformValue("colour", shadowColor);
-    glShadowQuad->setUniformValue("height", shadowHeight);
+
+    GLfloat shadowWorldZ = sceneView->worldZfromPressure(shadowElevation_hPa);
+    //LOG4CPLUS_DEBUG(mlog, "shadow elevation: " << shadowElevation_hPa
+    //                << " hPa, worldZ=" << shadowWorldZ);
+    glShadowQuad->setUniformValue("height", shadowWorldZ);
 
     // Draw shadow quad.
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);

@@ -445,6 +445,7 @@ private:
 
         RenderMode::ShadowMode         shadowMode;
         RenderMode::Resolution         shadowsResolution;
+        GLfloat                        shadowMapElevation_hPa;
 
         // properties
         QtProperty*                    groupProp;
@@ -460,6 +461,7 @@ private:
         QtProperty*                    interactionBisectionStepsProp;
         QtProperty*                    shadowModeProp;
         QtProperty*                    shadowsResolutionProp;
+        QtProperty*                    shadowMapElevationProp;
     };
 
     /**
