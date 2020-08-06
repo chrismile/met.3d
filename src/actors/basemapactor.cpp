@@ -35,6 +35,7 @@
 #include <log4cplus/loggingmacros.h>
 #include <QString>
 #include <QFileDialog>
+#include <QList>
 
 // local application imports
 #include "util/mstopwatch.h"
@@ -54,7 +55,11 @@ namespace Met3D
 *******************************************************************************/
 
 MBaseMapActor::MBaseMapActor()
-    : MMapProjectionSupportingActor(),
+    : MMapProjectionSupportingActor(QList<MapProjectionType>()
+                                    // MBaseMapActor supports cylindrical and
+                                    // rotated map projections.
+                                    << MAPPROJECTION_CYLINDRICAL
+                                    << MAPPROJECTION_ROTATEDLATLON),
       MBoundingBoxInterface(this, MBoundingBoxConnectionType::HORIZONTAL),
       texture(nullptr),
       numVertices(4),
@@ -86,7 +91,7 @@ MBaseMapActor::MBaseMapActor()
     properties->setDDouble(colourSaturationProperty, colourSaturation,
                            0., 1., 2., 0.1, " (0..1)");
 
-    actorPropertiesSupGroup->addSubProperty(gridProjectionPropertiesSubGroup);
+    actorPropertiesSupGroup->addSubProperty(mapProjectionPropertiesSubGroup);
 
     endInitialiseQtProperties();
 }
@@ -225,45 +230,11 @@ void MBaseMapActor::onQtPropertyChanged(QtProperty* property)
                 properties->mDDouble()->value(colourSaturationProperty);
         emitActorChangedSignal();
     }
-    // enable/disable GUI options for grid projections
-    else if ( ( property == gridProjectionTypesProperty))
+    else if (property == mapProjectionTypesProperty)
     {
-
-        gridProjectionTypes projIndex = stringToGridProjection(properties->getEnumItem(
-                                                   gridProjectionTypesProperty));
-        switch (projIndex)
-        {
-        case GRIDPROJECTION_CYLINDRICAL:
-            gridProjection = GRIDPROJECTION_CYLINDRICAL;
-            rotateBBoxProperty->setEnabled(false);
-            rotatedNorthPoleProperty->setEnabled(false);
-            enableGridRotation = false;
-            projLibraryStringProperty->setEnabled(false);
-            enableProjLibraryProjection = false;
-            if (suppressActorUpdates()) return;
-            emitActorChangedSignal();
-            break;
-        case GRIDPROJECTION_ROTATEDLATLON:
-            gridProjection = GRIDPROJECTION_ROTATEDLATLON;
-            rotateBBoxProperty->setEnabled(true);
-            rotatedNorthPoleProperty->setEnabled(true);
-            enableGridRotation = true;
-            projLibraryStringProperty->setEnabled(false);
-            enableProjLibraryProjection = false;
-            if (suppressActorUpdates()) return;
-            emitActorChangedSignal();
-            break;
-        case GRIDPROJECTION_PROJ_LIBRARY:
-            gridProjection = GRIDPROJECTION_PROJ_LIBRARY;
-            rotateBBoxProperty->setEnabled(false);
-            rotatedNorthPoleProperty->setEnabled(false);
-            enableGridRotation = false;
-            projLibraryStringProperty->setEnabled(true);
-            enableProjLibraryProjection = true;
-            if (suppressActorUpdates()) return;
-            emitActorChangedSignal();
-            break;
-        }
+        updateMapProjectionProperties();
+        if (suppressActorUpdates()) return;
+        emitActorChangedSignal();
     }
     else if (property == rotateBBoxProperty)
     {
@@ -277,7 +248,7 @@ void MBaseMapActor::onQtPropertyChanged(QtProperty* property)
         rotatedNorthPole =
                 properties->mPointF()->value(rotatedNorthPoleProperty);
         if (suppressActorUpdates()) return;
-        if (enableGridRotation)
+        if (mapProjection == MAPPROJECTION_ROTATEDLATLON)
         {
             emitActorChangedSignal();
         }
@@ -292,7 +263,7 @@ void MBaseMapActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
         QVector4D bboxVec4(bBoxConnection->westLon(), bBoxConnection->southLat(),
                            bBoxConnection->eastLon(), bBoxConnection->northLat());
         // Bind shader program.
-        if (enableGridRotation) // Rotated 
+        if (mapProjection == MAPPROJECTION_ROTATEDLATLON) // Rotated
         {
             // Bounding box is given in coordinates of the real geographical
             // system.
@@ -317,9 +288,6 @@ void MBaseMapActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
             shaderProgram->setUniformValue(
                         "poleLon", GLfloat(rotatedNorthPole.x()));
         }
-        /*else if(enableProjLibraryProjection) //Stereographic
-        {
-        }*/
         else // Cylindrical
         {
             shaderProgram->bindProgram("Basemap");
@@ -412,7 +380,7 @@ void MBaseMapActor::loadMap(std::string filename)
     const int32_t colorDim = tiffData->GetRasterCount();
 
     float scaleFactor =  1.0f;
-    if( gridProjection == GRIDPROJECTION_PROJ_LIBRARY)
+    if (mapProjection == MAPPROJECTION_PROJ_LIBRARY)
     {
         scaleFactor =  1.0e+6f;
     }

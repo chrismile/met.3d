@@ -4,11 +4,15 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2017 Marc Rautenhaus
-**  Copyright 2017 Bianca Tost
+**  Copyright 2017-2020 Marc Rautenhaus [*, previously +]
+**  Copyright 2020 Kameswarro Modali [*]
+**  Copyright 2017 Bianca Tost [+]
 **
-**  Computer Graphics and Visualization Group
+**  + Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
+**
+**  * Regional Computing Center, Visual Data Analysis
+**  Universitaet Hamburg, Hamburg, Germany
 **
 **  Met.3D is free software: you can redistribute it and/or modify
 **  it under the terms of the GNU General Public License as published by
@@ -51,13 +55,13 @@ namespace Met3D
 ***                     CONSTRUCTOR / DESTRUCTOR                            ***
 *******************************************************************************/
 
-MMapProjectionSupportingActor::MMapProjectionSupportingActor()
+MMapProjectionSupportingActor::MMapProjectionSupportingActor(QList<MapProjectionType> supportedProjections)
     : MActor(),
-      gridProjection(GRIDPROJECTION_CYLINDRICAL),
-      enableGridRotation(false),
+      mapProjection(MAPPROJECTION_CYLINDRICAL),
       rotateBBox(false),
       rotatedNorthPole(QPointF(-180., 90.)),
-      enableProjLibraryProjection(false)
+      projLibraryDefaultString("+proj=stere +a=6378273 +b=6356889.44891 +lat_0=90 +lat_ts=70 +lon_0=0"),
+      projLibraryString(projLibraryDefaultString)
 {
     // Create and initialise QtProperties for the GUI.
     // ===============================================
@@ -65,41 +69,45 @@ MMapProjectionSupportingActor::MMapProjectionSupportingActor()
 
     setName("Grid projection support enabled");
 
-    // projection sub-group header
-    gridProjectionPropertiesSubGroup = addProperty(
-                GROUP_PROPERTY, "grid projection support", nullptr);
+    mapProjectionPropertiesSubGroup = addProperty(
+                GROUP_PROPERTY, "map projection support", nullptr);
 
-    // drop-down list for choosing type of projection
+    // Drop-down list for choosing type of projection.
     QStringList gridProjectionNames;
-    gridProjectionNames << gridProjectionToString(GRIDPROJECTION_CYLINDRICAL)
-                        << gridProjectionToString(GRIDPROJECTION_ROTATEDLATLON)
-                        << gridProjectionToString(GRIDPROJECTION_PROJ_LIBRARY);
-    gridProjectionTypesProperty = addProperty(
-                ENUM_PROPERTY, "type of projection", gridProjectionPropertiesSubGroup);
-    properties->mEnum()->setEnumNames(gridProjectionTypesProperty, gridProjectionNames);
-    properties->mEnum()->setValue(gridProjectionTypesProperty, gridProjection);
+    for (MapProjectionType proj : supportedProjections)
+    {
+        gridProjectionNames << mapProjectionToString(proj);
+    }
+    mapProjectionTypesProperty = addProperty(
+                ENUM_PROPERTY, "type of projection", mapProjectionPropertiesSubGroup);
+    properties->mEnum()->setEnumNames(mapProjectionTypesProperty, gridProjectionNames);
+    properties->mEnum()->setValue(mapProjectionTypesProperty, mapProjection);
 
-    // inputs for grid projection: rotated lat lon
+    // Inputs for rotated lat-lon projection.
     rotateBBoxProperty = addProperty(BOOL_PROPERTY, "rotate bounding box",
-                                     gridProjectionPropertiesSubGroup);
+                                     mapProjectionPropertiesSubGroup);
     properties->mBool()->setValue(rotateBBoxProperty, rotateBBox);
     rotateBBoxProperty->setEnabled(false);
 
     rotatedNorthPoleProperty = addProperty(
                 POINTF_LONLAT_PROPERTY, "rotated north pole",
-                gridProjectionPropertiesSubGroup);
+                mapProjectionPropertiesSubGroup);
     properties->mPointF()->setValue(rotatedNorthPoleProperty, rotatedNorthPole);
     rotatedNorthPoleProperty->setEnabled(false);
 
+    // Proj.org string, see https://proj.org/operations/projections/index.html.
     projLibraryStringProperty = addProperty(
-                    STRING_PROPERTY, "Proj Library Settings String",
-                    gridProjectionPropertiesSubGroup);
-    properties->mString()->setValue(projLibraryStringProperty,
-    "+proj=stere +a=6378273 +b=6356889.44891 +lat_0=90 +lat_ts=70 +lon_0=0");
-    projLibraryStringProperty->setToolTip("https://proj.org/usage/projections.html");
+                STRING_PROPERTY, "proj-string",
+                mapProjectionPropertiesSubGroup);
+    properties->mString()->setValue(projLibraryStringProperty, projLibraryString);
+    projLibraryStringProperty->setToolTip("Enter a valid proj-string, see: https://proj.org/operations/projections/index.html\n"
+                                          "Note that this does NOT project the data - only this actor's geometry.");
     projLibraryStringProperty->setEnabled(false);
 
-    // ToDo (MM, 05/2020): define stuff for southern hemisphere and possibly also other projection params
+    projLibraryApplyProperty = addProperty(
+                CLICK_PROPERTY, "apply projection",
+                mapProjectionPropertiesSubGroup);
+    projLibraryApplyProperty->setEnabled(false);
 
     endInitialiseQtProperties();
 }
@@ -117,12 +125,12 @@ MMapProjectionSupportingActor::~MMapProjectionSupportingActor()
 void MMapProjectionSupportingActor::saveConfiguration(QSettings *settings)
 {
     settings->beginGroup(MMapProjectionSupportingActor::getSettingsID());
-    settings->setValue("gridProjection",gridProjectionToString(gridProjection));
-    settings->setValue("useRotation", enableGridRotation);
+
+    settings->setValue("mapProjection", mapProjectionToString(mapProjection));
     settings->setValue("rotateBoundingBox", rotateBBox);
     settings->setValue("rotatedNorthPole", rotatedNorthPole);
+    settings->setValue("projString", projLibraryString);
 
-    settings->setValue("enableProjLibraryProjection",enableProjLibraryProjection);
     settings->endGroup();
 }
 
@@ -132,9 +140,9 @@ void MMapProjectionSupportingActor::loadConfiguration(QSettings *settings)
     settings->beginGroup(MMapProjectionSupportingActor::getSettingsID());
 
     properties->mEnum()->setValue(
-                gridProjectionTypesProperty, stringToGridProjection(
-                    (settings->value("gridProjection",
-                                     gridProjectionToString(GRIDPROJECTION_CYLINDRICAL))
+                mapProjectionTypesProperty, stringToMapProjection(
+                    (settings->value("mapProjection",
+                                     mapProjectionToString(MAPPROJECTION_CYLINDRICAL))
                      ).toString()));
     properties->mBool()->setValue(
                 rotateBBoxProperty,
@@ -143,44 +151,81 @@ void MMapProjectionSupportingActor::loadConfiguration(QSettings *settings)
                 rotatedNorthPoleProperty,
                 settings->value("rotatedNorthPole",
                                 QPointF(-180., 90.)).toPointF());
-   properties->mString()->setValue(
-                   projLibraryStringProperty,
-                   settings->value("enableProjLibraryProjection","").toString());
+    // Explicitly load value into string variable here as changing the property
+    // will not trigger a recomputation of graticule/map geometry.
+    projLibraryString = settings->value("projString",
+                                        projLibraryDefaultString).toString();
+    properties->mString()->setValue(projLibraryStringProperty,
+                                    projLibraryString);
+
     settings->endGroup();
 }
 
-MMapProjectionSupportingActor::gridProjectionTypes MMapProjectionSupportingActor::stringToGridProjection(
-        QString gridProjectionName)
+
+void MMapProjectionSupportingActor::updateMapProjectionProperties()
 {
-    if (gridProjectionName == "cylindrical")
+    MapProjectionType projIndex = stringToMapProjection(
+                properties->getEnumItem(mapProjectionTypesProperty));
+
+    switch (projIndex)
     {
-        return GRIDPROJECTION_CYLINDRICAL;
-    }
-    else if (gridProjectionName == "rotated lat.-lon.")
-    {
-        return GRIDPROJECTION_ROTATEDLATLON;
-    }
-    else if (gridProjectionName == "proj'-library supported projection")
-    {
-        return GRIDPROJECTION_PROJ_LIBRARY;
-    }
-    else
-    {
-        return GRIDPROJECTION_CYLINDRICAL;
+    case MAPPROJECTION_CYLINDRICAL:
+        mapProjection = MAPPROJECTION_CYLINDRICAL;
+        rotateBBoxProperty->setEnabled(false);
+        rotatedNorthPoleProperty->setEnabled(false);
+        projLibraryStringProperty->setEnabled(false);
+        projLibraryApplyProperty->setEnabled(false);
+        break;
+    case MAPPROJECTION_ROTATEDLATLON:
+        mapProjection = MAPPROJECTION_ROTATEDLATLON;
+        rotateBBoxProperty->setEnabled(true);
+        rotatedNorthPoleProperty->setEnabled(true);
+        projLibraryStringProperty->setEnabled(false);
+        projLibraryApplyProperty->setEnabled(false);
+        break;
+    case MAPPROJECTION_PROJ_LIBRARY:
+        mapProjection = MAPPROJECTION_PROJ_LIBRARY;
+        rotateBBoxProperty->setEnabled(false);
+        rotatedNorthPoleProperty->setEnabled(false);
+        projLibraryStringProperty->setEnabled(true);
+        projLibraryApplyProperty->setEnabled(true);
+        break;
     }
 }
 
 
-QString MMapProjectionSupportingActor::gridProjectionToString(
-        gridProjectionTypes gridProjection)
+MMapProjectionSupportingActor::MapProjectionType
+MMapProjectionSupportingActor::stringToMapProjection(QString gridProjectionName)
+{
+    if (gridProjectionName == "cylindrical")
+    {
+        return MAPPROJECTION_CYLINDRICAL;
+    }
+    else if (gridProjectionName == "rotated lat.-lon.")
+    {
+        return MAPPROJECTION_ROTATEDLATLON;
+    }
+    else if (gridProjectionName == "proj.org projection")
+    {
+        return MAPPROJECTION_PROJ_LIBRARY;
+    }
+    else
+    {
+        return MAPPROJECTION_CYLINDRICAL;
+    }
+}
+
+
+QString MMapProjectionSupportingActor::mapProjectionToString(
+        MapProjectionType gridProjection)
 {
     switch (gridProjection)
     {
-        case GRIDPROJECTION_CYLINDRICAL: return "cylindrical";
-        case GRIDPROJECTION_ROTATEDLATLON: return "rotated lat.-lon.";
-        case GRIDPROJECTION_PROJ_LIBRARY: return "proj'-library supported projection";
+    case MAPPROJECTION_CYLINDRICAL: return "cylindrical";
+    case MAPPROJECTION_ROTATEDLATLON: return "rotated lat.-lon.";
+    case MAPPROJECTION_PROJ_LIBRARY: return "proj.org projection";
+    default: return "cylindrical";
     }
-    return "cylindrical";
 }
 
 

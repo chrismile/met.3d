@@ -4,11 +4,15 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2017 Marc Rautenhaus
-**  Copyright 2017 Bianca Tost
+**  Copyright 2017-2020 Marc Rautenhaus [*, previously +]
+**  Copyright 2020 Kameswarro Modali [*]
+**  Copyright 2017 Bianca Tost [+]
 **
-**  Computer Graphics and Visualization Group
+**  + Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
+**
+**  * Regional Computing Center, Visual Data Analysis
+**  Universitaet Hamburg, Hamburg, Germany
 **
 **  Met.3D is free software: you can redistribute it and/or modify
 **  it under the terms of the GNU General Public License as published by
@@ -48,56 +52,61 @@ namespace Met3D
 {
 
 /**
-  @brief MRotatedGridSupportingActor is a abstract base class for actors
-  supporting rotated grids.
+  @brief MMapProjectionSupportingActor is a abstract base class for actors
+  supporting map projections.
 
-  It adds properties to define rotated north pole coordinates and to choose
-  between whether to use rotation or not and if rotation is used whether to
-  rotate the bounding box or to treat the bounding box coordinates as regular
-  coordinates.
+  It adds properties for (a) proj.org supported projections and (b) for rotated
+  pole projections. For the latter, properties are included to define rotated
+  north pole coordinates and to choose between whether to use rotation or not
+  and if rotation is used whether to rotate the bounding box or to treat the
+  bounding box coordinates as regular coordinates.
 
   It is used by @ref MBaseMapActor and @ref MGraticuleActor .
   */
 class MMapProjectionSupportingActor : public MActor
 {
 public:
-    MMapProjectionSupportingActor();
+    typedef enum {
+        MAPPROJECTION_CYLINDRICAL = 0,
+        MAPPROJECTION_ROTATEDLATLON = 1,
+        MAPPROJECTION_PROJ_LIBRARY = 2,
+    } MapProjectionType;
+
+    MMapProjectionSupportingActor(QList<MapProjectionType> supportedProjections);
     ~MMapProjectionSupportingActor();
 
-    QString getSettingsID() override { return "RotatedGridEnablingActor"; }
+    QString getSettingsID() override { return "MapProjectionEnablingActor"; }
 
     void saveConfiguration(QSettings *settings) override;
 
     void loadConfiguration(QSettings *settings) override;
 
-    // define grid projection types
-    typedef enum {
-        GRIDPROJECTION_CYLINDRICAL = 0,
-        GRIDPROJECTION_ROTATEDLATLON = 1,
-        GRIDPROJECTION_PROJ_LIBRARY = 2,
-    } gridProjectionTypes;
+    /**
+      Call this method from onQtPropertyChanged() implementations to update
+      the map projection parameters when the projection type has been changed.
+     */
+    void updateMapProjectionProperties();
 
-    // convert grid projection between enum and string
-    static QString gridProjectionToString(gridProjectionTypes gridProjection);
-    MMapProjectionSupportingActor::gridProjectionTypes stringToGridProjection(QString gridProjection);
+    static QString mapProjectionToString(MapProjectionType mapProjection);
+    static MapProjectionType stringToMapProjection(QString mapProjection);
 
 protected:
-    // definitions for choosing the type of projection
-    QtProperty *gridProjectionTypesProperty;
-    gridProjectionTypes gridProjection;
-    QtProperty *gridProjectionPropertiesSubGroup;
+    QtProperty *mapProjectionPropertiesSubGroup;
 
-    // definitions for projection: rotated lat lon
-    bool enableGridRotation;
+    QtProperty *mapProjectionTypesProperty;
+    MapProjectionType mapProjection;
+
+    // Rotated lat-lon grid.
     bool rotateBBox;
     QtProperty *rotateBBoxProperty;
     QPointF rotatedNorthPole;
     QtProperty *rotatedNorthPoleProperty;
 
-    // definitions for projection: Proj Library based projection
-    bool enableProjLibraryProjection;
+    // Proj-library based projection.
     QtProperty *projLibraryStringProperty;
+    QString projLibraryDefaultString;
     QString projLibraryString;
+    QtProperty *projLibraryApplyProperty;
 };
 
 } // namespace Met3D

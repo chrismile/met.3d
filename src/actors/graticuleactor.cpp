@@ -49,7 +49,10 @@ namespace Met3D
 *******************************************************************************/
 
 MGraticuleActor::MGraticuleActor(MBoundingBoxConnection *boundingBoxConnection)
-    : MMapProjectionSupportingActor(),
+    : MMapProjectionSupportingActor(QList<MapProjectionType>()
+                                    << MAPPROJECTION_CYLINDRICAL
+                                    << MAPPROJECTION_ROTATEDLATLON
+                                    << MAPPROJECTION_PROJ_LIBRARY),
       MBoundingBoxInterface(this, MBoundingBoxConnectionType::HORIZONTAL,
                             boundingBoxConnection),
       graticuleVertexBuffer(nullptr),
@@ -107,7 +110,7 @@ MGraticuleActor::MGraticuleActor(MBoundingBoxConnection *boundingBoxConnection)
                                           actorPropertiesSupGroup);
     properties->mBool()->setValue(drawBorderLinesProperty, drawGraticule);
 
-    actorPropertiesSupGroup->addSubProperty(gridProjectionPropertiesSubGroup);
+    actorPropertiesSupGroup->addSubProperty(mapProjectionPropertiesSubGroup);
 
     // Default vertical position is at 1049 hPa.
     setVerticalPosition(1049.);
@@ -247,7 +250,6 @@ void MGraticuleActor::initializeActorResources()
 
 void MGraticuleActor::onQtPropertyChanged(QtProperty *property)
 {
-    // Recompute the geometry when bounding box or spacing have been changed.
     if ( (property == spacingProperty)
          || (property == labelSizeProperty)
          || (property == labelColourProperty)
@@ -255,16 +257,15 @@ void MGraticuleActor::onQtPropertyChanged(QtProperty *property)
          || (property == labelBBoxColourProperty) )
     {
         if (suppressActorUpdates()) return;
+        // Recompute the geometry when bounding box or spacing have been changed.
         generateGeometry();
         emitActorChangedSignal();
     }
-
     else if (property == colourProperty)
     {
         graticuleColour = properties->mColor()->value(colourProperty);
         emitActorChangedSignal();
     }
-
     else if ( (property == drawGraticuleProperty)
               || (property == drawCoastLinesProperty)
               || (property == drawBorderLinesProperty) )
@@ -274,48 +275,12 @@ void MGraticuleActor::onQtPropertyChanged(QtProperty *property)
         drawBorderLines = properties->mBool()->value(drawBorderLinesProperty);
         emitActorChangedSignal();
     }
-    // enable/disable GUI options for grid projections
-    else if ( ( property == gridProjectionTypesProperty))
+    else if (property == mapProjectionTypesProperty)
     {
-
-        gridProjectionTypes projIndex = stringToGridProjection(properties->getEnumItem(
-                                                   gridProjectionTypesProperty));
-        switch (projIndex)
-        {
-        case GRIDPROJECTION_CYLINDRICAL:
-            gridProjection = GRIDPROJECTION_CYLINDRICAL;
-            rotateBBoxProperty->setEnabled(false);
-            rotatedNorthPoleProperty->setEnabled(false);
-            enableGridRotation = false;
-            enableProjLibraryProjection = false;
-            projLibraryStringProperty->setEnabled(false);
-            if (suppressActorUpdates()) return;
-            generateGeometry();
-            emitActorChangedSignal();
-            break;
-        case GRIDPROJECTION_ROTATEDLATLON:
-            gridProjection = GRIDPROJECTION_ROTATEDLATLON;
-            rotateBBoxProperty->setEnabled(true);
-            rotatedNorthPoleProperty->setEnabled(true);
-            enableGridRotation = true;
-            enableProjLibraryProjection = false;
-            projLibraryStringProperty->setEnabled(false);
-            if (suppressActorUpdates()) return;
-            generateGeometry();
-            emitActorChangedSignal();
-            break;
-        case GRIDPROJECTION_PROJ_LIBRARY:
-            gridProjection = GRIDPROJECTION_PROJ_LIBRARY;
-            rotateBBoxProperty->setEnabled(false);
-            rotatedNorthPoleProperty->setEnabled(false);
-            enableGridRotation = false;
-            enableProjLibraryProjection = true;
-            projLibraryStringProperty->setEnabled(true);
-            if (suppressActorUpdates()) return;
-            generateGeometry();
-            emitActorChangedSignal();
-            break;
-        }
+        updateMapProjectionProperties();
+        if (suppressActorUpdates()) return;
+        generateGeometry();
+        emitActorChangedSignal();
     }
     else if (property == rotateBBoxProperty)
     {
@@ -329,18 +294,18 @@ void MGraticuleActor::onQtPropertyChanged(QtProperty *property)
         rotatedNorthPole =
                 properties->mPointF()->value(rotatedNorthPoleProperty);
         if (suppressActorUpdates()) return;
-        if (enableGridRotation)
+        if (mapProjection == MAPPROJECTION_ROTATEDLATLON)
         {
             generateGeometry();
             emitActorChangedSignal();
         }
     }
-    else if (property == projLibraryStringProperty)
+    else if (property == projLibraryApplyProperty)
     {
         projLibraryString =
                 properties->mString()->value(projLibraryStringProperty);
         if (suppressActorUpdates()) return;
-        if (enableProjLibraryProjection)
+        if (mapProjection == MAPPROJECTION_PROJ_LIBRARY)
         {
             generateGeometry();
             emitActorChangedSignal();
@@ -373,7 +338,7 @@ void MGraticuleActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); CHECK_GL_ERROR;
         glLineWidth(1); CHECK_GL_ERROR;
 
-        if (enableGridRotation)
+        if (mapProjection == MAPPROJECTION_ROTATEDLATLON)
         {
             int startIndex = 0;
             if (rotateBBox)
@@ -408,7 +373,7 @@ void MGraticuleActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
             }
         }
 
-        else if(enableProjLibraryProjection)
+        else if (mapProjection == MAPPROJECTION_PROJ_LIBRARY)
         {
             int startIndex = 0;
             for (int i = 0; i < nLats.size(); i++)
@@ -531,9 +496,9 @@ void MGraticuleActor::generateGeometry()
 
     // Append all graticule lines to this vector.
     QVector<QVector2D> verticesGraticule;
-    if (!enableProjLibraryProjection)
+    if (mapProjection != MAPPROJECTION_PROJ_LIBRARY)
     {
-        if (!enableGridRotation)
+        if (mapProjection != MAPPROJECTION_ROTATEDLATLON)
         {
             // Generate parallels (lines of constant latitude) and their correspondig
             // labels. NOTE that parallels are started at the first latitude that is
@@ -1884,9 +1849,9 @@ void MGraticuleActor::updateCoastalLines(QRectF cornerRect)
 {
     QVector<QVector2D> verticesCoastlines;
 
-    if(!enableProjLibraryProjection)
+    if (mapProjection != MAPPROJECTION_PROJ_LIBRARY)
     {
-        if (enableGridRotation)
+        if (mapProjection == MAPPROJECTION_ROTATEDLATLON)
         {
             if (rotateBBox)
             {
@@ -1987,9 +1952,9 @@ void MGraticuleActor::updateBorderLines(QRectF cornerRect)
 {
     QVector<QVector2D> verticesBorderlines;
 
-    if(!enableProjLibraryProjection)
+    if (mapProjection != MAPPROJECTION_PROJ_LIBRARY)
     {
-        if (enableGridRotation)
+        if (mapProjection == MAPPROJECTION_ROTATEDLATLON)
         {
             if (rotateBBox)
             {
