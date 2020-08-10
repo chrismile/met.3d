@@ -68,8 +68,13 @@ MBoundingBoxDockWidget::MBoundingBoxDockWidget(QWidget *parent) :
     font.setPixelSize(11);
     ui->tableWidget->horizontalHeader()->setFont(font);
     ui->tableWidget->setHorizontalHeaderLabels(
-    {"name", "western\nlongitude", "southern\nlatitude", "east-west\nextend",
-     "north-south\nextend", "bottom\npressure (hPa)", "top\npressure (hPa)"});
+    {"name of bounding box",
+     "western longitude\nor projected x",
+     "southern latitude\n or projected y",
+     "east-west extend\n(degrees or projected units)",
+     "north-south extend\n(degrees or projected units)",
+     "bottom\npressure (hPa)",
+     "top\npressure (hPa)"});
     ui->tableWidget->horizontalHeader()->setResizeMode(
                 QHeaderView::ResizeToContents);
 
