@@ -163,9 +163,6 @@ protected:
     QVector2D variableRotatedNorthPoleCoordinates( MVerticalLevelType levelType,
                                                    const QString& variableName);
 
-    // method to read paraemters of stereographic projection from data file.
-    QVector4D variableStereographicCoordinates( MVerticalLevelType levelType,
-                                                   const QString& variableName);
     void scanDataRoot();
 
     MStructuredGrid* readGrid(MVerticalLevelType levelType,

@@ -486,76 +486,6 @@ QVector2D MClimateForecastReader::variableRotatedNorthPoleCoordinates(
 }
 
 
-// Get parameters of stereographic projection and store in coordinate array.
-// Implementation in analogy to "variableRotatedNorthPoleCoordinates()".
-QVector4D MClimateForecastReader::variableStereographicCoordinates(
-        MVerticalLevelType levelType,
-        const QString&     variableName)
-{
-
-    QReadLocker availableItemsReadLocker(&availableItemsLock);
-    if (!availableDataFields.keys().contains(levelType))
-    {
-        throw MBadDataFieldRequest(
-                    "unkown level type requested: " +
-                    MStructuredGrid::verticalLevelTypeToString(
-                        levelType).toStdString(),
-                    __FILE__, __LINE__);
-    }
-    if (availableDataFields.value(levelType).keys().contains(variableName))
-    {
-        if (availableDataFields.value(levelType).value(variableName)
-                ->horizontalGridType == STEREOGRAPHIC_PROJ)
-        {
-            QVector4D coordinates;
-            coordinates.setX(
-                        availableDataFields.value(levelType).value(variableName)
-                        ->stereoStraightLon);
-            coordinates.setY(
-                        availableDataFields.value(levelType).value(variableName)
-                        ->stereoStandardLat);
-            return coordinates;
-        }
-        else
-        {
-            throw MBadDataFieldRequest(
-                        "Stereographic projection parameters requested for a grid "
-                        "that is not stereographic", __FILE__, __LINE__);
-        }
-    }
-    else if (availableDataFieldsByStdName.value(levelType).keys().contains(
-                 variableName))
-    {
-        if (availableDataFields.value(levelType).value(variableName)
-                ->horizontalGridType == STEREOGRAPHIC_PROJ)
-        {
-            QVector4D coordinates;
-            coordinates.setX(
-                        availableDataFieldsByStdName.value(levelType)
-                        .value(variableName)->stereoStraightLon);
-            coordinates.setY(
-                        availableDataFieldsByStdName.value(levelType)
-                        .value(variableName)->stereoStandardLat);
-
-            return coordinates;
-        }
-        else
-        {
-            throw MBadDataFieldRequest(
-                        "Stereographic projection parameters requested for a grid "
-                        "that is not stereographic", __FILE__, __LINE__);
-        }
-    }
-    else
-    {
-        throw MBadDataFieldRequest(
-                "unkown variable requested: " + variableName.toStdString(),
-                __FILE__, __LINE__);
-    }
-}
-
-
-
 void MClimateForecastReader::scanDataRoot()
 {
     // Lock access to all availableXX data fields.
@@ -988,19 +918,8 @@ void MClimateForecastReader::scanDataRoot()
                                     ncFile->getVar(varName.toStdString()),
                                     gridMappingVarNames, &gridMappingVarName))
                         {
-                            // check if the required stereographic proj coordinates are
-                            // available in the data-file and store their values
-                            if (NcCFVar::getStereographicProjCoordinates(
-                                        ncFile->getVar(
-                                            gridMappingVarName.toStdString()),
-                                        ncFile->getVar(varName.toStdString()),
-                                        &(vinfo->stereoStraightLon),
-                                        &(vinfo->stereoStandardLat)
-                                        ))
-                            {
-                                vinfo->horizontalGridType =
-                                        MHorizontalGridType::STEREOGRAPHIC_PROJ;
-                            }
+                            vinfo->horizontalGridType =
+                                    MHorizontalGridType::STEREOGRAPHIC_PROJ;
                         }
 
                         // At the moment, only register rotated_lonlat variable

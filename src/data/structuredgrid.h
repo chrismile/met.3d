@@ -69,8 +69,7 @@ enum MHorizontalGridType
     // (cf. http://www.cosmo-model.org/content/model/documentation/core/cosmoDyncsNumcs.pdf ,
     //  chapter 3.3)
     ROTATED_LONLAT = 1,
-    // MM Stereo
-    // stereographic projection
+    // Stereographic projection.
     STEREOGRAPHIC_PROJ = 2
 };
 
@@ -237,11 +236,6 @@ public:
     { this->rotatedNorthPoleLon = coordinates.x();
         this->rotatedNorthPoleLat = coordinates.y(); }
 
-    inline void setStereographicProjCoordinates(QVector4D coordinates)
-    {   this->stereoStraightLon = coordinates.x();
-        this->stereoStandardLat = coordinates.y();
-    }
-
     inline unsigned int getNumLevels() const { return nlevs; }
     inline unsigned int getNumLats() const { return nlats; }
     inline unsigned int getNumLons() const { return nlons; }
@@ -255,10 +249,6 @@ public:
     { return horizontalGridType; }
     inline float getRotatedNorthPoleLon() { return rotatedNorthPoleLon; }
     inline float getRotatedNorthPoleLat() { return rotatedNorthPoleLat; }
-    // MM Stereo get stereo proj coordinates
-    inline float getStereoStraightLon() { return stereoStraightLon; }
-    inline float getStereoStandardLat() { return stereoStandardLat; }
-
 
     /**
       Returns the pressure (hPa) of grid point at indices @p i, @p j, @p k.
@@ -614,7 +604,6 @@ protected:
     friend class MDifferenceDataSource;
     friend class MProcessingWeatherPredictionDataSource;
     friend class MPotentialVorticityProcessor_LAGRANTOcalvar;
-    friend class MMaskData;
 
     /** Sizes of the dimensions. */
     unsigned int nlevs, nlats, nlons;
@@ -633,9 +622,6 @@ protected:
     MHorizontalGridType horizontalGridType;
     float rotatedNorthPoleLon;
     float rotatedNorthPoleLat;
-    // MM Stereo
-    float stereoStraightLon;
-    float stereoStandardLat;
 
     /** Texture parameters. **/
     GLint  textureInternalFormat;

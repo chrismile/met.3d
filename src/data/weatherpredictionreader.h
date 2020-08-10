@@ -84,9 +84,6 @@ struct MVariableInfo
                                             // grid.
     float         rotatedNorthPoleLon; // Longitude rotation for rotated grids.
     float         rotatedNorthPoleLat; // Latitude rotation for rotated grids.
-
-    float         stereoStraightLon;       // straight vertical longitude from pole
-    float         stereoStandardLat;       // standard latitude of stereographic projection
 };
 
 typedef QMap<QString, MVariableInfo*> MVariableNameMap;
@@ -141,16 +138,6 @@ protected:
     virtual QVector2D variableRotatedNorthPoleCoordinates(
             MVerticalLevelType levelType,
             const QString&     variableName) = 0;
-
-    /**
-      Returns the projection parameters of the stereographic proj as a vector
-      if the requested variable is defined on a stereographic grid. Otherwise it throws
-      an bad data field request exception.
-      */
-    virtual QVector4D variableStereographicCoordinates(
-            MVerticalLevelType levelType,
-            const QString&     variableName) = 0;
-
 
     /**
       Reads the requested data field from disk. The returned @ref

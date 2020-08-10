@@ -211,13 +211,6 @@ protected:
     QVector2D variableRotatedNorthPoleCoordinates(MVerticalLevelType levelType,
                                                   const QString& variableName);
 
-    // Method for reading parameters of stereographic projection from data file.
-    // NOTE: this method, as well as above method
-    // "variableRotatedNorthPoleCoordinates()" do not yet do anything meaningful
-    // but set the projection coordinates to 0.
-    QVector4D variableStereographicCoordinates(MVerticalLevelType levelType,
-                                                  const QString& variableName);
-
     /**
       Helper method for @ref readGrid() to copy lon/lat coordinate data
       into grid objects.
