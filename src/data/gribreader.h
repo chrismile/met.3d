@@ -202,14 +202,12 @@ public:
 protected:
     QString variableSurfacePressureName(MVerticalLevelType levelType,
                                         const QString&     variableName);
+
     QString variableAuxiliaryPressureName(MVerticalLevelType levelType,
                                           const QString&     variableName);
 
     MHorizontalGridType variableHorizontalGridType(MVerticalLevelType levelType,
-                                       const QString&     variableName);
-
-    QVector2D variableRotatedNorthPoleCoordinates(MVerticalLevelType levelType,
-                                                  const QString& variableName);
+                                                   const QString&     variableName);
 
     /**
       Helper method for @ref readGrid() to copy lon/lat coordinate data

@@ -232,10 +232,6 @@ public:
     inline void setHorizontalGridType(MHorizontalGridType horizontalGridType)
     { this->horizontalGridType = horizontalGridType; }
 
-    inline void setRotatedNorthPoleCoordinates(QVector2D coordinates)
-    { this->rotatedNorthPoleLon = coordinates.x();
-        this->rotatedNorthPoleLat = coordinates.y(); }
-
     inline unsigned int getNumLevels() const { return nlevs; }
     inline unsigned int getNumLats() const { return nlats; }
     inline unsigned int getNumLons() const { return nlons; }
@@ -247,8 +243,6 @@ public:
 
     inline MHorizontalGridType getHorizontalGridType()
     { return horizontalGridType; }
-    inline float getRotatedNorthPoleLon() { return rotatedNorthPoleLon; }
-    inline float getRotatedNorthPoleLat() { return rotatedNorthPoleLat; }
 
     /**
       Returns the pressure (hPa) of grid point at indices @p i, @p j, @p k.
@@ -620,8 +614,6 @@ protected:
     quint64  contributingMembers;
     quint64  availableMembers;
     MHorizontalGridType horizontalGridType;
-    float rotatedNorthPoleLon;
-    float rotatedNorthPoleLat;
 
     /** Texture parameters. **/
     GLint  textureInternalFormat;

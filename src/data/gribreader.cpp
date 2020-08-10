@@ -287,47 +287,6 @@ MHorizontalGridType MGribReader::variableHorizontalGridType(MVerticalLevelType l
 }
 
 
-QVector2D MGribReader::variableRotatedNorthPoleCoordinates(
-        MVerticalLevelType levelType, const QString& variableName)
-{
-    // cf.  MClimateForecastReader::availableVariables() .
-    QReadLocker availableItemsReadLocker(&availableItemsLock);
-    if (!availableDataFields.keys().contains(levelType))
-    {
-        throw MBadDataFieldRequest(
-                    "unkown level type requested: " +
-                    MStructuredGrid::verticalLevelTypeToString(levelType).toStdString(),
-                    __FILE__, __LINE__);
-    }
-    if (!availableDataFields.value(levelType).keys().contains(variableName))
-    {
-        throw MBadDataFieldRequest(
-                    "unkown variable requested: " + variableName.toStdString(),
-                    __FILE__, __LINE__);
-    }
-    if (availableDataFields.value(levelType).value(variableName)
-            ->horizontalGridType != ROTATED_LONLAT)
-    {
-        throw MBadDataFieldRequest(
-                    "Rotated north pole coordinates requested for grid not "
-                    "rotated", __FILE__, __LINE__);
-    }
-    // TODO (bt, 09Feb2017): Adapt to get rotated north pole coordinates
-    // read from grib file. Reading rotated north pole coordinates from grib
-    // file isn't implemented yet. If done, coordinates could be read like this:
-
-    //    QVector2D coordinates;
-    //    coordinates.setX(
-    //                availableDataFields.value(levelType).value(variableName)
-    //                ->rotatedNorthPoleLon);
-    //    coordinates.setY(
-    //                availableDataFields.value(levelType).value(variableName)
-    //                ->rotatedNorthPoleLat);
-    QVector2D coordinates(0.f, 0.f);
-    return coordinates;
-}
-
-
 inline int shiftedLonIndex(int i, MGribVariableInfo* vinfo)
 {
     // Compute the shifted index for the lon array. Variables need to be cast

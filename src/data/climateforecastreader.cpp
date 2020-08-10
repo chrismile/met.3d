@@ -418,74 +418,6 @@ MHorizontalGridType MClimateForecastReader::variableHorizontalGridType(
 }
 
 
-QVector2D MClimateForecastReader::variableRotatedNorthPoleCoordinates(
-        MVerticalLevelType levelType,
-        const QString&     variableName)
-{
-    // cf.  MClimateForecastReader::availableVariables() .
-    QReadLocker availableItemsReadLocker(&availableItemsLock);
-    if (!availableDataFields.keys().contains(levelType))
-    {
-        throw MBadDataFieldRequest(
-                    "unkown level type requested: " +
-                    MStructuredGrid::verticalLevelTypeToString(
-                        levelType).toStdString(),
-                    __FILE__, __LINE__);
-    }
-    if (availableDataFields.value(levelType).keys().contains(variableName))
-    {
-        if (availableDataFields.value(levelType).value(variableName)
-                ->horizontalGridType == ROTATED_LONLAT)
-        {
-            QVector2D coordinates;
-            coordinates.setX(
-                        availableDataFields.value(levelType).value(variableName)
-                        ->rotatedNorthPoleLon);
-            coordinates.setY(
-                        availableDataFields.value(levelType).value(variableName)
-                        ->rotatedNorthPoleLat);
-
-            return coordinates;
-        }
-        else
-        {
-            throw MBadDataFieldRequest(
-                        "Rotated north pole coordinates requested for grid not "
-                        "rotated", __FILE__, __LINE__);
-        }
-    }
-    else if (availableDataFieldsByStdName.value(levelType).keys().contains(
-                 variableName))
-    {
-        if (availableDataFields.value(levelType).value(variableName)
-                ->horizontalGridType == ROTATED_LONLAT)
-        {
-            QVector2D coordinates;
-            coordinates.setX(
-                        availableDataFieldsByStdName.value(levelType)
-                        .value(variableName)->rotatedNorthPoleLon);
-            coordinates.setY(
-                        availableDataFieldsByStdName.value(levelType)
-                        .value(variableName)->rotatedNorthPoleLat);
-
-            return coordinates;
-        }
-        else
-        {
-            throw MBadDataFieldRequest(
-                        "Rotated north pole coordinates requested for grid not "
-                        "rotated", __FILE__, __LINE__);
-        }
-    }
-    else
-    {
-        throw MBadDataFieldRequest(
-                "unkown variable requested: " + variableName.toStdString(),
-                __FILE__, __LINE__);
-    }
-}
-
-
 void MClimateForecastReader::scanDataRoot()
 {
     // Lock access to all availableXX data fields.
@@ -903,15 +835,8 @@ void MClimateForecastReader::scanDataRoot()
                                     ncFile->getVar(varName.toStdString()),
                                     gridMappingVarNames, &gridMappingVarName))
                         {
-                            if (NcCFVar::getRotatedNorthPoleCoordinates(
-                                        ncFile->getVar(
-                                            gridMappingVarName.toStdString()),
-                                        &(vinfo->rotatedNorthPoleLon),
-                                        &(vinfo->rotatedNorthPoleLat)))
-                            {
-                                vinfo->horizontalGridType =
-                                        MHorizontalGridType::ROTATED_LONLAT;
-                            }
+                            vinfo->horizontalGridType =
+                                    MHorizontalGridType::ROTATED_LONLAT;
                         }
                         // check if data is defined on a stereographic grid
                         if (NcCFVar::isDefinedOnStereographicGrid(
@@ -941,8 +866,6 @@ void MClimateForecastReader::scanDataRoot()
                         {
                             continue;
                         }
-
-
                     }
                     // Initialise shared data of variable for consistency check.
                     checkSharedVariableDataConsistency(

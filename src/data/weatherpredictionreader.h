@@ -82,8 +82,6 @@ struct MVariableInfo
                                          // contain a single "0" member
     MHorizontalGridType horizontalGridType; // Enum representing the type of the
                                             // grid.
-    float         rotatedNorthPoleLon; // Longitude rotation for rotated grids.
-    float         rotatedNorthPoleLat; // Latitude rotation for rotated grids.
 };
 
 typedef QMap<QString, MVariableInfo*> MVariableNameMap;
@@ -114,6 +112,7 @@ protected:
     virtual QString variableSurfacePressureName(
             MVerticalLevelType levelType,
             const QString&     variableName) = 0;
+
     /**
       Only applicable for auxiliary pressure levels variables. Returns the name
       of the auxiliary pressure variable that is associated with this variable.
@@ -123,19 +122,12 @@ protected:
     virtual QString variableAuxiliaryPressureName(
             MVerticalLevelType levelType,
             const QString&     variableName) = 0;
+
     /**
       Returns the grid data type of the variable. At the moment there is only
       a distinction between regular and rotated longitude latitude grid.
       */
     virtual MHorizontalGridType variableHorizontalGridType(
-            MVerticalLevelType levelType,
-            const QString&     variableName) = 0;
-    /**
-      Returns the coordinates of the rotated north pole as vector (lon,lat) if
-      requested variable is defined on rotated lon lat grid. Otherwise it throws
-      a bad data field request exception.
-      */
-    virtual QVector2D variableRotatedNorthPoleCoordinates(
             MVerticalLevelType levelType,
             const QString&     variableName) = 0;
 
