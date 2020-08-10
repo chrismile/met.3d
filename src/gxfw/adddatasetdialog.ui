@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>734</width>
-    <height>556</height>
+    <height>582</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -183,14 +183,14 @@
           <item>
            <widget class="QCheckBox" name="treatRotatedAsRegularCheckBox">
             <property name="text">
-             <string>treat rotated grid as regular grid</string>
+             <string>interpret rotated lon-lat coordinates of grid as regular lon-lat coordinates</string>
             </property>
            </widget>
           </item>
           <item>
-           <widget class="QCheckBox" name="treatStereographicAsRegularCheckBox">
+           <widget class="QCheckBox" name="treatProjectedAsRegularLonLatCheckBox">
             <property name="text">
-             <string>treat stereographic grid as regular grid</string>
+             <string>interpret projected (as supported by proj-library) x-y coordinates of grid as regular lon-lat coordinates</string>
             </property>
            </widget>
           </item>

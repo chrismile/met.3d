@@ -77,7 +77,7 @@ MStructuredGrid::MStructuredGrid(MVerticalLevelType leveltype,
       flagsCanBeEnabled(true),
       contributingMembers(0),
       availableMembers(0),
-      horizontalGridType(REGULAR_LONLAT),
+      horizontalGridType(REGULAR_LONLAT_GRID),
       leveltype(leveltype),
       minMaxAccel(nullptr)
 {

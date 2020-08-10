@@ -1384,7 +1384,7 @@ void MMainWindow::openDatasetDialog(MAddDatasetDialog &addDatasetDialog)
                         pipelineConfig.enableRegridding,
                         pipelineConfig.enableProbabiltyRegionFilter,
                         pipelineConfig.treatRotatedGridAsRegularGrid,
-                        pipelineConfig.treatStereographicGridAsRegularGrid,
+                        pipelineConfig.treatProjectedGridAsRegularLonLatGrid,
                         pipelineConfig.surfacePressureFieldType,
                         pipelineConfig
                         .convertGeometricHeightToPressure_ICAOStandard,

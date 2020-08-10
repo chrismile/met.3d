@@ -137,11 +137,16 @@ public:
             QVector<int> *count, bool append=true,
             double poleLat=90., double poleLon=-180.);
 
-    // ToDo: add short summary / documentation
-    void loadAndTransformStereographicLineGeometryAndCutUsingBBox(
-            GeometryType type, QRectF bbox, QVector<QVector2D> *vertices,
-            QVector<int> *startIndices, QVector<int> *count, bool append,
-            double poleLat, double poleLon,QString proj4_string);
+    /**
+      Same as @ref loadAndRotateLineGeometryUsingRotatedBBox() but for generic
+      proj-supported projections.
+     */
+    void loadAndTransformProjectedLineGeometryAndCutUsingBBox(
+            GeometryType type, QRectF bbox,
+            QVector<QVector2D> *vertices,
+            QVector<int> *startIndices,
+            QVector<int> *count, bool append,
+            QString proj4_string);
 
     /**
      @brief geographicalToRotatedCoords transforms @p point according to the
@@ -255,33 +260,13 @@ public:
      */
     static OGRPolygon *getBBoxPolygon(QRectF *bbox);
 
-    // method to convert from regular lat-lon coorindates to polar
-    // stereographic grid coordinates.
-    // Based on formulae in (Snyder, 1987: Map projections, around p. 160) and
-    // implementations here:
-    // https://nsidc.org/data/polar-stereo/tools_geo_pixel.html#geolocate
-    // ftp://sidads.colorado.edu/pub/DATASETS/brightness-temperatures/polar-stereo/tools/geo-coord/fortran/
-    QVector<QVector2D> convertPolarStereographicToRegularLatLonCoords(
-            QVector<QVector2D> polarStereographicCoords,
-            float stereoStandardLat,
-            float stereoStraightLon
-            );
-
-
-    // method to convert from regular lat-lon coordinates to polar stereographic
-    // projection grid coordinates.
-    // Based on formulae in (Snyder, 1987: Map projections, around p. 160) and
-    // implementations here:
-    // https://nsidc.org/data/polar-stereo/tools_geo_pixel.html#geolocate
-    // ftp://sidads.colorado.edu/pub/DATASETS/brightness-temperatures/polar-stereo/tools/geo-coord/fortran/
-//    QVector<QVector2D> convertRegularLatLonToPolarStereographicCoords(
-//            QVector<QVector2D> verticesVector,
-//            float stereoStandardLat,
-//            float stereoStraightLon
-//            );
-
-    QVector<QVector2D> convertRegularLatLonToPolarStereographicCoordsUsingProj(
-            QVector<QVector2D> verticesVector,QString proj4_string);
+    /**
+      Projects the vertices in @p verticesVector, specified in geographical
+      lon-lat coordinates, to the coordinate system defined by the proj-string
+      @p projString.
+     */
+    QVector<QVector2D> projectGeographicalLatLonCoords(
+            QVector<QVector2D> verticesVector, QString projString);
 
 private:
     /**

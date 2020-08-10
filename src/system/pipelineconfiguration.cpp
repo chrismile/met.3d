@@ -293,8 +293,8 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
                                                    false).toBool();
         bool treatRotatedGridAsRegularGrid =
                 config.value("treatRotatedGridAsRegularGrid", false).toBool();
-        bool treatStereographicGridAsRegularGrid =
-                config.value("treatStereographicGridAsRegularGrid", false).toBool();
+        bool treatProjectedGridAsRegularLonLatGrid =
+                config.value("treatProjectedGridAsRegularLonLatGrid", false).toBool();
         QString gribSurfacePressureFieldType =
                 config.value("gribSurfacePressureFieldType", "auto").toString();
         bool convertGeometricHeightToPressure_ICAOStandard =
@@ -327,10 +327,10 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
                         << (enableRegridding ? "enabled" : "disabled"));
         LOG4CPLUS_DEBUG(mlog, "  probability region="
                         << (enableProbRegionFilter ? "enabled" : "disabled"));
-        LOG4CPLUS_DEBUG(mlog, "  treat rotated grid as regular grid="
+        LOG4CPLUS_DEBUG(mlog, "  treat rotated lon-lat coordinates of grid as regular lon-lat coordinates="
                         << (treatRotatedGridAsRegularGrid ? "enabled" : "disabled"));
-        LOG4CPLUS_DEBUG(mlog, "  treat stereographic grid as regular grid="
-                        << (treatStereographicGridAsRegularGrid ? "enabled" : "disabled"));
+        LOG4CPLUS_DEBUG(mlog, "  treat projected x-y coordinates of grid as regular lon-lat coordinates="
+                        << (treatProjectedGridAsRegularLonLatGrid ? "enabled" : "disabled"));
         LOG4CPLUS_DEBUG(mlog, "  surfacePressureFieldType="
                         << gribSurfacePressureFieldType.toStdString());
         LOG4CPLUS_DEBUG(mlog, "  convert geometric height to pressure (using"
@@ -374,7 +374,7 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
                     name, path, fileFilter, schedulerID,
                     memoryManagerID, fileFormat, enableRegridding,
                     enableProbRegionFilter, treatRotatedGridAsRegularGrid,
-                    treatStereographicGridAsRegularGrid,
+                    treatProjectedGridAsRegularLonLatGrid,
                     gribSurfacePressureFieldType,
                     convertGeometricHeightToPressure_ICAOStandard,
                     auxiliary3DPressureField, disableGridConsistencyCheck,
@@ -588,7 +588,7 @@ void MPipelineConfiguration::initializeNWPPipeline(
         bool enableRegridding,
         bool enableProbabiltyRegionFilter,
         bool treatRotatedGridAsRegularGrid,
-        bool treatStereographicGridAsRegularGrid,
+        bool treatProjectedGridAsRegularLonLatGrid,
         QString surfacePressureFieldType,
         bool convertGeometricHeightToPressure_ICAOStandard,
         QString auxiliary3DPressureField,
@@ -628,7 +628,7 @@ void MPipelineConfiguration::initializeNWPPipeline(
     {
         nwpReaderENS = new MClimateForecastReader(
                     dataSourceId, treatRotatedGridAsRegularGrid,
-                    treatStereographicGridAsRegularGrid,
+                    treatProjectedGridAsRegularLonLatGrid,
                     convertGeometricHeightToPressure_ICAOStandard,
                     auxiliary3DPressureField, disableGridConsistencyCheck);
     }
@@ -913,9 +913,9 @@ void MPipelineConfiguration::initializeTrajectoryComputationPipeline(
         MHorizontalGridType hGridTypW =
                 netCDFDataSource->variableHorizontalGridType(
                     verticalLevelType, windVerticalVariable);
-        if (hGridTypU == MHorizontalGridType::ROTATED_LONLAT
-                || hGridTypV == MHorizontalGridType::ROTATED_LONLAT
-                || hGridTypW == MHorizontalGridType::ROTATED_LONLAT)
+        if (hGridTypU == MHorizontalGridType::ROTATED_REGULAR_LONLAT_GRID
+                || hGridTypV == MHorizontalGridType::ROTATED_REGULAR_LONLAT_GRID
+                || hGridTypW == MHorizontalGridType::ROTATED_REGULAR_LONLAT_GRID)
         {
             LOG4CPLUS_WARN(mlog, "One or more wind variables are defined on"
                                  " a rotated grid coordinates; skipping.");
@@ -1169,7 +1169,7 @@ void MPipelineConfiguration::initializeDevelopmentDataPipeline()
                 false,
                 true,
                 false,
-                false,  // MM Stereo: add default for stereo; needed because expected num arguments
+                false,
                 "auto",
                 false,
                 "",
@@ -1186,7 +1186,7 @@ void MPipelineConfiguration::initializeDevelopmentDataPipeline()
                 false,
                 true,
                 false,
-                false,  // MM Stereo: add default for stereo; needed because expected num arguments
+                false,
                 "auto",
                 false,
                 "",

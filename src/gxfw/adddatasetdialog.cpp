@@ -145,8 +145,8 @@ MNWPPipelineConfigurationInfo MAddDatasetDialog::getNWPPipelineConfigurationInfo
     d.enableProbabiltyRegionFilter = ui->propRegBool->isChecked();
     d.treatRotatedGridAsRegularGrid =
             ui->treatRotatedAsRegularCheckBox->isChecked();
-    d.treatStereographicGridAsRegularGrid =
-            ui->treatStereographicAsRegularCheckBox->isChecked();
+    d.treatProjectedGridAsRegularLonLatGrid =
+            ui->treatProjectedAsRegularLonLatCheckBox->isChecked();
     d.surfacePressureFieldType = ui->surfacePressureTypeComboBox->currentText();
     d.convertGeometricHeightToPressure_ICAOStandard =
             ui->convertGeometricHeightToPressureICAOStandardCheckBox->isChecked();
@@ -250,8 +250,8 @@ void MAddDatasetDialog::saveConfiguration(QSettings *settings)
                            ui->propRegBool->isChecked());
         settings->setValue("treatRotatedGridAsRegularGrid",
                            ui->treatRotatedAsRegularCheckBox->isChecked());
-        settings->setValue("treatStereographicGridAsRegularGrid",
-                           ui->treatStereographicAsRegularCheckBox->isChecked());
+        settings->setValue("treatProjectedGridAsRegularLonLatGrid",
+                           ui->treatProjectedAsRegularLonLatCheckBox->isChecked());
         settings->setValue(
                     "convertGeometricHeightToPressure_ICAOStandard",
                     ui->convertGeometricHeightToPressureICAOStandardCheckBox
@@ -336,9 +336,9 @@ void MAddDatasetDialog::loadConfiguration(QSettings *settings)
         ui->treatRotatedAsRegularCheckBox->setChecked(
                     settings->value(
                         "treatRotatedGridAsRegularGrid", false).toBool());
-        ui->treatStereographicAsRegularCheckBox->setChecked(
+        ui->treatProjectedAsRegularLonLatCheckBox->setChecked(
                     settings->value(
-                        "treatStereographicGridAsRegularGrid", false).toBool());
+                        "treatProjectedGridAsRegularLonLatGrid", false).toBool());
         ui->convertGeometricHeightToPressureICAOStandardCheckBox->setChecked(
                     settings->value(
                         "convertGeometricHeightToPressure_ICAOStandard",

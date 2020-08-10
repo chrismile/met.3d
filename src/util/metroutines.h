@@ -65,7 +65,7 @@ const double EARTH_RADIUS_km = 6371.; // km
 const double EARTHS_ANGULAR_SPEED_OF_ROTATION = 7.292115E-5; // rad/s
 
 // Scaling factor for projections
-const double scaleFactorToFitStereoCoordsTo360 = 1000.0;
+const double scaleFactorToFitProjectedCoordsTo360Range = 1000.0;
 }
 
 

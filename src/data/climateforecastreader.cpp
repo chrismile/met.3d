@@ -59,12 +59,12 @@ namespace Met3D
 
 MClimateForecastReader::MClimateForecastReader(
         QString identifier, bool treatRotatedGridAsRegularGrid,
-        bool treatStereographicGridAsRegularGrid,
+        bool treatProjectedGridAsRegularLonLatGrid,
         bool convertGeometricHeightToPressure_ICAOStandard,
         QString auxiliary3DPressureField, bool disableGridConsistencyCheck)
     : MWeatherPredictionReader(identifier, auxiliary3DPressureField),
       treatRotatedGridAsRegularGrid(treatRotatedGridAsRegularGrid),
-      treatStereographicGridAsRegularGrid(treatStereographicGridAsRegularGrid),
+      treatProjectedGridAsRegularLonLatGrid(treatProjectedGridAsRegularLonLatGrid),
       convertGeometricHeightToPressure_ICAOStandard(
           convertGeometricHeightToPressure_ICAOStandard),
       disableGridConsistencyCheck(disableGridConsistencyCheck),
@@ -428,10 +428,10 @@ void MClimateForecastReader::scanDataRoot()
                     << "for files with NetCDF-CF forecast data.");
     LOG4CPLUS_DEBUG(mlog, "Using file filter: " << dirFileFilters.toStdString());
     LOG4CPLUS_DEBUG(mlog, "Parameters: "
-                    << "treat rotated grid as regular grid="
+                    << "treat rotated lon-lat coordinates of grid as regular lon-lat coordinates="
                     << (treatRotatedGridAsRegularGrid ? "enabled" : "disabled")
-                    << "treat stereographic grid as regular grid="
-                    << (treatStereographicGridAsRegularGrid ? "enabled" : "disabled")
+                    << "treat projected x-y coordinates of grid as regular lon-lat coordinates="
+                    << (treatProjectedGridAsRegularLonLatGrid ? "enabled" : "disabled")
                     << "; convert geometric height to pressure (using standard ICAO)="
                     << (convertGeometricHeightToPressure_ICAOStandard ? "enabled" : "disabled")
                     << "; grid consistency check="
@@ -822,12 +822,11 @@ void MClimateForecastReader::scanDataRoot()
                     }
 
                     // Check horizontal grid type. Default grid: regular lat-lon.
-                    vinfo->horizontalGridType = MHorizontalGridType::REGULAR_LONLAT;
+                    vinfo->horizontalGridType = MHorizontalGridType::REGULAR_LONLAT_GRID;
 
-                    // Change grid data type to ROTATED_LONLAT or STEREOGRAPHIC_PROJ
-                    // if a grid mapping variable exists, the data is defined on one
-                    // of these grids and the necessary grid coordinates/parameters
-                    // are available in the data-file.
+                    // Change grid type to ROTATED_REGULAR_LONLAT_GRID or
+                    // PROJECTED_REGULAR_GRID if the data is defined on one
+                    // of these grids.
                     if (!gridMappingVarNames.empty())
                     {
                         QString gridMappingVarName = "";
@@ -836,33 +835,31 @@ void MClimateForecastReader::scanDataRoot()
                                     gridMappingVarNames, &gridMappingVarName))
                         {
                             vinfo->horizontalGridType =
-                                    MHorizontalGridType::ROTATED_LONLAT;
+                                    MHorizontalGridType::ROTATED_REGULAR_LONLAT_GRID;
                         }
-                        // check if data is defined on a stereographic grid
+                        // Check if data is defined on a stereographic grid.
                         if (NcCFVar::isDefinedOnStereographicGrid(
                                     ncFile->getVar(varName.toStdString()),
                                     gridMappingVarNames, &gridMappingVarName))
                         {
                             vinfo->horizontalGridType =
-                                    MHorizontalGridType::STEREOGRAPHIC_PROJ;
+                                    MHorizontalGridType::PROJECTED_REGULAR_GRID;
                         }
-
-                        // At the moment, only register rotated_lonlat variable
-                        // if the user wants to treat rotated grids as regular
-                        // grids. Later it should be possible to treat rotated
-                        // grids as rotated grids.
+                        // At the moment, only register rotated grids if the
+                        // user wants to interpret rotated lon-latgrids as
+                        // regular lon-lat grids.
                         if (!treatRotatedGridAsRegularGrid
                                 && (vinfo->horizontalGridType
-                                    == MHorizontalGridType::ROTATED_LONLAT))
+                                    == MHorizontalGridType::ROTATED_REGULAR_LONLAT_GRID))
                         {
                             continue;
                         }
-                        // At the moment, only register stereographic_lonlat variable
-                        // if the user wants to treat stereographic grids as regular
-                        // grids. Handle stereographic grid as we handle rotated grids for now.
-                        if (!treatStereographicGridAsRegularGrid
+                        // At the moment, only register stereographic grid if
+                        // the user wants to interpret projected grids as
+                        // regular lon-lat grids.
+                        if (!treatProjectedGridAsRegularLonLatGrid
                                 && (vinfo->horizontalGridType
-                                    == MHorizontalGridType::STEREOGRAPHIC_PROJ))
+                                    == MHorizontalGridType::PROJECTED_REGULAR_GRID))
                         {
                             continue;
                         }
@@ -1462,10 +1459,10 @@ MStructuredGrid *MClimateForecastReader::readGrid(
 
         // MKM Read units from the input file and then find the factor to divide
         // 10^3(if input  data in "km") or 10^6(if input  data in "m")
-         if (treatStereographicGridAsRegularGrid)
+         if (treatProjectedGridAsRegularLonLatGrid)
          {
             string units = "";
-            float scaleFactor = MetConstants::scaleFactorToFitStereoCoordsTo360;
+            float scaleFactor = MetConstants::scaleFactorToFitProjectedCoordsTo360Range;
             shared->lonVar.getAtt("units").getValues(units);
             if (units == "m")
             {
@@ -1473,7 +1470,7 @@ MStructuredGrid *MClimateForecastReader::readGrid(
             }
             else if (units != "km")
             {
-                LOG4CPLUS_ERROR(mlog, "Stereographic coordinates x,y have unknown units!");
+                LOG4CPLUS_ERROR(mlog, "ERROR: stereographic coordinates x,y have unknown units.");
             }
             int size = shared->lats.size();
             for (int i = 0; i < size; i++)

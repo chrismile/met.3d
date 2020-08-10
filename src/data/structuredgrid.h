@@ -64,13 +64,13 @@ enum MVerticalLevelType {
 
 enum MHorizontalGridType
 {
-    REGULAR_LONLAT = 0,
+    REGULAR_LONLAT_GRID = 0,
     // Rotated north pole coordinates as used by COSMO.
     // (cf. http://www.cosmo-model.org/content/model/documentation/core/cosmoDyncsNumcs.pdf ,
     //  chapter 3.3)
-    ROTATED_LONLAT = 1,
-    // Stereographic projection.
-    STEREOGRAPHIC_PROJ = 2
+    ROTATED_REGULAR_LONLAT_GRID = 1,
+    // Proj-supported projection.
+    PROJECTED_REGULAR_GRID = 2
 };
 
 

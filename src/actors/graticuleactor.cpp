@@ -1056,9 +1056,8 @@ void MGraticuleActor::generateGeometry()
         updateBorderLines(cornerRect);
 
     }
-    else // Stereographic projection case
+    else // Projected coordinates case.
     {
-
         // get corners of bounding-box
         float llcrnrlat = float(bBoxConnection->southLat());
         float llcrnrlon = float(bBoxConnection->westLon());
@@ -1066,13 +1065,13 @@ void MGraticuleActor::generateGeometry()
         float urcrnrlon = float(bBoxConnection->eastLon());
 
         // Get bounding box as polygon and scale it appropriately
-        // for representing stereographic data. The bounding box
+        // for representing projected data. The bounding box
         // is needed to compute the intersection with the graticule lines.
         QRectF cornerRect = bBoxConnection->horizontal2DCoords();
-        cornerRect.setX( llcrnrlon );
-        cornerRect.setY( llcrnrlat );
-        cornerRect.setWidth( ( urcrnrlon - llcrnrlon ) );
-        cornerRect.setHeight( ( urcrnrlat - llcrnrlat ) );
+        cornerRect.setX(llcrnrlon);
+        cornerRect.setY(llcrnrlat);
+        cornerRect.setWidth(urcrnrlon-llcrnrlon);
+        cornerRect.setHeight(urcrnrlat-llcrnrlat);
 
         // draw lat-lon lines
         updateLatLonLines(cornerRect);
@@ -1082,7 +1081,6 @@ void MGraticuleActor::generateGeometry()
 
         // draw border lines
         updateBorderLines(cornerRect);
-
     }
 
     // Since a vertex count array filled with zeros leads to a program
@@ -1386,12 +1384,10 @@ void MGraticuleActor::updateLatLonLines(QRectF cornerRect)
             }
         } // for latitudes.
     } // if rotateBBox
-    // Draw stereographic lat-longraticule lines in a rectangle.
+    // Draw projected lat-lon graticule lines in a rectangle.
     else
     {
-
         cutWithBoundingBox(cornerRect);
-
     } // else do not rotateBBox
 
     // Clean up.
@@ -1400,32 +1396,25 @@ void MGraticuleActor::updateLatLonLines(QRectF cornerRect)
     // This method is currently disabled 
     // ToDo: make it work and pass the correct flag: stereoBBox and not rotateBBox which  
     // is copied from the old rotated lat-lon code 
-    if(rotateBBox)
+    if (rotateBBox)
     {
-
-        QVector<QVector2D> stereographicVerticesGraticule;
-	        
-		//stereographicVerticesGraticule =		
-		// old method for converting stereographic coords by KMK
-		// naturalEarthDataLoader->computeStereographicCoordinates(verticesGraticule);
-		
-		// revised version MM and KMK; 
-		stereographicVerticesGraticule =
-        naturalEarthDataLoader->convertRegularLatLonToPolarStereographicCoordsUsingProj(
+        QVector<QVector2D> projectedVerticesGraticule;
+        projectedVerticesGraticule =
+                naturalEarthDataLoader->projectGeographicalLatLonCoords(
                     verticesGraticule,this->projLibraryString);
 
         // generate data item key for every vertex buffer object wrt the actor
         const QString graticuleRequestKey = QString("graticule_vertices_actor#")
                                         + QString::number(getID());
-        uploadVec2ToVertexBuffer(stereographicVerticesGraticule, graticuleRequestKey,
+        uploadVec2ToVertexBuffer(projectedVerticesGraticule, graticuleRequestKey,
                              &graticuleVertexBuffer);
 
         // Required for the glDrawArrays() call in renderToCurrentContext().
-        numVerticesGraticule = stereographicVerticesGraticule.size();
+        numVerticesGraticule = projectedVerticesGraticule.size();
 
         // Update the lable position co-ordinates
         QVector<QVector2D> labelAnchorVector;
-        QVector<QVector2D> stereographicLabelAnchorVector;
+        QVector<QVector2D> projectedLabelAnchorVector;
         int index = 0;
         foreach (MLabel* label, labels)
         {
@@ -1435,14 +1424,14 @@ void MGraticuleActor::updateLatLonLines(QRectF cornerRect)
             labelAnchorVector.append(anchorPoint);
         }
 
-	stereographicLabelAnchorVector =
-    naturalEarthDataLoader->convertRegularLatLonToPolarStereographicCoordsUsingProj(
-                labelAnchorVector, this->projLibraryString);
+        projectedLabelAnchorVector =
+                naturalEarthDataLoader->projectGeographicalLatLonCoords(
+                    labelAnchorVector, this->projLibraryString);
 
         foreach (MLabel* label, labels)
         {
-            label->anchor.setX(stereographicLabelAnchorVector[index].x());
-            label->anchor.setY(stereographicLabelAnchorVector[index].y());
+            label->anchor.setX(projectedLabelAnchorVector[index].x());
+            label->anchor.setY(projectedLabelAnchorVector[index].y());
             index++;
         }
     }
@@ -1606,20 +1595,20 @@ void MGraticuleActor::cutWithBoundingBox(QRectF cornerRect)
         {
             point->setX(lon);
             point->setY(lat);
-            QVector<QVector2D> regularpoint;
-            QVector<QVector2D> stereopoint;
-            regularpoint.append(QVector2D(point->getX(),point->getY()));
+            QVector<QVector2D> lonLatPoint;
+            QVector<QVector2D> projectedPoint;
+            lonLatPoint.append(QVector2D(point->getX(),point->getY()));
 
-            stereopoint = naturalEarthDataLoader->convertRegularLatLonToPolarStereographicCoordsUsingProj(
-                        regularpoint, this->projLibraryString);
+            projectedPoint = naturalEarthDataLoader->projectGeographicalLatLonCoords(
+                        lonLatPoint, this->projLibraryString);
 
             lineStringList.append(new OGRLineString());
             lineString = lineStringList.last();
-            lineString->addPoint(stereopoint[0].x(), stereopoint[0].y());
+            lineString->addPoint(projectedPoint[0].x(), projectedPoint[0].y());
 
             //MKM  addthe point also to the previous line string as second point.
             lineString = lineStringList.at(lineStringList.count()-2);
-            lineString->addPoint(stereopoint[0].x(), stereopoint[0].y());
+            lineString->addPoint(projectedPoint[0].x(), projectedPoint[0].y());
         }
         // Add missing connection line for spacing between first and
         // last lon smaller than deltalon.
@@ -1757,14 +1746,14 @@ void MGraticuleActor::cutWithBoundingBox(QRectF cornerRect)
         {
             point->setX(lon);
             point->setY(lat);
-            QVector<QVector2D> regularpoint;
-            QVector<QVector2D> stereopoint;
-            regularpoint.append(QVector2D(point->getX(),point->getY()));
+            QVector<QVector2D> lonLatPoint;
+            QVector<QVector2D> projectedPoint;
+            lonLatPoint.append(QVector2D(point->getX(),point->getY()));
 
-            stereopoint = naturalEarthDataLoader->convertRegularLatLonToPolarStereographicCoordsUsingProj(
-                        regularpoint, this->projLibraryString);
+            projectedPoint = naturalEarthDataLoader->projectGeographicalLatLonCoords(
+                        lonLatPoint, this->projLibraryString);
 
-            lineString->addPoint(stereopoint[0].x(), stereopoint[0].y());
+            lineString->addPoint(projectedPoint[0].x(), projectedPoint[0].y());
         }
 
         // Compute intersection with bbox.
@@ -1888,10 +1877,9 @@ void MGraticuleActor::updateCoastalLines(QRectF cornerRect)
         uploadVec2ToVertexBuffer(verticesCoastlines, coastRequestKey,
                                  &coastlineVertexBuffer);
     }
-    else // Stereographic case
+    else // Projected case.
     {
-
-        if(rotateBBox)
+        if (rotateBBox)
         {
             // this option is disabled, hence should never enter this loop
             // ToDo: need to correct the flat to stereoBBox
@@ -1921,28 +1909,24 @@ void MGraticuleActor::updateCoastalLines(QRectF cornerRect)
       }
       else
       {
-
-            QVector<QVector2D> stereographicVerticesCoastlines;
+            QVector<QVector2D> projectedVerticesCoastlines;
 	    
-            naturalEarthDataLoader->loadAndTransformStereographicLineGeometryAndCutUsingBBox(
+            naturalEarthDataLoader->loadAndTransformProjectedLineGeometryAndCutUsingBBox(
                         MNaturalEarthDataLoader::COASTLINES,
                         cornerRect,
-                        &stereographicVerticesCoastlines,
+                        &projectedVerticesCoastlines,
                         &coastlineStartIndices,
                         &coastlineVertexCount,
-                        false, rotatedNorthPole.y(),
-                        rotatedNorthPole.x(),
-                        this->projLibraryString
-                        );  // ToDo: clear rotated pole vectors
-
+                        false,
+                        projLibraryString
+                        );
 
             // generate data item key for every vertex buffer object wrt the actor
             const QString coastRequestKey = "graticule_coastlines_actor#"
                                             + QString::number(getID());
 
-            uploadVec2ToVertexBuffer(stereographicVerticesCoastlines, coastRequestKey,
-                                 &coastlineVertexBuffer);
-
+            uploadVec2ToVertexBuffer(projectedVerticesCoastlines, coastRequestKey,
+                                     &coastlineVertexBuffer);
         }
     }
 }
@@ -1992,13 +1976,11 @@ void MGraticuleActor::updateBorderLines(QRectF cornerRect)
         uploadVec2ToVertexBuffer(verticesBorderlines, borderRequestKey,
                                  &borderlineVertexBuffer);
     }
-    else // Stereographic Case
+    else // Projected case.
     {
-
-
-        // this is disabled, as above. ToDo: either enable and fix or delete.
         if(rotateBBox)
         {
+            // this is disabled, as above. ToDo: either enable and fix or delete.
 //            naturalEarthDataLoader->loadAndRotateLineGeometry(
 //                        MNaturalEarthDataLoader::BORDERLINES,
 //                        cornerRect,
@@ -2024,22 +2006,20 @@ void MGraticuleActor::updateBorderLines(QRectF cornerRect)
         }
         else
         {
-
-            QVector<QVector2D> stereographicVerticesBorderlines;
+            QVector<QVector2D> projectedVerticesBorderlines;
             
-            naturalEarthDataLoader->loadAndTransformStereographicLineGeometryAndCutUsingBBox(
+            naturalEarthDataLoader->loadAndTransformProjectedLineGeometryAndCutUsingBBox(
                         MNaturalEarthDataLoader::BORDERLINES,
                         cornerRect,
-                        &stereographicVerticesBorderlines,
+                        &projectedVerticesBorderlines,
                         &borderlineStartIndices,
                         &borderlineVertexCount,
-                        false, rotatedNorthPole.y(),
-                        rotatedNorthPole.x(),this->projLibraryString
+                        false, projLibraryString
                         );  // clear vectors
 
             const QString borderRequestKey = "graticule_borderlines_actor#"
                                              + QString::number(getID());
-            uploadVec2ToVertexBuffer(stereographicVerticesBorderlines,
+            uploadVec2ToVertexBuffer(projectedVerticesBorderlines,
                                      borderRequestKey,
                                      &borderlineVertexBuffer);
         }

@@ -822,7 +822,7 @@ void MGribReader::scanDataRoot()
                     vinfo->lons = gmiInfo.lons;
                     vinfo->lats = gmiInfo.lats;
                     // TODO (bt, 08FEB2017) Adapt to set type according to the data read.
-                    vinfo->horizontalGridType = MHorizontalGridType::REGULAR_LONLAT;
+                    vinfo->horizontalGridType = MHorizontalGridType::REGULAR_LONLAT_GRID;
 
                     // Check if grid spans globe in longitude (cyclic in lon).
                     double lonWest = MMOD(vinfo->lon0, 360.);

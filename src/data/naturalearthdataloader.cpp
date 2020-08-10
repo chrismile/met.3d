@@ -711,10 +711,10 @@ void MNaturalEarthDataLoader::loadAndRotateLineGeometryUsingRotatedBBox(
 }
 
 
-void MNaturalEarthDataLoader::loadAndTransformStereographicLineGeometryAndCutUsingBBox(
+void MNaturalEarthDataLoader::loadAndTransformProjectedLineGeometryAndCutUsingBBox(
         GeometryType type, QRectF bbox, QVector<QVector2D> *vertices,
         QVector<int> *startIndices, QVector<int> *count, bool append,
-        double poleLat, double poleLon,QString proj4_string)
+        QString proj4_string)
 {
     if (gdalDataSet.size() < 2)
     {
@@ -757,10 +757,6 @@ void MNaturalEarthDataLoader::loadAndTransformStereographicLineGeometryAndCutUsi
     // Variables used to get rid of lines crossing the whole domain.
     // (Conntection of the right most and the left most vertex)
 
-    // ToDo: check if this is needed and clean up if not
-    QVector2D centreLons(0., 0.);
-    getCentreLons(&centreLons, poleLat, poleLon);
-
     // Loop over all features contained in the layer.
     layer->ResetReading();
     OGRFeature *feature;
@@ -788,33 +784,33 @@ void MNaturalEarthDataLoader::loadAndTransformStereographicLineGeometryAndCutUsi
 
             originalLineString->getPoint(0, point);
 
-            QVector<QVector2D> regularpoint;
-            QVector<QVector2D> stereopoint;
-            regularpoint.append(QVector2D(point->getX(),point->getY()));
+            QVector<QVector2D> lonLatPoint;
+            QVector<QVector2D> projectedPoint;
+            lonLatPoint.append(QVector2D(point->getX(),point->getY()));
 
-            stereopoint = convertRegularLatLonToPolarStereographicCoordsUsingProj(
-                        regularpoint, proj4_string);
+            projectedPoint = projectGeographicalLatLonCoords(
+                        lonLatPoint, proj4_string);
 
             // For rotation loop over all vertices of the current lineString,
             // apply the rotation and store the point in a new line string.
             for (int i = 0; i < originalLineString->getNumPoints(); i++)
             {
                 originalLineString->getPoint(i, point);
-                QVector<QVector2D> regularpoint;
-                QVector<QVector2D> stereopoint;
-                regularpoint.append(QVector2D(point->getX(),point->getY()));
+                QVector<QVector2D> lonLatpoint;
+                QVector<QVector2D> projectedPoint;
+                lonLatpoint.append(QVector2D(point->getX(),point->getY()));
 
-                stereopoint = convertRegularLatLonToPolarStereographicCoordsUsingProj(
-                            regularpoint, proj4_string);
+                projectedPoint = projectGeographicalLatLonCoords(
+                            lonLatpoint, proj4_string);
 
                 // Start new line.
                 lineStringList.append(new OGRLineString());
                 lineString = lineStringList.last();
-                lineString->addPoint(stereopoint[0].x(), stereopoint[0].y());
+                lineString->addPoint(projectedPoint[0].x(), projectedPoint[0].y());
 
                 //MKM  addthe point also to the previous line string as second point.
                 lineString = lineStringList.at(lineStringList.count()-2);
-                lineString->addPoint(stereopoint[0].x(), stereopoint[0].y());
+                lineString->addPoint(projectedPoint[0].x(), projectedPoint[0].y());
             }
 
             // Loop over all separated lines and intersect each with the
@@ -1259,236 +1255,49 @@ void MNaturalEarthDataLoader::getCentreLons(
 }
 
 
-QVector<QVector2D> MNaturalEarthDataLoader::convertPolarStereographicToRegularLatLonCoords(
-        QVector<QVector2D> polarStereographicCoords,
-        float stereoStandardLat,
-        float stereoStraightLon)
+QVector<QVector2D> MNaturalEarthDataLoader::projectGeographicalLatLonCoords(
+        QVector<QVector2D> verticesVector, QString projString)
 {
     // define output array
-    QVector<QVector2D> regularLatLonCoords;
-
-    // initialize variables for storing stereographic and lat-lon coordinates
-    float iStereoXCoord, iStereoYCoord, iLat, iLon;
-
-    // define constants required for the coordinate conversion
-    // ToDo: move the def. of constants somewhere more central like metroutines?
-    float E = 0.08182;                           // eccentricity Earth
-    float E2 = E * E;
-    float SL = stereoStandardLat*M_PI/180.;
-    float EARTH_RADIUS_km = 6378.3;              // EARTH_RADIUS_km
-    int SGN=1;                                   // ToDo: this should be made dynamic for southern hemisphere
-
-    // initilize some helperlies
-    float RE, T, CM, CHI, RHO;
-
-    // rescale radius of Earth to units of stereographic grid coords
-    RE = EARTH_RADIUS_km * 1000;
-
-    // loop all input coordinate points (x, y coord pairs)
-    for (int i = 0; i <polarStereographicCoords.size() ; i++)
-    {
-
-        // initialize array for holding the resulting lat-lon coords
-        QVector2D latlon_point;
-
-        // get x and y coords (with respect to the internal met3d grid)
-        iStereoXCoord=polarStereographicCoords[i].x();
-        iStereoYCoord=polarStereographicCoords[i].y();
-
-        // get distance from origin (assumed at pole - 0, 0)
-        RHO=sqrt(pow(iStereoXCoord,2)+pow(iStereoYCoord,2));
-
-        // check if at pole
-        if (RHO < 0.1)
-        {
-            iLat=90.*SGN;
-            iLon=0.0;
-        }
-        // if not at pole, convert from stereo to lat-lon
-        else
-        {
-            CM=cos(SL)/sqrt(1.0-pow(E2*sin(SL),2));
-            T=tan((M_PI/4.0)-(SL/(2.0)))/pow(((1.0-E*sin(SL))/(1.0+E*sin(SL))),(E/2.0));
-
-            if ( abs(stereoStandardLat-90) < 0.00001 )
-            {
-                T=RHO*sqrt(pow((1.+E),(1.+E))*pow((1.-E),(1.-E)))/(2.*RE);
-            }
-            else
-            {
-                T=RHO*T/(RE*CM);
-                CHI=(M_PI/2.0)-2.0*atan(T);
-                iLat=CHI+((E2/2.0)+(5.0*pow(E2,2.0)/24.0)+(pow(E2,3.0)/12.0))*sin(2*CHI)+((7.0*pow(E2,2.0)/48.0)+(29.0*pow(E2,3)/240.0))*sin(4.0*CHI)+(7.0*pow(E2,3.0)/120.0)*sin(6.0*CHI);
-                iLat=SGN*iLat;
-                iLon=atan2(SGN*iStereoXCoord,-SGN*iStereoYCoord);
-                iLon=SGN*iLon;
-
-                // convert from radians to degree and account for
-                // offset of vertical meridian from pole undefined
-                iLat=iLat*180./M_PI;
-                iLon=(iLon*180./M_PI)-stereoStraightLon;
-            }
-        }
-
-        // append lat-lon coords of this point to results-array
-        latlon_point.setX(iLon);
-        latlon_point.setY(iLat);
-        regularLatLonCoords.append(latlon_point);
-
-    } // loop all input points
-
-    // return array with regular lat-lon coords
-    return regularLatLonCoords;
-
-}
-
-/*
-double x = 138494.92605;
-  double y = 467792.640021;
-
-  char *srid28992 = "+proj=sterea +lat_0=52.15616055555555 +lon_0=5.38763888888889 +k=0.9999079 +x_0=155000 +y_0=463000 +ellps=bessel +towgs84=565.04,49.91,465.84,-1.9848,1.7439,-9.0587,4.0772 +units=m +no_defs";
-  char *srid4326 = "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs";
-
-  projPJ source = pj_init_plus(srid28992);
-  projPJ target = pj_init_plus(srid4326);
-
-  if(source==NULL || target==NULL)
-    return false;
-
-  int success = pj_transform(source, target, 1, 1, &x, &y, NULL );
-
-  x *= RAD_TO_DEG;
-  y *= RAD_TO_DEG;
-*/
-
-
-QVector<QVector2D> MNaturalEarthDataLoader::convertRegularLatLonToPolarStereographicCoordsUsingProj(
-        QVector<QVector2D> verticesVector,QString proj4_string)
-{
-    // define output array
-    QVector<QVector2D> stereographicVerticesVector;
-    double cur_reg_lat, cur_reg_lon;
-    float stereoScaleFactor = MetConstants::scaleFactorToFitStereoCoordsTo360;
+    QVector<QVector2D> projectedVerticesVector;
+    double currentLat, currentLon;
+    float projectionCoordsScaleFactor =
+            MetConstants::scaleFactorToFitProjectedCoordsTo360Range;
     int errorCodeProjLibrary;
 
-    // Proj4 variables
-    projPJ pj_stereo, pj_latlong;
-
-    pj_stereo = pj_init_plus(proj4_string.toStdString().c_str());
-    //pj_stereo  = pj_init_plus("+proj=stere +a=6378273 +b=6356889.44891 +lat_0=90 +lat_ts=70 +lon_0=0"); //ups
-    //pj_stereo  = pj_init_plus("+proj=robin +lon_0=0 +x_0=0 +y_0=0 +a=6371000 +b=6371000 +units=m +no_defs"); //ups
-    //pj_stereo = pj_init_plus("+proj=merc +lat_ts=0 +lon_0=0 +k=1.000000 +x_0=0 +y_0=0 +ellps=WGS84 +datum=WGS84 +units=m +no_defs");
-    pj_latlong = pj_init_plus("+proj=latlong");
+    // Proj4 variables.
+    projPJ pjProj, pjLatlon;
+    pjProj = pj_init_plus(projString.toStdString().c_str());
+    pjLatlon = pj_init_plus("+proj=latlong");
 
     for (int i = 0; i <verticesVector.size() ; i++)
     {
-        QVector2D stereographic_point;
+        QVector2D projectedPoint;
 
-        cur_reg_lat = verticesVector[i].y();
-        cur_reg_lat = degreesToRadians(cur_reg_lat);
+        currentLat = verticesVector[i].y();
+        currentLat = degreesToRadians(currentLat);
 
-        cur_reg_lon = verticesVector[i].x();
-        cur_reg_lon = degreesToRadians(cur_reg_lon);
+        currentLon = verticesVector[i].x();
+        currentLon = degreesToRadians(currentLon);
 
-        errorCodeProjLibrary = pj_transform(pj_latlong, pj_stereo, 1, 1, &cur_reg_lon, &cur_reg_lat, NULL );
-        stereographic_point.setX(cur_reg_lon/
-        (stereoScaleFactor * stereoScaleFactor));
-        stereographic_point.setY(cur_reg_lat/
-        (stereoScaleFactor * stereoScaleFactor));
-        stereographicVerticesVector.append(stereographic_point);
+        errorCodeProjLibrary = pj_transform(pjLatlon, pjProj, 1, 1, &currentLon, &currentLat, NULL);
 
-        if(errorCodeProjLibrary)
+        projectedPoint.setX(currentLon/
+                            (projectionCoordsScaleFactor * projectionCoordsScaleFactor));
+        projectedPoint.setY(currentLat/
+                            (projectionCoordsScaleFactor * projectionCoordsScaleFactor));
+        projectedVerticesVector.append(projectedPoint);
+
+        if (errorCodeProjLibrary)
         {
             // In later version of proj, const char* proj_errno_string(int err)
             // is available to get the text corresponding to the error code to.
-            LOG4CPLUS_ERROR(mlog,"Error " << errorCodeProjLibrary <<
+            LOG4CPLUS_ERROR(mlog, "Error " << errorCodeProjLibrary <<
                             "encountered during transformation using Proj library\n");
         }
     }
-    return stereographicVerticesVector;
+    return projectedVerticesVector;
 }
-
-
-/*
-QVector<QVector2D> MNaturalEarthDataLoader::convertRegularLatLonToPolarStereographicCoords(
-        QVector<QVector2D> verticesVector,
-        float stereoStandardLat,
-        float stereoStraightLon)
-{
-    // define output array
-    QVector<QVector2D> stereographicVerticesVector;
-
-    // define constants for coordinate conversion
-    float E = 0.08182;                 // eccentricity of ellipsoid Earth
-    float ESQUARE = E * E;
-
-    // initialize some helper vars for storing coordinate values
-    float cur_reg_lat, cur_reg_lon;
-    float cur_stereo_x, cur_stereo_y;
-    float T, TC, RHO, RE, MC;
-
-    // projection parameters
-    float DELTA_LON = stereoStraightLon - 90.0f;
-    float REF_LAT = stereoStandardLat;
-    float REF_LAT_RAD;
-
-    // rescale radius of Earth to units of stereographic grid coords
-    float EARTH_RADIUS_km = 6378.3;
-    float stereoScaleFactor = MetConstants::scaleFactorToFitStereoCoordsTo360;
-    RE = EARTH_RADIUS_km * stereoScaleFactor;
-
-    for (int i = 0; i <verticesVector.size() ; i++)
-    {
-        QVector2D stereographic_point;
-        cur_reg_lat = verticesVector[i].y();
-        cur_reg_lat = degreesToRadians(cur_reg_lat);
-
-        cur_stereo_x = 0.0f;
-        cur_stereo_y = 0.0f;
-
-        if( fabs(cur_reg_lat) > ( M_PI / 2.0f ) )
-        {
-            cur_stereo_x = 0.0f;
-            cur_stereo_y = 0.0f;
-        }
-        else
-        {
-            cur_reg_lon = verticesVector[i].x();
-            cur_reg_lon = cur_reg_lon + DELTA_LON; // MKM rotate globe
-            cur_reg_lon = 180.0f - cur_reg_lon;
-            cur_reg_lon = degreesToRadians(cur_reg_lon);
-
-            T = tan( M_PI/4.0f - cur_reg_lat / 2.0f ) /pow( ( (1.0f - E * sin(cur_reg_lat) ) /
-                                                            (1.0f + E * sin(cur_reg_lat) ) ),(E / 2.0f ) );
-
-            if( abs(90.f - REF_LAT) < 1.0e-5f)
-            {
-                RHO = 2.0f * RE * T / pow( ( pow( (1.0f + E),(1.0f + E) ) *
-                                             pow( (1.0f - E),(1.0f - E) )),0.5f);
-            }
-            else
-            {
-                REF_LAT_RAD = degreesToRadians(REF_LAT);
-                float esin1;
-                esin1 = E * sin(REF_LAT_RAD);
-                //TC = tan( M_PI/4.0f - REF_LAT_RAD / 2.0f ) / pow(((1.0f - E * sin(REF_LAT_RAD) ) / (1.0f + E * sin(REF_LAT_RAD))),(E/2.0f));
-                TC = tan( M_PI/4.0f - REF_LAT_RAD / 2.0f ) / pow(((1.0f - esin1 ) / (1.0f + esin1)),(E/2.0f));
-                MC = cos(REF_LAT_RAD) / sqrt(1.0f - ESQUARE * pow(sin(REF_LAT_RAD),2.0f));
-                RHO = RE * MC * T / TC;
-            }
-
-            cur_stereo_x  = -1.0f * RHO * cos( cur_reg_lon );
-            cur_stereo_y  =  RHO * sin( cur_reg_lon );
-        }
-
-        stereographic_point.setX(cur_stereo_x  / (stereoScaleFactor * stereoScaleFactor));
-        stereographic_point.setY(cur_stereo_y  / (stereoScaleFactor * stereoScaleFactor));
-        stereographicVerticesVector.append(stereographic_point);
-    }
-    return stereographicVerticesVector;
-
-}
-*/
 
 
 /******************************************************************************

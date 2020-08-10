@@ -66,10 +66,11 @@ size=0
 # grids as regular grids. Setting it to false will cause rejection of data sets
 # with rotated grid coordinates.
 1\treatRotatedGridAsRegularGrid=false
-# Set "treatStereographicGridAsRegularGrid" to "true" if you want to treat stereographic
-# grids as regular grids. Setting it to false will cause rejection of data sets
-# with stereographic grid coordinates.
-1\treatStereographicGridAsRegularGrid=false
+# Set "treatProjectedGridAsRegularLonLatGrid" to "true" if you want to treat projected
+# (as projected by the proj-library with, e.g., CDO)
+# grids as regular lon-lat grids. Setting it to false will cause rejection of data sets
+# with projected grid coordinates.
+1\treatProjectedGridAsRegularLonLatGrid=false
 # For ECMWF grib files only: specify type and name of the surface pressure field
 # used to reconstruct pressure for hybrid sigma-pressure coordinates.
 # Can be "sp" (surface pressure), "lnsp" (log of surface pressure) or

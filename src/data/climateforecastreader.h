@@ -120,10 +120,9 @@ typedef QHash<QString, MFileInfo*> MOpenFileMap;
 class MClimateForecastReader : public MWeatherPredictionReader
 {
 public:
-    MClimateForecastReader(
-            QString identifier,
+    MClimateForecastReader(QString identifier,
             bool treatRotatedGridAsRegularGrid=false,
-            bool treatStereographicGridAsRegularGrid=false,
+            bool treatProjectedGridAsRegularLonLatGrid=false,
             bool convertGeometricHeightToPressure_ICAOStandard=false,
             QString auxiliary3DPressureField="",
             bool disableGridConsistencyCheck=false);
@@ -230,7 +229,7 @@ protected:
             bool testEnsembleMemberConsistency);
 
     bool treatRotatedGridAsRegularGrid;
-    bool treatStereographicGridAsRegularGrid;
+    bool treatProjectedGridAsRegularLonLatGrid;
     bool convertGeometricHeightToPressure_ICAOStandard;
     bool disableGridConsistencyCheck;
     bool ensembleIDIsSpecifiedInFileName;

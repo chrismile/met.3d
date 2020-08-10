@@ -72,7 +72,7 @@ struct MNWPPipelineConfigurationInfo
     bool enableRegridding;
     bool enableProbabiltyRegionFilter;
     bool treatRotatedGridAsRegularGrid;
-    bool treatStereographicGridAsRegularGrid;
+    bool treatProjectedGridAsRegularLonLatGrid;
     QString surfacePressureFieldType;
     bool convertGeometricHeightToPressure_ICAOStandard;
     QString auxiliary3DPressureField;
