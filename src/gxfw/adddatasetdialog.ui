@@ -113,7 +113,7 @@
             <item>
              <widget class="QLabel" name="label_7">
               <property name="text">
-               <string>Use only files that match this filter (wildcards allowed):</string>
+               <string>Data file names match this filter (wildcards allowed, e.g. &quot;NWP*.nc&quot;):</string>
               </property>
              </widget>
             </item>
@@ -167,20 +167,6 @@
          </property>
          <layout class="QVBoxLayout" name="verticalLayout_2">
           <item>
-           <widget class="QCheckBox" name="regriddingBool">
-            <property name="text">
-             <string>enable vertical regridding</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QCheckBox" name="propRegBool">
-            <property name="text">
-             <string>enable probability region detection filter</string>
-            </property>
-           </widget>
-          </item>
-          <item>
            <widget class="QCheckBox" name="treatRotatedAsRegularCheckBox">
             <property name="text">
              <string>interpret rotated lon-lat coordinates of grid as regular lon-lat coordinates</string>
@@ -195,9 +181,9 @@
            </widget>
           </item>
           <item>
-           <widget class="QCheckBox" name="convertGeometricHeightToPressureICAOStandardCheckBox">
-            <property name="text">
-             <string>convert geometric height to pressure using the ICAO standard atmosphere</string>
+           <widget class="Line" name="line">
+            <property name="orientation">
+             <enum>Qt::Horizontal</enum>
             </property>
            </widget>
           </item>
@@ -212,7 +198,7 @@
                </sizepolicy>
               </property>
               <property name="text">
-               <string>surface pressure field type:</string>
+               <string>For vertical hybrid sigma-pressure levels in GRIB files: data contains surface pressure (sp) or log(surface pressure):</string>
               </property>
              </widget>
             </item>
@@ -264,7 +250,7 @@
                <string>Leave empty for not using an auxiliary 3D pressure field.</string>
               </property>
               <property name="text">
-               <string>Auxiliary 3D pressure field name:</string>
+               <string>For vertical levels that are NOT pressure: name of 3D pressure variable:</string>
               </property>
              </widget>
             </item>
@@ -274,9 +260,16 @@
            </layout>
           </item>
           <item>
-           <widget class="QCheckBox" name="disableGridConsistencyCheckCheckBox">
+           <widget class="QCheckBox" name="convertGeometricHeightToPressureICAOStandardCheckBox">
             <property name="text">
-             <string>disable grid consistency check</string>
+             <string>for vertical z-levels without 3D pressure field: convert geometric height z to pressure using the ICAO standard atmosphere</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="Line" name="line_3">
+            <property name="orientation">
+             <enum>Qt::Horizontal</enum>
             </property>
            </widget>
           </item>
@@ -285,7 +278,7 @@
             <item>
              <widget class="QLabel" name="label_8">
               <property name="text">
-               <string>Input variables for derived variables:</string>
+               <string>Input variables for derived variable computation:</string>
               </property>
              </widget>
             </item>
@@ -293,6 +286,34 @@
              <widget class="QLineEdit" name="inputVarsForDerivedVarsLineEdit"/>
             </item>
            </layout>
+          </item>
+          <item>
+           <widget class="Line" name="line_2">
+            <property name="orientation">
+             <enum>Qt::Horizontal</enum>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QCheckBox" name="disableGridConsistencyCheckCheckBox">
+            <property name="text">
+             <string>disable grid consistency check (experimental, try this if data is stored on staggered grid but be aware of location error)</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QCheckBox" name="propRegBool">
+            <property name="text">
+             <string>enable probability region detection filter (as described in Rautenhaus et al., GMD 2015)</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QCheckBox" name="regriddingBool">
+            <property name="text">
+             <string>enable vertical regridding (experimental)</string>
+            </property>
+           </widget>
           </item>
          </layout>
         </widget>
@@ -557,7 +578,7 @@
           <item>
            <widget class="QCheckBox" name="ablTrajectoriesCheckBox">
             <property name="text">
-             <string>ABL Trajectories</string>
+             <string>For region contribution analysis: trajectories are started on grid that covers atmospheric boundary layer</string>
             </property>
            </widget>
           </item>
@@ -586,7 +607,7 @@
      <item>
       <widget class="QLabel" name="label_4">
        <property name="text">
-        <string>Memory manager for the dataset pipeline:</string>
+        <string>(Expert setting: memory manager for the dataset pipeline:)</string>
        </property>
       </widget>
      </item>
@@ -607,7 +628,7 @@
      <item>
       <widget class="QLabel" name="label_13">
        <property name="text">
-        <string>Scheduler ID:</string>
+        <string>(Expert setting: scheduler ID:)</string>
        </property>
       </widget>
      </item>
@@ -651,7 +672,7 @@
      <item>
       <widget class="QPushButton" name="saveConfigPushButton">
        <property name="text">
-        <string>save Configuration</string>
+        <string>Save configuration to file</string>
        </property>
       </widget>
      </item>
