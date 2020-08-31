@@ -6,6 +6,7 @@
 **
 **  Copyright 2015-2018 Marc Rautenhaus
 **  Copyright 2017      Philipp Kaiser
+**  Copyright 2020 Marcel Meyer [*]
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -259,6 +260,61 @@ void MTrajectories::copyVertexDataFrom(QVector<QVector<QVector3D>> &v)
 }
 
 
+void MTrajectories::copyAuxDataPerVertex(float *auxData, int iIndexAuxData)
+{
+
+    auxDataAtVertices.resize(getVertices().size());
+    for (int i = 0; i < getVertices().size(); i++)
+    {        
+        auxDataAtVertices[i].resize(iIndexAuxData+1);
+        auxDataAtVertices[i][iIndexAuxData]=auxData[i];
+    }
+}
+
+void MTrajectories::copyAuxDataPerVertex(QVector<QVector<QVector<float>>> &av)
+{
+
+    // Copy auxiliary data from one QVector array to another QVector array
+    // with the format of the internal (trajectory class) auxiliary data array.
+    // Array-Indexing:
+    // Input: The input to this method is a 3-D array (Qvector of Qvector of Qvector
+    // with dimensions: (i) trajectories, (ii) time-steps per trajectory,
+    // (iii) aux data.
+    // Output: The auxiliary data in the trajectory class is stored in the
+    // format QVector<Qvector<float>> where the vertices of all trajectories
+    // are stored in one long list in the first dimension of the QVector
+    // (traj1_v1, traj1_v2,...,traj1_vN, traj2_v1,traj2_v2,...), and the
+    // auxiliary data variables at each of the vertices are stored in the
+    // second dimension (QVector<float>).
+    int numTrajs = av.size();
+    for (int i = 0; i < numTrajs; ++i)
+    {
+        int numVerticesPerTraj = av[i].size();
+        for (int j = 0; j < numVerticesPerTraj; ++j)
+        {
+            if ((i==0) && (j==0))
+            {
+                auxDataAtVertices.resize(av.size()*av[0].size());
+            }
+            int numAuxDataVars = av[i][j].size();
+            for (int k = 0; k < numAuxDataVars; k++)
+            {
+                auxDataAtVertices[i * numVerticesPerTraj + j].resize(
+                            av[0][0].size());
+                auxDataAtVertices[i * numVerticesPerTraj + j][k]=
+                        av.at(i).at(j).at(k);
+            }
+        }
+     }
+}
+
+
+void MTrajectories::copyAuxDataNames(QStringList allAuxDataNames)
+{
+    auxDataVarNames=allAuxDataNames;
+}
+
+
 unsigned int MTrajectories::getTimeStepLength_sec()
 {
     if (times.size() < 2)
@@ -290,10 +346,62 @@ GL::MVertexBuffer* MTrajectories::getVertexBuffer(QGLWidget *currentGLContext)
                 glRM->getGPUItem(getID()));
 }
 
+// Load auxiliary data along trajectories into a vertex buffer.
+GL::MVertexBuffer* MTrajectories::getAuxDataVertexBuffer(
+        QString requestedAuxDataVarName,
+        QGLWidget *currentGLContext)
+{
+    // Initialize instance of openGL resource manager.
+    MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
+
+    // Get the requested auxiliary data from the QVector with all auxiliary
+    // data vars along trajectories.
+    QVector<float> requestedAuxDataAtVertices(auxDataAtVertices.size()) ;
+    for (int i=0;i<auxDataVarNames.size();i++)
+    {
+       QString iAuxDataVarName=auxDataVarNames.at(i);
+       if (iAuxDataVarName==requestedAuxDataVarName)
+       {
+           for (int j=0; j<auxDataAtVertices.size();j++)
+           {
+                requestedAuxDataAtVertices[j]=auxDataAtVertices.at(j).at(i);
+           }
+       }
+    }
+
+    // Check if a texture with this item's data already exists in GPU memory.
+    GL::MVertexBuffer *vb = static_cast<GL::MVertexBuffer*>(
+                glRM->getGPUItem((getID()+requestedAuxDataVarName)));
+    if (vb) return vb;
+
+    // If no texture with this item's data exists, then create a new one.
+    GL::MFloatVertexBuffer *newVB = new GL::MFloatVertexBuffer(
+                (getID()+requestedAuxDataVarName),
+                requestedAuxDataAtVertices.size());
+
+    // Upload the request auxiliary data.
+    if (glRM->tryStoreGPUItem(newVB))
+        newVB->upload(requestedAuxDataAtVertices, currentGLContext);
+    else
+        delete newVB;
+
+    return static_cast<GL::MVertexBuffer*>(
+                glRM->getGPUItem((getID()+requestedAuxDataVarName)));
+}
+
+
 
 void MTrajectories::releaseVertexBuffer()
 {
     MGLResourcesManager::getInstance()->releaseGPUItem(getID());
+}
+
+// Release vertex buffer with auxiliary data. As there can be more than one
+// aux.-data var per vertex, its name is provided as a unique identifier.
+void MTrajectories::releaseAuxDataVertexBuffer(QString requestedAuxDataVarName)
+{
+    MGLResourcesManager::getInstance()->releaseGPUItem(
+                (getID()+requestedAuxDataVarName));
 }
 
 

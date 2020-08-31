@@ -7,6 +7,7 @@
 **  Copyright 2015-2018 Marc Rautenhaus [*, previously +]
 **  Copyright 2017-2018 Bianca Tost [+]
 **  Copyright 2017      Philipp Kaiser [+]
+**  Copyright 2020 Marcel Meyer [*]
 **
 **  + Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -297,6 +298,12 @@ private:
     void updateStartTimeProperty();
 
     /**
+      Update the auxiliary data property (listing the auxiliary data variables
+      that are available along trajectories) for the current data source.
+     */
+    void updateAuxDataVarNamesProperty();
+
+    /**
       Update the trajectory time property (available time steps for the current
       trajectory) from the loaded trajectory data. Does not use data from the
       data source.
@@ -345,13 +352,15 @@ private:
                 : trajectories(nullptr),
                   trajectorySelection(nullptr),
                   trajectorySingleTimeSelection(nullptr),
-                  trajectoriesVertexBuffer(nullptr)
+                  trajectoriesVertexBuffer(nullptr),
+                  trajectoriesAuxDataVertexBuffer(nullptr)
         { }
 
         MTrajectories* trajectories;
         MTrajectorySelection* trajectorySelection;
         MTrajectorySelection* trajectorySingleTimeSelection;
         GL::MVertexBuffer* trajectoriesVertexBuffer;
+        GL::MVertexBuffer* trajectoriesAuxDataVertexBuffer;
 
         QHash<MSceneViewGLWidget*, MTrajectoryNormals*> normals;
         QHash<MSceneViewGLWidget*, GL::MVertexBuffer*> normalsVertexBuffer;
@@ -369,6 +378,7 @@ private:
     MTrajectoryDataSource *trajectorySource;
     MTrajectories *trajectories;
     GL::MVertexBuffer *trajectoriesVertexBuffer;
+    GL::MVertexBuffer *trajectoriesAuxDataVertexBuffer;
 
     MTrajectoryNormalsSource *normalsSource;
     QHash<MSceneViewGLWidget*, MTrajectoryNormals*> normals;
@@ -396,8 +406,20 @@ private:
         BACKWARDTUBES_AND_SINGLETIME = 4
     };
 
+    /** Render color mode (pressure, aux-data). */
+    enum TrajectoryRenderColorMode {
+        PRESSURE = 0,
+        AUXDATA  = 1
+    };
+
+
     TrajectoryRenderType renderMode;
+    TrajectoryRenderColorMode renderColorMode;
     QtProperty *renderModeProperty;
+    QtProperty *renderColorModeProperty;
+    QtProperty *renderAuxDataVarProperty;
+    QString requestedAuxDataVarName = "none";
+
 
     /** Synchronisation with MSyncControl. */
     MSyncControl *synchronizationControl;

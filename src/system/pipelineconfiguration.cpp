@@ -7,6 +7,7 @@
 **  Copyright 2015-2018 Marc Rautenhaus
 **  Copyright 2017-2018 Bianca Tost
 **  Copyright 2017      Philipp Kaiser
+**  Copyright 2020 Marcel Meyer [*]
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -403,6 +404,8 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
                 config.value("northwardWind_ms").toString();
         QString windVerticalVariable =
                 config.value("verticalWind_Pas").toString();
+        QString auxDataVariablesStrList =
+                (config.value("auxDataVariablesStrList").toString());
         QString windVarsVerticalLevelTypeString =
                 config.value("windComponentVariablesVerticalLevelType").toString();
 
@@ -499,7 +502,7 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
                         name, ablTrajectories, schedulerID,
                         memoryManagerID, NWPDataset,
                         windEastwardVariable, windNorthwardVariable,
-                        windVerticalVariable, windVarsVerticalLevelType);
+                        windVerticalVariable,auxDataVariablesStrList,windVarsVerticalLevelType);
             }
             else
             {
@@ -808,6 +811,7 @@ void MPipelineConfiguration::initializeTrajectoryComputationPipeline(
         QString windEastwardVariable,
         QString windNorthwardVariable,
         QString windVerticalVariable,
+        QString auxDataVariableNames,
         MVerticalLevelType verticalLevelType)
 {
     const QString dataSourceId = name;
@@ -894,6 +898,29 @@ void MPipelineConfiguration::initializeTrajectoryComputationPipeline(
         }
     }
 
+    // Get vertical level type of auxiliary data variables
+    QStringList auxDataVariableList = auxDataVariableNames.split(",");
+    //QList<MVerticalLevelType> verticalLevelsOfAuxDataVars;
+    QMap<QString, MVerticalLevelType> verticalLevelsOfAuxDataVars;
+
+    for (int i = 0; i < auxDataVariableList.size(); ++i)
+    {
+        QString iAuxDataVar= auxDataVariableList.at(i);
+
+        QList<MVerticalLevelType> levelTypes =
+                NWPDataSource->availableLevelTypes();
+        foreach (MVerticalLevelType level, levelTypes)
+        {
+            QStringList variables = NWPDataSource->availableVariables(level);
+            if (variables.contains(iAuxDataVar))
+            {
+                //verticalLevelsOfAuxDataVars.append(level);
+                verticalLevelsOfAuxDataVars.insert(iAuxDataVar,level);
+            }
+        }
+
+    }
+
     if (MClimateForecastReader *netCDFDataSource =
             dynamic_cast<MClimateForecastReader*>(NWPDataSource))
     {
@@ -923,6 +950,8 @@ void MPipelineConfiguration::initializeTrajectoryComputationPipeline(
     trajectoryComputation->setInputWindVariables(windEastwardVariable,
                                                  windNorthwardVariable,
                                                  windVerticalVariable);
+    trajectoryComputation->setAuxDataVariables(auxDataVariableNames);
+    trajectoryComputation->setVerticalLevelsOfAuxDataVariables(verticalLevelsOfAuxDataVars);
 
     trajectoryComputation-> setVerticalLevelType(verticalLevelType);
     trajectoryComputation->setInputSource(NWPDataSource);

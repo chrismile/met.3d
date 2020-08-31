@@ -4,10 +4,14 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015 Marc Rautenhaus [*, previously +]
+**  Copyright 2020 Marcel Meyer [*]
 **
-**  Computer Graphics and Visualization Group
+**  + Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
+**
+**  * Regional Computing Center, Visualization
+**  Universitaet Hamburg, Hamburg, Germany
 **
 **  Met.3D is free software: you can redistribute it and/or modify
 **  it under the terms of the GNU General Public License as published by
@@ -193,7 +197,7 @@ MTrajectories* MTrajectoryReader::produceData(MDataRequest request)
                 "invalid ensemble member requested",
                 __FILE__, __LINE__);
 
-    // Correct the number of timesteps if only a part if the trajectory is read.
+    // Correct the number of timesteps if only a part of the trajectory is read.
     unsigned int startIndex = 0;
     QVector<QDateTime> times;
     if (timeSpan != "ALL")
@@ -214,6 +218,7 @@ MTrajectories* MTrajectoryReader::produceData(MDataRequest request)
     float *lons = new float[numVertices];
     float *lats = new float[numVertices];
     float *pres = new float[numVertices];
+    float *auxData = new float[numVertices];
 
     // Read data from file.
     vector<size_t> start = {member, 0, startIndex};
@@ -222,8 +227,7 @@ MTrajectories* MTrajectoryReader::produceData(MDataRequest request)
     QMutexLocker ncAccessMutexLocker(&staticNetCDFAccessMutex);
     finfo->lonVar.getVar(start, count, lons);
     finfo->latVar.getVar(start, count, lats);
-    finfo->prsVar.getVar(start, count, pres);
-    ncAccessMutexLocker.unlock();
+    finfo->prsVar.getVar(start, count, pres);    
 
     // Create the trajectory data struct that is returned from this function.
     Met3D::MTrajectories* trajectories =
@@ -232,8 +236,33 @@ MTrajectories* MTrajectoryReader::produceData(MDataRequest request)
     trajectories->setMetaData(
                 initTime, validTime, "PRECOMPUTED_trajectories", member);
 
-    // Copy temporary data fields to return data struct.
+    // Copy temporary data with vertex positions into the return data struct.
     trajectories->copyVertexDataFrom(lons, lats, pres);
+
+    // Read all auxiliary data variables from file and copy to the return
+    // data struct.
+    int iIndexAuxData=0;
+    QVector<netCDF::NcVar> allAuxDataVariables = finfo->auxDataVars;
+    for (QVector<netCDF::NcVar>::iterator iAuxDataVar =
+         allAuxDataVariables.begin();
+         iAuxDataVar != allAuxDataVariables.end(); iAuxDataVar++)
+    {
+
+        // Read auxiliary data into temporary data array.
+        finfo->auxDataVars[iIndexAuxData].getVar(start, count, auxData);
+
+        // Copy this auxiliary data, iAuxDataVar, to the aux. data struct
+        // in the trajectories class.
+        trajectories->copyAuxDataPerVertex(auxData,iIndexAuxData);
+
+        // Iterate over all auxiliary data variables.
+        iIndexAuxData=iIndexAuxData+1;
+     }
+
+    ncAccessMutexLocker.unlock();
+
+    // Copy the names of auxiliary data variables.
+    trajectories->copyAuxDataNames(finfo->auxDataVarNames);
 
     // Copy start grid geometry, if available.
     trajectories->setStartGrid(finfo->startGrid);
@@ -245,6 +274,7 @@ MTrajectories* MTrajectoryReader::produceData(MDataRequest request)
     delete[] lons;
     delete[] lats;
     delete[] pres;
+    delete[] auxData;
 
 #ifdef MSTOPWATCH_ENABLED
     stopwatch.split();
@@ -542,6 +572,32 @@ void MTrajectoryReader::checkFileOpen(QString filename)
         finfo->lonVar = ncFile->getVar("lon");
         finfo->latVar = ncFile->getVar("lat");
         finfo->prsVar = ncFile->getVar("pressure");
+
+        // Get auxiliary data along trajectories by screening
+        // all available ncvars in the input file and picking
+        // those vars indicated as "aux. data" by the
+        // nc var attribute "auxiliary_data".
+        multimap<string, NcVar> ncVariables = ncFile->getVars();
+        for (multimap<string, NcVar>::iterator iVar = ncVariables.begin();
+             iVar != ncVariables.end(); iVar++)
+        {
+            QString varName = QString::fromStdString(iVar->first);
+            NcCFVar iCFVar(ncFile->getVar(varName.toStdString()));
+
+            string auxdataindicator = "";
+            try { iCFVar.getAtt("auxiliary_data").getValues(auxdataindicator);}
+            catch (NcException) {}
+
+            if (auxdataindicator=="yes")
+            {
+                finfo->auxDataVarNames.append(varName);
+                finfo->auxDataVars.append(ncFile->getVar(
+                                              varName.toStdString()));
+            }
+        }
+
+        // Get the number of auxiliary data variables along trajectories.
+        finfo->numAuxDataVars = finfo->auxDataVars.size();
 
         // Get time values.
         NcCFVar cfVar(finfo->prsVar);

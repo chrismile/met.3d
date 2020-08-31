@@ -6,6 +6,7 @@
 **
 **  Copyright 2017      Philipp Kaiser [+]
 **  Copyright 2017-2018 Marc Rautenhaus [*, previously +]
+**  Copyright 2020 Marcel Meyer [*]
 **
 **  + Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -76,6 +77,18 @@ void MTrajectoryComputationSource::setInputWindVariables(
     windEastwardVariableName = eastwardWind_ms;
     windNorthwardVariableName = northwardWind_ms;
     windVerticalVariableName = verticalWind_Pas;
+}
+
+void MTrajectoryComputationSource::setAuxDataVariables(
+        QString auxDataVarNamesList)
+{
+    auxDataVarNames = auxDataVarNamesList.split(",");
+}
+
+void MTrajectoryComputationSource::setVerticalLevelsOfAuxDataVariables(
+        QMap<QString, MVerticalLevelType> verticalLevelsOfAuxDataVars)
+{
+    verticalLevelsOfAuxDataVariables = verticalLevelsOfAuxDataVars;
 }
 
 
@@ -212,6 +225,8 @@ MTrajectories* MTrajectoryComputationSource::produceData(MDataRequest request)
     trajectories->setMetaData(initTime, validTime, "MET3DCOMPUTED_trajectories",
                               member);
     trajectories->copyVertexDataFrom(cInfo.vertices);
+    trajectories->copyAuxDataPerVertex(cInfo.auxDataAtVertices);
+    trajectories->copyAuxDataNames(cInfo.auxDataVarNames);
     trajectories->setStartGrid(cInfo.startGrid);
 
     LOG4CPLUS_DEBUG(mlog, "Computation of trajectories/streamlines finished.");
@@ -254,7 +269,7 @@ MTask* MTrajectoryComputationSource::createTaskGraph(MDataRequest request)
     QDateTime endTime = rh.timeValue("END_TIME");
     QStringList variables = QStringList()
             << windEastwardVariableName << windNorthwardVariableName
-            << windVerticalVariableName;
+            << windVerticalVariableName << auxDataVarNames;
 
     // Get valid times for given init time.
     QReadLocker availableItemsReadLocker(&availableItemsLock);
@@ -266,14 +281,28 @@ MTask* MTrajectoryComputationSource::createTaskGraph(MDataRequest request)
     int endIndex = validTimes.indexOf(endTime);
 
     // Request resources required for computation.
+    MVerticalLevelType verticalLevelOfVariable;
     for (QString variable : variables)
     {
+
+        // Get vertical level type. For all wind variables this
+        // is fixed to "levelType", but auxiliary data variables
+        // may be given on other vertical level types.
+        if (auxDataVarNames.contains(variable))
+        {
+            verticalLevelOfVariable=verticalLevelsOfAuxDataVariables[variable];
+        }
+        else
+        {
+            verticalLevelOfVariable=levelType;
+        }
+
         for (int i = min(startIndex, endIndex);
              i <= max(startIndex, endIndex); i++)
         {
             rh.insert("VALID_TIME", validTimes.at(i));
             rh.insert("VARIABLE", variable);
-            rh.insert("LEVELTYPE", levelType);
+            rh.insert("LEVELTYPE", verticalLevelOfVariable);
             task->addParent(dataSource->getTaskGraph(rh.request()));
         }
     }
@@ -397,6 +426,7 @@ void MTrajectoryComputationSource::computeTrajectories(
     helper.varNames[0] = windEastwardVariableName;
     helper.varNames[1] = windNorthwardVariableName;
     helper.varNames[2] = windVerticalVariableName;
+    helper.auxVarNames = auxDataVarNames;
     helper.validTimes = validTimes;
     helper.iterationMethod = integrationMethod;
     helper.interpolationMethod = interpolationMethod;
@@ -470,19 +500,28 @@ void MTrajectoryComputationSource::computeTrajectories(
             computeStreamLines(helper, cInfo);
             break;
     }
+
 }
 
 
 void MTrajectoryComputationSource::computeStreamLines(
         TrajectoryComputationHelper& ch, MTrajectoryComputationInfo& cInfo)
 {
-    // Array to store grids with wind data that are passed to the integration
-    // methods. trajectoryIntegrationEuler() and trajectoryIntegrationRungeKutta()
+
+    // Define number of required data grids.
+    uint numWindDataVars = ch.varNames.size();
+    uint numAuxDataVars = ch.auxVarNames.size();
+
+    // Array to store grids with wind data and auxiliary data sampled along
+    // trajectories. These are passed to the integration
+    // methods. trajectoryIntegrationEuler() and
+    // trajectoryIntegrationRungeKutta()
     // both require two timesteps to be passed. As for streamlines we only
     // consider a single timestep, the current implementation simply stores
     // pointers to the same data for both time steps (see below).
     QVector<QVector<MStructuredGrid*>> grids(
-                2, QVector<MStructuredGrid *>(3, nullptr));
+                2, QVector<MStructuredGrid *>(numWindDataVars+numAuxDataVars,
+                                              nullptr));
 
     MDataRequestHelper rh(ch.baseRequest);
 
@@ -491,30 +530,57 @@ void MTrajectoryComputationSource::computeStreamLines(
     cInfo.numStoredVerticesPerTrajectory = ch.streamlineLength;
     cInfo.times.reserve(cInfo.numStoredVerticesPerTrajectory);
     cInfo.vertices = QVector<QVector<QVector3D>>(cInfo.numTrajectories);
+    cInfo.auxDataAtVertices = QVector<QVector<QVector<float>>>(
+                                                 cInfo.numTrajectories);
+    cInfo.auxDataVarNames=ch.auxVarNames;
     for (uint t = 0; t < cInfo.numTrajectories; ++t)
     {
         cInfo.vertices[t].reserve(cInfo.numStoredVerticesPerTrajectory);
+        cInfo.auxDataAtVertices[t].reserve(
+                    cInfo.numStoredVerticesPerTrajectory*numAuxDataVars);
     }
+
+    // Create temporary vector to cache auxiliary data at vertex positions.
+    QVector<QVector<float>> auxDataValuesPerVertexPerTrajectory(
+                cInfo.numTrajectories,QVector<float>(numAuxDataVars));
 
     // Add start time step and seed points.
     QVector<bool> validPosition(cInfo.numTrajectories);
+    QVector<QVector3D> seedPos(cInfo.numTrajectories);
     cInfo.times.push_back(ch.validTimes.at(ch.startTimeStep));
     for (uint trajectory = 0; trajectory < ch.trajectoryCount; ++trajectory)
     {
-        cInfo.vertices[trajectory].push_back(
-                    determineTrajectorySeedPosition(trajectory, ch));
+        seedPos[trajectory]=determineTrajectorySeedPosition(trajectory, ch);
+        cInfo.vertices[trajectory].push_back(seedPos[trajectory]);
         validPosition[trajectory] = true;
     }
 
-    // Load wind data (see comment above; two timesteps are required for the
+    // Load wind data and auxiliary data to be sampled along streamlines
+    // (see comment above; two timesteps are required for the
     // integration methods, here both grids are the same as only a single time
     // step is required for streamline computation).
     QDateTime timeStep = ch.validTimes.at(ch.startTimeStep);
     rh.insert("VALID_TIME", timeStep);
     bool allDataFieldsValid = true;
-    for (int v = 0; v < ch.varNames.size(); ++v) // v = 0,1,2 => wind u,v,w
+    // loop over wind fields and aux data fields
+    for (int v = 0; v < ch.varNames.size()+ch.auxVarNames.size(); ++v)
     {
-        rh.insert("VARIABLE", ch.varNames[v]);
+
+        // Wind data vars.
+        if (v < ch.varNames.size())
+        {
+            rh.insert("VARIABLE", ch.varNames[v]);
+            rh.insert("LEVELTYPE",levelType);
+        }
+        // Auxiliary data vars.
+        else if (v >= ch.varNames.size())
+        {
+            rh.insert("VARIABLE", ch.auxVarNames[v - numWindDataVars]);
+            rh.insert("LEVELTYPE", verticalLevelsOfAuxDataVariables[
+                      ch.auxVarNames[v - numWindDataVars]]);
+        }
+
+        // get data at current time-step
         grids[0][v] = dataSource->getData(rh.request()); // timestep 0
         grids[1][v] = grids[0][v];                       // timestep 1 (link)
 
@@ -522,14 +588,42 @@ void MTrajectoryComputationSource::computeStreamLines(
         {
             allDataFieldsValid = false;
             QString emsg = QString("ERROR: Not all wind components required "
-                                   "for the streamline computation could be "
-                                   "loaded. Please check the console output "
-                                   "and your datasets. Aborting streamline "
+                                   "for the streamline computation and all "
+                                   "auxiliary data fields required for sampling"
+                                   "the requested auxiliary data along streamlines"
+                                   "could be loaded. Please check the console "
+                                   "output and your datasets. Also make sure that "
+                                   "the names of the auxiliary data variables "
+                                   "entered in the GUI macht the variable names "
+                                   "in the NWP input dataset. Aborting streamline "
                                    "computation.");
             LOG4CPLUS_ERROR(mlog, emsg.toStdString());
 //TODO (mr, 20Jul2018) -- see corresponding part in computePathLines().
 //            QMessageBox::critical(nullptr, "Error", emsg, QMessageBox::Ok);
         }
+    }
+
+    // Sample auxiliary data at the seed position of each trajectory.
+    const float timeIntWeight = 0;       //  value at first time-step
+    for (uint iStreamline = 0; iStreamline < ch.trajectoryCount; ++iStreamline)
+    {
+       for (int w = 0; w < ch.auxVarNames.size(); ++w)
+       {
+           // Get index of aux. data field which is behind wind vars in
+           // list of grids.
+           uint gridIndex=numWindDataVars + w;
+
+           // Get auxiliary data, w, at this vertex.
+           float iAuxDataValue = sampleAuxDataAtTrajectoryVertex(
+                       seedPos[iStreamline],
+                       timeIntWeight, ch.interpolationMethod, grids,
+                       gridIndex, validPosition[iStreamline]);
+           auxDataValuesPerVertexPerTrajectory[iStreamline][w]=iAuxDataValue;
+
+       }
+       // Store all auxiliary data variables at this vertex of the trajectory.
+       cInfo.auxDataAtVertices[iStreamline].push_back(
+                   auxDataValuesPerVertexPerTrajectory[iStreamline]);
     }
 
     // cInfo.times contains the list of timesteps that correspond to the
@@ -583,12 +677,32 @@ void MTrajectoryComputationSource::computeStreamLines(
 
                 // Store position in vertex buffer.
                 cInfo.vertices[iStreamline].push_back(nextPos);
+
+                // Sample auxiliary data at current position and time-step
+                const float timeIntWeight = 0; // identical grids at t0 and t1
+                for (int w = 0; w < ch.auxVarNames.size(); ++w)
+                {
+                    // Set index of aux. data field which is behind the wind
+                    // data grids in the list of grids
+                    uint gridIndex=numWindDataVars + w;
+
+                    // Get the auxiliary data, w, at vertex.
+                    float iAuxDataValue = sampleAuxDataAtTrajectoryVertex(
+                                nextPos, timeIntWeight, ch.interpolationMethod,
+                                grids, gridIndex, validPosition[iStreamline]);
+                    auxDataValuesPerVertexPerTrajectory[iStreamline][w]=
+                            iAuxDataValue;
+                }
+                // Store all auxiliary data variables at this vertex of
+                // iTrajectory.
+                cInfo.auxDataAtVertices[iStreamline].push_back(
+                            auxDataValuesPerVertexPerTrajectory[iStreamline]);
             }
         }
     }
 
-    // Release wind data grids.
-    for (int v = 0; v < ch.varNames.size(); ++v)
+    // Release wind and auxiliary data grids.
+    for (int v = 0; v < (ch.varNames.size()+ch.auxVarNames.size()) ; ++v)
     {
         if (grids[0][v])
         {
@@ -601,12 +715,20 @@ void MTrajectoryComputationSource::computeStreamLines(
 void MTrajectoryComputationSource::computePathLines(
         TrajectoryComputationHelper& ch, MTrajectoryComputationInfo& cInfo)
 {
-    // Array to store grids with wind data that are passed to the integration
+
+    // Define number of required data grids.
+    uint numWindDataVars = ch.varNames.size();
+    uint numAuxDataVars = ch.auxVarNames.size();
+
+    // Array to store grids with wind data and auxiliary data for sampling
+    // along trajectories. The array with grids is passed to the integration
     // methods. Two timesteps are stored.
     QVector<QVector<MStructuredGrid*>> grids(
-                2, QVector<MStructuredGrid *>(3, nullptr));
+                2, QVector<MStructuredGrid *>(numWindDataVars+numAuxDataVars,
+                                              nullptr));
     QVector<QDateTime> timeSteps(2);
     MDataRequestHelper rh(ch.baseRequest);
+
 
     // Initialize computation information.
     cInfo.numStoredVerticesPerTrajectory =
@@ -614,14 +736,21 @@ void MTrajectoryComputationSource::computePathLines(
     cInfo.numTrajectories = ch.trajectoryCount;
     cInfo.times.reserve(cInfo.numStoredVerticesPerTrajectory);
     cInfo.vertices = QVector<QVector<QVector3D>>(cInfo.numTrajectories);
+    cInfo.auxDataAtVertices = QVector<QVector<QVector<float>>>(cInfo.numTrajectories);
+    cInfo.auxDataVarNames=ch.auxVarNames;
     for (uint t = 0; t < cInfo.numTrajectories; ++t)
     {
         cInfo.vertices[t].reserve(cInfo.numStoredVerticesPerTrajectory);
+        cInfo.auxDataAtVertices[t].reserve(
+                    cInfo.numStoredVerticesPerTrajectory*numAuxDataVars);
     }
 
     // Create temporary vector to cache trajectory vertex positions.
     QVector<QVector3D> positions(cInfo.numTrajectories);
     QVector<bool> validPosition(cInfo.numTrajectories);
+
+    // Create temporary vector to cache auxiliary data at vertex positions.
+    QVector<QVector<float>> auxDataValuesPerVertexPerTrajectory(cInfo.numTrajectories,QVector<float>(numAuxDataVars));
 
     // Add start time step and seed points.
     cInfo.times.push_back(ch.validTimes.at(ch.startTimeStep));
@@ -646,14 +775,27 @@ void MTrajectoryComputationSource::computePathLines(
         const float timeStepSeconds = timeSteps[0].secsTo(timeSteps[1])
                 / static_cast<float>(ch.subTimeStepsPerDataTimeStep);
 
-        // Load wind data (u,v,w components for both data time steps).
+        // Load wind data (u,v,w components for both data time steps)
+        // and auxiliary data along trajectories.
         bool allDataFieldsValid = true;
         for (int t = 0; t < timeSteps.size(); ++t)
         {
             rh.insert("VALID_TIME", timeSteps[t]);
-            for (int v = 0; v < ch.varNames.size(); ++v)
+            for (int v = 0; v < ch.varNames.size()+ch.auxVarNames.size(); ++v)
             {
-                rh.insert("VARIABLE", ch.varNames[v]);
+                // Wind data vars.
+                if (v < ch.varNames.size())
+                {
+                    rh.insert("VARIABLE", ch.varNames[v]);
+                    rh.insert("LEVELTYPE",levelType);
+                }
+                // Auxiliary data vars.
+                else if (v >= ch.varNames.size())
+                {
+                    rh.insert("VARIABLE", ch.auxVarNames[v - numWindDataVars]);
+                    rh.insert("LEVELTYPE", verticalLevelsOfAuxDataVariables[
+                              ch.auxVarNames[v - numWindDataVars]]);
+                }
                 if (!grids[t][v])
                 {
                     // The "next" timestep of the previous time iteration
@@ -672,9 +814,15 @@ void MTrajectoryComputationSource::computePathLines(
         if (!allDataFieldsValid)
         {
             QString emsg = QString("ERROR: Not all wind components required "
-                                   "for the trajectory computation could be "
-                                   "loaded. Please check the console output "
-                                   "and your datasets. Aborting trajectory "
+                                   "for the trajectory computation and all"
+                                   "auxiliary data fields required for sampling the "
+                                   "requested auxiliary data along trajectories "
+                                   "could be loaded. "
+                                   "Please check the console output "
+                                   "and your datasets. Also make sure the names "
+                                   "of the auxiliary data variables provided in "
+                                   "the GUI match the variable names in the NWP input data. "
+                                   "Aborting trajectory "
                                    "computation.");
             LOG4CPLUS_ERROR(mlog, emsg.toStdString());
 //TODO (mr, 20Jul2018) -- show QMessageBox at this place to inform the user
@@ -682,6 +830,34 @@ void MTrajectoryComputationSource::computePathLines(
 // https://stackoverflow.com/questions/3268073/qobject-cannot-create-children-for-a-parent-that-is-in-a-different-thread
 //            QMessageBox::critical(nullptr, "Error", emsg, QMessageBox::Ok);
             break;
+        }
+
+        // Sample auxiliary data at the seed position of each trajectory.
+        if (step == ch.startTimeStep)
+        {
+            const float timeIntWeight = 0; // value at first time-step
+            for (uint trajectory = 0; trajectory < ch.trajectoryCount;
+                 ++trajectory)
+            {
+                for (int w = 0; w < ch.auxVarNames.size(); ++w)
+                {
+                    // Get index of aux. data field which is behind wind vars
+                    // in list of grids.
+                    uint gridIndex=numWindDataVars + w;
+
+                    // Get auxiliary data, w, at this vertex
+                    float iAuxDataValue = sampleAuxDataAtTrajectoryVertex(
+                                positions[trajectory], timeIntWeight,
+                                ch.interpolationMethod, grids, gridIndex,
+                                validPosition[trajectory]);
+                    auxDataValuesPerVertexPerTrajectory[trajectory][w]=
+                            iAuxDataValue;
+
+                }
+                // Store all auxiliary data variables at this vertex of trajectory
+                cInfo.auxDataAtVertices[trajectory].push_back(
+                            auxDataValuesPerVertexPerTrajectory[trajectory]);
+            }
         }
 
         // The "current" timestep for which the new vertex position needs to
@@ -736,10 +912,40 @@ void MTrajectoryComputationSource::computePathLines(
 
             // Save computed vertex position for the "current" time step.
             cInfo.vertices[iTrajectory].push_back(positions[iTrajectory]);
-        }
+
+            // Sample auxiliary data at current position and time-step
+            // particle positions are integrated from date time, t0, to next
+            // data time, t1, using n steps between the data-time steps.
+            // the positions on sub-grid-scales, i.e. at each of the n steps,
+            // are not saved and not plotted; instead only positions at
+            // time-steps of the data are saved. We want to sample the aux data
+            // at the time of the data, hence we set the time-ingetration
+            // weight to 1.
+            const float timeIntWeight = 1;
+            // Set the time interpolation weight to 1 for sampling at the time
+            // of the second data grid.
+            for (int w = 0; w < ch.auxVarNames.size(); ++w)
+            {
+                // Set index of aux. data field which is behind the wind data
+                // grids in the list of grids.
+                uint gridIndex=numWindDataVars + w;
+
+                // Get the auxiliary data, w, at vertex.
+                float iAuxDataValue = sampleAuxDataAtTrajectoryVertex(
+                            positions[iTrajectory], timeIntWeight,
+                            ch.interpolationMethod, grids, gridIndex,
+                            validPosition[iTrajectory]);
+                auxDataValuesPerVertexPerTrajectory[iTrajectory][w]=
+                        iAuxDataValue;
+            }
+            // Store all auxiliary data variables at this vertex of
+            // iTrajectory.
+            cInfo.auxDataAtVertices[iTrajectory].push_back(
+                        auxDataValuesPerVertexPerTrajectory[iTrajectory]);
+         }
 
         // Release data grid of previous time step (i.e. index [0]).
-        for (int v = 0; v < ch.varNames.size(); ++v)
+        for (int v = 0; v < (ch.varNames.size()+ch.auxVarNames.size()); ++v)
         {
             dataSource->releaseData(grids[0][v]);
             grids[0][v] = nullptr;
@@ -748,11 +954,13 @@ void MTrajectoryComputationSource::computePathLines(
         // Swap data grids (the current data field at index [1] will be
         // needed at index [0] in the next time iteration).
         swap(grids[0], grids[1]);
+
     }
 
     // Release all remaining not-yet released data fields.
     for (int t = 0; t < grids.size(); ++t)
     {
+        // wind and aux data
         for (int v = 0; v < grids[t].size(); ++v)
         {
             if (grids[t][v])
@@ -895,6 +1103,73 @@ QVector3D MTrajectoryComputationSource::sampleVelocity3DSpaceTime(
     }
 
     return velocity;
+}
+
+
+float MTrajectoryComputationSource::sampleAuxDataAtTrajectoryVertex(
+        QVector3D pos, float timeInterpolationValue,
+        TRAJECTORY_COMPUTATION_INTERPOLATION_METHOD method,
+        QVector<QVector<MStructuredGrid*>> &grids, uint indexAuxVar,
+        bool& valid)
+{
+    // Initialise variable for storing auxiliary data value.
+    float auxDataValue = M_MISSING_VALUE;
+
+    // Sample auxiliary data with the given interpolation method.
+    // For consistency w.r.t. the interpolation methods for wind data
+    // (for the calculation of vertex positions) and auxiliary data at
+    // vertex positions, there are 2 interpolation methods here, such that
+    // the auxiliary data is interpolated using the same method as
+    // used for the interpolation of wind fields for the calculation of
+    // trajectories (see above: "sampleVelocity3DSpaceTime").
+    switch (method)
+    {
+        case LAGRANTO_INTERPOLATION:
+        {
+            // Get time-interpolated index of pos in grid.
+            QVector3D auxDataIndex = floatIndexAtPosInterpolatedInTime(
+                    pos, grids[0][indexAuxVar], grids[1][indexAuxVar],
+                    timeInterpolationValue);
+
+            // Check if index is valid.
+            if ( auxDataIndex.x() < 0 || auxDataIndex.y() < 0 ||
+                 auxDataIndex.z() < 0)
+            {
+                valid = false;
+                break;
+            }
+
+            // Get auxiliary data value at index pos and interpolate in time.
+            auxDataValue = sampleDataValueAtFloatIndexAndInterpolateInTime(
+                        auxDataIndex, grids[0][indexAuxVar],
+                        grids[1][indexAuxVar], timeInterpolationValue);
+
+            break;
+        }
+
+        case MET3D_INTERPOLATION:
+        {
+            // Sample auxiliary data by linear interpolation to pos for
+            // two time-steps.
+            float auxDataT0 = grids[0][indexAuxVar]->interpolateValue(
+                        pos.x(), pos.y(), pos.z());
+            float auxDataT1 = grids[1][indexAuxVar]->interpolateValue(
+                        pos.x(), pos.y(), pos.z());
+
+            // Check for missing values.
+            if (IS_MISSING(auxDataT0) || IS_MISSING(auxDataT1))
+            {
+                valid = false;
+                break;
+            }
+
+            // Interpolate in time.
+            auxDataValue = MMIX(auxDataT0, auxDataT1, timeInterpolationValue);
+            break;
+        }
+    }
+
+    return auxDataValue;
 }
 
 

@@ -6,6 +6,7 @@
 **
 **  Copyright 2017      Philipp Kaiser [+]
 **  Copyright 2017-2018 Marc Rautenhaus [*, previously +]
+**  Copyright 2020 Marcel Meyer [*]
 **
 **  + Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -98,6 +99,15 @@ struct MTrajectoryComputationInfo
     // Start grid geometry (i.e., seed points).
     std::shared_ptr<MStructuredGrid> startGrid;
 
+    // Array for storing auxiliary data along trajectories:
+    // - 1-Dim: number of trajectories,
+    // - 2-Dim: vertices/time-steps per trajectory,
+    // - 3-Dim: auxiliary data.
+    QVector<QVector<QVector<float>>> auxDataAtVertices;
+
+    // List with auxiliary data variable names.
+    QStringList auxDataVarNames;    
+
     // Mutex to lock access to the struct.
     QMutex accessMutex;
 };
@@ -134,6 +144,19 @@ public:
     void setInputWindVariables(
             QString eastwardWind_ms, QString northwardWind_ms,
             QString verticalWind_Pas);
+
+    /**
+      Specify variable names of the auxiliary data fields sampled
+      along trajectories.
+     */
+    void setAuxDataVariables(QString);
+
+    /**
+      Specify the vertical level types of auxiliary data variables sampled
+      along trajectories.
+     */
+    void setVerticalLevelsOfAuxDataVariables(
+            QMap<QString, MVerticalLevelType> verticalLevelsOfAuxDataVars);
 
     /**
       Returns a @ref QList<QDateTime> containing the available forecast
@@ -174,10 +197,12 @@ protected:
                   trajectoryCount(0),
                   subTimeStepsPerDataTimeStep(0),
                   streamlineDeltaS(1.),
-                  streamlineLength(1)
+                  streamlineLength(1),
+                  auxVarNames(QStringList())
         { }
 
         QVector<QString> varNames;
+        QStringList auxVarNames;
         QList<QDateTime> validTimes;
         MDataRequest baseRequest;
         TRAJECTORY_COMPUTATION_INTEGRATION_METHOD iterationMethod;
@@ -295,6 +320,27 @@ protected:
             QVector<QVector<MStructuredGrid*>> &grids, bool& valid);
 
     /**
+      Samples auxiliary data (e.g. humidity) at @p pos in 3D space and
+      time from @p grids using the interpolation method @p and the time
+      interpolation factor @p timeInterpolationValue (0..1).
+
+      @p grids is a 2-D list of data grids that needs to contain two
+      timesteps of the data field that is sampled at pos. The indexAuxVar
+      contains the index required to pick the correct data grid from the
+      list of grids.
+
+      If sampling was successfull @p valid will be set to true, else false.
+
+      @note The different approaches to 3D space/time interpolation are
+      documented in Philipp Kaiser's master's thesis (TUM 2017).
+     */
+     float sampleAuxDataAtTrajectoryVertex(
+            QVector3D pos, float timeInterpolationValue,
+            TRAJECTORY_COMPUTATION_INTERPOLATION_METHOD method,
+            QVector<QVector<MStructuredGrid*>> &grids, uint indexAuxVar,
+            bool& valid);
+
+    /**
       Performs tri-linear intperpolation to obtain the pressure value of
       @p grid at the float index position @p index.
      */
@@ -355,6 +401,8 @@ protected:
     QString windNorthwardVariableName;
     QString windVerticalVariableName;
     MVerticalLevelType levelType;
+    QStringList auxDataVarNames;
+    QMap<QString, MVerticalLevelType> verticalLevelsOfAuxDataVariables;
 };
 
 

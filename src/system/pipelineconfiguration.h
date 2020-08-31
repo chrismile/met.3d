@@ -158,6 +158,7 @@ protected:
             QString windEastwardVariable,
             QString windNorthwardVariable,
             QString windVerticalVariable,
+            QString auxDataVariableNames,
             MVerticalLevelType verticalLevelType);
 
     void initializeEnsembleTrajectoriesPipeline(
