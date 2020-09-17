@@ -188,4 +188,106 @@ MProcessingWeatherPredictionDataSource::createAndInitializeResultGrid(
 }
 
 
+/******************************************************************************
+***                     CONSTRUCTOR / DESTRUCTOR                            ***
+*******************************************************************************/
+
+MSingleInputProcessingWeatherPredictionDataSource::MSingleInputProcessingWeatherPredictionDataSource()
+    : MProcessingWeatherPredictionDataSource()
+{
+}
+
+
+/******************************************************************************
+***                            PUBLIC METHODS                               ***
+*******************************************************************************/
+
+void MSingleInputProcessingWeatherPredictionDataSource::setInputSource(
+        MWeatherPredictionDataSource* s)
+{
+    inputSource = s;
+    registerInputSource(inputSource);
+    enablePassThrough(s);
+}
+
+
+QList<MVerticalLevelType>
+MSingleInputProcessingWeatherPredictionDataSource::availableLevelTypes()
+{
+    assert(inputSource != nullptr);
+    return inputSource->availableLevelTypes();
+}
+
+
+QStringList
+MSingleInputProcessingWeatherPredictionDataSource::availableVariables(
+        MVerticalLevelType levelType)
+{
+    assert(inputSource != nullptr);
+    return inputSource->availableVariables(levelType);
+}
+
+
+QSet<unsigned int>
+MSingleInputProcessingWeatherPredictionDataSource::availableEnsembleMembers(
+        MVerticalLevelType levelType, const QString& variableName)
+{
+    assert(inputSource != nullptr);
+    return inputSource->availableEnsembleMembers(levelType, variableName);
+}
+
+
+QList<QDateTime>
+MSingleInputProcessingWeatherPredictionDataSource::availableInitTimes(
+        MVerticalLevelType levelType, const QString& variableName)
+{
+    assert(inputSource != nullptr);
+    return inputSource->availableInitTimes(levelType, variableName);
+}
+
+
+QList<QDateTime>
+MSingleInputProcessingWeatherPredictionDataSource::availableValidTimes(
+        MVerticalLevelType levelType,
+        const QString& variableName, const QDateTime& initTime)
+{
+    assert(inputSource != nullptr);
+    return inputSource->availableValidTimes(levelType, variableName, initTime);
+}
+
+
+QString MSingleInputProcessingWeatherPredictionDataSource::variableLongName(
+        MVerticalLevelType levelType,
+        const QString& variableName)
+{
+    assert(inputSource != nullptr);
+    return inputSource->variableLongName(levelType, variableName);
+}
+
+
+QString MSingleInputProcessingWeatherPredictionDataSource::variableStandardName(
+        MVerticalLevelType levelType,
+        const QString& variableName)
+{
+    assert(inputSource != nullptr);
+    return inputSource->variableStandardName(levelType, variableName);
+}
+
+
+QString MSingleInputProcessingWeatherPredictionDataSource::variableUnits(
+        MVerticalLevelType levelType,
+        const QString& variableName)
+{
+    assert(inputSource != nullptr);
+    return inputSource->variableUnits(levelType, variableName);
+}
+
+
+/******************************************************************************
+***                          PROTECTED METHODS                              ***
+*******************************************************************************/
+
+
+
+
 } // namespace Met3D

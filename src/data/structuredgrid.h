@@ -262,9 +262,8 @@ public:
             unsigned int k, unsigned int j, unsigned int i)
     { Q_UNUSED(k); Q_UNUSED(j); Q_UNUSED(i); return M_MISSING_VALUE; }
 
-    inline float getDeltaLon() { return fabs(lons[1]-lons[0]); }
-
-    inline float getDeltaLat() { return fabs(lats[1]-lats[0]); }
+    inline float getDeltaLon() const { return fabs(lons[1]-lons[0]); }
+    inline float getDeltaLat() const { return fabs(lats[1]-lats[0]); }
 
     inline float getWestInterfaceLon(unsigned int i)
     { return lons[i] - getDeltaLon()/2.; }
@@ -583,6 +582,9 @@ public:
     GL::MTexture* getMinMaxAccelTexture3D(QGLWidget *currentGLContext = nullptr);
 
     void releaseMinMaxAccelTexture3D();
+
+    float getDeltaLonInKm(const int iLat) const;
+    float getDeltaLatInKm() const;
 
 protected:
     friend class MClimateForecastReader; // NetCDF can read directly into data

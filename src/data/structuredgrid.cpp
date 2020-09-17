@@ -42,6 +42,7 @@
 #include "util/mutil.h"
 #include "util/mexception.h"
 #include "util/mstopwatch.h"
+#include "util/metroutines.h"
 #include "gxfw/mglresourcesmanager.h"
 #include "data/abstractmemorymanager.h"
 
@@ -1105,6 +1106,27 @@ GL::MTexture *MStructuredGrid::getMinMaxAccelTexture3D(
 void MStructuredGrid::releaseMinMaxAccelTexture3D()
 {
     MGLResourcesManager::getInstance()->releaseGPUItem(minMaxAccelID);
+}
+
+
+float MStructuredGrid::getDeltaLonInKm(const int iLat) const
+{
+    float phi = abs(getLats()[iLat]) * M_PI / 180.;
+    float circumferenceLatitudeCircle_km = cos(phi) * 2. * M_PI
+            * MetConstants::EARTH_RADIUS_km;
+    float deltaGridpoints_km = circumferenceLatitudeCircle_km
+            * (getDeltaLon() / 360.);
+    return deltaGridpoints_km;
+}
+
+
+float MStructuredGrid::getDeltaLatInKm() const
+{
+    float circumferenceLongitudeCircle_km = 2. * M_PI
+            * MetConstants::EARTH_RADIUS_km;
+    float deltaGridpoints_km = circumferenceLongitudeCircle_km
+            * (getDeltaLat() / 360.);
+    return deltaGridpoints_km;
 }
 
 

@@ -4,11 +4,15 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2017 Marc Rautenhaus
-**  Copyright 2015-2017 Bianca Tost
+**  Copyright 2015-2020 Marc Rautenhaus [1][2]
+**  Copyright 2015-2017 Bianca Tost [1]
+**  Copyright 2020      Andreas Beckert [2]
 **
-**  Computer Graphics and Visualization Group
-**  Technische Universitaet Muenchen, Garching, Germany
+**  [1] Computer Graphics and Visualization Group
+**      Technische Universitaet Muenchen, Garching, Germany
+**
+**  [2] Regional Computing Center, Visualization
+**      Universitaet Hamburg, Hamburg, Germany
 **
 **  Met.3D is free software: you can redistribute it and/or modify
 **  it under the terms of the GNU General Public License as published by
@@ -102,6 +106,11 @@ void MRequestPropertiesFactory::updateProperties(
     // MProbabilityRegionProperties
     updateTypedProperties<MProbabilityRegionProperties>(
                 QStringList() << "PROBABILITY",
+                propertiesList, keysRequiredByPipeline);
+
+    // MSmoothProperties
+    updateTypedProperties<MSmoothProperties>(
+                QStringList() << "SMOOTH",
                 propertiesList, keysRequiredByPipeline);
 }
 
@@ -904,6 +913,243 @@ void MProbabilityRegionProperties::loadConfiguration(QSettings *settings)
     properties->mDDouble()->setValue(
                 probabilityRegionIsovalueProperty,
                 settings->value("probabilityRegionDetectionIsovalue", 0.).toDouble());
+}
+
+
+/******************************************************************************
+***                     MSmoothingProperties                        ***
+*******************************************************************************/
+/******************************************************************************
+***                     CONSTRUCTOR / DESTRUCTOR                            ***
+*******************************************************************************/
+
+MSmoothProperties::MSmoothProperties(
+        MNWPActorVariable *actorVar)
+    : MRequestProperties(actorVar),
+      smoothMode(DISABLE_FILTER)
+{
+    MNWPMultiVarActor *a = actorVar->getActor();
+    MQtProperties *properties = a->getQtProperties();
+
+    // Create and initialize QtProperties for the GUI.
+    // ===============================================
+    a->beginInitialiseQtProperties();
+    groupProperty = actorVar->getPropertyGroup("horizontal smoothing");
+
+    recomputeOnPropertyChange = a->addProperty(
+                BOOL_PROPERTY, "recompute on property change", groupProperty);
+    applySettingsProperty = a->addProperty(
+                CLICK_PROPERTY, "compute", groupProperty);
+    QStringList smoothModeNames;
+    // Comment the smoothModeName if you want that it does not show up in the
+    // drop down menu of the GUI.
+    smoothModeNames << smoothModeToString(DISABLE_FILTER)
+                    << smoothModeToString(GAUSS_DISTANCE)
+                    << smoothModeToString(BOX_BLUR_DISTANCE_FAST)
+                    << smoothModeToString(UNIFORM_WEIGHTED_GRIDPOINTS)
+                    << smoothModeToString(GAUSS_GRIDPOINTS)
+//                    << smoothModeToString(BOX_BLUR_GRIDPOINTS_SLOW)
+                    << smoothModeToString(BOX_BLUR_GRIDPOINTS_FAST);
+    smoothModeProperty = a->addProperty(
+                ENUM_PROPERTY, "smooth mode", groupProperty);
+    properties->mEnum()->setEnumNames(smoothModeProperty, smoothModeNames);
+    properties->mEnum()->setValue(smoothModeProperty, smoothMode);
+
+    smoothStDevKmProperty = a->addProperty(
+                DOUBLE_PROPERTY, "standard deviation (km)", groupProperty);
+    properties->setDouble(
+                smoothStDevKmProperty, 10, 0.5, 1000.0, 1, 0.5);
+    smoothStDevKmProperty->setEnabled(false);
+    smoothStDevGridboxProperty = a->addProperty(
+                INT_PROPERTY, "standard deviation (grid cells)", groupProperty);
+    properties->setInt(
+                smoothStDevGridboxProperty, 3, 1, 500, 1);
+    smoothStDevGridboxProperty->setEnabled(false);
+    a->endInitialiseQtProperties();
+}
+
+
+MSmoothProperties::~MSmoothProperties()
+{
+}
+
+
+/******************************************************************************
+***                            PUBLIC METHODS                               ***
+*******************************************************************************/
+
+bool MSmoothProperties::onQtPropertyChanged(
+        QtProperty *property, bool *redrawWithoutDataRequest)
+{
+    Q_UNUSED(redrawWithoutDataRequest);
+
+    if ((property == applySettingsProperty)
+            || (property == smoothModeProperty)
+            || (property == smoothStDevKmProperty)
+            || (property == smoothStDevGridboxProperty))
+    {
+        MQtProperties *properties
+                = actorVariable->getActor()->getQtProperties();
+        SmoothModeTypes index = stringToSmoothMode(properties->getEnumItem(
+                                                       smoothModeProperty));
+        switch (index)
+        {
+        case DISABLE_FILTER: // no smoothing
+            smoothMode = DISABLE_FILTER;
+            smoothStDevKmProperty->setEnabled(false);
+            smoothStDevGridboxProperty->setEnabled(false);
+            break;
+        case GAUSS_DISTANCE:
+            smoothMode = GAUSS_DISTANCE;
+            smoothStDevKmProperty->setEnabled(true);
+            smoothStDevGridboxProperty->setEnabled(false);
+            break;
+        case BOX_BLUR_DISTANCE_FAST:
+            smoothMode = BOX_BLUR_DISTANCE_FAST;
+            smoothStDevKmProperty->setEnabled(true);
+            smoothStDevGridboxProperty->setEnabled(false);
+            break;
+        case UNIFORM_WEIGHTED_GRIDPOINTS:
+            smoothMode = UNIFORM_WEIGHTED_GRIDPOINTS;
+            smoothStDevKmProperty->setEnabled(false);
+            smoothStDevGridboxProperty->setEnabled(true);
+            break;
+        case GAUSS_GRIDPOINTS:
+            smoothMode =  GAUSS_GRIDPOINTS;
+            smoothStDevKmProperty->setEnabled(false);
+            smoothStDevGridboxProperty->setEnabled(true);
+            break;
+        case BOX_BLUR_GRIDPOINTS_SLOW:
+            smoothMode = BOX_BLUR_GRIDPOINTS_SLOW;
+            smoothStDevKmProperty->setEnabled(false);
+            smoothStDevGridboxProperty->setEnabled(true);
+            break;
+        case BOX_BLUR_GRIDPOINTS_FAST:
+            smoothMode = BOX_BLUR_GRIDPOINTS_FAST;
+            smoothStDevKmProperty->setEnabled(false);
+            smoothStDevGridboxProperty->setEnabled(true);
+            break;
+        }
+        if (properties->mBool()->value(recomputeOnPropertyChange))
+        {
+            actorVariable->triggerAsynchronousDataRequest(true);
+            return true;
+        }
+        else if (property == applySettingsProperty)
+        {
+            actorVariable->triggerAsynchronousDataRequest(true);
+            return true;
+        }
+        else
+        {
+            return false;
+        }
+    }
+    return false;
+}
+
+
+void MSmoothProperties::addToRequest(MDataRequestHelper *rh)
+{
+    if (smoothMode != DISABLE_FILTER)
+    {
+        MQtProperties *properties =
+                actorVariable->getActor()->getQtProperties();
+        float smoothStDev_km =
+                properties->mDouble()->value(smoothStDevKmProperty);
+        float smoothStdGridbox =
+                properties->mInt()->value(smoothStDevGridboxProperty);
+        rh->insert("SMOOTH", QString("%1/%2/%3")
+                   .arg(smoothMode).arg(smoothStDev_km).arg(smoothStdGridbox));
+    }
+}
+
+
+void MSmoothProperties::saveConfiguration(QSettings *settings)
+{
+    MQtProperties *properties = actorVariable->getActor()->getQtProperties();
+    settings->beginGroup("SmoothFilter");
+    settings->setValue("smoothMode", smoothModeToString(smoothMode));
+    settings->setValue("standardDeviation_km",
+                       properties->mDouble()->value(smoothStDevKmProperty));
+    settings->setValue("standardDeviation_gridcells",
+                       properties->mInt()->value(smoothStDevGridboxProperty));
+    settings->endGroup();
+}
+
+
+void MSmoothProperties::loadConfiguration(QSettings *settings)
+{
+    MQtProperties *properties = actorVariable->getActor()->getQtProperties();
+    settings->beginGroup("SmoothFilter");
+    properties->mEnum()->setValue(
+                smoothModeProperty, stringToSmoothMode(
+                    (settings->value("smoothMode",
+                                     smoothModeToString(DISABLE_FILTER))
+                     ).toString()));
+    properties->mDouble()->setValue(
+                smoothStDevKmProperty,
+                settings->value("standardDeviation_km", 10.0).toDouble());
+    properties->mInt()->setValue(
+                smoothStDevGridboxProperty,
+                settings->value("standardDeviation_gridcells", 3).toInt());
+    settings->endGroup();
+}
+
+
+MSmoothProperties::SmoothModeTypes MSmoothProperties::stringToSmoothMode(
+        QString smoothModeName)
+{
+    if (smoothModeName == "disabled")
+    {
+        return DISABLE_FILTER;
+    }
+    else if (smoothModeName == "horizontalGauss_distance")
+    {
+        return GAUSS_DISTANCE;
+    }
+    else if (smoothModeName == "horizontalBoxBlur_distance")
+    {
+        return BOX_BLUR_DISTANCE_FAST;
+    }
+    else if (smoothModeName == "horizontalUniformWeights_gridcells")
+    {
+        return UNIFORM_WEIGHTED_GRIDPOINTS;
+    }
+    else if (smoothModeName == "horizontalGauss_gridcells")
+    {
+        return GAUSS_GRIDPOINTS;
+    }
+    else if (smoothModeName == "horizontalBoxBlurSlow_gridcells")
+    {
+        return BOX_BLUR_GRIDPOINTS_SLOW;
+    }
+    else if (smoothModeName == "horizontalBoxBlur_gridcells")
+    {
+        return BOX_BLUR_GRIDPOINTS_FAST;
+    }
+    else
+    {
+        return DISABLE_FILTER;
+    }
+}
+
+
+QString MSmoothProperties::smoothModeToString(
+        SmoothModeTypes smoothModeType)
+{
+    switch (smoothModeType)
+    {
+        case DISABLE_FILTER: return "disabled";
+        case GAUSS_DISTANCE: return "horizontalGauss_distance";
+        case BOX_BLUR_DISTANCE_FAST: return "horizontalBoxBlur_distance";
+        case UNIFORM_WEIGHTED_GRIDPOINTS: return
+                "horizontalUniformWeights_gridcells";
+        case GAUSS_GRIDPOINTS: return "horizontalGauss_gridcells";
+        case BOX_BLUR_GRIDPOINTS_SLOW: return "horizontalBoxBlurSlow_gridcells";
+        case BOX_BLUR_GRIDPOINTS_FAST: return "horizontalBoxBlur_gridcells";
+    }
+    return "disable filter";
 }
 
 
