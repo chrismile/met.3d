@@ -4,8 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus [*, previously +]
-**  Copyright 2020 Marcel Meyer [*]
+**  Copyright 2015-2020 Marc Rautenhaus [*, previously +]
+**  Copyright 2020      Marcel Meyer [*]
 **
 **  + Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -126,6 +126,13 @@ QSet<unsigned int> MTrajectoryReader::availableEnsembleMembers()
 }
 
 
+QStringList MTrajectoryReader::availableAuxiliaryVariables()
+{
+    QReadLocker availableItemsReadLocker(&availableItemsLock);
+    return availableAuxDataVariables.toList();
+}
+
+
 MTrajectories* MTrajectoryReader::produceData(MDataRequest request)
 {
 #ifdef MSTOPWATCH_ENABLED
@@ -241,13 +248,12 @@ MTrajectories* MTrajectoryReader::produceData(MDataRequest request)
 
     // Read all auxiliary data variables from file and copy to the return
     // data struct.
-    int iIndexAuxData=0;
+    int iIndexAuxData = 0;
     QVector<netCDF::NcVar> allAuxDataVariables = finfo->auxDataVars;
     for (QVector<netCDF::NcVar>::iterator iAuxDataVar =
          allAuxDataVariables.begin();
          iAuxDataVar != allAuxDataVariables.end(); iAuxDataVar++)
     {
-
         // Read auxiliary data into temporary data array.
         finfo->auxDataVars[iIndexAuxData].getVar(start, count, auxData);
 
@@ -262,7 +268,7 @@ MTrajectories* MTrajectoryReader::produceData(MDataRequest request)
     ncAccessMutexLocker.unlock();
 
     // Copy the names of auxiliary data variables.
-    trajectories->copyAuxDataNames(finfo->auxDataVarNames);
+    trajectories->setAuxDataVariableNames(finfo->auxDataVarNames);
 
     // Copy start grid geometry, if available.
     trajectories->setStartGrid(finfo->startGrid);
@@ -485,14 +491,40 @@ void MTrajectoryReader::scanDataRoot()
         // below.
         QList<QDateTime> trajectoryTimes = currCFVar.getTimeValues();
         for (int t = 0; t < trajectoryTimes.size(); t++)
+        {
             availableTrajectories[initTime][trajectoryTimes[t]]
                     .validTimeOverlap.append(startTime);
+        }
 
         // Determine the available ensemble members.
         NcDim        ensembleDim = ncFile->getDim("ensemble");
         unsigned int numMembers  = ensembleDim.getSize();
         for (unsigned int m = 0; m < numMembers; m++)
+        {
             availableMembers.insert(m);
+        }
+
+        // Determine available auxiliary data variables.
+        // Get auxiliary data along trajectories by screening
+        // all available ncvars in the input file and picking
+        // those vars indicated as "aux. data" by the
+        // nc var attribute "auxiliary_data".
+        multimap<string, NcVar> ncVariables = ncFile->getVars();
+        for (multimap<string, NcVar>::iterator iVar = ncVariables.begin();
+             iVar != ncVariables.end(); iVar++)
+        {
+            QString varName = QString::fromStdString(iVar->first);
+            NcCFVar iCFVar(ncFile->getVar(varName.toStdString()));
+
+            string auxDataIndicator = "";
+            try { iCFVar.getAtt("auxiliary_data").getValues(auxDataIndicator); }
+            catch (NcException) {}
+
+            if (auxDataIndicator == "yes")
+            {
+                availableAuxDataVariables.insert(varName);
+            }
+        }
 
         delete ncFile;
     } // for (files)
@@ -584,11 +616,11 @@ void MTrajectoryReader::checkFileOpen(QString filename)
             QString varName = QString::fromStdString(iVar->first);
             NcCFVar iCFVar(ncFile->getVar(varName.toStdString()));
 
-            string auxdataindicator = "";
-            try { iCFVar.getAtt("auxiliary_data").getValues(auxdataindicator);}
+            string auxDataIndicator = "";
+            try { iCFVar.getAtt("auxiliary_data").getValues(auxDataIndicator); }
             catch (NcException) {}
 
-            if (auxdataindicator=="yes")
+            if (auxDataIndicator == "yes")
             {
                 finfo->auxDataVarNames.append(varName);
                 finfo->auxDataVars.append(ncFile->getVar(

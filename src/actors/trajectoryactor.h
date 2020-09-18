@@ -4,10 +4,10 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2018 Marc Rautenhaus [*, previously +]
+**  Copyright 2015-2020 Marc Rautenhaus [*, previously +]
 **  Copyright 2017-2018 Bianca Tost [+]
 **  Copyright 2017      Philipp Kaiser [+]
-**  Copyright 2020 Marcel Meyer [*]
+**  Copyright 2020      Marcel Meyer [*]
 **
 **  + Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -361,11 +361,38 @@ private:
         MTrajectorySelection* trajectorySingleTimeSelection;
         GL::MVertexBuffer* trajectoriesVertexBuffer;
         GL::MVertexBuffer* trajectoriesAuxDataVertexBuffer;
+        // Remember the name of the current aux var to correctly release
+        // the "trajectoriesAuxDataVertexBuffer". Needs to be empty if
+        // no aux VB is in use.
+        QString currentAuxDataVarName;
 
         QHash<MSceneViewGLWidget*, MTrajectoryNormals*> normals;
         QHash<MSceneViewGLWidget*, GL::MVertexBuffer*> normalsVertexBuffer;
 
         QQueue<MTrajectoryRequestQueueInfo> pendingRequestsQueue;
+
+        void requestAuxVertexBuffer(QString auxVarName)
+        {
+            // Only allow a new VB if the previous has been released.
+            assert(currentAuxDataVarName.isEmpty());
+
+            if (!auxVarName.isEmpty())
+            {
+                currentAuxDataVarName = auxVarName;
+                trajectoriesAuxDataVertexBuffer = trajectories->
+                        getAuxDataVertexBuffer(currentAuxDataVarName);
+            }
+        }
+
+        void releasePreviousAuxVertexBuffer()
+        {
+            if (!currentAuxDataVarName.isEmpty())
+            {
+                trajectories->releaseAuxDataVertexBuffer(currentAuxDataVarName);
+                trajectoriesAuxDataVertexBuffer = nullptr;
+                currentAuxDataVarName = QString(); // empty string = no VB in use
+            }
+        }
     };
     QVector<MTrajectoryRequestBuffer> trajectoryRequests;
 
@@ -412,14 +439,11 @@ private:
         AUXDATA  = 1
     };
 
-
     TrajectoryRenderType renderMode;
     TrajectoryRenderColorMode renderColorMode;
     QtProperty *renderModeProperty;
     QtProperty *renderColorModeProperty;
     QtProperty *renderAuxDataVarProperty;
-    QString requestedAuxDataVarName = "none";
-
 
     /** Synchronisation with MSyncControl. */
     MSyncControl *synchronizationControl;

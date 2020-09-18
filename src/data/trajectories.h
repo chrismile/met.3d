@@ -4,12 +4,15 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2018 Marc Rautenhaus
-**  Copyright 2017      Philipp Kaiser
-**  Copyright 2020 Marcel Meyer [*]
+**  Copyright 2015-2020 Marc Rautenhaus [*, previously +]
+**  Copyright 2017      Philipp Kaiser [+]
+**  Copyright 2020      Marcel Meyer [*]
 **
-**  Computer Graphics and Visualization Group
+**  + Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
+**
+**  * Regional Computing Center, Visualization
+**  Universitaet Hamburg, Hamburg, Germany
 **
 **  Met.3D is free software: you can redistribute it and/or modify
 **  it under the terms of the GNU General Public License as published by
@@ -266,8 +269,10 @@ public:
     void copyAuxDataPerVertex(QVector<QVector<QVector<float>>>
                               &auxDataAtVertices);
 
-    // Copy the names of the auxiliary data variables.
-    void copyAuxDataNames(QStringList);
+    /**
+      Copy the names of the auxiliary data variables.
+     */
+    void setAuxDataVariableNames(QStringList varNames);
 
     /**
       Get auxiliary data, size of auxiliary data array and names
@@ -275,8 +280,11 @@ public:
      */
     const QVector<float>& getAuxDataAtVertex(int i)
     { return auxDataAtVertices[i]; }
-    unsigned int getSizeOfAuxDataAtVertices(){return auxDataAtVertices.size();}
-    QStringList getAuxDataVarNames(){ return auxDataVarNames; }
+
+    unsigned int getSizeOfAuxDataAtVertices()
+    { return auxDataAtVertices.size(); }
+
+    QStringList getAuxDataVarNames() { return auxDataVarNames; }
 
     /**
       Returns the length of a single time step in seconds.
@@ -317,10 +325,18 @@ public:
 
       The QString is passed for identifying the requested auxiliary data
       variable.
+
+      @note Be perticularly careful to call the correct @ref
+      releaseAuxDataVertexBuffer() after use of the returned vertex buffer has
+      finished to avoid memory leaks.
      */
     GL::MVertexBuffer *getAuxDataVertexBuffer(QString requestedAuxDataVarName,
-                                             QGLWidget *currentGLContext = 0);
+                                              QGLWidget *currentGLContext = 0);
 
+    /**
+      Release vertex buffer with auxiliary data. As there can be more than one
+      aux.-data var per vertex, its name is provided as a unique identifier.
+     */
     void releaseAuxDataVertexBuffer(QString requestedAuxDataVarName);
 
     /**

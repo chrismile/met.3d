@@ -4,10 +4,10 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2018 Marc Rautenhaus [*, previously +]
+**  Copyright 2015-2020 Marc Rautenhaus [*, previously +]
 **  Copyright 2016-2018 Bianca Tost [+]
 **  Copyright 2017      Philipp Kaiser [+]
-**  Copyright 2020 Marcel Meyer [*]
+**  Copyright 2020      Marcel Meyer [*]
 **
 **  + Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -76,6 +76,7 @@ MTrajectoryActor::MTrajectoryActor()
       precomputedDataSource(false),
       initialDataRequest(true),
       renderMode(TRAJECTORY_TUBES),
+      renderColorMode(PRESSURE),
       synchronizationControl(nullptr),
       synchronizeInitTime(true),
       synchronizeStartTime(true),
@@ -285,17 +286,17 @@ MTrajectoryActor::MTrajectoryActor()
     // Render colors.
     QStringList renderColorModeNames;
     renderColorModeNames << "pressure"
-                         << "auxiliary data";
+                         << "auxiliary variable";
     renderColorModeProperty = addProperty(ENUM_PROPERTY, "color according to",
-                                     renderingGroupProperty);
+                                          renderingGroupProperty);
     properties->mEnum()->setEnumNames(renderColorModeProperty,
                                       renderColorModeNames);
     properties->mEnum()->setValue(renderColorModeProperty, renderColorMode);
 
     // Choose auxiliary data variable for rendering.
-    renderAuxDataVarProperty = addProperty(ENUM_PROPERTY, "auxiliary data "
-                                         "variable", renderingGroupProperty);
-
+    renderAuxDataVarProperty = addProperty(ENUM_PROPERTY, "auxiliary variable",
+                                           renderingGroupProperty);
+    renderAuxDataVarProperty->setEnabled(false);
 
     // Transfer function.
     // Scan currently available actors for transfer functions. Add TFs to
@@ -310,10 +311,13 @@ MTrajectoryActor::MTrajectoryActor()
             availableTFs << tf->transferFunctionName();
         }
     }
-    transferFunctionProperty = addProperty(ENUM_PROPERTY,
-                                           "transfer function for coloring",
+    transferFunctionProperty = addProperty(ENUM_PROPERTY, "transfer function",
                                            renderingGroupProperty);
     properties->mEnum()->setEnumNames(transferFunctionProperty, availableTFs);
+    transferFunctionProperty->setToolTip("This transfer function is used "
+                                         "for mapping either pressure or the "
+                                         "selected auxiliary variable to "
+                                         "the trajectory's colour.");
 
     // Render mode and parameters.
     tubeRadiusProperty = addProperty(DECORATEDDOUBLE_PROPERTY, "tube radius",
@@ -406,6 +410,7 @@ void MTrajectoryActor::saveConfiguration(QSettings *settings)
     settings->setValue("dataSourceID", dataSourceID);
 
     settings->setValue("renderMode", static_cast<int>(renderMode));
+    settings->setValue("renderColorMode", static_cast<int>(renderColorMode));
 
     // Save synchronization properties.
     settings->setValue("synchronizationID",
@@ -545,6 +550,7 @@ void MTrajectoryActor::loadConfiguration(QSettings *settings)
             updateInitTimeProperty();
             updateStartTimeProperty();
             updateEnsembleSingleMemberProperty();
+            updateAuxDataVarNamesProperty();
         }
     }
 
@@ -1450,19 +1456,10 @@ void MTrajectoryActor::prepareAvailableDataForRendering(uint slot)
             if (trajectoryRequests[slot].trajectories)
             {
                 trajectoryRequests[slot].trajectories->releaseVertexBuffer();
-
-                // release old auxiliary data 
-                if (requestedAuxDataVarName!="none" &&
-                        (trajectoryRequests[slot].trajectories->
-                         getSizeOfAuxDataAtVertices()>0))
-                {
-                    trajectoryRequests[slot].trajectories->
-                           releaseAuxDataVertexBuffer(requestedAuxDataVarName);
-                }
+                trajectoryRequests[slot].releasePreviousAuxVertexBuffer();
 
                 trajectorySource->releaseData(trajectoryRequests[slot]
-                                              .trajectories);                
-
+                                              .trajectories);
             }
             trajectoryRequests[slot].trajectories = trajectorySource->getData(
                         trqi.dataRequest.request);
@@ -1472,15 +1469,8 @@ void MTrajectoryActor::prepareAvailableDataForRendering(uint slot)
                     trajectoryRequests[slot].trajectories->getVertexBuffer();
 
             // Get vertex buffer for auxiliary data along trajectories.
-            if ( (requestedAuxDataVarName!="none") &&
-                  (trajectoryRequests[slot].trajectories->
-                   getSizeOfAuxDataAtVertices()>0) )
-            {
-                trajectoryRequests[slot].trajectoriesAuxDataVertexBuffer =
-                    trajectoryRequests[slot].trajectories->
-                        getAuxDataVertexBuffer(requestedAuxDataVarName);
-            }
-
+            trajectoryRequests[slot].requestAuxVertexBuffer(
+                        properties->getEnumItem(renderAuxDataVarProperty));
 
             // Update displayed information about timestep length.
             float timeStepLength_hours = trajectoryRequests[slot].trajectories
@@ -1783,6 +1773,7 @@ void MTrajectoryActor::initializeActorResources()
         updateInitTimeProperty();
         updateStartTimeProperty();
         updateEnsembleSingleMemberProperty();
+        updateAuxDataVarNamesProperty();
 
         // Get values from sync control, if connected to one.
         if (synchronizationControl == nullptr)
@@ -1840,6 +1831,7 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
             updateInitTimeProperty();
             updateStartTimeProperty();
             updateEnsembleSingleMemberProperty();
+            updateAuxDataVarNamesProperty();
             // Synchronise with synchronisation control if available.
             if (synchronizationControl != nullptr)
             {
@@ -2016,74 +2008,48 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
         renderColorMode = TrajectoryRenderColorMode(
                     properties->mEnum()->value(renderColorModeProperty));
 
-        // If coloring according to pressure, then update data and disable
-        // the auxiliary data variable selection item.
-        if (renderColorMode==PRESSURE)
+        if (renderColorMode == PRESSURE)
         {
-            // Disable choice for aux. data var
-            // and set requested auxdataname to "none".
-            requestedAuxDataVarName = "none";
             renderAuxDataVarProperty->setEnabled(false);
-
             // Allow colouring of shadows.
             colourShadowProperty->setEnabled(true);   
-
         }
-
-        // If request to color according to auxiliary data variables, then
-        // update the list with available aux.-data and trigger data request.
-        if (renderColorMode==AUXDATA)
+        else if (renderColorMode == AUXDATA)
         {
-
-            // Check if there are any aux.-data vars available.
-            MTrajectories* t = trajectoryRequests.at(0).trajectories;
-            QStringList allAuxDataVarNames = t->getAuxDataVarNames();
-            if (allAuxDataVarNames.size()>0)
-            {
-                // Update the list with available aux.-data vars.
-                updateAuxDataVarNamesProperty();
-                renderAuxDataVarProperty->setEnabled(true);
-
-                // Disable the coloring of shadows because it
-                // is not implemented for aux.-data vars.
-                colourShadowProperty->setEnabled(false);
-
-                // Trigger data request.
-                if (suppressActorUpdates()) return;
-                asynchronousDataRequest();
-            }
-            else
-            {
-                renderAuxDataVarProperty->setEnabled(false);
-            }
-
+            renderAuxDataVarProperty->setEnabled(true);
+            // Disable the coloring of shadows because it
+            // is not implemented for aux.-data vars.
+            colourShadowProperty->setEnabled(false);
         }
+
+        // Update aux data vertex buffers.
+        if (suppressActorUpdates()) return;
+        QString auxVariableName = properties->getEnumItem(
+                    renderAuxDataVarProperty);
+        for (int t = 0; t < (precomputedDataSource ? 1 : seedActorData.size()); t++)
+        {
+            // (for all seed actors or for single precomputed trajectories..)
+            trajectoryRequests[t].releasePreviousAuxVertexBuffer();
+            trajectoryRequests[t].requestAuxVertexBuffer(auxVariableName);
+            // will not do anything for empty requestedAuxDataVarName
+        }
+        emitActorChangedSignal();
     }
 
     else if (property == renderAuxDataVarProperty)
     {
-        // Get the requested auxiliary data variable.
-        QStringList allAuxDataVars = properties->mEnum()->
-                enumNames(renderAuxDataVarProperty);
-        if (allAuxDataVars.empty())
+        // Update aux data vertex buffers.
+        if (suppressActorUpdates()) return;
+        QString auxVariableName = properties->getEnumItem(
+                    renderAuxDataVarProperty);
+        for (int t = 0; t < (precomputedDataSource ? 1 : seedActorData.size()); t++)
         {
-            requestedAuxDataVarName="none";
+            // (for all seed actors or for single precomputed trajectories..)
+            trajectoryRequests[t].releasePreviousAuxVertexBuffer();
+            trajectoryRequests[t].requestAuxVertexBuffer(auxVariableName);
+            // will not do anything for empty requestedAuxDataVarName
         }
-        else
-        {
-            int index = properties->mEnum()->value(renderAuxDataVarProperty);
-            requestedAuxDataVarName=allAuxDataVars.at(index);
-
-            // Disable coloring of shadows because it
-            // is not implemented for aux.-data vars.
-            colourShadowProperty->setEnabled(false);
-
-            // Trigger data request.
-            if (suppressActorUpdates()) return;
-            asynchronousDataRequest();
-
-        }
-
+        emitActorChangedSignal();
     }
 
     else if (property == transferFunctionProperty)
@@ -2253,7 +2219,6 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
 
 void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
 {
-
     // Only render if transfer function is available.
     if (transferFunction == nullptr)
     {
@@ -2314,32 +2279,23 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
                         .trajectories->getNumTimeStepsPerTrajectory());
 
             // Set shader uniform for defining the type of color rendering.
-            if ( (renderColorMode==AUXDATA) )
+            tubeShader->setUniformValue(
+                        "renderAuxData",
+                        GLboolean(renderColorMode == AUXDATA));
+
+            if (renderMode == BACKWARDTUBES_AND_SINGLETIME)
             {
                 tubeShader->setUniformValue(
-                    "renderAuxData",
-                    true);
-             }
-             else
-             {
+                            "renderTubesUpToIndex",
+                            particlePosTimeStep);
+            }
+            else
+            {
                 tubeShader->setUniformValue(
-                    "renderAuxData",
-                    false);
-             }
-
-             if (renderMode == BACKWARDTUBES_AND_SINGLETIME)
-             {
-                tubeShader->setUniformValue(
-                        "renderTubesUpToIndex",
-                        particlePosTimeStep);
-             }
-             else
-             {
-                tubeShader->setUniformValue(
-                        "renderTubesUpToIndex",
-                        trajectoryRequests[t]
+                            "renderTubesUpToIndex",
+                            trajectoryRequests[t]
                             .trajectories->getNumTimeStepsPerTrajectory());
-             }
+            }
 
             // Texture bindings for transfer function for data scalar (1D texture
             // from transfer function class). The data scalar is stored in the
@@ -2361,12 +2317,10 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
                     ->attachToVertexAttribute(SHADER_NORMAL_ATTRIBUTE);
 
             // Bind auxiliary data vertex buffer object.
-            if ( (requestedAuxDataVarName!="none") &&
-                  (trajectoryRequests[t].trajectories->
-                   getSizeOfAuxDataAtVertices()>0) )
+            if (trajectoryRequests[t].trajectoriesAuxDataVertexBuffer != nullptr)
             {
                 trajectoryRequests[t].trajectoriesAuxDataVertexBuffer
-                    ->attachToVertexAttribute(SHADER_AUXDATA_ATTRIBUTE);
+                        ->attachToVertexAttribute(SHADER_AUXDATA_ATTRIBUTE);
             }
 
             glPolygonMode(GL_FRONT_AND_BACK,
@@ -2510,18 +2464,9 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
             positionSphereShader->setUniformValue(
                     "scaleRadius",
                     GLboolean(false));
-            if ( (renderColorMode==AUXDATA) )
-            {
-                positionSphereShader->setUniformValue(
-                    "renderAuxData",
-                    true);
-             }
-             else
-            {
-                positionSphereShader->setUniformValue(
-                    "renderAuxData",
-                    false);
-            }
+            positionSphereShader->setUniformValue(
+                        "renderAuxData",
+                        GLboolean(renderColorMode == AUXDATA));
 
             // Texture bindings for transfer function for data scalar (1D
             // texture from transfer function class). The data scalar is stored
@@ -2542,12 +2487,10 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
                     ->attachToVertexAttribute(SHADER_VERTEX_ATTRIBUTE);
 
             // Bind auxiliary data vertex buffer object.
-            if ( (requestedAuxDataVarName!="none") &&
-                  (trajectoryRequests[t].trajectories->
-                   getSizeOfAuxDataAtVertices()>0) )
+            if (trajectoryRequests[t].trajectoriesAuxDataVertexBuffer != nullptr)
             {
                 trajectoryRequests[t].trajectoriesAuxDataVertexBuffer
-                    ->attachToVertexAttribute(SHADER_AUXDATA_ATTRIBUTE);
+                        ->attachToVertexAttribute(SHADER_AUXDATA_ATTRIBUTE);
             }
 
             glPolygonMode(GL_FRONT_AND_BACK,
@@ -2749,13 +2692,13 @@ void MTrajectoryActor::outputAsLagrantoASCIIFile()
 
         // Add the auxiliary data variable names to the header line.
         QStringList allAuxDataVarNames = t->getAuxDataVarNames();
-        for (int i=0;i<allAuxDataVarNames.size();i++)
+        for (int i = 0; i < allAuxDataVarNames.size(); i++)
         {
            out << QString(" %1 ").arg(allAuxDataVarNames.value(i),-20) ;
-           underLineHeader = underLineHeader+"----------------------";
+           underLineHeader = underLineHeader + "----------------------";
         }
         out << "\n";
-        out << underLineHeader+"\n\n";
+        out << underLineHeader + "\n\n";
 
         // Loop over all available trajectory data objects and write their
         // contents to file.
@@ -2790,17 +2733,17 @@ void MTrajectoryActor::outputAsLagrantoASCIIFile()
                     out << QString(" %1 ").arg(v.z(),-20, 'g', 6);
 
                     // Write auxiliary data values at this vertex to file.
-                    if (t->getSizeOfAuxDataAtVertices()>0)
+                    if (t->getSizeOfAuxDataAtVertices() > 0)
                     {
                         for (int iAuxDataVar=0;
                              iAuxDataVar<allAuxDataVarNames.size();
                              iAuxDataVar++)
                         {
-                           float iAuxDataValue =
+                            float iAuxDataValue =
                                     t->getAuxDataAtVertex(
-                                    t->getStartIndices()[iTraj] + iTime).at(
+                                        t->getStartIndices()[iTraj] + iTime).at(
                                         iAuxDataVar);
-                           out << QString(" %1 ").arg(iAuxDataValue,-20,'g',6);
+                            out << QString(" %1 ").arg(iAuxDataValue, -20, 'g', 6);
                         }
                     }
                     out << endl;
@@ -3483,13 +3426,9 @@ void MTrajectoryActor::updateAuxDataVarNamesProperty()
     }
     else
     {
-
-       // Get list of auxiliary data variables.
-       MTrajectories* t = trajectoryRequests.at(0).trajectories;
-       QStringList allAuxDataVarNames = t->getAuxDataVarNames();
-       properties->mEnum()->setEnumNames(renderAuxDataVarProperty,
-                                         allAuxDataVarNames);
-
+        properties->mEnum()->setEnumNames(
+                    renderAuxDataVarProperty,
+                    trajectorySource->availableAuxiliaryVariables());
     }
 
     enableActorUpdates(true);
@@ -3803,6 +3742,7 @@ bool MTrajectoryActor::selectDataSource()
         updateInitTimeProperty();
         updateStartTimeProperty();
         updateEnsembleSingleMemberProperty();
+        updateAuxDataVarNamesProperty();
 
         return true;
     }
@@ -4026,13 +3966,7 @@ void MTrajectoryActor::releaseData(int slot)
     if (trajectoryRequests[slot].trajectories)
     {
         trajectoryRequests[slot].trajectories->releaseVertexBuffer();
-        if (requestedAuxDataVarName!="none" &&
-                (trajectoryRequests[slot].trajectories->
-                 getSizeOfAuxDataAtVertices()>0))
-        {
-            trajectoryRequests[slot].trajectories->
-                    releaseAuxDataVertexBuffer(requestedAuxDataVarName);
-        }
+        trajectoryRequests[slot].releasePreviousAuxVertexBuffer();
         trajectorySource->releaseData(trajectoryRequests[slot].trajectories);
         trajectoryRequests[slot].trajectories = nullptr;
     }

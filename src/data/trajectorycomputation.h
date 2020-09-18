@@ -5,8 +5,8 @@
 **  prediction data.
 **
 **  Copyright 2017      Philipp Kaiser [+]
-**  Copyright 2017-2018 Marc Rautenhaus [*, previously +]
-**  Copyright 2020 Marcel Meyer [*]
+**  Copyright 2017-2020 Marc Rautenhaus [*, previously +]
+**  Copyright 2020      Marcel Meyer [*]
 **
 **  + Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -178,6 +178,8 @@ public:
                                       const QDateTime& validTime);
 
     QSet<unsigned int> availableEnsembleMembers();
+
+    QStringList availableAuxiliaryVariables();
 
     MTrajectories* produceData(MDataRequest request);
 

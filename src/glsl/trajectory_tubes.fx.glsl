@@ -4,8 +4,8 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2018 Marc Rautenhaus [*, previously +]
-**  Copyright 2020 Marcel Meyer [*]
+**  Copyright 2015-2020 Marc Rautenhaus [*, previously +]
+**  Copyright 2020      Marcel Meyer [*]
 **
 **  + Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -70,8 +70,14 @@ shader VSmain(in vec3 vertex : 0, in vec3 normal : 1,
 
     // Convert from world space to clip space.
     // Define scalar value for rendering colors in 4th vertex component.
-    if (renderAuxData) vs_vertex = vec4(vertex.xy, worldZ, auxDataAtVertex);
-    if (!renderAuxData) vs_vertex = vec4(vertex.xy, worldZ, vertex.z);
+    if (renderAuxData)
+    {
+        vs_vertex = vec4(vertex.xy, worldZ, auxDataAtVertex);
+    }
+    else
+    {
+        vs_vertex = vec4(vertex.xy, worldZ, vertex.z);
+    }
 
     // Pass normal and vertex ID to geometry shader.
     vs_normal   = normal;

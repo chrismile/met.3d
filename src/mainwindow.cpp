@@ -6,7 +6,7 @@
 **
 **  Copyright 2015-2019 Marc Rautenhaus [*, previously +]
 **  Copyright 2016-2018 Bianca Tost [+]
-**  Copyright 2020 Marcel Meyer [*]
+**  Copyright 2020      Marcel Meyer [*]
 **
 **  + Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany

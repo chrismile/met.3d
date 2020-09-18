@@ -5,8 +5,8 @@
 **  prediction data.
 **
 **  Copyright 2017      Philipp Kaiser [+]
-**  Copyright 2017-2018 Marc Rautenhaus [*, previously +]
-**  Copyright 2020 Marcel Meyer [*]
+**  Copyright 2017-2020 Marc Rautenhaus [*, previously +]
+**  Copyright 2020      Marcel Meyer [*]
 **
 **  + Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -79,11 +79,13 @@ void MTrajectoryComputationSource::setInputWindVariables(
     windVerticalVariableName = verticalWind_Pas;
 }
 
+
 void MTrajectoryComputationSource::setAuxDataVariables(
         QString auxDataVarNamesList)
 {
     auxDataVarNames = auxDataVarNamesList.split(",");
 }
+
 
 void MTrajectoryComputationSource::setVerticalLevelsOfAuxDataVariables(
         QMap<QString, MVerticalLevelType> verticalLevelsOfAuxDataVars)
@@ -129,6 +131,13 @@ QList<QDateTime> MTrajectoryComputationSource::validTimeOverlap(
             __FILE__, __LINE__);
     return availableTrajectories.value(initTime).value(validTime)
             .validTimeOverlap;
+}
+
+
+QStringList MTrajectoryComputationSource::availableAuxiliaryVariables()
+{
+    QReadLocker availableItemsReadLocker(&availableItemsLock);
+    return auxDataVarNames;
 }
 
 
@@ -226,7 +235,7 @@ MTrajectories* MTrajectoryComputationSource::produceData(MDataRequest request)
                               member);
     trajectories->copyVertexDataFrom(cInfo.vertices);
     trajectories->copyAuxDataPerVertex(cInfo.auxDataAtVertices);
-    trajectories->copyAuxDataNames(cInfo.auxDataVarNames);
+    trajectories->setAuxDataVariableNames(cInfo.auxDataVarNames);
     trajectories->setStartGrid(cInfo.startGrid);
 
     LOG4CPLUS_DEBUG(mlog, "Computation of trajectories/streamlines finished.");
@@ -284,17 +293,16 @@ MTask* MTrajectoryComputationSource::createTaskGraph(MDataRequest request)
     MVerticalLevelType verticalLevelOfVariable;
     for (QString variable : variables)
     {
-
         // Get vertical level type. For all wind variables this
         // is fixed to "levelType", but auxiliary data variables
         // may be given on other vertical level types.
         if (auxDataVarNames.contains(variable))
         {
-            verticalLevelOfVariable=verticalLevelsOfAuxDataVariables[variable];
+            verticalLevelOfVariable = verticalLevelsOfAuxDataVariables[variable];
         }
         else
         {
-            verticalLevelOfVariable=levelType;
+            verticalLevelOfVariable = levelType;
         }
 
         for (int i = min(startIndex, endIndex);
@@ -500,14 +508,12 @@ void MTrajectoryComputationSource::computeTrajectories(
             computeStreamLines(helper, cInfo);
             break;
     }
-
 }
 
 
 void MTrajectoryComputationSource::computeStreamLines(
         TrajectoryComputationHelper& ch, MTrajectoryComputationInfo& cInfo)
 {
-
     // Define number of required data grids.
     uint numWindDataVars = ch.varNames.size();
     uint numAuxDataVars = ch.auxVarNames.size();
@@ -520,7 +526,7 @@ void MTrajectoryComputationSource::computeStreamLines(
     // consider a single timestep, the current implementation simply stores
     // pointers to the same data for both time steps (see below).
     QVector<QVector<MStructuredGrid*>> grids(
-                2, QVector<MStructuredGrid *>(numWindDataVars+numAuxDataVars,
+                2, QVector<MStructuredGrid *>(numWindDataVars + numAuxDataVars,
                                               nullptr));
 
     MDataRequestHelper rh(ch.baseRequest);
@@ -550,7 +556,7 @@ void MTrajectoryComputationSource::computeStreamLines(
     cInfo.times.push_back(ch.validTimes.at(ch.startTimeStep));
     for (uint trajectory = 0; trajectory < ch.trajectoryCount; ++trajectory)
     {
-        seedPos[trajectory]=determineTrajectorySeedPosition(trajectory, ch);
+        seedPos[trajectory] = determineTrajectorySeedPosition(trajectory, ch);
         cInfo.vertices[trajectory].push_back(seedPos[trajectory]);
         validPosition[trajectory] = true;
     }
@@ -565,7 +571,6 @@ void MTrajectoryComputationSource::computeStreamLines(
     // loop over wind fields and aux data fields
     for (int v = 0; v < ch.varNames.size()+ch.auxVarNames.size(); ++v)
     {
-
         // Wind data vars.
         if (v < ch.varNames.size())
         {
@@ -618,7 +623,7 @@ void MTrajectoryComputationSource::computeStreamLines(
                        seedPos[iStreamline],
                        timeIntWeight, ch.interpolationMethod, grids,
                        gridIndex, validPosition[iStreamline]);
-           auxDataValuesPerVertexPerTrajectory[iStreamline][w]=iAuxDataValue;
+           auxDataValuesPerVertexPerTrajectory[iStreamline][w] = iAuxDataValue;
 
        }
        // Store all auxiliary data variables at this vertex of the trajectory.
@@ -690,7 +695,7 @@ void MTrajectoryComputationSource::computeStreamLines(
                     float iAuxDataValue = sampleAuxDataAtTrajectoryVertex(
                                 nextPos, timeIntWeight, ch.interpolationMethod,
                                 grids, gridIndex, validPosition[iStreamline]);
-                    auxDataValuesPerVertexPerTrajectory[iStreamline][w]=
+                    auxDataValuesPerVertexPerTrajectory[iStreamline][w] =
                             iAuxDataValue;
                 }
                 // Store all auxiliary data variables at this vertex of
@@ -715,7 +720,6 @@ void MTrajectoryComputationSource::computeStreamLines(
 void MTrajectoryComputationSource::computePathLines(
         TrajectoryComputationHelper& ch, MTrajectoryComputationInfo& cInfo)
 {
-
     // Define number of required data grids.
     uint numWindDataVars = ch.varNames.size();
     uint numAuxDataVars = ch.auxVarNames.size();
@@ -724,11 +728,10 @@ void MTrajectoryComputationSource::computePathLines(
     // along trajectories. The array with grids is passed to the integration
     // methods. Two timesteps are stored.
     QVector<QVector<MStructuredGrid*>> grids(
-                2, QVector<MStructuredGrid *>(numWindDataVars+numAuxDataVars,
+                2, QVector<MStructuredGrid *>(numWindDataVars + numAuxDataVars,
                                               nullptr));
     QVector<QDateTime> timeSteps(2);
     MDataRequestHelper rh(ch.baseRequest);
-
 
     // Initialize computation information.
     cInfo.numStoredVerticesPerTrajectory =
@@ -737,12 +740,12 @@ void MTrajectoryComputationSource::computePathLines(
     cInfo.times.reserve(cInfo.numStoredVerticesPerTrajectory);
     cInfo.vertices = QVector<QVector<QVector3D>>(cInfo.numTrajectories);
     cInfo.auxDataAtVertices = QVector<QVector<QVector<float>>>(cInfo.numTrajectories);
-    cInfo.auxDataVarNames=ch.auxVarNames;
+    cInfo.auxDataVarNames = ch.auxVarNames;
     for (uint t = 0; t < cInfo.numTrajectories; ++t)
     {
         cInfo.vertices[t].reserve(cInfo.numStoredVerticesPerTrajectory);
         cInfo.auxDataAtVertices[t].reserve(
-                    cInfo.numStoredVerticesPerTrajectory*numAuxDataVars);
+                    cInfo.numStoredVerticesPerTrajectory * numAuxDataVars);
     }
 
     // Create temporary vector to cache trajectory vertex positions.
@@ -787,7 +790,7 @@ void MTrajectoryComputationSource::computePathLines(
                 if (v < ch.varNames.size())
                 {
                     rh.insert("VARIABLE", ch.varNames[v]);
-                    rh.insert("LEVELTYPE",levelType);
+                    rh.insert("LEVELTYPE", levelType);
                 }
                 // Auxiliary data vars.
                 else if (v >= ch.varNames.size())
@@ -850,7 +853,7 @@ void MTrajectoryComputationSource::computePathLines(
                                 positions[trajectory], timeIntWeight,
                                 ch.interpolationMethod, grids, gridIndex,
                                 validPosition[trajectory]);
-                    auxDataValuesPerVertexPerTrajectory[trajectory][w]=
+                    auxDataValuesPerVertexPerTrajectory[trajectory][w] =
                             iAuxDataValue;
 
                 }
@@ -954,7 +957,6 @@ void MTrajectoryComputationSource::computePathLines(
         // Swap data grids (the current data field at index [1] will be
         // needed at index [0] in the next time iteration).
         swap(grids[0], grids[1]);
-
     }
 
     // Release all remaining not-yet released data fields.

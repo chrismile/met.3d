@@ -4,13 +4,16 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2018 Marc Rautenhaus
-**  Copyright 2017-2018 Bianca Tost
-**  Copyright 2017      Philipp Kaiser
-**  Copyright 2020 Marcel Meyer [*]
+**  Copyright 2015-2020 Marc Rautenhaus [*, previously +]
+**  Copyright 2017-2018 Bianca Tost [+]
+**  Copyright 2017      Philipp Kaiser [+]
+**  Copyright 2020      Marcel Meyer [*]
 **
-**  Computer Graphics and Visualization Group
+**  + Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
+**
+**  * Regional Computing Center, Visualization
+**  Universitaet Hamburg, Hamburg, Germany
 **
 **  Met.3D is free software: you can redistribute it and/or modify
 **  it under the terms of the GNU General Public License as published by
@@ -900,7 +903,6 @@ void MPipelineConfiguration::initializeTrajectoryComputationPipeline(
 
     // Get vertical level type of auxiliary data variables
     QStringList auxDataVariableList = auxDataVariableNames.split(",");
-    //QList<MVerticalLevelType> verticalLevelsOfAuxDataVars;
     QMap<QString, MVerticalLevelType> verticalLevelsOfAuxDataVars;
 
     for (int i = 0; i < auxDataVariableList.size(); ++i)
@@ -909,16 +911,14 @@ void MPipelineConfiguration::initializeTrajectoryComputationPipeline(
 
         QList<MVerticalLevelType> levelTypes =
                 NWPDataSource->availableLevelTypes();
-        foreach (MVerticalLevelType level, levelTypes)
+        for (MVerticalLevelType level : levelTypes)
         {
             QStringList variables = NWPDataSource->availableVariables(level);
             if (variables.contains(iAuxDataVar))
             {
-                //verticalLevelsOfAuxDataVars.append(level);
                 verticalLevelsOfAuxDataVars.insert(iAuxDataVar,level);
             }
         }
-
     }
 
     if (MClimateForecastReader *netCDFDataSource =
@@ -953,7 +953,7 @@ void MPipelineConfiguration::initializeTrajectoryComputationPipeline(
     trajectoryComputation->setAuxDataVariables(auxDataVariableNames);
     trajectoryComputation->setVerticalLevelsOfAuxDataVariables(verticalLevelsOfAuxDataVars);
 
-    trajectoryComputation-> setVerticalLevelType(verticalLevelType);
+    trajectoryComputation->setVerticalLevelType(verticalLevelType);
     trajectoryComputation->setInputSource(NWPDataSource);
     sysMC->registerDataSource(dataSourceId + QString(" Reader"),
                               trajectoryComputation);
