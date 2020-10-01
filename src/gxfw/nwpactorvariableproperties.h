@@ -293,6 +293,14 @@ public:
         BOX_BLUR_GRIDPOINTS_FAST = 6,
     } SmoothModeTypes;
 
+    // Types of boundary handleing in smooth filter.
+    typedef enum {
+        CONSTANT = 0,
+        NANPADDING = 1,
+        SYMMETRIC = 2,
+    } BoundaryModeTypes;
+
+
     /**
      * @brief smoothModeToString this method converts the smooth mode from
      * SmoothModeType to the real smooth mode name. If you want to add an
@@ -312,17 +320,40 @@ public:
      */
     MSmoothProperties::SmoothModeTypes stringToSmoothMode(QString smoothMode);
 
+
+    /**
+     * @brief boundaryModeToString this method converts the boundary mode from
+     * BoundaryModeType to the real boundary mode name. If you want to add an
+     * boundary mode, you have to add in this method a translation from
+     * BoundaryModeType to the boundary mode name (string).
+     * @param smoothMode the smooth mode from the enum item.
+     * @return boundary mode name as string.
+     */
+    static QString boundaryModeToString(BoundaryModeTypes boundaryMode);
+
+    /**
+     * @brief stringToBoundaryMode This method converts the boundary mode as string
+     * to the enum item BoundaryModeTypes. If you add a boundary mode, you need to
+     * add in this method the conversion from BoundaryModeType to string
+     * @param boundaryMode the real name of the smooth mode as string
+     * @return the boundary mode as enum item.
+     */
+    MSmoothProperties::BoundaryModeTypes stringToBoundaryMode(QString boundaryMode);
+
 protected:
     QtProperty *recomputeOnPropertyChange;
     QtProperty *smoothStDevKmProperty;
     QtProperty *smoothStDevGridboxProperty;
     QtProperty *applySettingsProperty;
     QtProperty *smoothModeProperty;
+    QtProperty *boundaryModeProperty;
 
 private:
     SmoothModeTypes smoothMode;
+    BoundaryModeTypes boundaryMode;
     QtProperty *groupProperty;
 };
+
 
 } // namespace Met3D
 

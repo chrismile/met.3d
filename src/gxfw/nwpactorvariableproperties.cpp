@@ -926,7 +926,8 @@ void MProbabilityRegionProperties::loadConfiguration(QSettings *settings)
 MSmoothProperties::MSmoothProperties(
         MNWPActorVariable *actorVar)
     : MRequestProperties(actorVar),
-      smoothMode(DISABLE_FILTER)
+      smoothMode(DISABLE_FILTER),
+      boundaryMode(CONSTANT)
 {
     MNWPMultiVarActor *a = actorVar->getActor();
     MQtProperties *properties = a->getQtProperties();
@@ -948,12 +949,23 @@ MSmoothProperties::MSmoothProperties(
                     << smoothModeToString(BOX_BLUR_DISTANCE_FAST)
                     << smoothModeToString(UNIFORM_WEIGHTED_GRIDPOINTS)
                     << smoothModeToString(GAUSS_GRIDPOINTS)
-//                    << smoothModeToString(BOX_BLUR_GRIDPOINTS_SLOW)
+                    << smoothModeToString(BOX_BLUR_GRIDPOINTS_SLOW)
                     << smoothModeToString(BOX_BLUR_GRIDPOINTS_FAST);
     smoothModeProperty = a->addProperty(
                 ENUM_PROPERTY, "smooth mode", groupProperty);
     properties->mEnum()->setEnumNames(smoothModeProperty, smoothModeNames);
     properties->mEnum()->setValue(smoothModeProperty, smoothMode);
+
+    QStringList boundaryModeNames;
+    // Comment the boundaryModeName if you want that it does not show up in the
+    // drop down menu of the GUI.
+    boundaryModeNames << boundaryModeToString(CONSTANT)
+                      << boundaryModeToString(NANPADDING)
+                      << boundaryModeToString(SYMMETRIC);
+    boundaryModeProperty = a->addProperty(
+                ENUM_PROPERTY, "boundary mode", groupProperty);
+    properties->mEnum()->setEnumNames(boundaryModeProperty, boundaryModeNames);
+    properties->mEnum()->setValue(boundaryModeProperty, boundaryMode);
 
     smoothStDevKmProperty = a->addProperty(
                 DOUBLE_PROPERTY, "standard deviation (km)", groupProperty);
@@ -986,48 +998,68 @@ bool MSmoothProperties::onQtPropertyChanged(
     if ((property == applySettingsProperty)
             || (property == smoothModeProperty)
             || (property == smoothStDevKmProperty)
-            || (property == smoothStDevGridboxProperty))
+            || (property == smoothStDevGridboxProperty)
+            || (property == boundaryModeProperty))
     {
         MQtProperties *properties
                 = actorVariable->getActor()->getQtProperties();
         SmoothModeTypes index = stringToSmoothMode(properties->getEnumItem(
                                                        smoothModeProperty));
+        BoundaryModeTypes boundaryModeType = stringToBoundaryMode(
+                    properties->getEnumItem(boundaryModeProperty));
         switch (index)
         {
         case DISABLE_FILTER: // no smoothing
             smoothMode = DISABLE_FILTER;
             smoothStDevKmProperty->setEnabled(false);
             smoothStDevGridboxProperty->setEnabled(false);
+            boundaryModeProperty->setEnabled(false);
             break;
         case GAUSS_DISTANCE:
             smoothMode = GAUSS_DISTANCE;
             smoothStDevKmProperty->setEnabled(true);
             smoothStDevGridboxProperty->setEnabled(false);
+            boundaryMode = NANPADDING;
+            properties->mEnum()->setValue(boundaryModeProperty, boundaryMode);
+            boundaryModeProperty->setEnabled(false);
             break;
         case BOX_BLUR_DISTANCE_FAST:
             smoothMode = BOX_BLUR_DISTANCE_FAST;
             smoothStDevKmProperty->setEnabled(true);
             smoothStDevGridboxProperty->setEnabled(false);
+            boundaryModeProperty->setEnabled(true);
+            boundaryMode = boundaryModeType;
             break;
         case UNIFORM_WEIGHTED_GRIDPOINTS:
             smoothMode = UNIFORM_WEIGHTED_GRIDPOINTS;
             smoothStDevKmProperty->setEnabled(false);
             smoothStDevGridboxProperty->setEnabled(true);
+            boundaryMode = NANPADDING;
+            properties->mEnum()->setValue(boundaryModeProperty, boundaryMode);
+            boundaryModeProperty->setEnabled(false);
             break;
         case GAUSS_GRIDPOINTS:
             smoothMode =  GAUSS_GRIDPOINTS;
             smoothStDevKmProperty->setEnabled(false);
             smoothStDevGridboxProperty->setEnabled(true);
+            boundaryMode = NANPADDING;
+            properties->mEnum()->setValue(boundaryModeProperty, boundaryMode);
+            boundaryModeProperty->setEnabled(false);
             break;
         case BOX_BLUR_GRIDPOINTS_SLOW:
             smoothMode = BOX_BLUR_GRIDPOINTS_SLOW;
             smoothStDevKmProperty->setEnabled(false);
             smoothStDevGridboxProperty->setEnabled(true);
+            boundaryMode = CONSTANT;
+            properties->mEnum()->setValue(boundaryModeProperty, boundaryMode);
+            boundaryModeProperty->setEnabled(false);
             break;
         case BOX_BLUR_GRIDPOINTS_FAST:
             smoothMode = BOX_BLUR_GRIDPOINTS_FAST;
             smoothStDevKmProperty->setEnabled(false);
             smoothStDevGridboxProperty->setEnabled(true);
+            boundaryModeProperty->setEnabled(true);
+            boundaryMode = boundaryModeType;
             break;
         }
         if (properties->mBool()->value(recomputeOnPropertyChange))
@@ -1059,8 +1091,14 @@ void MSmoothProperties::addToRequest(MDataRequestHelper *rh)
                 properties->mDouble()->value(smoothStDevKmProperty);
         float smoothStdGridbox =
                 properties->mInt()->value(smoothStDevGridboxProperty);
-        rh->insert("SMOOTH", QString("%1/%2/%3")
-                   .arg(smoothMode).arg(smoothStDev_km).arg(smoothStdGridbox));
+        // request is as follows:
+        // 1. Smooth mode (e.g. BOX_BLUR_DISTANCE_FAST)
+        // 2. Standard deviation of smooth mode in km (e.g. 50)
+        // 3. Standard deviation of smooth radius in gridpoints (e.g. 5)
+        // 4. Boundary handling (e.g. SYMMETRIC)
+        rh->insert("SMOOTH", QString("%1/%2/%3/%4")
+                   .arg(smoothMode).arg(smoothStDev_km)
+                   .arg(smoothStdGridbox).arg(boundaryMode));
     }
 }
 
@@ -1074,6 +1112,7 @@ void MSmoothProperties::saveConfiguration(QSettings *settings)
                        properties->mDouble()->value(smoothStDevKmProperty));
     settings->setValue("standardDeviation_gridcells",
                        properties->mInt()->value(smoothStDevGridboxProperty));
+    settings->setValue("boundaryMode", boundaryModeToString(boundaryMode));
     settings->endGroup();
 }
 
@@ -1093,6 +1132,11 @@ void MSmoothProperties::loadConfiguration(QSettings *settings)
     properties->mInt()->setValue(
                 smoothStDevGridboxProperty,
                 settings->value("standardDeviation_gridcells", 3).toInt());
+    properties->mEnum()->setValue(
+                boundaryModeProperty, stringToBoundaryMode(
+                    (settings->value("boundaryMode",
+                                    boundaryModeToString(CONSTANT))
+                     ).toString()));
     settings->endGroup();
 }
 
@@ -1152,5 +1196,39 @@ QString MSmoothProperties::smoothModeToString(
     return "disable filter";
 }
 
+
+MSmoothProperties::BoundaryModeTypes MSmoothProperties::stringToBoundaryMode(
+        QString boundaryModeName)
+{
+    if (boundaryModeName == "constant")
+    {
+        return CONSTANT;
+    }
+    else if (boundaryModeName == "nan-padding")
+    {
+        return NANPADDING;
+    }
+    else if (boundaryModeName == "symmetric")
+    {
+        return SYMMETRIC;
+    }
+    else
+    {
+        return CONSTANT;
+    }
+}
+
+
+QString MSmoothProperties::boundaryModeToString(
+        BoundaryModeTypes boundaryModeType)
+{
+    switch (boundaryModeType)
+    {
+        case CONSTANT: return "constant";
+        case NANPADDING: return "nan-padding";
+        case SYMMETRIC: return "symmetric";
+    }
+    return "constant";
+}
 
 } // namespace Met3D

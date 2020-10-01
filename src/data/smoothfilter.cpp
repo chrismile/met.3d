@@ -34,7 +34,6 @@
 #include <log4cplus/loggingmacros.h>
 
 // local application imports
-#include "gxfw/nwpactorvariableproperties.h"
 #include "util/mutil.h"
 #include "util/mexception.h"
 #include "util/metroutines.h"
@@ -75,6 +74,7 @@ MStructuredGrid *MSmoothFilter::produceData(MDataRequest request)
             static_cast<MSmoothProperties::SmoothModeTypes>(
                 parameterList[0].toInt());
 
+
     MStructuredGrid *result = nullptr;
 
     MStructuredGrid* inputGrid = inputSource->getData(rh.request());
@@ -82,6 +82,10 @@ MStructuredGrid *MSmoothFilter::produceData(MDataRequest request)
     QString smoothModeName = MSmoothProperties::smoothModeToString(filterType);
     LOG4CPLUS_DEBUG(mlog, "Smooth filter: computing "
                     << smoothModeName.toUtf8().constData());
+
+    MSmoothProperties::BoundaryModeTypes boundaryType =
+            static_cast<MSmoothProperties::BoundaryModeTypes>(
+                parameterList[3].toInt());
 
     switch (filterType)
     {
@@ -100,7 +104,7 @@ MStructuredGrid *MSmoothFilter::produceData(MDataRequest request)
     {
         float stdDev_km = parameterList[1].toFloat();
         computeHorizontalBoxBlurSmoothing_GCDistanceFast(
-                    inputGrid, result, stdDev_km);
+                    inputGrid, result, stdDev_km, boundaryType);
         break;
     }
     // Uniform weights of surrounding grid points.
@@ -133,7 +137,7 @@ MStructuredGrid *MSmoothFilter::produceData(MDataRequest request)
     {
         int stdDev_gp = parameterList[2].toInt();
         computeHorizontalBoxBlurSmoothing_GCGridpointsFast(
-                    inputGrid, result, stdDev_gp);
+                    inputGrid, result, stdDev_gp, boundaryType);
         break;
     }
     default:
@@ -141,6 +145,7 @@ MStructuredGrid *MSmoothFilter::produceData(MDataRequest request)
                               "Return nullptr data field."
                         << smoothModeName.toUtf8().constData());
     }
+    //releaseData(inputGrid);
     return result;
 }
 
@@ -168,6 +173,11 @@ const QStringList MSmoothFilter::locallyRequiredKeys()
     return (QStringList() << "SMOOTH");
 }
 
+/******************************************************************************
+***                          PRIVATE METHODS                                ***
+*******************************************************************************/
+
+//*************************** GAUSSIAN SMOOTHING *******************************
 
 // Kernel cannot be precomputed as distances between center point and
 // surrounding points change depending on geographical position.
@@ -256,32 +266,183 @@ void MSmoothFilter::computeHorizontalGaussianSmoothing_GCDistance(
             }
         }
     }
-}
+};
 
+
+void MSmoothFilter::computeHorizontalGaussianSmoothing_GCGridpoints(
+        const MStructuredGrid *inputGrid, MStructuredGrid *resultGrid,
+        int stdDev_gp)
+{
+    const unsigned int nlon = inputGrid->getNumLons();
+    const unsigned int nlat = inputGrid->getNumLats();
+    const float radius = 2. * pow(float(stdDev_gp), 2.);
+    //Significant radius, all grid points within the 99% quantile
+    //of a Gaussian distribution are considered. The 99% quantile is the
+    //result of the standard deviation multiplied by 2.576. For more
+    //information see: https://en.wikipedia.org/wiki/Normal_distribution
+    const int sigRadius = ceil(float(stdDev_gp) * 2.576);
+    int squaredDistance;
+    double weight, currentValue, totalValue, addValue, weightSum;
+//#pragma omp parallel for
+    for (unsigned int k = 0; k < inputGrid->getNumLevels(); ++k)
+        {
+        for (unsigned int j = 0; j < nlat; ++j)
+        {
+            for (unsigned int i = 0; i < nlon; ++i)
+            {
+                currentValue = inputGrid->getValue(k, j, i);
+                if (IS_MISSING(currentValue))
+                {
+                    resultGrid->setValue(k, j, i, M_MISSING_VALUE);
+                }
+                else
+                {
+                    totalValue = 0;
+                    weightSum = 0;
+                    int south = max(0, static_cast<int>(i) - sigRadius);
+                    int north = min(static_cast<int>(nlon), static_cast<int>(i)
+                                    + sigRadius);
+                    int west = max(0, static_cast<int>(j) - sigRadius);
+                    int east = min(static_cast<int>(nlat), static_cast<int>(j)
+                                    + sigRadius);
+                    for(int n = south; n < north; n++)
+                    {
+                        for(int m = west; m < east + 1; m++)
+                        {
+                            addValue = inputGrid->getValue(k, m, n);
+                            if (!IS_MISSING(addValue))
+                            {
+                                squaredDistance = (m - j) * (m - j) + (n - i) * (n - i);
+                                weight = exp(-squaredDistance / radius)
+                                        / (M_PI * radius);
+                                totalValue += addValue * weight;
+                                weightSum += weight;
+                            }
+                        }
+                    }
+                    resultGrid->setValue(k, j, i, (totalValue / weightSum));
+                }
+            }
+        }
+    }
+};
+
+
+QList<QList<float>> MSmoothFilter::precomputeLatDependendDistanceWeightsOfLongitude(
+        const MStructuredGrid *inputGrid, float stdDev_km)
+{
+    //Significant radius, all grid points within the 99% quantile
+    //of a Gaussian distribution are considered. The 99% quantile is the
+    //result of the standard deviation multiplied by 2.576. For more
+    //information see: https://en.wikipedia.org/wiki/Normal_distribution
+    float sigRadius = stdDev_km * 2.576;
+    int sigRadius_gridpoints;
+    float deltaGridpoint_km;
+    float distance_km;
+    QList<float> weights;
+    QList<QList<float>> latDependendWeights;
+    for (unsigned int i = 0; i<inputGrid->getNumLats(); i++)
+    {
+        //deltaGridpoint_km = inputGrid->getGeometricDeltaLat_km(i);
+        deltaGridpoint_km = inputGrid->getDeltaLonInKm(i);
+        sigRadius_gridpoints = round(sigRadius/deltaGridpoint_km);
+        for (int j = 0; j <= sigRadius_gridpoints; j++)
+        {
+            distance_km = j *  deltaGridpoint_km;
+            weights.append(computeGaussWeight(stdDev_km, distance_km));
+        }
+        latDependendWeights.append((QList<float>) weights);
+        weights.clear();
+    }
+    return latDependendWeights;
+};
+
+
+QList<float> MSmoothFilter::precomputeDistanceWeightsOfLatitude(
+        const MStructuredGrid *inputGrid, float stdDev_km)
+{
+    //Significant radius, all grid points within the 99% quantile
+    //of a Gaussian distribution are considered. The 99% quantile is the
+    //result of the standard deviation multiplied by 2.576. For more
+    //information see: https://en.wikipedia.org/wiki/Normal_distribution
+    float significantRadius = stdDev_km * 2.576;
+    int significantRadius_gridpoints;
+    //float deltaGridpoints_km = inputGrid->getGeometricDeltaLat_km();
+    float deltaGridpoints_km = inputGrid->getDeltaLatInKm();
+    float distance_km;
+    QList<float> weights;
+    significantRadius_gridpoints =
+            round(significantRadius / deltaGridpoints_km);
+
+    for (int j = 0; j <= significantRadius_gridpoints; j++)
+    {
+        distance_km = j * deltaGridpoints_km;
+        weights.append(computeGaussWeight(stdDev_km, distance_km));
+    }
+    return weights;
+};
+
+
+float MSmoothFilter::computeGaussWeight(float stdDev_km, float distance_km)
+{
+    float weight = exp(-(pow(distance_km, 2.) / (2. * pow(stdDev_km, 2.))))
+            / sqrt(1. / (2. * M_PI * pow(stdDev_km, 2.)));
+    return weight;
+};
+
+
+//*************************** BOX BLUR SMOOTHING *******************************
 
 // Longitudinal Box Blur smoothing.
 void MSmoothFilter::computeHorizontalBoxBlurSmoothing_GCDistanceFast(
         const MStructuredGrid *inputGrid, MStructuredGrid *resultGrid,
-        float stdDev_km)
+        float stdDev_km, MSmoothProperties::BoundaryModeTypes boundaryType)
 {
     QList<QList<int>> latDependentBoxRadii;
     int n = 3;
     latDependentBoxRadii = computeLatDependentBoxRadii(inputGrid, stdDev_km, n);
     // Distance between latitudes.
-    // Distance between latitudes.
-    //const float deltaGp_km = MetConstants::DELTA_LAT_km
-    //         / (1. / inputGrid->getDeltaLat());
     const float deltaGp_km = inputGrid->getDeltaLatInKm();
     int distanceInGridpoints = static_cast<int>(round(stdDev_km / deltaGp_km));
     QVector<int> lonBoxRadii = computeBoxRadii(distanceInGridpoints, n);
     MStructuredGrid *resultGridTemp = nullptr;
     resultGridTemp = createAndInitializeResultGrid(resultGrid);
     boxBlurTotalFast(inputGrid, resultGrid, lonBoxRadii[0],
-            latDependentBoxRadii[0]);
+            latDependentBoxRadii[0], boundaryType);
     boxBlurTotalFast(resultGrid, resultGridTemp, lonBoxRadii[1],
-            latDependentBoxRadii[1]);
+            latDependentBoxRadii[1], boundaryType);
     boxBlurTotalFast(resultGridTemp, resultGrid, lonBoxRadii[2],
-            latDependentBoxRadii[2]);
+            latDependentBoxRadii[2], boundaryType);
+
+    //releaseData(resultGridTemp);
+ };
+
+
+void MSmoothFilter::computeHorizontalBoxBlurSmoothing_GCGridpointsFast(
+        const MStructuredGrid *inputGrid, MStructuredGrid *resultGrid,
+        int stdDev_gp, MSmoothProperties::BoundaryModeTypes boundaryType)
+{
+    QVector<int> boxRadii = computeBoxRadii(stdDev_gp, 3);
+    MStructuredGrid *resultGridTemp = nullptr;
+    resultGridTemp = createAndInitializeResultGrid(resultGrid);
+    boxBlurTotalFast(inputGrid, resultGrid, boxRadii[0], boundaryType);
+    boxBlurTotalFast(resultGrid, resultGridTemp, boxRadii[1], boundaryType);
+    boxBlurTotalFast(resultGridTemp, resultGrid, boxRadii[2], boundaryType);
+    //releaseData(resultGridTemp);
+ };
+
+
+void MSmoothFilter::computeHorizontalBoxBlurSmoothing_GCGridpointsSlow(
+        const MStructuredGrid *inputGrid, MStructuredGrid *resultGrid,
+        int stdDev_gp)
+{
+    QVector<int> boxRadii = computeBoxRadii(stdDev_gp, 3);
+    MStructuredGrid *resultGridTemp = nullptr;
+    resultGridTemp = createAndInitializeResultGrid(resultGrid);
+    boxBlurTotalSlow(inputGrid, resultGrid, boxRadii[0]);
+    boxBlurTotalSlow(resultGrid, resultGridTemp, boxRadii[1]);
+    boxBlurTotalSlow(resultGridTemp, resultGrid, boxRadii[2]);
+    //releaseData(resultGridTemp);
  };
 
 
@@ -362,179 +523,546 @@ int MSmoothFilter::numGridpointsSpannedByDistance(
 }
 
 
-QList<QList<float>> MSmoothFilter::precomputeLatDependendDistanceWeightsOfLongitude(
-        const MStructuredGrid *inputGrid, float stdDev_km)
+QVector<int> MSmoothFilter::computeBoxRadii(int stdDev_gp, int n)
 {
-    //Significant radius, all grid points within the 99% quantile
-    //of a Gaussian distribution are considered. The 99% quantile is the
-    //result of the standard deviation multiplied by 2.576. For more
-    //information see: https://en.wikipedia.org/wiki/Normal_distribution
-    float sigRadius = stdDev_km * 2.576;
-    int sigRadius_gridpoints;
-    float deltaGridpoint_km;
-    float distance_km;
-    QList<float> weights;
-    QList<QList<float>> latDependendWeights;
-    for (unsigned int i = 0; i<inputGrid->getNumLats(); i++)
+    QVector<int> boxRadii(n);
+    // Ideal averaging filter width.
+    float widthIdeal = sqrt((12. * pow(stdDev_gp, 2.) / float(n)) + 1.);
+    // Filter width rounded to nearest odd integer less than widthIdeal.
+    int widthIdealLess = floor(widthIdeal);
+    if ((widthIdealLess % 2) == 0)
     {
-        //deltaGridpoint_km = inputGrid->getGeometricDeltaLat_km(i);
-        deltaGridpoint_km = inputGrid->getDeltaLonInKm(i);
-        sigRadius_gridpoints = round(sigRadius/deltaGridpoint_km);
-        for (int j = 0; j <= sigRadius_gridpoints; j++)
+        widthIdealLess--;
+    }
+    // Check if widthIdealLess is odd.
+    int widthIdealUp = widthIdealLess + 2;
+    // mIdeal determines at which pass the nearest odd integer width is higher
+    // than the ideal width should be used. This should compensate the
+    // rounding in the first place to the nearest integer less than
+    // the ideal width.
+    float mIdeal = (12. * pow(stdDev_gp, 2.) - n
+                    * pow(float(widthIdealLess), 2.) - 4.
+                    * float(n) * widthIdealLess - 3. * float(n))
+            / (-4. * float(widthIdealLess) - 4.);
+    int m = round(mIdeal);
+    for (int i = 0; i < n; i++)
+    {
+        if (i < m)
         {
-            distance_km = j *  deltaGridpoint_km;
-            weights.append(computeGaussWeight(stdDev_km, distance_km));
+            boxRadii[i] = (widthIdealLess - 1) / 2;
         }
-        latDependendWeights.append((QList<float>) weights);
-        weights.clear();
+        else
+        {
+            boxRadii[i] = (widthIdealUp - 1) / 2;
+        }
     }
-    return latDependendWeights;
-};
-
-
-QList<float> MSmoothFilter::precomputeDistanceWeightsOfLatitude(
-        const MStructuredGrid *inputGrid, float stdDev_km)
-{
-    //Significant radius, all grid points within the 99% quantile
-    //of a Gaussian distribution are considered. The 99% quantile is the
-    //result of the standard deviation multiplied by 2.576. For more
-    //information see: https://en.wikipedia.org/wiki/Normal_distribution
-    float significantRadius = stdDev_km * 2.576;
-    int significantRadius_gridpoints;
-    //float deltaGridpoints_km = inputGrid->getGeometricDeltaLat_km();
-    float deltaGridpoints_km = inputGrid->getDeltaLatInKm();
-    float distance_km;
-    QList<float> weights;
-    significantRadius_gridpoints =
-            round(significantRadius / deltaGridpoints_km);
-
-    for (int j = 0; j <= significantRadius_gridpoints; j++)
-    {
-        distance_km = j * deltaGridpoints_km;
-        weights.append(computeGaussWeight(stdDev_km, distance_km));
-    }
-    return weights;
-};
-
-
-float MSmoothFilter::computeGaussWeight(float stdDev_km, float distance_km)
-{
-    float weight = exp(-(pow(distance_km, 2.) / (2. * pow(stdDev_km, 2.))))
-            / sqrt(1. / (2. * M_PI * pow(stdDev_km, 2.)));
-    return weight;
+    return boxRadii;
 };
 
 
 void MSmoothFilter::boxBlurTotalFast(
         const MStructuredGrid *inputGrid, MStructuredGrid *resultGrid,
-        int lonBoxRadius, QList<int> latDependentBoxRadii)
+        int lonBoxRadius, QList<int> latDependentBoxRadii,
+        MSmoothProperties::BoundaryModeTypes boundaryType)
 {
     MStructuredGrid *resultGridTemp = nullptr;
     resultGridTemp = createAndInitializeResultGrid(resultGrid);
-    boxBlurLongitudinalFast(inputGrid, resultGridTemp, latDependentBoxRadii);
-    boxBlurLatitudinalFast(resultGridTemp, resultGrid, lonBoxRadius);
-    delete resultGridTemp;
+    boxBlurLongitudinalFast(inputGrid, resultGridTemp, latDependentBoxRadii,
+                            boundaryType);
+    boxBlurLatitudinalFast(resultGridTemp, resultGrid, lonBoxRadius,
+                           boundaryType);
+    //releaseData(resultGridTemp);
 
+};
+
+
+void MSmoothFilter::boxBlurTotalFast(
+        const MStructuredGrid *inputGrid, MStructuredGrid *resultGrid,
+        int boxRadius, MSmoothProperties::BoundaryModeTypes boundaryType)
+{
+    MStructuredGrid *resultGridTemp = nullptr;
+    resultGridTemp = createAndInitializeResultGrid(resultGrid);
+    boxBlurLongitudinalFast(inputGrid, resultGridTemp, boxRadius, boundaryType);
+    boxBlurLatitudinalFast(resultGridTemp, resultGrid, boxRadius, boundaryType);
+    //releaseData(resultGridTemp);
 };
 
 
 void MSmoothFilter::boxBlurLongitudinalFast(
         const MStructuredGrid *inputGrid, MStructuredGrid *resultGrid,
-        QList<int> latDependentBoxRadii)
+        QList<int> latDependentBoxRadii,
+        MSmoothProperties::BoundaryModeTypes boundaryType)
 {
-    float iarr, value, currentValue, minusValue = 0.0, plusValue = 0.0;;
-    int boxRadius;
-    int nLon = inputGrid->getNumLons();
-    int nGridPoints;
+    double value, plusValue, minusValue;
+    int boxRadius, nGridPoints, iMinus, iPlus;
+    int nLons = inputGrid->getNumLons();
 //#pragma omp parallel for
-    for (unsigned int k = 0; k < inputGrid->getNumLevels(); k++)
+    if (boundaryType == MSmoothProperties::BoundaryModeTypes::CONSTANT)
     {
-        for (unsigned int j = 0; j < inputGrid->getNumLats(); j++)
+        for (unsigned int k = 0; k < inputGrid->getNumLevels(); k++)
         {
-            boxRadius = latDependentBoxRadii[j];
-            value = 0;
-            nGridPoints = 0;
-            // Adds the values until radius is reached.
-            // This is then the first value to be set on the result grid.
-            for (int i = 0; i < boxRadius; i++)
+            for (unsigned int j = 0; j < inputGrid->getNumLats(); j++)
             {
-                plusValue = inputGrid->getValue(k, j, i);
-                if (IS_MISSING(plusValue))
+                boxRadius = latDependentBoxRadii[j];
+                if IS_MISSING(inputGrid->getValue(k, j, 0))
                 {
-                    plusValue = 0;
-                    nGridPoints--;
-                }
-                value += plusValue;
-                nGridPoints++;
-            }
-            for(int i = 0; i < boxRadius + 1; i++)
-            {
-                plusValue = inputGrid->getValue(k, j, i + boxRadius);
-                currentValue = inputGrid->getValue(k, j, i);
-                if (IS_MISSING(plusValue))
-                {
-                    plusValue = 0;
-                    nGridPoints--;
-                }
-                value += plusValue;
-                nGridPoints++;
-                if (IS_MISSING(currentValue))
-                {
-                    resultGrid->setValue(k, j, i, M_MISSING_VALUE);
+                    nGridPoints = 0;
+                    value = 0.;
                 }
                 else
                 {
-                    iarr = 1. / float(nGridPoints);
-                    resultGrid->setValue(k, j, i, value * iarr);
+                    value = inputGrid->getValue(k, j, 0) * double(boxRadius + 1);
+                    nGridPoints = boxRadius + 1;
+                }
+                // add values until box Radius is reached
+                for(int i = 1; i < boxRadius + 1; i++)
+                {
+                    plusValue = inputGrid->getValue(k, j, i);
+                    if IS_MISSING(plusValue)
+                    {
+                        plusValue = 0.;
+                    }
+                    else
+                    {
+                        nGridPoints ++;
+                    }
+                    value += plusValue;
+                }
+                // set the first value
+                if IS_MISSING(inputGrid->getValue(k, j, 0))
+                {
+                    resultGrid->setValue(k, j, 0, M_MISSING_VALUE);
+                }
+                else
+                {
+                    resultGrid->setValue(k, j, 0, value/double(nGridPoints));
+                }
+
+                // Get and set all other values starting from index i = 1.
+                for (int i = 1; i < nLons; i++)
+                {
+                    iMinus = std::max(0, i - boxRadius - 1);
+                    minusValue = inputGrid->getValue(k, j, iMinus);
+                    if IS_MISSING(minusValue)
+                    {
+                        minusValue = 0.;
+                        nGridPoints ++;
+                    }
+                    value -= minusValue;
+
+                    iPlus = std::min(nLons - 1, i + boxRadius);
+                    plusValue = inputGrid->getValue(k, j, iPlus);
+                    if IS_MISSING(plusValue)
+                    {
+                        nGridPoints --;
+                        plusValue = 0.;
+                    }
+                    value += plusValue;
+                    if IS_MISSING(inputGrid->getValue(k, j, i))
+                    {
+                        resultGrid->setValue(k, j, i, M_MISSING_VALUE);
+                    }
+                    else
+                    {
+                        resultGrid->setValue(k, j, i, value/double(nGridPoints));
+                    }
                 }
             }
-
-            for(int i = boxRadius + 1; i < (nLon - boxRadius); i++)
+        }
+    }
+    else if (boundaryType == MSmoothProperties::BoundaryModeTypes::SYMMETRIC)
+    {
+        for (unsigned int k = 0; k < inputGrid->getNumLevels(); k++)
+        {
+            for (unsigned int j = 0; j < inputGrid->getNumLats(); j++)
             {
-                plusValue = inputGrid->getValue(k, j, i + boxRadius);
-                minusValue = inputGrid->getValue(k, j, i - boxRadius - 1);
-                currentValue = inputGrid->getValue(k, j, i);
-                if (IS_MISSING(plusValue))
+                boxRadius = latDependentBoxRadii[j];
+                QVector<int> indexList = createIndexList(inputGrid, boxRadius,
+                                                           QString("LON"));
+                value = 0;
+                nGridPoints = 2 * boxRadius + 1;
+                // add values until box 2 * Radius + 1 is reached
+                for (int i = 0; i < (2 * boxRadius + 1); i++)
                 {
-                    plusValue = 0;
-                    nGridPoints--;
+                    plusValue = inputGrid->getValue(k, j, indexList[i]);
+                    if IS_MISSING(plusValue)
+                    {
+                        plusValue = 0.;
+                        nGridPoints --;
+                    }
+                    value += plusValue;
                 }
-                if (IS_MISSING(minusValue))
+                if IS_MISSING(inputGrid->getValue(k, j, 0))
                 {
-                    minusValue = 0;
+                     resultGrid->setValue(k, j, 0, M_MISSING_VALUE);
+                }
+                else
+                {
+                    resultGrid->setValue(k, j, 0, value/double(nGridPoints));
+                }
+                for (int i = 1; i < nLons; i++)
+                {
+                    iMinus = i - 1;
+                    minusValue = inputGrid->getValue(k, j, indexList[iMinus]);
+                    if IS_MISSING(minusValue)
+                    {
+                        minusValue = 0.;
+                        nGridPoints ++;
+                    }
+                    value -= minusValue;
+
+                    iPlus = i + 2 * boxRadius;
+                    plusValue = inputGrid->getValue(k, j, indexList[iPlus]);
+                    if IS_MISSING(plusValue)
+                    {
+                        plusValue = 0.;
+                        nGridPoints --;
+                    }
+                    value += plusValue;
+
+                    if IS_MISSING(inputGrid->getValue(k, j, i))
+                    {
+                         resultGrid->setValue(k, j, i, M_MISSING_VALUE);
+                    }
+                    else
+                    {
+                        resultGrid->setValue(k, j, i, value/double(nGridPoints));
+                    }
+                }
+            }
+        }
+    }
+    else if (boundaryType == MSmoothProperties::BoundaryModeTypes::NANPADDING)
+    {
+        double iarr, currentValue;
+        for (unsigned int k = 0; k < inputGrid->getNumLevels(); k++)
+        {
+            for (unsigned int j = 0; j < inputGrid->getNumLats(); j++)
+            {
+                boxRadius = latDependentBoxRadii[j];
+                value = 0.;
+                nGridPoints = 0;
+                // Adds the values until radius is reached.
+                // This is then the first value to be set on the result grid.
+                for (int i = 0; i < boxRadius; i++)
+                {
+                    plusValue = inputGrid->getValue(k, j, i);
+                    if (IS_MISSING(plusValue))
+                    {
+                        plusValue = 0.;
+                        nGridPoints--;
+                    }
+                    value += plusValue;
                     nGridPoints++;
                 }
-                value += plusValue - minusValue;
-                if (IS_MISSING(currentValue))
+                for(int i = 0; i < boxRadius + 1; i++)
                 {
-                    resultGrid->setValue(k, j, i, M_MISSING_VALUE);
+                    plusValue = inputGrid->getValue(k, j, i + boxRadius);
+                    currentValue = inputGrid->getValue(k, j, i);
+                    if (IS_MISSING(plusValue))
+                    {
+                        plusValue = 0.;
+                        nGridPoints--;
+                    }
+                    value += plusValue;
+                    nGridPoints++;
+                    if (IS_MISSING(currentValue))
+                    {
+                        resultGrid->setValue(k, j, i, M_MISSING_VALUE);
+                    }
+                    else
+                    {
+                        iarr = 1. / double(nGridPoints);
+                        resultGrid->setValue(k, j, i, value * iarr);
+                    }
                 }
-                else
+
+                for(int i = boxRadius + 1; i < (nLons - boxRadius); i++)
                 {
-                    iarr = 1. / float(nGridPoints);
-                    resultGrid->setValue(k, j, i, value * iarr);
+                    plusValue = inputGrid->getValue(k, j, i + boxRadius);
+                    minusValue = inputGrid->getValue(k, j, i - boxRadius - 1);
+                    currentValue = inputGrid->getValue(k, j, i);
+                    if (IS_MISSING(plusValue))
+                    {
+                        plusValue = 0.;
+                        nGridPoints--;
+                    }
+                    if (IS_MISSING(minusValue))
+                    {
+                        minusValue = 0.;
+                        nGridPoints++;
+                    }
+                    value += plusValue - minusValue;
+                    if (IS_MISSING(currentValue))
+                    {
+                        resultGrid->setValue(k, j, i, M_MISSING_VALUE);
+                    }
+                    else
+                    {
+                        iarr = 1. / double(nGridPoints);
+                        resultGrid->setValue(k, j, i, value * iarr);
+                    }
+                }
+
+                for(int i = (nLons - boxRadius); i < nLons; i++)
+                {
+                    minusValue = inputGrid->getValue(k, j, i - boxRadius - 1);
+                    currentValue = inputGrid->getValue(k, j, i);
+                    if (IS_MISSING(minusValue))
+                    {
+                        minusValue = 0.;
+                        nGridPoints ++;
+                    }
+                    value -= minusValue;
+                    nGridPoints--;
+                    if (IS_MISSING(currentValue))
+                    {
+                        resultGrid->setValue(k, j, i, M_MISSING_VALUE);
+                    }
+                    else
+                    {
+                        iarr = 1. / double(nGridPoints);
+                        resultGrid->setValue(k, j, i, value * iarr);
+                    }
                 }
             }
+        }
+    }
+};
 
-            for(int i = (nLon - boxRadius); i < nLon; i++)
+
+void MSmoothFilter::boxBlurLongitudinalFast(
+        const MStructuredGrid *inputGrid, MStructuredGrid *resultGrid,
+        int boxRadius, MSmoothProperties::BoundaryModeTypes boundaryType)
+{
+    double value, plusValue, minusValue;
+    int nGridPoints, iMinus, iPlus;
+    int nLons = inputGrid->getNumLons();
+//#pragma omp parallel for
+    if (boundaryType == MSmoothProperties::BoundaryModeTypes::CONSTANT)
+    {
+        for (unsigned int k = 0; k < inputGrid->getNumLevels(); k++)
+        {
+            for (unsigned int j = 0; j < inputGrid->getNumLats(); j++)
             {
-                minusValue = inputGrid->getValue(k, j, i - boxRadius - 1);
-                currentValue = inputGrid->getValue(k, j, i);
-                if (IS_MISSING(minusValue))
+                if IS_MISSING(inputGrid->getValue(k, j, 0))
                 {
-                    minusValue = 0;
-                    nGridPoints ++;
-                }
-                value -= minusValue;
-                nGridPoints--;
-                if (IS_MISSING(currentValue))
-                {
-                    resultGrid->setValue(k, j, i, M_MISSING_VALUE);
+                    nGridPoints = 0;
+                    value = 0.;
                 }
                 else
                 {
-                    iarr = 1. / float(nGridPoints);
-                    resultGrid->setValue(k, j, i, value * iarr);
+                    value = inputGrid->getValue(k, j, 0) * double(boxRadius + 1);
+                    nGridPoints = boxRadius + 1;
+                }
+                // add values until box Radius is reached
+                for(int i = 1; i < boxRadius + 1; i++)
+                {
+                    plusValue = inputGrid->getValue(k, j, i);
+                    if IS_MISSING(plusValue)
+                    {
+                        plusValue = 0.;
+                    }
+                    else
+                    {
+                        nGridPoints ++;
+                    }
+                    value += plusValue;
+                }
+                // set the first value
+                if IS_MISSING(inputGrid->getValue(k, j, 0))
+                {
+                    resultGrid->setValue(k, j, 0, M_MISSING_VALUE);
+                }
+                else
+                {
+                    resultGrid->setValue(k, j, 0, value/double(nGridPoints));
+                }
+
+                // Get and set all other values starting from index i = 1.
+                for (int i = 1; i < nLons; i++)
+                {
+                    iMinus = std::max(0, i - boxRadius - 1);
+                    minusValue = inputGrid->getValue(k, j, iMinus);
+                    if IS_MISSING(minusValue)
+                    {
+                        minusValue = 0.;
+                        nGridPoints ++;
+                    }
+                    value -= minusValue;
+
+                    iPlus = std::min(nLons - 1, i + boxRadius);
+                    plusValue = inputGrid->getValue(k, j, iPlus);
+                    if IS_MISSING(plusValue)
+                    {
+                        nGridPoints --;
+                        plusValue = 0.;
+                    }
+                    value += plusValue;
+                    if IS_MISSING(inputGrid->getValue(k, j, i))
+                    {
+                        resultGrid->setValue(k, j, i, M_MISSING_VALUE);
+                    }
+                    else
+                    {
+                        resultGrid->setValue(k, j, i, value/double(nGridPoints));
+                    }
+                }
+            }
+        }
+    }
+    else if (boundaryType == MSmoothProperties::BoundaryModeTypes::SYMMETRIC)
+    {
+        for (unsigned int k = 0; k < inputGrid->getNumLevels(); k++)
+        {
+            for (unsigned int j = 0; j < inputGrid->getNumLats(); j++)
+            {
+                QVector<int> indexList = createIndexList(inputGrid, boxRadius,
+                                                           QString("LON"));
+                value = 0;
+                nGridPoints = 2 * boxRadius + 1;
+                // add values until box 2 * Radius + 1 is reached
+                for (int i = 0; i < (2 * boxRadius + 1); i++)
+                {
+                    plusValue = inputGrid->getValue(k, j, indexList[i]);
+                    if IS_MISSING(plusValue)
+                    {
+                        plusValue = 0.;
+                        nGridPoints --;
+                    }
+                    value += plusValue;
+                }
+                if IS_MISSING(inputGrid->getValue(k, j, 0))
+                {
+                     resultGrid->setValue(k, j, 0, M_MISSING_VALUE);
+                }
+                else
+                {
+                    resultGrid->setValue(k, j, 0, value/double(nGridPoints));
+                }
+                for (int i = 1; i < nLons; i++)
+                {
+                    iMinus = i - 1;
+                    minusValue = inputGrid->getValue(k, j, indexList[iMinus]);
+                    if IS_MISSING(minusValue)
+                    {
+                        minusValue = 0.;
+                        nGridPoints ++;
+                    }
+                    value -= minusValue;
+
+                    iPlus = i + 2 * boxRadius;
+                    plusValue = inputGrid->getValue(k, j, indexList[iPlus]);
+                    if IS_MISSING(plusValue)
+                    {
+                        plusValue = 0.;
+                        nGridPoints --;
+                    }
+                    value += plusValue;
+
+                    if IS_MISSING(inputGrid->getValue(k, j, i))
+                    {
+                         resultGrid->setValue(k, j, i, M_MISSING_VALUE);
+                    }
+                    else
+                    {
+                        resultGrid->setValue(k, j, i, value/double(nGridPoints));
+                    }
+                }
+            }
+        }
+    }
+    else if (boundaryType == MSmoothProperties::BoundaryModeTypes::NANPADDING)
+    {
+        double iarr, currentValue;
+        for (unsigned int k = 0; k < inputGrid->getNumLevels(); k++)
+        {
+            for (unsigned int j = 0; j < inputGrid->getNumLats(); j++)
+            {
+                value = 0.;
+                nGridPoints = 0;
+                // Adds the values until radius is reached.
+                // This is then the first value to be set on the result grid.
+                for (int i = 0; i < boxRadius; i++)
+                {
+                    plusValue = inputGrid->getValue(k, j, i);
+                    if (IS_MISSING(plusValue))
+                    {
+                        plusValue = 0.;
+                        nGridPoints--;
+                    }
+                    value += plusValue;
+                    nGridPoints++;
+                }
+                for(int i = 0; i < boxRadius + 1; i++)
+                {
+                    plusValue = inputGrid->getValue(k, j, i + boxRadius);
+                    currentValue = inputGrid->getValue(k, j, i);
+                    if (IS_MISSING(plusValue))
+                    {
+                        plusValue = 0.;
+                        nGridPoints--;
+                    }
+                    value += plusValue;
+                    nGridPoints++;
+                    if (IS_MISSING(currentValue))
+                    {
+                        resultGrid->setValue(k, j, i, M_MISSING_VALUE);
+                    }
+                    else
+                    {
+                        iarr = 1. / double(nGridPoints);
+                        resultGrid->setValue(k, j, i, value * iarr);
+                    }
+                }
+
+                for(int i = boxRadius + 1; i < (nLons - boxRadius); i++)
+                {
+                    plusValue = inputGrid->getValue(k, j, i + boxRadius);
+                    minusValue = inputGrid->getValue(k, j, i - boxRadius - 1);
+                    currentValue = inputGrid->getValue(k, j, i);
+                    if (IS_MISSING(plusValue))
+                    {
+                        plusValue = 0.;
+                        nGridPoints--;
+                    }
+                    if (IS_MISSING(minusValue))
+                    {
+                        minusValue = 0.;
+                        nGridPoints++;
+                    }
+                    value += plusValue - minusValue;
+                    if (IS_MISSING(currentValue))
+                    {
+                        resultGrid->setValue(k, j, i, M_MISSING_VALUE);
+                    }
+                    else
+                    {
+                        iarr = 1. / double(nGridPoints);
+                        resultGrid->setValue(k, j, i, value * iarr);
+                    }
+                }
+
+                for(int i = (nLons - boxRadius); i < nLons; i++)
+                {
+                    minusValue = inputGrid->getValue(k, j, i - boxRadius - 1);
+                    currentValue = inputGrid->getValue(k, j, i);
+                    if (IS_MISSING(minusValue))
+                    {
+                        minusValue = 0.;
+                        nGridPoints ++;
+                    }
+                    value -= minusValue;
+                    nGridPoints--;
+                    if (IS_MISSING(currentValue))
+                    {
+                        resultGrid->setValue(k, j, i, M_MISSING_VALUE);
+                    }
+                    else
+                    {
+                        iarr = 1. / double(nGridPoints);
+                        resultGrid->setValue(k, j, i, value * iarr);
+                    }
                 }
             }
         }
@@ -544,104 +1072,310 @@ void MSmoothFilter::boxBlurLongitudinalFast(
 
 void MSmoothFilter::boxBlurLatitudinalFast(
         const MStructuredGrid *inputGrid, MStructuredGrid *resultGrid,
-        int boxRadius)
+        int boxRadius, MSmoothProperties::BoundaryModeTypes boundaryType)
 {
-    const unsigned int nlat = inputGrid->getNumLats();
-    int nGridPoints;
-    float value, currentValue, iarr, minusValue = 0.0, plusValue = 0.0;
+    double value, plusValue, minusValue;
+    int nGridPoints, jMinus, jPlus;
+    int nLats = inputGrid->getNumLats();
 //#pragma omp parallel for
-    for (unsigned int k = 0; k < inputGrid->getNumLevels(); k++)
+    if (boundaryType == MSmoothProperties::BoundaryModeTypes::CONSTANT)
     {
-        for (unsigned int i = 0; i < inputGrid->getNumLons(); i++)
+        for (unsigned int k = 0; k < inputGrid->getNumLevels(); k++)
         {
-            value = 0;
-            nGridPoints = 0;
-            // Adds the values until radius is reached.
-            // This is then the first value to be set on the result grid.
-            for (int j = 0; j < boxRadius; j++)
+            for (unsigned int i = 0; i < inputGrid->getNumLons(); i++)
             {
-                plusValue = inputGrid->getValue(k, j, i);
-                if (IS_MISSING(plusValue))
+                if IS_MISSING(inputGrid->getValue(k, 0, i))
                 {
-                    plusValue = 0;
-                    nGridPoints --;
+                    nGridPoints = 0;
+                    value = 0.;
                 }
-                value += plusValue;
-                nGridPoints++;
-            }
+                else
+                {
+                    value = inputGrid->getValue(k, 0, i) * double(boxRadius + 1);
+                    nGridPoints = boxRadius + 1;
+                }
+                // add values until box Radius is reached
+                for(int j = 1; j < boxRadius + 1; j++)
+                {
+                    plusValue = inputGrid->getValue(k, j, i);
+                    if IS_MISSING(plusValue)
+                    {
+                        plusValue = 0.;
+                    }
+                    else
+                    {
+                        nGridPoints ++;
+                    }
+                    value += plusValue;
+                }
+                // set the first value
+                if IS_MISSING(inputGrid->getValue(k, 0, i))
+                {
+                    resultGrid->setValue(k, 0, i, M_MISSING_VALUE);
+                }
+                else
+                {
+                    resultGrid->setValue(k, 0, i, value/double(nGridPoints));
+                }
 
-            for(int j = 0; j < boxRadius + 1; j++)
-            {
-                plusValue = inputGrid->getValue(k, j + boxRadius, i);
-                currentValue = inputGrid->getValue(k, j, i);
-                if (IS_MISSING(plusValue))
+                // Get and set all other values starting from index j = 1.
+                for (int j = 1; j < nLats; j++)
                 {
-                    plusValue = 0;
-                    nGridPoints --;
-                }
-                value += plusValue;
-                nGridPoints++;
-                if (IS_MISSING(currentValue))
-                {
-                    resultGrid->setValue(k, j, i, M_MISSING_VALUE);
-                }
-                else
-                {
-                    iarr = 1. / float(nGridPoints);
-                    resultGrid->setValue(k, j, i, value * iarr);
-                }
-            }
-            for(unsigned int j = boxRadius + 1; j < (nlat - boxRadius); j++)
-            {
-                plusValue = inputGrid->getValue(k, j + boxRadius, i);
-                minusValue = inputGrid->getValue(k, j - boxRadius - 1, i);
-                currentValue = inputGrid->getValue(k, j, i);
-                if (IS_MISSING(plusValue))
-                {
-                    plusValue = 0;
-                    nGridPoints --;
-                }
-                if (IS_MISSING(minusValue))
-                {
-                    minusValue = 0;
-                    nGridPoints ++;
-                }
-                value += plusValue - minusValue;
-                if (IS_MISSING(currentValue))
-                {
-                    resultGrid->setValue(k, j, i, M_MISSING_VALUE);
-                }
-                else
-                {
-                    iarr = 1. / float(nGridPoints);
-                    resultGrid->setValue(k, j, i, value * iarr);
+                    jMinus = std::max(0, j - boxRadius - 1);
+                    minusValue = inputGrid->getValue(k, jMinus, i);
+                    if IS_MISSING(minusValue)
+                    {
+                        minusValue = 0.;
+                        nGridPoints ++;
+                    }
+                    value -= minusValue;
+
+                    jPlus = std::min(nLats - 1, j + boxRadius);
+                    plusValue = inputGrid->getValue(k, jPlus, i);
+                    if IS_MISSING(plusValue)
+                    {
+                        nGridPoints --;
+                        plusValue = 0.;
+                    }
+                    value += plusValue;
+                    if IS_MISSING(inputGrid->getValue(k, j, i))
+                    {
+                        resultGrid->setValue(k, j, i, M_MISSING_VALUE);
+                    }
+                    else
+                    {
+                        resultGrid->setValue(k, j, i, value/double(nGridPoints));
+                    }
                 }
             }
-            for(unsigned int j = (nlat - boxRadius); j < nlat; j++)
+        }
+    }
+    else if (boundaryType == MSmoothProperties::BoundaryModeTypes::SYMMETRIC)
+    {
+        for (unsigned int k = 0; k < inputGrid->getNumLevels(); k++)
+        {
+            for (unsigned int i = 0; i < inputGrid->getNumLons(); i++)
             {
-                minusValue = inputGrid->getValue(k, j - boxRadius - 1, i);
-                currentValue = inputGrid->getValue(k, j, i);
-                if (IS_MISSING(minusValue))
+                QVector<int> indexList = createIndexList(inputGrid, boxRadius,
+                                                           QString("LAT"));
+                value = 0;
+                nGridPoints = 2 * boxRadius + 1;
+                // add values until box Radius + 1 is reached
+                for (int j = 0; j < (2 * boxRadius + 1); j++)
                 {
-                    minusValue = 0;
-                    nGridPoints ++;
+                    plusValue = inputGrid->getValue(k, indexList[j], i);
+                    if IS_MISSING(plusValue)
+                    {
+                        plusValue = 0.;
+                        nGridPoints --;
+                    }
+                    value += plusValue;
                 }
-                value -= minusValue;
-                nGridPoints--;
-                if (IS_MISSING(currentValue))
+                if IS_MISSING(inputGrid->getValue(k, 0, i))
                 {
-                    resultGrid->setValue(k, j, i, M_MISSING_VALUE);
+                     resultGrid->setValue(k, 0, i, M_MISSING_VALUE);
                 }
                 else
                 {
-                    iarr = 1. / float(nGridPoints);
-                    resultGrid->setValue(k, j, i, value * iarr);
+                    resultGrid->setValue(k, 0, i, value/double(nGridPoints));
+                }
+                for (int j = 1; j < nLats; j++)
+                {
+                    jMinus = j - 1;
+                    minusValue = inputGrid->getValue(k, indexList[jMinus], i);
+                    if IS_MISSING(minusValue)
+                    {
+                        minusValue = 0.;
+                        nGridPoints ++;
+                    }
+                    value -= minusValue;
+
+                    jPlus = j + 2 * boxRadius;
+                    plusValue = inputGrid->getValue(k, indexList[jPlus], i);
+                    if IS_MISSING(plusValue)
+                    {
+                        plusValue = 0.;
+                        nGridPoints --;
+                    }
+                    value += plusValue;
+
+                    if IS_MISSING(inputGrid->getValue(k, j, i))
+                    {
+                         resultGrid->setValue(k, j, i, M_MISSING_VALUE);
+                    }
+                    else
+                    {
+                        resultGrid->setValue(k, j, i, value/double(nGridPoints));
+                    }
+                }
+            }
+        }
+    }
+    else if (boundaryType == MSmoothProperties::BoundaryModeTypes::NANPADDING)
+    {
+        double iarr, currentValue;
+        for (unsigned int k = 0; k < inputGrid->getNumLevels(); k++)
+        {
+            for (unsigned int i = 0; i < inputGrid->getNumLons(); i++)
+            {
+                value = 0.;
+                nGridPoints = 0;
+                // Adds the values until radius is reached.
+                // This is then the first value to be set on the result grid.
+                for (int j = 0; j < boxRadius; j++)
+                {
+                    plusValue = inputGrid->getValue(k, j, i);
+                    if (IS_MISSING(plusValue))
+                    {
+                        plusValue = 0.;
+                        nGridPoints--;
+                    }
+                    value += plusValue;
+                    nGridPoints++;
+                }
+                for(int j = 0; j < boxRadius + 1; j++)
+                {
+                    plusValue = inputGrid->getValue(k, j + boxRadius, i);
+                    currentValue = inputGrid->getValue(k, j, i);
+                    if (IS_MISSING(plusValue))
+                    {
+                        plusValue = 0.;
+                        nGridPoints--;
+                    }
+                    value += plusValue;
+                    nGridPoints++;
+                    if (IS_MISSING(currentValue))
+                    {
+                        resultGrid->setValue(k, j, i, M_MISSING_VALUE);
+                    }
+                    else
+                    {
+                        iarr = 1. / double(nGridPoints);
+                        resultGrid->setValue(k, j, i, value * iarr);
+                    }
+                }
+
+                for(int j = boxRadius + 1; j < (nLats - boxRadius); j++)
+                {
+                    plusValue = inputGrid->getValue(k, j + boxRadius, i);
+                    minusValue = inputGrid->getValue(k, j - boxRadius - 1, i);
+                    currentValue = inputGrid->getValue(k, j, i);
+                    if (IS_MISSING(plusValue))
+                    {
+                        plusValue = 0.;
+                        nGridPoints--;
+                    }
+                    if (IS_MISSING(minusValue))
+                    {
+                        minusValue = 0.;
+                        nGridPoints++;
+                    }
+                    value += plusValue - minusValue;
+                    if (IS_MISSING(currentValue))
+                    {
+                        resultGrid->setValue(k, j, i, M_MISSING_VALUE);
+                    }
+                    else
+                    {
+                        iarr = 1. / static_cast<double>(nGridPoints);
+                        resultGrid->setValue(k, j, i, value * iarr);
+                    }
+                }
+
+                for(int j = (nLats - boxRadius); j < nLats; j++)
+                {
+                    minusValue = inputGrid->getValue(k, j - boxRadius - 1, i);
+                    currentValue = inputGrid->getValue(k, j, i);
+                    if (IS_MISSING(minusValue))
+                    {
+                        minusValue = 0.;
+                        nGridPoints ++;
+                    }
+                    value -= minusValue;
+                    nGridPoints--;
+                    if (IS_MISSING(currentValue))
+                    {
+                        resultGrid->setValue(k, j, i, M_MISSING_VALUE);
+                    }
+                    else
+                    {
+                        iarr = 1. / float(nGridPoints);
+                        resultGrid->setValue(k, j, i, value * iarr);
+                    }
                 }
             }
         }
     }
 };
 
+
+QVector<int> MSmoothFilter::createIndexList(const MStructuredGrid *inputGrid,
+                                    int boxRadius, QString dir)
+{
+    int size;
+    if (dir == "LON")
+    {
+        size = inputGrid->getNumLons();
+    }
+    else if (dir == "LAT")
+    {
+        size = inputGrid->getNumLats();
+    }
+    else
+    {
+        size = 0;
+    }
+
+    QVector<int> indexList;
+    for (int i = boxRadius - 1; i > -1; i--)
+    {
+        indexList.push_back(i);
+    }
+    for (int i = 0; i < size; i ++)
+    {
+        indexList.push_back(i);
+    }
+    for (int i = size - 1; i > size - boxRadius - 1; i--)
+    {
+        indexList.push_back(i);
+    }
+    return indexList;
+}
+
+void MSmoothFilter::boxBlurTotalSlow(const MStructuredGrid *inputGrid,
+                                     MStructuredGrid *resultGrid, int boxRadius)
+{
+    // No missing value handling!
+    // Same result as boxBlurTotalFast with constant boundaries.
+    int nLat = inputGrid->getNumLats();
+    int nLon = inputGrid->getNumLons();
+//#pragma omp parallel for
+    for (unsigned int k = 0; k < inputGrid->getNumLevels(); k++)
+    {
+        for (int j = 0; j < nLat; j++)
+        {
+            for (int i = 0; i < nLon; i++)
+            {
+                float value = 0;
+                for(int iy = j - boxRadius; iy <= j + boxRadius; iy++)
+                {
+                    for(int ix = i - boxRadius; ix <= i + boxRadius; ix++)
+                    {
+                        int x = min(nLon - 1, max(0, ix));
+                        int y = min(nLat - 1, max(0, iy));
+                        value += inputGrid->getValue(k, y, x);
+                    }
+                }
+                resultGrid->setValue(k, j, i,
+                                     (value / ((2 * float(boxRadius) + 1)
+                                               * (2 * float(boxRadius) + 1))));
+            }
+        }
+    }
+};
+
+
+//*************************** UNIFORM WEIGHTED SMOOTHING ***********************
 
 void MSmoothFilter::computeHorizontalUniformWeightedSmoothing_GCGridpoints(
         const MStructuredGrid *inputGrid, MStructuredGrid *resultGrid,
@@ -698,275 +1432,5 @@ void MSmoothFilter::computeHorizontalUniformWeightedSmoothing_GCGridpoints(
         }
     }
  };
-
-
-void MSmoothFilter::computeHorizontalGaussianSmoothing_GCGridpoints(
-        const MStructuredGrid *inputGrid, MStructuredGrid *resultGrid,
-        int stdDev_gp)
-{
-    const unsigned int nlon = inputGrid->getNumLons();
-    const unsigned int nlat = inputGrid->getNumLats();
-    const float radius = 2. * pow(float(stdDev_gp), 2.);
-    //Significant radius, all grid points within the 99% quantile
-    //of a Gaussian distribution are considered. The 99% quantile is the
-    //result of the standard deviation multiplied by 2.576. For more
-    //information see: https://en.wikipedia.org/wiki/Normal_distribution
-    const int sigRadius = ceil(float(stdDev_gp) * 2.576);
-    int squaredDistance;
-    float weight, currentValue, totalValue, addValue, weightSum;
-//#pragma omp parallel for
-    for (unsigned int k = 0; k < inputGrid->getNumLevels(); ++k)
-        {
-        for (unsigned int j = 0; j < nlat; ++j)
-        {
-            for (unsigned int i = 0; i < nlon; ++i)
-            {
-                currentValue = inputGrid->getValue(k, j, i);
-                if (IS_MISSING(currentValue))
-                {
-                    resultGrid->setValue(k, j, i, M_MISSING_VALUE);
-                }
-                else
-                {
-                    totalValue = 0;
-                    weightSum = 0;
-                    int west = max(0, static_cast<int>(i) - sigRadius);
-                    int east = min(static_cast<int>(nlon), static_cast<int>(i)
-                                    + sigRadius);
-                    int south = max(0, static_cast<int>(j) - sigRadius);
-                    int north = min(static_cast<int>(nlat), static_cast<int>(j)
-                                    + sigRadius);
-                    for(int n = south; n < north; n++)
-                    {
-                        for(int m = west; m < east; m++)
-                        {
-                            addValue = inputGrid->getValue(k, n, m);
-                            if (!IS_MISSING(addValue))
-                            {
-                                squaredDistance = (n - j) * (n - j) + (m - i) * (m - i);
-                                weight = exp(-squaredDistance / radius)
-                                        / (M_PI * radius);
-                                totalValue += addValue * weight;
-                                weightSum += weight;
-                            }
-                        }
-                    }
-                    resultGrid->setValue(k, j, i, (totalValue / weightSum));
-                }
-            }
-        }
-    }
-};
-
-
-QVector<int> MSmoothFilter::computeBoxRadii(int stdDev_gp, int n)
-{
-    QVector<int> boxRadii(n);
-    // Ideal averaging filter width.
-    float widthIdeal = sqrt((12. * pow(stdDev_gp, 2.) / float(n)) + 1.);
-    // Filter width rounded to nearest odd integer less than widthIdeal.
-    int widthIdealLess = floor(widthIdeal);
-    if ((widthIdealLess % 2) == 0)
-    {
-        widthIdealLess--;
-    }
-    // Check if widthIdealLess is odd.
-    int widthIdealUp = widthIdealLess + 2;
-    // mIdeal determines at which pass the nearest odd integer width is higher
-    // than the ideal width should be used. This should compensate the
-    // rounding in the first place to the nearest integer less than
-    // the ideal width.
-    float mIdeal = (12. * pow(stdDev_gp, 2.) - n
-                    * pow(float(widthIdealLess), 2.) - 4.
-                    * float(n) * widthIdealLess - 3. * float(n))
-            / (-4. * float(widthIdealLess) - 4.);
-    int m = round(mIdeal);
-    for (int i = 0; i < n; i++)
-    {
-        if (i < m)
-        {
-            boxRadii[i] = (widthIdealLess - 1) / 2;
-        }
-        else
-        {
-            boxRadii[i] = (widthIdealUp - 1) / 2;
-        }
-    }
-    return boxRadii;
-};
-
-
-void MSmoothFilter::boxBlurTotalSlow(const MStructuredGrid *inputGrid,
-                                     MStructuredGrid *resultGrid, int boxRadius)
-{
-    // no missing value handling!
-    // same result as boxBlurTotalFast, but with missing value handling
-    int nLat = inputGrid->getNumLats();
-    int nLon = inputGrid->getNumLons();
-//#pragma omp parallel for
-    for (unsigned int k = 0; k < inputGrid->getNumLevels(); k++)
-    {
-        for (int j = 0; j < nLat; j++)
-        {
-            for (int i = 0; i < nLon; i++)
-            {
-                float value = 0;
-                for(int iy = j - boxRadius; iy <= j + boxRadius; iy++)
-                {
-                    for(int ix = i - boxRadius; ix <= i + boxRadius; ix++)
-                    {
-                        int x = min(nLon - 1, max(0, ix));
-                        int y = min(nLat - 1, max(0, iy));
-                        value += inputGrid->getValue(k, y, x);
-                    }
-                }
-                resultGrid->setValue(k, j, i,
-                                     (value / ((2 * float(boxRadius) + 1)
-                                               * (2 * float(boxRadius) + 1))));
-            }
-        }
-    }
-};
-
-
-void MSmoothFilter::computeHorizontalBoxBlurSmoothing_GCGridpointsSlow(
-        const MStructuredGrid *inputGrid, MStructuredGrid *resultGrid,
-        int stdDev_gp)
-{
-    QVector<int> boxRadii = computeBoxRadii(stdDev_gp, 3);
-    MStructuredGrid *resultGridTemp = nullptr;
-    resultGridTemp = createAndInitializeResultGrid(resultGrid);
-    boxBlurTotalSlow(inputGrid, resultGrid, boxRadii[0]);
-    boxBlurTotalSlow(resultGrid, resultGridTemp, boxRadii[1]);
-    boxBlurTotalSlow(resultGridTemp, resultGrid, boxRadii[2]);
-    delete resultGridTemp;
- };
-
-
-void MSmoothFilter::computeHorizontalBoxBlurSmoothing_GCGridpointsFast(
-        const MStructuredGrid *inputGrid, MStructuredGrid *resultGrid,
-        int stdDev_gp)
-{
-    QVector<int> boxRadii = computeBoxRadii(stdDev_gp, 3);
-    MStructuredGrid *resultGridTemp = nullptr;
-    resultGridTemp = createAndInitializeResultGrid(resultGrid);
-    boxBlurTotalFast(inputGrid, resultGrid, boxRadii[0]);
-    boxBlurTotalFast(resultGrid, resultGridTemp, boxRadii[1]);
-    boxBlurTotalFast(resultGridTemp, resultGrid, boxRadii[2]);
-    delete resultGridTemp;
- };
-
-
-void MSmoothFilter::boxBlurTotalFast(const MStructuredGrid *inputGrid,
-                                     MStructuredGrid *resultGrid, int boxRadius)
-{
-    MStructuredGrid *resultGridTemp = nullptr;
-    resultGridTemp = createAndInitializeResultGrid(resultGrid);
-    boxBlurLongitudinalFast(inputGrid, resultGridTemp, boxRadius);
-    boxBlurLatitudinalFast(resultGridTemp, resultGrid, boxRadius);
-    delete resultGridTemp;
-};
-
-
-void MSmoothFilter::boxBlurLongitudinalFast(const MStructuredGrid *inputGrid,
-                                 MStructuredGrid *resultGrid, int boxRadius)
-{
-    int nGridPoints;;
-    int nLon = inputGrid->getNumLons();
-    float iarr, value, currentValue, minusValue = 0.0, plusValue = 0.0;
-//#pragma omp parallel for
-    for (unsigned int k = 0; k < inputGrid->getNumLevels(); k++)
-    {
-        for (unsigned int j = 0; j < inputGrid->getNumLats(); j++)
-        {
-            value = 0;
-            nGridPoints = 0;
-            // Adds the values until radius is reached.
-            // This is then the first value to be set on the result grid.
-            for (int i = 0; i < boxRadius; i++)
-            {
-                plusValue = inputGrid->getValue(k, j, i);
-                if (IS_MISSING(plusValue))
-                {
-                    plusValue = 0;
-                    nGridPoints --;
-                }
-                value += plusValue;
-                nGridPoints++;
-            }
-
-            for(int i = 0; i < boxRadius + 1; i++)
-            {
-                plusValue = inputGrid->getValue(k, j, i + boxRadius);
-                currentValue = inputGrid->getValue(k, j, i);
-                if (IS_MISSING(plusValue))
-                {
-                    plusValue = 0;
-                    nGridPoints --;
-                }
-                value += plusValue;
-                nGridPoints++;
-                if (IS_MISSING(currentValue))
-                {
-                    resultGrid->setValue(k, j, i, M_MISSING_VALUE);
-                }
-                else
-                {
-                    iarr = 1. / float(nGridPoints);
-                    resultGrid->setValue(k, j, i, value * iarr);
-                }
-            }
-
-            for(int i = boxRadius + 1; i < (nLon - boxRadius); i++)
-            {
-                plusValue = inputGrid->getValue(k, j, i + boxRadius);
-                minusValue = inputGrid->getValue(k, j, i - boxRadius - 1);
-                currentValue = inputGrid->getValue(k, j, i);
-                if (IS_MISSING(plusValue))
-                {
-                    plusValue = 0;
-                    nGridPoints --;
-                }
-                if (IS_MISSING(minusValue))
-                {
-                    minusValue = 0;
-                    nGridPoints ++;
-                }
-                value += plusValue - minusValue;
-                if (IS_MISSING(currentValue))
-                {
-                    resultGrid->setValue(k, j, i, M_MISSING_VALUE);
-                }
-                else
-                {
-                    iarr = 1. / float(nGridPoints);
-                    resultGrid->setValue(k, j, i, value * iarr);
-                }
-            }
-
-            for(int i = (nLon - boxRadius); i < nLon; i++)
-            {
-                minusValue = inputGrid->getValue(k, j, i - boxRadius - 1);
-                currentValue = inputGrid->getValue(k, j, i);
-                if (IS_MISSING(minusValue))
-                {
-                    minusValue = 0;
-                    nGridPoints ++;
-                }
-                value -= minusValue;
-                nGridPoints--;
-                if (IS_MISSING(currentValue))
-                {
-                    resultGrid->setValue(k, j, i, M_MISSING_VALUE);
-                }
-                else
-                {
-                    iarr = 1. / float(nGridPoints);
-                    resultGrid->setValue(k, j, i, value * iarr);
-                }
-            }
-        }
-    }
-};
 
 }  // namespace Met3D
