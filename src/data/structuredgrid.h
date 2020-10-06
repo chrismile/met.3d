@@ -586,6 +586,8 @@ public:
     float getDeltaLonInKm(const int iLat) const;
     float getDeltaLatInKm() const;
 
+    MVerticalLevelType getVerticalLevelType() { return leveltype; }
+
 protected:
     friend class MClimateForecastReader; // NetCDF can read directly into data
                                          // fields.
@@ -756,7 +758,22 @@ public:
 
     unsigned int getMemorySize_kb();
 
+    /**
+      Returns a pointer to the surface pressure grid associated with this
+      hybrid sigma-pressure levels grid object.
+      @note This method does NOT increase the reference count of the surface
+      pressure field in the memory manager, hence does not need to be released.
+     */
     MRegularLonLatGrid* getSurfacePressureGrid() { return surfacePressure; }
+
+    /**
+      Exchanges the associated surface pressure field with
+      @p newSfcPressureGrid.
+      @note If the new field is memory managed (should almost always be the
+      case), the reference counter needs to be increased before the field is
+      passed to this method! See, e.g., use in @ref MSmoothFilter::produceData().
+     */
+    void exchangeSurfacePressureGrid(MRegularLonLatGrid* newSfcPressureGrid);
 
     GL::MTexture* getHybridCoeffTexture(QGLWidget *currentGLContext = nullptr);
 
@@ -833,6 +850,12 @@ protected:
     QString getPressureTexCoordID();
 
 private:
+    /**
+      Releases (if memory managed) or deletes the current surface pressure
+      field.
+     */
+    void removeSurfacePressureField();
+
     QString pressureTexCoordID;
     double cachedTopDataVolumePressure_hPa;
     double cachedBottomDataVolumePressure_hPa;
@@ -849,6 +872,15 @@ public:
 
     MLonLatAuxiliaryPressureGrid* getAuxiliaryPressureFieldGrid()
     { return auxPressureField_hPa; }
+
+    /**
+      Exchanges the associated surface pressure field with
+      @p newSfcPressureGrid.
+      @note If the new field is memory managed (should almost always be the
+      case), the reference counter needs to be increased before the field is
+      passed to this method! See, e.g., use in @ref MSmoothFilter::produceData().
+     */
+    void exchangeAuxiliaryPressureGrid(MLonLatAuxiliaryPressureGrid* newAuxPGrid);
 
     float interpolateGridColumnToPressure(unsigned int j, unsigned int i,
                                           float p_hPa);
@@ -891,6 +923,8 @@ protected:
     bool reverseLevels;
 
 private:
+    void removeAuxiliaryPressureField();
+
     double cachedTopDataVolumePressure_hPa;
     double cachedBottomDataVolumePressure_hPa;
 };

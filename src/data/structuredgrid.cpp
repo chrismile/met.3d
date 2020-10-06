@@ -1589,21 +1589,7 @@ MLonLatHybridSigmaPressureGrid::MLonLatHybridSigmaPressureGrid(
 
 MLonLatHybridSigmaPressureGrid::~MLonLatHybridSigmaPressureGrid()
 {
-    if (surfacePressure)
-    {
-        // Release surface pressure field if it has been registered to a memory
-        // manager otherwise delete it.
-        if (surfacePressure->getMemoryManager())
-        {
-            LOG4CPLUS_TRACE(mlog, "Releasing psfc of request "
-                            << getGeneratingRequest().toStdString());
-            surfacePressure->getMemoryManager()->releaseData(surfacePressure);
-        }
-        else
-        {
-            delete surfacePressure;
-        }
-    }
+    removeSurfacePressureField();
 
     MGLResourcesManager::getInstance()->releaseAllGPUItemReferences(akbkID);
 
@@ -1626,6 +1612,17 @@ unsigned int MLonLatHybridSigmaPressureGrid::getMemorySize_kb()
                 + (nlevs * 2) * sizeof(double) // ak, bk
                 + ((nlevs+1) * 2) * sizeof(double) // aki, bki
                 ) / 1024.;
+}
+
+
+void MLonLatHybridSigmaPressureGrid::exchangeSurfacePressureGrid(
+        MRegularLonLatGrid *newSfcPressureGrid)
+{
+    if (newSfcPressureGrid != nullptr)
+    {
+        removeSurfacePressureField();
+        surfacePressure = newSfcPressureGrid;
+    }
 }
 
 
@@ -2130,6 +2127,26 @@ QString MLonLatHybridSigmaPressureGrid::getPressureTexCoordID()
 }
 
 
+void MLonLatHybridSigmaPressureGrid::removeSurfacePressureField()
+{
+    if (surfacePressure)
+    {
+        // Release surface pressure field if it has been registered to a memory
+        // manager otherwise delete it.
+        if (surfacePressure->getMemoryManager())
+        {
+            LOG4CPLUS_TRACE(mlog, "Releasing psfc of request "
+                            << getGeneratingRequest().toStdString());
+            surfacePressure->getMemoryManager()->releaseData(surfacePressure);
+        }
+        else
+        {
+            delete surfacePressure;
+        }
+    }
+}
+
+
 /******************************************************************************
 *******************************************************************************/
 /******************************************************************************
@@ -2155,26 +2172,17 @@ MLonLatAuxiliaryPressureGrid::MLonLatAuxiliaryPressureGrid(
 
 MLonLatAuxiliaryPressureGrid::~MLonLatAuxiliaryPressureGrid()
 {
-    // If the pressure field was set by the friend class
-    // MWeatherPredictionReader, the field was stored in the same memory
-    // manager as this item. If this item is deleted from the memory manager,
-    // release the pressure field.
-    // If this grid is not registered with any memory manager simply delete
-    // the pressure field grid.
-    // Special case: Since the pressure field is connected to itself, don't
-    // release it again.
-    if (auxPressureField_hPa && auxPressureField_hPa != this)
+    removeAuxiliaryPressureField();
+}
+
+
+void MLonLatAuxiliaryPressureGrid::exchangeAuxiliaryPressureGrid(
+        MLonLatAuxiliaryPressureGrid *newAuxPGrid)
+{
+    if (newAuxPGrid != nullptr)
     {
-        if (auxPressureField_hPa->getMemoryManager())
-        {
-            LOG4CPLUS_TRACE(mlog, "Releasing pressure field of request "
-                            << getGeneratingRequest().toStdString());
-            auxPressureField_hPa->getMemoryManager()->releaseData(auxPressureField_hPa);
-        }
-        else
-        {
-            delete auxPressureField_hPa;
-        }
+        removeAuxiliaryPressureField();
+        auxPressureField_hPa = newAuxPGrid;
     }
 }
 
@@ -2373,6 +2381,32 @@ void MLonLatAuxiliaryPressureGrid::dumpGridData(unsigned int maxValues)
     str += "\n\nend data\n====================\n";
 
     LOG4CPLUS_INFO(mlog, str.toStdString());
+}
+
+
+void MLonLatAuxiliaryPressureGrid::removeAuxiliaryPressureField()
+{
+    // If the pressure field was set by the friend class
+    // MWeatherPredictionReader, the field was stored in the same memory
+    // manager as this item. If this item is deleted from the memory manager,
+    // release the pressure field.
+    // If this grid is not registered with any memory manager simply delete
+    // the pressure field grid.
+    // Special case: Since the pressure field is connected to itself, don't
+    // release it again.
+    if (auxPressureField_hPa && auxPressureField_hPa != this)
+    {
+        if (auxPressureField_hPa->getMemoryManager())
+        {
+            LOG4CPLUS_TRACE(mlog, "Releasing aux pressure field of request "
+                            << getGeneratingRequest().toStdString());
+            auxPressureField_hPa->getMemoryManager()->releaseData(auxPressureField_hPa);
+        }
+        else
+        {
+            delete auxPressureField_hPa;
+        }
+    }
 }
 
 

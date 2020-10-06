@@ -180,6 +180,7 @@ MProcessingWeatherPredictionDataSource::createAndInitializeResultGrid(
                                   "for request %1 should have been in "
                                   "cache.").arg(
                         auxresult->auxPressureField_hPa->getGeneratingRequest());
+            LOG4CPLUS_ERROR(mlog, msg.toStdString());
             throw MMemoryError(msg.toStdString(), __FILE__, __LINE__);
         }
     } // grid is auxiliary pressure 3D

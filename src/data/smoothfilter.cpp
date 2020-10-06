@@ -64,37 +64,143 @@ MStructuredGrid *MSmoothFilter::produceData(MDataRequest request)
 
     MDataRequestHelper rh(request);
 
-    // Parse request.
+    // Parse request and initialize result grids.
+    // ==========================================
     // "SMOOTH" = Filter type / std deviation (km) / std deviation (grid points)
     // filter type is uniform weights, std deviation is interpreted as radius.
-    QStringList parameterList = rh.value("SMOOTH").split("/");
+    QString smoothParameter = rh.value("SMOOTH");
+    QStringList parameterList = smoothParameter.split("/");
     rh.removeAll(locallyRequiredKeys());
     // The first parameter passes the filter type.
     MSmoothProperties::SmoothModeTypes filterType =
             static_cast<MSmoothProperties::SmoothModeTypes>(
                 parameterList[0].toInt());
 
-
     MStructuredGrid *result = nullptr;
-
     MStructuredGrid* inputGrid = inputSource->getData(rh.request());
     result = createAndInitializeResultGrid(inputGrid);
+
+    MStructuredGrid *smoothedSfcAuxGrid = nullptr;
+    MStructuredGrid *sfcAuxInputGrid = nullptr;
+
     QString smoothModeName = MSmoothProperties::smoothModeToString(filterType);
-    LOG4CPLUS_DEBUG(mlog, "Smooth filter: computing "
-                    << smoothModeName.toUtf8().constData());
+    LOG4CPLUS_DEBUG(mlog, "Smooth filter: computing smoothed data fields using "
+                    << "method " << smoothModeName.toStdString()
+                    << "...");
 
-    MSmoothProperties::BoundaryModeTypes boundaryType =
-            static_cast<MSmoothProperties::BoundaryModeTypes>(
-                parameterList[3].toInt());
+    // For hybrid-sigma-pressure and aux-pressure grids, we also need to
+    // smooth the surface pressure or aux pressure field. Since these can be
+    // shared between multiple grid objects, check if the smoothed field
+    // already is under memory mangement (i.e., has already been computed
+    // previously). If not, compute and store.
+    MDataRequest smoothedSfcAuxRequest;
+    bool smoothedSfcAuxFieldNeedsToBeComputed = false;
+    if ((result->getVerticalLevelType() == HYBRID_SIGMA_PRESSURE_3D)
+            || (result->getVerticalLevelType() == AUXILIARY_PRESSURE_3D))
+    {
+        // Obtain pointer to input sfc/aux grid.
+        switch (inputGrid->getVerticalLevelType())
+        {
+        case HYBRID_SIGMA_PRESSURE_3D:
+            sfcAuxInputGrid =
+                    dynamic_cast<MLonLatHybridSigmaPressureGrid*>(inputGrid)
+                    ->getSurfacePressureGrid(); // does not increase ref count
+            break;
+        case AUXILIARY_PRESSURE_3D:
+            sfcAuxInputGrid =
+                    dynamic_cast<MLonLatAuxiliaryPressureGrid*>(inputGrid)
+                    ->getAuxiliaryPressureFieldGrid(); // does not incr. ref c.
+            break;
+        default:
+            break;
+        }
 
+        // Construct request for smoothed surface pressure field.
+        MDataRequestHelper smoothedSfcAuxReqHelp(
+                    sfcAuxInputGrid->getGeneratingRequest());
+        smoothedSfcAuxReqHelp.insert("SMOOTH", smoothParameter);
+        smoothedSfcAuxRequest = smoothedSfcAuxReqHelp.request();
+
+        // Find out whether the sfc pressure field with the required request
+        // has already been computed and thus is available in the memory manager,
+        // or whether it needs to be computed.
+        if (memoryManager->containsData(this, smoothedSfcAuxRequest))
+        {
+            LOG4CPLUS_DEBUG(mlog, "Smooth filter: required sfc/aux-p field "
+                            << "is available in cache.");
+
+            // containsData() increases the item's reference count, hence
+            // get the data item (i.e. the sfc/aux pressure field) and
+            // exchange it in the result grid.
+            if (MLonLatHybridSigmaPressureGrid *hybridResult =
+                    dynamic_cast<MLonLatHybridSigmaPressureGrid*>(result))
+            {
+                hybridResult->exchangeSurfacePressureGrid(
+                            static_cast<MRegularLonLatGrid*>(
+                                memoryManager->getData(
+                                    this, smoothedSfcAuxRequest)));
+            }
+            else if (MLonLatAuxiliaryPressureGrid *auxPResult =
+                     dynamic_cast<MLonLatAuxiliaryPressureGrid*>(result))
+            {
+                auxPResult->exchangeAuxiliaryPressureGrid(
+                            static_cast<MLonLatAuxiliaryPressureGrid*>(
+                                memoryManager->getData(
+                                    this, smoothedSfcAuxRequest)));
+            }
+        }
+        else
+        {
+            LOG4CPLUS_DEBUG(mlog, "Smooth filter: required sfc/aux-p field "
+                            << "needs to be computed.");
+
+            smoothedSfcAuxFieldNeedsToBeComputed = true;
+
+            // Initialize new smoothed surface pressure or aux pressure field.
+            switch (result->getVerticalLevelType())
+            {
+            case HYBRID_SIGMA_PRESSURE_3D:
+                smoothedSfcAuxGrid = createAndInitializeResultGrid(
+                            dynamic_cast<MLonLatHybridSigmaPressureGrid*>(result)
+                            ->getSurfacePressureGrid());
+                break;
+            case AUXILIARY_PRESSURE_3D:
+                smoothedSfcAuxGrid = createAndInitializeResultGrid(
+                            dynamic_cast<MLonLatAuxiliaryPressureGrid*>(result)
+                            ->getAuxiliaryPressureFieldGrid());
+                // NOTE: As a special case, the aux-p grid references itself
+                // as aux-p grid. The createAndInitializeResultGrid() method
+                // copies the pointer to the *unsmoothed* aux-p grid. Hence,
+                // at the end of this method, the smoothed grid in
+                // "smoothedSfcAuxGrid" needs to be fixed to reference itself.
+                break;
+            default:
+                break;
+            }
+
+            smoothedSfcAuxGrid->setGeneratingRequest(smoothedSfcAuxRequest);
+        }
+    }
+
+
+    // Compute smoothed data fields.
+    // =============================
     switch (filterType)
     {
     // Original Gaussian blur filter with precomputed weights.
     case MSmoothProperties::GAUSS_DISTANCE:
     {
         float stdDev_km = parameterList[1].toFloat();
-        computeHorizontalGaussianSmoothing_GCDistance(inputGrid, result,
-                                                      stdDev_km);
+
+        computeHorizontalGaussianSmoothing_GCDistance(
+                    inputGrid, result, stdDev_km);
+
+        if (smoothedSfcAuxFieldNeedsToBeComputed)
+        {
+            computeHorizontalGaussianSmoothing_GCDistance(
+                        sfcAuxInputGrid, smoothedSfcAuxGrid, stdDev_km);
+        }
+
         break;
     }
     // Box blur filter, where the box size is precalculated according to
@@ -103,8 +209,19 @@ MStructuredGrid *MSmoothFilter::produceData(MDataRequest request)
     case MSmoothProperties::BOX_BLUR_DISTANCE_FAST:
     {
         float stdDev_km = parameterList[1].toFloat();
+        MSmoothProperties::BoundaryModeTypes boundaryType =
+                static_cast<MSmoothProperties::BoundaryModeTypes>(
+                    parameterList[3].toInt());
+
         computeHorizontalBoxBlurSmoothing_GCDistanceFast(
                     inputGrid, result, stdDev_km, boundaryType);
+
+        if (smoothedSfcAuxFieldNeedsToBeComputed)
+        {
+            computeHorizontalBoxBlurSmoothing_GCDistanceFast(
+                        sfcAuxInputGrid, smoothedSfcAuxGrid, stdDev_km, boundaryType);
+        }
+
         break;
     }
     // Uniform weights of surrounding grid points.
@@ -113,6 +230,13 @@ MStructuredGrid *MSmoothFilter::produceData(MDataRequest request)
         int radius_gp = parameterList[2].toInt();
         computeHorizontalUniformWeightedSmoothing_GCGridpoints(
                     inputGrid, result, radius_gp);
+
+        if (smoothedSfcAuxFieldNeedsToBeComputed)
+        {
+            computeHorizontalUniformWeightedSmoothing_GCGridpoints(
+                        sfcAuxInputGrid, smoothedSfcAuxGrid, radius_gp);
+        }
+
         break;
     }
     // Original Gaussian blur filter on grid points.
@@ -121,6 +245,13 @@ MStructuredGrid *MSmoothFilter::produceData(MDataRequest request)
         int stdDev_gp = parameterList[2].toInt();
         computeHorizontalGaussianSmoothing_GCGridpoints(
                     inputGrid, result, stdDev_gp);
+
+        if (smoothedSfcAuxFieldNeedsToBeComputed)
+        {
+            computeHorizontalGaussianSmoothing_GCGridpoints(
+                        sfcAuxInputGrid, smoothedSfcAuxGrid, stdDev_gp);
+        }
+
         break;
     }
     // Box blur filter. This is the original implementation of the box blur
@@ -130,22 +261,93 @@ MStructuredGrid *MSmoothFilter::produceData(MDataRequest request)
         int stdDev_gp = parameterList[2].toInt();
         computeHorizontalBoxBlurSmoothing_GCGridpointsSlow(
                     inputGrid, result, stdDev_gp);
+
+        if (smoothedSfcAuxFieldNeedsToBeComputed)
+        {
+            computeHorizontalBoxBlurSmoothing_GCGridpointsSlow(
+                        sfcAuxInputGrid, smoothedSfcAuxGrid, stdDev_gp);
+        }
+
         break;
     }
     // Fastest box blur filter, with the same result as the slow box blur filter.
     case MSmoothProperties::BOX_BLUR_GRIDPOINTS_FAST:
     {
         int stdDev_gp = parameterList[2].toInt();
+        MSmoothProperties::BoundaryModeTypes boundaryType =
+                static_cast<MSmoothProperties::BoundaryModeTypes>(
+                    parameterList[3].toInt());
+
         computeHorizontalBoxBlurSmoothing_GCGridpointsFast(
                     inputGrid, result, stdDev_gp, boundaryType);
+
+        if (smoothedSfcAuxFieldNeedsToBeComputed)
+        {
+            computeHorizontalBoxBlurSmoothing_GCGridpointsFast(
+                        sfcAuxInputGrid, smoothedSfcAuxGrid, stdDev_gp, boundaryType);
+        }
+
         break;
     }
     default:
-        LOG4CPLUS_ERROR(mlog, "This smooth filter does not exists. "
-                              "Return nullptr data field."
-                        << smoothModeName.toUtf8().constData());
+        LOG4CPLUS_ERROR(mlog, "ERROR: Requested smooth method '"
+                        << smoothModeName.toStdString()
+                        << "' does not exist. Returning nullptr data field.");
     }
-    //releaseData(inputGrid);
+
+
+    // For hybrid-sigma-pressure and aux-pressure grids, if new surface pressure
+    // or aux pressure field has been computed:
+    if (smoothedSfcAuxFieldNeedsToBeComputed)
+    {
+        // Special case (cf comments above where grids are initialized):
+        // The 3D pressure field that acts as the aux-p grid references itself.
+        // At this point, the smoothed field still references the unsmoothed
+        // field. Fix this.
+        if (MLonLatAuxiliaryPressureGrid *smoothedAuxP =
+                dynamic_cast<MLonLatAuxiliaryPressureGrid*>(smoothedSfcAuxGrid))
+        {
+            smoothedAuxP->exchangeAuxiliaryPressureGrid(smoothedAuxP);
+        }
+
+        // Store sfc/aux grid in memory manager. The call to "storeData()" will
+        // place an initial reference of "1" on the item, hence upon success
+        // the corresponding fields in the result object can be replaced. In
+        // case "storeData()" fails (e.g. in the unlikely event that another
+        // thread has stored a field with the same request in the mean time),
+        // "storeData()" also increases the reference count, hence the item
+        // computed in this thread can be deleted and a reference to the
+        // already stored field needs to be obtained.
+        if ( !memoryManager->storeData(this, smoothedSfcAuxGrid) )
+        {
+            delete smoothedSfcAuxGrid;
+        }
+
+        // In both cases (storeData() fail and success) the item is now in the
+        // memory manager. Hence exchange sfc pressure or aux pressure grid in
+        // "result" field.
+        if (MLonLatHybridSigmaPressureGrid *hybridResult =
+                dynamic_cast<MLonLatHybridSigmaPressureGrid*>(result))
+        {
+            hybridResult->exchangeSurfacePressureGrid(
+                        static_cast<MRegularLonLatGrid*>(
+                            memoryManager->getData(
+                                this, smoothedSfcAuxRequest)));
+        }
+        else if (MLonLatAuxiliaryPressureGrid *auxPResult =
+                 dynamic_cast<MLonLatAuxiliaryPressureGrid*>(result))
+        {
+            auxPResult->exchangeAuxiliaryPressureGrid(
+                        static_cast<MLonLatAuxiliaryPressureGrid*>(
+                            memoryManager->getData(
+                                this, smoothedSfcAuxRequest)));
+        }
+    }
+
+    LOG4CPLUS_DEBUG(mlog, "Smooth filter: computation finished.");
+
+    // That's it. Release input grid and return result.
+    inputSource->releaseData(inputGrid);
     return result;
 }
 
@@ -172,6 +374,7 @@ const QStringList MSmoothFilter::locallyRequiredKeys()
 {
     return (QStringList() << "SMOOTH");
 }
+
 
 /******************************************************************************
 ***                          PRIVATE METHODS                                ***
@@ -266,7 +469,9 @@ void MSmoothFilter::computeHorizontalGaussianSmoothing_GCDistance(
             }
         }
     }
-};
+
+    delete resultGridTemp;
+}
 
 
 void MSmoothFilter::computeHorizontalGaussianSmoothing_GCGridpoints(
@@ -325,7 +530,7 @@ void MSmoothFilter::computeHorizontalGaussianSmoothing_GCGridpoints(
             }
         }
     }
-};
+}
 
 
 QList<QList<float>> MSmoothFilter::precomputeLatDependendDistanceWeightsOfLongitude(
@@ -355,7 +560,7 @@ QList<QList<float>> MSmoothFilter::precomputeLatDependendDistanceWeightsOfLongit
         weights.clear();
     }
     return latDependendWeights;
-};
+}
 
 
 QList<float> MSmoothFilter::precomputeDistanceWeightsOfLatitude(
@@ -380,7 +585,7 @@ QList<float> MSmoothFilter::precomputeDistanceWeightsOfLatitude(
         weights.append(computeGaussWeight(stdDev_km, distance_km));
     }
     return weights;
-};
+}
 
 
 float MSmoothFilter::computeGaussWeight(float stdDev_km, float distance_km)
@@ -388,7 +593,7 @@ float MSmoothFilter::computeGaussWeight(float stdDev_km, float distance_km)
     float weight = exp(-(pow(distance_km, 2.) / (2. * pow(stdDev_km, 2.))))
             / sqrt(1. / (2. * M_PI * pow(stdDev_km, 2.)));
     return weight;
-};
+}
 
 
 //*************************** BOX BLUR SMOOTHING *******************************
@@ -413,9 +618,8 @@ void MSmoothFilter::computeHorizontalBoxBlurSmoothing_GCDistanceFast(
             latDependentBoxRadii[1], boundaryType);
     boxBlurTotalFast(resultGridTemp, resultGrid, lonBoxRadii[2],
             latDependentBoxRadii[2], boundaryType);
-
-    //releaseData(resultGridTemp);
- };
+    delete resultGridTemp;
+}
 
 
 void MSmoothFilter::computeHorizontalBoxBlurSmoothing_GCGridpointsFast(
@@ -428,8 +632,8 @@ void MSmoothFilter::computeHorizontalBoxBlurSmoothing_GCGridpointsFast(
     boxBlurTotalFast(inputGrid, resultGrid, boxRadii[0], boundaryType);
     boxBlurTotalFast(resultGrid, resultGridTemp, boxRadii[1], boundaryType);
     boxBlurTotalFast(resultGridTemp, resultGrid, boxRadii[2], boundaryType);
-    //releaseData(resultGridTemp);
- };
+    delete resultGridTemp;
+}
 
 
 void MSmoothFilter::computeHorizontalBoxBlurSmoothing_GCGridpointsSlow(
@@ -442,8 +646,8 @@ void MSmoothFilter::computeHorizontalBoxBlurSmoothing_GCGridpointsSlow(
     boxBlurTotalSlow(inputGrid, resultGrid, boxRadii[0]);
     boxBlurTotalSlow(resultGrid, resultGridTemp, boxRadii[1]);
     boxBlurTotalSlow(resultGridTemp, resultGrid, boxRadii[2]);
-    //releaseData(resultGridTemp);
- };
+    delete resultGridTemp;
+}
 
 
 QList<QList<int>> MSmoothFilter::computeLatDependentBoxRadii(
@@ -494,7 +698,7 @@ QList<QList<int>> MSmoothFilter::computeLatDependentBoxRadii(
         }
     }
     return boxes;
-};
+}
 
 
 int MSmoothFilter::numGridpointsSpannedByDistance(
@@ -557,7 +761,7 @@ QVector<int> MSmoothFilter::computeBoxRadii(int stdDev_gp, int n)
         }
     }
     return boxRadii;
-};
+}
 
 
 void MSmoothFilter::boxBlurTotalFast(
@@ -571,9 +775,8 @@ void MSmoothFilter::boxBlurTotalFast(
                             boundaryType);
     boxBlurLatitudinalFast(resultGridTemp, resultGrid, lonBoxRadius,
                            boundaryType);
-    //releaseData(resultGridTemp);
-
-};
+    delete resultGridTemp;
+}
 
 
 void MSmoothFilter::boxBlurTotalFast(
@@ -584,8 +787,8 @@ void MSmoothFilter::boxBlurTotalFast(
     resultGridTemp = createAndInitializeResultGrid(resultGrid);
     boxBlurLongitudinalFast(inputGrid, resultGridTemp, boxRadius, boundaryType);
     boxBlurLatitudinalFast(resultGridTemp, resultGrid, boxRadius, boundaryType);
-    //releaseData(resultGridTemp);
-};
+    delete resultGridTemp;
+}
 
 
 void MSmoothFilter::boxBlurLongitudinalFast(
@@ -828,7 +1031,7 @@ void MSmoothFilter::boxBlurLongitudinalFast(
             }
         }
     }
-};
+}
 
 
 void MSmoothFilter::boxBlurLongitudinalFast(
@@ -1067,7 +1270,7 @@ void MSmoothFilter::boxBlurLongitudinalFast(
             }
         }
     }
-};
+}
 
 
 void MSmoothFilter::boxBlurLatitudinalFast(
@@ -1306,7 +1509,7 @@ void MSmoothFilter::boxBlurLatitudinalFast(
             }
         }
     }
-};
+}
 
 
 QVector<int> MSmoothFilter::createIndexList(const MStructuredGrid *inputGrid,
@@ -1342,6 +1545,7 @@ QVector<int> MSmoothFilter::createIndexList(const MStructuredGrid *inputGrid,
     return indexList;
 }
 
+
 void MSmoothFilter::boxBlurTotalSlow(const MStructuredGrid *inputGrid,
                                      MStructuredGrid *resultGrid, int boxRadius)
 {
@@ -1372,7 +1576,7 @@ void MSmoothFilter::boxBlurTotalSlow(const MStructuredGrid *inputGrid,
             }
         }
     }
-};
+}
 
 
 //*************************** UNIFORM WEIGHTED SMOOTHING ***********************
@@ -1431,6 +1635,6 @@ void MSmoothFilter::computeHorizontalUniformWeightedSmoothing_GCGridpoints(
             }
         }
     }
- };
+}
 
 }  // namespace Met3D

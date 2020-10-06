@@ -641,7 +641,6 @@ void MPipelineConfiguration::initializeNWPPipeline(
     smoothFilter->setScheduler(scheduler);
     smoothFilter->setInputSource(nwpReaderENS);
 
-
     MStructuredGridEnsembleFilter *ensFilter =
             new MStructuredGridEnsembleFilter();
     ensFilter->setMemoryManager(memoryManager);
