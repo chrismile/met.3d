@@ -4,10 +4,11 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2019 Marc Rautenhaus [*, previously +]
+**  Copyright 2015-2020 Marc Rautenhaus [*, previously +]
 **  Copyright 2017-2018 Bianca Tost [+]
+**  Copyright 2020      Andreas Beckert [*]
 **
-**  * Regional Computing Center, Visualization
+**  Regional Computing Center, Visual Data Analysis Group
 **  Universitaet Hamburg, Hamburg, Germany
 **
 **  + Computer Graphics and Visualization Group
@@ -262,9 +263,8 @@ public:
             unsigned int k, unsigned int j, unsigned int i)
     { Q_UNUSED(k); Q_UNUSED(j); Q_UNUSED(i); return M_MISSING_VALUE; }
 
-    inline float getDeltaLon() { return fabs(lons[1]-lons[0]); }
-
-    inline float getDeltaLat() { return fabs(lats[1]-lats[0]); }
+    inline float getDeltaLon() const { return fabs(lons[1]-lons[0]); }
+    inline float getDeltaLat() const { return fabs(lats[1]-lats[0]); }
 
     inline float getWestInterfaceLon(unsigned int i)
     { return lons[i] - getDeltaLon()/2.; }
@@ -584,6 +584,19 @@ public:
 
     void releaseMinMaxAccelTexture3D();
 
+    /**
+      Computes the longitudinal grid point spacing in km at the specified
+      latitude index.
+     */
+    float getDeltaLon_km(const int iLat) const;
+
+    /**
+      Computes the latitudinal grid point spacing in km.
+     */
+    float getDeltaLat_km() const;
+
+    MVerticalLevelType getVerticalLevelType() { return leveltype; }
+
 protected:
     friend class MClimateForecastReader; // NetCDF can read directly into data
                                          // fields.
@@ -754,7 +767,22 @@ public:
 
     unsigned int getMemorySize_kb();
 
+    /**
+      Returns a pointer to the surface pressure grid associated with this
+      hybrid sigma-pressure levels grid object.
+      @note This method does NOT increase the reference count of the surface
+      pressure field in the memory manager, hence does not need to be released.
+     */
     MRegularLonLatGrid* getSurfacePressureGrid() { return surfacePressure; }
+
+    /**
+      Exchanges the associated surface pressure field with
+      @p newSfcPressureGrid.
+      @note If the new field is memory managed (should almost always be the
+      case), the reference counter needs to be increased before the field is
+      passed to this method! See, e.g., use in @ref MSmoothFilter::produceData().
+     */
+    void exchangeSurfacePressureGrid(MRegularLonLatGrid* newSfcPressureGrid);
 
     GL::MTexture* getHybridCoeffTexture(QGLWidget *currentGLContext = nullptr);
 
@@ -831,6 +859,12 @@ protected:
     QString getPressureTexCoordID();
 
 private:
+    /**
+      Releases (if memory managed) or deletes the current surface pressure
+      field.
+     */
+    void removeSurfacePressureField();
+
     QString pressureTexCoordID;
     double cachedTopDataVolumePressure_hPa;
     double cachedBottomDataVolumePressure_hPa;
@@ -847,6 +881,15 @@ public:
 
     MLonLatAuxiliaryPressureGrid* getAuxiliaryPressureFieldGrid()
     { return auxPressureField_hPa; }
+
+    /**
+      Exchanges the associated surface pressure field with
+      @p newSfcPressureGrid.
+      @note If the new field is memory managed (should almost always be the
+      case), the reference counter needs to be increased before the field is
+      passed to this method! See, e.g., use in @ref MSmoothFilter::produceData().
+     */
+    void exchangeAuxiliaryPressureGrid(MLonLatAuxiliaryPressureGrid* newAuxPGrid);
 
     float interpolateGridColumnToPressure(unsigned int j, unsigned int i,
                                           float p_hPa);
@@ -889,6 +932,8 @@ protected:
     bool reverseLevels;
 
 private:
+    void removeAuxiliaryPressureField();
+
     double cachedTopDataVolumePressure_hPa;
     double cachedBottomDataVolumePressure_hPa;
 };

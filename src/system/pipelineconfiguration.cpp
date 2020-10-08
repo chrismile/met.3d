@@ -67,6 +67,7 @@
 #include "data/singletimetrajectoryfilter.h"
 #include "data/pressuretimetrajectoryfilter.h"
 #include "data/bboxtrajectoryfilter.h"
+#include "data/smoothfilter.h"
 
 
 namespace Met3D
@@ -641,6 +642,11 @@ void MPipelineConfiguration::initializeNWPPipeline(
     nwpReaderENS->setScheduler(scheduler);
     nwpReaderENS->setDataRoot(fileDir, fileFilter);
 
+    MSmoothFilter *smoothFilter = new MSmoothFilter();
+    smoothFilter->setMemoryManager(memoryManager);
+    smoothFilter->setScheduler(scheduler);
+    smoothFilter->setInputSource(nwpReaderENS);
+
     MStructuredGridEnsembleFilter *ensFilter =
             new MStructuredGridEnsembleFilter();
     ensFilter->setMemoryManager(memoryManager);
@@ -648,7 +654,7 @@ void MPipelineConfiguration::initializeNWPPipeline(
 
     if (!enableRegridding)
     {
-        ensFilter->setInputSource(nwpReaderENS);
+        ensFilter->setInputSource(smoothFilter);
     }
     else
     {
@@ -656,7 +662,7 @@ void MPipelineConfiguration::initializeNWPPipeline(
                 new MStructuredGridEnsembleFilter();
         ensFilter1->setMemoryManager(memoryManager);
         ensFilter1->setScheduler(scheduler);
-        ensFilter1->setInputSource(nwpReaderENS);
+        ensFilter1->setInputSource(smoothFilter);
 
         MVerticalRegridder *regridderEPS =
                 new MVerticalRegridder();
@@ -707,6 +713,11 @@ void MPipelineConfiguration::initializeNWPPipeline(
         }
     }
 
+    MSmoothFilter *smoothFilterDerived = new MSmoothFilter();
+    smoothFilterDerived->setMemoryManager(memoryManager);
+    smoothFilterDerived->setScheduler(scheduler);
+    smoothFilterDerived->setInputSource(derivedMetVarsSource);
+
     MStructuredGridEnsembleFilter *ensFilterDerived =
             new MStructuredGridEnsembleFilter();
     ensFilterDerived->setMemoryManager(memoryManager);
@@ -714,7 +725,7 @@ void MPipelineConfiguration::initializeNWPPipeline(
 
     if (!enableRegridding)
     {
-        ensFilterDerived->setInputSource(derivedMetVarsSource);
+        ensFilterDerived->setInputSource(smoothFilterDerived);
     }
     else
     {
@@ -722,7 +733,7 @@ void MPipelineConfiguration::initializeNWPPipeline(
                 new MStructuredGridEnsembleFilter();
         ensFilter1Derived->setMemoryManager(memoryManager);
         ensFilter1Derived->setScheduler(scheduler);
-        ensFilter1Derived->setInputSource(derivedMetVarsSource);
+        ensFilter1Derived->setInputSource(smoothFilterDerived);
 
         MVerticalRegridder *regridderEPSDerived =
                 new MVerticalRegridder();

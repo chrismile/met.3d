@@ -4,10 +4,13 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2018 Bianca Tost
-**  Copyright 2018 Marc Rautenhaus
+**  Copyright 2018-2020 Marc Rautenhaus [*, previously +]
+**  Copyright 2018      Bianca Tost [+]
 **
-**  Computer Graphics and Visualization Group
+**  * Regional Computing Center, Visual Data Analysis Group
+**  Universitaet Hamburg, Hamburg, Germany
+**
+**  + Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
 **
 **  Met.3D is free software: you can redistribute it and/or modify
@@ -60,6 +63,52 @@ protected:
      */
     virtual MStructuredGrid *createAndInitializeResultGrid(
             MStructuredGrid *templateGrid);
+
+};
+
+
+/**
+  @brief Same as @ref MProcessingWeatherPredictionDataSource but for data
+  sources that process only a single input. Methods including @p setInput
+  and @p available* are predefined.
+  */
+class MSingleInputProcessingWeatherPredictionDataSource
+        : public MProcessingWeatherPredictionDataSource
+{
+public:
+    MSingleInputProcessingWeatherPredictionDataSource();
+
+    /**
+      Request pass-through is enabled by default. Override to disable.
+     */
+    virtual void setInputSource(MWeatherPredictionDataSource* s);
+
+    QList<MVerticalLevelType> availableLevelTypes() override;
+
+    QStringList availableVariables(MVerticalLevelType levelType) override;
+
+    QSet<unsigned int> availableEnsembleMembers(MVerticalLevelType levelType,
+                                                const QString& variableName) override;
+
+    QList<QDateTime> availableInitTimes(MVerticalLevelType levelType,
+                                        const QString& variableName) override;
+
+    QList<QDateTime> availableValidTimes(MVerticalLevelType levelType,
+                                         const QString& variableName,
+                                         const QDateTime& initTime) override;
+
+    QString variableLongName(MVerticalLevelType levelType,
+                             const QString&     variableName) override;
+
+    QString variableStandardName(MVerticalLevelType levelType,
+                             const QString&     variableName) override;
+
+    QString variableUnits(MVerticalLevelType levelType,
+                             const QString&     variableName) override;
+
+
+protected:
+    MWeatherPredictionDataSource* inputSource;
 
 };
 
