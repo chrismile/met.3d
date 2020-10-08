@@ -4,15 +4,15 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2020 Marc Rautenhaus [1][2]
-**  Copyright 2015-2017 Bianca Tost [1]
-**  Copyright 2020      Andreas Beckert [2]
+**  Copyright 2015-2020 Marc Rautenhaus [*, previously +]
+**  Copyright 2015-2017 Bianca Tost [+]
+**  Copyright 2020      Andreas Beckert [*]
 **
-**  [1] Computer Graphics and Visualization Group
-**      Technische Universitaet Muenchen, Garching, Germany
+**  * Regional Computing Center, Visual Data Analysis Group
+**  Universitaet Hamburg, Hamburg, Germany
 **
-**  [2] Regional Computing Center, Visualization
-**      Universitaet Hamburg, Hamburg, Germany
+**  + Computer Graphics and Visualization Group
+**  Technische Universitaet Muenchen, Garching, Germany
 **
 **  Met.3D is free software: you can redistribute it and/or modify
 **  it under the terms of the GNU General Public License as published by
@@ -963,7 +963,7 @@ MSmoothProperties::MSmoothProperties(
                       << boundaryModeToString(NANPADDING)
                       << boundaryModeToString(SYMMETRIC);
     boundaryModeProperty = a->addProperty(
-                ENUM_PROPERTY, "boundary mode", groupProperty);
+                ENUM_PROPERTY, "boundary conditions", groupProperty);
     properties->mEnum()->setEnumNames(boundaryModeProperty, boundaryModeNames);
     properties->mEnum()->setValue(boundaryModeProperty, boundaryMode);
 

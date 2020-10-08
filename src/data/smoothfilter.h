@@ -4,10 +4,10 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2020 Marc Rautenhaus
-**  Copyright 2020      Andreas Beckert
+**  Copyright 2020 Andreas Beckert
+**  Copyright 2020 Marc Rautenhaus
 **
-**  Regional Computing Center, Visualization
+**  Regional Computing Center, Visual Data Analysis Group
 **  Universitaet Hamburg, Hamburg, Germany
 **
 **  Met.3D is free software: you can redistribute it and/or modify
@@ -328,9 +328,6 @@ private:
     void computeHorizontalUniformWeightedSmoothing_GCGridpoints(
             const MStructuredGrid *inputGrid, MStructuredGrid *resultGrid,
             int radius_gp);
-
-
-
 };
 
 } // namespace Met3D

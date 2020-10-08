@@ -4,10 +4,10 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2020 Marc Rautenhaus
-**  Copyright 2020      Andreas Beckert
+**  Copyright 2020 Andreas Beckert
+**  Copyright 2020 Marc Rautenhaus
 **
-**  Regional Computing Center, Visualization
+**  Regional Computing Center, Visual Data Analysis Group
 **  Universitaet Hamburg, Hamburg, Germany
 **
 **  Met.3D is free software: you can redistribute it and/or modify
@@ -53,10 +53,10 @@ MSmoothFilter::MSmoothFilter()
 
 }
 
+
 /******************************************************************************
 ***                            PUBLIC METHODS                               ***
 *******************************************************************************/
-
 
 MStructuredGrid *MSmoothFilter::produceData(MDataRequest request)
 {
@@ -549,7 +549,7 @@ QList<QList<float>> MSmoothFilter::precomputeLatDependendDistanceWeightsOfLongit
     for (unsigned int i = 0; i<inputGrid->getNumLats(); i++)
     {
         //deltaGridpoint_km = inputGrid->getGeometricDeltaLat_km(i);
-        deltaGridpoint_km = inputGrid->getDeltaLonInKm(i);
+        deltaGridpoint_km = inputGrid->getDeltaLon_km(i);
         sigRadius_gridpoints = round(sigRadius/deltaGridpoint_km);
         for (int j = 0; j <= sigRadius_gridpoints; j++)
         {
@@ -573,7 +573,7 @@ QList<float> MSmoothFilter::precomputeDistanceWeightsOfLatitude(
     float significantRadius = stdDev_km * 2.576;
     int significantRadius_gridpoints;
     //float deltaGridpoints_km = inputGrid->getGeometricDeltaLat_km();
-    float deltaGridpoints_km = inputGrid->getDeltaLatInKm();
+    float deltaGridpoints_km = inputGrid->getDeltaLat_km();
     float distance_km;
     QList<float> weights;
     significantRadius_gridpoints =
@@ -607,7 +607,7 @@ void MSmoothFilter::computeHorizontalBoxBlurSmoothing_GCDistanceFast(
     int n = 3;
     latDependentBoxRadii = computeLatDependentBoxRadii(inputGrid, stdDev_km, n);
     // Distance between latitudes.
-    const float deltaGp_km = inputGrid->getDeltaLatInKm();
+    const float deltaGp_km = inputGrid->getDeltaLat_km();
     int distanceInGridpoints = static_cast<int>(round(stdDev_km / deltaGp_km));
     QVector<int> lonBoxRadii = computeBoxRadii(distanceInGridpoints, n);
     MStructuredGrid *resultGridTemp = nullptr;
@@ -1513,7 +1513,7 @@ void MSmoothFilter::boxBlurLatitudinalFast(
 
 
 QVector<int> MSmoothFilter::createIndexList(const MStructuredGrid *inputGrid,
-                                    int boxRadius, QString dir)
+                                            int boxRadius, QString dir)
 {
     int size;
     if (dir == "LON")

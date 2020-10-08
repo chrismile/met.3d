@@ -4,10 +4,11 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2019 Marc Rautenhaus [*, previously +]
+**  Copyright 2015-2020 Marc Rautenhaus [*, previously +]
 **  Copyright 2017-2018 Bianca Tost [+]
+**  Copyright 2020      Andreas Beckert [*]
 **
-**  * Regional Computing Center, Visualization
+**  Regional Computing Center, Visual Data Analysis Group
 **  Universitaet Hamburg, Hamburg, Germany
 **
 **  + Computer Graphics and Visualization Group
@@ -1109,7 +1110,7 @@ void MStructuredGrid::releaseMinMaxAccelTexture3D()
 }
 
 
-float MStructuredGrid::getDeltaLonInKm(const int iLat) const
+float MStructuredGrid::getDeltaLon_km(const int iLat) const
 {
     float phi = abs(getLats()[iLat]) * M_PI / 180.;
     float circumferenceLatitudeCircle_km = cos(phi) * 2. * M_PI
@@ -1120,7 +1121,7 @@ float MStructuredGrid::getDeltaLonInKm(const int iLat) const
 }
 
 
-float MStructuredGrid::getDeltaLatInKm() const
+float MStructuredGrid::getDeltaLat_km() const
 {
     float circumferenceLongitudeCircle_km = 2. * M_PI
             * MetConstants::EARTH_RADIUS_km;

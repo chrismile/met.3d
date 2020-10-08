@@ -4,10 +4,11 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2019 Marc Rautenhaus [*, previously +]
+**  Copyright 2015-2020 Marc Rautenhaus [*, previously +]
 **  Copyright 2017-2018 Bianca Tost [+]
+**  Copyright 2020      Andreas Beckert [*]
 **
-**  * Regional Computing Center, Visualization
+**  Regional Computing Center, Visual Data Analysis Group
 **  Universitaet Hamburg, Hamburg, Germany
 **
 **  + Computer Graphics and Visualization Group
@@ -583,8 +584,16 @@ public:
 
     void releaseMinMaxAccelTexture3D();
 
-    float getDeltaLonInKm(const int iLat) const;
-    float getDeltaLatInKm() const;
+    /**
+      Computes the longitudinal grid point spacing in km at the specified
+      latitude index.
+     */
+    float getDeltaLon_km(const int iLat) const;
+
+    /**
+      Computes the latitudinal grid point spacing in km.
+     */
+    float getDeltaLat_km() const;
 
     MVerticalLevelType getVerticalLevelType() { return leveltype; }
 
