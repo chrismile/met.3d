@@ -4,10 +4,14 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015-2020 Marc Rautenhaus [*, previously +]
+**  Copyright 2020      Marcel Meyer [*]
 **
-**  Computer Graphics and Visualization Group
+**  + Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
+**
+**  * Regional Computing Center, Visualization
+**  Universitaet Hamburg, Hamburg, Germany
 **
 **  Met.3D is free software: you can redistribute it and/or modify
 **  it under the terms of the GNU General Public License as published by
@@ -82,9 +86,13 @@ struct MTrajectoryFileInfo
 
     netCDF::NcFile *ncFile;
 
-    unsigned int numTimeSteps, numTrajectories, numEnsembleMembers;
+    unsigned int numTimeSteps, numTrajectories, numEnsembleMembers;    
 
     netCDF::NcVar lonVar, latVar, prsVar;
+
+    QVector<netCDF::NcVar> auxDataVars;
+    QStringList auxDataVarNames;
+    unsigned int numAuxDataVars;
 
     QVector<QDateTime> times;
 
@@ -131,6 +139,8 @@ public:
 
     QSet<unsigned int> availableEnsembleMembers();
 
+    QStringList availableAuxiliaryVariables();
+
     /**
       Reads a data item from disk.
      */
@@ -173,6 +183,7 @@ protected:
     // by the provided read/write lock.
     MTrajectoryInitTimeMap availableTrajectories;
     QSet<unsigned int>     availableMembers;
+    QSet<QString>          availableAuxDataVariables;
     QReadWriteLock         availableItemsLock;
 
     // Dictionary of open file information. Read/write access to this

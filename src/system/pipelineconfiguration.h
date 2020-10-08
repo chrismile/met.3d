@@ -4,12 +4,16 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2018 Marc Rautenhaus
-**  Copyright 2017-2018 Bianca Tost
-**  Copyright 2017      Philipp Kaiser
+**  Copyright 2015-2020 Marc Rautenhaus [*, previously +]
+**  Copyright 2017-2018 Bianca Tost [+]
+**  Copyright 2017      Philipp Kaiser [+]
+**  Copyright 2020      Marcel Meyer [*]
 **
-**  Computer Graphics and Visualization Group
+**  + Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
+**
+**  * Regional Computing Center, Visualization
+**  Universitaet Hamburg, Hamburg, Germany
 **
 **  Met.3D is free software: you can redistribute it and/or modify
 **  it under the terms of the GNU General Public License as published by
@@ -159,6 +163,7 @@ protected:
             QString windEastwardVariable,
             QString windNorthwardVariable,
             QString windVerticalVariable,
+            QString auxDataVariableNames,
             MVerticalLevelType verticalLevelType);
 
     void initializeEnsembleTrajectoriesPipeline(

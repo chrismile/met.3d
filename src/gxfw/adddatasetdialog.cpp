@@ -187,6 +187,8 @@ MAddDatasetDialog::getTrajectoriesPipelineConfigurationInfo()
             ->currentText().split(" || Level type: ").first();
     d.windVerticalVariable = ui->trajectoriesWindWVarCombo
             ->currentText().split(" || Level type: ").first();
+    d.auxDataVariablesInputStr = ui->auxDataVarsAlongTrajsLineEdit
+            ->text();
     d.verticalLevelType = ui->trajectoriesWindUVarCombo
             ->currentText().split(" || Level type: ").last();
     return d;

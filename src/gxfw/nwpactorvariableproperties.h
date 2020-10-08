@@ -4,9 +4,13 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015-2020 Marc Rautenhaus [*, previously +]
+**  Copyright 2020      Andreas Beckert [*]
 **
-**  Computer Graphics and Visualization Group
+**  * Regional Computing Center, Visual Data Analysis Group
+**  Universitaet Hamburg, Hamburg, Germany
+**
+**  + Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
 **
 **  Met.3D is free software: you can redistribute it and/or modify
@@ -260,6 +264,96 @@ public:
 protected:
     QtProperty *probabilityRegionIsovalueProperty;
 };
+
+
+/**
+  Smooth filter.
+  */
+class MSmoothProperties : public MRequestProperties
+{
+public:
+    MSmoothProperties(MNWPActorVariable *actorVar);
+    ~MSmoothProperties();
+    bool onQtPropertyChanged(QtProperty *property,
+                             bool *redrawWithoutDataRequest);
+    void addToRequest(MDataRequestHelper *rh);
+
+    void saveConfiguration(QSettings *settings);
+
+    void loadConfiguration(QSettings *settings);
+
+    // Smooth modes as enum item. Add here your own implemented smooth modes.
+    typedef enum {
+        DISABLE_FILTER = 0,
+        GAUSS_DISTANCE = 1,
+        BOX_BLUR_DISTANCE_FAST = 2,
+        UNIFORM_WEIGHTED_GRIDPOINTS = 3,
+        GAUSS_GRIDPOINTS = 4,
+        BOX_BLUR_GRIDPOINTS_SLOW = 5,
+        BOX_BLUR_GRIDPOINTS_FAST = 6,
+    } SmoothModeTypes;
+
+    // Types of boundary handleing in smooth filter.
+    typedef enum {
+        CONSTANT = 0,
+        NANPADDING = 1,
+        SYMMETRIC = 2,
+    } BoundaryModeTypes;
+
+
+    /**
+     * @brief smoothModeToString this method converts the smooth mode from
+     * SmoothModeType to the real smooth mode name. If you want to add an
+     * smooth mode, you have to add in this method a translation from
+     * SmoothModeType to the smooth mode name (string).
+     * @param smoothMode the smooth mode from the enum item.
+     * @return smooth mode name as string.
+     */
+    static QString smoothModeToString(SmoothModeTypes smoothMode);
+
+    /**
+     * @brief stringToSmoothMode This method converts the smooth mode as string
+     * to the enum item SmoothModeTypes. If you add a smooth mode, you need to
+     * add in this method the conversion from SmoothModeType to string
+     * @param smoothMode the real name of the smooth mode as string
+     * @return the smooth mode as enum item.
+     */
+    MSmoothProperties::SmoothModeTypes stringToSmoothMode(QString smoothMode);
+
+
+    /**
+     * @brief boundaryModeToString this method converts the boundary mode from
+     * BoundaryModeType to the real boundary mode name. If you want to add an
+     * boundary mode, you have to add in this method a translation from
+     * BoundaryModeType to the boundary mode name (string).
+     * @param smoothMode the smooth mode from the enum item.
+     * @return boundary mode name as string.
+     */
+    static QString boundaryModeToString(BoundaryModeTypes boundaryMode);
+
+    /**
+     * @brief stringToBoundaryMode This method converts the boundary mode as string
+     * to the enum item BoundaryModeTypes. If you add a boundary mode, you need to
+     * add in this method the conversion from BoundaryModeType to string
+     * @param boundaryMode the real name of the smooth mode as string
+     * @return the boundary mode as enum item.
+     */
+    MSmoothProperties::BoundaryModeTypes stringToBoundaryMode(QString boundaryMode);
+
+protected:
+    QtProperty *recomputeOnPropertyChange;
+    QtProperty *smoothStDevKmProperty;
+    QtProperty *smoothStDevGridboxProperty;
+    QtProperty *applySettingsProperty;
+    QtProperty *smoothModeProperty;
+    QtProperty *boundaryModeProperty;
+
+private:
+    SmoothModeTypes smoothMode;
+    BoundaryModeTypes boundaryMode;
+    QtProperty *groupProperty;
+};
+
 
 } // namespace Met3D
 

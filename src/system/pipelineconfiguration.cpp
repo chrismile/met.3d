@@ -4,12 +4,16 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2018 Marc Rautenhaus
-**  Copyright 2017-2018 Bianca Tost
-**  Copyright 2017      Philipp Kaiser
+**  Copyright 2015-2020 Marc Rautenhaus [*, previously +]
+**  Copyright 2017-2018 Bianca Tost [+]
+**  Copyright 2017      Philipp Kaiser [+]
+**  Copyright 2020      Marcel Meyer [*]
 **
-**  Computer Graphics and Visualization Group
+**  + Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
+**
+**  * Regional Computing Center, Visualization
+**  Universitaet Hamburg, Hamburg, Germany
 **
 **  Met.3D is free software: you can redistribute it and/or modify
 **  it under the terms of the GNU General Public License as published by
@@ -63,6 +67,7 @@
 #include "data/singletimetrajectoryfilter.h"
 #include "data/pressuretimetrajectoryfilter.h"
 #include "data/bboxtrajectoryfilter.h"
+#include "data/smoothfilter.h"
 
 
 namespace Met3D
@@ -408,6 +413,8 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
                 config.value("northwardWind_ms").toString();
         QString windVerticalVariable =
                 config.value("verticalWind_Pas").toString();
+        QString auxDataVariablesStrList =
+                (config.value("auxDataVariablesStrList").toString());
         QString windVarsVerticalLevelTypeString =
                 config.value("windComponentVariablesVerticalLevelType").toString();
 
@@ -504,7 +511,7 @@ void MPipelineConfiguration::initializeDataPipelineFromConfigFile(
                         name, ablTrajectories, schedulerID,
                         memoryManagerID, NWPDataset,
                         windEastwardVariable, windNorthwardVariable,
-                        windVerticalVariable, windVarsVerticalLevelType);
+                        windVerticalVariable,auxDataVariablesStrList,windVarsVerticalLevelType);
             }
             else
             {
@@ -642,6 +649,11 @@ void MPipelineConfiguration::initializeNWPPipeline(
     nwpReaderENS->setScheduler(scheduler);
     nwpReaderENS->setDataRoot(fileDir, fileFilter);
 
+    MSmoothFilter *smoothFilter = new MSmoothFilter();
+    smoothFilter->setMemoryManager(memoryManager);
+    smoothFilter->setScheduler(scheduler);
+    smoothFilter->setInputSource(nwpReaderENS);
+
     MStructuredGridEnsembleFilter *ensFilter =
             new MStructuredGridEnsembleFilter();
     ensFilter->setMemoryManager(memoryManager);
@@ -649,7 +661,7 @@ void MPipelineConfiguration::initializeNWPPipeline(
 
     if (!enableRegridding)
     {
-        ensFilter->setInputSource(nwpReaderENS);
+        ensFilter->setInputSource(smoothFilter);
     }
     else
     {
@@ -657,7 +669,7 @@ void MPipelineConfiguration::initializeNWPPipeline(
                 new MStructuredGridEnsembleFilter();
         ensFilter1->setMemoryManager(memoryManager);
         ensFilter1->setScheduler(scheduler);
-        ensFilter1->setInputSource(nwpReaderENS);
+        ensFilter1->setInputSource(smoothFilter);
 
         MVerticalRegridder *regridderEPS =
                 new MVerticalRegridder();
@@ -708,6 +720,11 @@ void MPipelineConfiguration::initializeNWPPipeline(
         }
     }
 
+    MSmoothFilter *smoothFilterDerived = new MSmoothFilter();
+    smoothFilterDerived->setMemoryManager(memoryManager);
+    smoothFilterDerived->setScheduler(scheduler);
+    smoothFilterDerived->setInputSource(derivedMetVarsSource);
+
     MStructuredGridEnsembleFilter *ensFilterDerived =
             new MStructuredGridEnsembleFilter();
     ensFilterDerived->setMemoryManager(memoryManager);
@@ -715,7 +732,7 @@ void MPipelineConfiguration::initializeNWPPipeline(
 
     if (!enableRegridding)
     {
-        ensFilterDerived->setInputSource(derivedMetVarsSource);
+        ensFilterDerived->setInputSource(smoothFilterDerived);
     }
     else
     {
@@ -723,7 +740,7 @@ void MPipelineConfiguration::initializeNWPPipeline(
                 new MStructuredGridEnsembleFilter();
         ensFilter1Derived->setMemoryManager(memoryManager);
         ensFilter1Derived->setScheduler(scheduler);
-        ensFilter1Derived->setInputSource(derivedMetVarsSource);
+        ensFilter1Derived->setInputSource(smoothFilterDerived);
 
         MVerticalRegridder *regridderEPSDerived =
                 new MVerticalRegridder();
@@ -815,6 +832,7 @@ void MPipelineConfiguration::initializeTrajectoryComputationPipeline(
         QString windEastwardVariable,
         QString windNorthwardVariable,
         QString windVerticalVariable,
+        QString auxDataVariableNames,
         MVerticalLevelType verticalLevelType)
 {
     const QString dataSourceId = name;
@@ -901,6 +919,26 @@ void MPipelineConfiguration::initializeTrajectoryComputationPipeline(
         }
     }
 
+    // Get vertical level type of auxiliary data variables
+    QStringList auxDataVariableList = auxDataVariableNames.split(",");
+    QMap<QString, MVerticalLevelType> verticalLevelsOfAuxDataVars;
+
+    for (int i = 0; i < auxDataVariableList.size(); ++i)
+    {
+        QString iAuxDataVar= auxDataVariableList.at(i);
+
+        QList<MVerticalLevelType> levelTypes =
+                NWPDataSource->availableLevelTypes();
+        for (MVerticalLevelType level : levelTypes)
+        {
+            QStringList variables = NWPDataSource->availableVariables(level);
+            if (variables.contains(iAuxDataVar))
+            {
+                verticalLevelsOfAuxDataVars.insert(iAuxDataVar,level);
+            }
+        }
+    }
+
     if (MClimateForecastReader *netCDFDataSource =
             dynamic_cast<MClimateForecastReader*>(NWPDataSource))
     {
@@ -930,8 +968,10 @@ void MPipelineConfiguration::initializeTrajectoryComputationPipeline(
     trajectoryComputation->setInputWindVariables(windEastwardVariable,
                                                  windNorthwardVariable,
                                                  windVerticalVariable);
+    trajectoryComputation->setAuxDataVariables(auxDataVariableNames);
+    trajectoryComputation->setVerticalLevelsOfAuxDataVariables(verticalLevelsOfAuxDataVars);
 
-    trajectoryComputation-> setVerticalLevelType(verticalLevelType);
+    trajectoryComputation->setVerticalLevelType(verticalLevelType);
     trajectoryComputation->setInputSource(NWPDataSource);
     sysMC->registerDataSource(dataSourceId + QString(" Reader"),
                               trajectoryComputation);

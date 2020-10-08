@@ -4,10 +4,13 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2018 Bianca Tost
-**  Copyright 2018 Marc Rautenhaus
+**  Copyright 2018-2020 Marc Rautenhaus [*, previously +]
+**  Copyright 2018      Bianca Tost [+]
 **
-**  Computer Graphics and Visualization Group
+**  * Regional Computing Center, Visual Data Analysis Group
+**  Universitaet Hamburg, Hamburg, Germany
+**
+**  + Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
 **
 **  Met.3D is free software: you can redistribute it and/or modify
@@ -180,12 +183,115 @@ MProcessingWeatherPredictionDataSource::createAndInitializeResultGrid(
                                   "for request %1 should have been in "
                                   "cache.").arg(
                         auxresult->auxPressureField_hPa->getGeneratingRequest());
+            LOG4CPLUS_ERROR(mlog, msg.toStdString());
             throw MMemoryError(msg.toStdString(), __FILE__, __LINE__);
         }
     } // grid is auxiliary pressure 3D
 
     return result;
 }
+
+
+/******************************************************************************
+***                     CONSTRUCTOR / DESTRUCTOR                            ***
+*******************************************************************************/
+
+MSingleInputProcessingWeatherPredictionDataSource::MSingleInputProcessingWeatherPredictionDataSource()
+    : MProcessingWeatherPredictionDataSource()
+{
+}
+
+
+/******************************************************************************
+***                            PUBLIC METHODS                               ***
+*******************************************************************************/
+
+void MSingleInputProcessingWeatherPredictionDataSource::setInputSource(
+        MWeatherPredictionDataSource* s)
+{
+    inputSource = s;
+    registerInputSource(inputSource);
+    enablePassThrough(s);
+}
+
+
+QList<MVerticalLevelType>
+MSingleInputProcessingWeatherPredictionDataSource::availableLevelTypes()
+{
+    assert(inputSource != nullptr);
+    return inputSource->availableLevelTypes();
+}
+
+
+QStringList
+MSingleInputProcessingWeatherPredictionDataSource::availableVariables(
+        MVerticalLevelType levelType)
+{
+    assert(inputSource != nullptr);
+    return inputSource->availableVariables(levelType);
+}
+
+
+QSet<unsigned int>
+MSingleInputProcessingWeatherPredictionDataSource::availableEnsembleMembers(
+        MVerticalLevelType levelType, const QString& variableName)
+{
+    assert(inputSource != nullptr);
+    return inputSource->availableEnsembleMembers(levelType, variableName);
+}
+
+
+QList<QDateTime>
+MSingleInputProcessingWeatherPredictionDataSource::availableInitTimes(
+        MVerticalLevelType levelType, const QString& variableName)
+{
+    assert(inputSource != nullptr);
+    return inputSource->availableInitTimes(levelType, variableName);
+}
+
+
+QList<QDateTime>
+MSingleInputProcessingWeatherPredictionDataSource::availableValidTimes(
+        MVerticalLevelType levelType,
+        const QString& variableName, const QDateTime& initTime)
+{
+    assert(inputSource != nullptr);
+    return inputSource->availableValidTimes(levelType, variableName, initTime);
+}
+
+
+QString MSingleInputProcessingWeatherPredictionDataSource::variableLongName(
+        MVerticalLevelType levelType,
+        const QString& variableName)
+{
+    assert(inputSource != nullptr);
+    return inputSource->variableLongName(levelType, variableName);
+}
+
+
+QString MSingleInputProcessingWeatherPredictionDataSource::variableStandardName(
+        MVerticalLevelType levelType,
+        const QString& variableName)
+{
+    assert(inputSource != nullptr);
+    return inputSource->variableStandardName(levelType, variableName);
+}
+
+
+QString MSingleInputProcessingWeatherPredictionDataSource::variableUnits(
+        MVerticalLevelType levelType,
+        const QString& variableName)
+{
+    assert(inputSource != nullptr);
+    return inputSource->variableUnits(levelType, variableName);
+}
+
+
+/******************************************************************************
+***                          PROTECTED METHODS                              ***
+*******************************************************************************/
+
+
 
 
 } // namespace Met3D

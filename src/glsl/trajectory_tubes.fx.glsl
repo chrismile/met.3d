@@ -4,10 +4,14 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2015-2020 Marc Rautenhaus [*, previously +]
+**  Copyright 2020      Marcel Meyer [*]
 **
-**  Computer Graphics and Visualization Group
+**  + Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
+**
+**  * Regional Computing Center, Visualization
+**  Universitaet Hamburg, Hamburg, Germany
 **
 **  Met.3D is free software: you can redistribute it and/or modify
 **  it under the terms of the GNU General Public License as published by
@@ -36,12 +40,12 @@ const float M_INVALID_TRAJECTORY_POS = -999.99;
  ***                             UNIFORMS
  *****************************************************************************/
 
-uniform vec2 pToWorldZParams; // parameters to convert p[hPa] to world z
+uniform vec2 pToWorldZParams;            // parameters to convert p[hPa] to world z
 
-uniform mat4  mvpMatrix;            // model-view-projection
-uniform float radius;               // radius of the tube in world space
-uniform int   numObsPerTrajectory;  // number of "observations" (i.e. points)
-                                    // per trajectory
+uniform mat4  mvpMatrix;                 // model-view-projection
+uniform float radius;                    // radius of the tube in world space
+uniform int   numObsPerTrajectory;       // number of "observations" (i.e. points)
+                                         // per trajectory
 
 uniform sampler1D transferFunction;      // 1D transfer function
 uniform float     scalarMinimum;         // min/max data values to scale to 0..1
@@ -50,18 +54,30 @@ uniform vec3      lightDirection;        // light direction in world space
 uniform vec3      cameraPosition;        // camera position in world space
 uniform int       renderTubesUpToIndex;
 
+uniform bool renderAuxData;              // Define boolean for deciding which
+                                         // type of rendering
 
 /*****************************************************************************
  ***                           VERTEX SHADER
  *****************************************************************************/
 
 shader VSmain(in vec3 vertex : 0, in vec3 normal : 1,
-              out vec4 vs_vertex, out vec3 vs_normal, out int vs_vertexID)
+              in float auxDataAtVertex : 2, out vec4 vs_vertex,
+              out vec3 vs_normal, out int vs_vertexID)
 {
     // Convert pressure to world Z coordinate.
     float worldZ = (log(vertex.z) - pToWorldZParams.x) * pToWorldZParams.y;
+
     // Convert from world space to clip space.
-    vs_vertex = vec4(vertex.xy, worldZ, vertex.z);
+    // Define scalar value for rendering colors in 4th vertex component.
+    if (renderAuxData)
+    {
+        vs_vertex = vec4(vertex.xy, worldZ, auxDataAtVertex);
+    }
+    else
+    {
+        vs_vertex = vec4(vertex.xy, worldZ, vertex.z);
+    }
 
     // Pass normal and vertex ID to geometry shader.
     vs_normal   = normal;
