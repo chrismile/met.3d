@@ -4,11 +4,15 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2017 Marc Rautenhaus
-**  Copyright 2017      Bianca Tost
+**  Copyright 2015-2020 Marc Rautenhaus [*, previously +]
+**  Copyright 2020 Kameswarro Modali [*]
+**  Copyright 2017 Bianca Tost [+]
 **
-**  Computer Graphics and Visualization Group
+**  + Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
+**
+**  * Regional Computing Center, Visual Data Analysis Group
+**  Universitaet Hamburg, Hamburg, Germany
 **
 **  Met.3D is free software: you can redistribute it and/or modify
 **  it under the terms of the GNU General Public License as published by
@@ -282,13 +286,6 @@ void MGraticuleActor::onQtPropertyChanged(QtProperty *property)
         generateGeometry();
         emitActorChangedSignal();
     }
-    else if (property == rotateBBoxProperty)
-    {
-        rotateBBox = properties->mBool()->value(rotateBBoxProperty);
-        if (suppressActorUpdates()) return;
-        generateGeometry();
-        emitActorChangedSignal();
-    }
     else if (property == rotatedNorthPoleProperty)
     {
         rotatedNorthPole =
@@ -341,38 +338,17 @@ void MGraticuleActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
         if (mapProjection == MAPPROJECTION_ROTATEDLATLON)
         {
             int startIndex = 0;
-            if (rotateBBox)
+            for (int i = 0; i < nLats.size(); i++)
             {
-                // Start at index 1 since at index 0 the number of longitudes to
-                // be drawn is stored.
-                for (int j = 1; j < nLons.size(); j++)
-                {
-                    glDrawArrays(GL_LINE_STRIP, startIndex, nLons.at(j)); CHECK_GL_ERROR;
-                    startIndex = startIndex + nLons.at(j);
-                }
-                // Use the number of longitudes stored at index 0 to draw the
-                // longitudes.
-                for (int i = 0; i < nLons.at(0); i++)
-                {
-                    glDrawArrays(GL_LINE_STRIP, startIndex, nLats.at(0)); CHECK_GL_ERROR;
-                    startIndex = startIndex + nLats.at(0);
-                }
+                glDrawArrays(GL_LINE_STRIP, startIndex, nLats.at(i)); CHECK_GL_ERROR;
+                startIndex = startIndex + nLats.at(i);
             }
-            else
+            for (int i = 0; i < nLons.size(); i++)
             {
-                for (int i = 0; i < nLats.size(); i++)
-                {
-                    glDrawArrays(GL_LINE_STRIP, startIndex, nLats.at(i)); CHECK_GL_ERROR;
-                    startIndex = startIndex + nLats.at(i);
-                }
-                for (int i = 0; i < nLons.size(); i++)
-                {
-                    glDrawArrays(GL_LINE_STRIP, startIndex, nLons.at(i)); CHECK_GL_ERROR;
-                    startIndex = startIndex + nLons.at(i);
-                }
+                glDrawArrays(GL_LINE_STRIP, startIndex, nLons.at(i)); CHECK_GL_ERROR;
+                startIndex = startIndex + nLons.at(i);
             }
         }
-
         else if (mapProjection == MAPPROJECTION_PROJ_LIBRARY)
         {
             int startIndex = 0;
@@ -566,217 +542,6 @@ void MGraticuleActor::generateGeometry()
                         &centreLons, rotatedNorthPole.y(), rotatedNorthPole.x());
 
             bool label = true;
-            // Rotate graticule and bounding box.
-            if (rotateBBox)
-            {
-                // Draw rotated graticule only in the latitude range [-90,90] since
-                // otherwise graticule lines might overlap due to the rotation applied.
-                urcrnrlat = min( 90.f, urcrnrlat);
-                llcrnrlat = max(-90.f, llcrnrlat);
-                // Compute starting points (see starting point computation above).
-                float latstart = ceil(llcrnrlat / deltalat) * deltalat;
-                float lonstart = ceil(llcrnrlon / deltalon) * deltalon;
-
-                // Compute number of longitudes and latitudes.
-                int numlons = floor((urcrnrlon - lonstart) / deltalon) + 1;
-                int numlats = floor((urcrnrlat - latstart) / deltalat) + 1;
-
-                // Compute length of a latitude/longitude line in number of
-                // vertices (start, end, number of "crossing points"). This might
-                // differ from the number of lons and lats to be drawn if the
-                // bounding box does not start and/or end at lon/lat coordinates
-                // which can be divided by the according delta.
-                int lengthLat = ceil(urcrnrlon / deltalon)
-                        - floor(llcrnrlon / deltalon) + 1;
-                int lengthLon = ceil(urcrnrlat / deltalat)
-                        - floor(llcrnrlat / deltalat) + 1;
-
-                // Special case: The length of a latitude or longitude might be
-                // computed wrong if the size of the bounding box is 0 but the
-                // boundary coordinate cannot be divided by the delta of the
-                // according dimension (ceil and floor differ and do not eliminate
-                // each other but they should in this special case).
-                if (urcrnrlon == llcrnrlon)
-                {
-                    lengthLat = 1;
-                }
-                if (urcrnrlat == llcrnrlat)
-                {
-                    lengthLon = 1;
-                }
-                int countLons = 0;
-
-                // Since the length of lat/lon might differ from the number of
-                // lons/lats we want to draw, we need different indices to compute
-                // the position of a vertex in the vertices array (e.g. if the
-                // southern latitude of the bounding box is not divisible by
-                // deltalat, iLon starts with the bounding box boundary to draw the
-                // longitude from boundary to boundary but iLat starts with latstart
-                // since we draw latitudes (and longitudes) only at coordinates
-                // divisible by the range).
-                int iLon = 0;
-                int jLon = 0;
-                int iLat = 0;
-                int jLat = 0;
-                // Store number of longitudes at first position of nLons for later
-                // use to draw correct amout of longitudes.
-                nLons.append(numlons);
-                nLats.append(lengthLon);
-                int latVerticesCount = lengthLat * numlats;
-                verticesGraticule.resize(latVerticesCount + lengthLon * numlons);
-                bool lonLabel = false;
-
-                for (float lat = llcrnrlat; lat <= urcrnrlat; lat += deltalat)
-                {
-                    // Reset j indices (represents longitude coordinate in array
-                    // index computation).
-                    jLon = 0;
-                    jLat = 0;
-                    // Initialise previous longitudes with first longitude to avoid
-                    // discarding it.
-                    point->setX(MMOD(lonstart + 180., 360.) - 180.);
-                    point->setY(lat);
-                    MNaturalEarthDataLoader::geographicalToRotatedCoords(
-                                point, rotatedNorthPole.y(), rotatedNorthPole.x());
-                    prevPosition.setX(point->getX());
-                    prevPosition.setY(point->getY());
-                    for (float lon = llcrnrlon; lon <= urcrnrlon; lon += deltalon)
-                    {
-                        point->setX(MMOD(lon + 180., 360.) - 180.);
-                        point->setY(lat);
-                        if (!MNaturalEarthDataLoader::validConnectionBetweenPositions(
-                                    &prevPosition, &currPosition, point,
-                                    rotatedNorthPole.y(), rotatedNorthPole.x(),
-                                    &centreLons))
-                        {
-                            // Start new line.
-                            nLons.append(countLons);
-                            countLons = 0;
-                        }
-
-                        // Don't draw latitudes at latitude coordinates which cannot
-                        // be divided by deltalat but start longitude lines at
-                        // bounding box boundary.
-                        if (fmod(lat, deltalat) == 0.f)
-                        {
-                            verticesGraticule.replace(iLat * lengthLat + jLat,
-                                                      currPosition);
-                            ++countLons;
-                        }
-                        // Same for longitudes.
-                        if (fmod(lon, deltalon) == 0.f)
-                        {
-                            verticesGraticule.replace(
-                                        latVerticesCount + jLon * lengthLon + iLon,
-                                        currPosition);
-                        }
-
-                        ++jLat;
-
-                        // We might need to adapt lon if the distance between
-                        // llcrnrlon and the next node is not equal to deltalon
-                        // (detailed explanation see below).
-                        if (lon == llcrnrlon)
-                        {
-                            if (llcrnrlon != lonstart)
-                            {
-                                lon = lonstart - deltalon;
-                                continue;
-                            }
-                        }
-
-                        ++jLon;
-
-                        // Add longitude label.
-                        if (lat == llcrnrlat && lonLabel)
-                        {
-                            point->setX(MMOD(lon + 180., 360.) - 180.);
-                            point->setY(llcrnrlat);
-                            MNaturalEarthDataLoader::geographicalToRotatedCoords(
-                                        point, rotatedNorthPole.y(),
-                                        rotatedNorthPole.x());
-                            labels.append(tm->addText(
-                                              QString("%1").arg(lon),
-                                              MTextManager::LONLATP,
-                                              point->getX(), point->getY(),
-                                              verticalPosition_hPa, labelsize,
-                                              labelColour,
-                                              MTextManager::BASELINECENTRE,
-                                              labelbbox, labelBBoxColour)
-                                          );
-                        }
-                        lonLabel = !lonLabel; // alternate labelling of lines
-
-                        // We might need to adapt lon if the distance between
-                        // the second to last node's longitude and urcrnrlon is not
-                        // equal to deltalon (detailed explanation see below).
-                        if (lon + deltalon > urcrnrlon)
-                        {
-                            if (lon != urcrnrlon)
-                            {
-                                lon = urcrnrlon - deltalon;
-                                lonLabel = false;
-                            }
-                        }
-                    }
-
-                    nLons.append(countLons);
-                    countLons = 0;
-
-                    ++iLon;
-
-                    // We always start with llcrnrlat but its distance to the next
-                    // node of the graticule might not be deltalat (this is the
-                    // case if llcrnrlat is not divisble by deltalat). Thus we need
-                    // to manipulate lat so that after llcrnrlat the next greatest
-                    // latitude value divisible by deltalat (latstart) will follow.
-                    // We need to substract deltalat since the for loop will add it
-                    // for the next iteration.
-                    if (lat == llcrnrlat)
-                    {
-                        if (llcrnrlat != latstart)
-                        {
-                            lat = latstart - deltalat;
-                            continue;
-                        }
-                    }
-
-                    ++iLat;
-
-                    if (label)
-                    {
-                        point->setX(MMOD(urcrnrlon + 180., 360.) - 180.);
-                        point->setY(lat);
-                        MNaturalEarthDataLoader::geographicalToRotatedCoords(
-                                    point, rotatedNorthPole.y(),
-                                    rotatedNorthPole.x());
-                        labels.append(tm->addText(
-                                          QString("%1").arg(lat),
-                                          MTextManager::LONLATP,
-                                          point->getX(), point->getY(),
-                                          verticalPosition_hPa, labelsize,
-                                          labelColour, MTextManager::BASELINECENTRE,
-                                          labelbbox, labelBBoxColour)
-                                      );
-                    }
-                    label = !label; // alternate labelling of lines
-
-                    // If the distance betweene the second to last node's latitude
-                    // coordinate and urcrnrlat is smaller than deltalat, we need
-                    // to adapt lat after reaching the second to last latitude so
-                    // that the we end at urcrnrlat as last latitude coordinate.
-                    if (lat + deltalat > urcrnrlat)
-                    {
-                        if (lat != urcrnrlat)
-                        {
-                            lat = urcrnrlat - deltalat;
-                            label = false;
-                        }
-                    }
-                } // for latitudes.
-            } // if rotateBBox
-            // Rotate graticule but not bounding box (represents rotated coordinates).
-            else
             {
                 int numVertices = 0;
 
@@ -1036,7 +801,7 @@ void MGraticuleActor::generateGeometry()
                     label = !label;
                     lonStart = llcrnrlon;
                 } // for longitudes.
-            } // else rotateBBox
+            }
             // Clean up.
             delete point;
         } // else !useRotation
@@ -1174,267 +939,12 @@ void MGraticuleActor::updateLatLonLines(QRectF cornerRect)
     MNaturalEarthDataLoader::getCentreLons(
                 &centreLons, rotatedNorthPole.y(), rotatedNorthPole.x());
 
-    bool label = true;
-    // Rotate graticule and bounding box.
-    if (rotateBBox)
-    {
-        // Draw rotated graticule only in the latitude range [-90,90] since
-        // otherwise graticule lines might overlap due to the rotation applied.
-        urcrnrlat = min( 90.f, urcrnrlat);
-        llcrnrlat = max(-90.f, llcrnrlat);
-        // Compute starting points (see starting point computation above).
-        float latstart = ceil(llcrnrlat / deltalat) * deltalat;
-        float lonstart = ceil(llcrnrlon / deltalon) * deltalon;
-
-        // Compute number of longitudes and latitudes.
-        int numlons = floor((urcrnrlon - lonstart) / deltalon) + 1;
-        int numlats = floor((urcrnrlat - latstart) / deltalat) + 1;
-
-        // Compute length of a latitude/longitude line in number of
-        // vertices (start, end, number of "crossing points"). This might
-        // differ from the number of lons and lats to be drawn if the
-        // bounding box does not start and/or end at lon/lat coordinates
-        // which can be divided by the according delta.
-        int lengthLat = ceil(urcrnrlon / deltalon)
-                - floor(llcrnrlon / deltalon) + 1;
-        int lengthLon = ceil(urcrnrlat / deltalat)
-                - floor(llcrnrlat / deltalat) + 1;
-
-        // Special case: The length of a latitude or longitude might be
-        // computed wrong if the size of the bounding box is 0 but the
-        // boundary coordinate cannot be divided by the delta of the
-        // according dimension (ceil and floor differ and do not eliminate
-        // each other but they should in this special case).
-        if (urcrnrlon == llcrnrlon)
-        {
-            lengthLat = 1;
-        }
-        if (urcrnrlat == llcrnrlat)
-        {
-            lengthLon = 1;
-        }
-        int countLons = 0;
-
-        // Since the length of lat/lon might differ from the number of
-        // lons/lats we want to draw, we need different indices to compute
-        // the position of a vertex in the vertices array (e.g. if the
-        // southern latitude of the bounding box is not divisible by
-        // deltalat, iLon starts with the bounding box boundary to draw the
-        // longitude from boundary to boundary but iLat starts with latstart
-        // since we draw latitudes (and longitudes) only at coordinates
-        // divisible by the range).
-        int iLon = 0;
-        int jLon = 0;
-        int iLat = 0;
-        int jLat = 0;
-        // Store number of longitudes at first position of nLons for later
-        // use to draw correct amout of longitudes.
-        nLons.append(numlons);
-        nLats.append(lengthLon);
-        int latVerticesCount = lengthLat * numlats;
-        verticesGraticule.resize(latVerticesCount + lengthLon * numlons);
-        bool lonLabel = false;
-
-        for (float lat = llcrnrlat; lat <= urcrnrlat; lat += deltalat)
-        {
-            // Reset j indices (represents longitude coordinate in array
-            // index computation).
-            jLon = 0;
-            jLat = 0;
-            // Initialise previous longitudes with first longitude to avoid
-            // discarding it.
-            point->setX(MMOD(lonstart + 180., 360.) - 180.);
-            point->setY(lat);
-            MNaturalEarthDataLoader::geographicalToRotatedCoords(
-                        point, rotatedNorthPole.y(), rotatedNorthPole.x());
-            prevPosition.setX(point->getX());
-            prevPosition.setY(point->getY());
-            for (float lon = llcrnrlon; lon <= urcrnrlon; lon += deltalon)
-            {
-                point->setX(MMOD(lon + 180., 360.) - 180.);
-                point->setY(lat);
-                if (!MNaturalEarthDataLoader::validConnectionBetweenPositions(
-                            &prevPosition, &currPosition, point,
-                            rotatedNorthPole.y(), rotatedNorthPole.x(),
-                            &centreLons))
-                {
-                    // Start new line.
-                    nLons.append(countLons);
-                    countLons = 0;
-                }
-
-                // Don't draw latitudes at latitude coordinates which cannot
-                // be divided by deltalat but start longitude lines at
-                // bounding box boundary.
-                if (fmod(lat, deltalat) == 0.f)
-                {
-                    verticesGraticule.replace(iLat * lengthLat + jLat,
-                                              currPosition);
-                    ++countLons;
-                }
-                // Same for longitudes.
-                if (fmod(lon, deltalon) == 0.f)
-                {
-                    verticesGraticule.replace(
-                                latVerticesCount + jLon * lengthLon + iLon,
-                                currPosition);
-                }
-
-                ++jLat;
-
-                // We might need to adapt lon if the distance between
-                // llcrnrlon and the next node is not equal to deltalon
-                // (detailed explanation see below).
-                if (lon == llcrnrlon)
-                {
-                    if (llcrnrlon != lonstart)
-                    {
-                        lon = lonstart - deltalon;
-                        continue;
-                    }
-                }
-
-                ++jLon;
-
-                // Add longitude label.
-                if (lat == llcrnrlat && lonLabel)
-                {
-                    point->setX(MMOD(lon + 180., 360.) - 180.);
-                    point->setY(llcrnrlat);
-                    MNaturalEarthDataLoader::geographicalToRotatedCoords(
-                                point, rotatedNorthPole.y(),
-                                rotatedNorthPole.x());
-                    labels.append(tm->addText(
-                                      QString("%1").arg(lon),
-                                      MTextManager::LONLATP,
-                                      point->getX(), point->getY(),
-                                      verticalPosition_hPa, labelsize,
-                                      labelColour,
-                                      MTextManager::BASELINECENTRE,
-                                      labelbbox, labelBBoxColour)
-                                  );
-                }
-                lonLabel = !lonLabel; // alternate labelling of lines
-
-                // We might need to adapt lon if the distance between
-                // the second to last node's longitude and urcrnrlon is not
-                // equal to deltalon (detailed explanation see below).
-                if (lon + deltalon > urcrnrlon)
-                {
-                    if (lon != urcrnrlon)
-                    {
-                        lon = urcrnrlon - deltalon;
-                        lonLabel = false;
-                    }
-                }
-            }
-
-            nLons.append(countLons);
-            countLons = 0;
-
-            ++iLon;
-
-            // We always start with llcrnrlat but its distance to the next
-            // node of the graticule might not be deltalat (this is the
-            // case if llcrnrlat is not divisble by deltalat). Thus we need
-            // to manipulate lat so that after llcrnrlat the next greatest
-            // latitude value divisible by deltalat (latstart) will follow.
-            // We need to substract deltalat since the for loop will add it
-            // for the next iteration.
-            if (lat == llcrnrlat)
-            {
-                if (llcrnrlat != latstart)
-                {
-                    lat = latstart - deltalat;
-                    continue;
-                }
-            }
-
-            ++iLat;
-
-            if (label)
-            {
-                point->setX(MMOD(urcrnrlon + 180., 360.) - 180.);
-                point->setY(lat);
-                MNaturalEarthDataLoader::geographicalToRotatedCoords(
-                            point, rotatedNorthPole.y(),
-                            rotatedNorthPole.x());
-                labels.append(tm->addText(
-                                  QString("%1").arg(lat),
-                                  MTextManager::LONLATP,
-                                  point->getX(), point->getY(),
-                                  verticalPosition_hPa, labelsize,
-                                  labelColour, MTextManager::BASELINECENTRE,
-                                  labelbbox, labelBBoxColour)
-                              );
-            }
-            label = !label; // alternate labelling of lines
-
-            // If the distance betweene the second to last node's latitude
-            // coordinate and urcrnrlat is smaller than deltalat, we need
-            // to adapt lat after reaching the second to last latitude so
-            // that the we end at urcrnrlat as last latitude coordinate.
-            if (lat + deltalat > urcrnrlat)
-            {
-                if (lat != urcrnrlat)
-                {
-                    lat = urcrnrlat - deltalat;
-                    label = false;
-                }
-            }
-        } // for latitudes.
-    } // if rotateBBox
-    // Draw projected lat-lon graticule lines in a rectangle.
-    else
     {
         cutWithBoundingBox(cornerRect);
     } // else do not rotateBBox
 
     // Clean up.
     delete point;
-
-    // This method is currently disabled 
-    // ToDo: make it work and pass the correct flag: stereoBBox and not rotateBBox which  
-    // is copied from the old rotated lat-lon code 
-    if (rotateBBox)
-    {
-        QVector<QVector2D> projectedVerticesGraticule;
-        projectedVerticesGraticule =
-                naturalEarthDataLoader->projectGeographicalLatLonCoords(
-                    verticesGraticule,this->projLibraryString);
-
-        // generate data item key for every vertex buffer object wrt the actor
-        const QString graticuleRequestKey = QString("graticule_vertices_actor#")
-                                        + QString::number(getID());
-        uploadVec2ToVertexBuffer(projectedVerticesGraticule, graticuleRequestKey,
-                             &graticuleVertexBuffer);
-
-        // Required for the glDrawArrays() call in renderToCurrentContext().
-        numVerticesGraticule = projectedVerticesGraticule.size();
-
-        // Update the lable position co-ordinates
-        QVector<QVector2D> labelAnchorVector;
-        QVector<QVector2D> projectedLabelAnchorVector;
-        int index = 0;
-        foreach (MLabel* label, labels)
-        {
-            QVector2D anchorPoint;
-            anchorPoint.setX(label->anchor.x());
-            anchorPoint.setY(label->anchor.y());
-            labelAnchorVector.append(anchorPoint);
-        }
-
-        projectedLabelAnchorVector =
-                naturalEarthDataLoader->projectGeographicalLatLonCoords(
-                    labelAnchorVector, this->projLibraryString);
-
-        foreach (MLabel* label, labels)
-        {
-            label->anchor.setX(projectedLabelAnchorVector[index].x());
-            label->anchor.setY(projectedLabelAnchorVector[index].y());
-            index++;
-        }
-    }
 }
 
 
@@ -1842,28 +1352,14 @@ void MGraticuleActor::updateCoastalLines(QRectF cornerRect)
     {
         if (mapProjection == MAPPROJECTION_ROTATEDLATLON)
         {
-            if (rotateBBox)
-            {
-                naturalEarthDataLoader->loadAndRotateLineGeometry(
-                            MNaturalEarthDataLoader::COASTLINES,
-                            cornerRect,
-                            &verticesCoastlines,
-                            &coastlineStartIndices,
-                            &coastlineVertexCount,
-                            false, rotatedNorthPole.y(),
-                            rotatedNorthPole.x());  // clear vectors
-            }
-            else
-            {
-                naturalEarthDataLoader->loadAndRotateLineGeometryUsingRotatedBBox(
-                            MNaturalEarthDataLoader::COASTLINES,
-                            cornerRect,
-                            &verticesCoastlines,
-                            &coastlineStartIndices,
-                            &coastlineVertexCount,
-                            false, rotatedNorthPole.y(),
-                            rotatedNorthPole.x());  // clear vectors
-            }
+            naturalEarthDataLoader->loadAndRotateLineGeometryUsingRotatedBBox(
+                        MNaturalEarthDataLoader::COASTLINES,
+                        cornerRect,
+                        &verticesCoastlines,
+                        &coastlineStartIndices,
+                        &coastlineVertexCount,
+                        false, rotatedNorthPole.y(),
+                        rotatedNorthPole.x());  // clear vectors
         }
         else
         {
@@ -1879,36 +1375,7 @@ void MGraticuleActor::updateCoastalLines(QRectF cornerRect)
     }
     else // Projected case.
     {
-        if (rotateBBox)
         {
-            // this option is disabled, hence should never enter this loop
-            // ToDo: need to correct the flat to stereoBBox
-
-//        naturalEarthDataLoader->loadAndRotateLineGeometry(
-//                    MNaturalEarthDataLoader::COASTLINES,
-//                    cornerRect,
-//                    &verticesCoastlines,
-//                    &coastlineStartIndices,
-//                    &coastlineVertexCount,
-//                    false, rotatedNorthPole.y(),
-//                    rotatedNorthPole.x());  // clear vectors
-
-//        QVector<QVector2D> stereographicVerticesCoastlines;
-//        stereographicVerticesCoastlines =
-//		  naturalEarthDataLoader->convertRegularLatLonToPolarStereographicCoords(
-//                        verticesCoastlines,
-//                        this->stereoStandardLat,
-//                        this->stereoStraightLon);
-            
-
-//            //  generate data item key for every vertex buffer object wrt the actor
-//            const QString coastRequestKey = "graticule_coastlines_actor#"
-//                                   + QString::number(getID());
-//            uploadVec2ToVertexBuffer(stereographicVerticesCoastlines, coastRequestKey,
-//            &coastlineVertexBuffer);
-      }
-      else
-      {
             QVector<QVector2D> projectedVerticesCoastlines;
 	    
             naturalEarthDataLoader->loadAndTransformProjectedLineGeometryAndCutUsingBBox(
@@ -1940,28 +1407,14 @@ void MGraticuleActor::updateBorderLines(QRectF cornerRect)
     {
         if (mapProjection == MAPPROJECTION_ROTATEDLATLON)
         {
-            if (rotateBBox)
-            {
-                naturalEarthDataLoader->loadAndRotateLineGeometry(
-                            MNaturalEarthDataLoader::BORDERLINES,
-                            cornerRect,
-                            &verticesBorderlines,
-                            &borderlineStartIndices,
-                            &borderlineVertexCount,
-                            false, rotatedNorthPole.y(),
-                            rotatedNorthPole.x());  // clear vectors
-            }
-            else
-            {
-                naturalEarthDataLoader->loadAndRotateLineGeometryUsingRotatedBBox(
-                            MNaturalEarthDataLoader::BORDERLINES,
-                            cornerRect,
-                            &verticesBorderlines,
-                            &borderlineStartIndices,
-                            &borderlineVertexCount,
-                            false, rotatedNorthPole.y(),
-                            rotatedNorthPole.x());  // clear vectors
-            }
+            naturalEarthDataLoader->loadAndRotateLineGeometryUsingRotatedBBox(
+                        MNaturalEarthDataLoader::BORDERLINES,
+                        cornerRect,
+                        &verticesBorderlines,
+                        &borderlineStartIndices,
+                        &borderlineVertexCount,
+                        false, rotatedNorthPole.y(),
+                        rotatedNorthPole.x());  // clear vectors
         }
         else
         {
@@ -1978,33 +1431,6 @@ void MGraticuleActor::updateBorderLines(QRectF cornerRect)
     }
     else // Projected case.
     {
-        if(rotateBBox)
-        {
-            // this is disabled, as above. ToDo: either enable and fix or delete.
-//            naturalEarthDataLoader->loadAndRotateLineGeometry(
-//                        MNaturalEarthDataLoader::BORDERLINES,
-//                        cornerRect,
-//                        &verticesBorderlines,
-//                        &borderlineStartIndices,
-//                        &borderlineVertexCount,
-//                        false, rotatedNorthPole.y(),
-//                        rotatedNorthPole.x());  // clear vectors
-//            QVector<QVector2D> stereographicVerticesBorderlines;
-//		    //naturalEarthDataLoader->convertRegularLatLonToPolarStereographicCoords(
-//                    //    verticesBorderlines,
-//                    //    this->stereoStandardLat,
-//                    //    this->stereoStraightLon,
-//                    //    stereoGridScaleFactor,
-//                    //    stereoGridUnit_m);
-
-//            const QString borderRequestKey = "graticule_borderlines_actor#"
-//                                             + QString::number(getID());
-
-//            uploadVec2ToVertexBuffer(stereographicVerticesBorderlines,
-//                                     borderRequestKey,
-//                                     &borderlineVertexBuffer);
-        }
-        else
         {
             QVector<QVector2D> projectedVerticesBorderlines;
             

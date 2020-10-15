@@ -11,7 +11,7 @@
 **  + Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
 **
-**  * Regional Computing Center, Visual Data Analysis
+**  * Regional Computing Center, Visual Data Analysis Group
 **  Universitaet Hamburg, Hamburg, Germany
 **
 **  Met.3D is free software: you can redistribute it and/or modify
@@ -85,7 +85,7 @@ public:
       Call this method from onQtPropertyChanged() implementations to update
       the map projection parameters when the projection type has been changed.
      */
-    void updateMapProjectionProperties();
+    virtual void updateMapProjectionProperties();
 
     static QString mapProjectionToString(MapProjectionType mapProjection);
     static MapProjectionType stringToMapProjection(QString mapProjection);
@@ -95,10 +95,9 @@ protected:
 
     QtProperty *mapProjectionTypesProperty;
     MapProjectionType mapProjection;
+    MapProjectionType previousMapProjection;
 
     // Rotated lat-lon grid.
-    bool rotateBBox;
-    QtProperty *rotateBBoxProperty;
     QPointF rotatedNorthPole;
     QtProperty *rotatedNorthPoleProperty;
 

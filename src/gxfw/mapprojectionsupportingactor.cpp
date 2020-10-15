@@ -11,7 +11,7 @@
 **  + Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
 **
-**  * Regional Computing Center, Visual Data Analysis
+**  * Regional Computing Center, Visual Data Analysis Group
 **  Universitaet Hamburg, Hamburg, Germany
 **
 **  Met.3D is free software: you can redistribute it and/or modify
@@ -58,9 +58,10 @@ namespace Met3D
 MMapProjectionSupportingActor::MMapProjectionSupportingActor(QList<MapProjectionType> supportedProjections)
     : MActor(),
       mapProjection(MAPPROJECTION_CYLINDRICAL),
-      rotateBBox(false),
-      rotatedNorthPole(QPointF(-180., 90.)),
-      projLibraryDefaultString("+proj=stere +a=6378273 +b=6356889.44891 +lat_0=90 +lat_ts=70 +lon_0=0"),
+      previousMapProjection(MAPPROJECTION_CYLINDRICAL),
+      rotatedNorthPole(QPointF(-170., 40.)),
+      projLibraryDefaultString(
+          "+proj=stere +a=6378273 +b=6356889.44891 +lat_0=90 +lat_ts=70 +lon_0=0"),
       projLibraryString(projLibraryDefaultString)
 {
     // Create and initialise QtProperties for the GUI.
@@ -84,11 +85,6 @@ MMapProjectionSupportingActor::MMapProjectionSupportingActor(QList<MapProjection
     properties->mEnum()->setValue(mapProjectionTypesProperty, mapProjection);
 
     // Inputs for rotated lat-lon projection.
-    rotateBBoxProperty = addProperty(BOOL_PROPERTY, "rotate bounding box",
-                                     mapProjectionPropertiesSubGroup);
-    properties->mBool()->setValue(rotateBBoxProperty, rotateBBox);
-    rotateBBoxProperty->setEnabled(false);
-
     rotatedNorthPoleProperty = addProperty(
                 POINTF_LONLAT_PROPERTY, "rotated north pole",
                 mapProjectionPropertiesSubGroup);
@@ -127,7 +123,6 @@ void MMapProjectionSupportingActor::saveConfiguration(QSettings *settings)
     settings->beginGroup(MMapProjectionSupportingActor::getSettingsID());
 
     settings->setValue("mapProjection", mapProjectionToString(mapProjection));
-    settings->setValue("rotateBoundingBox", rotateBBox);
     settings->setValue("rotatedNorthPole", rotatedNorthPole);
     settings->setValue("projString", projLibraryString);
 
@@ -144,9 +139,6 @@ void MMapProjectionSupportingActor::loadConfiguration(QSettings *settings)
                     (settings->value("mapProjection",
                                      mapProjectionToString(MAPPROJECTION_CYLINDRICAL))
                      ).toString()));
-    properties->mBool()->setValue(
-                rotateBBoxProperty,
-                settings->value("rotateBoundingBox", false).toBool());
     properties->mPointF()->setValue(
                 rotatedNorthPoleProperty,
                 settings->value("rotatedNorthPole",
@@ -167,25 +159,24 @@ void MMapProjectionSupportingActor::updateMapProjectionProperties()
     MapProjectionType projIndex = stringToMapProjection(
                 properties->getEnumItem(mapProjectionTypesProperty));
 
+    previousMapProjection = mapProjection;
+
     switch (projIndex)
     {
     case MAPPROJECTION_CYLINDRICAL:
         mapProjection = MAPPROJECTION_CYLINDRICAL;
-        rotateBBoxProperty->setEnabled(false);
         rotatedNorthPoleProperty->setEnabled(false);
         projLibraryStringProperty->setEnabled(false);
         projLibraryApplyProperty->setEnabled(false);
         break;
     case MAPPROJECTION_ROTATEDLATLON:
         mapProjection = MAPPROJECTION_ROTATEDLATLON;
-        rotateBBoxProperty->setEnabled(true);
         rotatedNorthPoleProperty->setEnabled(true);
         projLibraryStringProperty->setEnabled(false);
         projLibraryApplyProperty->setEnabled(false);
         break;
     case MAPPROJECTION_PROJ_LIBRARY:
         mapProjection = MAPPROJECTION_PROJ_LIBRARY;
-        rotateBBoxProperty->setEnabled(false);
         rotatedNorthPoleProperty->setEnabled(false);
         projLibraryStringProperty->setEnabled(true);
         projLibraryApplyProperty->setEnabled(true);

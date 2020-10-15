@@ -64,8 +64,12 @@ const double EARTH_RADIUS_km = 6371.; // km
 // Source: http://hpiers.obspm.fr/eop-pc/models/constants.html
 const double EARTHS_ANGULAR_SPEED_OF_ROTATION = 7.292115E-5; // rad/s
 
-// Scaling factor for projections
-const double scaleFactorToFitProjectedCoordsTo360Range = 1000.0;
+// Scaling factor for projections, since Met.3D has originally been designed
+// such that horizontal coordinates are in the range (-180..180 and -90..90)
+// (lon and lat). For projection coordinates that are given in e.g. meters,
+// we need to scale to fit into that range. Example: 1.e6 will scale
+// stereographic units in m to 10^3 km.
+const double scaleFactorToFitProjectedCoordsTo360Range = 1.e6;
 }
 
 

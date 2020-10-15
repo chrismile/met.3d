@@ -4,12 +4,16 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2017 Marc Rautenhaus
-**  Copyright 2015      Michael Kern
-**  Copyright 2017      Bianca Tost
+**  Copyright 2015-2020 Marc Rautenhaus [*, previously +]
+**  Copyright 2020 Kameswarro Modali [*]
+**  Copyright 2015 Michael Kern [+]
+**  Copyright 2017 Bianca Tost [+]
 **
-**  Computer Graphics and Visualization Group
+**  + Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
+**
+**  * Regional Computing Center, Visual Data Analysis Group
+**  Universitaet Hamburg, Hamburg, Germany
 **
 **  Met.3D is free software: you can redistribute it and/or modify
 **  it under the terms of the GNU General Public License as published by
@@ -79,6 +83,8 @@ public:
 
     void onBoundingBoxChanged() override;
 
+    void updateMapProjectionProperties() override;
+
 protected:
     /**
       Loads the shader programs and generates the graticule geometry. The
@@ -91,17 +97,7 @@ protected:
     void renderToCurrentContext(MSceneViewGLWidget *sceneView);
 
 private:
-    void loadMap(std::string filename);
-
-    void LoadGDALDataset(GDALDataset* dataset);
-    /**
-      @brief getBBoxOfRotatedBBox calcuates a rectangle bounding box in
-      rotated coordinates covering the region of a complete map.
-
-      @return QVector4D storing coordinates of the corners of the bounding box
-      computed stored in the order leftX, lowerY, rightX, upperY.
-     */
-    QVector4D getBBoxOfRotatedBBox();
+    void loadMap();
 
     /**
       adaptBBoxForRotatedGrids changes @ref bboxForRotatedGrids to contain

@@ -1464,11 +1464,11 @@ MStructuredGrid *MClimateForecastReader::readGrid(
             string units = "";
             float scaleFactor = MetConstants::scaleFactorToFitProjectedCoordsTo360Range;
             shared->lonVar.getAtt("units").getValues(units);
-            if (units == "m")
+            if (units == "km")
             {
-                scaleFactor *= 1000.0f;
+                scaleFactor /= 1000.0f;
             }
-            else if (units != "km")
+            else if (units != "m")
             {
                 LOG4CPLUS_ERROR(mlog, "ERROR: stereographic coordinates x,y have unknown units.");
             }

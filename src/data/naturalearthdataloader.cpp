@@ -1261,8 +1261,6 @@ QVector<QVector2D> MNaturalEarthDataLoader::projectGeographicalLatLonCoords(
     // define output array
     QVector<QVector2D> projectedVerticesVector;
     double currentLat, currentLon;
-    float projectionCoordsScaleFactor =
-            MetConstants::scaleFactorToFitProjectedCoordsTo360Range;
     int errorCodeProjLibrary;
 
     // Proj4 variables.
@@ -1282,10 +1280,8 @@ QVector<QVector2D> MNaturalEarthDataLoader::projectGeographicalLatLonCoords(
 
         errorCodeProjLibrary = pj_transform(pjLatlon, pjProj, 1, 1, &currentLon, &currentLat, NULL);
 
-        projectedPoint.setX(currentLon/
-                            (projectionCoordsScaleFactor * projectionCoordsScaleFactor));
-        projectedPoint.setY(currentLat/
-                            (projectionCoordsScaleFactor * projectionCoordsScaleFactor));
+        projectedPoint.setX(currentLon / MetConstants::scaleFactorToFitProjectedCoordsTo360Range);
+        projectedPoint.setY(currentLat / MetConstants::scaleFactorToFitProjectedCoordsTo360Range);
         projectedVerticesVector.append(projectedPoint);
 
         if (errorCodeProjLibrary)
