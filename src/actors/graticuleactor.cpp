@@ -42,6 +42,7 @@
 #include "gxfw/mglresourcesmanager.h"
 #include "gxfw/msceneviewglwidget.h"
 #include "gxfw/textmanager.h"
+#include "util/geometryhandling.h"
 
 using namespace std;
 
@@ -335,76 +336,40 @@ void MGraticuleActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); CHECK_GL_ERROR;
         glLineWidth(1); CHECK_GL_ERROR;
 
-        if (mapProjection == MAPPROJECTION_ROTATEDLATLON)
-        {
-            int startIndex = 0;
-            for (int i = 0; i < nLats.size(); i++)
-            {
-                glDrawArrays(GL_LINE_STRIP, startIndex, nLats.at(i)); CHECK_GL_ERROR;
-                startIndex = startIndex + nLats.at(i);
-            }
-            for (int i = 0; i < nLons.size(); i++)
-            {
-                glDrawArrays(GL_LINE_STRIP, startIndex, nLons.at(i)); CHECK_GL_ERROR;
-                startIndex = startIndex + nLons.at(i);
-            }
-        }
-        else if (mapProjection == MAPPROJECTION_PROJ_LIBRARY)
-        {
-            int startIndex = 0;
-            for (int i = 0; i < nLats.size(); i++)
-            {
-                glDrawArrays(GL_LINE_STRIP, startIndex, nLats.at(i)); CHECK_GL_ERROR;
-                startIndex = startIndex + nLats.at(i);
-            }
-            for (int i = 0; i < nLons.size(); i++)
-            {
-                glDrawArrays(GL_LINE_STRIP, startIndex, nLons.at(i)); CHECK_GL_ERROR;
-                startIndex = startIndex + nLons.at(i);
-            }
-        }
-        else
-        {
-            glDrawArrays(GL_LINES, 0, numVerticesGraticule); CHECK_GL_ERROR;
-        }
+        glMultiDrawArrays(GL_LINE_STRIP,
+                          graticuleStartIndices.constData(),
+                          graticuleVertexCount.constData(),
+                          graticuleStartIndices.size()); CHECK_GL_ERROR;
     }
 
     if (drawCoastLines)
     {
-        if (coastLinesCountIsValid)
-        {
-            // Draw coastlines.
-            coastlineVertexBuffer->attachToVertexAttribute(
-                        SHADER_VERTEX_ATTRIBUTE);
-            CHECK_GL_ERROR;
+        // Draw coastlines.
+        coastlineVertexBuffer->attachToVertexAttribute(SHADER_VERTEX_ATTRIBUTE);
+        CHECK_GL_ERROR;
 
-            glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); CHECK_GL_ERROR;
-            glLineWidth(2); CHECK_GL_ERROR;
+        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); CHECK_GL_ERROR;
+        glLineWidth(2); CHECK_GL_ERROR;
 
-            glMultiDrawArrays(GL_LINE_STRIP,
-                              coastlineStartIndices.constData(),
-                              coastlineVertexCount.constData(),
-                              coastlineStartIndices.size()); CHECK_GL_ERROR;
-        }
+        glMultiDrawArrays(GL_LINE_STRIP,
+                          coastlineStartIndices.constData(),
+                          coastlineVertexCount.constData(),
+                          coastlineStartIndices.size()); CHECK_GL_ERROR;
     }
 
     if (drawBorderLines)
     {
-        if (borderLinesCountIsValid)
-        {
-            // Draw borderlines.
-            borderlineVertexBuffer->attachToVertexAttribute(
-                        SHADER_VERTEX_ATTRIBUTE);
-            CHECK_GL_ERROR;
+        // Draw borderlines.
+        borderlineVertexBuffer->attachToVertexAttribute(SHADER_VERTEX_ATTRIBUTE);
+        CHECK_GL_ERROR;
 
-            glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); CHECK_GL_ERROR;
-            glLineWidth(1); CHECK_GL_ERROR;
+        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); CHECK_GL_ERROR;
+        glLineWidth(1); CHECK_GL_ERROR;
 
-            glMultiDrawArrays(GL_LINE_STRIP,
-                              borderlineStartIndices.constData(),
-                              borderlineVertexCount.constData(),
-                              borderlineStartIndices.size()); CHECK_GL_ERROR;
-        }
+        glMultiDrawArrays(GL_LINE_STRIP,
+                          borderlineStartIndices.constData(),
+                          borderlineVertexCount.constData(),
+                          borderlineStartIndices.size()); CHECK_GL_ERROR;
     }
 
     glBindBuffer(GL_ARRAY_BUFFER, 0); CHECK_GL_ERROR;
@@ -415,8 +380,87 @@ void MGraticuleActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
 ***                           PRIVATE METHODS                               ***
 *******************************************************************************/
 
+void MGraticuleActor::generateGeometryNewGeometryHandling()
+{
+    // Generate nothing if no bounding box is available.
+    if (bBoxConnection->getBoundingBox() == nullptr)
+    {
+        return;
+    }
+    // Make sure that "glResourcesManager" is the currently active context,
+    // otherwise glDrawArrays on the VBO generated here will fail in any other
+    // context than the currently active. The "glResourcesManager" context is
+    // shared with all visible contexts, hence modifying the VBO there works
+    // fine.
+    MGLResourcesManager* glRM = MGLResourcesManager::getInstance();
+    glRM->makeCurrent();
+
+    LOG4CPLUS_DEBUG(mlog, "generating graticule geometry" << flush);
+
+    QVector2D spacing(properties->mPointF()->value(spacingProperty));
+
+//TODO: add properties for graticule limits in addition to clipping bbox
+    QVector2D lonLatStart(-180., -90.);
+    QVector2D lonLatEnd(180., 80.);
+
+    QRectF bbox = bBoxConnection->horizontal2DCoords();
+
+    float deltalat  = spacing.y();
+    float deltalon  = spacing.x();
+
+//TODO: move to onQtPropertyChanged or restrict property ranges
+    // Check for zero or negative spacing between the graticule lines.
+    if (deltalon <= 0.)
+    {
+        deltalon = 1.;
+        properties->mPointF()->setValue(spacingProperty,
+                                        QPointF(deltalon, deltalat));
+    }
+    if (deltalat <= 0.)
+    {
+        deltalat = 1.;
+        properties->mPointF()->setValue(spacingProperty,
+                                        QPointF(deltalon, deltalat));
+    }
+
+    MGeometryHandling geo;
+    // Make geo member variable.
+    // Create global graticule / coastlines and keep
+    // on re-generation only perform projection and clipping
+
+    QVector<QPolygonF> graticule = geo.generate2DGraticuleGeometry(
+                lonLatStart, lonLatEnd, spacing, spacing/10.);
+
+    if (mapProjection == MAPPROJECTION_PROJ_LIBRARY)
+    {
+        geo.initProjProjection(projLibraryString);
+        graticule = geo.geographicalToProjectedCoordinates(graticule);
+    }
+
+    graticule = geo.clipPolygons(graticule, bbox);
+
+    // Append all graticule lines to this vector.
+    QVector<QVector2D> verticesGraticule;
+    graticuleStartIndices.clear();
+    graticuleVertexCount.clear();
+    geo.flattenPolygonsToVertexList(graticule,
+                                    &verticesGraticule,
+                                    &graticuleStartIndices,
+                                    &graticuleVertexCount);
+
+    // generate data item key for every vertex buffer object wrt the actor
+    const QString graticuleRequestKey = QString("graticule_vertices_actor#")
+                                        + QString::number(getID());
+    uploadVec2ToVertexBuffer(verticesGraticule, graticuleRequestKey,
+                             &graticuleVertexBuffer);
+}
+
+
 void MGraticuleActor::generateGeometry()
 {
+    generateGeometryNewGeometryHandling();
+    return;
+
     // Generate nothing if no bounding box is available.
     if (bBoxConnection->getBoundingBox() == nullptr)
     {

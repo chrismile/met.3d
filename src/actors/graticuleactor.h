@@ -104,6 +104,8 @@ protected:
     void renderToCurrentContext(MSceneViewGLWidget *sceneView);
 
 private:
+    void generateGeometryNewGeometryHandling();
+
     /**
       Generates the graticule geometry and uploads it to a vertex buffer.
       ToDo: add a short summary / documentation
@@ -152,6 +154,9 @@ private:
     std::shared_ptr<GL::MShaderEffect> shaderProgram;
 
     GL::MVertexBuffer* graticuleVertexBuffer;
+    QVector<int> graticuleStartIndices;
+    QVector<int> graticuleVertexCount;
+//TODO remove
     uint   numVerticesGraticule;
 
     QVector<int> nLats;

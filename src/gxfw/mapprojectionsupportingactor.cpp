@@ -155,7 +155,9 @@ void MMapProjectionSupportingActor::loadConfiguration(QSettings *settings)
 
 
 void MMapProjectionSupportingActor::updateMapProjectionProperties()
-{
+{    
+    enableActorUpdates(false);
+
     MapProjectionType projIndex = stringToMapProjection(
                 properties->getEnumItem(mapProjectionTypesProperty));
 
@@ -182,6 +184,8 @@ void MMapProjectionSupportingActor::updateMapProjectionProperties()
         projLibraryApplyProperty->setEnabled(true);
         break;
     }
+
+    enableActorUpdates(true);
 }
 
 
