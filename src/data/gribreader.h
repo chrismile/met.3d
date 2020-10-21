@@ -70,7 +70,10 @@ struct MGribVariableInfo
 {
     MGribVariableInfo() : nlons(0), nlats(0),
         lon0(0), lat0(0), lon1(0), lat1(0), dlon(0), dlat(0),
-        availableMembers_bitfield(0) {}
+        availableMembers_bitfield(0),
+        gridIsCyclicInLongitude(false),
+        longitudinalIndexShiftForCyclicGrid(0),
+        lon0ShiftedReference(0.) {}
 
     // This struct stores variable-specific information, the hierarchy of
     // maps is continued in the field "timeMap".
