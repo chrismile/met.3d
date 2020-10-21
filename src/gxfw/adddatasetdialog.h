@@ -92,6 +92,7 @@ struct MTrajectoriesPipelineConfigurationInfo
     QString windEastwardVariable;
     QString windNorthwardVariable;
     QString windVerticalVariable;
+    QString auxDataVariablesInputStr;
     QString verticalLevelType;
 };
 

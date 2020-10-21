@@ -80,6 +80,12 @@ public:
       */
     virtual QSet<unsigned int> availableEnsembleMembers() = 0;
 
+    /**
+      Returns a list of auxiliary data variables that can be traced along the
+      trajectories.
+     */
+    virtual QStringList availableAuxiliaryVariables() = 0;
+
 protected:
 
 };

@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>734</width>
-    <height>525</height>
+    <height>556</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -439,13 +439,6 @@
                 <property name="horizontalSpacing">
                  <number>5</number>
                 </property>
-                <item row="0" column="0">
-                 <widget class="QLabel" name="label_21">
-                  <property name="text">
-                   <string>NWP dataset:</string>
-                  </property>
-                 </widget>
-                </item>
                 <item row="0" column="1">
                  <widget class="QComboBox" name="trajectoriesNWPDatasetCombo">
                   <property name="sizePolicy">
@@ -479,15 +472,8 @@
                   </property>
                  </widget>
                 </item>
-                <item row="2" column="0">
-                 <widget class="QLabel" name="label_11">
-                  <property name="text">
-                   <string>northward wind (v, m/s):</string>
-                  </property>
-                 </widget>
-                </item>
-                <item row="2" column="1">
-                 <widget class="QComboBox" name="trajectoriesWindVVarCombo">
+                <item row="3" column="1">
+                 <widget class="QComboBox" name="trajectoriesWindWVarCombo">
                   <property name="sizePolicy">
                    <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
                     <horstretch>0</horstretch>
@@ -503,13 +489,40 @@
                   </property>
                  </widget>
                 </item>
-                <item row="3" column="1">
-                 <widget class="QComboBox" name="trajectoriesWindWVarCombo">
+                <item row="0" column="0">
+                 <widget class="QLabel" name="label_21">
+                  <property name="text">
+                   <string>NWP dataset:</string>
+                  </property>
+                 </widget>
+                </item>
+                <item row="2" column="1">
+                 <widget class="QComboBox" name="trajectoriesWindVVarCombo">
                   <property name="sizePolicy">
                    <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
                     <horstretch>0</horstretch>
                     <verstretch>0</verstretch>
                    </sizepolicy>
+                  </property>
+                 </widget>
+                </item>
+                <item row="2" column="0">
+                 <widget class="QLabel" name="label_11">
+                  <property name="text">
+                   <string>northward wind (v, m/s):</string>
+                  </property>
+                 </widget>
+                </item>
+                <item row="4" column="1">
+                 <widget class="QLineEdit" name="auxDataVarsAlongTrajsLineEdit"/>
+                </item>
+                <item row="4" column="0">
+                 <widget class="QLabel" name="label_9">
+                  <property name="text">
+                   <string>Trace auxiliary variables along trajectories (comma-separated list of variable names):</string>
+                  </property>
+                  <property name="wordWrap">
+                   <bool>true</bool>
                   </property>
                  </widget>
                 </item>

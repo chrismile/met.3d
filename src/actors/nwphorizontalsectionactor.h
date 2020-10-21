@@ -378,8 +378,8 @@ private:
     QColor      shadowColor;
     QtProperty* shadowColorProp;
 
-    GLfloat     shadowHeight;
-    QtProperty* shadowHeightProp;
+    GLfloat     shadowElevation_hPa;
+    QtProperty* shadowElevationProperty;
 
     // If the user picks the handle not in its centre, we cannot move the handle
     // by setting the centre point to the mouse position so we need this offset

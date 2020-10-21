@@ -272,7 +272,8 @@ MNWPVolumeRaycasterActor::RayCasterSettings::RayCasterSettings(
       bisectionSteps(4),
       interactionBisectionSteps(4),
       shadowMode(RenderMode::ShadowMap),
-      shadowsResolution(RenderMode::LowRes)
+      shadowsResolution(RenderMode::LowRes),
+      shadowMapElevation_hPa(1049.5)
 {
     MActor *a = hostActor;
     MQtProperties *properties = a->getQtProperties();
@@ -337,6 +338,12 @@ MNWPVolumeRaycasterActor::RayCasterSettings::RayCasterSettings(
     properties->mEnum()->setEnumNames(shadowsResolutionProp, modesLst);
     properties->mEnum()->setValue(shadowsResolutionProp,
                                   static_cast<int>(shadowsResolution));
+
+    shadowMapElevationProp = a->addProperty(DECORATEDDOUBLE_PROPERTY,
+                                            "shadow map elevation",
+                                            groupShadowSettings);
+    properties->setDDouble(shadowMapElevationProp, shadowMapElevation_hPa,
+                           1., 1060., 2, 0.1, " hPa");
 }
 
 
@@ -624,6 +631,7 @@ void MNWPVolumeRaycasterActor::saveConfiguration(QSettings *settings)
                            rayCasterSettings->shadowModeProp));
     settings->setValue("shadowMapRes", properties->getEnumItem(
                            rayCasterSettings->shadowsResolutionProp));
+    settings->setValue("shadowElevation_hPa", rayCasterSettings->shadowMapElevation_hPa);
 
     settings->beginGroup("IsoValues");
 
@@ -819,6 +827,9 @@ void MNWPVolumeRaycasterActor::loadConfiguration(QSettings *settings)
                             settings->value("shadowMode").toString());
     properties->setEnumItem(rayCasterSettings->shadowsResolutionProp,
                             settings->value("shadowMapRes").toString());
+    properties->mDDouble()->setValue(
+                rayCasterSettings->shadowMapElevationProp,
+                settings->value("shadowElevation_hPa", 1049.5).toFloat());
 
     settings->endGroup();
 
@@ -1282,7 +1293,8 @@ void MNWPVolumeRaycasterActor::onQtPropertyChanged(QtProperty* property)
 
     else if (property == rayCasterSettings->stepSizeProp ||
              property == rayCasterSettings->bisectionStepsProp ||
-             property == rayCasterSettings->shadowModeProp)
+             property == rayCasterSettings->shadowModeProp ||
+             property == rayCasterSettings->shadowMapElevationProp)
     {
         rayCasterSettings->stepSize = properties->mSciDouble()
                 ->value(rayCasterSettings->stepSizeProp);
@@ -1291,6 +1303,8 @@ void MNWPVolumeRaycasterActor::onQtPropertyChanged(QtProperty* property)
         rayCasterSettings->shadowMode = static_cast<RenderMode::ShadowMode>(
                     properties->mEnum()
                     ->value(rayCasterSettings->shadowModeProp));
+        rayCasterSettings->shadowMapElevation_hPa = properties->mDecoratedDouble()
+                ->value(rayCasterSettings->shadowMapElevationProp);
 
         emitActorChangedSignal();
     }
@@ -2970,19 +2984,21 @@ void MNWPVolumeRaycasterActor::renderShadows(
         return;
     }
 
+    float shadowMapWorldZ = sceneView->worldZfromPressure(
+                rayCasterSettings->shadowMapElevation_hPa);
     float vertexData[] =
     {
         float(bBoxConnection->westLon()), float(bBoxConnection->southLat()),
-        0.01f, 0.0f, 0.0f,
+        shadowMapWorldZ, 0.0f, 0.0f,
 
         float(bBoxConnection->westLon()), float(bBoxConnection->northLat()),
-        0.01f, 0.0f, 1.0f,
+        shadowMapWorldZ, 0.0f, 1.0f,
 
         float(bBoxConnection->eastLon()), float(bBoxConnection->southLat()),
-        0.01f, 1.0f, 0.0f,
+        shadowMapWorldZ, 1.0f, 0.0f,
 
         float(bBoxConnection->eastLon()), float(bBoxConnection->northLat()),
-        0.01f, 1.0f, 1.0f,
+        shadowMapWorldZ, 1.0f, 1.0f,
     };
 
     MGLResourcesManager* glRM = MGLResourcesManager::getInstance();

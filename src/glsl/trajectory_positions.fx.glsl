@@ -4,11 +4,15 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2018 Marc Rautenhaus
-**  Copyright 2015-2016 Christoph Heidelmann
+**  Copyright 2015-2020 Marc Rautenhaus [*, previously +]
+**  Copyright 2015-2016 Christoph Heidelmann [+]
+**  Copyright 2020      Marcel Meyer [*]
 **
-**  Computer Graphics and Visualization Group
+**  + Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
+**
+**  * Regional Computing Center, Visualization
+**  Universitaet Hamburg, Hamburg, Germany
 **
 **  Met.3D is free software: you can redistribute it and/or modify
 **  it under the terms of the GNU General Public License as published by
@@ -44,16 +48,16 @@ interface GStoFS
  ***                           VERTEX SHADER
  *****************************************************************************/
 
-uniform vec2 pToWorldZParams; // parameters to convert p[hPa] to world z
+uniform vec2 pToWorldZParams;         // parameters to convert p[hPa] to world z
 
-uniform mat4  mvpMatrix;             // model-view-projection
-uniform float radius;                // radius of the sphere in world space
-uniform bool  scaleRadius;           // if true, radius will be scaled with
-                                     // distance camera-vertex
-uniform vec3  cameraPosition;        // camera position in world space
-uniform vec3  cameraUpDir;           // camera upward axis
+uniform mat4  mvpMatrix;              // model-view-projection
+uniform float radius;                 // radius of the sphere in world space
+uniform bool  scaleRadius;            // if true, radius will be scaled with
+                                      // distance camera-vertex
+uniform vec3  cameraPosition;         // camera position in world space
+uniform vec3  cameraUpDir;            // camera upward axis
 
-uniform vec2  position;           // camera upward axis
+uniform vec2  position;                // camera upward axis
 
 uniform int       numObsPerTrajectory; // number of "observations" (i.e. points)
 uniform bool      useTransferFunction; // use transfer function or const col?
@@ -61,14 +65,26 @@ uniform vec4      constColour;
 uniform sampler1D transferFunction;    // 1D transfer function
 uniform float     scalarMinimum;       // min/max data values to scale to 0..1
 uniform float     scalarMaximum;
-uniform vec3      lightDirection;      // light direction in world space
+uniform vec3      lightDirection;       // light direction in world space
 
-shader VSmain(in vec3 vertex : 0, out vec4 vs_vertex)
+uniform bool renderAuxData;             // define boolean for deciding which
+                                        // type of rendering
+
+shader VSmain(in vec3 vertex : 0, in float auxDataAtVertex : 2, out vec4 vs_vertex)
 {
-    // Convert pressure to world Z coordinate.
-    float worldZ = (log(vertex.z) - pToWorldZParams.x) * pToWorldZParams.y;
-    // Convert from world space to clip space.
-    vs_vertex = vec4(vertex.xy, worldZ, vertex.z);
+     // Convert pressure to world Z coordinate.
+     float worldZ = (log(vertex.z) - pToWorldZParams.x) * pToWorldZParams.y;
+
+     // Convert from world space to clip space.
+     // Define scalar value for rendering colors in 4th vertex component.
+     if (renderAuxData)
+     {
+         vs_vertex = vec4(vertex.xy, worldZ, auxDataAtVertex);
+     }
+     else
+     {
+         vs_vertex = vec4(vertex.xy, worldZ, vertex.z);
+     }
 }
 
 shader VSusePosition(in vec3 vertex : 0, out vec4 vs_vertex)
