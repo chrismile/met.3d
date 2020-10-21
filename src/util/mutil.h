@@ -47,7 +47,7 @@ const QString met3dVersionBranchID = "-experimental-spaghetti-alternatives";
 // Set to "-devel" for development versions.
 const QString met3dVersionDevelID = "";
 
-const QString met3dVersionString = "1.6/20.10.6" + met3dVersionDevelID
+const QString met3dVersionString = "1.6/20.10.7" + met3dVersionDevelID
         + met3dVersionBranchID;
 // String containing default value for missing version number in config.
 const QString defaultConfigVersion = "1.0.0";
