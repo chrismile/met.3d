@@ -54,7 +54,8 @@ namespace Met3D
 
 MGeometryHandling::MGeometryHandling()
     : pjDstProjection(nullptr),
-      pjSrcProjection(nullptr)
+      pjSrcProjection(nullptr),
+      rotatedPole(QPointF(0., 90.))
 {
 
 }
@@ -233,6 +234,191 @@ QVector<QPolygonF> MGeometryHandling::geographicalToProjectedCoordinates(
     }
 
     return projectedPolygons;
+}
+
+
+void MGeometryHandling::initRotatedLonLatProjection(QPointF rotatedPoleLonLat)
+{
+    rotatedPole = rotatedPoleLonLat;
+}
+
+static const double DEG2RAD = M_PI / 180.0;
+static const double RAD2DEG = 180.0 / M_PI;
+
+// Parts of the following method have been ported from the C implementation of
+// the methods 'lam_to_lamrot' and 'phi_to_phirot'. The original code has been
+// published under GNU GENERAL PUBLIC LICENSE Version 2, June 1991.
+// source: https://code.zmaw.de/projects/cdo/files  [Version 1.8.1]
+
+// Original code:
+
+// static
+// double lam_to_lamrot(double phi, double rla, double polphi, double pollam)
+// {
+//   /*
+//     Umrechnung von rla (geo. System) auf rlas (rot. System)
+
+//     phi    : Breite im geographischen System (N>0)
+//     rla    : Laenge im geographischen System (E>0)
+//     polphi : Geographische Breite des Nordpols des rot. Systems
+//     pollam : Geographische Laenge des Nordpols des rot. Systems
+
+//     result : Rotierte Laenge
+//   */
+//   double zsinpol = sin(DEG2RAD*polphi);
+//   double zcospol = cos(DEG2RAD*polphi);
+//   double zlampol =     DEG2RAD*pollam;
+
+//   if ( rla > 180.0 ) rla -= 360.0;
+
+//   double zrla = DEG2RAD*rla;
+//   double zphi = DEG2RAD*phi;
+
+//   double zarg1  = - sin(zrla-zlampol)*cos(zphi);
+//   double zarg2  = - zsinpol*cos(zphi)*cos(zrla-zlampol)+zcospol*sin(zphi);
+
+//   if ( fabs(zarg2) < 1.0e-20 ) zarg2 = 1.0e-20;
+
+//   return RAD2DEG*atan2(zarg1,zarg2);
+// }
+
+// static
+// double phi_to_phirot(double phi, double rla, double polphi, double pollam)
+// {
+//   /*
+//     Umrechnung von phi (geo. System) auf phis (rot. System)
+
+//     phi    : Breite im geographischen System (N>0)
+//     rla    : Laenge im geographischen System (E>0)
+//     polphi : Geographische Breite des Nordpols des rot. Systems
+//     pollam : Geographische Laenge des Nordpols des rot. Systems
+
+//     result : Rotierte Breite
+//   */
+//   double zsinpol = sin(DEG2RAD*polphi);
+//   double zcospol = cos(DEG2RAD*polphi);
+//   double zlampol =     DEG2RAD*pollam;
+
+//   double zphi = DEG2RAD*phi;
+//   if ( rla > 180.0 ) rla -= 360.0;
+//   double zrla = DEG2RAD*rla;
+
+//   double zarg = zcospol*cos(zphi)*cos(zrla-zlampol) + zsinpol*sin(zphi);
+
+//   return RAD2DEG*asin(zarg);
+// }
+
+
+QPointF MGeometryHandling::geographicalToRotatedCoordinates(QPointF point)
+{
+    // Early break for rotation values with no effect.
+    double poleLon = rotatedPole.x();
+    double poleLat = rotatedPole.y();
+    if ((poleLon == -180. || poleLon == 180.) && poleLat == 90.)
+    {
+        return QPointF();
+    }
+
+    // Get longitude and latitude from point.
+    double lon = point.x();
+    double lat = point.y();
+
+    if ( lon > 180.0 )
+    {
+        lon -= 360.0;
+    }
+
+    // Convert degrees to radians.
+    double poleLatRad = DEG2RAD * poleLat;
+    double poleLonRad = DEG2RAD * poleLon;
+    double lonRad = DEG2RAD * lon;
+    double latRad = DEG2RAD * lat;
+
+    // Compute sinus and cosinus of some coordinates since they are needed more
+    // often later on.
+    double sinPoleLat = sin(poleLatRad);
+    double cosPoleLat = cos(poleLatRad);
+
+    // Apply the transformation (conversation to Cartesian coordinates and  two
+    // rotations; difference to original code: no use of pollam).
+
+    double x = ((-sinPoleLat) * cos(latRad) * cos(lonRad - poleLonRad))
+            + (cosPoleLat * sin(latRad));
+    double y = (-sin(lonRad - poleLonRad)) * cos(latRad);
+    double z = (cosPoleLat * cos(latRad) * cos(lonRad - poleLonRad))
+            + (sinPoleLat * sin(latRad));
+
+    // Avoid invalid values for z (Might occure due to inaccuracies in
+    // computations).
+    z = max(-1., min(1., z));
+
+    // Too small values can lead to numerical problems in method atans2.
+    if ( std::abs(x) < 1.0e-20 )
+    {
+        x = 1.0e-20;
+    }
+
+    // Compute spherical coordinates from Cartesian coordinates and convert
+    // radians to degrees.
+    return QPointF(RAD2DEG * (atan2(y, x)), RAD2DEG * (asin(z)));
+}
+
+
+QVector<QPolygonF> MGeometryHandling::geographicalToRotatedCoordinates(
+        QVector<QPolygonF> polygons)
+{
+    QVector<QPolygonF> projectedPolygons;
+
+    for (QPolygonF polygon : polygons)
+    {
+        QPolygonF projectedPolygon;
+        for (QPointF vertex : polygon)
+        {
+            projectedPolygon << geographicalToRotatedCoordinates(vertex);
+        }
+        projectedPolygons << projectedPolygon;
+    }
+
+    return projectedPolygons;
+}
+
+
+QVector<QPolygonF> MGeometryHandling::splitLineSegmentsLongerThanThreshold(
+        QVector<QPolygonF> polygons, double thresholdDistance)
+{
+    QVector<QPolygonF> revisedPolygons;
+
+    for (QPolygonF polygon : polygons)
+    {
+        QPolygonF revisedPolygon;
+        for (QPointF vertex : polygon)
+        {
+            // The revised polygon is empty? Add this vertex.
+            if (revisedPolygon.isEmpty())
+            {
+                revisedPolygon << vertex;
+            }
+            // Otherwise, check if the distance between this vertex and the
+            // previous one is smaller than the threshold. If yes, add this
+            // vertex.
+            else if (QVector2D(revisedPolygon.last() - vertex).length()
+                     < thresholdDistance)
+            {
+                revisedPolygon << vertex;
+            }
+            // If the distance is larger than the threshold split into two
+            // polygons.
+            else
+            {
+                revisedPolygons << revisedPolygon;
+                revisedPolygon = QPolygonF();
+                revisedPolygon << vertex;
+            }
+        }
+        revisedPolygons << revisedPolygon;
+    }
+
+    return revisedPolygons;
 }
 
 

@@ -66,12 +66,15 @@ public:
     QVector<QPolygonF> geographicalToProjectedCoordinates(
             QVector<QPolygonF> polygons);
 
-    void initRotatedLonLatProjection(QVector2D rotatedPoleLonLat);
+    void initRotatedLonLatProjection(QPointF rotatedPoleLonLat);
 
     QPointF geographicalToRotatedCoordinates(QPointF point);
 
     QVector<QPolygonF> geographicalToRotatedCoordinates(
             QVector<QPolygonF> polygons);
+
+    QVector<QPolygonF> splitLineSegmentsLongerThanThreshold(
+            QVector<QPolygonF> polygons, double thresholdDistance);
 
     QVector<QPolygonF> clipPolygons(QVector<QPolygonF> polygons, QRectF bbox);
 
@@ -94,6 +97,7 @@ private:
                                              OGRGeometry *geometry);
 
     projPJ pjDstProjection, pjSrcProjection;
+    QPointF rotatedPole;
 };
 
 } // namespace Met3D

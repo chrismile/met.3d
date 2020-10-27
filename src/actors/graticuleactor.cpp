@@ -430,6 +430,9 @@ void MGraticuleActor::generateGeometry()
     LOG4CPLUS_DEBUG(mlog, "Generating graticule and coast-/borderline "
                           "geometry..." << flush);
 
+//TODO explain
+    double rotatedGridMaxSegmentLength = 20.;
+
     // Generate graticule geometry.
     // ============================
 //TODO rename parsePressureLevelString()
@@ -450,6 +453,17 @@ void MGraticuleActor::generateGeometry()
     {
         geo.initProjProjection(projLibraryString);
         graticule = geo.geographicalToProjectedCoordinates(graticule);
+        //OPENISSUE (mr, 26Oct2020) -- is this safe with all projections or
+        // do specific projections also lead to erroneous projected line
+        // segments as those that occur with rotated lon-lat projections
+        // (fixed using splitLineSegmentsLongerThanThreshold() below)?
+    }
+    else if (mapProjection == MAPPROJECTION_ROTATEDLATLON)
+    {
+        geo.initRotatedLonLatProjection(rotatedNorthPole);
+        graticule = geo.geographicalToRotatedCoordinates(graticule);
+        graticule = geo.splitLineSegmentsLongerThanThreshold(
+                    graticule, rotatedGridMaxSegmentLength);
     }
 
     // Clip to bounding box.
@@ -485,6 +499,12 @@ void MGraticuleActor::generateGeometry()
     {
         coastlines = geo.geographicalToProjectedCoordinates(coastlines);
     }
+    else if (mapProjection == MAPPROJECTION_ROTATEDLATLON)
+    {
+        coastlines = geo.geographicalToRotatedCoordinates(coastlines);
+        coastlines = geo.splitLineSegmentsLongerThanThreshold(
+                    coastlines, rotatedGridMaxSegmentLength);
+    }
     coastlines = geo.clipPolygons(coastlines, bbox);
 
     QVector<QVector2D> verticesCoastlines;
@@ -511,6 +531,12 @@ void MGraticuleActor::generateGeometry()
     if (mapProjection == MAPPROJECTION_PROJ_LIBRARY)
     {
         borderlines = geo.geographicalToProjectedCoordinates(borderlines);
+    }
+    else if (mapProjection == MAPPROJECTION_ROTATEDLATLON)
+    {
+        borderlines = geo.geographicalToRotatedCoordinates(borderlines);
+        borderlines = geo.splitLineSegmentsLongerThanThreshold(
+                    borderlines, rotatedGridMaxSegmentLength);
     }
     borderlines = geo.clipPolygons(borderlines, bbox);
 
