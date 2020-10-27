@@ -104,13 +104,13 @@ protected:
     void renderToCurrentContext(MSceneViewGLWidget *sceneView);
 
 private:
-    void generateGeometryNewGeometryHandling();
-
     /**
       Generates the graticule geometry and uploads it to a vertex buffer.
       ToDo: add a short summary / documentation
       */
     void generateGeometry();
+
+    void generateGeometryOld();
 
     // ToDo: short documentation / summary
     void cutWithBoundingBox(QRectF cornerRect);
@@ -172,7 +172,13 @@ private:
     QVector<int> borderlineStartIndices;
     QVector<int> borderlineVertexCount;
 
-    QtProperty *spacingProperty;
+    QString defaultGraticuleLongitudesString;
+    QtProperty *graticuleLongitudesProperty;
+    QString defaultGraticuleLatitudesString;
+    QtProperty *graticuleLatitudesProperty;
+    QtProperty *vertexSpacingProperty;
+    QtProperty *computeGraticuleProperty;
+
     QtProperty *colourProperty;
     QColor graticuleColour;
 

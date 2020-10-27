@@ -63,6 +63,9 @@ MGraticuleActor::MGraticuleActor(MBoundingBoxConnection *boundingBoxConnection)
       graticuleVertexBuffer(nullptr),
       numVerticesGraticule(0),
       coastlineVertexBuffer(nullptr),
+      borderlineVertexBuffer(nullptr),
+      defaultGraticuleLongitudesString("[-180.,180.,10.]"),
+      defaultGraticuleLatitudesString("[-90.,90.,5.]"),
       graticuleColour(QColor(Qt::black)),
       drawGraticule(true),
       drawCoastLines(true),
@@ -95,9 +98,26 @@ MGraticuleActor::MGraticuleActor(MBoundingBoxConnection *boundingBoxConnection)
         insertBoundingBoxProperty(actorPropertiesSupGroup);
     }
 
-    spacingProperty = addProperty(POINTF_LONLAT_PROPERTY, "spacing",
-                                  actorPropertiesSupGroup);
-    properties->setPointF(spacingProperty, QPointF(10., 5.), 2);
+    graticuleLongitudesProperty = addProperty(STRING_PROPERTY,
+                                              "graticule longitudes",
+                                              actorPropertiesSupGroup);
+    properties->mString()->setValue(graticuleLongitudesProperty,
+                                    defaultGraticuleLongitudesString);
+
+    graticuleLatitudesProperty = addProperty(STRING_PROPERTY,
+                                             "graticule latitudes",
+                                             actorPropertiesSupGroup);
+    properties->mString()->setValue(graticuleLatitudesProperty,
+                                    defaultGraticuleLatitudesString);
+
+    vertexSpacingProperty = addProperty(POINTF_LONLAT_PROPERTY,
+                                        "vertex spacing",
+                                        actorPropertiesSupGroup);
+    properties->setPointF(vertexSpacingProperty, QPointF(1., 1.), 2);
+
+    computeGraticuleProperty = addProperty(CLICK_PROPERTY,
+                                           "re-compute graticule",
+                                           actorPropertiesSupGroup);
 
     colourProperty = addProperty(COLOR_PROPERTY, "colour",
                                  actorPropertiesSupGroup);
@@ -146,7 +166,12 @@ void MGraticuleActor::saveConfiguration(QSettings *settings)
     {
         MBoundingBoxInterface::saveConfiguration(settings);
     }
-    settings->setValue("spacing", properties->mPointF()->value(spacingProperty));
+    settings->setValue("graticuleLongitudes",
+                       properties->mString()->value(graticuleLongitudesProperty));
+    settings->setValue("graticuleLatitudes",
+                       properties->mString()->value(graticuleLatitudesProperty));
+    settings->setValue("vertexSpacing",
+                       properties->mPointF()->value(vertexSpacingProperty));
     settings->setValue("colour", graticuleColour);
     settings->setValue("drawGraticule", drawGraticule);
     settings->setValue("drawCoastLines", drawCoastLines);
@@ -171,8 +196,16 @@ void MGraticuleActor::loadConfiguration(QSettings *settings)
         MBoundingBoxInterface::loadConfiguration(settings);
     }
 
-    QPointF spacing = settings->value("spacing", QPointF(10., 5.)).toPointF();
-    properties->mPointF()->setValue(spacingProperty, spacing);
+    QString lonsStr = settings->value(
+                "graticuleLongitudes", defaultGraticuleLongitudesString).toString();
+    properties->mString()->setValue(graticuleLongitudesProperty, lonsStr);
+
+    QString latsStr = settings->value(
+                "graticuleLatitudes", defaultGraticuleLatitudesString).toString();
+    properties->mString()->setValue(graticuleLatitudesProperty, latsStr);
+
+    QPointF spacing = settings->value("vertexSpacing", QPointF(1., 1.)).toPointF();
+    properties->mPointF()->setValue(vertexSpacingProperty, spacing);
 
     QColor color = settings->value("colour").value<QColor>();
     properties->mColor()->setValue(colourProperty, color);
@@ -255,14 +288,13 @@ void MGraticuleActor::initializeActorResources()
 
 void MGraticuleActor::onQtPropertyChanged(QtProperty *property)
 {
-    if ( (property == spacingProperty)
+    if ( (property == computeGraticuleProperty)
          || (property == labelSizeProperty)
          || (property == labelColourProperty)
          || (property == labelBBoxProperty)
          || (property == labelBBoxColourProperty) )
     {
         if (suppressActorUpdates()) return;
-        // Recompute the geometry when bounding box or spacing have been changed.
         generateGeometry();
         emitActorChangedSignal();
     }
@@ -380,7 +412,7 @@ void MGraticuleActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
 ***                           PRIVATE METHODS                               ***
 *******************************************************************************/
 
-void MGraticuleActor::generateGeometryNewGeometryHandling()
+void MGraticuleActor::generateGeometry()
 {
     // Generate nothing if no bounding box is available.
     if (bBoxConnection->getBoundingBox() == nullptr)
@@ -395,51 +427,36 @@ void MGraticuleActor::generateGeometryNewGeometryHandling()
     MGLResourcesManager* glRM = MGLResourcesManager::getInstance();
     glRM->makeCurrent();
 
-    LOG4CPLUS_DEBUG(mlog, "generating graticule geometry" << flush);
+    LOG4CPLUS_DEBUG(mlog, "Generating graticule and coast-/borderline "
+                          "geometry..." << flush);
 
-    QVector2D spacing(properties->mPointF()->value(spacingProperty));
-
-//TODO: add properties for graticule limits in addition to clipping bbox
-    QVector2D lonLatStart(-180., -90.);
-    QVector2D lonLatEnd(180., 80.);
-
-    QRectF bbox = bBoxConnection->horizontal2DCoords();
-
-    float deltalat  = spacing.y();
-    float deltalon  = spacing.x();
-
-//TODO: move to onQtPropertyChanged or restrict property ranges
-    // Check for zero or negative spacing between the graticule lines.
-    if (deltalon <= 0.)
-    {
-        deltalon = 1.;
-        properties->mPointF()->setValue(spacingProperty,
-                                        QPointF(deltalon, deltalat));
-    }
-    if (deltalat <= 0.)
-    {
-        deltalat = 1.;
-        properties->mPointF()->setValue(spacingProperty,
-                                        QPointF(deltalon, deltalat));
-    }
+    // Generate graticule geometry.
+    // ============================
+//TODO rename parsePressureLevelString()
+    QVector<float> graticuleLongitudes = parsePressureLevelString(
+                properties->mString()->value(graticuleLongitudesProperty));
+    QVector<float> graticuleLatitudes = parsePressureLevelString(
+                properties->mString()->value(graticuleLatitudesProperty));
+    QVector2D graticuleSpacing(
+                properties->mPointF()->value(vertexSpacingProperty));
 
     MGeometryHandling geo;
-    // Make geo member variable.
-    // Create global graticule / coastlines and keep
-    // on re-generation only perform projection and clipping
 
     QVector<QPolygonF> graticule = geo.generate2DGraticuleGeometry(
-                lonLatStart, lonLatEnd, spacing, spacing/10.);
+                graticuleLongitudes, graticuleLatitudes, graticuleSpacing);
 
+    // If projection is enabled, project vertices.
     if (mapProjection == MAPPROJECTION_PROJ_LIBRARY)
     {
         geo.initProjProjection(projLibraryString);
         graticule = geo.geographicalToProjectedCoordinates(graticule);
     }
 
+    // Clip to bounding box.
+    QRectF bbox = bBoxConnection->horizontal2DCoords();
     graticule = geo.clipPolygons(graticule, bbox);
 
-    // Append all graticule lines to this vector.
+    // Convert list of polygons to vertex list for OpenGL rendering.
     QVector<QVector2D> verticesGraticule;
     graticuleStartIndices.clear();
     graticuleVertexCount.clear();
@@ -448,19 +465,74 @@ void MGraticuleActor::generateGeometryNewGeometryHandling()
                                     &graticuleStartIndices,
                                     &graticuleVertexCount);
 
-    // generate data item key for every vertex buffer object wrt the actor
+    // Upload vertex list to vertex buffer.
     const QString graticuleRequestKey = QString("graticule_vertices_actor#")
                                         + QString::number(getID());
     uploadVec2ToVertexBuffer(verticesGraticule, graticuleRequestKey,
                              &graticuleVertexBuffer);
+
+
+    // Read coastline geometry from shapefile.
+    // =======================================
+    QRectF geometryLimits =  QRectF(-180., -90., 360., 180.);
+
+    QVector<QPolygonF> coastlines = geo.read2DGeometryFromShapefile(
+                expandEnvironmentVariables(
+                    "$MET3D_BASE/third-party/naturalearth/ne_50m_coastline.shp"),
+                geometryLimits);
+
+    if (mapProjection == MAPPROJECTION_PROJ_LIBRARY)
+    {
+        coastlines = geo.geographicalToProjectedCoordinates(coastlines);
+    }
+    coastlines = geo.clipPolygons(coastlines, bbox);
+
+    QVector<QVector2D> verticesCoastlines;
+    coastlineStartIndices.clear();
+    coastlineVertexCount.clear();
+    geo.flattenPolygonsToVertexList(coastlines,
+                                    &verticesCoastlines,
+                                    &coastlineStartIndices,
+                                    &coastlineVertexCount);
+
+    const QString coastRequestKey = "graticule_coastlines_actor#"
+                                    + QString::number(getID());
+    uploadVec2ToVertexBuffer(verticesCoastlines, coastRequestKey,
+                             &coastlineVertexBuffer);
+
+
+    // Read borderline geometry from shapefile.
+    // ========================================
+    QVector<QPolygonF> borderlines = geo.read2DGeometryFromShapefile(
+                expandEnvironmentVariables(
+                    "$MET3D_BASE/third-party/naturalearth/ne_50m_admin_0_boundary_lines_land.shp"),
+                geometryLimits);
+
+    if (mapProjection == MAPPROJECTION_PROJ_LIBRARY)
+    {
+        borderlines = geo.geographicalToProjectedCoordinates(borderlines);
+    }
+    borderlines = geo.clipPolygons(borderlines, bbox);
+
+    QVector<QVector2D> verticesBorderlines;
+    borderlineStartIndices.clear();
+    borderlineVertexCount.clear();
+    geo.flattenPolygonsToVertexList(borderlines,
+                                    &verticesBorderlines,
+                                    &borderlineStartIndices,
+                                    &borderlineVertexCount);
+
+    const QString borderRequestKey = "graticule_borderlines_actor#"
+                                     + QString::number(getID());
+    uploadVec2ToVertexBuffer(verticesBorderlines, borderRequestKey,
+                             &borderlineVertexBuffer);
+
+    LOG4CPLUS_DEBUG(mlog, "Graticule and coast-/borderline geometry generated.");
 }
 
 
-void MGraticuleActor::generateGeometry()
+void MGraticuleActor::generateGeometryOld()
 {
-    generateGeometryNewGeometryHandling();
-    return;
-
     // Generate nothing if no bounding box is available.
     if (bBoxConnection->getBoundingBox() == nullptr)
     {
@@ -487,7 +559,7 @@ void MGraticuleActor::generateGeometry()
 
     // Get (user-defined) corner coordinates from the property browser.
     QRectF cornerRect = bBoxConnection->horizontal2DCoords();
-    QPointF spacing = properties->mPointF()->value(spacingProperty);
+    QPointF spacing = properties->mPointF()->value(vertexSpacingProperty);
 
     float llcrnrlat = float(bBoxConnection->southLat());
     float llcrnrlon = float(bBoxConnection->westLon());
@@ -500,13 +572,13 @@ void MGraticuleActor::generateGeometry()
     if (deltalon <= 0.)
     {
         deltalon = 1.;
-        properties->mPointF()->setValue(spacingProperty,
+        properties->mPointF()->setValue(vertexSpacingProperty,
                                         QPointF(deltalon, deltalat));
     }
     if (deltalat <= 0.)
     {
         deltalat = 1.;
-        properties->mPointF()->setValue(spacingProperty,
+        properties->mPointF()->setValue(vertexSpacingProperty,
                                         QPointF(deltalon, deltalat));
     }
 
@@ -940,7 +1012,7 @@ void MGraticuleActor::updateLatLonLines(QRectF cornerRect)
 
     // Get (user-defined) corner coordinates from the property browser.
     //QRectF cornerRect = bBoxConnection->horizontal2DCoords();
-    QPointF spacing = properties->mPointF()->value(spacingProperty);
+    QPointF spacing = properties->mPointF()->value(vertexSpacingProperty);
 
     float llcrnrlat = float(bBoxConnection->southLat());
     float llcrnrlon = float(bBoxConnection->westLon());
@@ -953,13 +1025,13 @@ void MGraticuleActor::updateLatLonLines(QRectF cornerRect)
     if (deltalon <= 0.)
     {
         deltalon = 1.;
-        properties->mPointF()->setValue(spacingProperty,
+        properties->mPointF()->setValue(vertexSpacingProperty,
                                         QPointF(deltalon, deltalat));
     }
     if (deltalat <= 0.)
     {
         deltalat = 1.;
-        properties->mPointF()->setValue(spacingProperty,
+        properties->mPointF()->setValue(vertexSpacingProperty,
                                         QPointF(deltalon, deltalat));
     }
 
@@ -1014,7 +1086,7 @@ void MGraticuleActor::cutWithBoundingBox(QRectF cornerRect)
     float lonStart = llcrnrlon;
     float latStart = llcrnrlat;
 
-    QPointF spacing = properties->mPointF()->value(spacingProperty);
+    QPointF spacing = properties->mPointF()->value(vertexSpacingProperty);
 
     float deltalat  = spacing.y();
     float deltalon  = spacing.x();
@@ -1051,13 +1123,13 @@ void MGraticuleActor::cutWithBoundingBox(QRectF cornerRect)
     if (deltalon <= 0.)
     {
         deltalon = 1.;
-        properties->mPointF()->setValue(spacingProperty,
+        properties->mPointF()->setValue(vertexSpacingProperty,
                                         QPointF(deltalon, deltalat));
     }
     if (deltalat <= 0.)
     {
         deltalat = 1.;
-        properties->mPointF()->setValue(spacingProperty,
+        properties->mPointF()->setValue(vertexSpacingProperty,
                                         QPointF(deltalon, deltalat));
     }
 

@@ -71,17 +71,29 @@ MGeometryHandling::~MGeometryHandling()
 *******************************************************************************/
 
 QVector<QPolygonF> MGeometryHandling::generate2DGraticuleGeometry(
-        QVector2D lonLatStart, QVector2D lonLatEnd,
-        QVector2D lonLatLineSpacing, QVector2D lonLatVertexSpacing)
+        QVector<float> longitudes, QVector<float> latitudes,
+        QVector2D lonLatVertexSpacing)
 {
     QVector<QPolygonF> graticuleGeometry;
 
+    // Non-empty lists of lons and lats are required.
+    if (longitudes.isEmpty() || latitudes.isEmpty())
+    {
+        return graticuleGeometry;
+    }
+    // Positive vertex spacing is required.
+    if (lonLatVertexSpacing.x() <= 0.) lonLatVertexSpacing.setX(1.);
+    if (lonLatVertexSpacing.y() <= 0.) lonLatVertexSpacing.setY(1.);
+
+    // List of lons and lats needs to be in ascending order.
+    qSort(longitudes);
+    qSort(latitudes);
+
     // Generate meridians (lines of constant longitude).
-    for (float lon = lonLatStart.x(); lon <= lonLatEnd.x();
-         lon += lonLatLineSpacing.x())
+    for (float lon : longitudes)
     {
         QPolygonF meridian;
-        for (float lat = lonLatStart.y(); lat <= lonLatEnd.y();
+        for (float lat = latitudes.first(); lat <= latitudes.last();
              lat += lonLatVertexSpacing.y())
         {
             meridian << QPointF(lon, lat);
@@ -90,11 +102,10 @@ QVector<QPolygonF> MGeometryHandling::generate2DGraticuleGeometry(
     }
 
     // Generate parallels (lines of constant latitude).
-    for (float lat = lonLatStart.y(); lat <= lonLatEnd.y();
-         lat += lonLatLineSpacing.y())
+    for (float lat : latitudes)
     {
         QPolygonF parallel;
-        for (float lon = lonLatStart.x(); lon <= lonLatEnd.x();
+        for (float lon = longitudes.first(); lon <= longitudes.last();
              lon += lonLatVertexSpacing.x())
         {
             parallel << QPointF(lon, lat);
@@ -103,6 +114,66 @@ QVector<QPolygonF> MGeometryHandling::generate2DGraticuleGeometry(
     }
 
     return graticuleGeometry;
+}
+
+
+QVector<QPolygonF> MGeometryHandling::read2DGeometryFromShapefile(
+        QString fname, QRectF bbox)
+{
+    LOG4CPLUS_DEBUG(mlog, "Loading shapefile geometry from file "
+                    << fname.toStdString() << "...");
+
+    QVector<QPolygonF> polygons;
+
+    // Open Shapefile.
+    GDALDataset* gdalDataSet = (GDALDataset*) GDALOpenEx(
+                fname.toStdString().c_str(),
+                GDAL_OF_VECTOR, NULL, NULL, NULL);
+
+    if (gdalDataSet == NULL)
+    {
+        LOG4CPLUS_ERROR(mlog, "ERROR: cannot open shapefile "
+                        << fname.toStdString() << ".");
+        return polygons;
+    }
+
+    // NaturalEarth shapefiles only contain one layer. (Do shapefiles in
+    // general contain only one layer?)
+    OGRLayer *layer;
+    layer = gdalDataSet->GetLayer(0);
+
+    // Filter the layer on-load: Only load those geometries that intersect
+    // with the bounding box.
+    OGRPolygon *bboxPolygon = convertQRectToOGRPolygon(bbox);
+    layer->SetSpatialFilter(bboxPolygon);
+
+    // Loop over all features contained in the layer, add all OGRLineStrings
+    // to our list of polygons.
+    layer->ResetReading();
+    OGRFeature *feature;
+    while ((feature = layer->GetNextFeature()) != NULL)
+    {
+        QList<OGRLineString*> lineStrings;
+        // Get the geometry associated with the current feature.
+        appendOGRLineStringsFromOGRGeometry(&lineStrings, feature->GetGeometryRef());
+
+        // Create QPolygons from the OGRLineStrings.
+        for (OGRLineString *lineString : lineStrings)
+        {
+            polygons << convertOGRLineStringToQPolygon(lineString);
+        }
+
+        OGRFeature::DestroyFeature(feature);
+    }
+
+    // Clean up.
+    OGRGeometryFactory::destroyGeometry(bboxPolygon);
+    GDALClose(gdalDataSet);
+
+    LOG4CPLUS_DEBUG(mlog, "Geometry from shapefile "
+                    << fname.toStdString() << " has been loaded.");
+
+    return polygons;
 }
 
 
@@ -384,6 +455,70 @@ bool MGeometryHandling::cohenSutherlandClip(
     }
 
     return accept;
+}
+
+
+OGRPolygon *MGeometryHandling::convertQRectToOGRPolygon(QRectF &rect)
+{
+    float leftlon = rect.x();
+    float lowerlat = rect.y();
+    float rightlon = rect.x() + rect.width();
+    float upperlat = rect.y() + rect.height();
+
+    OGRLinearRing bboxRing;
+    bboxRing.addPoint(leftlon, lowerlat);
+    bboxRing.addPoint(rightlon, lowerlat);
+    bboxRing.addPoint(rightlon, upperlat);
+    bboxRing.addPoint(leftlon, upperlat);
+    bboxRing.addPoint(leftlon, lowerlat);
+    // OGRPolygon *bboxPolygon = new OGRPolygon(); causes problems on windows
+    OGRPolygon *bboxPolygon = dynamic_cast<OGRPolygon*>
+        (OGRGeometryFactory::createGeometry(OGRwkbGeometryType::wkbPolygon));
+    bboxPolygon->addRing(&bboxRing);
+    return bboxPolygon;
+}
+
+
+QPolygonF MGeometryHandling::convertOGRLineStringToQPolygon(
+        OGRLineString *lineString)
+{
+//TODO (17Oct2020, mr) -- do we still require an offset?
+    double offset = 0.;
+
+    int numLinePoints = lineString->getNumPoints();
+    OGRRawPoint *v = new OGRRawPoint[numLinePoints];
+    lineString->getPoints(v);
+    QPolygonF polygon;
+    for (int i = 0; i < numLinePoints; i++)
+    {
+        polygon << QPointF(v[i].x + offset, v[i].y);
+    }
+    delete[] v;
+    return polygon;
+}
+
+
+void MGeometryHandling::appendOGRLineStringsFromOGRGeometry(
+        QList<OGRLineString *> *lineStrings, OGRGeometry *geometry)
+{
+    if (geometry != NULL)
+    {
+        OGRwkbGeometryType gType = wkbFlatten(geometry->getGeometryType());
+
+        if (gType == wkbLineString)
+        {
+            lineStrings->append((OGRLineString *) geometry);
+        }
+
+        else if (gType == wkbMultiLineString)
+        {
+            OGRGeometryCollection *gc = (OGRGeometryCollection *) geometry;
+            for (int g = 0; g < gc->getNumGeometries(); g++)
+            {
+                lineStrings->append((OGRLineString *) gc->getGeometryRef(g));
+            }
+        }
+    }
 }
 
 

@@ -169,8 +169,11 @@ QVector<float> parsePressureLevelString(QString levels)
 
         bool ok;
         double from = rangeValues.value(1).toFloat(&ok);
+        if (!ok) return pressureLevels;
         double to   = rangeValues.value(2).toFloat(&ok);
+        if (!ok) return pressureLevels;
         double step = rangeValues.value(3).toFloat(&ok);
+        if (!ok) return pressureLevels;
 
         if (step > 0)
         {
@@ -192,9 +195,10 @@ QVector<float> parsePressureLevelString(QString levels)
         QStringList listValues = levels.split(",");
 
         bool ok;
-        for (int i = 0; i < listValues.size(); i++)
+        for (QString str : listValues)
         {
-            pressureLevels << listValues.value(i).toFloat(&ok);
+            float value = str.toFloat(&ok);
+            if (ok) pressureLevels << value;
         }
     }
 

@@ -30,6 +30,8 @@
 
 // related third party imports
 #include <QtCore>
+#include "ogrsf_frmts.h"
+#include "cpl_error.h"
 #ifdef ACCEPT_USE_OF_DEPRECATED_PROJ_API_H
 #include <proj_api.h>
 #endif
@@ -50,10 +52,10 @@ public:
     virtual ~MGeometryHandling();
 
     QVector<QPolygonF> generate2DGraticuleGeometry(
-            QVector2D lonLatStart, QVector2D lonLatEnd,
-            QVector2D lonLatLineSpacing, QVector2D lonLatVertexSpacing);
+            QVector<float> longitudes, QVector<float> latitudes,
+            QVector2D lonLatVertexSpacing);
 
-    QVector<QPolygonF> read2DGeometryFromShapefile(QString fname);
+    QVector<QPolygonF> read2DGeometryFromShapefile(QString fname, QRectF bbox);
 
     void initProjProjection(QString projString);
 
@@ -80,13 +82,18 @@ public:
             QVector<int> *polygonVertexCount);
 
 private:
-
     int cohenSutherlandCode(QPointF &point, QRectF &bbox) const;
 
     bool cohenSutherlandClip(QPointF *p1, QPointF *p2, QRectF &bbox);
 
-    projPJ pjDstProjection, pjSrcProjection;
+    OGRPolygon* convertQRectToOGRPolygon(QRectF &rect);
 
+    QPolygonF convertOGRLineStringToQPolygon(OGRLineString *lineString);
+
+    void appendOGRLineStringsFromOGRGeometry(QList<OGRLineString*> *lineStrings,
+                                             OGRGeometry *geometry);
+
+    projPJ pjDstProjection, pjSrcProjection;
 };
 
 } // namespace Met3D
