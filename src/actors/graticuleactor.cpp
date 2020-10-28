@@ -453,8 +453,17 @@ void MGraticuleActor::generateGeometry()
     // Met.3D version 1.6 or earlier.
     double rotatedGridMaxSegmentLength_deg = 20.;
 
-    // If projection is enabled, project vertices.
-    if (mapProjection == MAPPROJECTION_PROJ_LIBRARY)
+    // Get bounding box in which the graticule will be displayed.
+    QRectF bbox = bBoxConnection->horizontal2DCoords();
+
+    // Projection-dependent operations.
+    if (mapProjection == MAPPROJECTION_CYLINDRICAL)
+    {
+        // Cylindrical projections may display bounding boxed outside the
+        // -180..180 degrees range, hence enlarge the geometry if required.
+        graticule = geo.enlargeGeometryToBBoxIfNecessary(graticule, bbox);
+    }
+    else if (mapProjection == MAPPROJECTION_PROJ_LIBRARY)
     {
         geo.initProjProjection(projLibraryString);
         graticule = geo.geographicalToProjectedCoordinates(graticule);
@@ -472,7 +481,6 @@ void MGraticuleActor::generateGeometry()
     }
 
     // Clip line geometry to the bounding box that is rendered.
-    QRectF bbox = bBoxConnection->horizontal2DCoords();
     graticule = geo.clipPolygons(graticule, bbox);
 
     // Convert list of polygons to vertex list for OpenGL rendering.
@@ -513,7 +521,11 @@ void MGraticuleActor::generateGeometry()
     QVector<QPolygonF> coastlines = geo.read2DGeometryFromShapefile(
                 expandEnvironmentVariables(coastfile), geometryLimits);
 
-    if (mapProjection == MAPPROJECTION_PROJ_LIBRARY)
+    if (mapProjection == MAPPROJECTION_CYLINDRICAL)
+    {
+        coastlines = geo.enlargeGeometryToBBoxIfNecessary(coastlines, bbox);
+    }
+    else if (mapProjection == MAPPROJECTION_PROJ_LIBRARY)
     {
         coastlines = geo.geographicalToProjectedCoordinates(coastlines);
     }
@@ -546,7 +558,11 @@ void MGraticuleActor::generateGeometry()
     QVector<QPolygonF> borderlines = geo.read2DGeometryFromShapefile(
                 expandEnvironmentVariables(borderfile), geometryLimits);
 
-    if (mapProjection == MAPPROJECTION_PROJ_LIBRARY)
+    if (mapProjection == MAPPROJECTION_CYLINDRICAL)
+    {
+        borderlines = geo.enlargeGeometryToBBoxIfNecessary(borderlines, bbox);
+    }
+    else if (mapProjection == MAPPROJECTION_PROJ_LIBRARY)
     {
         borderlines = geo.geographicalToProjectedCoordinates(borderlines);
     }

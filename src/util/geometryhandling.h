@@ -76,6 +76,9 @@ public:
     QVector<QPolygonF> splitLineSegmentsLongerThanThreshold(
             QVector<QPolygonF> polygons, double thresholdDistance);
 
+    QVector<QPolygonF> enlargeGeometryToBBoxIfNecessary(
+            QVector<QPolygonF> polygons, QRectF bbox);
+
     QVector<QPolygonF> clipPolygons(QVector<QPolygonF> polygons, QRectF bbox);
 
     void flattenPolygonsToVertexList(

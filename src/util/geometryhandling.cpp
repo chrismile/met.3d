@@ -422,6 +422,64 @@ QVector<QPolygonF> MGeometryHandling::splitLineSegmentsLongerThanThreshold(
 }
 
 
+QVector<QPolygonF> MGeometryHandling::enlargeGeometryToBBoxIfNecessary(
+        QVector<QPolygonF> polygons, QRectF bbox)
+{
+    // The geometry in "polygons" is assumed to be located in the range
+    // -180..180 degrees.
+    // First, determine how many times the geometry needs to be repeated to
+    // fill the provdied bounding box "bbox".
+    // E.g., if the western edge of the bbox is at -270. degrees, repeat
+    // one time to the west; if the eastern edge is 600. degrees, repeat twice
+    // to the east.
+    int globeRepetitionsWestward = 0;
+    if (bbox.left() < -180.)
+    {
+        globeRepetitionsWestward = int(floor((bbox.left() + 180.) / 360.));
+        LOG4CPLUS_DEBUG(mlog, "Western edge of BBOX is west of -180. degrees, "
+                        << "copying global geometry "
+                        << globeRepetitionsWestward << " times westward.");
+    }
+
+    int globeRepetitionsEastward = 0;
+    if (bbox.right() > 180.)
+    {
+        globeRepetitionsEastward = int(ceil((bbox.right() - 180.) / 360.));
+        LOG4CPLUS_DEBUG(mlog, "Eastern edge of BBOX is east of 180. degrees, "
+                        << "copying global geometry "
+                        << globeRepetitionsEastward << " times eastward.");
+    }
+
+    if (globeRepetitionsWestward == 0 && globeRepetitionsEastward == 0)
+    {
+        // Bounding box is in range -180..180 degrees, polygons can remain
+        // as they are.
+        return polygons;
+    }
+
+    QVector<QPolygonF> enlargedPolygonGeometry;
+
+    for (int globeOffset = globeRepetitionsWestward;
+         globeOffset <= globeRepetitionsEastward; globeOffset++)
+    {
+        qreal lonOffset = globeOffset * 360.;
+        for (QPolygonF polygon : polygons)
+        {
+            if (globeOffset == 0)
+            {
+                enlargedPolygonGeometry << polygon;
+            }
+            else
+            {
+                enlargedPolygonGeometry << polygon.translated(lonOffset, 0.);
+            }
+        }
+    }
+
+    return enlargedPolygonGeometry;
+}
+
+
 QVector<QPolygonF> MGeometryHandling::clipPolygons(
         QVector<QPolygonF> polygons, QRectF bbox)
 {
@@ -668,16 +726,13 @@ OGRPolygon *MGeometryHandling::convertQRectToOGRPolygon(QRectF &rect)
 QPolygonF MGeometryHandling::convertOGRLineStringToQPolygon(
         OGRLineString *lineString)
 {
-//TODO (17Oct2020, mr) -- do we still require an offset?
-    double offset = 0.;
-
     int numLinePoints = lineString->getNumPoints();
     OGRRawPoint *v = new OGRRawPoint[numLinePoints];
     lineString->getPoints(v);
     QPolygonF polygon;
     for (int i = 0; i < numLinePoints; i++)
     {
-        polygon << QPointF(v[i].x + offset, v[i].y);
+        polygon << QPointF(v[i].x, v[i].y);
     }
     delete[] v;
     return polygon;
