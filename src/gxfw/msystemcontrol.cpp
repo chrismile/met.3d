@@ -694,6 +694,19 @@ void MSystemManagerAndControl::executeBatchMode()
 }
 
 
+void MSystemManagerAndControl::setApplicationConfigurationValue(
+        QString key, QVariant item)
+{
+    applicationConfigurationValues.insert(key, item);
+}
+
+
+QVariant MSystemManagerAndControl::getApplicationConfigurationValue(QString key)
+{
+    return applicationConfigurationValues.value(key);
+}
+
+
 /******************************************************************************
 ***                             PUBLIC SLOTS                                ***
 *******************************************************************************/

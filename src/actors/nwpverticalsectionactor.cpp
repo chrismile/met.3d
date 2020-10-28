@@ -117,7 +117,7 @@ MNWPVerticalSectionActor::MNWPVerticalSectionActor()
     properties->mString()->setValue(pressureLineLevelsProperty,
                                     defaultPressureLineLevel);
 
-    selectedPressureLineLevels = parsePressureLevelString(defaultPressureLineLevel);
+    selectedPressureLineLevels = parseFloatRangeString(defaultPressureLineLevel);
 
     opacityProperty = addProperty(DECORATEDDOUBLE_PROPERTY, "opacity",
                                   actorPropertiesSupGroup);
@@ -642,7 +642,7 @@ void MNWPVerticalSectionActor::onQtPropertyChanged(QtProperty *property)
     {
         QString pressureLevelStr = properties->mString()->value(
                     pressureLineLevelsProperty);
-        selectedPressureLineLevels = parsePressureLevelString(pressureLevelStr);
+        selectedPressureLineLevels = parseFloatRangeString(pressureLevelStr);
 
         if (suppressActorUpdates()) return;
 

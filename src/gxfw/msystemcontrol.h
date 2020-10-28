@@ -198,6 +198,10 @@ public:
 
     void executeBatchMode();   
 
+    void setApplicationConfigurationValue(QString key, QVariant item);
+
+    QVariant getApplicationConfigurationValue(QString key);
+
 signals:
     void boundingBoxCreated();
     void boundingBoxDeleted(QString name);
@@ -297,6 +301,8 @@ private:
     MNaturalEarthDataLoader *naturalEarthDataLoader;
 
     QMap<QString, QString>                 defaultMemoryManagers;
+
+    QMap<QString, QVariant> applicationConfigurationValues;
 };
 
 } // namespace Met3D

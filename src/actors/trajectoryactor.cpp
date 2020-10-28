@@ -701,7 +701,7 @@ void MTrajectoryActor::loadConfiguration(QSettings *settings)
                 settings->value(QString("computationSeedActorPressureLevels%1")
                                 .arg(i)).toString();
         addSeedActor(actorName, deltaLon, deltaLat,
-                     parsePressureLevelString(presLvls));
+                     parseFloatRangeString(presLvls));
     }
 
     settings->endGroup();
@@ -2774,7 +2774,7 @@ void MTrajectoryActor::updateActorData()
 
         double stepSizeLon = properties->mDDouble()->value(sas.lonSpacing);
         double stepSizeLat = properties->mDDouble()->value(sas.latSpacing);
-        QVector<float> pressureLevels = parsePressureLevelString(
+        QVector<float> pressureLevels = parseFloatRangeString(
                     properties->mString()->value(sas.pressureLevels));
 
         switch (sas.type)

@@ -199,6 +199,11 @@ void MFrontendConfiguration::initializeFrontendFromConfigFile(
                 config.value("countryfile").toString());
     sysMC->getNaturalEarthDataLoader()->setDataSources(coastfile, countryfile);
 
+    sysMC->setApplicationConfigurationValue("geometry_shapefile_coastlines",
+                                            config.value("coastfile"));
+    sysMC->setApplicationConfigurationValue("geometry_shapefile_borderlines",
+                                            config.value("countryfile"));
+
     config.endGroup();
 
     // Initialize application.

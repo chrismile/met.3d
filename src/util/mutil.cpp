@@ -144,16 +144,16 @@ bool isValidObjectName(QString name)
 }
 
 
-QVector<float> parsePressureLevelString(QString levels)
+QVector<float> parseFloatRangeString(QString levels)
 {
-    // Clear the current list of pressure line levels. If pLevelStr does not
-    // match any accepted format, no pressure lines are drawn.
-    QVector<float> pressureLevels;
+    // Clear the current list of values. If "levels" does not
+    // match any accepted format, no values are returned.
+    QVector<float> floatValueList;
 
-    // Empty strings, i.e. no pressure lines, are accepted.
+    // Empty strings, i.e. no values, are accepted.
     if (levels.isEmpty())
     {
-        return pressureLevels;
+        return floatValueList;
     }
 
     // Match strings of format "[0,100,10]" or "[0.5,10,0.5]".
@@ -169,24 +169,24 @@ QVector<float> parsePressureLevelString(QString levels)
 
         bool ok;
         double from = rangeValues.value(1).toFloat(&ok);
-        if (!ok) return pressureLevels;
+        if (!ok) return floatValueList;
         double to   = rangeValues.value(2).toFloat(&ok);
-        if (!ok) return pressureLevels;
+        if (!ok) return floatValueList;
         double step = rangeValues.value(3).toFloat(&ok);
-        if (!ok) return pressureLevels;
+        if (!ok) return floatValueList;
 
         if (step > 0)
         {
             for (float d = from; d <= to; d += step)
             {
-                pressureLevels << d;
+                floatValueList << d;
             }
         }
         else if (step < 0)
         {
             for (float d = from; d >= to; d += step)
             {
-                pressureLevels << d;
+                floatValueList << d;
             }
         }
     }
@@ -198,11 +198,11 @@ QVector<float> parsePressureLevelString(QString levels)
         for (QString str : listValues)
         {
             float value = str.toFloat(&ok);
-            if (ok) pressureLevels << value;
+            if (ok) floatValueList << value;
         }
     }
 
-    return pressureLevels;
+    return floatValueList;
 }
 
 

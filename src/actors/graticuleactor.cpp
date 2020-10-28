@@ -414,39 +414,44 @@ void MGraticuleActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
 
 void MGraticuleActor::generateGeometry()
 {
-    // Generate nothing if no bounding box is available.
+    // The method requires a bounding box to correctly generate geometry.
     if (bBoxConnection->getBoundingBox() == nullptr)
     {
         return;
     }
-    // Make sure that "glResourcesManager" is the currently active context,
-    // otherwise glDrawArrays on the VBO generated here will fail in any other
-    // context than the currently active. The "glResourcesManager" context is
-    // shared with all visible contexts, hence modifying the VBO there works
-    // fine.
-    MGLResourcesManager* glRM = MGLResourcesManager::getInstance();
-    glRM->makeCurrent();
 
     LOG4CPLUS_DEBUG(mlog, "Generating graticule and coast-/borderline "
                           "geometry..." << flush);
 
-//TODO explain
-    double rotatedGridMaxSegmentLength = 20.;
-
     // Generate graticule geometry.
     // ============================
-//TODO rename parsePressureLevelString()
-    QVector<float> graticuleLongitudes = parsePressureLevelString(
+    QVector<float> graticuleLongitudes = parseFloatRangeString(
                 properties->mString()->value(graticuleLongitudesProperty));
-    QVector<float> graticuleLatitudes = parsePressureLevelString(
+    QVector<float> graticuleLatitudes = parseFloatRangeString(
                 properties->mString()->value(graticuleLatitudesProperty));
     QVector2D graticuleSpacing(
                 properties->mPointF()->value(vertexSpacingProperty));
 
+    // Instantiate utility class for geometry handling.
     MGeometryHandling geo;
 
+    // Generate graticule geometry.
     QVector<QPolygonF> graticule = geo.generate2DGraticuleGeometry(
                 graticuleLongitudes, graticuleLatitudes, graticuleSpacing);
+
+    // Heuristic value to eliminate line segments that after projection cross
+    // the map domain due to a connection that after projection is invalid.
+    // This happens when a line segment that connects two closeby vertices after
+    // projection leaves e.g. the eastern side of the map and re-enters on the
+    // western side (or vice versa).
+    // A value of "20deg" seems to work well with global data from NaturalEarth.
+    // NOTE (mr, 28Oct2020): This is "quick&dirty" workaround. The correct
+    // approach to this would be to perform some sort of test that checks if
+    // the correct connection of the two vertices after projection should cross
+    // map boundaries, in such as case the segment needs to be broken up.
+    // Another approach to this was previously implemented in BT's code, see
+    // Met.3D version 1.6 or earlier.
+    double rotatedGridMaxSegmentLength_deg = 20.;
 
     // If projection is enabled, project vertices.
     if (mapProjection == MAPPROJECTION_PROJ_LIBRARY)
@@ -463,10 +468,10 @@ void MGraticuleActor::generateGeometry()
         geo.initRotatedLonLatProjection(rotatedNorthPole);
         graticule = geo.geographicalToRotatedCoordinates(graticule);
         graticule = geo.splitLineSegmentsLongerThanThreshold(
-                    graticule, rotatedGridMaxSegmentLength);
+                    graticule, rotatedGridMaxSegmentLength_deg);
     }
 
-    // Clip to bounding box.
+    // Clip line geometry to the bounding box that is rendered.
     QRectF bbox = bBoxConnection->horizontal2DCoords();
     graticule = geo.clipPolygons(graticule, bbox);
 
@@ -479,6 +484,14 @@ void MGraticuleActor::generateGeometry()
                                     &graticuleStartIndices,
                                     &graticuleVertexCount);
 
+    // Make sure that "glResourcesManager" is the currently active context,
+    // otherwise glDrawArrays on the VBO generated here will fail in any other
+    // context than the currently active. The "glResourcesManager" context is
+    // shared with all visible contexts, hence modifying the VBO there works
+    // fine.
+    MGLResourcesManager* glRM = MGLResourcesManager::getInstance();
+    glRM->makeCurrent();
+
     // Upload vertex list to vertex buffer.
     const QString graticuleRequestKey = QString("graticule_vertices_actor#")
                                         + QString::number(getID());
@@ -488,12 +501,17 @@ void MGraticuleActor::generateGeometry()
 
     // Read coastline geometry from shapefile.
     // =======================================
-    QRectF geometryLimits =  QRectF(-180., -90., 360., 180.);
 
+    // For projection and clippling to work correctly, we load coastline and
+    // borderline geometry on the entire globe, then clip to the bounding
+    // box after projection. Performance seems to be accaptable (mr, 28Oct2020).
+    QRectF geometryLimits = QRectF(-180., -90., 360., 180.);
+
+    MSystemManagerAndControl *sysMC = MSystemManagerAndControl::getInstance();
+    QString coastfile = sysMC->getApplicationConfigurationValue(
+                "geometry_shapefile_coastlines").toString();
     QVector<QPolygonF> coastlines = geo.read2DGeometryFromShapefile(
-                expandEnvironmentVariables(
-                    "$MET3D_BASE/third-party/naturalearth/ne_50m_coastline.shp"),
-                geometryLimits);
+                expandEnvironmentVariables(coastfile), geometryLimits);
 
     if (mapProjection == MAPPROJECTION_PROJ_LIBRARY)
     {
@@ -503,7 +521,7 @@ void MGraticuleActor::generateGeometry()
     {
         coastlines = geo.geographicalToRotatedCoordinates(coastlines);
         coastlines = geo.splitLineSegmentsLongerThanThreshold(
-                    coastlines, rotatedGridMaxSegmentLength);
+                    coastlines, rotatedGridMaxSegmentLength_deg);
     }
     coastlines = geo.clipPolygons(coastlines, bbox);
 
@@ -523,10 +541,10 @@ void MGraticuleActor::generateGeometry()
 
     // Read borderline geometry from shapefile.
     // ========================================
+    QString borderfile = sysMC->getApplicationConfigurationValue(
+                "geometry_shapefile_borderlines").toString();
     QVector<QPolygonF> borderlines = geo.read2DGeometryFromShapefile(
-                expandEnvironmentVariables(
-                    "$MET3D_BASE/third-party/naturalearth/ne_50m_admin_0_boundary_lines_land.shp"),
-                geometryLimits);
+                expandEnvironmentVariables(borderfile), geometryLimits);
 
     if (mapProjection == MAPPROJECTION_PROJ_LIBRARY)
     {
@@ -536,7 +554,7 @@ void MGraticuleActor::generateGeometry()
     {
         borderlines = geo.geographicalToRotatedCoordinates(borderlines);
         borderlines = geo.splitLineSegmentsLongerThanThreshold(
-                    borderlines, rotatedGridMaxSegmentLength);
+                    borderlines, rotatedGridMaxSegmentLength_deg);
     }
     borderlines = geo.clipPolygons(borderlines, bbox);
 

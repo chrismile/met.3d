@@ -154,7 +154,7 @@ bool isValidObjectName(QString name);
   either given by a range (e.g. "[0, 100, 10]") or by a list of values (e.g.
   "10, 20, 50, 100, 200, 500, 700, 900").
  */
-QVector<float> parsePressureLevelString(QString levels);
+QVector<float> parseFloatRangeString(QString levels);
 
 /**
   Builds a string containing all values given by @p levels by separating the
