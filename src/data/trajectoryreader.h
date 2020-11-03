@@ -78,7 +78,11 @@ struct MTrajectoryFileInfo
 {
     MTrajectoryFileInfo()
         : ncFile(nullptr),
-          numTimeSteps(0), numTrajectories(0), numEnsembleMembers(0)
+          numTimeSteps(0), numTrajectories(0), numEnsembleMembers(0),
+          prsVarUnits(""),
+          lonMissingValue(M_INVALID_TRAJECTORY_POS),
+          latMissingValue(M_INVALID_TRAJECTORY_POS),
+          prsMissingValue(M_INVALID_TRAJECTORY_POS)
     { }
 
     ~MTrajectoryFileInfo()
@@ -89,10 +93,11 @@ struct MTrajectoryFileInfo
     unsigned int numTimeSteps, numTrajectories, numEnsembleMembers;    
 
     netCDF::NcVar lonVar, latVar, prsVar;
+    QString prsVarUnits; // units of pressure variable (Pa or hPa)
+    float lonMissingValue, latMissingValue, prsMissingValue;
 
     QVector<netCDF::NcVar> auxDataVars;
     QStringList auxDataVarNames;
-    unsigned int numAuxDataVars;
 
     QVector<QDateTime> times;
 
