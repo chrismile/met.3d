@@ -62,8 +62,7 @@ MSystemManagerAndControl::MSystemManagerAndControl(QWidget *parent) :
     batchModeQuitWhenCompleted(false),
     batchModeOverwriteImages(true),
     handleSize(.5),
-    mainWindow(nullptr),
-    naturalEarthDataLoader(nullptr)
+    mainWindow(nullptr)
 {
     LOG4CPLUS_DEBUG(mlog, "Initialising system manager...");
     ui->setupUi(this);
@@ -239,7 +238,6 @@ MSystemManagerAndControl::~MSystemManagerAndControl()
         delete it.value();
     }
 
-    if (naturalEarthDataLoader) delete naturalEarthDataLoader;
     delete systemPropertiesBrowser;
     delete ui;
 }
@@ -571,14 +569,6 @@ double MSystemManagerAndControl::elapsedTimeSinceSystemStart(
 {
     systemStopwatch.split();
     return systemStopwatch.getElapsedTime(units);
-}
-
-
-MNaturalEarthDataLoader *MSystemManagerAndControl::getNaturalEarthDataLoader()
-{
-    if (naturalEarthDataLoader == nullptr)
-        naturalEarthDataLoader = new MNaturalEarthDataLoader();
-    return naturalEarthDataLoader;
 }
 
 

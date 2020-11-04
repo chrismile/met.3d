@@ -34,7 +34,6 @@
 #include <QtCore>
 
 // local application imports
-#include "data/naturalearthdataloader.h"
 
 using namespace std;
 

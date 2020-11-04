@@ -42,7 +42,6 @@
 #include "gxfw/synccontrol.h"
 #include "data/waypoints/waypointstablemodel.h"
 #include "util/mstopwatch.h"
-#include "data/naturalearthdataloader.h"
 #include "boundingbox/boundingbox.h"
 #include "boundingbox/bboxdockwidget.h"
 
@@ -172,8 +171,6 @@ public:
 
     double elapsedTimeSinceSystemStart(const MStopwatch::TimeUnits units);
 
-    MNaturalEarthDataLoader* getNaturalEarthDataLoader();
-
     /**
       Returns true after @ref MGLResourcesManager::initializeGL() has been executed
       and the application is entirely initialized (i.e. all config files
@@ -298,7 +295,6 @@ private:
     QMap<QString, MBoundingBox*>           boundingBoxPool;
 
     MStopwatch systemStopwatch;
-    MNaturalEarthDataLoader *naturalEarthDataLoader;
 
     QMap<QString, QString>                 defaultMemoryManagers;
 

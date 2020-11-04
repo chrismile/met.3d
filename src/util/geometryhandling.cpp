@@ -389,6 +389,178 @@ QVector<QPolygonF> MGeometryHandling::geographicalToRotatedCoordinates(
 }
 
 
+// Parts of the following method have been ported from the C implementation of
+// the methods 'lamrot_to_lam' and 'phirot_to_phi'. The original code has been
+// published under GNU GENERAL PUBLIC LICENSE Version 2, June 1991.
+// source: https://code.zmaw.de/projects/cdo/files  [Version 1.8.1]
+// Necessary code duplicate in basemap.fx.glsl .
+
+// Original code:
+
+// double lamrot_to_lam(double phirot, double lamrot, double polphi, double pollam, double polgam)
+// {
+//   /*
+//     This function converts lambda from one rotated system to lambda in another system.
+//     If the optional argument polgam is present, the other system can also be a rotated one,
+//     where polgam is the angle between the two north poles.
+//     If polgam is not present, the other system is the real geographical system.
+
+//     phirot : latitude in the rotated system
+//     lamrot : longitude in the rotated system (E>0)
+//     polphi : latitude of the rotated north pole
+//     pollam : longitude of the rotated north pole
+
+//     result : longitude in the geographical system
+//   */
+//   double zarg1, zarg2;
+//   double zgam;
+//   double result = 0;
+
+//   double zsinpol = sin(DEG2RAD*polphi);
+//   double zcospol = cos(DEG2RAD*polphi);
+
+//   double zlampol = DEG2RAD*pollam;
+//   double zphirot = DEG2RAD*phirot;
+//   if ( lamrot > 180.0 ) lamrot -= 360.0;
+//   double zlamrot = DEG2RAD*lamrot;
+
+//   if ( fabs(polgam) > 0 )
+//     {
+//       zgam  = -DEG2RAD*polgam;
+//       zarg1 = sin(zlampol) *
+//  	     (- zsinpol*cos(zphirot) * (cos(zlamrot)*cos(zgam) - sin(zlamrot)*sin(zgam))
+//  	      + zcospol*sin(zphirot))
+// 	 - cos(zlampol)*cos(zphirot) * (sin(zlamrot)*cos(zgam) + cos(zlamrot)*sin(zgam));
+
+//       zarg2 = cos(zlampol) *
+//  	     (- zsinpol*cos(zphirot) * (cos(zlamrot)*cos(zgam) - sin(zlamrot)*sin(zgam))
+//	      + zcospol*sin(zphirot))
+//	 + sin(zlampol)*cos(zphirot) * (sin(zlamrot)*cos(zgam) + cos(zlamrot)*sin(zgam));
+//      }
+//   else
+//     {
+//       zarg1 = sin(zlampol)*(- zsinpol*cos(zlamrot)*cos(zphirot)  +
+//      		               zcospol*             sin(zphirot)) -
+//	       cos(zlampol)*           sin(zlamrot)*cos(zphirot);
+//       zarg2 = cos(zlampol)*(- zsinpol*cos(zlamrot)*cos(zphirot)  +
+//                               zcospol*             sin(zphirot)) +
+//               sin(zlampol)*           sin(zlamrot)*cos(zphirot);
+//     }
+
+//   if ( fabs(zarg2) > 0 ) result = RAD2DEG*atan2(zarg1, zarg2);
+//   if ( fabs(result) < 9.e-14 ) result = 0;
+
+//   return result;
+// }
+
+// double phirot_to_phi(double phirot, double lamrot, double polphi, double polgam)
+// {
+//   /*
+//     This function converts phi from one rotated system to phi in another
+//     system. If the optional argument polgam is present, the other system
+//     can also be a rotated one, where polgam is the angle between the two
+//     north poles.
+//     If polgam is not present, the other system is the real geographical
+//     system.
+
+//     phirot : latitude in the rotated system
+//     lamrot : longitude in the rotated system (E>0)
+//     polphi : latitude of the rotated north pole
+//     polgam : angle between the north poles of the systems
+
+//     result : latitude in the geographical system
+//   */
+//   double zarg;
+//   double zgam;
+
+//   double zsinpol = sin(DEG2RAD*polphi);
+//   double zcospol = cos(DEG2RAD*polphi);
+
+//   double zphirot   = DEG2RAD*phirot;
+//   if ( lamrot > 180.0 ) lamrot -= 360.0;
+//   double zlamrot   = DEG2RAD*lamrot;
+
+//   if ( fabs(polgam) > 0 )
+//     {
+//       zgam = -DEG2RAD*polgam;
+//       zarg = zsinpol*sin(zphirot) +
+//              zcospol*cos(zphirot)*(cos(zlamrot)*cos(zgam) - sin(zgam)*sin(zlamrot));
+//     }
+//   else
+//     zarg   = zcospol*cos(zphirot)*cos(zlamrot) + zsinpol*sin(zphirot);
+
+//   return RAD2DEG*asin(zarg);
+// }
+
+
+QPointF MGeometryHandling::rotatedToGeographicalCoordinates(QPointF point)
+{
+    // Early break for rotation values with no effect.
+    double poleLon = rotatedPole.x();
+    double poleLat = rotatedPole.y();
+    if ((poleLon == -180. || poleLon == 180.) && poleLat == 90.)
+    {
+        return QPointF();
+    }
+
+    double resultLon = 0.;
+
+    // Get longitude and latitude from point.
+    double rotLon = point.x();
+    double rotLat = point.y();
+
+    if ( rotLon > 180.0 )
+    {
+        rotLon -= 360.0;
+    }
+
+    // Convert degrees to radians.
+    double poleLatRad = DEG2RAD * poleLat;
+    double poleLonRad = DEG2RAD * poleLon;
+    double rotLonRad = DEG2RAD * rotLon;
+
+    // Compute sinus and cosinus of some coordinates since they are needed more
+    // often later on.
+    double sinPoleLat = sin(poleLatRad);
+    double cosPoleLat = cos(poleLatRad);
+    double sinRotLatRad = sin(DEG2RAD * rotLat);
+    double cosRotLatRad = cos(DEG2RAD * rotLat);
+    double cosRotLonRad = cos(DEG2RAD * rotLon);
+
+    // Apply the transformation (conversation to Cartesian coordinates and  two
+    // rotations; difference to original code: no use of polgam).
+
+    double x =
+            (cos(poleLonRad) * (((-sinPoleLat) * cosRotLonRad * cosRotLatRad)
+                                + (cosPoleLat * sinRotLatRad)))
+            + (sin(poleLonRad) * sin(rotLonRad) * cosRotLatRad);
+    double y =
+            (sin(poleLonRad) * (((-sinPoleLat) * cosRotLonRad * cosRotLatRad)
+                                + (cosPoleLat * sinRotLatRad)))
+            - (cos(poleLonRad) * sin(rotLonRad) * cosRotLatRad);
+    double z = cosPoleLat * cosRotLatRad * cosRotLonRad
+            + sinPoleLat * sinRotLatRad;
+
+    // Avoid invalid values for z (Might occure due to inaccuracies in
+    // computations).
+    z = max(-1., min(1., z));
+
+    // Compute spherical coordinates from Cartesian coordinates and convert
+    // radians to degrees.
+
+    if ( std::abs(x) > 0 )
+    {
+        resultLon = RAD2DEG * atan2(y, x);
+    }
+    if ( std::abs(resultLon) < 9.e-14 )
+    {
+        resultLon = 0.;
+    }
+
+    return QPointF(resultLon, RAD2DEG * (asin(z)));
+}
+
+
 QVector<QPolygonF> MGeometryHandling::splitLineSegmentsLongerThanThreshold(
         QVector<QPolygonF> polygons, double thresholdDistance)
 {

@@ -73,6 +73,8 @@ public:
     QVector<QPolygonF> geographicalToRotatedCoordinates(
             QVector<QPolygonF> polygons);
 
+    QPointF rotatedToGeographicalCoordinates(QPointF point);
+
     QVector<QPolygonF> splitLineSegmentsLongerThanThreshold(
             QVector<QPolygonF> polygons, double thresholdDistance);
 

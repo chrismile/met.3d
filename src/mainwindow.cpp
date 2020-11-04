@@ -4,14 +4,14 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2019 Marc Rautenhaus [*, previously +]
+**  Copyright 2015-2020 Marc Rautenhaus [*, previously +]
 **  Copyright 2016-2018 Bianca Tost [+]
 **  Copyright 2020      Marcel Meyer [*]
 **
 **  + Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
 **
-**  * Regional Computing Center, Visualization
+**  * Regional Computing Center, Visual Data Analysis Group
 **  Universitaet Hamburg, Hamburg, Germany
 **
 **  Met.3D is free software: you can redistribute it and/or modify
@@ -46,6 +46,8 @@
 #include <eccodes.h>
 #include <gsl/gsl_version.h>
 #include <netcdf_meta.h>
+#include <gdal_version.h>
+#include <proj_api.h>
 
 // local application imports
 #include "gxfw/msystemcontrol.h"
@@ -1229,15 +1231,16 @@ void MMainWindow::showAboutDialog()
             "ANY WARRANTY; without even the implied warranty of MERCHANTABILITY "
             "or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public "
             "License for more details.<br><br>"
-            "Copyright 2015-2019 Met.3D authors:<br>"
+            "Copyright 2015-2020 Met.3D authors:<br>"
             "Marc Rautenhaus(2, 1[until 2018]), Bianca Tost(1), Michael Kern(1), "
-            "with contributions by Alexander Kumpf(1), Philipp Kaiser(1), "
+            "with contributions by Kamesh Modali(2), Andreas Beckert(2), Marcel Meyer(2), "
+            "Alexander Kumpf(1), Philipp Kaiser(1), "
             "Fabian Sch&ouml;ttl(1), Christoph Heidelmann(1).<br><br>"
             "(1) <a href='https://www.in.tum.de/cg/'>Computer Graphics and "
             "Visualization Group</a>, "
             "Technical University of Munich, Garching, Germany<br>"
-            "(2) <a href='https://www.rrz.uni-hamburg.de/'>Regional Computing "
-            "Center</a>, "
+            "(2) <a href='https://uhh.de/rrz-research'>Visual Data Analysis Group, "
+            "Regional Computing Center</a>, "
             "Universitaet Hamburg, Hamburg, Germany<br><br>"
             "See Met.3D source files for license details.<br><hr>"
             "Met.3D uses Qt (see 'About Qt') and the following open-source libraries:<br>"
@@ -1257,6 +1260,7 @@ void MMainWindow::showAboutDialog()
             "<tr> "
             "<td> NetCDF-4 C++: %16.%17.%18 </td>"
             " <td> QCustomPlot: %19.%20.%21 </td>"
+            " <td> proj: %22 </td>"
             "</tr>"
             "</table>"
             "(Note: For versions listed as x.x.x "
@@ -1287,10 +1291,11 @@ void MMainWindow::showAboutDialog()
 #if defined(QCPLOT_MAJOR_VERSION) && defined(QCPLOT_MINOR_VERSION) \
     && defined(QCPLOT_PATCH_VERSION)
             .arg(QCPLOT_MAJOR_VERSION).arg(QCPLOT_MINOR_VERSION)
-            .arg(QCPLOT_PATCH_VERSION);
+            .arg(QCPLOT_PATCH_VERSION)
 #else
-    .arg("x").arg("x").arg("x");
+    .arg("x").arg("x").arg("x")
 #endif
+            .arg(PJ_VERSION);
 
     QMessageBox::about(this, "About Met.3D", aboutString);
 }

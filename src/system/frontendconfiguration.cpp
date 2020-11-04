@@ -193,12 +193,6 @@ void MFrontendConfiguration::initializeFrontendFromConfigFile(
     // =======================================================
     config.beginGroup("CoastCountryLines");
 
-    QString coastfile = expandEnvironmentVariables(config.value("coastfile")
-                                                   .toString());
-    QString countryfile = expandEnvironmentVariables(
-                config.value("countryfile").toString());
-    sysMC->getNaturalEarthDataLoader()->setDataSources(coastfile, countryfile);
-
     sysMC->setApplicationConfigurationValue("geometry_shapefile_coastlines",
                                             config.value("coastfile"));
     sysMC->setApplicationConfigurationValue("geometry_shapefile_borderlines",
