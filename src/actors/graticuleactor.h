@@ -44,7 +44,6 @@
 #include "gxfw/mapprojectionsupportingactor.h"
 #include "gxfw/gl/shadereffect.h"
 #include "gxfw/gl/vertexbuffer.h"
-#include "data/naturalearthdataloader.h"
 #include "gxfw/boundingbox/boundingbox.h"
 #include "util/geometryhandling.h"
 
@@ -116,59 +115,11 @@ private:
             QVector<QPolygonF> geometry, QRectF bbox,
             double rotatedGridMaxSegmentLength_deg);
 
-    void generateGeometryOld();
-
-    // ToDo: short documentation / summary
-    void cutWithBoundingBox(QRectF cornerRect);
-    void updateLatLonLines(QRectF cornerRect);
-    void updateCoastalLines(QRectF cornerRect);
-    void updateBorderLines(QRectF cornerRect);
-
-
-    /**
-      Loads line geometry of @p geometryType while considering cyclic
-      repetitions in longitude direction. Results are stored in @p vertices,
-      @p startIndices and @p vertexCount. @p cornerRect contains the world
-      coordinates of the bounding box.
-
-      Generates the vertices of the geometry in at most three steps by dividing
-      the bounding box domain into regions which on a sphere are equal to region
-      with longitudes in the range of [-180, 180] which is the domain the coast-
-      and borderlines to be loaded are defined on:
-
-      1) Determines the west-most of the regions described above and tests if
-         its west-east-extend is smaller than 360:
-         If yes: Compue it seperately.
-         If no: It will be considered in the second step.
-      2) Tells @ref MNaturalEarthDataLoader::loadLineGeometry() to load the
-         complete line geometry and to make a shifted copy of if for each
-         360-degree-region.
-         [Considerss all of the regions described above with west-east-extend
-          equal to 360.]
-      3) Loads the remaining region if not all of the geometry was loaded in the
-         steps before.
-
-      The line geometry in all three steps is loaded by adapting the bounding
-      box and the shift parameters of
-      @ref MNaturalEarthDataLoader::loadLineGeometry() to the region[s] needed.
-      */
-    void loadCyclicLineGeometry(
-            MNaturalEarthDataLoader::GeometryType geometryType,
-            QRectF cornerRect, QVector<QVector2D> *vertices,
-            QVector<int> *startIndices, QVector<int> *vertexCount);
-
     std::shared_ptr<GL::MShaderEffect> shaderProgram;
 
     GL::MVertexBuffer* graticuleVertexBuffer;
     QVector<int> graticuleStartIndices;
     QVector<int> graticuleVertexCount;
-//TODO remove
-    uint   numVerticesGraticule;
-
-    QVector<int> nLats;
-    QVector<int> nLons;
-
-    MNaturalEarthDataLoader *naturalEarthDataLoader;
 
     GL::MVertexBuffer* coastlineVertexBuffer;
     QVector<int> coastlineStartIndices;
@@ -200,13 +151,6 @@ private:
     QtProperty *drawBorderLinesProperty;
 
     float verticalPosition_hPa;
-
-    // Inidcate whether coastlineVertexCount/borderlineVertexCount contains at
-    // least one value greater and therefore is valid to be used as count array
-    // during rendering. Using a count array filled with zeros leads to an
-    // program crash.
-    bool coastLinesCountIsValid;
-    bool borderLinesCountIsValid;
 };
 
 
