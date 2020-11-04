@@ -1151,7 +1151,6 @@ void MGribReader::scanDataRoot()
                     vinfo->gridIsCyclicInLongitude =
                             floatIsAlmostEqualRelativeAndAbs(
                                 lonWest, lonEast, M_LONLAT_RESOLUTION);
-                    vinfo->longitudinalIndexShiftForCyclicGrid = 0;
 
                     // Fill lat/lon arrays.
                     vinfo->lons.resize(vinfo->nlons);

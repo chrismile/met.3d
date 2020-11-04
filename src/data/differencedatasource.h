@@ -54,6 +54,8 @@ namespace Met3D
   class receives in the pipeline to two input requests that can be passed on
   to the input sources. See @ref constructInputSourceRequestFromRequest().
 
+  Example:
+
       [NWPPipeline]
       size=2
 
@@ -64,7 +66,7 @@ namespace Met3D
       ...
 
       [ConfigurablePipeline]
-      size=1
+      size=2
 
       1\type=DIFFERENCE
       1\name=Difference to z(an)
@@ -75,6 +77,16 @@ namespace Met3D
       1\schedulerID=MultiThread
       1\memoryManagerID=NWP
       1\enableRegridding=false
+
+      2\type=DIFFERENCE
+      2\name=ECMWF NAWDEX PL ENSEMBLE 6h tendency
+      2\input1=ECMWF NAWDEX ANALYSIS ENSFilter
+      2\input2=ECMWF NAWDEX ANALYSIS ENSFilter
+      2\baseRequest1="LEVELTYPE=REQUESTED_LEVELTYPE;VARIABLE=REQUESTED_VARIABLE;INIT_TIME=REQUESTED_INIT_TIME;VALID_TIME=REQUESTED_VALID_TIME;MEMBER=REQUESTED_MEMBER"
+      2\baseRequest2="LEVELTYPE=REQUESTED_LEVELTYPE;VARIABLE=REQUESTED_VARIABLE;INIT_TIME=TIMEDIFF_-6_HOURS_REQUESTED_INIT_TIME;VALID_TIME=TIMEDIFF_-6_HOURS_REQUESTED_VALID_TIME;MEMBER=REQUESTED_MEMBER"
+      2\schedulerID=MultiThread
+      2\memoryManagerID=NWP
+      2\enableRegridding=false
 
   @todo Correct determination of available init/valid times is still missing.
   This can lead to missing input grids and nullptr fields to be returned --

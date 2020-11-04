@@ -234,7 +234,51 @@ MTrajectories* MTrajectoryReader::produceData(MDataRequest request)
     QMutexLocker ncAccessMutexLocker(&staticNetCDFAccessMutex);
     finfo->lonVar.getVar(start, count, lons);
     finfo->latVar.getVar(start, count, lats);
-    finfo->prsVar.getVar(start, count, pres);    
+    finfo->prsVar.getVar(start, count, pres);
+
+    // Trajectory pressure coordinate needs to be in hPa; hence scale if
+    // given in Pa.
+    if (finfo->prsVarUnits == "Pa")
+    {
+        for (int i = 0; i < numVertices; i++) pres[i] /= 100.;
+    }
+
+    // Replace missing values other than "M_INVALID_TRAJECTORY_POS" by
+    // "M_INVALID_TRAJECTORY_POS".
+    if (finfo->lonMissingValue != M_INVALID_TRAJECTORY_POS)
+    {
+        for (int i = 0; i < numVertices; i++)
+        {
+            if (isnan(lons[i]) || floatIsAlmostEqualRelativeAndAbs(
+                        lons[i], finfo->lonMissingValue, 1.E-6f))
+            {
+                lons[i] = M_INVALID_TRAJECTORY_POS;
+            }
+        }
+    }
+    if (finfo->latMissingValue != M_INVALID_TRAJECTORY_POS)
+    {
+        for (int i = 0; i < numVertices; i++)
+        {
+            if (isnan(lats[i]) || floatIsAlmostEqualRelativeAndAbs(
+                        lats[i], finfo->latMissingValue, 1.E-6f))
+            {
+                lats[i] = M_INVALID_TRAJECTORY_POS;
+            }
+        }
+    }
+    if (finfo->prsMissingValue != M_INVALID_TRAJECTORY_POS)
+    {
+        for (int i = 0; i < numVertices; i++)
+        {
+            if (isnan(pres[i]) || floatIsAlmostEqualRelativeAndAbs(
+                        pres[i], finfo->prsMissingValue, 1.E-6f))
+            {
+                pres[i] = M_INVALID_TRAJECTORY_POS;
+            }
+        }
+    }
+
 
     // Create the trajectory data struct that is returned from this function.
     Met3D::MTrajectories* trajectories =
@@ -248,21 +292,18 @@ MTrajectories* MTrajectoryReader::produceData(MDataRequest request)
 
     // Read all auxiliary data variables from file and copy to the return
     // data struct.
-    int iIndexAuxData = 0;
-    QVector<netCDF::NcVar> allAuxDataVariables = finfo->auxDataVars;
-    for (QVector<netCDF::NcVar>::iterator iAuxDataVar =
-         allAuxDataVariables.begin();
-         iAuxDataVar != allAuxDataVariables.end(); iAuxDataVar++)
+    for (int iIndexAuxData = 0; iIndexAuxData < finfo->auxDataVars.size();
+         iIndexAuxData++)
     {
+        // Note: Here we assume that variable is of type float or double,
+        // as "auxData" is of type float.
+
         // Read auxiliary data into temporary data array.
         finfo->auxDataVars[iIndexAuxData].getVar(start, count, auxData);
 
         // Copy this auxiliary data, iAuxDataVar, to the aux. data struct
         // in the trajectories class.
-        trajectories->copyAuxDataPerVertex(auxData,iIndexAuxData);
-
-        // Iterate over all auxiliary data variables.
-        iIndexAuxData=iIndexAuxData+1;
+        trajectories->copyAuxDataPerVertex(auxData, iIndexAuxData);
      }
 
     ncAccessMutexLocker.unlock();
@@ -605,6 +646,86 @@ void MTrajectoryReader::checkFileOpen(QString filename)
         finfo->latVar = ncFile->getVar("lat");
         finfo->prsVar = ncFile->getVar("pressure");
 
+        // Get units of pressure variable.
+        string units = "";
+        try
+        {
+            finfo->prsVar.getAtt("units").getValues(units);
+        }
+        catch (NcException)
+        {
+            LOG4CPLUS_WARN(mlog, "WARNING: cannot determine units of trajectory "
+                           "pressure variable. Assuming 'hPa'.");
+            units = "hPa";
+        }
+        finfo->prsVarUnits = units.c_str();
+
+        // Check if missing values are provided.
+//TODO (mr, 02Nov2020) -- eliminate the code repition below...
+        try
+        {
+            finfo->lonVar.getAtt("_FillValue").getValues(
+                        &(finfo->lonMissingValue));
+        }
+        catch (NcException)
+        {
+            try
+            {
+                finfo->lonVar.getAtt("missing_value").getValues(
+                            &(finfo->lonMissingValue));
+            }
+            catch (NcException) {}
+        }
+        if (finfo->lonMissingValue != M_INVALID_TRAJECTORY_POS)
+        {
+            LOG4CPLUS_DEBUG(mlog, "Trajectories: Missing value has been "
+                                  "provided for 'lon': "
+                            << finfo->lonMissingValue << ".");
+        }
+
+        try
+        {
+            finfo->latVar.getAtt("_FillValue").getValues(
+                        &(finfo->latMissingValue));
+        }
+        catch (NcException)
+        {
+            try
+            {
+                finfo->latVar.getAtt("missing_value").getValues(
+                            &(finfo->latMissingValue));
+            }
+            catch (NcException) {}
+        }
+        if (finfo->latMissingValue != M_INVALID_TRAJECTORY_POS)
+        {
+            LOG4CPLUS_DEBUG(mlog, "Trajectories: Missing value has been "
+                                  "provided for 'lat': "
+                            << finfo->latMissingValue << ".");
+        }
+
+        try
+        {
+            finfo->prsVar.getAtt("_FillValue").getValues(
+                        &(finfo->prsMissingValue));
+        }
+        catch (NcException)
+        {
+            try
+            {
+                finfo->prsVar.getAtt("missing_value").getValues(
+                            &(finfo->prsMissingValue));
+            }
+            catch (NcException) {}
+        }
+        if (finfo->prsMissingValue != M_INVALID_TRAJECTORY_POS)
+        {
+            LOG4CPLUS_DEBUG(mlog, "Trajectories: Missing value has been "
+                                  "provided for 'pressure': "
+                            << finfo->prsMissingValue << ".");
+        }
+
+
         // Get auxiliary data along trajectories by screening
         // all available ncvars in the input file and picking
         // those vars indicated as "aux. data" by the
@@ -622,14 +743,17 @@ void MTrajectoryReader::checkFileOpen(QString filename)
 
             if (auxDataIndicator == "yes")
             {
-                finfo->auxDataVarNames.append(varName);
-                finfo->auxDataVars.append(ncFile->getVar(
-                                              varName.toStdString()));
+                // Currently we can only handle variables of type float or
+                // double.
+                NcType varType = iCFVar.getType();
+                if (varType == NcType::nc_FLOAT || varType == NcType::nc_DOUBLE)
+                {
+                    finfo->auxDataVarNames.append(varName);
+                    finfo->auxDataVars.append(ncFile->getVar(
+                                                  varName.toStdString()));
+                }
             }
         }
-
-        // Get the number of auxiliary data variables along trajectories.
-        finfo->numAuxDataVars = finfo->auxDataVars.size();
 
         // Get time values.
         NcCFVar cfVar(finfo->prsVar);
