@@ -46,6 +46,7 @@
 #include "gxfw/gl/vertexbuffer.h"
 #include "data/naturalearthdataloader.h"
 #include "gxfw/boundingbox/boundingbox.h"
+#include "util/geometryhandling.h"
 
 class MGLResourcesManager;
 class MSceneViewGLWidget;
@@ -109,6 +110,11 @@ private:
       ToDo: add a short summary / documentation
       */
     void generateGeometry();
+
+    QVector<QPolygonF> projectAndClipGeometry(
+            MGeometryHandling *geo,
+            QVector<QPolygonF> geometry, QRectF bbox,
+            double rotatedGridMaxSegmentLength_deg);
 
     void generateGeometryOld();
 
@@ -177,6 +183,10 @@ private:
     QString defaultGraticuleLatitudesString;
     QtProperty *graticuleLatitudesProperty;
     QtProperty *vertexSpacingProperty;
+    QString defaultLongitudeLabelsString;
+    QtProperty *longitudeLabelsProperty;
+    QString defaultLatitudeLabelsString;
+    QtProperty *latitudeLabelsProperty;
     QtProperty *computeGraticuleProperty;
 
     QtProperty *colourProperty;

@@ -42,7 +42,6 @@
 #include "gxfw/mglresourcesmanager.h"
 #include "gxfw/msceneviewglwidget.h"
 #include "gxfw/textmanager.h"
-#include "util/geometryhandling.h"
 
 using namespace std;
 
@@ -66,6 +65,8 @@ MGraticuleActor::MGraticuleActor(MBoundingBoxConnection *boundingBoxConnection)
       borderlineVertexBuffer(nullptr),
       defaultGraticuleLongitudesString("[-180.,180.,10.]"),
       defaultGraticuleLatitudesString("[-90.,90.,5.]"),
+      defaultLongitudeLabelsString("[-180.,180.,20.]"),
+      defaultLatitudeLabelsString("[-90.,90.,10.]"),
       graticuleColour(QColor(Qt::black)),
       drawGraticule(true),
       drawCoastLines(true),
@@ -103,12 +104,32 @@ MGraticuleActor::MGraticuleActor(MBoundingBoxConnection *boundingBoxConnection)
                                               actorPropertiesSupGroup);
     properties->mString()->setValue(graticuleLongitudesProperty,
                                     defaultGraticuleLongitudesString);
+    graticuleLongitudesProperty->setToolTip(
+                "Format can be '[from,to,step]' or 'v1,v2,v3,...'.");
 
     graticuleLatitudesProperty = addProperty(STRING_PROPERTY,
                                              "graticule latitudes",
                                              actorPropertiesSupGroup);
     properties->mString()->setValue(graticuleLatitudesProperty,
                                     defaultGraticuleLatitudesString);
+    graticuleLatitudesProperty->setToolTip(
+                "Format can be '[from,to,step]' or 'v1,v2,v3,...'.");
+
+    longitudeLabelsProperty = addProperty(STRING_PROPERTY,
+                                          "longitude labels",
+                                          actorPropertiesSupGroup);
+    properties->mString()->setValue(longitudeLabelsProperty,
+                                    defaultLongitudeLabelsString);
+    longitudeLabelsProperty->setToolTip(
+                "Format can be '[from,to,step]' or 'v1,v2,v3,...'.");
+
+    latitudeLabelsProperty = addProperty(STRING_PROPERTY,
+                                         "latitude labels",
+                                         actorPropertiesSupGroup);
+    properties->mString()->setValue(latitudeLabelsProperty,
+                                    defaultLatitudeLabelsString);
+    latitudeLabelsProperty->setToolTip(
+                "Format can be '[from,to,step]' or 'v1,v2,v3,...'.");
 
     vertexSpacingProperty = addProperty(POINTF_LONLAT_PROPERTY,
                                         "vertex spacing",
@@ -170,6 +191,10 @@ void MGraticuleActor::saveConfiguration(QSettings *settings)
                        properties->mString()->value(graticuleLongitudesProperty));
     settings->setValue("graticuleLatitudes",
                        properties->mString()->value(graticuleLatitudesProperty));
+    settings->setValue("graticuleLongitudeLabels",
+                       properties->mString()->value(longitudeLabelsProperty));
+    settings->setValue("graticuleLatitudeLabels",
+                       properties->mString()->value(latitudeLabelsProperty));
     settings->setValue("vertexSpacing",
                        properties->mPointF()->value(vertexSpacingProperty));
     settings->setValue("colour", graticuleColour);
@@ -203,6 +228,14 @@ void MGraticuleActor::loadConfiguration(QSettings *settings)
     QString latsStr = settings->value(
                 "graticuleLatitudes", defaultGraticuleLatitudesString).toString();
     properties->mString()->setValue(graticuleLatitudesProperty, latsStr);
+
+    QString lonLabelsStr = settings->value(
+                "graticuleLongitudeLabels", defaultLongitudeLabelsString).toString();
+    properties->mString()->setValue(longitudeLabelsProperty, lonLabelsStr);
+
+    QString latLabelssStr = settings->value(
+                "graticuleLatitudeLabels", defaultLatitudeLabelsString).toString();
+    properties->mString()->setValue(latitudeLabelsProperty, latLabelssStr);
 
     QPointF spacing = settings->value("vertexSpacing", QPointF(1., 1.)).toPointF();
     properties->mPointF()->setValue(vertexSpacingProperty, spacing);
@@ -434,6 +467,8 @@ void MGraticuleActor::generateGeometry()
 
     // Instantiate utility class for geometry handling.
     MGeometryHandling geo;
+    geo.initProjProjection(projLibraryString);
+    geo.initRotatedLonLatProjection(rotatedNorthPole);
 
     // Generate graticule geometry.
     QVector<QPolygonF> graticule = geo.generate2DGraticuleGeometry(
@@ -456,32 +491,9 @@ void MGraticuleActor::generateGeometry()
     // Get bounding box in which the graticule will be displayed.
     QRectF bbox = bBoxConnection->horizontal2DCoords();
 
-    // Projection-dependent operations.
-    if (mapProjection == MAPPROJECTION_CYLINDRICAL)
-    {
-        // Cylindrical projections may display bounding boxed outside the
-        // -180..180 degrees range, hence enlarge the geometry if required.
-        graticule = geo.enlargeGeometryToBBoxIfNecessary(graticule, bbox);
-    }
-    else if (mapProjection == MAPPROJECTION_PROJ_LIBRARY)
-    {
-        geo.initProjProjection(projLibraryString);
-        graticule = geo.geographicalToProjectedCoordinates(graticule);
-        //OPENISSUE (mr, 26Oct2020) -- is this safe with all projections or
-        // do specific projections also lead to erroneous projected line
-        // segments as those that occur with rotated lon-lat projections
-        // (fixed using splitLineSegmentsLongerThanThreshold() below)?
-    }
-    else if (mapProjection == MAPPROJECTION_ROTATEDLATLON)
-    {
-        geo.initRotatedLonLatProjection(rotatedNorthPole);
-        graticule = geo.geographicalToRotatedCoordinates(graticule);
-        graticule = geo.splitLineSegmentsLongerThanThreshold(
-                    graticule, rotatedGridMaxSegmentLength_deg);
-    }
-
-    // Clip line geometry to the bounding box that is rendered.
-    graticule = geo.clipPolygons(graticule, bbox);
+    // Project and clip the generated graticule geometry.
+    graticule = projectAndClipGeometry(
+                &geo, graticule, bbox, rotatedGridMaxSegmentLength_deg);
 
     // Convert list of polygons to vertex list for OpenGL rendering.
     QVector<QVector2D> verticesGraticule;
@@ -507,6 +519,86 @@ void MGraticuleActor::generateGeometry()
                              &graticuleVertexBuffer);
 
 
+    // Generate graticule labels.
+    // ==========================
+    MTextManager* tm = glRM->getTextManager();
+
+    // Remove all text labels of the old geometry (MActor method).
+    removeAllLabels();
+
+    // Get properties for label font size and colour and bounding box.
+    int labelsize = properties->mInt()->value(labelSizeProperty);
+    QColor labelColour = properties->mColor()->value(labelColourProperty);
+    bool labelbbox = properties->mBool()->value(labelBBoxProperty);
+    QColor labelBBoxColour = properties->mColor()->value(labelBBoxColourProperty);
+
+    QVector<float> longitudeLabels = parseFloatRangeString(
+                properties->mString()->value(longitudeLabelsProperty));
+    QVector<float> latitudeLabels = parseFloatRangeString(
+                properties->mString()->value(latitudeLabelsProperty));
+
+    // Label positions are found by creating a "proxy graticule" for each
+    // meridian, then after projection and clipping placing the label
+    // at the first polygon vertex (i.e. boundary of the bbox).
+    for (float lonLabel : longitudeLabels)
+    {
+        QVector<float> singleLongitudeLabel;
+        singleLongitudeLabel << lonLabel;
+
+        QVector<QPolygonF> proxyGraticule =
+                geo.generate2DGraticuleGeometry(
+                    singleLongitudeLabel, latitudeLabels, graticuleSpacing);
+
+        proxyGraticule = projectAndClipGeometry(
+                    &geo, proxyGraticule, bbox, rotatedGridMaxSegmentLength_deg);
+
+        for (QPolygonF proxyPolygon : proxyGraticule)
+        {
+            QPointF labelPosition = proxyPolygon.first();
+            labels.append(tm->addText(
+                              QString("%1%2").arg(lonLabel).arg(
+                                  lonLabel >= 0 ? "E" : "W"),
+                              MTextManager::LONLATP,
+                              labelPosition.x(), labelPosition.y(),
+                              verticalPosition_hPa,
+                              labelsize, labelColour,
+                              MTextManager::BASELINECENTRE,
+                              labelbbox, labelBBoxColour)
+                          );
+        }
+    }
+
+    // Parallels' labels are positioned at the last vertex of each projected
+    // clipped polygon.
+    for (float latLabel : latitudeLabels)
+    {
+        QVector<float> singleLatitudeLabel;
+        singleLatitudeLabel << latLabel;
+
+        QVector<QPolygonF> proxyGraticule =
+                geo.generate2DGraticuleGeometry(
+                    longitudeLabels, singleLatitudeLabel, graticuleSpacing);
+
+        proxyGraticule = projectAndClipGeometry(
+                    &geo, proxyGraticule, bbox, rotatedGridMaxSegmentLength_deg);
+
+        for (QPolygonF proxyPolygon : proxyGraticule)
+        {
+            QPointF labelPosition = proxyPolygon.last();
+            labels.append(tm->addText(
+                              QString("%1%2").arg(latLabel).arg(
+                                  latLabel >= 0 ? "N" : "S"),
+                              MTextManager::LONLATP,
+                              labelPosition.x(), labelPosition.y(),
+                              verticalPosition_hPa,
+                              labelsize, labelColour,
+                              MTextManager::BASELINECENTRE,
+                              labelbbox, labelBBoxColour)
+                          );
+        }
+    }
+
+
     // Read coastline geometry from shapefile.
     // =======================================
 
@@ -521,21 +613,8 @@ void MGraticuleActor::generateGeometry()
     QVector<QPolygonF> coastlines = geo.read2DGeometryFromShapefile(
                 expandEnvironmentVariables(coastfile), geometryLimits);
 
-    if (mapProjection == MAPPROJECTION_CYLINDRICAL)
-    {
-        coastlines = geo.enlargeGeometryToBBoxIfNecessary(coastlines, bbox);
-    }
-    else if (mapProjection == MAPPROJECTION_PROJ_LIBRARY)
-    {
-        coastlines = geo.geographicalToProjectedCoordinates(coastlines);
-    }
-    else if (mapProjection == MAPPROJECTION_ROTATEDLATLON)
-    {
-        coastlines = geo.geographicalToRotatedCoordinates(coastlines);
-        coastlines = geo.splitLineSegmentsLongerThanThreshold(
-                    coastlines, rotatedGridMaxSegmentLength_deg);
-    }
-    coastlines = geo.clipPolygons(coastlines, bbox);
+    coastlines = projectAndClipGeometry(
+                &geo, coastlines, bbox, rotatedGridMaxSegmentLength_deg);
 
     QVector<QVector2D> verticesCoastlines;
     coastlineStartIndices.clear();
@@ -558,21 +637,8 @@ void MGraticuleActor::generateGeometry()
     QVector<QPolygonF> borderlines = geo.read2DGeometryFromShapefile(
                 expandEnvironmentVariables(borderfile), geometryLimits);
 
-    if (mapProjection == MAPPROJECTION_CYLINDRICAL)
-    {
-        borderlines = geo.enlargeGeometryToBBoxIfNecessary(borderlines, bbox);
-    }
-    else if (mapProjection == MAPPROJECTION_PROJ_LIBRARY)
-    {
-        borderlines = geo.geographicalToProjectedCoordinates(borderlines);
-    }
-    else if (mapProjection == MAPPROJECTION_ROTATEDLATLON)
-    {
-        borderlines = geo.geographicalToRotatedCoordinates(borderlines);
-        borderlines = geo.splitLineSegmentsLongerThanThreshold(
-                    borderlines, rotatedGridMaxSegmentLength_deg);
-    }
-    borderlines = geo.clipPolygons(borderlines, bbox);
+    borderlines = projectAndClipGeometry(
+                &geo, borderlines, bbox, rotatedGridMaxSegmentLength_deg);
 
     QVector<QVector2D> verticesBorderlines;
     borderlineStartIndices.clear();
@@ -587,7 +653,41 @@ void MGraticuleActor::generateGeometry()
     uploadVec2ToVertexBuffer(verticesBorderlines, borderRequestKey,
                              &borderlineVertexBuffer);
 
-    LOG4CPLUS_DEBUG(mlog, "Graticule and coast-/borderline geometry generated.");
+    LOG4CPLUS_DEBUG(mlog, "Graticule and coast-/borderline geometry was generated.");
+}
+
+
+QVector<QPolygonF> MGraticuleActor::projectAndClipGeometry(
+        MGeometryHandling *geo,
+        QVector<QPolygonF> geometry, QRectF bbox,
+        double rotatedGridMaxSegmentLength_deg)
+{
+    // Projection-dependent operations.
+    if (mapProjection == MAPPROJECTION_CYLINDRICAL)
+    {
+        // Cylindrical projections may display bounding boxed outside the
+        // -180..180 degrees range, hence enlarge the geometry if required.
+        geometry = geo->enlargeGeometryToBBoxIfNecessary(geometry, bbox);
+    }
+    else if (mapProjection == MAPPROJECTION_PROJ_LIBRARY)
+    {
+        geometry = geo->geographicalToProjectedCoordinates(geometry);
+        //OPENISSUE (mr, 26Oct2020) -- is this safe with all projections or
+        // do specific projections also lead to erroneous projected line
+        // segments as those that occur with rotated lon-lat projections
+        // (fixed using splitLineSegmentsLongerThanThreshold() below)?
+    }
+    else if (mapProjection == MAPPROJECTION_ROTATEDLATLON)
+    {
+        geometry = geo->geographicalToRotatedCoordinates(geometry);
+        geometry = geo->splitLineSegmentsLongerThanThreshold(
+                    geometry, rotatedGridMaxSegmentLength_deg);
+    }
+
+    // Clip line geometry to the bounding box that is rendered.
+    geometry = geo->clipPolygons(geometry, bbox);
+
+    return geometry;
 }
 
 

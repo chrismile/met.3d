@@ -91,27 +91,33 @@ QVector<QPolygonF> MGeometryHandling::generate2DGraticuleGeometry(
     qSort(latitudes);
 
     // Generate meridians (lines of constant longitude).
-    for (float lon : longitudes)
+    if (latitudes.size() > 1)
     {
-        QPolygonF meridian;
-        for (float lat = latitudes.first(); lat <= latitudes.last();
-             lat += lonLatVertexSpacing.y())
+        for (float lon : longitudes)
         {
-            meridian << QPointF(lon, lat);
+            QPolygonF meridian;
+            for (float lat = latitudes.first(); lat <= latitudes.last();
+                 lat += lonLatVertexSpacing.y())
+            {
+                meridian << QPointF(lon, lat);
+            }
+            graticuleGeometry << meridian;
         }
-        graticuleGeometry << meridian;
     }
 
     // Generate parallels (lines of constant latitude).
-    for (float lat : latitudes)
+    if (longitudes.size() > 1)
     {
-        QPolygonF parallel;
-        for (float lon = longitudes.first(); lon <= longitudes.last();
-             lon += lonLatVertexSpacing.x())
+        for (float lat : latitudes)
         {
-            parallel << QPointF(lon, lat);
+            QPolygonF parallel;
+            for (float lon = longitudes.first(); lon <= longitudes.last();
+                 lon += lonLatVertexSpacing.x())
+            {
+                parallel << QPointF(lon, lat);
+            }
+            graticuleGeometry << parallel;
         }
-        graticuleGeometry << parallel;
     }
 
     return graticuleGeometry;
