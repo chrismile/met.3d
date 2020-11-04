@@ -244,6 +244,9 @@ void MGraticuleActor::loadConfiguration(QSettings *settings)
     verticalPosition_hPa = settings->value("verticalPosition", 1049.).toFloat();
 
     settings->endGroup();
+
+    // Update geometry with loaded configuration.
+    generateGeometry();
 }
 
 
