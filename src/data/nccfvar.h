@@ -4,11 +4,15 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2018 Marc Rautenhaus
-**  Copyright 2017-2018  Bianca Tost
+**  Copyright 2015-2020 Marc Rautenhaus [*, previously +]
+**  Copyright 2020 Kameswarro Modali [*]
+**  Copyright 2017-2018 Bianca Tost [+]
 **
-**  Computer Graphics and Visualization Group
+**  + Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
+**
+**  * Regional Computing Center, Visual Data Analysis Group
+**  Universitaet Hamburg, Hamburg, Germany
 **
 **  Met.3D is free software: you can redistribute it and/or modify
 **  it under the terms of the GNU General Public License as published by
@@ -129,10 +133,10 @@ public:
     NcVar getRotatedLatitudeVar();
 
     /**
-      Returns the stereographic grid coordinate along the latitude direction
+      Returns the projected grid coordinate along the Y direction
       of the variable corresponding to the CF variable represented by this object.
       */
-    NcVar getStereographicLatitudeVar();
+    NcVar getProjectionYCoordinateVar();
 
     /**
       Returns the longitude variable corresponding to the CF variable
@@ -150,10 +154,10 @@ public:
     NcVar getRotatedLongitudeVar();
 
     /**
-      Returns the stereographic grid coordinate along the longitude direction
+      Returns the projected grid coordinate along the X direction
       of the variable corresponding to the CF variable represented by this object.
       */
-    NcVar getStereographicLongitudeVar();
+    NcVar getProjectionXCoordinateVar();
 
     /**
       If the CF variable represented by this object has a pressure dimension,
@@ -318,12 +322,12 @@ public:
 
     /**
       Static function that checks if the specified @p var is a CF variable
-      defined on a stereographic grid with a mapping defined by one of the variables
+      defined on a projected grid with a mapping defined by one of the variables
       with their names stored in @p gridMappingVarNames. If so,
       @p gridMappingVarName holds the name of the corresponding grid mapping
       variable.
       */
-    static bool isDefinedOnStereographicGrid(const NcVar& var,
+    static bool isDefinedOnProjectedGrid(const NcVar& var,
                                        const QStringList gridMappingVarNames,
                                        QString *gridMappingVarName);
 
@@ -337,25 +341,6 @@ public:
     static bool getRotatedNorthPoleCoordinates(const NcVar& gridMappingVar,
                                                float *rotatedNorthPoleLon,
                                                float *rotatedNorthPoleLat);
-
-    /**
-      Static function that gets the standard parallel latitude and the
-      straight longitude from pole for a given
-      grid mapping variable @p gridMappingVar. The results are stored in
-      @p stereoStandardLat and @p stereoStraightLon respectively.
-      The function returns true if gridMappingVar is stereographic
-      and all required projection parameters are available.
-      */
-    static bool getStereographicProjCoordinates(const NcVar& gridMappingVar,
-                                                const NcVar& var,
-                                                float *stereoStraightLon,
-                                                float *stereoStandardLat
-                                                );
-
-
-    // get unit of stereographic grid coordinates from data file
-    //NcVar getStereographicUnitVar(QString *stereoGridUnit,
-    //                             float *stereoGridUnit_m);
 
     /**
       Static function that converts an @ref NcVariableGridType enum to

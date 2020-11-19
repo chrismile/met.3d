@@ -4,11 +4,15 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2017 Marc Rautenhaus
-**  Copyright 2017-2018  Bianca Tost
+**  Copyright 2015-2020 Marc Rautenhaus [*, previously +]
+**  Copyright 2020 Kameswarro Modali [*]
+**  Copyright 2017-2018 Bianca Tost [+]
 **
-**  Computer Graphics and Visualization Group
+**  + Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
+**
+**  * Regional Computing Center, Visual Data Analysis Group
+**  Universitaet Hamburg, Hamburg, Germany
 **
 **  Met.3D is free software: you can redistribute it and/or modify
 **  it under the terms of the GNU General Public License as published by
@@ -35,14 +39,6 @@
 
 // local application imports
 #include "util/mutil.h"
-
-// MM
-//#include "util/mutil.h"
-//#include "gxfw/mglresourcesmanager.h"
-//#include "gxfw/msceneviewglwidget.h"
-
-// MM
-//#include "gxfw/mapprojectionsupportingactor.h"
 
 using namespace std;
 using namespace netCDF;
@@ -214,9 +210,9 @@ NcVar NcCFVar::getLatitudeVar()
     // (NOTE: extended initialiser lists require the C++-0x standard).
     vector<string> units = {"degrees_north", "degree_north", "degree_N",
                             "degrees_N", "degreeN", "degreesN", "degrees",
-                            "meters","kilometers","m","km"}; // MM: required for initial screen
+                            "meters", "kilometers", "m", "km"};
 
-    vector<string> standardNames = {"latitude", "grid_latitude","projection_y_coordinate"};
+    vector<string> standardNames = {"latitude", "grid_latitude", "projection_y_coordinate"};
 
     // Find a variable whose 'units' attribute equals one of the specified
     // values or whose 'standard_name' attribute equals 'latitude'.
@@ -238,19 +234,13 @@ NcVar NcCFVar::getRotatedLatitudeVar()
     return getCFCoordinateVar(units, standardNames);
 }
 
-NcVar NcCFVar::getStereographicLatitudeVar()
+
+NcVar NcCFVar::getProjectionYCoordinateVar()
 {
-    // List of units allowed for the stereographic variable in northerly
-    // direction (latitudes;y) can be recognised
-    vector<string> units = {"meters","kilometers","m","km"};
-
+    vector<string> units = {"meters", "kilometers", "m", "km"};
     vector<string> standardNames = {"projection_y_coordinate"};
-
-    // Find a variable whose 'units' attribute equals one of the specified
-    // values or whose 'standard_name' attribute equals 'latitude'.
     return getCFCoordinateVar(units, standardNames);
 }
-
 
 
 NcVar NcCFVar::getLongitudeVar()
@@ -260,9 +250,9 @@ NcVar NcCFVar::getLongitudeVar()
     // (NOTE: extended initialiser lists require the C++-0x standard).
     vector<string> units = {"degrees_east", "degree_east", "degree_E",
                             "degrees_E", "degreeE", "degreesE", "degrees",
-                            "meters","kilometers","m","km"}; // required for initial screen
+                            "meters", "kilometers", "m", "km"};
 
-    vector<string> standardNames = {"longitude", "grid_longitude","projection_x_coordinate"};
+    vector<string> standardNames = {"longitude", "grid_longitude", "projection_x_coordinate"};
 
     // Find a variable whose 'units' attribute equals one of the specified
     // values or whose 'standard_name' attribute equals 'longitude'.
@@ -284,16 +274,11 @@ NcVar NcCFVar::getRotatedLongitudeVar()
     return getCFCoordinateVar(units, standardNames);
 }
 
-NcVar NcCFVar::getStereographicLongitudeVar()
+
+NcVar NcCFVar::getProjectionXCoordinateVar()
 {
-    // List of units allowed for the stereographic variable in easterly
-    // (longitude (x)) direction
-    vector<string> units = {"meters","kilometers","m","km"};
-
+    vector<string> units = {"meters", "kilometers", "m", "km"};
     vector<string> standardNames = {"projection_x_coordinate"};
-
-    // Find a variable whose 'units' attribute equals one of the specified
-    // values or whose 'standard_name' attribute equals 'longitude'.
     return getCFCoordinateVar(units, standardNames);
 }
 
@@ -893,6 +878,7 @@ bool NcCFVar::isCFGridMappingVariable(const NcVar& var)
         // other than 'rotated_latitude_longitude' or "polar stereographic"
         if ( (attribute != "rotated_latitude_longitude") &&
              (attribute != "polar_stereographic") )
+//TODO (mr, 2020Nov19) -- how do we support arbitrary projections?
         {
             return false;
         }
@@ -968,9 +954,9 @@ bool NcCFVar::isDefinedOnRotatedGrid(const NcVar& var,
 
 }
 
-bool NcCFVar::isDefinedOnStereographicGrid(const NcVar& var,
-                                    const QStringList gridMappingVarNames,
-                                    QString *gridMappingVarName)
+bool NcCFVar::isDefinedOnProjectedGrid(
+        const NcVar& var, const QStringList gridMappingVarNames,
+        QString *gridMappingVarName)
 {
     string attribute;
     NcVar coordinateVar;
@@ -994,28 +980,28 @@ bool NcCFVar::isDefinedOnStereographicGrid(const NcVar& var,
             return false;
         }
         NcCFVar cfvar(var);
-        // Test if the variable has a stereographic grid coordinate
-        // in longitude direction.
+        // Test if the variable has a projected grid coordinate
+        // in x/longitude direction.
         try
         {
-            coordinateVar = cfvar.getStereographicLongitudeVar();
-            // Test if the variable has a stereographic grid coordinate
-            // in latitude direction
+            coordinateVar = cfvar.getProjectionXCoordinateVar();
+            // Test if the variable has a projected grid coordinate
+            // in y/latitude direction.
             try
             {
-                coordinateVar = cfvar.getStereographicLatitudeVar();
+                coordinateVar = cfvar.getProjectionYCoordinateVar();
                 return true;
             }
             // An NcException here means that there was no dimension found
             // fulfiling the requirements of being latitude dimension in a
-            // stereographic grid.
+            // projected grid.
             catch (NcException)
             {
                 return false;
             }
         }
         // An NcException here means that there was no dimension found fulfilling
-        // the requirements of being longitude dimension in a stereographic grid.
+        // the requirements of being longitude dimension in a projected grid.
         catch (NcException)
         {
             return false;
@@ -1028,7 +1014,6 @@ bool NcCFVar::isDefinedOnStereographicGrid(const NcVar& var,
     {
         return false;
     }
-
 }
 
 
@@ -1084,148 +1069,6 @@ bool NcCFVar::getRotatedNorthPoleCoordinates(const NcVar& gridMappingVar,
         return false;
     }
 
-}
-
-/*
-NcVar NcCFVar::getStereographicUnitVar(QString *stereoGridUnit,
-                                          float *stereoGridUnit_m)
-{
-
-    string attribute;
-
-    // Loop over all coordinate (=dimension) variables and return the
-    // one that has an attribute "standard_name" = "projection_x_coorindate"
-    // and also has an attribute "units" (which holds the desired information about
-    // the unit of the stereographic projection). It is assumed here that
-    // "projection_x_coordinate" and "projection_y_coordinate" have the same unit
-    for (int i = 0; i < getDimCount(); i++)
-    {
-        NcVar var = getParentGroup().getVar(getDim(i).getName());
-
-        map<string,NcVarAtt> attributeList = var.getAtts();
-        if (attributeList.find("standard_name")!= attributeList.end())
-        {
-
-            var.getAtt("standard_name").getValues(attribute);
-            fixZeroTermination(&attribute);
-            if (attribute == "projection_x_coordinate")
-            {
-                if (attributeList.find("units")!= attributeList.end())
-                {
-
-                    // get unit
-                    var.getAtt("units").getValues(attribute);
-                    *stereoGridUnit = QString::fromStdString(attribute);
-
-                    // get unit in meters  as numeric value for flexible handling/scaling
-                    if ( (*stereoGridUnit == "meters") || (*stereoGridUnit == "m") )
-                    {
-                        *stereoGridUnit_m = 1.0f;
-                    }
-                    else if ( (*stereoGridUnit == "kilometers") || (*stereoGridUnit == "km") )
-                    {
-                        *stereoGridUnit_m = 1000.0f;
-                    }
-
-                    return var;
-                }
-            }
-        }
-    }
-
-    // If we get here, the unit of the stereographic grid-coordinates
-    // cannot be identified from the data file. Throw an exception, because
-    // the unit is needed for correct re-scaling of the stereographic data to fit
-    // it into the internal Met3D grid
-    throw MNcException("NcException", "cannot identify unit of stereographic coordinate variable",
-                      __FILE__, __LINE__);
-
-}
-*/
-
-
-bool NcCFVar::getStereographicProjCoordinates(const NcVar& gridMappingVar,
-                                        const NcVar& var,
-                                        float *stereoStraightLon,
-                                        float *stereoStandardLat)
-{
-    string attribute;   
-
-    // check if the grid mapping name is "polar stereographic".
-    // If not, return false, if true continue and get the relevant
-    // projection parameter information (e.g. unit) from file as these
-    // are needed for converting between polar stereographic and Met3D grid
-    try
-    {
-        gridMappingVar.getAtt("grid_mapping_name").getValues(attribute);
-        fixZeroTermination(&attribute);
-        if (attribute != "polar_stereographic")
-        {
-            return false;
-        }
-        return true;
-    }
-    catch (NcException)
-    {
-        return false;
-    }
-
-    float coordinate;
-
-    // projection parameter: straight vertical longitude from pole
-    try
-    {
-        gridMappingVar.getAtt("straight_vertical_longitude_from_pole").getValues(
-                    &coordinate);
-        string attribute = QString::number(coordinate).toStdString();
-        fixZeroTermination(&attribute);
-        coordinate = QString::fromStdString(attribute).toFloat();
-        *stereoStraightLon = coordinate;
-        return true;
-    }
-    catch (NcException)
-    {
-        return false;
-    }
-
-    // projection parameter: standard parallel latitude
-    try
-    {
-        gridMappingVar.getAtt("standard_parallel").getValues(
-                    &coordinate);
-        string attribute = QString::number(coordinate).toStdString();
-        fixZeroTermination(&attribute);
-        coordinate = QString::fromStdString(attribute).toFloat();
-        *stereoStandardLat = coordinate;
-        return true;
-    }
-    catch (NcException)
-    {
-        return false;
-    }
-
-    // projection parameter: unit and scale factor of stereographic grid
-    /*
-    try
-    {
-
-        // get unit of the stereographic grid coordinates
-        NcCFVar cfvar(var);
-        cfvar.getStereographicUnitVar(stereoGridUnit,stereoGridUnit_m);
-
-        // compute scale factor to squash stereographic grid coords into
-        // the internal Met3D grid
-        //Met3D::MNaturalEarthDataLoader NatEarthObj;
-        // *stereoGridScaleFactor=NatEarthObj.computeScalingFromStereographicToMet3DGridCoords(*stereoGridUnit);
-
-        // return true as all necessary parameters have been identified and stored
-        return true;
-    }
-    catch (NcException)
-    {
-        return false;
-    }
-    */
 }
 
 

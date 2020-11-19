@@ -4,11 +4,15 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015-2018 Marc Rautenhaus
-**  Copyright 2017-2018 Bianca Tost
+**  Copyright 2015-2020 Marc Rautenhaus [*, previously +]
+**  Copyright 2020 Kameswarro Modali [*]
+**  Copyright 2017-2018 Bianca Tost [+]
 **
-**  Computer Graphics and Visualization Group
+**  + Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
+**
+**  * Regional Computing Center, Visual Data Analysis Group
+**  Universitaet Hamburg, Hamburg, Germany
 **
 **  Met.3D is free software: you can redistribute it and/or modify
 **  it under the terms of the GNU General Public License as published by
@@ -428,9 +432,9 @@ void MClimateForecastReader::scanDataRoot()
                     << "for files with NetCDF-CF forecast data.");
     LOG4CPLUS_DEBUG(mlog, "Using file filter: " << dirFileFilters.toStdString());
     LOG4CPLUS_DEBUG(mlog, "Parameters: "
-                    << "treat rotated lon-lat coordinates of grid as regular lon-lat coordinates="
+                    << "data is specified on a horizontally regular grid in rotated lon-lat coordinates="
                     << (treatRotatedGridAsRegularGrid ? "enabled" : "disabled")
-                    << "treat projected x-y coordinates of grid as regular lon-lat coordinates="
+                    << "data is specified on a horizontally regular grid in projected x-y coordinates="
                     << (treatProjectedGridAsRegularLonLatGrid ? "enabled" : "disabled")
                     << "; convert geometric height to pressure (using standard ICAO)="
                     << (convertGeometricHeightToPressure_ICAOStandard ? "enabled" : "disabled")
@@ -837,8 +841,8 @@ void MClimateForecastReader::scanDataRoot()
                             vinfo->horizontalGridType =
                                     MHorizontalGridType::ROTATED_REGULAR_LONLAT_GRID;
                         }
-                        // Check if data is defined on a stereographic grid.
-                        if (NcCFVar::isDefinedOnStereographicGrid(
+                        // Check if data is defined on a projected grid.
+                        if (NcCFVar::isDefinedOnProjectedGrid(
                                     ncFile->getVar(varName.toStdString()),
                                     gridMappingVarNames, &gridMappingVarName))
                         {
@@ -854,7 +858,7 @@ void MClimateForecastReader::scanDataRoot()
                         {
                             continue;
                         }
-                        // At the moment, only register stereographic grid if
+                        // At the moment, only register projected grid if
                         // the user wants to interpret projected grids as
                         // regular lon-lat grids.
                         if (!treatProjectedGridAsRegularLonLatGrid
@@ -1456,9 +1460,9 @@ MStructuredGrid *MClimateForecastReader::readGrid(
         shared->lats.resize(shared->latVar.getDim(0).getSize());
         shared->latVar.getVar(shared->lats.data());
 
-
-        // MKM Read units from the input file and then find the factor to divide
-        // 10^3(if input  data in "km") or 10^6(if input  data in "m")
+        // Projected coordinates: Read units from the input file and scale
+        // coordinate values to fit 0..360 range to be handled correctly by
+        // Met.3D.
          if (treatProjectedGridAsRegularLonLatGrid)
          {
             string units = "";
@@ -1470,7 +1474,8 @@ MStructuredGrid *MClimateForecastReader::readGrid(
             }
             else if (units != "m")
             {
-                LOG4CPLUS_ERROR(mlog, "ERROR: stereographic coordinates x,y have unknown units.");
+                LOG4CPLUS_ERROR(mlog, "ERROR: projected coordinates x,y have "
+                                      "unknown units (must be 'm' or 'km').");
             }
             int size = shared->lats.size();
             for (int i = 0; i < size; i++)

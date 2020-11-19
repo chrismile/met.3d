@@ -885,11 +885,6 @@ QWidget *MDoubleSpinBoxDelegate::createEditor(QWidget *parent,
     doubleSpinBox->setDecimals(decimals);
     doubleSpinBox->setSingleStep(singleStep);
 
-    // Connect editor and dock widget to update bounding boxes instantly if the
-    // value of one of the double spin boxes changes.
-    // connect(doubleSpinBox, SIGNAL(valueChanged(double)),
-    //        dockWidget, SLOT(onSpinBoxUpdate(double)));
-
     return doubleSpinBox;
 }
 

@@ -7,9 +7,7 @@
 #       - proj_INCLUDE_DIR  - Package include directory
 #       - proj_LIBRARIES    - Package static libraries
 #
-#  Copyright 2016-2018 Marc Rautenhaus
-#  Copyright 2016      Michael Kern
-#  Copyright 2017-2018 Bianca Tost
+#  Copyright 2020 Kameswarro Modali
 #
 ####################################################################################################
 

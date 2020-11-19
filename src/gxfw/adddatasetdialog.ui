@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>737</width>
-    <height>609</height>
+    <width>816</width>
+    <height>678</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -168,15 +168,21 @@
          <layout class="QVBoxLayout" name="verticalLayout_2">
           <item>
            <widget class="QCheckBox" name="treatRotatedAsRegularCheckBox">
+            <property name="toolTip">
+             <string>(horizontal coordinates in Met.3D will also be rotated)</string>
+            </property>
             <property name="text">
-             <string>interpret rotated lon-lat coordinates of grid as regular lon-lat coordinates</string>
+             <string>data is defined on a horizontally regular grid in rotated lon-lat coordinates</string>
             </property>
            </widget>
           </item>
           <item>
            <widget class="QCheckBox" name="treatProjectedAsRegularLonLatCheckBox">
+            <property name="toolTip">
+             <string>(horizontal coordinates in Met.3D will also be projected)</string>
+            </property>
             <property name="text">
-             <string>interpret projected (as supported by proj-library) x-y coordinates of grid as regular lon-lat coordinates</string>
+             <string>data is defined on a horizontally regular grid in projected (as supported by proj-library) x-y coordinates</string>
             </property>
            </widget>
           </item>
@@ -283,7 +289,11 @@
              </widget>
             </item>
             <item>
-             <widget class="QLineEdit" name="inputVarsForDerivedVarsLineEdit"/>
+             <widget class="QLineEdit" name="inputVarsForDerivedVarsLineEdit">
+              <property name="toolTip">
+               <string>Format is a &quot;/&quot;-separated list of &quot;CF-std-name:NC-variable-name&quot;, e.g. &quot;eastward_wind:u-component_of_wind_hybrid/northward_wind:v-component_of_wind_hybrid/air_temperature:Temperature_hybrid/...&quot;</string>
+              </property>
+             </widget>
             </item>
            </layout>
           </item>

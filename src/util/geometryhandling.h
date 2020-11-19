@@ -43,7 +43,11 @@ namespace Met3D
 {
 
 /**
-
+  @brief MGeometryHandling provides methods to create, load, and transform 2D
+  geometries. Geometries are generally handled as @ref QVector<QPolygonF>.
+  Methods include loading geometry from shapefiles, generation of graticule
+  geometry, projection methods for rotated lon-lat and proj-supported projections,
+  and clipping to bounding boxes.
  */
 class MGeometryHandling
 {
