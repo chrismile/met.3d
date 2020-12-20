@@ -98,9 +98,11 @@ MDerivedMetVarsDataSource::MDerivedMetVarsDataSource()
 
 #ifdef ENABLE_EXPERIMENTAL_DERIVEDVARS
     registerDerivedDataFieldProcessor(new MMCAOIndexProcessor_Papritz2015());
+     registerDerivedDataFieldProcessor(new MMCAOIndexProcessor_Papritz2015_nonMasked());
     registerDerivedDataFieldProcessor(new MMCAOIndexProcessor_Kolstad2008());
     // MMCAOIndexProcessor_BracegirdleGray2008 needs to be fixed -- do not use!
-//    registerDerivedDataFieldProcessor(new MMCAOIndexProcessor_BracegirdleGray2008());
+    // registerDerivedDataFieldProcessor(new MMCAOIndexProcessor_BracegirdleGray2008());
+    registerDerivedDataFieldProcessor(new MMCAOIndexProcessor_Michel2018());
     registerDerivedDataFieldProcessor(
                 new MMCAOIndex2DProcessor_YuliaP(
                     "HYBRID_SIGMA_PRESSURE_3D"));
