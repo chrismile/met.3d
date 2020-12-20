@@ -164,10 +164,9 @@ public:
 
 
 /*
- @brief MCAO Index 5: Difference SST and T (500) (SST - T).
- Michel, 2018, reports that most previous studies have used SST-T500 to distinguish Polar Lows
- from PMCs. Extending this to 3-D, we calculate SST-T for visual exploration of differences
- compared with other indicees, based on potential temperature.
+ @brief MCAO Index 5: Difference between sea surface temperature
+ and temperature aloft at 500 hPa (SST - T_500hPa), as used in
+ (Michel, 2018; Journal of Climate).
  */
 class MMCAOIndexProcessor_Michel2018
         : public MDerivedDataFieldProcessor

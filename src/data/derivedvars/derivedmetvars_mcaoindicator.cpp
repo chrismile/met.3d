@@ -81,8 +81,7 @@ void MMCAOIndexProcessor_Papritz2015::compute(
     // We first get PT at the surface, then PT at each pressure level and
     // from this compute mcao index 1 and write it to the derivedGrid
 
-    // initialize variable for storing information about the proportion of each grid-cell
-    // covered with ocean / land (use land-sea mask from ERA5)
+    // initialize variable for storing land-sea mask data
     float propGridCellLand = 0;
 
     for (unsigned int j = 0; j < derivedGrid->getNumLats(); j++)
@@ -91,7 +90,8 @@ void MMCAOIndexProcessor_Papritz2015::compute(
         {
 
              // consider only water surfaces. According to the ECMWF all grid cells
-             // with values of 0.5 or below can be considered water surfaces
+             // with values of 0.5, or below, as given in the ERA5 land-sea mask
+             // can be considered as water surfaces
              // https://apps.ecmwf.int/codes/grib/param-db/?id=172
              propGridCellLand = landSeaMaskGrid->getValue(j, i);
              if (propGridCellLand <= 0.5)
@@ -372,21 +372,17 @@ void MMCAOIndex2DProcessor_YuliaP::compute(
     // pressure level of 850 hPa. MCAO index 4 yields a 2-D derived grid
     // whereas MCAO indicators 1-3 result in 3-D grids.
 
-    // initialize variable for storing information about the proportion of each grid-cell
-    // covered with ocean / land (use land-sea mask from ERA5)
+    // initialize variable for storing land-sea mask data
     float propGridCellLand = 0;
 
     for (unsigned int j = 0; j < derivedGrid->getNumLats(); j++)
     {
        for (unsigned int i = 0; i < derivedGrid->getNumLons(); i++)
        {
-            // calculate potential temperature at the surface (j,i)
-            float theta_surface = M_MISSING_VALUE;
-            float t_surface_K = surfaceTemperatureGrid->getValue(j, i);
-            float p_surface_Pa = surfaceAirPressureGrid->getValue(j, i);
 
            // consider only water surfaces. According to the ECMWF all grid cells
-           // with values of 0.5 or below can be considered water surfaces
+           // with values of 0.5, or below, as given in the ERA5 land-sea mask
+           // can be considered as water surfaces
            // https://apps.ecmwf.int/codes/grib/param-db/?id=172
            propGridCellLand = landSeaMaskGrid->getValue(j, i);
            if (propGridCellLand <= 0.5)
@@ -468,8 +464,7 @@ void MMCAOIndexProcessor_Michel2018::compute(
 
     // MCAO index 5 is calculated as the difference of SST and T
 
-    // initialize variable for storing information about the proportion of each grid-cell
-    // covered with ocean / land (use land-sea mask from ERA5)
+    // initialize variable for storing land-sea mask data
     float propGridCellLand = 0;
 
     for (unsigned int j = 0; j < derivedGrid->getNumLats(); j++)
@@ -478,7 +473,8 @@ void MMCAOIndexProcessor_Michel2018::compute(
         {
 
              // consider only water surfaces. According to the ECMWF all grid cells
-             // with values of 0.5 or below can be considered water surfaces
+             // with values of 0.5, or below, as given in the ERA5 land-sea mask
+             // can be considered as water surfaces
              // https://apps.ecmwf.int/codes/grib/param-db/?id=172
              propGridCellLand = landSeaMaskGrid->getValue(j, i);
              if (propGridCellLand <= 0.5)
