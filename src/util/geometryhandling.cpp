@@ -191,7 +191,24 @@ void MGeometryHandling::initProjProjection(QString projString)
 //TODO (mr, 16Oct2020) -- replace by new proj API.
     destroyProjProjection();
     pjDstProjection = pj_init_plus(projString.toStdString().c_str());
-    pjSrcProjection = pj_init_plus("+proj=latlong");
+    if (!pjDstProjection)
+    {
+        LOG4CPLUS_ERROR(mlog, "ERROR: cannot initialize proj with definition '"
+                        << projString.toStdString() << "' (dst); error is '"
+                        << pj_strerrno(pj_errno) << "'.");
+    }
+
+    // Source coordinate system for coordinates is assumed to be simple
+    // lon/lat in WGS84, e.g. NaturalEarth:
+    //   https://www.naturalearthdata.com/features/
+    QString srcProjString = "+proj=latlong +ellps=WGS84";
+    pjSrcProjection = pj_init_plus(srcProjString.toStdString().c_str());
+    if (!pjSrcProjection)
+    {
+        LOG4CPLUS_ERROR(mlog, "ERROR: cannot initialize proj with definition '"
+                        << srcProjString.toStdString() << " (src)'; error is '"
+                        << pj_strerrno(pj_errno) << "'.");
+    }
 }
 
 
@@ -204,6 +221,13 @@ void MGeometryHandling::destroyProjProjection()
 
 QPointF MGeometryHandling::geographicalToProjectedCoordinates(QPointF point)
 {
+    if (!pjSrcProjection || !pjDstProjection)
+    {
+        LOG4CPLUS_ERROR(mlog, "ERROR: proj library not initialized, cannot "
+                              "project geographical coordinates.");
+        return QPointF();
+    }
+
     int errorCode;
     double lon = degreesToRadians(point.x());
     double lat = degreesToRadians(point.y());
@@ -215,8 +239,8 @@ QPointF MGeometryHandling::geographicalToProjectedCoordinates(QPointF point)
     {
         // In later version of proj, const char* proj_errno_string(int err)
         // is available to get the text corresponding to the error code to.
-        LOG4CPLUS_ERROR(mlog, "Error " << errorCode <<
-                        "encountered during transformation using Proj library\n");
+        LOG4CPLUS_ERROR(mlog, "ERROR: proj transformation failed with error '"
+                        << pj_strerrno(errorCode) << "'.");
     }
 
     return QPointF(lon / MetConstants::scaleFactorToFitProjectedCoordsTo360Range,
