@@ -85,7 +85,8 @@ inline double degCToKelvin(double temperature_degC)
 { return temperature_degC + 273.15; }
 
 
-inline double degreesToRadians(double angle);
+inline double degreesToRadians(double angle)
+{ return angle / 180. * M_PI; }
 
 
 /**

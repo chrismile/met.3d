@@ -45,12 +45,6 @@ using namespace std;
 namespace Met3D
 {
 
-inline double degreesToRadians(double angle)
-{
-    return angle / 180. * M_PI;
-}
-
-
 inline double haversin(double radians)
 {
     double sinValue = sin(radians / 2.);
