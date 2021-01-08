@@ -67,7 +67,7 @@ MClimateForecastReader::MClimateForecastReader(
         bool convertGeometricHeightToPressure_ICAOStandard,
         QString auxiliary3DPressureField, bool disableGridConsistencyCheck)
     : MWeatherPredictionReader(identifier, auxiliary3DPressureField),
-      treatRotatedGridAsRegularGrid(treatRotatedGridAsRegularGrid),
+      treatRotatedGridAsRegularLonLatGrid(treatRotatedGridAsRegularGrid),
       treatProjectedGridAsRegularLonLatGrid(treatProjectedGridAsRegularLonLatGrid),
       convertGeometricHeightToPressure_ICAOStandard(
           convertGeometricHeightToPressure_ICAOStandard),
@@ -433,8 +433,8 @@ void MClimateForecastReader::scanDataRoot()
     LOG4CPLUS_DEBUG(mlog, "Using file filter: " << dirFileFilters.toStdString());
     LOG4CPLUS_DEBUG(mlog, "Parameters: "
                     << "data is specified on a horizontally regular grid in rotated lon-lat coordinates="
-                    << (treatRotatedGridAsRegularGrid ? "enabled" : "disabled")
-                    << "data is specified on a horizontally regular grid in projected x-y coordinates="
+                    << (treatRotatedGridAsRegularLonLatGrid ? "enabled" : "disabled")
+                    << "; data is specified on a horizontally regular grid in projected x-y coordinates="
                     << (treatProjectedGridAsRegularLonLatGrid ? "enabled" : "disabled")
                     << "; convert geometric height to pressure (using standard ICAO)="
                     << (convertGeometricHeightToPressure_ICAOStandard ? "enabled" : "disabled")
@@ -522,25 +522,6 @@ void MClimateForecastReader::scanDataRoot()
             }
         }
 
-        QStringList gridMappingVarNames = QStringList();
-        // Since we don't know the name of the grid mapping variable, loop over
-        // all variables, check if variable with grid_mapping_name
-        // 'rotated_latitude_longitude' exist and store their names in
-        // gridMappingVarNames. Find the grid mapping variables first since
-        // they are needed to check if a variable is defined on a rotated grid.
-        for (multimap<string, NcVar>::iterator gridVar = ncVariables.begin();
-             gridVar != ncVariables.end(); gridVar++)
-        {
-            QString varName = QString::fromStdString(gridVar->first);
-
-            bool gridVariablePresent = NcCFVar::isCFGridMappingVariable(
-                        ncFile->getVar(varName.toStdString()));
-            if (gridVariablePresent)
-            {
-                gridMappingVarNames.append(varName);
-            }
-        }
-
         // Loop over all variables: Obtain available time values for each
         // variable and insert the fields into "availableDataFields".
         for (multimap<string, NcVar>::iterator var=ncVariables.begin();
@@ -548,15 +529,17 @@ void MClimateForecastReader::scanDataRoot()
         {
             QString varName = QString::fromStdString(var->first);
 
+            LOG4CPLUS_DEBUG(mlog, "\tChecking variable <"
+                            << varName.toStdString() << "> ...");
+
             if ( NcCFVar::isCFDataVariable(
-                     ncFile->getVar(varName.toStdString()), NcCFVar::LAT_LON) )
+                     ncFile->getVar(varName.toStdString()), NcCFVar::LAT_LON,
+                     treatRotatedGridAsRegularLonLatGrid,
+                     treatProjectedGridAsRegularLonLatGrid) )
             {
                 // Get the NcVar object belonging to the variable and wrap
                 // it in a NcCFVar object.
                 NcCFVar currCFVar(ncFile->getVar(varName.toStdString()));
-
-                LOG4CPLUS_DEBUG(mlog, "\tChecking variable <"
-                                << varName.toStdString() << "> ...");
 
                 // Read the variable's long_name, standard_name and units
                 // attributes, if present. If they are not present, leave the
@@ -584,7 +567,7 @@ void MClimateForecastReader::scanDataRoot()
                     else
                     {
                         LOG4CPLUS_WARN(mlog,
-                                       "WARNING: no standard name and no mapping "
+                                       "NOTE: no standard name and no mapping "
                                        "from variable name to standard name "
                                        "defined for <"
                                        << varName.toStdString() << ">.");
@@ -621,15 +604,23 @@ void MClimateForecastReader::scanDataRoot()
                     continue;
                 }
 
-                // Determin the type of the vertical level of the variable.
+                // Determine the type of the vertical level of the variable.
                 MVerticalLevelType levelType;
                 NcCFVar::NcVariableGridType gridType = currCFVar.getGridType(
-                            auxiliary3DPressureField, disableGridConsistencyCheck);
+                            auxiliary3DPressureField,
+                            treatRotatedGridAsRegularLonLatGrid,
+                            treatProjectedGridAsRegularLonLatGrid,
+                            disableGridConsistencyCheck);
 
                 LOG4CPLUS_DEBUG(mlog, "\t--detected grid type: "
                                 << NcCFVar::ncVariableGridTypeToString(
-                                    gridType).toStdString());
+                                    gridType).toStdString()
+                                << (treatRotatedGridAsRegularLonLatGrid ?
+                                        " (with rotated lon/lat)" : "")
+                                << (treatProjectedGridAsRegularLonLatGrid ?
+                                        " (with projected x/y)" : ""));
 
+                int numLevels = -1;
                 switch (gridType)
                 {
                 case NcCFVar::LAT_LON:
@@ -639,64 +630,103 @@ void MClimateForecastReader::scanDataRoot()
                     levelType = PRESSURE_LEVELS_3D;
                     if (convertGeometricHeightToPressure_ICAOStandard)
                     {
-                        LOG4CPLUS_WARN(
-                                    mlog,
-                                    "WARNING: identified variable <"
-                                    << varName.toStdString()
-                                    << "> is defined on a grid using vertical"
-                                       " pressure levels, and conversion of"
-                                       " geometric height to pressure"
-                                       " coordinates is enabled  -- skipping"
-                                       " variable.");
+                        LOG4CPLUS_WARN(mlog, "WARNING: variable <"
+                                       << varName.toStdString()
+                                       << "> is defined on a grid using vertical"
+                                          " pressure levels, and conversion of"
+                                          " geometric height to pressure"
+                                          " coordinates is enabled -- skipping"
+                                          " variable.");
                         continue;
                     }
-                    else
-                    {
-                        levelType = PRESSURE_LEVELS_3D;
-                    }
+                    numLevels = currCFVar.getVerticalCoordinatePressure()
+                            .getDim(0).getSize();
                     break;
                 case NcCFVar::LAT_LON_HYBRID:
                     levelType = HYBRID_SIGMA_PRESSURE_3D;
+                {
+                    NcVar apVar, bVar;
+                    QString psName;
+                    numLevels = currCFVar.getVerticalCoordinateHybridSigmaPressure(
+                                &apVar, &bVar, &psName).getDim(0).getSize();
+                }
                     break;
                 case NcCFVar::LAT_LON_PVU:
                     levelType = POTENTIAL_VORTICITY_2D;
+                    numLevels = currCFVar.getVerticalCoordinatePotVort()
+                            .getDim(0).getSize();
                     break;
                 case NcCFVar::LAT_LON_AUXP3D:
                     levelType = AUXILIARY_PRESSURE_3D;
                     break;
                 case NcCFVar::LAT_LON_Z:
+                    numLevels = currCFVar.getVerticalCoordinateGeometricHeight()
+                            .getDim(0).getSize();
                     if (convertGeometricHeightToPressure_ICAOStandard)
                     {
                         levelType = PRESSURE_LEVELS_3D;
                     }
-                    else
+                    else if (numLevels != 1)
                     {
-                        LOG4CPLUS_WARN(
-                                    mlog,
-                                    "WARNING: identified variable <"
-                                    << varName.toStdString()
-                                    << "> is defined on a grid using vertical"
-                                       " geometric height levels, and"
-                                       " conversion to pressure coordinates is"
-                                       " disabled -- Met.3D can currently only"
-                                       " handle pressure coordinates internally;"
-                                       " skipping variable.");
+                        // If only a single vertical level is available, the
+                        // variable is interpreted as a surface field, see
+                        // below.
+                        LOG4CPLUS_WARN(mlog, "WARNING: variable <"
+                                       << varName.toStdString()
+                                       << "> is defined on a grid using vertical"
+                                          " geometric height levels, and"
+                                          " conversion to pressure coordinates is"
+                                          " disabled -- Met.3D can currently only"
+                                          " handle pressure coordinates internally;"
+                                          " skipping variable.");
                         continue;
                     }
                     break;
                 default:
                     // If neither of the above choices could be matched,
                     // discard this variable and continue.
-                    LOG4CPLUS_WARN(
-                                mlog,
-                                "WARNING: identified variable <"
-                                << varName.toStdString()
-                                << "> is defined on a grid that Met.3D "
-                                   "currently does not understand -- skipping "
-                                   "variable.");
+                    LOG4CPLUS_WARN(mlog, "WARNING: variable <"
+                                   << varName.toStdString()
+                                   << "> is defined on a grid that Met.3D "
+                                      "currently does not understand -- skipping "
+                                      "variable.");
                     continue;
                     break;
                 }
+
+                // For 3D fields, check the number of available vertical
+                // levels. At least three vertical levels are required
+                // so that vertical interpolation does work - if only
+                // a single level is available, interpret the variable
+                // as a 2D variable.
+                // (check is enabled if numLevels > -1, see above).
+                if (numLevels >= 0)
+                {
+                    int minRequiredVerticalLevels = 3;
+                    if (numLevels == 1)
+                    {
+                        // Single level: Interpret as 2D field.
+                        LOG4CPLUS_WARN(mlog, "NOTE: variable <"
+                                       << varName.toStdString()
+                                       << "> has only a single vertical level;"
+                                          " it will be interpreted as a 2D"
+                                          " 'surface' field.");
+                        levelType = SURFACE_2D;
+                    }
+                    else if (numLevels < minRequiredVerticalLevels)
+                    {
+                        LOG4CPLUS_WARN(mlog, "WARNING: variable <"
+                                       << varName.toStdString()
+                                       << "> has only " << numLevels
+                                       << " vertical level(s); at least "
+                                       << minRequiredVerticalLevels
+                                       << " are required for vertical"
+                                          " interpolation to work -- skipping"
+                                          " variable.");
+                        continue;
+                    }
+                }
+
                 // Create a new MVariableInfo struct and store available
                 // variable information in this field.
                 MVariableInfo* vinfo;
@@ -724,7 +754,7 @@ void MClimateForecastReader::scanDataRoot()
                         {
                             LOG4CPLUS_ERROR(
                                         mlog,
-                                        "found different geographical region "
+                                        "found different horizontal domain "
                                         "than previously used for this "
                                         "variable; skipping grids of variable '"
                                         + varName.toStdString()
@@ -774,8 +804,8 @@ void MClimateForecastReader::scanDataRoot()
                                     &lvlIndex, disableGridConsistencyCheck);
                         vinfo->auxiliaryPressureName = pressureName;
 
-                        // Auxiliary pressure field is not stored in the same
-                        // file thus it is necessary to perform a check after
+                        // Auxiliary pressure field could be stored in a different
+                        // file, thus it is necessary to perform a check after
                         // reading all the files whether this variable is
                         // really an auxiliary pressure variable. (Dimensions
                         // must match the dimensions of the auxiliary 3D
@@ -785,7 +815,7 @@ void MClimateForecastReader::scanDataRoot()
                             // Store dimension information (names, sizes) for
                             // variables detected as auxiliary pressure variable
                             // but not checked yet since the auxiliary pressure
-                            // field is not stored in the same file. The check
+                            // field could be stored in a different file. The check
                             // is performed after all files have been read.
                             if (!auxiliaryVarsDimensionsInfo.contains(varName))
                             {
@@ -831,43 +861,19 @@ void MClimateForecastReader::scanDataRoot()
                     // Change grid type to ROTATED_REGULAR_LONLAT_GRID or
                     // PROJECTED_REGULAR_GRID if the data is defined on one
                     // of these grids.
-                    if (!gridMappingVarNames.empty())
+                    if (NcCFVar::isDefinedOnRotatedGrid(
+                                ncFile->getVar(varName.toStdString())))
                     {
-                        QString gridMappingVarName = "";
-                        if (NcCFVar::isDefinedOnRotatedGrid(
-                                    ncFile->getVar(varName.toStdString()),
-                                    gridMappingVarNames, &gridMappingVarName))
-                        {
-                            vinfo->horizontalGridType =
-                                    MHorizontalGridType::ROTATED_REGULAR_LONLAT_GRID;
-                        }
-                        // Check if data is defined on a projected grid.
-                        if (NcCFVar::isDefinedOnProjectedGrid(
-                                    ncFile->getVar(varName.toStdString()),
-                                    gridMappingVarNames, &gridMappingVarName))
-                        {
-                            vinfo->horizontalGridType =
-                                    MHorizontalGridType::PROJECTED_REGULAR_GRID;
-                        }
-                        // At the moment, only register rotated grids if the
-                        // user wants to interpret rotated lon-latgrids as
-                        // regular lon-lat grids.
-                        if (!treatRotatedGridAsRegularGrid
-                                && (vinfo->horizontalGridType
-                                    == MHorizontalGridType::ROTATED_REGULAR_LONLAT_GRID))
-                        {
-                            continue;
-                        }
-                        // At the moment, only register projected grid if
-                        // the user wants to interpret projected grids as
-                        // regular lon-lat grids.
-                        if (!treatProjectedGridAsRegularLonLatGrid
-                                && (vinfo->horizontalGridType
-                                    == MHorizontalGridType::PROJECTED_REGULAR_GRID))
-                        {
-                            continue;
-                        }
+                        vinfo->horizontalGridType =
+                                MHorizontalGridType::ROTATED_REGULAR_LONLAT_GRID;
                     }
+                    if (NcCFVar::isDefinedOnProjectedGrid(
+                                ncFile->getVar(varName.toStdString())))
+                    {
+                        vinfo->horizontalGridType =
+                                MHorizontalGridType::PROJECTED_REGULAR_GRID;
+                    }
+
                     // Initialise shared data of variable for consistency check.
                     checkSharedVariableDataConsistency(
                                 &sharedVariableInfos[levelType][varName],
@@ -936,6 +942,7 @@ void MClimateForecastReader::scanDataRoot()
                         {
                             LOG4CPLUS_ERROR(
                                         mlog,
+                                        "WARNING: "
                                         "found difference to reference variable"
                                         " '" + refVarName.toStdString()
                                         + "'; skipping grids of variable '"
@@ -945,6 +952,8 @@ void MClimateForecastReader::scanDataRoot()
                                         + " [Dataset: "
                                         + getIdentifier().toStdString() + "]");
                             checkedVariables[levelType][varName] = false;
+
+                            delete vinfo;
                             continue;
                         }
                     }
@@ -996,6 +1005,14 @@ void MClimateForecastReader::scanDataRoot()
                                 vinfo->standardname, vinfo);
 
             } // if (is CF variable)
+            else
+            {
+                LOG4CPLUS_DEBUG(mlog, "\tvariable <"
+                                << varName.toStdString()
+                                << "> is not a gridded data field that "
+                                   "corresponds to the dataset configuration "
+                                   "-- skipping as gridded data field.");
+            }
         } // for (variables)
 
         delete ncFile;
@@ -1214,11 +1231,24 @@ MStructuredGrid *MClimateForecastReader::readGrid(
 
         // Query latitude, longitude and time coordinate system variables.
         ncAccessMutexLocker.relock();
-        shared->latVar = shared->cfVar.getLatitudeVar();
+        if (treatRotatedGridAsRegularLonLatGrid)
+        {
+            shared->latVar = shared->cfVar.getRotatedLatitudeVar();
+            shared->lonVar = shared->cfVar.getRotatedLongitudeVar();
+        }
+        else if (treatProjectedGridAsRegularLonLatGrid)
+        {
+            shared->latVar = shared->cfVar.getProjectionYCoordinateVar();
+            shared->lonVar = shared->cfVar.getProjectionXCoordinateVar();
+        }
+        else
+        {
+            shared->latVar = shared->cfVar.getLatitudeVar();
+            shared->lonVar = shared->cfVar.getLongitudeVar();
+        }
         LOG4CPLUS_DEBUG(mlog, "\tLatitude variable is '" << shared->latVar.getName()
                         << "' (" << shared->latVar.getDim(0).getSize()
                         << " elements).");
-        shared->lonVar = shared->cfVar.getLongitudeVar();
         LOG4CPLUS_DEBUG(mlog, "\tLongitude variable is '" << shared->lonVar.getName()
                         << "' (" << shared->lonVar.getDim(0).getSize()
                         << " elements).");
@@ -1463,8 +1493,8 @@ MStructuredGrid *MClimateForecastReader::readGrid(
         // Projected coordinates: Read units from the input file and scale
         // coordinate values to fit 0..360 range to be handled correctly by
         // Met.3D.
-         if (treatProjectedGridAsRegularLonLatGrid)
-         {
+        if (treatProjectedGridAsRegularLonLatGrid)
+        {
             string units = "";
             float scaleFactor = MetConstants::scaleFactorToFitProjectedCoordsTo360Range;
             shared->lonVar.getAtt("units").getValues(units);
@@ -1487,7 +1517,7 @@ MStructuredGrid *MClimateForecastReader::readGrid(
             {
                 shared->lons[i] /= scaleFactor;
             }
-         }
+        }
 
         // Check if longitudes are cyclic (0..360 or -180..180 etc) and OVERLAP
         // (e.g. starts with -180 and ends with +180). In these cases we don't
@@ -1896,14 +1926,22 @@ MStructuredGrid *MClimateForecastReader::readGrid(
         // No ensemble field.
         if ( shared->ensembleVar.isNull() )
         {
-            if (shared->cfVar.getDimCount() == 3)
+            if (shared->cfVar.getDimCount() == 3
+                    || shared->cfVar.getDimCount() == 4)
             {
-                // Load from a 3D NetCDF variable (time, lat, lon).
-                vector<size_t> start(3); start.assign(3,0);
-                start[0] = timeIndex;
-                vector<size_t> count(3); count.assign(3,1);
-                count[1] = shared->lats.size();
-                count[2] = shared->lons.size();
+                // Load from a 3D or 4D NetCDF variable (time, lat, lon)
+                // or (time, single level, lat, lon).
+                vector<size_t> start;
+                vector<size_t> count;
+                start.assign({size_t(timeIndex), 0, 0});
+                count.assign({1, size_t(shared->lats.size()),
+                              size_t(shared->lons.size())});
+                if (shared->cfVar.getDimCount() == 4)
+                {
+                    start.assign({size_t(timeIndex), 0, 0, 0});
+                    count.assign({1, 1, size_t(shared->lats.size()),
+                                  size_t(shared->lons.size())});
+                }
 
                 if (shared->reverseLatitudes)
                 {
@@ -1939,7 +1977,7 @@ MStructuredGrid *MClimateForecastReader::readGrid(
                 // return zero data field so that the application does not
                 // crash.
                 errorMsgDimensionMismatch(shared, levelType,
-                                          "time, lat, lon");
+                                          "time, [single level,] lat, lon");
                 grid->setToZero();
             }
         }
@@ -1947,16 +1985,26 @@ MStructuredGrid *MClimateForecastReader::readGrid(
         // Ensemble field.
         else
         {
-            if (shared->cfVar.getDimCount() == 4)
+            if (shared->cfVar.getDimCount() == 4
+                    || shared->cfVar.getDimCount() == 5)
             {
-                // Load from a 4D NetCDF variable (time, ens, lat, lon).
-                vector<size_t> start(4); start.assign(4,0);
-                start[0] = timeIndex;
-                start[1] = shared->memberToFileIndexMap.value(ensembleMember);
-                vector<size_t> count(4); count.assign(4,1);
-                count[1] = 1;
-                count[2] = shared->lats.size();
-                count[3] = shared->lons.size();
+                // Load from a 4D or 5D NetCDF variable (time, ens, lat, lon)
+                // or (time, ens, single level, lat, lon).
+                vector<size_t> start;
+                vector<size_t> count;
+                start.assign({size_t(timeIndex),
+                              size_t(shared->memberToFileIndexMap.value(ensembleMember)),
+                              0, 0});
+                count.assign({1, 1, size_t(shared->lats.size()),
+                              size_t(shared->lons.size())});
+                if (shared->cfVar.getDimCount() == 5)
+                {
+                    start.assign({size_t(timeIndex),
+                                  size_t(shared->memberToFileIndexMap.value(ensembleMember)),
+                                  0, 0, 0});
+                    count.assign({1, 1, 1, size_t(shared->lats.size()),
+                                  size_t(shared->lons.size())});
+                }
 
                 if (shared->reverseLatitudes)
                 {
@@ -1988,7 +2036,7 @@ MStructuredGrid *MClimateForecastReader::readGrid(
             else
             {
                 errorMsgDimensionMismatch(shared, levelType,
-                                          "time, ens, lat, lon");
+                                          "time, ens, [single level,] lat, lon");
                 grid->setToZero();
             }
         }
@@ -2176,8 +2224,21 @@ bool MClimateForecastReader::checkSharedVariableDataConsistency(
     MVariableDataSharedPerFile current;
 
     // Query latitude, longitude and time coordinate system variables.
-    current.latVar = cfVar->getLatitudeVar();
-    current.lonVar = cfVar->getLongitudeVar();
+    if (treatRotatedGridAsRegularLonLatGrid)
+    {
+        current.latVar = cfVar->getRotatedLatitudeVar();
+        current.lonVar = cfVar->getRotatedLongitudeVar();
+    }
+    else if (treatProjectedGridAsRegularLonLatGrid)
+    {
+        current.latVar = cfVar->getProjectionYCoordinateVar();
+        current.lonVar = cfVar->getProjectionXCoordinateVar();
+    }
+    else
+    {
+        current.latVar = cfVar->getLatitudeVar();
+        current.lonVar = cfVar->getLongitudeVar();
+    }
     current.timeVar = cfVar->getTimeVar();
 
     // Query scale and offset, if provided.

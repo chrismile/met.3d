@@ -291,6 +291,8 @@ public:
       which the grid type should be detected.
       */
     NcVariableGridType getGridType(QString auxiliary3DPressureField,
+                                   bool treatRotatedGridAsRegularLonLatGrid,
+                                   bool treatProjectedGridAsRegularLonLatGrid,
                                    bool disableGridConsistencyCheck);
 
     /**
@@ -298,49 +300,22 @@ public:
       one of the types defined in @ref NcVariableGridType.
       */
     static bool isCFDataVariable(const NcVar& var, NcVariableGridType type,
+                                 bool treatRotatedGridAsRegularLonLatGrid=false,
+                                 bool treatProjectedGridAsRegularLonLatGrid=false,
                                  QString auxiliary3DPressureField="",
                                  bool disableGridConsistencyCheck=false);
 
     /**
-      Static function that checks if the specified @p var is a CF variable of
-      one of the types defined in @ref NcVariableGridType.
-
-      ( cf. http://cfconventions.org/cf-conventions/v1.6.0/cf-conventions.html#grid-mappings-and-projections )
+      Static function that checks if the specified @p var is a CF variable
+      defined on a rotated grid.
       */
-    static bool isCFGridMappingVariable(const NcVar& var);
+    static bool isDefinedOnRotatedGrid(const NcVar& var);
 
     /**
       Static function that checks if the specified @p var is a CF variable
-      defined on a rotated grid with a mapping defined by one of the variables
-      with their names stored in @p gridMappingVarNames. If so,
-      @p gridMappingVarName holds the name of the corresponding grid mapping
-      variable.
+      defined on a projected grid.
       */
-    static bool isDefinedOnRotatedGrid(const NcVar& var,
-                                       const QStringList gridMappingVarNames,
-                                       QString *gridMappingVarName);
-
-    /**
-      Static function that checks if the specified @p var is a CF variable
-      defined on a projected grid with a mapping defined by one of the variables
-      with their names stored in @p gridMappingVarNames. If so,
-      @p gridMappingVarName holds the name of the corresponding grid mapping
-      variable.
-      */
-    static bool isDefinedOnProjectedGrid(const NcVar& var,
-                                       const QStringList gridMappingVarNames,
-                                       QString *gridMappingVarName);
-
-    /**
-      Static function that gets the rotated north pole coordinates for a given
-      grid mapping variable @p gridMappingVar. The results are stored in
-      @p rotatedNorthPoleLon and @p rotatedNorthPoleLat respectively.
-      The function returns true if gridMappingVar is a rotated_lon_lat variable
-      and it is able to get the coordinates.
-      */
-    static bool getRotatedNorthPoleCoordinates(const NcVar& gridMappingVar,
-                                               float *rotatedNorthPoleLon,
-                                               float *rotatedNorthPoleLat);
+    static bool isDefinedOnProjectedGrid(const NcVar& var);
 
     /**
       Static function that converts an @ref NcVariableGridType enum to

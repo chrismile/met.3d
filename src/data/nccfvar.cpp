@@ -170,24 +170,20 @@ NcVar NcCFVar::getCFCoordinateVar(const vector<string>& units,
                 {
                     return var;
                 }
-
             }
         }
         catch (NcException) {}
 
-        // Try to match one of the values of the 'units' vector to the units
-        // attribute of the variable, if available.
+        // In case no standard name could be matched, try to match one of the
+        // values of the 'units' vector to the units attribute of the variable,
+        // if available.
         try
         {
             var.getAtt("units").getValues(attribute);
             fixZeroTermination(&attribute);
             for (unsigned int i = 0; i < units.size(); i++)
             {
-                // degrees and m/km attributes are not unique and thus cannot be used to
-                // distinguish different horizontal coordinates.
-                if (attribute == units[i] && attribute != "degrees" &&
-                        attribute != "meters" && attribute != "kilometers" &&
-                        attribute != "m" && attribute != "km")
+                if (attribute == units[i])
                 {
                     return var;
                 }
@@ -196,7 +192,6 @@ NcVar NcCFVar::getCFCoordinateVar(const vector<string>& units,
         // An NcException here means that the 'units' attribute is not defined
         // for the variable. Skip.
         catch (NcException) {}
-
     }
 
     // If we get here no variable has been identified. Throw an exception.
@@ -211,10 +206,9 @@ NcVar NcCFVar::getLatitudeVar()
     // (http://cfconventions.org/cf-conventions/v1.6.0/cf-conventions.html#latitude-coordinate).
     // (NOTE: extended initialiser lists require the C++-0x standard).
     vector<string> units = {"degrees_north", "degree_north", "degree_N",
-                            "degrees_N", "degreeN", "degreesN", "degrees",
-                            "meters", "kilometers", "m", "km"};
+                            "degrees_N", "degreeN", "degreesN"};
 
-    vector<string> standardNames = {"latitude", "grid_latitude", "projection_y_coordinate"};
+    vector<string> standardNames = {"latitude", "grid_latitude"};
 
     // Find a variable whose 'units' attribute equals one of the specified
     // values or whose 'standard_name' attribute equals 'latitude'.
@@ -224,22 +218,19 @@ NcVar NcCFVar::getLatitudeVar()
 
 NcVar NcCFVar::getRotatedLatitudeVar()
 {
-    // List of units from which the latitude variable can be recognised
-    // (http://cfconventions.org/cf-conventions/v1.6.0/cf-conventions.html#latitude-coordinate).
-    // (NOTE: extended initialiser lists require the C++-0x standard).
-    vector<string> units = {"degrees"};
-
+    // Rotated lon/lat-coordinates need to be distinguished by standard
+    // name; as units are ambiguous.
+    vector<string> units; // = {"degrees"};
     vector<string> standardNames = {"grid_latitude"};
-
-    // Find a variable whose 'units' attribute equals one of the specified
-    // values or whose 'standard_name' attribute equals 'latitude'.
     return getCFCoordinateVar(units, standardNames);
 }
 
 
 NcVar NcCFVar::getProjectionYCoordinateVar()
 {
-    vector<string> units = {"meters", "kilometers", "m", "km"};
+    // Projected X/Y-coordinates need to be distinguished by standard
+    // name; as units are ambiguous.
+    vector<string> units; // = {"meters", "kilometers", "m", "km"};
     vector<string> standardNames = {"projection_y_coordinate"};
     return getCFCoordinateVar(units, standardNames);
 }
@@ -251,10 +242,9 @@ NcVar NcCFVar::getLongitudeVar()
     // (http://cfconventions.org/cf-conventions/v1.6.0/cf-conventions.html#longitude-coordinate).
     // (NOTE: extended initialiser lists require the C++-0x standard).
     vector<string> units = {"degrees_east", "degree_east", "degree_E",
-                            "degrees_E", "degreeE", "degreesE", "degrees",
-                            "meters", "kilometers", "m", "km"};
+                            "degrees_E", "degreeE", "degreesE"};
 
-    vector<string> standardNames = {"longitude", "grid_longitude", "projection_x_coordinate"};
+    vector<string> standardNames = {"longitude", "grid_longitude"};
 
     // Find a variable whose 'units' attribute equals one of the specified
     // values or whose 'standard_name' attribute equals 'longitude'.
@@ -264,22 +254,19 @@ NcVar NcCFVar::getLongitudeVar()
 
 NcVar NcCFVar::getRotatedLongitudeVar()
 {
-    // List of units from which the longitude variable can be recognised
-    // (http://cfconventions.org/cf-conventions/v1.6.0/cf-conventions.html#longitude-coordinate).
-    // (NOTE: extended initialiser lists require the C++-0x standard).
-    vector<string> units = {"degrees"};
-
+    // Rotated lon/lat-coordinates need to be distinguished by standard
+    // name; as units are ambiguous.
+    vector<string> units; // = {"degrees"};
     vector<string> standardNames = {"grid_longitude"};
-
-    // Find a variable whose 'units' attribute equals one of the specified
-    // values or whose 'standard_name' attribute equals 'longitude'.
     return getCFCoordinateVar(units, standardNames);
 }
 
 
 NcVar NcCFVar::getProjectionXCoordinateVar()
 {
-    vector<string> units = {"meters", "kilometers", "m", "km"};
+    // Projected X/Y-coordinates need to be distinguished by standard
+    // name; as units are ambiguous.
+    vector<string> units; // = {"meters", "kilometers", "m", "km"};
     vector<string> standardNames = {"projection_x_coordinate"};
     return getCFCoordinateVar(units, standardNames);
 }
@@ -750,43 +737,62 @@ QDateTime NcCFVar::getTimeFromAttribute(QString attributeName)
 }
 
 
-NcCFVar::NcVariableGridType NcCFVar::getGridType(QString auxiliary3DPressureField,
-                                                 bool disableGridConsistencyCheck)
+NcCFVar::NcVariableGridType NcCFVar::getGridType(
+        QString auxiliary3DPressureField,
+        bool treatRotatedGridAsRegularLonLatGrid,
+        bool treatProjectedGridAsRegularLonLatGrid,
+        bool disableGridConsistencyCheck)
 {
     if (varGridType != UNDEFINED) return varGridType;
 
     // Only continue with checks if the variable type is UNDEFINED (i.e. has not
     // yet been defined).
-    if      (isCFDataVariable(*this, LAT_LON_PVU))
+    if (isCFDataVariable(*this, LAT_LON_PVU,
+                         treatRotatedGridAsRegularLonLatGrid,
+                         treatProjectedGridAsRegularLonLatGrid))
     {
         varGridType = LAT_LON_PVU;
     }
-    else if (isCFDataVariable(*this, LAT_LON_P))
+    else if (isCFDataVariable(*this, LAT_LON_P,
+                              treatRotatedGridAsRegularLonLatGrid,
+                              treatProjectedGridAsRegularLonLatGrid))
     {
         varGridType = LAT_LON_P;
     }
-    else if (isCFDataVariable(*this, LAT_LON_AUXP3D, auxiliary3DPressureField,
+    else if (isCFDataVariable(*this, LAT_LON_AUXP3D,
+                              treatRotatedGridAsRegularLonLatGrid,
+                              treatProjectedGridAsRegularLonLatGrid,
+                              auxiliary3DPressureField,
                               disableGridConsistencyCheck))
     {
         varGridType = LAT_LON_AUXP3D;
     }
-    else if (isCFDataVariable(*this, LAT_LON_HYBRID))
+    else if (isCFDataVariable(*this, LAT_LON_HYBRID,
+                              treatRotatedGridAsRegularLonLatGrid,
+                              treatProjectedGridAsRegularLonLatGrid))
     {
         varGridType = LAT_LON_HYBRID;
     }
-    else if (isCFDataVariable(*this, LAT_LON_Z))
+    else if (isCFDataVariable(*this, LAT_LON_Z,
+                              treatRotatedGridAsRegularLonLatGrid,
+                              treatProjectedGridAsRegularLonLatGrid))
     {
         varGridType = LAT_LON_Z;
     }
-    else if (isCFDataVariable(*this, LAT_LON))
+    else if (isCFDataVariable(*this, LAT_LON,
+                              treatRotatedGridAsRegularLonLatGrid,
+                              treatProjectedGridAsRegularLonLatGrid))
     {
         varGridType = LAT_LON;
     }
+
     return varGridType;
 }
 
 
 bool NcCFVar::isCFDataVariable(const NcVar& var, NcVariableGridType type,
+                               bool treatRotatedGridAsRegularLonLatGrid,
+                               bool treatProjectedGridAsRegularLonLatGrid,
                                QString auxiliary3DPressureField,
                                bool disableGridConsistencyCheck)
 {
@@ -808,39 +814,51 @@ bool NcCFVar::isCFDataVariable(const NcVar& var, NcVariableGridType type,
 
     // Third test: Are all coordinates for the requested variable type present?
     NcCFVar cfvar(var);
+
+    // At least the horizontal coordinate variables need to be present for all
+    // grid types.
+    if (treatRotatedGridAsRegularLonLatGrid)
+    {
+        // Rotated lon/lat grid.
+        try { NcVar dummy = cfvar.getRotatedLongitudeVar(); }
+        catch (NcException) { return false; }
+        try { NcVar dummy = cfvar.getRotatedLatitudeVar(); }
+        catch (NcException) { return false; }
+    }
+    else if (treatProjectedGridAsRegularLonLatGrid)
+    {
+        // Projected x/y coordinates.
+        try { NcVar dummy = cfvar.getProjectionXCoordinateVar(); }
+        catch (NcException) { return false; }
+        try { NcVar dummy = cfvar.getProjectionYCoordinateVar(); }
+        catch (NcException) { return false; }
+    }
+    else
+    {
+        // Regular lon/lat grid.
+        try { NcVar dummy = cfvar.getLongitudeVar(); }
+        catch (NcException) { return false; }
+        try { NcVar dummy = cfvar.getLatitudeVar(); }
+        catch (NcException) { return false; }
+    }
+
+    // Check for vertical coordinate variable.
     switch (type) {
     case UNDEFINED:
     case ALL:
-        break;
     case LAT_LON:
-        try { NcVar dummy = cfvar.getLongitudeVar(); }
-        catch (NcException) { return false; }
-        try { NcVar dummy = cfvar.getLatitudeVar(); }
-        catch (NcException) { return false; }
         break;
     case LAT_LON_P:
         try { NcVar dummy = cfvar.getVerticalCoordinatePressure(); }
-        catch (NcException) { return false; }
-        try { NcVar dummy = cfvar.getLongitudeVar(); }
-        catch (NcException) { return false; }
-        try { NcVar dummy = cfvar.getLatitudeVar(); }
         catch (NcException) { return false; }
         break;
     case LAT_LON_HYBRID:
         try { NcVar a, b; QString ps; NcVar dummy =
                 cfvar.getVerticalCoordinateHybridSigmaPressure(&a, &b, &ps); }
         catch (NcException) { return false; }
-        try { NcVar dummy = cfvar.getLongitudeVar(); }
-        catch (NcException) { return false; }
-        try { NcVar dummy = cfvar.getLatitudeVar(); }
-        catch (NcException) { return false; }
         break;
     case LAT_LON_PVU:
         try { NcVar dummy = cfvar.getVerticalCoordinatePotVort(); }
-        catch (NcException) { return false; }
-        try { NcVar dummy = cfvar.getLongitudeVar(); }
-        catch (NcException) { return false; }
-        try { NcVar dummy = cfvar.getLatitudeVar(); }
         catch (NcException) { return false; }
         break;
     case LAT_LON_AUXP3D:
@@ -849,17 +867,9 @@ bool NcCFVar::isCFDataVariable(const NcVar& var, NcVariableGridType type,
                     auxiliary3DPressureField, &p, &idx,
                     disableGridConsistencyCheck); }
         catch (NcException) { return false; }
-        try { NcVar dummy = cfvar.getLongitudeVar(); }
-        catch (NcException) { return false; }
-        try { NcVar dummy = cfvar.getLatitudeVar(); }
-        catch (NcException) { return false; }
         break;
     case LAT_LON_Z:
         try { NcVar dummy = cfvar.getVerticalCoordinateGeometricHeight(); }
-        catch (NcException) { return false; }
-        try { NcVar dummy = cfvar.getLongitudeVar(); }
-        catch (NcException) { return false; }
-        try { NcVar dummy = cfvar.getLatitudeVar(); }
         catch (NcException) { return false; }
         break;
     }
@@ -869,208 +879,85 @@ bool NcCFVar::isCFDataVariable(const NcVar& var, NcVariableGridType type,
 }
 
 
-bool NcCFVar::isCFGridMappingVariable(const NcVar& var)
+bool NcCFVar::isDefinedOnRotatedGrid(const NcVar& var)
 {
-    string attribute;
+    // Reference:
+    // http://cfconventions.org/Data/cf-conventions/cf-conventions-1.8/cf-conventions.html#grid-mappings-and-projections
+
+    // Does the variable have the required "grid_mapping" attribute?
     try
     {
-        var.getAtt("grid_mapping_name").getValues(attribute);
-        fixZeroTermination(&attribute);
-        // The 'grid_mapping_name' attribute is present but contains a value
-        // other than 'rotated_latitude_longitude' or "polar stereographic"
-        if ( (attribute != "rotated_latitude_longitude") &&
-             (attribute != "polar_stereographic") )
-//TODO (mr, 2020Nov19) -- how do we support arbitrary projections?
-        {
-            return false;
-        }
-        return true;
-    }
-    // An NcException here means that the 'grid_mapping_name' attribute is not
-    // defined for the variable i.e. variable is not a grid mapping variable.
-    catch (NcException)
-    {
-        return false;
-    }
-}
-
-
-bool NcCFVar::isDefinedOnRotatedGrid(const NcVar& var,
-                                    const QStringList gridMappingVarNames,
-                                    QString *gridMappingVarName)
-{
-    string attribute;
-    NcVar coordinateVar;
-    // Test if variable has grid mapping attribute.
-    try
-    {
+        string attribute;
         var.getAtt("grid_mapping").getValues(attribute);
-        fixZeroTermination(&attribute);
-        *gridMappingVarName = "";
-        foreach (*gridMappingVarName, gridMappingVarNames)
-        {
-            if (attribute == gridMappingVarName->toStdString())
-            {
-                break;
-            }
-        }
-        // The 'grid_mapping' attribute is present but contains a value
-        // other that stored in gridMappingVarName: return false.
-        if ((attribute != gridMappingVarName->toStdString()))
-        {
-            return false;
-        }
-        NcCFVar cfvar(var);
-        // Test if variable has rotated longitude dimension.
-        try
-        {
-            coordinateVar = cfvar.getRotatedLongitudeVar();
-            // Test if variable has rotated latitude dimension.
-            try
-            {
-                coordinateVar = cfvar.getRotatedLatitudeVar();
-                return true;
-            }
-            // An NcException here means that there was no dimension found
-            // fulfiling the requirements of being latitude dimension in a
-            // rotated grid.
-            catch (NcException)
-            {
-                return false;
-            }
-        }
-        // An NcException here means that there was no dimension found fulfiling
-        // the requirements of being longitude dimension in a rotated grid.
-        catch (NcException)
-        {
-            return false;
-        }
     }
-
-    // An NcException here means that the 'grid_mapping_name' attribute is not
-    // defined for the variable i.e. variable is not a grid mapping variable.
     catch (NcException)
     {
         return false;
     }
 
-}
-
-bool NcCFVar::isDefinedOnProjectedGrid(
-        const NcVar& var, const QStringList gridMappingVarNames,
-        QString *gridMappingVarName)
-{
-    string attribute;
-    NcVar coordinateVar;
-    // Test if the variable has a grid mapping attribute.
+    NcCFVar cfvar(var);
+    // Does the variable have a rotated longitude dimension?
     try
     {
+        NcVar coordinateVar = cfvar.getRotatedLongitudeVar();
+    }
+    catch (NcException)
+    {
+        return false;
+    }
+
+    // Does the variable have a rotated latitude dimension?
+    try
+    {
+        NcVar coordinateVar = cfvar.getRotatedLatitudeVar();
+    }
+    catch (NcException)
+    {
+        return false;
+    }
+
+    return true;
+}
+
+
+bool NcCFVar::isDefinedOnProjectedGrid(const NcVar& var)
+{
+    // Reference:
+    // http://cfconventions.org/Data/cf-conventions/cf-conventions-1.8/cf-conventions.html#grid-mappings-and-projections
+
+    // Does the variable have the required "grid_mapping" attribute?
+    try
+    {
+        string attribute;
         var.getAtt("grid_mapping").getValues(attribute);
-        fixZeroTermination(&attribute);
-        *gridMappingVarName = "";
-        foreach (*gridMappingVarName, gridMappingVarNames)
-        {
-            if (attribute == gridMappingVarName->toStdString())
-            {
-                break;
-            }
-        }
-        // The 'grid_mapping' attribute is present but contains a value
-        // other than stored in gridMappingVarName: return false.
-        if ((attribute != gridMappingVarName->toStdString()))
-        {
-            return false;
-        }
-        NcCFVar cfvar(var);
-        // Test if the variable has a projected grid coordinate
-        // in x/longitude direction.
-        try
-        {
-            coordinateVar = cfvar.getProjectionXCoordinateVar();
-            // Test if the variable has a projected grid coordinate
-            // in y/latitude direction.
-            try
-            {
-                coordinateVar = cfvar.getProjectionYCoordinateVar();
-                return true;
-            }
-            // An NcException here means that there was no dimension found
-            // fulfiling the requirements of being latitude dimension in a
-            // projected grid.
-            catch (NcException)
-            {
-                return false;
-            }
-        }
-        // An NcException here means that there was no dimension found fulfilling
-        // the requirements of being longitude dimension in a projected grid.
-        catch (NcException)
-        {
-            return false;
-        }
     }
-
-    // An NcException here means that the 'grid_mapping_name' attribute is not
-    // defined for the variable i.e. variable is not a grid mapping variable.
     catch (NcException)
     {
         return false;
     }
-}
 
-
-bool NcCFVar::getRotatedNorthPoleCoordinates(const NcVar& gridMappingVar,
-                                        float *rotatedNorthPoleLon,
-                                        float *rotatedNorthPoleLat)
-{
-    string attribute;
-
+    NcCFVar cfvar(var);
+    // Does the variable have a projected X dimension?
     try
     {
-        gridMappingVar.getAtt("grid_mapping_name").getValues(attribute);
-        fixZeroTermination(&attribute);
-        if (attribute != "rotated_latitude_longitude")
-        {
-            return false;
-        }
+        NcVar coordinateVar = cfvar.getProjectionXCoordinateVar();
     }
     catch (NcException)
     {
         return false;
     }
 
-    float coordinate;
-
+    // Does the variable have a projected Y dimension?
     try
     {
-        gridMappingVar.getAtt("grid_north_pole_longitude").getValues(
-                    &coordinate);
-        string attribute = QString::number(coordinate).toStdString();
-        fixZeroTermination(&attribute);
-        coordinate = QString::fromStdString(attribute).toFloat();
-        *rotatedNorthPoleLon = coordinate;
-
+        NcVar coordinateVar = cfvar.getProjectionYCoordinateVar();
     }
     catch (NcException)
     {
         return false;
     }
 
-    try
-    {
-        gridMappingVar.getAtt("grid_north_pole_latitude").getValues(
-                    &coordinate);
-        string attribute = QString::number(coordinate).toStdString();
-        fixZeroTermination(&attribute);
-        coordinate = QString::fromStdString(attribute).toFloat();
-        *rotatedNorthPoleLat = coordinate;
-        return true;
-    }
-    catch (NcException)
-    {
-        return false;
-    }
-
+    return true;
 }
 
 

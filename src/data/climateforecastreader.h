@@ -121,7 +121,7 @@ class MClimateForecastReader : public MWeatherPredictionReader
 {
 public:
     MClimateForecastReader(QString identifier,
-            bool treatRotatedGridAsRegularGrid=false,
+            bool treatRotatedGridAsRegularLonLatGrid=false,
             bool treatProjectedGridAsRegularLonLatGrid=false,
             bool convertGeometricHeightToPressure_ICAOStandard=false,
             QString auxiliary3DPressureField="",
@@ -232,7 +232,7 @@ protected:
                                       MVerticalLevelType levelType,
                                       QString expectedDims);
 
-    bool treatRotatedGridAsRegularGrid;
+    bool treatRotatedGridAsRegularLonLatGrid;
     bool treatProjectedGridAsRegularLonLatGrid;
     bool convertGeometricHeightToPressure_ICAOStandard;
     bool disableGridConsistencyCheck;
