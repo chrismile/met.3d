@@ -80,7 +80,7 @@ NcCFVar::NcCFVar()
     // etc. (mr, 14Sept2011).
 
     // RegExp that works in Python:
-    // "(second|sec|s|minute|min|hour|hr|h|day|d|year|yr)s? since (\d+)-(\d+)-(\d+)(?:[T\s](\d+)(?::(\d+)(?::(\d+(?:\.\d+)?))?)?)?[Z\s]?(?:UTC|(-?\d+):?(\d+)?)?\Z"
+    // "(second|sec|s|minute|min|hour|hr|h|day|d|year|yr)s? since (\d+)-(\d+)-(\d+)(?:[T\s](\d+)(?::(\d+)(?::(\d+(?:\.\d+)?))?)?)?[Z\s]?(?:UTC|([-\+]?\d+):?(\d+)?)?\Z"
 
     // (From the Qt documentation:) Note: The C++ compiler transforms
     // backslashes in strings. To include a \ in a regexp, enter it twice, i.e.
@@ -90,10 +90,12 @@ NcCFVar::NcCFVar()
     // assertions. The \G assertion is not supported but can be emulated in a
     // loop.
 
+    // To modify/test the regex, this website is useful: https://regexr.com/
+
     // RegExp that works in C++ (\ -> \\; \Z -> $):
     reTimeUnits.setPattern("(second|sec|s|minute|min|hour|hr|h|day|d|year|yr)s? since (\\d+)-(\\d+)-(\\d+)"
                            "(?:[T\\s](\\d+)(?::(\\d+)(?::(\\d+(?:\\.\\d+)?))?)?)?[Z\\s]?"
-                           "(?:UTC|(-?\\d+):?(\\d+)?)?$");
+                           "(?:UTC|([-\\+]?\\d+):?(\\d+)?)?$");
     reTimeUnits.setCaseSensitivity(Qt::CaseInsensitive);
 
     varGridType = UNDEFINED;
@@ -105,7 +107,7 @@ NcCFVar::NcCFVar(const NcVar& rhs)
 {
     reTimeUnits.setPattern("(second|sec|s|minute|min|hour|hr|h|day|d|year|yr)s? since (\\d+)-(\\d+)-(\\d+)"
                            "(?:[T\\s](\\d+)(?::(\\d+)(?::(\\d+(?:\\.\\d+)?))?)?)?[Z\\s]?"
-                           "(?:UTC|(-?\\d+):?(\\d+)?)?$");
+                           "(?:UTC|([-\\+]?\\d+):?(\\d+)?)?$");
     reTimeUnits.setCaseSensitivity(Qt::CaseInsensitive);
 
     varGridType = UNDEFINED;
@@ -311,7 +313,7 @@ NcVar NcCFVar::getVerticalCoordinateHybridSigmaPressure(NcVar *ap, NcVar *b,
     fixZeroTermination(&formulaTerms);
 
     // Set up a regular expression to match the "formula_terms" attribute.
-    QRegExp re("ap: (.+) b: (.+) ps: (.+)");
+    QRegExp re("ap: (\\w+) b: (\\w+) ps: (\\w+)");
 
     // If the formula_terms string cannot be matched to the regular expression,
     // don't modify the variables for ap and b. Otherwise..
