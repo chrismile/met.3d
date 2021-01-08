@@ -1805,10 +1805,13 @@ MStructuredGrid *MClimateForecastReader::readGrid(
             }
             else
             {
-                // This shouldn't happen -- raise an exception.
-                throw MBadDataFieldRequest("variable has unexpected number of "
-                                           "dimensions (should be 4)",
-                                           __FILE__, __LINE__);
+                // Error handling: The NetCDF variable has a different number
+                // of dimensions than expected. Output error message and
+                // return zero data field so that the application does not
+                // crash.
+                errorMsgDimensionMismatch(shared, levelType,
+                                          "time, vertical, lat, lon");
+                grid->setToZero();
             }
         }
 
@@ -1817,7 +1820,7 @@ MStructuredGrid *MClimateForecastReader::readGrid(
         {
             if (shared->cfVar.getDimCount() == 5)
             {
-                // Load from a 5D NetCDF variable (ens, time, vertical, lat, lon).
+                // Load from a 5D NetCDF variable (time, ens, vertical, lat, lon).
                 vector<size_t> start(5); start.assign(5,0);
                 start[0] = timeIndex;
                 start[1] = shared->memberToFileIndexMap.value(ensembleMember);
@@ -1881,10 +1884,9 @@ MStructuredGrid *MClimateForecastReader::readGrid(
             }
             else
             {
-                // This shouldn't happen -- raise an exception.
-                throw MBadDataFieldRequest("variable has unexpected number of "
-                                           "dimensions (should be 5)",
-                                           __FILE__, __LINE__);
+                errorMsgDimensionMismatch(shared, levelType,
+                                          "time, ens, vertical, lat, lon");
+                grid->setToZero();
             }
         }
         break;
@@ -1932,10 +1934,13 @@ MStructuredGrid *MClimateForecastReader::readGrid(
             }
             else
             {
-                // This shouldn't happen -- raise an exception.
-                throw MBadDataFieldRequest("variable has unexpected number of "
-                                           "dimensions (should be 3)",
-                                           __FILE__, __LINE__);
+                // Error handling: The NetCDF variable has a different number
+                // of dimensions than expected. Output error message and
+                // return zero data field so that the application does not
+                // crash.
+                errorMsgDimensionMismatch(shared, levelType,
+                                          "time, lat, lon");
+                grid->setToZero();
             }
         }
 
@@ -1944,7 +1949,7 @@ MStructuredGrid *MClimateForecastReader::readGrid(
         {
             if (shared->cfVar.getDimCount() == 4)
             {
-                // Load from a 3D NetCDF variable (time, lat, lon).
+                // Load from a 4D NetCDF variable (time, ens, lat, lon).
                 vector<size_t> start(4); start.assign(4,0);
                 start[0] = timeIndex;
                 start[1] = shared->memberToFileIndexMap.value(ensembleMember);
@@ -1982,10 +1987,9 @@ MStructuredGrid *MClimateForecastReader::readGrid(
             }
             else
             {
-                // This shouldn't happen -- raise an exception.
-                throw MBadDataFieldRequest("variable has unexpected number of "
-                                           "dimensions (should be 4)",
-                                           __FILE__, __LINE__);
+                errorMsgDimensionMismatch(shared, levelType,
+                                          "time, ens, lat, lon");
+                grid->setToZero();
             }
         }
         break;
@@ -2396,6 +2400,24 @@ bool MClimateForecastReader::checkSharedVariableDataConsistency(
     }
 
     return true;
+}
+
+
+QString MClimateForecastReader::errorMsgDimensionMismatch(
+        MVariableDataSharedPerFile *shared, MVerticalLevelType levelType,
+        QString expectedDims)
+{
+    QString msg = QString("ERROR: cannot load data field - NetCDF "
+                          "variable %1 (type %2) has unexpected number of "
+                          "dimensions (found %3, expected are: %4). "
+                          "RETURNING DATA FIELD WITH ZERO VALUES.")
+            .arg(shared->cfVar.getName().c_str())
+            .arg(MStructuredGrid::verticalLevelTypeToString(levelType))
+            .arg(shared->cfVar.getDimCount())
+            .arg(expectedDims);
+
+    LOG4CPLUS_ERROR(mlog, msg.toStdString());
+    return msg;
 }
 
 

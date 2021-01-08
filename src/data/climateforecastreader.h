@@ -228,6 +228,10 @@ protected:
             bool initialiseConsistencyData,
             bool testEnsembleMemberConsistency);
 
+    QString errorMsgDimensionMismatch(MVariableDataSharedPerFile *shared,
+                                      MVerticalLevelType levelType,
+                                      QString expectedDims);
+
     bool treatRotatedGridAsRegularGrid;
     bool treatProjectedGridAsRegularLonLatGrid;
     bool convertGeometricHeightToPressure_ICAOStandard;
