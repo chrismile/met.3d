@@ -89,6 +89,10 @@ inline double degreesToRadians(double angle)
 { return angle / 180. * M_PI; }
 
 
+inline double radiansToDegrees(double angle)
+{ return angle / M_PI * 180.; }
+
+
 /**
   Computes the haversine: haversin(theta) = sin^2(theta/2.).
   @see https://en.wikipedia.org/wiki/Haversine_formula

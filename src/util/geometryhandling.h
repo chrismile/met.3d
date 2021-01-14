@@ -65,10 +65,10 @@ public:
 
     void destroyProjProjection();
 
-    QPointF geographicalToProjectedCoordinates(QPointF point);
+    QPointF geographicalToProjectedCoordinates(QPointF point, bool inverse=false);
 
     QVector<QPolygonF> geographicalToProjectedCoordinates(
-            QVector<QPolygonF> polygons);
+            QVector<QPolygonF> polygons, bool inverse=false);
 
     void initRotatedLonLatProjection(QPointF rotatedPoleLonLat);
 

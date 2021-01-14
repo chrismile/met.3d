@@ -123,14 +123,15 @@ bool computeVectorFieldData(in vec3 posWorld)
 {
     // Sample both vector field component textures, obtain scalar value in
     // longitudial and latitudial direction.
+    vec4 dirCorrForProjMaps;
     float lonField = sampleDataAtPos(
                 posWorld, vectorDataLonComponent3D, vectorDataLonComponent2D,
                 surfacePressureLon, hybridCoefficientsLon,
-                auxPressureFieldLon_hPa);
+                auxPressureFieldLon_hPa, dirCorrForProjMaps);
     float latField = sampleDataAtPos(
                 posWorld, vectorDataLatComponent3D, vectorDataLatComponent2D,
                 surfacePressureLat, hybridCoefficientsLat,
-                auxPressureFieldLat_hPa);
+                auxPressureFieldLat_hPa, dirCorrForProjMaps);
 
     // If no data is available, do not draw any glyphs.
     if (lonField == MISSING_VALUE || latField == MISSING_VALUE)
@@ -142,7 +143,18 @@ bool computeVectorFieldData(in vec3 posWorld)
     vec3 magnitudeDir = vec3(lonField, latField, 0);
 
     // Normalize direction vector.
-    vectorField.dir = normalize(magnitudeDir);
+    if (applyVectorCorrectionForProjMaps)
+    {
+        // dirCorrForProjMaps.xy contains basis vector in eastward direction;
+        // dirCorrForProjMaps.zw contains basis vector in northward direction
+        vec3 correctedDir = vec3(lonField * dirCorrForProjMaps.xy
+                                 + latField * dirCorrForProjMaps.zw, 0);
+        vectorField.dir = normalize(correctedDir);
+    }
+    else
+    {
+        vectorField.dir = normalize(magnitudeDir);
+    }
     vectorField.normal = normalize(vec3(-vectorField.dir.y, vectorField.dir.x,
                                         0));
 

@@ -219,8 +219,12 @@ void MGeometryHandling::destroyProjProjection()
 }
 
 
-QPointF MGeometryHandling::geographicalToProjectedCoordinates(QPointF point)
+QPointF MGeometryHandling::geographicalToProjectedCoordinates(
+        QPointF point, bool inverse)
 {
+    // For tests:
+    // https://mygeodata.cloud/cs2cs/
+
     if (!pjSrcProjection || !pjDstProjection)
     {
         LOG4CPLUS_ERROR(mlog, "ERROR: proj library not initialized, cannot "
@@ -229,11 +233,29 @@ QPointF MGeometryHandling::geographicalToProjectedCoordinates(QPointF point)
     }
 
     int errorCode;
-    double lon = degreesToRadians(point.x());
-    double lat = degreesToRadians(point.y());
+    double lon_x = 0.;
+    double lat_y = 0.;
 
-    errorCode = pj_transform(pjSrcProjection, pjDstProjection,
-                             1, 1, &lon, &lat, NULL);
+    if (inverse)
+    {
+        // Inverse projection: projected to geographical coordinates.
+        lon_x = point.x() * MetConstants::scaleFactorToFitProjectedCoordsTo360Range;
+        lat_y = point.y() * MetConstants::scaleFactorToFitProjectedCoordsTo360Range;
+        errorCode = pj_transform(pjDstProjection, pjSrcProjection,
+                                 1, 1, &lon_x, &lat_y, NULL);
+        lon_x = radiansToDegrees(lon_x);
+        lat_y = radiansToDegrees(lat_y);
+    }
+    else
+    {
+        // Geographical to projected coordinates.
+        lon_x = degreesToRadians(point.x());
+        lat_y = degreesToRadians(point.y());
+        errorCode = pj_transform(pjSrcProjection, pjDstProjection,
+                                 1, 1, &lon_x, &lat_y, NULL);
+        lon_x /= MetConstants::scaleFactorToFitProjectedCoordsTo360Range;
+        lat_y /= MetConstants::scaleFactorToFitProjectedCoordsTo360Range;
+    }
 
     if (errorCode)
     {
@@ -243,13 +265,12 @@ QPointF MGeometryHandling::geographicalToProjectedCoordinates(QPointF point)
                         << pj_strerrno(errorCode) << "'.");
     }
 
-    return QPointF(lon / MetConstants::scaleFactorToFitProjectedCoordsTo360Range,
-                   lat / MetConstants::scaleFactorToFitProjectedCoordsTo360Range);
+    return QPointF(lon_x, lat_y);
 }
 
 
 QVector<QPolygonF> MGeometryHandling::geographicalToProjectedCoordinates(
-        QVector<QPolygonF> polygons)
+        QVector<QPolygonF> polygons, bool inverse)
 {
     QVector<QPolygonF> projectedPolygons;
 
@@ -258,7 +279,8 @@ QVector<QPolygonF> MGeometryHandling::geographicalToProjectedCoordinates(
         QPolygonF projectedPolygon;
         for (QPointF vertex : polygon)
         {
-            projectedPolygon << geographicalToProjectedCoordinates(vertex);
+            projectedPolygon << geographicalToProjectedCoordinates(
+                                    vertex, inverse);
         }
         projectedPolygons << projectedPolygon;
     }

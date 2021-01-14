@@ -60,6 +60,7 @@ enum MVerticalLevelType {
     POTENTIAL_VORTICITY_2D   = 3,
     LOG_PRESSURE_LEVELS_3D   = 4,
     AUXILIARY_PRESSURE_3D    = 5,   // pressure in auxiliary variable
+    MISC_LEVELS_3D           = 6,   // level types that do not fit any other
     SIZE_LEVELTYPES
 };
 

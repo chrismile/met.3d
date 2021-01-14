@@ -217,14 +217,15 @@ shader VSHSecVertex(in vec2 vertex : 0, out vec4 vs_vertex, out vec4 vs_data,
 
     // Sample both vector field component textures, obtain scalar value in
     // longitudial and latitudial direction.
+    vec4 dirCorrForProjMaps;
     float lonField = sampleDataAtPos(
                 worldPos, vectorDataLonComponent3D, vectorDataLonComponent2D,
                 surfacePressureLon, hybridCoefficientsLon,
-                auxPressureFieldLon_hPa);
+                auxPressureFieldLon_hPa, dirCorrForProjMaps);
     float latField = sampleDataAtPos(
                 worldPos, vectorDataLatComponent3D, vectorDataLatComponent2D,
                 surfacePressureLat, hybridCoefficientsLat,
-                auxPressureFieldLat_hPa);
+                auxPressureFieldLat_hPa, dirCorrForProjMaps);
 
     // If no data is available, do not draw any glyphs.
     if (lonField == MISSING_VALUE || latField == MISSING_VALUE)
@@ -237,6 +238,19 @@ shader VSHSecVertex(in vec2 vertex : 0, out vec4 vs_vertex, out vec4 vs_data,
     vec3 magnitudeDir = vec3(lonField, latField, 0);
 
     vec4 data = vec4(magnitudeDir, 1).xyzw;
+    if (applyVectorCorrectionForProjMaps)
+    {
+        // dirCorrForProjMaps.xy contains basis vector in eastward direction;
+        // dirCorrForProjMaps.zw contains basis vector in northward direction
+        data = vec4(lonField * dirCorrForProjMaps.xy
+                    + latField * dirCorrForProjMaps.zw, 0, 1).xyzw;
+        //DEBUG (mr, 14Jan2021) -- if the following line is uncommented all
+        // vector glyphs should be parallel to parallels (equal latitude).
+        //data = vec4(dirCorrForProjMaps.xy, 0, 1).xyzw;
+        //DEBUG (mr, 14Jan2021) -- if the following line is uncommented all
+        // vector glyphs should be parallel to meridians (equal longitude).
+        //data = vec4(dirCorrForProjMaps.zw, 0, 1).xyzw;
+    }
 
     float deltaGrid = (deltaGridX + deltaGridY) / 2.0f;
     Output.adaptedArrowLength = 0.75 * deltaGrid;
