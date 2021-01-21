@@ -30,7 +30,7 @@ if (UNIX)
     # Use pkg_config to detect INCLUDE/LIBRARY directories
     function(use_pkg_config pkg_name)
 
-        if (${${pgk_name}_FOUND})
+        if (${${pkg_name}_FOUND})
             return()
         endif()
 
@@ -38,7 +38,7 @@ if (UNIX)
         pkg_search_module(${PREFIX} ${pkg_name})
 
         if (${PREFIX}_FOUND)
-            message(STATUS "Found pgk_config file for package ${pkg_name}")
+            message(STATUS "Found pkg_config file for package ${pkg_name}")
         endif()
 
         set(PKG_LIBRARY_DIRS ${${PREFIX}_LIBRARY_DIRS} PARENT_SCOPE)
