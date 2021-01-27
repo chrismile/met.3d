@@ -246,7 +246,10 @@ void MGraticuleActor::loadConfiguration(QSettings *settings)
     settings->endGroup();
 
     // Update geometry with loaded configuration.
-    generateGeometry();
+    if (MSystemManagerAndControl::getInstance()->applicationIsInitialized())
+    {
+        generateGeometry();
+    }
 }
 
 
