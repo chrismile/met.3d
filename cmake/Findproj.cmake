@@ -8,6 +8,7 @@
 #       - proj_LIBRARIES    - Package static libraries
 #
 #  Copyright 2020 Kameswarro Modali
+#  Copyright 2021 Christoph Neuhauser
 #
 ####################################################################################################
 
@@ -86,17 +87,11 @@ find_package_handle_standard_args(${PKG_NAME} REQUIRED_VARS ${PKG_NAME}_LIBRARIE
 
 # Extract version number of Proj library from header-file:
 # Get content of header-file.
-#file(STRINGS "${${PKG_NAME}_INCLUDE_DIR}/proj_api.h" ${PKG_NAME}_VERSION NEWLINE_CONSUME)
 file(STRINGS "${${PKG_NAME}_INCLUDE_DIR}/proj_api.h" ${PKG_NAME}_VERSION_STRING NEWLINE_CONSUME)
-# Extract version from content by matching string: "Version: major.minor.patch".
-#string(REGEX MATCH "Version [0-9]+([.][0-9]+)?([.][0-9]+)?"
-#       ${PKG_NAME}_VERSION ${${PKG_NAME}_VERSION})
+# Extract version from content by matching string: "#define PJ_VERSION [MAJOR;MINOR;PATCH]".
 string(REGEX MATCH "#define PJ_VERSION ([0-9])*"
        ${PKG_NAME}_VERSION_STRING ${${PKG_NAME}_VERSION_STRING})
-# Extract version from matched string by using the white space to create list and
-# choosing the second argument of the list.
-#string(REPLACE " " ";" ${PKG_NAME}_VERSION ${${PKG_NAME}_VERSION})
-#list(GET ${PKG_NAME}_VERSION 1 ${PKG_NAME}_VERSION)
+# Extract version list (major, minor, patch) from matched string.
 string(REGEX REPLACE "#define PJ_VERSION ([0-9])([0-9])([0-9])"
         "\\1;\\2;\\3" ${PKG_NAME}_VERSION_LIST ${${PKG_NAME}_VERSION_STRING})
 list(LENGTH ${PKG_NAME}_VERSION_LIST n)
@@ -116,7 +111,6 @@ if(${PKG_NAME}_VERSION VERSION_LESS "4.0")
 endif()
 
 # Split version into major, minor and patch part.
-#string(REPLACE "." ";" ${PKG_NAME}_VERSION ${${PKG_NAME}_VERSION})
 # Set major version.
 list(GET ${PKG_NAME}_VERSION_LIST 0 ${PKG_NAME}_MAJOR_VERSION)
 # Set minor version.
