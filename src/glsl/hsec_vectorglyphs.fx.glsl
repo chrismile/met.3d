@@ -266,6 +266,12 @@ shader GSwindBarbs(in vec3 worldPos[], out GStoFS Output)
     // Convert wind velocity in m/s into kt.
     float knots = computeKnots(vectorField.magnitude);
 
+//TODO (mr, 28Jan2021) -- the loop below goes into an endless loop
+// if the magnitude is very large (due to errors, wrong data fields, ..).
+// We limit the max. wind speed to be drawn to 400knots= 205m/s.
+// Is there a better solution to this?
+    knots = min(knots, 400.);
+
     // Compute small radius of calm wind.
     float smallRadius = 0.15 * vectorField.deltaGrid;
     // Compute large radius of calm wind.
