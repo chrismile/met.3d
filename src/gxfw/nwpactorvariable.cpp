@@ -3272,9 +3272,11 @@ void MNWP2DHorizontalActorVariable::computeRenderRegionParameters(
     // DEBUG output.
     // =============
 
-    LOG4CPLUS_DEBUG(mlog, "(grid is " << (gridIsCyclic ? "" : "not")
-                    << " cyclic; shiftLon = " << shiftLon << ") "
-                    << "BBox = (" << llcrnrlon << "/" << llcrnrlat << " -> "
+    LOG4CPLUS_DEBUG(mlog, "Boundingbox/grid-index mapping of "
+                    << variableName.toStdString()
+                    << ": grid is " << (gridIsCyclic ? "" : "not")
+                    << " cyclic; shiftLon = " << shiftLon << "; "
+                    << "bbox = (" << llcrnrlon << "/" << llcrnrlat << " -> "
                     << urcrnrlon << "/" << urcrnrlat << "); "
                     << "i = (" << i0 << "--" << i1 << "); j = (" << j0 << "--"
                     << j1 << "); n = (" << nlons << "/" << nlats << ")");

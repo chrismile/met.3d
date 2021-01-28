@@ -261,8 +261,12 @@ QPointF MGeometryHandling::geographicalToProjectedCoordinates(
     {
         // In later version of proj, const char* proj_errno_string(int err)
         // is available to get the text corresponding to the error code to.
-        LOG4CPLUS_ERROR(mlog, "ERROR: proj transformation failed with error '"
-                        << pj_strerrno(errorCode) << "'.");
+        LOG4CPLUS_ERROR(mlog, "ERROR: proj transformation of point ("
+                        << point.x() << ", " << point.y()
+                        << ") failed with error '"
+                        << pj_strerrno(errorCode)
+                        << "'. Returning (0., 0.).");
+        return QPointF();
     }
 
     return QPointF(lon_x, lat_y);
