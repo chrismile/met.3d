@@ -249,8 +249,11 @@ void MGraticuleActor::loadConfiguration(QSettings *settings)
     settings->endGroup();
 
     // Update geometry with loaded configuration.
-    generateGeometry();
-    if (connectedHSecActor) connectedHSecActor->updateMapProjectionCorrectionForVectorGlyphs();
+    if (isInitialized())
+    {
+        generateGeometry();
+        if (connectedHSecActor) connectedHSecActor->updateMapProjectionCorrectionForVectorGlyphs();
+    }
 }
 
 
