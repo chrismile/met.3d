@@ -7,6 +7,7 @@
 **  Copyright 2015-2020 Marc Rautenhaus [*, previously +]
 **  Copyright 2020 Kameswarro Modali [*]
 **  Copyright 2017 Bianca Tost [+]
+**  Copyright 2021 Christoph Neuhauser [+]
 **
 **  + Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
