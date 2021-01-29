@@ -2803,8 +2803,7 @@ void MNWPHorizontalSectionActor::renderVectorGlyphs(
                 "mvpMatrix",
                 *(sceneView->getModelViewProjectionMatrix())); CHECK_GL_ERROR;
 
-//TODO (mr 17May2017) -- why is there an offset?
-    const GLfloat worldZ = sceneView->worldZfromPressure(slicePosition_hPa) + 0.1;
+    const GLfloat worldZ = sceneView->worldZfromPressure(slicePosition_hPa);
     glyphsShader->setUniformValue(
                 "worldZ", worldZ); CHECK_GL_ERROR;
 
@@ -3039,10 +3038,10 @@ void MNWPHorizontalSectionActor::renderVectorGlyphs(
     const int VERTEX_ATTRIBUTE = 0;
     vectorGlyphsVertexBuffer->attachToVertexAttribute(VERTEX_ATTRIBUTE, 2);
 
+    glDepthFunc(GL_LEQUAL);
     glPolygonMode(GL_FRONT_AND_BACK,
                   renderAsWireFrame ? GL_LINE : GL_FILL); CHECK_GL_ERROR;
 
-    glPolygonOffset(.8f, 1.0f); CHECK_GL_ERROR;
     glEnable(GL_POLYGON_OFFSET_FILL); CHECK_GL_ERROR;
     glDrawArrays(GL_POINTS, 0, nGlyphsLon * nGlyphsLat); CHECK_GL_ERROR;
 
