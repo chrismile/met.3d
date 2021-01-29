@@ -1389,7 +1389,7 @@ void MNWPHorizontalSectionActor::onQtPropertyChanged(QtProperty *property)
         if ( (vectorGlyphsSettings->lonComponentVarIndex != previousLonComponentVarIndex)
              || (property == vectorGlyphsSettings->lengthProjectedBasisVectorsProperty))
         {
-            updateMapProjectionCorrectionForVectorGlyphs();
+            updateVectorCorrForProjOnNextRenderCycle = true;
         }
 
         if (suppressActorUpdates()) return;
