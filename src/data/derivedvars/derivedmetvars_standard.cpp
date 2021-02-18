@@ -207,6 +207,48 @@ void MEquivalentPotentialTemperatureProcessor::compute(
 }
 
 
+
+// Relative humidity
+// =================
+
+MRelativeHumdityProcessor::MRelativeHumdityProcessor()
+    : MDerivedDataFieldProcessor(
+          "relative_humidity",
+          QStringList() << "air_temperature" << "specific_humidity")
+{
+}
+
+
+void MRelativeHumdityProcessor::compute(
+        QList<MStructuredGrid *> &inputGrids, MStructuredGrid *derivedGrid)
+{
+    // input 0 = "air_temperature"
+    // input 1 = "specific_humidity"
+
+    // Requires nested k/j/i loops to access pressure at grid point.
+    for (unsigned int k = 0; k < derivedGrid->getNumLevels(); k++)
+        for (unsigned int j = 0; j < derivedGrid->getNumLats(); j++)
+            for (unsigned int i = 0; i < derivedGrid->getNumLons(); i++)
+            {
+                float T_K = inputGrids.at(0)->getValue(k, j, i);
+                float q_kgkg = inputGrids.at(1)->getValue(k, j, i);
+
+                if (T_K == M_MISSING_VALUE || q_kgkg == M_MISSING_VALUE)
+                {
+                    derivedGrid->setValue(k, j, i, M_MISSING_VALUE);
+                }
+                else
+                {
+                    float relHum_percent = relativeHumdity_Huang2018(
+                                inputGrids.at(0)->getPressure(k, j, i) * 100.,
+                                T_K,
+                                q_kgkg);
+                    derivedGrid->setValue(k, j, i, relHum_percent);
+                }
+            }
+}
+
+
 // Potential vorticity (LAGRANTO libcalvar implementation)
 // =======================================================
 

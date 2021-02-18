@@ -66,6 +66,7 @@ MDerivedMetVarsDataSource::MDerivedMetVarsDataSource()
     registerDerivedDataFieldProcessor(new MMagnitudeOfAirVelocityProcessor());
     registerDerivedDataFieldProcessor(new MPotentialTemperatureProcessor());
     registerDerivedDataFieldProcessor(new MEquivalentPotentialTemperatureProcessor());
+    registerDerivedDataFieldProcessor(new MRelativeHumdityProcessor());
     registerDerivedDataFieldProcessor(new MGeopotentialHeightProcessor());
     registerDerivedDataFieldProcessor(new MGeopotentialHeightFromGeopotentialProcessor());
     registerDerivedDataFieldProcessor(new MDewPointTemperatureProcessor());

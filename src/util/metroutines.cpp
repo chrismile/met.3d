@@ -705,6 +705,39 @@ double coriolisParameter_deg(double lat)
 }
 
 
+double saturationVapourPressure_Pa_Huang2018(double T_K)
+{
+    double T_degC = T_K - 273.15;
+    if (T_degC > 0.)
+    {
+        // Huang (2018), Eq. 17: Saturation vapour pressure over water.
+        return exp(34.494 - 4924.99 / (T_degC + 237.1)) / pow(T_degC + 105., 1.57);
+    }
+    else
+    {
+        // Huang (2018), Eq. 18: Saturation vapour pressure over ice.
+        return exp(43.494 - 6545.8 / (T_degC + 278.)) / pow(T_degC + 868., 2.);
+    }
+}
+
+
+double relativeHumdity_Huang2018(double p_Pa, double T_K, double q_kgkg)
+{
+    // Compute mixing ratio w from specific humidiy q.
+    double w_kgkg = mixingRatio_kgkg(q_kgkg);
+
+    // Compute saturation vapour pressure from temperature T.
+    double eSat_Pa = saturationVapourPressure_Pa_Huang2018(T_K);
+
+    // Compute saturation mixing ratio from e_sat and pressure p.
+    double wSat_kgkg = 0.622 * eSat_Pa / (p_Pa - eSat_Pa);
+
+    // Return the relative humidity, computed from w and w_sat.
+    return 100. * w_kgkg / wSat_kgkg;
+}
+
+
+
 /******************************************************************************
 ***            WRAPPER for LAGRANTO LIBCALVAR FORTRAN FUNCTIONS             ***
 *******************************************************************************/
@@ -879,10 +912,52 @@ void test_wetBulbPotentialTemperatureOfSaturatedAdiabat_K_MoisseevaStull()
 }
 
 
+void test_saturationVapourPressure()
+{
+    LOG4CPLUS_INFO(mlog, "Running test for saturation vapour pressure"
+                         "computation following Huang (2018).");
+
+    const int nTests = 12;
+
+    // Test values (T_degC, eSat_Pa); using the values in Tables 1 and 2
+    // in Huang (2018),
+    // https://journals.ametsoc.org/view/journals/apme/57/6/jamc-d-17-0334.1.xml
+    float values_T_eSat[nTests][2] = {
+        {0.01, 611.689},
+        {  20, 2339.32},
+        {  40, 7384.93},
+        {  60, 19946.1},
+        {  80, 47415.0},
+        { 100, 101417},
+        {-100, 0.0014050},
+        { -80, 0.05477},
+        { -60, 1.0814},
+        { -40, 12.841},
+        { -20, 103.23},
+        { 0.0, 611.29},
+    };
+
+    for (int i = 0; i < nTests; i++)
+    {
+        double T_K = values_T_eSat[i][0] + 273.15;
+        double eSat_Pa_target = values_T_eSat[i][1];
+        double eSat_Pa_computed = saturationVapourPressure_Pa_Huang2018(T_K);
+
+        QString s = QString("(%1) T_K = %2  target eSat_Pa = %3  computed eSat_Pa = %4")
+                .arg(i).arg(T_K).arg(eSat_Pa_target).arg(eSat_Pa_computed);
+
+        LOG4CPLUS_INFO(mlog, s.toStdString());
+    }
+
+    LOG4CPLUS_INFO(mlog, "Test finished.");
+}
+
+
 void runMetRoutinesTests()
 {
     test_temperatureAlongSaturatedAdiabat_K_MoisseevaStull();
     test_wetBulbPotentialTemperatureOfSaturatedAdiabat_K_MoisseevaStull();
+    test_saturationVapourPressure();
 }
 
 } // namespace MetRoutinesTests

@@ -404,6 +404,20 @@ double wetBulbPotentialTemperatureOfSaturatedAdiabat_K_MoisseevaStull(
  */
 double coriolisParameter_deg(double lat);
 
+/**
+  Computes the saturation vapour pressure over water and over ice, using
+  the equations presented by Huang (JAMC, 2018), "A Simple Accurate Formula
+  for Calculating Saturation VaporPressure of Water and Ice",
+  DOI: 10.1175/JAMC-D-17-0334.1
+ */
+double saturationVapourPressure_Pa_Huang2018(double T_K);
+
+/**
+  Computes relative humidity, using the saturation vapour pressure computed
+  by @ref saturationVapourPressure_Pa_Huang2018().
+ */
+double relativeHumdity_Huang2018(double p_Pa, double T_K, double q_kgkg);
+
 
 /******************************************************************************
 ***            WRAPPER for LAGRANTO LIBCALVAR FORTRAN FUNCTIONS             ***
@@ -476,6 +490,7 @@ namespace MetRoutinesTests
 
 void test_EQPT();
 void test_temperatureAlongSaturatedAdiabat_K_MoisseevaStull();
+void test_saturationVapourPressure();
 
 void runMetRoutinesTests();
 
