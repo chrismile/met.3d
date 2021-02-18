@@ -117,7 +117,8 @@ MProcessingWeatherPredictionDataSource::createAndInitializeResultGrid(
         throw MInitialisationError(msg.toStdString(), __FILE__, __LINE__);
     }
 
-    // Copy coordinate axes.
+    // Set horizontal grid type and copy coordinate axes.
+    result->setHorizontalGridType(templateGrid->getHorizontalGridType());
     for (unsigned int i = 0; i < templateGrid->nlons; i++)
         result->lons[i] = templateGrid->lons[i];
     for (unsigned int j = 0; j < templateGrid->nlats; j++)

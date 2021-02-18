@@ -214,9 +214,9 @@ MPotentialVorticityProcessor_LAGRANTOcalvar
 ::MPotentialVorticityProcessor_LAGRANTOcalvar()
     : MDerivedDataFieldProcessor(
           "ertel_potential_vorticity",
-          QStringList() << "eastward_wind"
-                        << "northward_wind"
-                        << "air_temperature"
+          QStringList() << "eastward_wind/HYBRID_SIGMA_PRESSURE_3D"
+                        << "northward_wind/HYBRID_SIGMA_PRESSURE_3D"
+                        << "air_temperature/HYBRID_SIGMA_PRESSURE_3D"
                         << "surface_air_pressure/SURFACE_2D")
 {
 }
@@ -243,6 +243,18 @@ void MPotentialVorticityProcessor_LAGRANTOcalvar::compute(
     // * ak and bk coefficients need to be passed as float arrays.
     //
     // Also compare to libcalvar usage in ppecmwf.py in the met.dp repository.
+
+    // This implementation only works with lon/lat grids - return missing data
+    // field if any other horizontal grid type is passed.
+    if (!(derivedGrid->getHorizontalGridType() == REGULAR_LONLAT_GRID
+          || derivedGrid->getHorizontalGridType() == REGULAR_ROTATED_LONLAT_GRID))
+    {
+        derivedGrid->setToValue(M_MISSING_VALUE);
+        LOG4CPLUS_WARN(mlog, "WARNING: Potential vorticity computation is "
+                       "only implemented for lon/lat grids. Returning empty "
+                       "data field with missing values.");
+        return;
+    }
 
     // Grid sizes.
     int nlev = derivedGrid->getNumLevels();
