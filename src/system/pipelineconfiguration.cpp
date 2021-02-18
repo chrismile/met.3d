@@ -951,9 +951,9 @@ void MPipelineConfiguration::initializeTrajectoryComputationPipeline(
         MHorizontalGridType hGridTypW =
                 netCDFDataSource->variableHorizontalGridType(
                     verticalLevelType, windVerticalVariable);
-        if (hGridTypU == MHorizontalGridType::ROTATED_REGULAR_LONLAT_GRID
-                || hGridTypV == MHorizontalGridType::ROTATED_REGULAR_LONLAT_GRID
-                || hGridTypW == MHorizontalGridType::ROTATED_REGULAR_LONLAT_GRID)
+        if (hGridTypU == MHorizontalGridType::REGULAR_ROTATED_LONLAT_GRID
+                || hGridTypV == MHorizontalGridType::REGULAR_ROTATED_LONLAT_GRID
+                || hGridTypW == MHorizontalGridType::REGULAR_ROTATED_LONLAT_GRID)
         {
             LOG4CPLUS_WARN(mlog, "One or more wind variables are defined on"
                                  " a rotated grid coordinates; skipping.");

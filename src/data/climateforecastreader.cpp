@@ -865,13 +865,13 @@ void MClimateForecastReader::scanDataRoot()
                                 ncFile->getVar(varName.toStdString())))
                     {
                         vinfo->horizontalGridType =
-                                MHorizontalGridType::ROTATED_REGULAR_LONLAT_GRID;
+                                MHorizontalGridType::REGULAR_ROTATED_LONLAT_GRID;
                     }
                     if (NcCFVar::isDefinedOnProjectedGrid(
                                 ncFile->getVar(varName.toStdString())))
                     {
                         vinfo->horizontalGridType =
-                                MHorizontalGridType::PROJECTED_REGULAR_GRID;
+                                MHorizontalGridType::REGULAR_PROJECTED_GRID;
                     }
 
                     // Initialise shared data of variable for consistency check.

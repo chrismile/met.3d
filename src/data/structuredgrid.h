@@ -70,9 +70,11 @@ enum MHorizontalGridType
     // Rotated north pole coordinates as used by COSMO.
     // (cf. http://www.cosmo-model.org/content/model/documentation/core/cosmoDyncsNumcs.pdf ,
     //  chapter 3.3)
-    ROTATED_REGULAR_LONLAT_GRID = 1,
+    REGULAR_ROTATED_LONLAT_GRID = 1,
     // Proj-supported projection.
-    PROJECTED_REGULAR_GRID = 2
+    REGULAR_PROJECTED_GRID = 2,
+    // Regular grid with geometric coordinates without geographical reference.
+    REGULAR_GEOMETRIC_GRID
 };
 
 
