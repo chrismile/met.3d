@@ -7,6 +7,7 @@
 **  Copyright 2015-2020 Marc Rautenhaus [*, previously +]
 **  Copyright 2017      Philipp Kaiser [+]
 **  Copyright 2020      Marcel Meyer [*]
+**  Copyright 2021      Christoph Neuhauser [+]
 **
 **  + Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -213,7 +214,7 @@ private:
 
 /**
  @brief Stores the trajectories of a single forecast member at a single
- timestep. The smallest entitiy that can be read from disk.
+ timestep. The smallest entity that can be read from disk.
  */
 class MTrajectories :
         public MTrajectorySelection, public MWeatherPredictionMetaData
@@ -253,7 +254,7 @@ public:
     */
     void copyVertexDataFrom(QVector<QVector<QVector3D>> &vertices);
 
-    const QVector<QVector3D>& getVertices() { return vertices; }
+    const QVector<QVector3D>& getVertices() const{ return vertices; }
 
     /**
       Copy auxiliary data given as float arrays in the trajectory data file to
@@ -278,13 +279,13 @@ public:
       Get auxiliary data, size of auxiliary data array and names
       of auxiliary data variables.
      */
-    const QVector<float>& getAuxDataAtVertex(int i)
+    const QVector<float>& getAuxDataAtVertex(int i) const
     { return auxDataAtVertices[i]; }
 
-    unsigned int getSizeOfAuxDataAtVertices()
+    unsigned int getSizeOfAuxDataAtVertices() const
     { return auxDataAtVertices.size(); }
 
-    QStringList getAuxDataVarNames() { return auxDataVarNames; }
+    QStringList getAuxDataVarNames() const { return auxDataVarNames; }
 
     /**
       Returns the length of a single time step in seconds.

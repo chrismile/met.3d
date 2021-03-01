@@ -267,6 +267,14 @@ bool MGLResourcesManager::generateEffectProgram(
 }
 
 
+bool MGLResourcesManager::generateEffectProgramUncached(
+        QString name, std::shared_ptr<GL::MShaderEffect>& effectProgram)
+{
+    effectProgram = shared_ptr<GL::MShaderEffect>(new GL::MShaderEffect());
+    return true;
+}
+
+
 bool MGLResourcesManager::generateTexture(QString name, GLuint *textureObjectName)
 {
     bool createdNewTexture = false;

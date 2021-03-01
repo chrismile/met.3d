@@ -114,6 +114,8 @@ public:
      */
     QColor getColorValue(const float scalar) const;
 
+    inline const std::vector<unsigned char> &getColorValuesByteArray() const { return colorValues; }
+
 protected:
     /**
       Generates the colourbar texture with the colour mapping specified by the

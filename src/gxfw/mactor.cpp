@@ -806,6 +806,17 @@ void MActor::compileShadersFromFileWithProgressDialog(
 }
 
 
+void MActor::compileShadersFromFileWithProgressDialog(
+        std::shared_ptr<GL::MShaderEffect> shader,
+        const QString filename,
+        const QMap<QString, QString>& defines)
+{
+    shader->compileFromFile_Met3DHome(filename, defines);
+    shaderCompilationProgressDialog->setValue(++shaderCompilationProgress);
+    shaderCompilationProgressDialog->repaint();
+}
+
+
 void MActor::emitActorChangedSignal()
 {
     if ((actorChangedSignalDisabledCounter == 0) && actorIsEnabled

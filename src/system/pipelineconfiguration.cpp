@@ -8,6 +8,7 @@
 **  Copyright 2017-2018 Bianca Tost [+]
 **  Copyright 2017      Philipp Kaiser [+]
 **  Copyright 2020      Marcel Meyer [*]
+**  Copyright 2021      Christoph Neuhauser [+]
 **
 **  + Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -60,6 +61,7 @@
 #include "data/trajectorycomputation.h"
 #include "data/trajectorynormalssource.h"
 #include "data/trajectoryselectionsource.h"
+#include "data/multivar/bezietrajectoriessource.h"
 #include "data/deltapressurepertrajectory.h"
 #include "data/thinouttrajectoryfilter.h"
 #include "data/probdftrajectoriessource.h"
@@ -1048,6 +1050,14 @@ void MPipelineConfiguration::initializeEnsembleTrajectoriesPipeline(
     trajectoryNormals->setTrajectorySource(baseDataSource);
     sysMC->registerDataSource(dataSourceId + QString(" Normals"),
                               trajectoryNormals);
+
+    MBezierTrajectoriesSource *bezierTrajectories =
+            new MBezierTrajectoriesSource();
+    bezierTrajectories->setMemoryManager(memoryManager);
+    bezierTrajectories->setScheduler(scheduler);
+    bezierTrajectories->setTrajectorySource(baseDataSource);
+    sysMC->registerDataSource(dataSourceId + QString(" Bezier Trajectories"),
+                              bezierTrajectories);
 
 // TODO (bt, 03Aug2018): Remove this when trajectories probability data sources
 // are implemented for trajectories computed in Met.3D.

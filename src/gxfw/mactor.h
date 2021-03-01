@@ -62,6 +62,7 @@ class MSceneControl;
 class MActor : public QObject
 {
     Q_OBJECT
+    friend class MMultiVarData;
 
 public:
     /**
@@ -588,6 +589,16 @@ protected:
     void compileShadersFromFileWithProgressDialog(
             std::shared_ptr<GL::MShaderEffect> shader,
             const QString filename);
+
+    /**
+      Compiles a GLSL shader from @p filename and updates the "compile shaders"
+      progress dialog. Uses @ref shaderCompilationProgress to update number of
+      already compiled shaders.
+      */
+    void compileShadersFromFileWithProgressDialog(
+            std::shared_ptr<GL::MShaderEffect> shader,
+            const QString filename,
+            const QMap<QString, QString>& defines);
 
     /**
       Emit the @ref actorChanged() signal, but only if the signal is enabled,

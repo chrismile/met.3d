@@ -110,6 +110,15 @@ public:
             std::shared_ptr<GL::MShaderEffect>& effectProgram);
 
     /**
+      Returns a shared pointer to a new shader effect program if no program
+      with the given name has been created so far, or a pointer to the
+      existing shader program.
+      */
+    bool generateEffectProgramUncached(
+            QString name,
+            std::shared_ptr<GL::MShaderEffect>& effectProgram);
+
+    /**
       @deprecated
 
       @note Use the @ref tryStoreGPUItem() mechanism instead.

@@ -8,6 +8,7 @@
 **  Copyright 2017-2018 Bianca Tost [+]
 **  Copyright 2017      Philipp Kaiser [+]
 **  Copyright 2020      Marcel Meyer [*]
+**  Copyright 2021      Christoph Neuhauser [+]
 **
 **  + Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -50,8 +51,11 @@
 #include "data/trajectorydatasource.h"
 #include "data/trajectorynormalssource.h"
 #include "data/pressuretimetrajectoryfilter.h"
-#include "gxfw/boundingbox/boundingbox.h"
 #include "data/trajectorycomputation.h"
+#include "data/multivar/beziertrajectories.h"
+#include "data/multivar/bezietrajectoriessource.h"
+#include "data/multivar/multivardata.h"
+#include "gxfw/boundingbox/boundingbox.h"
 
 
 class MGLResourcesManager;
@@ -84,7 +88,7 @@ public:
     /**
       Set a transfer function to map vertical position (pressure) to colour.
       */
-    void setTransferFunction(MTransferFunction1D *tf);    
+    void setTransferFunction(MTransferFunction1D *tf);
     /**
       Set a transfer function by its name. Set to 'none' if @oaram tfName does
       not exit.
@@ -122,6 +126,10 @@ public:
     void setNormalsSource(MTrajectoryNormalsSource* s);
 
     void setNormalsSource(const QString& id);
+
+    void setBezierTrajectoriesSource(MBezierTrajectoriesSource* s);
+
+    void setBezierTrajectoriesSource(const QString& id);
 
     void setTrajectoryFilter(MTrajectoryFilter* f);
 
@@ -171,6 +179,11 @@ public slots:
       Called by the normals source when requested normals are ready.
      */
     void asynchronousNormalsAvailable(MDataRequest request);
+
+    /**
+      Called by the normals source when requested normals are ready.
+     */
+    void asynchronousBezierTrajectoriesAvailable(MDataRequest request);
 
     /**
       Called by the trajectory filter when a requested filter computation is
@@ -336,6 +349,7 @@ private:
     {
         MRequestQueueInfo dataRequest;
         QHash<MSceneViewGLWidget*, MRequestQueueInfo> normalsRequests;
+        QHash<MSceneViewGLWidget*, MRequestQueueInfo> bezierTrajectoriesRequests;
         MRequestQueueInfo filterRequest;
         MRequestQueueInfo singleTimeFilterRequest;
         int numPendingRequests;
@@ -356,18 +370,22 @@ private:
                   trajectoriesAuxDataVertexBuffer(nullptr)
         { }
 
-        MTrajectories* trajectories;
-        MTrajectorySelection* trajectorySelection;
-        MTrajectorySelection* trajectorySingleTimeSelection;
-        GL::MVertexBuffer* trajectoriesVertexBuffer;
-        GL::MVertexBuffer* trajectoriesAuxDataVertexBuffer;
+        MTrajectories *trajectories;
+        MTrajectorySelection *trajectorySelection;
+        MTrajectorySelection *trajectorySingleTimeSelection;
+        GL::MVertexBuffer *trajectoriesVertexBuffer;
+        GL::MVertexBuffer *trajectoriesAuxDataVertexBuffer;
         // Remember the name of the current aux var to correctly release
         // the "trajectoriesAuxDataVertexBuffer". Needs to be empty if
         // no aux VB is in use.
         QString currentAuxDataVarName;
-
+        
         QHash<MSceneViewGLWidget*, MTrajectoryNormals*> normals;
         QHash<MSceneViewGLWidget*, GL::MVertexBuffer*> normalsVertexBuffer;
+
+        // Bezier trajectories.
+        QHash<MSceneViewGLWidget*, MBezierTrajectories*> bezierTrajectoriesMap;
+        QHash<MSceneViewGLWidget*, MBezierTrajectoriesRenderData> bezierTrajectoriesRenderDataMap;
 
         QQueue<MTrajectoryRequestQueueInfo> pendingRequestsQueue;
 
@@ -410,6 +428,12 @@ private:
     MTrajectoryNormalsSource *normalsSource;
     QHash<MSceneViewGLWidget*, MTrajectoryNormals*> normals;
     QHash<MSceneViewGLWidget*, GL::MVertexBuffer*> normalsVertexBuffer;
+
+    MBezierTrajectoriesSource* bezierTrajectoriesSource;
+    MMultiVarData multiVarData;
+    bool useBezierTrajectories;
+    QtProperty *multiVarGroupProperty;
+    QtProperty *useBezierTrajectoriesProperty;
 
     MTrajectoryFilter *trajectoryFilter;
     MTrajectorySelection *trajectorySelection;

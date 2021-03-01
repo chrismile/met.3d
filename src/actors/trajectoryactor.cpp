@@ -8,6 +8,7 @@
 **  Copyright 2016-2018 Bianca Tost [+]
 **  Copyright 2017      Philipp Kaiser [+]
 **  Copyright 2020      Marcel Meyer [*]
+**  Copyright 2021      Christoph Neuhauser [+]
 **
 **  + Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -71,6 +72,8 @@ MTrajectoryActor::MTrajectoryActor()
       globalRequestIDCounter(0),
       trajectorySource(nullptr),
       normalsSource(nullptr),
+      bezierTrajectoriesSource(nullptr),
+      useBezierTrajectories(true), // TODO: Set to false after testing.
       trajectoryFilter(nullptr),
       dataSourceID(""),
       precomputedDataSource(false),
@@ -338,6 +341,18 @@ MTrajectoryActor::MTrajectoryActor()
                                        renderingGroupProperty);
     properties->mBool()->setValue(colourShadowProperty, shadowColoured);
 
+
+    // Property group: Multi-variable rendering.
+    // ====================================
+    useBezierTrajectoriesProperty = addProperty(
+            BOOL_PROPERTY, "use multi-var rendering", renderingGroupProperty);
+
+    multiVarGroupProperty = addProperty(
+            GROUP_PROPERTY, "multi-var rendering", renderingGroupProperty);
+
+    multiVarData.setProperties(this, properties, multiVarGroupProperty);
+
+
     // Property group: Analysis.
     // ====================================
     analysisGroupProperty = addProperty(GROUP_PROPERTY, "analysis",
@@ -387,17 +402,17 @@ void MTrajectoryActor::reloadShaderEffects()
     beginCompileShaders(4);
 
     compileShadersFromFileWithProgressDialog(
-                tubeShader,
-                "src/glsl/trajectory_tubes.fx.glsl");
+            tubeShader,
+            "src/glsl/trajectory_tubes.fx.glsl");
     compileShadersFromFileWithProgressDialog(
-                tubeShadowShader,
-                "src/glsl/trajectory_tubes_shadow.fx.glsl");
+            tubeShadowShader,
+            "src/glsl/trajectory_tubes_shadow.fx.glsl");
     compileShadersFromFileWithProgressDialog(
-                positionSphereShader,
-                "src/glsl/trajectory_positions.fx.glsl");
+            positionSphereShader,
+            "src/glsl/trajectory_positions.fx.glsl");
     compileShadersFromFileWithProgressDialog(
-                positionSphereShadowShader,
-                "src/glsl/trajectory_positions_shadow.fx.glsl");
+            positionSphereShadowShader,
+            "src/glsl/trajectory_positions_shadow.fx.glsl");
 
     endCompileShaders();
 }
@@ -438,6 +453,13 @@ void MTrajectoryActor::saveConfiguration(QSettings *settings)
 
     settings->setValue("transferFunction",
                        properties->getEnumItem(transferFunctionProperty));
+
+    settings->setValue("useBezierTrajectories",
+                       properties->mBool()->value(useBezierTrajectoriesProperty));
+    if (useBezierTrajectories)
+    {
+        multiVarData.saveConfiguration(settings);
+    }
 
     settings->setValue("tubeRadius", tubeRadius);
     settings->setValue("sphereRadius", sphereRadius);
@@ -482,6 +504,10 @@ void MTrajectoryActor::saveConfiguration(QSettings *settings)
                     QString("computationSeedActorPressureLevels%1").arg(i),
                     properties->mString()->value(sas.pressureLevels));
     }
+
+    settings->setValue(
+            "computationSeedActorSize",
+            computationSeedActorProperties.size());
 
     settings->endGroup();
 }
@@ -546,6 +572,10 @@ void MTrajectoryActor::loadConfiguration(QSettings *settings)
             this->setDataSource(dataSourceID + QString(" Reader"));
             this->setNormalsSource(dataSourceID + QString(" Normals"));
             this->setTrajectoryFilter(dataSourceID + QString(" timestepFilter"));
+            if (useBezierTrajectories)
+            {
+                this->setBezierTrajectoriesSource(dataSourceID + QString(" Bezier Trajectories"));
+            }
 
             updateInitTimeProperty();
             updateStartTimeProperty();
@@ -634,6 +664,17 @@ void MTrajectoryActor::loadConfiguration(QSettings *settings)
         {
             break;
         }
+    }
+
+    properties->mBool()->setValue(
+            useBezierTrajectoriesProperty,
+            settings->value("useBezierTrajectories", true).toBool()); // TODO: Set to false
+    useBezierTrajectories = properties->mBool()->value(useBezierTrajectoriesProperty);
+    properties->mBool()->setValue(useBezierTrajectoriesProperty, useBezierTrajectories);
+    multiVarData.setEnabled(useBezierTrajectories);
+    if (useBezierTrajectories)
+    {
+        multiVarData.loadConfiguration(settings);
     }
 
     properties->mDDouble()->setValue(
@@ -1164,6 +1205,31 @@ void MTrajectoryActor::setNormalsSource(const QString& id)
 }
 
 
+void MTrajectoryActor::setBezierTrajectoriesSource(MBezierTrajectoriesSource *s)
+{
+    if (bezierTrajectoriesSource != nullptr)
+    {
+        disconnect(bezierTrajectoriesSource, SIGNAL(dataRequestCompleted(MDataRequest)),
+                   this, SLOT(asynchronousBezierTrajectoriesAvailable(MDataRequest)));
+    }
+
+    bezierTrajectoriesSource = s;
+    if (bezierTrajectoriesSource != nullptr)
+    {
+        connect(bezierTrajectoriesSource, SIGNAL(dataRequestCompleted(MDataRequest)),
+                this, SLOT(asynchronousBezierTrajectoriesAvailable(MDataRequest)));
+    }
+}
+
+
+void MTrajectoryActor::setBezierTrajectoriesSource(const QString& id)
+{
+    MAbstractDataSource* ds =
+            MSystemManagerAndControl::getInstance()->getDataSource(id);
+    setBezierTrajectoriesSource(dynamic_cast<MBezierTrajectoriesSource*>(ds));
+}
+
+
 void MTrajectoryActor::setTrajectoryFilter(MTrajectoryFilter *f)
 {
     if (trajectoryFilter != nullptr)
@@ -1356,6 +1422,51 @@ void MTrajectoryActor::asynchronousNormalsAvailable(MDataRequest request)
 }
 
 
+void MTrajectoryActor::asynchronousBezierTrajectoriesAvailable(MDataRequest request)
+{
+    for (int t = 0; t < trajectoryRequests.size(); t++)
+    {
+        bool queueContainsEntryWithNoPendingRequests = false;
+        for (int i = 0; i < trajectoryRequests[t].pendingRequestsQueue.size();
+             i++)
+        {
+                foreach (MSceneViewGLWidget *view,
+                         trajectoryRequests[t].pendingRequestsQueue[i]
+                                 .bezierTrajectoriesRequests.keys())
+                {
+                    if (trajectoryRequests[t].pendingRequestsQueue[i]
+                                .bezierTrajectoriesRequests[view].request == request)
+                    {
+                        if ( !trajectoryRequests[t].pendingRequestsQueue[i]
+                                .bezierTrajectoriesRequests[view].available )
+                        {
+                            trajectoryRequests[t].pendingRequestsQueue[i]
+                                    .numPendingRequests--;
+                        }
+
+                        trajectoryRequests[t].pendingRequestsQueue[i]
+                                .bezierTrajectoriesRequests[view].available = true;
+
+                        if (trajectoryRequests[t].pendingRequestsQueue[i]
+                                    .numPendingRequests == 0)
+                        {
+                            queueContainsEntryWithNoPendingRequests = true;
+                        }
+
+                        // Do NOT break the loop here; "request" might be relevant to
+                        // multiple entries in the queue.
+                    }
+                }
+        }
+
+        if (queueContainsEntryWithNoPendingRequests)
+        {
+            prepareAvailableDataForRendering(t);
+        }
+    }
+}
+
+
 void MTrajectoryActor::asynchronousSelectionAvailable(MDataRequest request)
 {
     for (int t = 0; t < trajectoryRequests.size(); t++)
@@ -1534,6 +1645,31 @@ void MTrajectoryActor::prepareAvailableDataForRendering(uint slot)
                     trajectoryFilter->getData(trqi.singleTimeFilterRequest.request);
         }
 
+        // 5. Bezier trajectories.
+        // ===========
+        if (useBezierTrajectories)
+        {
+            foreach (MSceneViewGLWidget *view, trqi.bezierTrajectoriesRequests.keys())
+            {
+                if (trqi.bezierTrajectoriesRequests[view].available)
+                {
+                    if (trajectoryRequests[slot].bezierTrajectoriesMap.value(view, nullptr))
+                    {
+                        trajectoryRequests[slot].bezierTrajectoriesMap[view]->releaseRenderData();
+                        bezierTrajectoriesSource->releaseData(
+                                trajectoryRequests[slot].bezierTrajectoriesMap[view]);
+                    }
+                    trajectoryRequests[slot].bezierTrajectoriesMap[view] = bezierTrajectoriesSource->getData(
+                            trqi.bezierTrajectoriesRequests[view].request);
+                    trajectoryRequests[slot].bezierTrajectoriesRenderDataMap[view] =
+                            trajectoryRequests[slot].bezierTrajectoriesMap[view]->getRenderData();
+                }
+            }
+
+            multiVarData.onBezierTrajectoriesLoaded(trajectoryRequests[slot].trajectories->getAuxDataVarNames());
+        }
+
+
 #ifdef DIRECT_SYNCHRONIZATION
         // If this was a synchronization request, check if the request was
         // the last request due to the sync sent by any seed actor -- if
@@ -1585,6 +1721,11 @@ void MTrajectoryActor::onActorCreated(MActor *actor)
 
         enableEmissionOfActorChangedSignal(true);
     }
+
+    if (useBezierTrajectories)
+    {
+        multiVarData.onActorCreated(actor);
+    }
 }
 
 
@@ -1631,6 +1772,11 @@ void MTrajectoryActor::onActorDeleted(MActor *actor)
             }
         }
     }
+
+    if (useBezierTrajectories)
+    {
+        multiVarData.onActorDeleted(actor);
+    }
 }
 
 
@@ -1654,6 +1800,7 @@ void MTrajectoryActor::onActorRenamed(MActor *actor, QString oldName)
                                           availableTFs);
         properties->mEnum()->setValue(transferFunctionProperty, index);
 
+
         enableEmissionOfActorChangedSignal(true);
     }
 
@@ -1667,6 +1814,11 @@ void MTrajectoryActor::onActorRenamed(MActor *actor, QString oldName)
                 sas.propertyGroup->setPropertyName(sas.actor->getName());
             }
         }
+    }
+
+    if (useBezierTrajectories)
+    {
+        multiVarData.onActorRenamed(actor, oldName);
     }
 }
 
@@ -2173,6 +2325,21 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
         outputAsLagrantoASCIIFile();
     }
 
+    else if (property == useBezierTrajectoriesProperty)
+    {
+        useBezierTrajectories = properties->mBool()->value(useBezierTrajectoriesProperty);
+        multiVarData.setEnabled(useBezierTrajectories);
+        if (suppressActorUpdates()) return;
+        emitActorChangedSignal();
+    }
+
+    else if (useBezierTrajectories && multiVarData.hasProperty(property))
+    {
+        multiVarData.onQtPropertyChanged(property);
+        if (suppressActorUpdates()) return;
+        emitActorChangedSignal();
+    }
+
     else
     {
         for (SeedActorSettings& sas : computationSeedActorProperties)
@@ -2224,6 +2391,156 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
     {
         return;
     }
+
+
+    if (useBezierTrajectories)
+    {
+        for (int t = 0; t < (precomputedDataSource ? 1 : seedActorData.size()); t++)
+        {
+
+            // If any required data item is missing we cannot render.
+            if ( (trajectoryRequests[t].trajectories == nullptr)
+                 || (trajectoryRequests[t].bezierTrajectoriesMap[sceneView] == nullptr)
+                 || (trajectoryRequests[t].trajectorySelection == nullptr) )
+            {
+                continue;
+            }
+
+            // If the vertical scaling of the view has changed, a recomputation
+            // of the normals is necessary, as they are based on worldZ
+            // coordinates.
+            if (sceneView->visualisationParametersHaveChanged())
+            {
+                // Discard old normals.
+                if (trajectoryRequests[t].normals.value(sceneView, nullptr))
+                {
+                    normalsSource->releaseData(trajectoryRequests[t]
+                                                       .normals[sceneView]);
+                }
+
+                trajectoryRequests[t].normals[sceneView] = nullptr;
+
+                // Discard old Bezier trajectories.
+                if (trajectoryRequests[t].bezierTrajectoriesMap.value(sceneView, nullptr))
+                {
+                    bezierTrajectoriesSource->releaseData(
+                            trajectoryRequests[t].bezierTrajectoriesMap[sceneView]);
+                }
+
+                trajectoryRequests[t].bezierTrajectoriesMap[sceneView] = nullptr;
+                continue;
+            }
+
+            std::shared_ptr<GL::MShaderEffect> tubeShader = multiVarData.getShaderEffect();
+            tubeShader->bind();
+            multiVarData.setUniformData(textureUnitTransferFunction);
+
+            tubeShader->setUniformValue("mvpMatrix", *(sceneView->getModelViewProjectionMatrix()));
+            tubeShader->setUniformValue("lightDirection", sceneView->getLightDirection());
+            tubeShader->setUniformValue("cameraPosition", sceneView->getCamera()->getOrigin());
+            tubeShader->setUniformValue("lineWidth", GLfloat(2.0f * tubeRadius));
+
+            MBezierTrajectoriesRenderData& bezierTrajectoriesRenderData =
+                    trajectoryRequests[t].bezierTrajectoriesRenderDataMap[sceneView];
+
+            // Bind vertex buffer objects.
+            bezierTrajectoriesRenderData.vertexPositionBuffer->attachToVertexAttribute(0);
+            bezierTrajectoriesRenderData.vertexNormalBuffer->attachToVertexAttribute(1);
+            bezierTrajectoriesRenderData.vertexTangentBuffer->attachToVertexAttribute(2);
+            bezierTrajectoriesRenderData.vertexMultiVariableBuffer->attachToVertexAttribute(3);
+            bezierTrajectoriesRenderData.vertexVariableDescBuffer->attachToVertexAttribute(4);
+
+            // Bind shader storage buffer objects.
+            bezierTrajectoriesRenderData.variableArrayBuffer->bindToIndex(2);
+            bezierTrajectoriesRenderData.lineDescArrayBuffer->bindToIndex(4);
+            bezierTrajectoriesRenderData.varDescArrayBuffer->bindToIndex(5);
+            bezierTrajectoriesRenderData.lineVarDescArrayBuffer->bindToIndex(6);
+            bezierTrajectoriesRenderData.varSelectedArrayBuffer->bindToIndex(7);
+
+            glPolygonMode(GL_FRONT_AND_BACK,
+                    renderAsWireFrame ? GL_LINE : GL_FILL); CHECK_GL_ERROR;
+
+            bezierTrajectoriesRenderData.indexBuffer->bindToElementArrayBuffer();
+            glDrawElements(
+                    GL_LINES, bezierTrajectoriesRenderData.indexBuffer->getCount(),
+                    bezierTrajectoriesRenderData.indexBuffer->getType(), nullptr);
+
+            // Unbind IBO.
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0); CHECK_GL_ERROR;
+
+            if (shadowEnabled)
+            {
+                tubeShadowShader->bind();
+
+                tubeShadowShader->setUniformValue(
+                        "mvpMatrix",
+                        *(sceneView->getModelViewProjectionMatrix()));
+                tubeShadowShader->setUniformValue(
+                        "pToWorldZParams",
+                        sceneView->pressureToWorldZParameters());
+                tubeShadowShader->setUniformValue(
+                        "lightDirection",
+                        sceneView->getLightDirection());
+                tubeShadowShader->setUniformValue(
+                        "cameraPosition",
+                        sceneView->getCamera()->getOrigin());
+                tubeShadowShader->setUniformValue(
+                        "radius",
+                        GLfloat(tubeRadius));
+                tubeShadowShader->setUniformValue(
+                        "numObsPerTrajectory",
+                        trajectoryRequests[t].trajectories
+                                ->getNumTimeStepsPerTrajectory());
+
+                if (renderMode == BACKWARDTUBES_AND_SINGLETIME)
+                {
+                    tubeShadowShader->setUniformValue(
+                            "renderTubesUpToIndex",
+                            particlePosTimeStep);
+                }
+                else
+                {
+                    tubeShadowShader->setUniformValue(
+                            "renderTubesUpToIndex",
+                            trajectoryRequests[t].trajectories
+                                    ->getNumTimeStepsPerTrajectory());
+                }
+
+                tubeShadowShader->setUniformValue(
+                        "useTransferFunction", GLboolean(shadowColoured));
+
+                if (shadowColoured)
+                {
+                    tubeShadowShader->setUniformValue(
+                            "transferFunction", textureUnitTransferFunction);
+                    tubeShadowShader->setUniformValue(
+                            "scalarMinimum",
+                            transferFunction->getMinimumValue());
+                    tubeShadowShader->setUniformValue(
+                            "scalarMaximum",
+                            transferFunction->getMaximumValue());
+                }
+                else
+                    tubeShadowShader->setUniformValue(
+                            "constColour", QColor(20, 20, 20, 155));
+
+                glMultiDrawArrays(GL_LINE_STRIP_ADJACENCY,
+                                  trajectoryRequests[t].trajectorySelection
+                                          ->getStartIndices(),
+                                  trajectoryRequests[t].trajectorySelection
+                                          ->getIndexCount(),
+                                  trajectoryRequests[t].trajectorySelection
+                                          ->getNumTrajectories());
+                CHECK_GL_ERROR;
+            }
+
+            // Unbind VBO.
+            glBindBuffer(GL_ARRAY_BUFFER, 0); CHECK_GL_ERROR;
+        }
+
+        return;
+    }
+
 
     if ( (renderMode == TRAJECTORY_TUBES)
          || (renderMode == TUBES_AND_SINGLETIME)
@@ -3104,7 +3421,28 @@ void MTrajectoryActor::asynchronousDataRequest(bool synchronizationRequest)
         }
         rh.remove("NORMALS_LOGP_SCALED");
 
-        // Request 3: Pressure/Time selection filter.
+        // Request 3: Bezier trajectories for all scene views that display the trajectories.
+        // =====================================================================
+        if (useBezierTrajectories)
+        {
+            foreach (MSceneViewGLWidget* view, getViews())
+            {
+                QVector2D params = view->pressureToWorldZParameters();
+                QString query = QString("%1/%2").arg(params.x()).arg(params.y());
+                LOG4CPLUS_DEBUG(mlog, "BEZIERTRAJECTORIES: " << query.toStdString());
+
+                rh.insert("BEZIERTRAJECTORIES_LOGP_SCALED", query);
+                MRequestQueueInfo rqi;
+                rqi.request = rh.request();
+                rqi.available = false;
+                trqi.bezierTrajectoriesRequests.insert(view, rqi);
+                trqi.numPendingRequests++;
+            }
+            rh.remove("BEZIERTRAJECTORIES_LOGP_SCALED");
+        }
+
+
+        // Request 4: Pressure/Time selection filter.
         // ==========================================
 
         //TODO: add property
@@ -3168,6 +3506,14 @@ void MTrajectoryActor::asynchronousDataRequest(bool synchronizationRequest)
         foreach (MSceneViewGLWidget* view, getViews())
         {
             normalsSource->requestData(trqi.normalsRequests[view].request);
+        }
+
+        if (useBezierTrajectories)
+        {
+            foreach (MSceneViewGLWidget* view, getViews())
+            {
+                bezierTrajectoriesSource->requestData(trqi.bezierTrajectoriesRequests[view].request);
+            }
         }
 
         if ((renderMode == SINGLETIME_POSITIONS)
@@ -3691,6 +4037,22 @@ void MTrajectoryActor::debugPrintPendingRequestsQueue()
                         .arg(trajectoryRequests[t].pendingRequestsQueue[i]
                              .normalsRequests[view].request);
             }
+
+            if (useBezierTrajectories)
+            {
+                int sv = 0;
+                foreach (MSceneViewGLWidget *view,
+                         trajectoryRequests[t].pendingRequestsQueue[i]
+                                 .bezierTrajectoriesRequests.keys())
+                {
+                    str += QString("\nScene view [%1] Bezier trajectories: available=[%2]\n[%3]\n")
+                            .arg(sv++)
+                            .arg(trajectoryRequests[t].pendingRequestsQueue[i]
+                                         .bezierTrajectoriesRequests[view].available)
+                            .arg(trajectoryRequests[t].pendingRequestsQueue[i]
+                                         .bezierTrajectoriesRequests[view].request);
+                }
+            }
         }
     }
 
@@ -3738,6 +4100,10 @@ bool MTrajectoryActor::selectDataSource()
         this->setDataSource(dataSourceID + QString(" Reader"));
         this->setNormalsSource(dataSourceID + QString(" Normals"));
         this->setTrajectoryFilter(dataSourceID + QString(" timestepFilter"));
+        if (useBezierTrajectories)
+        {
+            this->setBezierTrajectoriesSource(dataSourceID + QString(" Bezier Trajectories"));
+        }
 
         updateInitTimeProperty();
         updateStartTimeProperty();
@@ -3931,6 +4297,8 @@ void MTrajectoryActor::enableProperties(bool enable)
     enableShadowProperty->setEnabled(enable);
     colourShadowProperty->setEnabled(enable);
 
+    useBezierTrajectoriesProperty->setEnabled(enable);
+
     initTimeProperty->setEnabled(
                 enable && !(enableSync && synchronizeInitTime));
     startTimeProperty->setEnabled(
@@ -3973,16 +4341,16 @@ void MTrajectoryActor::releaseData(int slot)
 
     // 2. Normals.
     // ===========
-            foreach (MSceneViewGLWidget *view,
-                     MSystemManagerAndControl::getInstance()->getRegisteredViews())
+    foreach (MSceneViewGLWidget *view,
+             MSystemManagerAndControl::getInstance()->getRegisteredViews())
+    {
+        if (trajectoryRequests[slot].normals.value(view, nullptr))
         {
-            if (trajectoryRequests[slot].normals.value(view, nullptr))
-            {
-                trajectoryRequests[slot].normals[view]->releaseVertexBuffer();
-                normalsSource->releaseData(trajectoryRequests[slot].normals[view]);
-                trajectoryRequests[slot].normals[view] = nullptr;
-            }
+            trajectoryRequests[slot].normals[view]->releaseVertexBuffer();
+            normalsSource->releaseData(trajectoryRequests[slot].normals[view]);
+            trajectoryRequests[slot].normals[view] = nullptr;
         }
+    }
 
     // 3. Selection.
     // =============
@@ -3999,6 +4367,22 @@ void MTrajectoryActor::releaseData(int slot)
         trajectoryFilter->releaseData(trajectoryRequests[slot]
                                       .trajectorySingleTimeSelection);
         trajectoryRequests[slot].trajectorySingleTimeSelection = nullptr;
+    }
+
+    // 5. Bezier trajectories.
+    // ===========
+    if (useBezierTrajectories)
+    {
+        foreach (MSceneViewGLWidget *view,
+                 MSystemManagerAndControl::getInstance()->getRegisteredViews())
+        {
+            if (trajectoryRequests[slot].bezierTrajectoriesMap.value(view, nullptr))
+            {
+                trajectoryRequests[slot].bezierTrajectoriesMap[view]->releaseRenderData();
+                bezierTrajectoriesSource->releaseData(trajectoryRequests[slot].bezierTrajectoriesMap[view]);
+                trajectoryRequests[slot].bezierTrajectoriesMap[view] = nullptr;
+            }
+        }
     }
 }
 
