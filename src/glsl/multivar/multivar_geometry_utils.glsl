@@ -161,8 +161,8 @@ void createPartialTubeSegments(
         }
     }
 }
-/*
-#ifdef GL_GEOMETRY_SHADER
+
+#if defined(GL_GEOMETRY_SHADER) && !defined(ORIENTED_COLOR_BANDS)
 void drawTangentLid(in vec3 p0, in vec3 p1, in vec3 p2) {
     gl_Position = mvpMatrix * vec4(p0, 1.0);
     fragWorldPos = p0;
@@ -234,7 +234,7 @@ void drawPartialCircleLids(
     EndPrimitive();
 }
 #endif
-*/
+
 uniform int mapTubeDiameterMode;
 
 float computeRadius(

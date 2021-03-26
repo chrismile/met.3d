@@ -112,7 +112,7 @@ public:
 
     MBezierTrajectoriesRenderData getRenderData(QGLWidget *currentGLContext = 0);
     void releaseRenderData();
-    void updateSelectedVariables(QVector<uint32_t> varSelected);
+    void updateSelectedVariables(const QVector<uint32_t>& varSelected);
 
 private:
     QVector<MBezierTrajectory> bezierTrajectories;

@@ -1666,7 +1666,8 @@ void MTrajectoryActor::prepareAvailableDataForRendering(uint slot)
                 }
             }
 
-            multiVarData.onBezierTrajectoriesLoaded(trajectoryRequests[slot].trajectories->getAuxDataVarNames());
+            multiVarData.onBezierTrajectoriesLoaded(
+                    trajectoryRequests[slot].trajectories->getAuxDataVarNames());
         }
 
 
@@ -2429,6 +2430,13 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
 
                 trajectoryRequests[t].bezierTrajectoriesMap[sceneView] = nullptr;
                 continue;
+            }
+
+            if (multiVarData.getSelectedVariablesChanged())
+            {
+                trajectoryRequests[t].bezierTrajectoriesMap[sceneView]->updateSelectedVariables(
+                        multiVarData.getSelectedVariables());
+                multiVarData.resetSelectedVariablesChanged();
             }
 
             std::shared_ptr<GL::MShaderEffect> tubeShader = multiVarData.getShaderEffect();

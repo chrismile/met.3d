@@ -1,89 +1,117 @@
--- Vertex
+/******************************************************************************
+**
+**  This file is part of Met.3D -- a research environment for the
+**  three-dimensional visual exploration of numerical ensemble weather
+**  prediction data.
+**
+**  Copyright 2020-2021 Christoph Neuhauser
+**  Copyright 2020      Michael Kern
+**
+**  Computer Graphics and Visualization Group
+**  Technische Universitaet Muenchen, Garching, Germany
+**
+**  Met.3D is free software: you can redistribute it and/or modify
+**  it under the terms of the GNU General Public License as published by
+**  the Free Software Foundation, either version 3 of the License, or
+**  (at your option) any later version.
+**
+**  Met.3D is distributed in the hope that it will be useful,
+**  but WITHOUT ANY WARRANTY; without even the implied warranty of
+**  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+**  GNU General Public License for more details.
+**
+**  You should have received a copy of the GNU General Public License
+**  along with Met.3D.  If not, see <http://www.gnu.org/licenses/>.
+**
+******************************************************************************/
 
-#version 430 core
+/*****************************************************************************
+ ***                             UNIFORMS
+ *****************************************************************************/
 
-#include "MultiVarGlobalVertexInput.glsl"
-#include "MultiVarGlobalVariables.glsl"
+#include "transferfunction.glsl"
+#include "multivar_global_variables.glsl"
 
-out VertexData {
+// "Fibers"-specific uniforms
+uniform float fiberRadius;
+uniform bool mapTubeDiameter;
+uniform float separatorWidth;
+
+
+/*****************************************************************************
+ ***                            INTERFACES
+ *****************************************************************************/
+
+interface VSOutput
+{
     vec3 vPosition;// Position in world space
     vec3 vNormal;// Orientation normal along line in world space
     vec3 vTangent;// Tangent of line in world space
-//    int variableID; // variable index
     int vLineID;// number of line
     int vElementID;// number of line element (original line vertex index)
     int vElementNextID; // number of next line element (original next line vertex index)
     float vElementInterpolant; // curve parameter t along curve between element and next element
 };
-//} GeomOut; // does not work
 
-void main() {
-    //    uint varID = gl_InstanceID % 6;
-    const int lineID = int(variableDesc.y);
-    const int elementID = int(variableDesc.x);
-
-    vPosition = vertexPosition;
-    vNormal = normalize(vertexLineNormal);
-    vTangent = normalize(vertexLineTangent);
-
-    vLineID = lineID;
-    vElementID = elementID;
-
-    vElementNextID = int(variableDesc.z);
-    vElementInterpolant = variableDesc.w;
-}
-
--- Geometry
-
-#version 430 core
-
-#if !defined(NUM_INSTANCES)
-#define NUM_INSTANCES 10
-#endif
-
-#if !defined(NUM_SEGMENTS)
-#define NUM_SEGMENTS 5
-#endif
-
-layout(lines, invocations = NUM_INSTANCES) in;
-layout(triangle_strip, max_vertices = 128) out;
-
-#include "MultiVarGlobalVariables.glsl"
-
-//#define NUM_SEGMENTS 10
-
-// Input from vertex buffer
-in VertexData {
-    vec3 vPosition;// Position in world space
-    vec3 vNormal;// Orientation normal along line in world space
-    vec3 vTangent;// Tangent of line in world space
-    int vLineID;// number of line
-    int vElementID;// number of line element (original line vertex index)
-    int vElementNextID; // number of next line element (original next line vertex index)
-    float vElementInterpolant; // curve parameter t along curve between element and next element
-} vertexOutput[];
-
+#if defined(GL_GEOMETRY_SHADER)
 // Output to fragments
 out vec3 fragWorldPos;
 out vec3 fragNormal;
 out vec3 fragTangent;
-out vec3 screenSpacePosition; // screen space position for depth in view space (to sort for buckets...)
 out vec2 fragTexCoord;
-// "Oriented Stripes"-specfic outputs
+// "Fibers"-specfic inputs
 flat out int fragElementID; // Actual per-line vertex index --> required for sampling from global buffer
 flat out int fragElementNextID; // Actual next per-line vertex index --> for linear interpolation
 flat out int fragLineID; // Line index --> required for sampling from global buffer
 flat out int fragVarID;
 out float fragElementInterpolant; // current number of curve parameter t (in [0;1]) within one line segment
+#elif defined(GL_FRAGMENT_SHADER)
+// Output to fragments
+in vec3 fragWorldPos;
+in vec3 fragNormal;
+in vec3 fragTangent;
+in vec2 fragTexCoord;
+// "Fibers"-specfic inputs
+flat in int fragElementID; // Actual per-line vertex index --> required for sampling from global buffer
+flat in int fragElementNextID; // Actual next per-line vertex index --> for linear interpolation
+flat in int fragLineID; // Line index --> required for sampling from global buffer
+flat in int fragVarID;
+in float fragElementInterpolant; // current number of curve parameter t (in [0;1]) within one line segment
+#endif
 
-uniform float fiberRadius;
-uniform bool mapTubeDiameter;
 
-#include "MultiVarGeometryUtils.glsl"
+/*****************************************************************************
+ ***                           VERTEX SHADER
+ *****************************************************************************/
 
-void main() {
-    vec3 currentPoint = (mMatrix * vec4(vertexOutput[0].vPosition, 1.0)).xyz;
-    vec3 nextPoint = (mMatrix * vec4(vertexOutput[1].vPosition, 1.0)).xyz;
+shader VSmain(
+        in vec3 vertexPosition : 0, in vec3 vertexLineNormal : 1, in vec3 vertexLineTangent : 2,
+        in vec4 multiVariable : 3, in vec4 variableDesc : 4, out VSOutput outputs) {
+    //    uint varID = gl_InstanceID % 6;
+    const int lineID = int(variableDesc.y);
+    const int elementID = int(variableDesc.x);
+
+    outputs.vPosition = vertexPosition;
+    outputs.vNormal = normalize(vertexLineNormal);
+    outputs.vTangent = normalize(vertexLineTangent);
+
+    outputs.vLineID = lineID;
+    outputs.vElementID = elementID;
+
+    outputs.vElementNextID = int(variableDesc.z);
+    outputs.vElementInterpolant = variableDesc.w;
+}
+
+
+/*****************************************************************************
+ ***                          GEOMETRY SHADER
+ *****************************************************************************/
+
+#include "multivar_geometry_utils.glsl"
+
+shader GSmain(in VSOutput inputs[]) {
+    vec3 currentPoint = inputs[0].vPosition;
+    vec3 nextPoint = inputs[1].vPosition;
 
     vec3 circlePointsCurrent[NUM_SEGMENTS];
     vec3 circlePointsNext[NUM_SEGMENTS];
@@ -94,11 +122,11 @@ void main() {
     vec2 vertexTexCoordsCurrent[NUM_SEGMENTS];
     vec2 vertexTexCoordsNext[NUM_SEGMENTS];
 
-    vec3 normalCurrent = vertexOutput[0].vNormal;
-    vec3 tangentCurrent = vertexOutput[0].vTangent;
+    vec3 normalCurrent = inputs[0].vNormal;
+    vec3 tangentCurrent = inputs[0].vTangent;
     vec3 binormalCurrent = cross(tangentCurrent, normalCurrent);
-    vec3 normalNext = vertexOutput[1].vNormal;
-    vec3 tangentNext = vertexOutput[1].vTangent;
+    vec3 normalNext = inputs[1].vNormal;
+    vec3 tangentNext = inputs[1].vTangent;
     vec3 binormalNext = cross(tangentNext, normalNext);
 
     vec3 tangent = normalize(nextPoint - currentPoint);
@@ -106,8 +134,8 @@ void main() {
     // 0) Setup temp fiber offset on imaginary circle
     const int instanceID = gl_InvocationID;
     const int varID = sampleActualVarID(instanceID % maxNumVariables); // for stripes
-    const int elementID = vertexOutput[0].vElementID;
-    const int lineID = vertexOutput[0].vLineID;
+    const int elementID = inputs[0].vElementID;
+    const int lineID = inputs[0].vLineID;
 
     float thetaInc = 2 * 3.1415926 / (NUM_INSTANCES);
     float thetaCur = thetaInc * instanceID;
@@ -125,19 +153,23 @@ void main() {
         nextRadius = minRadius;
 
         if (varID >= 0) {
-            curRadius = computeRadius(lineID, varID, elementID, vertexOutput[0].vElementNextID,
-                                      minRadius, fiberRadius, vertexOutput[0].vElementInterpolant);
+            curRadius = computeRadius(
+                    lineID, varID, elementID, inputs[0].vElementNextID,
+                    minRadius, fiberRadius, inputs[0].vElementInterpolant);
             //            nextRadius = curRadius;
-            nextRadius = computeRadius(lineID, varID, vertexOutput[1].vElementID, vertexOutput[1].vElementNextID,
-                                       minRadius, fiberRadius, vertexOutput[1].vElementInterpolant);
+            nextRadius = computeRadius(
+                    lineID, varID, inputs[1].vElementID, inputs[1].vElementNextID,
+                    minRadius, fiberRadius, inputs[1].vElementInterpolant);
         }
     }
 
     // 1) Create tube circle vertices for current and next point
-    createTubeSegments(circlePointsCurrent, vertexNormalsCurrent, currentPoint,
-                       normalCurrent, tangentCurrent, curRadius);
-    createTubeSegments(circlePointsNext, vertexNormalsNext, nextPoint,
-                       normalNext, tangentNext, nextRadius);
+    createTubeSegments(
+            circlePointsCurrent, vertexNormalsCurrent, currentPoint,
+            normalCurrent, tangentCurrent, curRadius);
+    createTubeSegments(
+            circlePointsNext, vertexNormalsNext, nextPoint,
+            normalNext, tangentNext, nextRadius);
 
     // 2) Create NDC AABB for stripe -> tube mapping
     // 2.1) Define orientation of local NDC frame-of-reference
@@ -169,8 +201,8 @@ void main() {
 //    invMatNDC, tangentNDC, normalNDC, refPointNDC);
 
     // 4) Emit the tube triangle vertices and attributes to the fragment shader
-    fragElementID = vertexOutput[0].vElementID;
-    fragLineID = vertexOutput[0].vLineID;
+    fragElementID = inputs[0].vElementID;
+    fragLineID = inputs[0].vLineID;
     fragVarID = varID;
 
     for (int i = 0; i < NUM_SEGMENTS; i++) {
@@ -181,46 +213,42 @@ void main() {
         vec3 segmentPointCurrent1 = circlePointsCurrent[iN];
         vec3 segmentPointNext1 = circlePointsNext[iN];
 
-        fragElementNextID = vertexOutput[0].vElementNextID;
-        fragElementInterpolant = vertexOutput[0].vElementInterpolant;
+        fragElementNextID = inputs[0].vElementNextID;
+        fragElementInterpolant = inputs[0].vElementInterpolant;
 
         gl_Position = mvpMatrix * vec4(segmentPointCurrent0, 1.0);
         fragNormal = vertexNormalsCurrent[i];
         fragTangent = tangentCurrent;
-        fragWorldPos = (mMatrix * vec4(segmentPointCurrent0, 1.0)).xyz;
+        fragWorldPos = segmentPointCurrent0;
 //        fragTexCoord = vertexTexCoordsCurrent[i];
-        screenSpacePosition = (vMatrix * mMatrix * vec4(segmentPointCurrent0, 1.0)).xyz;
         EmitVertex();
 
         gl_Position = mvpMatrix * vec4(segmentPointCurrent1, 1.0);
         fragNormal = vertexNormalsCurrent[iN];
         fragTangent = tangentCurrent;
-        fragWorldPos = (mMatrix * vec4(segmentPointCurrent1, 1.0)).xyz;
-        screenSpacePosition = (vMatrix * mMatrix * vec4(segmentPointCurrent1, 1.0)).xyz;
+        fragWorldPos = segmentPointCurrent1;
 //        fragTexCoord = vertexTexCoordsCurrent[iN];
         EmitVertex();
 
-        if (vertexOutput[1].vElementInterpolant < vertexOutput[0].vElementInterpolant) {
+        if (inputs[1].vElementInterpolant < inputs[0].vElementInterpolant) {
             fragElementInterpolant = 1.0f;
-            fragElementNextID = int(vertexOutput[0].vElementNextID);
+            fragElementNextID = int(inputs[0].vElementNextID);
         } else {
-            fragElementInterpolant = vertexOutput[1].vElementInterpolant;
-            fragElementNextID = int(vertexOutput[1].vElementNextID);
+            fragElementInterpolant = inputs[1].vElementInterpolant;
+            fragElementNextID = int(inputs[1].vElementNextID);
         }
 
         gl_Position = mvpMatrix * vec4(segmentPointNext0, 1.0);
         fragNormal = vertexNormalsNext[i];
         fragTangent = tangentNext;
-        fragWorldPos = (mMatrix * vec4(segmentPointNext0, 1.0)).xyz;
-        screenSpacePosition = (vMatrix * mMatrix * vec4(segmentPointNext0, 1.0)).xyz;
+        fragWorldPos = segmentPointNext0;
 //        fragTexCoord = vertexTexCoordsNext[i];
         EmitVertex();
 
         gl_Position = mvpMatrix * vec4(segmentPointNext1, 1.0);
         fragNormal = vertexNormalsNext[iN];
         fragTangent = tangentNext;
-        fragWorldPos = (mMatrix * vec4(segmentPointNext1, 1.0)).xyz;
-        screenSpacePosition = (vMatrix * mMatrix * vec4(segmentPointNext1, 1.0)).xyz;
+        fragWorldPos = segmentPointNext1;
 //        fragTexCoord = vertexTexCoordsNext[iN];
         EmitVertex();
 
@@ -229,42 +257,13 @@ void main() {
 }
 
 
--- Fragment
+/*****************************************************************************
+ ***                          FRAGMENT SHADER
+ *****************************************************************************/
 
-#version 430 core
+#include "multivar_shading_utils.glsl"
 
-in vec3 screenSpacePosition; // Required for transparency rendering techniques
-
-in vec3 fragWorldPos;
-in vec3 fragNormal;
-in vec3 fragTangent;
-in vec2 fragTexCoord;
-flat in int fragElementID; // Actual per-line vertex index --> required for sampling from global buffer
-flat in int fragElementNextID; // Actual next per-line vertex index --> for linear interpolation
-flat in int fragLineID; // Line index --> required for sampling from global buffer
-flat in int fragVarID;
-in float fragElementInterpolant; // current number of curve parameter t (in [0;1]) within one line segment
-
-uniform vec3 cameraPosition; // world space
-
-#if !defined(DIRECT_BLIT_GATHER)
-#define fragmentPositionWorld fragWorldPos
-#include OIT_GATHER_HEADER
-#endif
-
-#ifdef DIRECT_BLIT_GATHER
-out vec4 fragColor;
-#endif
-
-// "Color bands"-specific uniforms
-uniform float separatorWidth;
-
-#include "MultiVarGlobalVariables.glsl"
-#include "MultiVarShadingUtils.glsl"
-
-
-void main()
-{
+shader FSmain(out vec4 fragColor) {
     float variableValue;
     vec2 variableMinMax;
 
@@ -310,34 +309,17 @@ void main()
         discard;
     }
 
-#if defined(DIRECT_BLIT_GATHER)
-    // Direct rendering
     fragColor = color;
-#elif defined(USE_SYNC_FRAGMENT_SHADER_INTERLOCK)
-    // Area of mutual exclusion for fragments mapping to the same pixel
-    beginInvocationInterlockARB();
-    gatherFragment(color);
-    endInvocationInterlockARB();
-#elif defined(USE_SYNC_SPINLOCK)
-    uint x = uint(gl_FragCoord.x);
-    uint y = uint(gl_FragCoord.y);
-    uint pixelIndex = addrGen(uvec2(x,y));
-    /**
-     * Spinlock code below based on code in:
-     * Brüll, Felix. (2018). Order-Independent Transparency Acceleration. 10.13140/RG.2.2.17568.84485.
-     */
-    if (!gl_HelperInvocation) {
-        bool keepWaiting = true;
-        while (keepWaiting) {
-            if (atomicCompSwap(spinlockViewportBuffer[pixelIndex], 0, 1) == 0) {
-                gatherFragment(color);
-                memoryBarrier();
-                atomicExchange(spinlockViewportBuffer[pixelIndex], 0);
-                keepWaiting = false;
-            }
-        }
-    }
-#else
-    gatherFragment(color);
-#endif
 }
+
+
+/*****************************************************************************
+ ***                             PROGRAMS
+ *****************************************************************************/
+
+program Standard
+{
+    vs(430)=VSmain();
+    gs(430)=GSmain() : in(lines, invocations = NUM_LINESEGMENTS), out(triangle_strip, max_vertices = 128);
+    fs(430)=FSmain();
+};

@@ -44,6 +44,9 @@
 #include "transferfunction.glsl"
 #include "multivar_global_variables.glsl"
 
+// "Color bands"-specific uniforms
+uniform float separatorWidth;
+
 /*****************************************************************************
  ***                            INTERFACES
  *****************************************************************************/
@@ -65,7 +68,6 @@ interface FSInput
     vec3 fragWorldPos;
     vec3 fragNormal;
     vec3 fragTangent;
-    vec3 screenSpacePosition; // screen space position for depth in view space (to sort for buckets...)
     vec2 fragTexCoord;
     // "Oriented Stripes"-specfic outputs
     flat int fragElementID; // Actual per-line vertex index --> required for sampling from global buffer
@@ -99,6 +101,7 @@ shader VSmain(
  ***                          GEOMETRY SHADER
  *****************************************************************************/
 
+#define ORIENTED_COLOR_BANDS
 #include "multivar_geometry_utils.glsl"
 
 shader GSmain(in VSOutput inputs[], out FSInput outputs) {
@@ -281,9 +284,6 @@ shader GSmain(in VSOutput inputs[], out FSInput outputs) {
 /*****************************************************************************
  ***                          FRAGMENT SHADER
  *****************************************************************************/
-
-// "Color bands"-specific uniforms
-uniform float separatorWidth;
 
 #if ORIENTED_RIBBON_MODE == 1 // ORIENTED_RIBBON_MODE_VARYING_BAND_WIDTH
 uniform vec4 bandBackgroundColor = vec4(0.5, 0.5, 0.5, 1.0);

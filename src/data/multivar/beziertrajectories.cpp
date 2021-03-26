@@ -51,10 +51,9 @@ MBezierTrajectories::MBezierTrajectories(
         MDataRequest requestToReferTo, unsigned int numTrajectories, unsigned int numVariables)
         : MSupplementalTrajectoryData(requestToReferTo, numTrajectories), bezierTrajectories(numTrajectories)
 {
-    // TODO: Select over UI
     for (unsigned int i = 0; i < numVariables; i++)
     {
-        varSelected.push_back(1);
+        varSelected.push_back(true);
     }
 }
 
@@ -337,8 +336,9 @@ void MBezierTrajectories::releaseRenderData()
 }
 
 
-void MBezierTrajectories::updateSelectedVariables(QVector<uint32_t> varSelected)
+void MBezierTrajectories::updateSelectedVariables(const QVector<uint32_t>& varSelected)
 {
+    this->varSelected = varSelected;
     if (bezierTrajectoriesRenderData.varSelectedArrayBuffer)
     {
         bezierTrajectoriesRenderData.varSelectedArrayBuffer->upload(varSelected.constData(), GL_STATIC_DRAW);

@@ -193,7 +193,7 @@ void MMultiVarData::setPropertiesRenderingSettings()
     fiberRadiusProperty = addProperty(
             DECORATEDDOUBLE_PROPERTY, "fiber radius", renderingSettingsGroupProperty);
     properties->setDDouble(
-            fiberRadiusProperty, fiberRadius, 0.0001, 0.01, 4, 0.1, " (world space)");
+            fiberRadiusProperty, fiberRadius, 0.01, 1.0, 4, 0.1, " (world space)");
     fiberRadiusProperty->setToolTip("Fiber radius.");
     propertyList.push_back(fiberRadiusProperty);
 
@@ -264,15 +264,29 @@ void MMultiVarData::setPropertiesRenderingSettings()
 
 void MMultiVarData::setPropertiesVarSelected()
 {
+    selectedVariablesGroupProperty->setEnabled(true);
     for (int varIdx = 0; varIdx < maxNumVariables; varIdx++)
     {
         QString name = QString("use variable #%1 (%2)").arg(QString::number(varIdx + 1), varNames.at(varIdx));
-        haloFactorProperty = addProperty(
+        QtProperty* variableProperty = addProperty(
                 BOOL_PROPERTY, name, selectedVariablesGroupProperty);
-        properties->mBool()->setValue(haloFactorProperty, true);
-        haloFactorProperty->setToolTip("Whether map the variables to color intensity.");
-        selectedVariablesProperties.push_back(haloFactorProperty);
-        propertyList.push_back(haloFactorProperty);
+        properties->mBool()->setValue(variableProperty, true);
+        variableProperty->setToolTip(QString("Whether to display the variable '%2'").arg(varNames.at(varIdx)));
+        selectedVariablesProperties.push_back(variableProperty);
+        propertyList.push_back(variableProperty);
+    }
+}
+
+
+void MMultiVarData::updateNumVariablesSelected()
+{
+    numVariablesSelected = 0;
+    foreach (uint32_t isSelected, selectedVariables)
+    {
+        if (isSelected)
+        {
+            numVariablesSelected++;
+        }
     }
 }
 
@@ -314,7 +328,12 @@ void MMultiVarData::saveConfiguration(QSettings *settings)
     int varIdx = 0;
     foreach(QtProperty *tfProperty, tfPropertiesMultiVar)
     {
-        settings->setValue(QString("transferFunction#%1").arg(varIdx), properties->getEnumItem(tfProperty));
+        settings->setValue(
+                QString("transferFunction#%1").arg(varIdx + 1),
+                properties->getEnumItem(tfProperty));
+        settings->setValue(
+                QString("varName#%1").arg(varIdx + 1),
+                varNames.at(varIdx));
         varIdx++;
     }
 }
@@ -323,12 +342,14 @@ void MMultiVarData::loadConfiguration(QSettings *settings)
 {
     // TODO
 
-    int numVariables = settings->value("numVariables", 1).toInt();
+    int numVariables = settings->value("numVariables", 0).toInt();
     initTransferFunctionsMultiVar(numVariables);
 
     for (int varIdx = 0; varIdx < numVariables; varIdx++)
     {
-        QString tfName = settings->value(QString("transferFunction#%1").arg(varIdx)).toString();
+        QString tfName = settings->value(QString("transferFunction#%1").arg(varIdx + 1)).toString();
+        QString varName = settings->value(QString("varName#%1").arg(varIdx + 1)).toString();
+        varNames.push_back(varName);
         while (!setTransferFunctionMultiVar(varIdx, tfName))
         {
             if (!MTransferFunction::loadMissingTransferFunction(
@@ -339,6 +360,13 @@ void MMultiVarData::loadConfiguration(QSettings *settings)
             }
         }
     }
+
+    // TODO: Selected variables, etc.
+    /*for ()
+    {
+        updateNumVariablesSelected();
+        selectedVariablesChanged = true;
+    }*/
 }
 
 
@@ -438,8 +466,9 @@ void MMultiVarData::initTransferFunctionsMultiVar(uint32_t numVariables)
                 availableTFs << tf->transferFunctionName();
             }
         }
-        tfPropertiesMultiVar[varIdx] = addProperty(
-                ENUM_PROPERTY, QString("transfer function #%1").arg(varIdx), multiVarGroupProperty);
+        QString name = QString("transfer function #%1 (%2)").arg(
+                QString::number(varIdx + 1), varNames.at(varIdx));
+        tfPropertiesMultiVar[varIdx] = addProperty(ENUM_PROPERTY, name, multiVarGroupProperty);
         properties->mEnum()->setEnumNames(tfPropertiesMultiVar[varIdx], availableTFs);
         tfPropertiesMultiVar[varIdx]->setToolTip(
                 "This transfer function is used for mapping either pressure or the "
@@ -623,6 +652,8 @@ void MMultiVarData::onQtPropertyChanged(QtProperty *property)
     {
         int varIdx = selectedVariablesProperties.indexOf(property);
         selectedVariables[varIdx] = properties->mBool()->value(property);
+        updateNumVariablesSelected();
+        selectedVariablesChanged = true;
     }
 
 
@@ -651,6 +682,8 @@ void MMultiVarData::onBezierTrajectoriesLoaded(const QStringList& auxDataVarName
         {
             selectedVariables[varIdx] = true;
         }
+        updateNumVariablesSelected();
+        selectedVariablesChanged = true;
 
         setPropertiesVarSelected();
     }

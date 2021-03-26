@@ -1,11 +1,53 @@
--- Vertex
+/******************************************************************************
+**
+**  This file is part of Met.3D -- a research environment for the
+**  three-dimensional visual exploration of numerical ensemble weather
+**  prediction data.
+**
+**  Copyright 2020-2021 Christoph Neuhauser
+**  Copyright 2020      Michael Kern
+**
+**  Computer Graphics and Visualization Group
+**  Technische Universitaet Muenchen, Garching, Germany
+**
+**  Met.3D is free software: you can redistribute it and/or modify
+**  it under the terms of the GNU General Public License as published by
+**  the Free Software Foundation, either version 3 of the License, or
+**  (at your option) any later version.
+**
+**  Met.3D is distributed in the hope that it will be useful,
+**  but WITHOUT ANY WARRANTY; without even the implied warranty of
+**  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+**  GNU General Public License for more details.
+**
+**  You should have received a copy of the GNU General Public License
+**  along with Met.3D.  If not, see <http://www.gnu.org/licenses/>.
+**
+******************************************************************************/
 
-#version 430 core
+/*****************************************************************************
+ ***                             UNIFORMS
+ *****************************************************************************/
 
-#include "MultiVarGlobalVertexInput.glsl"
-#include "MultiVarGlobalVariables.glsl"
+#include "transferfunction.glsl"
+#include "multivar_global_variables.glsl"
 
-out VertexData {
+// "Checkerboard"-specific uniforms
+uniform bool mapTubeDiameter;
+uniform float twistOffset;
+uniform bool constantTwistOffset;
+uniform int checkerboardWidth;
+uniform int checkerboardHeight;
+uniform int checkerboardIterator;
+uniform float separatorWidth;
+
+
+/*****************************************************************************
+ ***                            INTERFACES
+ *****************************************************************************/
+
+interface VSOutput
+{
     vec3 vPosition;// Position in world space
     vec3 vNormal;// Orientation normal along line in world space
     vec3 vTangent;// Tangent of line in world space
@@ -17,94 +59,84 @@ out VertexData {
     vec4 lineVariable; // not needed anymore actually
     int vVertexID;
 };
-//} GeomOut; // does not work
 
-void main() {
-    int varID = int(multiVariable.w);
-    const int lineID = int(variableDesc.y);
-    const int elementID = int(variableDesc.x);
+/*interface FSInput
+{
+// Output to fragments
+    vec3 fragWorldPos;
+    vec3 fragNormal;
+    vec3 fragTangent;
+    vec2 fragTexCoord;
+// "Checkerboard"-specfic inputs
+    flat int fragVariableID;
+    flat float fragVariableValue;
+    vec2 fragBorderInterpolant;
+    flat float fragVariableNextValue;
+    float fragElementInterpolant;
+};*/
 
-    vPosition = vertexPosition;
-    vNormal = normalize(vertexLineNormal);
-    vTangent = normalize(vertexLineTangent);
-
-    vVariableID = varID;
-    vLineID = lineID;
-    vElementID = elementID;
-    vVertexID = gl_VertexID;
-
-    vElementNextID = int(variableDesc.z);
-    vElementInterpolant = variableDesc.w;
-
-    lineVariable = multiVariable;
-}
-
--- Geometry
-
-#version 430 core
-
-#if !defined(NUM_LINESEGMENTS)
-    #define NUM_LINESEGMENTS 10
-#endif
-
-#if !defined(NUM_CIRCLE_POINTS_PER_INSTANCE)
-    #define NUM_CIRCLE_POINTS_PER_INSTANCE 2
-#endif
-
-#include "MultiVarGlobalVariables.glsl"
-
-layout(lines, invocations = NUM_LINESEGMENTS) in;
-layout(triangle_strip, max_vertices = 128) out;
-
-
-
-//#define NUM_SEGMENTS 10
-
-
-// Input from vertex buffer
-in VertexData {
-    vec3 vPosition;// Position in world space
-    vec3 vNormal;// Orientation normal along line in world space
-    vec3 vTangent;// Tangent of line in world space
-    int vVariableID; // variable index (for alternating variable indices per line curve)
-    int vLineID;// number of line
-    int vElementID;// number of line element (original line vertex index)
-    int vElementNextID; // number of next line element (original next line vertex index)
-    float vElementInterpolant; // curve parameter t along curve between element and next element
-    vec4 lineVariable; // not needed anymore
-    int vVertexID;
-} vertexOutput[];
-
-in int gl_PrimitiveIDIn;
-
+#if defined(GL_GEOMETRY_SHADER)
 // Output to fragments
 out vec3 fragWorldPos;
 out vec3 fragNormal;
 out vec3 fragTangent;
-out vec3 screenSpacePosition; // screen space position for depth in view space (to sort for buckets...)
 out vec2 fragTexCoord;
-// "Rolls"-specfic outputs
+// "Checkerboard"-specfic inputs
 flat out int fragVariableID;
 flat out float fragVariableValue;
 out vec2 fragBorderInterpolant;
-//flat out int fragVariableNextID;
 flat out float fragVariableNextValue;
 out float fragElementInterpolant;
+#elif defined(GL_FRAGMENT_SHADER)
+// Output to fragments
+in vec3 fragWorldPos;
+in vec3 fragNormal;
+in vec3 fragTangent;
+in vec2 fragTexCoord;
+// "Checkerboard"-specfic inputs
+flat in int fragVariableID;
+flat in float fragVariableValue;
+in vec2 fragBorderInterpolant;
+flat in float fragVariableNextValue;
+in float fragElementInterpolant;
+#endif
 
-#include "MultiVarGeometryUtils.glsl"
+/*****************************************************************************
+ ***                           VERTEX SHADER
+ *****************************************************************************/
 
-// "Twisted Rolls" specific uniforms
-uniform bool mapTubeDiameter;
-uniform float twistOffset;
-uniform bool constantTwistOffset;
-uniform int checkerboardWidth;
-uniform int checkerboardHeight;
-uniform int checkerboardIterator;
+shader VSmain(
+        in vec3 vertexPosition : 0, in vec3 vertexLineNormal : 1, in vec3 vertexLineTangent : 2,
+        in vec4 multiVariable : 3, in vec4 variableDesc : 4, out VSOutput outputs) {
+    int varID = int(multiVariable.w);
+    const int lineID = int(variableDesc.y);
+    const int elementID = int(variableDesc.x);
+
+    outputs.vPosition = vertexPosition;
+    outputs.vNormal = normalize(vertexLineNormal);
+    outputs.vTangent = normalize(vertexLineTangent);
+
+    outputs.vVariableID = varID;
+    outputs.vLineID = lineID;
+    outputs.vElementID = elementID;
+    outputs.vVertexID = gl_VertexID;
+
+    outputs.vElementNextID = int(variableDesc.z);
+    outputs.vElementInterpolant = variableDesc.w;
+
+    outputs.lineVariable = multiVariable;
+}
 
 
-void main() {
-    vec3 currentPoint = (mMatrix * vec4(vertexOutput[0].vPosition, 1.0)).xyz;
-    vec3 nextPoint = (mMatrix * vec4(vertexOutput[1].vPosition, 1.0)).xyz;
+/*****************************************************************************
+ ***                          GEOMETRY SHADER
+ *****************************************************************************/
+
+#include "multivar_geometry_utils.glsl"
+
+shader GSmain(in VSOutput inputs[]) {
+    vec3 currentPoint = inputs[0].vPosition;
+    vec3 nextPoint = inputs[1].vPosition;
 
     vec3 circlePointsCurrent[NUM_CIRCLE_POINTS_PER_INSTANCE];
     vec3 circlePointsNext[NUM_CIRCLE_POINTS_PER_INSTANCE];
@@ -112,11 +144,11 @@ void main() {
     vec3 vertexNormalsCurrent[NUM_CIRCLE_POINTS_PER_INSTANCE];
     vec3 vertexNormalsNext[NUM_CIRCLE_POINTS_PER_INSTANCE];
 
-    vec3 normalCurrent = vertexOutput[0].vNormal;
-    vec3 tangentCurrent = vertexOutput[0].vTangent;
+    vec3 normalCurrent = inputs[0].vNormal;
+    vec3 tangentCurrent = inputs[0].vTangent;
     vec3 binormalCurrent = cross(tangentCurrent, normalCurrent);
-    vec3 normalNext = vertexOutput[1].vNormal;
-    vec3 tangentNext = vertexOutput[1].vTangent;
+    vec3 normalNext = inputs[1].vNormal;
+    vec3 tangentNext = inputs[1].vTangent;
     vec3 binormalNext = cross(tangentNext, normalNext);
 
     vec3 tangent = normalize(nextPoint - currentPoint);
@@ -124,18 +156,18 @@ void main() {
     // 1) Sample variables at each tube roll
     const int instanceID = gl_InvocationID;
     const float curAreaHeight = float(instanceID) / checkerboardHeight;
-    const float curAreaWidth = float(vertexOutput[0].vVertexID) / checkerboardWidth;
-    const int varID = sampleActualVarID((int(curAreaHeight) + int(curAreaWidth) * checkerboardIterator) % numVariables);//vertexOutput[0].vVertexID % 2;
+    const float curAreaWidth = float(inputs[0].vVertexID) / checkerboardWidth;
+    const int varID = sampleActualVarID((int(curAreaHeight) + int(curAreaWidth) * checkerboardIterator) % numVariables);//inputs[0].vVertexID % 2;
 
 //    const int varID = instanceID % numVariables; // for stripes
-    const int elementID = vertexOutput[0].vElementID;
-    const int lineID = vertexOutput[0].vLineID;
+    const int elementID = inputs[0].vElementID;
+    const int lineID = inputs[0].vLineID;
 
     //float variableValueOrig = 0;
     float variableValue = 0;
     vec2 variableMinMax = vec2(0);
 
-    //    vec4 varInfo = vertexOutput[0].lineVariable;
+    //    vec4 varInfo = inputs[0].lineVariable;
 
     if (varID >= 0)     {
         sampleVariableFromLineSSBO(lineID, varID, elementID, variableValue, variableMinMax);
@@ -153,11 +185,11 @@ void main() {
         curRadius = minRadius;
         nextRadius = minRadius;
         if (varID >= 0) {
-            curRadius = computeRadius(lineID, varID, elementID, vertexOutput[0].vElementNextID,
-                                      minRadius, lineWidth / 2.0, vertexOutput[0].vElementInterpolant);
+            curRadius = computeRadius(lineID, varID, elementID, inputs[0].vElementNextID,
+                                      minRadius, lineWidth / 2.0, inputs[0].vElementInterpolant);
 //            nextRadius = curRadius;
-            nextRadius = computeRadius(lineID, varID, vertexOutput[1].vElementID, vertexOutput[1].vElementNextID,
-                                      minRadius, lineWidth / 2.0, vertexOutput[1].vElementInterpolant);
+            nextRadius = computeRadius(lineID, varID, inputs[1].vElementID, inputs[1].vElementNextID,
+                                      minRadius, lineWidth / 2.0, inputs[1].vElementInterpolant);
         }
     } else {
         if (varID < 0) {
@@ -169,9 +201,9 @@ void main() {
     // 2) Create tube circle vertices for current and next point
     createPartialTubeSegments(circlePointsCurrent, vertexNormalsCurrent, currentPoint,
                                 normalCurrent, tangentCurrent, curRadius, -1, instanceID,
-                                0.0, vertexOutput[0].vVertexID);
+                                0.0, inputs[0].vVertexID);
 
-    int vertexIDNext = (constantTwistOffset) ? vertexOutput[0].vVertexID : vertexOutput[1].vVertexID;
+    int vertexIDNext = (constantTwistOffset) ? inputs[0].vVertexID : inputs[1].vVertexID;
 
     createPartialTubeSegments(circlePointsNext, vertexNormalsNext, nextPoint,
                                 normalNext, tangentNext, nextRadius, -1, instanceID,
@@ -202,7 +234,7 @@ void main() {
 
         ////////////////////////
         // For linear interpolation: define next element and interpolant on curve
-        int elementNextID = vertexOutput[0].vElementNextID;
+        int elementNextID = inputs[0].vElementNextID;
 
 //        float variableNextValueOrig = 0;
         float variableNextValue = 0;
@@ -215,7 +247,7 @@ void main() {
             fragVariableNextValue = variableNextValue;
         }
 //        fragVariableNextID = elementNextID;
-        fragElementInterpolant = vertexOutput[0].vElementInterpolant;
+        fragElementInterpolant = inputs[0].vElementInterpolant;
 
         ////////////////////////
 
@@ -227,8 +259,7 @@ void main() {
         } else {
             fragNormal = vertexNormalsCurrent[i];
         }
-        fragWorldPos = (mMatrix * vec4(segmentPointCurrent0, 1.0)).xyz;
-        screenSpacePosition = (vMatrix * mMatrix * vec4(segmentPointCurrent0, 1.0)).xyz;
+        fragWorldPos = segmentPointCurrent0;
         fragBorderInterpolant = vec2(borderFracX, curInterpolant);
         EmitVertex();
 
@@ -240,24 +271,23 @@ void main() {
         } else {
             fragNormal = vertexNormalsCurrent[iN];
         }
-        fragWorldPos = (mMatrix * vec4(segmentPointCurrent1, 1.0)).xyz;
-        screenSpacePosition = (vMatrix * mMatrix * vec4(segmentPointCurrent1, 1.0)).xyz;
+        fragWorldPos = segmentPointCurrent1;
         fragBorderInterpolant = vec2(borderFracX, curInterpolant + interpIncrement);
         EmitVertex();
 
         ////////////////////////
         // For linear interpolation: define next element and interpolant on curve
-        elementNextID = vertexOutput[0].vElementNextID;
+        elementNextID = inputs[0].vElementNextID;
 
-        if (vertexOutput[1].vElementInterpolant < vertexOutput[0].vElementInterpolant)
+        if (inputs[1].vElementInterpolant < inputs[0].vElementInterpolant)
         {
             fragElementInterpolant = 1.0f;
-//            fragElementNextID = int(vertexOutput[0].vElementNextID);
+//            fragElementNextID = int(inputs[0].vElementNextID);
         }
         else
         {
-//            fragElementNextID = int(vertexOutput[1].vElementNextID);
-            fragElementInterpolant = vertexOutput[1].vElementInterpolant;
+//            fragElementNextID = int(inputs[1].vElementNextID);
+            fragElementInterpolant = inputs[1].vElementInterpolant;
         }
 
 //        fragVariableNextID = elementNextID;
@@ -277,8 +307,7 @@ void main() {
         } else {
             fragNormal = vertexNormalsNext[i];
         }
-        fragWorldPos = (mMatrix * vec4(segmentPointNext0, 1.0)).xyz;
-        screenSpacePosition = (vMatrix * mMatrix * vec4(segmentPointNext0, 1.0)).xyz;
+        fragWorldPos = segmentPointNext0;
         fragBorderInterpolant = vec2(borderFracX + borderInc, curInterpolant);
         EmitVertex();
 
@@ -290,8 +319,7 @@ void main() {
         } else {
             fragNormal = vertexNormalsNext[iN];
         }
-        fragWorldPos = (mMatrix * vec4(segmentPointNext1, 1.0)).xyz;
-        screenSpacePosition = (vMatrix * mMatrix * vec4(segmentPointNext1, 1.0)).xyz;
+        fragWorldPos = segmentPointNext1;
         fragBorderInterpolant = vec2(borderFracX + borderInc, curInterpolant + interpIncrement);
         EmitVertex();
 
@@ -332,46 +360,18 @@ void main() {
 }
 
 
--- Fragment
+/*****************************************************************************
+ ***                          FRAGMENT SHADER
+ *****************************************************************************/
 
-#version 430 core
+#include "multivar_shading_utils.glsl"
 
-in vec3 screenSpacePosition; // Required for transparency rendering techniques
-
-in vec3 fragWorldPos;
-in vec3 fragNormal;
-in vec3 fragTangent;
-in vec2 fragTexCoord;
-// "Rolls"-specfic inputs
-flat in int fragVariableID;
-flat in float fragVariableValue;
-in vec2 fragBorderInterpolant;
-//flat in int fragVariableNextID;
-flat in float fragVariableNextValue;
-in float fragElementInterpolant;
-
-uniform vec3 cameraPosition; // world space
-
-#if !defined(DIRECT_BLIT_GATHER)
-#define fragmentPositionWorld fragWorldPos
-#include OIT_GATHER_HEADER
-#endif
-
-#ifdef DIRECT_BLIT_GATHER
-out vec4 fragColor;
-#endif
-
-#include "MultiVarGlobalVariables.glsl"
-#include "MultiVarShadingUtils.glsl"
-
-// "Rolls"-specific uniforms
-uniform float separatorWidth;
-
-void main() {
+shader FSmain(out vec4 fragColor) {
     // 1) Determine variable color
 //    vec4 surfaceColor = determineColor(fragVariableID, fragVariableValue);
-    vec4 surfaceColor = determineColorLinearInterpolate(fragVariableID, fragVariableValue,
-                                                        fragVariableNextValue, fragElementInterpolant);
+    vec4 surfaceColor = determineColorLinearInterpolate(
+            fragVariableID, fragVariableValue,
+            fragVariableNextValue, fragElementInterpolant);
     // 1.1) Draw black separators between single stripes.
     float varFractionY = fragBorderInterpolant.y;
     float varFractionX = fragBorderInterpolant.x;
@@ -398,34 +398,17 @@ void main() {
         discard;
     }
 
-#if defined(DIRECT_BLIT_GATHER)
-    // Direct rendering
     fragColor = color;
-#elif defined(USE_SYNC_FRAGMENT_SHADER_INTERLOCK)
-    // Area of mutual exclusion for fragments mapping to the same pixel
-    beginInvocationInterlockARB();
-    gatherFragment(color);
-    endInvocationInterlockARB();
-#elif defined(USE_SYNC_SPINLOCK)
-    uint x = uint(gl_FragCoord.x);
-    uint y = uint(gl_FragCoord.y);
-    uint pixelIndex = addrGen(uvec2(x,y));
-    /**
-     * Spinlock code below based on code in:
-     * Brüll, Felix. (2018). Order-Independent Transparency Acceleration. 10.13140/RG.2.2.17568.84485.
-     */
-    if (!gl_HelperInvocation) {
-        bool keepWaiting = true;
-        while (keepWaiting) {
-            if (atomicCompSwap(spinlockViewportBuffer[pixelIndex], 0, 1) == 0) {
-                gatherFragment(color);
-                memoryBarrier();
-                atomicExchange(spinlockViewportBuffer[pixelIndex], 0);
-                keepWaiting = false;
-            }
-        }
-    }
-#else
-    gatherFragment(color);
-#endif
 }
+
+
+/*****************************************************************************
+ ***                             PROGRAMS
+ *****************************************************************************/
+
+program Standard
+{
+    vs(430)=VSmain();
+    gs(430)=GSmain() : in(lines, invocations = NUM_LINESEGMENTS), out(triangle_strip, max_vertices = 128);
+    fs(430)=FSmain();
+};

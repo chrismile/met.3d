@@ -77,6 +77,10 @@ public:
 
     void initTransferFunctionsMultiVar(uint32_t numVariables);
 
+    bool getSelectedVariablesChanged() { return selectedVariablesChanged; }
+    bool resetSelectedVariablesChanged() { selectedVariablesChanged = false; }
+    const QVector<uint32_t>& getSelectedVariables() { return selectedVariables; }
+
     /**
       Set a transfer function to map vertical position (pressure) to colour.
       */
@@ -105,6 +109,7 @@ private:
     void setPropertiesVarSelected();
     void reloadShaderEffect();
     void updateModeEnabledProperties();
+    void updateNumVariablesSelected();
 
     MActor* actor;
     MQtProperties *properties;
@@ -146,7 +151,8 @@ private:
 
     QtProperty *selectedVariablesGroupProperty;
     QVector<QtProperty*> selectedVariablesProperties;
-    QVector<bool> selectedVariables;
+    QVector<uint32_t> selectedVariables;
+    bool selectedVariablesChanged = false;
 
     std::shared_ptr<GL::MShaderEffect> shaderEffect;
     bool isDirty = true;
@@ -186,7 +192,7 @@ private:
 
     // Line settings.
     float minRadiusFactor = 0.5f;
-    float fiberRadius = 0.0005f;
+    float fiberRadius = 0.05f;
 
     // Lighting settings.
     bool useColorIntensity = true;
