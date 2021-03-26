@@ -367,8 +367,6 @@ void MMultiVarData::saveConfiguration(QSettings *settings)
 
 void MMultiVarData::loadConfiguration(QSettings *settings)
 {
-    // TODO
-
     int numVariables = settings->value("numVariables", 0).toInt();
     initTransferFunctionsMultiVar(numVariables);
 
