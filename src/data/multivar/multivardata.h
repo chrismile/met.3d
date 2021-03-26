@@ -78,7 +78,7 @@ public:
     void initTransferFunctionsMultiVar(uint32_t numVariables);
 
     bool getSelectedVariablesChanged() { return selectedVariablesChanged; }
-    bool resetSelectedVariablesChanged() { selectedVariablesChanged = false; }
+    void resetSelectedVariablesChanged() { selectedVariablesChanged = false; }
     const QVector<uint32_t>& getSelectedVariables() { return selectedVariables; }
 
     /**
@@ -172,9 +172,7 @@ private:
     bool mapColorToSaturation = true; ///< !mapColorToSaturation -> DIRECT_COLOR_MAPPING in gather shader.
 
     // Multi-variable settings.
-    std::vector<uint32_t> varSelected;
     //std::vector<glm::vec4> varColors;
-    std::string comboValue = "";
     int32_t numVariablesSelected = 0;
     int32_t maxNumVariables = 6;
     int32_t numLineSegments = 8;
@@ -196,10 +194,10 @@ private:
 
     // Lighting settings.
     bool useColorIntensity = true;
-    float materialConstantAmbient = 0.1f;
-    float materialConstantDiffuse = 0.85f;
-    float materialConstantSpecular = 0.05f;
-    float materialConstantSpecularExp = 10.0f;
+    float materialConstantAmbient = 0.2f;
+    float materialConstantDiffuse = 0.7f;
+    float materialConstantSpecular = 0.5f;
+    float materialConstantSpecularExp = 8.0f;
     bool drawHalo = true;
     float haloFactor = 1.2f;
 };

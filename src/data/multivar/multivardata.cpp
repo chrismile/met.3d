@@ -322,11 +322,9 @@ void MMultiVarData::setEnabled(bool isEnabled)
 
 void MMultiVarData::saveConfiguration(QSettings *settings)
 {
-    // TODO
-
     settings->setValue("numVariables", transferFunctionsMultiVar.size());
     int varIdx = 0;
-    foreach(QtProperty *tfProperty, tfPropertiesMultiVar)
+    foreach (QtProperty *tfProperty, tfPropertiesMultiVar)
     {
         settings->setValue(
                 QString("transferFunction#%1").arg(varIdx + 1),
@@ -334,8 +332,37 @@ void MMultiVarData::saveConfiguration(QSettings *settings)
         settings->setValue(
                 QString("varName#%1").arg(varIdx + 1),
                 varNames.at(varIdx));
+        settings->setValue(
+                QString("varSelected#%1").arg(varIdx + 1),
+                static_cast<bool>(selectedVariables.at(varIdx)));
         varIdx++;
     }
+
+    // Multi-variable settings.
+    settings->setValue(QString("numLineSegments"), numLineSegments);
+    settings->setValue(QString("numInstances"), numInstances);
+    settings->setValue(QString("rollWidth"), rollWidth);
+    settings->setValue(QString("separatorWidth"), separatorWidth);
+    settings->setValue(QString("mapTubeDiameter"), mapTubeDiameter);
+    settings->setValue(QString("twistOffset"), twistOffset);
+    settings->setValue(QString("constantTwistOffset"), constantTwistOffset);
+    settings->setValue(QString("checkerboardWidth"), checkerboardWidth);
+    settings->setValue(QString("checkerboardHeight"), checkerboardHeight);
+    settings->setValue(QString("checkerboardIterator"), checkerboardIterator);
+    settings->setValue(QString("bandBackgroundColor"), QVariant::fromValue<QVector4D>(bandBackgroundColor));
+
+    // Line settings.
+    settings->setValue(QString("minRadiusFactor"), minRadiusFactor);
+    settings->setValue(QString("fiberRadius"), fiberRadius);
+
+    // Lighting settings.
+    settings->setValue(QString("useColorIntensity"), useColorIntensity);
+    settings->setValue(QString("materialConstantAmbient"), materialConstantAmbient);
+    settings->setValue(QString("materialConstantDiffuse"), materialConstantDiffuse);
+    settings->setValue(QString("materialConstantSpecular"), materialConstantSpecular);
+    settings->setValue(QString("materialConstantSpecularExp"), materialConstantSpecularExp);
+    settings->setValue(QString("drawHalo"), drawHalo);
+    settings->setValue(QString("haloFactor"), haloFactor);
 }
 
 void MMultiVarData::loadConfiguration(QSettings *settings)
@@ -345,11 +372,15 @@ void MMultiVarData::loadConfiguration(QSettings *settings)
     int numVariables = settings->value("numVariables", 0).toInt();
     initTransferFunctionsMultiVar(numVariables);
 
+    varNames.clear();
+    selectedVariables.clear();
     for (int varIdx = 0; varIdx < numVariables; varIdx++)
     {
         QString tfName = settings->value(QString("transferFunction#%1").arg(varIdx + 1)).toString();
         QString varName = settings->value(QString("varName#%1").arg(varIdx + 1)).toString();
+        bool varSelected = settings->value(QString("varSelected#%1").arg(varIdx + 1)).toBool();
         varNames.push_back(varName);
+        selectedVariables.push_back(varSelected);
         while (!setTransferFunctionMultiVar(varIdx, tfName))
         {
             if (!MTransferFunction::loadMissingTransferFunction(
@@ -360,13 +391,37 @@ void MMultiVarData::loadConfiguration(QSettings *settings)
             }
         }
     }
+    maxNumVariables = varNames.size();
+    updateNumVariablesSelected();
+    selectedVariablesChanged = true;
 
-    // TODO: Selected variables, etc.
-    /*for ()
-    {
-        updateNumVariablesSelected();
-        selectedVariablesChanged = true;
-    }*/
+    // Multi-variable settings.
+    numLineSegments = settings->value("numLineSegments", 8).toInt();
+    numInstances = settings->value("numInstances", 12).toInt();
+    rollWidth = settings->value("rollWidth", 1).toInt();
+    separatorWidth = settings->value("separatorWidth", 0.15f).toFloat();
+    mapTubeDiameter = settings->value("mapTubeDiameter", false).toBool();
+    twistOffset = settings->value("twistOffset", 0.1f).toFloat();
+    constantTwistOffset = settings->value("constantTwistOffset", false).toBool();
+    checkerboardWidth = settings->value("checkerboardWidth", 3).toInt();
+    checkerboardHeight = settings->value("checkerboardHeight", 2).toInt();
+    checkerboardIterator = settings->value("checkerboardIterator", 2).toInt();
+    bandBackgroundColor = settings->value(
+            "bandBackgroundColor",
+            QVector4D(0.5f, 0.5f, 0.5f, 1.0f)).value<QVector4D>();
+
+    // Line settings.
+    minRadiusFactor = settings->value("minRadiusFactor", 0.5f).toFloat();
+    fiberRadius = settings->value("fiberRadius", 0.05f).toFloat();
+
+    // Lighting settings.
+    useColorIntensity = settings->value("useColorIntensity", true).toBool();
+    materialConstantAmbient = settings->value("materialConstantAmbient", 0.2f).toFloat();
+    materialConstantDiffuse = settings->value("materialConstantDiffuse", 0.7f).toFloat();
+    materialConstantSpecular = settings->value("materialConstantSpecular", 0.5f).toFloat();
+    materialConstantSpecularExp = settings->value("materialConstantSpecularExp", 8.0f).toFloat();
+    drawHalo = settings->value("drawHalo", true).toBool();
+    haloFactor = settings->value("haloFactor", 1.2f).toFloat();
 }
 
 

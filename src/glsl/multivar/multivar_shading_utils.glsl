@@ -101,28 +101,9 @@ vec3 hsvToRGB(in vec3 color) {
     }
 }
 
-///////////////////////////////////////////
-// RGB <-> sRGB
-
-vec3 linearRGBTosRGB(in vec3 color_sRGB) {
-    //float factor = 1.0f / 2.2f;
-    //return glm::pow(color_sRGB, glm::vec3(factor));
-    // See https://en.wikipedia.org/wiki/SRGB
-    return mix(1.055f * pow(color_sRGB, vec3(1.0f / 2.4f)) - 0.055f, color_sRGB * 12.92f,
-    lessThanEqual(color_sRGB, vec3(0.0031308f)));
-}
-
-vec3 sRGBToLinearRGB(in vec3 color_LinearRGB) {
-    //float factor = 2.2f;
-    //return glm::pow(color_LinearRGB, glm::vec3(factor));
-    // See https://en.wikipedia.org/wiki/SRGB
-    return mix(pow((color_LinearRGB + 0.055f) / 1.055f, vec3(2.4f)),
-    color_LinearRGB / 12.92f, lessThanEqual(color_LinearRGB, vec3(0.04045f)));
-}
 
 ///////////////////////////////////////////
 // Variable color mapping
-
 
 vec4 mapColor(in float value, uint index) {
     if (index == 0) {
@@ -242,6 +223,7 @@ void drawSeparatorBetweenStripes(
 ///////////////////////////////////////////
 // Phong lighting model
 
+uniform vec3 lightDirection; // light direction in world space
 uniform float materialAmbient;
 uniform float materialDiffuse;
 uniform float materialSpecular;
@@ -252,7 +234,6 @@ uniform float haloFactor;
 vec4 computePhongLighting(
         in vec4 surfaceColor, in float occlusionFactor, in float shadowFactor,
         in vec3 worldPos, in vec3 normal, in vec3 tangent) {
-    const vec3 lightColor = vec3(1,1,1);
     const vec3 ambientColor = surfaceColor.rgb;
     const vec3 diffuseColor = surfaceColor.rgb;
 
@@ -264,35 +245,24 @@ vec4 computePhongLighting(
 
     const vec3 n = normalize(normal);
     const vec3 v = normalize(cameraPosition - worldPos);
-    const vec3 l = normalize(v);
+    const vec3 l = normalize(-lightDirection);//normalize(v);
     const vec3 h = normalize(v + l);
     vec3 t = normalize(tangent);
-    //    vec3 t = normalize(cross(vec3(0, 0, 1), n));
-
 
     vec3 Id = kD * clamp((dot(n, l)), 0.0, 1.0) * diffuseColor;
-    vec3 Is = kS * pow(clamp((dot(n, h)), 0.0, 1.0), s) * lightColor;
+    vec3 Is = kS * pow(clamp((dot(n, h)), 0.0, 1.0), s) * diffuseColor;
     vec3 colorShading = Ia + Id + Is;
 
     if (drawHalo) {
-        //    float haloParameter = 0.5;
-        //    float angle1 = abs( dot( v, n)) * 0.8;
-        //    float angle2 = abs( dot( v, normalize(t))) * 0.2;
-        //    float halo = min(1.0,mix(1.0f,angle1 + angle2,haloParameter));//((angle1)+(angle2)), haloParameter);
-
         vec3 hV = normalize(cross(t, v));
         vec3 vNew = normalize(cross(hV, t));
 
         float angle = pow(abs((dot(vNew, n))), haloFactor); // 1.8 + 1.5
         float angleN = pow(abs((dot(v, n))), haloFactor);
-        //    float EPSILON = 0.8f;
-        //    float coverage = 1.0 - smoothstep(1.0 - 2.0*EPSILON, 1.0, angle);
 
         float haloNew = min(1.0, mix(1.0f, angle + angleN, 0.9)) * 0.9 + 0.1;
         colorShading *= (haloNew) * (haloNew);
     }
-
-    ////////////
 
     return vec4(colorShading.rgb, surfaceColor.a);
 }
