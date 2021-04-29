@@ -456,10 +456,7 @@ void MTrajectoryActor::saveConfiguration(QSettings *settings)
 
     settings->setValue("useBezierTrajectories",
                        properties->mBool()->value(useBezierTrajectoriesProperty));
-    if (useBezierTrajectories)
-    {
-        multiVarData.saveConfiguration(settings);
-    }
+    multiVarData.saveConfiguration(settings);
 
     settings->setValue("tubeRadius", tubeRadius);
     settings->setValue("sphereRadius", sphereRadius);
@@ -668,14 +665,11 @@ void MTrajectoryActor::loadConfiguration(QSettings *settings)
 
     properties->mBool()->setValue(
             useBezierTrajectoriesProperty,
-            settings->value("useBezierTrajectories", true).toBool()); // TODO: Set to false
+            settings->value("useBezierTrajectories", false).toBool());
     useBezierTrajectories = properties->mBool()->value(useBezierTrajectoriesProperty);
     properties->mBool()->setValue(useBezierTrajectoriesProperty, useBezierTrajectories);
     multiVarData.setEnabled(useBezierTrajectories);
-    if (useBezierTrajectories)
-    {
-        multiVarData.loadConfiguration(settings);
-    }
+    multiVarData.loadConfiguration(settings);
 
     properties->mDDouble()->setValue(
                 tubeRadiusProperty,
@@ -2334,7 +2328,7 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
         emitActorChangedSignal();
     }
 
-    else if (useBezierTrajectories && multiVarData.hasProperty(property))
+    else if (multiVarData.hasProperty(property))
     {
         multiVarData.onQtPropertyChanged(property);
         if (suppressActorUpdates()) return;
@@ -2448,6 +2442,20 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
             tubeShader->setUniformValue("cameraPosition", sceneView->getCamera()->getOrigin());
             tubeShader->setUniformValue("lineWidth", GLfloat(2.0f * tubeRadius));
 
+            if (renderMode == BACKWARDTUBES_AND_SINGLETIME)
+            {
+                tubeShader->setUniformValue(
+                        "renderTubesUpToIndex",
+                        particlePosTimeStep);
+            }
+            else
+            {
+                tubeShader->setUniformValue(
+                        "renderTubesUpToIndex",
+                        trajectoryRequests[t]
+                                .trajectories->getNumTimeStepsPerTrajectory());
+            }
+
             MBezierTrajectoriesRenderData& bezierTrajectoriesRenderData =
                     trajectoryRequests[t].bezierTrajectoriesRenderDataMap[sceneView];
 
@@ -2465,19 +2473,37 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
             bezierTrajectoriesRenderData.lineVarDescArrayBuffer->bindToIndex(6);
             bezierTrajectoriesRenderData.varSelectedArrayBuffer->bindToIndex(7);
 
-            glPolygonMode(GL_FRONT_AND_BACK,
-                    renderAsWireFrame ? GL_LINE : GL_FILL); CHECK_GL_ERROR;
+            glPolygonMode(GL_FRONT_AND_BACK, renderAsWireFrame ? GL_LINE : GL_FILL); CHECK_GL_ERROR;
 
+            // TODO: Filtering
             bezierTrajectoriesRenderData.indexBuffer->bindToElementArrayBuffer();
             glDrawElements(
                     GL_LINES, bezierTrajectoriesRenderData.indexBuffer->getCount(),
                     bezierTrajectoriesRenderData.indexBuffer->getType(), nullptr);
+            /*glMultiDrawElements(
+                    GL_LINES, trajectoryRequests[t].trajectorySelection->getStartIndices(),
+                    GL_UNSIGNED_INT, trajectoryRequests[t].trajectorySelection->getIndexCount(),
+                    trajectoryRequests[t].trajectorySelection->getNumTrajectories());*/
 
             // Unbind IBO.
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0); CHECK_GL_ERROR;
 
             if (shadowEnabled)
             {
+                // Bind trajectories and normals vertex buffer objects.
+                trajectoryRequests[t].trajectoriesVertexBuffer
+                        ->attachToVertexAttribute(SHADER_VERTEX_ATTRIBUTE);
+
+                trajectoryRequests[t].normalsVertexBuffer[sceneView]
+                        ->attachToVertexAttribute(SHADER_NORMAL_ATTRIBUTE);
+
+                // Bind auxiliary data vertex buffer object.
+                if (trajectoryRequests[t].trajectoriesAuxDataVertexBuffer != nullptr)
+                {
+                    trajectoryRequests[t].trajectoriesAuxDataVertexBuffer
+                            ->attachToVertexAttribute(SHADER_AUXDATA_ATTRIBUTE);
+                }
+
                 tubeShadowShader->bind();
 
                 tubeShadowShader->setUniformValue(
@@ -3520,6 +3546,7 @@ void MTrajectoryActor::asynchronousDataRequest(bool synchronizationRequest)
         {
             foreach (MSceneViewGLWidget* view, getViews())
             {
+                view->setLightDirection(MSceneViewGLWidget::VIEWDIRECTION);
                 bezierTrajectoriesSource->requestData(trqi.bezierTrajectoriesRequests[view].request);
             }
         }

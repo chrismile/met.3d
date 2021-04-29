@@ -143,7 +143,7 @@ void MMultiVarData::setProperties(MActor* actor, MQtProperties *properties, QtPr
     properties->mEnum()->setEnumNames(orientedRibbonModeProperty, orientedRibbonModes);
     properties->mEnum()->setValue(orientedRibbonModeProperty, int(orientedRibbonMode));
     orientedRibbonModeProperty->setToolTip(
-            "Oriented ribbon mode (only when render technique 'oriented color bands' is used.");
+            "Oriented ribbon mode (only when render technique 'oriented color bands' is used).");
     propertyList.push_back(orientedRibbonModeProperty);
 
     bandBackgroundColorProperty = addProperty(
@@ -270,7 +270,7 @@ void MMultiVarData::setPropertiesVarSelected()
         QString name = QString("use variable #%1 (%2)").arg(QString::number(varIdx + 1), varNames.at(varIdx));
         QtProperty* variableProperty = addProperty(
                 BOOL_PROPERTY, name, selectedVariablesGroupProperty);
-        properties->mBool()->setValue(variableProperty, true);
+        properties->mBool()->setValue(variableProperty, selectedVariables.at(varIdx));
         variableProperty->setToolTip(QString("Whether to display the variable '%2'").arg(varNames.at(varIdx)));
         selectedVariablesProperties.push_back(variableProperty);
         propertyList.push_back(variableProperty);
@@ -287,6 +287,11 @@ void MMultiVarData::updateNumVariablesSelected()
         {
             numVariablesSelected++;
         }
+    }
+
+    if (multiVarRenderMode == MultiVarRenderMode::FIBERS)
+    {
+        reloadShaderEffect();
     }
 }
 
@@ -368,17 +373,22 @@ void MMultiVarData::saveConfiguration(QSettings *settings)
 void MMultiVarData::loadConfiguration(QSettings *settings)
 {
     int numVariables = settings->value("numVariables", 0).toInt();
-    initTransferFunctionsMultiVar(numVariables);
 
     varNames.clear();
     selectedVariables.clear();
     for (int varIdx = 0; varIdx < numVariables; varIdx++)
     {
-        QString tfName = settings->value(QString("transferFunction#%1").arg(varIdx + 1)).toString();
+        std::string testStr = QString("varName#%1").arg(varIdx + 1).toStdString();
+        std::cout << testStr << std::endl;
         QString varName = settings->value(QString("varName#%1").arg(varIdx + 1)).toString();
         bool varSelected = settings->value(QString("varSelected#%1").arg(varIdx + 1)).toBool();
         varNames.push_back(varName);
         selectedVariables.push_back(varSelected);
+    }
+    initTransferFunctionsMultiVar(numVariables);
+    for (int varIdx = 0; varIdx < numVariables; varIdx++)
+    {
+        QString tfName = settings->value(QString("transferFunction#%1").arg(varIdx + 1)).toString();
         while (!setTransferFunctionMultiVar(varIdx, tfName))
         {
             if (!MTransferFunction::loadMissingTransferFunction(
@@ -390,6 +400,7 @@ void MMultiVarData::loadConfiguration(QSettings *settings)
         }
     }
     maxNumVariables = varNames.size();
+    setPropertiesVarSelected();
     updateNumVariablesSelected();
     selectedVariablesChanged = true;
 
@@ -419,7 +430,7 @@ void MMultiVarData::loadConfiguration(QSettings *settings)
     materialConstantSpecular = settings->value("materialConstantSpecular", 0.5f).toFloat();
     materialConstantSpecularExp = settings->value("materialConstantSpecularExp", 8.0f).toFloat();
     drawHalo = settings->value("drawHalo", true).toBool();
-    haloFactor = settings->value("haloFactor", 1.2f).toFloat();
+    haloFactor = settings->value("haloFactor", 1.0f).toFloat();
 }
 
 
@@ -502,6 +513,14 @@ void MMultiVarData::onActorRenamed(MActor *actor, QString oldName)
 
 void MMultiVarData::initTransferFunctionsMultiVar(uint32_t numVariables)
 {
+    if (tfPropertiesMultiVar.empty()) {
+        foreach (QtProperty *property, tfPropertiesMultiVar)
+        {
+            removeProperty(property, multiVarGroupProperty);
+        }
+    }
+    tfPropertiesMultiVar.clear();
+
     tfPropertiesMultiVar.resize(numVariables);
     transferFunctionsMultiVar.resize(numVariables);
     for (uint32_t varIdx = 0; varIdx < numVariables; varIdx++)
@@ -533,6 +552,7 @@ void MMultiVarData::initTransferFunctionsMultiVar(uint32_t numVariables)
 void MMultiVarData::setTransferFunctionMultiVar(int varIdx, MTransferFunction1D *tf)
 {
     transferFunctionsMultiVar[varIdx] = tf;
+    registerTransferFunction(tf);
 }
 
 
@@ -577,8 +597,29 @@ void MMultiVarData::setTransferFunctionMultiVarFromProperty(int varIdx)
             if (tf->transferFunctionName() == tfName)
             {
                 transferFunctionsMultiVar[varIdx] = tf;
+                registerTransferFunction(tf);
                 return;
             }
+        }
+    }
+}
+
+
+void MMultiVarData::registerTransferFunction(MTransferFunction1D *tf)
+{
+    QObject::connect(
+            tf, &MTransferFunction1D::transferFunctionChanged,
+            this, &MMultiVarData::transferFunctionChanged);
+}
+
+
+void MMultiVarData::transferFunctionChanged(MTransferFunction1D *tf)
+{
+    foreach(MTransferFunction1D *transferFunction, transferFunctionsMultiVar)
+    {
+        if (tf == transferFunction)
+        {
+            multiVarTf.generateTexture1DArray();
         }
     }
 }
@@ -587,6 +628,12 @@ void MMultiVarData::setTransferFunctionMultiVarFromProperty(int varIdx)
 QtProperty* MMultiVarData::addProperty(MQtPropertyType type, const QString& name, QtProperty *group)
 {
     return actor->addProperty(type, name, group);
+}
+
+
+void MMultiVarData::removeProperty(QtProperty* property, QtProperty *group)
+{
+    return actor->removeProperty(property, group);
 }
 
 
@@ -733,8 +780,9 @@ void MMultiVarData::onBezierTrajectoriesLoaded(const QStringList& auxDataVarName
         selectedVariables.resize(maxNumVariables);
         for (int varIdx = 0; varIdx < maxNumVariables; varIdx++)
         {
-            selectedVariables[varIdx] = true;
+            selectedVariables[varIdx] = false;
         }
+        selectedVariables[0] = true;
         updateNumVariablesSelected();
         selectedVariablesChanged = true;
 
@@ -822,7 +870,9 @@ void MMultiVarData::reloadShaderEffect()
         {
             defines.insert("DIRECT_COLOR_MAPPING", "");
         }
-        defines.insert("ORIENTED_RIBBON_MODE", QString::fromStdString(std::to_string((int)orientedRibbonMode)));
+        defines.insert(
+                "ORIENTED_RIBBON_MODE",
+                QString::fromStdString(std::to_string((int)orientedRibbonMode)));
     }
 
     MGLResourcesManager* glRM = MGLResourcesManager::getInstance();

@@ -57,7 +57,7 @@ enum class MultiVarRadiusMappingMode {
     LINE
 };
 
-class MMultiVarData
+class MMultiVarData : public QObject
 {
 public:
     MMultiVarData();
@@ -65,6 +65,7 @@ public:
     void setProperties(MActor* actor, MQtProperties *properties, QtProperty *multiVarGroupProperty);
 
     QtProperty *addProperty(MQtPropertyType type, const QString &name, QtProperty *group = nullptr);
+    void removeProperty(QtProperty* property, QtProperty *group = nullptr);
     void setEnabled(bool isEnabled);
 
     bool hasProperty(QtProperty *property);
@@ -87,12 +88,14 @@ public:
     void setTransferFunctionMultiVar(int varIdx, MTransferFunction1D *tf);
 
     /**
-      Set a transfer function by its name. Set to 'none' if @oaram tfName does
+      Set a transfer function by its name. Set to 'none' if @param tfName does
       not exit.
       */
     bool setTransferFunctionMultiVar(int varIdx, QString tfName);
 
     void setTransferFunctionMultiVarFromProperty(int varIdx);
+
+    void registerTransferFunction(MTransferFunction1D *tf);
 
     void setUniformData(int textureUnitTransferFunction);
     std::shared_ptr<GL::MShaderEffect> getShaderEffect();
@@ -103,6 +106,9 @@ public:
     void onActorCreated(MActor *actor);
     void onActorDeleted(MActor *actor);
     void onActorRenamed(MActor *actor, QString oldName);
+
+public slots:
+    void transferFunctionChanged(MTransferFunction1D *tf);
 
 private:
     void setPropertiesRenderingSettings();
@@ -199,7 +205,7 @@ private:
     float materialConstantSpecular = 0.5f;
     float materialConstantSpecularExp = 8.0f;
     bool drawHalo = true;
-    float haloFactor = 1.2f;
+    float haloFactor = 1.0f;
 };
 
 }

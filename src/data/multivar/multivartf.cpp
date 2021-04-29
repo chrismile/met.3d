@@ -62,7 +62,7 @@ void MMultiVarTf::generateTexture1DArray()
 {
     MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
 
-    if (minMaxList.empty()) {
+    if (minMaxList.size() != transferFunctions.size()) {
         minMaxList.resize(transferFunctions.size());
     }
 
@@ -75,7 +75,7 @@ void MMultiVarTf::generateTexture1DArray()
         {
             allNullptr = false;
             const std::vector<unsigned char> &colorValuesTf = tf->getColorValuesByteArray();
-            if (numBytesPerColorMap != 0 && numBytesPerColorMap != colorValuesTf.size())
+            /*if (numBytesPerColorMap != 0 && numBytesPerColorMap != colorValuesTf.size())
             {
                 LOG4CPLUS_ERROR(mlog, "Inconsistent number of transfer function steps!");
                 return;
@@ -83,8 +83,11 @@ void MMultiVarTf::generateTexture1DArray()
             else if (numBytesPerColorMap == 0)
             {
                 numBytesPerColorMap = colorValuesTf.size();
-            }
-        } else {
+            }*/
+            numBytesPerColorMap = std::max(numBytesPerColorMap, colorValuesTf.size());
+        }
+        else
+        {
             hasNullptr = true;
         }
     }
@@ -98,6 +101,7 @@ void MMultiVarTf::generateTexture1DArray()
     std::vector<unsigned char> standardColorMapBytes;
     if (hasNullptr)
     {
+        standardColorMapBytes.reserve(numBytesPerColorMap);
         for (size_t i = 0; i < numEntriesPerColorMap; i++)
         {
             float pct = float(i) / float(numEntriesPerColorMap - 1);
@@ -111,21 +115,42 @@ void MMultiVarTf::generateTexture1DArray()
     }
 
     std::vector<unsigned char> colorValuesArray;
-    colorValuesArray.resize(transferFunctions.size() * numBytesPerColorMap);
+    colorValuesArray.reserve(transferFunctions.size() * numBytesPerColorMap);
     int varIdx = 0;
     foreach(MTransferFunction1D *tf, transferFunctions)
     {
         if (tf != nullptr)
         {
             const std::vector<unsigned char> &colorValuesTf = tf->getColorValuesByteArray();
-            colorValuesArray.insert(
-                    colorValuesArray.begin(), colorValuesTf.begin(), colorValuesTf.end());
+            if (colorValuesTf.size() != numBytesPerColorMap)
+            {
+                // Resampling using nearest neighbor interpolation.
+                std::vector<unsigned char> resampledColorValuesTf;
+                resampledColorValuesTf.resize(numBytesPerColorMap);
+                const size_t numEntriesOld = colorValuesTf.size() / 4;
+                for (size_t i = 0; i < numEntriesPerColorMap; i++)
+                {
+                    for (size_t channel = 0; channel < 4; channel++)
+                    {
+                        size_t iOld = (i * numEntriesOld) / numEntriesPerColorMap * 4 + channel;
+                        size_t iNew = i * 4 + channel;
+                        resampledColorValuesTf.at(iNew) = colorValuesTf.at(iOld);
+                    }
+                }
+                colorValuesArray.insert(
+                        colorValuesArray.end(), resampledColorValuesTf.begin(), resampledColorValuesTf.end());
+            }
+            else
+            {
+                colorValuesArray.insert(
+                        colorValuesArray.end(), colorValuesTf.begin(), colorValuesTf.end());
+            }
             minMaxList[varIdx] = QVector2D(tf->getMinimumValue(), tf->getMaximumValue());
         }
         else
         {
             colorValuesArray.insert(
-                    colorValuesArray.begin(), standardColorMapBytes.begin(), standardColorMapBytes.end());
+                    colorValuesArray.end(), standardColorMapBytes.begin(), standardColorMapBytes.end());
             minMaxList[varIdx] = QVector2D(0.0f, 1.0f);
         }
         varIdx++;

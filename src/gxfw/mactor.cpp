@@ -647,6 +647,12 @@ QtProperty* MActor::addProperty(
 }
 
 
+void MActor::removeProperty(QtProperty* property, QtProperty *group)
+{
+    group->removeSubProperty(property);
+}
+
+
 void MActor::collapseActorPropertyTree()
 {
     for (auto it = scenes.begin(); it != scenes.end(); ++it)

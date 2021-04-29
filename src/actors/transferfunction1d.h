@@ -136,6 +136,9 @@ protected:
 
     void renderToCurrentContext(MSceneViewGLWidget *sceneView);
 
+signals:
+    void transferFunctionChanged(MTransferFunction1D* transferFunction);
+
 public slots:
     void onEditorTransferFunctionChanged();
 

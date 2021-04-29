@@ -115,7 +115,7 @@ public:
             QString callerName, QSettings *settings);
 
 signals:
-    
+
 public slots:
 
 protected:

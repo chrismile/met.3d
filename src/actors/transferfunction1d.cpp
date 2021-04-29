@@ -269,6 +269,7 @@ void MTransferFunction1D::selectPredefinedColourmap(
         {
             generateTransferTexture();
             generateBarGeometry();
+            emit transferFunctionChanged(this);
             emitActorChangedSignal();
         }
     }
@@ -309,6 +310,7 @@ void MTransferFunction1D::selectHCLColourmap(
     {
         generateTransferTexture();
         generateBarGeometry();
+        emit transferFunctionChanged(this);
         emitActorChangedSignal();
     }
 }
@@ -338,6 +340,7 @@ void MTransferFunction1D::selectHSVColourmap(
     {
         generateTransferTexture();
         generateBarGeometry();
+        emit transferFunctionChanged(this);
         emitActorChangedSignal();
     }
 }
@@ -902,6 +905,7 @@ void MTransferFunction1D::onQtPropertyChanged(QtProperty *property)
 
         generateTransferTexture();
         generateBarGeometry();
+        emit transferFunctionChanged(this);
         emitActorChangedSignal();
     }
 
@@ -954,6 +958,7 @@ void MTransferFunction1D::onQtPropertyChanged(QtProperty *property)
 
         generateTransferTexture();
         generateBarGeometry();
+        emit transferFunctionChanged(this);
         emitActorChangedSignal();
     }
 
@@ -965,6 +970,7 @@ void MTransferFunction1D::onQtPropertyChanged(QtProperty *property)
 
         generateTransferTexture();
         generateBarGeometry();
+        emit transferFunctionChanged(this);
         emitActorChangedSignal();
     }
 
@@ -1012,6 +1018,7 @@ void MTransferFunction1D::onQtPropertyChanged(QtProperty *property)
 
         generateTransferTexture();
         generateBarGeometry();
+        emit transferFunctionChanged(this);
         emitActorChangedSignal();
     }
 
@@ -1366,6 +1373,7 @@ void MTransferFunction1D::updateHSVProperties()
 void MTransferFunction1D::onEditorTransferFunctionChanged()
 {
     generateTransferTexture();
+    emit transferFunctionChanged(this);
     emitActorChangedSignal();
 }
 

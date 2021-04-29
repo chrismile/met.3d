@@ -38,6 +38,8 @@ uniform float lineWidth;
 
 uniform vec3 cameraPosition; // world space
 
+uniform int renderTubesUpToIndex;
+
 // Structs for SSBOs
 struct LineDescData {
     float startIndex; // TODO: int?

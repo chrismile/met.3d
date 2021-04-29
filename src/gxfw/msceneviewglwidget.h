@@ -167,6 +167,13 @@ public:
       */
     QVector3D getLightDirection();
 
+    inline void setLightDirection(LightDirection lightDirection)
+    {
+        this->lightDirection = lightDirection;
+        MSystemManagerAndControl *systemControl = MSystemManagerAndControl::getInstance();
+        systemControl->getEnumPropertyManager()->setValue(lightingProperty, lightDirection);
+    }
+
     /**
       Returns a unique number that identifies the scene view.
       */

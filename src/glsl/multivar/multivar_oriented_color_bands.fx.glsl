@@ -105,6 +105,8 @@ shader VSmain(
 #include "multivar_geometry_utils.glsl"
 
 shader GSmain(in VSOutput inputs[], out FSInput outputs) {
+    //if (inputs[0].vElementID, numObsPerTrajectory > renderTubesUpToIndex) return;
+
     vec3 currentPoint = inputs[0].vPosition;
     vec3 nextPoint = inputs[1].vPosition;
 

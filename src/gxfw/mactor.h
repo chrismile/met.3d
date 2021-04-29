@@ -388,6 +388,17 @@ public:
     QtProperty* addProperty(MQtPropertyType type, const QString &name,
                             QtProperty *group = nullptr);
 
+    /**
+      Removes a GUI QtProperty to this actor's properties.
+
+      If @p group is specified, the new property is removed from this property
+      group.
+
+      @p removeProperty() automatically disconnects from the signals of the
+      property manager used for the new property.
+     */
+    void removeProperty(QtProperty* property, QtProperty *group = nullptr);
+
     void collapseActorPropertyTree();
 
     /**

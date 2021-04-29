@@ -320,6 +320,6 @@ shader FSmain(out vec4 fragColor) {
 program Standard
 {
     vs(430)=VSmain();
-    gs(430)=GSmain() : in(lines, invocations = NUM_LINESEGMENTS), out(triangle_strip, max_vertices = 128);
+    gs(430)=GSmain() : in(lines, invocations = NUM_INSTANCES), out(triangle_strip, max_vertices = 128);
     fs(430)=FSmain();
 };
