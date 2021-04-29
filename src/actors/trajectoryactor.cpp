@@ -1661,7 +1661,8 @@ void MTrajectoryActor::prepareAvailableDataForRendering(uint slot)
             }
 
             multiVarData.onBezierTrajectoriesLoaded(
-                    trajectoryRequests[slot].trajectories->getAuxDataVarNames());
+                    trajectoryRequests[slot].trajectories->getAuxDataVarNames(),
+                    trajectoryRequests[slot].trajectories->getNumTrajectories());
         }
 
 
@@ -2477,13 +2478,33 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
 
             // TODO: Filtering
             bezierTrajectoriesRenderData.indexBuffer->bindToElementArrayBuffer();
-            glDrawElements(
-                    GL_LINES, bezierTrajectoriesRenderData.indexBuffer->getCount(),
-                    bezierTrajectoriesRenderData.indexBuffer->getType(), nullptr);
-            /*glMultiDrawElements(
-                    GL_LINES, trajectoryRequests[t].trajectorySelection->getStartIndices(),
-                    GL_UNSIGNED_INT, trajectoryRequests[t].trajectorySelection->getIndexCount(),
+            /*multiVarData.updateTrajectorySelection(
+                    trajectoryRequests[t].trajectorySelection->getStartIndices(),
+                    trajectoryRequests[t].trajectorySelection->getIndexCount(),
+                    trajectoryRequests[t].trajectorySelection->getNumTrajectories());
+            glMultiDrawElements(
+                    GL_LINES, multiVarData.getTrajectorySelectionCount(),
+                    GL_UNSIGNED_INT, multiVarData.getTrajectorySelectionIndices(),
                     trajectoryRequests[t].trajectorySelection->getNumTrajectories());*/
+            bool useFiltering = trajectoryRequests[t].bezierTrajectoriesMap[sceneView]->updateTrajectorySelection(
+                    trajectoryRequests[t].trajectorySelection->getStartIndices(),
+                    trajectoryRequests[t].trajectorySelection->getIndexCount(),
+                    trajectoryRequests[t].trajectorySelection->getNumTimeStepsPerTrajectory());
+            if (useFiltering)
+            {
+                glMultiDrawElements(
+                        GL_LINES,
+                        trajectoryRequests[t].bezierTrajectoriesMap[sceneView]->getTrajectorySelectionCount(),
+                        GL_UNSIGNED_INT,
+                        trajectoryRequests[t].bezierTrajectoriesMap[sceneView]->getTrajectorySelectionIndices(),
+                        trajectoryRequests[t].trajectorySelection->getNumTrajectories());
+            }
+            else
+            {
+                glDrawElements(
+                        GL_LINES, bezierTrajectoriesRenderData.indexBuffer->getCount(),
+                        bezierTrajectoriesRenderData.indexBuffer->getType(), nullptr);
+            }
 
             // Unbind IBO.
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0); CHECK_GL_ERROR;

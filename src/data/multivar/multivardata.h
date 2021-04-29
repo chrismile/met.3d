@@ -61,20 +61,21 @@ class MMultiVarData : public QObject
 {
 public:
     MMultiVarData();
+    ~MMultiVarData();
 
-    void setProperties(MActor* actor, MQtProperties *properties, QtProperty *multiVarGroupProperty);
+    void setProperties(MActor* actor, MQtProperties* properties, QtProperty* multiVarGroupProperty);
 
-    QtProperty *addProperty(MQtPropertyType type, const QString &name, QtProperty *group = nullptr);
+    QtProperty *addProperty(MQtPropertyType type, const QString &name, QtProperty* group = nullptr);
     void removeProperty(QtProperty* property, QtProperty *group = nullptr);
     void setEnabled(bool isEnabled);
 
-    bool hasProperty(QtProperty *property);
-    void onQtPropertyChanged(QtProperty *property);
+    bool hasProperty(QtProperty* property);
+    void onQtPropertyChanged(QtProperty* property);
 
-    void saveConfiguration(QSettings *settings);
-    void loadConfiguration(QSettings *settings);
+    void saveConfiguration(QSettings* settings);
+    void loadConfiguration(QSettings* settings);
 
-    void onBezierTrajectoriesLoaded(const QStringList& auxDataVarNames);
+    void onBezierTrajectoriesLoaded(const QStringList& auxDataVarNames, int numTrajectories);
 
     void initTransferFunctionsMultiVar(uint32_t numVariables);
 

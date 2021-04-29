@@ -55,11 +55,26 @@ MBezierTrajectories::MBezierTrajectories(
     {
         varSelected.push_back(true);
     }
+
+    this->numTrajectories = static_cast<int>(numTrajectories);
+    trajectorySelectionCount = new GLsizei[numTrajectories];
+    trajectorySelectionIndices = new ptrdiff_t[numTrajectories];
 }
 
 
 MBezierTrajectories::~MBezierTrajectories()
 {
+    if (trajectorySelectionCount)
+    {
+        delete trajectorySelectionCount;
+        trajectorySelectionCount = nullptr;
+    }
+    if (trajectorySelectionIndices)
+    {
+        delete trajectorySelectionIndices;
+        trajectorySelectionIndices = nullptr;
+    }
+
     // Make sure the corresponding data is removed from GPU memory as well.
     MGLResourcesManager::getInstance()->releaseAllGPUItemReferences(getID());
 }
@@ -80,6 +95,7 @@ template<typename T>
 void createLineTubesRenderDataCPU(
         const QVector<QVector<QVector3D>>& lineCentersList,
         const QVector<QVector<T>>& lineAttributesList,
+        QVector<uint32_t>& lineIndexOffsets,
         QVector<uint32_t>& lineIndices,
         QVector<QVector3D>& vertexPositions,
         QVector<QVector3D>& vertexNormals,
@@ -87,6 +103,7 @@ void createLineTubesRenderDataCPU(
         QVector<T>& vertexAttributes)
 {
     assert(lineCentersList.size() == lineAttributesList.size());
+    lineIndexOffsets.reserve(lineCentersList.size());
     for (int lineId = 0; lineId < lineCentersList.size(); lineId++)
     {
         const QVector<QVector3D> &lineCenters = lineCentersList.at(lineId);
@@ -157,6 +174,7 @@ void createLineTubesRenderDataCPU(
         }
 
         // Create indices
+        lineIndexOffsets.push_back(lineIndices.size());
         for (int i = 0; i < numValidLinePoints-1; i++)
         {
             lineIndices.push_back(indexOffset + i);
@@ -199,8 +217,9 @@ MBezierTrajectoriesRenderData MBezierTrajectories::getRenderData(QGLWidget *curr
         }
     }
 
+    trajectoryIndexOffsets.clear();
     createLineTubesRenderDataCPU(
-            lineCentersList, lineAttributesList,
+            lineCentersList, lineAttributesList, trajectoryIndexOffsets,
             lineIndices, vertexPositions, vertexNormals, vertexTangents, vertexAttributes);
 
     QVector<QVector4D> vertexMultiVariableArray;
@@ -343,6 +362,52 @@ void MBezierTrajectories::updateSelectedVariables(const QVector<uint32_t>& varSe
     {
         bezierTrajectoriesRenderData.varSelectedArrayBuffer->upload(varSelected.constData(), GL_STATIC_DRAW);
     }
+}
+
+
+bool MBezierTrajectories::updateTrajectorySelection(
+        const GLint* startIndices, const GLsizei* indexCount, int numTimeStepsPerTrajectory)
+{
+    bool useFiltering = false;
+    for (int trajectoryIdx = 0; trajectoryIdx < numTrajectories; trajectoryIdx++)
+    {
+        MBezierTrajectory& bezierTrajectory = bezierTrajectories[trajectoryIdx];
+
+        GLint startNormal = startIndices[trajectoryIdx];
+        GLsizei countNormal = indexCount[trajectoryIdx];
+        uint32_t trajectoryIndexOffset = trajectoryIndexOffsets.at(trajectoryIdx);
+
+        GLsizei selectionCount;
+        ptrdiff_t selectionIndex;
+        if (startNormal == 0) {
+            selectionCount = 0;
+        } else {
+            useFiltering = true;
+            selectionCount = 2 * (bezierTrajectory.positions.size() * startNormal / numTimeStepsPerTrajectory);
+        }
+        if (countNormal == numTimeStepsPerTrajectory) {
+            selectionIndex = 0;
+        } else {
+            useFiltering = true;
+            selectionIndex = 2 * (bezierTrajectory.positions.size() * countNormal / numTimeStepsPerTrajectory);
+        }
+        selectionIndex += trajectoryIndexOffset;
+        selectionIndex = selectionIndex * sizeof(uint32_t);
+
+        trajectorySelectionCount[trajectoryIdx] = selectionCount;
+        trajectorySelectionIndices[trajectoryIdx] = selectionIndex;
+    }
+    return useFiltering;
+}
+
+GLsizei* MBezierTrajectories::getTrajectorySelectionCount()
+{
+    return trajectorySelectionCount;
+}
+
+const void* const* MBezierTrajectories::getTrajectorySelectionIndices()
+{
+    return reinterpret_cast<const void* const*>(trajectorySelectionIndices);
 }
 
 

@@ -110,6 +110,12 @@ public:
     inline MBezierTrajectory& operator[](std::size_t idx) { return bezierTrajectories[idx]; }
     inline const MBezierTrajectory& operator[](std::size_t idx) const { return bezierTrajectories[idx]; }
 
+    // For trajectory filtering.
+    bool updateTrajectorySelection(
+            const GLint* startIndices, const GLsizei* indexCount, int numTimeStepsPerTrajectory);
+    GLsizei* getTrajectorySelectionCount();
+    const void* const* getTrajectorySelectionIndices();
+
     MBezierTrajectoriesRenderData getRenderData(QGLWidget *currentGLContext = 0);
     void releaseRenderData();
     void updateSelectedVariables(const QVector<uint32_t>& varSelected);
@@ -118,6 +124,12 @@ private:
     QVector<MBezierTrajectory> bezierTrajectories;
     MBezierTrajectoriesRenderData bezierTrajectoriesRenderData;
     QVector<uint32_t> varSelected;
+    QVector<uint32_t> trajectoryIndexOffsets;
+
+    // Data for trajectory filtering.
+    int numTrajectories = 0;
+    GLsizei* trajectorySelectionCount = nullptr;
+    ptrdiff_t* trajectorySelectionIndices = nullptr;
 
     const QString indexBufferID =
             QString("beziertrajectories_index_buffer_#%1").arg(getID());

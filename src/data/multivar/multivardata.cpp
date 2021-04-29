@@ -53,7 +53,10 @@ const int MAX_NUM_VARIABLES = 20;
 
 MMultiVarData::MMultiVarData() : multiVarTf(tfPropertiesMultiVar, transferFunctionsMultiVar)
 {
-    ;
+}
+
+MMultiVarData::~MMultiVarData()
+{
 }
 
 
@@ -764,7 +767,8 @@ void MMultiVarData::onQtPropertyChanged(QtProperty *property)
 }
 
 
-void MMultiVarData::onBezierTrajectoriesLoaded(const QStringList& auxDataVarNames)
+void MMultiVarData::onBezierTrajectoriesLoaded(
+        const QStringList& auxDataVarNames, int numTrajectories)
 {
     if (tfPropertiesMultiVar.empty())
     {
