@@ -84,6 +84,9 @@ MBezierTrajectories *MBezierTrajectoriesSource::produceData(
     MFilteredTrajectories filteredTrajectories;
     filteredTrajectories.reserve(inTrajectories->getNumTrajectories());
 
+    QVector<int> indicesToFilteredIndicesMap;
+    indicesToFilteredIndicesMap.reserve(inTrajectories->getNumTrajectories());
+
     // Loop over all trajectories and compute normals for each of their
     // vertices.
     int numTrajectories = inTrajectories->getNumTrajectories();
@@ -140,7 +143,12 @@ MBezierTrajectories *MBezierTrajectoriesSource::produceData(
 
         if (filteredTrajectory.positions.size() >= 2)
         {
+            indicesToFilteredIndicesMap.push_back(filteredTrajectories.size());
             filteredTrajectories.push_back(filteredTrajectory);
+        }
+        else
+        {
+            indicesToFilteredIndicesMap.push_back(-1);
         }
     }
 
@@ -261,7 +269,8 @@ MBezierTrajectories *MBezierTrajectoriesSource::produceData(
     float rollSegLength = avgSegLength / numVariables;// avgSegLength * 0.2f;
 
     MBezierTrajectories* newTrajectories = new MBezierTrajectories(
-            inTrajectories->getGeneratingRequest(), filteredTrajectories.size(), numVariables);
+            inTrajectories->getGeneratingRequest(),
+            filteredTrajectories.size(), indicesToFilteredIndicesMap, numVariables);
 
     for (int32_t traj = 0; traj < int(filteredTrajectories.size()); ++traj)
     {

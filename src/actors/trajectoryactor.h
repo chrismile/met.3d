@@ -432,6 +432,7 @@ private:
     MBezierTrajectoriesSource* bezierTrajectoriesSource;
     MMultiVarData multiVarData;
     bool useBezierTrajectories;
+    bool bezierDataDirty = false;
     QtProperty *multiVarGroupProperty;
     QtProperty *useBezierTrajectoriesProperty;
 

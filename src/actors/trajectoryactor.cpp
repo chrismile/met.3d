@@ -1641,6 +1641,7 @@ void MTrajectoryActor::prepareAvailableDataForRendering(uint slot)
 
         // 5. Bezier trajectories.
         // ===========
+
         if (useBezierTrajectories)
         {
             foreach (MSceneViewGLWidget *view, trqi.bezierTrajectoriesRequests.keys())
@@ -1657,12 +1658,20 @@ void MTrajectoryActor::prepareAvailableDataForRendering(uint slot)
                             trqi.bezierTrajectoriesRequests[view].request);
                     trajectoryRequests[slot].bezierTrajectoriesRenderDataMap[view] =
                             trajectoryRequests[slot].bezierTrajectoriesMap[view]->getRenderData();
+                    trajectoryRequests[slot].bezierTrajectoriesMap[view]->setDirty(true);
                 }
             }
 
-            multiVarData.onBezierTrajectoriesLoaded(
-                    trajectoryRequests[slot].trajectories->getAuxDataVarNames(),
-                    trajectoryRequests[slot].trajectories->getNumTrajectories());
+            if (trqi.filterRequest.available || trqi.singleTimeFilterRequest.available)
+            {
+                bezierDataDirty = true;
+            }
+            if (trqi.dataRequest.available)
+            {
+                multiVarData.onBezierTrajectoriesLoaded(
+                        trajectoryRequests[slot].trajectories->getAuxDataVarNames(),
+                        trajectoryRequests[slot].trajectories->getNumTrajectories());
+            }
         }
 
 
@@ -2326,6 +2335,7 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
         useBezierTrajectories = properties->mBool()->value(useBezierTrajectoriesProperty);
         multiVarData.setEnabled(useBezierTrajectories);
         if (suppressActorUpdates()) return;
+        asynchronousDataRequest();
         emitActorChangedSignal();
     }
 
@@ -2476,20 +2486,17 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
 
             glPolygonMode(GL_FRONT_AND_BACK, renderAsWireFrame ? GL_LINE : GL_FILL); CHECK_GL_ERROR;
 
-            // TODO: Filtering
             bezierTrajectoriesRenderData.indexBuffer->bindToElementArrayBuffer();
-            /*multiVarData.updateTrajectorySelection(
+            if (bezierDataDirty) {
+                bezierDataDirty = false;
+                trajectoryRequests[t].bezierTrajectoriesMap[sceneView]->setDirty(true);
+            }
+            trajectoryRequests[t].bezierTrajectoriesMap[sceneView]->updateTrajectorySelection(
                     trajectoryRequests[t].trajectorySelection->getStartIndices(),
                     trajectoryRequests[t].trajectorySelection->getIndexCount(),
+                    trajectoryRequests[t].trajectorySelection->getNumTimeStepsPerTrajectory(),
                     trajectoryRequests[t].trajectorySelection->getNumTrajectories());
-            glMultiDrawElements(
-                    GL_LINES, multiVarData.getTrajectorySelectionCount(),
-                    GL_UNSIGNED_INT, multiVarData.getTrajectorySelectionIndices(),
-                    trajectoryRequests[t].trajectorySelection->getNumTrajectories());*/
-            bool useFiltering = trajectoryRequests[t].bezierTrajectoriesMap[sceneView]->updateTrajectorySelection(
-                    trajectoryRequests[t].trajectorySelection->getStartIndices(),
-                    trajectoryRequests[t].trajectorySelection->getIndexCount(),
-                    trajectoryRequests[t].trajectorySelection->getNumTimeStepsPerTrajectory());
+            bool useFiltering = trajectoryRequests[t].bezierTrajectoriesMap[sceneView]->getUseFiltering();
             if (useFiltering)
             {
                 glMultiDrawElements(
@@ -2497,7 +2504,7 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
                         trajectoryRequests[t].bezierTrajectoriesMap[sceneView]->getTrajectorySelectionCount(),
                         GL_UNSIGNED_INT,
                         trajectoryRequests[t].bezierTrajectoriesMap[sceneView]->getTrajectorySelectionIndices(),
-                        trajectoryRequests[t].trajectorySelection->getNumTrajectories());
+                        trajectoryRequests[t].bezierTrajectoriesMap[sceneView]->getNumFilteredTrajectories());
             }
             else
             {

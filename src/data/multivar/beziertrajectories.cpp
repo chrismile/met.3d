@@ -48,8 +48,11 @@ unsigned int MBezierTrajectory::getMemorySize_kb() const {
 
 
 MBezierTrajectories::MBezierTrajectories(
-        MDataRequest requestToReferTo, unsigned int numTrajectories, unsigned int numVariables)
-        : MSupplementalTrajectoryData(requestToReferTo, numTrajectories), bezierTrajectories(numTrajectories)
+        MDataRequest requestToReferTo, unsigned int numTrajectories,
+        const QVector<int>& trajIndicesToFilteredIndicesMap,
+        unsigned int numVariables)
+        : MSupplementalTrajectoryData(requestToReferTo, numTrajectories),
+          bezierTrajectories(numTrajectories), trajIndicesToFilteredIndicesMap(trajIndicesToFilteredIndicesMap)
 {
     for (unsigned int i = 0; i < numVariables; i++)
     {
@@ -96,6 +99,7 @@ void createLineTubesRenderDataCPU(
         const QVector<QVector<QVector3D>>& lineCentersList,
         const QVector<QVector<T>>& lineAttributesList,
         QVector<uint32_t>& lineIndexOffsets,
+        QVector<uint32_t>& numIndicesPerLine,
         QVector<uint32_t>& lineIndices,
         QVector<QVector3D>& vertexPositions,
         QVector<QVector3D>& vertexNormals,
@@ -104,6 +108,7 @@ void createLineTubesRenderDataCPU(
 {
     assert(lineCentersList.size() == lineAttributesList.size());
     lineIndexOffsets.reserve(lineCentersList.size());
+    numIndicesPerLine.reserve(lineCentersList.size());
     for (int lineId = 0; lineId < lineCentersList.size(); lineId++)
     {
         const QVector<QVector3D> &lineCenters = lineCentersList.at(lineId);
@@ -111,11 +116,13 @@ void createLineTubesRenderDataCPU(
         assert(lineCenters.size() == lineAttributes.size());
         size_t n = lineCenters.size();
         size_t indexOffset = vertexPositions.size();
+        lineIndexOffsets.push_back(lineIndices.size());
 
         if (n < 2)
         {
             //sgl::Logfile::get()->writeError(
             //        "ERROR in createLineTubesRenderDataCPU: Line must consist of at least two points.");
+            numIndicesPerLine.push_back(0);
             continue;
         }
 
@@ -170,12 +177,13 @@ void createLineTubesRenderDataCPU(
             vertexNormals.pop_back();
             vertexTangents.pop_back();
             vertexAttributes.pop_back();
+            numIndicesPerLine.push_back(0);
             continue;
         }
 
         // Create indices
-        lineIndexOffsets.push_back(lineIndices.size());
-        for (int i = 0; i < numValidLinePoints-1; i++)
+        numIndicesPerLine.push_back((numValidLinePoints - 1) * 2);
+        for (int i = 0; i < numValidLinePoints - 1; i++)
         {
             lineIndices.push_back(indexOffset + i);
             lineIndices.push_back(indexOffset + i + 1);
@@ -218,8 +226,9 @@ MBezierTrajectoriesRenderData MBezierTrajectories::getRenderData(QGLWidget *curr
     }
 
     trajectoryIndexOffsets.clear();
+    numIndicesPerTrajectory.clear();
     createLineTubesRenderDataCPU(
-            lineCentersList, lineAttributesList, trajectoryIndexOffsets,
+            lineCentersList, lineAttributesList, trajectoryIndexOffsets, numIndicesPerTrajectory,
             lineIndices, vertexPositions, vertexNormals, vertexTangents, vertexAttributes);
 
     QVector<QVector4D> vertexMultiVariableArray;
@@ -365,39 +374,76 @@ void MBezierTrajectories::updateSelectedVariables(const QVector<uint32_t>& varSe
 }
 
 
-bool MBezierTrajectories::updateTrajectorySelection(
-        const GLint* startIndices, const GLsizei* indexCount, int numTimeStepsPerTrajectory)
-{
-    bool useFiltering = false;
-    for (int trajectoryIdx = 0; trajectoryIdx < numTrajectories; trajectoryIdx++)
-    {
-        MBezierTrajectory& bezierTrajectory = bezierTrajectories[trajectoryIdx];
+inline int iceil(int x, int y) { return (x - 1) / y + 1; }
 
-        GLint startNormal = startIndices[trajectoryIdx];
-        GLsizei countNormal = indexCount[trajectoryIdx];
-        uint32_t trajectoryIndexOffset = trajectoryIndexOffsets.at(trajectoryIdx);
+void MBezierTrajectories::updateTrajectorySelection(
+        const GLint* startIndices, const GLsizei* indexCount,
+        int numTimeStepsPerTrajectory, int numSelectedTrajectories)
+{
+    if (!isDirty) {
+        return;
+    }
+
+    useFiltering = false;
+    int filteredTrajectoryIdx = 0;
+    for (int trajectorySelectionIdx = 0; trajectorySelectionIdx < numSelectedTrajectories; trajectorySelectionIdx++)
+    {
+        GLint startSelection = startIndices[trajectorySelectionIdx];
+        GLsizei countSelection = indexCount[trajectorySelectionIdx];
+        int offsetSelection = startSelection % numTimeStepsPerTrajectory;
+        int trajectoryIdx = iceil(startSelection, numTimeStepsPerTrajectory);
+        int bezierTrajectoryIdx = trajIndicesToFilteredIndicesMap[trajectoryIdx];
+        if (bezierTrajectoryIdx == -1 || offsetSelection >= countSelection) {
+            continue;
+        }
+
+        uint32_t trajectoryIndexOffset = trajectoryIndexOffsets.at(bezierTrajectoryIdx);
+        uint32_t numTrajectoryIndices = numIndicesPerTrajectory.at(bezierTrajectoryIdx);
+        if (numTrajectoryIndices == 0) {
+            continue;
+        }
+
+        //MBezierTrajectory& bezierTrajectory = bezierTrajectories[trajectoryIdx];
 
         GLsizei selectionCount;
-        ptrdiff_t selectionIndex;
-        if (startNormal == 0) {
-            selectionCount = 0;
+        if (countSelection == numTimeStepsPerTrajectory) {
+            selectionCount = numTrajectoryIndices;
         } else {
             useFiltering = true;
-            selectionCount = 2 * (bezierTrajectory.positions.size() * startNormal / numTimeStepsPerTrajectory);
+            selectionCount = 2 * (numTrajectoryIndices / 2 * countSelection / numTimeStepsPerTrajectory);
         }
-        if (countNormal == numTimeStepsPerTrajectory) {
+
+        ptrdiff_t selectionIndex;
+        if (offsetSelection == 0) {
             selectionIndex = 0;
         } else {
             useFiltering = true;
-            selectionIndex = 2 * (bezierTrajectory.positions.size() * countNormal / numTimeStepsPerTrajectory);
+            selectionIndex = 2 * (numTrajectoryIndices / 2 * offsetSelection / numTimeStepsPerTrajectory);
         }
         selectionIndex += trajectoryIndexOffset;
         selectionIndex = selectionIndex * sizeof(uint32_t);
 
-        trajectorySelectionCount[trajectoryIdx] = selectionCount;
-        trajectorySelectionIndices[trajectoryIdx] = selectionIndex;
+        trajectorySelectionCount[filteredTrajectoryIdx] = selectionCount;
+        trajectorySelectionIndices[filteredTrajectoryIdx] = selectionIndex;
+        filteredTrajectoryIdx++;
     }
+
+    numFilteredTrajectories = filteredTrajectoryIdx;
+    if (numFilteredTrajectories != numTrajectories) {
+        useFiltering = true;
+    }
+
+    isDirty = false;
+}
+
+bool MBezierTrajectories::getUseFiltering()
+{
     return useFiltering;
+}
+
+int MBezierTrajectories::getNumFilteredTrajectories()
+{
+    return numFilteredTrajectories;
 }
 
 GLsizei* MBezierTrajectories::getTrajectorySelectionCount()

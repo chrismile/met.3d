@@ -101,7 +101,10 @@ struct MBezierTrajectoriesRenderData
 class MBezierTrajectories : public MSupplementalTrajectoryData
 {
 public:
-    MBezierTrajectories(MDataRequest requestToReferTo, unsigned int numTrajectories, unsigned int numVariables);
+    MBezierTrajectories(
+            MDataRequest requestToReferTo, unsigned int numTrajectories,
+            const QVector<int>& trajIndicesToFilteredIndicesMap,
+            unsigned int numVariables);
     ~MBezierTrajectories();
 
     unsigned int getMemorySize_kb();
@@ -111,8 +114,12 @@ public:
     inline const MBezierTrajectory& operator[](std::size_t idx) const { return bezierTrajectories[idx]; }
 
     // For trajectory filtering.
-    bool updateTrajectorySelection(
-            const GLint* startIndices, const GLsizei* indexCount, int numTimeStepsPerTrajectory);
+    inline void setDirty(bool isDirty) { this->isDirty = isDirty; }
+    void updateTrajectorySelection(
+            const GLint* startIndices, const GLsizei* indexCount,
+            int numTimeStepsPerTrajectory, int numFilteredTrajectories);
+    bool getUseFiltering();
+    int getNumFilteredTrajectories();
     GLsizei* getTrajectorySelectionCount();
     const void* const* getTrajectorySelectionIndices();
 
@@ -125,9 +132,14 @@ private:
     MBezierTrajectoriesRenderData bezierTrajectoriesRenderData;
     QVector<uint32_t> varSelected;
     QVector<uint32_t> trajectoryIndexOffsets;
+    QVector<uint32_t> numIndicesPerTrajectory;
 
     // Data for trajectory filtering.
+    bool isDirty = true;
+    QVector<int> trajIndicesToFilteredIndicesMap;
     int numTrajectories = 0;
+    bool useFiltering = false;
+    int numFilteredTrajectories = 0;
     GLsizei* trajectorySelectionCount = nullptr;
     ptrdiff_t* trajectorySelectionIndices = nullptr;
 
