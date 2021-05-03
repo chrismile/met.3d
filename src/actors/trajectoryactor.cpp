@@ -2388,6 +2388,169 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
 }
 
 
+void MTrajectoryActor::renderShadowsTubes(MSceneViewGLWidget *sceneView, int t)
+{
+    tubeShadowShader->bind();
+
+    tubeShadowShader->setUniformValue(
+            "mvpMatrix",
+            *(sceneView->getModelViewProjectionMatrix()));
+    tubeShadowShader->setUniformValue(
+            "pToWorldZParams",
+            sceneView->pressureToWorldZParameters());
+    tubeShadowShader->setUniformValue(
+            "lightDirection",
+            sceneView->getLightDirection());
+    tubeShadowShader->setUniformValue(
+            "cameraPosition",
+            sceneView->getCamera()->getOrigin());
+    tubeShadowShader->setUniformValue(
+            "radius",
+            GLfloat(tubeRadius));
+    tubeShadowShader->setUniformValue(
+            "numObsPerTrajectory",
+            trajectoryRequests[t].trajectories
+                    ->getNumTimeStepsPerTrajectory());
+
+    if (renderMode == BACKWARDTUBES_AND_SINGLETIME)
+    {
+        tubeShadowShader->setUniformValue(
+                "renderTubesUpToIndex",
+                particlePosTimeStep);
+    }
+    else
+    {
+        tubeShadowShader->setUniformValue(
+                "renderTubesUpToIndex",
+                trajectoryRequests[t].trajectories
+                        ->getNumTimeStepsPerTrajectory());
+    }
+
+    tubeShadowShader->setUniformValue(
+            "useTransferFunction", GLboolean(shadowColoured));
+
+    if (shadowColoured)
+    {
+        tubeShadowShader->setUniformValue(
+                "transferFunction", textureUnitTransferFunction);
+        tubeShadowShader->setUniformValue(
+                "scalarMinimum",
+                transferFunction->getMinimumValue());
+        tubeShadowShader->setUniformValue(
+                "scalarMaximum",
+                transferFunction->getMaximumValue());
+    }
+    else
+        tubeShadowShader->setUniformValue(
+                "constColour", QColor(20, 20, 20, 155));
+
+    bindShadowStencilBuffer();
+    glMultiDrawArrays(GL_LINE_STRIP_ADJACENCY,
+                      trajectoryRequests[t].trajectorySelection
+                              ->getStartIndices(),
+                      trajectoryRequests[t].trajectorySelection
+                              ->getIndexCount(),
+                      trajectoryRequests[t].trajectorySelection
+                              ->getNumTrajectories());
+    unbindShadowStencilBuffer();
+}
+
+void MTrajectoryActor::renderShadowsSpheres(MSceneViewGLWidget *sceneView, int t)
+{
+    positionSphereShadowShader->bind();
+
+    positionSphereShadowShader->setUniformValue(
+            "mvpMatrix",
+            *(sceneView->getModelViewProjectionMatrix()));
+    CHECK_GL_ERROR;
+    positionSphereShadowShader->setUniformValue(
+            "pToWorldZParams",
+            sceneView->pressureToWorldZParameters()); CHECK_GL_ERROR;
+    positionSphereShadowShader->setUniformValue(
+            "lightDirection",
+            sceneView->getLightDirection());
+    positionSphereShadowShader->setUniformValue(
+            "cameraPosition",
+            sceneView->getCamera()->getOrigin()); CHECK_GL_ERROR;
+    positionSphereShadowShader->setUniformValue(
+            "radius",
+            GLfloat(sphereRadius)); CHECK_GL_ERROR;
+    positionSphereShadowShader->setUniformValue(
+            "scaleRadius",
+            GLboolean(false)); CHECK_GL_ERROR;
+
+    positionSphereShadowShader->setUniformValue(
+            "useTransferFunction",
+            GLboolean(shadowColoured)); CHECK_GL_ERROR;
+
+    if (shadowColoured)
+    {
+        // Transfer function texture is still bound from the sphere
+        // shader.
+        positionSphereShadowShader->setUniformValue(
+                "transferFunction",
+                textureUnitTransferFunction); CHECK_GL_ERROR;
+        positionSphereShadowShader->setUniformValue(
+                "scalarMinimum",
+                transferFunction->getMinimumValue()); CHECK_GL_ERROR;
+        positionSphereShadowShader->setUniformValue(
+                "scalarMaximum",
+                transferFunction->getMaximumValue()); CHECK_GL_ERROR;
+
+    }
+    else
+        positionSphereShadowShader->setUniformValue(
+                "constColour", QColor(20, 20, 20, 155)); CHECK_GL_ERROR;
+
+    bindShadowStencilBuffer();
+    if (renderMode == ALL_POSITION_SPHERES)
+        glMultiDrawArrays(GL_POINTS,
+                          trajectoryRequests[t]
+                                  .trajectorySelection->getStartIndices(),
+                          trajectoryRequests[t]
+                                  .trajectorySelection->getIndexCount(),
+                          trajectoryRequests[t]
+                                  .trajectorySelection->getNumTrajectories());
+    else
+        glMultiDrawArrays(GL_POINTS,
+                          trajectoryRequests[t]
+                                  .trajectorySingleTimeSelection
+                                  ->getStartIndices(),
+                          trajectoryRequests[t]
+                                  .trajectorySingleTimeSelection
+                                  ->getIndexCount(),
+                          trajectoryRequests[t]
+                                  .trajectorySingleTimeSelection
+                                  ->getNumTrajectories());
+    unbindShadowStencilBuffer();
+    CHECK_GL_ERROR;
+}
+
+void MTrajectoryActor::bindShadowStencilBuffer()
+{
+    glDepthMask(GL_FALSE);
+    glEnable(GL_STENCIL_TEST);
+    glStencilMask(0xFF);
+    if (!stencilBufferCleared) {
+        glClearStencil(0);
+        glClear(GL_STENCIL_BUFFER_BIT);
+        stencilBufferCleared = true;
+    }
+    glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
+    glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+    // Darker shadows
+    //glStencilFunc(GL_NOTEQUAL, 2, 0xFF);
+    //glStencilOp(GL_KEEP, GL_KEEP, GL_INCR);
+}
+
+void MTrajectoryActor::unbindShadowStencilBuffer()
+{
+    glStencilMask(0x00);
+    glDisable(GL_STENCIL_TEST);
+    glDepthMask(GL_TRUE);
+    CHECK_GL_ERROR;
+}
+
 void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
 {
     // Only render if transfer function is available.
@@ -2395,7 +2558,7 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
     {
         return;
     }
-
+    stencilBufferCleared = false;
 
     if (useBezierTrajectories)
     {
@@ -2530,68 +2693,7 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
                             ->attachToVertexAttribute(SHADER_AUXDATA_ATTRIBUTE);
                 }
 
-                tubeShadowShader->bind();
-
-                tubeShadowShader->setUniformValue(
-                        "mvpMatrix",
-                        *(sceneView->getModelViewProjectionMatrix()));
-                tubeShadowShader->setUniformValue(
-                        "pToWorldZParams",
-                        sceneView->pressureToWorldZParameters());
-                tubeShadowShader->setUniformValue(
-                        "lightDirection",
-                        sceneView->getLightDirection());
-                tubeShadowShader->setUniformValue(
-                        "cameraPosition",
-                        sceneView->getCamera()->getOrigin());
-                tubeShadowShader->setUniformValue(
-                        "radius",
-                        GLfloat(tubeRadius));
-                tubeShadowShader->setUniformValue(
-                        "numObsPerTrajectory",
-                        trajectoryRequests[t].trajectories
-                                ->getNumTimeStepsPerTrajectory());
-
-                if (renderMode == BACKWARDTUBES_AND_SINGLETIME)
-                {
-                    tubeShadowShader->setUniformValue(
-                            "renderTubesUpToIndex",
-                            particlePosTimeStep);
-                }
-                else
-                {
-                    tubeShadowShader->setUniformValue(
-                            "renderTubesUpToIndex",
-                            trajectoryRequests[t].trajectories
-                                    ->getNumTimeStepsPerTrajectory());
-                }
-
-                tubeShadowShader->setUniformValue(
-                        "useTransferFunction", GLboolean(shadowColoured));
-
-                if (shadowColoured)
-                {
-                    tubeShadowShader->setUniformValue(
-                            "transferFunction", textureUnitTransferFunction);
-                    tubeShadowShader->setUniformValue(
-                            "scalarMinimum",
-                            transferFunction->getMinimumValue());
-                    tubeShadowShader->setUniformValue(
-                            "scalarMaximum",
-                            transferFunction->getMaximumValue());
-                }
-                else
-                    tubeShadowShader->setUniformValue(
-                            "constColour", QColor(20, 20, 20, 155));
-
-                glMultiDrawArrays(GL_LINE_STRIP_ADJACENCY,
-                                  trajectoryRequests[t].trajectorySelection
-                                          ->getStartIndices(),
-                                  trajectoryRequests[t].trajectorySelection
-                                          ->getIndexCount(),
-                                  trajectoryRequests[t].trajectorySelection
-                                          ->getNumTrajectories());
-                CHECK_GL_ERROR;
+                renderShadowsTubes(sceneView, t);
             }
 
             // Unbind VBO.
@@ -2716,69 +2818,7 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
 
             if (shadowEnabled)
             {
-
-                tubeShadowShader->bind();
-
-                tubeShadowShader->setUniformValue(
-                        "mvpMatrix",
-                        *(sceneView->getModelViewProjectionMatrix()));
-                tubeShadowShader->setUniformValue(
-                        "pToWorldZParams",
-                        sceneView->pressureToWorldZParameters());
-                tubeShadowShader->setUniformValue(
-                        "lightDirection",
-                        sceneView->getLightDirection());
-                tubeShadowShader->setUniformValue(
-                        "cameraPosition",
-                        sceneView->getCamera()->getOrigin());
-                tubeShadowShader->setUniformValue(
-                        "radius",
-                        GLfloat(tubeRadius));
-                tubeShadowShader->setUniformValue(
-                        "numObsPerTrajectory",
-                        trajectoryRequests[t].trajectories
-                            ->getNumTimeStepsPerTrajectory());
-
-                if (renderMode == BACKWARDTUBES_AND_SINGLETIME)
-                {
-                    tubeShadowShader->setUniformValue(
-                            "renderTubesUpToIndex",
-                            particlePosTimeStep);
-                }
-                else
-                {
-                    tubeShadowShader->setUniformValue(
-                            "renderTubesUpToIndex",
-                            trajectoryRequests[t].trajectories
-                                ->getNumTimeStepsPerTrajectory());
-                }
-
-                tubeShadowShader->setUniformValue(
-                        "useTransferFunction", GLboolean(shadowColoured));
-
-                if (shadowColoured)
-                {
-                    tubeShadowShader->setUniformValue(
-                            "transferFunction", textureUnitTransferFunction);
-                    tubeShadowShader->setUniformValue(
-                            "scalarMinimum",
-                            transferFunction->getMinimumValue());
-                    tubeShadowShader->setUniformValue(
-                            "scalarMaximum",
-                            transferFunction->getMaximumValue());
-                }
-                else
-                    tubeShadowShader->setUniformValue(
-                            "constColour", QColor(20, 20, 20, 155));
-
-                glMultiDrawArrays(GL_LINE_STRIP_ADJACENCY,
-                                  trajectoryRequests[t].trajectorySelection
-                                  ->getStartIndices(),
-                                  trajectoryRequests[t].trajectorySelection
-                                  ->getIndexCount(),
-                                  trajectoryRequests[t].trajectorySelection
-                                  ->getNumTrajectories());
-                CHECK_GL_ERROR;
+                renderShadowsTubes(sceneView, t);
             }
 
             // Unbind VBO.
@@ -2902,71 +2942,7 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
 
             if (shadowEnabled)
             {
-                positionSphereShadowShader->bind();
-
-                positionSphereShadowShader->setUniformValue(
-                        "mvpMatrix",
-                        *(sceneView->getModelViewProjectionMatrix()));
-                CHECK_GL_ERROR;
-                positionSphereShadowShader->setUniformValue(
-                        "pToWorldZParams",
-                        sceneView->pressureToWorldZParameters()); CHECK_GL_ERROR;
-                positionSphereShadowShader->setUniformValue(
-                        "lightDirection",
-                        sceneView->getLightDirection());
-                positionSphereShadowShader->setUniformValue(
-                        "cameraPosition",
-                        sceneView->getCamera()->getOrigin()); CHECK_GL_ERROR;
-                positionSphereShadowShader->setUniformValue(
-                        "radius",
-                        GLfloat(sphereRadius)); CHECK_GL_ERROR;
-                positionSphereShadowShader->setUniformValue(
-                        "scaleRadius",
-                        GLboolean(false)); CHECK_GL_ERROR;
-
-                positionSphereShadowShader->setUniformValue(
-                        "useTransferFunction",
-                        GLboolean(shadowColoured)); CHECK_GL_ERROR;
-
-                if (shadowColoured)
-                {
-                    // Transfer function texture is still bound from the sphere
-                    // shader.
-                    positionSphereShadowShader->setUniformValue(
-                            "transferFunction",
-                            textureUnitTransferFunction); CHECK_GL_ERROR;
-                    positionSphereShadowShader->setUniformValue(
-                            "scalarMinimum",
-                            transferFunction->getMinimumValue()); CHECK_GL_ERROR;
-                    positionSphereShadowShader->setUniformValue(
-                            "scalarMaximum",
-                            transferFunction->getMaximumValue()); CHECK_GL_ERROR;
-
-                }
-                else
-                    positionSphereShadowShader->setUniformValue(
-                            "constColour", QColor(20, 20, 20, 155)); CHECK_GL_ERROR;
-
-                if (renderMode == ALL_POSITION_SPHERES)
-                    glMultiDrawArrays(GL_POINTS,
-                                      trajectoryRequests[t]
-                                      .trajectorySelection->getStartIndices(),
-                                      trajectoryRequests[t]
-                                      .trajectorySelection->getIndexCount(),
-                                      trajectoryRequests[t]
-                                      .trajectorySelection->getNumTrajectories());
-                else
-                    glMultiDrawArrays(GL_POINTS,
-                                      trajectoryRequests[t]
-                                      .trajectorySingleTimeSelection
-                                      ->getStartIndices(),
-                                      trajectoryRequests[t]
-                                      .trajectorySingleTimeSelection
-                                      ->getIndexCount(),
-                                      trajectoryRequests[t]
-                                      .trajectorySingleTimeSelection
-                                      ->getNumTrajectories());
-                CHECK_GL_ERROR;
+                renderShadowsSpheres(sceneView, t);
             }
 
             // Unbind VBO.

@@ -240,6 +240,11 @@ protected:
 
     void onQtPropertyChanged(QtProperty *property);
 
+    void renderShadowsTubes(MSceneViewGLWidget *sceneView, int t);
+    void renderShadowsSpheres(MSceneViewGLWidget *sceneView, int t);
+    void bindShadowStencilBuffer();
+    void unbindShadowStencilBuffer();
+
     void renderToCurrentContext(MSceneViewGLWidget *sceneView);
 
     void updateTimeProperties();
@@ -561,6 +566,7 @@ private:
     std::shared_ptr<GL::MShaderEffect> tubeShadowShader;
     std::shared_ptr<GL::MShaderEffect> positionSphereShader;
     std::shared_ptr<GL::MShaderEffect> positionSphereShadowShader;
+    bool stencilBufferCleared = false;
 
     QtProperty *transferFunctionProperty;
     /** Pointer to transfer function object and corresponding texture unit. */
