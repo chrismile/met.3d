@@ -773,10 +773,11 @@ void MMultiVarData::onBezierTrajectoriesLoaded(
     if (tfPropertiesMultiVar.empty())
     {
         QStringList varNames = auxDataVarNames;
-        if (varNames.empty())
-        {
-            varNames = QStringList("Pressure");
-        }
+        varNames.push_front("Pressure");
+        //if (varNames.empty())
+        //{
+        //    varNames = QStringList("Pressure");
+        //}
         this->varNames = varNames;
         maxNumVariables = varNames.size();
         initTransferFunctionsMultiVar(maxNumVariables);

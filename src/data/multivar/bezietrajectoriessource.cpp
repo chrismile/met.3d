@@ -93,7 +93,8 @@ MBezierTrajectories *MBezierTrajectoriesSource::produceData(
     int numTimeStepsPerTrajectory = inTrajectories->getNumTimeStepsPerTrajectory();
     QVector<QVector3D> vertices = inTrajectories->getVertices();
     const uint32_t numVariablesReal = inTrajectories->getAuxDataVarNames().size();
-    const uint32_t numVariables = std::max(numVariablesReal, uint32_t(1));
+    const uint32_t numVariables = numVariablesReal + 1;
+    //const uint32_t numVariables = std::max(numVariablesReal, uint32_t(1));
     this->numVariables = numVariables;
 
     for (int i = 0; i < numTrajectories; i++)
@@ -110,6 +111,7 @@ MBezierTrajectories *MBezierTrajectoriesSource::produceData(
         MFilteredTrajectory filteredTrajectory;
         filteredTrajectory.attributes.resize(numVariables);
 
+        QVector3D prevPoint(M_INVALID_TRAJECTORY_POS, M_INVALID_TRAJECTORY_POS, M_INVALID_TRAJECTORY_POS);
         for (int t = 0; t < numTimeStepsPerTrajectory; t++)
         {
             QVector3D point = vertices.at(baseIndex+t);
@@ -118,24 +120,31 @@ MBezierTrajectories *MBezierTrajectoriesSource::produceData(
             {
                 continue;
             }
+            if ((point - prevPoint).length() < 1e-5)
+            {
+                continue;
+            }
 
+            // Use pressure as attribute if no auxiliary data is available.
+            filteredTrajectory.attributes[0].push_back(point.z());
             if (numVariablesReal > 0)
             {
                 QVector<float> vertexAttributes = inTrajectories->getAuxDataAtVertex(baseIndex+t);
-                for (uint32_t j = 0; j < numVariables; j++)
+                for (uint32_t j = 0; j < numVariablesReal; j++)
                 {
-                    filteredTrajectory.attributes[j].push_back(vertexAttributes.at(j));
+                    filteredTrajectory.attributes[j + 1].push_back(vertexAttributes.at(j));
                 }
             }
-            else
-            {
-                // Use pressure as attribute if no auxiliary data is available.
-                for (uint32_t j = 0; j < numVariables; j++)
-                {
-                    filteredTrajectory.attributes[j].push_back(point.z());
-                }
-            }
+            //else
+            //{
+            //    // Use pressure as attribute if no auxiliary data is available.
+            //    for (uint32_t j = 0; j < numVariables; j++)
+            //    {
+            //        filteredTrajectory.attributes[j].push_back(point.z());
+            //    }
+            //}
 
+            prevPoint = point;
             point.setZ(MSceneViewGLWidget::worldZfromPressure(
                     point.z(), log_pBottom_hPa, deltaZ_deltaLogP));
             filteredTrajectory.positions.push_back(point);
@@ -322,8 +331,14 @@ MBezierTrajectories *MBezierTrajectoriesSource::produceData(
             {
                 varIDPerLine = 0;
                 lineID++;
+                if (lineID >= BCurves.size()) {
+                    break;
+                }
                 sumArcLengths = sumArcLengthsNext;
                 sumArcLengthsNext += BCurves[lineID].totalArcLength;
+            }
+            if (lineID >= BCurves.size()) {
+                break;
             }
 
             const auto &BCurve = BCurves[lineID];

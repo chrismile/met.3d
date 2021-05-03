@@ -73,7 +73,7 @@ MTrajectoryActor::MTrajectoryActor()
       trajectorySource(nullptr),
       normalsSource(nullptr),
       bezierTrajectoriesSource(nullptr),
-      useBezierTrajectories(true), // TODO: Set to false after testing.
+      useBezierTrajectories(false),
       trajectoryFilter(nullptr),
       dataSourceID(""),
       precomputedDataSource(false),
@@ -346,6 +346,7 @@ MTrajectoryActor::MTrajectoryActor()
     // ====================================
     useBezierTrajectoriesProperty = addProperty(
             BOOL_PROPERTY, "use multi-var rendering", renderingGroupProperty);
+    properties->mBool()->setValue(useBezierTrajectoriesProperty, useBezierTrajectories);
 
     multiVarGroupProperty = addProperty(
             GROUP_PROPERTY, "multi-var rendering", renderingGroupProperty);
@@ -569,10 +570,7 @@ void MTrajectoryActor::loadConfiguration(QSettings *settings)
             this->setDataSource(dataSourceID + QString(" Reader"));
             this->setNormalsSource(dataSourceID + QString(" Normals"));
             this->setTrajectoryFilter(dataSourceID + QString(" timestepFilter"));
-            if (useBezierTrajectories)
-            {
-                this->setBezierTrajectoriesSource(dataSourceID + QString(" Bezier Trajectories"));
-            }
+            this->setBezierTrajectoriesSource(dataSourceID + QString(" Bezier Trajectories"));
 
             updateInitTimeProperty();
             updateStartTimeProperty();
@@ -4163,10 +4161,7 @@ bool MTrajectoryActor::selectDataSource()
         this->setDataSource(dataSourceID + QString(" Reader"));
         this->setNormalsSource(dataSourceID + QString(" Normals"));
         this->setTrajectoryFilter(dataSourceID + QString(" timestepFilter"));
-        if (useBezierTrajectories)
-        {
-            this->setBezierTrajectoriesSource(dataSourceID + QString(" Bezier Trajectories"));
-        }
+        this->setBezierTrajectoriesSource(dataSourceID + QString(" Bezier Trajectories"));
 
         updateInitTimeProperty();
         updateStartTimeProperty();
