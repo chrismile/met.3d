@@ -391,8 +391,8 @@ void MBezierTrajectories::updateTrajectorySelection(
         GLint startSelection = startIndices[trajectorySelectionIdx];
         GLsizei countSelection = indexCount[trajectorySelectionIdx];
         int offsetSelection = startSelection % numTimeStepsPerTrajectory;
-        int trajectoryIdx = iceil(startSelection, numTimeStepsPerTrajectory);
-        //int trajectoryIdx = startSelection / numTimeStepsPerTrajectory;
+        //int trajectoryIdx = iceil(startSelection, numTimeStepsPerTrajectory);
+        int trajectoryIdx = startSelection / numTimeStepsPerTrajectory;
         int bezierTrajectoryIdx = trajIndicesToFilteredIndicesMap[trajectoryIdx];
         if (bezierTrajectoryIdx == -1 || offsetSelection >= countSelection) {
             continue;
