@@ -119,7 +119,7 @@ void MMultiVarTf::generateTexture1DArray()
     int varIdx = 0;
     foreach(MTransferFunction1D *tf, transferFunctions)
     {
-        if (tf != nullptr)
+        if (tf != nullptr && !tf->getColorValuesByteArray().empty())
         {
             const std::vector<unsigned char> &colorValuesTf = tf->getColorValuesByteArray();
             if (colorValuesTf.size() != numBytesPerColorMap)

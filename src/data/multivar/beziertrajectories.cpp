@@ -299,7 +299,7 @@ MBezierTrajectoriesRenderData MBezierTrajectories::getRenderData(QGLWidget *curr
         lineDescData[lineIdx] = bezierTrajectories.at(lineIdx).lineDesc.startIndex;
     }
 
-    const size_t numVars = bezierTrajectories.front().multiVarDescs.size();
+    const size_t numVars = bezierTrajectories.empty() ? 0 : bezierTrajectories.front().multiVarDescs.size();
     QVector<float> attributesMinValues(numVars, 0.0f);
     QVector<float> attributesMaxValues(numVars, 0.0f);
     for (size_t lineIdx = 0; lineIdx < numLines; ++lineIdx)

@@ -113,15 +113,15 @@ void MMultiVarData::setProperties(MActor* actor, MQtProperties *properties, QtPr
     propertyList.push_back(checkerboardHeightProperty);
 
     checkerboardWidthProperty = addProperty(
-            INT_PROPERTY, "checkerboard height", multiVarGroupProperty);
+            INT_PROPERTY, "checkerboard width", multiVarGroupProperty);
     properties->setInt(checkerboardWidthProperty, checkerboardWidth, 1, 20);
     checkerboardWidthProperty->setToolTip("Checkerboard pattern height.");
     propertyList.push_back(checkerboardWidthProperty);
 
     checkerboardIteratorProperty = addProperty(
-            INT_PROPERTY, "checkerboard height", multiVarGroupProperty);
+            INT_PROPERTY, "checkerboard iterator", multiVarGroupProperty);
     properties->setInt(checkerboardIteratorProperty, checkerboardIterator, 1, 5);
-    checkerboardIteratorProperty->setToolTip("Checkerboard pattern height.");
+    checkerboardIteratorProperty->setToolTip("Checkerboard iterator.");
     propertyList.push_back(checkerboardIteratorProperty);
 
     twistOffsetProperty = addProperty(
@@ -158,7 +158,7 @@ void MMultiVarData::setProperties(MActor* actor, MQtProperties *properties, QtPr
     separatorWidthProperty = addProperty(
             DECORATEDDOUBLE_PROPERTY, "separator width", multiVarGroupProperty);
     properties->setDDouble(
-            separatorWidthProperty, separatorWidth, 0.0, 1.0, 2, 0.1, " (ratio)");
+            separatorWidthProperty, separatorWidth, 0.0, 1.0, 2, 0.05, " (ratio)");
     separatorWidthProperty->setToolTip("Separator width.");
     propertyList.push_back(separatorWidthProperty);
 
@@ -196,19 +196,19 @@ void MMultiVarData::setPropertiesRenderingSettings()
     fiberRadiusProperty = addProperty(
             DECORATEDDOUBLE_PROPERTY, "fiber radius", renderingSettingsGroupProperty);
     properties->setDDouble(
-            fiberRadiusProperty, fiberRadius, 0.01, 1.0, 4, 0.1, " (world space)");
+            fiberRadiusProperty, fiberRadius, 0.01, 1.0, 4, 0.05, " (world space)");
     fiberRadiusProperty->setToolTip("Fiber radius.");
     propertyList.push_back(fiberRadiusProperty);
 
     minRadiusFactorProperty = addProperty(
             DECORATEDDOUBLE_PROPERTY, "min radius factor", renderingSettingsGroupProperty);
     properties->setDDouble(
-            minRadiusFactorProperty, minRadiusFactor, 0.0, 1.0, 3, 0.1, " (world space)");
+            minRadiusFactorProperty, minRadiusFactor, 0.0, 1.0, 3, 0.05, " (world space)");
     minRadiusFactorProperty->setToolTip("Minimum radius factor.");
     propertyList.push_back(minRadiusFactorProperty);
 
     rollWidthProperty = addProperty(
-            INT_PROPERTY, "num line segments", renderingSettingsGroupProperty);
+            INT_PROPERTY, "roll width", renderingSettingsGroupProperty);
     properties->setInt(rollWidthProperty, rollWidth, 1, 4);
     rollWidthProperty->setToolTip("Number of line segments used for the tube rendering.");
     propertyList.push_back(rollWidthProperty);
@@ -424,7 +424,7 @@ void MMultiVarData::loadConfiguration(QSettings *settings)
 
     // Line settings.
     minRadiusFactor = settings->value("minRadiusFactor", 0.5f).toFloat();
-    fiberRadius = settings->value("fiberRadius", 0.05f).toFloat();
+    fiberRadius = settings->value("fiberRadius", 0.1f).toFloat();
 
     // Lighting settings.
     useColorIntensity = settings->value("useColorIntensity", true).toBool();
@@ -709,8 +709,16 @@ void MMultiVarData::onQtPropertyChanged(QtProperty *property)
     // --- Group: Rendering settings ---
     else if (property == numLineSegmentsProperty)
     {
-        numLineSegments = properties->mBool()->value(numLineSegmentsProperty);
-        numInstances = properties->mBool()->value(numLineSegmentsProperty);
+        if (multiVarRenderMode == MultiVarRenderMode::ORIENTED_COLOR_BANDS
+                || multiVarRenderMode == MultiVarRenderMode::FIBERS)
+        {
+            numLineSegments = properties->mInt()->value(numLineSegmentsProperty);
+        }
+        else
+        {
+            numInstances = properties->mInt()->value(numLineSegmentsProperty);
+        }
+        reloadShaderEffect();
     }
     else if (property == fiberRadiusProperty)
     {
@@ -789,10 +797,9 @@ void MMultiVarData::onBezierTrajectoriesLoaded(
         }
         selectedVariables[0] = true;
         updateNumVariablesSelected();
-        selectedVariablesChanged = true;
-
         setPropertiesVarSelected();
     }
+    selectedVariablesChanged = true;
 }
 
 

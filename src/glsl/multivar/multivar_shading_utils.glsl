@@ -207,17 +207,27 @@ vec4 determineColorLinearInterpolate(
     return surfaceColor;
 }
 
+#ifdef GL_FRAGMENT_SHADER
+#define USE_SMOOTH_SEPARATOR
 void drawSeparatorBetweenStripes(
         inout vec4 surfaceColor, in float varFraction, in float separatorWidth) {
+#ifdef USE_SMOOTH_SEPARATOR
+    separatorWidth = separatorWidth * 2.0 / 3.0f;
+    if (varFraction > 0.5) { varFraction = 1.0 - varFraction; }
+    float aaf = fwidth(varFraction);
+    float alphaBorder = smoothstep(separatorWidth - aaf, separatorWidth + aaf, varFraction);
+    surfaceColor.rgb = surfaceColor.rgb * alphaBorder;
+#else
     float borderWidth = separatorWidth;
     float alphaBorder = 0.5;
     if (varFraction <= borderWidth || varFraction >= (1.0 - borderWidth))
     {
         if (varFraction > 0.5) { varFraction = 1.0 - varFraction; }
-
         surfaceColor.rgb = surfaceColor.rgb * (alphaBorder + (1 - alphaBorder) * varFraction / borderWidth);
     }
+#endif
 }
+#endif
 
 
 ///////////////////////////////////////////

@@ -382,7 +382,8 @@ shader FSmain(out vec4 fragColor) {
 //        drawSeparatorBetweenStripes(c1, varFractionY, separatorWidth);
 //
 //        surfaceColor = (c0 + c1) / 2;
-        drawSeparatorBetweenStripes(surfaceColor, varFractionX, separatorWidth);
+        float distFactor = float(checkerboardHeight) / float(checkerboardWidth) * 0.35;
+        drawSeparatorBetweenStripes(surfaceColor, varFractionX, separatorWidth * distFactor);
         drawSeparatorBetweenStripes(surfaceColor, varFractionY, separatorWidth);
     }
 

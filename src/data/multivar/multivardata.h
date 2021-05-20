@@ -197,7 +197,7 @@ private:
 
     // Line settings.
     float minRadiusFactor = 0.5f;
-    float fiberRadius = 0.05f;
+    float fiberRadius = 0.1f;
 
     // Lighting settings.
     bool useColorIntensity = true;
