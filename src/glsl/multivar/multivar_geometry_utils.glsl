@@ -261,6 +261,12 @@ float computeRadius(
     }
     if (lineVarMinMax.x != lineVarMinMax.y) {
         float interpolant = (variableValueOrig - lineVarMinMax.x) / (lineVarMinMax.y - lineVarMinMax.x);
+
+        uint isDiverging = sampleIsDiverging(varID);
+        if (isDiverging > 0) {
+            interpolant = abs(interpolant - 0.5) * 2.0;
+        }
+
         //                interpolant = max(0.0, min(1.0, interpolant));
         curRadius = mix(minRadius, maxRadius, interpolant);
     }
@@ -272,6 +278,12 @@ float computeRadius(
     //            float variableNextValue = (variableNextValueOrig - variableNextMinMax.x) / (variableNextMinMax.y - variableNextMinMax.x);
     if (lineVarMinMax.x != lineVarMinMax.y) {
         float interpolant = (variableValueOrig - lineVarMinMax.x) / (lineVarMinMax.y - lineVarMinMax.x);
+
+        uint isDiverging = sampleIsDiverging(varID);
+        if (isDiverging > 0) {
+            interpolant = abs(interpolant - 0.5) * 2.0;
+        }
+
         //                interpolant = max(0.0, min(1.0, interpolant));
         nextRadius = mix(minRadius, maxRadius, interpolant);
     }

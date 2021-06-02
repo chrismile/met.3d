@@ -141,15 +141,22 @@ shader GSmain(in VSOutput inputs[], out FSInput outputs) {
         // 1) Sample variables from buffers.
         float variableValue, variableNextValue;
         vec2 variableMinMax, variableNextMinMax;
-        sampleVariableFromLineSSBO(inputs[0].vLineID, sampleActualVarID(varID), inputs[0].vElementID, variableValue, variableMinMax);
-        sampleVariableFromLineSSBO(inputs[0].vLineID, sampleActualVarID(varID), inputs[0].vElementNextID, variableNextValue, variableNextMinMax);
+        const uint actualVarID = sampleActualVarID(varID);
+        sampleVariableFromLineSSBO(inputs[0].vLineID, actualVarID, inputs[0].vElementID, variableValue, variableMinMax);
+        sampleVariableFromLineSSBO(inputs[0].vLineID, actualVarID, inputs[0].vElementNextID, variableNextValue, variableNextMinMax);
 
         // 2) Normalize values.
         variableValue = clamp((variableValue - variableMinMax.x) / (variableMinMax.y - variableMinMax.x), 0.0, 1.0);
         variableNextValue = clamp((variableNextValue - variableNextMinMax.x) / (variableNextMinMax.y - variableNextMinMax.x), 0.0, 1.0);
 
+        float value = mix(variableValue, variableNextValue, inputs[0].vElementInterpolant);
+        uint isDiverging = sampleIsDiverging(actualVarID);
+        if (isDiverging > 0) {
+            value = abs(value - 0.5) * 2.0;
+        }
+
         // 3) Interpolate linearly.
-        variables[varID] = mix(variableValue, variableNextValue, inputs[0].vElementInterpolant);
+        variables[varID] = value;
     }
 
     // Compute the sum of all variables
@@ -175,15 +182,22 @@ shader GSmain(in VSOutput inputs[], out FSInput outputs) {
         // 1) Sample variables from buffers.
         float variableValue, variableNextValue;
         vec2 variableMinMax, variableNextMinMax;
-        sampleVariableFromLineSSBO(inputs[0].vLineID, sampleActualVarID(varID), inputs[0].vElementID, variableValue, variableMinMax);
-        sampleVariableFromLineSSBO(inputs[0].vLineID, sampleActualVarID(varID), _fragElementNextID, variableNextValue, variableNextMinMax);
+        const uint actualVarID = sampleActualVarID(varID);
+        sampleVariableFromLineSSBO(inputs[0].vLineID, actualVarID, inputs[0].vElementID, variableValue, variableMinMax);
+        sampleVariableFromLineSSBO(inputs[0].vLineID, actualVarID, _fragElementNextID, variableNextValue, variableNextMinMax);
 
         // 2) Normalize values.
         variableValue = clamp((variableValue - variableMinMax.x) / (variableMinMax.y - variableMinMax.x), 0.0, 1.0);
         variableNextValue = clamp((variableNextValue - variableNextMinMax.x) / (variableNextMinMax.y - variableNextMinMax.x), 0.0, 1.0);
 
+        float value = mix(variableValue, variableNextValue, _fragElementInterpolant);
+        uint isDiverging = sampleIsDiverging(actualVarID);
+        if (isDiverging > 0) {
+            value = abs(value - 0.5) * 2.0;
+        }
+
         // 3) Interpolate linearly.
-        variables[varID] = mix(variableValue, variableNextValue, _fragElementInterpolant);
+        variables[varID] = value;
     }
 
     // Compute the sum of all variables
@@ -338,15 +352,22 @@ shader FSmain(in FSInput inputs, out vec4 fragColor) {
         // 1.1) Sample variables from buffers.
         float variableValue, variableNextValue;
         vec2 variableMinMax, variableNextMinMax;
-        sampleVariableFromLineSSBO(inputs.fragLineID, sampleActualVarID(varID), inputs.fragElementID, variableValue, variableMinMax);
-        sampleVariableFromLineSSBO(inputs.fragLineID, sampleActualVarID(varID), inputs.fragElementNextID, variableNextValue, variableNextMinMax);
+        const uint actualVarID = sampleActualVarID(varID);
+        sampleVariableFromLineSSBO(inputs.fragLineID, actualVarID, inputs.fragElementID, variableValue, variableMinMax);
+        sampleVariableFromLineSSBO(inputs.fragLineID, actualVarID, inputs.fragElementNextID, variableNextValue, variableNextMinMax);
 
         // 1.2) Normalize values.
         variableValue = clamp((variableValue - variableMinMax.x) / (variableMinMax.y - variableMinMax.x), 0.0, 1.0);
         variableNextValue = clamp((variableNextValue - variableNextMinMax.x) / (variableNextMinMax.y - variableNextMinMax.x), 0.0, 1.0);
 
+        float value = mix(variableValue, variableNextValue, inputs.fragElementInterpolant);
+        uint isDiverging = sampleIsDiverging(actualVarID);
+        if (isDiverging > 0) {
+            value = abs(value - 0.5) * 2.0;
+        }
+
         // 1.3) Interpolate linearly.
-        variables[varID] = mix(variableValue, variableNextValue, inputs.fragElementInterpolant);
+        variables[varID] = value;
     }
 
     // Compute the sum of all variables
@@ -372,8 +393,9 @@ shader FSmain(in FSInput inputs, out vec4 fragColor) {
     // 2) Sample variables from buffers
     float variableValue, variableNextValue;
     vec2 variableMinMax, variableNextMinMax;
-    sampleVariableFromLineSSBO(inputs.fragLineID, sampleActualVarID(varID), inputs.fragElementID, variableValue, variableMinMax);
-    sampleVariableFromLineSSBO(inputs.fragLineID, sampleActualVarID(varID), inputs.fragElementNextID, variableNextValue, variableNextMinMax);
+    const uint actualVarID = sampleActualVarID(varID);
+    sampleVariableFromLineSSBO(inputs.fragLineID, actualVarID, inputs.fragElementID, variableValue, variableMinMax);
+    sampleVariableFromLineSSBO(inputs.fragLineID, actualVarID, inputs.fragElementNextID, variableNextValue, variableNextMinMax);
 
     // 3) Normalize values
     //variableValue = (variableValue - variableMinMax.x) / (variableMinMax.y - variableMinMax.x);
@@ -381,7 +403,7 @@ shader FSmain(in FSInput inputs, out vec4 fragColor) {
 
     // 4) Determine variable color
     vec4 surfaceColor = determineColorLinearInterpolate(
-            sampleActualVarID(varID), variableValue, variableNextValue, inputs.fragElementInterpolant);
+            actualVarID, variableValue, variableNextValue, inputs.fragElementInterpolant);
 
 #if ORIENTED_RIBBON_MODE == 1 // ORIENTED_RIBBON_MODE_VARYING_BAND_WIDTH
     float symBandPos = abs(bandPos * 2.0 - 1.0);
@@ -391,6 +413,12 @@ shader FSmain(in FSInput inputs, out vec4 fragColor) {
     float variableNextValuePrime = clamp((variableNextValue - variableNextMinMax.x) / (variableNextMinMax.y - variableNextMinMax.x), 0.0, 1.0);
 
     float interpolatedVariableValue = mix(variableValuePrime, variableNextValuePrime, inputs.fragElementInterpolant);
+
+    uint isDiverging = sampleIsDiverging(actualVarID);
+    if (isDiverging > 0) {
+        interpolatedVariableValue = abs(interpolatedVariableValue - 0.5) * 2.0;
+    }
+
     bandPos = (-symBandPos / interpolatedVariableValue + 1.0) * 0.5;
 #endif
 

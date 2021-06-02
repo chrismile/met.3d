@@ -92,6 +92,7 @@ struct MBezierTrajectoriesRenderData
     GL::MShaderStorageBufferObject* varDescArrayBuffer = nullptr;
     GL::MShaderStorageBufferObject* lineVarDescArrayBuffer = nullptr;
     GL::MShaderStorageBufferObject* varSelectedArrayBuffer = nullptr;
+    GL::MShaderStorageBufferObject* varDivergingArrayBuffer = nullptr;
 };
 
 /**
@@ -126,11 +127,13 @@ public:
     MBezierTrajectoriesRenderData getRenderData(QGLWidget *currentGLContext = 0);
     void releaseRenderData();
     void updateSelectedVariables(const QVector<uint32_t>& varSelected);
+    void updateDivergingVariables(const QVector<uint32_t>& varDiverging);
 
 private:
     QVector<MBezierTrajectory> bezierTrajectories;
     MBezierTrajectoriesRenderData bezierTrajectoriesRenderData;
     QVector<uint32_t> varSelected;
+    QVector<uint32_t> varDiverging;
     QVector<uint32_t> trajectoryIndexOffsets;
     QVector<uint32_t> numIndicesPerTrajectory;
 
@@ -165,6 +168,8 @@ private:
             QString("beziertrajectories_line_var_desc_array_buffer_#%1").arg(getID());
     const QString varSelectedArrayBufferID =
             QString("beziertrajectories_var_selected_array_buffer_#%1").arg(getID());
+    const QString varDivergingArrayBufferID =
+            QString("beziertrajectories_var_diverging_array_buffer_#%1").arg(getID());
 };
 
 }

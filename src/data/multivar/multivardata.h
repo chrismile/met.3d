@@ -83,6 +83,10 @@ public:
     void resetSelectedVariablesChanged() { selectedVariablesChanged = false; }
     const QVector<uint32_t>& getSelectedVariables() { return selectedVariables; }
 
+    bool getVarDivergingChanged() { return varDivergingChanged; }
+    void resetVarDivergingChanged() { varDivergingChanged = false; }
+    const QVector<uint32_t>& getVarDiverging() { return varDiverging; }
+
     /**
       Set a transfer function to map vertical position (pressure) to colour.
       */
@@ -160,6 +164,9 @@ private:
     QVector<QtProperty*> selectedVariablesProperties;
     QVector<uint32_t> selectedVariables;
     bool selectedVariablesChanged = false;
+
+    bool varDivergingChanged = false;
+    QVector<uint32_t> varDiverging;
 
     std::shared_ptr<GL::MShaderEffect> shaderEffect;
     bool isDirty = true;

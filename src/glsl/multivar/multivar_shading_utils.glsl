@@ -149,7 +149,7 @@ vec4 mapColor(in float value, uint index) {
 }*/
 
 
-vec4 determineColor(in int varID, in float variableValue) {
+vec4 determineColor(in uint varID, in float variableValue) {
     // Determine variable color
     /*vec4 surfaceColor = determineVariableColor(varID);
 
@@ -166,17 +166,13 @@ vec4 determineColor(in int varID, in float variableValue) {
     }
 
     //vec4 surfaceColor = transferFunction(variableValue * (1.0 - minColorIntensity) + minColorIntensity, varID);
-    float value = 1.0;
-    if (useColorIntensity == 1) {
-        value = variableValue;
-    }
-    vec4 surfaceColor = transferFunction(value, varID);
+    vec4 surfaceColor = transferFunction(variableValue, varID);
     return surfaceColor;
 }
 
 
 vec4 determineColorLinearInterpolate(
-        in int varID, in float variableValue, in float variableNextValue, in float interpolant) {
+        in uint varID, in float variableValue, in float variableNextValue, in float interpolant) {
     // Determine variable color
     /*vec4 surfaceColor = determineVariableColor(varID);
 
@@ -201,8 +197,7 @@ vec4 determineColorLinearInterpolate(
         return vec4(0.4, 0.4, 0.4, 1);
     }
 
-    float rate = mix(variableValue, variableNextValue, interpolant);
-    float value = rate;
+    float value = mix(variableValue, variableNextValue, interpolant);
     vec4 surfaceColor = transferFunction(value, varID);
     return surfaceColor;
 }

@@ -94,6 +94,8 @@ public:
             float alpha1, float alpha2, float poweralpha,
             bool reversed=false);
 
+    inline MHCLType getMHCLType() { return MHCLType(properties->mEnum()->value(hclTypeProperty)); }
+
     void  selectEditor();
 
     void selectHSVColourmap(QString vaporXMLFile, bool reversed=false);

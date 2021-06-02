@@ -58,6 +58,10 @@ MBezierTrajectories::MBezierTrajectories(
     {
         varSelected.push_back(true);
     }
+    for (unsigned int i = 0; i < numVariables; i++)
+    {
+        varDiverging.push_back(false);
+    }
 
     this->numTrajectories = static_cast<int>(numTrajectories);
     trajectorySelectionCount = new GLsizei[numTrajectories];
@@ -342,6 +346,8 @@ MBezierTrajectoriesRenderData MBezierTrajectories::getRenderData(QGLWidget *curr
             currentGLContext, lineVarDescArrayBufferID, lineVarDescData);
     bezierTrajectoriesRenderData.varSelectedArrayBuffer = createShaderStorageBuffer(
             currentGLContext, varSelectedArrayBufferID, varSelected);
+    bezierTrajectoriesRenderData.varDivergingArrayBuffer = createShaderStorageBuffer(
+            currentGLContext, varDivergingArrayBufferID, varDiverging);
 
     this->bezierTrajectoriesRenderData = bezierTrajectoriesRenderData;
 
@@ -361,6 +367,7 @@ void MBezierTrajectories::releaseRenderData()
     MGLResourcesManager::getInstance()->releaseGPUItem(varDescArrayBufferID);
     MGLResourcesManager::getInstance()->releaseGPUItem(lineVarDescArrayBufferID);
     MGLResourcesManager::getInstance()->releaseGPUItem(varSelectedArrayBufferID);
+    MGLResourcesManager::getInstance()->releaseGPUItem(varDivergingArrayBufferID);
 }
 
 
@@ -370,6 +377,16 @@ void MBezierTrajectories::updateSelectedVariables(const QVector<uint32_t>& varSe
     if (bezierTrajectoriesRenderData.varSelectedArrayBuffer)
     {
         bezierTrajectoriesRenderData.varSelectedArrayBuffer->upload(varSelected.constData(), GL_STATIC_DRAW);
+    }
+}
+
+
+void MBezierTrajectories::updateDivergingVariables(const QVector<uint32_t>& varDiverging)
+{
+    this->varDiverging = varDiverging;
+    if (bezierTrajectoriesRenderData.varDivergingArrayBuffer)
+    {
+        bezierTrajectoriesRenderData.varDivergingArrayBuffer->upload(varDiverging.constData(), GL_STATIC_DRAW);
     }
 }
 

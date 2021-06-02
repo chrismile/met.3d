@@ -2605,6 +2605,13 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
                 multiVarData.resetSelectedVariablesChanged();
             }
 
+            if (multiVarData.getVarDivergingChanged())
+            {
+                trajectoryRequests[t].bezierTrajectoriesMap[sceneView]->updateDivergingVariables(
+                        multiVarData.getVarDiverging());
+                multiVarData.resetVarDivergingChanged();
+            }
+
             std::shared_ptr<GL::MShaderEffect> tubeShader = multiVarData.getShaderEffect();
             tubeShader->bind();
             multiVarData.setUniformData(textureUnitTransferFunction);
@@ -2644,6 +2651,7 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
             bezierTrajectoriesRenderData.varDescArrayBuffer->bindToIndex(5);
             bezierTrajectoriesRenderData.lineVarDescArrayBuffer->bindToIndex(6);
             bezierTrajectoriesRenderData.varSelectedArrayBuffer->bindToIndex(7);
+            bezierTrajectoriesRenderData.varDivergingArrayBuffer->bindToIndex(8);
 
             glPolygonMode(GL_FRONT_AND_BACK, renderAsWireFrame ? GL_LINE : GL_FILL); CHECK_GL_ERROR;
 

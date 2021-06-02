@@ -526,6 +526,7 @@ void MMultiVarData::initTransferFunctionsMultiVar(uint32_t numVariables)
 
     tfPropertiesMultiVar.resize(numVariables);
     transferFunctionsMultiVar.resize(numVariables);
+    varDiverging.resize(numVariables);
     for (uint32_t varIdx = 0; varIdx < numVariables; varIdx++)
     {
         // Transfer function.
@@ -548,7 +549,9 @@ void MMultiVarData::initTransferFunctionsMultiVar(uint32_t numVariables)
         tfPropertiesMultiVar[varIdx]->setToolTip(
                 "This transfer function is used for mapping either pressure or the "
                 "selected auxiliary variable to the trajectory's colour.");
+        varDiverging[varIdx] = 0;
     }
+    varDivergingChanged = true;
 }
 
 
@@ -556,6 +559,8 @@ void MMultiVarData::setTransferFunctionMultiVar(int varIdx, MTransferFunction1D 
 {
     transferFunctionsMultiVar[varIdx] = tf;
     registerTransferFunction(tf);
+    varDiverging[varIdx] = tf->getMHCLType() == MTransferFunction1D::DIVERGING ? 1 : 0;
+    varDivergingChanged = true;
 }
 
 
@@ -600,6 +605,8 @@ void MMultiVarData::setTransferFunctionMultiVarFromProperty(int varIdx)
             if (tf->transferFunctionName() == tfName)
             {
                 transferFunctionsMultiVar[varIdx] = tf;
+                varDiverging[varIdx] = tf->getMHCLType() == MTransferFunction1D::DIVERGING ? 1 : 0;
+                varDivergingChanged = true;
                 registerTransferFunction(tf);
                 return;
             }
@@ -618,12 +625,16 @@ void MMultiVarData::registerTransferFunction(MTransferFunction1D *tf)
 
 void MMultiVarData::transferFunctionChanged(MTransferFunction1D *tf)
 {
+    int varIdx = 0;
     foreach(MTransferFunction1D *transferFunction, transferFunctionsMultiVar)
     {
         if (tf == transferFunction)
         {
             multiVarTf.generateTexture1DArray();
+            varDiverging[varIdx] = tf->getMHCLType() == MTransferFunction1D::DIVERGING ? 1 : 0;
+            varDivergingChanged = true;
         }
+        varIdx++;
     }
 }
 

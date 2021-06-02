@@ -30,6 +30,9 @@
 #if defined(USE_MULTI_VAR_TRANSFER_FUNCTION)
 
 uniform sampler1DArray transferFunctionTexture;
+layout (std430, binding = 8) readonly buffer VarDivergingArray {
+    uint varDiverging[];
+};
 layout (std430, binding = 9) readonly buffer MinMaxBuffer {
     vec2 minMaxValues[];
 };
@@ -37,6 +40,11 @@ layout (std430, binding = 9) readonly buffer MinMaxBuffer {
 #ifdef IS_MULTIVAR_DATA
 uniform int useColorIntensity = 1;
 #endif
+
+// Function to sample from SSBOs
+uint sampleIsDiverging(in uint varID) {
+    return varDiverging[varID];
+}
 
 vec4 transferFunction(float attr, uint variableIndex) {
     vec2 minMaxValue = minMaxValues[variableIndex];
@@ -48,7 +56,11 @@ vec4 transferFunction(float attr, uint variableIndex) {
 
 #ifdef IS_MULTIVAR_DATA
     if (useColorIntensity == 0) {
-        posFloat = 1.0;
+        if (sampleIsDiverging(variableIndex) > 0 && posFloat < 0.5) {
+            posFloat = 0.0;
+        } else {
+            posFloat = 1.0;
+        }
     }
 #endif
 

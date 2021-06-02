@@ -58,23 +58,23 @@ struct LineVarDescData {
 };
 
 // SSBOs which contain all data for all variables per trajectory
-layout (std430, binding = 2) buffer VariableArray {
+layout (std430, binding = 2) readonly buffer VariableArray {
     float varArray[];
 };
 
-layout (std430, binding = 4) buffer LineDescArray {
+layout (std430, binding = 4) readonly buffer LineDescArray {
     LineDescData lineDescs[];
 };
 
-layout (std430, binding = 5) buffer VarDescArray {
+layout (std430, binding = 5) readonly buffer VarDescArray {
     VarDescData varDescs[];
 };
 
-layout (std430, binding = 6) buffer LineVarDescArray {
+layout (std430, binding = 6) readonly buffer LineVarDescArray {
     LineVarDescData lineVarDescs[];
 };
 
-layout (std430, binding = 7) buffer VarSelectedArray {
+layout (std430, binding = 7) readonly buffer VarSelectedArray {
     uint selectedVars[];
 };
 
