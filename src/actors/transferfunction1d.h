@@ -96,6 +96,8 @@ public:
 
     inline MHCLType getMHCLType() { return MHCLType(properties->mEnum()->value(hclTypeProperty)); }
 
+    inline bool getIsRangeReverse() { return properties->mBool()->value(reverseTFRangeProperty); }
+
     void  selectEditor();
 
     void selectHSVColourmap(QString vaporXMLFile, bool reversed=false);

@@ -164,7 +164,9 @@ shader GSmain(in VSOutput inputs[], out FSInput outputs) {
     for (int varID = 0; varID < numVariables; varID++) {
         variablesSumTotal += variables[varID];
     }
-    const float lineRadius0 = lineWidth * 0.5 * (variablesSumTotal / float(max(numVariables, 1)));
+    const float maxRadius = lineWidth * 0.5;
+    const float minRadius = minRadiusFactor * maxRadius;
+    const float lineRadius0 = mix(minRadius, maxRadius, variablesSumTotal / float(max(numVariables, 1)));
 
 
     float _fragElementInterpolant;
@@ -205,8 +207,7 @@ shader GSmain(in VSOutput inputs[], out FSInput outputs) {
     for (int varID = 0; varID < numVariables; varID++) {
         variablesSumTotal += variables[varID];
     }
-    const float lineRadius1 = lineWidth * 0.5 * (variablesSumTotal / float(max(numVariables, 1)));
-
+    const float lineRadius1 = mix(minRadius, maxRadius, variablesSumTotal / float(max(numVariables, 1)));
 
     createTubeSegments(
             circlePointsCurrent, vertexNormalsCurrent, currentPoint, normalCurrent, tangentCurrent, lineRadius0);

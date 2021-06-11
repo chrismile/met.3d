@@ -317,7 +317,9 @@ void MMultiVarData::updateModeEnabledProperties()
 
     // --- Group: Rendering settings ---
     fiberRadiusProperty->setEnabled(multiVarRenderMode == MultiVarRenderMode::FIBERS);
-    minRadiusFactorProperty->setEnabled(multiVarRenderMode != MultiVarRenderMode::ORIENTED_COLOR_BANDS);
+    minRadiusFactorProperty->setEnabled(
+            multiVarRenderMode != MultiVarRenderMode::ORIENTED_COLOR_BANDS
+            || orientedRibbonMode == OrientedRibbonMode::VARYING_RIBBON_WIDTH);
     rollWidthProperty->setEnabled(multiVarRenderMode == MultiVarRenderMode::ROLLS);
 }
 
@@ -811,6 +813,7 @@ void MMultiVarData::onBezierTrajectoriesLoaded(
         setPropertiesVarSelected();
     }
     selectedVariablesChanged = true;
+    varDivergingChanged = true;
 }
 
 
@@ -827,11 +830,15 @@ void MMultiVarData::setUniformData(int textureUnitTransferFunction)
     shaderEffect->setUniformValue("separatorWidth", separatorWidth);
     shaderEffect->setUniformValue("useColorIntensity", int(useColorIntensity));
 
+    if (multiVarRenderMode != MultiVarRenderMode::ORIENTED_COLOR_BANDS
+            || orientedRibbonMode == OrientedRibbonMode::VARYING_RIBBON_WIDTH)
+    {
+        shaderEffect->setUniformValue("minRadiusFactor", minRadiusFactor);
+    }
     if (multiVarRenderMode != MultiVarRenderMode::ORIENTED_COLOR_BANDS)
     {
         shaderEffect->setUniformValue("mapTubeDiameter", mapTubeDiameter);
         shaderEffect->setUniformValue("mapTubeDiameterMode", int(multiVarRadiusMappingMode));
-        shaderEffect->setUniformValue("minRadiusFactor", minRadiusFactor);
     }
     if (multiVarRenderMode == MultiVarRenderMode::ROLLS)
     {

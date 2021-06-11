@@ -121,7 +121,19 @@ void MMultiVarTf::generateTexture1DArray()
     {
         if (tf != nullptr && !tf->getColorValuesByteArray().empty())
         {
-            const std::vector<unsigned char> &colorValuesTf = tf->getColorValuesByteArray();
+            std::vector<unsigned char> colorValuesTf = tf->getColorValuesByteArray();
+            float minimumValue = tf->getMinimumValue();
+            float maximumValue = tf->getMaximumValue();
+            if (tf->getIsRangeReverse())
+            {
+                float tmp = minimumValue;
+                minimumValue = maximumValue;
+                maximumValue = tmp;
+
+                uint32_t* data = reinterpret_cast<uint32_t*>(colorValuesTf.data());
+                std::reverse(data, data + colorValuesTf.size() / sizeof(uint32_t));
+            }
+
             if (colorValuesTf.size() != numBytesPerColorMap)
             {
                 // Resampling using nearest neighbor interpolation.
@@ -145,7 +157,7 @@ void MMultiVarTf::generateTexture1DArray()
                 colorValuesArray.insert(
                         colorValuesArray.end(), colorValuesTf.begin(), colorValuesTf.end());
             }
-            minMaxList[varIdx] = QVector2D(tf->getMinimumValue(), tf->getMaximumValue());
+            minMaxList[varIdx] = QVector2D(minimumValue, maximumValue);
         }
         else
         {
