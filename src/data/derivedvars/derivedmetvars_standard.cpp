@@ -207,6 +207,48 @@ void MEquivalentPotentialTemperatureProcessor::compute(
 }
 
 
+
+// Relative humidity
+// =================
+
+MRelativeHumdityProcessor::MRelativeHumdityProcessor()
+    : MDerivedDataFieldProcessor(
+          "relative_humidity",
+          QStringList() << "air_temperature" << "specific_humidity")
+{
+}
+
+
+void MRelativeHumdityProcessor::compute(
+        QList<MStructuredGrid *> &inputGrids, MStructuredGrid *derivedGrid)
+{
+    // input 0 = "air_temperature"
+    // input 1 = "specific_humidity"
+
+    // Requires nested k/j/i loops to access pressure at grid point.
+    for (unsigned int k = 0; k < derivedGrid->getNumLevels(); k++)
+        for (unsigned int j = 0; j < derivedGrid->getNumLats(); j++)
+            for (unsigned int i = 0; i < derivedGrid->getNumLons(); i++)
+            {
+                float T_K = inputGrids.at(0)->getValue(k, j, i);
+                float q_kgkg = inputGrids.at(1)->getValue(k, j, i);
+
+                if (T_K == M_MISSING_VALUE || q_kgkg == M_MISSING_VALUE)
+                {
+                    derivedGrid->setValue(k, j, i, M_MISSING_VALUE);
+                }
+                else
+                {
+                    float relHum_percent = relativeHumdity_Huang2018(
+                                inputGrids.at(0)->getPressure(k, j, i) * 100.,
+                                T_K,
+                                q_kgkg);
+                    derivedGrid->setValue(k, j, i, relHum_percent);
+                }
+            }
+}
+
+
 // Potential vorticity (LAGRANTO libcalvar implementation)
 // =======================================================
 
@@ -214,9 +256,9 @@ MPotentialVorticityProcessor_LAGRANTOcalvar
 ::MPotentialVorticityProcessor_LAGRANTOcalvar()
     : MDerivedDataFieldProcessor(
           "ertel_potential_vorticity",
-          QStringList() << "eastward_wind"
-                        << "northward_wind"
-                        << "air_temperature"
+          QStringList() << "eastward_wind/HYBRID_SIGMA_PRESSURE_3D"
+                        << "northward_wind/HYBRID_SIGMA_PRESSURE_3D"
+                        << "air_temperature/HYBRID_SIGMA_PRESSURE_3D"
                         << "surface_air_pressure/SURFACE_2D")
 {
 }
@@ -243,6 +285,18 @@ void MPotentialVorticityProcessor_LAGRANTOcalvar::compute(
     // * ak and bk coefficients need to be passed as float arrays.
     //
     // Also compare to libcalvar usage in ppecmwf.py in the met.dp repository.
+
+    // This implementation only works with lon/lat grids - return missing data
+    // field if any other horizontal grid type is passed.
+    if (!(derivedGrid->getHorizontalGridType() == REGULAR_LONLAT_GRID
+          || derivedGrid->getHorizontalGridType() == REGULAR_ROTATED_LONLAT_GRID))
+    {
+        derivedGrid->setToValue(M_MISSING_VALUE);
+        LOG4CPLUS_WARN(mlog, "WARNING: Potential vorticity computation is "
+                       "only implemented for lon/lat grids. Returning empty "
+                       "data field with missing values.");
+        return;
+    }
 
     // Grid sizes.
     int nlev = derivedGrid->getNumLevels();

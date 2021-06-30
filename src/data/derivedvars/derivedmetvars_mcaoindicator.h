@@ -54,13 +54,13 @@ namespace Met3D
 
 /**
  @brief MCAO Index 1: Difference in Potential Temperature (PT) at the sea surface
- and Potential Temperature at some pressure level:
- (PT_surface - PT_pressureLevel).
+ (skin temperature) and Potential Temperature at some pressure level:
+ (PT_skin - PT_pressureLevel).
  Motivated by the use of PT at different pressure levels in the literature
   - (Papritz, 2015; Journal of Climate) and (Yulia P., MPI) using:
-    PT_surface - PT_850hPa
+    PT_skin - PT_850hPa
   - (Fletcher, 2016; Journal of Climate) using:
-    PT_surface - PT_800hPa
+    PT_skin - PT_800hPa
  we compute the index for all pressure levels.
 */
 class MMCAOIndexProcessor_Papritz2015
@@ -68,7 +68,7 @@ class MMCAOIndexProcessor_Papritz2015
 {
 public:
     MMCAOIndexProcessor_Papritz2015(QString standardName =
-            "mcao_index_1_(PTs-PTz)");
+            "mcao_index_1_(PTs_-_PTz)");
 
     void compute(QList<MStructuredGrid*>& inputGrids,
                  MStructuredGrid *derivedGrid);
@@ -76,15 +76,40 @@ public:
 
 
 /**
+ @brief MCAO Index 1 - variant B (same as above, but not masked to lsm):
+ Difference in Potential Temperature (PT) at the sea surface
+ (skin temperature) and Potential Temperature at some pressure level:
+ (PT_skin - PT_pressureLevel).
+ Motivated by the use of PT at different pressure levels in the literature
+  - (Papritz, 2015; Journal of Climate) and (Yulia P., MPI) using:
+    PT_skin - PT_850hPa
+  - (Fletcher, 2016; Journal of Climate) using:
+    PT_skin - PT_800hPa
+ we compute the index for all pressure levels.
+*/
+class MMCAOIndexProcessor_Papritz2015_nonMasked
+        : public MDerivedDataFieldProcessor
+{
+public:
+    MMCAOIndexProcessor_Papritz2015_nonMasked(QString standardName =
+            "mcao_index_1_(PTs_-_PTz)_notmasked");
+
+    void compute(QList<MStructuredGrid*>& inputGrids,
+                 MStructuredGrid *derivedGrid);
+};
+
+
+
+/**
  @brief MCAO Index 2: Difference in Potential Temperature (PT) at the sea
- surface and PT at some vertical level divided by the pressure difference
- between the surface and the vertical level:
- (PT_surface - PT_pressureLevel)/(P_surface - P_at_pressureLevel).
+ surface (skin temperature) and PT at some vertical level divided by the
+ pressure difference between the surface and the vertical level:
+ (PT_skin - PT_pressureLevel)/(P_surface - P_at_pressureLevel).
  Motivated by the use of PT at different pressure levels in the literature
   - (Kolstad, 2008; Clim Dyn) using:
-    (PT_surface - PT_700hPa)/(P_surface-P_at_700hPa)
+    (PT_skin - PT_700hPa)/(P_surface-P_at_700hPa)
   - (Landgren,2019; Clim Dyn) using:
-    (PT_surface - PT_500hPa)/(P_surface-P_at_500hPa)
+    (PT_skin - PT_500hPa)/(P_surface-P_at_500hPa)
  we compute the index for all pressure levels.
  As MCAO Index 2 is very similar to MCAO Index 1, it is implemented as a
  derived class of MMCAOIndexProcessor_Papritz2015.
@@ -120,8 +145,8 @@ public:
 
 /**
  @brief MCAO Index 4: Difference in Potential Temperature (PT) at the sea
- surface and PT at a fixed pressure level of 850 hPa
- (PT_surface - PT_850hPa).
+ surface (skin temperature) and PT at a fixed pressure level of 850 hPa
+ (PT_skin - PT_850hPa).
  This 2-D index field is calculated for direct comparison with the work of
  Yulia P. from MPI-M. Note that MCAO Index 4 is equivalent to MCAO Index 1
  taken at pressure level 850 hPa.
@@ -136,6 +161,23 @@ public:
     void compute(QList<MStructuredGrid*>& inputGrids,
                  MStructuredGrid *derivedGrid);
 };
+
+
+/*
+ @brief MCAO Index 5: Difference between sea surface temperature
+ and temperature aloft at 500 hPa (SST - T_500hPa), as used in
+ (Michel, 2018; Journal of Climate).
+ */
+class MMCAOIndexProcessor_Michel2018
+        : public MDerivedDataFieldProcessor
+{
+public:
+    MMCAOIndexProcessor_Michel2018();
+
+    void compute(QList<MStructuredGrid*>& inputGrids,
+                 MStructuredGrid *derivedGrid);
+};
+
 
 }
 

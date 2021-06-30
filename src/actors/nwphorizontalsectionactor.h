@@ -117,6 +117,13 @@ public:
 
     const double getSectionElevation_hPa() { return slicePosition_hPa; }
 
+    /**
+     If a map projection is used, this method computes a horizontal 2D grid
+     that contains basis vectors for eastward and northward vector components
+     for the projection.
+     */
+    void updateMapProjectionCorrectionForVectorGlyphs();
+
 public slots:
     /**
       Set the pressure at which the section is rendered.
@@ -247,6 +254,10 @@ private:
 
         QList<QString> varNameList;
 
+        bool rotateUVComponentsToMapProjection;
+        QtProperty *rotateUVComponentsToMapProjectionProperty;
+        QtProperty *lengthProjectedBasisVectorsProperty;
+
         QtProperty *appearanceGroupProperty;
 
         enum class GlyphType
@@ -340,6 +351,11 @@ private:
 
     friend struct VectorGlyphsSettings;
     VectorGlyphsSettings *vectorGlyphsSettings;
+
+    MStructuredGrid *vectorCorrForProjMapsGrid;
+    GL::MTexture *textureCorrForProjMapsGrid;
+    int textureUnitCorrForProjMapsGrid;
+    bool updateVectorCorrForProjOnNextRenderCycle;
 
     /** Properties for shadow quad. */
     QtProperty* shadowPropGroup;

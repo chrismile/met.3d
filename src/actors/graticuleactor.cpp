@@ -43,6 +43,7 @@
 #include "gxfw/mglresourcesmanager.h"
 #include "gxfw/msceneviewglwidget.h"
 #include "gxfw/textmanager.h"
+#include "actors/nwphorizontalsectionactor.h"
 
 using namespace std;
 
@@ -53,7 +54,8 @@ namespace Met3D
 ***                     CONSTRUCTOR / DESTRUCTOR                            ***
 *******************************************************************************/
 
-MGraticuleActor::MGraticuleActor(MBoundingBoxConnection *boundingBoxConnection)
+MGraticuleActor::MGraticuleActor(MBoundingBoxConnection *boundingBoxConnection,
+                                 MNWPHorizontalSectionActor *connectedHSecActor)
     : MMapProjectionSupportingActor(QList<MapProjectionType>()
                                     << MAPPROJECTION_CYLINDRICAL
                                     << MAPPROJECTION_ROTATEDLATLON
@@ -70,7 +72,8 @@ MGraticuleActor::MGraticuleActor(MBoundingBoxConnection *boundingBoxConnection)
       graticuleColour(QColor(Qt::black)),
       drawGraticule(true),
       drawCoastLines(true),
-      drawBorderLines(true)
+      drawBorderLines(true),
+      connectedHSecActor(connectedHSecActor)
 {
     // Create and initialise QtProperties for the GUI.
     // ===============================================
@@ -247,9 +250,10 @@ void MGraticuleActor::loadConfiguration(QSettings *settings)
     settings->endGroup();
 
     // Update geometry with loaded configuration.
-    if (MSystemManagerAndControl::getInstance()->applicationIsInitialized())
+    if (isInitialized())
     {
         generateGeometry();
+        if (connectedHSecActor) connectedHSecActor->updateMapProjectionCorrectionForVectorGlyphs();
     }
 }
 
@@ -345,6 +349,7 @@ void MGraticuleActor::onQtPropertyChanged(QtProperty *property)
     {
         updateMapProjectionProperties();
         if (suppressActorUpdates()) return;
+        if (connectedHSecActor) connectedHSecActor->updateMapProjectionCorrectionForVectorGlyphs();
         generateGeometry();
         emitActorChangedSignal();
     }
@@ -367,6 +372,7 @@ void MGraticuleActor::onQtPropertyChanged(QtProperty *property)
         if (mapProjection == MAPPROJECTION_PROJ_LIBRARY)
         {
             generateGeometry();
+            if (connectedHSecActor) connectedHSecActor->updateMapProjectionCorrectionForVectorGlyphs();
             emitActorChangedSignal();
         }
     }

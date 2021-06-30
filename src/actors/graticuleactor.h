@@ -53,6 +53,8 @@ class MSceneViewGLWidget;
 namespace Met3D
 {
 
+class MNWPHorizontalSectionActor;
+
 /**
   @brief GraticuleActor draws a graticule into a scene. Horizontal extent,
   spacing of latitude / longitude lines and colour parameters are customisable
@@ -65,7 +67,8 @@ class MGraticuleActor : public MMapProjectionSupportingActor,
         public MBoundingBoxInterface
 {
 public:
-    MGraticuleActor(MBoundingBoxConnection *boundingBoxConnection = nullptr);
+    MGraticuleActor(MBoundingBoxConnection *boundingBoxConnection = nullptr,
+                    MNWPHorizontalSectionActor *connectedHSecActor = nullptr);
 
     ~MGraticuleActor();
 
@@ -151,6 +154,8 @@ private:
     QtProperty *drawBorderLinesProperty;
 
     float verticalPosition_hPa;
+
+    MNWPHorizontalSectionActor *connectedHSecActor;
 };
 
 

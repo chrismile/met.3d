@@ -67,6 +67,10 @@ MNWPHorizontalSectionActor::MNWPHorizontalSectionActor()
       differenceMode(0),
       vectorGlyphsVertexBuffer(nullptr),
       vectorGlyphsSettings(),
+      vectorCorrForProjMapsGrid(nullptr),
+      textureCorrForProjMapsGrid(nullptr),
+      textureUnitCorrForProjMapsGrid(-1),
+      updateVectorCorrForProjOnNextRenderCycle(true), // update on initial load
       renderShadowQuad(true),
       shadowColor(QColor(60, 60, 60, 70)),
       shadowElevation_hPa(1049.7),
@@ -81,14 +85,17 @@ MNWPHorizontalSectionActor::MNWPHorizontalSectionActor()
     setActorType(staticActorType());
     setName(getActorType());
 
-    slicePosProperty = addProperty(DECORATEDDOUBLE_PROPERTY, "slice position",
+    slicePosProperty = addProperty(DECORATEDDOUBLE_PROPERTY, "section elevation",
                                    actorPropertiesSupGroup);
     properties->setDDouble(slicePosProperty, slicePosition_hPa, 0.01, 1050.,
                            2, slicePositionGranularity_hPa, " hPa");
 
     slicePosGranularityProperty = addProperty(DECORATEDDOUBLE_PROPERTY,
-                                              "slice position granularity",
+                                              "elevation step size",
                                               actorPropertiesSupGroup);
+    slicePosGranularityProperty->setToolTip(
+                "step size when changing the section elevation with the "
+                "mouse cursor");
     properties->setDDouble(slicePosGranularityProperty,
                            slicePositionGranularity_hPa, 0.01, 50., 2, 1., " hPa");
 
@@ -106,7 +113,7 @@ MNWPHorizontalSectionActor::MNWPHorizontalSectionActor()
         }
     }
     synchronizeSlicePosWithOtherActorProperty = addProperty(
-                ENUM_PROPERTY, "sync slice position with",
+                ENUM_PROPERTY, "sync elevation with",
                 actorPropertiesSupGroup);
     properties->mEnum()->setEnumNames(
                 synchronizeSlicePosWithOtherActorProperty, hsecActorNames);
@@ -125,7 +132,7 @@ MNWPHorizontalSectionActor::MNWPHorizontalSectionActor()
     actorPropertiesSupGroup->addSubProperty(vectorGlyphsSettings->groupProperty);
 
     // Shadow properties.
-    shadowPropGroup = addProperty(GROUP_PROPERTY, "ground shadow",
+    shadowPropGroup = addProperty(GROUP_PROPERTY, "section shadow",
                                   actorPropertiesSupGroup);
 
     shadowEnabledProp = addProperty(BOOL_PROPERTY, "enabled", shadowPropGroup);
@@ -142,8 +149,8 @@ MNWPHorizontalSectionActor::MNWPHorizontalSectionActor()
     // Keep an instance of GraticuleActor as a "subactor" to draw a graticule
     // on top of the section. The graticule's vertical position and bounding
     // box will be synchronized with the horizontal section.
-    graticuleActor = new MGraticuleActor(bBoxConnection);
-    graticuleActor->setName("section graticule");
+    graticuleActor = new MGraticuleActor(bBoxConnection, this);
+    graticuleActor->setName("map and graticule");
     graticuleActor->setVerticalPosition(slicePosition_hPa);
     actorPropertiesSupGroup->addSubProperty(graticuleActor->getPropertyGroup());
 
@@ -156,6 +163,7 @@ MNWPHorizontalSectionActor::VectorGlyphsSettings::VectorGlyphsSettings(
     : enabled(false),
       lonComponentVarIndex(0),
       latComponentVarIndex(0),
+      rotateUVComponentsToMapProjection(false),
       glyphType(GlyphType::WindBarbs),
       pivotPosition(PivotPos::Tip),
       lineWidth(0.04),
@@ -200,6 +208,24 @@ MNWPHorizontalSectionActor::VectorGlyphsSettings::VectorGlyphsSettings(
                                              "latitudinal component",
                                              groupProperty);
     latComponentVarProperty->setToolTip("example: northward component of wind");
+
+    rotateUVComponentsToMapProjectionProperty = a->addProperty(
+                BOOL_PROPERTY, "rotate to graticule projection", groupProperty);
+    rotateUVComponentsToMapProjectionProperty->setToolTip(
+                "If u/v wind components are given as eastward and northward "
+                "wind and not relative to the projected grid, use the "
+                "grid projection specified in the graticule to rotate the "
+                "wind barbs.");
+    properties->mBool()->setValue(rotateUVComponentsToMapProjectionProperty,
+                                  rotateUVComponentsToMapProjection);
+    lengthProjectedBasisVectorsProperty = a->addProperty(
+                SCIENTIFICDOUBLE_PROPERTY, "length of basis vectors",
+                groupProperty);
+    lengthProjectedBasisVectorsProperty->setToolTip(
+                "Length of the wind basis vectors used to rotate wind "
+                "barbs to map projection.");
+    properties->setSciDouble(lengthProjectedBasisVectorsProperty,
+                             0.01, 1, 0.01);
 
     appearanceGroupProperty = a->addProperty(GROUP_PROPERTY, "appearance",
                                              groupProperty);
@@ -349,8 +375,14 @@ MNWPHorizontalSectionActor::~MNWPHorizontalSectionActor()
 {
     // "graticuleActor" is deleted by the resourcesManager.
 
+    if (textureUnitCorrForProjMapsGrid >= 0)
+    {
+        releaseTextureUnit(textureUnitCorrForProjMapsGrid);
+    }
+
     delete vectorGlyphsSettings;
     if (vbMouseHandlePoints) delete vbMouseHandlePoints;
+    if (vectorCorrForProjMapsGrid) delete vectorCorrForProjMapsGrid;
 }
 
 
@@ -468,6 +500,12 @@ void MNWPHorizontalSectionActor::saveConfiguration(QSettings *settings)
     settings->setValue("deltaBarbsLonLat", vectorGlyphsSettings->deltaGlyphsLonLat);
     settings->setValue("clampDeltaBarbsToGrid",
                        vectorGlyphsSettings->clampDeltaGlyphsToGrid);
+
+    settings->setValue("rotateUVComponentsToMapProjection",
+                       vectorGlyphsSettings->rotateUVComponentsToMapProjection);
+    settings->setValue("lengthProjectedBasisVectors",
+                       properties->mSciDouble()->value(
+                           vectorGlyphsSettings->lengthProjectedBasisVectorsProperty));
 
     settings->endGroup(); // Windbarbs = Vector Glyphs
 
@@ -632,6 +670,13 @@ void MNWPHorizontalSectionActor::loadConfiguration(QSettings *settings)
                 vectorGlyphsSettings->latComponentVarProperty,
                 settings->value("vComponent", 0).toInt());
 
+    properties->mBool()->setValue(
+                vectorGlyphsSettings->rotateUVComponentsToMapProjectionProperty,
+                settings->value("rotateUVComponentsToMapProjection", false).toBool());
+    properties->mSciDouble()->setValue(
+                vectorGlyphsSettings->lengthProjectedBasisVectorsProperty,
+                settings->value("lengthProjectedBasisVectors", 0.01).toDouble());
+
     settings->endGroup(); // Windbarbs = Vector Glyphs
 
     settings->beginGroup("SubActor_Graticule");
@@ -641,7 +686,7 @@ void MNWPHorizontalSectionActor::loadConfiguration(QSettings *settings)
     // an empty actor name.
     if (graticuleActor->getName().isEmpty())
     {
-        graticuleActor->setName("section graticule");
+        graticuleActor->setName("map and graticule");
     }
     // Old sessions have stored the graticule properties in a different
     // subgroup; restore vertical position to avoid user confusion.
@@ -713,7 +758,6 @@ int MNWPHorizontalSectionActor::checkIntersectionWithHandle(
 
     return selectedMouseHandle;
 }
-void addPositionLabel(MSceneViewGLWidget *sceneView, int handleID);
 
 
 void MNWPHorizontalSectionActor::addPositionLabel(MSceneViewGLWidget *sceneView,
@@ -941,6 +985,116 @@ void MNWPHorizontalSectionActor::onBoundingBoxChanged()
 }
 
 
+void MNWPHorizontalSectionActor::updateMapProjectionCorrectionForVectorGlyphs()
+{
+    // Compare to the matplotlib basemap function
+    //     rotate_vector(self,uin,vin,lons,lats,returnxy=False)
+    // at https://github.com/matplotlib/basemap/blob/master/lib/mpl_toolkits/basemap/__init__.py
+
+    if (!isInitialized()) return;
+
+    if (vectorCorrForProjMapsGrid)
+    {
+        // Deleting a previous grid will also release the texture from GPU
+        // memory.
+        delete vectorCorrForProjMapsGrid;
+        textureCorrForProjMapsGrid = nullptr;
+    }
+
+    // Is a map projection selected? If not, do nothing.
+    if (graticuleActor->getMapProjection() !=
+            MMapProjectionSupportingActor::MAPPROJECTION_PROJ_LIBRARY)
+    {
+        return;
+    }
+
+    // Are the variables selected as vector components valid?
+    if (vectorGlyphsSettings->latComponentVarIndex >= variables.size() ||
+            vectorGlyphsSettings->latComponentVarIndex < 0 ||
+            vectorGlyphsSettings->lonComponentVarIndex >= variables.size() ||
+            vectorGlyphsSettings->lonComponentVarIndex < 0)
+    {
+        return;
+    }
+
+    LOG4CPLUS_DEBUG(mlog, "Computing vector glyph correction for map projection..");
+
+    // Obtain pointer to actor variable representing lon component.
+    MNWP2DHorizontalActorVariable *varLongitudinalComponent =
+            static_cast<MNWP2DHorizontalActorVariable*>(
+                variables.at(vectorGlyphsSettings->lonComponentVarIndex)
+                );
+
+    // (Re-)Initialize (2D x 2 x 2 components) grid that stores vector basis for
+    // map projection. The grid has the same horizontal layout as the vector
+    // component variable. The 2x2 components are stored in 4 levels:
+    //   (0) eastward, x
+    //   (1) eastward, y
+    //   (2) northward, x
+    //   (3) northward, y
+    MStructuredGrid *dGridPtr = varLongitudinalComponent->grid;
+    if (dGridPtr == nullptr)
+    {
+        LOG4CPLUS_ERROR(mlog, "ERROR while computing vector glyph correction "
+                              "for map projection: lon/x-vector component "
+                              "not yet loaded.");
+        return;
+    }
+    vectorCorrForProjMapsGrid = new MStructuredGrid(
+                MISC_LEVELS_3D, 4,
+                dGridPtr->getNumLats(), dGridPtr->getNumLons());
+
+    // Initialize projection object.
+    MGeometryHandling geo;
+    geo.initProjProjection(graticuleActor->getProjLibraryString());
+    geo.initRotatedLonLatProjection(graticuleActor->getRotatedNorthPole());
+
+    // Basis vectors are generated by displacing the current grid point
+    // position by this value in the eastward or northward direction.
+    float vecDisplacement = properties->mSciDouble()->value(
+                vectorGlyphsSettings->lengthProjectedBasisVectorsProperty);
+
+    // For each grid point, compute eastward/northward basis vectors in
+    // projected coordinates.
+    for (unsigned int j = 0; j < dGridPtr->getNumLats(); j++)
+    {
+        for (unsigned int i = 0; i < dGridPtr->getNumLons(); i++)
+        {
+            // Generate end points of basis vectors (eastward/northward) in
+            // lon/lat space.
+            // Coordinates of current grid point in projected coords..
+            QPointF gridPoint(dGridPtr->getLons()[i], dGridPtr->getLats()[j]);
+            // ..transformed to lon/lat ("true" is inverse projection).
+            gridPoint = geo.geographicalToProjectedCoordinates(gridPoint, true);
+            // Displace grid point eastward and northward.
+            QPointF gridPoint_eastward = gridPoint + QPointF(vecDisplacement, 0.);
+            QPointF gridPoint_northward = gridPoint + QPointF(0., vecDisplacement);
+
+            // Project end points to map projection.
+            gridPoint = geo.geographicalToProjectedCoordinates(gridPoint);
+            gridPoint_eastward = geo.geographicalToProjectedCoordinates(gridPoint_eastward);
+            gridPoint_northward = geo.geographicalToProjectedCoordinates(gridPoint_northward);
+
+            // Assemble new basis vectors in projection.
+            QVector2D projUBasis(gridPoint_eastward - gridPoint);
+            projUBasis.normalize();
+            QVector2D projVBasis(gridPoint_northward - gridPoint);
+            projVBasis.normalize();
+
+            // Store basis vector components in grid.
+            vectorCorrForProjMapsGrid->setValue(0, j, i, projUBasis.x());
+            vectorCorrForProjMapsGrid->setValue(1, j, i, projUBasis.y());
+            vectorCorrForProjMapsGrid->setValue(2, j, i, projVBasis.x());
+            vectorCorrForProjMapsGrid->setValue(3, j, i, projVBasis.y());
+        }
+    }
+
+    textureCorrForProjMapsGrid = vectorCorrForProjMapsGrid->getTexture();
+
+    updateVectorCorrForProjOnNextRenderCycle = false;
+}
+
+
 /******************************************************************************
 ***                             PUBLIC SLOTS                                ***
 *******************************************************************************/
@@ -963,6 +1117,12 @@ void MNWPHorizontalSectionActor::initializeActorResources()
 
     // Parent initialisation.
     MNWPMultiVarActor::initializeActorResources();
+
+    if (textureUnitCorrForProjMapsGrid >= 0)
+    {
+        releaseTextureUnit(textureUnitCorrForProjMapsGrid);
+    }
+    textureUnitCorrForProjMapsGrid = assignTextureUnit();
 
     for (int vi = 0; vi < variables.size(); vi++)
     {
@@ -1163,7 +1323,9 @@ void MNWPHorizontalSectionActor::onQtPropertyChanged(QtProperty *property)
              || property == vectorGlyphsSettings->reduceSlopeProperty
              || property == vectorGlyphsSettings->sensitivityProperty
              || property == vectorGlyphsSettings->lonComponentVarProperty
-             || property == vectorGlyphsSettings->latComponentVarProperty)
+             || property == vectorGlyphsSettings->latComponentVarProperty
+             || property == vectorGlyphsSettings->rotateUVComponentsToMapProjectionProperty
+             || property == vectorGlyphsSettings->lengthProjectedBasisVectorsProperty)
     {
         vectorGlyphsSettings->glyphType = VectorGlyphsSettings::GlyphType(
                     properties->mEnum()
@@ -1211,10 +1373,24 @@ void MNWPHorizontalSectionActor::onQtPropertyChanged(QtProperty *property)
                 ->value(vectorGlyphsSettings->reduceSlopeProperty);
         vectorGlyphsSettings->sensitivity = properties->mDouble()
                 ->value(vectorGlyphsSettings->sensitivityProperty);
+        int8_t previousLonComponentVarIndex =
+                vectorGlyphsSettings->lonComponentVarIndex;
         vectorGlyphsSettings->lonComponentVarIndex = properties->mEnum()
                 ->value(vectorGlyphsSettings->lonComponentVarProperty);
         vectorGlyphsSettings->latComponentVarIndex = properties->mEnum()
                 ->value(vectorGlyphsSettings->latComponentVarProperty);
+        vectorGlyphsSettings->rotateUVComponentsToMapProjection = properties->mBool()
+                ->value(vectorGlyphsSettings->rotateUVComponentsToMapProjectionProperty);
+
+        // For vector glyphs on projected maps: update direction correction
+        // in case the vector component in lon/x direction has changed.
+        // Since lon/lat components are required to be on the same grid, we
+        // only need to check one component.
+        if ( (vectorGlyphsSettings->lonComponentVarIndex != previousLonComponentVarIndex)
+             || (property == vectorGlyphsSettings->lengthProjectedBasisVectorsProperty))
+        {
+            updateVectorCorrForProjOnNextRenderCycle = true;
+        }
 
         if (suppressActorUpdates()) return;
 
@@ -2463,13 +2639,18 @@ void MNWPHorizontalSectionActor::renderVectorGlyphs(
                 variables.at(vectorGlyphsSettings->lonComponentVarIndex)
                 );
 
-    if (varLatitudinal->grid->getLevelType()
-            != varLongitudinal->grid->getLevelType())
+    if (varLatitudinal->dataSource != varLongitudinal->dataSource)
     {
         LOG4CPLUS_WARN(mlog, "WARNING: Vector field longitudinal and latitudinal"
-                             " variables must have the same vertical level type."
+                             " variables must come from the same data source to"
+                             " make sure they share the same grid."
                              " Disabling vector glyphs.");
         return;
+    }
+
+    if (updateVectorCorrForProjOnNextRenderCycle)
+    {
+        updateMapProjectionCorrectionForVectorGlyphs();
     }
 
     // Don't render vector glyphs if horizontal slice position is outside the
@@ -2622,8 +2803,7 @@ void MNWPHorizontalSectionActor::renderVectorGlyphs(
                 "mvpMatrix",
                 *(sceneView->getModelViewProjectionMatrix())); CHECK_GL_ERROR;
 
-//TODO (mr 17May2017) -- why is there an offset?
-    const GLfloat worldZ = sceneView->worldZfromPressure(slicePosition_hPa) + 0.1;
+    const GLfloat worldZ = sceneView->worldZfromPressure(slicePosition_hPa);
     glyphsShader->setUniformValue(
                 "worldZ", worldZ); CHECK_GL_ERROR;
 
@@ -2728,6 +2908,22 @@ void MNWPHorizontalSectionActor::renderVectorGlyphs(
                 "lineWidth", vectorGlyphsSettings->lineWidth); CHECK_GL_ERROR;
     glyphsShader->setUniformValue(
                 "glyphColor", vectorGlyphsSettings->color); CHECK_GL_ERROR;
+
+    if (graticuleActor->getMapProjection() ==
+            MMapProjectionSupportingActor::MAPPROJECTION_PROJ_LIBRARY)
+    {
+        glyphsShader->setUniformValue(
+                    "applyVectorCorrectionForProjMaps",
+                    GLboolean(vectorGlyphsSettings->rotateUVComponentsToMapProjection));
+        textureCorrForProjMapsGrid->bindToTextureUnit(textureUnitCorrForProjMapsGrid);
+        glyphsShader->setUniformValue("vectorCorrForProjMaps",
+                                      textureUnitCorrForProjMapsGrid); CHECK_GL_ERROR;
+    }
+    else
+    {
+        glyphsShader->setUniformValue("applyVectorCorrectionForProjMaps",
+                                      GLboolean(false)); CHECK_GL_ERROR;
+    }
 
     float scale = 1.;
     float deltaGlyphs = 1.;
@@ -2842,10 +3038,10 @@ void MNWPHorizontalSectionActor::renderVectorGlyphs(
     const int VERTEX_ATTRIBUTE = 0;
     vectorGlyphsVertexBuffer->attachToVertexAttribute(VERTEX_ATTRIBUTE, 2);
 
+    glDepthFunc(GL_LEQUAL);
     glPolygonMode(GL_FRONT_AND_BACK,
                   renderAsWireFrame ? GL_LINE : GL_FILL); CHECK_GL_ERROR;
 
-    glPolygonOffset(.8f, 1.0f); CHECK_GL_ERROR;
     glEnable(GL_POLYGON_OFFSET_FILL); CHECK_GL_ERROR;
     glDrawArrays(GL_POINTS, 0, nGlyphsLon * nGlyphsLat); CHECK_GL_ERROR;
 

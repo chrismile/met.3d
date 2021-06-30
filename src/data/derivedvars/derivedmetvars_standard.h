@@ -93,6 +93,17 @@ public:
 };
 
 
+class MRelativeHumdityProcessor
+        : public MDerivedDataFieldProcessor
+{
+public:
+    MRelativeHumdityProcessor();
+
+    void compute(QList<MStructuredGrid*>& inputGrids,
+                 MStructuredGrid *derivedGrid);
+};
+
+
 class MPotentialVorticityProcessor_LAGRANTOcalvar
         : public MDerivedDataFieldProcessor
 {

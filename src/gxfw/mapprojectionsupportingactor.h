@@ -88,7 +88,14 @@ public:
     virtual void updateMapProjectionProperties();
 
     static QString mapProjectionToString(MapProjectionType mapProjection);
+
     static MapProjectionType stringToMapProjection(QString mapProjection);
+
+    MapProjectionType getMapProjection() { return mapProjection; }
+
+    QPointF getRotatedNorthPole() { return rotatedNorthPole; }
+
+    QString getProjLibraryString() { return projLibraryString; }
 
 protected:
     QtProperty *mapProjectionPropertiesSubGroup;

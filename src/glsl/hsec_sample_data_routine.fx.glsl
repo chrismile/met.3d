@@ -50,13 +50,16 @@ uniform int         levelType;       // vertical level type of the data grid
 uniform sampler1D   latLonAxesData;  // 1D texture that holds both lon and lat
 uniform int         verticalOffset;  // index at which vertical axis data starts
 
+uniform bool        applyVectorCorrectionForProjMaps; // correct vector direction
+uniform sampler3D   vectorCorrForProjMaps; // for projected maps?
 
 float sampleDataAtPos(  in vec3 pos,
                         in sampler3D volume,
                         in sampler2D dataField2D,
                         in sampler2D surfacePressure,
                         in sampler1D hybridCoefficients,
-                        in sampler3D auxPressureField_hPa)
+                        in sampler3D auxPressureField_hPa,
+                        out vec4 dirCorrForProjMaps)
 {
     float mixI = mod(pos.x - dataNWCrnr.x, 360.) / deltaLon;
     float mixJ = (dataNWCrnr.y - pos.y) / deltaLat;
@@ -72,6 +75,16 @@ float sampleDataAtPos(  in vec3 pos,
     }
     if (i < 0 || i >= dims.x) return MISSING_VALUE;
     if (j < 0 || j >= dims.y) return MISSING_VALUE;
+
+    dirCorrForProjMaps = vec4(0.);
+    if (applyVectorCorrectionForProjMaps)
+    {
+        dirCorrForProjMaps = vec4(
+                    texelFetch(vectorCorrForProjMaps, ivec3(i, j, 0), 0).a,
+                    texelFetch(vectorCorrForProjMaps, ivec3(i, j, 1), 0).a,
+                    texelFetch(vectorCorrForProjMaps, ivec3(i, j, 2), 0).a,
+                    texelFetch(vectorCorrForProjMaps, ivec3(i, j, 3), 0).a);
+    }
 
     int numberOfLevels = 0;
     int klower = 0;
