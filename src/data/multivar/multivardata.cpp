@@ -663,7 +663,14 @@ void MMultiVarData::onQtPropertyChanged(QtProperty *property)
 {
     if (property == renderTechniqueProperty)
     {
-        multiVarRenderMode = MultiVarRenderMode(properties->mEnum()->value(renderTechniqueProperty));
+        MultiVarRenderMode newRenderMode = MultiVarRenderMode(properties->mEnum()->value(renderTechniqueProperty));
+        bool oldRenderModeNeedsSubdiv = getMultiVarRenderModeNeedsSubdiv(multiVarRenderMode);
+        bool newRenderModeNeedsSubdiv = getMultiVarRenderModeNeedsSubdiv(newRenderMode);
+        if (oldRenderModeNeedsSubdiv != newRenderModeNeedsSubdiv)
+        {
+            internalRepresentationChanged = true;
+        }
+        multiVarRenderMode = newRenderMode;
         reloadShaderEffect();
     }
     else if (tfPropertiesMultiVar.contains(property))

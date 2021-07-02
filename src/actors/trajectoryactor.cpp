@@ -1638,7 +1638,7 @@ void MTrajectoryActor::prepareAvailableDataForRendering(uint slot)
         }
 
         // 5. Bezier trajectories.
-        // ===========
+        // =======================
 
         if (useBezierTrajectories)
         {
@@ -2581,20 +2581,42 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
                 // Discard old normals.
                 if (trajectoryRequests[t].normals.value(sceneView, nullptr))
                 {
-                    normalsSource->releaseData(trajectoryRequests[t]
-                                                       .normals[sceneView]);
+                    normalsSource->releaseData(trajectoryRequests[t].normals[sceneView]);
                 }
-
                 trajectoryRequests[t].normals[sceneView] = nullptr;
 
                 // Discard old Bezier trajectories.
                 if (trajectoryRequests[t].bezierTrajectoriesMap.value(sceneView, nullptr))
                 {
+                    trajectoryRequests[t].bezierTrajectoriesMap[sceneView]->releaseRenderData();
                     bezierTrajectoriesSource->releaseData(
                             trajectoryRequests[t].bezierTrajectoriesMap[sceneView]);
                 }
-
                 trajectoryRequests[t].bezierTrajectoriesMap[sceneView] = nullptr;
+
+                if (suppressActorUpdates()) return;
+                asynchronousDataRequest();
+                emitActorChangedSignal();
+
+                continue;
+            }
+
+            if (multiVarData.getInternalRepresentationChanged())
+            {
+                // Discard old Bezier trajectories.
+                if (trajectoryRequests[t].bezierTrajectoriesMap.value(sceneView, nullptr))
+                {
+                    trajectoryRequests[t].bezierTrajectoriesMap[sceneView]->releaseRenderData();
+                    bezierTrajectoriesSource->releaseData(
+                            trajectoryRequests[t].bezierTrajectoriesMap[sceneView]);
+                }
+                trajectoryRequests[t].bezierTrajectoriesMap[sceneView] = nullptr;
+                multiVarData.resetInternalRepresentationChanged();
+
+                if (suppressActorUpdates()) return;
+                asynchronousDataRequest();
+                emitActorChangedSignal();
+
                 continue;
             }
 
@@ -3472,7 +3494,8 @@ void MTrajectoryActor::asynchronousDataRequest(bool synchronizationRequest)
             foreach (MSceneViewGLWidget* view, getViews())
             {
                 QVector2D params = view->pressureToWorldZParameters();
-                QString query = QString("%1/%2").arg(params.x()).arg(params.y());
+                QString query = QString("%1/%2/%3").arg(params.x()).arg(params.y()).arg(
+                        multiVarData.getNeedsSubdiv());
                 LOG4CPLUS_DEBUG(mlog, "BEZIERTRAJECTORIES: " << query.toStdString());
 
                 rh.insert("BEZIERTRAJECTORIES_LOGP_SCALED", query);
@@ -3557,6 +3580,7 @@ void MTrajectoryActor::asynchronousDataRequest(bool synchronizationRequest)
             foreach (MSceneViewGLWidget* view, getViews())
             {
                 view->setLightDirection(MSceneViewGLWidget::VIEWDIRECTION);
+                bezierTrajectoriesSource->setNeedsSubdiv(multiVarData.getNeedsSubdiv());
                 bezierTrajectoriesSource->requestData(trqi.bezierTrajectoriesRequests[view].request);
             }
         }

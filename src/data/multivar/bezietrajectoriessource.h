@@ -52,6 +52,8 @@ class MBezierTrajectoriesSource : public MScheduledDataSource
 public:
     MBezierTrajectoriesSource();
 
+    inline void setNeedsSubdiv(bool needsSubdiv) { this->needsSubdiv = needsSubdiv; }
+
     /**
       Overloads @ref MMemoryManagedDataSource::getData() to cast the result
       to the type @ref MFloatPerTrajectorySupplement.
@@ -74,6 +76,7 @@ protected:
 private:
     MTrajectoryDataSource* trajectorySource;
     uint32_t numVariables = 0;
+    bool needsSubdiv = true;
 };
 
 } // namespace Met3D

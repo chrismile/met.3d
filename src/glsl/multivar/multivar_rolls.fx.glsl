@@ -129,10 +129,16 @@ shader GSmain(in VSOutput inputs[]) {
 
     vec3 tangent = normalize(nextPoint - currentPoint);
 
+    const int vVariableIDMod = inputs[0].vVariableID % MAX_NUM_VARIABLES; // % maxNumVariables, % numVariables
+
     // 1) Sample variables at each tube roll
     const int instanceID = gl_InvocationID;
-    const float mappedVarIDRatio = mod(float(inputs[0].vVariableID) / float(rollWidth), 1.0);
-    const int mappedVarID = (inputs[0].vVariableID >= 0) ? inputs[0].vVariableID / rollWidth : -1;
+    //const float mappedVarIDRatio = mod(float(inputs[0].vVariableID) / float(rollWidth), 1.0);
+    const float mappedVarIDRatio = mod(float(vVariableIDMod) / float(rollWidth), 1.0);
+    //const int mappedVarID = (inputs[0].vVariableID >= 0) ? inputs[0].vVariableID / rollWidth : -1;
+    //const int mappedVarID = (inputs[0].vVariableID >= 0) ? (inputs[0].vVariableID % maxNumVariables) / rollWidth : -1;
+    //const int mappedVarID = (inputs[0].vVariableID >= 0) ? (inputs[0].vVariableID % numVariables) / rollWidth : -1;
+    const int mappedVarID = (inputs[0].vVariableID >= 0) ? vVariableIDMod / rollWidth : -1;
     const int varID = sampleActualVarID(mappedVarID); // instanceID % numVariables for stripes
     const int elementID = inputs[0].vElementID;
     const int lineID = inputs[0].vLineID;

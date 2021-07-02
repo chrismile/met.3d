@@ -27,7 +27,8 @@
 #include "bezietrajectoriessource.h"
 
 // standard library imports
-#include "assert.h"
+#include <algorithm>
+#include <cassert>
 
 // related third party imports
 #include <log4cplus/loggingmacros.h>
@@ -65,8 +66,7 @@ struct MFilteredTrajectory
 };
 typedef QVector<MFilteredTrajectory> MFilteredTrajectories;
 
-MBezierTrajectories *MBezierTrajectoriesSource::produceData(
-        MDataRequest request)
+MBezierTrajectories *MBezierTrajectoriesSource::produceData(MDataRequest request)
 {
     assert(trajectorySource != nullptr);
 
@@ -87,8 +87,7 @@ MBezierTrajectories *MBezierTrajectoriesSource::produceData(
     QVector<int> indicesToFilteredIndicesMap;
     indicesToFilteredIndicesMap.reserve(inTrajectories->getNumTrajectories());
 
-    // Loop over all trajectories and compute normals for each of their
-    // vertices.
+    // Loop over all trajectories and compute normals for each of their vertices.
     int numTrajectories = inTrajectories->getNumTrajectories();
     int numTimeStepsPerTrajectory = inTrajectories->getNumTimeStepsPerTrajectory();
     QVector<QVector3D> vertices = inTrajectories->getVertices();
@@ -101,8 +100,7 @@ MBezierTrajectories *MBezierTrajectoriesSource::produceData(
     {
         int baseIndex = i * numTimeStepsPerTrajectory;
 
-        // Prevent "out of bound exception" ("vertices" are access at
-        // "baseIndex+1").
+        // Prevent "out of bound exception" ("vertices" are accessed at "baseIndex+1").
         if (baseIndex+1 >= vertices.size())
         {
             continue;
@@ -275,7 +273,21 @@ MBezierTrajectories *MBezierTrajectoriesSource::produceData(
 
     // 3) Compute several equally-distributed / equi-distant points along Bezier curves.
     // Store these points in a new trajectory
-    float rollSegLength = avgSegLength / numVariables;// avgSegLength * 0.2f;
+    bool resetPerSegMode;
+    const float minAvgSegLength = 0.1f;
+    if (avgSegLength < minAvgSegLength)
+    {
+        resetPerSegMode = !needsSubdiv;
+        if (needsSubdiv)
+        {
+            avgSegLength = minAvgSegLength;
+        }
+    }
+    else
+    {
+        resetPerSegMode = true;
+    }
+    float rollSegLength = avgSegLength / std::min(numVariables, uint32_t(8));// avgSegLength * 0.2f;
 
     MBezierTrajectories* newTrajectories = new MBezierTrajectories(
             inTrajectories->getGeneratingRequest(),
@@ -329,21 +341,35 @@ MBezierTrajectories *MBezierTrajectoriesSource::produceData(
             // Obtain current Bezier segment index based on arc length
             while (sumArcLengthsNext <= curArcLength)
             {
-                varIDPerLine = 0;
+                if (resetPerSegMode)
+                {
+                    varIDPerLine = 0;
+                }
                 lineID++;
                 if (lineID >= BCurves.size()) {
                     break;
                 }
                 sumArcLengths = sumArcLengthsNext;
                 sumArcLengthsNext += BCurves[lineID].totalArcLength;
+                if (!resetPerSegMode)
+                {
+                    break;
+                }
             }
-            if (lineID >= BCurves.size()) {
+            if (lineID >= BCurves.size())
+            {
                 break;
             }
 
             const auto &BCurve = BCurves[lineID];
 
-            float t = BCurve.solveTForArcLength(curArcLength - sumArcLengths);
+            const float _arcLength = curArcLength - sumArcLengths;
+            if (_arcLength > BCurve.totalArcLength)
+            {
+                continue;
+            }
+            float t = BCurve.solveTForArcLength(_arcLength);
+            t = clamp(t, BCurve.minT, BCurve.maxT);
 
             BCurves[lineID].evaluate(t, pos, tangent);
 
@@ -355,13 +381,19 @@ MBezierTrajectories *MBezierTrajectoriesSource::produceData(
                 newTrajectory.attributes[0].push_back(varValue);
                 newTrajectory.attributes[1].push_back(attributesMinMax[varIDPerLine].x());
                 newTrajectory.attributes[2].push_back(attributesMinMax[varIDPerLine].y());
-                // var ID
-                newTrajectory.attributes[3].push_back(static_cast<float>(varIDPerLine));
-
-            } else {
+            }
+            else
+            {
                 newTrajectory.attributes[0].push_back(0.0);
                 newTrajectory.attributes[1].push_back(0.0);
                 newTrajectory.attributes[2].push_back(0.0);
+            }
+            if (varIDPerLine < numVariables || !resetPerSegMode)
+            {
+                newTrajectory.attributes[3].push_back(static_cast<float>(varIDPerLine));
+            }
+            else
+            {
                 newTrajectory.attributes[3].push_back(-1.0);
             }
 

@@ -52,6 +52,12 @@ enum class MultiVarRenderMode {
     FIBERS
 };
 
+inline bool getMultiVarRenderModeNeedsSubdiv(MultiVarRenderMode multiVarRenderMode) {
+    return multiVarRenderMode == MultiVarRenderMode::ROLLS
+            || multiVarRenderMode == MultiVarRenderMode::CHECKERBOARD
+            || multiVarRenderMode == MultiVarRenderMode::TWISTED_ROLLS;
+}
+
 enum class MultiVarRadiusMappingMode {
     GLOBAL,
     LINE
@@ -79,13 +85,18 @@ public:
 
     void initTransferFunctionsMultiVar(uint32_t numVariables);
 
-    bool getSelectedVariablesChanged() { return selectedVariablesChanged; }
-    void resetSelectedVariablesChanged() { selectedVariablesChanged = false; }
-    const QVector<uint32_t>& getSelectedVariables() { return selectedVariables; }
+    // When a shader needing a different internal representation was loaded.
+    inline bool getInternalRepresentationChanged() { return internalRepresentationChanged; }
+    inline void resetInternalRepresentationChanged() { internalRepresentationChanged = false; }
+    inline bool getNeedsSubdiv() { return getMultiVarRenderModeNeedsSubdiv(multiVarRenderMode); }
 
-    bool getVarDivergingChanged() { return varDivergingChanged; }
-    void resetVarDivergingChanged() { varDivergingChanged = false; }
-    const QVector<uint32_t>& getVarDiverging() { return varDiverging; }
+    inline bool getSelectedVariablesChanged() { return selectedVariablesChanged; }
+    inline void resetSelectedVariablesChanged() { selectedVariablesChanged = false; }
+    inline const QVector<uint32_t>& getSelectedVariables() { return selectedVariables; }
+
+    inline bool getVarDivergingChanged() { return varDivergingChanged; }
+    inline void resetVarDivergingChanged() { varDivergingChanged = false; }
+    inline const QVector<uint32_t>& getVarDiverging() { return varDiverging; }
 
     /**
       Set a transfer function to map vertical position (pressure) to colour.
@@ -174,6 +185,7 @@ private:
     // Rendering modes.
     MultiVarRenderMode multiVarRenderMode = MultiVarRenderMode::ORIENTED_COLOR_BANDS;
     MultiVarRadiusMappingMode multiVarRadiusMappingMode = MultiVarRadiusMappingMode::GLOBAL;
+    bool internalRepresentationChanged = false; ///< If multiVarRenderMode changes to other mode needing different data.
 
     // For MULTIVAR_RENDERMODE_ORIENTED_COLOR_BANDS, MULTIVAR_RENDERMODE_ORIENTED_COLOR_BANDS_RIBBON
     enum class OrientedRibbonMode {
