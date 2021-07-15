@@ -173,7 +173,7 @@ shader GSmain(in VSOutput inputs[]) {
             }
 
             if (lineVarMinMax.x != lineVarMinMax.y) {
-                float interpolant = (variableValue - lineVarMinMax.x) / (lineVarMinMax.y - lineVarMinMax.x);
+                float interpolant = clamp((variableValue - lineVarMinMax.x) / (lineVarMinMax.y - lineVarMinMax.x), 0.0, 1.0);
 //                interpolant = max(0.0, min(1.0, interpolant));
                 curRadius = mix(minRadius, lineWidth / 2.0, interpolant);
             }

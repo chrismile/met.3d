@@ -196,7 +196,7 @@ void MMultiVarData::setPropertiesRenderingSettings()
     fiberRadiusProperty = addProperty(
             DECORATEDDOUBLE_PROPERTY, "fiber radius", renderingSettingsGroupProperty);
     properties->setDDouble(
-            fiberRadiusProperty, fiberRadius, 0.01, 1.0, 4, 0.05, " (world space)");
+            fiberRadiusProperty, fiberRadius, 0.01, 1.0, 4, 0.01, " (world space)");
     fiberRadiusProperty->setToolTip("Fiber radius.");
     propertyList.push_back(fiberRadiusProperty);
 
@@ -426,7 +426,7 @@ void MMultiVarData::loadConfiguration(QSettings *settings)
 
     // Line settings.
     minRadiusFactor = settings->value("minRadiusFactor", 0.5f).toFloat();
-    fiberRadius = settings->value("fiberRadius", 0.1f).toFloat();
+    fiberRadius = settings->value("fiberRadius", 0.05f).toFloat();
 
     // Lighting settings.
     useColorIntensity = settings->value("useColorIntensity", true).toBool();

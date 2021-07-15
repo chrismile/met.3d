@@ -260,7 +260,7 @@ float computeRadius(
         sampleVariableDistributionFromLineSSBO(lineID, varID, lineVarMinMax);
     }
     if (lineVarMinMax.x != lineVarMinMax.y) {
-        float interpolant = (variableValueOrig - lineVarMinMax.x) / (lineVarMinMax.y - lineVarMinMax.x);
+        float interpolant = clamp((variableValueOrig - lineVarMinMax.x) / (lineVarMinMax.y - lineVarMinMax.x), 0.0, 1.0);
 
         uint isDiverging = sampleIsDiverging(varID);
         if (isDiverging > 0) {
@@ -277,7 +277,7 @@ float computeRadius(
     }
     //            float variableNextValue = (variableNextValueOrig - variableNextMinMax.x) / (variableNextMinMax.y - variableNextMinMax.x);
     if (lineVarMinMax.x != lineVarMinMax.y) {
-        float interpolant = (variableValueOrig - lineVarMinMax.x) / (lineVarMinMax.y - lineVarMinMax.x);
+        float interpolant = clamp((variableValueOrig - lineVarMinMax.x) / (lineVarMinMax.y - lineVarMinMax.x), 0.0, 1.0);
 
         uint isDiverging = sampleIsDiverging(varID);
         if (isDiverging > 0) {
