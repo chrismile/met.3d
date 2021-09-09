@@ -220,7 +220,7 @@ void MMultiVarTf::bindTexture1DArray(int textureUnitTransferFunction)
 }
 
 
-GL::MShaderStorageBufferObject *MMultiVarTf::getMinMaxBuffer(QGLWidget *currentGLContext)
+GL::MShaderStorageBufferObject *MMultiVarTf::getMinMaxBuffer(QOpenGLWidget *currentGLContext)
 {
     if (minMaxBuffer == nullptr)
     {

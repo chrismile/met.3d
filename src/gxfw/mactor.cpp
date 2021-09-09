@@ -940,7 +940,7 @@ void MActor::removeAllLabels()
 void MActor::uploadVec3ToVertexBuffer(const QVector<QVector3D>& data,
                               const QString requestKey,
                               GL::MVertexBuffer** vbo,
-                              QGLWidget* currentGLContext)
+                              QOpenGLWidget* currentGLContext)
 {
     MGLResourcesManager* glRM = MGLResourcesManager::getInstance();
 
@@ -969,7 +969,7 @@ void MActor::uploadVec3ToVertexBuffer(const QVector<QVector3D>& data,
 void MActor::uploadVec2ToVertexBuffer(const QVector<QVector2D>& data,
                               const QString requestKey,
                               GL::MVertexBuffer** vbo,
-                              QGLWidget* currentGLContext)
+                              QOpenGLWidget* currentGLContext)
 {
     MGLResourcesManager* glRM = MGLResourcesManager::getInstance();
 

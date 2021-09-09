@@ -696,7 +696,7 @@ void MNWPVerticalSectionActor::onQtPropertyChanged(QtProperty *property)
 
 
 void MNWPVerticalSectionActor::generatePathFromWaypoints(
-        QModelIndex mindex1, QModelIndex mindex2, QGLWidget *currentGLContext)
+        QModelIndex mindex1, QModelIndex mindex2, QOpenGLWidget *currentGLContext)
 {
 //TODO: implement great circles.
     // Great circles (ECMWF seems to use a perfect sphere for the IFS):

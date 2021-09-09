@@ -32,7 +32,7 @@
 // related third party imports
 #include "GL/glew.h"
 #include <QVector2D>
-#include <QGLWidget>
+#include <QOpenGLWidget>
 
 // local application imports
 #include "../trajectories.h"
@@ -125,7 +125,7 @@ public:
     GLsizei* getTrajectorySelectionCount();
     const void* const* getTrajectorySelectionIndices();
 
-    MBezierTrajectoriesRenderData getRenderData(QGLWidget *currentGLContext = 0);
+    MBezierTrajectoriesRenderData getRenderData(QOpenGLWidget *currentGLContext = 0);
     void releaseRenderData();
     void updateSelectedVariables(const QVector<uint32_t>& varSelected);
     void updateDivergingVariables(const QVector<uint32_t>& varDiverging);

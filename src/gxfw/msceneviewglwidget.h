@@ -31,8 +31,8 @@
 
 // related third party imports
 #include "GL/glew.h"
-#include <QGLWidget>
-#include <QGLShaderProgram>
+#include <QOpenGLWidget>
+#include <QOpenGLShaderProgram>
 #include <QtProperty>
 
 // local application imports
@@ -64,7 +64,7 @@ struct PickActor {
   @brief MSceneViewGLWidget implements a view on a given scene (which is
   represented by an @ref MSceneControl instance).
   */
-class MSceneViewGLWidget : public QGLWidget, public MSynchronizedObject
+class MSceneViewGLWidget : public QOpenGLWidget, public MSynchronizedObject
 {
     Q_OBJECT
 
@@ -326,7 +326,7 @@ public slots:
     void onActorRenamed(MActor *actor, QString oldName);
 
     /**
-      Directly connect change signal of full-screen actor to @ref updateGL() to
+      Directly connect change signal of full-screen actor to @ref update() to
       allow the user to select actors as full-screen actors which are not
       connected to the scene view's scene.
      */
@@ -335,7 +335,7 @@ public slots:
 protected:
     void initializeGL();
 
-    void updateGL();
+    void update();
 
     void paintGL();
 
@@ -346,7 +346,7 @@ protected:
     void mousePressEvent(QMouseEvent *event);
 
     /**
-      Overloads QGLWidget::mouseMoveEvent().
+      Overloads QOpenGLWidget::mouseMoveEvent().
 
       In interaction mode (actor elements can be changed interactively, e.g.
       the waypoints of a vertical section) this method handles pick&drag
@@ -459,7 +459,7 @@ private:
     LightDirection lightDirection;
     QMatrix4x4 sceneNorthWestRotationMatrix;
 
-    QGLShaderProgram *focusShader;
+    QOpenGLShaderProgram *focusShader;
     std::shared_ptr<GL::MShaderEffect> northArrowShader;
 
     // In modification mode, stores the currently picked actor.

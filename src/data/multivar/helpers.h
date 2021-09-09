@@ -44,7 +44,7 @@ namespace Met3D
 
 template<class T>
 GL::MVertexBuffer* createVertexBuffer(
-        QGLWidget *currentGLContext, const QString& vbID, const QVector<T>& data)
+        QOpenGLWidget *currentGLContext, const QString& vbID, const QVector<T>& data)
 {
     MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
 
@@ -66,7 +66,7 @@ GL::MVertexBuffer* createVertexBuffer(
 
 
 inline GL::MIndexBuffer* createIndexBuffer(
-        QGLWidget *currentGLContext, const QString& ibID, const QVector<uint32_t>& data)
+        QOpenGLWidget *currentGLContext, const QString& ibID, const QVector<uint32_t>& data)
 {
     MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
 
@@ -88,7 +88,7 @@ inline GL::MIndexBuffer* createIndexBuffer(
 
 template<class T>
 GL::MShaderStorageBufferObject* createShaderStorageBuffer(
-        QGLWidget *currentGLContext, const QString& vbID, const QVector<T>& data)
+        QOpenGLWidget *currentGLContext, const QString& vbID, const QVector<T>& data)
 {
     MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
 

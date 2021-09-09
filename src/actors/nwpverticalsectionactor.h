@@ -145,7 +145,7 @@ public slots:
       */
     void generatePathFromWaypoints(QModelIndex mindex1=QModelIndex(),
                                    QModelIndex mindex2=QModelIndex(),
-                                   QGLWidget* currentGLContext = nullptr);
+                                   QOpenGLWidget* currentGLContext = nullptr);
 
     void actOnWaypointInsertDelete(const QModelIndex &parent,
                                    int start, int end);

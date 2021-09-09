@@ -56,7 +56,7 @@ public:
     void generateTexture1DArray();
     void bindTexture1DArray(int textureUnitTransferFunction);
 
-    GL::MShaderStorageBufferObject *getMinMaxBuffer(QGLWidget *currentGLContext = 0);
+    GL::MShaderStorageBufferObject *getMinMaxBuffer(QOpenGLWidget *currentGLContext = 0);
     void releaseMinMaxBuffer();
 
 private:

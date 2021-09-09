@@ -35,6 +35,8 @@
 
 // related third party imports
 #include <log4cplus/loggingmacros.h>
+#include <QOpenGLContext>
+#include <QOpenGLShaderProgram>
 
 // local application imports
 #include "gxfw/textmanager.h"
@@ -62,10 +64,10 @@ MGLResourcesManager* MGLResourcesManager::instance = 0;
 *******************************************************************************/
 
 // Constructor is private.
-MGLResourcesManager::MGLResourcesManager(const QGLFormat &format,
+MGLResourcesManager::MGLResourcesManager(const QSurfaceFormat &format,
                                          QWidget *parent,
-                                         QGLWidget *shareWidget)
-    : QGLWidget(format, parent, shareWidget),
+                                         QOpenGLWidget *shareWidget)
+    : QOpenGLWidget(parent),
       globalMouseButtonRotate(Qt::LeftButton),
       globalMouseButtonPan(Qt::RightButton),
       globalMouseButtonZoom(Qt::MiddleButton),
@@ -75,6 +77,10 @@ MGLResourcesManager::MGLResourcesManager(const QGLFormat &format,
       selectSceneCentreActor(nullptr),
       selectSceneCentreText(nullptr)
 {
+    requestedFormat = format;
+    this->setFormat(format);
+    create();
+
     // Get the system control instance.
     systemControl = MSystemManagerAndControl::getInstance();
 
@@ -161,17 +167,46 @@ MGLResourcesManager::~MGLResourcesManager()
 ***                            PUBLIC METHODS                               ***
 *******************************************************************************/
 
-void MGLResourcesManager::initialize(const QGLFormat &format,
+void MGLResourcesManager::initialize(const QSurfaceFormat &format,
                                      QWidget *parent,
-                                     QGLWidget *shareWidget)
+                                     QOpenGLWidget *shareWidget)
 {
     // If the instance is already initialized, this method won't do anything.
     if (MGLResourcesManager::instance == 0)
     {
-        MGLResourcesManager::instance = new MGLResourcesManager(format, parent,
-                                                                shareWidget);
+        MGLResourcesManager::instance = new MGLResourcesManager(format, parent);
         MGLResourcesManager::instance->initializeTextManager();
     }
+}
+
+
+void MGLResourcesManager::initializeExternal()
+{
+    if (!isExternalDataInitialized) {
+        LOG4CPLUS_DEBUG(mlog, "Initialising GLEW..." << flush);
+        GLenum err = glewInit();
+        if (err != GLEW_OK)
+        {
+            LOG4CPLUS_ERROR(mlog, "\tError: " << glewGetErrorString(err) << flush);
+        }
+
+
+        // Initialise currently registered actors.
+        LOG4CPLUS_DEBUG(mlog, "Initialising actors.." << flush);
+        LOG4CPLUS_DEBUG(mlog, "===================================================="
+                << "====================================================");
+
+        for (int i = 0; i < actorPool.size(); i++)
+        {
+            LOG4CPLUS_DEBUG(mlog, "======== ACTOR #" << i << " ========" << flush);
+            if (!actorPool[i]->isInitialized()) actorPool[i]->initialize();
+        }
+
+        LOG4CPLUS_DEBUG(mlog, "===================================================="
+                << "====================================================");
+        LOG4CPLUS_DEBUG(mlog, "Actors are initialised." << flush);
+    }
+    isExternalDataInitialized = true;
 }
 
 
@@ -885,6 +920,8 @@ void MGLResourcesManager::actorHasChangedItsName(MActor *actor, QString oldName)
 ***                          PROTECTED METHODS                              ***
 *******************************************************************************/
 
+bool MGLResourcesManager::isExternalDataInitialized = false;
+
 void MGLResourcesManager::initializeGL()
 {
     cout << endl << endl;
@@ -896,29 +933,24 @@ void MGLResourcesManager::initializeGL()
     LOG4CPLUS_DEBUG(mlog, "OpenGL context is "
                     << (context()->isValid() ? "" : "NOT ") << "valid.");
     LOG4CPLUS_DEBUG(mlog, "\tRequested version: "
-                    << context()->requestedFormat().majorVersion()
-                    << "." << context()->requestedFormat().minorVersion());
+                    << requestedFormat.majorVersion()
+                    << "." << requestedFormat.minorVersion());
     LOG4CPLUS_DEBUG(mlog, "\tObtained version: "
                     << context()->format().majorVersion() << "."
                     << context()->format().minorVersion());
     LOG4CPLUS_DEBUG(mlog, "\tObtained profile: "
                     << context()->format().profile());
     LOG4CPLUS_DEBUG(mlog, "\tShaders are "
-                    << (QGLShaderProgram::hasOpenGLShaderPrograms(
+                    << (QOpenGLShaderProgram::hasOpenGLShaderPrograms(
                             context()) ? "" : "NOT ") << "supported.");
     LOG4CPLUS_DEBUG(mlog, "\tMultisampling is "
-                    << (context()->format().sampleBuffers() ? "" : "NOT ")
+                    << (context()->format().samples() > 0 ? "" : "NOT ")
                     << "enabled." << flush);
     LOG4CPLUS_DEBUG(mlog, "\tNumber of samples per pixel: "
                     << context()->format().samples() << flush);
 
+    initializeExternal();
 
-    LOG4CPLUS_DEBUG(mlog, "Initialising GLEW.." << flush);
-    GLenum err = glewInit();
-    if (err != GLEW_OK)
-    {
-        LOG4CPLUS_ERROR(mlog, "\tError: " << glewGetErrorString(err) << flush);
-    }
     LOG4CPLUS_DEBUG(mlog, "Using GLEW " << glewGetString(GLEW_VERSION));
     LOG4CPLUS_DEBUG(mlog, "OpenGL version supported by this platform "
                     << "(glGetString): " << glGetString(GL_VERSION));
@@ -936,32 +968,15 @@ void MGLResourcesManager::initializeGL()
                                    .arg((char*) glGetString(GL_VERSION)));
 
     QString value = "";
-    if (QGLFormat::hasOpenGL())
-    {
-        int flags = QGLFormat::openGLVersionFlags();
-        if (flags & QGLFormat::OpenGL_Version_4_0) value += "OpenGL 4.0";
-        else if (flags & QGLFormat::OpenGL_Version_3_3) value += "OpenGL 3.3";
-        else if (flags & QGLFormat::OpenGL_Version_3_2) value += "OpenGL 3.2";
-        else if (flags & QGLFormat::OpenGL_Version_3_1) value += "OpenGL 3.1";
-        else if (flags & QGLFormat::OpenGL_Version_3_0) value += "OpenGL 3.0";
-        else if (flags & QGLFormat::OpenGL_Version_2_1) value += "OpenGL 2.1";
-        else if (flags & QGLFormat::OpenGL_Version_2_0) value += "OpenGL 2.0";
-        else if (flags & QGLFormat::OpenGL_Version_1_5) value += "OpenGL 1.5";
-        else if (flags & QGLFormat::OpenGL_Version_1_4) value += "OpenGL 1.4";
-        else if (flags & QGLFormat::OpenGL_Version_1_3) value += "OpenGL 1.3";
-        else if (flags & QGLFormat::OpenGL_Version_1_2) value += "OpenGL 1.2";
-        else if (flags & QGLFormat::OpenGL_Version_1_1) value += "OpenGL 1.1";
-        if (flags & QGLFormat::OpenGL_ES_CommonLite_Version_1_0) value += " OpenGL ES 1.0 Common Lite";
-        else if (flags & QGLFormat::OpenGL_ES_Common_Version_1_0) value += " OpenGL ES 1.0 Common";
-        else if (flags & QGLFormat::OpenGL_ES_CommonLite_Version_1_1) value += " OpenGL ES 1.1 Common Lite";
-        else if (flags & QGLFormat::OpenGL_ES_Common_Version_1_1) value += " OpenGL ES 1.1 Common";
-        else if (flags & QGLFormat::OpenGL_ES_Version_2_0) value += " OpenGL ES 2.0";
+    QPair<int, int> flags = context()->format().version();
+    QString formatString;
+    if (context()->format().renderableType() == QSurfaceFormat::OpenGLES) {
+        formatString = QString("OpenGL ES %1.%2");
+    } else {
+        formatString = QString("OpenGL %1.%2");
     }
-    else
-    {
-        value = "None";
-    }
-    LOG4CPLUS_DEBUG(mlog, "QGLFormat::openGLVersionFlags() returns minimum "
+    value += formatString.arg(flags.first).arg(flags.second);
+    LOG4CPLUS_DEBUG(mlog, "QSurfaceFormat::version() returns minimum "
                     << "supported version is " << value.toStdString());
 
     LOG4CPLUS_DEBUG(mlog, "*** END OpenGL information.\n");
@@ -974,22 +989,6 @@ void MGLResourcesManager::initializeGL()
 
     LOG4CPLUS_DEBUG(mlog, "Maximum GPU video memory to be used: "
                     << videoMemoryLimit_kb / 1024. << " MB." << flush);
-
-    // Initialise currently registered actors.
-    LOG4CPLUS_DEBUG(mlog, "Initialising actors.." << flush);
-    LOG4CPLUS_DEBUG(mlog, "===================================================="
-                    << "====================================================");
-
-    for (int i = 0; i < actorPool.size(); i++)
-    {
-        LOG4CPLUS_DEBUG(mlog, "======== ACTOR #" << i << " ========" << flush);
-        if (!actorPool[i]->isInitialized()) actorPool[i]->initialize();
-    }
-
-    LOG4CPLUS_DEBUG(mlog, "===================================================="
-                    << "====================================================");
-    LOG4CPLUS_DEBUG(mlog, "Actors are initialised." << flush);
-
     displayMemoryUsage();
 
     // Start a time to update the displayed memory information every 2 seconds.

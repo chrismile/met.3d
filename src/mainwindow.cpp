@@ -76,6 +76,23 @@ MMainWindow::MMainWindow(QStringList commandLineArguments, QWidget *parent)
       systemDock(nullptr),
       sessionAutoSaveTimer(nullptr)
 {
+    // OpenGL settings.
+    // =========================================================================
+
+    QSurfaceFormat format;
+    format.setDepthBufferSize(24);
+    format.setStencilBufferSize(8);
+    format.setSamples(8); // TODO: Query maximum using GLX etc.?
+    format.setProfile(QSurfaceFormat::CoreProfile);
+    QSurfaceFormat::setDefaultFormat(format);
+
+    // OpenGL resources manager -- the "invisible" OpenGL context.
+    // =========================================================================
+
+    // Create a hidden QOpenGLWidget as resources manager.
+    MGLResourcesManager::initialize(format, this);
+    glResourcesManager = MGLResourcesManager::getInstance();
+
     // Qt Designer specific initialization.
     ui->setupUi(this);
 
@@ -102,14 +119,6 @@ MMainWindow::MMainWindow(QStringList commandLineArguments, QWidget *parent)
     sessionAutoSaveTimer = new QTimer();
     sessionAutoSaveTimer->setInterval(30000);
 
-    // OpenGL settings.
-    // =========================================================================
-
-    QGLFormat glformat;  
-    // glformat.setVersion(4, 1);
-    glformat.setProfile(QGLFormat::CoreProfile);
-    glformat.setSampleBuffers(true);
-
     // System control (dock widget).
     // =========================================================================
 
@@ -130,13 +139,6 @@ MMainWindow::MMainWindow(QStringList commandLineArguments, QWidget *parent)
     // the widgets, nesting is allowed.
     setTabPosition(Qt::AllDockWidgetAreas, QTabWidget::West);
     setDockNestingEnabled(true);
-
-    // OpenGL resources manager -- the "invisible" OpenGL context.
-    // =========================================================================
-
-    // Create a hidden QGLWidget as resources manager.
-    MGLResourcesManager::initialize(glformat, this);
-    glResourcesManager = MGLResourcesManager::getInstance();
 
     // SCENE VIEWS -- the "visible" OpenGL contexts.
     //==========================================================================

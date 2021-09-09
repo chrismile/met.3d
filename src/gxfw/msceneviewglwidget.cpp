@@ -38,6 +38,7 @@
 #include <QLabel>
 #include <QMouseEvent>
 #include <QToolTip>
+#include <QOpenGLContext>
 
 // local application imports
 #include "util/mutil.h"
@@ -61,8 +62,7 @@ unsigned int MSceneViewGLWidget::idCounter = 0;
 *******************************************************************************/
 
 MSceneViewGLWidget::MSceneViewGLWidget()
-    : QGLWidget(MGLResourcesManager::getInstance()->format(), 0,
-                MGLResourcesManager::getInstance()),
+    : QOpenGLWidget(/*MGLResourcesManager::getInstance()*/),
       scene(nullptr),
       lastPoint(QVector3D(0,0,0)),
       sceneNavigationMode(MOVE_CAMERA),
@@ -89,15 +89,52 @@ MSceneViewGLWidget::MSceneViewGLWidget()
       resizeViewDialog(new MResizeWindowDialog),
       overwriteImageSequence(false)
 {
+    this->setFormat(MGLResourcesManager::getInstance()->format());
+
+    QGridLayout* gridLayout = new QGridLayout(this);
+
     // TODO: Test
-    //QtExtensions::MRadarChart* radarChart = new QtExtensions::MRadarChart(this);
-    //radarChart->setVariableNames({ "Variable 0", "Variable 1", "Variable 2", "Variable 3", "Variable 4", "Variable 5", "Variable 6", "Variable 7" });
-    //radarChart->addRadar("Trajectory A", { 0.9, 0.2, 0.7, 0.1, 0.8, 0.01, 0.6, 0.3 });
-    //radarChart->addRadar("Trajectory B", { 0.7, 0.3, 0.8, 0.4, 0.7, 0.3, 0.9, 0.4 });
-    //radarChart->setRenderHint(QPainter::Antialiasing);
-    //radarChart->resize(500, 400);
+    QtExtensions::MRadarChart* radarChart = new QtExtensions::MRadarChart();
+    radarChart->setVariableNames({ "Variable 0", "Variable 1", "Variable 2", "Variable 3", "Variable 4", "Variable 5", "Variable 6", "Variable 7" });
+    radarChart->addRadar("Trajectory A", { 0.9, 0.2, 0.7, 0.1, 0.8, 0.01, 0.6, 0.3 });
+    radarChart->addRadar("Trajectory B", { 0.7, 0.3, 0.8, 0.4, 0.7, 0.3, 0.9, 0.4 });
+    radarChart->setRenderHint(QPainter::Antialiasing);
+    radarChart->resize(500, 400);
     //radarChart->setAttribute(Qt::WA_TranslucentBackground);
     //radarChart->setBackgroundVisible(false);
+    //radarChart->setOpacity(0.1);
+    //radarChart->layout()->setContentsMargins(0, 0, 0, 0);
+    radarChart->setContentsMargins(QMargins(0, 0, 0, 0));
+    radarChart->setAutoFillBackground(false);
+    QtCharts::QPolarChart* chart = radarChart->getChart();
+    chart->setBackgroundBrush(QBrush(QColor("transparent")));
+    chart->setBackgroundRoundness(0.0f);
+    chart->setBackgroundVisible(false);
+    chart->setPlotAreaBackgroundVisible(false);
+    chart->setPlotAreaBackgroundBrush(QBrush(QColor("transparent")));
+
+    radarChart->setBackgroundBrush(QBrush(QColor(100, 100, 100, 10)));
+    //radarChart->setBackgroundBrush(QBrush(QColor("transparent")));
+    radarChart->viewport()->setAutoFillBackground(false);
+
+    QPalette palette = radarChart->palette();
+    palette.setBrush(QPalette::Base, Qt::transparent);
+    radarChart->setPalette(palette);
+    radarChart->setAttribute(Qt::WA_OpaquePaintEvent, false);
+
+    chart->legend()->hide();
+
+    chart->setPos(0.0f, 1000.0f);
+
+    //QCheckBox* testCheckBox = new QCheckBox("ABC", this);
+    //testCheckBox->resize(500, 400);
+
+    QSpacerItem* verticalSpacer = new QSpacerItem(20, 40, QSizePolicy::Minimum, QSizePolicy::Expanding);
+    gridLayout->addItem(verticalSpacer, 0, 0, 1, 2);
+    QSpacerItem* horizontalSpacer = new QSpacerItem(40, 20, QSizePolicy::Expanding, QSizePolicy::Minimum);
+    gridLayout->addItem(horizontalSpacer, 1, 1);
+    gridLayout->addWidget(radarChart, 1, 0);
+
 
     viewIsInitialised = false;
     focusShader = nullptr;
@@ -616,7 +653,7 @@ void MSceneViewGLWidget::setScene(MSceneControl *scene)
 #ifndef CONTINUOUS_GL_UPDATE
     connect(this->scene,
             SIGNAL(sceneChanged()),
-            SLOT(updateGL()));
+            SLOT(update()));
 #endif
 
     if (!viewIsInitialised) return;
@@ -624,7 +661,7 @@ void MSceneViewGLWidget::setScene(MSceneControl *scene)
     updateSceneLabel();
 
 #ifndef CONTINUOUS_GL_UPDATE
-    updateGL();
+    update();
 #endif
 }
 
@@ -645,7 +682,7 @@ void MSceneViewGLWidget::removeCurrentScene()
         disconnect(scene,
                    SIGNAL(sceneChanged()),
                    this,
-                   SLOT(updateGL()));
+                   SLOT(update()));
 #endif
     }
 
@@ -669,7 +706,7 @@ void MSceneViewGLWidget::setBackgroundColour(const QColor &color)
 {
     backgroundColour = color;
 #ifndef CONTINUOUS_GL_UPDATE
-    updateGL();
+    update();
 #endif
 }
 
@@ -814,7 +851,7 @@ void MSceneViewGLWidget::setFreeze(bool enabled)
     }
 
 #ifndef CONTINUOUS_GL_UPDATE
-    if ( viewIsInitialised && (!freezeMode) ) updateGL();
+    if ( viewIsInitialised && (!freezeMode) ) update();
 #endif
 }
 
@@ -874,7 +911,7 @@ void MSceneViewGLWidget::executeCameraAction(int action,
     updateCameraPositionDisplay();
 
 #ifndef CONTINUOUS_GL_UPDATE
-    if (viewIsInitialised && (!freezeMode)) updateGL();
+    if (viewIsInitialised && (!freezeMode)) update();
 #endif
 }
 
@@ -912,7 +949,7 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
         setMouseTracking(actorInteractionMode);
         updateSceneLabel();
 #ifndef CONTINUOUS_GL_UPDATE
-        updateGL();
+        update();
 #endif
     }
 
@@ -928,7 +965,7 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
         }
         updateSceneLabel();
 #ifndef CONTINUOUS_GL_UPDATE
-        updateGL();
+        update();
 #endif
     }
 
@@ -945,7 +982,7 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
                 ->getDecoratedDoublePropertyManager()
                 ->value(farPlaneDistanceProperty);
 #ifndef CONTINUOUS_GL_UPDATE
-        updateGL();
+        update();
 #endif
     }
 
@@ -963,7 +1000,7 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
             glDisable(GL_MULTISAMPLE);
         }
 #ifndef CONTINUOUS_GL_UPDATE
-        updateGL();
+        update();
 #endif
     }
 
@@ -988,7 +1025,7 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
             glDisable(GL_POLYGON_SMOOTH);
         }
 #ifndef CONTINUOUS_GL_UPDATE
-        updateGL();
+        update();
 #endif
     }
 
@@ -998,7 +1035,7 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
         renderLabelsWithDepthTest = MSystemManagerAndControl::getInstance()
                 ->getBoolPropertyManager()->value(labelDepthTestProperty);
 #ifndef CONTINUOUS_GL_UPDATE
-        updateGL();
+        update();
 #endif
     }
 
@@ -1010,7 +1047,7 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
                     ->value(lightingProperty));
         LOG4CPLUS_DEBUG(mlog, "Setting light direction to" << lightDirection);
 #ifndef CONTINUOUS_GL_UPDATE
-        updateGL();
+        update();
 #endif
     }
 
@@ -1024,7 +1061,7 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
         visualizationParameterChange = true;
 
 #ifndef CONTINUOUS_GL_UPDATE
-        if (viewIsInitialised) updateGL();
+        if (viewIsInitialised) update();
 #endif
     }
 
@@ -1048,7 +1085,7 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
         }
 
 #ifndef CONTINUOUS_GL_UPDATE
-        if (viewIsInitialised) updateGL();
+        if (viewIsInitialised) update();
 #endif
     }
 
@@ -1125,7 +1162,7 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
 
         enablePropertyEvents = true;
         updateSceneLabel();
-        updateGL();
+        update();
     }
 
     else if (property == sceneRotationCentreElevationProperty ||
@@ -1194,7 +1231,7 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
             return;
         }
 #ifndef CONTINUOUS_GL_UPDATE
-        updateGL();
+        update();
 #endif
     }
 
@@ -1207,7 +1244,7 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
 
         updateSceneLabel();
 #ifndef CONTINUOUS_GL_UPDATE
-        updateGL();
+        update();
 #endif
     }
 
@@ -1258,7 +1295,7 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
         // Record measurements starting at the front of "fpsTimeseries".
         fpsTimeseriesIndex = 0;
         QTimer::singleShot(30000, this, SLOT(stopFPSMeasurement()));
-        updateGL();
+        update();
     }
 #endif
 
@@ -1324,7 +1361,7 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
         northArrow.enabled = MSystemManagerAndControl::getInstance()
                 ->getBoolPropertyManager()->value(northArrow.enabledProperty);
 #ifndef CONTINUOUS_GL_UPDATE
-        updateGL();
+        update();
 #endif
     }
 
@@ -1334,7 +1371,7 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
                 ->getDecoratedDoublePropertyManager()
                 ->value(northArrow.horizontalScaleProperty);
 #ifndef CONTINUOUS_GL_UPDATE
-        updateGL();
+        update();
 #endif
     }
 
@@ -1344,7 +1381,7 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
                 ->getDecoratedDoublePropertyManager()
                 ->value(northArrow.verticalScaleProperty);
 #ifndef CONTINUOUS_GL_UPDATE
-        updateGL();
+        update();
 #endif
     }
 
@@ -1354,7 +1391,7 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
                 ->getDecoratedDoublePropertyManager()
                 ->value(northArrow.lonPositionProperty);
 #ifndef CONTINUOUS_GL_UPDATE
-        updateGL();
+        update();
 #endif
     }
 
@@ -1364,7 +1401,7 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
                 ->getDecoratedDoublePropertyManager()
                 ->value(northArrow.latPositionProperty);
 #ifndef CONTINUOUS_GL_UPDATE
-        updateGL();
+        update();
 #endif
     }
 
@@ -1374,7 +1411,7 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
                 ->getDecoratedDoublePropertyManager()
                 ->value(northArrow.worldZPositionProperty);
 #ifndef CONTINUOUS_GL_UPDATE
-        updateGL();
+        update();
 #endif
     }
 
@@ -1383,7 +1420,7 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
         northArrow.colour = MSystemManagerAndControl::getInstance()
                 ->getColorPropertyManager()->value(northArrow.colourProperty);
 #ifndef CONTINUOUS_GL_UPDATE
-        updateGL();
+        update();
 #endif
     }
 
@@ -1391,7 +1428,7 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
     {
         updateSceneLabel();
 #ifndef CONTINUOUS_GL_UPDATE
-        updateGL();
+        update();
 #endif
     }
 }
@@ -1443,7 +1480,7 @@ void MSceneViewGLWidget::updateDisplayTime()
 #ifndef CONTINUOUS_GL_UPDATE
     if (viewIsInitialised)
     {
-        updateGL();
+        update();
     }
 #endif
 }
@@ -1477,14 +1514,16 @@ void MSceneViewGLWidget::stopFPSMeasurement()
 
 void MSceneViewGLWidget::initializeGL()
 {
+    MGLResourcesManager::getInstance()->initializeExternal();
+
     LOG4CPLUS_DEBUG(mlog, "initialising OpenGL context of scene view " << myID);
     LOG4CPLUS_DEBUG(mlog, "\tOpenGL context is "
                     << (context()->isValid() ? "" : "NOT ") << "valid.");
-    LOG4CPLUS_DEBUG(mlog, "\tOpenGL context is "
-                    << (context()->isSharing() ? "" : "NOT ") << "sharing.");
+    //LOG4CPLUS_DEBUG(mlog, "\tOpenGL context is "
+    //                << (context()->isSharing() ? "" : "NOT ") << "sharing.");
 
     // Create the widget's only shader: To draw the focus rectangle.
-    QGLShader *vshader = new QGLShader(QGLShader::Vertex, this);
+    QOpenGLShader *vshader = new QOpenGLShader(QOpenGLShader::Vertex, this);
     const char *vsrc =
         "#version 130\n"
         "in vec2 vertex;\n"
@@ -1494,7 +1533,7 @@ void MSceneViewGLWidget::initializeGL()
         "}\n";
     vshader->compileSourceCode(vsrc);
 
-    QGLShader *fshader = new QGLShader(QGLShader::Fragment, this);
+    QOpenGLShader *fshader = new QOpenGLShader(QOpenGLShader::Fragment, this);
     const char *fsrc =
         "#version 130\n"
         "uniform vec4 colourValue;\n"
@@ -1505,7 +1544,7 @@ void MSceneViewGLWidget::initializeGL()
         "}\n";
     fshader->compileSourceCode(fsrc);
 
-    focusShader = new QGLShaderProgram(this);
+    focusShader = new QOpenGLShaderProgram(this);
     focusShader->addShader(vshader);
     focusShader->addShader(fshader);
 #define FOCUSSHADER_VERTEX_ATTRIBUTE 0
@@ -1554,12 +1593,12 @@ void MSceneViewGLWidget::initializeGL()
 }
 
 
-void MSceneViewGLWidget::updateGL()
+void MSceneViewGLWidget::update()
 {
     // Don't update GL if no scene is attached to the scene view.
     if (scene != nullptr)
     {
-        QGLWidget::updateGL();
+        QOpenGLWidget::update();
     }
 }
 
@@ -1595,7 +1634,10 @@ void MSceneViewGLWidget::paintGL()
         glDisable(GL_POLYGON_SMOOTH);
     }
 
-    qglClearColor(backgroundColour);
+    //qglClearColor(backgroundColour);
+    qreal r, g, b, a;
+    backgroundColour.getRgbF(&r, &g, &b, &a);
+    glClearColor(GLclampf(r), GLclampf(g), GLclampf(b), GLclampf(a));
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     // Status information: The "main" scene view instance measures frame rate.
@@ -2009,7 +2051,7 @@ void MSceneViewGLWidget::mouseMoveEvent(QMouseEvent *event)
 
             // Redraw (the actors might draw any highlighted handles).
 #ifndef CONTINUOUS_GL_UPDATE
-            updateGL();
+            update();
 #endif
         }
 
@@ -2122,7 +2164,7 @@ void MSceneViewGLWidget::mouseMoveEvent(QMouseEvent *event)
     updateSynchronizedCameras();
 
 #ifndef CONTINUOUS_GL_UPDATE
-    updateGL();
+    update();
 #endif
 }
 
@@ -2181,7 +2223,7 @@ void MSceneViewGLWidget::mouseReleaseEvent(QMouseEvent *event)
     }
 
 #ifndef CONTINUOUS_GL_UPDATE
-    updateGL();
+    update();
 #endif
 }
 
@@ -2241,7 +2283,7 @@ void MSceneViewGLWidget::wheelEvent(QWheelEvent *event)
         updateSynchronizedCameras();
     }
 #ifndef CONTINUOUS_GL_UPDATE
-    updateGL();
+    update();
 #endif
 }
 
@@ -2254,7 +2296,7 @@ void MSceneViewGLWidget::checkUserScrolling()
 
     if (elapsedTime > 0.5f) { userIsScrolling = false; }
 
-    if (oldUserScrolling != userIsScrolling) { updateGL(); }
+    if (oldUserScrolling != userIsScrolling) { update(); }
 }
 
 
@@ -2262,7 +2304,7 @@ void MSceneViewGLWidget::autoRotateCamera()
 {
     sceneRotationMatrix.rotate(cameraAutoRotationAngle, cameraAutoRotationAxis);
 #ifndef CONTINUOUS_GL_UPDATE
-    updateGL();
+    update();
 #endif
 }
 
@@ -2319,7 +2361,7 @@ void MSceneViewGLWidget::keyPressEvent(QKeyEvent *event)
         // Shader reload.
         MGLResourcesManager::getInstance()->reloadActorShaders();
 #ifndef CONTINUOUS_GL_UPDATE
-        updateGL();
+            update();
 #endif
         break;
     case Qt::Key_I:
@@ -2366,7 +2408,7 @@ void MSceneViewGLWidget::keyPressEvent(QKeyEvent *event)
     default:
         // If we do not act upon the key, pass event to base class
         // implementation.
-        QGLWidget::keyPressEvent(event);
+        QOpenGLWidget::keyPressEvent(event);
     }
 }
 
@@ -2390,7 +2432,7 @@ bool MSceneViewGLWidget::event(QEvent *event)
 
         return true;
     }*/
-    return QGLWidget::event(event);
+    return QOpenGLWidget::event(event);
 }
 
 
@@ -2406,7 +2448,7 @@ void MSceneViewGLWidget::updateSynchronizedCameras()
         otherCamera->setYAxis(camera.getYAxis());
         otherCamera->setZAxis(camera.getZAxis());
         otherView->updateCameraPositionDisplay();
-        otherView->updateGL();
+        otherView->update();
     }
 }
 
@@ -2603,7 +2645,7 @@ void MSceneViewGLWidget::onActorRenamed(MActor *actor, QString oldName)
 
 void MSceneViewGLWidget::onFullScreenActorUpdate()
 {
-    updateGL();
+    update();
 }
 
 
@@ -3009,7 +3051,7 @@ void MSceneViewGLWidget::loadConfiguration(QSettings *settings)
 void MSceneViewGLWidget::onHandleSizeChanged()
 {
 #ifndef CONTINUOUS_GL_UPDATE
-    updateGL();
+    update();
 #endif
 }
 
@@ -3160,7 +3202,7 @@ void MSceneViewGLWidget::saveScreenshot()
 void MSceneViewGLWidget::saveScreenshotToFileName(QString filename)
 {
     // Take Screenshot of current scene.
-    QImage screenshot = this->grabFrameBuffer();
+    QImage screenshot = this->grabFramebuffer();
     // Chop red frame. (Only visible if view has focus.)
     if (this->hasFocus())
     {

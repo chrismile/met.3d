@@ -196,7 +196,7 @@ void createLineTubesRenderDataCPU(
 }
 
 
-MBezierTrajectoriesRenderData MBezierTrajectories::getRenderData(QGLWidget *currentGLContext)
+MBezierTrajectoriesRenderData MBezierTrajectories::getRenderData(QOpenGLWidget *currentGLContext)
 {
     QVector<QVector<QVector3D>> lineCentersList;
     QVector<QVector<QVector<float>>> lineAttributesList;

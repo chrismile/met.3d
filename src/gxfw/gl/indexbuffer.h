@@ -31,7 +31,7 @@
 // related third party imports
 #include "GL/glew.h"
 #include "QtCore"
-#include "QGLWidget"
+#include "QOpenGLWidget"
 
 // local application imports
 #include "gxfw/gl/abstractgpudataitem.h"

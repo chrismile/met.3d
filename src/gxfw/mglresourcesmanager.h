@@ -31,8 +31,8 @@
 
 // related third party imports
 #include "GL/glew.h"
-#include <QGLWidget>
-#include <QGLShaderProgram>
+#include <QOpenGLWidget>
+#include <QOpenGLShaderProgram>
 #include "qtpropertymanager.h"
 
 // local application imports
@@ -63,15 +63,15 @@ namespace Met3D
   There is only one instance of MGLResourcesManager in the system (singleton
   pattern).
   */
-class MGLResourcesManager : public QGLWidget
+class MGLResourcesManager : public QOpenGLWidget
 {
     Q_OBJECT
 
 public:
     /**
      */
-    static void initialize(const QGLFormat &format, QWidget *parent = 0,
-                           QGLWidget *shareWidget = 0);
+    static void initialize(const QSurfaceFormat &format, QWidget *parent = 0,
+                           QOpenGLWidget *shareWidget = nullptr);
 
     ~MGLResourcesManager();
 
@@ -81,6 +81,11 @@ public:
      argument.
      */
     static MGLResourcesManager* getInstance();
+
+    /**
+     * Initializes GLEW and the actors if this was not already done.
+     */
+    void initializeExternal();
 
     /**
       Place a scene in a managed pool of scenes. All registered scenes are
@@ -389,6 +394,8 @@ signals:
 protected:
     friend class MSceneViewGLWidget;
 
+    static bool isExternalDataInitialized;
+
     /**
       Initialize the OpenGL resources. Called once on program start.
      */
@@ -407,8 +414,11 @@ private:
      Constructor is private, as it should only be called from getInstance().
      See https://en.wikipedia.org/wiki/Singleton_pattern#Lazy_initialization.
      */
-    MGLResourcesManager(const QGLFormat &format, QWidget *parent = 0,
-                        QGLWidget *shareWidget = 0);
+    MGLResourcesManager(const QSurfaceFormat &format, QWidget *parent = 0,
+                        QOpenGLWidget *shareWidget = nullptr);
+
+    /** The requested surface format passed to the constructor. */
+    QSurfaceFormat requestedFormat;
 
     /** Single instance of the GL resources manager. */
     static MGLResourcesManager* instance;

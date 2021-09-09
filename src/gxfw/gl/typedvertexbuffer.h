@@ -32,7 +32,7 @@
 // related third party imports
 #include "GL/glew.h"
 #include "QtCore"
-#include "QGLWidget"
+#include "QOpenGLWidget"
 #include <log4cplus/loggingmacros.h>
 
 // local application imports
@@ -59,26 +59,26 @@ public:
     explicit MTypedVertexBuffer(Met3D::MDataRequest requestKey,
                                 uint32_t numVertices_);
 
-    void upload(const QVector<Data>& data, QGLWidget* currentGLContext = 0);
+    void upload(const QVector<Data>& data, QOpenGLWidget* currentGLContext = 0);
 
     void upload(const Data* data, const uint32_t elemCount,
-                QGLWidget* currentGLContext = 0);
+                QOpenGLWidget* currentGLContext = 0);
 
     void reallocate(const Data* data, const uint32_t elemCount,
                     GLsizei size = 0, bool force = false,
-                    QGLWidget* currentGLContext = 0);
+                    QOpenGLWidget* currentGLContext = 0);
 
     void reallocate(const QVector<Data>& data,
                     GLsizei size = 0, bool force = false,
-                    QGLWidget* currentGLContext = 0);
+                    QOpenGLWidget* currentGLContext = 0);
 
     void update(const Data* data, const uint32_t elemCount,
                 GLint offset = 0, GLsizei size = 0,
-                QGLWidget* currentGLContext = 0);
+                QOpenGLWidget* currentGLContext = 0);
 
     void update(const QVector<Data>& data,
                 GLint offset = 0, GLsizei size = 0,
-                QGLWidget* currentGLContext = 0);
+                QOpenGLWidget* currentGLContext = 0);
 
     void attachToVertexAttribute(GLuint attribute,
                                  GLint elemCount = -1,
@@ -152,7 +152,7 @@ void MTypedVertexBuffer<Data,Type,Num>::attachToVertexAttribute(
 template <class Data, typename Type, int Num>
 void MTypedVertexBuffer<Data,Type,Num>::upload(
         const QVector<Data>& data,
-        QGLWidget* currentGLContext)
+        QOpenGLWidget* currentGLContext)
 {
     upload(data.constData(), data.size(), currentGLContext);
 }
@@ -162,7 +162,7 @@ template <class Data, typename Type, int Num>
 void MTypedVertexBuffer<Data,Type,Num>::upload(
         const Data* data,
         const uint32_t elemCount,
-        QGLWidget* currentGLContext)
+        QOpenGLWidget* currentGLContext)
 {
     // if uploaded size does not equal desired size and data is not a nullptr
     // then throw an error
@@ -212,7 +212,7 @@ void MTypedVertexBuffer<Data,Type,Num>::reallocate(
         const Data* data,
         const uint32_t elemCount,
         GLsizei size, bool force,
-        QGLWidget* currentGLContext)
+        QOpenGLWidget* currentGLContext)
 {
     Met3D::MGLResourcesManager *glRM = Met3D::MGLResourcesManager::getInstance();
     glRM->makeCurrent();
@@ -254,7 +254,7 @@ void MTypedVertexBuffer<Data,Type,Num>::reallocate(
         const QVector<Data>& data,
         GLsizei size,
         bool force,
-        QGLWidget* currentGLContext)
+        QOpenGLWidget* currentGLContext)
 {
     reallocate(data, data.size(), 0, size, force, currentGLContext);
 }
@@ -265,7 +265,7 @@ void MTypedVertexBuffer<Data,Type,Num>::update(
         const Data* data,
         const uint32_t elemCount,
         GLint offset, GLsizei size,
-        QGLWidget* currentGLContext)
+        QOpenGLWidget* currentGLContext)
 {
     const GLsizei vboSize = sizeof(Type) * Num * numVertices;
     const GLsizei upBufSize = (size > 0) ? size : sizeof(Type) * Num * elemCount;
@@ -305,7 +305,7 @@ template <class Data, typename Type, int Num>
 void MTypedVertexBuffer<Data,Type,Num>::update(
         const QVector<Data>& data,
         GLint offset, GLsizei size,
-        QGLWidget* currentGLContext)
+        QOpenGLWidget* currentGLContext)
 {
     update(data.constData(), data.size(), offset, size, currentGLContext);
 }

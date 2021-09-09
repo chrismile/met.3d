@@ -71,11 +71,11 @@ int main(int argc, char *argv[])
     LOG4CPLUS_INFO(mlog, "");
 
     // Check for OpenGL.
-    if (!QGLFormat::hasOpenGL())
-    {
-        LOG4CPLUS_ERROR(mlog, "ERROR: This system has no OpenGL support.");
-        return 1;
-    }
+    //if (!QOpenGLContext::openGLModuleType())
+    //{
+    //    LOG4CPLUS_ERROR(mlog, "ERROR: This system has no OpenGL support.");
+    //    return 1;
+    //}
 
     // Create the application window and run the application.
     Met3D::MMainWindow win(commandLineArguments);

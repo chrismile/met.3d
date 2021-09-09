@@ -33,7 +33,7 @@
 // related third party imports
 #include "GL/glew.h"
 #include "QtCore"
-#include "QGLWidget"
+#include "QOpenGLWidget"
 #include <log4cplus/loggingmacros.h>
 
 // local application imports
@@ -58,26 +58,26 @@ public:
     explicit MTypedIndexBuffer(Met3D::MDataRequest requestKey,
                                uint32_t numIndices_);
 
-    void upload(const QVector<Type>& data, QGLWidget* currentGLContext = 0);
+    void upload(const QVector<Type>& data, QOpenGLWidget* currentGLContext = 0);
 
     void upload(const Type* data, const uint32_t elemCount,
-                QGLWidget* currentGLContext = 0);
+                QOpenGLWidget* currentGLContext = 0);
 
     void reallocate(const Type* data, const uint32_t elemCount,
                     GLsizei size = 0, bool force = false,
-                    QGLWidget* currentGLContext = 0);
+                    QOpenGLWidget* currentGLContext = 0);
 
     void reallocate(const QVector<Type>& data,
                     GLsizei size = 0, bool force = false,
-                    QGLWidget* currentGLContext = 0);
+                    QOpenGLWidget* currentGLContext = 0);
 
     void update(const Type* data, const uint32_t elemCount,
                 GLint offset = 0, GLsizei size = 0,
-                QGLWidget* currentGLContext = 0);
+                QOpenGLWidget* currentGLContext = 0);
 
     void update(const QVector<Type>& data,
                 GLint offset = 0, GLsizei size = 0,
-                QGLWidget* currentGLContext = 0);
+                QOpenGLWidget* currentGLContext = 0);
 
     GLuint getGPUMemorySize_kb();
 };
@@ -126,7 +126,7 @@ GLuint MTypedIndexBuffer<Type>::getGPUMemorySize_kb()
 template <class Type>
 void MTypedIndexBuffer<Type>::upload(
         const QVector<Type>& data,
-        QGLWidget* currentGLContext)
+        QOpenGLWidget* currentGLContext)
 {
     upload(data.constData(), data.size(), currentGLContext);
 }
@@ -136,7 +136,7 @@ template <class Type>
 void MTypedIndexBuffer<Type>::upload(
         const Type* data,
         const uint32_t elemCount,
-        QGLWidget* currentGLContext)
+        QOpenGLWidget* currentGLContext)
 {
     // if uploaded size does not equal desired size and data is not a nullptr
     // then throw an error
@@ -185,7 +185,7 @@ void MTypedIndexBuffer<Type>::reallocate(
         const Type* data,
         const uint32_t elemCount,
         GLsizei size, bool force,
-        QGLWidget* currentGLContext)
+        QOpenGLWidget* currentGLContext)
 {
     Met3D::MGLResourcesManager *glRM = Met3D::MGLResourcesManager::getInstance();
     glRM->makeCurrent();
@@ -227,7 +227,7 @@ void MTypedIndexBuffer<Type>::reallocate(
         const QVector<Type>& data,
         GLsizei size,
         bool force,
-        QGLWidget* currentGLContext)
+        QOpenGLWidget* currentGLContext)
 {
     reallocate(data, data.size(), 0, size, force, currentGLContext);
 }
@@ -238,7 +238,7 @@ void MTypedIndexBuffer<Type>::update(
         const Type* data,
         const uint32_t elemCount,
         GLint offset, GLsizei size,
-        QGLWidget* currentGLContext)
+        QOpenGLWidget* currentGLContext)
 {
     const GLsizei vboSize = sizeof(Type) * numIndices;
     const GLsizei upBufSize = (size > 0) ? size : sizeof(Type) * elemCount;
@@ -278,7 +278,7 @@ template <class Type>
 void MTypedIndexBuffer<Type>::update(
         const QVector<Type>& data,
         GLint offset, GLsizei size,
-        QGLWidget* currentGLContext)
+        QOpenGLWidget* currentGLContext)
 {
     update(data.constData(), data.size(), offset, size, currentGLContext);
 }

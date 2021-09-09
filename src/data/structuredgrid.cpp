@@ -541,7 +541,7 @@ void MStructuredGrid::setTextureParameters(GLint  internalFormat,
 }
 
 
-GL::MTexture* MStructuredGrid::getTexture(QGLWidget *currentGLContext,
+GL::MTexture* MStructuredGrid::getTexture(QOpenGLWidget *currentGLContext,
                                          bool nullTexture)
 {
     MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
@@ -600,7 +600,7 @@ void MStructuredGrid::releaseTexture()
 }
 
 
-GL::MTexture *MStructuredGrid::getLonLatLevTexture(QGLWidget *currentGLContext)
+GL::MTexture *MStructuredGrid::getLonLatLevTexture(QOpenGLWidget *currentGLContext)
 {
     MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
 
@@ -806,7 +806,7 @@ void MStructuredGrid::clearAllFlags()
 }
 
 
-GL::MTexture *MStructuredGrid::getFlagsTexture(QGLWidget *currentGLContext)
+GL::MTexture *MStructuredGrid::getFlagsTexture(QOpenGLWidget *currentGLContext)
 {
     MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
 
@@ -891,7 +891,7 @@ unsigned char MStructuredGrid::getMinAvailableMember() const
 
 
 GL::MTexture *MStructuredGrid::getMinMaxAccelTexture3D(
-        QGLWidget *currentGLContext)
+        QOpenGLWidget *currentGLContext)
 {
     MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
 
@@ -1256,7 +1256,7 @@ MRegularLonLatStructuredPressureGrid::MRegularLonLatStructuredPressureGrid(
 *******************************************************************************/
 
 GL::MTexture *MRegularLonLatStructuredPressureGrid::getPressureTexCoordTexture1D(
-        QGLWidget *currentGLContext)
+        QOpenGLWidget *currentGLContext)
 {
     MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
 
@@ -1473,7 +1473,7 @@ MRegularLonLatGrid::MRegularLonLatGrid(
 ***                            PUBLIC METHODS                               ***
 *******************************************************************************/
 
-GL::MTexture *MRegularLonLatGrid::getTexture(QGLWidget *currentGLContext,
+GL::MTexture *MRegularLonLatGrid::getTexture(QOpenGLWidget *currentGLContext,
                                             bool nullTexture)
 {
     MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
@@ -1519,7 +1519,7 @@ GL::MTexture *MRegularLonLatGrid::getTexture(QGLWidget *currentGLContext,
 }
 
 
-GL::MTexture *MRegularLonLatGrid::getFlagsTexture(QGLWidget *currentGLContext)
+GL::MTexture *MRegularLonLatGrid::getFlagsTexture(QOpenGLWidget *currentGLContext)
 {
     MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
 
@@ -1628,7 +1628,7 @@ void MLonLatHybridSigmaPressureGrid::exchangeSurfacePressureGrid(
 
 
 GL::MTexture *MLonLatHybridSigmaPressureGrid::getHybridCoeffTexture(
-        QGLWidget *currentGLContext)
+        QOpenGLWidget *currentGLContext)
 {
     MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
 
@@ -1690,7 +1690,7 @@ void MLonLatHybridSigmaPressureGrid::releaseHybridCoeffTexture()
 
 
 GL::MTexture *MLonLatHybridSigmaPressureGrid::getPressureTexCoordTexture2D(
-        QGLWidget *currentGLContext)
+        QOpenGLWidget *currentGLContext)
 {
     MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
 

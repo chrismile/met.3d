@@ -35,6 +35,7 @@
 #include <QFileDialog>
 #include <QListWidget>
 #include <QListWidgetItem>
+#include <QGLWidget>
 
 // local application imports
 #include "gxfw/mglresourcesmanager.h"

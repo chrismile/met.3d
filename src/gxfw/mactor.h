@@ -742,12 +742,12 @@ protected:
     void uploadVec3ToVertexBuffer(const QVector<QVector3D>& data,
                                   const QString requestKey,
                                   GL::MVertexBuffer** vbo,
-                                  QGLWidget* currentGLContext = nullptr);
+                                  QOpenGLWidget* currentGLContext = nullptr);
 
     void uploadVec2ToVertexBuffer(const QVector<QVector2D>& data,
                                   const QString requestKey,
                                   GL::MVertexBuffer** vbo,
-                                  QGLWidget* currentGLContext = nullptr);
+                                  QOpenGLWidget* currentGLContext = nullptr);
 
     /** Unique integer identifying this actor, assigned in the constructor. */
     unsigned int myID;

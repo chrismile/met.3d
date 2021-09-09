@@ -35,7 +35,7 @@
 
 // related third party imports
 #include "GL/glew.h"
-#include <QGLWidget>
+#include <QOpenGLWidget>
 
 // local application imports
 #include "data/abstractdataitem.h"
@@ -389,7 +389,7 @@ public:
       (not released textures will stay in GPU memory forever). The texture is
       memory managed by @ref MGLResourcesManager.
      */
-    virtual GL::MTexture* getTexture(QGLWidget *currentGLContext = nullptr,
+    virtual GL::MTexture* getTexture(QOpenGLWidget *currentGLContext = nullptr,
                                     bool nullTexture = false);
 
     /** Release a texture acquired with getTexture(). */
@@ -399,7 +399,7 @@ public:
       Returns the handle to a texture containing the coordinate axis data (1D
       texture). Needs to be released with @ref releaseLonLatTexture().
      */
-    GL::MTexture* getLonLatLevTexture(QGLWidget *currentGLContext = nullptr);
+    GL::MTexture* getLonLatLevTexture(QOpenGLWidget *currentGLContext = nullptr);
 
     /** Release a texture acquired with getLonLatTexture(). */
     void releaseLonLatLevTexture();
@@ -534,7 +534,7 @@ public:
       Returns the handle to a texture containing the flag data (3D int
       texture). Needs to be released with @ref releaseFlagsTexture().
      */
-    virtual GL::MTexture* getFlagsTexture(QGLWidget *currentGLContext = nullptr);
+    virtual GL::MTexture* getFlagsTexture(QOpenGLWidget *currentGLContext = nullptr);
 
     /** Release a texture acquired with getFlagsTexture(). */
     void releaseFlagsTexture();
@@ -579,7 +579,7 @@ public:
       References: Krueger and Westermann (2003); Shirley, Fundamentals of
       Computer Graphics, 3rd ed. (2009), Ch. 12.2.3.
      */
-    GL::MTexture* getMinMaxAccelTexture3D(QGLWidget *currentGLContext = nullptr);
+    GL::MTexture* getMinMaxAccelTexture3D(QOpenGLWidget *currentGLContext = nullptr);
 
     void releaseMinMaxAccelTexture3D();
 
@@ -691,7 +691,7 @@ public:
 
      @note see notes 17Mar2014.
      */
-    GL::MTexture* getPressureTexCoordTexture1D(QGLWidget *currentGLContext = nullptr);
+    GL::MTexture* getPressureTexCoordTexture1D(QOpenGLWidget *currentGLContext = nullptr);
 
     void releasePressureTexCoordTexture1D();
 
@@ -743,10 +743,10 @@ public:
                                           float p_hPa)
     { Q_UNUSED(p_hPa); return getValue(j, i); }
 
-    GL::MTexture* getTexture(QGLWidget *currentGLContext = nullptr,
+    GL::MTexture* getTexture(QOpenGLWidget *currentGLContext = nullptr,
                             bool nullTexture = false);
 
-    GL::MTexture* getFlagsTexture(QGLWidget *currentGLContext = nullptr);
+    GL::MTexture* getFlagsTexture(QOpenGLWidget *currentGLContext = nullptr);
 
 protected:
 
@@ -780,13 +780,13 @@ public:
      */
     void exchangeSurfacePressureGrid(MRegularLonLatGrid* newSfcPressureGrid);
 
-    GL::MTexture* getHybridCoeffTexture(QGLWidget *currentGLContext = nullptr);
+    GL::MTexture* getHybridCoeffTexture(QOpenGLWidget *currentGLContext = nullptr);
 
     void releaseHybridCoeffTexture();
 
     /**
      */
-    GL::MTexture* getPressureTexCoordTexture2D(QGLWidget *currentGLContext = nullptr);
+    GL::MTexture* getPressureTexCoordTexture2D(QOpenGLWidget *currentGLContext = nullptr);
 
     void releasePressureTexCoordTexture2D();
 
