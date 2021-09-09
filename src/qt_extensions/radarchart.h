@@ -54,6 +54,9 @@ public:
     void addRadar(const QString& radarName, const QVector<float>& variableValues);
     void addRadar(const QString& radarName, const QColor& color, const QVector<float>& variableValues);
     inline void setBackgroundVisible(bool visible) { chart->setBackgroundVisible(visible); }
+    inline void setOpacity(qreal opacity) { chart->setOpacity(opacity); }
+
+    inline QtCharts::QPolarChart* getChart() { return chart; }
 
 private:
     void _initialize();

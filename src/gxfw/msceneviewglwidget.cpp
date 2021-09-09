@@ -89,15 +89,51 @@ MSceneViewGLWidget::MSceneViewGLWidget()
       resizeViewDialog(new MResizeWindowDialog),
       overwriteImageSequence(false)
 {
+    QGridLayout* gridLayout = new QGridLayout(this);
+
     // TODO: Test
-    //QtExtensions::MRadarChart* radarChart = new QtExtensions::MRadarChart(this);
-    //radarChart->setVariableNames({ "Variable 0", "Variable 1", "Variable 2", "Variable 3", "Variable 4", "Variable 5", "Variable 6", "Variable 7" });
-    //radarChart->addRadar("Trajectory A", { 0.9, 0.2, 0.7, 0.1, 0.8, 0.01, 0.6, 0.3 });
-    //radarChart->addRadar("Trajectory B", { 0.7, 0.3, 0.8, 0.4, 0.7, 0.3, 0.9, 0.4 });
-    //radarChart->setRenderHint(QPainter::Antialiasing);
-    //radarChart->resize(500, 400);
+    QtExtensions::MRadarChart* radarChart = new QtExtensions::MRadarChart();
+    radarChart->setVariableNames({ "Variable 0", "Variable 1", "Variable 2", "Variable 3", "Variable 4", "Variable 5", "Variable 6", "Variable 7" });
+    radarChart->addRadar("Trajectory A", { 0.9, 0.2, 0.7, 0.1, 0.8, 0.01, 0.6, 0.3 });
+    radarChart->addRadar("Trajectory B", { 0.7, 0.3, 0.8, 0.4, 0.7, 0.3, 0.9, 0.4 });
+    radarChart->setRenderHint(QPainter::Antialiasing);
+    radarChart->resize(500, 400);
     //radarChart->setAttribute(Qt::WA_TranslucentBackground);
     //radarChart->setBackgroundVisible(false);
+    //radarChart->setOpacity(0.1);
+    //radarChart->layout()->setContentsMargins(0, 0, 0, 0);
+    radarChart->setContentsMargins(QMargins(0, 0, 0, 0));
+    radarChart->setAutoFillBackground(false);
+    QtCharts::QPolarChart* chart = radarChart->getChart();
+    chart->setBackgroundBrush(QBrush(QColor("transparent")));
+    chart->setBackgroundRoundness(0.0f);
+    chart->setBackgroundVisible(false);
+    chart->setPlotAreaBackgroundVisible(false);
+    chart->setPlotAreaBackgroundBrush(QBrush(QColor("transparent")));
+
+    radarChart->setBackgroundBrush(QBrush(QColor(100, 100, 100, 10)));
+    //radarChart->setBackgroundBrush(QBrush(QColor("transparent")));
+    radarChart->viewport()->setAutoFillBackground(false);
+
+    QPalette palette = radarChart->palette();
+    palette.setBrush(QPalette::Base, Qt::transparent);
+    radarChart->setPalette(palette);
+    radarChart->setAttribute(Qt::WA_OpaquePaintEvent, false);
+
+    chart->legend()->hide();
+
+    chart->setPos(0.0f, 1000.0f);
+
+    //QCheckBox* testCheckBox = new QCheckBox("ABC", this);
+    //testCheckBox->resize(500, 400);
+
+    QSpacerItem* verticalSpacer = new QSpacerItem(20, 40, QSizePolicy::Minimum, QSizePolicy::Expanding);
+    gridLayout->addItem(verticalSpacer, 0, 0, 1, 2);
+    QSpacerItem* horizontalSpacer = new QSpacerItem(40, 20, QSizePolicy::Expanding, QSizePolicy::Minimum);
+    gridLayout->addItem(horizontalSpacer, 1, 1);
+    gridLayout->addWidget(radarChart, 1, 0);
+
+
 
     viewIsInitialised = false;
     focusShader = nullptr;
