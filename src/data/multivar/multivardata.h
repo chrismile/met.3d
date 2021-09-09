@@ -98,6 +98,9 @@ public:
     inline void resetVarDivergingChanged() { varDivergingChanged = false; }
     inline const QVector<uint32_t>& getVarDiverging() { return varDiverging; }
 
+    inline bool getUseTimestepLens() { return useTimestepLens; }
+    inline void setParticlePosTimeStep(int t) { particlePosTimeStep = t; }
+
     /**
       Set a transfer function to map vertical position (pressure) to colour.
       */
@@ -162,6 +165,7 @@ private:
     QtProperty *fiberRadiusProperty;
     QtProperty *minRadiusFactorProperty;
     QtProperty *rollWidthProperty;
+    QtProperty *useTimestepLensProperty;
 
     QtProperty *phongLightingSettingsGroup;
     QtProperty *materialConstantAmbientProperty;
@@ -217,6 +221,8 @@ private:
     // Line settings.
     float minRadiusFactor = 0.5f;
     float fiberRadius = 0.05f;
+    bool useTimestepLens = true;
+    float particlePosTimeStep = 0.0f;
 
     // Lighting settings.
     bool useColorIntensity = true;

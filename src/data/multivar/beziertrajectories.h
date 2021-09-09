@@ -86,6 +86,7 @@ struct MBezierTrajectoriesRenderData
     GL::MVertexBuffer* vertexTangentBuffer = nullptr;
     GL::MVertexBuffer* vertexMultiVariableBuffer = nullptr;
     GL::MVertexBuffer* vertexVariableDescBuffer = nullptr;
+    GL::MVertexBuffer* vertexTimestepIndexBuffer = nullptr;
     // SSBOs
     GL::MShaderStorageBufferObject* variableArrayBuffer = nullptr;
     GL::MShaderStorageBufferObject* lineDescArrayBuffer = nullptr;
@@ -158,6 +159,8 @@ private:
             QString("beziertrajectories_vertex_multi_variable_buffer_#%1").arg(getID());
     const QString vertexVariableDescBufferID =
             QString("beziertrajectories_vertex_variable_desc_buffer_#%1").arg(getID());
+    const QString vertexTimestepIndexBufferID =
+            QString("beziertrajectories_vertex_timestep_index_buffer_#%1").arg(getID());
     const QString variableArrayBufferID =
             QString("beziertrajectories_variable_array_buffer_#%1").arg(getID());
     const QString lineDescArrayBufferID =

@@ -2261,6 +2261,7 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
     {
         particlePosTimeStep = properties->mEnum()->value(
                     particlePosTimeProperty);
+        multiVarData.setParticlePosTimeStep(particlePosTimeStep);
 
         if (suppressActorUpdates()) return;
         asynchronousSelectionRequest();
@@ -2643,18 +2644,22 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
             tubeShader->setUniformValue("cameraPosition", sceneView->getCamera()->getOrigin());
             tubeShader->setUniformValue("lineWidth", GLfloat(2.0f * tubeRadius));
 
-            if (renderMode == BACKWARDTUBES_AND_SINGLETIME)
+            //if (renderMode == BACKWARDTUBES_AND_SINGLETIME)
+            //{
+            //    tubeShader->setUniformValue(
+            //            "renderTubesUpToIndex",
+            //            particlePosTimeStep);
+            //}
+            //else
+            //{
+            //    tubeShader->setUniformValue(
+            //            "renderTubesUpToIndex",
+            //            trajectoryRequests[t]
+            //                    .trajectories->getNumTimeStepsPerTrajectory());
+            //}
+            if (multiVarData.getUseTimestepLens())
             {
-                tubeShader->setUniformValue(
-                        "renderTubesUpToIndex",
-                        particlePosTimeStep);
-            }
-            else
-            {
-                tubeShader->setUniformValue(
-                        "renderTubesUpToIndex",
-                        trajectoryRequests[t]
-                                .trajectories->getNumTimeStepsPerTrajectory());
+                tubeShader->setUniformValue("timestepLensePosition", particlePosTimeStep);
             }
 
             MBezierTrajectoriesRenderData& bezierTrajectoriesRenderData =
@@ -2666,6 +2671,7 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
             bezierTrajectoriesRenderData.vertexTangentBuffer->attachToVertexAttribute(2);
             bezierTrajectoriesRenderData.vertexMultiVariableBuffer->attachToVertexAttribute(3);
             bezierTrajectoriesRenderData.vertexVariableDescBuffer->attachToVertexAttribute(4);
+            bezierTrajectoriesRenderData.vertexTimestepIndexBuffer->attachToVertexAttribute(5);
 
             // Bind shader storage buffer objects.
             bezierTrajectoriesRenderData.variableArrayBuffer->bindToIndex(2);

@@ -365,6 +365,8 @@ protected:
 
     void keyPressEvent(QKeyEvent *event);
 
+    bool event(QEvent *event) override;
+
     void updateSynchronizedCameras();
 
     QList<MLabel*> staticLabels;

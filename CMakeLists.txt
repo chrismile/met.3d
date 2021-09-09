@@ -142,7 +142,7 @@ cmake_policy(SET CMP0020 NEW)
 option(FORCE_USE_QT4 "Build with Qt4 even if Qt5 is available." OFF)
 
 if(NOT FORCE_USE_QT4)
-    find_package(Qt5 COMPONENTS Core Widgets Gui OpenGL Xml Network Concurrent)
+    find_package(Qt5 COMPONENTS Core Widgets Gui OpenGL Xml Network Concurrent Charts)
 endif()
 
 if(FORCE_USE_QT4
@@ -334,7 +334,7 @@ target_link_libraries(Met3D
 if(USE_QT4)
     target_link_libraries(Met3D Qt4::QtCore Qt4::QtGui Qt4::QtOpenGL Qt4::QtXml Qt4::QtNetwork)
 else()
-    qt5_use_modules(Met3D Core Widgets Gui OpenGL Xml Network Concurrent)
+    qt5_use_modules(Met3D Core Widgets Gui OpenGL Xml Network Concurrent Charts)
 endif()
 
 # Set command line arguments TODO does not work!

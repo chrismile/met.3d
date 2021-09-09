@@ -46,6 +46,12 @@
 
 // "Color bands"-specific uniforms
 uniform float separatorWidth;
+#ifdef TIMESTEP_LENS
+uniform int timestepLensePosition;
+//uniform float timestepLenseThickness = 1.0f;
+//uniform float timestepLenseRadius = 100.0f;
+uniform float timestepLenseRadius = 30.0f;
+#endif
 
 /*****************************************************************************
  ***                            INTERFACES
@@ -60,6 +66,9 @@ interface VSOutput
     int vElementID; // number of line element (original line vertex index)
     int vElementNextID; // number of next line element (original next line vertex index)
     float vElementInterpolant; // curve parameter t along curve between element and next element
+#ifdef TIMESTEP_LENS
+    float vTimestepIndex;
+#endif
 };
 
 interface FSInput
@@ -68,12 +77,15 @@ interface FSInput
     vec3 fragWorldPos;
     vec3 fragNormal;
     vec3 fragTangent;
-    vec2 fragTexCoord;
+    //vec2 fragTexCoord;
     // "Oriented Stripes"-specfic outputs
     flat int fragElementID; // Actual per-line vertex index --> required for sampling from global buffer
     flat int fragElementNextID; // Actual next per-line vertex index --> for linear interpolation
     flat int fragLineID; // Line index --> required for sampling from global buffer
     float fragElementInterpolant; // current number of curve parameter t (in [0;1]) within one line segment
+#ifdef TIMESTEP_LENS
+    float fragTimestep;
+#endif
 };
 
 /*****************************************************************************
@@ -82,7 +94,7 @@ interface FSInput
 
 shader VSmain(
         in vec3 vertexPosition : 0, in vec3 vertexLineNormal : 1, in vec3 vertexLineTangent : 2,
-        in vec4 multiVariable : 3, in vec4 variableDesc : 4, out VSOutput outputs) {
+        in vec4 multiVariable : 3, in vec4 variableDesc : 4, in float timestepIndex : 5, out VSOutput outputs) {
     const int lineID = int(variableDesc.y);
     const int elementID = int(variableDesc.x);
 
@@ -95,6 +107,10 @@ shader VSmain(
 
     outputs.vElementNextID = int(variableDesc.z);
     outputs.vElementInterpolant = variableDesc.w;
+
+#ifdef TIMESTEP_LENS
+    outputs.vTimestepIndex = timestepIndex;
+#endif
 }
 
 /*****************************************************************************
@@ -103,6 +119,15 @@ shader VSmain(
 
 #define ORIENTED_COLOR_BANDS
 #include "multivar_geometry_utils.glsl"
+
+#ifdef TIMESTEP_LENS
+float computeZoomFactor(float timestepIndex) {
+    float timeDist = abs(float(timestepLensePosition) - timestepIndex);
+    float radicand = max(0.0, timestepLenseRadius*timestepLenseRadius - timeDist*timeDist);
+    return sqrt(radicand) * timestepLenseRadius * 0.002 + 1.0;
+    //return smoothstep(timestepLenseRadius, 0.0f, timeDist) * timestepLenseThickness + 1.0;
+}
+#endif
 
 shader GSmain(in VSOutput inputs[], out FSInput outputs) {
     //if (inputs[0].vElementID, numObsPerTrajectory > renderTubesUpToIndex) return;
@@ -130,10 +155,19 @@ shader GSmain(in VSOutput inputs[], out FSInput outputs) {
 
     // 1) Create tube circle vertices for current and next point
 #if ORIENTED_RIBBON_MODE != 3 // ORIENTED_RIBBON_MODE_VARYING_RIBBON_WIDTH
+#ifdef TIMESTEP_LENS
+    float radius0 = lineWidth / 2.0 * computeZoomFactor(inputs[0].vTimestepIndex);
+    float radius1 = lineWidth / 2.0 * computeZoomFactor(inputs[1].vTimestepIndex);
     createTubeSegments(
-            circlePointsCurrent, vertexNormalsCurrent, currentPoint, normalCurrent, tangentCurrent, lineWidth / 2.0);
+    circlePointsCurrent, vertexNormalsCurrent, currentPoint, normalCurrent, tangentCurrent, radius0);
     createTubeSegments(
-            circlePointsNext, vertexNormalsNext, nextPoint, normalNext, tangentNext, lineWidth / 2.0);
+    circlePointsNext, vertexNormalsNext, nextPoint, normalNext, tangentNext, radius1);
+#else
+    createTubeSegments(
+    circlePointsCurrent, vertexNormalsCurrent, currentPoint, normalCurrent, tangentCurrent, lineWidth / 2.0);
+    createTubeSegments(
+    circlePointsNext, vertexNormalsNext, nextPoint, normalNext, tangentNext, lineWidth / 2.0);
+#endif
 #else
     // Sample ALL variables.
     float variables[MAX_NUM_VARIABLES];
@@ -217,30 +251,30 @@ shader GSmain(in VSOutput inputs[], out FSInput outputs) {
 
     // 2) Create NDC AABB for stripe -> tube mapping
     // 2.1) Define orientation of local NDC frame-of-reference
-    vec4 currentPointNDC = mvpMatrix * vec4(currentPoint, 1);
-    currentPointNDC.xyz /= currentPointNDC.w;
-    vec4 nextPointNDC = mvpMatrix * vec4(nextPoint, 1);
-    nextPointNDC.xyz /= nextPointNDC.w;
+    //vec4 currentPointNDC = mvpMatrix * vec4(currentPoint, 1);
+    //currentPointNDC.xyz /= currentPointNDC.w;
+    //vec4 nextPointNDC = mvpMatrix * vec4(nextPoint, 1);
+    //nextPointNDC.xyz /= nextPointNDC.w;
 
-    vec2 ndcOrientation = normalize(nextPointNDC.xy - currentPointNDC.xy);
-    vec2 ndcOrientNormal = vec2(-ndcOrientation.y, ndcOrientation.x);
+    //vec2 ndcOrientation = normalize(nextPointNDC.xy - currentPointNDC.xy);
+    //vec2 ndcOrientNormal = vec2(-ndcOrientation.y, ndcOrientation.x);
     // 2.2) Matrix to rotate every NDC point back to the local frame-of-reference
     // (such that tangent is aligned with the x-axis)
-    mat2 invMatNDC = inverse(mat2(ndcOrientation, ndcOrientNormal));
+    //mat2 invMatNDC = inverse(mat2(ndcOrientation, ndcOrientNormal));
 
     // 2.3) Compute AABB in NDC space
-    vec2 bboxMin = vec2(10,10);
-    vec2 bboxMax = vec2(-10,-10);
-    vec2 tangentNDC = vec2(0);
-    vec2 normalNDC = vec2(0);
-    vec2 refPointNDC = vec2(0);
+    //vec2 bboxMin = vec2(10,10);
+    //vec2 bboxMax = vec2(-10,-10);
+    //vec2 tangentNDC = vec2(0);
+    //vec2 normalNDC = vec2(0);
+    //vec2 refPointNDC = vec2(0);
 
-    computeAABBFromNDC(circlePointsCurrent, invMatNDC, bboxMin, bboxMax, tangentNDC, normalNDC, refPointNDC);
-    computeAABBFromNDC(circlePointsNext, invMatNDC, bboxMin, bboxMax, tangentNDC, normalNDC, refPointNDC);
+    //computeAABBFromNDC(circlePointsCurrent, invMatNDC, bboxMin, bboxMax, tangentNDC, normalNDC, refPointNDC);
+    //computeAABBFromNDC(circlePointsNext, invMatNDC, bboxMin, bboxMax, tangentNDC, normalNDC, refPointNDC);
 
     // 3) Compute texture coordinates
-    computeTexCoords(vertexTexCoordsCurrent, circlePointsCurrent, invMatNDC, tangentNDC, normalNDC, refPointNDC);
-    computeTexCoords(vertexTexCoordsNext, circlePointsNext, invMatNDC, tangentNDC, normalNDC, refPointNDC);
+    //computeTexCoords(vertexTexCoordsCurrent, circlePointsCurrent, invMatNDC, tangentNDC, normalNDC, refPointNDC);
+    //computeTexCoords(vertexTexCoordsNext, circlePointsNext, invMatNDC, tangentNDC, normalNDC, refPointNDC);
 
     // 4) Emit the tube triangle vertices and attributes to the fragment shader
     outputs.fragElementID = inputs[0].vElementID;
@@ -261,14 +295,17 @@ shader GSmain(in VSOutput inputs[], out FSInput outputs) {
         outputs.fragNormal = vertexNormalsCurrent[i];
         outputs.fragTangent = tangentCurrent;
         outputs.fragWorldPos = segmentPointCurrent0;
-        outputs.fragTexCoord = vertexTexCoordsCurrent[i];
+        //outputs.fragTexCoord = vertexTexCoordsCurrent[i];
+#ifdef TIMESTEP_LENS
+        outputs.fragTimestep = inputs[0].vTimestepIndex;
+#endif
         EmitVertex();
 
         gl_Position = mvpMatrix * vec4(segmentPointCurrent1, 1.0);
         outputs.fragNormal = vertexNormalsCurrent[iN];
         outputs.fragTangent = tangentCurrent;
         outputs.fragWorldPos = segmentPointCurrent1;
-        outputs.fragTexCoord = vertexTexCoordsCurrent[iN];
+        //outputs.fragTexCoord = vertexTexCoordsCurrent[iN];
         EmitVertex();
 
         if (inputs[1].vElementInterpolant < inputs[0].vElementInterpolant) {
@@ -283,14 +320,17 @@ shader GSmain(in VSOutput inputs[], out FSInput outputs) {
         outputs.fragNormal = vertexNormalsNext[i];
         outputs.fragTangent = tangentNext;
         outputs.fragWorldPos = segmentPointNext0;
-        outputs.fragTexCoord = vertexTexCoordsNext[i];
+        //outputs.fragTexCoord = vertexTexCoordsNext[i];
+#ifdef TIMESTEP_LENS
+        outputs.fragTimestep = inputs[1].vTimestepIndex;
+#endif
         EmitVertex();
 
         gl_Position = mvpMatrix * vec4(segmentPointNext1, 1.0);
         outputs.fragNormal = vertexNormalsNext[iN];
         outputs.fragTangent = tangentNext;
         outputs.fragWorldPos = segmentPointNext1;
-        outputs.fragTexCoord = vertexTexCoordsNext[iN];
+        //outputs.fragTexCoord = vertexTexCoordsNext[iN];
         EmitVertex();
 
         EndPrimitive();

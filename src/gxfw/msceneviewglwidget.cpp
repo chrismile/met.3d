@@ -37,11 +37,13 @@
 #include <QFileInfo>
 #include <QLabel>
 #include <QMouseEvent>
+#include <QToolTip>
 
 // local application imports
 #include "util/mutil.h"
 #include "gxfw/mtypes.h"
 #include "gxfw/textmanager.h"
+#include "qt_extensions/radarchart.h"
 #include "mainwindow.h"
 
 using namespace std;
@@ -87,6 +89,16 @@ MSceneViewGLWidget::MSceneViewGLWidget()
       resizeViewDialog(new MResizeWindowDialog),
       overwriteImageSequence(false)
 {
+    // TODO: Test
+    //QtExtensions::MRadarChart* radarChart = new QtExtensions::MRadarChart(this);
+    //radarChart->setVariableNames({ "Variable 0", "Variable 1", "Variable 2", "Variable 3", "Variable 4", "Variable 5", "Variable 6", "Variable 7" });
+    //radarChart->addRadar("Trajectory A", { 0.9, 0.2, 0.7, 0.1, 0.8, 0.01, 0.6, 0.3 });
+    //radarChart->addRadar("Trajectory B", { 0.7, 0.3, 0.8, 0.4, 0.7, 0.3, 0.9, 0.4 });
+    //radarChart->setRenderHint(QPainter::Antialiasing);
+    //radarChart->resize(500, 400);
+    //radarChart->setAttribute(Qt::WA_TranslucentBackground);
+    //radarChart->setBackgroundVisible(false);
+
     viewIsInitialised = false;
     focusShader = nullptr;
 
@@ -2356,6 +2368,29 @@ void MSceneViewGLWidget::keyPressEvent(QKeyEvent *event)
         // implementation.
         QGLWidget::keyPressEvent(event);
     }
+}
+
+
+bool MSceneViewGLWidget::event(QEvent *event)
+{
+    /*if (event->type() == QEvent::ToolTip)
+    {
+        QHelpEvent *helpEvent = static_cast<QHelpEvent*>(event);
+        float time = 0.0f;
+        int index = 0;//itemAt(helpEvent->pos());
+        if (index != -1)
+        {
+            QToolTip::showText(helpEvent->globalPos(), QString("Time: #%1").arg(time));
+        }
+        else
+        {
+            QToolTip::hideText();
+            event->ignore();
+        }
+
+        return true;
+    }*/
+    return QGLWidget::event(event);
 }
 
 

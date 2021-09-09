@@ -313,7 +313,7 @@ MBezierTrajectories *MBezierTrajectoriesSource::produceData(MDataRequest request
         newTrajectory.positions.push_back(pos);
 
         // Now we store variable, min, and max, and var ID per vertex as new attributes
-        newTrajectory.attributes.resize(8);
+        newTrajectory.attributes.resize(9);
         float varValue = filteredTrajectories[traj].attributes[varIDPerLine][lineID];
         newTrajectory.attributes[0].push_back(varValue);
         newTrajectory.attributes[1].push_back(attributesMinMax[varIDPerLine].x());
@@ -328,6 +328,8 @@ MBezierTrajectories *MBezierTrajectoriesSource::produceData(MDataRequest request
         newTrajectory.attributes[6].push_back(static_cast<float>(std::min(lineID, uint32_t(BCurves.size() - 1))));
         // interpolant t
         newTrajectory.attributes[7].push_back(0.0f);
+        // timestep index
+        newTrajectory.attributes[8].push_back(0.0f);
 
         curArcLength += rollSegLength;
 
@@ -407,6 +409,8 @@ MBezierTrajectories *MBezierTrajectoriesSource::produceData(MDataRequest request
             // interpolant t
             float normalizedT = BCurve.normalizeT(t);
             newTrajectory.attributes[7].push_back(normalizedT);
+            // timestep index
+            newTrajectory.attributes[8].push_back(float(lineID) + normalizedT);
 
             curArcLength += rollSegLength;
             varIDPerLine++;

@@ -213,6 +213,12 @@ void MMultiVarData::setPropertiesRenderingSettings()
     rollWidthProperty->setToolTip("Number of line segments used for the tube rendering.");
     propertyList.push_back(rollWidthProperty);
 
+    useTimestepLensProperty = addProperty(
+            BOOL_PROPERTY, "use timestep lens", renderingSettingsGroupProperty);
+    properties->mBool()->setValue(useTimestepLensProperty, useColorIntensity);
+    useTimestepLensProperty->setToolTip("Whether use a timestep lense for highlighting user-selected timesteps.");
+    propertyList.push_back(useTimestepLensProperty);
+
 
     // --- Phong lighting settings ---
     phongLightingSettingsGroup = addProperty(
@@ -321,6 +327,7 @@ void MMultiVarData::updateModeEnabledProperties()
             multiVarRenderMode != MultiVarRenderMode::ORIENTED_COLOR_BANDS
             || orientedRibbonMode == OrientedRibbonMode::VARYING_RIBBON_WIDTH);
     rollWidthProperty->setEnabled(multiVarRenderMode == MultiVarRenderMode::ROLLS);
+    useTimestepLensProperty->setEnabled(multiVarRenderMode == MultiVarRenderMode::ORIENTED_COLOR_BANDS);
 }
 
 
@@ -752,6 +759,11 @@ void MMultiVarData::onQtPropertyChanged(QtProperty *property)
     {
         rollWidth = properties->mInt()->value(rollWidthProperty);
     }
+    else if (property == useTimestepLensProperty)
+    {
+        useTimestepLens = properties->mBool()->value(useTimestepLensProperty);
+        reloadShaderEffect();
+    }
 
     else if (property == materialConstantAmbientProperty)
     {
@@ -898,7 +910,7 @@ void MMultiVarData::reloadShaderEffect()
             {"NUM_LINESEGMENTS", QString::fromStdString(std::to_string(numInstances)) },
             {"MAX_NUM_VARIABLES", QString::fromStdString(std::to_string(MAX_NUM_VARIABLES)) },
             {"USE_MULTI_VAR_TRANSFER_FUNCTION", QString::fromStdString("") },
-            {"IS_MULTIVAR_DATA", QString::fromStdString("") }
+            {"IS_MULTIVAR_DATA", QString::fromStdString("") },
     };
 
     if (multiVarRenderMode == MultiVarRenderMode::ORIENTED_COLOR_BANDS)
@@ -906,6 +918,10 @@ void MMultiVarData::reloadShaderEffect()
         if (!mapColorToSaturation)
         {
             defines.insert("DIRECT_COLOR_MAPPING", "");
+        }
+        if (useTimestepLens)
+        {
+            defines.insert("TIMESTEP_LENS", "");
         }
         defines.insert(
                 "ORIENTED_RIBBON_MODE",

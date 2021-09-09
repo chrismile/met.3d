@@ -237,8 +237,10 @@ MBezierTrajectoriesRenderData MBezierTrajectories::getRenderData(QGLWidget *curr
 
     QVector<QVector4D> vertexMultiVariableArray;
     QVector<QVector4D> vertexVariableDescArray;
+    QVector<float> vertexTimestepIndexArray;
     vertexMultiVariableArray.reserve(vertexAttributes.size());
     vertexVariableDescArray.reserve(vertexAttributes.size());
+    vertexTimestepIndexArray.reserve(vertexAttributes.size());
     for (int vertexIdx = 0; vertexIdx < vertexAttributes.size(); vertexIdx++)
     {
         QVector<float>& attrList = vertexAttributes[vertexIdx];
@@ -246,6 +248,7 @@ MBezierTrajectoriesRenderData MBezierTrajectories::getRenderData(QGLWidget *curr
                 attrList.at(0), attrList.at(1), attrList.at(2), attrList.at(3)));
         vertexVariableDescArray.push_back(QVector4D(
                 attrList.at(4), attrList.at(5), attrList.at(6), attrList.at(7)));
+        vertexTimestepIndexArray.push_back(attrList.at(8));
     }
 
 
@@ -273,7 +276,8 @@ MBezierTrajectoriesRenderData MBezierTrajectories::getRenderData(QGLWidget *curr
             currentGLContext, vertexMultiVariableBufferID, vertexMultiVariableArray);
     bezierTrajectoriesRenderData.vertexVariableDescBuffer = createVertexBuffer(
             currentGLContext, vertexVariableDescBufferID, vertexVariableDescArray);
-
+    bezierTrajectoriesRenderData.vertexTimestepIndexBuffer = createVertexBuffer(
+            currentGLContext, vertexTimestepIndexBufferID, vertexTimestepIndexArray);
 
 
     // ------------------------------------------ Create SSBOs. ------------------------------------------
