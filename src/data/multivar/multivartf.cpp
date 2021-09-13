@@ -208,6 +208,11 @@ void MMultiVarTf::generateTexture1DArray()
                      GL_RGBA,                   // format
                      GL_UNSIGNED_BYTE,          // data type of the pixel data
                      colorValuesArray.data()); CHECK_GL_ERROR;
+
+#ifdef USE_QOPENGLWIDGET
+        glActiveTexture(GL_TEXTURE0);
+        glRM->doneCurrent();
+#endif
     }
 
     this->minMaxIsDirty = true;
@@ -220,7 +225,12 @@ void MMultiVarTf::bindTexture1DArray(int textureUnitTransferFunction)
 }
 
 
-GL::MShaderStorageBufferObject *MMultiVarTf::getMinMaxBuffer(QGLWidget *currentGLContext)
+GL::MShaderStorageBufferObject *MMultiVarTf::getMinMaxBuffer(
+#ifdef USE_QOPENGLWIDGET
+        QOpenGLWidget *currentGLContext)
+#else
+        QGLWidget *currentGLContext)
+#endif
 {
     if (minMaxBuffer == nullptr)
     {

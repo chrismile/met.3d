@@ -866,6 +866,11 @@ void MTransferFunction1D::generateTransferTexture()
                      GL_RGBA,                   // format
                      GL_UNSIGNED_BYTE,          // data type of the pixel data
                      colorValues.data()); CHECK_GL_ERROR;
+
+#ifdef USE_QOPENGLWIDGET
+        glActiveTexture(GL_TEXTURE0);
+        glRM->doneCurrent();
+#endif
     }
 }
 
@@ -1191,6 +1196,10 @@ void MTransferFunction1D::generateBarGeometry()
         }
         vertexBuffer = static_cast<GL::MVertexBuffer*>(glRM->getGPUItem(requestKey));
     }
+
+#ifdef USE_QOPENGLWIDGET
+    glRM->doneCurrent();
+#endif
 
     // Required for the glDrawArrays() call in renderToCurrentContext().
     numVertices = 4;

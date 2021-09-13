@@ -66,6 +66,10 @@ if (ENABLE_EXPERIMENTAL_DERIVEDVARS)
     add_definitions(-DENABLE_EXPERIMENTAL_DERIVEDVARS)
 endif (ENABLE_EXPERIMENTAL_DERIVEDVARS)
 
+option(USE_QOPENGLWIDGET "Build with QOpenGLWidget used instead of QGLWidget." ON)
+if (USE_QOPENGLWIDGET)
+    add_definitions(-DUSE_QOPENGLWIDGET)
+endif()
 
 # Operating-system specific settings.
 if (WIN32)
@@ -251,6 +255,20 @@ add_definitions(-DPROJ_MAJOR_VERSION=${proj_MAJOR_VERSION})
 add_definitions(-DPROJ_MINOR_VERSION=${proj_MINOR_VERSION})
 add_definitions(-DPROJ_PATCH_VERSION=${proj_PATCH_VERSION})
 
+# Embree 3
+if(VCPKG_TOOLCHAIN)
+    find_package(TBB QUIET)
+    find_package(embree 3 QUIET)
+else()
+    find_package(embree 3.0 QUIET)
+endif()
+if(embree_FOUND)
+    MESSAGE(STATUS "Found Embree. Using Embree as as for computing ray-mesh intersections.")
+else()
+    list(REMOVE_ITEM SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/data/multivar/trajectorypicking.cpp)
+    MESSAGE(STATUS "Embree couldn't be found. Disabling Embree ray-mesh intersection support.")
+endif()
+
 ##############################################################################
 #                      Configure Other Projects                              #
 ##############################################################################
@@ -330,6 +348,16 @@ target_link_libraries(Met3D
 			${proj_LIBRARIES}
                         #${EIGEN3_LIBRARIES}
   )
+
+if(embree_FOUND)
+    if(VCPKG_TOOLCHAIN)
+        target_link_libraries(Met3D embree)
+    else()
+        target_link_libraries(Met3D ${EMBREE_LIBRARIES})
+    endif()
+    include_directories(${EMBREE_INCLUDE_DIRS})
+    add_definitions(-DUSE_EMBREE)
+endif()
 
 if(USE_QT4)
     target_link_libraries(Met3D Qt4::QtCore Qt4::QtGui Qt4::QtOpenGL Qt4::QtXml Qt4::QtNetwork)
@@ -424,7 +452,7 @@ if(WIN32)
   find_dll_for_package(GLEW)
   find_dll_for_package(qcustomplot)
   find_dll_for_package(proj)
-  
+
   find_dll_dummy(GEOS)
   find_dll_dummy(GEOS_C)
   find_dll_dummy(HDF5)

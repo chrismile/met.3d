@@ -34,8 +34,12 @@
 // standard library imports
 
 // related third party imports
-#include "GL/glew.h"
+#include <GL/glew.h>
+#ifdef USE_QOPENGLWIDGET
+#include <QOpenGLWidget>
+#else
 #include <QGLWidget>
+#endif
 
 // local application imports
 #include "data/abstractdataitem.h"
@@ -389,8 +393,13 @@ public:
       (not released textures will stay in GPU memory forever). The texture is
       memory managed by @ref MGLResourcesManager.
      */
-    virtual GL::MTexture* getTexture(QGLWidget *currentGLContext = nullptr,
-                                    bool nullTexture = false);
+    virtual GL::MTexture* getTexture(
+#ifdef USE_QOPENGLWIDGET
+            QOpenGLWidget *currentGLContext = nullptr,
+#else
+            QGLWidget *currentGLContext = nullptr,
+#endif
+            bool nullTexture = false);
 
     /** Release a texture acquired with getTexture(). */
     void releaseTexture();
@@ -399,7 +408,12 @@ public:
       Returns the handle to a texture containing the coordinate axis data (1D
       texture). Needs to be released with @ref releaseLonLatTexture().
      */
-    GL::MTexture* getLonLatLevTexture(QGLWidget *currentGLContext = nullptr);
+    GL::MTexture* getLonLatLevTexture(
+#ifdef USE_QOPENGLWIDGET
+            QOpenGLWidget *currentGLContext = nullptr);
+#else
+            QGLWidget *currentGLContext = nullptr);
+#endif
 
     /** Release a texture acquired with getLonLatTexture(). */
     void releaseLonLatLevTexture();
@@ -534,7 +548,12 @@ public:
       Returns the handle to a texture containing the flag data (3D int
       texture). Needs to be released with @ref releaseFlagsTexture().
      */
-    virtual GL::MTexture* getFlagsTexture(QGLWidget *currentGLContext = nullptr);
+    virtual GL::MTexture* getFlagsTexture(
+#ifdef USE_QOPENGLWIDGET
+            QOpenGLWidget *currentGLContext = nullptr);
+#else
+            QGLWidget *currentGLContext = nullptr);
+#endif
 
     /** Release a texture acquired with getFlagsTexture(). */
     void releaseFlagsTexture();
@@ -579,7 +598,12 @@ public:
       References: Krueger and Westermann (2003); Shirley, Fundamentals of
       Computer Graphics, 3rd ed. (2009), Ch. 12.2.3.
      */
-    GL::MTexture* getMinMaxAccelTexture3D(QGLWidget *currentGLContext = nullptr);
+    GL::MTexture* getMinMaxAccelTexture3D(
+#ifdef USE_QOPENGLWIDGET
+            QOpenGLWidget *currentGLContext = nullptr);
+#else
+            QGLWidget *currentGLContext = nullptr);
+#endif
 
     void releaseMinMaxAccelTexture3D();
 
@@ -691,7 +715,12 @@ public:
 
      @note see notes 17Mar2014.
      */
-    GL::MTexture* getPressureTexCoordTexture1D(QGLWidget *currentGLContext = nullptr);
+    GL::MTexture* getPressureTexCoordTexture1D(
+#ifdef USE_QOPENGLWIDGET
+            QOpenGLWidget *currentGLContext = nullptr);
+#else
+            QGLWidget *currentGLContext = nullptr);
+#endif
 
     void releasePressureTexCoordTexture1D();
 
@@ -743,10 +772,20 @@ public:
                                           float p_hPa)
     { Q_UNUSED(p_hPa); return getValue(j, i); }
 
-    GL::MTexture* getTexture(QGLWidget *currentGLContext = nullptr,
-                            bool nullTexture = false);
+    GL::MTexture* getTexture(
+#ifdef USE_QOPENGLWIDGET
+            QOpenGLWidget *currentGLContext = nullptr,
+#else
+            QGLWidget *currentGLContext = nullptr,
+#endif
+            bool nullTexture = false);
 
-    GL::MTexture* getFlagsTexture(QGLWidget *currentGLContext = nullptr);
+    GL::MTexture* getFlagsTexture(
+#ifdef USE_QOPENGLWIDGET
+            QOpenGLWidget *currentGLContext = nullptr);
+#else
+            QGLWidget *currentGLContext = nullptr);
+#endif
 
 protected:
 
@@ -780,13 +819,23 @@ public:
      */
     void exchangeSurfacePressureGrid(MRegularLonLatGrid* newSfcPressureGrid);
 
-    GL::MTexture* getHybridCoeffTexture(QGLWidget *currentGLContext = nullptr);
+    GL::MTexture* getHybridCoeffTexture(
+#ifdef USE_QOPENGLWIDGET
+            QOpenGLWidget *currentGLContext = nullptr);
+#else
+            QGLWidget *currentGLContext = nullptr);
+#endif
 
     void releaseHybridCoeffTexture();
 
     /**
      */
-    GL::MTexture* getPressureTexCoordTexture2D(QGLWidget *currentGLContext = nullptr);
+    GL::MTexture* getPressureTexCoordTexture2D(
+#ifdef USE_QOPENGLWIDGET
+            QOpenGLWidget *currentGLContext = nullptr);
+#else
+            QGLWidget *currentGLContext = nullptr);
+#endif
 
     void releasePressureTexCoordTexture2D();
 

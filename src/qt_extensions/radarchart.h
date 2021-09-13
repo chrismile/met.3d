@@ -29,6 +29,7 @@
 // standard library imports
 
 // related third party imports
+#include <QGridLayout>
 #include <QtCharts/QChartView>
 #include <QtCharts/QPolarChart>
 
@@ -58,12 +59,28 @@ public:
 
     inline QtCharts::QPolarChart* getChart() { return chart; }
 
+    void enterEvent(QEvent* event);
+    void leaveEvent(QEvent* event);
+    bool hasHeightForWidth() const;
+    int heightForWidth(int w) const;
+
 private:
     void _initialize();
     QtCharts::QPolarChart* chart = nullptr;
     QtCharts::QCategoryAxis* angularAxis = nullptr;
     QtCharts::QValueAxis* radialAxis = nullptr;
     QVector<QString> variableNames;
+};
+
+class MMultiVarChartCollection : public QGridLayout {
+public:
+    MMultiVarChartCollection();
+    void setTrajectory(int index, const QVector<float>& variableValues);
+    void clear();
+
+private:
+    QVector<MRadarChart*> charts;
+    QSpacerItem* verticalSpacer, *horizontalSpacer;
 };
 
 }

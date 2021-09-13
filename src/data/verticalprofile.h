@@ -66,7 +66,12 @@ public:
       from a render method, it should switch back to the current render context
       (given by @p currentGLContext).
      */
-    GL::MVertexBuffer *getVertexBuffer(QGLWidget *currentGLContext = 0);
+    GL::MVertexBuffer *getVertexBuffer(
+#ifdef USE_QOPENGLWIDGET
+            QOpenGLWidget *currentGLContext = nullptr);
+#else
+            QGLWidget *currentGLContext = nullptr);
+#endif
 
     void releaseVertexBuffer();
 

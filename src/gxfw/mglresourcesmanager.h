@@ -31,8 +31,13 @@
 
 // related third party imports
 #include "GL/glew.h"
+#ifdef USE_QOPENGLWIDGET
+#include <QOpenGLWidget>
+#include <QOpenGLShaderProgram>
+#else
 #include <QGLWidget>
 #include <QGLShaderProgram>
+#endif
 #include "qtpropertymanager.h"
 
 // local application imports
@@ -63,15 +68,29 @@ namespace Met3D
   There is only one instance of MGLResourcesManager in the system (singleton
   pattern).
   */
+#ifdef USE_QOPENGLWIDGET
+class MGLResourcesManager : public QOpenGLWidget
+#else
 class MGLResourcesManager : public QGLWidget
+#endif
 {
     Q_OBJECT
 
 public:
     /**
      */
-    static void initialize(const QGLFormat &format, QWidget *parent = 0,
-                           QGLWidget *shareWidget = 0);
+    static void initialize(
+#ifdef USE_QOPENGLWIDGET
+            const QSurfaceFormat &format,
+#else
+            const QGLFormat &format,
+#endif
+            QWidget *parent = nullptr,
+#ifdef USE_QOPENGLWIDGET
+            QOpenGLWidget *shareWidget = nullptr);
+#else
+            QGLWidget *shareWidget = nullptr);
+#endif
 
     ~MGLResourcesManager();
 
@@ -81,6 +100,13 @@ public:
      argument.
      */
     static MGLResourcesManager* getInstance();
+
+#ifdef USE_QOPENGLWIDGET
+    /**
+     * Initializes GLEW and the actors if this was not already done.
+     */
+    void initializeExternal();
+#endif
 
     /**
       Place a scene in a managed pool of scenes. All registered scenes are
@@ -230,6 +256,10 @@ public:
     void releaseGPUItem(Met3D::MDataRequest key);
 
     void releaseAllGPUItemReferences(Met3D::MDataRequest key);
+
+    void deleteReleasedGPUItem(GL::MAbstractGPUDataItem *item);
+
+    void deleteReleasedGPUItem(MDataRequest removeKey);
 
     void updateGPUItemSize(GL::MAbstractGPUDataItem *item);
 
@@ -389,6 +419,10 @@ signals:
 protected:
     friend class MSceneViewGLWidget;
 
+#ifdef USE_QOPENGLWIDGET
+    static bool isExternalDataInitialized;
+#endif
+
     /**
       Initialize the OpenGL resources. Called once on program start.
      */
@@ -407,8 +441,23 @@ private:
      Constructor is private, as it should only be called from getInstance().
      See https://en.wikipedia.org/wiki/Singleton_pattern#Lazy_initialization.
      */
-    MGLResourcesManager(const QGLFormat &format, QWidget *parent = 0,
-                        QGLWidget *shareWidget = 0);
+    MGLResourcesManager(
+#ifdef USE_QOPENGLWIDGET
+            const QSurfaceFormat &format,
+#else
+            const QGLFormat &format,
+#endif
+            QWidget *parent = nullptr,
+#ifdef USE_QOPENGLWIDGET
+            QOpenGLWidget *shareWidget = nullptr);
+#else
+            QGLWidget *shareWidget = nullptr);
+#endif
+
+#ifdef USE_QOPENGLWIDGET
+    /** The requested surface format passed to the constructor. */
+    QSurfaceFormat requestedFormat;
+#endif
 
     /** Single instance of the GL resources manager. */
     static MGLResourcesManager* instance;

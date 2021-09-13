@@ -520,6 +520,10 @@ void MGraticuleActor::generateGeometry()
     uploadVec2ToVertexBuffer(verticesGraticule, graticuleRequestKey,
                              &graticuleVertexBuffer);
 
+#ifdef USE_QOPENGLWIDGET
+    glRM->doneCurrent();
+#endif
+
 
     // Generate graticule labels.
     // ==========================

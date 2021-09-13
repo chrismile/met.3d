@@ -32,7 +32,7 @@
 // related third party imports
 #include "GL/glew.h"
 #include "QtCore"
-#include "QGLWidget"
+#include "QOpenGLWidget"
 #include <log4cplus/loggingmacros.h>
 
 // local application imports
@@ -59,26 +59,57 @@ public:
     explicit MTypedVertexBuffer(Met3D::MDataRequest requestKey,
                                 uint32_t numVertices_);
 
-    void upload(const QVector<Data>& data, QGLWidget* currentGLContext = 0);
+    void upload(
+            const QVector<Data>& data,
+#ifdef USE_QOPENGLWIDGET
+            QOpenGLWidget *currentGLContext = nullptr);
+#else
+            QGLWidget *currentGLContext = nullptr);
+#endif
 
-    void upload(const Data* data, const uint32_t elemCount,
-                QGLWidget* currentGLContext = 0);
+    void upload(
+            const Data* data, const uint32_t elemCount,
+#ifdef USE_QOPENGLWIDGET
+            QOpenGLWidget *currentGLContext = nullptr);
+#else
+            QGLWidget *currentGLContext = nullptr);
+#endif
 
-    void reallocate(const Data* data, const uint32_t elemCount,
-                    GLsizei size = 0, bool force = false,
-                    QGLWidget* currentGLContext = 0);
+    void reallocate(
+            const Data* data, const uint32_t elemCount,
+            GLsizei size = 0, bool force = false,
+#ifdef USE_QOPENGLWIDGET
+            QOpenGLWidget *currentGLContext = nullptr);
+#else
+            QGLWidget *currentGLContext = nullptr);
+#endif
 
-    void reallocate(const QVector<Data>& data,
-                    GLsizei size = 0, bool force = false,
-                    QGLWidget* currentGLContext = 0);
+    void reallocate(
+            const QVector<Data>& data,
+            GLsizei size = 0, bool force = false,
+#ifdef USE_QOPENGLWIDGET
+            QOpenGLWidget *currentGLContext = nullptr);
+#else
+            QGLWidget *currentGLContext = nullptr);
+#endif
 
-    void update(const Data* data, const uint32_t elemCount,
-                GLint offset = 0, GLsizei size = 0,
-                QGLWidget* currentGLContext = 0);
+    void update(
+            const Data* data, const uint32_t elemCount,
+            GLint offset = 0, GLsizei size = 0,
+#ifdef USE_QOPENGLWIDGET
+            QOpenGLWidget *currentGLContext = nullptr);
+#else
+            QGLWidget *currentGLContext = nullptr);
+#endif
 
-    void update(const QVector<Data>& data,
-                GLint offset = 0, GLsizei size = 0,
-                QGLWidget* currentGLContext = 0);
+    void update(
+            const QVector<Data>& data,
+            GLint offset = 0, GLsizei size = 0,
+#ifdef USE_QOPENGLWIDGET
+            QOpenGLWidget *currentGLContext = nullptr);
+#else
+            QGLWidget *currentGLContext = nullptr);
+#endif
 
     void attachToVertexAttribute(GLuint attribute,
                                  GLint elemCount = -1,
@@ -152,7 +183,11 @@ void MTypedVertexBuffer<Data,Type,Num>::attachToVertexAttribute(
 template <class Data, typename Type, int Num>
 void MTypedVertexBuffer<Data,Type,Num>::upload(
         const QVector<Data>& data,
+#ifdef USE_QOPENGLWIDGET
+        QOpenGLWidget* currentGLContext)
+#else
         QGLWidget* currentGLContext)
+#endif
 {
     upload(data.constData(), data.size(), currentGLContext);
 }
@@ -162,7 +197,11 @@ template <class Data, typename Type, int Num>
 void MTypedVertexBuffer<Data,Type,Num>::upload(
         const Data* data,
         const uint32_t elemCount,
+#ifdef USE_QOPENGLWIDGET
+        QOpenGLWidget* currentGLContext)
+#else
         QGLWidget* currentGLContext)
+#endif
 {
     // if uploaded size does not equal desired size and data is not a nullptr
     // then throw an error
@@ -179,6 +218,9 @@ void MTypedVertexBuffer<Data,Type,Num>::upload(
     // any other context than the currently active. The GLResourcesManager
     // context is shared with all visible contexts.
     Met3D::MGLResourcesManager *glRM = Met3D::MGLResourcesManager::getInstance();
+#ifdef USE_QOPENGLWIDGET
+    if (currentGLContext) currentGLContext->doneCurrent();
+#endif
     glRM->makeCurrent();
 
     // Delete the old VBO. If this is the first time the method has been called
@@ -202,6 +244,10 @@ void MTypedVertexBuffer<Data,Type,Num>::upload(
                  GL_STATIC_DRAW); CHECK_GL_ERROR;
     glBindBuffer(GL_ARRAY_BUFFER, 0); CHECK_GL_ERROR;
 
+#ifdef USE_QOPENGLWIDGET
+    glRM->doneCurrent();
+#endif
+
     // If a valid GL context has been specifed, make this current.
     if (currentGLContext) currentGLContext->makeCurrent();
 }
@@ -212,9 +258,16 @@ void MTypedVertexBuffer<Data,Type,Num>::reallocate(
         const Data* data,
         const uint32_t elemCount,
         GLsizei size, bool force,
+#ifdef USE_QOPENGLWIDGET
+        QOpenGLWidget* currentGLContext)
+#else
         QGLWidget* currentGLContext)
+#endif
 {
     Met3D::MGLResourcesManager *glRM = Met3D::MGLResourcesManager::getInstance();
+#ifdef USE_QOPENGLWIDGET
+    if (currentGLContext) currentGLContext->doneCurrent();
+#endif
     glRM->makeCurrent();
 
     const GLsizei vboSize = sizeof(Type) * Num * numVertices;
@@ -244,6 +297,10 @@ void MTypedVertexBuffer<Data,Type,Num>::reallocate(
         if (glRM->isManagedGPUItem(this)) glRM->updateGPUItemSize(this);
     }
 
+#ifdef USE_QOPENGLWIDGET
+    glRM->doneCurrent();
+#endif
+
     // If a valid GL context has been specifed, make this current.
     if (currentGLContext) currentGLContext->makeCurrent();
 }
@@ -254,7 +311,11 @@ void MTypedVertexBuffer<Data,Type,Num>::reallocate(
         const QVector<Data>& data,
         GLsizei size,
         bool force,
+#ifdef USE_QOPENGLWIDGET
+        QOpenGLWidget* currentGLContext)
+#else
         QGLWidget* currentGLContext)
+#endif
 {
     reallocate(data, data.size(), 0, size, force, currentGLContext);
 }
@@ -265,7 +326,11 @@ void MTypedVertexBuffer<Data,Type,Num>::update(
         const Data* data,
         const uint32_t elemCount,
         GLint offset, GLsizei size,
+#ifdef USE_QOPENGLWIDGET
+        QOpenGLWidget* currentGLContext)
+#else
         QGLWidget* currentGLContext)
+#endif
 {
     const GLsizei vboSize = sizeof(Type) * Num * numVertices;
     const GLsizei upBufSize = (size > 0) ? size : sizeof(Type) * Num * elemCount;
@@ -283,6 +348,9 @@ void MTypedVertexBuffer<Data,Type,Num>::update(
     // any other context than the currently active. The GLResourcesManager
     // context is shared with all visible contexts.
     Met3D::MGLResourcesManager *glRM = Met3D::MGLResourcesManager::getInstance();
+#ifdef USE_QOPENGLWIDGET
+    if (currentGLContext) currentGLContext->doneCurrent();
+#endif
     glRM->makeCurrent();
 
     glBindBuffer(GL_ARRAY_BUFFER, vertexBufferObject); CHECK_GL_ERROR;
@@ -296,6 +364,10 @@ void MTypedVertexBuffer<Data,Type,Num>::update(
 
     glBindBuffer(GL_ARRAY_BUFFER, 0); CHECK_GL_ERROR;
 
+#ifdef USE_QOPENGLWIDGET
+    glRM->doneCurrent();
+#endif
+
     // If a valid GL context has been specifed, make this current.
     if (currentGLContext) currentGLContext->makeCurrent();
 }
@@ -305,7 +377,11 @@ template <class Data, typename Type, int Num>
 void MTypedVertexBuffer<Data,Type,Num>::update(
         const QVector<Data>& data,
         GLint offset, GLsizei size,
+#ifdef USE_QOPENGLWIDGET
+        QOpenGLWidget* currentGLContext)
+#else
         QGLWidget* currentGLContext)
+#endif
 {
     update(data.constData(), data.size(), offset, size, currentGLContext);
 }

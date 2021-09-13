@@ -352,6 +352,10 @@ void MVolumeBoundingBoxActor::generateGeometry()
                                     + QString::number(getID());
     uploadVec3ToVertexBuffer(axisTicks, axisRequestKey, &axisVertexBuffer);
 
+#ifdef USE_QOPENGLWIDGET
+    glRM->doneCurrent();
+#endif
+
 
     // C) Generate labels.
     // ===================

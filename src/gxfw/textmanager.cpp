@@ -243,6 +243,9 @@ void MTextManager::renderChar(
     glActiveTexture(GL_TEXTURE0 + textureUnit);
     glBindTexture(GL_TEXTURE_2D, textureObjectName);
     textEffect->setUniformValue("textAtlas", textureUnit);
+#ifdef USE_QOPENGLWIDGET
+    glActiveTexture(GL_TEXTURE0);
+#endif
 
     glBindBuffer(GL_ARRAY_BUFFER, directRenderingTextVBO);
     glBufferData(GL_ARRAY_BUFFER, sizeof(cquad), cquad, GL_DYNAMIC_DRAW);
@@ -329,6 +332,9 @@ void MTextManager::renderText_2DClip_i(QString text, float x, float y, float siz
         glActiveTexture(GL_TEXTURE0 + textureUnit);
         glBindTexture(GL_TEXTURE_2D, textureObjectName);
         textEffect->setUniformValue("textAtlas", textureUnit);
+#ifdef USE_QOPENGLWIDGET
+        glActiveTexture(GL_TEXTURE0);
+#endif
 
         glBindBuffer(GL_ARRAY_BUFFER, directRenderingTextVBO);
         glBufferData(GL_ARRAY_BUFFER, sizeof(cquad), cquad, GL_DYNAMIC_DRAW);
@@ -552,6 +558,9 @@ void MTextManager::renderText(
     glActiveTexture(GL_TEXTURE0 + textureUnit);
     glBindTexture(GL_TEXTURE_2D, textureObjectName);
     textEffect->setUniformValue("textAtlas", textureUnit);
+#ifdef USE_QOPENGLWIDGET
+    glActiveTexture(GL_TEXTURE0);
+#endif
 
     glBindBuffer(GL_ARRAY_BUFFER, directRenderingTextVBO);
     glBufferData(GL_ARRAY_BUFFER, sizeof(ctriangles), ctriangles,
@@ -759,6 +768,8 @@ MLabel* MTextManager::addText(
 		coordinates.data(), GL_STATIC_DRAW); CHECK_GL_ERROR;
     glBindBuffer(GL_ARRAY_BUFFER, 0); CHECK_GL_ERROR;
 
+    MGLResourcesManager::getInstance()->doneCurrent();
+
     // Store label information in "labels" list.
     labelPool.insert(label);
 
@@ -833,6 +844,9 @@ void MTextManager::renderLabelList(MSceneViewGLWidget *sceneView,
     glActiveTexture(GL_TEXTURE0 + textureUnit); CHECK_GL_ERROR;
     glBindTexture(GL_TEXTURE_2D, textureObjectName); CHECK_GL_ERROR;
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL); CHECK_GL_ERROR;
+#ifdef USE_QOPENGLWIDGET
+    glActiveTexture(GL_TEXTURE0);
+#endif
 
     glEnableVertexAttribArray(SHADER_VERTEX_ATTRIBUTE); CHECK_GL_ERROR;
     glEnableVertexAttribArray(SHADER_TEXTURE_ATTRIBUTE); CHECK_GL_ERROR;
@@ -1087,6 +1101,10 @@ void MTextManager::generateTextureAtlas(QString fontFile, int size)
 
         glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT,
                         largestAnisotropyLevel); CHECK_GL_ERROR;
+
+#ifdef USE_QOPENGLWIDGET
+        glActiveTexture(GL_TEXTURE0);
+#endif
 
 		delete[] nullData;
     }

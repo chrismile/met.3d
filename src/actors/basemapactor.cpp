@@ -534,6 +534,11 @@ void MBaseMapActor::loadMap()
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB,
                      longitudeDim, latitudeDim,
                      0, GL_RGB, GL_UNSIGNED_BYTE, &tiffImg[0]); CHECK_GL_ERROR;
+
+#ifdef USE_QOPENGLWIDGET
+        glActiveTexture(GL_TEXTURE0);
+        glRM->doneCurrent();
+#endif
     }
 }
 

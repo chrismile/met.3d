@@ -24,7 +24,7 @@
 **  along with Met.3D.  If not, see <http://www.gnu.org/licenses/>.
 **
 *******************************************************************************/
-#include "bezietrajectoriessource.h"
+#include "beziertrajectoriessource.h"
 
 // standard library imports
 #include <algorithm>

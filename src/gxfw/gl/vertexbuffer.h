@@ -29,9 +29,13 @@
 // standard library imports
 
 // related third party imports
-#include "GL/glew.h"
-#include "QtCore"
-#include "QGLWidget"
+#include <GL/glew.h>
+#include <QtCore>
+#ifdef USE_QOPENGLWIDGET
+#include <QOpenGLWidget>
+#else
+#include <QGLWidget>
+#endif
 
 // local application imports
 #include "gxfw/gl/abstractgpudataitem.h"

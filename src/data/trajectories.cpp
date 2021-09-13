@@ -169,7 +169,11 @@ unsigned int MTrajectoryNormals::getMemorySize_kb()
 
 
 GL::MVertexBuffer* MTrajectoryNormals::getVertexBuffer(
+#ifdef USE_QOPENGLWIDGET
+        QOpenGLWidget *currentGLContext)
+#else
         QGLWidget *currentGLContext)
+#endif
 {
     MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
 
@@ -326,7 +330,12 @@ unsigned int MTrajectories::getTimeStepLength_sec()
 }
 
 
-GL::MVertexBuffer* MTrajectories::getVertexBuffer(QGLWidget *currentGLContext)
+GL::MVertexBuffer* MTrajectories::getVertexBuffer(
+#ifdef USE_QOPENGLWIDGET
+        QOpenGLWidget *currentGLContext)
+#else
+        QGLWidget *currentGLContext)
+#endif
 {
     MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
 
@@ -354,7 +363,11 @@ GL::MVertexBuffer* MTrajectories::getVertexBuffer(QGLWidget *currentGLContext)
 
 GL::MVertexBuffer* MTrajectories::getAuxDataVertexBuffer(
         QString requestedAuxDataVarName,
+#ifdef USE_QOPENGLWIDGET
+        QOpenGLWidget *currentGLContext)
+#else
         QGLWidget *currentGLContext)
+#endif
 {
     // Initialize instance of openGL resource manager.
     MGLResourcesManager *glRM = MGLResourcesManager::getInstance();

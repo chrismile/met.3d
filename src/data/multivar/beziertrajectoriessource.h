@@ -24,8 +24,8 @@
 **  along with Met.3D.  If not, see <http://www.gnu.org/licenses/>.
 **
 *******************************************************************************/
-#ifndef MET_3D_BEZIETRAJECTORIESSOURCE_H
-#define MET_3D_BEZIETRAJECTORIESSOURCE_H
+#ifndef MET_3D_BEZIERTRAJECTORIESSOURCE_H
+#define MET_3D_BEZIERTRAJECTORIESSOURCE_H
 
 // standard library imports
 
@@ -81,4 +81,4 @@ private:
 
 } // namespace Met3D
 
-#endif //MET_3D_BEZIETRAJECTORIESSOURCE_H
+#endif //MET_3D_BEZIERTRAJECTORIESSOURCE_H

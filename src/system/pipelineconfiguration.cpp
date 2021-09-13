@@ -61,7 +61,7 @@
 #include "data/trajectorycomputation.h"
 #include "data/trajectorynormalssource.h"
 #include "data/trajectoryselectionsource.h"
-#include "data/multivar/bezietrajectoriessource.h"
+#include "data/multivar/beziertrajectoriessource.h"
 #include "data/deltapressurepertrajectory.h"
 #include "data/thinouttrajectoryfilter.h"
 #include "data/probdftrajectoriessource.h"

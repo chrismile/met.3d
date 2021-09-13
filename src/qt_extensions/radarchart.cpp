@@ -40,20 +40,49 @@
 
 namespace QtExtensions {
 
-MRadarChart::MRadarChart(QWidget* parent) : QtCharts::QChartView(parent) {
+MRadarChart::MRadarChart(QWidget* parent) : QtCharts::QChartView(parent)
+{
     _initialize();
 }
 
-MRadarChart::MRadarChart(QtCharts::QChart* chart, QWidget* parent) : QtCharts::QChartView(chart, parent) {
+MRadarChart::MRadarChart(QtCharts::QChart* chart, QWidget* parent) : QtCharts::QChartView(chart, parent)
+{
     _initialize();
 }
 
-void MRadarChart::_initialize() {
+void MRadarChart::_initialize()
+{
     chart = new QtCharts::QPolarChart();
     this->setChart(chart);
+
+    chart->setBackgroundBrush(QBrush(QColor(220, 220, 220, 90)));
+    chart->setPlotAreaBackgroundVisible(false);
+    chart->setPlotAreaBackgroundBrush(QBrush(QColor("transparent")));
+    chart->setMargins(QMargins(0, 0, 0, 0));
+    chart->setContentsMargins(0, 0, 0, 0);
+    chart->setMargins(QMargins(20, 0, 20, 0));
+    chart->setBackgroundRoundness(8.0f);
+
+    this->setBackgroundBrush(QBrush(QColor("transparent")));
+    this->setContentsMargins(QMargins(0, 0, 0, 0));
+    this->setAutoFillBackground(false);
+    this->viewport()->setAutoFillBackground(false);
+
+    QPalette palette = this->palette();
+    palette.setBrush(QPalette::Base, Qt::transparent);
+    this->setPalette(palette);
+    this->setAttribute(Qt::WA_OpaquePaintEvent, false);
+    this->setAttribute(Qt::WA_Hover, true);
+    this->setEnabled(false);
+
+    chart->legend()->hide();
+
+    this->resize(300, 300);
+    this->setMaximumSize(600, int(600.0f * 0.8f));
 }
 
-void MRadarChart::setVariableNames(const QVector<QString>& names) {
+void MRadarChart::setVariableNames(const QVector<QString>& names)
+{
     if (angularAxis) {
         delete angularAxis;
     }
@@ -79,19 +108,23 @@ void MRadarChart::setVariableNames(const QVector<QString>& names) {
     chart->addAxis(radialAxis, QtCharts::QPolarChart::PolarOrientationRadial);
 }
 
-void MRadarChart::setChartTitle(const QString& chartTitle) {
+void MRadarChart::setChartTitle(const QString& chartTitle)
+{
     chart->setTitle(chartTitle);
 }
 
-void MRadarChart::hideLegend() {
+void MRadarChart::hideLegend()
+{
     chart->legend()->hide();
 }
 
-void MRadarChart::clearRadars() {
+void MRadarChart::clearRadars()
+{
     chart->removeAllSeries();
 }
 
-void MRadarChart::addRadar(const QString& radarName, const QVector<float>& variableValues) {
+void MRadarChart::addRadar(const QString& radarName, const QVector<float>& variableValues)
+{
     const std::vector<QColor> predefinedColors = {
             // RED
             QColor(228, 26, 28),
@@ -115,7 +148,8 @@ void MRadarChart::addRadar(const QString& radarName, const QVector<float>& varia
     addRadar(radarName, color, variableValues);
 }
 
-void MRadarChart::addRadar(const QString& radarName, const QColor& color, const QVector<float>& variableValues) {
+void MRadarChart::addRadar(const QString& radarName, const QColor& color, const QVector<float>& variableValues)
+{
     QtCharts::QLineSeries* seriesLines = new QtCharts::QLineSeries();
     seriesLines->setName(radarName);
     for (int i = 0; i <= variableNames.size(); i++) {
@@ -150,6 +184,60 @@ void MRadarChart::addRadar(const QString& radarName, const QColor& color, const 
     seriesLines->attachAxis(angularAxis);
     areaSeries->attachAxis(radialAxis);
     areaSeries->attachAxis(angularAxis);
+}
+
+void MRadarChart::enterEvent(QEvent* event)
+{
+    setOpacity(0.2f);
+    QWidget::enterEvent(event);
+}
+
+void MRadarChart::leaveEvent(QEvent* event)
+{
+    setOpacity(1.0f);
+    QWidget::leaveEvent(event);
+}
+
+bool MRadarChart::hasHeightForWidth() const
+{
+    return true;
+}
+
+int MRadarChart::heightForWidth(int w) const
+{
+    return int(float(w) * 0.8f);
+}
+
+MMultiVarChartCollection::MMultiVarChartCollection() {
+    verticalSpacer = new QSpacerItem(
+            20, 40, QSizePolicy::Minimum, QSizePolicy::Expanding);
+    addItem(verticalSpacer, 0, 0, 1, 1);
+    horizontalSpacer = new QSpacerItem(
+            40, 20, QSizePolicy::Expanding, QSizePolicy::Minimum);
+    addItem(horizontalSpacer, 1, 0);
+}
+
+void MMultiVarChartCollection::setTrajectory(int index, const QVector<float>& variableValues) {
+    removeItem(horizontalSpacer);
+
+    QtExtensions::MRadarChart* radarChart = new QtExtensions::MRadarChart();
+    radarChart->setVariableNames({ "Variable 0", "Variable 1", "Variable 2", "Variable 3", "Variable 4", "Variable 5", "Variable 6", "Variable 7" });
+    radarChart->addRadar(QString("Trajectory %1").arg(index), variableValues);
+    radarChart->setRenderHint(QPainter::Antialiasing);
+
+    addWidget(radarChart, 1, charts.size());
+    charts.push_back(radarChart);
+    addItem(horizontalSpacer, 1, charts.size());
+}
+
+void MMultiVarChartCollection::clear() {
+    for (MRadarChart* radarChart : charts) {
+        this->removeWidget(radarChart);
+    }
+    charts.clear();
+
+    removeItem(horizontalSpacer);
+    addItem(horizontalSpacer, 1, 0);
 }
 
 }
