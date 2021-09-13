@@ -310,6 +310,8 @@ MMainWindow::~MMainWindow()
     delete sceneManagementDialog;
     delete resizeWindowDialog;
 
+    glResourcesManager->deleteActors();
+
     for (int i = 0; i < sceneViewGLWidgets.size(); i++)
         delete sceneViewGLWidgets[i];
 

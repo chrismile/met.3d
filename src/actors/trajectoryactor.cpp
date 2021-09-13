@@ -1665,9 +1665,11 @@ void MTrajectoryActor::prepareAvailableDataForRendering(uint slot)
                     trajectoryRequests[slot].bezierTrajectoriesMap[view]->setDirty(true);
 
                     if (trajectoryPickerMap.find(view) == trajectoryPickerMap.end()) {
-                        trajectoryPickerMap[view] = new MTrajectoryPicker;
+                        trajectoryPickerMap[view] = new MTrajectoryPicker(view, multiVarData.getVarNames());
                         trajectoryPickerMap[view]->updateTrajectoryRadius(tubeRadius);
                     }
+                    trajectoryPickerMap[view]->setBaseTrajectories(
+                            trajectoryRequests[slot].bezierTrajectoriesMap[view]->getBaseTrajectories());
                 }
             }
 
@@ -1912,7 +1914,8 @@ void MTrajectoryActor::checkIntersectionWithSelectableData(
     if (trajectoryPickerMap[sceneView]->pickPointScreen(
             sceneView, mousePositionX, mousePositionY,
             firstHitPoint, trajectoryIndex, timeAtHit)) {
-        trajectoryPickerMap[sceneView]->toggleTrajectoryHighlighted(trajectoryIndex, timeAtHit);
+        trajectoryPickerMap[sceneView]->toggleTrajectoryHighlighted(
+                trajectoryIndex, timeAtHit);
         LOG4CPLUS_DEBUG(mlog, "Hit with trajectory " + std::to_string(trajectoryIndex));
     }
 }
@@ -2772,7 +2775,6 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
                 glDrawElements(
                         GL_TRIANGLES, highlightedTrajectoriesRenderData.indexBufferHighlighted->getCount(),
                         highlightedTrajectoriesRenderData.indexBufferHighlighted->getType(), nullptr);
-                glCullFace(GL_NONE);
                 glDisable(GL_CULL_FACE);
             }
 

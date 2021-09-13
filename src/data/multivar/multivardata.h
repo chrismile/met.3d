@@ -101,6 +101,8 @@ public:
     inline bool getUseTimestepLens() { return useTimestepLens; }
     inline void setParticlePosTimeStep(int t) { particlePosTimeStep = t; }
 
+    inline const QVector<QString>& getVarNames() const { return varNames; }
+
     /**
       Set a transfer function to map vertical position (pressure) to colour.
       */
@@ -155,7 +157,7 @@ private:
     QtProperty *useColorIntensityProperty;
 
     // TODO
-    QStringList varNames;
+    QVector<QString> varNames;
     MMultiVarTf multiVarTf;
     QVector<QtProperty*> tfPropertiesMultiVar;
     QVector<MTransferFunction1D*> transferFunctionsMultiVar;

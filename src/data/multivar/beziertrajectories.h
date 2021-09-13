@@ -45,6 +45,13 @@
 
 namespace Met3D {
 
+struct MFilteredTrajectory
+{
+    QVector<QVector3D> positions;
+    QVector<QVector<float>> attributes;
+};
+typedef QVector<MFilteredTrajectory> MFilteredTrajectories;
+
 /**
  * Data for one single trajectory for @see MBezierTrajectories.
  */
@@ -108,7 +115,7 @@ class MBezierTrajectories : public MSupplementalTrajectoryData
 {
 public:
     MBezierTrajectories(
-            MDataRequest requestToReferTo, unsigned int numTrajectories,
+            MDataRequest requestToReferTo, const MFilteredTrajectories& filteredTrajectories,
             const QVector<int>& trajIndicesToFilteredIndicesMap,
             unsigned int numVariables);
     ~MBezierTrajectories();
@@ -118,6 +125,7 @@ public:
     inline int size() const { return bezierTrajectories.size(); }
     inline MBezierTrajectory& operator[](std::size_t idx) { return bezierTrajectories[idx]; }
     inline const MBezierTrajectory& operator[](std::size_t idx) const { return bezierTrajectories[idx]; }
+    inline const MFilteredTrajectories& getBaseTrajectories() const { return baseTrajectories; }
 
     // For trajectory filtering.
     inline void setDirty(bool isDirty) { this->isDirty = isDirty; }
@@ -145,6 +153,7 @@ public:
     void updateDivergingVariables(const QVector<uint32_t>& varDiverging);
 
 private:
+    MFilteredTrajectories baseTrajectories;
     QVector<MBezierTrajectory> bezierTrajectories;
     MBezierTrajectoriesRenderData bezierTrajectoriesRenderData;
     QVector<uint32_t> varSelected;

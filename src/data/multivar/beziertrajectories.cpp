@@ -48,11 +48,13 @@ unsigned int MBezierTrajectory::getMemorySize_kb() const {
 
 
 MBezierTrajectories::MBezierTrajectories(
-        MDataRequest requestToReferTo, unsigned int numTrajectories,
+        MDataRequest requestToReferTo, const MFilteredTrajectories& filteredTrajectories,
         const QVector<int>& trajIndicesToFilteredIndicesMap,
         unsigned int numVariables)
-        : MSupplementalTrajectoryData(requestToReferTo, numTrajectories),
-          bezierTrajectories(numTrajectories), trajIndicesToFilteredIndicesMap(trajIndicesToFilteredIndicesMap)
+        : MSupplementalTrajectoryData(requestToReferTo, filteredTrajectories.size()),
+          baseTrajectories(filteredTrajectories), bezierTrajectories(filteredTrajectories.size()),
+          trajIndicesToFilteredIndicesMap(trajIndicesToFilteredIndicesMap),
+          numTrajectories(filteredTrajectories.size())
 {
     for (unsigned int i = 0; i < numVariables; i++)
     {

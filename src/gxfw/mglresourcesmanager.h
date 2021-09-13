@@ -94,6 +94,8 @@ public:
 
     ~MGLResourcesManager();
 
+    void deleteActors();
+
     /**
      Returns the (singleton) instance of the system control. If getInstance()
      is called for the first time an optional parent widget can be passed as

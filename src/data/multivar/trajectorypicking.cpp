@@ -34,11 +34,13 @@
 
 // local application imports
 #include "../../gxfw/msceneviewglwidget.h"
+#include "util/mutil.h"
 #include "helpers.h"
 
 namespace Met3D {
 
-MTrajectoryPicker::MTrajectoryPicker()
+MTrajectoryPicker::MTrajectoryPicker(MSceneViewGLWidget* sceneView, const QVector<QString>& varNames)
+        : multiVarCharts(sceneView)
 {
     device = rtcNewDevice(nullptr);
     scene = rtcNewScene(device);
@@ -49,6 +51,13 @@ MTrajectoryPicker::MTrajectoryPicker()
             "multivar_oriented_color_bands", shaderEffectHighlighted);
     shaderEffectHighlighted->compileFromFile_Met3DHome(
             "src/glsl/multivar/trajectories_highlighted.fx.glsl");
+
+    numVars = varNames.size();
+
+    radarChart = new QtExtensions::MRadarChart();
+    radarChart->setVariableNames(varNames);
+    radarChart->setRenderHint(QPainter::Antialiasing);
+    multiVarCharts.addChartView(radarChart);
 }
 
 MTrajectoryPicker::~MTrajectoryPicker()
@@ -101,6 +110,32 @@ void MTrajectoryPicker::updateTrajectoryRadius(float lineRadius)
     highlightDataDirty = true;
 }
 
+void MTrajectoryPicker::setBaseTrajectories(const MFilteredTrajectories& filteredTrajectories)
+{
+    baseTrajectories = filteredTrajectories;
+
+    minMaxAttributes.clear();
+    minMaxAttributes.resize(int(numVars));
+    for (size_t i = 0; i < numVars; i++)
+    {
+        minMaxAttributes[int(i)] = QVector2D(
+                std::numeric_limits<float>::max(), std::numeric_limits<float>::lowest());
+    }
+    for (const MFilteredTrajectory& trajectory : filteredTrajectories)
+    {
+        for (size_t i = 0; i < numVars; i++)
+        {
+            const QVector<float>& attributes = trajectory.attributes.at(int(i));
+            QVector2D& minMaxVector = minMaxAttributes[int(i)];
+            for (float v : attributes)
+            {
+                minMaxVector.setX(std::min(minMaxVector.x(), v));
+                minMaxVector.setY(std::max(minMaxVector.y(), v));
+            }
+        }
+    }
+}
+
 void MTrajectoryPicker::recreateTubeTriangleData()
 {
     this->triangleIndices.clear();
@@ -124,20 +159,20 @@ void MTrajectoryPicker::recreateTubeTriangleData()
         position *= radialFactor;
     }
 
-    for (size_t lineId = 0; lineId < trajectories.size(); lineId++) {
-        const QVector<QVector3D> &lineCenters = trajectories.at(lineId);
-        size_t n = lineCenters.size();
+    for (int lineId = 0; lineId < trajectories.size(); lineId++) {
+        const QVector<QVector3D> &lineCenters = trajectories.at(int(lineId));
+        int n = lineCenters.size();
         size_t indexOffset = vertexPositions.size();
 
         if (n < 2) {
             continue;
         }
 
-        uint32_t selectedTrajectoryIndex = selectedTrajectoryIndices.at(lineId);
+        uint32_t selectedTrajectoryIndex = selectedTrajectoryIndices.at(int(lineId));
 
         QVector3D lastLineNormal(1.0f, 0.0f, 0.0f);
         int numValidLinePoints = 0;
-        for (size_t i = 0; i < n; i++) {
+        for (int i = 0; i < n; i++) {
             QVector3D tangent;
             if (i == 0) {
                 tangent = lineCenters[i + 1] - lineCenters[i];
@@ -154,7 +189,7 @@ void MTrajectoryPicker::recreateTubeTriangleData()
             }
             tangent.normalize();
 
-            QVector3D center = lineCenters.at(i);
+            QVector3D center = lineCenters.at(int(i));
 
             QVector3D helperAxis = lastLineNormal;
             if ((QVector3D::crossProduct(helperAxis, tangent).length()) < 0.01f) {
@@ -256,7 +291,7 @@ void MTrajectoryPicker::setMeshTriangleData(
     }
 
     rtcCommitGeometry(mesh);
-    unsigned int geomID = rtcAttachGeometry(scene, mesh);
+    geomID = rtcAttachGeometry(scene, mesh);
 
     rtcCommitScene(scene);
     loaded = true;
@@ -335,7 +370,19 @@ bool MTrajectoryPicker::pickPointWorld(
 
 void MTrajectoryPicker::toggleTrajectoryHighlighted(uint32_t trajectoryIndex, float timeAtHit)
 {
-    const std::vector<QColor> predefinedColors = {
+    highlightDataDirty = true;
+
+    auto it = highlightedTrajectories.find(trajectoryIndex);
+    if (it != highlightedTrajectories.end())
+    {
+        radarChart->removeRadar(trajectoryIndex);
+        colorUsesCountMap[it->second] -= 1;
+        highlightedTrajectories.erase(trajectoryIndex);
+        return;
+    }
+
+    const std::vector<QColor> predefinedColors =
+    {
             // RED
             QColor(228, 26, 28),
             // BLUE
@@ -353,9 +400,38 @@ void MTrajectoryPicker::toggleTrajectoryHighlighted(uint32_t trajectoryIndex, fl
             // DARK BLUE
             QColor(0, 7, 255)
     };
-    size_t idx = highlightedTrajectories.size() % predefinedColors.size();
-    highlightedTrajectories.insert(std::make_pair(trajectoryIndex, predefinedColors.at(idx)));
-    highlightDataDirty = true;
+    if (colorUsesCountMap.empty())
+    {
+        for (const QColor& color : predefinedColors)
+        {
+            colorUsesCountMap[color] = 0;
+        }
+    }
+
+    uint32_t minNumUses = std::numeric_limits<uint32_t>::max();
+    QColor highlightColor;
+    for (const QColor& color : predefinedColors)
+    {
+        if (colorUsesCountMap[color] < minNumUses)
+        {
+            minNumUses = colorUsesCountMap[color];
+            highlightColor = color;
+        }
+    }
+    colorUsesCountMap[highlightColor] += 1;
+
+    highlightedTrajectories.insert(std::make_pair(trajectoryIndex, highlightColor));
+    const MFilteredTrajectory& trajectory = baseTrajectories.at(int(trajectoryIndex));
+    QVector<float> values;
+    for (size_t i = 0; i < numVars; i++)
+    {
+        int time = clamp(int(std::round(timeAtHit)), 0, int(trajectory.attributes.at(int(i)).size()) - 1);
+        float value = trajectory.attributes.at(int(i)).at(time);
+        QVector2D minMaxVector = minMaxAttributes.at(int(i));
+        value = (value - minMaxVector.x()) / (minMaxVector.y() - minMaxVector.x());
+        values.push_back(value);
+    }
+    radarChart->addRadar(trajectoryIndex, QString("Trajectory #%1").arg(trajectoryIndex), values);
 }
 
 MHighlightedTrajectoriesRenderData MTrajectoryPicker::getHighlightedTrajectoriesRenderData(
@@ -398,9 +474,9 @@ void MTrajectoryPicker::updateHighlightRenderData(
         position *= radialFactor;
     }
 
-    for (size_t lineId = 0; lineId < trajectories.size(); lineId++) {
+    for (int lineId = 0; lineId < trajectories.size(); lineId++) {
         const QVector<QVector3D> &lineCenters = trajectories.at(lineId);
-        size_t n = lineCenters.size();
+        int n = lineCenters.size();
         size_t indexOffset = vertexPositionsHighlighted.size();
 
         if (n < 2) {
@@ -419,7 +495,7 @@ void MTrajectoryPicker::updateHighlightRenderData(
 
         QVector3D lastLineNormal(1.0f, 0.0f, 0.0f);
         int numValidLinePoints = 0;
-        for (size_t i = 0; i < n; i++) {
+        for (int i = 0; i < n; i++) {
             QVector3D tangent;
             if (i == 0) {
                 tangent = lineCenters[i + 1] - lineCenters[i];

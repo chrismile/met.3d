@@ -818,7 +818,10 @@ void MMultiVarData::onBezierTrajectoriesLoaded(
         //{
         //    varNames = QStringList("Pressure");
         //}
-        this->varNames = varNames;
+        this->varNames.clear();
+        for (const QString& str : varNames) {
+            this->varNames.push_back(str);
+        }
         maxNumVariables = varNames.size();
         initTransferFunctionsMultiVar(maxNumVariables);
 

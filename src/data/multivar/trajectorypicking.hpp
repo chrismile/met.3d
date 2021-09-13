@@ -39,6 +39,8 @@
 #include "gxfw/gl/vertexbuffer.h"
 #include "gxfw/gl/shadereffect.h"
 #include "data/abstractdataitem.h"
+#include "qt_extensions/radarchart.h"
+#include "beziertrajectories.h"
 
 namespace Met3D {
 
@@ -53,12 +55,13 @@ struct MHighlightedTrajectoriesRenderData
 
 class MTrajectoryPicker : public MMemoryManagementUsingObject {
 public:
-    MTrajectoryPicker();
+    MTrajectoryPicker(MSceneViewGLWidget* sceneView, const QVector<QString>& varNames);
     ~MTrajectoryPicker();
 
     void setTrajectoryData(
             const QVector<QVector<QVector3D>>& trajectories, const QVector<uint32_t>& selectedTrajectoryIndices);
     void updateTrajectoryRadius(float lineRadius);
+    void setBaseTrajectories(const MFilteredTrajectories& filteredTrajectories);
 
     /**
      * Sets the triangle mesh data.
@@ -105,6 +108,7 @@ public:
             QGLWidget *currentGLContext = nullptr);
 #endif
     inline std::shared_ptr<GL::MShaderEffect> getHighlightShaderEffect() { return shaderEffectHighlighted; }
+    inline QtExtensions::MMultiVarChartCollection& getMultiVarChartCollection() { return multiVarCharts; }
 
 private:
     void freeStorage();
@@ -115,6 +119,9 @@ private:
 #else
             QGLWidget *currentGLContext);
 #endif
+
+    MFilteredTrajectories baseTrajectories;
+    QVector<QVector2D> minMaxAttributes;
 
     float lineRadius = 0.0f;
     int numCircleSubdivisions = 8;
@@ -133,7 +140,25 @@ private:
     bool loaded = false;
 
     // Highlighted trajectories.
-    std::map<uint32_t, QColor> highlightedTrajectories = {{13, QColor(255, 0, 0, 255)}}; // TODO
+    std::map<uint32_t, QColor> highlightedTrajectories;
+    struct ColorComparator {
+        bool operator()(const QColor& c0, const QColor& c1) {
+            if (c0.red() != c1.red()) {
+                return c0.red() < c1.red();
+            }
+            if (c0.green() != c1.green()) {
+                return c0.green() < c1.green();
+            }
+            if (c0.blue() != c1.blue()) {
+                return c0.blue() < c1.blue();
+            }
+            if (c0.alpha() != c1.alpha()) {
+                return c0.alpha() < c1.alpha();
+            }
+            return false;
+        }
+    };
+    std::map<QColor, uint32_t, ColorComparator> colorUsesCountMap;
     bool highlightDataDirty = true;
     std::shared_ptr<GL::MShaderEffect> shaderEffectHighlighted;
     const QString indexBufferHighlightedID =
@@ -143,6 +168,9 @@ private:
     const QString vertexColorBufferHighlightedID =
             QString("beziertrajectories_vertex_color_buffer_highlighted_#%1").arg(getID());
     MHighlightedTrajectoriesRenderData highlightedTrajectoriesRenderData;
+    QtExtensions::MMultiVarChartCollection multiVarCharts;
+    QtExtensions::MRadarChart* radarChart;
+    size_t numVars = 0;
 };
 
 }

@@ -147,18 +147,7 @@ MGLResourcesManager::~MGLResourcesManager()
 
     // Free memory of the various pools.
 
-    LOG4CPLUS_DEBUG(mlog, "\tactor pool" << flush);
-    for (int i = 0; i < actorPool.size(); i++)
-    {
-        LOG4CPLUS_DEBUG(mlog, "\t\t -> deleting actor " << actorPool[i]->getID()
-                        << " (" << actorPool[i]->getName().toStdString() << ")"
-                        << flush);
-        delete actorPool[i];
-        if (actorPool[i] == textManager)
-        {
-            textManager = nullptr;
-        }
-    }
+    deleteActors();
 
     LOG4CPLUS_DEBUG(mlog, "\tactor factory pool" << flush);
     foreach(MAbstractActorFactory* factory, actorFactoryPool)
@@ -177,6 +166,24 @@ MGLResourcesManager::~MGLResourcesManager()
     }
 
     LOG4CPLUS_DEBUG(mlog, "done");
+}
+
+
+void MGLResourcesManager::deleteActors()
+{
+    LOG4CPLUS_DEBUG(mlog, "\tactor pool" << flush);
+    for (int i = 0; i < actorPool.size(); i++)
+    {
+        LOG4CPLUS_DEBUG(mlog, "\t\t -> deleting actor " << actorPool[i]->getID()
+                                                        << " (" << actorPool[i]->getName().toStdString() << ")"
+                                                        << flush);
+        delete actorPool[i];
+        if (actorPool[i] == textManager)
+        {
+            textManager = nullptr;
+        }
+    }
+    actorPool.clear();
 }
 
 

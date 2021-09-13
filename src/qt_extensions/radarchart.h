@@ -30,6 +30,8 @@
 
 // related third party imports
 #include <QGridLayout>
+#include <QLineSeries>
+#include <QAreaSeries>
 #include <QtCharts/QChartView>
 #include <QtCharts/QPolarChart>
 
@@ -52,8 +54,9 @@ public:
     void setChartTitle(const QString& chartTitle);
     void hideLegend();
     void clearRadars();
-    void addRadar(const QString& radarName, const QVector<float>& variableValues);
-    void addRadar(const QString& radarName, const QColor& color, const QVector<float>& variableValues);
+    void addRadar(uint32_t id, const QString& radarName, const QVector<float>& variableValues);
+    void addRadar(uint32_t id, const QString& radarName, const QColor& color, const QVector<float>& variableValues);
+    void removeRadar(uint32_t id);
     inline void setBackgroundVisible(bool visible) { chart->setBackgroundVisible(visible); }
     inline void setOpacity(qreal opacity) { chart->setOpacity(opacity); }
 
@@ -70,17 +73,28 @@ private:
     QtCharts::QCategoryAxis* angularAxis = nullptr;
     QtCharts::QValueAxis* radialAxis = nullptr;
     QVector<QString> variableNames;
+    QVector<QString> radarNames;
+
+    struct SeriesTempData {
+        QtCharts::QLineSeries* seriesLines = nullptr;
+        QtCharts::QLineSeries* seriesLower = nullptr;
+        QtCharts::QAreaSeries *areaSeries = nullptr;
+    };
+    std::map<uint32_t, SeriesTempData> seriesMap;
 };
 
 class MMultiVarChartCollection : public QGridLayout {
 public:
     MMultiVarChartCollection();
-    void setTrajectory(int index, const QVector<float>& variableValues);
+    explicit MMultiVarChartCollection(QWidget* parent);
+
+    void addChartView(QtCharts::QChartView* chartView);
     void clear();
 
 private:
-    QVector<MRadarChart*> charts;
-    QSpacerItem* verticalSpacer, *horizontalSpacer;
+    void _initialize();
+    QVector<QtCharts::QChartView*> charts;
+    QSpacerItem* verticalSpacer = nullptr, *horizontalSpacer = nullptr;
 };
 
 }

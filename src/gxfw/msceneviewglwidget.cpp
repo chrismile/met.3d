@@ -46,7 +46,6 @@
 #include "util/mutil.h"
 #include "gxfw/mtypes.h"
 #include "gxfw/textmanager.h"
-#include "qt_extensions/radarchart.h"
 #include "mainwindow.h"
 
 using namespace std;
@@ -100,24 +99,6 @@ MSceneViewGLWidget::MSceneViewGLWidget()
 #ifdef USE_QOPENGLWIDGET
     this->setFormat(MGLResourcesManager::getInstance()->format());
 #endif
-
-    QGridLayout* gridLayout = new QGridLayout(this);
-
-    // TODO: Test
-    QtExtensions::MRadarChart* radarChart = new QtExtensions::MRadarChart();
-    radarChart->setVariableNames({ "Variable 0", "Variable 1", "Variable 2", "Variable 3", "Variable 4", "Variable 5", "Variable 6", "Variable 7" });
-    radarChart->addRadar("Trajectory A", { 0.9, 0.2, 0.7, 0.1, 0.8, 0.01, 0.6, 0.3 });
-    radarChart->addRadar("Trajectory B", { 0.7, 0.3, 0.8, 0.4, 0.7, 0.3, 0.9, 0.4 });
-    radarChart->setRenderHint(QPainter::Antialiasing);
-
-    QSpacerItem* verticalSpacer = new QSpacerItem(20, 40, QSizePolicy::Minimum, QSizePolicy::Expanding);
-    gridLayout->addItem(verticalSpacer, 0, 0, 1, 1);
-    QSpacerItem* horizontalSpacer = new QSpacerItem(40, 20, QSizePolicy::Expanding, QSizePolicy::Minimum);
-    gridLayout->addItem(horizontalSpacer, 1, 1);
-    gridLayout->addWidget(radarChart, 1, 0);
-
-    //gridLayout->removeItem();
-
 
     viewIsInitialised = false;
     focusShader = nullptr;

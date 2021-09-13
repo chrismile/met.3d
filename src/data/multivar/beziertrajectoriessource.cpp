@@ -59,13 +59,6 @@ MBezierTrajectoriesSource::MBezierTrajectoriesSource()
 ***                            PUBLIC METHODS                               ***
 *******************************************************************************/
 
-struct MFilteredTrajectory
-{
-    QVector<QVector3D> positions;
-    QVector<QVector<float>> attributes;
-};
-typedef QVector<MFilteredTrajectory> MFilteredTrajectories;
-
 MBezierTrajectories *MBezierTrajectoriesSource::produceData(MDataRequest request)
 {
     assert(trajectorySource != nullptr);
@@ -291,7 +284,7 @@ MBezierTrajectories *MBezierTrajectoriesSource::produceData(MDataRequest request
 
     MBezierTrajectories* newTrajectories = new MBezierTrajectories(
             inTrajectories->getGeneratingRequest(),
-            filteredTrajectories.size(), indicesToFilteredIndicesMap, numVariables);
+            filteredTrajectories, indicesToFilteredIndicesMap, numVariables);
 
     for (int32_t traj = 0; traj < int(filteredTrajectories.size()); ++traj)
     {

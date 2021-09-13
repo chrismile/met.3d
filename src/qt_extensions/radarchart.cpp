@@ -26,6 +26,8 @@
 #include "radarchart.h"
 
 // standard library imports
+#include <cmath>
+#include <iostream>
 
 // related third party imports
 #include <QWidget>
@@ -56,8 +58,10 @@ void MRadarChart::_initialize()
     this->setChart(chart);
 
     chart->setBackgroundBrush(QBrush(QColor(220, 220, 220, 90)));
-    chart->setPlotAreaBackgroundVisible(false);
-    chart->setPlotAreaBackgroundBrush(QBrush(QColor("transparent")));
+    //chart->setPlotAreaBackgroundVisible(false);
+    //chart->setPlotAreaBackgroundBrush(QBrush(QColor("transparent")));
+    chart->setPlotAreaBackgroundVisible(true);
+    chart->setPlotAreaBackgroundBrush(QBrush(QColor(240, 240, 240, 140)));
     chart->setMargins(QMargins(0, 0, 0, 0));
     chart->setContentsMargins(0, 0, 0, 0);
     chart->setMargins(QMargins(20, 0, 20, 0));
@@ -78,7 +82,7 @@ void MRadarChart::_initialize()
     chart->legend()->hide();
 
     this->resize(300, 300);
-    this->setMaximumSize(600, int(600.0f * 0.8f));
+    //this->setMaximumSize(600, int(600.0f * 0.8f));
 }
 
 void MRadarChart::setVariableNames(const QVector<QString>& names)
@@ -100,11 +104,20 @@ void MRadarChart::setVariableNames(const QVector<QString>& names)
     }
     angularAxis->setShadesVisible(true);
     angularAxis->setShadesBrush(QBrush(QColor(249, 249, 255)));
+    angularAxis->setShadesPen(Qt::NoPen);
+    QFont font = angularAxis->labelsFont();
+    std::cout << font.pointSize() << std::endl;
+    font.setPointSize(int(std::round(font.pointSize() * 0.5f)));
+    angularAxis->setLabelsFont(font);
+    angularAxis->setLabelsPosition(QtCharts::QCategoryAxis::AxisLabelsPositionCenter);
+    //         AxisLabelsPositionCenter = 0x0,
+    //        AxisLabelsPositionOnValue = 0x1
     chart->addAxis(angularAxis, QtCharts::QPolarChart::PolarOrientationAngular);
 
     radialAxis = new QtCharts::QValueAxis();
     radialAxis->setTickCount(variableNames.size() + 1);
-    radialAxis->setLabelFormat("%.1f");
+    //radialAxis->setLabelFormat("%.1f");
+    radialAxis->setLabelFormat("@");
     chart->addAxis(radialAxis, QtCharts::QPolarChart::PolarOrientationRadial);
 }
 
@@ -123,7 +136,7 @@ void MRadarChart::clearRadars()
     chart->removeAllSeries();
 }
 
-void MRadarChart::addRadar(const QString& radarName, const QVector<float>& variableValues)
+void MRadarChart::addRadar(uint32_t id, const QString& radarName, const QVector<float>& variableValues)
 {
     const std::vector<QColor> predefinedColors = {
             // RED
@@ -145,10 +158,11 @@ void MRadarChart::addRadar(const QString& radarName, const QVector<float>& varia
     };
 
     QColor color = predefinedColors[(chart->series().size() / 2) % predefinedColors.size()];
-    addRadar(radarName, color, variableValues);
+    addRadar(id, radarName, color, variableValues);
 }
 
-void MRadarChart::addRadar(const QString& radarName, const QColor& color, const QVector<float>& variableValues)
+void MRadarChart::addRadar(
+        uint32_t id, const QString& radarName, const QColor& color, const QVector<float>& variableValues)
 {
     QtCharts::QLineSeries* seriesLines = new QtCharts::QLineSeries();
     seriesLines->setName(radarName);
@@ -177,6 +191,12 @@ void MRadarChart::addRadar(const QString& radarName, const QColor& color, const 
     chart->addSeries(seriesLines);
     chart->addSeries(areaSeries);
 
+    SeriesTempData seriesTempData;
+    seriesTempData.seriesLines = seriesLines;
+    seriesTempData.seriesLower = seriesLower;
+    seriesTempData.areaSeries = areaSeries;
+    seriesMap.insert(std::make_pair(id, seriesTempData));
+
     auto markersList = chart->legend()->markers();
     markersList[markersList.size() - 1]->setVisible(false);
 
@@ -184,6 +204,18 @@ void MRadarChart::addRadar(const QString& radarName, const QColor& color, const 
     seriesLines->attachAxis(angularAxis);
     areaSeries->attachAxis(radialAxis);
     areaSeries->attachAxis(angularAxis);
+}
+
+void MRadarChart::removeRadar(uint32_t id)
+{
+    auto it = seriesMap.find(id);
+    chart->removeSeries(it->second.seriesLines);
+    chart->removeSeries(it->second.seriesLower);
+    chart->removeSeries(it->second.areaSeries);
+    delete it->second.seriesLines;
+    delete it->second.seriesLower;
+    delete it->second.areaSeries;
+    seriesMap.erase(id);
 }
 
 void MRadarChart::enterEvent(QEvent* event)
@@ -209,6 +241,14 @@ int MRadarChart::heightForWidth(int w) const
 }
 
 MMultiVarChartCollection::MMultiVarChartCollection() {
+    _initialize();
+}
+
+MMultiVarChartCollection::MMultiVarChartCollection(QWidget* parent) : QGridLayout(parent) {
+    _initialize();
+}
+
+void MMultiVarChartCollection::_initialize() {
     verticalSpacer = new QSpacerItem(
             20, 40, QSizePolicy::Minimum, QSizePolicy::Expanding);
     addItem(verticalSpacer, 0, 0, 1, 1);
@@ -217,21 +257,16 @@ MMultiVarChartCollection::MMultiVarChartCollection() {
     addItem(horizontalSpacer, 1, 0);
 }
 
-void MMultiVarChartCollection::setTrajectory(int index, const QVector<float>& variableValues) {
+void MMultiVarChartCollection::addChartView(QtCharts::QChartView* chartView) {
     removeItem(horizontalSpacer);
 
-    QtExtensions::MRadarChart* radarChart = new QtExtensions::MRadarChart();
-    radarChart->setVariableNames({ "Variable 0", "Variable 1", "Variable 2", "Variable 3", "Variable 4", "Variable 5", "Variable 6", "Variable 7" });
-    radarChart->addRadar(QString("Trajectory %1").arg(index), variableValues);
-    radarChart->setRenderHint(QPainter::Antialiasing);
-
-    addWidget(radarChart, 1, charts.size());
-    charts.push_back(radarChart);
+    addWidget(chartView, 1, charts.size());
+    charts.push_back(chartView);
     addItem(horizontalSpacer, 1, charts.size());
 }
 
 void MMultiVarChartCollection::clear() {
-    for (MRadarChart* radarChart : charts) {
+    for (QtCharts::QChartView* radarChart : charts) {
         this->removeWidget(radarChart);
     }
     charts.clear();
