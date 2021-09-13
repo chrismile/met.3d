@@ -32,7 +32,11 @@
 // related third party imports
 #include "GL/glew.h"
 #include <QVector2D>
+#ifdef USE_QOPENGLWIDGET
 #include <QOpenGLWidget>
+#else
+#include <QGLWidget>
+#endif
 
 // local application imports
 #include "../trajectories.h"
@@ -124,8 +128,18 @@ public:
     int getNumFilteredTrajectories();
     GLsizei* getTrajectorySelectionCount();
     const void* const* getTrajectorySelectionIndices();
+    bool getFilteredTrajectories(
+            const GLint* startIndices, const GLsizei* indexCount,
+            int numTimeStepsPerTrajectory, int numSelectedTrajectories,
+            QVector<QVector<QVector3D>>& trajectories,
+            QVector<uint32_t>& selectedTrajectoryIndices);
 
-    MBezierTrajectoriesRenderData getRenderData(QOpenGLWidget *currentGLContext = 0);
+    MBezierTrajectoriesRenderData getRenderData(
+#ifdef USE_QOPENGLWIDGET
+            QOpenGLWidget *currentGLContext = nullptr);
+#else
+            QGLWidget *currentGLContext = nullptr);
+#endif
     void releaseRenderData();
     void updateSelectedVariables(const QVector<uint32_t>& varSelected);
     void updateDivergingVariables(const QVector<uint32_t>& varDiverging);
@@ -146,6 +160,9 @@ private:
     int numFilteredTrajectories = 0;
     GLsizei* trajectorySelectionCount = nullptr;
     ptrdiff_t* trajectorySelectionIndices = nullptr;
+
+    QVector<uint32_t> lineIndicesCache;
+    QVector<QVector3D> vertexPositionsCache;
 
     const QString indexBufferID =
             QString("beziertrajectories_index_buffer_#%1").arg(getID());

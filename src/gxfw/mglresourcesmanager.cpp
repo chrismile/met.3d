@@ -35,8 +35,10 @@
 
 // related third party imports
 #include <log4cplus/loggingmacros.h>
+#ifdef USE_QOPENGLWIDGET
 #include <QOpenGLContext>
 #include <QOpenGLShaderProgram>
+#endif
 
 // local application imports
 #include "gxfw/textmanager.h"
@@ -64,10 +66,23 @@ MGLResourcesManager* MGLResourcesManager::instance = 0;
 *******************************************************************************/
 
 // Constructor is private.
-MGLResourcesManager::MGLResourcesManager(const QSurfaceFormat &format,
-                                         QWidget *parent,
-                                         QOpenGLWidget *shareWidget)
+MGLResourcesManager::MGLResourcesManager(
+#ifdef USE_QOPENGLWIDGET
+        const QSurfaceFormat &format,
+#else
+        const QGLFormat &format,
+#endif
+        QWidget *parent,
+#ifdef USE_QOPENGLWIDGET
+        QOpenGLWidget *shareWidget)
+#else
+        QGLWidget *shareWidget)
+#endif
+#ifdef USE_QOPENGLWIDGET
     : QOpenGLWidget(parent),
+#else
+    : QGLWidget(format, parent, shareWidget),
+#endif
       globalMouseButtonRotate(Qt::LeftButton),
       globalMouseButtonPan(Qt::RightButton),
       globalMouseButtonZoom(Qt::MiddleButton),
@@ -77,9 +92,11 @@ MGLResourcesManager::MGLResourcesManager(const QSurfaceFormat &format,
       selectSceneCentreActor(nullptr),
       selectSceneCentreText(nullptr)
 {
+#ifdef USE_QOPENGLWIDGET
     requestedFormat = format;
     this->setFormat(format);
     create();
+#endif
 
     // Get the system control instance.
     systemControl = MSystemManagerAndControl::getInstance();
@@ -167,22 +184,38 @@ MGLResourcesManager::~MGLResourcesManager()
 ***                            PUBLIC METHODS                               ***
 *******************************************************************************/
 
-void MGLResourcesManager::initialize(const QSurfaceFormat &format,
-                                     QWidget *parent,
-                                     QOpenGLWidget *shareWidget)
+void MGLResourcesManager::initialize(
+#ifdef USE_QOPENGLWIDGET
+        const QSurfaceFormat &format,
+#else
+        const QGLFormat &format,
+#endif
+        QWidget *parent,
+#ifdef USE_QOPENGLWIDGET
+        QOpenGLWidget *shareWidget)
+#else
+        QGLWidget *shareWidget)
+#endif
 {
     // If the instance is already initialized, this method won't do anything.
     if (MGLResourcesManager::instance == 0)
     {
-        MGLResourcesManager::instance = new MGLResourcesManager(format, parent);
+        MGLResourcesManager::instance = new MGLResourcesManager(
+#ifdef USE_QOPENGLWIDGET
+                format, parent);
+#else
+                format, parent, shareWidget);
+#endif
         MGLResourcesManager::instance->initializeTextManager();
     }
 }
 
 
+#ifdef USE_QOPENGLWIDGET
 void MGLResourcesManager::initializeExternal()
 {
-    if (!isExternalDataInitialized) {
+    if (!isExternalDataInitialized)
+    {
         LOG4CPLUS_DEBUG(mlog, "Initialising GLEW..." << flush);
         GLenum err = glewInit();
         if (err != GLEW_OK)
@@ -190,6 +223,11 @@ void MGLResourcesManager::initializeExternal()
             LOG4CPLUS_ERROR(mlog, "\tError: " << glewGetErrorString(err) << flush);
         }
 
+        //TODO: Make size of used video memory configurable.
+        uint gpuTotalMemory;
+        uint gpuAvailableMemory;
+        gpuMemoryInfo_kb(gpuTotalMemory, gpuAvailableMemory);
+        videoMemoryLimit_kb = gpuTotalMemory;
 
         // Initialise currently registered actors.
         LOG4CPLUS_DEBUG(mlog, "Initialising actors.." << flush);
@@ -205,10 +243,20 @@ void MGLResourcesManager::initializeExternal()
         LOG4CPLUS_DEBUG(mlog, "===================================================="
                 << "====================================================");
         LOG4CPLUS_DEBUG(mlog, "Actors are initialised." << flush);
+
+        displayMemoryUsage();
+
+        // Start a time to update the displayed memory information every 2 seconds.
+        QTimer *timer = new QTimer(this);
+        connect(timer, SIGNAL(timeout()), this, SLOT(displayMemoryUsage()));
+        timer->start(5000);
+
+        // Inform the system manager that the application has been initialized.
+        systemControl->setApplicationIsInitialized();
     }
     isExternalDataInitialized = true;
 }
-
+#endif
 
 MGLResourcesManager* MGLResourcesManager::getInstance()
 {
@@ -606,6 +654,29 @@ void MGLResourcesManager::releaseGPUItem(Met3D::MDataRequest key)
 }
 
 
+void MGLResourcesManager::deleteReleasedGPUItem(GL::MAbstractGPUDataItem *item)
+{
+    deleteReleasedGPUItem(item->getRequestKey());
+}
+
+
+void MGLResourcesManager::deleteReleasedGPUItem(MDataRequest removeKey)
+{
+    bool released = releasedGPUItemsQueue.removeOne(removeKey);
+    if (!released)
+    {
+        LOG4CPLUS_DEBUG(
+                mlog, "MGLResourcesManager::deleteReleasedGPUItem failed - no released "
+                      << "item with the specified key was found." << flush);
+        return;
+    }
+    gpuItemsReferenceCounter.take(removeKey);
+    GL::MAbstractGPUDataItem* removeItem = releasedGPUItems.take(removeKey);
+    videoMemoryUsage_kb -= removeItem->getGPUMemorySize_kb();
+    delete removeItem;
+}
+
+
 void MGLResourcesManager::releaseAllGPUItemReferences(MDataRequest key)
 {
     if (gpuItemsReferenceCounter.empty()
@@ -920,7 +991,9 @@ void MGLResourcesManager::actorHasChangedItsName(MActor *actor, QString oldName)
 ***                          PROTECTED METHODS                              ***
 *******************************************************************************/
 
+#ifdef USE_QOPENGLWIDGET
 bool MGLResourcesManager::isExternalDataInitialized = false;
+#endif
 
 void MGLResourcesManager::initializeGL()
 {
@@ -932,24 +1005,51 @@ void MGLResourcesManager::initializeGL()
     LOG4CPLUS_DEBUG(mlog, "*** OpenGL information:");
     LOG4CPLUS_DEBUG(mlog, "OpenGL context is "
                     << (context()->isValid() ? "" : "NOT ") << "valid.");
+#ifdef USE_QOPENGLWIDGET
     LOG4CPLUS_DEBUG(mlog, "\tRequested version: "
                     << requestedFormat.majorVersion()
                     << "." << requestedFormat.minorVersion());
+#else
+    LOG4CPLUS_DEBUG(mlog, "\tRequested version: "
+            << context()->requestedFormat().majorVersion()
+            << "." << context()->requestedFormat().minorVersion());
+#endif
     LOG4CPLUS_DEBUG(mlog, "\tObtained version: "
                     << context()->format().majorVersion() << "."
                     << context()->format().minorVersion());
     LOG4CPLUS_DEBUG(mlog, "\tObtained profile: "
                     << context()->format().profile());
+#ifdef USE_QOPENGLWIDGET
     LOG4CPLUS_DEBUG(mlog, "\tShaders are "
                     << (QOpenGLShaderProgram::hasOpenGLShaderPrograms(
                             context()) ? "" : "NOT ") << "supported.");
+#else
+    LOG4CPLUS_DEBUG(mlog, "\tShaders are "
+            << (QGLShaderProgram::hasOpenGLShaderPrograms(
+                    context()) ? "" : "NOT ") << "supported.");
+#endif
+#ifdef USE_QOPENGLWIDGET
     LOG4CPLUS_DEBUG(mlog, "\tMultisampling is "
                     << (context()->format().samples() > 0 ? "" : "NOT ")
                     << "enabled." << flush);
+#else
+    LOG4CPLUS_DEBUG(mlog, "\tMultisampling is "
+            << (context()->format().sampleBuffers() ? "" : "NOT ")
+            << "enabled." << flush);
+#endif
     LOG4CPLUS_DEBUG(mlog, "\tNumber of samples per pixel: "
                     << context()->format().samples() << flush);
 
+#ifdef USE_QOPENGLWIDGET
     initializeExternal();
+#else
+    LOG4CPLUS_DEBUG(mlog, "Initialising GLEW..." << flush);
+    GLenum err = glewInit();
+    if (err != GLEW_OK)
+    {
+        LOG4CPLUS_ERROR(mlog, "\tError: " << glewGetErrorString(err) << flush);
+    }
+#endif
 
     LOG4CPLUS_DEBUG(mlog, "Using GLEW " << glewGetString(GLEW_VERSION));
     LOG4CPLUS_DEBUG(mlog, "OpenGL version supported by this platform "
@@ -968,6 +1068,7 @@ void MGLResourcesManager::initializeGL()
                                    .arg((char*) glGetString(GL_VERSION)));
 
     QString value = "";
+#ifdef USE_QOPENGLWIDGET
     QPair<int, int> flags = context()->format().version();
     QString formatString;
     if (context()->format().renderableType() == QSurfaceFormat::OpenGLES) {
@@ -977,24 +1078,73 @@ void MGLResourcesManager::initializeGL()
     }
     value += formatString.arg(flags.first).arg(flags.second);
     LOG4CPLUS_DEBUG(mlog, "QSurfaceFormat::version() returns minimum "
-                    << "supported version is " << value.toStdString());
+            << "supported version is " << value.toStdString());
+#else
+    if (QGLFormat::hasOpenGL())
+    {
+        int flags = QGLFormat::openGLVersionFlags();
+        if (flags & QGLFormat::OpenGL_Version_4_0) value += "OpenGL 4.0";
+        else if (flags & QGLFormat::OpenGL_Version_3_3) value += "OpenGL 3.3";
+        else if (flags & QGLFormat::OpenGL_Version_3_2) value += "OpenGL 3.2";
+        else if (flags & QGLFormat::OpenGL_Version_3_1) value += "OpenGL 3.1";
+        else if (flags & QGLFormat::OpenGL_Version_3_0) value += "OpenGL 3.0";
+        else if (flags & QGLFormat::OpenGL_Version_2_1) value += "OpenGL 2.1";
+        else if (flags & QGLFormat::OpenGL_Version_2_0) value += "OpenGL 2.0";
+        else if (flags & QGLFormat::OpenGL_Version_1_5) value += "OpenGL 1.5";
+        else if (flags & QGLFormat::OpenGL_Version_1_4) value += "OpenGL 1.4";
+        else if (flags & QGLFormat::OpenGL_Version_1_3) value += "OpenGL 1.3";
+        else if (flags & QGLFormat::OpenGL_Version_1_2) value += "OpenGL 1.2";
+        else if (flags & QGLFormat::OpenGL_Version_1_1) value += "OpenGL 1.1";
+        if (flags & QGLFormat::OpenGL_ES_CommonLite_Version_1_0) value += " OpenGL ES 1.0 Common Lite";
+        else if (flags & QGLFormat::OpenGL_ES_Common_Version_1_0) value += " OpenGL ES 1.0 Common";
+        else if (flags & QGLFormat::OpenGL_ES_CommonLite_Version_1_1) value += " OpenGL ES 1.1 Common Lite";
+        else if (flags & QGLFormat::OpenGL_ES_Common_Version_1_1) value += " OpenGL ES 1.1 Common";
+        else if (flags & QGLFormat::OpenGL_ES_Version_2_0) value += " OpenGL ES 2.0";
+    }
+    else
+    {
+        value = "None";
+    }
+    LOG4CPLUS_DEBUG(mlog, "QGLFormat::openGLVersionFlags() returns minimum "
+            << "supported version is " << value.toStdString());
+#endif
 
     LOG4CPLUS_DEBUG(mlog, "*** END OpenGL information.\n");
 
-//TODO: Make size of used video memory configurable.
+#ifndef USE_QOPENGLWIDGET
+    //TODO: Make size of used video memory configurable.
     uint gpuTotalMemory;
     uint gpuAvailableMemory;
     gpuMemoryInfo_kb(gpuTotalMemory, gpuAvailableMemory);
     videoMemoryLimit_kb = gpuTotalMemory;
+#endif
 
     LOG4CPLUS_DEBUG(mlog, "Maximum GPU video memory to be used: "
                     << videoMemoryLimit_kb / 1024. << " MB." << flush);
+
+#ifndef USE_QOPENGLWIDGET
+    // Initialise currently registered actors.
+    LOG4CPLUS_DEBUG(mlog, "Initialising actors.." << flush);
+    LOG4CPLUS_DEBUG(mlog, "===================================================="
+            << "====================================================");
+
+    for (int i = 0; i < actorPool.size(); i++)
+    {
+        LOG4CPLUS_DEBUG(mlog, "======== ACTOR #" << i << " ========" << flush);
+        if (!actorPool[i]->isInitialized()) actorPool[i]->initialize();
+    }
+
+    LOG4CPLUS_DEBUG(mlog, "===================================================="
+            << "====================================================");
+    LOG4CPLUS_DEBUG(mlog, "Actors are initialised." << flush);
+
     displayMemoryUsage();
 
     // Start a time to update the displayed memory information every 2 seconds.
     QTimer *timer = new QTimer(this);
     connect(timer, SIGNAL(timeout()), this, SLOT(displayMemoryUsage()));
     timer->start(5000);
+#endif
 
     // Prevent this widget from being shown. It is meant as a hidden widget
     // that manages the OpenGL resources, not for displaying anything.
@@ -1003,8 +1153,10 @@ void MGLResourcesManager::initializeGL()
     LOG4CPLUS_DEBUG(mlog, "GL resources manager initialisation done\n*****\n"
                     << flush);
 
+#ifndef USE_QOPENGLWIDGET
     // Inform the system manager that the application has been initialized.
     systemControl->setApplicationIsInitialized();
+#endif
 }
 
 } // namespace Met3D

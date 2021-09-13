@@ -30,7 +30,6 @@
 // standard library imports
 #include <memory>
 
-
 // related third party imports
 #include <GL/glew.h>
 #include <QtProperty>
@@ -145,7 +144,11 @@ public slots:
       */
     void generatePathFromWaypoints(QModelIndex mindex1=QModelIndex(),
                                    QModelIndex mindex2=QModelIndex(),
+#ifdef USE_QOPENGLWIDGET
                                    QOpenGLWidget* currentGLContext = nullptr);
+#else
+                                   QGLWidget* currentGLContext = nullptr);
+#endif
 
     void actOnWaypointInsertDelete(const QModelIndex &parent,
                                    int start, int end);

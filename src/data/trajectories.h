@@ -36,7 +36,11 @@
 
 // related third party imports
 #include "GL/glew.h"
+#ifdef USE_QOPENGLWIDGET
 #include <QOpenGLWidget>
+#else
+#include <QGLWidget>
+#endif
 
 // local application imports
 #include "data/abstractdataitem.h"
@@ -202,7 +206,12 @@ public:
 
     /**
      */
-    GL::MVertexBuffer *getVertexBuffer(QOpenGLWidget *currentGLContext = 0);
+    GL::MVertexBuffer *getVertexBuffer(
+#ifdef USE_QOPENGLWIDGET
+            QOpenGLWidget *currentGLContext = nullptr);
+#else
+            QGLWidget *currentGLContext = nullptr);
+#endif
 
     void releaseVertexBuffer();
 
@@ -310,7 +319,12 @@ public:
       from a render method, it should switch back to the current render context
       (given by @p currentGLContext).
      */
-    GL::MVertexBuffer *getVertexBuffer(QOpenGLWidget *currentGLContext = 0);
+    GL::MVertexBuffer *getVertexBuffer(
+#ifdef USE_QOPENGLWIDGET
+            QOpenGLWidget *currentGLContext = nullptr);
+#else
+            QGLWidget *currentGLContext = nullptr);
+#endif
 
     void releaseVertexBuffer();
 
@@ -331,8 +345,13 @@ public:
       releaseAuxDataVertexBuffer() after use of the returned vertex buffer has
       finished to avoid memory leaks.
      */
-    GL::MVertexBuffer *getAuxDataVertexBuffer(QString requestedAuxDataVarName,
-                                              QOpenGLWidget *currentGLContext = 0);
+    GL::MVertexBuffer *getAuxDataVertexBuffer(
+            QString requestedAuxDataVarName,
+#ifdef USE_QOPENGLWIDGET
+            QOpenGLWidget *currentGLContext = nullptr);
+#else
+            QGLWidget *currentGLContext = nullptr);
+#endif
 
     /**
       Release vertex buffer with auxiliary data. As there can be more than one

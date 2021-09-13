@@ -66,7 +66,11 @@ unsigned int MVerticalProfile::getMemorySize_kb()
 
 
 GL::MVertexBuffer *MVerticalProfile::getVertexBuffer(
+#ifdef USE_QOPENGLWIDGET
         QOpenGLWidget *currentGLContext)
+#else
+        QGLWidget *currentGLContext)
+#endif
 {
     MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
 

@@ -62,6 +62,7 @@ MActor::MActor(QObject *parent)
       labelsAreEnabled(true),
       renderAsWireFrame(false),
       actorIsPickable(false), // by default actors are not pickable
+      actorHasSelectableData(false),
       shaderCompilationProgressDialog(nullptr),
       shaderCompilationProgress(0),
       positionLabel(nullptr),
@@ -937,10 +938,15 @@ void MActor::removeAllLabels()
 }
 
 
-void MActor::uploadVec3ToVertexBuffer(const QVector<QVector3D>& data,
-                              const QString requestKey,
-                              GL::MVertexBuffer** vbo,
-                              QOpenGLWidget* currentGLContext)
+void MActor::uploadVec3ToVertexBuffer(
+        const QVector<QVector3D>& data,
+        const QString requestKey,
+        GL::MVertexBuffer** vbo,
+#ifdef USE_QOPENGLWIDGET
+        QOpenGLWidget *currentGLContext)
+#else
+        QGLWidget *currentGLContext)
+#endif
 {
     MGLResourcesManager* glRM = MGLResourcesManager::getInstance();
 
@@ -966,10 +972,15 @@ void MActor::uploadVec3ToVertexBuffer(const QVector<QVector3D>& data,
 }
 
 
-void MActor::uploadVec2ToVertexBuffer(const QVector<QVector2D>& data,
-                              const QString requestKey,
-                              GL::MVertexBuffer** vbo,
-                              QOpenGLWidget* currentGLContext)
+void MActor::uploadVec2ToVertexBuffer(
+        const QVector<QVector2D>& data,
+        const QString requestKey,
+        GL::MVertexBuffer** vbo,
+#ifdef USE_QOPENGLWIDGET
+        QOpenGLWidget *currentGLContext)
+#else
+        QGLWidget *currentGLContext)
+#endif
 {
     MGLResourcesManager* glRM = MGLResourcesManager::getInstance();
 

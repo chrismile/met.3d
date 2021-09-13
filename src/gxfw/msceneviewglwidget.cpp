@@ -38,7 +38,9 @@
 #include <QLabel>
 #include <QMouseEvent>
 #include <QToolTip>
+#ifdef USE_QOPENGLWIDGET
 #include <QOpenGLContext>
+#endif
 
 // local application imports
 #include "util/mutil.h"
@@ -62,7 +64,13 @@ unsigned int MSceneViewGLWidget::idCounter = 0;
 *******************************************************************************/
 
 MSceneViewGLWidget::MSceneViewGLWidget()
-    : QOpenGLWidget(/*MGLResourcesManager::getInstance()*/),
+#ifdef USE_QOPENGLWIDGET
+    : QOpenGLWidget(),
+#else
+    : QGLWidget(
+            MGLResourcesManager::getInstance()->format(), 0,
+            MGLResourcesManager::getInstance()),
+#endif
       scene(nullptr),
       lastPoint(QVector3D(0,0,0)),
       sceneNavigationMode(MOVE_CAMERA),
@@ -89,7 +97,9 @@ MSceneViewGLWidget::MSceneViewGLWidget()
       resizeViewDialog(new MResizeWindowDialog),
       overwriteImageSequence(false)
 {
+#ifdef USE_QOPENGLWIDGET
     this->setFormat(MGLResourcesManager::getInstance()->format());
+#endif
 
     QGridLayout* gridLayout = new QGridLayout(this);
 
@@ -99,41 +109,14 @@ MSceneViewGLWidget::MSceneViewGLWidget()
     radarChart->addRadar("Trajectory A", { 0.9, 0.2, 0.7, 0.1, 0.8, 0.01, 0.6, 0.3 });
     radarChart->addRadar("Trajectory B", { 0.7, 0.3, 0.8, 0.4, 0.7, 0.3, 0.9, 0.4 });
     radarChart->setRenderHint(QPainter::Antialiasing);
-    radarChart->resize(500, 400);
-    //radarChart->setAttribute(Qt::WA_TranslucentBackground);
-    //radarChart->setBackgroundVisible(false);
-    //radarChart->setOpacity(0.1);
-    //radarChart->layout()->setContentsMargins(0, 0, 0, 0);
-    radarChart->setContentsMargins(QMargins(0, 0, 0, 0));
-    radarChart->setAutoFillBackground(false);
-    QtCharts::QPolarChart* chart = radarChart->getChart();
-    chart->setBackgroundBrush(QBrush(QColor("transparent")));
-    chart->setBackgroundRoundness(0.0f);
-    chart->setBackgroundVisible(false);
-    chart->setPlotAreaBackgroundVisible(false);
-    chart->setPlotAreaBackgroundBrush(QBrush(QColor("transparent")));
-
-    radarChart->setBackgroundBrush(QBrush(QColor(100, 100, 100, 10)));
-    //radarChart->setBackgroundBrush(QBrush(QColor("transparent")));
-    radarChart->viewport()->setAutoFillBackground(false);
-
-    QPalette palette = radarChart->palette();
-    palette.setBrush(QPalette::Base, Qt::transparent);
-    radarChart->setPalette(palette);
-    radarChart->setAttribute(Qt::WA_OpaquePaintEvent, false);
-
-    chart->legend()->hide();
-
-    chart->setPos(0.0f, 1000.0f);
-
-    //QCheckBox* testCheckBox = new QCheckBox("ABC", this);
-    //testCheckBox->resize(500, 400);
 
     QSpacerItem* verticalSpacer = new QSpacerItem(20, 40, QSizePolicy::Minimum, QSizePolicy::Expanding);
-    gridLayout->addItem(verticalSpacer, 0, 0, 1, 2);
+    gridLayout->addItem(verticalSpacer, 0, 0, 1, 1);
     QSpacerItem* horizontalSpacer = new QSpacerItem(40, 20, QSizePolicy::Expanding, QSizePolicy::Minimum);
     gridLayout->addItem(horizontalSpacer, 1, 1);
     gridLayout->addWidget(radarChart, 1, 0);
+
+    //gridLayout->removeItem();
 
 
     viewIsInitialised = false;
@@ -653,7 +636,11 @@ void MSceneViewGLWidget::setScene(MSceneControl *scene)
 #ifndef CONTINUOUS_GL_UPDATE
     connect(this->scene,
             SIGNAL(sceneChanged()),
+#ifdef USE_QOPENGLWIDGET
             SLOT(update()));
+#else
+            SLOT(updateGL()));
+#endif
 #endif
 
     if (!viewIsInitialised) return;
@@ -661,7 +648,11 @@ void MSceneViewGLWidget::setScene(MSceneControl *scene)
     updateSceneLabel();
 
 #ifndef CONTINUOUS_GL_UPDATE
+#ifdef USE_QOPENGLWIDGET
     update();
+#else
+    updateGL();
+#endif
 #endif
 }
 
@@ -682,7 +673,11 @@ void MSceneViewGLWidget::removeCurrentScene()
         disconnect(scene,
                    SIGNAL(sceneChanged()),
                    this,
+#ifdef USE_QOPENGLWIDGET
                    SLOT(update()));
+#else
+                   SLOT(updateGL()));
+#endif
 #endif
     }
 
@@ -706,7 +701,11 @@ void MSceneViewGLWidget::setBackgroundColour(const QColor &color)
 {
     backgroundColour = color;
 #ifndef CONTINUOUS_GL_UPDATE
+#ifdef USE_QOPENGLWIDGET
     update();
+#else
+    updateGL();
+#endif
 #endif
 }
 
@@ -851,7 +850,12 @@ void MSceneViewGLWidget::setFreeze(bool enabled)
     }
 
 #ifndef CONTINUOUS_GL_UPDATE
-    if ( viewIsInitialised && (!freezeMode) ) update();
+    if ( viewIsInitialised && (!freezeMode) )
+#ifdef USE_QOPENGLWIDGET
+        update();
+#else
+        updateGL();
+#endif
 #endif
 }
 
@@ -911,7 +915,12 @@ void MSceneViewGLWidget::executeCameraAction(int action,
     updateCameraPositionDisplay();
 
 #ifndef CONTINUOUS_GL_UPDATE
-    if (viewIsInitialised && (!freezeMode)) update();
+    if (viewIsInitialised && (!freezeMode))
+#ifdef USE_QOPENGLWIDGET
+        update();
+#else
+        updateGL();
+#endif
 #endif
 }
 
@@ -949,7 +958,11 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
         setMouseTracking(actorInteractionMode);
         updateSceneLabel();
 #ifndef CONTINUOUS_GL_UPDATE
+#ifdef USE_QOPENGLWIDGET
         update();
+#else
+        updateGL();
+#endif
 #endif
     }
 
@@ -965,7 +978,11 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
         }
         updateSceneLabel();
 #ifndef CONTINUOUS_GL_UPDATE
+#ifdef USE_QOPENGLWIDGET
         update();
+#else
+        updateGL();
+#endif
 #endif
     }
 
@@ -982,7 +999,11 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
                 ->getDecoratedDoublePropertyManager()
                 ->value(farPlaneDistanceProperty);
 #ifndef CONTINUOUS_GL_UPDATE
+#ifdef USE_QOPENGLWIDGET
         update();
+#else
+        updateGL();
+#endif
 #endif
     }
 
@@ -1000,7 +1021,11 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
             glDisable(GL_MULTISAMPLE);
         }
 #ifndef CONTINUOUS_GL_UPDATE
+#ifdef USE_QOPENGLWIDGET
         update();
+#else
+        updateGL();
+#endif
 #endif
     }
 
@@ -1025,7 +1050,11 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
             glDisable(GL_POLYGON_SMOOTH);
         }
 #ifndef CONTINUOUS_GL_UPDATE
+#ifdef USE_QOPENGLWIDGET
         update();
+#else
+        updateGL();
+#endif
 #endif
     }
 
@@ -1035,7 +1064,11 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
         renderLabelsWithDepthTest = MSystemManagerAndControl::getInstance()
                 ->getBoolPropertyManager()->value(labelDepthTestProperty);
 #ifndef CONTINUOUS_GL_UPDATE
+#ifdef USE_QOPENGLWIDGET
         update();
+#else
+        updateGL();
+#endif
 #endif
     }
 
@@ -1047,7 +1080,11 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
                     ->value(lightingProperty));
         LOG4CPLUS_DEBUG(mlog, "Setting light direction to" << lightDirection);
 #ifndef CONTINUOUS_GL_UPDATE
+#ifdef USE_QOPENGLWIDGET
         update();
+#else
+        updateGL();
+#endif
 #endif
     }
 
@@ -1061,7 +1098,12 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
         visualizationParameterChange = true;
 
 #ifndef CONTINUOUS_GL_UPDATE
-        if (viewIsInitialised) update();
+        if (viewIsInitialised)
+#ifdef USE_QOPENGLWIDGET
+            update();
+#else
+            updateGL();
+#endif
 #endif
     }
 
@@ -1085,7 +1127,12 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
         }
 
 #ifndef CONTINUOUS_GL_UPDATE
-        if (viewIsInitialised) update();
+        if (viewIsInitialised)
+#ifdef USE_QOPENGLWIDGET
+            update();
+#else
+            updateGL();
+#endif
 #endif
     }
 
@@ -1162,7 +1209,11 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
 
         enablePropertyEvents = true;
         updateSceneLabel();
+#ifdef USE_QOPENGLWIDGET
         update();
+#else
+        updateGL();
+#endif
     }
 
     else if (property == sceneRotationCentreElevationProperty ||
@@ -1231,7 +1282,11 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
             return;
         }
 #ifndef CONTINUOUS_GL_UPDATE
+#ifdef USE_QOPENGLWIDGET
         update();
+#else
+        updateGL();
+#endif
 #endif
     }
 
@@ -1244,7 +1299,11 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
 
         updateSceneLabel();
 #ifndef CONTINUOUS_GL_UPDATE
+#ifdef USE_QOPENGLWIDGET
         update();
+#else
+        updateGL();
+#endif
 #endif
     }
 
@@ -1295,7 +1354,11 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
         // Record measurements starting at the front of "fpsTimeseries".
         fpsTimeseriesIndex = 0;
         QTimer::singleShot(30000, this, SLOT(stopFPSMeasurement()));
+#ifdef USE_QOPENGLWIDGET
         update();
+#else
+        updateGL();
+#endif
     }
 #endif
 
@@ -1361,7 +1424,11 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
         northArrow.enabled = MSystemManagerAndControl::getInstance()
                 ->getBoolPropertyManager()->value(northArrow.enabledProperty);
 #ifndef CONTINUOUS_GL_UPDATE
+#ifdef USE_QOPENGLWIDGET
         update();
+#else
+        updateGL();
+#endif
 #endif
     }
 
@@ -1371,7 +1438,11 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
                 ->getDecoratedDoublePropertyManager()
                 ->value(northArrow.horizontalScaleProperty);
 #ifndef CONTINUOUS_GL_UPDATE
+#ifdef USE_QOPENGLWIDGET
         update();
+#else
+        updateGL();
+#endif
 #endif
     }
 
@@ -1381,7 +1452,11 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
                 ->getDecoratedDoublePropertyManager()
                 ->value(northArrow.verticalScaleProperty);
 #ifndef CONTINUOUS_GL_UPDATE
+#ifdef USE_QOPENGLWIDGET
         update();
+#else
+        updateGL();
+#endif
 #endif
     }
 
@@ -1391,7 +1466,11 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
                 ->getDecoratedDoublePropertyManager()
                 ->value(northArrow.lonPositionProperty);
 #ifndef CONTINUOUS_GL_UPDATE
+#ifdef USE_QOPENGLWIDGET
         update();
+#else
+        updateGL();
+#endif
 #endif
     }
 
@@ -1401,7 +1480,11 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
                 ->getDecoratedDoublePropertyManager()
                 ->value(northArrow.latPositionProperty);
 #ifndef CONTINUOUS_GL_UPDATE
+#ifdef USE_QOPENGLWIDGET
         update();
+#else
+        updateGL();
+#endif
 #endif
     }
 
@@ -1411,7 +1494,11 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
                 ->getDecoratedDoublePropertyManager()
                 ->value(northArrow.worldZPositionProperty);
 #ifndef CONTINUOUS_GL_UPDATE
+#ifdef USE_QOPENGLWIDGET
         update();
+#else
+        updateGL();
+#endif
 #endif
     }
 
@@ -1420,7 +1507,11 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
         northArrow.colour = MSystemManagerAndControl::getInstance()
                 ->getColorPropertyManager()->value(northArrow.colourProperty);
 #ifndef CONTINUOUS_GL_UPDATE
+#ifdef USE_QOPENGLWIDGET
         update();
+#else
+        updateGL();
+#endif
 #endif
     }
 
@@ -1428,7 +1519,11 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
     {
         updateSceneLabel();
 #ifndef CONTINUOUS_GL_UPDATE
+#ifdef USE_QOPENGLWIDGET
         update();
+#else
+        updateGL();
+#endif
 #endif
     }
 }
@@ -1480,7 +1575,11 @@ void MSceneViewGLWidget::updateDisplayTime()
 #ifndef CONTINUOUS_GL_UPDATE
     if (viewIsInitialised)
     {
+#ifdef USE_QOPENGLWIDGET
         update();
+#else
+        updateGL();
+#endif
     }
 #endif
 }
@@ -1514,16 +1613,24 @@ void MSceneViewGLWidget::stopFPSMeasurement()
 
 void MSceneViewGLWidget::initializeGL()
 {
+#ifdef USE_QOPENGLWIDGET
     MGLResourcesManager::getInstance()->initializeExternal();
+#endif
 
     LOG4CPLUS_DEBUG(mlog, "initialising OpenGL context of scene view " << myID);
     LOG4CPLUS_DEBUG(mlog, "\tOpenGL context is "
                     << (context()->isValid() ? "" : "NOT ") << "valid.");
-    //LOG4CPLUS_DEBUG(mlog, "\tOpenGL context is "
-    //                << (context()->isSharing() ? "" : "NOT ") << "sharing.");
+#ifndef USE_QOPENGLWIDGET
+    LOG4CPLUS_DEBUG(mlog, "\tOpenGL context is "
+                    << (context()->isSharing() ? "" : "NOT ") << "sharing.");
+#endif
 
     // Create the widget's only shader: To draw the focus rectangle.
+#ifdef USE_QOPENGLWIDGET
     QOpenGLShader *vshader = new QOpenGLShader(QOpenGLShader::Vertex, this);
+#else
+    QGLShader *vshader = new QGLShader(QGLShader::Vertex, this);
+#endif
     const char *vsrc =
         "#version 130\n"
         "in vec2 vertex;\n"
@@ -1533,7 +1640,11 @@ void MSceneViewGLWidget::initializeGL()
         "}\n";
     vshader->compileSourceCode(vsrc);
 
+#ifdef USE_QOPENGLWIDGET
     QOpenGLShader *fshader = new QOpenGLShader(QOpenGLShader::Fragment, this);
+#else
+    QGLShader *fshader = new QGLShader(QGLShader::Fragment, this);
+#endif
     const char *fsrc =
         "#version 130\n"
         "uniform vec4 colourValue;\n"
@@ -1544,7 +1655,11 @@ void MSceneViewGLWidget::initializeGL()
         "}\n";
     fshader->compileSourceCode(fsrc);
 
+#ifdef USE_QOPENGLWIDGET
     focusShader = new QOpenGLShaderProgram(this);
+#else
+    focusShader = new QGLShaderProgram(this);
+#endif
     focusShader->addShader(vshader);
     focusShader->addShader(fshader);
 #define FOCUSSHADER_VERTEX_ATTRIBUTE 0
@@ -1593,12 +1708,20 @@ void MSceneViewGLWidget::initializeGL()
 }
 
 
+#ifdef USE_QOPENGLWIDGET
 void MSceneViewGLWidget::update()
+#else
+void MSceneViewGLWidget::updateGL()
+#endif
 {
     // Don't update GL if no scene is attached to the scene view.
     if (scene != nullptr)
     {
+#ifdef USE_QOPENGLWIDGET
         QOpenGLWidget::update();
+#else
+        QGLWidget::updateGL();
+#endif
     }
 }
 
@@ -1726,7 +1849,8 @@ void MSceneViewGLWidget::paintGL()
     }
     else
     {
-        modelViewProjectionMatrix.perspective(45., ratio, abs(co.z())/10.,
+        modelViewProjectionMatrix.perspective(verticalAngle, ratio,
+                                              abs(co.z())/10.,
                                               farPlaneDistance);
     }
 
@@ -1901,7 +2025,7 @@ void MSceneViewGLWidget::resizeGL(int width, int height)
     else
     {
         modelViewProjectionMatrix.perspective(
-                45.,
+                verticalAngle,
                 ratio,
                 co.z()/10.,
                 500.);
@@ -1961,6 +2085,18 @@ void MSceneViewGLWidget::mousePressEvent(QMouseEvent *event)
     {
         pickedActor.actor->addPositionLabel(this, pickedActor.handleID,
                                             clipX, clipY);
+    }
+
+    if (controlKeyPressed)
+    {
+        foreach (MActor* actor, scene->getRenderQueue())
+        {
+            // Only check actors that have selectable data.
+            if (actor->hasSelectableData())
+            {
+                actor->checkIntersectionWithSelectableData(this, event->x(), event->y());
+            }
+        }
     }
 }
 
@@ -2051,7 +2187,11 @@ void MSceneViewGLWidget::mouseMoveEvent(QMouseEvent *event)
 
             // Redraw (the actors might draw any highlighted handles).
 #ifndef CONTINUOUS_GL_UPDATE
+#ifdef USE_QOPENGLWIDGET
             update();
+#else
+            updateGL();
+#endif
 #endif
         }
 
@@ -2164,7 +2304,11 @@ void MSceneViewGLWidget::mouseMoveEvent(QMouseEvent *event)
     updateSynchronizedCameras();
 
 #ifndef CONTINUOUS_GL_UPDATE
+#ifdef USE_QOPENGLWIDGET
     update();
+#else
+    updateGL();
+#endif
 #endif
 }
 
@@ -2223,7 +2367,11 @@ void MSceneViewGLWidget::mouseReleaseEvent(QMouseEvent *event)
     }
 
 #ifndef CONTINUOUS_GL_UPDATE
+#ifdef USE_QOPENGLWIDGET
     update();
+#else
+    updateGL();
+#endif
 #endif
 }
 
@@ -2283,7 +2431,11 @@ void MSceneViewGLWidget::wheelEvent(QWheelEvent *event)
         updateSynchronizedCameras();
     }
 #ifndef CONTINUOUS_GL_UPDATE
+#ifdef USE_QOPENGLWIDGET
     update();
+#else
+    updateGL();
+#endif
 #endif
 }
 
@@ -2296,7 +2448,13 @@ void MSceneViewGLWidget::checkUserScrolling()
 
     if (elapsedTime > 0.5f) { userIsScrolling = false; }
 
-    if (oldUserScrolling != userIsScrolling) { update(); }
+    if (oldUserScrolling != userIsScrolling) {
+#ifdef USE_QOPENGLWIDGET
+        update();
+#else
+        updateGL();
+#endif
+    }
 }
 
 
@@ -2304,7 +2462,11 @@ void MSceneViewGLWidget::autoRotateCamera()
 {
     sceneRotationMatrix.rotate(cameraAutoRotationAngle, cameraAutoRotationAxis);
 #ifndef CONTINUOUS_GL_UPDATE
+#ifdef USE_QOPENGLWIDGET
     update();
+#else
+    updateGL();
+#endif
 #endif
 }
 
@@ -2353,6 +2515,11 @@ void MSceneViewGLWidget::keyPressEvent(QKeyEvent *event)
         }
     }
 
+    if (event->key() == Qt::Key_Control)
+    {
+        controlKeyPressed = true;
+    }
+
     if (freezeMode) return;
 
     switch (event->key())
@@ -2361,7 +2528,11 @@ void MSceneViewGLWidget::keyPressEvent(QKeyEvent *event)
         // Shader reload.
         MGLResourcesManager::getInstance()->reloadActorShaders();
 #ifndef CONTINUOUS_GL_UPDATE
+#ifdef USE_QOPENGLWIDGET
             update();
+#else
+            updateGL();
+#endif
 #endif
         break;
     case Qt::Key_I:
@@ -2408,9 +2579,29 @@ void MSceneViewGLWidget::keyPressEvent(QKeyEvent *event)
     default:
         // If we do not act upon the key, pass event to base class
         // implementation.
-        QOpenGLWidget::keyPressEvent(event);
+#ifdef USE_QOPENGLWIDGET
+            QOpenGLWidget::keyPressEvent(event);
+#else
+            QGLWidget::keyPressEvent(event);
+#endif
     }
 }
+
+
+void MSceneViewGLWidget::keyReleaseEvent(QKeyEvent *event)
+{
+    if (event->key() == Qt::Key_Control)
+    {
+        controlKeyPressed = false;
+    }
+
+#ifdef USE_QOPENGLWIDGET
+    QOpenGLWidget::keyReleaseEvent(event);
+#else
+    QGLWidget::keyReleaseEvent(event);
+#endif
+}
+
 
 
 bool MSceneViewGLWidget::event(QEvent *event)
@@ -2432,7 +2623,11 @@ bool MSceneViewGLWidget::event(QEvent *event)
 
         return true;
     }*/
-    return QOpenGLWidget::event(event);
+#ifdef USE_QOPENGLWIDGET
+    QOpenGLWidget::event(event);
+#else
+    QGLWidget::event(event);
+#endif
 }
 
 
@@ -2448,7 +2643,11 @@ void MSceneViewGLWidget::updateSynchronizedCameras()
         otherCamera->setYAxis(camera.getYAxis());
         otherCamera->setZAxis(camera.getZAxis());
         otherView->updateCameraPositionDisplay();
+#ifdef USE_QOPENGLWIDGET
         otherView->update();
+#else
+        otherView->updateGL();
+#endif
     }
 }
 
@@ -2645,7 +2844,11 @@ void MSceneViewGLWidget::onActorRenamed(MActor *actor, QString oldName)
 
 void MSceneViewGLWidget::onFullScreenActorUpdate()
 {
+#ifdef USE_QOPENGLWIDGET
     update();
+#else
+    updateGL();
+#endif
 }
 
 
@@ -3051,7 +3254,11 @@ void MSceneViewGLWidget::loadConfiguration(QSettings *settings)
 void MSceneViewGLWidget::onHandleSizeChanged()
 {
 #ifndef CONTINUOUS_GL_UPDATE
+#ifdef USE_QOPENGLWIDGET
     update();
+#else
+    updateGL();
+#endif
 #endif
 }
 
@@ -3202,7 +3409,11 @@ void MSceneViewGLWidget::saveScreenshot()
 void MSceneViewGLWidget::saveScreenshotToFileName(QString filename)
 {
     // Take Screenshot of current scene.
+#ifdef USE_QOPENGLWIDGET
     QImage screenshot = this->grabFramebuffer();
+#else
+    QImage screenshot = this->grabFrameBuffer();
+#endif
     // Chop red frame. (Only visible if view has focus.)
     if (this->hasFocus())
     {

@@ -44,12 +44,17 @@ namespace Met3D
 
 template<class T>
 GL::MVertexBuffer* createVertexBuffer(
-        QOpenGLWidget *currentGLContext, const QString& vbID, const QVector<T>& data)
+#ifdef USE_QOPENGLWIDGET
+        QOpenGLWidget *currentGLContext,
+#else
+        QGLWidget *currentGLContext,
+#endif
+        const QString& vbID, const QVector<T>& data)
 {
-    MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
+    MGLResourcesManager* glRM = MGLResourcesManager::getInstance();
 
     // Check if a buffer with this item's data already exists in GPU memory.
-    GL::MVertexBuffer *vb = static_cast<GL::MVertexBuffer*>(glRM->getGPUItem(vbID));
+    GL::MVertexBuffer* vb = static_cast<GL::MVertexBuffer*>(glRM->getGPUItem(vbID));
     if (vb) return vb;
 
     // No buffer with this item's data exists. Create a new one.
@@ -66,12 +71,17 @@ GL::MVertexBuffer* createVertexBuffer(
 
 
 inline GL::MIndexBuffer* createIndexBuffer(
-        QOpenGLWidget *currentGLContext, const QString& ibID, const QVector<uint32_t>& data)
+#ifdef USE_QOPENGLWIDGET
+        QOpenGLWidget *currentGLContext,
+#else
+        QGLWidget *currentGLContext,
+#endif
+        const QString& ibID, const QVector<uint32_t>& data)
 {
-    MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
+    MGLResourcesManager* glRM = MGLResourcesManager::getInstance();
 
     // Check if a buffer with this item's data already exists in GPU memory.
-    GL::MIndexBuffer *ib = static_cast<GL::MIndexBuffer*>(glRM->getGPUItem(ibID));
+    GL::MIndexBuffer* ib = static_cast<GL::MIndexBuffer*>(glRM->getGPUItem(ibID));
     if (ib) return ib;
 
     // No buffer with this item's data exists. Create a new one.
@@ -88,12 +98,17 @@ inline GL::MIndexBuffer* createIndexBuffer(
 
 template<class T>
 GL::MShaderStorageBufferObject* createShaderStorageBuffer(
-        QOpenGLWidget *currentGLContext, const QString& vbID, const QVector<T>& data)
+#ifdef USE_QOPENGLWIDGET
+        QOpenGLWidget *currentGLContext,
+#else
+        QGLWidget *currentGLContext,
+#endif
+        const QString& vbID, const QVector<T>& data)
 {
-    MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
+    MGLResourcesManager* glRM = MGLResourcesManager::getInstance();
 
     // Check if a buffer with this item's data already exists in GPU memory.
-    GL::MShaderStorageBufferObject *vb = static_cast<GL::MShaderStorageBufferObject*>(glRM->getGPUItem(vbID));
+    GL::MShaderStorageBufferObject* vb = static_cast<GL::MShaderStorageBufferObject*>(glRM->getGPUItem(vbID));
     if (vb) return vb;
 
     // No buffer with this item's data exists. Create a new one.

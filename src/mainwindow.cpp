@@ -79,18 +79,29 @@ MMainWindow::MMainWindow(QStringList commandLineArguments, QWidget *parent)
     // OpenGL settings.
     // =========================================================================
 
+#ifdef USE_QOPENGLWIDGET
     QSurfaceFormat format;
     format.setDepthBufferSize(24);
     format.setStencilBufferSize(8);
     format.setSamples(8); // TODO: Query maximum using GLX etc.?
     format.setProfile(QSurfaceFormat::CoreProfile);
     QSurfaceFormat::setDefaultFormat(format);
+#else
+    QGLFormat glformat;
+    // glformat.setVersion(4, 1);
+    glformat.setProfile(QGLFormat::CoreProfile);
+    glformat.setSampleBuffers(true);
+#endif
 
     // OpenGL resources manager -- the "invisible" OpenGL context.
     // =========================================================================
 
     // Create a hidden QOpenGLWidget as resources manager.
+#ifdef USE_QOPENGLWIDGET
     MGLResourcesManager::initialize(format, this);
+#else
+    MGLResourcesManager::initialize(glformat, this);
+#endif
     glResourcesManager = MGLResourcesManager::getInstance();
 
     // Qt Designer specific initialization.

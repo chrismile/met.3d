@@ -53,8 +53,9 @@
 #include "data/pressuretimetrajectoryfilter.h"
 #include "data/trajectorycomputation.h"
 #include "data/multivar/beziertrajectories.h"
-#include "data/multivar/bezietrajectoriessource.h"
+#include "data/multivar/beziertrajectoriessource.h"
 #include "data/multivar/multivardata.h"
+#include "data/multivar/trajectorypicking.hpp"
 #include "gxfw/boundingbox/boundingbox.h"
 
 
@@ -234,6 +235,15 @@ public slots:
       are enabled.
      */
     void onSeedActorChanged();
+
+    /**
+      Checks whether selectable data of this actor is at
+      @p mousePositionX, @p mousePositionY.
+
+      Called by a @ref MSceneViewGLWidget.
+      */
+    void checkIntersectionWithSelectableData(
+            MSceneViewGLWidget *sceneView, int mousePositionX, int mousePositionY);
 
 protected:
     void initializeActorResources();
@@ -440,6 +450,8 @@ private:
     bool bezierDataDirty = false;
     QtProperty *multiVarGroupProperty;
     QtProperty *useBezierTrajectoriesProperty;
+
+    QHash<MSceneViewGLWidget*, MTrajectoryPicker*> trajectoryPickerMap;
 
     MTrajectoryFilter *trajectoryFilter;
     MTrajectorySelection *trajectorySelection;

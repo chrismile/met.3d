@@ -38,6 +38,7 @@
 
 int main(int argc, char *argv[])
 {
+    //QCoreApplication::setAttribute(Qt::AA_ShareOpenGLContexts);
     QApplication app(argc, argv);
     QStringList commandLineArguments = app.arguments();
 
@@ -71,18 +72,27 @@ int main(int argc, char *argv[])
     LOG4CPLUS_INFO(mlog, "");
 
     // Check for OpenGL.
+#ifdef USE_QOPENGLWIDGET
     //if (!QOpenGLContext::openGLModuleType())
     //{
     //    LOG4CPLUS_ERROR(mlog, "ERROR: This system has no OpenGL support.");
     //    return 1;
     //}
+#else
+    if (!QGLFormat::hasOpenGL())
+    {
+        LOG4CPLUS_ERROR(mlog, "ERROR: This system has no OpenGL support.");
+        return 1;
+    }
+#endif
 
     // Create the application window and run the application.
     Met3D::MMainWindow win(commandLineArguments);
 //    win.resize(1280, 610);
-    win.resize(1288, 610);
+//    win.resize(1288, 610);
 //    win.resize(1600, 900);
 //    win.resize(1800, 800);
+    win.resize(1800, 800);
     win.show();
 
     return app.exec();

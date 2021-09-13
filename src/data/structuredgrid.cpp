@@ -541,8 +541,13 @@ void MStructuredGrid::setTextureParameters(GLint  internalFormat,
 }
 
 
-GL::MTexture* MStructuredGrid::getTexture(QOpenGLWidget *currentGLContext,
-                                         bool nullTexture)
+GL::MTexture* MStructuredGrid::getTexture(
+#ifdef USE_QOPENGLWIDGET
+        QOpenGLWidget *currentGLContext,
+#else
+        QGLWidget *currentGLContext,
+#endif
+        bool nullTexture)
 {
     MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
 
@@ -558,6 +563,9 @@ GL::MTexture* MStructuredGrid::getTexture(QOpenGLWidget *currentGLContext,
     {
         // The new texture was successfully stored in the GPU memory manger.
         // We can now upload the data.
+#ifdef USE_QOPENGLWIDGET
+        if (currentGLContext) currentGLContext->doneCurrent();
+#endif
         glRM->makeCurrent();
 
         t->bindToLastTextureUnit();
@@ -583,6 +591,11 @@ GL::MTexture* MStructuredGrid::getTexture(QOpenGLWidget *currentGLContext,
                          0, textureFormat, GL_FLOAT, data);
         CHECK_GL_ERROR;
 
+#ifdef USE_QOPENGLWIDGET
+        glActiveTexture(GL_TEXTURE0);
+        glRM->doneCurrent();
+#endif
+
         if (currentGLContext) currentGLContext->makeCurrent();
     }
     else
@@ -600,7 +613,12 @@ void MStructuredGrid::releaseTexture()
 }
 
 
-GL::MTexture *MStructuredGrid::getLonLatLevTexture(QOpenGLWidget *currentGLContext)
+GL::MTexture *MStructuredGrid::getLonLatLevTexture(
+#ifdef USE_QOPENGLWIDGET
+        QOpenGLWidget *currentGLContext)
+#else
+        QGLWidget *currentGLContext)
+#endif
 {
     MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
 
@@ -616,6 +634,9 @@ GL::MTexture *MStructuredGrid::getLonLatLevTexture(QOpenGLWidget *currentGLConte
     {
         // The new texture was successfully stored in the GPU memory manger.
         // We can now upload the data.
+#ifdef USE_QOPENGLWIDGET
+        if (currentGLContext) currentGLContext->doneCurrent();
+#endif
         glRM->makeCurrent();
 
         t->bindToLastTextureUnit();
@@ -657,6 +678,11 @@ GL::MTexture *MStructuredGrid::getLonLatLevTexture(QOpenGLWidget *currentGLConte
         glTexSubImage1D(GL_TEXTURE_1D, 0, nlons+nlats, nlevs, GL_ALPHA,
                         GL_FLOAT, levs_); CHECK_GL_ERROR;
         delete[] levs_;
+
+#ifdef USE_QOPENGLWIDGET
+        glActiveTexture(GL_TEXTURE0);
+        glRM->doneCurrent();
+#endif
 
         if (currentGLContext) currentGLContext->makeCurrent();
     }
@@ -806,7 +832,12 @@ void MStructuredGrid::clearAllFlags()
 }
 
 
-GL::MTexture *MStructuredGrid::getFlagsTexture(QOpenGLWidget *currentGLContext)
+GL::MTexture *MStructuredGrid::getFlagsTexture(
+#ifdef USE_QOPENGLWIDGET
+        QOpenGLWidget *currentGLContext)
+#else
+        QGLWidget *currentGLContext)
+#endif
 {
     MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
 
@@ -822,6 +853,9 @@ GL::MTexture *MStructuredGrid::getFlagsTexture(QOpenGLWidget *currentGLContext)
     {
         // The new texture was successfully stored in the GPU memory manger.
         // We can now upload the data.
+#ifdef USE_QOPENGLWIDGET
+        if (currentGLContext) currentGLContext->doneCurrent();
+#endif
         glRM->makeCurrent();
 
         t->bindToLastTextureUnit();
@@ -837,6 +871,11 @@ GL::MTexture *MStructuredGrid::getFlagsTexture(QOpenGLWidget *currentGLContext)
                      nlons, nlats, nlevs,
                      0, GL_RG_INTEGER,  GL_UNSIGNED_INT, flags);
         CHECK_GL_ERROR;
+
+#ifdef USE_QOPENGLWIDGET
+        glActiveTexture(GL_TEXTURE0);
+        glRM->doneCurrent();
+#endif
 
         if (currentGLContext) currentGLContext->makeCurrent();
     }
@@ -891,7 +930,11 @@ unsigned char MStructuredGrid::getMinAvailableMember() const
 
 
 GL::MTexture *MStructuredGrid::getMinMaxAccelTexture3D(
+#ifdef USE_QOPENGLWIDGET
         QOpenGLWidget *currentGLContext)
+#else
+        QGLWidget *currentGLContext)
+#endif
 {
     MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
 
@@ -1077,6 +1120,9 @@ GL::MTexture *MStructuredGrid::getMinMaxAccelTexture3D(
     {
         // The new texture was successfully stored in the GPU memory manger.
         // We can now upload the data.
+#ifdef USE_QOPENGLWIDGET
+        if (currentGLContext) currentGLContext->doneCurrent();
+#endif
         glRM->makeCurrent();
 
         t->bindToLastTextureUnit();
@@ -1092,6 +1138,11 @@ GL::MTexture *MStructuredGrid::getMinMaxAccelTexture3D(
                      nAccLon, nAccLat, nAccLnP,
                      0, GL_RG, GL_FLOAT, minMaxAccel->data);
         CHECK_GL_ERROR;
+
+#ifdef USE_QOPENGLWIDGET
+        glActiveTexture(GL_TEXTURE0);
+        glRM->doneCurrent();
+#endif
 
         if (currentGLContext) currentGLContext->makeCurrent();
     }
@@ -1256,7 +1307,11 @@ MRegularLonLatStructuredPressureGrid::MRegularLonLatStructuredPressureGrid(
 *******************************************************************************/
 
 GL::MTexture *MRegularLonLatStructuredPressureGrid::getPressureTexCoordTexture1D(
+#ifdef USE_QOPENGLWIDGET
         QOpenGLWidget *currentGLContext)
+#else
+        QGLWidget *currentGLContext)
+#endif
 {
     MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
 
@@ -1319,6 +1374,9 @@ GL::MTexture *MRegularLonLatStructuredPressureGrid::getPressureTexCoordTexture1D
     {
         // The new texture was successfully stored in the GPU memory manger.
         // We can now upload the data.
+#ifdef USE_QOPENGLWIDGET
+        if (currentGLContext) currentGLContext->doneCurrent();
+#endif
         glRM->makeCurrent();
 
         t->bindToLastTextureUnit();
@@ -1335,6 +1393,11 @@ GL::MTexture *MRegularLonLatStructuredPressureGrid::getPressureTexCoordTexture1D
                      GL_ALPHA,                  // format
                      GL_FLOAT,                  // data type of the pixel data
                      texCoordsTable); CHECK_GL_ERROR;
+
+#ifdef USE_QOPENGLWIDGET
+        glActiveTexture(GL_TEXTURE0);
+        glRM->doneCurrent();
+#endif
 
         if (currentGLContext) currentGLContext->makeCurrent();
     }
@@ -1473,8 +1536,13 @@ MRegularLonLatGrid::MRegularLonLatGrid(
 ***                            PUBLIC METHODS                               ***
 *******************************************************************************/
 
-GL::MTexture *MRegularLonLatGrid::getTexture(QOpenGLWidget *currentGLContext,
-                                            bool nullTexture)
+GL::MTexture *MRegularLonLatGrid::getTexture(
+#ifdef USE_QOPENGLWIDGET
+        QOpenGLWidget *currentGLContext,
+#else
+        QGLWidget *currentGLContext,
+#endif
+        bool nullTexture)
 {
     MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
 
@@ -1490,6 +1558,9 @@ GL::MTexture *MRegularLonLatGrid::getTexture(QOpenGLWidget *currentGLContext,
     {
         // The new texture was successfully stored in the GPU memory manger.
         // We can now upload the data.
+#ifdef USE_QOPENGLWIDGET
+        if (currentGLContext) currentGLContext->doneCurrent();
+#endif
         glRM->makeCurrent();
 
         t->bindToLastTextureUnit();
@@ -1508,6 +1579,11 @@ GL::MTexture *MRegularLonLatGrid::getTexture(QOpenGLWidget *currentGLContext,
                          nlons, nlats, 0, textureFormat, GL_FLOAT, data);
         CHECK_GL_ERROR;
 
+#ifdef USE_QOPENGLWIDGET
+        glActiveTexture(GL_TEXTURE0);
+        glRM->doneCurrent();
+#endif
+
         if (currentGLContext) currentGLContext->makeCurrent();
     }
     else
@@ -1519,7 +1595,12 @@ GL::MTexture *MRegularLonLatGrid::getTexture(QOpenGLWidget *currentGLContext,
 }
 
 
-GL::MTexture *MRegularLonLatGrid::getFlagsTexture(QOpenGLWidget *currentGLContext)
+GL::MTexture *MRegularLonLatGrid::getFlagsTexture(
+#ifdef USE_QOPENGLWIDGET
+        QOpenGLWidget *currentGLContext)
+#else
+        QGLWidget *currentGLContext)
+#endif
 {
     MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
 
@@ -1535,6 +1616,9 @@ GL::MTexture *MRegularLonLatGrid::getFlagsTexture(QOpenGLWidget *currentGLContex
     {
         // The new texture was successfully stored in the GPU memory manger.
         // We can now upload the data.
+#ifdef USE_QOPENGLWIDGET
+        if (currentGLContext) currentGLContext->doneCurrent();
+#endif
         glRM->makeCurrent();
 
         t->bindToLastTextureUnit();
@@ -1549,6 +1633,11 @@ GL::MTexture *MRegularLonLatGrid::getFlagsTexture(QOpenGLWidget *currentGLContex
                      nlons, nlats, nlevs,
                      0, GL_RG_INTEGER,  GL_UNSIGNED_INT, flags);
         CHECK_GL_ERROR;
+
+#ifdef USE_QOPENGLWIDGET
+        glActiveTexture(GL_TEXTURE0);
+        glRM->doneCurrent();
+#endif
 
         if (currentGLContext) currentGLContext->makeCurrent();
     }
@@ -1628,7 +1717,11 @@ void MLonLatHybridSigmaPressureGrid::exchangeSurfacePressureGrid(
 
 
 GL::MTexture *MLonLatHybridSigmaPressureGrid::getHybridCoeffTexture(
+#ifdef USE_QOPENGLWIDGET
         QOpenGLWidget *currentGLContext)
+#else
+        QGLWidget *currentGLContext)
+#endif
 {
     MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
 
@@ -1643,6 +1736,9 @@ GL::MTexture *MLonLatHybridSigmaPressureGrid::getHybridCoeffTexture(
     {
         // The new texture was successfully stored in the GPU memory manger.
         // We can now upload the data.
+#ifdef USE_QOPENGLWIDGET
+        if (currentGLContext) currentGLContext->doneCurrent();
+#endif
         glRM->makeCurrent();
 
         t->bindToLastTextureUnit();
@@ -1672,6 +1768,11 @@ GL::MTexture *MLonLatHybridSigmaPressureGrid::getHybridCoeffTexture(
                      akbk); CHECK_GL_ERROR;
         delete[] akbk;
 
+#ifdef USE_QOPENGLWIDGET
+        glActiveTexture(GL_TEXTURE0);
+        glRM->doneCurrent();
+#endif
+
         if (currentGLContext) currentGLContext->makeCurrent();
     }
     else
@@ -1690,7 +1791,11 @@ void MLonLatHybridSigmaPressureGrid::releaseHybridCoeffTexture()
 
 
 GL::MTexture *MLonLatHybridSigmaPressureGrid::getPressureTexCoordTexture2D(
+#ifdef USE_QOPENGLWIDGET
         QOpenGLWidget *currentGLContext)
+#else
+        QGLWidget *currentGLContext)
+#endif
 {
     MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
 
@@ -1797,6 +1902,9 @@ GL::MTexture *MLonLatHybridSigmaPressureGrid::getPressureTexCoordTexture2D(
     {
         // The new texture was successfully stored in the GPU memory manger.
         // We can now upload the data.
+#ifdef USE_QOPENGLWIDGET
+        if (currentGLContext) currentGLContext->doneCurrent();
+#endif
         glRM->makeCurrent();
 
         t->bindToLastTextureUnit();
@@ -1815,6 +1923,11 @@ GL::MTexture *MLonLatHybridSigmaPressureGrid::getPressureTexCoordTexture2D(
                      GL_ALPHA,                  // format
                      GL_FLOAT,                  // data type of the pixel data
                      texCoordsTable); CHECK_GL_ERROR;
+
+#ifdef USE_QOPENGLWIDGET
+        glActiveTexture(GL_TEXTURE0);
+        glRM->doneCurrent();
+#endif
 
         if (currentGLContext) currentGLContext->makeCurrent();
     }

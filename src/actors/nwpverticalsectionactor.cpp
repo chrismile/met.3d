@@ -696,7 +696,12 @@ void MNWPVerticalSectionActor::onQtPropertyChanged(QtProperty *property)
 
 
 void MNWPVerticalSectionActor::generatePathFromWaypoints(
-        QModelIndex mindex1, QModelIndex mindex2, QOpenGLWidget *currentGLContext)
+        QModelIndex mindex1, QModelIndex mindex2,
+#ifdef USE_QOPENGLWIDGET
+        QOpenGLWidget *currentGLContext)
+#else
+        QGLWidget *currentGLContext)
+#endif
 {
 //TODO: implement great circles.
     // Great circles (ECMWF seems to use a perfect sphere for the IFS):
@@ -952,6 +957,9 @@ void MNWPVerticalSectionActor::generatePathFromWaypoints(
 
     //NOTE: generateLabels() switches to the MGLResourcesManager OpenGL context,
     // hence we need to switch back to the currentGLContext afterwards.
+#ifdef USE_QOPENGLWIDGET
+    if (currentGLContext) currentGLContext->doneCurrent();
+#endif
     generateLabels();
     if (currentGLContext) currentGLContext->makeCurrent();
 
@@ -1465,6 +1473,8 @@ void MNWPVerticalSectionActor::generateIsoPressureLines()
                  GL_ALPHA,                  // format
                  GL_FLOAT,                  // data type of the pixel data
                  pressureLineLevels.constData()); CHECK_GL_ERROR;
+
+    glActiveTexture(GL_TEXTURE0);
 }
 
 

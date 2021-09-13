@@ -352,6 +352,7 @@ MTrajectoryActor::MTrajectoryActor()
             GROUP_PROPERTY, "multi-var rendering", renderingGroupProperty);
 
     multiVarData.setProperties(this, properties, multiVarGroupProperty);
+    actorHasSelectableData = true;
 
 
     // Property group: Analysis.
@@ -385,6 +386,11 @@ MTrajectoryActor::~MTrajectoryActor()
 
     if (textureUnitTransferFunction >=0)
         releaseTextureUnit(textureUnitTransferFunction);
+
+    for (MTrajectoryPicker* trajectoryPicker : trajectoryPickerMap)
+    {
+        delete trajectoryPicker;
+    }
 }
 
 
@@ -1657,6 +1663,11 @@ void MTrajectoryActor::prepareAvailableDataForRendering(uint slot)
                     trajectoryRequests[slot].bezierTrajectoriesRenderDataMap[view] =
                             trajectoryRequests[slot].bezierTrajectoriesMap[view]->getRenderData();
                     trajectoryRequests[slot].bezierTrajectoriesMap[view]->setDirty(true);
+
+                    if (trajectoryPickerMap.find(view) == trajectoryPickerMap.end()) {
+                        trajectoryPickerMap[view] = new MTrajectoryPicker;
+                        trajectoryPickerMap[view]->updateTrajectoryRadius(tubeRadius);
+                    }
                 }
             }
 
@@ -1885,6 +1896,25 @@ void MTrajectoryActor::onSeedActorChanged()
     updateActorData();
 
     asynchronousDataRequest();
+}
+
+
+void MTrajectoryActor::checkIntersectionWithSelectableData(
+        MSceneViewGLWidget *sceneView, int mousePositionX, int mousePositionY)
+{
+    if (trajectoryPickerMap.find(sceneView) == trajectoryPickerMap.end()) {
+        return;
+    }
+
+    QVector3D firstHitPoint{};
+    uint32_t trajectoryIndex = 0;
+    float timeAtHit = 0.0f;
+    if (trajectoryPickerMap[sceneView]->pickPointScreen(
+            sceneView, mousePositionX, mousePositionY,
+            firstHitPoint, trajectoryIndex, timeAtHit)) {
+        trajectoryPickerMap[sceneView]->toggleTrajectoryHighlighted(trajectoryIndex, timeAtHit);
+        LOG4CPLUS_DEBUG(mlog, "Hit with trajectory " + std::to_string(trajectoryIndex));
+    }
 }
 
 
@@ -2217,6 +2247,10 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
     else if (property == tubeRadiusProperty)
     {
         tubeRadius = properties->mDDouble()->value(tubeRadiusProperty);
+        for (MTrajectoryPicker* trajectoryPicker : trajectoryPickerMap)
+        {
+            trajectoryPicker->updateTrajectoryRadius(tubeRadius);
+        }
         if (suppressActorUpdates()) return;
         emitActorChangedSignal();
     }
@@ -2693,6 +2727,17 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
                     trajectoryRequests[t].trajectorySelection->getIndexCount(),
                     trajectoryRequests[t].trajectorySelection->getNumTimeStepsPerTrajectory(),
                     trajectoryRequests[t].trajectorySelection->getNumTrajectories());
+            QVector<QVector<QVector3D>> trajectoriesData;
+            QVector<uint32_t> selectedTrajectoryIndices;
+            if (trajectoryRequests[t].bezierTrajectoriesMap[sceneView]->getFilteredTrajectories(
+                    trajectoryRequests[t].trajectorySelection->getStartIndices(),
+                    trajectoryRequests[t].trajectorySelection->getIndexCount(),
+                    trajectoryRequests[t].trajectorySelection->getNumTimeStepsPerTrajectory(),
+                    trajectoryRequests[t].trajectorySelection->getNumTrajectories(),
+                    trajectoriesData, selectedTrajectoryIndices)) {
+                trajectoryPickerMap[sceneView]->setTrajectoryData(trajectoriesData, selectedTrajectoryIndices);
+            }
+            trajectoryRequests[t].bezierTrajectoriesMap[sceneView]->setDirty(false);
             bool useFiltering = trajectoryRequests[t].bezierTrajectoriesMap[sceneView]->getUseFiltering();
             if (useFiltering)
             {
@@ -2708,6 +2753,27 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
                 glDrawElements(
                         GL_LINES, bezierTrajectoriesRenderData.indexBuffer->getCount(),
                         bezierTrajectoriesRenderData.indexBuffer->getType(), nullptr);
+            }
+
+            // Render selected/highlighted trajectories.
+            MHighlightedTrajectoriesRenderData highlightedTrajectoriesRenderData =
+                    trajectoryPickerMap[sceneView]->getHighlightedTrajectoriesRenderData();
+            if (highlightedTrajectoriesRenderData.indexBufferHighlighted)
+            {
+                glEnable(GL_CULL_FACE);
+                glCullFace(GL_FRONT);
+                std::shared_ptr<GL::MShaderEffect> highlightShader =
+                        trajectoryPickerMap[sceneView]->getHighlightShaderEffect();
+                highlightShader->bind();
+                highlightShader->setUniformValue("mvpMatrix", *(sceneView->getModelViewProjectionMatrix()));
+                highlightedTrajectoriesRenderData.indexBufferHighlighted->bindToElementArrayBuffer();
+                highlightedTrajectoriesRenderData.vertexPositionBufferHighlighted->attachToVertexAttribute(0);
+                highlightedTrajectoriesRenderData.vertexColorBufferHighlighted->attachToVertexAttribute(1);
+                glDrawElements(
+                        GL_TRIANGLES, highlightedTrajectoriesRenderData.indexBufferHighlighted->getCount(),
+                        highlightedTrajectoriesRenderData.indexBufferHighlighted->getType(), nullptr);
+                glCullFace(GL_NONE);
+                glDisable(GL_CULL_FACE);
             }
 
             // Unbind IBO.

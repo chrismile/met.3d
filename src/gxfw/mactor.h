@@ -230,6 +230,11 @@ public:
     bool isPickable() { return actorIsPickable; }
 
     /**
+      Returns @p true if the actor has data that can be selected.
+      */
+    bool hasSelectableData() { return actorHasSelectableData; }
+
+    /**
       Returns a handle ID if the clip space coordinates of a handle of this
       actor are within @p clipRadius of (@p clipX, @p clipY); or -1 otherwise.
 
@@ -242,6 +247,20 @@ public:
         Q_UNUSED(clipX);
         Q_UNUSED(clipY);
         return -1;
+    }
+
+    /**
+      Checks whether selectable data of this actor is at
+      @p mousePositionX, @p mousePositionY.
+
+      Called by a @ref MSceneViewGLWidget.
+      */
+    virtual void checkIntersectionWithSelectableData(
+            MSceneViewGLWidget *sceneView, int mousePositionX, int mousePositionY)
+    {
+        Q_UNUSED(sceneView);
+        Q_UNUSED(mousePositionX);
+        Q_UNUSED(mousePositionY);
     }
 
     /**
@@ -576,6 +595,8 @@ protected:
 
     void enablePicking(bool p) { actorIsPickable = p; }
 
+    void setHasSelectableData(bool p) { actorHasSelectableData = p; }
+
     /**
       This method needs to be called at the beginning of each actor's
       @ref reloadShaderEffects() method, indicating the number of shaders
@@ -712,6 +733,7 @@ protected:
     QtProperty *labelBBoxColourProperty;
 
     bool actorIsPickable;
+    bool actorHasSelectableData;
 
     /** Counter to monitor the progress of shader loading process. */
     QProgressDialog *shaderCompilationProgressDialog;
@@ -739,15 +761,25 @@ protected:
      */
     void uploadVec3ToVertexBuffer(const QVector<QVector3D> *data, GLuint *vbo);
 
-    void uploadVec3ToVertexBuffer(const QVector<QVector3D>& data,
-                                  const QString requestKey,
-                                  GL::MVertexBuffer** vbo,
-                                  QOpenGLWidget* currentGLContext = nullptr);
+    void uploadVec3ToVertexBuffer(
+            const QVector<QVector3D>& data,
+            const QString requestKey,
+            GL::MVertexBuffer** vbo,
+#ifdef USE_QOPENGLWIDGET
+            QOpenGLWidget *currentGLContext = nullptr);
+#else
+            QGLWidget *currentGLContext = nullptr);
+#endif
 
-    void uploadVec2ToVertexBuffer(const QVector<QVector2D>& data,
-                                  const QString requestKey,
-                                  GL::MVertexBuffer** vbo,
-                                  QOpenGLWidget* currentGLContext = nullptr);
+    void uploadVec2ToVertexBuffer(
+            const QVector<QVector2D>& data,
+            const QString requestKey,
+            GL::MVertexBuffer** vbo,
+#ifdef USE_QOPENGLWIDGET
+            QOpenGLWidget *currentGLContext = nullptr);
+#else
+            QGLWidget *currentGLContext = nullptr);
+#endif
 
     /** Unique integer identifying this actor, assigned in the constructor. */
     unsigned int myID;

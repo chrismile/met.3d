@@ -37,7 +37,11 @@
 // related third party imports
 #include <QObject>
 #include <GL/glew.h>
+#ifdef USE_QOPENGLWIDGET
 #include <QOpenGLShaderProgram>
+#else
+#include <QGLShaderProgram>
+#endif
 #include <QtProperty>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
