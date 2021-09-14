@@ -131,7 +131,17 @@ void MRadarChart::hideLegend()
 
 void MRadarChart::clearRadars()
 {
-    chart->removeAllSeries();
+    //chart->removeAllSeries();
+    for (auto& it : seriesMap)
+    {
+        chart->removeSeries(it.second.seriesLines);
+        chart->removeSeries(it.second.seriesLower);
+        chart->removeSeries(it.second.areaSeries);
+        delete it.second.seriesLines;
+        delete it.second.seriesLower;
+        delete it.second.areaSeries;
+    }
+    seriesMap.clear();
 }
 
 void MRadarChart::addRadar(uint32_t id, const QString& radarName, const QVector<float>& variableValues)

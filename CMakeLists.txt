@@ -264,9 +264,6 @@ else()
 endif()
 if(embree_FOUND)
     MESSAGE(STATUS "Found Embree. Using Embree as as for computing ray-mesh intersections.")
-else()
-    list(REMOVE_ITEM SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/data/multivar/trajectorypicking.cpp)
-    MESSAGE(STATUS "Embree couldn't be found. Disabling Embree ray-mesh intersection support.")
 endif()
 
 ##############################################################################
@@ -292,6 +289,11 @@ file (GLOB_RECURSE  Met3D_Source_C  src/*.c)
 file (GLOB_RECURSE  Met3D_Source_F  src/*.f)
 file (GLOB          Met3D_Shaders   src/glsl/*)
 file (GLOB          Met3D_Configs   config/*)
+
+if(NOT embree_FOUND)
+    list(REMOVE_ITEM Met3D_Source ${CMAKE_CURRENT_SOURCE_DIR}/src/data/multivar/trajectorypicking.cpp)
+    MESSAGE(STATUS "Embree couldn't be found. Disabling Embree ray-mesh intersection support.")
+endif()
 
 #source_group(automocs FILES ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}_automoc.cpp)
 

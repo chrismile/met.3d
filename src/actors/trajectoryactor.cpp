@@ -387,10 +387,12 @@ MTrajectoryActor::~MTrajectoryActor()
     if (textureUnitTransferFunction >=0)
         releaseTextureUnit(textureUnitTransferFunction);
 
+#ifdef USE_EMBREE
     for (MTrajectoryPicker* trajectoryPicker : trajectoryPickerMap)
     {
         delete trajectoryPicker;
     }
+#endif
 }
 
 
@@ -1666,12 +1668,15 @@ void MTrajectoryActor::prepareAvailableDataForRendering(uint slot)
                             trajectoryRequests[slot].bezierTrajectoriesMap[view]->getTimeStepSphereRenderData();
                     trajectoryRequests[slot].bezierTrajectoriesMap[view]->setDirty(true);
 
+#ifdef USE_EMBREE
                     if (trajectoryPickerMap.find(view) == trajectoryPickerMap.end()) {
                         trajectoryPickerMap[view] = new MTrajectoryPicker(view, multiVarData.getVarNames());
                         trajectoryPickerMap[view]->updateTrajectoryRadius(tubeRadius);
+                        trajectoryPickerMap[view]->setParticlePosTimeStep(particlePosTimeStep);
                     }
                     trajectoryPickerMap[view]->setBaseTrajectories(
                             trajectoryRequests[slot].bezierTrajectoriesMap[view]->getBaseTrajectories());
+#endif
                 }
             }
 
@@ -1903,8 +1908,9 @@ void MTrajectoryActor::onSeedActorChanged()
 }
 
 
+#ifdef USE_EMBREE
 void MTrajectoryActor::checkIntersectionWithSelectableData(
-        MSceneViewGLWidget *sceneView, int mousePositionX, int mousePositionY)
+        MSceneViewGLWidget *sceneView, QMouseEvent *event)
 {
     if (trajectoryPickerMap.find(sceneView) == trajectoryPickerMap.end()) {
         return;
@@ -1914,13 +1920,21 @@ void MTrajectoryActor::checkIntersectionWithSelectableData(
     uint32_t trajectoryIndex = 0;
     float timeAtHit = 0.0f;
     if (trajectoryPickerMap[sceneView]->pickPointScreen(
-            sceneView, mousePositionX, mousePositionY,
+            sceneView, event->x(), event->y(),
             firstHitPoint, trajectoryIndex, timeAtHit)) {
-        trajectoryPickerMap[sceneView]->toggleTrajectoryHighlighted(
-                trajectoryIndex, timeAtHit);
-        LOG4CPLUS_DEBUG(mlog, "Hit with trajectory " + std::to_string(trajectoryIndex));
+        if (event->button() == Qt::LeftButton)
+        {
+            trajectoryPickerMap[sceneView]->toggleTrajectoryHighlighted(trajectoryIndex);
+        }
+        if (event->button() == Qt::RightButton)
+        {
+            particlePosTimeStep = int(std::round(timeAtHit));
+            trajectoryPickerMap[sceneView]->setParticlePosTimeStep(particlePosTimeStep);
+            multiVarData.setParticlePosTimeStep(particlePosTimeStep);
+        }
     }
 }
+#endif
 
 
 /******************************************************************************
@@ -2252,10 +2266,12 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
     else if (property == tubeRadiusProperty)
     {
         tubeRadius = properties->mDDouble()->value(tubeRadiusProperty);
+#ifdef USE_EMBREE
         for (MTrajectoryPicker* trajectoryPicker : trajectoryPickerMap)
         {
             trajectoryPicker->updateTrajectoryRadius(tubeRadius);
         }
+#endif
         if (suppressActorUpdates()) return;
         emitActorChangedSignal();
     }
@@ -2298,8 +2314,7 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
 
     else if (property == particlePosTimeProperty)
     {
-        particlePosTimeStep = properties->mEnum()->value(
-                    particlePosTimeProperty);
+        particlePosTimeStep = properties->mEnum()->value(particlePosTimeProperty);
         multiVarData.setParticlePosTimeStep(particlePosTimeStep);
 
         if (suppressActorUpdates()) return;
@@ -2739,16 +2754,20 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
                     trajectoryRequests[t].trajectorySelection->getIndexCount(),
                     trajectoryRequests[t].trajectorySelection->getNumTimeStepsPerTrajectory(),
                     trajectoryRequests[t].trajectorySelection->getNumTrajectories());
+#ifdef USE_EMBREE
             QVector<QVector<QVector3D>> trajectoriesData;
+            QVector<QVector<float>> trajectoryPointTimeSteps;
             QVector<uint32_t> selectedTrajectoryIndices;
             if (trajectoryRequests[t].bezierTrajectoriesMap[sceneView]->getFilteredTrajectories(
                     trajectoryRequests[t].trajectorySelection->getStartIndices(),
                     trajectoryRequests[t].trajectorySelection->getIndexCount(),
                     trajectoryRequests[t].trajectorySelection->getNumTimeStepsPerTrajectory(),
                     trajectoryRequests[t].trajectorySelection->getNumTrajectories(),
-                    trajectoriesData, selectedTrajectoryIndices)) {
-                trajectoryPickerMap[sceneView]->setTrajectoryData(trajectoriesData, selectedTrajectoryIndices);
+                    trajectoriesData, trajectoryPointTimeSteps, selectedTrajectoryIndices)) {
+                trajectoryPickerMap[sceneView]->setTrajectoryData(
+                        trajectoriesData, trajectoryPointTimeSteps, selectedTrajectoryIndices);
             }
+#endif
             trajectoryRequests[t].bezierTrajectoriesMap[sceneView]->setDirty(false);
             bool useFiltering = trajectoryRequests[t].bezierTrajectoriesMap[sceneView]->getUseFiltering();
             if (useFiltering)
@@ -2767,7 +2786,9 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
                         bezierTrajectoriesRenderData.indexBuffer->getType(), nullptr);
             }
 
+#ifdef USE_EMBREE
             // Render selected/highlighted trajectories.
+            trajectoryPickerMap[sceneView]->setParticlePosTimeStep(particlePosTimeStep);
             MHighlightedTrajectoriesRenderData highlightedTrajectoriesRenderData =
                     trajectoryPickerMap[sceneView]->getHighlightedTrajectoriesRenderData();
             if (highlightedTrajectoriesRenderData.indexBufferHighlighted)
@@ -2786,6 +2807,7 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
                         highlightedTrajectoriesRenderData.indexBufferHighlighted->getType(), nullptr);
                 glDisable(GL_CULL_FACE);
             }
+#endif
 
             // Render tubes at time step positions.
             if (multiVarData.getUseTimestepLens() && useMultiVarSpheres)

@@ -59,7 +59,9 @@ public:
     ~MTrajectoryPicker();
 
     void setTrajectoryData(
-            const QVector<QVector<QVector3D>>& trajectories, const QVector<uint32_t>& selectedTrajectoryIndices);
+            const QVector<QVector<QVector3D>>& trajectories,
+            const QVector<QVector<float>>& trajectoryPointTimeSteps,
+            const QVector<uint32_t>& selectedTrajectoryIndices);
     void updateTrajectoryRadius(float lineRadius);
     void setBaseTrajectories(const MFilteredTrajectories& filteredTrajectories);
 
@@ -100,7 +102,8 @@ public:
             const QVector3D& cameraPosition, const QVector3D& rayDirection,
             QVector3D& firstHitPoint, uint32_t& trajectoryIndex, float& timeAtHit);
 
-    void toggleTrajectoryHighlighted(uint32_t trajectoryIndex, float timeAtHit);
+    void toggleTrajectoryHighlighted(uint32_t trajectoryIndex);
+    void setParticlePosTimeStep(int newTimeStep);
     MHighlightedTrajectoriesRenderData getHighlightedTrajectoriesRenderData(
 #ifdef USE_QOPENGLWIDGET
             QOpenGLWidget *currentGLContext = nullptr);
@@ -122,10 +125,12 @@ private:
 
     MFilteredTrajectories baseTrajectories;
     QVector<QVector2D> minMaxAttributes;
+    int timeStep = 0;
 
     float lineRadius = 0.0f;
     int numCircleSubdivisions = 8;
     QVector<QVector<QVector3D>> trajectories;
+    QVector<QVector<float>> trajectoryPointTimeSteps;
     QVector<uint32_t> selectedTrajectoryIndices;
 
     std::vector<uint32_t> triangleIndices;

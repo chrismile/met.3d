@@ -156,6 +156,7 @@ public:
             const GLint* startIndices, const GLsizei* indexCount,
             int numTimeStepsPerTrajectory, int numSelectedTrajectories,
             QVector<QVector<QVector3D>>& trajectories,
+            QVector<QVector<float>>& trajectoryPointTimeSteps,
             QVector<uint32_t>& selectedTrajectoryIndices);
 
     MBezierTrajectoriesRenderData getRenderData(

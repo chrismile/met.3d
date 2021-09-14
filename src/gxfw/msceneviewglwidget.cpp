@@ -145,7 +145,7 @@ MSceneViewGLWidget::MSceneViewGLWidget()
 
     if (myID == 0)
     {
-        // Scene view with ID 0 measures system frame rate performace.
+        // Scene view with ID 0 measures system frame rate performance.
         fpsTimer = new QTimer(this);
         connect(fpsTimer, SIGNAL(timeout()), SLOT(updateFPSTimer()));
         fpsTimer->start(1000); // update fps display every 1000ms
@@ -2034,7 +2034,10 @@ void MSceneViewGLWidget::mouseDoubleClickEvent(QMouseEvent *event)
 {
     Q_UNUSED(event);
     // Toggle interaction mode.
-    setInteractionMode(!actorInteractionMode);
+    if (!event->modifiers().testFlag(Qt::ControlModifier))
+    {
+        setInteractionMode(!actorInteractionMode);
+    }
 
     if (posLabelIsEnabled && actorInteractionMode
             && pickedActor.actor != nullptr
@@ -2066,18 +2069,6 @@ void MSceneViewGLWidget::mousePressEvent(QMouseEvent *event)
     {
         pickedActor.actor->addPositionLabel(this, pickedActor.handleID,
                                             clipX, clipY);
-    }
-
-    if (controlKeyPressed)
-    {
-        foreach (MActor* actor, scene->getRenderQueue())
-        {
-            // Only check actors that have selectable data.
-            if (actor->hasSelectableData())
-            {
-                actor->checkIntersectionWithSelectableData(this, event->x(), event->y());
-            }
-        }
     }
 }
 
@@ -2303,6 +2294,18 @@ void MSceneViewGLWidget::mouseReleaseEvent(QMouseEvent *event)
         pickedActor.actor->removePositionLabel();
     }
 
+    if (event->modifiers().testFlag(Qt::ControlModifier))
+    {
+        foreach (MActor* actor, scene->getRenderQueue())
+        {
+            // Only check actors that have selectable data.
+            if (actor->hasSelectableData())
+            {
+                actor->checkIntersectionWithSelectableData(this, event);
+            }
+        }
+    }
+
     userIsInteracting = false;
     emit clicked();
 
@@ -2496,11 +2499,6 @@ void MSceneViewGLWidget::keyPressEvent(QKeyEvent *event)
         }
     }
 
-    if (event->key() == Qt::Key_Control)
-    {
-        controlKeyPressed = true;
-    }
-
     if (freezeMode) return;
 
     switch (event->key())
@@ -2571,11 +2569,6 @@ void MSceneViewGLWidget::keyPressEvent(QKeyEvent *event)
 
 void MSceneViewGLWidget::keyReleaseEvent(QKeyEvent *event)
 {
-    if (event->key() == Qt::Key_Control)
-    {
-        controlKeyPressed = false;
-    }
-
 #ifdef USE_QOPENGLWIDGET
     QOpenGLWidget::keyReleaseEvent(event);
 #else
@@ -2605,9 +2598,9 @@ bool MSceneViewGLWidget::event(QEvent *event)
         return true;
     }*/
 #ifdef USE_QOPENGLWIDGET
-    QOpenGLWidget::event(event);
+    return QOpenGLWidget::event(event);
 #else
-    QGLWidget::event(event);
+    return QGLWidget::event(event);
 #endif
 }
 

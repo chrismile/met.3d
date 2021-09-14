@@ -713,6 +713,7 @@ bool MBezierTrajectories::getFilteredTrajectories(
         const GLint* startIndices, const GLsizei* indexCount,
         int numTimeStepsPerTrajectory, int numSelectedTrajectories,
         QVector<QVector<QVector3D>>& trajectories,
+        QVector<QVector<float>>& trajectoryPointTimeSteps,
         QVector<uint32_t>& selectedTrajectoryIndices)
 {
     if (!isDirty) {
@@ -754,12 +755,15 @@ bool MBezierTrajectories::getFilteredTrajectories(
         }
 
         QVector<QVector3D> trajectory;
+        QVector<float> pointTimeSteps;
         for (int i = selectionIndex; i < selectionCount; i++)
         {
             trajectory.push_back(bezierTrajectory.positions.at(i));
+            pointTimeSteps.push_back(bezierTrajectory.attributes[8].at(i));
         }
 
         trajectories.push_back(trajectory);
+        trajectoryPointTimeSteps.push_back(pointTimeSteps);
         selectedTrajectoryIndices.push_back(uint32_t(trajectoryIdx));
     }
 

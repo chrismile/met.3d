@@ -85,10 +85,16 @@ void MTrajectoryPicker::freeStorage()
 }
 
 void MTrajectoryPicker::setTrajectoryData(
-        const QVector<QVector<QVector3D>>& trajectories, const QVector<uint32_t>& selectedTrajectoryIndices)
+        const QVector<QVector<QVector3D>>& trajectories,
+        const QVector<QVector<float>>& trajectoryPointTimeSteps,
+        const QVector<uint32_t>& selectedTrajectoryIndices)
 {
     this->trajectories = trajectories;
+    this->trajectoryPointTimeSteps = trajectoryPointTimeSteps;
     this->selectedTrajectoryIndices = selectedTrajectoryIndices;
+    this->highlightedTrajectories.clear();
+    this->colorUsesCountMap.clear();
+    radarChart->clearRadars();
 
     if (lineRadius > 0.0f) {
         recreateTubeTriangleData();
@@ -160,7 +166,8 @@ void MTrajectoryPicker::recreateTubeTriangleData()
     }
 
     for (int lineId = 0; lineId < trajectories.size(); lineId++) {
-        const QVector<QVector3D> &lineCenters = trajectories.at(int(lineId));
+        const QVector<QVector3D>& lineCenters = trajectories.at(int(lineId));
+        const QVector<float>& pointTimeSteps = trajectoryPointTimeSteps.at(int(lineId));
         int n = lineCenters.size();
         size_t indexOffset = vertexPositions.size();
 
@@ -189,7 +196,8 @@ void MTrajectoryPicker::recreateTubeTriangleData()
             }
             tangent.normalize();
 
-            QVector3D center = lineCenters.at(int(i));
+            QVector3D center = lineCenters.at(i);
+            float timeStep = pointTimeSteps.at(i);
 
             QVector3D helperAxis = lastLineNormal;
             if ((QVector3D::crossProduct(helperAxis, tangent).length()) < 0.01f) {
@@ -215,7 +223,7 @@ void MTrajectoryPicker::recreateTubeTriangleData()
 
                 vertexPositions.push_back(transformedPoint);
                 vertexTrajectoryIndices.push_back(selectedTrajectoryIndex);
-                vertexTimeSteps.push_back(float(i));
+                vertexTimeSteps.push_back(timeStep);
             }
 
             numValidLinePoints++;
@@ -368,7 +376,7 @@ bool MTrajectoryPicker::pickPointWorld(
     return true;
 }
 
-void MTrajectoryPicker::toggleTrajectoryHighlighted(uint32_t trajectoryIndex, float timeAtHit)
+void MTrajectoryPicker::toggleTrajectoryHighlighted(uint32_t trajectoryIndex)
 {
     highlightDataDirty = true;
 
@@ -425,13 +433,43 @@ void MTrajectoryPicker::toggleTrajectoryHighlighted(uint32_t trajectoryIndex, fl
     QVector<float> values;
     for (size_t i = 0; i < numVars; i++)
     {
-        int time = clamp(int(std::round(timeAtHit)), 0, int(trajectory.attributes.at(int(i)).size()) - 1);
+        int time = clamp(timeStep, 0, int(trajectory.attributes.at(int(i)).size()) - 1);
         float value = trajectory.attributes.at(int(i)).at(time);
         QVector2D minMaxVector = minMaxAttributes.at(int(i));
         value = (value - minMaxVector.x()) / (minMaxVector.y() - minMaxVector.x());
         values.push_back(value);
     }
-    radarChart->addRadar(trajectoryIndex, QString("Trajectory #%1").arg(trajectoryIndex), values);
+    radarChart->addRadar(
+            trajectoryIndex, QString("Trajectory #%1").arg(trajectoryIndex), highlightColor, values);
+}
+
+void MTrajectoryPicker::setParticlePosTimeStep(int newTimeStep)
+{
+    if (timeStep == newTimeStep)
+    {
+        return;
+    }
+    timeStep = newTimeStep;
+
+    radarChart->clearRadars();
+
+    for (const auto& it : highlightedTrajectories)
+    {
+        uint32_t trajectoryIndex = it.first;
+        const QColor& highlightColor = it.second;
+        const MFilteredTrajectory& trajectory = baseTrajectories.at(int(trajectoryIndex));
+        QVector<float> values;
+        for (size_t i = 0; i < numVars; i++)
+        {
+            int time = clamp(timeStep, 0, int(trajectory.attributes.at(int(i)).size()) - 1);
+            float value = trajectory.attributes.at(int(i)).at(time);
+            QVector2D minMaxVector = minMaxAttributes.at(int(i));
+            value = (value - minMaxVector.x()) / (minMaxVector.y() - minMaxVector.x());
+            values.push_back(value);
+        }
+        radarChart->addRadar(
+                trajectoryIndex, QString("Trajectory #%1").arg(trajectoryIndex), highlightColor, values);
+    }
 }
 
 MHighlightedTrajectoriesRenderData MTrajectoryPicker::getHighlightedTrajectoriesRenderData(

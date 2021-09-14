@@ -45,6 +45,7 @@
 #include "gxfw/synccontrol.h"
 #include "gxfw/gl/texture.h"
 #include "gxfw/gl/shadereffect.h"
+#include "gxfw/boundingbox/boundingbox.h"
 #include "data/datarequest.h"
 #include "actors/transferfunction1d.h"
 
@@ -55,8 +56,10 @@
 #include "data/multivar/beziertrajectories.h"
 #include "data/multivar/beziertrajectoriessource.h"
 #include "data/multivar/multivardata.h"
+
+#ifdef USE_EMBREE
 #include "data/multivar/trajectorypicking.hpp"
-#include "gxfw/boundingbox/boundingbox.h"
+#endif
 
 
 class MGLResourcesManager;
@@ -236,6 +239,7 @@ public slots:
      */
     void onSeedActorChanged();
 
+#ifdef USE_EMBREE
     /**
       Checks whether selectable data of this actor is at
       @p mousePositionX, @p mousePositionY.
@@ -243,7 +247,8 @@ public slots:
       Called by a @ref MSceneViewGLWidget.
       */
     void checkIntersectionWithSelectableData(
-            MSceneViewGLWidget *sceneView, int mousePositionX, int mousePositionY);
+            MSceneViewGLWidget *sceneView, QMouseEvent *event) override;
+#endif
 
 protected:
     void initializeActorResources();
@@ -453,7 +458,9 @@ private:
     QtProperty *useBezierTrajectoriesProperty;
     bool useMultiVarSpheres = true;
 
+#ifdef USE_EMBREE
     QHash<MSceneViewGLWidget*, MTrajectoryPicker*> trajectoryPickerMap;
+#endif
 
     MTrajectoryFilter *trajectoryFilter;
     MTrajectorySelection *trajectorySelection;

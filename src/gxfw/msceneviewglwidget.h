@@ -451,7 +451,6 @@ private:
     bool userIsInteracting; // Is the user currently moving the camera?
     bool userIsScrolling;   // Is user currently scrolling with the mouse?
     bool viewportResized;   // Was the viewport resized?
-    bool controlKeyPressed = false;
 
     QElapsedTimer scrollTimer;
     QElapsedTimer resizeTimer;
