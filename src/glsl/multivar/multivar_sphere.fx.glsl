@@ -35,7 +35,6 @@
 uniform float separatorWidth;
 
 uniform float sphereRadius;
-uniform vec3 cameraUp;
 
 /*****************************************************************************
  ***                            INTERFACES
@@ -141,7 +140,8 @@ shader FSmain(in VSOutput inputs, out vec4 fragColor)
     vec3 crossProdVn = cross(newV, newN);*/
 
     //vec3 pn = normalize(cross(v, vec3(0.0, 0.0, 1.0)));
-    vec3 pn = normalize(cross(v, cameraUp));
+    vec3 up = normalize(cross(l, v));
+    vec3 pn = normalize(cross(v, up));
     vec3 helperVecN = normalize(cross(pn, n));
     vec3 newN = normalize(cross(helperVecN, pn));
     vec3 crossProdVn = cross(v, newN);
