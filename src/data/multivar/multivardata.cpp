@@ -894,6 +894,27 @@ void MMultiVarData::setUniformData(int textureUnitTransferFunction)
 }
 
 
+void MMultiVarData::setUniformDataSpheres(int textureUnitTransferFunction)
+{
+    shaderEffectSphere->setUniformValue("numVariables", std::min(numVariablesSelected, MAX_NUM_VARIABLES));
+    shaderEffectSphere->setUniformValue("maxNumVariables", maxNumVariables);
+    shaderEffectSphere->setUniformValue("materialAmbient", materialConstantAmbient);
+    shaderEffectSphere->setUniformValue("materialDiffuse", materialConstantDiffuse);
+    shaderEffectSphere->setUniformValue("materialSpecular", materialConstantSpecular);
+    shaderEffectSphere->setUniformValue("materialSpecularExp", materialConstantSpecularExp);
+    shaderEffectSphere->setUniformValue("drawHalo", drawHalo);
+    shaderEffectSphere->setUniformValue("haloFactor", haloFactor);
+    shaderEffectSphere->setUniformValue("separatorWidth", separatorWidth);
+    shaderEffectSphere->setUniformValue("useColorIntensity", int(useColorIntensity));
+    shaderEffectSphere->setUniformValue("bandBackgroundColor", bandBackgroundColor);
+
+    multiVarTf.bindTexture1DArray(textureUnitTransferFunction);
+    shaderEffectSphere->setUniformValue(
+            "transferFunctionTexture", textureUnitTransferFunction);
+    multiVarTf.getMinMaxBuffer()->bindToIndex(9);
+}
+
+
 std::shared_ptr<GL::MShaderEffect> MMultiVarData::getShaderEffect()
 {
     if (isDirty)
@@ -901,6 +922,25 @@ std::shared_ptr<GL::MShaderEffect> MMultiVarData::getShaderEffect()
         reloadShaderEffect();
     }
     return shaderEffect;
+}
+
+
+std::shared_ptr<GL::MShaderEffect> MMultiVarData::getTimeStepSphereShader()
+{
+    if (!shaderEffectSphere)
+    {
+        QMap<QString, QString> defines =
+        {
+                {"USE_MULTI_VAR_TRANSFER_FUNCTION", QString::fromStdString("") },
+                {"IS_MULTIVAR_DATA", QString::fromStdString("") },
+        };
+
+        MGLResourcesManager* glRM = MGLResourcesManager::getInstance();
+        glRM->generateEffectProgramUncached("multivar_sphere", shaderEffectSphere);
+        shaderEffectSphere->compileFromFile_Met3DHome("src/glsl/multivar/multivar_sphere.fx.glsl", defines);
+    }
+
+    return shaderEffectSphere;
 }
 
 

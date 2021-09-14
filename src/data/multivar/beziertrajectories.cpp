@@ -405,6 +405,229 @@ void MBezierTrajectories::updateDivergingVariables(const QVector<uint32_t>& varD
 }
 
 
+MTimeStepSphereRenderData* MBezierTrajectories::getTimeStepSphereRenderData(
+#ifdef USE_QOPENGLWIDGET
+        QOpenGLWidget *currentGLContext)
+#else
+        QGLWidget *currentGLContext)
+#endif
+{
+    QVector<uint32_t> triangleIndices;
+    QVector<QVector3D> vertexPositions;
+    QVector<QVector3D> vertexNormals;
+
+    int numLatitudeSubdivisions = 128;
+    int numLongitudeSubdivisions = 128;
+    float theta; // azimuth;
+    float phi; // zenith;
+
+    for (int lat = 0; lat <= numLatitudeSubdivisions; lat++) {
+        phi = float(M_PI) + float(M_PI) * (1.0f - float(lat) / float(numLatitudeSubdivisions));
+        for (int lon = 0; lon < numLongitudeSubdivisions; lon++) {
+            theta = -2.0f * float(M_PI) * float(lon) / float(numLongitudeSubdivisions);
+
+            QVector3D pt(
+                    std::cos(theta) * std::sin(phi),
+                    std::sin(theta) * std::sin(phi),
+                    std::cos(phi)
+            );
+            vertexNormals.push_back(pt);
+            vertexPositions.push_back(pt);
+        }
+    }
+    for (int lat = 0; lat < numLatitudeSubdivisions; lat++) {
+        for (int lon = 0; lon < numLongitudeSubdivisions; lon++) {
+            triangleIndices.push_back((lon)%numLongitudeSubdivisions
+                                      + (lat)*numLongitudeSubdivisions);
+            triangleIndices.push_back((lon+1)%numLongitudeSubdivisions
+                                      + (lat)*numLongitudeSubdivisions);
+            triangleIndices.push_back((lon)%numLongitudeSubdivisions
+                                      + (lat+1)*numLongitudeSubdivisions);
+            triangleIndices.push_back((lon+1)%numLongitudeSubdivisions
+                                      + (lat)*numLongitudeSubdivisions);
+            triangleIndices.push_back((lon+1)%numLongitudeSubdivisions
+                                      + (lat+1)*numLongitudeSubdivisions);
+            triangleIndices.push_back((lon)%numLongitudeSubdivisions
+                                      + (lat+1)*numLongitudeSubdivisions);
+        }
+    }
+
+    // Add the index buffer.
+    timeStepSphereRenderData.indexBuffer = createIndexBuffer(
+            currentGLContext, timeStepSphereIndexBufferID, triangleIndices);
+
+    // Add the vertex position buffer.
+    timeStepSphereRenderData.vertexPositionBuffer = createVertexBuffer(
+            currentGLContext, timeStepSphereVertexPositionBufferID, vertexPositions);
+
+    // Add the vertex normal buffer.
+    timeStepSphereRenderData.vertexNormalBuffer = createVertexBuffer(
+            currentGLContext, timeStepSphereVertexNormalBufferID, vertexNormals);
+
+    return &timeStepSphereRenderData;
+}
+
+#define SQR(x) ((x)*(x))
+
+float squareVec(QVector3D v) {
+    return SQR(v.x()) + SQR(v.y()) + SQR(v.z());
+}
+
+/**
+ * Implementation of ray-sphere intersection (idea from A. Glassner et al., "An Introduction to Ray Tracing").
+ * For more details see: https://www.siggraph.org//education/materials/HyperGraph/raytrace/rtinter1.htm
+ */
+bool lineSegmentSphereIntersection(
+        const QVector3D& p0, const QVector3D& p1, const QVector3D& sphereCenter, float sphereRadius, float& hitT) {
+    const QVector3D& rayOrigin = p0;
+    const QVector3D rayDirection = (p1 - p0).normalized();
+    const float rayLength = (p1 - p0).length();
+
+    float A = SQR(rayDirection.x()) + SQR(rayDirection.y()) + SQR(rayDirection.z());
+    float B = 2.0f * (
+            rayDirection.x() * (rayOrigin.x() - sphereCenter.x())
+            + rayDirection.y() * (rayOrigin.y() - sphereCenter.y())
+            + rayDirection.z() * (rayOrigin.z() - sphereCenter.z())
+    );
+    float C =
+            SQR(rayOrigin.x() - sphereCenter.x())
+            + SQR(rayOrigin.y() - sphereCenter.y())
+            + SQR(rayOrigin.z() - sphereCenter.z())
+            - SQR(sphereRadius);
+
+    float discriminant = SQR(B) - 4.0f * A * C;
+    if (discriminant < 0.0f) {
+        return false; // No intersection
+    }
+
+    float discriminantSqrt = std::sqrt(discriminant);
+    float t0 = (-B - discriminantSqrt) / (2.0f * A);
+    float t1 = (-B + discriminantSqrt) / (2.0f * A);
+
+    // Intersection(s) behind the ray origin?
+    if (t0 >= 0.0f && t0 <= rayLength) {
+        hitT = t0 / rayLength;
+    } else if (t1 >= 0.0f && t1 <= rayLength) {
+        hitT = t1 / rayLength;
+    } else {
+        return false;
+    }
+
+    return true;
+}
+
+
+struct LineElementIdData {
+    float entranceIdx;
+    float exitIdx;
+    int lineId;
+    int padding;
+};
+
+
+void MBezierTrajectories::updateTimeStepSphereRenderDataIfNecessary(
+        int timeStep, float sphereRadius,
+#ifdef USE_QOPENGLWIDGET
+        QOpenGLWidget *currentGLContext)
+#else
+        QGLWidget *currentGLContext)
+#endif
+{
+    if (timeStep == lastTimeStep && sphereRadius == lastSphereRadius) {
+        return;
+    }
+    lastTimeStep = timeStep;
+    lastSphereRadius = sphereRadius;
+
+    if (timeStepSphereRenderData.entrancePointsBuffer) {
+        MGLResourcesManager::getInstance()->releaseGPUItem(timeStepSphereRenderData.spherePositionsBuffer);
+        MGLResourcesManager::getInstance()->releaseGPUItem(timeStepSphereRenderData.entrancePointsBuffer);
+        MGLResourcesManager::getInstance()->releaseGPUItem(timeStepSphereRenderData.exitPointsBuffer);
+        MGLResourcesManager::getInstance()->releaseGPUItem(timeStepSphereRenderData.lineElementIdsBuffer);
+        MGLResourcesManager::getInstance()->deleteReleasedGPUItem(timeStepSphereRenderData.spherePositionsBuffer);
+        MGLResourcesManager::getInstance()->deleteReleasedGPUItem(timeStepSphereRenderData.entrancePointsBuffer);
+        MGLResourcesManager::getInstance()->deleteReleasedGPUItem(timeStepSphereRenderData.exitPointsBuffer);
+        MGLResourcesManager::getInstance()->deleteReleasedGPUItem(timeStepSphereRenderData.lineElementIdsBuffer);
+    }
+
+    QVector<QVector4D> spherePositions;
+    QVector<QVector4D> entrancePoints;
+    QVector<QVector4D> exitPoints;
+    QVector<LineElementIdData> lineElementIds;
+
+    int trajectoryIndex = 0;
+    for (MFilteredTrajectory& trajectory : baseTrajectories) {
+        int timeStepClamped = clamp(timeStep, 0, trajectory.positions.size() - 1);
+        const QVector3D& sphereCenter = trajectory.positions.at(timeStepClamped);
+        spherePositions.push_back(sphereCenter);
+
+        float entranceIdx = 0.0f;
+        bool foundEntrancePoint = false;
+        for (int i = timeStepClamped; i > 0; i--) {
+            const QVector3D& p0 = trajectory.positions.at(i - 1);
+            const QVector3D& p1 = trajectory.positions.at(i);
+            float hitT;
+            if (lineSegmentSphereIntersection(p0, p1, sphereCenter, sphereRadius, hitT)) {
+                entrancePoints.push_back((1.0f - hitT) * p0 + hitT * p1);
+                entranceIdx = float(i - 1) + hitT;
+                foundEntrancePoint = true;
+                break;
+            }
+        }
+        if (!foundEntrancePoint) {
+            entrancePoints.push_back(trajectory.positions.at(0));
+        }
+
+        float exitIdx = float(trajectory.positions.size() - 1);
+        bool foundExitPoint = false;
+        for (int i = timeStepClamped; i < trajectory.positions.size() - 1; i++) {
+            const QVector3D& p0 = trajectory.positions.at(i);
+            const QVector3D& p1 = trajectory.positions.at(i + 1);
+            float hitT;
+            if (lineSegmentSphereIntersection(p0, p1, sphereCenter, sphereRadius, hitT)) {
+                exitPoints.push_back((1.0f - hitT) * p0 + hitT * p1);
+                exitIdx = float(i) + hitT;
+                foundExitPoint = true;
+                break;
+            }
+        }
+        if (!foundExitPoint) {
+            exitPoints.push_back(trajectory.positions.at(trajectory.positions.size() - 1));
+        }
+
+        LineElementIdData lineElementIdData{};
+        lineElementIdData.entranceIdx = entranceIdx;
+        lineElementIdData.exitIdx = exitIdx;
+        lineElementIdData.lineId = trajectoryIndex;
+        lineElementIdData.padding = 0;
+        lineElementIds.push_back(lineElementIdData);
+        trajectoryIndex++;
+    }
+
+    timeStepSphereRenderData.numSpheres = spherePositions.size();
+
+    timeStepSphereRenderData.spherePositionsBuffer = createShaderStorageBuffer(
+            currentGLContext, timeStepSpherePositionsBufferID, spherePositions);
+    timeStepSphereRenderData.entrancePointsBuffer = createShaderStorageBuffer(
+            currentGLContext, timeStepSphereEntrancePointsBufferID, entrancePoints);
+    timeStepSphereRenderData.exitPointsBuffer = createShaderStorageBuffer(
+            currentGLContext, timeStepSphereExitPointsBufferID, exitPoints);
+    timeStepSphereRenderData.lineElementIdsBuffer = createShaderStorageBuffer(
+            currentGLContext, timeStepSphereLineElementIdsBufferID, lineElementIds);
+}
+
+void MBezierTrajectories::releaseTimeStepSphereRenderData()
+{
+    MGLResourcesManager::getInstance()->releaseGPUItem(timeStepSphereRenderData.indexBuffer);
+    MGLResourcesManager::getInstance()->releaseGPUItem(timeStepSphereRenderData.vertexPositionBuffer);
+    MGLResourcesManager::getInstance()->releaseGPUItem(timeStepSphereRenderData.vertexNormalBuffer);
+    MGLResourcesManager::getInstance()->releaseGPUItem(timeStepSphereRenderData.spherePositionsBuffer);
+    MGLResourcesManager::getInstance()->releaseGPUItem(timeStepSphereRenderData.entrancePointsBuffer);
+    MGLResourcesManager::getInstance()->releaseGPUItem(timeStepSphereRenderData.exitPointsBuffer);
+    MGLResourcesManager::getInstance()->releaseGPUItem(timeStepSphereRenderData.lineElementIdsBuffer);
+}
+
+
 inline int iceil(int x, int y) { return (x - 1) / y + 1; }
 
 void MBezierTrajectories::updateTrajectorySelection(

@@ -1662,6 +1662,8 @@ void MTrajectoryActor::prepareAvailableDataForRendering(uint slot)
                             trqi.bezierTrajectoriesRequests[view].request);
                     trajectoryRequests[slot].bezierTrajectoriesRenderDataMap[view] =
                             trajectoryRequests[slot].bezierTrajectoriesMap[view]->getRenderData();
+                    trajectoryRequests[slot].timeStepSphereRenderDataMap[view] =
+                            trajectoryRequests[slot].bezierTrajectoriesMap[view]->getTimeStepSphereRenderData();
                     trajectoryRequests[slot].bezierTrajectoriesMap[view]->setDirty(true);
 
                     if (trajectoryPickerMap.find(view) == trajectoryPickerMap.end()) {
@@ -2696,7 +2698,14 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
             //}
             if (multiVarData.getUseTimestepLens())
             {
-                tubeShader->setUniformValue("timestepLensePosition", particlePosTimeStep);
+                if (!useMultiVarSpheres)
+                {
+                    tubeShader->setUniformValue("timestepLensePosition", particlePosTimeStep);
+                }
+                else
+                {
+                    tubeShader->setUniformValue("timestepLensePosition", std::numeric_limits<int>::lowest());
+                }
             }
 
             MBezierTrajectoriesRenderData& bezierTrajectoriesRenderData =
@@ -2776,6 +2785,40 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
                         GL_TRIANGLES, highlightedTrajectoriesRenderData.indexBufferHighlighted->getCount(),
                         highlightedTrajectoriesRenderData.indexBufferHighlighted->getType(), nullptr);
                 glDisable(GL_CULL_FACE);
+            }
+
+            // Render tubes at time step positions.
+            if (multiVarData.getUseTimestepLens() && useMultiVarSpheres)
+            {
+                trajectoryRequests[t].bezierTrajectoriesMap[sceneView]->updateTimeStepSphereRenderDataIfNecessary(
+                        particlePosTimeStep, sphereRadius);
+                MTimeStepSphereRenderData* timeStepSphereRenderData =
+                        trajectoryRequests[t].timeStepSphereRenderDataMap[sceneView];
+
+                std::shared_ptr<GL::MShaderEffect> timeStepSphereShader = multiVarData.getTimeStepSphereShader();
+                timeStepSphereShader->bind();
+                multiVarData.setUniformDataSpheres(textureUnitTransferFunction);
+
+                timeStepSphereShader->setUniformValue("mvpMatrix", *(sceneView->getModelViewProjectionMatrix()));
+                timeStepSphereShader->setUniformValue("lightDirection", sceneView->getLightDirection());
+                timeStepSphereShader->setUniformValue("cameraPosition", sceneView->getCamera()->getOrigin());
+                timeStepSphereShader->setUniformValue("cameraUp", sceneView->getCamera()->getYAxis());
+                timeStepSphereShader->setUniformValue("sphereRadius", sphereRadius);
+                timeStepSphereShader->setUniformValue("timestepLensePosition", particlePosTimeStep);
+
+                timeStepSphereRenderData->indexBuffer->bindToElementArrayBuffer();
+                timeStepSphereRenderData->vertexPositionBuffer->attachToVertexAttribute(0);
+                timeStepSphereRenderData->vertexNormalBuffer->attachToVertexAttribute(1);
+
+                timeStepSphereRenderData->spherePositionsBuffer->bindToIndex(10);
+                timeStepSphereRenderData->entrancePointsBuffer->bindToIndex(11);
+                timeStepSphereRenderData->exitPointsBuffer->bindToIndex(12);
+                timeStepSphereRenderData->lineElementIdsBuffer->bindToIndex(13);
+
+                glDrawElementsInstanced(
+                        GL_TRIANGLES, timeStepSphereRenderData->indexBuffer->getCount(),
+                        timeStepSphereRenderData->indexBuffer->getType(), nullptr,
+                        timeStepSphereRenderData->numSpheres);
             }
 
             // Unbind IBO.

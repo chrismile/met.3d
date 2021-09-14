@@ -110,7 +110,7 @@ public:
 
     /**
       Set a transfer function by its name. Set to 'none' if @param tfName does
-      not exit.
+      not exist.
       */
     bool setTransferFunctionMultiVar(int varIdx, QString tfName);
 
@@ -119,7 +119,9 @@ public:
     void registerTransferFunction(MTransferFunction1D *tf);
 
     void setUniformData(int textureUnitTransferFunction);
+    void setUniformDataSpheres(int textureUnitTransferFunction);
     std::shared_ptr<GL::MShaderEffect> getShaderEffect();
+    std::shared_ptr<GL::MShaderEffect> getTimeStepSphereShader();
 
     /**
      * Interface for the trajectory actor.
@@ -187,6 +189,9 @@ private:
 
     std::shared_ptr<GL::MShaderEffect> shaderEffect;
     bool isDirty = true;
+
+    // Time step sphere rendering.
+    std::shared_ptr<GL::MShaderEffect> shaderEffectSphere;
 
     // Rendering modes.
     MultiVarRenderMode multiVarRenderMode = MultiVarRenderMode::ORIENTED_COLOR_BANDS;

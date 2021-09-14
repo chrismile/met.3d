@@ -118,6 +118,18 @@ void sampleVariableFromLineSSBO(
     value = varArray[startIndex + varOffset + elementID];
 }
 
+void sampleVariableFromLineSSBODirect(
+        in uint lineID, in uint varID, in uint elementID, out float value, out vec2 minMax) {
+    uint startIndex = uint(lineDescs[lineID].startIndex);
+    VarDescData varDesc = varDescs[maxNumVariables * lineID + varID];
+    const uint varOffset = uint(varDesc.info.r);
+    //minMax = varDesc.info.gb;
+
+    minMax = minMaxValues[varID];
+
+    value = varArray[startIndex + varOffset + elementID];
+}
+
 // Function to sample distribution from SSBO
 void sampleVariableDistributionFromLineSSBO(in uint lineID, in uint varID, out vec2 minMax) {
     LineVarDescData lineVarDesc = lineVarDescs[maxNumVariables * lineID + varID];

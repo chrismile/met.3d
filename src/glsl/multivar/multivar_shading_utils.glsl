@@ -271,3 +271,32 @@ vec4 computePhongLighting(
 
     return vec4(colorShading.rgb, surfaceColor.a);
 }
+
+vec4 computePhongLightingSphere(
+        in vec4 surfaceColor, in float occlusionFactor, in float shadowFactor,
+        in vec3 worldPos, in vec3 normal, in float bandPos) {
+    const vec3 ambientColor = surfaceColor.rgb;
+    const vec3 diffuseColor = surfaceColor.rgb;
+
+    const float kA = materialAmbient * occlusionFactor * shadowFactor;
+    const vec3 Ia = kA * ambientColor;
+    const float kD = materialDiffuse;
+    const float kS = materialSpecular;
+    const float s = materialSpecularExp;
+
+    const vec3 n = normalize(normal);
+    const vec3 v = normalize(cameraPosition - worldPos);
+    const vec3 l = normalize(-lightDirection);//normalize(v);
+    const vec3 h = normalize(v + l);
+
+    vec3 Id = kD * clamp((dot(n, l)), 0.0, 1.0) * diffuseColor;
+    vec3 Is = kS * pow(clamp((dot(n, h)), 0.0, 1.0), s) * diffuseColor;
+    vec3 colorShading = Ia + Id + Is;
+
+    if (drawHalo)
+    {
+        colorShading *= 1.0 - smoothstep(0.9 - fwidth(bandPos), 0.9, bandPos);
+    }
+
+    return vec4(colorShading.rgb, surfaceColor.a);
+}

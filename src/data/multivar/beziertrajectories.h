@@ -107,6 +107,22 @@ struct MBezierTrajectoriesRenderData
     GL::MShaderStorageBufferObject* varDivergingArrayBuffer = nullptr;
 };
 
+struct MTimeStepSphereRenderData
+{
+    int numSpheres = 1;
+
+    // IBO
+    GL::MIndexBuffer* indexBuffer = nullptr;
+    // VBOs
+    GL::MVertexBuffer* vertexPositionBuffer = nullptr;
+    GL::MVertexBuffer* vertexNormalBuffer = nullptr;
+    // SSBOs
+    GL::MShaderStorageBufferObject* spherePositionsBuffer = nullptr;
+    GL::MShaderStorageBufferObject* entrancePointsBuffer = nullptr;
+    GL::MShaderStorageBufferObject* exitPointsBuffer = nullptr;
+    GL::MShaderStorageBufferObject* lineElementIdsBuffer = nullptr;
+};
+
 /**
  * Flow line data with multiple variables being displayed at once.
  * The lines are smoothed using Bezier curves.
@@ -146,11 +162,26 @@ public:
 #ifdef USE_QOPENGLWIDGET
             QOpenGLWidget *currentGLContext = nullptr);
 #else
-            QGLWidget *currentGLContext = nullptr);
+    QGLWidget *currentGLContext = nullptr);
 #endif
     void releaseRenderData();
     void updateSelectedVariables(const QVector<uint32_t>& varSelected);
     void updateDivergingVariables(const QVector<uint32_t>& varDiverging);
+
+    MTimeStepSphereRenderData* getTimeStepSphereRenderData(
+#ifdef USE_QOPENGLWIDGET
+            QOpenGLWidget *currentGLContext = nullptr);
+#else
+            QGLWidget *currentGLContext = nullptr);
+#endif
+    void updateTimeStepSphereRenderDataIfNecessary(
+            int timeStep, float sphereRadius,
+#ifdef USE_QOPENGLWIDGET
+            QOpenGLWidget *currentGLContext = nullptr);
+#else
+            QGLWidget *currentGLContext = nullptr);
+#endif
+    void releaseTimeStepSphereRenderData();
 
 private:
     MFilteredTrajectories baseTrajectories;
@@ -160,6 +191,25 @@ private:
     QVector<uint32_t> varDiverging;
     QVector<uint32_t> trajectoryIndexOffsets;
     QVector<uint32_t> numIndicesPerTrajectory;
+
+    // Sphere data.
+    int lastTimeStep = std::numeric_limits<int>::lowest();
+    float lastSphereRadius = std::numeric_limits<float>::lowest();
+    MTimeStepSphereRenderData timeStepSphereRenderData;
+    const QString timeStepSphereIndexBufferID =
+            QString("timestepsphere_index_buffer_#%1").arg(getID());
+    const QString timeStepSphereVertexPositionBufferID =
+            QString("timestepsphere_vertex_position_buffer_#%1").arg(getID());
+    const QString timeStepSphereVertexNormalBufferID =
+            QString("timestepsphere_vertex_normal_buffer_#%1").arg(getID());
+    const QString timeStepSpherePositionsBufferID =
+            QString("timestepsphere_sphere_positions_buffer_#%1").arg(getID());
+    const QString timeStepSphereEntrancePointsBufferID =
+            QString("timestepsphere_sphere_entrance_points_buffer_#%1").arg(getID());
+    const QString timeStepSphereExitPointsBufferID =
+            QString("timestepsphere_sphere_exit_points_buffer_#%1").arg(getID());
+    const QString timeStepSphereLineElementIdsBufferID =
+            QString("timestepsphere_line_element_ids_buffer_#%1").arg(getID());
 
     // Data for trajectory filtering.
     bool isDirty = true;

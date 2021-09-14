@@ -27,7 +27,6 @@
 
 // standard library imports
 #include <cmath>
-#include <iostream>
 
 // related third party imports
 #include <QWidget>
@@ -106,7 +105,6 @@ void MRadarChart::setVariableNames(const QVector<QString>& names)
     angularAxis->setShadesBrush(QBrush(QColor(249, 249, 255)));
     angularAxis->setShadesPen(Qt::NoPen);
     QFont font = angularAxis->labelsFont();
-    std::cout << font.pointSize() << std::endl;
     font.setPointSize(int(std::round(font.pointSize() * 0.5f)));
     angularAxis->setLabelsFont(font);
     angularAxis->setLabelsPosition(QtCharts::QCategoryAxis::AxisLabelsPositionCenter);

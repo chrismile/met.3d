@@ -401,6 +401,7 @@ private:
         // Bezier trajectories.
         QHash<MSceneViewGLWidget*, MBezierTrajectories*> bezierTrajectoriesMap;
         QHash<MSceneViewGLWidget*, MBezierTrajectoriesRenderData> bezierTrajectoriesRenderDataMap;
+        QHash<MSceneViewGLWidget*, MTimeStepSphereRenderData*> timeStepSphereRenderDataMap;
 
         QQueue<MTrajectoryRequestQueueInfo> pendingRequestsQueue;
 
@@ -450,6 +451,7 @@ private:
     bool bezierDataDirty = false;
     QtProperty *multiVarGroupProperty;
     QtProperty *useBezierTrajectoriesProperty;
+    bool useMultiVarSpheres = true;
 
     QHash<MSceneViewGLWidget*, MTrajectoryPicker*> trajectoryPickerMap;
 
