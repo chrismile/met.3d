@@ -34,6 +34,7 @@
 #ifdef USE_QOPENGLWIDGET
 #include <QOpenGLWidget>
 #include <QOpenGLShaderProgram>
+#include <QOpenGLContext>
 #else
 #include <QGLWidget>
 #include <QGLShaderProgram>
@@ -109,6 +110,18 @@ public:
      */
     void initializeExternal();
 #endif
+
+    /**
+     * Returns whether the used OpenGL context supports at least version <major>.<minor>.
+     */
+    bool getIsOpenGLVersionAtLeast(int major, int minor = 0) {
+        if (majorVersionNumber < major) {
+            return false;
+        } else if (majorVersionNumber == major && minorVersionNumber < minor) {
+            return false;
+        }
+        return true;
+    }
 
     /**
       Place a scene in a managed pool of scenes. All registered scenes are
@@ -476,6 +489,10 @@ private:
 
     /** Textures */
     QMap<QString, GLuint> textureObjectPool;
+
+    /** OpenGL version information */
+    int majorVersionNumber = 0;
+    int minorVersionNumber = 0;
 
     // Dictionary of active (=used) textures.
     QHash<QString, GL::MTexture*> activeTexturesPool;

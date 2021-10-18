@@ -218,6 +218,15 @@ void MGLResourcesManager::initialize(
 }
 
 
+template <class T>
+T fromString(const std::string &stringObject) {
+    std::stringstream strstr;
+    strstr << stringObject;
+    T type;
+    strstr >> type;
+    return type;
+}
+
 #ifdef USE_QOPENGLWIDGET
 void MGLResourcesManager::initializeExternal()
 {
@@ -229,6 +238,10 @@ void MGLResourcesManager::initializeExternal()
         {
             LOG4CPLUS_ERROR(mlog, "\tError: " << glewGetErrorString(err) << flush);
         }
+
+        std::string versionString = (const char*)glGetString(GL_VERSION);
+        majorVersionNumber = fromString<int>(std::string() + versionString.at(0));
+        minorVersionNumber = fromString<int>(std::string() + versionString.at(2));
 
         //TODO: Make size of used video memory configurable.
         uint gpuTotalMemory;
@@ -1056,6 +1069,10 @@ void MGLResourcesManager::initializeGL()
     {
         LOG4CPLUS_ERROR(mlog, "\tError: " << glewGetErrorString(err) << flush);
     }
+
+    std::string versionString = (const char*)glGetString(GL_VERSION);
+    majorVersionNumber = fromString<int>(std::string() + versionString.at(0));
+    minorVersionNumber = fromString<int>(std::string() + versionString.at(2));
 #endif
 
     LOG4CPLUS_DEBUG(mlog, "Using GLEW " << glewGetString(GLEW_VERSION));
@@ -1135,9 +1152,12 @@ void MGLResourcesManager::initializeGL()
     LOG4CPLUS_DEBUG(mlog, "===================================================="
             << "====================================================");
 
+
     for (int i = 0; i < actorPool.size(); i++)
     {
         LOG4CPLUS_DEBUG(mlog, "======== ACTOR #" << i << " ========" << flush);
+        MGLResourcesManager* glRM = MGLResourcesManager::getInstance();
+        glRM->makeCurrent();
         if (!actorPool[i]->isInitialized()) actorPool[i]->initialize();
     }
 

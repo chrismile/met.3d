@@ -23,8 +23,8 @@
 **  along with Met.3D.  If not, see <http://www.gnu.org/licenses/>.
 **
 *******************************************************************************/
-#ifndef MET_3D_TRAJECTORYPICKING_HPP
-#define MET_3D_TRAJECTORYPICKING_HPP
+#ifndef MET_3D_TRAJECTORYPICKING_H
+#define MET_3D_TRAJECTORYPICKING_H
 
 // standard library imports
 #include <set>
@@ -41,6 +41,7 @@
 #include "data/abstractdataitem.h"
 #include "qt_extensions/radarchart.h"
 #include "beziertrajectories.h"
+#include "radarbarchart.h"
 
 namespace Met3D {
 
@@ -55,8 +56,10 @@ struct MHighlightedTrajectoriesRenderData
 
 class MTrajectoryPicker : public MMemoryManagementUsingObject {
 public:
-    MTrajectoryPicker(MSceneViewGLWidget* sceneView, const QVector<QString>& varNames);
+    MTrajectoryPicker(GLuint textureUnit, MSceneViewGLWidget* sceneView, const QVector<QString>& varNames);
     ~MTrajectoryPicker();
+
+    void render();
 
     void setTrajectoryData(
             const QVector<QVector<QVector3D>>& trajectories,
@@ -173,6 +176,7 @@ private:
     const QString vertexColorBufferHighlightedID =
             QString("beziertrajectories_vertex_color_buffer_highlighted_#%1").arg(getID());
     MHighlightedTrajectoriesRenderData highlightedTrajectoriesRenderData;
+    MRadarBarChart* radarBarChart;
     QtExtensions::MMultiVarChartCollection multiVarCharts;
     QtExtensions::MRadarChart* radarChart;
     size_t numVars = 0;
@@ -180,4 +184,4 @@ private:
 
 }
 
-#endif //MET_3D_TRAJECTORYPICKING_HPP
+#endif //MET_3D_TRAJECTORYPICKING_H

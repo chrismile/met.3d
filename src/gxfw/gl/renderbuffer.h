@@ -4,7 +4,7 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2015 Marc Rautenhaus
+**  Copyright 2021 Christoph Neuhauser
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -23,8 +23,8 @@
 **  along with Met.3D.  If not, see <http://www.gnu.org/licenses/>.
 **
 *******************************************************************************/
-#ifndef TEXTURE_H
-#define TEXTURE_H
+#ifndef RENDERBUFFER_H
+#define RENDERBUFFER_H
 
 // standard library imports
 
@@ -40,55 +40,49 @@ namespace GL
 {
 
 /**
-  @brief MTexture encapsulates OpenGL textures.
+  @brief MRenderbuffer encapsulates OpenGL renderbuffer objects.
   */
-class MTexture : public MAbstractGPUDataItem
+class MRenderbuffer : public MAbstractGPUDataItem
 {
 public:
-    MTexture(GLenum target, GLint internalFormat,
-             GLsizei width, GLsizei height=-1, GLsizei depth=-1, GLsizei samples=0);
+    MRenderbuffer(GLenum internalFormat, GLsizei width, GLsizei height, GLsizei samples=0);
 
-    MTexture(Met3D::MDataRequest requestKey, GLenum target, GLint internalFormat,
-             GLsizei width, GLsizei height=-1, GLsizei depth=-1, GLsizei samples=0);
+    MRenderbuffer(Met3D::MDataRequest requestKey, GLenum internalFormat,
+             GLsizei width, GLsizei height, GLsizei samples=0);
 
-    virtual ~MTexture();
+    virtual ~MRenderbuffer();
 
     /**
-      Returns the approximate size of the texture in bytes, computed by
+      Returns the approximate size of the renderbuffer in bytes, computed by
       width * height * depth * (bytes per value of internal format).
       */
     unsigned int approxSizeInBytes();
 
     unsigned int getGPUMemorySize_kb() override;
 
-    void bindToTextureUnit(GLuint unit);
-
-    void bindToLastTextureUnit();
+    /**
+      Returns the size of an renderbuffer element, given an internal format. See
+      https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/glRenderbufferStorage.xhtml.
+      */
+    static unsigned int formatSizeInBytes(GLenum internalFormat);
 
     /**
-      Returns the size of an texture element, given an internal format. See
-      http://www.opengl.org/sdk/docs/man4/xhtml/glTexImage2D.xml.
+      Returns the approximate size of the renderbuffer in bytes, computed by
+      width * height * depth * (bytes per value of internal format).
       */
-    static unsigned int formatSizeInBytes(GLint internalFormat);
-
-    /**
-      Returns the approximate size of the texture in bytes, computed by
-      width * height * depth * samples * (bytes per value of internal format).
-      */
-    static unsigned int approxSizeInBytes(GLint   internalFormat,
+    static unsigned int approxSizeInBytes(GLenum  internalFormat,
                                           GLsizei width,
-                                          GLsizei height=-1,
-                                          GLsizei depth=-1,
+                                          GLsizei height,
                                           GLsizei samples=0);
 
     /**
-      Update this texture's size parameters. If the texture is memory managed,
-      this method automatically tells the GLResourcesManager of the changed
-      size.
+      Update the size parameters of this renderbuffer. If the renderbuffer
+      is memory managed, this method automatically tells the GLResourcesManager
+      of the changed size.
      */
-    void updateSize(GLsizei width, GLsizei height=-1, GLsizei depth=-1, GLsizei samples=0);
+    void updateSize(GLsizei width, GLsizei height, GLsizei samples=0);
 
-    GLuint getTextureObject() { return textureObject; }
+    GLuint getRenderbufferObject() { return rbo; }
 
     void    setIDKey(QString key) { idKey = key; }
 
@@ -98,23 +92,15 @@ public:
 
     int getHeight() { return height; }
 
-    int getDepth() { return depth; }
-
     int getSamples() { return samples; }
 
 private:
 
-    GLuint  textureObject;
-    GLint   lastTextureUnit;
+    GLuint  rbo;
 
-    GLenum  target;
-    GLint   level;
-    GLint   internalFormat;
-    GLenum  format;
-    GLenum  type;
+    GLenum  internalFormat;
     GLsizei width;
     GLsizei height;
-    GLsizei depth;
     GLsizei samples;
 
     QString idKey;
@@ -123,4 +109,4 @@ private:
 
 } // namespace GL
 
-#endif // TEXTURE_H
+#endif // RENDERBUFFER_H

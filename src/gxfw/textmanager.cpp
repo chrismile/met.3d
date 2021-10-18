@@ -768,7 +768,9 @@ MLabel* MTextManager::addText(
 		coordinates.data(), GL_STATIC_DRAW); CHECK_GL_ERROR;
     glBindBuffer(GL_ARRAY_BUFFER, 0); CHECK_GL_ERROR;
 
+#ifdef USE_QOPENGLWIDGET
     MGLResourcesManager::getInstance()->doneCurrent();
+#endif
 
     // Store label information in "labels" list.
     labelPool.insert(label);

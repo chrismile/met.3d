@@ -23,7 +23,7 @@
 **  along with Met.3D.  If not, see <http://www.gnu.org/licenses/>.
 **
 *******************************************************************************/
-#include "trajectorypicking.hpp"
+#include "trajectorypicking.h"
 
 // standard library imports
 
@@ -39,7 +39,8 @@
 
 namespace Met3D {
 
-MTrajectoryPicker::MTrajectoryPicker(MSceneViewGLWidget* sceneView, const QVector<QString>& varNames)
+MTrajectoryPicker::MTrajectoryPicker(
+        GLuint textureUnit, MSceneViewGLWidget* sceneView, const QVector<QString>& varNames)
         : multiVarCharts(sceneView)
 {
     device = rtcNewDevice(nullptr);
@@ -54,10 +55,12 @@ MTrajectoryPicker::MTrajectoryPicker(MSceneViewGLWidget* sceneView, const QVecto
 
     numVars = varNames.size();
 
-    radarChart = new QtExtensions::MRadarChart();
-    radarChart->setVariableNames(varNames);
-    radarChart->setRenderHint(QPainter::Antialiasing);
-    multiVarCharts.addChartView(radarChart);
+    //radarChart = new QtExtensions::MRadarChart();
+    //radarChart->setVariableNames(varNames);
+    //radarChart->setRenderHint(QPainter::Antialiasing);
+    //multiVarCharts.addChartView(radarChart);
+
+    radarBarChart = new MRadarBarChart(textureUnit);
 }
 
 MTrajectoryPicker::~MTrajectoryPicker()
@@ -73,6 +76,8 @@ MTrajectoryPicker::~MTrajectoryPicker()
         MGLResourcesManager::getInstance()->releaseGPUItem(vertexPositionBufferHighlightedID);
         MGLResourcesManager::getInstance()->releaseGPUItem(vertexColorBufferHighlightedID);
     }
+
+    delete radarBarChart;
 }
 
 void MTrajectoryPicker::freeStorage()
@@ -82,6 +87,10 @@ void MTrajectoryPicker::freeStorage()
         rtcCommitScene(scene);
         loaded = false;
     }
+}
+
+void MTrajectoryPicker::render() {
+    radarBarChart->render();
 }
 
 void MTrajectoryPicker::setTrajectoryData(
@@ -94,7 +103,7 @@ void MTrajectoryPicker::setTrajectoryData(
     this->selectedTrajectoryIndices = selectedTrajectoryIndices;
     this->highlightedTrajectories.clear();
     this->colorUsesCountMap.clear();
-    radarChart->clearRadars();
+    //radarChart->clearRadars();
 
     if (lineRadius > 0.0f) {
         recreateTubeTriangleData();
@@ -383,7 +392,7 @@ void MTrajectoryPicker::toggleTrajectoryHighlighted(uint32_t trajectoryIndex)
     auto it = highlightedTrajectories.find(trajectoryIndex);
     if (it != highlightedTrajectories.end())
     {
-        radarChart->removeRadar(trajectoryIndex);
+        //radarChart->removeRadar(trajectoryIndex);
         colorUsesCountMap[it->second] -= 1;
         highlightedTrajectories.erase(trajectoryIndex);
         return;
@@ -439,8 +448,8 @@ void MTrajectoryPicker::toggleTrajectoryHighlighted(uint32_t trajectoryIndex)
         value = (value - minMaxVector.x()) / (minMaxVector.y() - minMaxVector.x());
         values.push_back(value);
     }
-    radarChart->addRadar(
-            trajectoryIndex, QString("Trajectory #%1").arg(trajectoryIndex), highlightColor, values);
+    //radarChart->addRadar(
+    //        trajectoryIndex, QString("Trajectory #%1").arg(trajectoryIndex), highlightColor, values);
 }
 
 void MTrajectoryPicker::setParticlePosTimeStep(int newTimeStep)
@@ -451,7 +460,7 @@ void MTrajectoryPicker::setParticlePosTimeStep(int newTimeStep)
     }
     timeStep = newTimeStep;
 
-    radarChart->clearRadars();
+    //radarChart->clearRadars();
 
     for (const auto& it : highlightedTrajectories)
     {
@@ -467,8 +476,8 @@ void MTrajectoryPicker::setParticlePosTimeStep(int newTimeStep)
             value = (value - minMaxVector.x()) / (minMaxVector.y() - minMaxVector.x());
             values.push_back(value);
         }
-        radarChart->addRadar(
-                trajectoryIndex, QString("Trajectory #%1").arg(trajectoryIndex), highlightColor, values);
+        //radarChart->addRadar(
+        //        trajectoryIndex, QString("Trajectory #%1").arg(trajectoryIndex), highlightColor, values);
     }
 }
 

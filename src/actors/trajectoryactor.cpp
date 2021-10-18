@@ -1670,7 +1670,9 @@ void MTrajectoryActor::prepareAvailableDataForRendering(uint slot)
 
 #ifdef USE_EMBREE
                     if (trajectoryPickerMap.find(view) == trajectoryPickerMap.end()) {
-                        trajectoryPickerMap[view] = new MTrajectoryPicker(view, multiVarData.getVarNames());
+                        GLuint textureUnit = assignTextureUnit();
+                        trajectoryPickerMap[view] = new MTrajectoryPicker(
+                                textureUnit, view, multiVarData.getVarNames());
                         trajectoryPickerMap[view]->updateTrajectoryRadius(tubeRadius);
                         trajectoryPickerMap[view]->setParticlePosTimeStep(particlePosTimeStep);
                     }
@@ -2866,6 +2868,8 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
 
             // Unbind VBO.
             glBindBuffer(GL_ARRAY_BUFFER, 0); CHECK_GL_ERROR;
+
+            trajectoryPickerMap[sceneView]->render();
         }
 
         return;

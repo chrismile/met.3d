@@ -387,6 +387,8 @@ void MVolumeBoundingBoxActor::generateGeometry()
                           labelbbox, labelBBoxColour)
                       );
     }
+    glRM = MGLResourcesManager::getInstance();
+    glRM->makeCurrent();
 }
 
 } // namespace Met3D

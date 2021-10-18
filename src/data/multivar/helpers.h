@@ -23,8 +23,8 @@
 **  along with Met.3D.  If not, see <http://www.gnu.org/licenses/>.
 **
 *******************************************************************************/
-#ifndef MET_3D_HELPERS_H
-#define MET_3D_HELPERS_H
+#ifndef HELPERS_H
+#define HELPERS_H
 
 // standard library imports
 
@@ -123,6 +123,20 @@ GL::MShaderStorageBufferObject* createShaderStorageBuffer(
     return static_cast<GL::MShaderStorageBufferObject*>(glRM->getGPUItem(vbID));
 }
 
+inline QMatrix4x4 matrixOrthogonalProjection(float left, float right, float bottom, float top, float near, float far)
+{
+    return QMatrix4x4(
+            2.0f / (right - left), 0.0f, 0.0f, - (right + left) / (right - left),
+            0.0f, 2.0f / (top - bottom), 0.0f, - (top + bottom) / (top - bottom),
+            0.0f, 0.0f, -2.0f / (far - near), - (far + near) / (far - near),
+            0.0f, 0.0f, 0.0f, 1.0f);
+    //return QMatrix4x4(
+    //        2.0f / (right - left), 0.0f, 0.0f, 0.0f,
+    //        0.0f, 2.0f / (top - bottom), 0.0f, 0.0f,
+    //        0.0f, 0.0f, -2.0f / (far - near), -(far + near) / (far - near),
+    //        -(right + left) / (right - left), -(top + bottom) / (top - bottom), 0.0f, 1.0f);
 }
 
-#endif //MET_3D_HELPERS_H
+}
+
+#endif // HELPERS_H

@@ -56,11 +56,11 @@ void MRadarChart::_initialize()
     chart = new QtCharts::QPolarChart();
     this->setChart(chart);
 
-    chart->setBackgroundBrush(QBrush(QColor(220, 220, 220, 90)));
+    chart->setBackgroundBrush(QBrush(QColor(220, 220, 220, 180)));
     //chart->setPlotAreaBackgroundVisible(false);
     //chart->setPlotAreaBackgroundBrush(QBrush(QColor("transparent")));
     chart->setPlotAreaBackgroundVisible(true);
-    chart->setPlotAreaBackgroundBrush(QBrush(QColor(240, 240, 240, 140)));
+    chart->setPlotAreaBackgroundBrush(QBrush(QColor(240, 240, 240, 160)));
     chart->setMargins(QMargins(0, 0, 0, 0));
     chart->setContentsMargins(0, 0, 0, 0);
     chart->setMargins(QMargins(20, 0, 20, 0));

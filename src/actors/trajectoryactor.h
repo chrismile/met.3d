@@ -58,7 +58,7 @@
 #include "data/multivar/multivardata.h"
 
 #ifdef USE_EMBREE
-#include "data/multivar/trajectorypicking.hpp"
+#include "data/multivar/trajectorypicking.h"
 #endif
 
 
