@@ -25,9 +25,12 @@
 *******************************************************************************/
 // standard library imports
 #include <set>
+#include <unordered_set>
 
 // related third party imports
 #include <QVector4D>
+#include <QStringList>
+#include <QFontDatabase>
 #include <GL/glew.h>
 #define NANOVG_GL3_IMPLEMENTATION
 #include "nanovg/nanovg.h"
@@ -64,6 +67,54 @@ static const std::vector<QColor> predefinedColors = {
         // DARK BLUE
         QColor(0, 7, 255)
 };
+
+QString getFontPath(const std::set<QString>& preferredFontNames) {
+    QStringList fontLocations = QStandardPaths::standardLocations(QStandardPaths::FontsLocation);
+
+#ifdef __linux__
+    // For some reason, on an Ubuntu 20.04 test system, Qt misses some of the paths specified on
+    // https://doc.qt.io/qt-5/qstandardpaths.html.
+    if (!fontLocations.contains("/usr/local/share/fonts")) {
+        fontLocations.push_back("/usr/local/share/fonts");
+    }
+    if (!fontLocations.contains("/usr/share/fonts")) {
+        fontLocations.push_back("/usr/share/fonts");
+    }
+#endif
+
+    std::cout << fontLocations.size() << std::endl;
+    for (const QString& fontLocation : fontLocations) {
+        std::cout << fontLocation.toStdString() << std::endl;
+    }
+
+    QString matchingFontPath;
+    QFontDatabase fontDatabase = QFontDatabase();
+    for (const QString& fontLocation : fontLocations) {
+        QDirIterator dirIterator(
+                fontLocation, QStringList() << "*.ttf" << "*.TTF", QDir::Files, QDirIterator::Subdirectories);
+        while (dirIterator.hasNext()) {
+            QString fontPath = dirIterator.next();
+            QString fontPathLower = fontPath.toLower();
+            std::cout << fontPath.toStdString() << std::endl;
+
+            int idx = fontDatabase.addApplicationFont(fontPath);
+            if (idx >= 0) {
+                QStringList names = fontDatabase.applicationFontFamilies(idx);
+                for (const QString& name : names) {
+                    if (preferredFontNames.find(name) != preferredFontNames.end()
+                            && !fontPathLower.contains("bold")
+                            && !fontPathLower.contains("italic")
+                            && !fontPathLower.contains("oblique")) {
+                        matchingFontPath = fontPath;
+                    }
+                    std::cout << name.toStdString() << std::endl;
+                }
+            }
+        }
+    }
+
+    return matchingFontPath;
+}
 
 MRadarBarChart::MRadarBarChart(GLint textureUnit) : textureUnit(textureUnit) {
     borderSizeX = 90;
@@ -141,9 +192,9 @@ void MRadarBarChart::createRenderData() {
 #endif
     vg = nvgCreateGL3(flags);
 
-    // TODO
-    std::string fontFilename = "/home/christoph/Programming/C++/RadialChart/Data/Fonts/DroidSans.ttf";
-    int font = nvgCreateFont(vg, "sans", fontFilename.c_str());
+    QString fontFilename = getFontPath({ "Liberation Sans", "Droid Sans" });
+    std::cout << "Used font: " << fontFilename.toStdString() << std::endl;
+    int font = nvgCreateFont(vg, "sans", fontFilename.toStdString().c_str());
     if (font == -1) {
         LOG4CPLUS_ERROR(mlog, "Error in MRadarBarChart::MRadarBarChart: Couldn't find the font file.");
     }

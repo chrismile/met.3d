@@ -2869,7 +2869,9 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
             // Unbind VBO.
             glBindBuffer(GL_ARRAY_BUFFER, 0); CHECK_GL_ERROR;
 
+#ifdef USE_EMBREE
             trajectoryPickerMap[sceneView]->render();
+#endif
         }
 
         return;
