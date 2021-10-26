@@ -137,6 +137,16 @@ inline QMatrix4x4 matrixOrthogonalProjection(float left, float right, float bott
     //        -(right + left) / (right - left), -(top + bottom) / (top - bottom), 0.0f, 1.0f);
 }
 
+inline QVector3D mix(const QVector3D &v0, const QVector3D &v1, float t)
+{
+    return (1.0f - t) * v0 + t * v1;
+}
+
+inline float fract(float x)
+{
+    return x - std::floor(x);
+}
+
 }
 
 #endif // HELPERS_H

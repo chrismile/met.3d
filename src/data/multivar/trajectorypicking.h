@@ -41,7 +41,7 @@
 #include "data/abstractdataitem.h"
 #include "qt_extensions/radarchart.h"
 #include "beziertrajectories.h"
-#include "radarbarchart.h"
+#include "src/data/multivar/charts/radarbarchart.h"
 
 namespace Met3D {
 
@@ -52,6 +52,10 @@ struct MHighlightedTrajectoriesRenderData
     GL::MIndexBuffer* indexBufferHighlighted = nullptr;
     GL::MVertexBuffer* vertexPositionBufferHighlighted = nullptr;
     GL::MVertexBuffer* vertexColorBufferHighlighted = nullptr;
+};
+
+enum class DiagramDisplayType {
+    RADAR_CHART_TIME_DEPENDENT, RADAR_CHART_TIME_INDEPENDENT, RADAR_BAR_CHART, HORIZON_GRAPH
 };
 
 class MTrajectoryPicker : public MMemoryManagementUsingObject {
@@ -148,6 +152,7 @@ private:
     bool loaded = false;
 
     // Highlighted trajectories.
+    void updateDiagramData();
     std::map<uint32_t, QColor> highlightedTrajectories;
     struct ColorComparator {
         bool operator()(const QColor& c0, const QColor& c1) {
@@ -176,9 +181,11 @@ private:
     const QString vertexColorBufferHighlightedID =
             QString("beziertrajectories_vertex_color_buffer_highlighted_#%1").arg(getID());
     MHighlightedTrajectoriesRenderData highlightedTrajectoriesRenderData;
-    MRadarBarChart* radarBarChart;
+    MDiagramBase* diagram;
+    DiagramDisplayType diagramDisplayType = DiagramDisplayType::RADAR_CHART_TIME_DEPENDENT;
     QtExtensions::MMultiVarChartCollection multiVarCharts;
     QtExtensions::MRadarChart* radarChart;
+    std::vector<std::string> variableNames;
     size_t numVars = 0;
 };
 

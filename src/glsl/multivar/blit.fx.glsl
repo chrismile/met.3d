@@ -32,6 +32,7 @@ uniform mat4 mvpMatrix;
 uniform sampler2D blitTexture;
 uniform sampler2DMS blitTextureMS;
 uniform int numSamples;
+uniform int supersamplingFactor;
 
 
 /*****************************************************************************
@@ -89,6 +90,71 @@ shader FSmainMS(in VStoFS Input, out vec4 fragColor)
 }
 
 
+shader FSmainDownscale(in VStoFS Input, out vec4 fragColor)
+{
+    ivec2 inputSize = textureSize(blitTexture, 0);
+    ivec2 outputSize = inputSize / supersamplingFactor;
+    ivec2 outputLocation = ivec2(int(Input.texCoord.x * outputSize.x), int(Input.texCoord.y * outputSize.y));
+    vec4 color = vec4(0.0);
+    vec4 totalSum = vec4(0.0);
+    for (int sampleIdxY = 0; sampleIdxY < supersamplingFactor; sampleIdxY++)
+    {
+        for (int sampleIdxX = 0; sampleIdxX < supersamplingFactor; sampleIdxX++)
+        {
+            ivec2 inputLocation = outputLocation * supersamplingFactor + ivec2(sampleIdxX, sampleIdxY);
+            vec4 sampleColor = texelFetch(blitTexture, inputLocation, 0);
+            totalSum += sampleColor;
+            color.rgb += sampleColor.rgb * sampleColor.a;
+            color.a += sampleColor.a;
+        }
+    }
+
+    int totalNumSamples = supersamplingFactor * supersamplingFactor;
+    color /= float(totalNumSamples);
+    if (color.a > 1.0 / 256.0)
+    {
+        fragColor = vec4(color.rgb / color.a, color.a);
+    } else
+    {
+        fragColor = totalSum / float(totalNumSamples);
+    }
+}
+
+shader FSmainDownscaleMS(in VStoFS Input, out vec4 fragColor)
+{
+    ivec2 inputSize = textureSize(blitTextureMS);
+    ivec2 outputSize = inputSize / supersamplingFactor;
+    ivec2 outputLocation = ivec2(int(Input.texCoord.x * outputSize.x), int(Input.texCoord.y * outputSize.y));
+    vec4 color = vec4(0.0);
+    vec4 totalSum = vec4(0.0);
+    for (int sampleIdxY = 0; sampleIdxY < supersamplingFactor; sampleIdxY++)
+    {
+        for (int sampleIdxX = 0; sampleIdxX < supersamplingFactor; sampleIdxX++)
+        {
+            ivec2 inputLocation = outputLocation * supersamplingFactor + ivec2(sampleIdxX, sampleIdxY);
+            for (int sampleIdx = 0; sampleIdx < numSamples; sampleIdx++)
+            {
+                vec4 sampleColor = texelFetch(blitTextureMS, inputLocation, sampleIdx);
+                totalSum += sampleColor;
+                color.rgb += sampleColor.rgb * sampleColor.a;
+                color.a += sampleColor.a;
+            }
+        }
+    }
+
+    int totalNumSamples = supersamplingFactor * supersamplingFactor * numSamples;
+    color /= float(totalNumSamples);
+    if (color.a > 1.0 / 256.0)
+    {
+        fragColor = vec4(color.rgb / color.a, color.a);
+    }
+    else
+    {
+        fragColor = totalSum / float(totalNumSamples);
+    }
+}
+
+
 /*****************************************************************************
  ***                             PROGRAMS
  *****************************************************************************/
@@ -103,4 +169,16 @@ program Multisampled
 {
     vs(430)=VSmain();
     fs(430)=FSmainMS();
+};
+
+program Downscale
+{
+    vs(430)=VSmain();
+    fs(430)=FSmainDownscale();
+};
+
+program DownscaleMultisampled
+{
+    vs(430)=VSmain();
+    fs(430)=FSmainDownscaleMS();
 };

@@ -55,12 +55,18 @@ MTrajectoryPicker::MTrajectoryPicker(
 
     numVars = varNames.size();
 
+    variableNames.reserve(varNames.size());
+    for (const QString& varName : varNames) {
+        variableNames.push_back(varName.toStdString());
+    }
+
     //radarChart = new QtExtensions::MRadarChart();
     //radarChart->setVariableNames(varNames);
     //radarChart->setRenderHint(QPainter::Antialiasing);
     //multiVarCharts.addChartView(radarChart);
 
-    radarBarChart = new MRadarBarChart(textureUnit);
+    diagram = new MRadarBarChart(textureUnit);
+    diagram->initialize();
 }
 
 MTrajectoryPicker::~MTrajectoryPicker()
@@ -77,7 +83,10 @@ MTrajectoryPicker::~MTrajectoryPicker()
         MGLResourcesManager::getInstance()->releaseGPUItem(vertexColorBufferHighlightedID);
     }
 
-    delete radarBarChart;
+    if (diagram) {
+        delete diagram;
+        diagram = nullptr;
+    }
 }
 
 void MTrajectoryPicker::freeStorage()
@@ -90,7 +99,7 @@ void MTrajectoryPicker::freeStorage()
 }
 
 void MTrajectoryPicker::render() {
-    radarBarChart->render();
+    diagram->render();
 }
 
 void MTrajectoryPicker::setTrajectoryData(
@@ -393,6 +402,7 @@ void MTrajectoryPicker::toggleTrajectoryHighlighted(uint32_t trajectoryIndex)
     if (it != highlightedTrajectories.end())
     {
         //radarChart->removeRadar(trajectoryIndex);
+        updateDiagramData();
         colorUsesCountMap[it->second] -= 1;
         highlightedTrajectories.erase(trajectoryIndex);
         return;
@@ -450,6 +460,7 @@ void MTrajectoryPicker::toggleTrajectoryHighlighted(uint32_t trajectoryIndex)
     }
     //radarChart->addRadar(
     //        trajectoryIndex, QString("Trajectory #%1").arg(trajectoryIndex), highlightColor, values);
+    updateDiagramData();
 }
 
 void MTrajectoryPicker::setParticlePosTimeStep(int newTimeStep)
@@ -478,6 +489,39 @@ void MTrajectoryPicker::setParticlePosTimeStep(int newTimeStep)
         }
         //radarChart->addRadar(
         //        trajectoryIndex, QString("Trajectory #%1").arg(trajectoryIndex), highlightColor, values);
+    }
+    updateDiagramData();
+}
+
+void MTrajectoryPicker::updateDiagramData()
+{
+    if (diagram->getDiagramType() == DiagramType::RADAR_BAR_CHART) {
+        MRadarBarChart* radarBarChart = static_cast<MRadarBarChart*>(diagram);
+        if (diagramDisplayType == DiagramDisplayType::RADAR_CHART_TIME_DEPENDENT) {
+            std::vector<std::vector<float>> variableValuesTimeDependent;
+            variableValuesTimeDependent.reserve(highlightedTrajectories.size());
+            for (const auto& it : highlightedTrajectories)
+            {
+                uint32_t trajectoryIndex = it.first;
+                const QColor& highlightColor = it.second;
+                const MFilteredTrajectory& trajectory = baseTrajectories.at(int(trajectoryIndex));
+                std::vector<float> values;
+                for (size_t i = 0; i < numVars; i++)
+                {
+                    int time = clamp(timeStep, 0, int(trajectory.attributes.at(int(i)).size()) - 1);
+                    float value = trajectory.attributes.at(int(i)).at(time);
+                    QVector2D minMaxVector = minMaxAttributes.at(int(i));
+                    value = (value - minMaxVector.x()) / (minMaxVector.y() - minMaxVector.x() + 1e-10);
+                    values.push_back(value);
+                }
+                variableValuesTimeDependent.push_back(values);
+                //radarChart->addRadar(
+                //        trajectoryIndex, QString("Trajectory #%1").arg(trajectoryIndex), highlightColor, values);
+            }
+            radarBarChart->setDataTimeDependent(variableNames, variableValuesTimeDependent);
+        } else {
+            //radarBarChart->setDataTimeIndependent(variableNames, variableValues);
+        }
     }
 }
 
