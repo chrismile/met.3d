@@ -263,6 +263,46 @@ public:
     }
 
     /**
+      Checks whether a virtual (i.e., drawn using OpenGL) window is below
+      the mouse cursor at @p mousePositionX, @p mousePositionY.
+
+      Called by a @ref MSceneViewGLWidget.
+      */
+    virtual bool checkVirtualWindowBelowMouse(
+            MSceneViewGLWidget *sceneView, int mousePositionX, int mousePositionY)
+    {
+        Q_UNUSED(sceneView);
+        Q_UNUSED(mousePositionX);
+        Q_UNUSED(mousePositionY);
+        return false;
+    }
+
+    virtual void mouseMoveEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event)
+    {
+        Q_UNUSED(sceneView);
+        Q_UNUSED(event);
+    }
+
+    virtual void mousePressEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event)
+    {
+        Q_UNUSED(sceneView);
+        Q_UNUSED(event);
+    }
+
+    virtual void mouseReleaseEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event)
+    {
+        Q_UNUSED(sceneView);
+        Q_UNUSED(event);
+    }
+
+    virtual void wheelEvent(MSceneViewGLWidget *sceneView, QWheelEvent *event)
+    {
+        Q_UNUSED(sceneView);
+        Q_UNUSED(event);
+    }
+
+
+    /**
       Creates a label representing the position of handle with ID @p handleID
       near the handle.
 

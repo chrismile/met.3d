@@ -92,7 +92,12 @@ void MRadarBarChart::setDataTimeDependent(
 }
 
 QVector3D MRadarBarChart::transferFunction(float value) {
-    std::vector<QColor> colorPoints = {
+    if (std::isnan(value)) {
+        return QVector3D(1.0f, 1.0f, 0.0f); // yellow
+    }
+    value = clamp(value, 0.0f, 1.0f);
+
+    const std::vector<QColor> colorPoints = {
             QColor(59, 76, 192),
             QColor(144, 178, 254),
             QColor(220, 220, 220),

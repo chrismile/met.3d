@@ -248,6 +248,20 @@ public slots:
       */
     void checkIntersectionWithSelectableData(
             MSceneViewGLWidget *sceneView, QMouseEvent *event) override;
+
+    /**
+      Checks whether a virtual (i.e., drawn using OpenGL) window is below
+      the mouse cursor at @p mousePositionX, @p mousePositionY.
+
+      Called by a @ref MSceneViewGLWidget.
+      */
+    bool checkVirtualWindowBelowMouse(
+            MSceneViewGLWidget *sceneView, int mousePositionX, int mousePositionY) override;
+
+    void mouseMoveEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event) override;
+    void mousePressEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event) override;
+    void mouseReleaseEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event) override;
+    void wheelEvent(MSceneViewGLWidget *sceneView, QWheelEvent *event) override;
 #endif
 
 protected:
@@ -454,9 +468,16 @@ private:
     MMultiVarData multiVarData;
     bool useBezierTrajectories;
     bool bezierDataDirty = false;
-    QtProperty *multiVarGroupProperty;
     QtProperty *useBezierTrajectoriesProperty;
+    QtProperty *multiVarGroupProperty;
     bool useMultiVarSpheres = true;
+
+    QStringList diagramTypeNames = {
+            "None", "Radar Bar Chart (Time Dependent)", "Radar Bar Chart (Time Independent)",
+            "Radar Chart", "Horizon Graph"
+    };
+    DiagramDisplayType diagramType = DiagramDisplayType::HORIZON_GRAPH;
+    QtProperty *diagramTypeProperty;
 
 #ifdef USE_EMBREE
     QHash<MSceneViewGLWidget*, MTrajectoryPicker*> trajectoryPickerMap;

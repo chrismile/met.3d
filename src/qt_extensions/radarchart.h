@@ -23,8 +23,8 @@
 **  along with Met.3D.  If not, see <http://www.gnu.org/licenses/>.
 **
 *******************************************************************************/
-#ifndef MET_3D_RADARCHART_H
-#define MET_3D_RADARCHART_H
+#ifndef MET_3D_QT_RADARCHART_H
+#define MET_3D_QT_RADARCHART_H
 
 // standard library imports
 
@@ -99,4 +99,4 @@ private:
 
 }
 
-#endif //MET_3D_RADARCHART_H
+#endif //MET_3D_QT_RADARCHART_H

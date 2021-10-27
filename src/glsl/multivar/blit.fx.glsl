@@ -70,23 +70,13 @@ shader FSmainMS(in VStoFS Input, out vec4 fragColor)
     ivec2 size = textureSize(blitTextureMS);
     ivec2 iCoords = ivec2(int(Input.texCoord.x * size.x), int(Input.texCoord.y * size.y));
     vec4 color = vec4(0.0);
-    vec4 totalSum = vec4(0.0);
     for (int currSample = 0; currSample < numSamples; currSample++)
     {
-        vec4 fetchedColor = texelFetch(blitTextureMS, iCoords, currSample);
-        totalSum += fetchedColor;
-        color.rgb += fetchedColor.rgb * fetchedColor.a;
-        color.a += fetchedColor.a;
+        vec4 sampleColor = texelFetch(blitTextureMS, iCoords, currSample);
+        color += sampleColor;
     }
     color /= float(numSamples);
-    if (color.a > 1.0 / 256.0)
-    {
-        fragColor = vec4(color.rgb / color.a, color.a);
-    }
-    else
-    {
-        fragColor = totalSum / float(numSamples);
-    }
+    fragColor = color;
 }
 
 
@@ -96,28 +86,19 @@ shader FSmainDownscale(in VStoFS Input, out vec4 fragColor)
     ivec2 outputSize = inputSize / supersamplingFactor;
     ivec2 outputLocation = ivec2(int(Input.texCoord.x * outputSize.x), int(Input.texCoord.y * outputSize.y));
     vec4 color = vec4(0.0);
-    vec4 totalSum = vec4(0.0);
     for (int sampleIdxY = 0; sampleIdxY < supersamplingFactor; sampleIdxY++)
     {
         for (int sampleIdxX = 0; sampleIdxX < supersamplingFactor; sampleIdxX++)
         {
             ivec2 inputLocation = outputLocation * supersamplingFactor + ivec2(sampleIdxX, sampleIdxY);
             vec4 sampleColor = texelFetch(blitTexture, inputLocation, 0);
-            totalSum += sampleColor;
-            color.rgb += sampleColor.rgb * sampleColor.a;
-            color.a += sampleColor.a;
+            color += sampleColor;
         }
     }
 
     int totalNumSamples = supersamplingFactor * supersamplingFactor;
     color /= float(totalNumSamples);
-    if (color.a > 1.0 / 256.0)
-    {
-        fragColor = vec4(color.rgb / color.a, color.a);
-    } else
-    {
-        fragColor = totalSum / float(totalNumSamples);
-    }
+    fragColor = color;
 }
 
 shader FSmainDownscaleMS(in VStoFS Input, out vec4 fragColor)
@@ -126,7 +107,6 @@ shader FSmainDownscaleMS(in VStoFS Input, out vec4 fragColor)
     ivec2 outputSize = inputSize / supersamplingFactor;
     ivec2 outputLocation = ivec2(int(Input.texCoord.x * outputSize.x), int(Input.texCoord.y * outputSize.y));
     vec4 color = vec4(0.0);
-    vec4 totalSum = vec4(0.0);
     for (int sampleIdxY = 0; sampleIdxY < supersamplingFactor; sampleIdxY++)
     {
         for (int sampleIdxX = 0; sampleIdxX < supersamplingFactor; sampleIdxX++)
@@ -135,23 +115,14 @@ shader FSmainDownscaleMS(in VStoFS Input, out vec4 fragColor)
             for (int sampleIdx = 0; sampleIdx < numSamples; sampleIdx++)
             {
                 vec4 sampleColor = texelFetch(blitTextureMS, inputLocation, sampleIdx);
-                totalSum += sampleColor;
-                color.rgb += sampleColor.rgb * sampleColor.a;
-                color.a += sampleColor.a;
+                color += sampleColor;
             }
         }
     }
 
     int totalNumSamples = supersamplingFactor * supersamplingFactor * numSamples;
     color /= float(totalNumSamples);
-    if (color.a > 1.0 / 256.0)
-    {
-        fragColor = vec4(color.rgb / color.a, color.a);
-    }
-    else
-    {
-        fragColor = totalSum / float(totalNumSamples);
-    }
+    fragColor = color;
 }
 
 

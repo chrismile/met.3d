@@ -59,10 +59,17 @@ public:
     virtual void initialize();
     virtual ~MDiagramBase();
     void render();
-    virtual void update(float dt) {}
+
+    /// Returns whether the mouse is over the area of the diagram.
+    bool isMouseOverDiagram(const QVector2D& mousePosition) const;
+    virtual bool hasData()=0;
+
+    virtual void mouseMoveEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event) {}
+    virtual void mousePressEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event) {}
+    virtual void mouseReleaseEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event) {}
+    virtual void wheelEvent(MSceneViewGLWidget *sceneView, QWheelEvent *event) {}
 
 protected:
-    virtual bool hasData()=0;
     virtual void renderBase()=0;
     virtual void onWindowSizeChanged();
 

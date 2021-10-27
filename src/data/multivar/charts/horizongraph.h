@@ -46,15 +46,19 @@ public:
     explicit MHorizonGraph(GLint textureUnit);
     DiagramType getDiagramType() override { return DiagramType::HORIZON_GRAPH; }
     void initialize() override;
-    void update(float dt) override;
 
     /**
      * @param variableNames The names of the variables to be displayed.
      * @param variableValuesArray An array with dimensions: Trajectory - Time - Variable.
      */
     void setData(
-            const std::vector<std::string>& variableNames, float timeMax, float timeMin,
+            const std::vector<std::string>& variableNames, float timeMin, float timeMax,
             const std::vector<std::vector<std::vector<float>>>& variableValuesArray);
+
+    void mouseMoveEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event) override;
+    void mousePressEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event) override;
+    void mouseReleaseEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event) override;
+    void wheelEvent(MSceneViewGLWidget *sceneView, QWheelEvent *event) override;
 
 protected:
     virtual bool hasData() override { return !variableValuesArray.empty(); }
@@ -62,6 +66,7 @@ protected:
 
 private:
     QVector3D transferFunction(float value);
+    void drawHorizonBackground();
     void drawHorizonLines();
     void drawHorizonOutline(const NVGcolor& textColor);
     void drawLegendLeft(const NVGcolor& textColor);
@@ -83,6 +88,7 @@ private:
     float offsetHorizonBarsX, offsetHorizonBarsY;
     float horizonBarMargin, horizonBarMarginBase;
     int timeStepLegendIncrement;
+    int timeStepTicksIncrement;
 
     // Scrolling and zooming.
     float maxWindowHeight = 500.0f;
@@ -111,6 +117,10 @@ private:
     std::vector<std::vector<std::vector<float>>> variableValuesArray;
     std::vector<std::vector<float>> ensembleMeanValues;
     std::vector<std::vector<float>> ensembleStdDevValues;
+
+    void sortVariables(int varIdx);
+    int sortingIdx = -1;
+    std::vector<size_t> sortedVariableIndices;
 };
 
 }

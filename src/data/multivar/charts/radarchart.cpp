@@ -75,6 +75,17 @@ void MRadarChart::initialize() {
 void MRadarChart::setData(
         const std::vector<std::string>& variableNames,
         const std::vector<std::vector<float>>& variableValuesPerTrajectory) {
+    this->highlightColors = predefinedColors;
+    this->variableNames = variableNames;
+    this->variableValuesPerTrajectory = variableValuesPerTrajectory;
+    onWindowSizeChanged();
+}
+
+void MRadarChart::setData(
+        const std::vector<std::string>& variableNames,
+        const std::vector<std::vector<float>>& variableValuesPerTrajectory,
+        const std::vector<QColor>& highlightColors) {
+    this->highlightColors = highlightColors;
     this->variableNames = variableNames;
     this->variableValuesPerTrajectory = variableValuesPerTrajectory;
     onWindowSizeChanged();
@@ -102,7 +113,7 @@ QVector3D MRadarChart::transferFunction(float value) {
 void MRadarChart::drawRadarLine(const QVector2D& center, int trajectoryIdx) {
     const size_t numVariables = variableNames.size();
 
-    QColor circleFillColorQt = predefinedColors.at(trajectoryIdx % predefinedColors.size());
+    QColor circleFillColorQt = highlightColors.at(trajectoryIdx % highlightColors.size());
     //QVector3D hsvColor = rgbToHSV(circleFillColorSgl.getFloatColorRGB());
     //hsvColor.g *= 0.5f;
     //QVector3D rgbColor = hsvToRGB(hsvColor);
@@ -110,15 +121,12 @@ void MRadarChart::drawRadarLine(const QVector2D& center, int trajectoryIdx) {
     qreal r, g, b;
     circleFillColorQt.getRgbF(&r, &g, &b);
     QVector3D rgbColor = mix(QVector3D(1.0f, 1.0f, 1.0f), QVector3D(r, g, b), 0.7f);
-    NVGcolor circleFillColor = nvgRGBf(rgbColor.x(), rgbColor.y(), rgbColor.z());
-    NVGcolor circleStrokeColor = nvgRGBA(0, 0, 0, 255);
+    NVGcolor circleFillColor = nvgRGBAf(rgbColor.x(), rgbColor.y(), rgbColor.z(), 0.25f);
+    NVGcolor circleStrokeColor = nvgRGBf(rgbColor.x(), rgbColor.y(), rgbColor.z());
 
     nvgBeginPath(vg);
     for (size_t varIdx = 0; varIdx < numVariables; varIdx++) {
         float varValue = variableValuesPerTrajectory.at(trajectoryIdx).at(varIdx);
-        if (varValue <= std::numeric_limits<float>::epsilon()) {
-            return;
-        }
         float radius = varValue * (chartRadius - chartHoleRadius) + chartHoleRadius;
         float angle = float(varIdx) / float(variableNames.size()) * 2.0f * float(M_PI) - float(M_PI) / 2.0f;
         QVector2D point(center.x() + std::cos(angle) * radius, center.y() + std::sin(angle) * radius);

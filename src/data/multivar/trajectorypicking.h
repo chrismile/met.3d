@@ -55,12 +55,14 @@ struct MHighlightedTrajectoriesRenderData
 };
 
 enum class DiagramDisplayType {
-    RADAR_CHART_TIME_DEPENDENT, RADAR_CHART_TIME_INDEPENDENT, RADAR_BAR_CHART, HORIZON_GRAPH
+    NONE, RADAR_BAR_CHART_TIME_DEPENDENT, RADAR_BAR_CHART_TIME_INDEPENDENT, RADAR_CHART, HORIZON_GRAPH
 };
 
 class MTrajectoryPicker : public MMemoryManagementUsingObject {
 public:
-    MTrajectoryPicker(GLuint textureUnit, MSceneViewGLWidget* sceneView, const QVector<QString>& varNames);
+    MTrajectoryPicker(
+            GLuint textureUnit, MSceneViewGLWidget* sceneView, const QVector<QString>& varNames,
+            DiagramDisplayType diagramType);
     ~MTrajectoryPicker();
 
     void render();
@@ -109,6 +111,19 @@ public:
             const QVector3D& cameraPosition, const QVector3D& rayDirection,
             QVector3D& firstHitPoint, uint32_t& trajectoryIndex, float& timeAtHit);
 
+    /**
+     * Checks whether a virtual (i.e., drawn using OpenGL) window is below
+     * the mouse cursor at @p mousePositionX, @p mousePositionY.
+     */
+    bool checkVirtualWindowBelowMouse(MSceneViewGLWidget* sceneView, int mousePositionX, int mousePositionY);
+
+    void mouseMoveEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event);
+    void mousePressEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event);
+    void mouseReleaseEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event);
+    void wheelEvent(MSceneViewGLWidget *sceneView, QWheelEvent *event);
+
+    void setDiagramType(DiagramDisplayType type);
+
     void toggleTrajectoryHighlighted(uint32_t trajectoryIndex);
     void setParticlePosTimeStep(int newTimeStep);
     MHighlightedTrajectoriesRenderData getHighlightedTrajectoriesRenderData(
@@ -130,6 +145,7 @@ private:
             QGLWidget *currentGLContext);
 #endif
 
+    GLuint textureUnit;
     MFilteredTrajectories baseTrajectories;
     QVector<QVector2D> minMaxAttributes;
     int timeStep = 0;
@@ -181,8 +197,8 @@ private:
     const QString vertexColorBufferHighlightedID =
             QString("beziertrajectories_vertex_color_buffer_highlighted_#%1").arg(getID());
     MHighlightedTrajectoriesRenderData highlightedTrajectoriesRenderData;
-    MDiagramBase* diagram;
-    DiagramDisplayType diagramDisplayType = DiagramDisplayType::RADAR_CHART_TIME_DEPENDENT;
+    MDiagramBase* diagram = nullptr;
+    DiagramDisplayType diagramDisplayType = DiagramDisplayType::HORIZON_GRAPH;
     QtExtensions::MMultiVarChartCollection multiVarCharts;
     QtExtensions::MRadarChart* radarChart;
     std::vector<std::string> variableNames;

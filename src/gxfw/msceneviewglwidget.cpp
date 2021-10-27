@@ -2032,7 +2032,26 @@ bool MSceneViewGLWidget::isViewPortResized()
 
 void MSceneViewGLWidget::mouseDoubleClickEvent(QMouseEvent *event)
 {
-    Q_UNUSED(event);
+    bool isVirtualWindowBelowMouse = false;
+    foreach (MActor* actor, scene->getRenderQueue())
+    {
+        bool widgetHasVirtualWindow = actor->checkVirtualWindowBelowMouse(this, event->x(), event->y());
+        isVirtualWindowBelowMouse = isVirtualWindowBelowMouse || widgetHasVirtualWindow;
+    }
+
+    if (isVirtualWindowBelowMouse)
+    {
+#ifndef CONTINUOUS_GL_UPDATE
+#ifdef USE_QOPENGLWIDGET
+        update();
+#else
+        updateGL();
+#endif
+#endif
+    }
+
+    if (isVirtualWindowBelowMouse) return;
+
     // Toggle interaction mode.
     if (!event->modifiers().testFlag(Qt::ControlModifier))
     {
@@ -2053,6 +2072,30 @@ void MSceneViewGLWidget::mouseDoubleClickEvent(QMouseEvent *event)
 
 void MSceneViewGLWidget::mousePressEvent(QMouseEvent *event)
 {
+    bool isVirtualWindowBelowMouse = false;
+    foreach (MActor* actor, scene->getRenderQueue())
+    {
+        bool widgetHasVirtualWindow = actor->checkVirtualWindowBelowMouse(this, event->x(), event->y());
+        if (widgetHasVirtualWindow)
+        {
+            actor->mousePressEvent(this, event);
+        }
+        isVirtualWindowBelowMouse = isVirtualWindowBelowMouse || widgetHasVirtualWindow;
+    }
+
+    if (isVirtualWindowBelowMouse)
+    {
+#ifndef CONTINUOUS_GL_UPDATE
+#ifdef USE_QOPENGLWIDGET
+        update();
+#else
+        updateGL();
+#endif
+#endif
+    }
+
+    if (isVirtualWindowBelowMouse) return;
+
     lastPos = event->pos();
     float clipX = -1. + 2.*(float(event->x()) / float(viewPortWidth));
     float clipY =  1. - 2.*(float(event->y()) / float(viewPortHeight));
@@ -2075,7 +2118,29 @@ void MSceneViewGLWidget::mousePressEvent(QMouseEvent *event)
 
 void MSceneViewGLWidget::mouseMoveEvent(QMouseEvent *event)
 {
-    if (freezeMode) return;
+    bool isVirtualWindowBelowMouse = false;
+    foreach (MActor* actor, scene->getRenderQueue())
+    {
+        bool widgetHasVirtualWindow = actor->checkVirtualWindowBelowMouse(this, event->x(), event->y());
+        if (widgetHasVirtualWindow)
+        {
+            actor->mouseMoveEvent(this, event);
+        }
+        isVirtualWindowBelowMouse = isVirtualWindowBelowMouse || widgetHasVirtualWindow;
+    }
+
+    if (isVirtualWindowBelowMouse)
+    {
+#ifndef CONTINUOUS_GL_UPDATE
+#ifdef USE_QOPENGLWIDGET
+        update();
+#else
+        updateGL();
+#endif
+#endif
+    }
+
+    if (freezeMode || isVirtualWindowBelowMouse) return;
 
     // A) INTERACTION MODE.
     // ========================================================================
@@ -2287,7 +2352,29 @@ void MSceneViewGLWidget::mouseMoveEvent(QMouseEvent *event)
 
 void MSceneViewGLWidget::mouseReleaseEvent(QMouseEvent *event)
 {
-    if (freezeMode) return;
+    bool isVirtualWindowBelowMouse = false;
+    foreach (MActor* actor, scene->getRenderQueue())
+    {
+        bool widgetHasVirtualWindow = actor->checkVirtualWindowBelowMouse(this, event->x(), event->y());
+        if (widgetHasVirtualWindow)
+        {
+            actor->mouseReleaseEvent(this, event);
+        }
+        isVirtualWindowBelowMouse = isVirtualWindowBelowMouse || widgetHasVirtualWindow;
+    }
+
+    if (isVirtualWindowBelowMouse)
+    {
+#ifndef CONTINUOUS_GL_UPDATE
+#ifdef USE_QOPENGLWIDGET
+        update();
+#else
+        updateGL();
+#endif
+#endif
+    }
+
+    if (freezeMode || isVirtualWindowBelowMouse) return;
 
     if (actorInteractionMode && pickedActor.actor != nullptr)
     {
@@ -2364,6 +2451,17 @@ void MSceneViewGLWidget::wheelEvent(QWheelEvent *event)
 {
     MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
 
+    bool isVirtualWindowBelowMouse = false;
+    foreach (MActor* actor, scene->getRenderQueue())
+    {
+        bool widgetHasVirtualWindow = actor->checkVirtualWindowBelowMouse(this, event->x(), event->y());
+        if (widgetHasVirtualWindow)
+        {
+            actor->wheelEvent(this, event);
+        }
+        isVirtualWindowBelowMouse = isVirtualWindowBelowMouse || widgetHasVirtualWindow;
+    }
+
     if (actorInteractionMode || analysisMode
             || sceneNavigationMode == SINGLE_FULLSCREEN_ACTOR)
     {
@@ -2390,7 +2488,7 @@ void MSceneViewGLWidget::wheelEvent(QWheelEvent *event)
 //            scene->timeBackward();
 //        }
     }
-    else
+    else if (!isVirtualWindowBelowMouse)
     {
         // starts scroll timer and sets scrolling to true
         userIsScrolling = true;

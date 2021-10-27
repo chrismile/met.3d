@@ -42,6 +42,7 @@
 #include "src/data/multivar/helpers.h"
 #include "src/data/multivar/hidpi.h"
 #include "diagrambase.h"
+#include "aabb2.h"
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -117,11 +118,36 @@ QString getFontPath(const std::set<QString>& preferredFontNames) {
 }
 
 MDiagramBase::MDiagramBase(GLint textureUnit) : textureUnit(textureUnit) {
+    if (!vg)
+    {
+        int flags = NVG_STENCIL_STROKES;
+        if (!useMsaa)
+        {
+            flags |= NVG_ANTIALIAS;
+        }
+#ifndef NDEBUG
+        flags |= NVG_DEBUG;
+#endif
+        vg = nvgCreateGL3(flags);
+
+        static QString fontFilename;
+        static bool fontFilenameLoaded = false;
+        if (!fontFilenameLoaded)
+        {
+            fontFilename = getFontPath({ "Liberation Sans", "Droid Sans" });
+            fontFilenameLoaded = true;
+        }
+        std::cout << "Used font: " << fontFilename.toStdString() << std::endl;
+        int font = nvgCreateFont(vg, "sans", fontFilename.toStdString().c_str());
+        if (font == -1) {
+            LOG4CPLUS_ERROR(mlog, "Error in MDiagramBase::MDiagramBase: Couldn't find the font file.");
+        }
+    }
 }
 
 void MDiagramBase::initialize() {
     windowOffsetX = 20;
-    windowOffsetY = 20;
+    windowOffsetY = 30;
 
     MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
     glRM->generateEffectProgram("blit_shader", blitShader);
@@ -136,43 +162,33 @@ void MDiagramBase::onWindowSizeChanged() {
     fboWidthInternal = fboWidthDisplay * supersamplingFactor;
     fboHeightInternal = fboHeightDisplay * supersamplingFactor;
 
-    if (fbo) {
+    if (fbo)
+    {
         delete fbo;
         fbo = nullptr;
     }
-    if (colorRenderTexture) {
+    if (colorRenderTexture)
+    {
         delete colorRenderTexture;
         colorRenderTexture = nullptr;
     }
-    if (depthStencilRbo) {
+    if (depthStencilRbo)
+    {
         delete depthStencilRbo;
         depthStencilRbo = nullptr;
+    }
+    if (blitVertexDataBuffer)
+    {
+        delete blitVertexDataBuffer;
+        blitVertexDataBuffer = nullptr;
     }
 }
 
 void MDiagramBase::createRenderData() {
     MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
 
-    if (!vg) {
-        int flags = NVG_STENCIL_STROKES;
-        if (!useMsaa) {
-            flags |= NVG_ANTIALIAS;
-        }
-#ifndef NDEBUG
-        flags |= NVG_DEBUG;
-#endif
-        vg = nvgCreateGL3(flags);
-
-        QString fontFilename = getFontPath({ "Liberation Sans", "Droid Sans" });
-        std::cout << "Used font: " << fontFilename.toStdString() << std::endl;
-        int font = nvgCreateFont(vg, "sans", fontFilename.toStdString().c_str());
-        if (font == -1) {
-            LOG4CPLUS_ERROR(mlog, "Error in MDiagramBase::MDiagramBase: Couldn't find the font file.");
-        }
-    }
-
-
-    if (!blitVertexDataBuffer) {
+    if (!blitVertexDataBuffer)
+    {
         QVector2D min = QVector2D(windowOffsetX, windowOffsetY);
         QVector2D max = QVector2D(windowOffsetX + float(fboWidthDisplay), windowOffsetY + float(fboHeightDisplay));
 
@@ -188,11 +204,18 @@ void MDiagramBase::createRenderData() {
                 { { max.x(), max.y(), 0 }, { 1, 1 } },
                 { { min.x(), max.y(), 0 }, { 0, 1 } }};
         QString vboID = QString("radarBarChartVbo_%1").arg(getID());
-        blitVertexDataBuffer = createVertexBuffer(glRM, vboID, vertexPositions);
+        //blitVertexDataBuffer = createVertexBuffer(glRM, vboID, vertexPositions);
+
+        // No buffer with this item's data exists. Create a new one.
+        GL::MTypedVertexBuffer<Vertex, GLfloat, sizeof(Vertex) / 4> *vb =
+                new GL::MTypedVertexBuffer<Vertex, GLfloat, sizeof(Vertex) / 4>(vboID, vertexPositions.size());
+        vb->upload(vertexPositions, glRM);
+        blitVertexDataBuffer = static_cast<GL::MVertexBuffer*>(vb);
     }
 
 
-    if (!fbo) {
+    if (!fbo)
+    {
         // Create the render texture.
         QString textureID = QString("radarBarChartRenderTexture_#%1").arg(getID());
         GLenum target;
@@ -208,11 +231,11 @@ void MDiagramBase::createRenderData() {
             colorRenderTexture = new GL::MTexture(
                     textureID, target, GL_RGBA8, fboWidthInternal, fboHeightInternal);
         }
-        if (!glRM->tryStoreGPUItem(colorRenderTexture))
+        /*if (!glRM->tryStoreGPUItem(colorRenderTexture))
         {
             delete colorRenderTexture;
             colorRenderTexture = nullptr;
-        }
+        }*/
         if (colorRenderTexture)
         {
             colorRenderTexture->bindToLastTextureUnit();
@@ -239,21 +262,21 @@ void MDiagramBase::createRenderData() {
         depthStencilRbo = new GL::MRenderbuffer(
                 rboID, GL_DEPTH24_STENCIL8, fboWidthInternal, fboHeightInternal,
                 useMsaa ? numMsaaSamples : 0);
-        if (!glRM->tryStoreGPUItem(depthStencilRbo))
+        /*if (!glRM->tryStoreGPUItem(depthStencilRbo))
         {
             delete depthStencilRbo;
             depthStencilRbo = nullptr;
-        }
+        }*/
 
         QString fboID = QString("radarBarChartFbo_#%1").arg(getID());
         fbo = new GL::MFramebuffer(fboID);
         fbo->bindTexture(colorRenderTexture, GL::COLOR_ATTACHMENT);
         fbo->bindRenderbuffer(depthStencilRbo, GL::DEPTH_STENCIL_ATTACHMENT);
-        if (!glRM->tryStoreGPUItem(fbo))
+        /*if (!glRM->tryStoreGPUItem(fbo))
         {
             delete fbo;
             fbo = nullptr;
-        }
+        }*/
 
         GLint oldDrawFbo = 0, oldReadFbo = 0;
         glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &oldDrawFbo);
@@ -265,6 +288,27 @@ void MDiagramBase::createRenderData() {
 }
 
 MDiagramBase::~MDiagramBase() {
+    if (fbo)
+    {
+        delete fbo;
+        fbo = nullptr;
+    }
+    if (colorRenderTexture)
+    {
+        delete colorRenderTexture;
+        colorRenderTexture = nullptr;
+    }
+    if (depthStencilRbo)
+    {
+        delete depthStencilRbo;
+        depthStencilRbo = nullptr;
+    }
+    if (blitVertexDataBuffer)
+    {
+        delete blitVertexDataBuffer;
+        blitVertexDataBuffer = nullptr;
+    }
+
     if (vg) {
         nvgDeleteGL3(vg);
     }
@@ -274,13 +318,18 @@ MDiagramBase::~MDiagramBase() {
 #define SHADER_TEXTURE_ATTRIBUTE 1
 
 void MDiagramBase::render() {
-    if (!hasData()) {
+    if (!hasData())
+    {
         return;
     }
     createRenderData();
 
-    NVGcolor backgroundFillColor = nvgRGBA(180, 180, 180, 70);
-    NVGcolor backgroundStrokeColor = nvgRGBA(120, 120, 120, 120);
+    //NVGcolor backgroundFillColor = nvgRGBA(180, 180, 180, 70);
+    //NVGcolor backgroundStrokeColor = nvgRGBA(120, 120, 120, 120);
+    //NVGcolor backgroundFillColor = nvgRGBA(215, 215, 215, 127);
+    //NVGcolor backgroundStrokeColor = nvgRGBA(190, 190, 190, 190);
+    NVGcolor backgroundFillColor = nvgRGBA(230, 230, 230, 190);
+    NVGcolor backgroundStrokeColor = nvgRGBA(190, 190, 190, 190);
 
     GLint oldDrawFbo = 0, oldReadFbo = 0;
     glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &oldDrawFbo);
@@ -292,6 +341,7 @@ void MDiagramBase::render() {
     glDepthMask(GL_FALSE); CHECK_GL_ERROR;
     fbo->bind();
     glViewport(0, 0, fboWidthInternal, fboHeightInternal);
+    glStencilMask(0xffffffff);
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f); CHECK_GL_ERROR;
     glClear(GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT); CHECK_GL_ERROR;
     nvgBeginFrame(vg, windowWidth, windowHeight, scaleFactor * supersamplingFactor);
@@ -366,6 +416,15 @@ void MDiagramBase::render() {
 
     glEnable(GL_DEPTH_TEST); CHECK_GL_ERROR;
     glDepthMask(GL_TRUE); CHECK_GL_ERROR;
+}
+
+bool MDiagramBase::isMouseOverDiagram(const QVector2D& mousePosition) const
+{
+    AABB2 aabb;
+    aabb.min = QVector2D(windowOffsetX, windowOffsetY);
+    aabb.max = QVector2D(windowOffsetX + float(fboWidthDisplay), windowOffsetY + float(fboHeightDisplay));
+
+    return aabb.contains(mousePosition);
 }
 
 

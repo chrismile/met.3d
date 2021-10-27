@@ -34,14 +34,17 @@
 
 // local application imports
 #include "../../gxfw/msceneviewglwidget.h"
+#include "charts/radarchart.h"
+#include "charts/radarbarchart.h"
+#include "charts/horizongraph.h"
 #include "util/mutil.h"
 #include "helpers.h"
 
 namespace Met3D {
 
 MTrajectoryPicker::MTrajectoryPicker(
-        GLuint textureUnit, MSceneViewGLWidget* sceneView, const QVector<QString>& varNames)
-        : multiVarCharts(sceneView)
+        GLuint textureUnit, MSceneViewGLWidget* sceneView, const QVector<QString>& varNames,
+        DiagramDisplayType diagramType) : textureUnit(textureUnit), multiVarCharts(sceneView)
 {
     device = rtcNewDevice(nullptr);
     scene = rtcNewScene(device);
@@ -65,8 +68,48 @@ MTrajectoryPicker::MTrajectoryPicker(
     //radarChart->setRenderHint(QPainter::Antialiasing);
     //multiVarCharts.addChartView(radarChart);
 
-    diagram = new MRadarBarChart(textureUnit);
-    diagram->initialize();
+    setDiagramType(diagramType);
+}
+
+void MTrajectoryPicker::setDiagramType(DiagramDisplayType type)
+{
+    // Make sure that "MGLResourcesManager" is the currently active context,
+    // otherwise glDrawArrays on the VBO generated here will fail in any other
+    // context than the currently active. The "MGLResourcesManager" context is
+    // shared with all visible contexts, hence modifying the VBO there works
+    // fine.
+    MGLResourcesManager::getInstance()->makeCurrent();
+
+    if (diagram)
+    {
+        delete diagram;
+        diagram = nullptr;
+    }
+
+    diagramDisplayType = type;
+    if (diagramDisplayType == DiagramDisplayType::RADAR_CHART)
+    {
+        diagram = new MRadarChart(textureUnit);
+    }
+    else if (diagramDisplayType == DiagramDisplayType::RADAR_BAR_CHART_TIME_DEPENDENT
+            || diagramDisplayType == DiagramDisplayType::RADAR_BAR_CHART_TIME_INDEPENDENT)
+    {
+        diagram = new MRadarBarChart(textureUnit);
+    }
+    else if (diagramDisplayType == DiagramDisplayType::HORIZON_GRAPH)
+    {
+        diagram = new MHorizonGraph(textureUnit);
+    }
+
+    if (diagram)
+    {
+        diagram->initialize();
+        updateDiagramData();
+    }
+
+#ifdef USE_QOPENGLWIDGET
+    MGLResourcesManager::getInstance()->doneCurrent();
+#endif
 }
 
 MTrajectoryPicker::~MTrajectoryPicker()
@@ -98,8 +141,12 @@ void MTrajectoryPicker::freeStorage()
     }
 }
 
-void MTrajectoryPicker::render() {
-    diagram->render();
+void MTrajectoryPicker::render()
+{
+    if (diagram)
+    {
+        diagram->render();
+    }
 }
 
 void MTrajectoryPicker::setTrajectoryData(
@@ -156,6 +203,13 @@ void MTrajectoryPicker::setBaseTrajectories(const MFilteredTrajectories& filtere
                 minMaxVector.setX(std::min(minMaxVector.x(), v));
                 minMaxVector.setY(std::max(minMaxVector.y(), v));
             }
+        }
+    }
+    for (size_t i = 0; i < numVars; i++)
+    {
+        QVector2D& minMax = minMaxAttributes[int(i)];
+        if (std::isinf(minMax[1])) {
+            minMax[1] = std::numeric_limits<float>::max();
         }
     }
 }
@@ -345,6 +399,56 @@ bool MTrajectoryPicker::pickPointScreen(
             sceneView->getCamera()->getOrigin(), rayDirection, firstHitPoint, trajectoryIndex, timeAtHit);
 }
 
+bool MTrajectoryPicker::checkVirtualWindowBelowMouse(
+        MSceneViewGLWidget* sceneView, int mousePositionX, int mousePositionY)
+{
+    if (!diagram)
+    {
+        return false;
+    }
+
+    int viewportHeight = sceneView->getViewPortHeight();
+    QVector2D mousePosition(float(mousePositionX), float(viewportHeight - mousePositionY - 1));
+    return diagram->isMouseOverDiagram(mousePosition) && diagram->hasData();
+}
+
+void MTrajectoryPicker::mouseMoveEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event)
+{
+    if (!diagram)
+    {
+        return;
+    }
+    diagram->mouseMoveEvent(sceneView, event);
+}
+
+void MTrajectoryPicker::mousePressEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event)
+{
+    if (!diagram)
+    {
+        return;
+    }
+    diagram->mousePressEvent(sceneView, event);
+}
+
+void MTrajectoryPicker::mouseReleaseEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event)
+{
+    if (!diagram)
+    {
+        return;
+    }
+    diagram->mouseReleaseEvent(sceneView, event);
+}
+
+void MTrajectoryPicker::wheelEvent(MSceneViewGLWidget *sceneView, QWheelEvent *event)
+{
+    if (!diagram)
+    {
+        return;
+    }
+    diagram->wheelEvent(sceneView, event);
+}
+
+
 bool MTrajectoryPicker::pickPointWorld(
         const QVector3D& cameraPosition, const QVector3D& rayDirection,
         QVector3D& firstHitPoint, uint32_t& trajectoryIndex, float& timeAtHit)
@@ -402,9 +506,9 @@ void MTrajectoryPicker::toggleTrajectoryHighlighted(uint32_t trajectoryIndex)
     if (it != highlightedTrajectories.end())
     {
         //radarChart->removeRadar(trajectoryIndex);
-        updateDiagramData();
         colorUsesCountMap[it->second] -= 1;
         highlightedTrajectories.erase(trajectoryIndex);
+        updateDiagramData();
         return;
     }
 
@@ -455,7 +559,8 @@ void MTrajectoryPicker::toggleTrajectoryHighlighted(uint32_t trajectoryIndex)
         int time = clamp(timeStep, 0, int(trajectory.attributes.at(int(i)).size()) - 1);
         float value = trajectory.attributes.at(int(i)).at(time);
         QVector2D minMaxVector = minMaxAttributes.at(int(i));
-        value = (value - minMaxVector.x()) / (minMaxVector.y() - minMaxVector.x());
+        float denominator = std::max(minMaxVector.y() - minMaxVector.x(), 1e-10f);
+        value = (value - minMaxVector.x()) / denominator;
         values.push_back(value);
     }
     //radarChart->addRadar(
@@ -484,7 +589,8 @@ void MTrajectoryPicker::setParticlePosTimeStep(int newTimeStep)
             int time = clamp(timeStep, 0, int(trajectory.attributes.at(int(i)).size()) - 1);
             float value = trajectory.attributes.at(int(i)).at(time);
             QVector2D minMaxVector = minMaxAttributes.at(int(i));
-            value = (value - minMaxVector.x()) / (minMaxVector.y() - minMaxVector.x());
+            float denominator = std::max(minMaxVector.y() - minMaxVector.x(), 1e-10f);
+            value = (value - minMaxVector.x()) / denominator;
             values.push_back(value);
         }
         //radarChart->addRadar(
@@ -495,9 +601,16 @@ void MTrajectoryPicker::setParticlePosTimeStep(int newTimeStep)
 
 void MTrajectoryPicker::updateDiagramData()
 {
-    if (diagram->getDiagramType() == DiagramType::RADAR_BAR_CHART) {
+    if (!diagram)
+    {
+        return;
+    }
+
+    if (diagram->getDiagramType() == DiagramType::RADAR_BAR_CHART)
+    {
         MRadarBarChart* radarBarChart = static_cast<MRadarBarChart*>(diagram);
-        if (diagramDisplayType == DiagramDisplayType::RADAR_CHART_TIME_DEPENDENT) {
+        if (diagramDisplayType == DiagramDisplayType::RADAR_BAR_CHART_TIME_DEPENDENT)
+        {
             std::vector<std::vector<float>> variableValuesTimeDependent;
             variableValuesTimeDependent.reserve(highlightedTrajectories.size());
             for (const auto& it : highlightedTrajectories)
@@ -511,17 +624,95 @@ void MTrajectoryPicker::updateDiagramData()
                     int time = clamp(timeStep, 0, int(trajectory.attributes.at(int(i)).size()) - 1);
                     float value = trajectory.attributes.at(int(i)).at(time);
                     QVector2D minMaxVector = minMaxAttributes.at(int(i));
-                    value = (value - minMaxVector.x()) / (minMaxVector.y() - minMaxVector.x() + 1e-10);
+                    float denominator = std::max(minMaxVector.y() - minMaxVector.x(), 1e-10f);
+                    value = (value - minMaxVector.x()) / denominator;
                     values.push_back(value);
                 }
                 variableValuesTimeDependent.push_back(values);
-                //radarChart->addRadar(
-                //        trajectoryIndex, QString("Trajectory #%1").arg(trajectoryIndex), highlightColor, values);
             }
             radarBarChart->setDataTimeDependent(variableNames, variableValuesTimeDependent);
-        } else {
-            //radarBarChart->setDataTimeIndependent(variableNames, variableValues);
         }
+        else if (!highlightedTrajectories.empty())
+        {
+            uint32_t trajectoryIndex = highlightedTrajectories.begin()->first;
+            const MFilteredTrajectory& trajectory = baseTrajectories.at(int(trajectoryIndex));
+            std::vector<float> variableValues;
+            for (size_t i = 0; i < numVars; i++)
+            {
+                int time = clamp(timeStep, 0, int(trajectory.attributes.at(int(i)).size()) - 1);
+                float value = trajectory.attributes.at(int(i)).at(time);
+                QVector2D minMaxVector = minMaxAttributes.at(int(i));
+                float denominator = std::max(minMaxVector.y() - minMaxVector.x(), 1e-10f);
+                value = (value - minMaxVector.x()) / denominator;
+                variableValues.push_back(value);
+            }
+            radarBarChart->setDataTimeIndependent(variableNames, variableValues);
+        }
+    }
+    else if (diagram->getDiagramType() == DiagramType::RADAR_CHART)
+    {
+        MRadarChart* radarChart = static_cast<MRadarChart*>(diagram);
+        std::vector<std::vector<float>> variableValuesPerTrajectory;
+        std::vector<QColor> highlightColors;
+        variableValuesPerTrajectory.reserve(highlightedTrajectories.size());
+        highlightColors.reserve(highlightedTrajectories.size());
+        for (const auto& it : highlightedTrajectories)
+        {
+            uint32_t trajectoryIndex = it.first;
+            const QColor& highlightColor = it.second;
+            const MFilteredTrajectory& trajectory = baseTrajectories.at(int(trajectoryIndex));
+            std::vector<float> values;
+            for (size_t i = 0; i < numVars; i++)
+            {
+                int time = clamp(timeStep, 0, int(trajectory.attributes.at(int(i)).size()) - 1);
+                float value = trajectory.attributes.at(int(i)).at(time);
+                QVector2D minMaxVector = minMaxAttributes.at(int(i));
+                float denominator = std::max(minMaxVector.y() - minMaxVector.x(), 1e-10f);
+                value = (value - minMaxVector.x()) / denominator;
+                if (std::isinf(value)) {
+                    value = 1.0f;
+                }
+                if (std::isnan(value)) {
+                    value = 0.0f;
+                }
+                values.push_back(value);
+            }
+            variableValuesPerTrajectory.push_back(values);
+            highlightColors.push_back(highlightColor);
+        }
+        radarChart->setData(variableNames, variableValuesPerTrajectory, highlightColors);
+    }
+    else if (diagram->getDiagramType() == DiagramType::HORIZON_GRAPH)
+    {
+        const size_t numTimeSteps = baseTrajectories.empty() ? 1 : baseTrajectories.front().positions.size();
+
+        MHorizonGraph* horizonGraph = static_cast<MHorizonGraph*>(diagram);
+        std::vector<std::vector<std::vector<float>>> variableValuesArray;
+        variableValuesArray.resize(highlightedTrajectories.size());
+        int i = 0;
+        for (const auto& it : highlightedTrajectories)
+        {
+            uint32_t trajectoryIndex = it.first;
+            const MFilteredTrajectory& trajectory = baseTrajectories.at(int(trajectoryIndex));
+            std::vector<std::vector<float>>& variableValuesPerTrajectory = variableValuesArray.at(i);
+            variableValuesPerTrajectory.resize(numTimeSteps);
+            for (size_t timeIdx = 0; timeIdx < numTimeSteps; timeIdx++)
+            {
+                std::vector<float>& values = variableValuesPerTrajectory.at(timeIdx);
+                values.resize(numVars);
+                for (size_t varIdx = 0; varIdx < numVars; varIdx++)
+                {
+                    float value = trajectory.attributes.at(int(varIdx)).at(int(timeIdx));
+                    QVector2D minMaxVector = minMaxAttributes.at(int(varIdx));
+                    float denominator = std::max(minMaxVector.y() - minMaxVector.x(), 1e-10f);
+                    value = (value - minMaxVector.x()) / denominator;
+                    values.at(varIdx) = value;
+                }
+            }
+            i++;
+        }
+
+        horizonGraph->setData(variableNames, 0.0f, float(numTimeSteps - 1), variableValuesArray);
     }
 }
 

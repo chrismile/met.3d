@@ -32,6 +32,7 @@
 // local application imports
 #include "../helpers.h"
 #include "horizongraph.h"
+#include "aabb2.h"
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -93,7 +94,7 @@ void MHorizonGraph::initialize() {
 }
 
 void MHorizonGraph::setData(
-        const std::vector<std::string>& variableNames, float timeMax, float timeMin,
+        const std::vector<std::string>& variableNames, float timeMin, float timeMax,
         const std::vector<std::vector<std::vector<float>>>& variableValuesArray) {
     this->variableNames = variableNames;
     this->variableValuesArray = variableValuesArray;
@@ -119,6 +120,7 @@ void MHorizonGraph::setData(
         windowHeight = maxWindowHeight;
         windowWidth += scrollBarWidth;
     }
+    recomputeScrollThumbHeight();
 
     // Compute metadata.
     this->timeMin = timeMin;
@@ -128,7 +130,16 @@ void MHorizonGraph::setData(
     } else {
         numTimeSteps = variableValuesArray.front().size();
     }
-    timeStepLegendIncrement = 5;
+    if (numTimeSteps < 10) {
+        timeStepLegendIncrement = 1;
+        timeStepTicksIncrement = 1;
+    } else if (numTimeSteps < 50) {
+        timeStepLegendIncrement = 5;
+        timeStepTicksIncrement = 1;
+    } else {
+        timeStepLegendIncrement = numTimeSteps / 10;
+        timeStepTicksIncrement = timeStepLegendIncrement / 5;
+    }
     numTrajectories = variableValuesArray.size();
     numVariables = variableNames.size();
 
@@ -143,18 +154,27 @@ void MHorizonGraph::setData(
         for (size_t varIdx = 0; varIdx < numVariables; varIdx++) {
             float& mean = meanValuesAtTime.at(varIdx);
             float& stdDev = stdDevsAtTime.at(varIdx);
+            mean = 0.0f;
             for (size_t trajectoryIdx = 0; trajectoryIdx < numTrajectories; trajectoryIdx++) {
                 float value = variableValuesArray.at(trajectoryIdx).at(timeStepIdx).at(varIdx);
                 mean += value / float(numTrajectories);
             }
             float variance = 0.0f;
+            float numTrajectoriesMinOne = std::max(float(numTrajectories - 1), 1e-8f);
             for (size_t trajectoryIdx = 0; trajectoryIdx < numTrajectories; trajectoryIdx++) {
                 float value = variableValuesArray.at(trajectoryIdx).at(timeStepIdx).at(varIdx);
                 float diff = value - mean;
-                variance += diff * diff / float(numTrajectories - 1);
+                variance += diff * diff / numTrajectoriesMinOne;
             }
             stdDev = std::sqrt(variance);
         }
+    }
+
+    sortingIdx = -1;
+    sortedVariableIndices.clear();
+    sortedVariableIndices.reserve(variableNames.size());
+    for (size_t varIdx = 0; varIdx < numVariables; varIdx++) {
+        sortedVariableIndices.push_back(varIdx);
     }
 
     onWindowSizeChanged();
@@ -179,12 +199,36 @@ QVector3D MHorizonGraph::transferFunction(float value) {
     return mix(colorLast, colorNext, t);
 }
 
+void MHorizonGraph::drawHorizonBackground() {
+    NVGcolor backgroundFillColor = nvgRGBA(255, 255, 255, 100);
+    for (size_t heightIdx = 0; heightIdx < numVariables; heightIdx++) {
+        float lowerY = offsetHorizonBarsY + float(heightIdx) * (horizonBarHeight + horizonBarMargin);
+        nvgBeginPath(vg);
+        nvgRect(vg, offsetHorizonBarsX, lowerY, horizonBarWidth, horizonBarHeight);
+        nvgFillColor(vg, backgroundFillColor);
+        nvgFill(vg);
+    }
+}
+
 void MHorizonGraph::drawHorizonLines() {
-    for (size_t varIdx = 0; varIdx < variableNames.size(); varIdx++) {
+    AABB2 scissorAabb(
+            QVector2D(borderWidth, offsetHorizonBarsY + scrollTranslationY),
+            QVector2D(windowWidth - borderWidth, windowHeight - borderWidth + scrollTranslationY));
+
+    size_t heightIdx = 0;
+    for (size_t varIdx : sortedVariableIndices) {
         NVGcolor strokeColor = nvgRGBA(0, 0, 0, 255);
 
-        float lowerY = offsetHorizonBarsY + float(varIdx) * (horizonBarHeight + horizonBarMargin);
+        float lowerY = offsetHorizonBarsY + float(heightIdx) * (horizonBarHeight + horizonBarMargin);
         float upperY = lowerY + horizonBarHeight;
+
+        AABB2 boxAabb(
+                QVector2D(offsetHorizonBarsX, lowerY),
+                QVector2D(offsetHorizonBarsX + horizonBarWidth, lowerY + horizonBarHeight));
+        if (!scissorAabb.intersects(boxAabb)) {
+            heightIdx++;
+            continue;
+        }
 
         if (mapStdDevToColor) {
             for (size_t timeStepIdx = 0; timeStepIdx < numTimeSteps - 1; timeStepIdx++) {
@@ -246,12 +290,14 @@ void MHorizonGraph::drawHorizonLines() {
         }
         nvgStrokeColor(vg, strokeColor);
         nvgStroke(vg);
+
+        heightIdx++;
     }
 }
 
 void MHorizonGraph::drawHorizonOutline(const NVGcolor& textColor) {
-    for (size_t varIdx = 0; varIdx < variableNames.size(); varIdx++) {
-        float lowerY = offsetHorizonBarsY + float(varIdx) * (horizonBarHeight + horizonBarMargin);
+    for (size_t heightIdx = 0; heightIdx < numVariables; heightIdx++) {
+        float lowerY = offsetHorizonBarsY + float(heightIdx) * (horizonBarHeight + horizonBarMargin);
         nvgBeginPath(vg);
         nvgRect(vg, offsetHorizonBarsX, lowerY, horizonBarWidth, horizonBarHeight);
         nvgStrokeWidth(vg, 0.25f);
@@ -263,14 +309,16 @@ void MHorizonGraph::drawHorizonOutline(const NVGcolor& textColor) {
 void MHorizonGraph::drawLegendLeft(const NVGcolor& textColor) {
     nvgFontSize(vg, textSize);
     nvgFontFace(vg, "sans");
-    for (size_t varIdx = 0; varIdx < variableNames.size(); varIdx++) {
-        float lowerY = offsetHorizonBarsY + float(varIdx) * (horizonBarHeight + horizonBarMargin);
+    size_t heightIdx = 0;
+    for (size_t varIdx : sortedVariableIndices) {
+        float lowerY = offsetHorizonBarsY + float(heightIdx) * (horizonBarHeight + horizonBarMargin);
         float upperY = lowerY + horizonBarHeight;
         nvgTextAlign(vg, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
         nvgFillColor(vg, textColor);
         nvgText(
                 vg, borderSizeX, lowerY + horizonBarHeight / 2.0f,
                 variableNames.at(varIdx).c_str(), nullptr);
+        heightIdx++;
     }
 }
 
@@ -291,7 +339,7 @@ void MHorizonGraph::drawTicks(const NVGcolor& textColor) {
     const float tickWidthBase = 0.5f;
     const float tickHeightBase = 2.0f;
     nvgBeginPath(vg);
-    for (size_t timeStepIdx = 0; timeStepIdx < numTimeSteps; timeStepIdx++) {
+    for (size_t timeStepIdx = 0; timeStepIdx < numTimeSteps; timeStepIdx += timeStepTicksIncrement) {
         float thicknessFactor = 1.0f;
         if (timeStepIdx % timeStepLegendIncrement == 0) {
             thicknessFactor = 2.0f;
@@ -346,6 +394,7 @@ void MHorizonGraph::renderBase() {
     //nvgScissor(vg, borderWidth, borderWidth, windowWidth - 2.0f * borderWidth, windowHeight - 2.0f * borderWidth);
     nvgTranslate(vg, 0.0f, -scrollTranslationY);
 
+    drawHorizonBackground();
     drawHorizonLines();
     drawHorizonOutline(textColor);
     drawLegendLeft(textColor);
@@ -376,64 +425,138 @@ void MHorizonGraph::recomputeScrollThumbHeight() {
     scrollThumbHeight = windowHeight / fullWindowHeight * (windowHeight - 2.0f * borderWidth);
 }
 
-void MHorizonGraph::update(float dt) {
-    /*QVector2D mousePosition(sgl::Mouse->getX(), sgl::Mouse->getY());
-    mousePosition.y = float(sgl::AppSettings::get()->getMainWindow()->getHeight()) - mousePosition.y;
+void MHorizonGraph::mouseMoveEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event)
+{
+    int viewportHeight = sceneView->getViewPortHeight();
+    QVector2D mousePosition(float(event->x()), float(viewportHeight - event->y() - 1));
     mousePosition -= QVector2D(getWindowOffsetX(), getWindowOffsetY());
     mousePosition /= getScaleFactor();
-    mousePosition.y = windowHeight - mousePosition.y;
-
-    sgl::AABB2 windowAabb(
-            QVector2D(borderWidth),
-            QVector2D(windowWidth - 2.0f * borderWidth, windowHeight - 2.0f * borderWidth));
-    if (windowAabb.contains(mousePosition) && (sgl::Keyboard->getModifier() & KMOD_CTRL) == 0) {
-        scrollTranslationY += -2000.0f * dt * sgl::Mouse->getScrollWheel();
-    }
-
-    recomputeScrollThumbHeight();
-
-    QVector2D scrollMin(windowWidth - scrollBarWidth, scrollThumbPosition);
-    sgl::AABB2 scrollThumbAabb(
-            scrollMin,
-            QVector2D(scrollMin.x + scrollBarWidth - borderWidth, scrollMin.y + scrollThumbHeight));
-    sgl::AABB2 scrollAreaAabb(
-            QVector2D(windowWidth - scrollBarWidth + borderWidth, borderWidth),
-            QVector2D(windowWidth - borderWidth, windowHeight - borderWidth));
-    if (scrollThumbAabb.contains(mousePosition)) {
-        scrollThumbHover = true;
-        if (sgl::Mouse->buttonPressed(1)) {
-            scrollThumbDrag = true;
-            thumbDragDelta = scrollThumbPosition - mousePosition.y;
-        }
-    } else {
-        scrollThumbHover = false;
-        if (scrollAreaAabb.contains(mousePosition)) {
-            if (sgl::Mouse->isButtonDown(1)) {
-                // Jump to clicked position on scroll bar.
-                scrollTranslationY = remap(
-                        mousePosition.y - scrollThumbHeight / 2.0f,
-                        borderWidth, windowHeight - borderWidth - scrollThumbHeight,
-                        0.0f, fullWindowHeight - windowHeight);
-            }
-        }
-    }
-
-    if (sgl::Mouse->buttonReleased(1)) {
-        scrollThumbDrag = false;
-    }
+    mousePosition[1] = windowHeight - mousePosition.y();
 
     if (scrollThumbDrag) {
         scrollTranslationY = remap(
-                mousePosition.y + thumbDragDelta,
+                mousePosition.y() + thumbDragDelta,
                 borderWidth, windowHeight - borderWidth - scrollThumbHeight,
                 0.0f, fullWindowHeight - windowHeight);
     }
 
-    if ((sgl::Keyboard->getModifier() & KMOD_CTRL) != 0 && sgl::Mouse->getScrollWheel() != 0.0f) {
-        zoomFactor *= (1.0f + dt * sgl::Mouse->getScrollWheel());
+    QVector2D scrollMin(windowWidth - scrollBarWidth, scrollThumbPosition);
+    AABB2 scrollThumbAabb(
+            scrollMin,
+            QVector2D(scrollMin.x() + scrollBarWidth - borderWidth, scrollMin.y() + scrollThumbHeight));
+    if (scrollThumbAabb.contains(mousePosition)) {
+        scrollThumbHover = true;
+    } else {
+        scrollThumbHover = false;
+    }
+
+    scrollTranslationY = clamp(scrollTranslationY, 0.0f, fullWindowHeight - windowHeight);
+    scrollThumbPosition = remap(
+            scrollTranslationY,
+            0.0f, fullWindowHeight - windowHeight,
+            borderWidth, windowHeight - borderWidth - scrollThumbHeight);
+}
+
+void MHorizonGraph::mousePressEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event)
+{
+    int viewportHeight = sceneView->getViewPortHeight();
+    QVector2D mousePosition(float(event->x()), float(viewportHeight - event->y() - 1));
+    mousePosition -= QVector2D(getWindowOffsetX(), getWindowOffsetY());
+    mousePosition /= getScaleFactor();
+    mousePosition[1] = windowHeight - mousePosition.y();
+
+    QVector2D scrollMin(windowWidth - scrollBarWidth, scrollThumbPosition);
+    AABB2 scrollThumbAabb(
+            scrollMin,
+            QVector2D(scrollMin.x() + scrollBarWidth - borderWidth, scrollMin.y() + scrollThumbHeight));
+    AABB2 scrollAreaAabb(
+            QVector2D(windowWidth - scrollBarWidth + borderWidth, borderWidth),
+            QVector2D(windowWidth - borderWidth, windowHeight - borderWidth));
+    if (scrollThumbAabb.contains(mousePosition)) {
+        scrollThumbHover = true;
+        if (event->button() == Qt::MouseButton::LeftButton) {
+            scrollThumbDrag = true;
+            thumbDragDelta = scrollThumbPosition - mousePosition.y();
+        }
+    } else {
+        scrollThumbHover = false;
+        if (scrollAreaAabb.contains(mousePosition) && event->button() == Qt::MouseButton::LeftButton) {
+            // Jump to clicked position on scroll bar.
+            scrollTranslationY = remap(
+                    mousePosition.y() - scrollThumbHeight / 2.0f,
+                    borderWidth, windowHeight - borderWidth - scrollThumbHeight,
+                    0.0f, fullWindowHeight - windowHeight);
+        }
+    }
+
+    scrollTranslationY = clamp(scrollTranslationY, 0.0f, fullWindowHeight - windowHeight);
+    scrollThumbPosition = remap(
+            scrollTranslationY,
+            0.0f, fullWindowHeight - windowHeight,
+            borderWidth, windowHeight - borderWidth - scrollThumbHeight);
+}
+
+void MHorizonGraph::mouseReleaseEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event)
+{
+    int viewportHeight = sceneView->getViewPortHeight();
+    QVector2D mousePosition(float(event->x()), float(viewportHeight - event->y() - 1));
+    mousePosition -= QVector2D(getWindowOffsetX(), getWindowOffsetY());
+    mousePosition /= getScaleFactor();
+    mousePosition[1] = windowHeight - mousePosition.y();
+
+    if (event->button() == Qt::MouseButton::LeftButton) {
+        scrollThumbDrag = false;
+    }
+
+    // Check whether the user clicked on one of the bars.
+    AABB2 windowAabb(
+            QVector2D(borderWidth, borderWidth),
+            QVector2D(windowWidth - 2.0f * borderWidth, windowHeight - 2.0f * borderWidth));
+    if (windowAabb.contains(mousePosition) && event->button() == Qt::MouseButton::LeftButton) {
+        size_t heightIdx = 0;
+        for (size_t varIdx : sortedVariableIndices) {
+            float lowerY = offsetHorizonBarsY + float(heightIdx) * (horizonBarHeight + horizonBarMargin);
+            AABB2 boxAabb(
+                    QVector2D(offsetHorizonBarsX, lowerY - scrollTranslationY),
+                    QVector2D(offsetHorizonBarsX + horizonBarWidth, lowerY + horizonBarHeight - scrollTranslationY));
+            if (boxAabb.contains(mousePosition)) {
+                sortVariables(int(varIdx));
+                break;
+            }
+            heightIdx++;
+        }
+    }
+
+    scrollTranslationY = clamp(scrollTranslationY, 0.0f, fullWindowHeight - windowHeight);
+    scrollThumbPosition = remap(
+            scrollTranslationY,
+            0.0f, fullWindowHeight - windowHeight,
+            borderWidth, windowHeight - borderWidth - scrollThumbHeight);
+}
+
+void MHorizonGraph::wheelEvent(MSceneViewGLWidget *sceneView, QWheelEvent *event)
+{
+    const float dt = 1.0f / 60.0f / 120.0f;
+    std::cout << "wheel: " << event->delta() << std::endl;
+
+    int viewportHeight = sceneView->getViewPortHeight();
+    QVector2D mousePosition(float(event->x()), float(viewportHeight - event->y() - 1));
+    mousePosition -= QVector2D(getWindowOffsetX(), getWindowOffsetY());
+    mousePosition /= getScaleFactor();
+    mousePosition[1] = windowHeight - mousePosition.y();
+
+    AABB2 windowAabb(
+            QVector2D(borderWidth, borderWidth),
+            QVector2D(windowWidth - 2.0f * borderWidth, windowHeight - 2.0f * borderWidth));
+    if (windowAabb.contains(mousePosition) && !event->modifiers().testFlag(Qt::ControlModifier)) {
+        scrollTranslationY += -2000.0f * dt * float(event->delta());
+    }
+
+    if (event->modifiers().testFlag(Qt::ControlModifier) && event->delta() != 0) {
+        zoomFactor *= (1.0f + dt * float(event->delta()));
         horizonBarHeight = horizonBarHeightBase * zoomFactor;
         horizonBarMargin = horizonBarMarginBase * zoomFactor;
-        textSize = std::max(horizonBarHeight - horizonBarMargin, 4.0f);
+        textSize = clamp(horizonBarHeight - horizonBarMargin, 4.0f, horizonBarHeightBase - horizonBarMarginBase);
         recomputeFullWindowHeight();
         if (windowHeight / fullWindowHeight > 1.0f) {
             fullWindowHeight = windowHeight;
@@ -444,13 +567,45 @@ void MHorizonGraph::update(float dt) {
             useScrollBar = true;
         }
         recomputeScrollThumbHeight();
-    }*/
+    }
 
     scrollTranslationY = clamp(scrollTranslationY, 0.0f, fullWindowHeight - windowHeight);
     scrollThumbPosition = remap(
             scrollTranslationY,
             0.0f, fullWindowHeight - windowHeight,
             borderWidth, windowHeight - borderWidth - scrollThumbHeight);
+}
+
+void MHorizonGraph::sortVariables(int newSortingIdx) {
+    if (sortingIdx == newSortingIdx) {
+        return;
+    }
+    sortingIdx = newSortingIdx;
+
+    sortedVariableIndices.clear();
+    std::vector<std::pair<float, size_t>> differenceMap;
+    for (size_t varIdx = 0; varIdx < variableNames.size(); varIdx++) {
+        float difference = -1.0f;
+        if (varIdx != sortingIdx) {
+            difference = 0.0f;
+            for (size_t timeStepIdx = 0; timeStepIdx < numTimeSteps; timeStepIdx++) {
+                float meanSorting = ensembleMeanValues.at(timeStepIdx).at(sortingIdx);
+                float meanVar = ensembleMeanValues.at(timeStepIdx).at(varIdx);
+                float stdDevSorting = ensembleStdDevValues.at(timeStepIdx).at(sortingIdx);
+                float stdDevVar = ensembleStdDevValues.at(timeStepIdx).at(varIdx);
+                float diffMean = meanSorting - meanVar;
+                float diffStdDev = stdDevSorting - stdDevVar;
+                difference += diffMean * diffMean + diffStdDev * diffStdDev;
+                //difference = std::abs(meanSorting - meanVar) + std::abs(stdDevSorting - stdDevVar);
+            }
+            difference /= float(numTimeSteps);
+        }
+        differenceMap.emplace_back(std::make_pair(difference, varIdx));
+    }
+    std::sort(differenceMap.begin(), differenceMap.end());
+    for (auto& it : differenceMap) {
+        sortedVariableIndices.push_back(it.second);
+    }
 }
 
 }

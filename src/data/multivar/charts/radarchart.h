@@ -54,6 +54,10 @@ public:
     void setData(
             const std::vector<std::string>& variableNames,
             const std::vector<std::vector<float>>& variableValuesPerTrajectory);
+    void setData(
+            const std::vector<std::string>& variableNames,
+            const std::vector<std::vector<float>>& variableValuesPerTrajectory,
+            const std::vector<QColor>& highlightColors);
 
 protected:
     virtual bool hasData() override { return !variableValuesPerTrajectory.empty(); }
@@ -78,6 +82,7 @@ private:
 
     std::vector<std::string> variableNames;
     std::vector<std::vector<float>> variableValuesPerTrajectory;
+    std::vector<QColor> highlightColors;
 };
 
 }

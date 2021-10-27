@@ -350,6 +350,10 @@ MTrajectoryActor::MTrajectoryActor()
 
     multiVarGroupProperty = addProperty(
             GROUP_PROPERTY, "multi-var rendering", renderingGroupProperty);
+    diagramTypeProperty = addProperty(
+            ENUM_PROPERTY, "chart type", multiVarGroupProperty);
+    properties->mEnum()->setEnumNames(diagramTypeProperty, diagramTypeNames);
+    properties->mEnum()->setValue(diagramTypeProperty, static_cast<int>(diagramType));
 
     multiVarData.setProperties(this, properties, multiVarGroupProperty);
     actorHasSelectableData = true;
@@ -465,6 +469,8 @@ void MTrajectoryActor::saveConfiguration(QSettings *settings)
 
     settings->setValue("useBezierTrajectories",
                        properties->mBool()->value(useBezierTrajectoriesProperty));
+    settings->setValue("diagramType",
+                       properties->mEnum()->value(diagramTypeProperty));
     multiVarData.saveConfiguration(settings);
 
     settings->setValue("tubeRadius", tubeRadius);
@@ -674,6 +680,13 @@ void MTrajectoryActor::loadConfiguration(QSettings *settings)
             settings->value("useBezierTrajectories", false).toBool());
     useBezierTrajectories = properties->mBool()->value(useBezierTrajectoriesProperty);
     properties->mBool()->setValue(useBezierTrajectoriesProperty, useBezierTrajectories);
+
+    properties->mEnum()->setValue(
+            diagramTypeProperty,
+            settings->value("diagramType", 0).toInt());
+    diagramType = static_cast<DiagramDisplayType>(properties->mEnum()->value(diagramTypeProperty));
+    properties->mEnum()->setValue(diagramTypeProperty, static_cast<int>(diagramType));
+
     multiVarData.setEnabled(useBezierTrajectories);
     multiVarData.loadConfiguration(settings);
 
@@ -1672,7 +1685,7 @@ void MTrajectoryActor::prepareAvailableDataForRendering(uint slot)
                     if (trajectoryPickerMap.find(view) == trajectoryPickerMap.end()) {
                         GLuint textureUnit = assignTextureUnit();
                         trajectoryPickerMap[view] = new MTrajectoryPicker(
-                                textureUnit, view, multiVarData.getVarNames());
+                                textureUnit, view, multiVarData.getVarNames(), diagramType);
                         trajectoryPickerMap[view]->updateTrajectoryRadius(tubeRadius);
                         trajectoryPickerMap[view]->setParticlePosTimeStep(particlePosTimeStep);
                     }
@@ -1914,7 +1927,8 @@ void MTrajectoryActor::onSeedActorChanged()
 void MTrajectoryActor::checkIntersectionWithSelectableData(
         MSceneViewGLWidget *sceneView, QMouseEvent *event)
 {
-    if (trajectoryPickerMap.find(sceneView) == trajectoryPickerMap.end()) {
+    if (trajectoryPickerMap.find(sceneView) == trajectoryPickerMap.end())
+    {
         return;
     }
 
@@ -1923,7 +1937,8 @@ void MTrajectoryActor::checkIntersectionWithSelectableData(
     float timeAtHit = 0.0f;
     if (trajectoryPickerMap[sceneView]->pickPointScreen(
             sceneView, event->x(), event->y(),
-            firstHitPoint, trajectoryIndex, timeAtHit)) {
+            firstHitPoint, trajectoryIndex, timeAtHit))
+    {
         if (event->button() == Qt::LeftButton)
         {
             trajectoryPickerMap[sceneView]->toggleTrajectoryHighlighted(trajectoryIndex);
@@ -1935,6 +1950,52 @@ void MTrajectoryActor::checkIntersectionWithSelectableData(
             multiVarData.setParticlePosTimeStep(particlePosTimeStep);
         }
     }
+}
+
+bool MTrajectoryActor::checkVirtualWindowBelowMouse(
+        MSceneViewGLWidget *sceneView, int mousePositionX, int mousePositionY)
+{
+    if (trajectoryPickerMap.find(sceneView) == trajectoryPickerMap.end())
+    {
+        return false;
+    }
+    return trajectoryPickerMap[sceneView]->checkVirtualWindowBelowMouse(sceneView, mousePositionX, mousePositionY);
+}
+
+void MTrajectoryActor::mouseMoveEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event)
+{
+    if (trajectoryPickerMap.find(sceneView) == trajectoryPickerMap.end())
+    {
+        return;
+    }
+    return trajectoryPickerMap[sceneView]->mouseMoveEvent(sceneView, event);
+}
+
+void MTrajectoryActor::mousePressEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event)
+{
+    if (trajectoryPickerMap.find(sceneView) == trajectoryPickerMap.end())
+    {
+        return;
+    }
+    return trajectoryPickerMap[sceneView]->mousePressEvent(sceneView, event);
+}
+
+void MTrajectoryActor::mouseReleaseEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event)
+{
+    if (trajectoryPickerMap.find(sceneView) == trajectoryPickerMap.end())
+    {
+        return;
+    }
+    return trajectoryPickerMap[sceneView]->mouseReleaseEvent(sceneView, event);
+}
+
+void MTrajectoryActor::wheelEvent(MSceneViewGLWidget *sceneView, QWheelEvent *event)
+{
+    if (trajectoryPickerMap.find(sceneView) == trajectoryPickerMap.end())
+    {
+        return;
+    }
+    return trajectoryPickerMap[sceneView]->wheelEvent(sceneView, event);
 }
 #endif
 
@@ -2392,6 +2453,18 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
         if (suppressActorUpdates()) return;
         asynchronousDataRequest();
         emitActorChangedSignal();
+    }
+    else if (property == diagramTypeProperty)
+    {
+        diagramType = static_cast<DiagramDisplayType>(properties->mEnum()->value(diagramTypeProperty));
+#ifdef USE_EMBREE
+        for (MTrajectoryPicker* trajectoryPicker : trajectoryPickerMap)
+        {
+            trajectoryPicker->setDiagramType(diagramType);
+        }
+        if (suppressActorUpdates()) return;
+        emitActorChangedSignal();
+#endif
     }
 
     else if (multiVarData.hasProperty(property))
@@ -4508,6 +4581,7 @@ void MTrajectoryActor::enableProperties(bool enable)
     colourShadowProperty->setEnabled(enable);
 
     useBezierTrajectoriesProperty->setEnabled(enable);
+    diagramTypeProperty->setEnabled(enable);
 
     initTimeProperty->setEnabled(
                 enable && !(enableSync && synchronizeInitTime));
