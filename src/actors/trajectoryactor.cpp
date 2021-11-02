@@ -34,7 +34,7 @@
 
 // standard library imports
 #include <iostream>
-#include "math.h"
+#include <cmath>
 
 // related third party imports
 #include <log4cplus/loggingmacros.h>
@@ -1686,6 +1686,7 @@ void MTrajectoryActor::prepareAvailableDataForRendering(uint slot)
                         GLuint textureUnit = assignTextureUnit();
                         trajectoryPickerMap[view] = new MTrajectoryPicker(
                                 textureUnit, view, multiVarData.getVarNames(), diagramType);
+                        trajectoryPickerMap[view]->setSelectedVariables(multiVarData.getSelectedVariables());
                         trajectoryPickerMap[view]->updateTrajectoryRadius(tubeRadius);
                         trajectoryPickerMap[view]->setParticlePosTimeStep(particlePosTimeStep);
                     }
@@ -2381,7 +2382,11 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
         multiVarData.setParticlePosTimeStep(particlePosTimeStep);
 
         if (suppressActorUpdates()) return;
-        asynchronousSelectionRequest();
+        if (useBezierTrajectories) {
+            emitActorChangedSignal();
+        } else {
+            asynchronousSelectionRequest();
+        }
     }
 
     else if (property == computationLineTypeProperty)
@@ -2750,10 +2755,28 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
                 continue;
             }
 
+#ifdef USE_EMBREE
+            if (trajectoryPickerMap[sceneView]->getSelectedTimeStepChanged())
+            {
+                particlePosTimeStep = int(std::round(trajectoryPickerMap[sceneView]->getSelectedTimeStep()));
+                trajectoryPickerMap[sceneView]->setParticlePosTimeStep(particlePosTimeStep);
+                multiVarData.setParticlePosTimeStep(particlePosTimeStep);
+                trajectoryPickerMap[sceneView]->resetSelectedTimeStepChanged();
+            }
+            if (trajectoryPickerMap[sceneView]->getSelectedVariablesChanged())
+            {
+                multiVarData.setSelectedVariables(trajectoryPickerMap[sceneView]->getSelectedVariables());
+                trajectoryRequests[t].bezierTrajectoriesMap[sceneView]->updateSelectedVariables(
+                        multiVarData.getSelectedVariables());
+                trajectoryPickerMap[sceneView]->resetSelectedVariablesChanged();
+            }
+#endif
+
             if (multiVarData.getSelectedVariablesChanged())
             {
                 trajectoryRequests[t].bezierTrajectoriesMap[sceneView]->updateSelectedVariables(
                         multiVarData.getSelectedVariables());
+                trajectoryPickerMap[sceneView]->setSelectedVariables(multiVarData.getSelectedVariables());
                 multiVarData.resetSelectedVariablesChanged();
             }
 

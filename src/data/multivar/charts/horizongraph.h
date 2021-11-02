@@ -55,13 +55,18 @@ public:
             const std::vector<std::string>& variableNames, float timeMin, float timeMax,
             const std::vector<std::vector<std::vector<float>>>& variableValuesArray);
 
+    inline float getSelectedTimeStep() const { return selectedTimeStep; }
+    inline void setSelectedTimeStep(float timeStep) { selectedTimeStep = timeStep; selectedTimeStepChanged = false; }
+    inline bool getSelectedTimeStepChanged() const { return selectedTimeStepChanged; }
+    inline void resetSelectedTimeStepChanged() { selectedTimeStepChanged = false; }
+
     void mouseMoveEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event) override;
     void mousePressEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event) override;
     void mouseReleaseEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event) override;
     void wheelEvent(MSceneViewGLWidget *sceneView, QWheelEvent *event) override;
 
 protected:
-    virtual bool hasData() override { return !variableValuesArray.empty(); }
+    bool hasData() override { return !variableValuesArray.empty(); }
     void renderBase() override;
 
 private:
@@ -69,6 +74,7 @@ private:
     void drawHorizonBackground();
     void drawHorizonLines();
     void drawHorizonOutline(const NVGcolor& textColor);
+    void drawSelectedTimeStepLine(const NVGcolor& textColor);
     void drawLegendLeft(const NVGcolor& textColor);
     void drawLegendTop(const NVGcolor& textColor);
     void drawTicks(const NVGcolor& textColor);
@@ -78,6 +84,13 @@ private:
     float computeWindowHeight();
     void recomputeWindowHeight();
     void recomputeFullWindowHeight();
+    void updateTimeStepTicks();
+
+    enum class EventType {
+        MousePress, MouseRelease, MouseMove
+    };
+    void updateTimeScale(const QVector2D& mousePosition, EventType eventType, QMouseEvent* event);
+    void updateTimeShift(const QVector2D& mousePosition, EventType eventType, QMouseEvent* event);
 
     bool mapStdDevToColor = true;
 
@@ -113,10 +126,20 @@ private:
     std::vector<std::string> variableNames;
     size_t numTrajectories;
     size_t numTimeSteps;
-    size_t numVariables;
     std::vector<std::vector<std::vector<float>>> variableValuesArray;
     std::vector<std::vector<float>> ensembleMeanValues;
     std::vector<std::vector<float>> ensembleStdDevValues;
+
+    float selectedTimeStep = 0.0f;
+    bool selectedTimeStepChanged = false;
+    float timeDisplayMin = 0.0f;
+    float timeDisplayMax = 1.0f;
+    float timeDisplayMinOld = 0.0f;
+    float timeDisplayMaxOld = 1.0f;
+    float topLegendClickPct;
+    bool isDraggingTopLegend = false;
+    float clickTime = 0.0f;
+    bool isDraggingTimeShift = false;
 
     void sortVariables(int varIdx);
     int sortingIdx = -1;

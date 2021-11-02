@@ -137,14 +137,35 @@ inline QMatrix4x4 matrixOrthogonalProjection(float left, float right, float bott
     //        -(right + left) / (right - left), -(top + bottom) / (top - bottom), 0.0f, 1.0f);
 }
 
-inline QVector3D mix(const QVector3D &v0, const QVector3D &v1, float t)
+inline float mix(float x, float y, float a)
 {
-    return (1.0f - t) * v0 + t * v1;
+    return x * (1.0f - a) + y * a;
+}
+
+inline QVector3D mix(const QVector3D &x, const QVector3D &y, float a)
+{
+    return (1.0f - a) * x + a * y;
 }
 
 inline float fract(float x)
 {
     return x - std::floor(x);
+}
+
+inline int sign(float x)
+{
+    return x > 0.0f ? 1 : (x < 0.0f ? -1 : 0);
+}
+
+inline int sign(int x)
+{
+    return x > 0 ? 1 : (x < 0 ? -1 : 0);
+}
+
+inline float remap(float x, float srcStart, float srcStop, float dstStart, float dstStop)
+{
+    float t = (x - srcStart) / (srcStop - srcStart);
+    return dstStart + t * (dstStop - dstStart);
 }
 
 }

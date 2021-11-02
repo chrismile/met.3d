@@ -99,12 +99,14 @@ void MTrajectoryPicker::setDiagramType(DiagramDisplayType type)
     else if (diagramDisplayType == DiagramDisplayType::HORIZON_GRAPH)
     {
         diagram = new MHorizonGraph(textureUnit);
+        static_cast<MHorizonGraph*>(diagram)->setSelectedTimeStep(timeStep);
     }
 
     if (diagram)
     {
         diagram->initialize();
         updateDiagramData();
+        diagram->setSelectedVariables(selectedVariables);
     }
 
 #ifdef USE_QOPENGLWIDGET
@@ -596,7 +598,16 @@ void MTrajectoryPicker::setParticlePosTimeStep(int newTimeStep)
         //radarChart->addRadar(
         //        trajectoryIndex, QString("Trajectory #%1").arg(trajectoryIndex), highlightColor, values);
     }
-    updateDiagramData();
+
+    if (diagram && diagram->getDiagramType() != DiagramType::HORIZON_GRAPH)
+    {
+        updateDiagramData();
+    }
+
+    if (diagram->getDiagramType() == DiagramType::HORIZON_GRAPH)
+    {
+        static_cast<MHorizonGraph*>(diagram)->setSelectedTimeStep(newTimeStep);
+    }
 }
 
 void MTrajectoryPicker::updateDiagramData()

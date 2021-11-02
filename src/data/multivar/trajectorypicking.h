@@ -42,6 +42,7 @@
 #include "qt_extensions/radarchart.h"
 #include "beziertrajectories.h"
 #include "src/data/multivar/charts/radarbarchart.h"
+#include "src/data/multivar/charts/horizongraph.h"
 
 namespace Met3D {
 
@@ -63,7 +64,7 @@ public:
     MTrajectoryPicker(
             GLuint textureUnit, MSceneViewGLWidget* sceneView, const QVector<QString>& varNames,
             DiagramDisplayType diagramType);
-    ~MTrajectoryPicker();
+    ~MTrajectoryPicker() override;
 
     void render();
 
@@ -123,6 +124,57 @@ public:
     void wheelEvent(MSceneViewGLWidget *sceneView, QWheelEvent *event);
 
     void setDiagramType(DiagramDisplayType type);
+
+    // Forwards all calls to 'diagram'.
+    inline float getSelectedTimeStep() const {
+        if (diagram && diagram->getDiagramType() == DiagramType::HORIZON_GRAPH) {
+            return static_cast<MHorizonGraph*>(diagram)->getSelectedTimeStep();
+        }
+        return 0.0f;
+    }
+    inline void setSelectedTimeStep(float timeStep) {
+        if (diagram && diagram->getDiagramType() == DiagramType::HORIZON_GRAPH) {
+            static_cast<MHorizonGraph*>(diagram)->setSelectedTimeStep(timeStep);
+        }
+    }
+    inline bool getSelectedTimeStepChanged() const {
+        if (diagram && diagram->getDiagramType() == DiagramType::HORIZON_GRAPH) {
+            return static_cast<MHorizonGraph*>(diagram)->getSelectedTimeStepChanged();
+        }
+        return false;
+    }
+    inline void resetSelectedTimeStepChanged() {
+        if (diagram && diagram->getDiagramType() == DiagramType::HORIZON_GRAPH) {
+            static_cast<MHorizonGraph*>(diagram)->resetSelectedTimeStepChanged();
+        }
+    }
+
+    inline QVector<uint32_t> getSelectedVariables() const {
+        if (diagram) {
+            return diagram->getSelectedVariables();
+        } else {
+            QVector<uint32_t> selectedVariables;
+            selectedVariables.resize(int(variableNames.size()));
+            return selectedVariables;
+        }
+    }
+    inline void setSelectedVariables(const QVector<uint32_t>& selectedVariables) {
+        this->selectedVariables = selectedVariables;
+        if (diagram) {
+            diagram->setSelectedVariables(selectedVariables);
+        }
+    }
+    inline bool getSelectedVariablesChanged() const {
+        if (diagram) {
+            return diagram->getSelectedVariablesChanged();
+        }
+        return false;
+    }
+    inline void resetSelectedVariablesChanged() {
+        if (diagram) {
+            diagram->resetSelectedVariablesChanged();
+        }
+    }
 
     void toggleTrajectoryHighlighted(uint32_t trajectoryIndex);
     void setParticlePosTimeStep(int newTimeStep);
@@ -203,6 +255,7 @@ private:
     QtExtensions::MRadarChart* radarChart;
     std::vector<std::string> variableNames;
     size_t numVars = 0;
+    QVector<uint32_t> selectedVariables;
 };
 
 }

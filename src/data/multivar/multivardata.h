@@ -86,19 +86,24 @@ public:
     void initTransferFunctionsMultiVar(uint32_t numVariables);
 
     // When a shader needing a different internal representation was loaded.
-    inline bool getInternalRepresentationChanged() { return internalRepresentationChanged; }
+    inline bool getInternalRepresentationChanged() const { return internalRepresentationChanged; }
     inline void resetInternalRepresentationChanged() { internalRepresentationChanged = false; }
     inline bool getNeedsSubdiv() { return getMultiVarRenderModeNeedsSubdiv(multiVarRenderMode); }
 
-    inline bool getSelectedVariablesChanged() { return selectedVariablesChanged; }
+    inline bool getSelectedVariablesChanged() const { return selectedVariablesChanged; }
     inline void resetSelectedVariablesChanged() { selectedVariablesChanged = false; }
     inline const QVector<uint32_t>& getSelectedVariables() { return selectedVariables; }
+    inline void setSelectedVariables(const QVector<uint32_t>& selectedVariables) {
+        this->selectedVariables = selectedVariables;
+        setPropertiesVarSelected();
+        updateNumVariablesSelected();
+    }
 
-    inline bool getVarDivergingChanged() { return varDivergingChanged; }
+    inline bool getVarDivergingChanged() const { return varDivergingChanged; }
     inline void resetVarDivergingChanged() { varDivergingChanged = false; }
     inline const QVector<uint32_t>& getVarDiverging() { return varDiverging; }
 
-    inline bool getUseTimestepLens() { return useTimestepLens; }
+    inline bool getUseTimestepLens() const { return useTimestepLens; }
     inline void setParticlePosTimeStep(int t) { particlePosTimeStep = t; }
 
     inline const QVector<QString>& getVarNames() const { return varNames; }

@@ -57,12 +57,32 @@ public:
     explicit MDiagramBase(GLint textureUnit);
     virtual DiagramType getDiagramType()=0;
     virtual void initialize();
-    virtual ~MDiagramBase();
+    ~MDiagramBase() override;
     void render();
 
     /// Returns whether the mouse is over the area of the diagram.
     bool isMouseOverDiagram(const QVector2D& mousePosition) const;
     virtual bool hasData()=0;
+
+    inline QVector<uint32_t> getSelectedVariables() const {
+        QVector<uint32_t> selectedVariables;
+        selectedVariables.resize(int(numVariables));
+        for (size_t varIdx : selectedVariableIndices) {
+            selectedVariables[int(varIdx)] = 1u;
+        }
+        return selectedVariables;
+    }
+    inline void setSelectedVariables(const QVector<uint32_t>& selectedVariables) {
+        selectedVariableIndices.clear();
+        for (int varIdx = 0; varIdx < selectedVariables.size(); varIdx++) {
+            if (selectedVariables.at(varIdx)) {
+                selectedVariableIndices.insert(size_t(varIdx));
+            }
+        }
+        selectedVariablesChanged = false;
+    }
+    inline bool getSelectedVariablesChanged() const { return selectedVariablesChanged; }
+    inline void resetSelectedVariablesChanged() { selectedVariablesChanged = false; }
 
     virtual void mouseMoveEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event) {}
     virtual void mousePressEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event) {}
@@ -109,6 +129,11 @@ protected:
     inline float getWindowOffsetX() const { return windowOffsetX; }
     inline float getWindowOffsetY() const { return windowOffsetY; }
     inline float getScaleFactor() const { return scaleFactor; }
+
+    // Variables can be selected by clicking on them.
+    size_t numVariables = 0;
+    std::set<size_t> selectedVariableIndices;
+    bool selectedVariablesChanged = false;
 
 private:
     void createRenderData();

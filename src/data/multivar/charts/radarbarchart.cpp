@@ -79,6 +79,7 @@ void MRadarBarChart::setDataTimeIndependent(
     useTimeDependentData = false;
     this->variableNames = variableNames;
     this->variableValues = variableValues;
+    numVariables = variableNames.size();
     onWindowSizeChanged();
 }
 
@@ -88,6 +89,7 @@ void MRadarBarChart::setDataTimeDependent(
     useTimeDependentData = true;
     this->variableNames = variableNames;
     this->variableValuesTimeDependent = variableValuesTimeDependent;
+    numVariables = variableNames.size();
     onWindowSizeChanged();
 }
 
@@ -331,7 +333,6 @@ void MRadarBarChart::renderBase() {
     }
 
 
-    size_t numVariables = variableNames.size();
     if (useTimeDependentData) {
         for (size_t varIdx = 0; varIdx < numVariables; varIdx++) {
             drawEqualAreaPieSlices(center, int(varIdx));

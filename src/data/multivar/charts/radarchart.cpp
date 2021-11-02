@@ -78,6 +78,7 @@ void MRadarChart::setData(
     this->highlightColors = predefinedColors;
     this->variableNames = variableNames;
     this->variableValuesPerTrajectory = variableValuesPerTrajectory;
+    numVariables = variableNames.size();
     onWindowSizeChanged();
 }
 
@@ -111,8 +112,6 @@ QVector3D MRadarChart::transferFunction(float value) {
 }
 
 void MRadarChart::drawRadarLine(const QVector2D& center, int trajectoryIdx) {
-    const size_t numVariables = variableNames.size();
-
     QColor circleFillColorQt = highlightColors.at(trajectoryIdx % highlightColors.size());
     //QVector3D hsvColor = rgbToHSV(circleFillColorSgl.getFloatColorRGB());
     //hsvColor.g *= 0.5f;
@@ -149,10 +148,6 @@ void MRadarChart::drawRadarLine(const QVector2D& center, int trajectoryIdx) {
     nvgStrokeWidth(vg, 2.0f);
     nvgStrokeColor(vg, circleStrokeColor);
     nvgStroke(vg);
-}
-
-inline int sign(float x) {
-    return x > 0.0f ? 1 : (x < 0.0f ? -1 : 0);
 }
 
 void MRadarChart::drawPieSliceTextHorizontal(const NVGcolor& textColor, const QVector2D& center, int varIdx) {
@@ -271,7 +266,6 @@ void MRadarChart::renderBase() {
             75, 0.5f, 0.25f);
 
 
-    const size_t numVariables = variableNames.size();
     const size_t numTrajectories = variableValuesPerTrajectory.size();
     for (size_t varIdx = 0; varIdx < numTrajectories; varIdx++) {
         drawRadarLine(center, int(varIdx));

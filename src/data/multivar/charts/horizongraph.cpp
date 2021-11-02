@@ -34,10 +34,6 @@
 #include "horizongraph.h"
 #include "aabb2.h"
 
-#ifndef M_PI
-#define M_PI 3.14159265358979323846
-#endif
-
 namespace Met3D {
 
 static const std::vector<QColor> predefinedColors = {
@@ -59,6 +55,7 @@ static const std::vector<QColor> predefinedColors = {
         QColor(0, 7, 255)
 };
 
+
 MHorizonGraph::MHorizonGraph(GLint textureUnit) : MDiagramBase(textureUnit) {
 }
 
@@ -74,6 +71,20 @@ void MHorizonGraph::recomputeWindowHeight() {
 
 void MHorizonGraph::recomputeFullWindowHeight() {
     fullWindowHeight = computeWindowHeight();
+}
+
+void MHorizonGraph::updateTimeStepTicks() {
+    size_t numTimeStepsLocal = size_t(float(numTimeSteps) * (timeDisplayMax - timeDisplayMin) / (timeMax - timeMin));
+    if (numTimeStepsLocal < 10) {
+        timeStepLegendIncrement = 1;
+        timeStepTicksIncrement = 1;
+    } else if (numTimeStepsLocal < 50) {
+        timeStepLegendIncrement = 5;
+        timeStepTicksIncrement = 1;
+    } else {
+        timeStepLegendIncrement = numTimeStepsLocal / 10;
+        timeStepTicksIncrement = timeStepLegendIncrement / 5;
+    }
 }
 
 void MHorizonGraph::initialize() {
@@ -125,21 +136,23 @@ void MHorizonGraph::setData(
     // Compute metadata.
     this->timeMin = timeMin;
     this->timeMax = timeMax;
+    if (this->selectedTimeStep < timeMin || this->selectedTimeStep > timeMax) {
+        if (this->selectedTimeStep < timeMin) {
+            this->selectedTimeStep = timeMin;
+        } else {
+            this->selectedTimeStep = timeMax;
+        }
+        this->selectedTimeStepChanged = true;
+    }
+    this->timeDisplayMin = timeMin;
+    this->timeDisplayMax = timeMax;
     if (variableValuesArray.empty()) {
         numTimeSteps = int(std::round(timeMax - timeMin)) + 1;
     } else {
         numTimeSteps = variableValuesArray.front().size();
     }
-    if (numTimeSteps < 10) {
-        timeStepLegendIncrement = 1;
-        timeStepTicksIncrement = 1;
-    } else if (numTimeSteps < 50) {
-        timeStepLegendIncrement = 5;
-        timeStepTicksIncrement = 1;
-    } else {
-        timeStepLegendIncrement = numTimeSteps / 10;
-        timeStepTicksIncrement = timeStepLegendIncrement / 5;
-    }
+    updateTimeStepTicks();
+
     numTrajectories = variableValuesArray.size();
     numVariables = variableNames.size();
 
@@ -230,19 +243,36 @@ void MHorizonGraph::drawHorizonLines() {
             continue;
         }
 
+        float timeStepIdxStartFlt = (timeDisplayMin - timeMin) / (timeMax - timeMin) * float(numTimeSteps);
+        float timeStepIdxStopFlt = (timeDisplayMax - timeMin) / (timeMax - timeMin) * float(numTimeSteps);
+        int timeStepIdxStart = int(std::floor(timeStepIdxStartFlt));
+        int timeStepIdxStop = int(std::ceil(timeStepIdxStopFlt));
+
         if (mapStdDevToColor) {
-            for (size_t timeStepIdx = 0; timeStepIdx < numTimeSteps - 1; timeStepIdx++) {
+            for (int timeStepIdx = timeStepIdxStart; timeStepIdx < timeStepIdxStop - 1; timeStepIdx++) {
                 float mean0 = ensembleMeanValues.at(timeStepIdx).at(varIdx);
                 float stddev0 = ensembleStdDevValues.at(timeStepIdx).at(varIdx);
-                float xpos0 = offsetHorizonBarsX + float(timeStepIdx) / float(numTimeSteps - 1) * horizonBarWidth;
-                float ypos0 = lowerY + (upperY - lowerY) * mean0;
-                QVector3D rgbColor0 = transferFunction(clamp(stddev0 * 2.0f, 0.0f, 1.0f));
-                NVGcolor fillColor0 = nvgRGBf(rgbColor0.x(), rgbColor0.y(), rgbColor0.z());
+                float timeStep0 = timeMin + (timeMax - timeMin) * float(timeStepIdx) / float(numTimeSteps - 1);
+                float xpos0 = offsetHorizonBarsX + (timeStep0 - timeDisplayMin) / (timeDisplayMax - timeDisplayMin) * horizonBarWidth;
 
                 float mean1 = ensembleMeanValues.at(timeStepIdx + 1).at(varIdx);
                 float stddev1 = ensembleStdDevValues.at(timeStepIdx + 1).at(varIdx);
-                float xpos1 = offsetHorizonBarsX + float(timeStepIdx + 1) / float(numTimeSteps - 1) * horizonBarWidth;
+                float timeStep1 = timeMin + (timeMax - timeMin) * float(timeStepIdx + 1) / float(numTimeSteps - 1);
+                float xpos1 = offsetHorizonBarsX + (timeStep1 - timeDisplayMin) / (timeDisplayMax - timeDisplayMin) * horizonBarWidth;
+
+                if (timeStepIdx == timeStepIdxStart && fract(timeStepIdxStartFlt) != 0.0f) {
+                    mean0 = mix(mean0, mean1, fract(timeStepIdxStartFlt));
+                    xpos0 = offsetHorizonBarsX;
+                }
+                if (timeStepIdx == timeStepIdxStop - 2 && fract(timeStepIdxStopFlt) != 0.0f) {
+                    mean1 = mix(mean0, mean1, fract(timeStepIdxStartFlt));
+                    xpos1 = offsetHorizonBarsX + horizonBarWidth;
+                }
+                float ypos0 = lowerY + (upperY - lowerY) * mean0;
                 float ypos1 = lowerY + (upperY - lowerY) * mean1;
+
+                QVector3D rgbColor0 = transferFunction(clamp(stddev0 * 2.0f, 0.0f, 1.0f));
+                NVGcolor fillColor0 = nvgRGBf(rgbColor0.x(), rgbColor0.y(), rgbColor0.z());
                 QVector3D rgbColor1 = transferFunction(clamp(stddev1 * 2.0f, 0.0f, 1.0f));
                 NVGcolor fillColor1 = nvgRGBf(rgbColor1.x(), rgbColor1.y(), rgbColor1.z());
 
@@ -278,11 +308,23 @@ void MHorizonGraph::drawHorizonLines() {
         }
 
         nvgBeginPath(vg);
-        for (size_t timeStepIdx = 0; timeStepIdx < numTimeSteps; timeStepIdx++) {
+        for (int timeStepIdx = timeStepIdxStart; timeStepIdx < timeStepIdxStop; timeStepIdx++) {
             float mean = ensembleMeanValues.at(timeStepIdx).at(varIdx);
-            float xpos = offsetHorizonBarsX + float(timeStepIdx) / float(numTimeSteps - 1) * horizonBarWidth;
+            float timeStep = timeMin + (timeMax - timeMin) * float(timeStepIdx) / float(numTimeSteps - 1);
+            float xpos = offsetHorizonBarsX + (timeStep - timeDisplayMin) / (timeDisplayMax - timeDisplayMin) * horizonBarWidth;
+            if (timeStepIdx == timeStepIdxStart && fract(timeStepIdxStartFlt) != 0.0f) {
+                float meanNext = ensembleMeanValues.at(timeStepIdx + 1).at(varIdx);
+                mean = mix(mean, meanNext, fract(timeStepIdxStartFlt));
+                xpos = offsetHorizonBarsX;
+            }
+            if (timeStepIdx == timeStepIdxStop - 1 && fract(timeStepIdxStopFlt) != 0.0f) {
+                float meanLast = ensembleMeanValues.at(timeStepIdx - 1).at(varIdx);
+                mean = mix(meanLast, mean, fract(timeStepIdxStartFlt));
+                xpos = offsetHorizonBarsX + horizonBarWidth;
+            }
             float ypos = lowerY + (upperY - lowerY) * mean;
-            if (timeStepIdx == 0) {
+
+            if (timeStepIdx == timeStepIdxStart) {
                 nvgMoveTo(vg, xpos, ypos);
             } else {
                 nvgLineTo(vg, xpos, ypos);
@@ -306,14 +348,42 @@ void MHorizonGraph::drawHorizonOutline(const NVGcolor& textColor) {
     }
 }
 
+void MHorizonGraph::drawSelectedTimeStepLine(const NVGcolor& textColor) {
+    if (selectedTimeStep < timeDisplayMin || selectedTimeStep > timeDisplayMax) {
+        return;
+    }
+
+    const float timeStepLineWidth = 1.0f;
+    NVGcolor lineColor = textColor;
+    lineColor.a = 0.1f;
+
+    nvgBeginPath(vg);
+    float xpos = remap(
+            selectedTimeStep, timeDisplayMin, timeDisplayMax,
+            offsetHorizonBarsX, offsetHorizonBarsX + horizonBarWidth);
+    nvgRect(
+            vg, xpos, offsetHorizonBarsY, timeStepLineWidth,
+            horizonBarHeight * float(variableNames.size()) + horizonBarMargin * (float(variableNames.size()) - 1.0f));
+    nvgFillColor(vg, lineColor);
+    nvgFill(vg);
+}
+
 void MHorizonGraph::drawLegendLeft(const NVGcolor& textColor) {
     nvgFontSize(vg, textSize);
     nvgFontFace(vg, "sans");
     size_t heightIdx = 0;
     for (size_t varIdx : sortedVariableIndices) {
         float lowerY = offsetHorizonBarsY + float(heightIdx) * (horizonBarHeight + horizonBarMargin);
-        float upperY = lowerY + horizonBarHeight;
+        //float upperY = lowerY + horizonBarHeight;
         nvgTextAlign(vg, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
+        if (selectedVariableIndices.find(varIdx) != selectedVariableIndices.end()) {
+            nvgFontBlur(vg, 1);
+            nvgFillColor(vg, nvgRGBA(255, 0, 0, 255));
+            nvgText(
+                    vg, borderSizeX, lowerY + horizonBarHeight / 2.0f,
+                    variableNames.at(varIdx).c_str(), nullptr);
+            nvgFontBlur(vg, 0);
+        }
         nvgFillColor(vg, textColor);
         nvgText(
                 vg, borderSizeX, lowerY + horizonBarHeight / 2.0f,
@@ -323,12 +393,19 @@ void MHorizonGraph::drawLegendLeft(const NVGcolor& textColor) {
 }
 
 void MHorizonGraph::drawLegendTop(const NVGcolor& textColor) {
+    updateTimeStepTicks();
+
     nvgFontSize(vg, textSizeLegendTop);
     nvgFontFace(vg, "sans");
-    for (size_t timeStepIdx = 0; timeStepIdx < numTimeSteps; timeStepIdx += timeStepLegendIncrement) {
+    int timeStepIdxStart = int(std::ceil((timeDisplayMin - timeMin) / (timeMax - timeMin) * float(numTimeSteps - 1)));
+    int timeStepIdxStop = int(std::floor((timeDisplayMax - timeMin) / (timeMax - timeMin) * float(numTimeSteps - 1)));
+    for (int timeStepIdx = timeStepIdxStart; timeStepIdx <= timeStepIdxStop; timeStepIdx++) {
+        if (timeStepIdx % timeStepLegendIncrement != 0) {
+            continue;
+        }
         float timeStep = timeMin + (timeMax - timeMin) * float(timeStepIdx) / float(numTimeSteps - 1);
         std::string timeStepName = std::to_string(int(timeStep));
-        float centerX = offsetHorizonBarsX + float(timeStepIdx) / float(numTimeSteps - 1) * horizonBarWidth;
+        float centerX = offsetHorizonBarsX + (timeStep - timeDisplayMin) / (timeDisplayMax - timeDisplayMin) * horizonBarWidth;
         nvgTextAlign(vg, NVG_ALIGN_CENTER | NVG_ALIGN_TOP);
         nvgFillColor(vg, textColor);
         nvgText(vg, centerX, borderSizeY, timeStepName.c_str(), nullptr);
@@ -339,23 +416,26 @@ void MHorizonGraph::drawTicks(const NVGcolor& textColor) {
     const float tickWidthBase = 0.5f;
     const float tickHeightBase = 2.0f;
     nvgBeginPath(vg);
-    for (size_t timeStepIdx = 0; timeStepIdx < numTimeSteps; timeStepIdx += timeStepTicksIncrement) {
+
+    int timeStepIdxStart = int(std::ceil((timeDisplayMin - timeMin) / (timeMax - timeMin) * float(numTimeSteps - 1)));
+    int timeStepIdxStop = int(std::floor((timeDisplayMax - timeMin) / (timeMax - timeMin) * float(numTimeSteps - 1)));
+    for (int timeStepIdx = timeStepIdxStart; timeStepIdx <= timeStepIdxStop; timeStepIdx++) {
+        if (timeStepIdx % timeStepTicksIncrement != 0) {
+            continue;
+        }
+
         float thicknessFactor = 1.0f;
         if (timeStepIdx % timeStepLegendIncrement == 0) {
             thicknessFactor = 2.0f;
         }
         const float tickWidth = thicknessFactor * tickWidthBase;
         const float tickHeight = thicknessFactor * tickHeightBase;
-        float centerX = offsetHorizonBarsX + float(timeStepIdx) / float(numTimeSteps - 1) * horizonBarWidth;
+        float timeStep = timeMin + (timeMax - timeMin) * float(timeStepIdx) / float(numTimeSteps - 1);
+        float centerX = offsetHorizonBarsX + (timeStep - timeDisplayMin) / (timeDisplayMax - timeDisplayMin) * horizonBarWidth;
         nvgRect(vg, centerX - tickWidth / 2.0f, offsetHorizonBarsY - tickHeight, tickWidth, tickHeight);
     }
     nvgFillColor(vg, textColor);
     nvgFill(vg);
-}
-
-static float remap(float x, float srcStart, float srcStop, float dstStart, float dstStop) {
-    float t = (x - srcStart) / (srcStop - srcStart);
-    return dstStart + t * (dstStop - dstStart);
 }
 
 void MHorizonGraph::drawScrollBar(const NVGcolor& textColor) {
@@ -397,6 +477,7 @@ void MHorizonGraph::renderBase() {
     drawHorizonBackground();
     drawHorizonLines();
     drawHorizonOutline(textColor);
+    drawSelectedTimeStepLine(textColor);
     drawLegendLeft(textColor);
 
     nvgRestore(vg);
@@ -455,6 +536,11 @@ void MHorizonGraph::mouseMoveEvent(MSceneViewGLWidget *sceneView, QMouseEvent *e
             scrollTranslationY,
             0.0f, fullWindowHeight - windowHeight,
             borderWidth, windowHeight - borderWidth - scrollThumbHeight);
+
+    // Click on the top legend and move the mouse to change the timescale.
+    updateTimeScale(mousePosition, EventType::MouseMove, event);
+    // Translation in the time axis.
+    updateTimeShift(mousePosition, EventType::MouseMove, event);
 }
 
 void MHorizonGraph::mousePressEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event)
@@ -494,6 +580,34 @@ void MHorizonGraph::mousePressEvent(MSceneViewGLWidget *sceneView, QMouseEvent *
             scrollTranslationY,
             0.0f, fullWindowHeight - windowHeight,
             borderWidth, windowHeight - borderWidth - scrollThumbHeight);
+
+
+    // Check whether the user clicked on one of the bars.
+    AABB2 windowAabb(
+            QVector2D(borderWidth, borderWidth),
+            QVector2D(windowWidth - 2.0f * borderWidth, windowHeight - 2.0f * borderWidth));
+    if (windowAabb.contains(mousePosition) && !event->modifiers().testFlag(Qt::ControlModifier)
+            && !event->modifiers().testFlag(Qt::ShiftModifier) && event->button() == Qt::MouseButton::LeftButton) {
+        size_t heightIdx = 0;
+        for (size_t varIdx : sortedVariableIndices) {
+            float lowerY = offsetHorizonBarsY + float(heightIdx) * (horizonBarHeight + horizonBarMargin);
+            AABB2 boxAabb(
+                    QVector2D(offsetHorizonBarsX, lowerY - scrollTranslationY),
+                    QVector2D(
+                            offsetHorizonBarsX + horizonBarWidth,
+                            lowerY + horizonBarHeight - scrollTranslationY));
+            if (boxAabb.contains(mousePosition)) {
+                sortVariables(int(varIdx));
+                break;
+            }
+            heightIdx++;
+        }
+    }
+
+    // Click on the top legend and move the mouse to change the timescale.
+    updateTimeScale(mousePosition, EventType::MousePress, event);
+    // Translation in the time axis.
+    updateTimeShift(mousePosition, EventType::MousePress, event);
 }
 
 void MHorizonGraph::mouseReleaseEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event)
@@ -508,23 +622,16 @@ void MHorizonGraph::mouseReleaseEvent(MSceneViewGLWidget *sceneView, QMouseEvent
         scrollThumbDrag = false;
     }
 
-    // Check whether the user clicked on one of the bars.
-    AABB2 windowAabb(
-            QVector2D(borderWidth, borderWidth),
-            QVector2D(windowWidth - 2.0f * borderWidth, windowHeight - 2.0f * borderWidth));
-    if (windowAabb.contains(mousePosition) && event->button() == Qt::MouseButton::LeftButton) {
-        size_t heightIdx = 0;
-        for (size_t varIdx : sortedVariableIndices) {
-            float lowerY = offsetHorizonBarsY + float(heightIdx) * (horizonBarHeight + horizonBarMargin);
-            AABB2 boxAabb(
-                    QVector2D(offsetHorizonBarsX, lowerY - scrollTranslationY),
-                    QVector2D(offsetHorizonBarsX + horizonBarWidth, lowerY + horizonBarHeight - scrollTranslationY));
-            if (boxAabb.contains(mousePosition)) {
-                sortVariables(int(varIdx));
-                break;
-            }
-            heightIdx++;
-        }
+    // Check whether the user right-clicked on the main graph area.
+    AABB2 graphAreaAabb(
+            QVector2D(offsetHorizonBarsX, offsetHorizonBarsY),
+            QVector2D(offsetHorizonBarsX + horizonBarWidth, windowHeight - borderWidth));
+    if (graphAreaAabb.contains(mousePosition) && event->button() == Qt::MouseButton::RightButton) {
+        selectedTimeStep = remap(
+                mousePosition.x(), offsetHorizonBarsX, offsetHorizonBarsX + horizonBarWidth,
+                timeDisplayMin, timeDisplayMax);
+        selectedTimeStep = clamp(selectedTimeStep, timeDisplayMin, timeDisplayMax);
+        selectedTimeStepChanged = true;
     }
 
     scrollTranslationY = clamp(scrollTranslationY, 0.0f, fullWindowHeight - windowHeight);
@@ -532,12 +639,45 @@ void MHorizonGraph::mouseReleaseEvent(MSceneViewGLWidget *sceneView, QMouseEvent
             scrollTranslationY,
             0.0f, fullWindowHeight - windowHeight,
             borderWidth, windowHeight - borderWidth - scrollThumbHeight);
+
+
+    // Let the user click on variables to select different variables to show in linked views.
+    AABB2 windowAabb(
+            QVector2D(borderWidth, borderWidth),
+            QVector2D(windowWidth - 2.0f * borderWidth, windowHeight - 2.0f * borderWidth));
+    if (windowAabb.contains(mousePosition) && event->button() == Qt::MouseButton::LeftButton) {
+        size_t heightIdx = 0;
+        for (size_t varIdx : sortedVariableIndices) {
+            float lowerY = offsetHorizonBarsY + float(heightIdx) * (horizonBarHeight + horizonBarMargin);
+            //float upperY = lowerY + horizonBarHeight;
+            nvgTextAlign(vg, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
+            QVector2D bounds[2];
+            nvgTextBounds(
+                    vg, borderSizeX, lowerY + horizonBarHeight / 2.0f - scrollTranslationY,
+                    variableNames.at(varIdx).c_str(), nullptr, &bounds[0][0]);
+            AABB2 textAabb(bounds[0], bounds[1]);
+            if (textAabb.contains(mousePosition)) {
+                if (selectedVariableIndices.find(varIdx) == selectedVariableIndices.end()) {
+                    selectedVariableIndices.insert(varIdx);
+                } else {
+                    selectedVariableIndices.erase(varIdx);
+                }
+                selectedVariablesChanged = true;
+            }
+            heightIdx++;
+        }
+    }
+
+    // Click on the top legend and move the mouse to change the timescale.
+    updateTimeScale(mousePosition, EventType::MouseRelease, event);
+    // Translation in the time axis.
+    updateTimeShift(mousePosition, EventType::MouseRelease, event);
 }
 
 void MHorizonGraph::wheelEvent(MSceneViewGLWidget *sceneView, QWheelEvent *event)
 {
     const float dt = 1.0f / 60.0f / 120.0f;
-    std::cout << "wheel: " << event->delta() << std::endl;
+    //std::cout << "wheel: " << event->delta() << std::endl;
 
     int viewportHeight = sceneView->getViewPortHeight();
     QVector2D mousePosition(float(event->x()), float(viewportHeight - event->y() - 1));
@@ -548,7 +688,8 @@ void MHorizonGraph::wheelEvent(MSceneViewGLWidget *sceneView, QWheelEvent *event
     AABB2 windowAabb(
             QVector2D(borderWidth, borderWidth),
             QVector2D(windowWidth - 2.0f * borderWidth, windowHeight - 2.0f * borderWidth));
-    if (windowAabb.contains(mousePosition) && !event->modifiers().testFlag(Qt::ControlModifier)) {
+    if (windowAabb.contains(mousePosition) && !event->modifiers().testFlag(Qt::ControlModifier)
+            && !event->modifiers().testFlag(Qt::ShiftModifier)) {
         scrollTranslationY += -2000.0f * dt * float(event->delta());
     }
 
@@ -574,6 +715,106 @@ void MHorizonGraph::wheelEvent(MSceneViewGLWidget *sceneView, QWheelEvent *event
             scrollTranslationY,
             0.0f, fullWindowHeight - windowHeight,
             borderWidth, windowHeight - borderWidth - scrollThumbHeight);
+
+    // Zoom in the time axis.
+    if (event->modifiers().testFlag(Qt::ShiftModifier) && event->delta() != 0) {
+        float timeZoomFactor = dt * float(event->delta());
+
+        float timeDisplayMinOld = timeDisplayMin;
+        float timeDisplayMaxOld = timeDisplayMax;
+
+        float x0 = (selectedTimeStep - timeDisplayMinOld) / (timeDisplayMaxOld - timeDisplayMinOld);
+        float xa = x0 + sign(event->delta()) * 0.1f;
+        float xb = xa + sign(event->delta()) * timeZoomFactor;
+
+        if (sign(xa - x0) == sign(xb - x0)) {
+            float pa = (xa - x0) * (1.0f - x0) / (xb - x0);
+            float na = (xa - x0) * x0 / (xb - x0);
+
+            timeDisplayMin = selectedTimeStep - na * (timeDisplayMaxOld - timeDisplayMinOld);
+            timeDisplayMax = selectedTimeStep + pa * (timeDisplayMaxOld - timeDisplayMinOld);
+
+            if (timeDisplayMin < timeMin) {
+                timeDisplayMin = timeMin;
+            }
+            if (timeDisplayMax > timeMax) {
+                timeDisplayMax = timeMax;
+            }
+        }
+    }
+}
+
+void MHorizonGraph::updateTimeScale(const QVector2D& mousePosition, EventType eventType, QMouseEvent* event) {
+    // Click on the top legend and move the mouse to change the timescale.
+    AABB2 legendTopAabb(
+            QVector2D(offsetHorizonBarsX, borderSizeY),
+            QVector2D(offsetHorizonBarsX + horizonBarWidth, offsetHorizonBarsY));
+    if (legendTopAabb.contains(mousePosition)) {
+        if (eventType == EventType::MousePress && event->button() == Qt::LeftButton
+                && event->modifiers().testFlag(Qt::ShiftModifier)) {
+            topLegendClickPct = (mousePosition.x() - offsetHorizonBarsX) / horizonBarWidth;
+            timeDisplayMinOld = timeDisplayMin;
+            timeDisplayMaxOld = timeDisplayMax;
+            isDraggingTopLegend = true;
+        }
+        if (eventType == EventType::MouseRelease && event->button() == Qt::LeftButton) {
+            isDraggingTopLegend = false;
+        }
+        if (isDraggingTopLegend && event->button() == Qt::LeftButton && eventType == EventType::MouseMove) {
+            float x0 = (selectedTimeStep - timeDisplayMinOld) / (timeDisplayMaxOld - timeDisplayMinOld);
+            float xa = topLegendClickPct;
+            float xb = (mousePosition.x() - offsetHorizonBarsX) / horizonBarWidth;
+
+            if (sign(xa - x0) == sign(xb - x0)) {
+                float pa = (xa - x0) * (1.0f - x0) / (xb - x0);
+                float na = (xa - x0) * x0 / (xb - x0);
+
+                timeDisplayMin = selectedTimeStep - na * (timeDisplayMaxOld - timeDisplayMinOld);
+                timeDisplayMax = selectedTimeStep + pa * (timeDisplayMaxOld - timeDisplayMinOld);
+
+                if (timeDisplayMin < timeMin) {
+                    timeDisplayMin = timeMin;
+                }
+                if (timeDisplayMax > timeMax) {
+                    timeDisplayMax = timeMax;
+                }
+            }
+        }
+    }
+}
+
+void MHorizonGraph::updateTimeShift(const QVector2D& mousePosition, EventType eventType, QMouseEvent* event) {
+    // Translation in the time axis.
+    AABB2 graphAreaAabb(
+            QVector2D(offsetHorizonBarsX, offsetHorizonBarsY),
+            QVector2D(offsetHorizonBarsX + horizonBarWidth, windowHeight - borderWidth));
+    if (graphAreaAabb.contains(mousePosition)) {
+        if (eventType == EventType::MousePress && event->button() == Qt::LeftButton
+                && event->modifiers().testFlag(Qt::ShiftModifier)) {
+            clickTime = remap(
+                    mousePosition.x(), offsetHorizonBarsX, offsetHorizonBarsX + horizonBarWidth,
+                    timeDisplayMin, timeDisplayMax);
+            timeDisplayMinOld = timeDisplayMin;
+            timeDisplayMaxOld = timeDisplayMax;
+            isDraggingTimeShift = true;
+        }
+        if (eventType == EventType::MouseRelease && event->button() == Qt::LeftButton) {
+            isDraggingTimeShift = false;
+        }
+        if (isDraggingTimeShift && event->button() == Qt::LeftButton && eventType == EventType::MouseMove) {
+            float timeDiff = clickTime - remap(
+                    mousePosition.x(), offsetHorizonBarsX, offsetHorizonBarsX + horizonBarWidth,
+                    timeDisplayMinOld, timeDisplayMaxOld);
+            if (timeDisplayMinOld + timeDiff < timeMin) {
+                timeDiff = timeMin - timeDisplayMinOld;
+            }
+            if (timeDisplayMaxOld + timeDiff > timeMax) {
+                timeDiff = timeMax - timeDisplayMaxOld;
+            }
+            timeDisplayMin = timeDisplayMinOld + timeDiff;
+            timeDisplayMax = timeDisplayMaxOld + timeDiff;
+        }
+    }
 }
 
 void MHorizonGraph::sortVariables(int newSortingIdx) {
@@ -586,7 +827,7 @@ void MHorizonGraph::sortVariables(int newSortingIdx) {
     std::vector<std::pair<float, size_t>> differenceMap;
     for (size_t varIdx = 0; varIdx < variableNames.size(); varIdx++) {
         float difference = -1.0f;
-        if (varIdx != sortingIdx) {
+        if (int(varIdx) != sortingIdx) {
             difference = 0.0f;
             for (size_t timeStepIdx = 0; timeStepIdx < numTimeSteps; timeStepIdx++) {
                 float meanSorting = ensembleMeanValues.at(timeStepIdx).at(sortingIdx);
