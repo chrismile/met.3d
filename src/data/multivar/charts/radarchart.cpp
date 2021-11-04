@@ -90,6 +90,7 @@ void MRadarChart::setData(
     this->highlightColors = highlightColors;
     this->variableNames = variableNames;
     this->variableValuesPerTrajectory = variableValuesPerTrajectory;
+    numVariables = variableNames.size();
     onWindowSizeChanged();
 }
 

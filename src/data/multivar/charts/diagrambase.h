@@ -56,6 +56,7 @@ class MDiagramBase : public MMemoryManagementUsingObject {
 public:
     explicit MDiagramBase(GLint textureUnit);
     virtual DiagramType getDiagramType()=0;
+    void createNanoVgHandle();
     virtual void initialize();
     ~MDiagramBase() override;
     void render();

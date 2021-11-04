@@ -118,6 +118,9 @@ QString getFontPath(const std::set<QString>& preferredFontNames) {
 }
 
 MDiagramBase::MDiagramBase(GLint textureUnit) : textureUnit(textureUnit) {
+}
+
+void MDiagramBase::createNanoVgHandle() {
     if (!vg)
     {
         int flags = NVG_STENCIL_STROKES;

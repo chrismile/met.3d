@@ -250,6 +250,8 @@ private:
             QString("beziertrajectories_vertex_color_buffer_highlighted_#%1").arg(getID());
     MHighlightedTrajectoriesRenderData highlightedTrajectoriesRenderData;
     MDiagramBase* diagram = nullptr;
+    MDiagramBase* oldDiagram = nullptr;
+    bool needsInitializationBeforeRendering = false;
     DiagramDisplayType diagramDisplayType = DiagramDisplayType::HORIZON_GRAPH;
     //QtExtensions::MMultiVarChartCollection multiVarCharts;
     //QtExtensions::MRadarChart* radarChart;

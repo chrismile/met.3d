@@ -78,11 +78,11 @@ void MTrajectoryPicker::setDiagramType(DiagramDisplayType type)
     // context than the currently active. The "MGLResourcesManager" context is
     // shared with all visible contexts, hence modifying the VBO there works
     // fine.
-    MGLResourcesManager::getInstance()->makeCurrent();
+    //MGLResourcesManager::getInstance()->makeCurrent();
 
     if (diagram)
     {
-        delete diagram;
+        oldDiagram = diagram;
         diagram = nullptr;
     }
 
@@ -104,14 +104,12 @@ void MTrajectoryPicker::setDiagramType(DiagramDisplayType type)
 
     if (diagram)
     {
-        diagram->initialize();
-        updateDiagramData();
-        diagram->setSelectedVariables(selectedVariables);
+        needsInitializationBeforeRendering = true;
     }
 
-#ifdef USE_QOPENGLWIDGET
-    MGLResourcesManager::getInstance()->doneCurrent();
-#endif
+//#ifdef USE_QOPENGLWIDGET
+    //MGLResourcesManager::getInstance()->doneCurrent();
+//#endif
 }
 
 MTrajectoryPicker::~MTrajectoryPicker()
@@ -122,15 +120,22 @@ MTrajectoryPicker::~MTrajectoryPicker()
     rtcReleaseScene(scene);
     rtcReleaseDevice(device);
 
-    if (highlightedTrajectoriesRenderData.indexBufferHighlighted) {
+    if (highlightedTrajectoriesRenderData.indexBufferHighlighted)
+    {
         MGLResourcesManager::getInstance()->releaseGPUItem(indexBufferHighlightedID);
         MGLResourcesManager::getInstance()->releaseGPUItem(vertexPositionBufferHighlightedID);
         MGLResourcesManager::getInstance()->releaseGPUItem(vertexColorBufferHighlightedID);
     }
 
-    if (diagram) {
+    if (diagram)
+    {
         delete diagram;
         diagram = nullptr;
+    }
+    if (oldDiagram)
+    {
+        delete oldDiagram;
+        oldDiagram = nullptr;
     }
 }
 
@@ -145,8 +150,22 @@ void MTrajectoryPicker::freeStorage()
 
 void MTrajectoryPicker::render()
 {
+    if (oldDiagram)
+    {
+        delete oldDiagram;
+        oldDiagram = nullptr;
+    }
+
     if (diagram)
     {
+        if (needsInitializationBeforeRendering)
+        {
+            needsInitializationBeforeRendering = false;
+            diagram->createNanoVgHandle();
+            diagram->initialize();
+            updateDiagramData();
+            diagram->setSelectedVariables(selectedVariables);
+        }
         diagram->render();
     }
 }
