@@ -2776,7 +2776,9 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
             {
                 trajectoryRequests[t].bezierTrajectoriesMap[sceneView]->updateSelectedVariables(
                         multiVarData.getSelectedVariables());
+#ifdef USE_EMBREE
                 trajectoryPickerMap[sceneView]->setSelectedVariables(multiVarData.getSelectedVariables());
+#endif
                 multiVarData.resetSelectedVariablesChanged();
             }
 

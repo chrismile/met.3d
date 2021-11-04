@@ -418,7 +418,7 @@ void MDiagramBase::render() {
     glDepthMask(GL_TRUE); CHECK_GL_ERROR;
 }
 
-bool MDiagramBase::isMouseOverDiagram(const QVector2D& mousePosition) const
+bool MDiagramBase::isMouseOverDiagram(QVector2D mousePosition) const
 {
     AABB2 aabb;
     aabb.min = QVector2D(windowOffsetX, windowOffsetY);
@@ -494,8 +494,8 @@ void MDiagramBase::drawColorLegend(
     const float tickHeight = 1.0f;
     nvgBeginPath(vg);
     for (size_t tickIdx = 0; tickIdx < numTicks; tickIdx++) {
-        float t = 1.0f - float(tickIdx) / float(numTicks - 1);
-        float centerY = y + float(tickIdx) / float(numTicks - 1) * h;
+        //float t = 1.0f - float(tickIdx) / float(int(numTicks) - 1);
+        float centerY = y + float(tickIdx) / float(int(numTicks) - 1) * h;
         nvgRect(vg, x + w, centerY - tickHeight / 2.0f, tickWidth, tickHeight);
     }
     nvgFillColor(vg, textColor);
@@ -505,8 +505,8 @@ void MDiagramBase::drawColorLegend(
     nvgFontSize(vg, 12.0f);
     nvgFontFace(vg, "sans");
     for (size_t tickIdx = 0; tickIdx < numTicks; tickIdx++) {
-        float t = 1.0f - float(tickIdx) / float(numTicks - 1);
-        float centerY = y + float(tickIdx) / float(numTicks - 1) * h;
+        float t = 1.0f - float(tickIdx) / float(int(numTicks) - 1);
+        float centerY = y + float(tickIdx) / float(int(numTicks) - 1) * h;
         std::string labelText = labelMap(t);
         nvgTextAlign(vg, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
         nvgFillColor(vg, textColor);

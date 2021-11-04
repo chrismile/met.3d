@@ -387,7 +387,7 @@ protected:
 
     void keyReleaseEvent(QKeyEvent *event);
 
-    bool event(QEvent *event) override;
+    //bool event(QEvent *event) override;
 
     void updateSynchronizedCameras();
 

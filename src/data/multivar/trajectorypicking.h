@@ -185,7 +185,7 @@ public:
             QGLWidget *currentGLContext = nullptr);
 #endif
     inline std::shared_ptr<GL::MShaderEffect> getHighlightShaderEffect() { return shaderEffectHighlighted; }
-    inline QtExtensions::MMultiVarChartCollection& getMultiVarChartCollection() { return multiVarCharts; }
+    //inline QtExtensions::MMultiVarChartCollection& getMultiVarChartCollection() { return multiVarCharts; }
 
 private:
     void freeStorage();
@@ -251,8 +251,8 @@ private:
     MHighlightedTrajectoriesRenderData highlightedTrajectoriesRenderData;
     MDiagramBase* diagram = nullptr;
     DiagramDisplayType diagramDisplayType = DiagramDisplayType::HORIZON_GRAPH;
-    QtExtensions::MMultiVarChartCollection multiVarCharts;
-    QtExtensions::MRadarChart* radarChart;
+    //QtExtensions::MMultiVarChartCollection multiVarCharts;
+    //QtExtensions::MRadarChart* radarChart;
     std::vector<std::string> variableNames;
     size_t numVars = 0;
     QVector<uint32_t> selectedVariables;

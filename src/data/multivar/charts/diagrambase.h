@@ -61,7 +61,7 @@ public:
     void render();
 
     /// Returns whether the mouse is over the area of the diagram.
-    bool isMouseOverDiagram(const QVector2D& mousePosition) const;
+    bool isMouseOverDiagram(QVector2D mousePosition) const;
     virtual bool hasData()=0;
 
     inline QVector<uint32_t> getSelectedVariables() const {

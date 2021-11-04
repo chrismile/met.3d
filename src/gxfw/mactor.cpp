@@ -165,7 +165,11 @@ MActor::MActor(QObject *parent)
 
 MActor::~MActor()
 {
-    delete shaderCompilationProgressDialog;
+    if (shaderCompilationProgressDialog)
+    {
+        delete shaderCompilationProgressDialog;
+    }
+
     if (positionLabel != nullptr)
     {
         delete positionLabel;
@@ -799,7 +803,9 @@ void MActor::beginCompileShaders(int numberOfShaders)
 
 void MActor::endCompileShaders()
 {
-    shaderCompilationProgressDialog->hide();
+    shaderCompilationProgressDialog->close();
+    delete shaderCompilationProgressDialog;
+    shaderCompilationProgressDialog = nullptr;
 }
 
 

@@ -2676,9 +2676,9 @@ void MSceneViewGLWidget::keyReleaseEvent(QKeyEvent *event)
 
 
 
-bool MSceneViewGLWidget::event(QEvent *event)
+/*bool MSceneViewGLWidget::event(QEvent *event)
 {
-    /*if (event->type() == QEvent::ToolTip)
+    if (event->type() == QEvent::ToolTip)
     {
         QHelpEvent *helpEvent = static_cast<QHelpEvent*>(event);
         float time = 0.0f;
@@ -2694,13 +2694,13 @@ bool MSceneViewGLWidget::event(QEvent *event)
         }
 
         return true;
-    }*/
+    }
 #ifdef USE_QOPENGLWIDGET
     return QOpenGLWidget::event(event);
 #else
     return QGLWidget::event(event);
 #endif
-}
+}*/
 
 
 void MSceneViewGLWidget::updateSynchronizedCameras()

@@ -31,6 +31,7 @@
 
 // local application imports
 #include "../helpers.h"
+#include "aabb2.h"
 #include "radarchart.h"
 
 #ifndef M_PI
@@ -172,6 +173,12 @@ void MRadarChart::drawPieSliceTextHorizontal(const NVGcolor& textColor, const QV
     textPosition[1] += textSize.y() * ((dirY - 1) * 0.5f + scaleFactorText);
 
     nvgTextAlign(vg,NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
+    if (selectedVariableIndices.find(varIdx) != selectedVariableIndices.end()) {
+        nvgFontBlur(vg, 1);
+        nvgFillColor(vg, nvgRGBA(255, 0, 0, 255));
+        nvgText(vg, textPosition.x(), textPosition.y(), text, nullptr);
+        nvgFontBlur(vg, 0);
+    }
     nvgFillColor(vg, textColor);
     nvgText(vg, textPosition.x(), textPosition.y(), text, nullptr);
 }
@@ -199,10 +206,18 @@ void MRadarChart::drawPieSliceTextRotated(const NVGcolor& textColor, const QVect
     nvgTranslate(vg, -textPosition.x(), -textPosition.y());
     nvgFillColor(vg, textColor);
     if (std::cos(angleCenter) < -1e-5f) {
-        nvgTranslate(vg, (bounds[0].x() + bounds[1].x()) / 2.0f, (bounds[0].y() + bounds[1].y()) / 2.0f);
+        nvgTranslate(vg, (bounds[0][0] + bounds[1][0]) / 2.0f, (bounds[0][1] + bounds[1][1]) / 2.0f);
         nvgRotate(vg, M_PI);
-        nvgTranslate(vg, -(bounds[0].x() + bounds[1].x()) / 2.0f, -(bounds[0].y() + bounds[1].y()) / 2.0f);
+        nvgTranslate(vg, -(bounds[0][0] + bounds[1][0]) / 2.0f, -(bounds[0][1] + bounds[1][1]) / 2.0f);
     }
+
+    if (selectedVariableIndices.find(varIdx) != selectedVariableIndices.end()) {
+        nvgFontBlur(vg, 1);
+        nvgFillColor(vg, nvgRGBA(255, 0, 0, 255));
+        nvgText(vg, textPosition.x(), textPosition.y(), text, nullptr);
+        nvgFontBlur(vg, 0);
+    }
+    nvgFillColor(vg, textColor);
     nvgText(vg, textPosition.x(), textPosition.y(), text, nullptr);
 
     nvgRestore(vg);
@@ -277,6 +292,124 @@ void MRadarChart::renderBase() {
     } else {
         for (size_t varIdx = 0; varIdx < numVariables; varIdx++) {
             drawPieSliceTextRotated(textColor, center, int(varIdx));
+        }
+    }
+}
+
+void MRadarChart::mouseReleaseEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event)
+{
+    int viewportHeight = sceneView->getViewPortHeight();
+    QVector2D mousePosition(float(event->x()), float(viewportHeight - event->y() - 1));
+    mousePosition -= QVector2D(getWindowOffsetX(), getWindowOffsetY());
+    mousePosition /= getScaleFactor();
+    mousePosition[1] = windowHeight - mousePosition.y();
+
+    // Let the user click on variables to select different variables to show in linked views.
+    AABB2 windowAabb(
+            QVector2D(borderWidth, borderWidth),
+            QVector2D(windowWidth - 2.0f * borderWidth, windowHeight - 2.0f * borderWidth));
+    if (windowAabb.contains(mousePosition) && event->button() == Qt::MouseButton::LeftButton) {
+        QVector2D center(windowWidth / 2.0f, windowHeight / 2.0f);
+
+        nvgFontSize(vg, variableNames.size() > 50 ? 8.0f : 12.0f);
+        nvgFontFace(vg, "sans");
+        if (textMode == TextMode::HORIZONTAL) {
+            nvgTextAlign(vg,NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
+        } else {
+            nvgTextAlign(vg, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
+        }
+
+        for (size_t varIdx = 0; varIdx < numVariables; varIdx++) {
+            QVector2D bounds[2];
+            QVector2D transformedMousePosition;
+            if (textMode == TextMode::HORIZONTAL) {
+                float radius = 1.0f * chartRadius + 10;
+                float angleCenter = float(varIdx) / float(variableNames.size()) * 2.0f * float(M_PI) - float(M_PI) / 2.0f;
+                QVector2D circlePoint(center.x() + std::cos(angleCenter) * radius, center.y() + std::sin(angleCenter) * radius);
+
+                float dirX = clamp(std::cos(angleCenter) * 2.0f, -1.0f, 1.0f);
+                float dirY = clamp(std::sin(angleCenter) * 2.0f, -1.0f, 1.0f);
+                float scaleFactorText = 0.0f;
+
+                const char* text = variableNames.at(varIdx).c_str();
+                QVector2D boundsLocal[2];
+                nvgFontSize(vg, variableNames.size() > 50 ? 7.0f : 12.0f);
+                nvgFontFace(vg, "sans");
+                nvgTextBounds(vg, 0, 0, text, nullptr, &boundsLocal[0][0]);
+                QVector2D textSize = boundsLocal[1] - boundsLocal[0];
+
+                QVector2D textPosition(circlePoint.x(), circlePoint.y());
+                textPosition[0] += textSize.x() * (dirX - 1) * 0.5f;
+                textPosition[1] += textSize.y() * ((dirY - 1) * 0.5f + scaleFactorText);
+
+                nvgTextBounds(
+                        vg, textPosition.x(), textPosition.y(),
+                        variableNames.at(varIdx).c_str(), nullptr, &bounds[0][0]);
+                transformedMousePosition = mousePosition;
+            } else {
+                float radius = 1.0f * chartRadius + 10;
+                float angleCenter = float(varIdx) / float(variableNames.size()) * 2.0f * float(M_PI) - float(M_PI) / 2.0f;
+                QVector2D circlePoint(
+                        center.x() + std::cos(angleCenter) * radius,
+                        center.y() + std::sin(angleCenter) * radius);
+                QVector2D textPosition(circlePoint.x(), circlePoint.y());
+
+                nvgSave(vg);
+
+                QVector2D boundsLocal[2];
+                nvgTextBounds(
+                        vg, textPosition.x(), textPosition.y(),
+                        variableNames.at(varIdx).c_str(), nullptr, &boundsLocal[0][0]);
+
+                nvgTranslate(vg, textPosition.x(), textPosition.y());
+                nvgRotate(vg, angleCenter);
+                nvgTranslate(vg, -textPosition.x(), -textPosition.y());
+                if (std::cos(angleCenter) < -1e-5f) {
+                    nvgTranslate(
+                            vg, (boundsLocal[0].x() + boundsLocal[1].x()) / 2.0f,
+                            (boundsLocal[0].y() + boundsLocal[1].y()) / 2.0f);
+                    nvgRotate(vg, M_PI);
+                    nvgTranslate(
+                            vg, -(boundsLocal[0].x() + boundsLocal[1].x()) / 2.0f,
+                            -(boundsLocal[0].y() + boundsLocal[1].y()) / 2.0f);
+                }
+                nvgTextBounds(
+                        vg, textPosition.x(), textPosition.y(),
+                        variableNames.at(varIdx).c_str(), nullptr, &bounds[0][0]);
+
+                float xform[6] = {};
+                float xformInv[6] = {};
+                nvgCurrentTransform(vg, xform);
+                nvgTransformInverse(xformInv, xform);
+                nvgTransformPoint(
+                        &transformedMousePosition[0], &transformedMousePosition[1],
+                        xformInv, mousePosition[0], mousePosition[1]);
+                nvgRestore(vg);
+
+                QMatrix4x4 trafo{};
+                trafo.translate(textPosition[0], textPosition[1]);
+                trafo.rotate(angleCenter / float(M_PI) * 180.0f, 0.0f, 0.0f, 1.0f);
+                trafo.translate(-textPosition[0], -textPosition[1]);
+                if (std::cos(angleCenter) < -1e-5f) {
+                    trafo.translate((bounds[0][0] + bounds[1][0]) / 2.0f, (bounds[0][1] + bounds[1][1]) / 2.0f);
+                    trafo.rotate(180.0f, 0.0f, 0.0f, 1.0f);
+                    trafo.translate(-(bounds[0][0] + bounds[1][0]) / 2.0f, -(bounds[0][1] + bounds[1][1]) / 2.0f);
+                }
+                QMatrix4x4 trafoInv = trafo.inverted();
+                QVector4D trafoPt = trafoInv.map(QVector4D(
+                        mousePosition.x(), mousePosition.y(), 0.0f, 1.0f));
+                transformedMousePosition = QVector2D(trafoPt.x(), trafoPt.y());
+            }
+
+            AABB2 textAabb(bounds[0], bounds[1]);
+            if (textAabb.contains(transformedMousePosition)) {
+                if (selectedVariableIndices.find(varIdx) == selectedVariableIndices.end()) {
+                    selectedVariableIndices.insert(varIdx);
+                } else {
+                    selectedVariableIndices.erase(varIdx);
+                }
+                selectedVariablesChanged = true;
+            }
         }
     }
 }

@@ -67,6 +67,8 @@ public:
 
     inline void setUseEqualArea(bool useEqualArea) { equalArea = useEqualArea; }
 
+    void mouseReleaseEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event) override;
+
 protected:
     virtual bool hasData() override {
         return useTimeDependentData ? !variableValuesTimeDependent.empty() : !variableValues.empty();

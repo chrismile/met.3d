@@ -44,7 +44,7 @@ namespace Met3D {
 
 MTrajectoryPicker::MTrajectoryPicker(
         GLuint textureUnit, MSceneViewGLWidget* sceneView, const QVector<QString>& varNames,
-        DiagramDisplayType diagramType) : textureUnit(textureUnit), multiVarCharts(sceneView)
+        DiagramDisplayType diagramType) : textureUnit(textureUnit)//, multiVarCharts(sceneView)
 {
     device = rtcNewDevice(nullptr);
     scene = rtcNewScene(device);

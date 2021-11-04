@@ -59,6 +59,8 @@ public:
             const std::vector<std::vector<float>>& variableValuesPerTrajectory,
             const std::vector<QColor>& highlightColors);
 
+    void mouseReleaseEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event) override;
+
 protected:
     virtual bool hasData() override { return !variableValuesPerTrajectory.empty(); }
     void renderBase() override;
