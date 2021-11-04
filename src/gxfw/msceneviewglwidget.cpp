@@ -140,6 +140,9 @@ MSceneViewGLWidget::MSceneViewGLWidget()
     // Focus policy: Accept focus by both tab and click.
     setFocusPolicy(Qt::StrongFocus);
 
+    // Allow mouse move events to be generated even when the mouse is not visible.
+    setMouseTracking(true);
+
     fpsStopwatch = new MStopwatch();
     frameCount   = 0;
 
@@ -2139,6 +2142,11 @@ void MSceneViewGLWidget::mouseMoveEvent(QMouseEvent *event)
 #endif
 #endif
     }
+    else if (event->buttons() == Qt::NoButton)
+    {
+        return;
+    }
+
 
     if (freezeMode || isVirtualWindowBelowMouse) return;
 

@@ -64,6 +64,10 @@ public:
     void setDataTimeDependent(
             const std::vector<std::string>& variableNames,
             const std::vector<std::vector<float>>& variableValuesTimeDependent);
+    void setDataTimeDependent(
+            const std::vector<std::string>& variableNames,
+            const std::vector<std::vector<float>>& variableValuesTimeDependent,
+            const std::vector<QColor>& highlightColors);
 
     inline void setUseEqualArea(bool useEqualArea) { equalArea = useEqualArea; }
 
@@ -79,11 +83,17 @@ private:
     QVector3D transferFunction(float value);
     void drawPieSlice(const QVector2D& center, int varIdx);
     void drawEqualAreaPieSlices(const QVector2D& center, int varIdx);
+    void drawEqualAreaPieSlicesWithLabels(const QVector2D& center);
     void drawPieSliceTextHorizontal(const NVGcolor& textColor, const QVector2D& center, int varIdx);
     void drawPieSliceTextRotated(const NVGcolor& textColor, const QVector2D& center, int indvarIdxex);
     void drawDashedCircle(
             const NVGcolor& circleColor, const QVector2D& center, float radius,
             int numDashes, float dashSpaceRatio, float thickness);
+    /**
+     * Maps the variable index to the corresponding angle.
+     * @param varIdxFloat The variable index.
+     */
+    float mapVarIdxToAngle(float varIdxFloat);
 
     enum class TextMode {
         HORIZONTAL, ROTATED
@@ -91,6 +101,7 @@ private:
     TextMode textMode = TextMode::ROTATED;
     bool useTimeDependentData = true;
     bool equalArea = true;
+    bool timeStepColorMode = true;
 
     float chartRadius;
     float chartHoleRadius;
@@ -103,6 +114,7 @@ private:
     std::vector<std::string> variableNames;
     std::vector<float> variableValues;
     std::vector<std::vector<float>> variableValuesTimeDependent;
+    std::vector<QColor> highlightColors;
 };
 
 }

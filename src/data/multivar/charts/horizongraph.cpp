@@ -514,6 +514,10 @@ void MHorizonGraph::mouseMoveEvent(MSceneViewGLWidget *sceneView, QMouseEvent *e
     mousePosition /= getScaleFactor();
     mousePosition[1] = windowHeight - mousePosition.y();
 
+    if (event->buttons() == Qt::NoButton) {
+        scrollThumbDrag = false;
+    }
+
     if (scrollThumbDrag) {
         scrollTranslationY = remap(
                 mousePosition.y() + thumbDragDelta,
