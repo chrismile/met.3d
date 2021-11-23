@@ -152,8 +152,8 @@ void MRadarBarChart::drawPieSlice(const QVector2D& center, int varIdx) {
     if (numVariables == 1) {
         nvgCircle(vg, center.x(), center.y(), radius);
     } else {
-        float angleStart = float(varIdx) / float(numVariables) * 2.0f * float(M_PI) - float(M_PI) / 2.0f;
-        float angleEnd = float(varIdx + 1) / float(numVariables) * 2.0f * float(M_PI) - float(M_PI) / 2.0f;
+        float angleStart = mapVarIdxToAngle(float(varIdx));
+        float angleEnd = mapVarIdxToAngle(float(varIdx + 1));
 
         if (chartHoleRadius > 0.0f) {
             nvgArc(vg, center.x(), center.y(), chartHoleRadius, angleEnd, angleStart, NVG_CCW);
@@ -203,8 +203,8 @@ void MRadarBarChart::drawEqualAreaPieSlices(const QVector2D& center, int varIdx)
                 nvgPathWinding(vg, NVG_HOLE);
             }
         } else {
-            float angleStart = float(varIdx) / float(numVariables) * 2.0f * float(M_PI) - float(M_PI) / 2.0f;
-            float angleEnd = float(varIdx + 1) / float(numVariables) * 2.0f * float(M_PI) - float(M_PI) / 2.0f;
+            float angleStart = mapVarIdxToAngle(float(varIdx));
+            float angleEnd = mapVarIdxToAngle(float(varIdx + 1));
 
             if (radiusInner > 0.0f) {
                 nvgArc(vg, center.x(), center.y(), radiusInner, angleEnd, angleStart, NVG_CCW);
@@ -345,7 +345,7 @@ float MRadarBarChart::mapVarIdxToAngle(float varIdxFloat) {
 
 void MRadarBarChart::drawPieSliceTextHorizontal(const NVGcolor& textColor, const QVector2D& center, int varIdx) {
     float radius = 1.0f * chartRadius + 10;
-    float angleCenter = (float(varIdx) + 0.5f) / float(numVariables) * 2.0f * float(M_PI) - float(M_PI) / 2.0f;
+    float angleCenter = mapVarIdxToAngle(float(varIdx) + 0.5f);
     QVector2D circlePoint(center.x() + std::cos(angleCenter) * radius, center.y() + std::sin(angleCenter) * radius);
 
     float dirX = clamp(std::cos(angleCenter) * 2.0f, -1.0f, 1.0f);
@@ -378,7 +378,7 @@ void MRadarBarChart::drawPieSliceTextRotated(const NVGcolor& textColor, const QV
     nvgSave(vg);
 
     float radius = 1.0f * chartRadius + 10;
-    float angleCenter = (float(varIdx) + 0.5f) / float(numVariables) * 2.0f * float(M_PI) - float(M_PI) / 2.0f;
+    float angleCenter = mapVarIdxToAngle(float(varIdx) + 0.5f);
     QVector2D circlePoint(center.x() + std::cos(angleCenter) * radius, center.y() + std::sin(angleCenter) * radius);
 
     const char* text = variableNames.at(varIdx).c_str();
@@ -549,7 +549,7 @@ void MRadarBarChart::mouseReleaseEvent(MSceneViewGLWidget *sceneView, QMouseEven
             QVector2D transformedMousePosition;
             if (textMode == TextMode::HORIZONTAL) {
                 float radius = 1.0f * chartRadius + 10;
-                float angleCenter = (float(varIdx) + 0.5f) / float(numVariables) * 2.0f * float(M_PI) - float(M_PI) / 2.0f;
+                float angleCenter = mapVarIdxToAngle(float(varIdx) + 0.5f);
                 QVector2D circlePoint(center.x() + std::cos(angleCenter) * radius, center.y() + std::sin(angleCenter) * radius);
 
                 float dirX = clamp(std::cos(angleCenter) * 2.0f, -1.0f, 1.0f);
@@ -573,7 +573,7 @@ void MRadarBarChart::mouseReleaseEvent(MSceneViewGLWidget *sceneView, QMouseEven
                 transformedMousePosition = mousePosition;
             } else {
                 float radius = 1.0f * chartRadius + 10;
-                float angleCenter = (float(varIdx) + 0.5f) / float(numVariables) * 2.0f * float(M_PI) - float(M_PI) / 2.0f;
+                float angleCenter = mapVarIdxToAngle(float(varIdx) + 0.5f);
                 QVector2D circlePoint(
                         center.x() + std::cos(angleCenter) * radius,
                         center.y() + std::sin(angleCenter) * radius);

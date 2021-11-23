@@ -183,7 +183,13 @@ MBezierTrajectories *MBezierTrajectoriesSource::produceData(MDataRequest request
             const QVector3D cotangent1 = (pos2 - pos0).normalized();
             const QVector3D cotangent2 = (pos3 - pos1).normalized();
             const QVector3D tangent = pos2 - pos1;
-            const float lenTangent = tangent.length();
+            float lenTangent = tangent.length();
+
+            if (std::isnan(lenTangent))
+            {
+                LOG4CPLUS_DEBUG(mlog, "ERROR: NaN encountered in trajectory file.");
+                lenTangent = 0.0f;
+            }
 
             avgSegLength += lenTangent;
             minSegLength = std::min(minSegLength, lenTangent);
@@ -195,6 +201,10 @@ MBezierTrajectories *MBezierTrajectoriesSource::produceData(MDataRequest request
             QVector3D C3 = pos2;
 
             MBezierCurve BCurve({{C0, C1, C2, C3}}, minT, maxT);
+            if (std::isnan(BCurve.totalArcLength))
+            {
+                BCurve.totalArcLength = 0.0f;
+            }
 
             curveSet.push_back(BCurve);
             curveArcLengths[trajCounter] += BCurve.totalArcLength;

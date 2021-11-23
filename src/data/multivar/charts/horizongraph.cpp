@@ -243,13 +243,13 @@ void MHorizonGraph::drawHorizonLines() {
             continue;
         }
 
-        float timeStepIdxStartFlt = (timeDisplayMin - timeMin) / (timeMax - timeMin) * float(numTimeSteps);
-        float timeStepIdxStopFlt = (timeDisplayMax - timeMin) / (timeMax - timeMin) * float(numTimeSteps);
+        float timeStepIdxStartFlt = (timeDisplayMin - timeMin) / (timeMax - timeMin) * float(numTimeSteps - 1);
+        float timeStepIdxStopFlt = (timeDisplayMax - timeMin) / (timeMax - timeMin) * float(numTimeSteps - 1);
         int timeStepIdxStart = int(std::floor(timeStepIdxStartFlt));
         int timeStepIdxStop = int(std::ceil(timeStepIdxStopFlt));
 
         if (mapStdDevToColor) {
-            for (int timeStepIdx = timeStepIdxStart; timeStepIdx < timeStepIdxStop - 1; timeStepIdx++) {
+            for (int timeStepIdx = timeStepIdxStart; timeStepIdx < timeStepIdxStop; timeStepIdx++) {
                 float mean0 = ensembleMeanValues.at(timeStepIdx).at(varIdx);
                 float stddev0 = ensembleStdDevValues.at(timeStepIdx).at(varIdx);
                 float timeStep0 = timeMin + (timeMax - timeMin) * float(timeStepIdx) / float(numTimeSteps - 1);
@@ -264,7 +264,7 @@ void MHorizonGraph::drawHorizonLines() {
                     mean0 = mix(mean0, mean1, fract(timeStepIdxStartFlt));
                     xpos0 = offsetHorizonBarsX;
                 }
-                if (timeStepIdx == timeStepIdxStop - 2 && fract(timeStepIdxStopFlt) != 0.0f) {
+                if (timeStepIdx == timeStepIdxStop - 1 && fract(timeStepIdxStopFlt) != 0.0f) {
                     mean1 = mix(mean0, mean1, fract(timeStepIdxStartFlt));
                     xpos1 = offsetHorizonBarsX + horizonBarWidth;
                 }
@@ -296,7 +296,7 @@ void MHorizonGraph::drawHorizonLines() {
 
             nvgBeginPath(vg);
             nvgMoveTo(vg, offsetHorizonBarsX, upperY);
-            for (size_t timeStepIdx = 0; timeStepIdx < numTimeSteps; timeStepIdx++) {
+            for (size_t timeStepIdx = 0; timeStepIdx <= numTimeSteps; timeStepIdx++) {
                 float mean = ensembleMeanValues.at(timeStepIdx).at(varIdx);
                 float xpos = offsetHorizonBarsX + float(timeStepIdx) / float(numTimeSteps - 1) * horizonBarWidth;
                 float ypos = lowerY + (upperY - lowerY) * mean;
@@ -308,7 +308,7 @@ void MHorizonGraph::drawHorizonLines() {
         }
 
         nvgBeginPath(vg);
-        for (int timeStepIdx = timeStepIdxStart; timeStepIdx < timeStepIdxStop; timeStepIdx++) {
+        for (int timeStepIdx = timeStepIdxStart; timeStepIdx <= timeStepIdxStop; timeStepIdx++) {
             float mean = ensembleMeanValues.at(timeStepIdx).at(varIdx);
             float timeStep = timeMin + (timeMax - timeMin) * float(timeStepIdx) / float(numTimeSteps - 1);
             float xpos = offsetHorizonBarsX + (timeStep - timeDisplayMin) / (timeDisplayMax - timeDisplayMin) * horizonBarWidth;
@@ -317,7 +317,7 @@ void MHorizonGraph::drawHorizonLines() {
                 mean = mix(mean, meanNext, fract(timeStepIdxStartFlt));
                 xpos = offsetHorizonBarsX;
             }
-            if (timeStepIdx == timeStepIdxStop - 1 && fract(timeStepIdxStopFlt) != 0.0f) {
+            if (timeStepIdx == timeStepIdxStop && fract(timeStepIdxStopFlt) != 0.0f) {
                 float meanLast = ensembleMeanValues.at(timeStepIdx - 1).at(varIdx);
                 mean = mix(meanLast, mean, fract(timeStepIdxStartFlt));
                 xpos = offsetHorizonBarsX + horizonBarWidth;
@@ -739,10 +739,18 @@ void MHorizonGraph::wheelEvent(MSceneViewGLWidget *sceneView, QWheelEvent *event
             timeDisplayMax = selectedTimeStep + pa * (timeDisplayMaxOld - timeDisplayMinOld);
 
             if (timeDisplayMin < timeMin) {
+                float timeDisplayMinNew = timeDisplayMin;
+                float timeDisplayMaxNew = timeDisplayMax;
+
                 timeDisplayMin = timeMin;
+                timeDisplayMax = std::min(timeMax, timeDisplayMin + (timeDisplayMaxNew - timeDisplayMinNew));
             }
             if (timeDisplayMax > timeMax) {
+                float timeDisplayMinNew = timeDisplayMin;
+                float timeDisplayMaxNew = timeDisplayMax;
+
                 timeDisplayMax = timeMax;
+                timeDisplayMin = std::max(timeMin, timeDisplayMax - (timeDisplayMaxNew - timeDisplayMinNew));
             }
         }
     }
@@ -764,7 +772,7 @@ void MHorizonGraph::updateTimeScale(const QVector2D& mousePosition, EventType ev
         if (eventType == EventType::MouseRelease && event->button() == Qt::LeftButton) {
             isDraggingTopLegend = false;
         }
-        if (isDraggingTopLegend && event->button() == Qt::LeftButton && eventType == EventType::MouseMove) {
+        if (isDraggingTopLegend && event->buttons() == Qt::LeftButton && eventType == EventType::MouseMove) {
             float x0 = (selectedTimeStep - timeDisplayMinOld) / (timeDisplayMaxOld - timeDisplayMinOld);
             float xa = topLegendClickPct;
             float xb = (mousePosition.x() - offsetHorizonBarsX) / horizonBarWidth;
@@ -777,10 +785,18 @@ void MHorizonGraph::updateTimeScale(const QVector2D& mousePosition, EventType ev
                 timeDisplayMax = selectedTimeStep + pa * (timeDisplayMaxOld - timeDisplayMinOld);
 
                 if (timeDisplayMin < timeMin) {
+                    float timeDisplayMinNew = timeDisplayMin;
+                    float timeDisplayMaxNew = timeDisplayMax;
+
                     timeDisplayMin = timeMin;
+                    timeDisplayMax = std::min(timeMax, timeDisplayMin + (timeDisplayMaxNew - timeDisplayMinNew));
                 }
                 if (timeDisplayMax > timeMax) {
+                    float timeDisplayMinNew = timeDisplayMin;
+                    float timeDisplayMaxNew = timeDisplayMax;
+
                     timeDisplayMax = timeMax;
+                    timeDisplayMin = std::max(timeMin, timeDisplayMax - (timeDisplayMaxNew - timeDisplayMinNew));
                 }
             }
         }
@@ -805,7 +821,7 @@ void MHorizonGraph::updateTimeShift(const QVector2D& mousePosition, EventType ev
         if (eventType == EventType::MouseRelease && event->button() == Qt::LeftButton) {
             isDraggingTimeShift = false;
         }
-        if (isDraggingTimeShift && event->button() == Qt::LeftButton && eventType == EventType::MouseMove) {
+        if (isDraggingTimeShift && event->buttons() == Qt::LeftButton && eventType == EventType::MouseMove) {
             float timeDiff = clickTime - remap(
                     mousePosition.x(), offsetHorizonBarsX, offsetHorizonBarsX + horizonBarWidth,
                     timeDisplayMinOld, timeDisplayMaxOld);
