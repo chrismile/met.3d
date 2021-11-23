@@ -136,12 +136,10 @@ void MHorizonGraph::setData(
     // Compute metadata.
     this->timeMin = timeMin;
     this->timeMax = timeMax;
-    if (this->selectedTimeStep < timeMin || this->selectedTimeStep > timeMax) {
-        if (this->selectedTimeStep < timeMin) {
-            this->selectedTimeStep = timeMin;
-        } else {
-            this->selectedTimeStep = timeMax;
-        }
+    if (this->timeMin != timeMin || this->timeMax != timeMax) {
+        this->selectedTimeStep = timeMin;
+        this->timeDisplayMin = timeMin;
+        this->timeDisplayMax = timeMax;
         this->selectedTimeStepChanged = true;
     }
     this->timeDisplayMin = timeMin;
@@ -337,6 +335,201 @@ void MHorizonGraph::drawHorizonLines() {
     }
 }
 
+void MHorizonGraph::drawHorizonLinesSparse() {
+    AABB2 scissorAabb(
+            QVector2D(borderWidth, offsetHorizonBarsY + scrollTranslationY),
+            QVector2D(windowWidth - borderWidth, windowHeight - borderWidth + scrollTranslationY));
+
+    float timeStepIdxStartFlt = (timeDisplayMin - timeMin) / (timeMax - timeMin) * float(numTimeSteps - 1);
+    float timeStepIdxStopFlt = (timeDisplayMax - timeMin) / (timeMax - timeMin) * float(numTimeSteps - 1);
+    int timeStepIdxStart = int(std::floor(timeStepIdxStartFlt));
+    int timeStepIdxStop = int(std::ceil(timeStepIdxStopFlt));
+
+    float density = horizonBarWidth * getScaleFactor() / float(timeStepIdxStop - timeStepIdxStart);
+    const int horizonBarWidthInt = int(horizonBarWidth);
+
+    size_t heightIdx = 0;
+    for (size_t varIdx : sortedVariableIndices) {
+        NVGcolor strokeColor = nvgRGBA(0, 0, 0, 255);
+
+        float lowerY = offsetHorizonBarsY + float(heightIdx) * (horizonBarHeight + horizonBarMargin);
+        float upperY = lowerY + horizonBarHeight;
+
+        AABB2 boxAabb(
+                QVector2D(offsetHorizonBarsX, lowerY),
+                QVector2D(offsetHorizonBarsX + horizonBarWidth, lowerY + horizonBarHeight));
+        if (!scissorAabb.intersects(boxAabb)) {
+            heightIdx++;
+            continue;
+        }
+
+        if (mapStdDevToColor) {
+            if (density >= 1.0f) {
+                for (int timeStepIdx = timeStepIdxStart; timeStepIdx < timeStepIdxStop; timeStepIdx++) {
+                    float mean0 = ensembleMeanValues.at(timeStepIdx).at(varIdx);
+                    float stddev0 = ensembleStdDevValues.at(timeStepIdx).at(varIdx);
+                    float timeStep0 = timeMin + (timeMax - timeMin) * float(timeStepIdx) / float(numTimeSteps - 1);
+                    float xpos0 =
+                            offsetHorizonBarsX
+                            + (timeStep0 - timeDisplayMin) / (timeDisplayMax - timeDisplayMin) * horizonBarWidth;
+
+                    float mean1 = ensembleMeanValues.at(timeStepIdx + 1).at(varIdx);
+                    float stddev1 = ensembleStdDevValues.at(timeStepIdx + 1).at(varIdx);
+                    float timeStep1 = timeMin + (timeMax - timeMin) * float(timeStepIdx + 1) / float(numTimeSteps - 1);
+                    float xpos1 =
+                            offsetHorizonBarsX
+                            + (timeStep1 - timeDisplayMin) / (timeDisplayMax - timeDisplayMin) * horizonBarWidth;
+
+                    if (timeStepIdx == timeStepIdxStart && fract(timeStepIdxStartFlt) != 0.0f) {
+                        mean0 = mix(mean0, mean1, fract(timeStepIdxStartFlt));
+                        xpos0 = offsetHorizonBarsX;
+                    }
+                    if (timeStepIdx == timeStepIdxStop - 1 && fract(timeStepIdxStopFlt) != 0.0f) {
+                        mean1 = mix(mean0, mean1, fract(timeStepIdxStartFlt));
+                        xpos1 = offsetHorizonBarsX + horizonBarWidth;
+                    }
+                    float ypos0 = lowerY + (upperY - lowerY) * mean0;
+                    float ypos1 = lowerY + (upperY - lowerY) * mean1;
+
+                    QVector3D rgbColor0 = transferFunction(clamp(stddev0 * 2.0f, 0.0f, 1.0f));
+                    NVGcolor fillColor0 = nvgRGBf(rgbColor0.x(), rgbColor0.y(), rgbColor0.z());
+                    QVector3D rgbColor1 = transferFunction(clamp(stddev1 * 2.0f, 0.0f, 1.0f));
+                    NVGcolor fillColor1 = nvgRGBf(rgbColor1.x(), rgbColor1.y(), rgbColor1.z());
+
+                    nvgBeginPath(vg);
+                    nvgMoveTo(vg, xpos0, upperY);
+                    nvgLineTo(vg, xpos0, ypos0);
+                    nvgLineTo(vg, xpos1, ypos1);
+                    nvgLineTo(vg, xpos1, upperY);
+                    nvgClosePath(vg);
+
+                    NVGpaint paint = nvgLinearGradient(vg, xpos0, upperY, xpos1, upperY, fillColor0, fillColor1);
+                    nvgFillPaint(vg, paint);
+                    nvgFill(vg);
+                }
+            } else {
+                for (int x = 0; x < horizonBarWidthInt; x++) {
+                    float timeStep0 = timeDisplayMin + float(x) / horizonBarWidth * (timeDisplayMax - timeDisplayMin);
+                    float timeStepIdxFlt0 = (timeStep0 - timeMin) / (timeMax - timeMin) * float(numTimeSteps - 1);
+                    int timeStepIdx0a = std::floor(timeStepIdxFlt0);
+                    int timeStepIdx0b = std::ceil(timeStepIdxFlt0);
+                    float interp0 = fract(timeStepIdxFlt0);
+                    float mean0a = ensembleMeanValues.at(timeStepIdx0a).at(varIdx);
+                    float mean0b = ensembleMeanValues.at(timeStepIdx0b).at(varIdx);
+                    float mean0 = mix(mean0a, mean0b, interp0);
+                    float stddev0a = ensembleStdDevValues.at(timeStepIdx0a).at(varIdx);
+                    float stddev0b = ensembleStdDevValues.at(timeStepIdx0b).at(varIdx);
+                    float stddev0 = mix(stddev0a, stddev0b, interp0);
+                    float xpos0 = offsetHorizonBarsX + float(x);
+
+                    float timeStep1 =
+                            timeDisplayMin + float(x + 1) / horizonBarWidth * (timeDisplayMax - timeDisplayMin);
+                    float timeStepIdxFlt1 = (timeStep1 - timeMin) / (timeMax - timeMin) * float(numTimeSteps - 1);
+                    int timeStepIdx1a = std::floor(timeStepIdxFlt1);
+                    int timeStepIdx1b = std::ceil(timeStepIdxFlt1);
+                    float interp1 = fract(timeStepIdxFlt1);
+                    float mean1a = ensembleMeanValues.at(timeStepIdx1a).at(varIdx);
+                    float mean1b = ensembleMeanValues.at(timeStepIdx1b).at(varIdx);
+                    float mean1 = mix(mean1a, mean1b, interp1);
+                    float stddev1a = ensembleStdDevValues.at(timeStepIdx1a).at(varIdx);
+                    float stddev1b = ensembleStdDevValues.at(timeStepIdx1b).at(varIdx);
+                    float stddev1 = mix(stddev1a, stddev1b, interp1);
+                    float xpos1 = offsetHorizonBarsX + float(x + 1);
+
+                    float ypos0 = lowerY + (upperY - lowerY) * mean0;
+                    float ypos1 = lowerY + (upperY - lowerY) * mean1;
+
+                    QVector3D rgbColor0 = transferFunction(clamp(stddev0 * 2.0f, 0.0f, 1.0f));
+                    NVGcolor fillColor0 = nvgRGBf(rgbColor0.x(), rgbColor0.y(), rgbColor0.z());
+                    QVector3D rgbColor1 = transferFunction(clamp(stddev1 * 2.0f, 0.0f, 1.0f));
+                    NVGcolor fillColor1 = nvgRGBf(rgbColor1.x(), rgbColor1.y(), rgbColor1.z());
+
+                    nvgBeginPath(vg);
+                    nvgMoveTo(vg, xpos0, upperY);
+                    nvgLineTo(vg, xpos0, ypos0);
+                    nvgLineTo(vg, xpos1, ypos1);
+                    nvgLineTo(vg, xpos1, upperY);
+                    nvgClosePath(vg);
+
+                    NVGpaint paint = nvgLinearGradient(vg, xpos0, upperY, xpos1, upperY, fillColor0, fillColor1);
+                    nvgFillPaint(vg, paint);
+                    nvgFill(vg);
+                }
+            }
+        } else {
+            QColor fillColorSgl = predefinedColors.at(varIdx % predefinedColors.size());
+            qreal r, g, b;
+            fillColorSgl.getRgbF(&r, &g, &b);
+            QVector3D rgbColor = mix(QVector3D(1.0f, 1.0f, 1.0f), QVector3D(r, g, b), 0.7f);
+            NVGcolor fillColor = nvgRGBf(rgbColor.x(), rgbColor.y(), rgbColor.z());
+
+            nvgBeginPath(vg);
+            nvgMoveTo(vg, offsetHorizonBarsX, upperY);
+            for (size_t timeStepIdx = 0; timeStepIdx <= numTimeSteps; timeStepIdx++) {
+                float mean = ensembleMeanValues.at(timeStepIdx).at(varIdx);
+                float xpos = offsetHorizonBarsX + float(timeStepIdx) / float(numTimeSteps - 1) * horizonBarWidth;
+                float ypos = lowerY + (upperY - lowerY) * mean;
+                nvgLineTo(vg, xpos, ypos);
+            }
+            nvgLineTo(vg, offsetHorizonBarsX + horizonBarWidth, upperY);
+            nvgFillColor(vg, fillColor);
+            nvgFill(vg);
+        }
+
+        nvgBeginPath(vg);
+        if (density >= 1.0f) {
+            for (int timeStepIdx = timeStepIdxStart; timeStepIdx <= timeStepIdxStop; timeStepIdx++) {
+                float mean = ensembleMeanValues.at(timeStepIdx).at(varIdx);
+                float timeStep = timeMin + (timeMax - timeMin) * float(timeStepIdx) / float(numTimeSteps - 1);
+                float xpos =
+                        offsetHorizonBarsX
+                        + (timeStep - timeDisplayMin) / (timeDisplayMax - timeDisplayMin) * horizonBarWidth;
+                if (timeStepIdx == timeStepIdxStart && fract(timeStepIdxStartFlt) != 0.0f) {
+                    float meanNext = ensembleMeanValues.at(timeStepIdx + 1).at(varIdx);
+                    mean = mix(mean, meanNext, fract(timeStepIdxStartFlt));
+                    xpos = offsetHorizonBarsX;
+                }
+                if (timeStepIdx == timeStepIdxStop && fract(timeStepIdxStopFlt) != 0.0f) {
+                    float meanLast = ensembleMeanValues.at(timeStepIdx - 1).at(varIdx);
+                    mean = mix(meanLast, mean, fract(timeStepIdxStartFlt));
+                    xpos = offsetHorizonBarsX + horizonBarWidth;
+                }
+                float ypos = lowerY + (upperY - lowerY) * mean;
+
+                if (timeStepIdx == timeStepIdxStart) {
+                    nvgMoveTo(vg, xpos, ypos);
+                } else {
+                    nvgLineTo(vg, xpos, ypos);
+                }
+            }
+        } else {
+            for (int x = 0; x <= horizonBarWidthInt; x++) {
+                float timeStep = timeDisplayMin + float(x) / horizonBarWidth * (timeDisplayMax - timeDisplayMin);
+                float timeStepIdxFlt = (timeStep - timeMin) / (timeMax - timeMin) * float(numTimeSteps - 1);
+                int timeStepIdxA = std::floor(timeStepIdxFlt);
+                int timeStepIdxB = std::ceil(timeStepIdxFlt);
+                float interp = fract(timeStepIdxFlt);
+                float meanB = ensembleMeanValues.at(timeStepIdxA).at(varIdx);
+                float meanA = ensembleMeanValues.at(timeStepIdxB).at(varIdx);
+                float mean = mix(meanA, meanB, interp);
+
+                float xpos = offsetHorizonBarsX + float(x);
+                float ypos = lowerY + (upperY - lowerY) * mean;
+
+                if (x == 0) {
+                    nvgMoveTo(vg, xpos, ypos);
+                } else {
+                    nvgLineTo(vg, xpos, ypos);
+                }
+            }
+        }
+        nvgStrokeColor(vg, strokeColor);
+        nvgStroke(vg);
+
+        heightIdx++;
+    }
+}
+
 void MHorizonGraph::drawHorizonOutline(const NVGcolor& textColor) {
     for (size_t heightIdx = 0; heightIdx < numVariables; heightIdx++) {
         float lowerY = offsetHorizonBarsY + float(heightIdx) * (horizonBarHeight + horizonBarMargin);
@@ -436,6 +629,19 @@ void MHorizonGraph::drawTicks(const NVGcolor& textColor) {
     }
     nvgFillColor(vg, textColor);
     nvgFill(vg);
+
+    // Arrow indicating selected time step.
+    NVGcolor lineColor = nvgRGB(50, 50, 50);
+    float xpos = remap(
+            selectedTimeStep, timeDisplayMin, timeDisplayMax,
+            offsetHorizonBarsX, offsetHorizonBarsX + horizonBarWidth);
+    nvgBeginPath(vg);
+    nvgMoveTo(vg, xpos, offsetHorizonBarsY);
+    nvgLineTo(vg, xpos + 4, offsetHorizonBarsY - 4);
+    nvgLineTo(vg, xpos - 4, offsetHorizonBarsY - 4);
+    nvgClosePath(vg);
+    nvgFillColor(vg, lineColor);
+    nvgFill(vg);
 }
 
 void MHorizonGraph::drawScrollBar(const NVGcolor& textColor) {
@@ -475,7 +681,7 @@ void MHorizonGraph::renderBase() {
     nvgTranslate(vg, 0.0f, -scrollTranslationY);
 
     drawHorizonBackground();
-    drawHorizonLines();
+    drawHorizonLinesSparse();
     drawHorizonOutline(textColor);
     drawSelectedTimeStepLine(textColor);
     drawLegendLeft(textColor);

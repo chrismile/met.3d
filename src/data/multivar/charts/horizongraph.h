@@ -73,6 +73,7 @@ private:
     QVector3D transferFunction(float value);
     void drawHorizonBackground();
     void drawHorizonLines();
+    void drawHorizonLinesSparse();
     void drawHorizonOutline(const NVGcolor& textColor);
     void drawSelectedTimeStepLine(const NVGcolor& textColor);
     void drawLegendLeft(const NVGcolor& textColor);
