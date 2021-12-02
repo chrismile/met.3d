@@ -44,6 +44,7 @@
 **
 *******************************************************************************/
 
+#include <cassert>
 #include "beziercurve.hpp"
 
 namespace Met3D {
