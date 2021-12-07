@@ -1663,6 +1663,13 @@ void MTrajectoryActor::prepareAvailableDataForRendering(uint slot)
 
         if (useBezierTrajectories)
         {
+            if (trqi.dataRequest.available)
+            {
+                multiVarData.onBezierTrajectoriesLoaded(
+                        trajectoryRequests[slot].trajectories->getAuxDataVarNames(),
+                        trajectoryRequests[slot].trajectories->getNumTrajectories());
+            }
+
             foreach (MSceneViewGLWidget *view, trqi.bezierTrajectoriesRequests.keys())
             {
                 if (trqi.bezierTrajectoriesRequests[view].available)
@@ -1699,12 +1706,6 @@ void MTrajectoryActor::prepareAvailableDataForRendering(uint slot)
             if (trqi.filterRequest.available || trqi.singleTimeFilterRequest.available)
             {
                 bezierDataDirty = true;
-            }
-            if (trqi.dataRequest.available)
-            {
-                multiVarData.onBezierTrajectoriesLoaded(
-                        trajectoryRequests[slot].trajectories->getAuxDataVarNames(),
-                        trajectoryRequests[slot].trajectories->getNumTrajectories());
             }
         }
 
