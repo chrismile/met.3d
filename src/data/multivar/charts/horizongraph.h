@@ -41,6 +41,17 @@ struct NVGcolor;
 
 namespace Met3D {
 
+enum class SimilarityMetric {
+    L1_NORM, // L1 norm, also called "sum of absolute differences" (SAD).
+    L2_NORM, // L2 norm, also called "sum of squared differences" (SSD) or "mean squared error" (MSE).
+    NCC, // Normalized cross correlation (NCC), sometimes also called zero-normalized cross correlation (ZNCC).
+    MI, // Mutual information (MI).
+    SSIM, // Structural similarity index measure (SSIM).
+};
+const char* const SIMILARITY_METRIC_NAMES[] = {
+        "L1 norm", "L2 norm", "Normalized Cross Correlation", "Mutual Information", "SSIM"
+};
+
 class MHorizonGraph : public MDiagramBase {
 public:
     explicit MHorizonGraph(GLint textureUnit);
@@ -70,7 +81,7 @@ protected:
     void renderBase() override;
 
 private:
-    QVector3D transferFunction(float value);
+    QVector3D transferFunction(float value) const;
     void drawHorizonBackground();
     void drawHorizonLines();
     void drawHorizonLinesSparse();
@@ -142,7 +153,23 @@ private:
     float clickTime = 0.0f;
     bool isDraggingTimeShift = false;
 
-    void sortVariables(int varIdx);
+    float computeSimilarityMetric(
+            int varIdx0, int varIdx1, const std::vector<std::vector<float>>& valueArray, float factor) const;
+    float computeL1Norm(
+            int varIdx0, int varIdx1, const std::vector<std::vector<float>>& valueArray, float factor) const;
+    float computeL2Norm(
+            int varIdx0, int varIdx1, const std::vector<std::vector<float>>& valueArray, float factor) const;
+    float computeNCC(
+            int varIdx0, int varIdx1, const std::vector<std::vector<float>>& valueArray, float factor) const;
+    float computeMI(
+            int varIdx0, int varIdx1, const std::vector<std::vector<float>>& valueArray, float factor) const;
+    float computeSSIM(
+            int varIdx0, int varIdx1, const std::vector<std::vector<float>>& valueArray, float factor) const;
+    void sortVariables(int newSortingIdx, bool forceRecompute = false);
+    SimilarityMetric similarityMetric = SimilarityMetric::MI;
+    int numBins = 10;
+    float meanMetricInfluence = 0.5f;
+    float stdDevMetricInfluence = 0.25f;
     int sortingIdx = -1;
     std::vector<size_t> sortedVariableIndices;
 };

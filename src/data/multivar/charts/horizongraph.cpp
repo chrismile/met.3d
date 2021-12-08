@@ -141,6 +141,7 @@ void MHorizonGraph::setData(
         this->timeDisplayMin = timeMin;
         this->timeDisplayMax = timeMax;
         this->selectedTimeStepChanged = true;
+        this->sortingIdx = -1;
     }
     this->timeDisplayMin = timeMin;
     this->timeDisplayMax = timeMax;
@@ -191,7 +192,7 @@ void MHorizonGraph::setData(
     onWindowSizeChanged();
 }
 
-QVector3D MHorizonGraph::transferFunction(float value) {
+QVector3D MHorizonGraph::transferFunction(float value) const {
     std::vector<QColor> colorPoints = {
             QColor(59, 76, 192),
             QColor(144, 178, 254),
@@ -1043,31 +1044,235 @@ void MHorizonGraph::updateTimeShift(const QVector2D& mousePosition, EventType ev
     }
 }
 
-void MHorizonGraph::sortVariables(int newSortingIdx) {
-    if (sortingIdx == newSortingIdx) {
+float MHorizonGraph::computeSimilarityMetric(
+        int varIdx0, int varIdx1, const std::vector<std::vector<float>>& valueArray, float factor) const {
+    if (varIdx0 == varIdx1) {
+        return std::numeric_limits<float>::lowest();
+    }
+
+    if (similarityMetric == SimilarityMetric::L1_NORM) {
+        return computeL1Norm(varIdx0, varIdx1, valueArray, factor);
+    } else if (similarityMetric == SimilarityMetric::L2_NORM) {
+        return computeL2Norm(varIdx0, varIdx1, valueArray, factor);
+    } else if (similarityMetric == SimilarityMetric::NCC) {
+        return computeNCC(varIdx0, varIdx1, valueArray, factor);
+    } else if (similarityMetric == SimilarityMetric::MI) {
+        return computeMI(varIdx0, varIdx1, valueArray, factor);
+    } else if (similarityMetric == SimilarityMetric::SSIM) {
+        return computeSSIM(varIdx0, varIdx1, valueArray, factor);
+    } else {
+        throw std::runtime_error("Error in HorizonGraph::computeSimilarityMetric: Unknown similarity metric.");
+        return 0.0f;
+    }
+}
+
+float MHorizonGraph::computeL1Norm(
+        int varIdx0, int varIdx1, const std::vector<std::vector<float>>& valueArray, float factor) const {
+    float difference = 0.0f;
+    for (size_t timeStepIdx = 0; timeStepIdx < numTimeSteps; timeStepIdx++) {
+        float val0 = factor * valueArray.at(timeStepIdx).at(varIdx0);
+        float val1 = factor * valueArray.at(timeStepIdx).at(varIdx1);
+        float diffMean = val1 - val0;
+        difference = std::abs(diffMean);
+    }
+    difference /= float(numTimeSteps);
+
+    return difference;
+}
+
+float MHorizonGraph::computeL2Norm(
+        int varIdx0, int varIdx1, const std::vector<std::vector<float>>& valueArray, float factor) const {
+    float difference = 0.0f;
+    for (size_t timeStepIdx = 0; timeStepIdx < numTimeSteps; timeStepIdx++) {
+        float val0 = factor * valueArray.at(timeStepIdx).at(varIdx0);
+        float val1 = factor * valueArray.at(timeStepIdx).at(varIdx1);
+        float diffMean = val1 - val0;
+        difference += diffMean * diffMean;
+    }
+    difference /= float(numTimeSteps);
+
+    return difference;
+}
+
+float MHorizonGraph::computeNCC(
+        int varIdx0, int varIdx1, const std::vector<std::vector<float>>& valueArray, float factor) const {
+    float mean0 = 0.0f;
+    float mean1 = 0.0f;
+    for (size_t timeStepIdx = 0; timeStepIdx < numTimeSteps; timeStepIdx++) {
+        float val0 = factor * valueArray.at(timeStepIdx).at(varIdx0);
+        float val1 = factor * valueArray.at(timeStepIdx).at(varIdx1);
+        mean0 += val0;
+        mean1 += val1;
+    }
+    mean0 /= float(numTimeSteps);
+    mean1 /= float(numTimeSteps);
+
+    float var0 = 0.0f;
+    float var1 = 0.0f;
+    for (size_t timeStepIdx = 0; timeStepIdx < numTimeSteps; timeStepIdx++) {
+        float val0 = factor * valueArray.at(timeStepIdx).at(varIdx0);
+        float val1 = factor * valueArray.at(timeStepIdx).at(varIdx1);
+        float diff0 = val0 - mean0;
+        float diff1 = val1 - mean1;
+        var0 += diff0 * diff0;
+        var1 += diff1 * diff1;
+    }
+    var0 /= float(numTimeSteps - 1);
+    var1 /= float(numTimeSteps - 1);
+
+    float stdDev0 = std::sqrt(var0);
+    float stdDev1 = std::sqrt(var1);
+
+    float ncc = 0.0f;
+    for (size_t timeStepIdx = 0; timeStepIdx < numTimeSteps; timeStepIdx++) {
+        float val0 = factor * valueArray.at(timeStepIdx).at(varIdx0);
+        float val1 = factor * valueArray.at(timeStepIdx).at(varIdx1);
+        ncc += (val0 - mean0) * (val1 - mean1) / (stdDev0 * stdDev1);
+    }
+    ncc /= float(numTimeSteps);
+
+    return -ncc;
+}
+
+float MHorizonGraph::computeMI(
+        int varIdx0, int varIdx1, const std::vector<std::vector<float>>& valueArray, float factor) const {
+    float* histogram0 = new float[numBins];
+    float* histogram1 = new float[numBins];
+    float* histogram2d = new float[numBins * numBins];
+
+    // Initialize the histograms with zeros.
+    for (int binIdx = 0; binIdx < numBins; binIdx++) {
+        histogram0[binIdx] = 0.0f;
+        histogram1[binIdx] = 0;
+    }
+    for (int binIdx0 = 0; binIdx0 < numBins; binIdx0++) {
+        for (int binIdx1 = 0; binIdx1 < numBins; binIdx1++) {
+            histogram2d[binIdx0 * numBins + binIdx1] = 0.0f;
+        }
+    }
+
+    // Compute the two 1D histograms and the 2D joint histogram.
+    float entryWeight1d = 1.0f / float(numTimeSteps);
+    float entryWeight2d = 1.0f / float(numTimeSteps * numTimeSteps);
+    for (size_t timeStepIdx = 0; timeStepIdx < numTimeSteps; timeStepIdx++) {
+        float val = factor * valueArray.at(timeStepIdx).at(varIdx0);
+        int binIdx = clamp(int(val * float(numBins)), 0, numBins - 1);
+        histogram0[binIdx] += entryWeight1d;
+    }
+    for (size_t timeStepIdx = 0; timeStepIdx < numTimeSteps; timeStepIdx++) {
+        float val = factor * valueArray.at(timeStepIdx).at(varIdx1);
+        int binIdx = clamp(int(val * float(numBins)), 0, numBins - 1);
+        histogram1[binIdx] += entryWeight1d;
+    }
+    for (size_t timeStepIdx0 = 0; timeStepIdx0 < numTimeSteps; timeStepIdx0++) {
+        for (size_t timeStepIdx1 = 0; timeStepIdx1 < numTimeSteps; timeStepIdx1++) {
+            float val0 = factor * valueArray.at(timeStepIdx0).at(varIdx0);
+            float val1 = factor * valueArray.at(timeStepIdx1).at(varIdx1);
+            int binIdx0 = clamp(int(val0 * float(numBins)), 0, numBins - 1);
+            int binIdx1 = clamp(int(val1 * float(numBins)), 0, numBins - 1);
+            histogram2d[binIdx0 * numBins + binIdx1] += entryWeight2d;
+        }
+    }
+
+    /*
+     * Compute the mutual information metric. Two possible ways of calculation:
+     * a) $MI = H(x) + H(y) - H(x, y)$
+     * with the Shannon entropy $H(x) = -\sum_i p_x(i) \log p_x(i)$
+     * and the joint entropy $H(x, y) = -\sum_i \sum_j p_{xy}(i, j) \log p_{xy}(i, j)$
+     * b) $MI = \sum_i \sum_j p_{xy}(i, j) \log \frac{p_{xy}(i, j)}{p_x(i) p_y(j)}$
+     */
+    const float EPSILON = 1e-7;
+    float mi = 0.0f;
+    for (int binIdx0 = 0; binIdx0 < numBins; binIdx0++) {
+        for (int binIdx1 = 0; binIdx1 < numBins; binIdx1++) {
+            float p_xy = std::max(histogram2d[binIdx0 * numBins + binIdx1], EPSILON);
+            float p_x = std::max(histogram0[binIdx0], EPSILON);
+            float p_y = std::max(histogram1[binIdx1], EPSILON);
+            mi += p_xy * std::log(std::max(p_xy, EPSILON) / std::max(p_x * p_y, EPSILON));
+        }
+    }
+
+    delete[] histogram0;
+    delete[] histogram1;
+    delete[] histogram2d;
+
+    return -mi;
+}
+
+float MHorizonGraph::computeSSIM(
+        int varIdx0, int varIdx1, const std::vector<std::vector<float>>& valueArray, float factor) const {
+    float mean0 = 0.0f;
+    float mean1 = 0.0f;
+    for (size_t timeStepIdx = 0; timeStepIdx < numTimeSteps; timeStepIdx++) {
+        float val0 = factor * valueArray.at(timeStepIdx).at(varIdx0);
+        float val1 = factor * valueArray.at(timeStepIdx).at(varIdx1);
+        mean0 += val0;
+        mean1 += val1;
+    }
+    mean0 /= float(numTimeSteps);
+    mean1 /= float(numTimeSteps);
+
+    float var0 = 0.0f;
+    float var1 = 0.0f;
+    for (size_t timeStepIdx = 0; timeStepIdx < numTimeSteps; timeStepIdx++) {
+        float val0 = factor * valueArray.at(timeStepIdx).at(varIdx0);
+        float val1 = factor * valueArray.at(timeStepIdx).at(varIdx1);
+        float diff0 = val0 - mean0;
+        float diff1 = val1 - mean1;
+        var0 += diff0 * diff0;
+        var1 += diff1 * diff1;
+    }
+    var0 /= float(numTimeSteps - 1);
+    var1 /= float(numTimeSteps - 1);
+
+    float stdDev0 = std::sqrt(var0);
+    float stdDev1 = std::sqrt(var1);
+
+    float cov = 0.0f;
+    for (size_t timeStepIdx = 0; timeStepIdx < numTimeSteps; timeStepIdx++) {
+        float val0 = factor * valueArray.at(timeStepIdx).at(varIdx0);
+        float val1 = factor * valueArray.at(timeStepIdx).at(varIdx1);
+        float diff0 = val0 - mean0;
+        float diff1 = val1 - mean1;
+        cov += diff0 * diff1;
+    }
+    cov /= float(numTimeSteps - 1);
+
+    const float k1 = 0.01;
+    const float k2 = 0.03;
+    const float c1 = k1 * k1;
+    const float c2 = k2 * k2;
+
+    float ssim =
+            (2.0f * mean0 * mean1 + c1) * (2.0f * cov + c2)
+            / ((mean0 * mean0 + mean1 * mean1 + c1) * (stdDev0 * stdDev0 + stdDev1 * stdDev1 + c2));
+
+    return -ssim;
+}
+
+void MHorizonGraph::sortVariables(int newSortingIdx, bool forceRecompute) {
+    if (sortingIdx == newSortingIdx && !forceRecompute) {
         return;
     }
     sortingIdx = newSortingIdx;
 
     sortedVariableIndices.clear();
     std::vector<std::pair<float, size_t>> differenceMap;
+    differenceMap.resize(variableNames.size());
+#if _OPENMP >= 200805
+    #pragma omp parallel for default(none) shared(variableNames, differenceMap, sortingIdx)
+#endif
     for (size_t varIdx = 0; varIdx < variableNames.size(); varIdx++) {
-        float difference = -1.0f;
-        if (int(varIdx) != sortingIdx) {
-            difference = 0.0f;
-            for (size_t timeStepIdx = 0; timeStepIdx < numTimeSteps; timeStepIdx++) {
-                float meanSorting = ensembleMeanValues.at(timeStepIdx).at(sortingIdx);
-                float meanVar = ensembleMeanValues.at(timeStepIdx).at(varIdx);
-                float stdDevSorting = ensembleStdDevValues.at(timeStepIdx).at(sortingIdx);
-                float stdDevVar = ensembleStdDevValues.at(timeStepIdx).at(varIdx);
-                float diffMean = meanSorting - meanVar;
-                float diffStdDev = stdDevSorting - stdDevVar;
-                difference += diffMean * diffMean + diffStdDev * diffStdDev;
-                //difference = std::abs(meanSorting - meanVar) + std::abs(stdDevSorting - stdDevVar);
-            }
-            difference /= float(numTimeSteps);
+        float metric = 0.0f;
+        if (meanMetricInfluence > 0.0f) {
+            metric += meanMetricInfluence * computeSimilarityMetric(
+                    sortingIdx, int(varIdx), ensembleMeanValues, 1.0f);
         }
-        differenceMap.emplace_back(std::make_pair(difference, varIdx));
+        if (stdDevMetricInfluence > 0.0f) {
+            metric += stdDevMetricInfluence * computeSimilarityMetric(
+                    sortingIdx, int(varIdx), ensembleStdDevValues, 2.0f);
+        }
+        differenceMap.at(varIdx) = std::make_pair(metric, varIdx);
     }
     std::sort(differenceMap.begin(), differenceMap.end());
     for (auto& it : differenceMap) {

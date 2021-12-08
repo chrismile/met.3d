@@ -1696,6 +1696,7 @@ void MTrajectoryActor::prepareAvailableDataForRendering(uint slot)
                         trajectoryPickerMap[view]->setSelectedVariables(multiVarData.getSelectedVariables());
                         trajectoryPickerMap[view]->updateTrajectoryRadius(tubeRadius);
                         trajectoryPickerMap[view]->setParticlePosTimeStep(particlePosTimeStep);
+                        //trajectoryPickerMap[view]->setProperties(this, properties, multiVarGroupProperty);
                     }
                     trajectoryPickerMap[view]->setBaseTrajectories(
                             trajectoryRequests[slot].bezierTrajectoriesMap[view]->getBaseTrajectories());

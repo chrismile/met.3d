@@ -67,7 +67,7 @@ class MMultiVarData : public QObject
 {
 public:
     MMultiVarData();
-    ~MMultiVarData();
+    ~MMultiVarData() override;
 
     void setProperties(MActor* actor, MQtProperties* properties, QtProperty* multiVarGroupProperty);
 
