@@ -124,6 +124,10 @@ public:
     void wheelEvent(MSceneViewGLWidget *sceneView, QWheelEvent *event);
 
     void setDiagramType(DiagramDisplayType type);
+    void setSimilarityMetric(SimilarityMetric similarityMetric);
+    void setMeanMetricInfluence(float meanMetricInfluence);
+    void setStdDevMetricInfluence(float stdDevMetricInfluence);
+    void setNumBins(int numBins);
 
     // Forwards all calls to 'diagram'.
     inline float getSelectedTimeStep() const {
@@ -196,6 +200,15 @@ private:
 #else
             QGLWidget *currentGLContext);
 #endif
+
+    MActor* actor;
+    MQtProperties *properties;
+    QtProperty *multiVarGroupProperty;
+
+    SimilarityMetric similarityMetric = SimilarityMetric::MI;
+    float meanMetricInfluence = 0.5f;
+    float stdDevMetricInfluence = 0.25f;
+    int numBins = 10;
 
     GLuint textureUnit;
     MFilteredTrajectories baseTrajectories;

@@ -479,6 +479,18 @@ private:
     DiagramDisplayType diagramType = DiagramDisplayType::HORIZON_GRAPH;
     QtProperty *diagramTypeProperty;
 
+    void updateSimilarityMetricGroupEnabled();
+    QtProperty *similarityMetricGroup;
+    QtProperty *similarityMetricProperty;
+    QtProperty *meanMetricInfluenceProperty;
+    QtProperty *stdDevMetricInfluenceProperty;
+    QtProperty *numBinsProperty;
+
+    SimilarityMetric similarityMetric = SimilarityMetric::MI;
+    float meanMetricInfluence = 0.5f;
+    float stdDevMetricInfluence = 0.25f;
+    int numBins = 10;
+
 #ifdef USE_EMBREE
     QHash<MSceneViewGLWidget*, MTrajectoryPicker*> trajectoryPickerMap;
 #endif

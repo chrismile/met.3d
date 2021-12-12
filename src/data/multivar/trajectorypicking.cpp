@@ -44,7 +44,7 @@ namespace Met3D {
 
 MTrajectoryPicker::MTrajectoryPicker(
         GLuint textureUnit, MSceneViewGLWidget* sceneView, const QVector<QString>& varNames,
-        DiagramDisplayType diagramType) : textureUnit(textureUnit)//, multiVarCharts(sceneView)
+        DiagramDisplayType diagramType) : textureUnit(textureUnit)
 {
     device = rtcNewDevice(nullptr);
     scene = rtcNewScene(device);
@@ -99,7 +99,12 @@ void MTrajectoryPicker::setDiagramType(DiagramDisplayType type)
     else if (diagramDisplayType == DiagramDisplayType::HORIZON_GRAPH)
     {
         diagram = new MHorizonGraph(textureUnit);
-        static_cast<MHorizonGraph*>(diagram)->setSelectedTimeStep(timeStep);
+        auto* horizonGraph = static_cast<MHorizonGraph*>(diagram);
+        horizonGraph->setSelectedTimeStep(timeStep);
+        horizonGraph->setSimilarityMetric(similarityMetric);
+        horizonGraph->setMeanMetricInfluence(meanMetricInfluence);
+        horizonGraph->setStdDevMetricInfluence(stdDevMetricInfluence);
+        horizonGraph->setNumBins(numBins);
     }
 
     if (diagram)
@@ -110,6 +115,42 @@ void MTrajectoryPicker::setDiagramType(DiagramDisplayType type)
 //#ifdef USE_QOPENGLWIDGET
     //MGLResourcesManager::getInstance()->doneCurrent();
 //#endif
+}
+
+void MTrajectoryPicker::setSimilarityMetric(SimilarityMetric similarityMetric)
+{
+    this->similarityMetric = similarityMetric;
+    if (diagramDisplayType == DiagramDisplayType::HORIZON_GRAPH)
+    {
+        static_cast<MHorizonGraph*>(diagram)->setSimilarityMetric(similarityMetric);
+    }
+}
+
+void MTrajectoryPicker::setMeanMetricInfluence(float meanMetricInfluence)
+{
+    this->meanMetricInfluence = meanMetricInfluence;
+    if (diagramDisplayType == DiagramDisplayType::HORIZON_GRAPH)
+    {
+        static_cast<MHorizonGraph*>(diagram)->setMeanMetricInfluence(meanMetricInfluence);
+    }
+}
+
+void MTrajectoryPicker::setStdDevMetricInfluence(float stdDevMetricInfluence)
+{
+    this->stdDevMetricInfluence = stdDevMetricInfluence;
+    if (diagramDisplayType == DiagramDisplayType::HORIZON_GRAPH)
+    {
+        static_cast<MHorizonGraph*>(diagram)->setStdDevMetricInfluence(stdDevMetricInfluence);
+    }
+}
+
+void MTrajectoryPicker::setNumBins(int numBins)
+{
+    this->numBins = numBins;
+    if (diagramDisplayType == DiagramDisplayType::HORIZON_GRAPH)
+    {
+        static_cast<MHorizonGraph*>(diagram)->setNumBins(numBins);
+    }
 }
 
 MTrajectoryPicker::~MTrajectoryPicker()
@@ -735,6 +776,14 @@ void MTrajectoryPicker::updateDiagramData()
                     float value = trajectory.attributes.at(int(varIdx)).at(int(timeIdx));
                     QVector2D minMaxVector = minMaxAttributes.at(int(varIdx));
                     float denominator = std::max(minMaxVector.y() - minMaxVector.x(), 1e-10f);
+                    if (std::isnan(value)) {
+                        if (timeIdx != 0) {
+                            value = variableValuesPerTrajectory.at(timeIdx - 1).at(varIdx);
+                        } else {
+                            std::cout << "NaN value encountered and no previous value available" << std::endl;
+                            value = 0.0f;
+                        }
+                    }
                     value = (value - minMaxVector.x()) / denominator;
                     values.at(varIdx) = value;
                 }

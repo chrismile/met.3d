@@ -74,7 +74,7 @@ static QVector4D vecFromColor(const QColor& color) {
 }
 
 
-void MMultiVarData::setProperties(MActor* actor, MQtProperties *properties, QtProperty *multiVarGroupProperty)
+void MMultiVarData::setProperties(MActor *actor, MQtProperties *properties, QtProperty *multiVarGroupProperty)
 {
     this->actor = actor;
     this->properties = properties;

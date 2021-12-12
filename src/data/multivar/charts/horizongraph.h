@@ -45,11 +45,13 @@ enum class SimilarityMetric {
     L1_NORM, // L1 norm, also called "sum of absolute differences" (SAD).
     L2_NORM, // L2 norm, also called "sum of squared differences" (SSD) or "mean squared error" (MSE).
     NCC, // Normalized cross correlation (NCC), sometimes also called zero-normalized cross correlation (ZNCC).
+    ABSOLUTE_NCC, // Absolute normalized cross correlation (NCC).
     MI, // Mutual information (MI).
     SSIM, // Structural similarity index measure (SSIM).
 };
 const char* const SIMILARITY_METRIC_NAMES[] = {
-        "L1 norm", "L2 norm", "Normalized Cross Correlation", "Mutual Information", "SSIM"
+        "L1 norm", "L2 norm", "Normalized Cross Correlation", "Absolute Normalized Cross Correlation",
+        "Mutual Information", "SSIM"
 };
 
 class MHorizonGraph : public MDiagramBase {
@@ -70,6 +72,11 @@ public:
     inline void setSelectedTimeStep(float timeStep) { selectedTimeStep = timeStep; selectedTimeStepChanged = false; }
     inline bool getSelectedTimeStepChanged() const { return selectedTimeStepChanged; }
     inline void resetSelectedTimeStepChanged() { selectedTimeStepChanged = false; }
+
+    void setSimilarityMetric(SimilarityMetric similarityMetric);
+    void setMeanMetricInfluence(float meanMetricInfluence);
+    void setStdDevMetricInfluence(float stdDevMetricInfluence);
+    void setNumBins(int numBins);
 
     void mouseMoveEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event) override;
     void mousePressEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event) override;
@@ -160,6 +167,8 @@ private:
     float computeL2Norm(
             int varIdx0, int varIdx1, const std::vector<std::vector<float>>& valueArray, float factor) const;
     float computeNCC(
+            int varIdx0, int varIdx1, const std::vector<std::vector<float>>& valueArray, float factor) const;
+    float computeAbsoluteNCC(
             int varIdx0, int varIdx1, const std::vector<std::vector<float>>& valueArray, float factor) const;
     float computeMI(
             int varIdx0, int varIdx1, const std::vector<std::vector<float>>& valueArray, float factor) const;

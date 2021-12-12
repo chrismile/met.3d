@@ -350,10 +350,51 @@ MTrajectoryActor::MTrajectoryActor()
 
     multiVarGroupProperty = addProperty(
             GROUP_PROPERTY, "multi-var rendering", renderingGroupProperty);
+
     diagramTypeProperty = addProperty(
             ENUM_PROPERTY, "chart type", multiVarGroupProperty);
     properties->mEnum()->setEnumNames(diagramTypeProperty, diagramTypeNames);
     properties->mEnum()->setValue(diagramTypeProperty, static_cast<int>(diagramType));
+
+    similarityMetricGroup = addProperty(
+            GROUP_PROPERTY, "similarity metric settings", multiVarGroupProperty);
+
+    similarityMetricProperty = addProperty(
+            ENUM_PROPERTY, "similarity metric", similarityMetricGroup);
+    int numSimilarityMetrics = int(sizeof(SIMILARITY_METRIC_NAMES) / sizeof(*SIMILARITY_METRIC_NAMES));
+    QStringList similarityMetricNames;
+    for (int i = 0; i < numSimilarityMetrics; i++) {
+        similarityMetricNames.push_back(SIMILARITY_METRIC_NAMES[i]);
+    }
+
+    properties->mEnum()->setEnumNames(similarityMetricProperty, similarityMetricNames);
+    properties->mEnum()->setValue(similarityMetricProperty, int(similarityMetric));
+    similarityMetricProperty->setToolTip(
+            "The similarity metric to use when ordering variables after clicking on the diagram.");
+
+    meanMetricInfluenceProperty = addProperty(
+            DECORATEDDOUBLE_PROPERTY, "mean metric influence", similarityMetricGroup);
+    properties->setDDouble(
+            meanMetricInfluenceProperty, meanMetricInfluence,
+            0.0, 100.0, 2, 0.1, " (factor)");
+    meanMetricInfluenceProperty->setToolTip(
+            "Influence factor of the similarity of the variable means on the final sorting order.");
+
+    stdDevMetricInfluenceProperty = addProperty(
+            DECORATEDDOUBLE_PROPERTY, "std. dev. metric influence", similarityMetricGroup);
+    properties->setDDouble(
+            stdDevMetricInfluenceProperty, stdDevMetricInfluence,
+            0.0, 100.0, 2, 0.1, " (factor)");
+    stdDevMetricInfluenceProperty->setToolTip(
+            "Influence factor of the similarity of the variable standard deviations on the final sorting order.");
+
+    numBinsProperty = addProperty(
+            INT_PROPERTY, "#bins", similarityMetricGroup);
+    properties->setInt(numBinsProperty, numBins, 1, 20);
+    numBinsProperty->setToolTip(
+            "Number of histogram bins used for the Mutual Information (MI) similarity metric.");
+
+    updateSimilarityMetricGroupEnabled();
 
     multiVarData.setProperties(this, properties, multiVarGroupProperty);
     actorHasSelectableData = true;
@@ -471,6 +512,12 @@ void MTrajectoryActor::saveConfiguration(QSettings *settings)
                        properties->mBool()->value(useBezierTrajectoriesProperty));
     settings->setValue("diagramType",
                        properties->mEnum()->value(diagramTypeProperty));
+
+    settings->setValue(QString("similarityMetric"), int(similarityMetric));
+    settings->setValue(QString("meanMetricInfluence"), meanMetricInfluence);
+    settings->setValue(QString("stdDevMetricInfluence"), stdDevMetricInfluence);
+    settings->setValue(QString("numBins"), numBins);
+
     multiVarData.saveConfiguration(settings);
 
     settings->setValue("tubeRadius", tubeRadius);
@@ -686,6 +733,21 @@ void MTrajectoryActor::loadConfiguration(QSettings *settings)
             settings->value("diagramType", 0).toInt());
     diagramType = static_cast<DiagramDisplayType>(properties->mEnum()->value(diagramTypeProperty));
     properties->mEnum()->setValue(diagramTypeProperty, static_cast<int>(diagramType));
+
+    similarityMetric = SimilarityMetric(settings->value(
+            "similarityMetric", int(SimilarityMetric::MI)).toInt());
+    properties->mEnum()->setValue(similarityMetricProperty, int(similarityMetric));
+    meanMetricInfluence = settings->value("meanMetricInfluence", 0.5f).toFloat();
+    properties->setDDouble(
+            meanMetricInfluenceProperty, meanMetricInfluence,
+            0.0, 100.0, 2, 0.1, " (factor)");
+    stdDevMetricInfluence = settings->value("stdDevMetricInfluence", 0.25f).toFloat();
+    properties->setDDouble(
+            stdDevMetricInfluenceProperty, stdDevMetricInfluence,
+            0.0, 100.0, 2, 0.1, " (factor)");
+    numBins = settings->value("numBins", 10).toInt();
+    properties->setInt(numBinsProperty, numBins, 1, 20);
+    updateSimilarityMetricGroupEnabled();
 
     multiVarData.setEnabled(useBezierTrajectories);
     multiVarData.loadConfiguration(settings);
@@ -1696,7 +1758,6 @@ void MTrajectoryActor::prepareAvailableDataForRendering(uint slot)
                         trajectoryPickerMap[view]->setSelectedVariables(multiVarData.getSelectedVariables());
                         trajectoryPickerMap[view]->updateTrajectoryRadius(tubeRadius);
                         trajectoryPickerMap[view]->setParticlePosTimeStep(particlePosTimeStep);
-                        //trajectoryPickerMap[view]->setProperties(this, properties, multiVarGroupProperty);
                     }
                     trajectoryPickerMap[view]->setBaseTrajectories(
                             trajectoryRequests[slot].bezierTrajectoriesMap[view]->getBaseTrajectories());
@@ -2089,6 +2150,13 @@ void MTrajectoryActor::initializeActorResources()
 }
 
 
+void MTrajectoryActor::updateSimilarityMetricGroupEnabled()
+{
+    similarityMetricGroup->setEnabled(diagramType == DiagramDisplayType::HORIZON_GRAPH);
+    numBinsProperty->setEnabled(similarityMetric == SimilarityMetric::MI);
+}
+
+
 void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
 {
     if (property == selectDataSourceProperty)
@@ -2468,6 +2536,59 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
         for (MTrajectoryPicker* trajectoryPicker : trajectoryPickerMap)
         {
             trajectoryPicker->setDiagramType(diagramType);
+        }
+        if (suppressActorUpdates()) return;
+        emitActorChangedSignal();
+#endif
+    }
+
+    else if (property == similarityMetricProperty)
+    {
+        similarityMetric = static_cast<SimilarityMetric>(properties->mEnum()->value(similarityMetricProperty));
+#ifdef USE_EMBREE
+        for (MTrajectoryPicker* trajectoryPicker : trajectoryPickerMap)
+        {
+            trajectoryPicker->setSimilarityMetric(similarityMetric);
+        }
+        updateSimilarityMetricGroupEnabled();
+        if (suppressActorUpdates()) return;
+        emitActorChangedSignal();
+#endif
+    }
+
+    else if (property == meanMetricInfluenceProperty)
+    {
+        meanMetricInfluence = float(properties->mDDouble()->value(meanMetricInfluenceProperty));
+#ifdef USE_EMBREE
+        for (MTrajectoryPicker* trajectoryPicker : trajectoryPickerMap)
+        {
+            trajectoryPicker->setMeanMetricInfluence(meanMetricInfluence);
+        }
+        if (suppressActorUpdates()) return;
+        emitActorChangedSignal();
+#endif
+    }
+
+    else if (property == stdDevMetricInfluenceProperty)
+    {
+        stdDevMetricInfluence = float(properties->mDDouble()->value(stdDevMetricInfluenceProperty));
+#ifdef USE_EMBREE
+        for (MTrajectoryPicker* trajectoryPicker : trajectoryPickerMap)
+        {
+            trajectoryPicker->setStdDevMetricInfluence(stdDevMetricInfluence);
+        }
+        if (suppressActorUpdates()) return;
+        emitActorChangedSignal();
+#endif
+    }
+
+    else if (property == numBinsProperty)
+    {
+        numBins = properties->mInt()->value(numBinsProperty);
+#ifdef USE_EMBREE
+        for (MTrajectoryPicker* trajectoryPicker : trajectoryPickerMap)
+        {
+            trajectoryPicker->setNumBins(numBins);
         }
         if (suppressActorUpdates()) return;
         emitActorChangedSignal();
