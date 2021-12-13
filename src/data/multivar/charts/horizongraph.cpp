@@ -226,6 +226,11 @@ void MHorizonGraph::setNumBins(int numBins) {
 }
 
 QVector3D MHorizonGraph::transferFunction(float value) const {
+    if (std::isnan(value)) {
+        return QVector3D(1.0f, 1.0f, 0.0f); // yellow
+    }
+    value = clamp(value, 0.0f, 1.0f);
+
     std::vector<QColor> colorPoints = {
             QColor(59, 76, 192),
             QColor(144, 178, 254),
@@ -292,6 +297,13 @@ void MHorizonGraph::drawHorizonLines() {
                 float timeStep1 = timeMin + (timeMax - timeMin) * float(timeStepIdx + 1) / float(numTimeSteps - 1);
                 float xpos1 = offsetHorizonBarsX + (timeStep1 - timeDisplayMin) / (timeDisplayMax - timeDisplayMin) * horizonBarWidth;
 
+                if (std::isnan(mean0)) {
+                    mean0 = 1.0f;
+                }
+                if (std::isnan(mean1)) {
+                    mean1 = 1.0f;
+                }
+
                 if (timeStepIdx == timeStepIdxStart && fract(timeStepIdxStartFlt) != 0.0f) {
                     mean0 = mix(mean0, mean1, fract(timeStepIdxStartFlt));
                     xpos0 = offsetHorizonBarsX;
@@ -300,8 +312,8 @@ void MHorizonGraph::drawHorizonLines() {
                     mean1 = mix(mean0, mean1, fract(timeStepIdxStartFlt));
                     xpos1 = offsetHorizonBarsX + horizonBarWidth;
                 }
-                float ypos0 = lowerY + (upperY - lowerY) * mean0;
-                float ypos1 = lowerY + (upperY - lowerY) * mean1;
+                float ypos0 = upperY + (lowerY - upperY) * mean0;
+                float ypos1 = upperY + (lowerY - upperY) * mean1;
 
                 QVector3D rgbColor0 = transferFunction(clamp(stddev0 * 2.0f, 0.0f, 1.0f));
                 NVGcolor fillColor0 = nvgRGBf(rgbColor0.x(), rgbColor0.y(), rgbColor0.z());
@@ -330,8 +342,11 @@ void MHorizonGraph::drawHorizonLines() {
             nvgMoveTo(vg, offsetHorizonBarsX, upperY);
             for (size_t timeStepIdx = 0; timeStepIdx <= numTimeSteps; timeStepIdx++) {
                 float mean = ensembleMeanValues.at(timeStepIdx).at(varIdx);
+                if (std::isnan(mean)) {
+                    mean = 1.0f;
+                }
                 float xpos = offsetHorizonBarsX + float(timeStepIdx) / float(numTimeSteps - 1) * horizonBarWidth;
-                float ypos = lowerY + (upperY - lowerY) * mean;
+                float ypos = upperY + (lowerY - upperY) * mean;
                 nvgLineTo(vg, xpos, ypos);
             }
             nvgLineTo(vg, offsetHorizonBarsX + horizonBarWidth, upperY);
@@ -354,7 +369,11 @@ void MHorizonGraph::drawHorizonLines() {
                 mean = mix(meanLast, mean, fract(timeStepIdxStartFlt));
                 xpos = offsetHorizonBarsX + horizonBarWidth;
             }
-            float ypos = lowerY + (upperY - lowerY) * mean;
+
+            if (std::isnan(mean)) {
+                mean = 1.0f;
+            }
+            float ypos = upperY + (lowerY - upperY) * mean;
 
             if (timeStepIdx == timeStepIdxStart) {
                 nvgMoveTo(vg, xpos, ypos);
@@ -414,6 +433,13 @@ void MHorizonGraph::drawHorizonLinesSparse() {
                             offsetHorizonBarsX
                             + (timeStep1 - timeDisplayMin) / (timeDisplayMax - timeDisplayMin) * horizonBarWidth;
 
+                    if (std::isnan(mean0)) {
+                        mean0 = 1.0f;
+                    }
+                    if (std::isnan(mean1)) {
+                        mean1 = 1.0f;
+                    }
+
                     if (timeStepIdx == timeStepIdxStart && fract(timeStepIdxStartFlt) != 0.0f) {
                         mean0 = mix(mean0, mean1, fract(timeStepIdxStartFlt));
                         xpos0 = offsetHorizonBarsX;
@@ -422,8 +448,8 @@ void MHorizonGraph::drawHorizonLinesSparse() {
                         mean1 = mix(mean0, mean1, fract(timeStepIdxStartFlt));
                         xpos1 = offsetHorizonBarsX + horizonBarWidth;
                     }
-                    float ypos0 = lowerY + (upperY - lowerY) * mean0;
-                    float ypos1 = lowerY + (upperY - lowerY) * mean1;
+                    float ypos0 = upperY + (lowerY - upperY) * mean0;
+                    float ypos1 = upperY + (lowerY - upperY) * mean1;
 
                     QVector3D rgbColor0 = transferFunction(clamp(stddev0 * 2.0f, 0.0f, 1.0f));
                     NVGcolor fillColor0 = nvgRGBf(rgbColor0.x(), rgbColor0.y(), rgbColor0.z());
@@ -470,8 +496,15 @@ void MHorizonGraph::drawHorizonLinesSparse() {
                     float stddev1 = mix(stddev1a, stddev1b, interp1);
                     float xpos1 = offsetHorizonBarsX + float(x + 1);
 
-                    float ypos0 = lowerY + (upperY - lowerY) * mean0;
-                    float ypos1 = lowerY + (upperY - lowerY) * mean1;
+                    if (std::isnan(mean0)) {
+                        mean0 = 1.0f;
+                    }
+                     if (std::isnan(mean1)) {
+                        mean1 = 1.0f;
+                    }
+
+                    float ypos0 = upperY + (lowerY - upperY) * mean0;
+                    float ypos1 = upperY + (lowerY - upperY) * mean1;
 
                     QVector3D rgbColor0 = transferFunction(clamp(stddev0 * 2.0f, 0.0f, 1.0f));
                     NVGcolor fillColor0 = nvgRGBf(rgbColor0.x(), rgbColor0.y(), rgbColor0.z());
@@ -501,8 +534,11 @@ void MHorizonGraph::drawHorizonLinesSparse() {
             nvgMoveTo(vg, offsetHorizonBarsX, upperY);
             for (size_t timeStepIdx = 0; timeStepIdx <= numTimeSteps; timeStepIdx++) {
                 float mean = ensembleMeanValues.at(timeStepIdx).at(varIdx);
+                if (std::isnan(mean)) {
+                    mean = 1.0f;
+                }
                 float xpos = offsetHorizonBarsX + float(timeStepIdx) / float(numTimeSteps - 1) * horizonBarWidth;
-                float ypos = lowerY + (upperY - lowerY) * mean;
+                float ypos = upperY + (lowerY - upperY) * mean;
                 nvgLineTo(vg, xpos, ypos);
             }
             nvgLineTo(vg, offsetHorizonBarsX + horizonBarWidth, upperY);
@@ -528,7 +564,11 @@ void MHorizonGraph::drawHorizonLinesSparse() {
                     mean = mix(meanLast, mean, fract(timeStepIdxStartFlt));
                     xpos = offsetHorizonBarsX + horizonBarWidth;
                 }
-                float ypos = lowerY + (upperY - lowerY) * mean;
+
+                if (std::isnan(mean)) {
+                    mean = 1.0f;
+                }
+                float ypos = upperY + (lowerY - upperY) * mean;
 
                 if (timeStepIdx == timeStepIdxStart) {
                     nvgMoveTo(vg, xpos, ypos);
@@ -547,8 +587,12 @@ void MHorizonGraph::drawHorizonLinesSparse() {
                 float meanA = ensembleMeanValues.at(timeStepIdxB).at(varIdx);
                 float mean = mix(meanA, meanB, interp);
 
+                if (std::isnan(mean)) {
+                    mean = 1.0f;
+                }
+
                 float xpos = offsetHorizonBarsX + float(x);
-                float ypos = lowerY + (upperY - lowerY) * mean;
+                float ypos = upperY + (lowerY - upperY) * mean;
 
                 if (x == 0) {
                     nvgMoveTo(vg, xpos, ypos);

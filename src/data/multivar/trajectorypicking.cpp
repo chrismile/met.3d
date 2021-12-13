@@ -263,6 +263,10 @@ void MTrajectoryPicker::setBaseTrajectories(const MFilteredTrajectories& filtere
             QVector2D& minMaxVector = minMaxAttributes[int(i)];
             for (float v : attributes)
             {
+                if (std::isnan(v))
+                {
+                    continue;
+                }
                 minMaxVector.setX(std::min(minMaxVector.x(), v));
                 minMaxVector.setY(std::max(minMaxVector.y(), v));
             }
@@ -777,17 +781,11 @@ void MTrajectoryPicker::updateDiagramData()
                 for (size_t varIdx = 0; varIdx < numVars; varIdx++)
                 {
                     float value = trajectory.attributes.at(int(varIdx)).at(int(timeIdx));
-                    QVector2D minMaxVector = minMaxAttributes.at(int(varIdx));
-                    float denominator = std::max(minMaxVector.y() - minMaxVector.x(), 1e-10f);
-                    if (std::isnan(value)) {
-                        if (timeIdx != 0) {
-                            value = variableValuesPerTrajectory.at(timeIdx - 1).at(varIdx);
-                        } else {
-                            std::cout << "NaN value encountered and no previous value available" << std::endl;
-                            value = 0.0f;
-                        }
+                    if (!std::isnan(value)) {
+                        QVector2D minMaxVector = minMaxAttributes.at(int(varIdx));
+                        float denominator = std::max(minMaxVector.y() - minMaxVector.x(), 1e-10f);
+                        value = (value - minMaxVector.x()) / denominator;
                     }
-                    value = (value - minMaxVector.x()) / denominator;
                     values.at(varIdx) = value;
                 }
             }
