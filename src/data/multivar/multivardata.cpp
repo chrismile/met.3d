@@ -276,7 +276,7 @@ void MMultiVarData::setPropertiesVarSelected()
     selectedVariablesGroupProperty->setEnabled(true);
     for (int varIdx = 0; varIdx < maxNumVariables; varIdx++)
     {
-        QString name = QString("use variable #%1 (%2)").arg(QString::number(varIdx + 1), varNames.at(varIdx));
+        QString name = QString("var. #%1 (%2)").arg(QString::number(varIdx + 1), varNames.at(varIdx));
         QtProperty* variableProperty = addProperty(
                 BOOL_PROPERTY, name, selectedVariablesGroupProperty);
         properties->mBool()->setValue(variableProperty, selectedVariables.at(varIdx));
@@ -551,7 +551,7 @@ void MMultiVarData::initTransferFunctionsMultiVar(uint32_t numVariables)
                 availableTFs << tf->transferFunctionName();
             }
         }
-        QString name = QString("transfer function #%1 (%2)").arg(
+        QString name = QString("tf #%1 (%2)").arg(
                 QString::number(varIdx + 1), varNames.at(varIdx));
         tfPropertiesMultiVar[varIdx] = addProperty(ENUM_PROPERTY, name, multiVarGroupProperty);
         properties->mEnum()->setEnumNames(tfPropertiesMultiVar[varIdx], availableTFs);

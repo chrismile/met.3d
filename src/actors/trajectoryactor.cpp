@@ -1992,7 +1992,7 @@ void MTrajectoryActor::onSeedActorChanged()
 void MTrajectoryActor::checkIntersectionWithSelectableData(
         MSceneViewGLWidget *sceneView, QMouseEvent *event)
 {
-    if (trajectoryPickerMap.find(sceneView) == trajectoryPickerMap.end())
+    if (!useBezierTrajectories || trajectoryPickerMap.find(sceneView) == trajectoryPickerMap.end())
     {
         return;
     }
@@ -2020,7 +2020,7 @@ void MTrajectoryActor::checkIntersectionWithSelectableData(
 bool MTrajectoryActor::checkVirtualWindowBelowMouse(
         MSceneViewGLWidget *sceneView, int mousePositionX, int mousePositionY)
 {
-    if (trajectoryPickerMap.find(sceneView) == trajectoryPickerMap.end())
+    if (!useBezierTrajectories || trajectoryPickerMap.find(sceneView) == trajectoryPickerMap.end())
     {
         return false;
     }
@@ -2029,7 +2029,7 @@ bool MTrajectoryActor::checkVirtualWindowBelowMouse(
 
 void MTrajectoryActor::mouseMoveEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event)
 {
-    if (trajectoryPickerMap.find(sceneView) == trajectoryPickerMap.end())
+    if (!useBezierTrajectories || trajectoryPickerMap.find(sceneView) == trajectoryPickerMap.end())
     {
         return;
     }
@@ -2038,7 +2038,7 @@ void MTrajectoryActor::mouseMoveEvent(MSceneViewGLWidget *sceneView, QMouseEvent
 
 void MTrajectoryActor::mousePressEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event)
 {
-    if (trajectoryPickerMap.find(sceneView) == trajectoryPickerMap.end())
+    if (!useBezierTrajectories || trajectoryPickerMap.find(sceneView) == trajectoryPickerMap.end())
     {
         return;
     }
@@ -2047,7 +2047,7 @@ void MTrajectoryActor::mousePressEvent(MSceneViewGLWidget *sceneView, QMouseEven
 
 void MTrajectoryActor::mouseReleaseEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event)
 {
-    if (trajectoryPickerMap.find(sceneView) == trajectoryPickerMap.end())
+    if (!useBezierTrajectories || trajectoryPickerMap.find(sceneView) == trajectoryPickerMap.end())
     {
         return;
     }
@@ -2056,7 +2056,7 @@ void MTrajectoryActor::mouseReleaseEvent(MSceneViewGLWidget *sceneView, QMouseEv
 
 void MTrajectoryActor::wheelEvent(MSceneViewGLWidget *sceneView, QWheelEvent *event)
 {
-    if (trajectoryPickerMap.find(sceneView) == trajectoryPickerMap.end())
+    if (!useBezierTrajectories || trajectoryPickerMap.find(sceneView) == trajectoryPickerMap.end())
     {
         return;
     }
