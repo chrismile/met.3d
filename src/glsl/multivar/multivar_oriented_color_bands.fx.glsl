@@ -86,6 +86,9 @@ interface FSInput
 #ifdef TIMESTEP_LENS
     float fragTimestep;
 #endif
+#ifdef SUPPORT_LINE_DESATURATION
+    flat uint desaturateLine;
+#endif
 };
 
 /*****************************************************************************
@@ -279,6 +282,10 @@ shader GSmain(in VSOutput inputs[], out FSInput outputs) {
     // 4) Emit the tube triangle vertices and attributes to the fragment shader
     outputs.fragElementID = inputs[0].vElementID;
     outputs.fragLineID = inputs[0].vLineID;
+
+#ifdef SUPPORT_LINE_DESATURATION
+    outputs.desaturateLine = 1 - lineSelectedArray[inputs[0].vLineID];
+#endif
 
     for (int i = 0; i < NUM_SEGMENTS; i++) {
         int iN = (i + 1) % NUM_SEGMENTS;
@@ -481,6 +488,12 @@ shader FSmain(in FSInput inputs, out vec4 fragColor) {
 
     vec4 color = computePhongLighting(
             surfaceColor, occlusionFactor, shadowFactor, inputs.fragWorldPos, inputs.fragNormal, inputs.fragTangent);
+
+#ifdef SUPPORT_LINE_DESATURATION
+    if (inputs.desaturateLine == 1) {
+        color = desaturateColor(color);
+    }
+#endif
 
     if (color.a < 1.0/255.0) {
         discard;

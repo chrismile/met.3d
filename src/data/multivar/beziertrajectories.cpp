@@ -64,6 +64,10 @@ MBezierTrajectories::MBezierTrajectories(
     {
         varDiverging.push_back(false);
     }
+    for (int i = 0; i < numTrajectories; i++)
+    {
+        selectedLines.push_back(false);
+    }
 
     this->numTrajectories = static_cast<int>(numTrajectories);
     trajectorySelectionCount = new GLsizei[numTrajectories];
@@ -362,6 +366,8 @@ MBezierTrajectoriesRenderData MBezierTrajectories::getRenderData(
             currentGLContext, varSelectedArrayBufferID, varSelected);
     bezierTrajectoriesRenderData.varDivergingArrayBuffer = createShaderStorageBuffer(
             currentGLContext, varDivergingArrayBufferID, varDiverging);
+    bezierTrajectoriesRenderData.lineSelectedArrayBuffer = createShaderStorageBuffer(
+            currentGLContext, lineSelectedArrayBufferID, selectedLines);
 
     this->bezierTrajectoriesRenderData = bezierTrajectoriesRenderData;
 
@@ -390,7 +396,8 @@ void MBezierTrajectories::updateSelectedVariables(const QVector<uint32_t>& varSe
     this->varSelected = varSelected;
     if (bezierTrajectoriesRenderData.varSelectedArrayBuffer)
     {
-        bezierTrajectoriesRenderData.varSelectedArrayBuffer->upload(varSelected.constData(), GL_STATIC_DRAW);
+        bezierTrajectoriesRenderData.varSelectedArrayBuffer->upload(
+                varSelected.constData(), GL_STATIC_DRAW);
     }
 }
 
@@ -400,7 +407,31 @@ void MBezierTrajectories::updateDivergingVariables(const QVector<uint32_t>& varD
     this->varDiverging = varDiverging;
     if (bezierTrajectoriesRenderData.varDivergingArrayBuffer)
     {
-        bezierTrajectoriesRenderData.varDivergingArrayBuffer->upload(varDiverging.constData(), GL_STATIC_DRAW);
+        bezierTrajectoriesRenderData.varDivergingArrayBuffer->upload(
+                this->varDiverging.constData(), GL_STATIC_DRAW);
+    }
+}
+
+
+void MBezierTrajectories::updateSelectedLines(const QVector<uint32_t>& selectedLines)
+{
+    if (selectedLines.empty())
+    {
+        // Data might not be available immediately at the first rendering pass.
+        for (uint32_t& entry : this->selectedLines)
+        {
+            entry = true;
+        }
+    }
+    else
+    {
+        this->selectedLines = selectedLines;
+    }
+
+    if (bezierTrajectoriesRenderData.lineSelectedArrayBuffer)
+    {
+        bezierTrajectoriesRenderData.lineSelectedArrayBuffer->upload(
+                this->selectedLines.constData(), GL_STATIC_DRAW);
     }
 }
 

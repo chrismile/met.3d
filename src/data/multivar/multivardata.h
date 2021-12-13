@@ -37,6 +37,7 @@
 #include "data/abstractdataitem.h"
 #include "actors/transferfunction1d.h"
 #include "gxfw/gl/shaderstoragebufferobject.h"
+#include "trajectorypicking.h"
 #include "multivartf.h"
 
 
@@ -109,7 +110,12 @@ public:
     inline const QVector<QString>& getVarNames() const { return varNames; }
 
     /**
-      Set a transfer function to map vertical position (pressure) to colour.
+      Sets the diagram type currently used by MTrajectoryPicking.
+      */
+    void setDiagramType(DiagramDisplayType type);
+
+    /**
+      Set a transfer function to map attributes to colour.
       */
     void setTransferFunctionMultiVar(int varIdx, MTransferFunction1D *tf);
 
@@ -142,6 +148,7 @@ private:
     void setPropertiesRenderingSettings();
     void setPropertiesVarSelected();
     void reloadShaderEffect();
+    void reloadSphereShaderEffect();
     void updateModeEnabledProperties();
     void updateNumVariablesSelected();
 
@@ -193,7 +200,10 @@ private:
     QVector<uint32_t> varDiverging;
 
     std::shared_ptr<GL::MShaderEffect> shaderEffect;
-    bool isDirty = true;
+    //bool isDirty = true;
+    bool shallReloadShaderEffect = true;
+    bool shallReloadSphereShaderEffect = true;
+    DiagramDisplayType diagramType = DiagramDisplayType::NONE;
 
     // Time step sphere rendering.
     std::shared_ptr<GL::MShaderEffect> shaderEffectSphere;

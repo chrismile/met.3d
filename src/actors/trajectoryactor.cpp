@@ -1755,6 +1755,7 @@ void MTrajectoryActor::prepareAvailableDataForRendering(uint slot)
                         GLuint textureUnit = assignTextureUnit();
                         trajectoryPickerMap[view] = new MTrajectoryPicker(
                                 textureUnit, view, multiVarData.getVarNames(), diagramType);
+                        multiVarData.setDiagramType(diagramType);
                         trajectoryPickerMap[view]->setSelectedVariables(multiVarData.getSelectedVariables());
                         trajectoryPickerMap[view]->updateTrajectoryRadius(tubeRadius);
                         trajectoryPickerMap[view]->setParticlePosTimeStep(particlePosTimeStep);
@@ -2537,6 +2538,7 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
         {
             trajectoryPicker->setDiagramType(diagramType);
         }
+        multiVarData.setDiagramType(diagramType);
         if (suppressActorUpdates()) return;
         emitActorChangedSignal();
 #endif
@@ -2893,6 +2895,13 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
                         multiVarData.getSelectedVariables());
                 trajectoryPickerMap[sceneView]->resetSelectedVariablesChanged();
             }
+
+            if (trajectoryPickerMap[sceneView]->getSelectedTrajectoriesChanged())
+            {
+                trajectoryRequests[t].bezierTrajectoriesMap[sceneView]->updateSelectedLines(
+                        trajectoryPickerMap[sceneView]->getSelectedTrajectories());
+                trajectoryPickerMap[sceneView]->resetSelectedTrajectoriesChanged();
+            }
 #endif
 
             if (multiVarData.getSelectedVariablesChanged())
@@ -2964,6 +2973,10 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
             bezierTrajectoriesRenderData.lineVarDescArrayBuffer->bindToIndex(6);
             bezierTrajectoriesRenderData.varSelectedArrayBuffer->bindToIndex(7);
             bezierTrajectoriesRenderData.varDivergingArrayBuffer->bindToIndex(8);
+            if (diagramType == DiagramDisplayType::NONE || diagramType == DiagramDisplayType::HORIZON_GRAPH)
+            {
+                bezierTrajectoriesRenderData.lineSelectedArrayBuffer->bindToIndex(14);
+            }
 
             glPolygonMode(GL_FRONT_AND_BACK, renderAsWireFrame ? GL_LINE : GL_FILL); CHECK_GL_ERROR;
 
@@ -3012,23 +3025,27 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
 #ifdef USE_EMBREE
             // Render selected/highlighted trajectories.
             trajectoryPickerMap[sceneView]->setParticlePosTimeStep(particlePosTimeStep);
-            MHighlightedTrajectoriesRenderData highlightedTrajectoriesRenderData =
-                    trajectoryPickerMap[sceneView]->getHighlightedTrajectoriesRenderData();
-            if (highlightedTrajectoriesRenderData.indexBufferHighlighted)
+            if (diagramType != DiagramDisplayType::NONE && diagramType != DiagramDisplayType::HORIZON_GRAPH)
             {
-                glEnable(GL_CULL_FACE);
-                glCullFace(GL_FRONT);
-                std::shared_ptr<GL::MShaderEffect> highlightShader =
-                        trajectoryPickerMap[sceneView]->getHighlightShaderEffect();
-                highlightShader->bind();
-                highlightShader->setUniformValue("mvpMatrix", *(sceneView->getModelViewProjectionMatrix()));
-                highlightedTrajectoriesRenderData.indexBufferHighlighted->bindToElementArrayBuffer();
-                highlightedTrajectoriesRenderData.vertexPositionBufferHighlighted->attachToVertexAttribute(0);
-                highlightedTrajectoriesRenderData.vertexColorBufferHighlighted->attachToVertexAttribute(1);
-                glDrawElements(
-                        GL_TRIANGLES, highlightedTrajectoriesRenderData.indexBufferHighlighted->getCount(),
-                        highlightedTrajectoriesRenderData.indexBufferHighlighted->getType(), nullptr);
-                glDisable(GL_CULL_FACE);
+                MHighlightedTrajectoriesRenderData highlightedTrajectoriesRenderData =
+                        trajectoryPickerMap[sceneView]->getHighlightedTrajectoriesRenderData();
+                if (highlightedTrajectoriesRenderData.indexBufferHighlighted)
+                {
+                    glEnable(GL_CULL_FACE);
+                    glCullFace(GL_FRONT);
+                    std::shared_ptr<GL::MShaderEffect> highlightShader =
+                            trajectoryPickerMap[sceneView]->getHighlightShaderEffect();
+                    highlightShader->bind();
+                    highlightShader->setUniformValue(
+                            "mvpMatrix", *(sceneView->getModelViewProjectionMatrix()));
+                    highlightedTrajectoriesRenderData.indexBufferHighlighted->bindToElementArrayBuffer();
+                    highlightedTrajectoriesRenderData.vertexPositionBufferHighlighted->attachToVertexAttribute(0);
+                    highlightedTrajectoriesRenderData.vertexColorBufferHighlighted->attachToVertexAttribute(1);
+                    glDrawElements(
+                            GL_TRIANGLES, highlightedTrajectoriesRenderData.indexBufferHighlighted->getCount(),
+                            highlightedTrajectoriesRenderData.indexBufferHighlighted->getType(), nullptr);
+                    glDisable(GL_CULL_FACE);
+                }
             }
 #endif
 

@@ -183,10 +183,16 @@ shader FSmain(in VSOutput inputs, out vec4 fragColor)
     vec4 color = computePhongLightingSphere(
             surfaceColor, occlusionFactor, shadowFactor, inputs.fragmentPosition, n, abs((ribbonPosition - 0.5) * 2.0));
 
-    //vec4 fragmentColor = vec4(vec3(pattern), 1.0);
-    vec4 fragmentColor = color;
+    //color = vec4(vec3(pattern), 1.0);
 
-    fragColor = fragmentColor;
+#ifdef SUPPORT_LINE_DESATURATION
+    uint desaturateLine = 1 - lineSelectedArray[fragmentLineID];
+    if (desaturateLine == 1) {
+        color = desaturateColor(color);
+    }
+#endif
+
+    fragColor = color;
 }
 
 /*****************************************************************************

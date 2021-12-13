@@ -180,6 +180,29 @@ public:
         }
     }
 
+    inline QVector<uint32_t> getSelectedTrajectories() const {
+        QVector<uint32_t> selectedTrajectories;
+        selectedTrajectories.resize(int(trajectories.size()));
+        if (!highlightedTrajectories.empty()) {
+            for (const auto& it : highlightedTrajectories) {
+                uint32_t trajectoryIndex = it.first;
+                selectedTrajectories[int(trajectoryIndex)] = true;
+            }
+        } else {
+            // Show all trajectories as highlighted if no trajectory is selected.
+            for (uint32_t& entry : selectedTrajectories) {
+                entry = 1;
+            }
+        }
+        return selectedTrajectories;
+    }
+    inline bool getSelectedTrajectoriesChanged() const {
+        return selectedTrajectoriesChanged;
+    }
+    inline void resetSelectedTrajectoriesChanged() {
+        selectedTrajectoriesChanged = false;
+    }
+
     void toggleTrajectoryHighlighted(uint32_t trajectoryIndex);
     void setParticlePosTimeStep(int newTimeStep);
     MHighlightedTrajectoriesRenderData getHighlightedTrajectoriesRenderData(
@@ -235,6 +258,7 @@ private:
     // Highlighted trajectories.
     void updateDiagramData();
     std::map<uint32_t, QColor> highlightedTrajectories;
+    bool selectedTrajectoriesChanged = true;
     struct ColorComparator {
         bool operator()(const QColor& c0, const QColor& c1) {
             if (c0.red() != c1.red()) {

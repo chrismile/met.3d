@@ -917,7 +917,7 @@ void MMultiVarData::setUniformDataSpheres(int textureUnitTransferFunction)
 
 std::shared_ptr<GL::MShaderEffect> MMultiVarData::getShaderEffect()
 {
-    if (isDirty)
+    if (shallReloadShaderEffect)
     {
         reloadShaderEffect();
     }
@@ -927,34 +927,38 @@ std::shared_ptr<GL::MShaderEffect> MMultiVarData::getShaderEffect()
 
 std::shared_ptr<GL::MShaderEffect> MMultiVarData::getTimeStepSphereShader()
 {
-    if (!shaderEffectSphere)
+    if (shallReloadSphereShaderEffect)
     {
-        QMap<QString, QString> defines =
-        {
-                {"USE_MULTI_VAR_TRANSFER_FUNCTION", QString::fromStdString("") },
-                {"IS_MULTIVAR_DATA", QString::fromStdString("") },
-        };
-
-        MGLResourcesManager* glRM = MGLResourcesManager::getInstance();
-        glRM->generateEffectProgramUncached("multivar_sphere", shaderEffectSphere);
-        shaderEffectSphere->compileFromFile_Met3DHome("src/glsl/multivar/multivar_sphere.fx.glsl", defines);
+        reloadSphereShaderEffect();
     }
-
     return shaderEffectSphere;
+}
+
+
+void MMultiVarData::setDiagramType(DiagramDisplayType type)
+{
+    diagramType = type;
+    shallReloadShaderEffect = true;
+    shallReloadSphereShaderEffect = true;
 }
 
 
 void MMultiVarData::reloadShaderEffect()
 {
     QMap<QString, QString> defines =
+            {
+                    {"NUM_INSTANCES", QString::fromStdString(std::to_string(numVariablesSelected)) },
+                    {"NUM_SEGMENTS", QString::fromStdString(std::to_string(numLineSegments)) },
+                    {"NUM_LINESEGMENTS", QString::fromStdString(std::to_string(numInstances)) },
+                    {"MAX_NUM_VARIABLES", QString::fromStdString(std::to_string(MAX_NUM_VARIABLES)) },
+                    {"USE_MULTI_VAR_TRANSFER_FUNCTION", QString::fromStdString("") },
+                    {"IS_MULTIVAR_DATA", QString::fromStdString("") },
+            };
+
+    if (diagramType == DiagramDisplayType::NONE || diagramType == DiagramDisplayType::HORIZON_GRAPH)
     {
-            {"NUM_INSTANCES", QString::fromStdString(std::to_string(numVariablesSelected)) },
-            {"NUM_SEGMENTS", QString::fromStdString(std::to_string(numLineSegments)) },
-            {"NUM_LINESEGMENTS", QString::fromStdString(std::to_string(numInstances)) },
-            {"MAX_NUM_VARIABLES", QString::fromStdString(std::to_string(MAX_NUM_VARIABLES)) },
-            {"USE_MULTI_VAR_TRANSFER_FUNCTION", QString::fromStdString("") },
-            {"IS_MULTIVAR_DATA", QString::fromStdString("") },
-    };
+        defines.insert("SUPPORT_LINE_DESATURATION", QString::fromStdString(""));
+    }
 
     if (multiVarRenderMode == MultiVarRenderMode::ORIENTED_COLOR_BANDS)
     {
@@ -976,7 +980,27 @@ void MMultiVarData::reloadShaderEffect()
             "multivar_oriented_color_bands", shaderEffect);
     shaderEffect->compileFromFile_Met3DHome(
             renderingTechniqueShaderFilenames[int(multiVarRenderMode)], defines);
-    isDirty = false;
+    shallReloadShaderEffect = false;
+}
+
+
+void MMultiVarData::reloadSphereShaderEffect()
+{
+    QMap<QString, QString> defines =
+            {
+                    {"USE_MULTI_VAR_TRANSFER_FUNCTION", QString::fromStdString("") },
+                    {"IS_MULTIVAR_DATA", QString::fromStdString("") },
+            };
+
+    if (diagramType == DiagramDisplayType::NONE || diagramType == DiagramDisplayType::HORIZON_GRAPH)
+    {
+        defines.insert("SUPPORT_LINE_DESATURATION", QString::fromStdString(""));
+    }
+
+    MGLResourcesManager* glRM = MGLResourcesManager::getInstance();
+    glRM->generateEffectProgramUncached("multivar_sphere", shaderEffectSphere);
+    shaderEffectSphere->compileFromFile_Met3DHome("src/glsl/multivar/multivar_sphere.fx.glsl", defines);
+    shallReloadSphereShaderEffect = false;
 }
 
 }

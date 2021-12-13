@@ -221,6 +221,7 @@ void MTrajectoryPicker::setTrajectoryData(
     this->selectedTrajectoryIndices = selectedTrajectoryIndices;
     this->highlightedTrajectories.clear();
     this->colorUsesCountMap.clear();
+    selectedTrajectoriesChanged = true;
     //radarChart->clearRadars();
 
     if (lineRadius > 0.0f) {
@@ -570,6 +571,7 @@ void MTrajectoryPicker::toggleTrajectoryHighlighted(uint32_t trajectoryIndex)
         //radarChart->removeRadar(trajectoryIndex);
         colorUsesCountMap[it->second] -= 1;
         highlightedTrajectories.erase(trajectoryIndex);
+        selectedTrajectoriesChanged = true;
         updateDiagramData();
         return;
     }
@@ -614,6 +616,7 @@ void MTrajectoryPicker::toggleTrajectoryHighlighted(uint32_t trajectoryIndex)
     colorUsesCountMap[highlightColor] += 1;
 
     highlightedTrajectories.insert(std::make_pair(trajectoryIndex, highlightColor));
+    selectedTrajectoriesChanged = true;
     const MFilteredTrajectory& trajectory = baseTrajectories.at(int(trajectoryIndex));
     QVector<float> values;
     for (size_t i = 0; i < numVars; i++)

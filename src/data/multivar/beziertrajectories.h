@@ -105,6 +105,7 @@ struct MBezierTrajectoriesRenderData
     GL::MShaderStorageBufferObject* lineVarDescArrayBuffer = nullptr;
     GL::MShaderStorageBufferObject* varSelectedArrayBuffer = nullptr;
     GL::MShaderStorageBufferObject* varDivergingArrayBuffer = nullptr;
+    GL::MShaderStorageBufferObject* lineSelectedArrayBuffer = nullptr; // For horizon graph diagram
 };
 
 struct MTimeStepSphereRenderData
@@ -168,6 +169,7 @@ public:
     void releaseRenderData();
     void updateSelectedVariables(const QVector<uint32_t>& varSelected);
     void updateDivergingVariables(const QVector<uint32_t>& varDiverging);
+    void updateSelectedLines(const QVector<uint32_t>& selectedLines);
 
     MTimeStepSphereRenderData* getTimeStepSphereRenderData(
 #ifdef USE_QOPENGLWIDGET
@@ -192,6 +194,7 @@ private:
     QVector<uint32_t> varDiverging;
     QVector<uint32_t> trajectoryIndexOffsets;
     QVector<uint32_t> numIndicesPerTrajectory;
+    QVector<uint32_t> selectedLines;
 
     // Sphere data.
     int lastTimeStep = std::numeric_limits<int>::lowest();
@@ -250,6 +253,8 @@ private:
             QString("beziertrajectories_var_selected_array_buffer_#%1").arg(getID());
     const QString varDivergingArrayBufferID =
             QString("beziertrajectories_var_diverging_array_buffer_#%1").arg(getID());
+    const QString lineSelectedArrayBufferID =
+            QString("beziertrajectories_line_selected_array_buffer_#%1").arg(getID());
 };
 
 }
