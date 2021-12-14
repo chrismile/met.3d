@@ -203,6 +203,8 @@ public:
         selectedTrajectoriesChanged = false;
     }
 
+    inline const QVector<QVector2D>& getVariableRanges() const { return minMaxAttributes; }
+
     void toggleTrajectoryHighlighted(uint32_t trajectoryIndex);
     void setParticlePosTimeStep(int newTimeStep);
     MHighlightedTrajectoriesRenderData getHighlightedTrajectoriesRenderData(

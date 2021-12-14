@@ -551,7 +551,7 @@ void MMultiVarData::initTransferFunctionsMultiVar(uint32_t numVariables)
                 availableTFs << tf->transferFunctionName();
             }
         }
-        QString name = QString("tf #%1 (%2)").arg(
+        QString name = QString("tf #%1: %2").arg(
                 QString::number(varIdx + 1), varNames.at(varIdx));
         tfPropertiesMultiVar[varIdx] = addProperty(ENUM_PROPERTY, name, multiVarGroupProperty);
         properties->mEnum()->setEnumNames(tfPropertiesMultiVar[varIdx], availableTFs);
@@ -807,9 +807,11 @@ void MMultiVarData::onQtPropertyChanged(QtProperty *property)
 }
 
 
-void MMultiVarData::onBezierTrajectoriesLoaded(
-        const QStringList& auxDataVarNames, int numTrajectories)
+void MMultiVarData::onBezierTrajectoriesLoaded(MTrajectories* trajectories)
 {
+    const QStringList& auxDataVarNames = trajectories->getAuxDataVarNames();
+    int numTrajectories = trajectories->getNumTrajectories();
+
     if (tfPropertiesMultiVar.empty())
     {
         QStringList varNames = auxDataVarNames;
@@ -834,8 +836,34 @@ void MMultiVarData::onBezierTrajectoriesLoaded(
         updateNumVariablesSelected();
         setPropertiesVarSelected();
     }
+
     selectedVariablesChanged = true;
     varDivergingChanged = true;
+}
+
+
+void MMultiVarData::clearVariableRanges()
+{
+    variableRanges.clear();
+    variableRanges.resize(maxNumVariables);
+
+    for (int i = 0; i < maxNumVariables; i++)
+    {
+        variableRanges[i] = QVector2D(
+                std::numeric_limits<float>::max(), std::numeric_limits<float>::lowest());
+    }
+}
+
+
+void MMultiVarData::updateVariableRanges(const QVector<QVector2D>& ranges)
+{
+    for (int i = 0; i < maxNumVariables; i++)
+    {
+        variableRanges[i].setX(std::min(variableRanges[i].x(), ranges[i].x()));
+        variableRanges[i].setY(std::max(variableRanges[i].y(), ranges[i].y()));
+    }
+
+    multiVarTf.setVariableRanges(variableRanges);
 }
 
 

@@ -40,11 +40,39 @@
 namespace Met3D
 {
 
+static std::vector<std::vector<QColor>> defaultTransferFunctions = {
+        // reds
+        { {228,218,218}, {228,192,192}, {228,161,161}, {228,118,119}, {228, 26, 28} },
+        // blues
+        { {176,179,184}, {157,168,184}, {134,156,184}, {104,142,184}, { 55,126,184} },
+        // greens
+        { {132,139,134}, {116,139,122}, { 96,139,108}, { 69,139, 91}, {  5,139, 69} },
+        // purples
+        { {129,123,129}, {129,108,127}, {129, 90,126}, {129, 65,125}, {129, 15,124} },
+        // oranges
+        { {217,208,207}, {217,186,182}, {217,159,152}, {217,125,110}, {217, 72,  1} },
+        // pinks
+        { {231,221,224}, {231,195,207}, {231,164,187}, {231,123,165}, {231, 41,138} },
+        // golds
+        { {254,248,243}, {254,233,217}, {254,217,185}, {254,199,144}, {254,178, 76} },
+        // dark-blues
+        { {243,243,255}, {214,214,255}, {179,179,255}, {130,131,255}, {  0,  7,255} },
+};
+
+
+MMultiVarTf::MMultiVarTf(
+        QVector<QtProperty*>& transferFunctionProperties, QVector<MTransferFunction1D*>& transferFunctions)
+        : transferFunctionProperties(transferFunctionProperties), transferFunctions(transferFunctions)
+{
+}
+
+
 MMultiVarTf::~MMultiVarTf()
 {
     destroyTexture1DArray();
     releaseMinMaxBuffer();
 }
+
 
 void MMultiVarTf::createTexture1DArray()
 {
@@ -98,7 +126,7 @@ void MMultiVarTf::generateTexture1DArray()
     }
     size_t numEntriesPerColorMap = numBytesPerColorMap / 4;
 
-    std::vector<unsigned char> standardColorMapBytes;
+    /*std::vector<unsigned char> standardColorMapBytes;
     if (hasNullptr)
     {
         standardColorMapBytes.reserve(numBytesPerColorMap);
@@ -111,6 +139,34 @@ void MMultiVarTf::generateTexture1DArray()
             standardColorMapBytes.push_back(green);
             standardColorMapBytes.push_back(blue);
             standardColorMapBytes.push_back(0xff);
+        }
+    }*/
+
+    const int VALUES_PER_MAP = 5;
+    standardColorMapsBytes.clear();
+    standardColorMapsBytes.resize(defaultTransferFunctions.size());
+    for (size_t colMapIdx = 0; colMapIdx < defaultTransferFunctions.size(); colMapIdx++)
+    {
+        std::vector<unsigned char>& colorMapBytes = standardColorMapsBytes.at(colMapIdx);
+        std::vector<QColor>& defaultTransferFunction = defaultTransferFunctions.at(colMapIdx);
+        colorMapBytes.reserve(numBytesPerColorMap);
+        for (size_t i = 0; i < numEntriesPerColorMap; i++)
+        {
+            float pct = float(i) / float(numEntriesPerColorMap - 1);
+            float arrayPosFlt = pct * float(VALUES_PER_MAP - 1);
+            int lastIdx = std::min(int(arrayPosFlt), VALUES_PER_MAP - 1);
+            int nextIdx = std::min(lastIdx + 1, VALUES_PER_MAP - 1);
+            float f1 = arrayPosFlt - float(lastIdx);
+            float f0 = 1.0f - f1;
+            QColor c0 = defaultTransferFunction.at(lastIdx);
+            QColor c1 = defaultTransferFunction.at(nextIdx);
+            uint8_t red = clamp(int(std::round(float(c0.red()) * f0 + float(c1.red()) * f1)), 0, 255);
+            uint8_t green = clamp(int(std::round(float(c0.green()) * f0 + float(c1.green()) * f1)), 0, 255);
+            uint8_t blue = clamp(int(std::round(float(c0.blue()) * f0 + float(c1.blue()) * f1)), 0, 255);
+            colorMapBytes.push_back(red);
+            colorMapBytes.push_back(green);
+            colorMapBytes.push_back(blue);
+            colorMapBytes.push_back(0xff);
         }
     }
 
@@ -161,9 +217,19 @@ void MMultiVarTf::generateTexture1DArray()
         }
         else
         {
-            colorValuesArray.insert(
-                    colorValuesArray.end(), standardColorMapBytes.begin(), standardColorMapBytes.end());
-            minMaxList[varIdx] = QVector2D(0.0f, 1.0f);
+            std::vector<unsigned char>& colorMapBytes = standardColorMapsBytes.at(
+                    varIdx % defaultTransferFunctions.size());
+            colorValuesArray.insert(colorValuesArray.end(), colorMapBytes.begin(), colorMapBytes.end());
+            QVector2D range;
+            if (varIdx < variableRanges.size())
+            {
+                range = variableRanges.at(varIdx);
+            }
+            else
+            {
+                range = QVector2D(0.0f, 1.0f);
+            }
+            minMaxList[varIdx] = range;
         }
         varIdx++;
     }
@@ -222,6 +288,46 @@ void MMultiVarTf::generateTexture1DArray()
 void MMultiVarTf::bindTexture1DArray(int textureUnitTransferFunction)
 {
     textureTransferFunctionArray->bindToTextureUnit(textureUnitTransferFunction);
+}
+
+
+void MMultiVarTf::setVariableRanges(const QVector<QVector2D>& variableRangesNew)
+{
+    variableRanges = variableRangesNew;
+
+    int varIdx = 0;
+    foreach(MTransferFunction1D *tf, transferFunctions)
+    {
+        if (tf != nullptr && !tf->getColorValuesByteArray().empty())
+        {
+            float minimumValue = tf->getMinimumValue();
+            float maximumValue = tf->getMaximumValue();
+            if (tf->getIsRangeReverse())
+            {
+                float tmp = minimumValue;
+                minimumValue = maximumValue;
+                maximumValue = tmp;
+            }
+
+            minMaxList[varIdx] = QVector2D(minimumValue, maximumValue);
+        }
+        else
+        {
+            QVector2D range;
+            if (varIdx < variableRanges.size())
+            {
+                range = variableRanges.at(varIdx);
+            }
+            else
+            {
+                range = QVector2D(0.0f, 1.0f);
+            }
+            minMaxList[varIdx] = range;
+        }
+        varIdx++;
+    }
+
+    this->minMaxIsDirty = true;
 }
 
 

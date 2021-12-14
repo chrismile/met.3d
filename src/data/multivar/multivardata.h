@@ -82,7 +82,9 @@ public:
     void saveConfiguration(QSettings* settings);
     void loadConfiguration(QSettings* settings);
 
-    void onBezierTrajectoriesLoaded(const QStringList& auxDataVarNames, int numTrajectories);
+    void onBezierTrajectoriesLoaded(MTrajectories* trajectories);
+    void clearVariableRanges();
+    void updateVariableRanges(const QVector<QVector2D>& ranges);
 
     void initTransferFunctionsMultiVar(uint32_t numVariables);
 
@@ -96,7 +98,11 @@ public:
     inline const QVector<uint32_t>& getSelectedVariables() { return selectedVariables; }
     inline void setSelectedVariables(const QVector<uint32_t>& selectedVariables) {
         this->selectedVariables = selectedVariables;
-        setPropertiesVarSelected();
+        for (int varIdx = 0; varIdx < maxNumVariables; varIdx++)
+        {
+            QtProperty* variableProperty = selectedVariablesProperties.at(varIdx);
+            properties->mBool()->setValue(variableProperty, selectedVariables.at(varIdx));
+        }
         updateNumVariablesSelected();
     }
 
@@ -170,11 +176,11 @@ private:
     QtProperty *separatorWidthProperty;
     QtProperty *useColorIntensityProperty;
 
-    // TODO
     QVector<QString> varNames;
     MMultiVarTf multiVarTf;
     QVector<QtProperty*> tfPropertiesMultiVar;
     QVector<MTransferFunction1D*> transferFunctionsMultiVar;
+    QVector<QVector2D> variableRanges;
 
     QtProperty *renderingSettingsGroupProperty;
     QtProperty *numLineSegmentsProperty;

@@ -47,14 +47,14 @@ class MTrajectoryActor;
 class MMultiVarTf : public MMemoryManagementUsingObject
 {
 public:
-    MMultiVarTf(QVector<QtProperty*>& transferFunctionProperties, QVector<MTransferFunction1D*>& transferFunctions)
-        : transferFunctionProperties(transferFunctionProperties), transferFunctions(transferFunctions) {}
-    ~MMultiVarTf();
+    MMultiVarTf(QVector<QtProperty*>& transferFunctionProperties, QVector<MTransferFunction1D*>& transferFunctions);
+    ~MMultiVarTf() override;
 
     void createTexture1DArray();
     void destroyTexture1DArray();
     void generateTexture1DArray();
     void bindTexture1DArray(int textureUnitTransferFunction);
+    void setVariableRanges(const QVector<QVector2D>& variableRangesNew);
 
     GL::MShaderStorageBufferObject *getMinMaxBuffer(
 #ifdef USE_QOPENGLWIDGET
@@ -75,6 +75,8 @@ private:
             QString("multivardata_minmax_buffer_#%1").arg(getID());
     QVector<QVector2D> minMaxList;
     bool minMaxIsDirty = true;
+    QVector<QVector2D> variableRanges;
+    std::vector<std::vector<unsigned char>> standardColorMapsBytes;
 };
 
 } // namespace Met3D

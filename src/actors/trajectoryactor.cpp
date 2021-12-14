@@ -1727,9 +1727,8 @@ void MTrajectoryActor::prepareAvailableDataForRendering(uint slot)
         {
             if (trqi.dataRequest.available)
             {
-                multiVarData.onBezierTrajectoriesLoaded(
-                        trajectoryRequests[slot].trajectories->getAuxDataVarNames(),
-                        trajectoryRequests[slot].trajectories->getNumTrajectories());
+                multiVarData.onBezierTrajectoriesLoaded(trajectoryRequests[slot].trajectories);
+                multiVarData.clearVariableRanges();
             }
 
             foreach (MSceneViewGLWidget *view, trqi.bezierTrajectoriesRequests.keys())
@@ -1760,8 +1759,11 @@ void MTrajectoryActor::prepareAvailableDataForRendering(uint slot)
                         trajectoryPickerMap[view]->updateTrajectoryRadius(tubeRadius);
                         trajectoryPickerMap[view]->setParticlePosTimeStep(particlePosTimeStep);
                     }
+
                     trajectoryPickerMap[view]->setBaseTrajectories(
                             trajectoryRequests[slot].bezierTrajectoriesMap[view]->getBaseTrajectories());
+                    const QVector<QVector2D>& variableRanges = trajectoryPickerMap[view]->getVariableRanges();
+                    multiVarData.updateVariableRanges(variableRanges);
 #endif
                 }
             }
