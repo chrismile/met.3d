@@ -123,6 +123,14 @@ GL::MShaderStorageBufferObject* createShaderStorageBuffer(
     return static_cast<GL::MShaderStorageBufferObject*>(glRM->getGPUItem(vbID));
 }
 
+inline QMatrix4x4 matrixTranslation(float tx, float ty) {
+    return QMatrix4x4(
+            1.0f, 0.0f, 0.0f, tx,
+            0.0f, 1.0f, 0.0f, ty,
+            0.0f, 0.0f, 1.0f, 0.0f,
+            0.0f, 0.0f, 0.0f, 1.0f);
+}
+
 inline QMatrix4x4 matrixOrthogonalProjection(float left, float right, float bottom, float top, float near, float far)
 {
     return QMatrix4x4(

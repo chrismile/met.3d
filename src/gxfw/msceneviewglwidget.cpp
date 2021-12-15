@@ -2082,6 +2082,11 @@ void MSceneViewGLWidget::mousePressEvent(QMouseEvent *event)
         if (widgetHasVirtualWindow)
         {
             actor->mousePressEvent(this, event);
+
+            if (event->button() == Qt::LeftButton)
+            {
+                isDraggingVirtualWindow = true;
+            }
         }
         isVirtualWindowBelowMouse = isVirtualWindowBelowMouse || widgetHasVirtualWindow;
     }
@@ -2124,7 +2129,9 @@ void MSceneViewGLWidget::mouseMoveEvent(QMouseEvent *event)
     bool isVirtualWindowBelowMouse = false;
     foreach (MActor* actor, scene->getRenderQueue())
     {
-        bool widgetHasVirtualWindow = actor->checkVirtualWindowBelowMouse(this, event->x(), event->y());
+        bool widgetHasVirtualWindow =
+                actor->checkVirtualWindowBelowMouse(this, event->x(), event->y())
+                || isDraggingVirtualWindow;
         if (widgetHasVirtualWindow)
         {
             actor->mouseMoveEvent(this, event);
@@ -2360,6 +2367,7 @@ void MSceneViewGLWidget::mouseMoveEvent(QMouseEvent *event)
 
 void MSceneViewGLWidget::mouseReleaseEvent(QMouseEvent *event)
 {
+    isDraggingVirtualWindow = false;
     bool isVirtualWindowBelowMouse = false;
     foreach (MActor* actor, scene->getRenderQueue())
     {

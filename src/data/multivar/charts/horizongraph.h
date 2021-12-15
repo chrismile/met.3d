@@ -175,7 +175,7 @@ private:
     float computeSSIM(
             int varIdx0, int varIdx1, const std::vector<std::vector<float>>& valueArray, float factor) const;
     void sortVariables(int newSortingIdx, bool forceRecompute = false);
-    SimilarityMetric similarityMetric = SimilarityMetric::MI;
+    SimilarityMetric similarityMetric = SimilarityMetric::ABSOLUTE_NCC;
     int numBins = 10;
     float meanMetricInfluence = 0.5f;
     float stdDevMetricInfluence = 0.25f;

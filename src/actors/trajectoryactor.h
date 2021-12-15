@@ -486,7 +486,7 @@ private:
     QtProperty *stdDevMetricInfluenceProperty;
     QtProperty *numBinsProperty;
 
-    SimilarityMetric similarityMetric = SimilarityMetric::MI;
+    SimilarityMetric similarityMetric = SimilarityMetric::ABSOLUTE_NCC;
     float meanMetricInfluence = 0.5f;
     float stdDevMetricInfluence = 0.25f;
     int numBins = 10;

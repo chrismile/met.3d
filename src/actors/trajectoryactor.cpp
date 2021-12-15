@@ -735,7 +735,7 @@ void MTrajectoryActor::loadConfiguration(QSettings *settings)
     properties->mEnum()->setValue(diagramTypeProperty, static_cast<int>(diagramType));
 
     similarityMetric = SimilarityMetric(settings->value(
-            "similarityMetric", int(SimilarityMetric::MI)).toInt());
+            "similarityMetric", int(SimilarityMetric::ABSOLUTE_NCC)).toInt());
     properties->mEnum()->setValue(similarityMetricProperty, int(similarityMetric));
     meanMetricInfluence = settings->value("meanMetricInfluence", 0.5f).toFloat();
     properties->setDDouble(

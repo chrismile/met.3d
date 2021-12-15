@@ -167,18 +167,38 @@ void MHorizonGraph::setData(
         for (size_t varIdx = 0; varIdx < numVariables; varIdx++) {
             float& mean = meanValuesAtTime.at(varIdx);
             float& stdDev = stdDevsAtTime.at(varIdx);
+
+            size_t numValidTrajectories = 0;
             mean = 0.0f;
             for (size_t trajectoryIdx = 0; trajectoryIdx < numTrajectories; trajectoryIdx++) {
                 float value = variableValuesArray.at(trajectoryIdx).at(timeStepIdx).at(varIdx);
-                mean += value / float(numTrajectories);
+                if (!std::isnan(value)) {
+                    mean += value;
+                    numValidTrajectories++;
+                }
             }
+            if (numValidTrajectories > 0) {
+                mean = mean / float(numValidTrajectories);
+            } else {
+                mean = std::numeric_limits<float>::quiet_NaN();
+            }
+
             float variance = 0.0f;
-            float numTrajectoriesMinOne = std::max(float(numTrajectories - 1), 1e-8f);
-            for (size_t trajectoryIdx = 0; trajectoryIdx < numTrajectories; trajectoryIdx++) {
-                float value = variableValuesArray.at(trajectoryIdx).at(timeStepIdx).at(varIdx);
-                float diff = value - mean;
-                variance += diff * diff / numTrajectoriesMinOne;
+            if (numValidTrajectories <= 0) {
+                variance = std::numeric_limits<float>::quiet_NaN();
+            } else if (numValidTrajectories <= 1) {
+                variance = 0.0f;
+            } else {
+                float numValidTrajectoriesMinOne = std::max(float(numValidTrajectories - 1), 1e-8f);
+                for (size_t trajectoryIdx = 0; trajectoryIdx < numTrajectories; trajectoryIdx++) {
+                    float value = variableValuesArray.at(trajectoryIdx).at(timeStepIdx).at(varIdx);
+                    if (!std::isnan(value)) {
+                        float diff = value - mean;
+                        variance += diff * diff / numValidTrajectoriesMinOne;
+                    }
+                }
             }
+
             stdDev = std::sqrt(variance);
         }
     }
@@ -792,6 +812,8 @@ void MHorizonGraph::recomputeScrollThumbHeight() {
 
 void MHorizonGraph::mouseMoveEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event)
 {
+    MDiagramBase::mouseMoveEvent(sceneView, event);
+
     int viewportHeight = sceneView->getViewPortHeight();
     QVector2D mousePosition(float(event->x()), float(viewportHeight - event->y() - 1));
     mousePosition -= QVector2D(getWindowOffsetX(), getWindowOffsetY());
@@ -833,6 +855,8 @@ void MHorizonGraph::mouseMoveEvent(MSceneViewGLWidget *sceneView, QMouseEvent *e
 
 void MHorizonGraph::mousePressEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event)
 {
+    bool mouseOverWidget = false;
+
     int viewportHeight = sceneView->getViewPortHeight();
     QVector2D mousePosition(float(event->x()), float(viewportHeight - event->y() - 1));
     mousePosition -= QVector2D(getWindowOffsetX(), getWindowOffsetY());
@@ -848,6 +872,7 @@ void MHorizonGraph::mousePressEvent(MSceneViewGLWidget *sceneView, QMouseEvent *
             QVector2D(windowWidth - borderWidth, windowHeight - borderWidth));
     if (scrollThumbAabb.contains(mousePosition)) {
         scrollThumbHover = true;
+        mouseOverWidget = true;
         if (event->button() == Qt::MouseButton::LeftButton) {
             scrollThumbDrag = true;
             thumbDragDelta = scrollThumbPosition - mousePosition.y();
@@ -885,6 +910,7 @@ void MHorizonGraph::mousePressEvent(MSceneViewGLWidget *sceneView, QMouseEvent *
                             offsetHorizonBarsX + horizonBarWidth,
                             lowerY + horizonBarHeight - scrollTranslationY));
             if (boxAabb.contains(mousePosition)) {
+                mouseOverWidget = true;
                 sortVariables(int(varIdx));
                 break;
             }
@@ -896,10 +922,17 @@ void MHorizonGraph::mousePressEvent(MSceneViewGLWidget *sceneView, QMouseEvent *
     updateTimeScale(mousePosition, EventType::MousePress, event);
     // Translation in the time axis.
     updateTimeShift(mousePosition, EventType::MousePress, event);
+
+    if (!mouseOverWidget)
+    {
+        MDiagramBase::mousePressEvent(sceneView, event);
+    }
 }
 
 void MHorizonGraph::mouseReleaseEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event)
 {
+    MDiagramBase::mouseReleaseEvent(sceneView, event);
+
     int viewportHeight = sceneView->getViewPortHeight();
     QVector2D mousePosition(float(event->x()), float(viewportHeight - event->y() - 1));
     mousePosition -= QVector2D(getWindowOffsetX(), getWindowOffsetY());
@@ -964,6 +997,8 @@ void MHorizonGraph::mouseReleaseEvent(MSceneViewGLWidget *sceneView, QMouseEvent
 
 void MHorizonGraph::wheelEvent(MSceneViewGLWidget *sceneView, QWheelEvent *event)
 {
+    MDiagramBase::wheelEvent(sceneView, event);
+
     const float dt = 1.0f / 60.0f / 120.0f;
     //std::cout << "wheel: " << event->delta() << std::endl;
 
@@ -1151,69 +1186,93 @@ typedef double Real;
 
 float MHorizonGraph::computeL1Norm(
         int varIdx0, int varIdx1, const std::vector<std::vector<float>>& valueArray, float factor) const {
+    size_t numValidTimeSteps = 0;
     Real difference = 0;
     for (size_t timeStepIdx = 0; timeStepIdx < numTimeSteps; timeStepIdx++) {
         Real val0 = factor * valueArray.at(timeStepIdx).at(varIdx0);
         Real val1 = factor * valueArray.at(timeStepIdx).at(varIdx1);
-        Real diffMean = val1 - val0;
-        difference = std::abs(diffMean);
+        if (!std::isnan(val0) && !std::isnan(val1)) {
+            Real diffMean = val1 - val0;
+            difference += std::abs(diffMean);
+            numValidTimeSteps++;
+        }
     }
-    difference /= Real(numTimeSteps);
+    difference /= Real(numValidTimeSteps);
 
     return float(difference);
 }
 
 float MHorizonGraph::computeL2Norm(
         int varIdx0, int varIdx1, const std::vector<std::vector<float>>& valueArray, float factor) const {
+    size_t numValidTimeSteps = 0;
     Real difference = 0;
     for (size_t timeStepIdx = 0; timeStepIdx < numTimeSteps; timeStepIdx++) {
         Real val0 = factor * valueArray.at(timeStepIdx).at(varIdx0);
         Real val1 = factor * valueArray.at(timeStepIdx).at(varIdx1);
-        Real diffMean = val1 - val0;
-        difference += diffMean * diffMean;
+        if (!std::isnan(val0) && !std::isnan(val1)) {
+            Real diffMean = val1 - val0;
+            difference += diffMean * diffMean;
+            numValidTimeSteps++;
+        }
     }
-    difference /= Real(numTimeSteps);
+    difference /= Real(numValidTimeSteps);
 
     return float(difference);
 }
 
 float MHorizonGraph::computeNCC(
         int varIdx0, int varIdx1, const std::vector<std::vector<float>>& valueArray, float factor) const {
+    size_t numValidTimeSteps0 = 0;
+    size_t numValidTimeSteps1 = 0;
     Real mean0 = 0;
     Real mean1 = 0;
     for (size_t timeStepIdx = 0; timeStepIdx < numTimeSteps; timeStepIdx++) {
         Real val0 = factor * valueArray.at(timeStepIdx).at(varIdx0);
         Real val1 = factor * valueArray.at(timeStepIdx).at(varIdx1);
-        mean0 += val0;
-        mean1 += val1;
+        if (!std::isnan(val0)) {
+            mean0 += val0;
+            numValidTimeSteps0++;
+        }
+        if (!std::isnan(val1)) {
+            mean1 += val1;
+            numValidTimeSteps1++;
+        }
     }
-    mean0 /= Real(numTimeSteps);
-    mean1 /= Real(numTimeSteps);
+    mean0 /= Real(numValidTimeSteps0);
+    mean1 /= Real(numValidTimeSteps1);
 
-    Real var0 = 0.0f;
-    Real var1 = 0.0f;
+    Real var0 = 0;
+    Real var1 = 0;
     for (size_t timeStepIdx = 0; timeStepIdx < numTimeSteps; timeStepIdx++) {
         Real val0 = factor * valueArray.at(timeStepIdx).at(varIdx0);
         Real val1 = factor * valueArray.at(timeStepIdx).at(varIdx1);
-        Real diff0 = val0 - mean0;
-        Real diff1 = val1 - mean1;
-        var0 += diff0 * diff0;
-        var1 += diff1 * diff1;
+        if (!std::isnan(val0)) {
+            Real diff0 = val0 - mean0;
+            var0 += diff0 * diff0;
+        }
+        if (!std::isnan(val1)) {
+            Real diff1 = val1 - mean1;
+            var1 += diff1 * diff1;
+        }
     }
-    var0 /= Real(numTimeSteps - 1);
-    var1 /= Real(numTimeSteps - 1);
+    var0 /= Real(numValidTimeSteps0 - 1);
+    var1 /= Real(numValidTimeSteps1 - 1);
 
     Real stdDev0 = std::sqrt(var0);
     Real stdDev1 = std::sqrt(var1);
 
+    size_t numValidTimeSteps01 = 0;
     const Real EPSILON = 1e-7;
-    Real ncc = 0.0f;
+    Real ncc = 0.0;
     for (size_t timeStepIdx = 0; timeStepIdx < numTimeSteps; timeStepIdx++) {
         Real val0 = factor * valueArray.at(timeStepIdx).at(varIdx0);
         Real val1 = factor * valueArray.at(timeStepIdx).at(varIdx1);
-        ncc += (val0 - mean0) * (val1 - mean1) / std::max(stdDev0 * stdDev1, EPSILON);
+        if (!std::isnan(val0) && !std::isnan(val1)) {
+            ncc += (val0 - mean0) * (val1 - mean1) / std::max(stdDev0 * stdDev1, EPSILON);
+            numValidTimeSteps01++;
+        }
     }
-    ncc /= float(numTimeSteps);
+    ncc /= double(numValidTimeSteps01);
 
     return float(-ncc);
 }
@@ -1242,48 +1301,122 @@ float MHorizonGraph::computeMI(
     }
 
     // Compute the two 1D histograms and the 2D joint histogram.
-    Real entryWeight1d = Real(1) / Real(numTimeSteps);
-    Real entryWeight2d = Real(1) / Real(numTimeSteps * numTimeSteps);
-    for (size_t timeStepIdx = 0; timeStepIdx < numTimeSteps; timeStepIdx++) {
-        Real val = factor * valueArray.at(timeStepIdx).at(varIdx0);
-        int binIdx = clamp(int(val * Real(numBins)), 0, numBins - 1);
-        histogram0[binIdx] += entryWeight1d;
-    }
-    for (size_t timeStepIdx = 0; timeStepIdx < numTimeSteps; timeStepIdx++) {
-        Real val = factor * valueArray.at(timeStepIdx).at(varIdx1);
-        int binIdx = clamp(int(val * Real(numBins)), 0, numBins - 1);
-        histogram1[binIdx] += entryWeight1d;
-    }
+    //Real totalSum0 = 0;
+    //Real totalSum1 = 0;
+    //Real totalSum2d = 0;
+    //for (size_t timeStepIdx = 0; timeStepIdx < numTimeSteps; timeStepIdx++) {
+    //    Real val = factor * valueArray.at(timeStepIdx).at(varIdx0);
+    //    if (!std::isnan(val)) {
+    //        int binIdx = clamp(int(val * Real(numBins)), 0, numBins - 1);
+    //        totalSum0 += 1;
+    //        histogram0[binIdx] += 1;
+    //    }
+    //}
+    //for (size_t timeStepIdx = 0; timeStepIdx < numTimeSteps; timeStepIdx++) {
+    //    Real val = factor * valueArray.at(timeStepIdx).at(varIdx1);
+    //    if (!std::isnan(val)) {
+    //        int binIdx = clamp(int(val * Real(numBins)), 0, numBins - 1);
+    //        totalSum1 += 1;
+    //        histogram1[binIdx] += 1;
+    //    }
+    //}
     for (size_t timeStepIdx0 = 0; timeStepIdx0 < numTimeSteps; timeStepIdx0++) {
         for (size_t timeStepIdx1 = 0; timeStepIdx1 < numTimeSteps; timeStepIdx1++) {
             Real val0 = factor * valueArray.at(timeStepIdx0).at(varIdx0);
             Real val1 = factor * valueArray.at(timeStepIdx1).at(varIdx1);
-            int binIdx0 = clamp(int(val0 * Real(numBins)), 0, numBins - 1);
-            int binIdx1 = clamp(int(val1 * Real(numBins)), 0, numBins - 1);
-            histogram2d[binIdx0 * numBins + binIdx1] += entryWeight2d;
+            if (!std::isnan(val0) && !std::isnan(val1)) {
+                int binIdx0 = clamp(int(val0 * Real(numBins)), 0, numBins - 1);
+                int binIdx1 = clamp(int(val1 * Real(numBins)), 0, numBins - 1);
+                //totalSum2d += 1;
+                histogram2d[binIdx0 * numBins + binIdx1] += 1;
+            }
+        }
+    }
+
+    // Normalize the histograms.
+    //for (int binIdx = 0; binIdx < numBins; binIdx++) {
+    //    histogram0[binIdx] /= totalSum0;
+    //    histogram1[binIdx] /= totalSum1;
+    //}
+    //for (int binIdx0 = 0; binIdx0 < numBins; binIdx0++) {
+    //    for (int binIdx1 = 0; binIdx1 < numBins; binIdx1++) {
+    //        histogram2d[binIdx0 * numBins + binIdx1] /= totalSum2d;
+    //    }
+    //}
+    Real totalSum2d = 0;
+    for (int binIdx0 = 0; binIdx0 < numBins; binIdx0++) {
+        for (int binIdx1 = 0; binIdx1 < numBins; binIdx1++) {
+            totalSum2d += histogram2d[binIdx0 * numBins + binIdx1];
+        }
+    }
+    for (int binIdx0 = 0; binIdx0 < numBins; binIdx0++) {
+        for (int binIdx1 = 0; binIdx1 < numBins; binIdx1++) {
+            histogram2d[binIdx0 * numBins + binIdx1] /= totalSum2d;
+        }
+    }
+
+    // Regularize.
+    const Real REG_FACTOR = 1e-7;
+    for (int binIdx0 = 0; binIdx0 < numBins; binIdx0++) {
+        for (int binIdx1 = 0; binIdx1 < numBins; binIdx1++) {
+            histogram2d[binIdx0 * numBins + binIdx1] += REG_FACTOR;
+        }
+    }
+
+    // Normalize again.
+    totalSum2d = 0;
+    for (int binIdx0 = 0; binIdx0 < numBins; binIdx0++) {
+        for (int binIdx1 = 0; binIdx1 < numBins; binIdx1++) {
+            totalSum2d += histogram2d[binIdx0 * numBins + binIdx1];
+        }
+    }
+    for (int binIdx0 = 0; binIdx0 < numBins; binIdx0++) {
+        for (int binIdx1 = 0; binIdx1 < numBins; binIdx1++) {
+            histogram2d[binIdx0 * numBins + binIdx1] /= totalSum2d;
+        }
+    }
+
+    // Marginalization of joint distribution.
+    for (int binIdx0 = 0; binIdx0 < numBins; binIdx0++) {
+        for (int binIdx1 = 0; binIdx1 < numBins; binIdx1++) {
+            histogram0[binIdx0] += histogram2d[binIdx0 * numBins + binIdx1];
+            histogram1[binIdx1] += histogram2d[binIdx0 * numBins + binIdx1];
         }
     }
 
     /*
-      * Compute the mutual information metric. Two possible ways of calculation:
-      * a) $MI = H(x) + H(y) - H(x, y)$
-      * with the Shannon entropy $H(x) = -\sum_i p_x(i) \log p_x(i)$
-      * and the joint entropy $H(x, y) = -\sum_i \sum_j p_{xy}(i, j) \log p_{xy}(i, j)$
-      * b) $MI = \sum_i \sum_j p_{xy}(i, j) \log \frac{p_{xy}(i, j)}{p_x(i) p_y(j)}$
-      */
-    const Real EPSILON = 1e-7;
-    Real mi = 0.0f;
+     * Compute the mutual information metric. Two possible ways of calculation:
+     * a) $MI = H(x) + H(y) - H(x, y)$
+     * with the Shannon entropy $H(x) = -\sum_i p_x(i) \log p_x(i)$
+     * and the joint entropy $H(x, y) = -\sum_i \sum_j p_{xy}(i, j) \log p_{xy}(i, j)$
+     * b) $MI = \sum_i \sum_j p_{xy}(i, j) \log \frac{p_{xy}(i, j)}{p_x(i) p_y(j)}$
+     */
+    const Real EPSILON = Real(1) / Real(numBins * numBins) * 1e-3;
+    Real mi = 0.0;
+    for (int binIdx = 0; binIdx < numBins; binIdx++) {
+        Real p_x = histogram0[binIdx];
+        Real p_y = histogram1[binIdx];
+        mi -= p_x * std::log(std::max(p_x, EPSILON));
+        mi -= p_y * std::log(std::max(p_y, EPSILON));
+    }
     for (int binIdx0 = 0; binIdx0 < numBins; binIdx0++) {
         for (int binIdx1 = 0; binIdx1 < numBins; binIdx1++) {
-            Real p_xy = std::max(histogram2d[binIdx0 * numBins + binIdx1], EPSILON);
-            Real p_x = std::max(histogram0[binIdx0], EPSILON);
-            Real p_y = std::max(histogram1[binIdx1], EPSILON);
-            mi += p_xy * std::log(p_xy / (p_x * p_y));
+            Real p_xy = histogram2d[binIdx0 * numBins + binIdx1];
+            mi += p_xy * std::log(std::max(p_xy, EPSILON));
         }
     }
+    /*for (int binIdx0 = 0; binIdx0 < numBins; binIdx0++) {
+        for (int binIdx1 = 0; binIdx1 < numBins; binIdx1++) {
+            Real p_xy = histogram2d[binIdx0 * numBins + binIdx1];
+            Real p_x = std::max(histogram0[binIdx0], EPSILON);
+            Real p_y = std::max(histogram1[binIdx1], EPSILON);
+            mi += p_xy * std::log(std::max(p_xy / (p_x * p_y), EPSILON));
+        }
+    }*/
+
 
     // Debug testing code for saving the joint histogram as a bitmap.
-    /*int resolutionBoost = 16;
+    /*int resolutionBoost = 1;
     int upscaledNumBins = resolutionBoost * numBins;
     QImage image(upscaledNumBins, upscaledNumBins, QImage::Format_RGB888);
     Real maxHistogramValue = 0;
@@ -1297,7 +1430,8 @@ float MHorizonGraph::computeMI(
             int binIdx0 = upscaledBinIdx0 / resolutionBoost;
             int binIdx1 = upscaledBinIdx1 / resolutionBoost;
             Real val = histogram2d[binIdx0 * numBins + binIdx1] / maxHistogramValue;
-            QVector3D colorFloat = transferFunction(float(val));
+            //QVector3D colorFloat = transferFunction(float(val));
+            QVector3D colorFloat = QVector3D(float(val), float(val), float(val));
             int pixelIdx = upscaledBinIdx0 * upscaledNumBins + upscaledBinIdx1;
             image.setPixelColor(
                     upscaledBinIdx0, upscaledBinIdx1,
@@ -1316,6 +1450,7 @@ float MHorizonGraph::computeMI(
     bool saveSuccessful = image.save(filename.c_str(), "PNG");
     assert(saveSuccessful);*/
 
+
     delete[] histogram0;
     delete[] histogram1;
     delete[] histogram2d;
@@ -1325,42 +1460,58 @@ float MHorizonGraph::computeMI(
 
 float MHorizonGraph::computeSSIM(
         int varIdx0, int varIdx1, const std::vector<std::vector<float>>& valueArray, float factor) const {
+    size_t numValidTimeSteps0 = 0;
+    size_t numValidTimeSteps1 = 0;
     Real mean0 = 0;
     Real mean1 = 0;
     for (size_t timeStepIdx = 0; timeStepIdx < numTimeSteps; timeStepIdx++) {
         Real val0 = factor * valueArray.at(timeStepIdx).at(varIdx0);
         Real val1 = factor * valueArray.at(timeStepIdx).at(varIdx1);
-        mean0 += val0;
-        mean1 += val1;
+        if (!std::isnan(val0)) {
+            mean0 += val0;
+            numValidTimeSteps0++;
+        }
+        if (!std::isnan(val1)) {
+            mean1 += val1;
+            numValidTimeSteps1++;
+        }
     }
-    mean0 /= Real(numTimeSteps);
-    mean1 /= Real(numTimeSteps);
+    mean0 /= Real(numValidTimeSteps0);
+    mean1 /= Real(numValidTimeSteps1);
 
     Real var0 = 0;
     Real var1 = 0;
     for (size_t timeStepIdx = 0; timeStepIdx < numTimeSteps; timeStepIdx++) {
         Real val0 = factor * valueArray.at(timeStepIdx).at(varIdx0);
         Real val1 = factor * valueArray.at(timeStepIdx).at(varIdx1);
-        Real diff0 = val0 - mean0;
-        Real diff1 = val1 - mean1;
-        var0 += diff0 * diff0;
-        var1 += diff1 * diff1;
+        if (!std::isnan(val0)) {
+            Real diff0 = val0 - mean0;
+            var0 += diff0 * diff0;
+        }
+        if (!std::isnan(val1)) {
+            Real diff1 = val1 - mean1;
+            var1 += diff1 * diff1;
+        }
     }
-    var0 /= Real(numTimeSteps - 1);
-    var1 /= Real(numTimeSteps - 1);
+    var0 /= Real(numValidTimeSteps0 - 1);
+    var1 /= Real(numValidTimeSteps1 - 1);
 
     Real stdDev0 = std::sqrt(var0);
     Real stdDev1 = std::sqrt(var1);
 
+    size_t numValidTimeSteps01 = 0;
     Real cov = 0.0f;
     for (size_t timeStepIdx = 0; timeStepIdx < numTimeSteps; timeStepIdx++) {
         Real val0 = factor * valueArray.at(timeStepIdx).at(varIdx0);
         Real val1 = factor * valueArray.at(timeStepIdx).at(varIdx1);
-        Real diff0 = val0 - mean0;
-        Real diff1 = val1 - mean1;
-        cov += diff0 * diff1;
+        if (!std::isnan(val0) && !std::isnan(val1)) {
+            Real diff0 = val0 - mean0;
+            Real diff1 = val1 - mean1;
+            cov += diff0 * diff1;
+            numValidTimeSteps01++;
+        }
     }
-    cov /= Real(numTimeSteps - 1);
+    cov /= Real(numValidTimeSteps01 - 1);
 
     const Real k1 = 0.01;
     const Real k2 = 0.03;
@@ -1403,7 +1554,7 @@ void MHorizonGraph::sortVariables(int newSortingIdx, bool forceRecompute) {
     }
     std::sort(differenceMap.begin(), differenceMap.end());
     for (auto& it : differenceMap) {
-        std::cout << it.first << std::endl;
+        std::cout << it.first << "(" << variableNames.at(it.second) << ")" << std::endl;
         sortedVariableIndices.push_back(it.second);
     }
     std::cout << std::endl;

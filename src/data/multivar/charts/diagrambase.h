@@ -61,6 +61,8 @@ public:
     ~MDiagramBase() override;
     void render();
 
+    inline bool getIsDraggingWindow() const { return isDraggingWindow; }
+
     /// Returns whether the mouse is over the area of the diagram.
     bool isMouseOverDiagram(QVector2D mousePosition) const;
     virtual bool hasData()=0;
@@ -85,10 +87,10 @@ public:
     inline bool getSelectedVariablesChanged() const { return selectedVariablesChanged; }
     inline void resetSelectedVariablesChanged() { selectedVariablesChanged = false; }
 
-    virtual void mouseMoveEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event) {}
-    virtual void mousePressEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event) {}
-    virtual void mouseReleaseEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event) {}
-    virtual void wheelEvent(MSceneViewGLWidget *sceneView, QWheelEvent *event) {}
+    virtual void mouseMoveEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event);
+    virtual void mousePressEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event);
+    virtual void mouseReleaseEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event);
+    virtual void wheelEvent(MSceneViewGLWidget *sceneView, QWheelEvent *event);
 
 protected:
     virtual void renderBase()=0;
@@ -157,6 +159,13 @@ private:
     GL::MTexture *colorRenderTexture = nullptr;
     GL::MRenderbuffer *depthStencilRbo = nullptr;
     GLint textureUnit;
+
+    // Dragging the window.
+    bool isDraggingWindow = false;
+    int mouseDragStartPosX = 0;
+    int mouseDragStartPosY = 0;
+    float windowOffsetXBase = 0.0f;
+    float windowOffsetYBase = 0.0f;
 
     // For drawing to the main window.
     std::shared_ptr<GL::MShaderEffect> blitShader;

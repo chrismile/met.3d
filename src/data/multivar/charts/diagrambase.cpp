@@ -192,8 +192,10 @@ void MDiagramBase::createRenderData() {
 
     if (!blitVertexDataBuffer)
     {
-        QVector2D min = QVector2D(windowOffsetX, windowOffsetY);
-        QVector2D max = QVector2D(windowOffsetX + float(fboWidthDisplay), windowOffsetY + float(fboHeightDisplay));
+        //QVector2D min = QVector2D(windowOffsetX, windowOffsetY);
+        //QVector2D max = QVector2D(windowOffsetX + float(fboWidthDisplay), windowOffsetY + float(fboHeightDisplay));
+        QVector2D min = QVector2D(0, 0);
+        QVector2D max = QVector2D(float(fboWidthDisplay), float(fboHeightDisplay));
 
         struct Vertex {
             QVector3D position;
@@ -349,7 +351,7 @@ void MDiagramBase::render() {
     glClear(GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT); CHECK_GL_ERROR;
     nvgBeginFrame(vg, windowWidth, windowHeight, scaleFactor * supersamplingFactor);
 
-    // Render the render target-filling widget rectangle.
+    // Render the render target-filling window rectangle.
     nvgBeginPath(vg);
     nvgRoundedRect(
             vg, borderWidth, borderWidth, windowWidth - 2.0f * borderWidth, windowHeight - 2.0f * borderWidth,
@@ -373,7 +375,7 @@ void MDiagramBase::render() {
     QMatrix4x4 mvpMatrix = matrixOrthogonalProjection(
             0.0f, float(oldViewport[2]),
             0.0f, float(oldViewport[3]),
-            -1.0f, 1.0f);
+            -1.0f, 1.0f) * matrixTranslation(windowOffsetX, windowOffsetY);
 
     colorRenderTexture->bindToTextureUnit(textureUnit);
     if (supersamplingFactor <= 1)
@@ -428,6 +430,41 @@ bool MDiagramBase::isMouseOverDiagram(QVector2D mousePosition) const
     aabb.max = QVector2D(windowOffsetX + float(fboWidthDisplay), windowOffsetY + float(fboHeightDisplay));
 
     return aabb.contains(mousePosition);
+}
+
+void MDiagramBase::mouseMoveEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event)
+{
+    if (event->buttons() == Qt::NoButton) {
+        isDraggingWindow = false;
+    }
+
+    if (isDraggingWindow) {
+        windowOffsetX = windowOffsetXBase + float(event->x() - mouseDragStartPosX);
+        windowOffsetY = windowOffsetYBase - float(event->y() - mouseDragStartPosY);
+    }
+}
+
+void MDiagramBase::mousePressEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event)
+{
+    if (event->button() == Qt::MouseButton::LeftButton) {
+        isDraggingWindow = true;
+        windowOffsetXBase = windowOffsetX;
+        windowOffsetYBase = windowOffsetY;
+        mouseDragStartPosX = event->x();
+        mouseDragStartPosY = event->y();
+    }
+}
+
+void MDiagramBase::mouseReleaseEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event)
+{
+    if (event->button() == Qt::MouseButton::LeftButton) {
+        isDraggingWindow = false;
+    }
+}
+
+void MDiagramBase::wheelEvent(MSceneViewGLWidget *sceneView, QWheelEvent *event)
+{
+    ;
 }
 
 
