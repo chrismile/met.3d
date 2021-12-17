@@ -95,6 +95,8 @@ public:
 protected:
     virtual void renderBase()=0;
     virtual void onWindowSizeChanged();
+    virtual void mousePressEventResizeWindow(MSceneViewGLWidget *sceneView, QMouseEvent *event);
+    virtual void mousePressEventMoveWindow(MSceneViewGLWidget *sceneView, QMouseEvent *event);
 
     // Utility functions.
     void drawColorLegend(
@@ -129,9 +131,15 @@ protected:
     const float borderWidth = 1.0f;
     const float borderRoundingRadius = 4.0f;
 
+    enum ResizeDirection {
+        NONE = 0, LEFT = 1, RIGHT = 2, BOTTOM = 4, TOP = 8,
+        BOTTOM_LEFT = BOTTOM | LEFT, BOTTOM_RIGHT = BOTTOM | RIGHT, TOP_LEFT = TOP | LEFT, TOP_RIGHT = TOP | RIGHT
+    };
+
     inline float getWindowOffsetX() const { return windowOffsetX; }
     inline float getWindowOffsetY() const { return windowOffsetY; }
     inline float getScaleFactor() const { return scaleFactor; }
+    inline ResizeDirection getResizeDirection() const { return resizeDirection; }
 
     // Variables can be selected by clicking on them.
     size_t numVariables = 0;
@@ -166,6 +174,14 @@ private:
     int mouseDragStartPosY = 0;
     float windowOffsetXBase = 0.0f;
     float windowOffsetYBase = 0.0f;
+
+    // Resizing the window.
+    bool isResizingWindow = false;
+    ResizeDirection resizeDirection = ResizeDirection::NONE;
+    const float resizeMarginBase = 8;
+    float resizeMargin = resizeMarginBase; // including scale factor
+    int lastResizeMouseX = 0;
+    int lastResizeMouseY = 0;
 
     // For drawing to the main window.
     std::shared_ptr<GL::MShaderEffect> blitShader;

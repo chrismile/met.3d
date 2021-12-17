@@ -85,6 +85,7 @@ public:
 
 protected:
     bool hasData() override { return !variableValuesArray.empty(); }
+    void onWindowSizeChanged() override;
     void renderBase() override;
 
 private:

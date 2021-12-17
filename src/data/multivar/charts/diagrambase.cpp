@@ -164,6 +164,7 @@ void MDiagramBase::onWindowSizeChanged() {
     fboHeightDisplay = std::ceil(float(windowHeight) * scaleFactor);
     fboWidthInternal = fboWidthDisplay * supersamplingFactor;
     fboHeightInternal = fboHeightDisplay * supersamplingFactor;
+    resizeMargin = resizeMarginBase * scaleFactor;
 
     if (fbo)
     {
@@ -435,7 +436,30 @@ bool MDiagramBase::isMouseOverDiagram(QVector2D mousePosition) const
 void MDiagramBase::mouseMoveEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event)
 {
     if (event->buttons() == Qt::NoButton) {
+        resizeDirection = ResizeDirection::NONE;
         isDraggingWindow = false;
+    }
+
+    if (resizeDirection != ResizeDirection::NONE) {
+        float diffX = float(event->x() - lastResizeMouseX);
+        float diffY = -float(event->y() - lastResizeMouseY);
+        if ((resizeDirection & ResizeDirection::LEFT) != 0) {
+            windowOffsetX += diffX;
+            windowWidth -= diffX / scaleFactor;
+        }
+        if ((resizeDirection & ResizeDirection::RIGHT) != 0) {
+            windowWidth += diffX / scaleFactor;
+        }
+        if ((resizeDirection & ResizeDirection::BOTTOM) != 0) {
+            windowOffsetY += diffY;
+            windowHeight -= diffY / scaleFactor;
+        }
+        if ((resizeDirection & ResizeDirection::TOP) != 0) {
+            windowHeight += diffY / scaleFactor;
+        }
+        lastResizeMouseX = event->x();
+        lastResizeMouseY = event->y();
+        onWindowSizeChanged();
     }
 
     if (isDraggingWindow) {
@@ -446,7 +470,55 @@ void MDiagramBase::mouseMoveEvent(MSceneViewGLWidget *sceneView, QMouseEvent *ev
 
 void MDiagramBase::mousePressEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event)
 {
+    MDiagramBase::mousePressEventResizeWindow(sceneView, event);
+    MDiagramBase::mousePressEventMoveWindow(sceneView, event);
+}
+
+void MDiagramBase::mousePressEventResizeWindow(MSceneViewGLWidget *sceneView, QMouseEvent *event)
+{
     if (event->button() == Qt::MouseButton::LeftButton) {
+        // First, check if a resize event was started.
+        int viewportHeight = sceneView->getViewPortHeight();
+        QVector2D mousePosition(float(event->x()), float(viewportHeight - event->y() - 1));
+
+        AABB2 leftAabb;
+        leftAabb.min = QVector2D(windowOffsetX, windowOffsetY);
+        leftAabb.max = QVector2D(windowOffsetX + resizeMargin, windowOffsetY + float(fboHeightDisplay));
+        AABB2 rightAabb;
+        rightAabb.min = QVector2D(windowOffsetX + float(fboWidthDisplay) - resizeMargin, windowOffsetY);
+        rightAabb.max = QVector2D(windowOffsetX + float(fboWidthDisplay), windowOffsetY + float(fboHeightDisplay));
+        AABB2 bottomAabb;
+        bottomAabb.min = QVector2D(windowOffsetX, windowOffsetY);
+        bottomAabb.max = QVector2D(windowOffsetX + float(fboWidthDisplay), windowOffsetY + resizeMargin);
+        AABB2 topAabb;
+        topAabb.min = QVector2D(windowOffsetX, windowOffsetY + float(fboHeightDisplay) - resizeMargin);
+        topAabb.max = QVector2D(windowOffsetX + float(fboWidthDisplay), windowOffsetY + float(fboHeightDisplay));
+
+        bool isInLeft = leftAabb.contains(mousePosition);
+        bool isInRight = rightAabb.contains(mousePosition);
+        bool isInBottom = bottomAabb.contains(mousePosition);
+        bool isInTop = topAabb.contains(mousePosition);
+        resizeDirection = ResizeDirection::NONE;
+        if (isInLeft) {
+            resizeDirection = ResizeDirection(resizeDirection | ResizeDirection::LEFT);
+        } else if (isInRight) {
+            resizeDirection = ResizeDirection(resizeDirection | ResizeDirection::RIGHT);
+        } else if (isInBottom) {
+            resizeDirection = ResizeDirection(resizeDirection | ResizeDirection::BOTTOM);
+        } else if (isInTop) {
+            resizeDirection = ResizeDirection(resizeDirection | ResizeDirection::TOP);
+        }
+
+        if (resizeDirection != ResizeDirection::NONE) {
+            lastResizeMouseX = event->x();
+            lastResizeMouseY = event->y();
+        }
+    }
+}
+
+void MDiagramBase::mousePressEventMoveWindow(MSceneViewGLWidget *sceneView, QMouseEvent *event)
+{
+    if (resizeDirection == ResizeDirection::NONE && event->button() == Qt::MouseButton::LeftButton) {
         isDraggingWindow = true;
         windowOffsetXBase = windowOffsetX;
         windowOffsetYBase = windowOffsetY;
@@ -458,6 +530,7 @@ void MDiagramBase::mousePressEvent(MSceneViewGLWidget *sceneView, QMouseEvent *e
 void MDiagramBase::mouseReleaseEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event)
 {
     if (event->button() == Qt::MouseButton::LeftButton) {
+        resizeDirection = ResizeDirection::NONE;
         isDraggingWindow = false;
     }
 }

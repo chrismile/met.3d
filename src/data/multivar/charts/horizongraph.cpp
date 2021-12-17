@@ -74,6 +74,34 @@ void MHorizonGraph::recomputeFullWindowHeight() {
     fullWindowHeight = computeWindowHeight();
 }
 
+void MHorizonGraph::onWindowSizeChanged() {
+    const float minBarWidth = 200;
+    windowWidth = std::max(
+            windowWidth,
+            borderSizeX * 3.0f + legendLeftWidth + horizonBarMargin + minBarWidth + colorLegendWidth + textWidthMax);
+    windowHeight = std::max(
+            windowHeight, colorLegendHeight + borderSizeY * 2.0f);
+    windowHeight = std::max(
+            windowHeight, borderSizeY * 2.0f + legendTopHeight + horizonBarMargin + horizonBarHeight * 1);
+    windowHeight = std::min(windowHeight, fullWindowHeight);
+    MDiagramBase::onWindowSizeChanged();
+    if (windowHeight < fullWindowHeight) {
+        if (!useScrollBar) {
+            windowWidth += scrollBarWidth;
+        }
+        useScrollBar = true;
+    } else {
+        if (useScrollBar) {
+            windowWidth -= scrollBarWidth;
+        }
+        useScrollBar = false;
+    }
+    recomputeScrollThumbHeight();
+    horizonBarWidth =
+            windowWidth - (borderSizeX * 3.0f + legendLeftWidth + horizonBarMargin + colorLegendWidth + textWidthMax)
+            - (useScrollBar ? scrollBarWidth : 0);
+}
+
 void MHorizonGraph::updateTimeStepTicks() {
     size_t numTimeStepsLocal = size_t(float(numTimeSteps) * (timeDisplayMax - timeDisplayMin) / (timeMax - timeMin));
     if (numTimeStepsLocal < 10) {
@@ -210,7 +238,7 @@ void MHorizonGraph::setData(
         sortedVariableIndices.push_back(varIdx);
     }
 
-    onWindowSizeChanged();
+    MDiagramBase::onWindowSizeChanged();
 }
 
 void MHorizonGraph::setSimilarityMetric(SimilarityMetric similarityMetric) {
@@ -855,6 +883,11 @@ void MHorizonGraph::mouseMoveEvent(MSceneViewGLWidget *sceneView, QMouseEvent *e
 
 void MHorizonGraph::mousePressEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event)
 {
+    MDiagramBase::mousePressEventResizeWindow(sceneView, event);
+    if (getResizeDirection() != ResizeDirection::NONE)
+    {
+        return;
+    }
     bool mouseOverWidget = false;
 
     int viewportHeight = sceneView->getViewPortHeight();
@@ -896,10 +929,13 @@ void MHorizonGraph::mousePressEvent(MSceneViewGLWidget *sceneView, QMouseEvent *
 
 
     // Check whether the user clicked on one of the bars.
-    AABB2 windowAabb(
-            QVector2D(borderWidth, borderWidth),
-            QVector2D(windowWidth - 2.0f * borderWidth, windowHeight - 2.0f * borderWidth));
-    if (windowAabb.contains(mousePosition) && !event->modifiers().testFlag(Qt::ControlModifier)
+    //AABB2 windowAabb(
+    //        QVector2D(borderWidth, borderWidth),
+    //        QVector2D(windowWidth - 2.0f * borderWidth, windowHeight - 2.0f * borderWidth));
+    AABB2 scissorAabb(
+            QVector2D(borderWidth, offsetHorizonBarsY + scrollTranslationY),
+            QVector2D(windowWidth - borderWidth, windowHeight - borderWidth + scrollTranslationY));
+    if (scissorAabb.contains(mousePosition) && !event->modifiers().testFlag(Qt::ControlModifier)
             && !event->modifiers().testFlag(Qt::ShiftModifier) && event->button() == Qt::MouseButton::LeftButton) {
         size_t heightIdx = 0;
         for (size_t varIdx : sortedVariableIndices) {
@@ -925,7 +961,7 @@ void MHorizonGraph::mousePressEvent(MSceneViewGLWidget *sceneView, QMouseEvent *
 
     if (!mouseOverWidget)
     {
-        MDiagramBase::mousePressEvent(sceneView, event);
+        MDiagramBase::mousePressEventMoveWindow(sceneView, event);
     }
 }
 
