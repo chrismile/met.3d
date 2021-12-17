@@ -77,6 +77,7 @@ protected:
     virtual bool hasData() override {
         return useTimeDependentData ? !variableValuesTimeDependent.empty() : !variableValues.empty();
     }
+    void onWindowSizeChanged() override;
     void renderBase() override;
 
 private:
@@ -103,8 +104,8 @@ private:
     bool equalArea = true;
     bool timeStepColorMode = true;
 
-    float chartRadius;
-    float chartHoleRadius;
+    float chartRadius = 0.0f;
+    float chartHoleRadius = 0.0f;
 
     // Color legend.
     const float colorLegendWidth = 16;

@@ -63,6 +63,7 @@ public:
 
 protected:
     virtual bool hasData() override { return !variableValuesPerTrajectory.empty(); }
+    void onWindowSizeChanged() override;
     void renderBase() override;
 
 private:

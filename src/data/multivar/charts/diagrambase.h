@@ -138,6 +138,8 @@ protected:
 
     inline float getWindowOffsetX() const { return windowOffsetX; }
     inline float getWindowOffsetY() const { return windowOffsetY; }
+    inline void setWindowOffsetX(float offset) { windowOffsetX = offset; }
+    inline void setWindowOffsetY(float offset) { windowOffsetY = offset; }
     inline float getScaleFactor() const { return scaleFactor; }
     inline ResizeDirection getResizeDirection() const { return resizeDirection; }
 
@@ -178,7 +180,7 @@ private:
     // Resizing the window.
     bool isResizingWindow = false;
     ResizeDirection resizeDirection = ResizeDirection::NONE;
-    const float resizeMarginBase = 8;
+    const float resizeMarginBase = 4;
     float resizeMargin = resizeMarginBase; // including scale factor
     int lastResizeMouseX = 0;
     int lastResizeMouseY = 0;

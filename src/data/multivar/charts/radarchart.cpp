@@ -73,6 +73,24 @@ void MRadarChart::initialize() {
     MDiagramBase::initialize();
 }
 
+void MRadarChart::onWindowSizeChanged() {
+    const float minChartRadius = 100.0f;
+    float oldWidth = windowWidth;
+    float oldHeight = windowHeight;
+    windowWidth = std::max(windowWidth, (minChartRadius + borderSizeX) * 2.0f);
+    windowHeight = std::max(windowHeight, (minChartRadius + borderSizeY) * 2.0f);
+    if ((getResizeDirection() & ResizeDirection::LEFT) != 0) {
+        setWindowOffsetX(getWindowOffsetX() + (oldWidth - windowWidth) * getScaleFactor());
+    }
+    if ((getResizeDirection() & ResizeDirection::BOTTOM) != 0) {
+        setWindowOffsetY(getWindowOffsetY() + (oldHeight - windowHeight) * getScaleFactor());
+    }
+    chartRadius = std::min(windowWidth * 0.5f - borderSizeX, windowHeight * 0.5f - borderSizeY);
+    chartRadius = std::max(chartRadius, 100.0f);
+    chartHoleRadius = chartRadius / 4.0f;
+    MDiagramBase::onWindowSizeChanged();
+}
+
 void MRadarChart::setData(
         const std::vector<std::string>& variableNames,
         const std::vector<std::vector<float>>& variableValuesPerTrajectory) {
@@ -164,7 +182,7 @@ void MRadarChart::drawPieSliceTextHorizontal(const NVGcolor& textColor, const QV
 
     const char* text = variableNames.at(varIdx).c_str();
     QVector2D bounds[2];
-    nvgFontSize(vg, variableNames.size() > 50 ? 7.0f : 12.0f);
+    nvgFontSize(vg, variableNames.size() > 50 ? 7.0f : 10.0f);
     nvgFontFace(vg, "sans");
     nvgTextBounds(vg, 0, 0, text, nullptr, &bounds[0][0]);
     QVector2D textSize = bounds[1] - bounds[0];
@@ -192,7 +210,7 @@ void MRadarChart::drawPieSliceTextRotated(const NVGcolor& textColor, const QVect
     QVector2D circlePoint(center.x() + std::cos(angleCenter) * radius, center.y() + std::sin(angleCenter) * radius);
 
     const char* text = variableNames.at(varIdx).c_str();
-    nvgFontSize(vg, variableNames.size() > 50 ? 8.0f : 12.0f);
+    nvgFontSize(vg, variableNames.size() > 50 ? 8.0f : 10.0f);
     nvgFontFace(vg, "sans");
 
     QVector2D textPosition(circlePoint.x(), circlePoint.y());
@@ -312,7 +330,7 @@ void MRadarChart::mouseReleaseEvent(MSceneViewGLWidget *sceneView, QMouseEvent *
     if (windowAabb.contains(mousePosition) && event->button() == Qt::MouseButton::LeftButton) {
         QVector2D center(windowWidth / 2.0f, windowHeight / 2.0f);
 
-        nvgFontSize(vg, variableNames.size() > 50 ? 8.0f : 12.0f);
+        nvgFontSize(vg, variableNames.size() > 50 ? 8.0f : 10.0f);
         nvgFontFace(vg, "sans");
         if (textMode == TextMode::HORIZONTAL) {
             nvgTextAlign(vg,NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
@@ -334,7 +352,7 @@ void MRadarChart::mouseReleaseEvent(MSceneViewGLWidget *sceneView, QMouseEvent *
 
                 const char* text = variableNames.at(varIdx).c_str();
                 QVector2D boundsLocal[2];
-                nvgFontSize(vg, variableNames.size() > 50 ? 7.0f : 12.0f);
+                nvgFontSize(vg, variableNames.size() > 50 ? 7.0f : 10.0f);
                 nvgFontFace(vg, "sans");
                 nvgTextBounds(vg, 0, 0, text, nullptr, &boundsLocal[0][0]);
                 QVector2D textSize = boundsLocal[1] - boundsLocal[0];

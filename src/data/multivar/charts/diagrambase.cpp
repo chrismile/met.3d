@@ -501,11 +501,14 @@ void MDiagramBase::mousePressEventResizeWindow(MSceneViewGLWidget *sceneView, QM
         resizeDirection = ResizeDirection::NONE;
         if (isInLeft) {
             resizeDirection = ResizeDirection(resizeDirection | ResizeDirection::LEFT);
-        } else if (isInRight) {
+        }
+        if (isInRight) {
             resizeDirection = ResizeDirection(resizeDirection | ResizeDirection::RIGHT);
-        } else if (isInBottom) {
+        }
+        if (isInBottom) {
             resizeDirection = ResizeDirection(resizeDirection | ResizeDirection::BOTTOM);
-        } else if (isInTop) {
+        }
+        if (isInTop) {
             resizeDirection = ResizeDirection(resizeDirection | ResizeDirection::TOP);
         }
 

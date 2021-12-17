@@ -76,14 +76,22 @@ void MHorizonGraph::recomputeFullWindowHeight() {
 
 void MHorizonGraph::onWindowSizeChanged() {
     const float minBarWidth = 200;
+    float oldWidth = windowWidth;
+    float oldHeight = windowHeight;
     windowWidth = std::max(
             windowWidth,
             borderSizeX * 3.0f + legendLeftWidth + horizonBarMargin + minBarWidth + colorLegendWidth + textWidthMax);
     windowHeight = std::max(
-            windowHeight, colorLegendHeight + borderSizeY * 2.0f);
+            windowHeight, colorLegendHeight + borderSizeY * 3.0f);
     windowHeight = std::max(
             windowHeight, borderSizeY * 2.0f + legendTopHeight + horizonBarMargin + horizonBarHeight * 1);
     windowHeight = std::min(windowHeight, fullWindowHeight);
+    if ((getResizeDirection() & ResizeDirection::LEFT) != 0) {
+        setWindowOffsetX(getWindowOffsetX() + (oldWidth - windowWidth) * getScaleFactor());
+    }
+    if ((getResizeDirection() & ResizeDirection::BOTTOM) != 0) {
+        setWindowOffsetY(getWindowOffsetY() + (oldHeight - windowHeight) * getScaleFactor());
+    }
     MDiagramBase::onWindowSizeChanged();
     if (windowHeight < fullWindowHeight) {
         if (!useScrollBar) {
@@ -967,7 +975,12 @@ void MHorizonGraph::mousePressEvent(MSceneViewGLWidget *sceneView, QMouseEvent *
 
 void MHorizonGraph::mouseReleaseEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event)
 {
+    ResizeDirection oldResizeDirection = getResizeDirection();
     MDiagramBase::mouseReleaseEvent(sceneView, event);
+    if (oldResizeDirection != ResizeDirection::NONE)
+    {
+        return;
+    }
 
     int viewportHeight = sceneView->getViewPortHeight();
     QVector2D mousePosition(float(event->x()), float(viewportHeight - event->y() - 1));
