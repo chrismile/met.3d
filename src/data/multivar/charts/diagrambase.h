@@ -65,6 +65,7 @@ public:
 
     /// Returns whether the mouse is over the area of the diagram.
     bool isMouseOverDiagram(QVector2D mousePosition) const;
+    inline Qt::CursorShape getCursorShape() const { return cursorShape; }
     virtual bool hasData()=0;
 
     inline QVector<uint32_t> getSelectedVariables() const {
@@ -88,6 +89,7 @@ public:
     inline void resetSelectedVariablesChanged() { selectedVariablesChanged = false; }
 
     virtual void mouseMoveEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event);
+    virtual void mouseMoveEventParent(MSceneViewGLWidget *sceneView, QMouseEvent *event);
     virtual void mousePressEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event);
     virtual void mouseReleaseEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event);
     virtual void wheelEvent(MSceneViewGLWidget *sceneView, QWheelEvent *event);
@@ -184,6 +186,7 @@ private:
     float resizeMargin = resizeMarginBase; // including scale factor
     int lastResizeMouseX = 0;
     int lastResizeMouseY = 0;
+    Qt::CursorShape cursorShape = Qt::ArrowCursor;
 
     // For drawing to the main window.
     std::shared_ptr<GL::MShaderEffect> blitShader;

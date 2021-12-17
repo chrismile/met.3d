@@ -779,6 +779,12 @@ void MHorizonGraph::drawTicks(const NVGcolor& textColor) {
 }
 
 void MHorizonGraph::drawScrollBar(const NVGcolor& textColor) {
+    NVGcolor scrollBarColor = nvgRGBA(120, 120, 120, 120);
+    nvgBeginPath(vg);
+    nvgRect(vg, windowWidth - scrollBarWidth, borderWidth, 1.0f, windowHeight - 2.0f * borderWidth);
+    nvgFillColor(vg, scrollBarColor);
+    nvgFill(vg);
+
     NVGcolor scrollThumbColor;
     if (scrollThumbHover) {
         scrollThumbColor = nvgRGBA(90, 90, 90, 120);
@@ -792,10 +798,17 @@ void MHorizonGraph::drawScrollBar(const NVGcolor& textColor) {
     nvgFillColor(vg, scrollThumbColor);
     nvgFill(vg);
 
-    NVGcolor scrollBarColor = nvgRGBA(120, 120, 120, 120);
+    NVGcolor scrollBarGripColor = nvgRGBA(60, 60, 60, 120);
+    float scrollBarMiddle = scrollThumbPosition + scrollThumbHeight / 2.0f;
+    float scrollBarLeft = windowWidth - scrollBarWidth;
+    float scrollBarWidthReal = scrollBarWidth - borderWidth;
+    float gripLeft = scrollBarLeft + 0.2f * scrollBarWidthReal;
+    float gripWidth = scrollBarWidthReal * 0.6f;
     nvgBeginPath(vg);
-    nvgRect(vg, windowWidth - scrollBarWidth, borderWidth, 1.0f, windowHeight - 2.0f * borderWidth);
-    nvgFillColor(vg, scrollBarColor);
+    nvgRect(vg, gripLeft, scrollBarMiddle - 3.0f, gripWidth, 1.0f);
+    nvgRect(vg, gripLeft, scrollBarMiddle + 0.0f, gripWidth, 1.0f);
+    nvgRect(vg, gripLeft, scrollBarMiddle + 3.0f, gripWidth, 1.0f);
+    nvgFillColor(vg, scrollBarGripColor);
     nvgFill(vg);
 }
 

@@ -119,6 +119,7 @@ public:
     bool checkVirtualWindowBelowMouse(MSceneViewGLWidget* sceneView, int mousePositionX, int mousePositionY);
 
     void mouseMoveEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event);
+    void mouseMoveEventParent(MSceneViewGLWidget *sceneView, QMouseEvent *event);
     void mousePressEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event);
     void mouseReleaseEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event);
     void wheelEvent(MSceneViewGLWidget *sceneView, QWheelEvent *event);

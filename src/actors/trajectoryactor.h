@@ -259,6 +259,7 @@ public slots:
             MSceneViewGLWidget *sceneView, int mousePositionX, int mousePositionY) override;
 
     void mouseMoveEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event) override;
+    void mouseMoveEventParent(MSceneViewGLWidget *sceneView, QMouseEvent *event) override;
     void mousePressEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event) override;
     void mouseReleaseEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event) override;
     void wheelEvent(MSceneViewGLWidget *sceneView, QWheelEvent *event) override;

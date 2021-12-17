@@ -2136,6 +2136,10 @@ void MSceneViewGLWidget::mouseMoveEvent(QMouseEvent *event)
         {
             actor->mouseMoveEvent(this, event);
         }
+        else
+        {
+            actor->mouseMoveEventParent(this, event);
+        }
         isVirtualWindowBelowMouse = isVirtualWindowBelowMouse || widgetHasVirtualWindow;
     }
 

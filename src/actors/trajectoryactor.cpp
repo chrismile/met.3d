@@ -2038,6 +2038,15 @@ void MTrajectoryActor::mouseMoveEvent(MSceneViewGLWidget *sceneView, QMouseEvent
     return trajectoryPickerMap[sceneView]->mouseMoveEvent(sceneView, event);
 }
 
+void MTrajectoryActor::mouseMoveEventParent(MSceneViewGLWidget *sceneView, QMouseEvent *event)
+{
+    if (!useBezierTrajectories || trajectoryPickerMap.find(sceneView) == trajectoryPickerMap.end())
+    {
+        return;
+    }
+    return trajectoryPickerMap[sceneView]->mouseMoveEventParent(sceneView, event);
+}
+
 void MTrajectoryActor::mousePressEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event)
 {
     if (!useBezierTrajectories || trajectoryPickerMap.find(sceneView) == trajectoryPickerMap.end())

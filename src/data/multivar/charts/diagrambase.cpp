@@ -460,6 +460,102 @@ void MDiagramBase::mouseMoveEvent(MSceneViewGLWidget *sceneView, QMouseEvent *ev
         lastResizeMouseX = event->x();
         lastResizeMouseY = event->y();
         onWindowSizeChanged();
+    } else {
+        int viewportHeight = sceneView->getViewPortHeight();
+        QVector2D mousePosition(float(event->x()), float(viewportHeight - event->y() - 1));
+
+        AABB2 leftAabb;
+        leftAabb.min = QVector2D(windowOffsetX, windowOffsetY);
+        leftAabb.max = QVector2D(windowOffsetX + resizeMargin, windowOffsetY + float(fboHeightDisplay));
+        AABB2 rightAabb;
+        rightAabb.min = QVector2D(windowOffsetX + float(fboWidthDisplay) - resizeMargin, windowOffsetY);
+        rightAabb.max = QVector2D(windowOffsetX + float(fboWidthDisplay), windowOffsetY + float(fboHeightDisplay));
+        AABB2 bottomAabb;
+        bottomAabb.min = QVector2D(windowOffsetX, windowOffsetY);
+        bottomAabb.max = QVector2D(windowOffsetX + float(fboWidthDisplay), windowOffsetY + resizeMargin);
+        AABB2 topAabb;
+        topAabb.min = QVector2D(windowOffsetX, windowOffsetY + float(fboHeightDisplay) - resizeMargin);
+        topAabb.max = QVector2D(windowOffsetX + float(fboWidthDisplay), windowOffsetY + float(fboHeightDisplay));
+
+        ResizeDirection resizeDirectionCurr = ResizeDirection::NONE;
+        if (leftAabb.contains(mousePosition)) {
+            resizeDirectionCurr = ResizeDirection(resizeDirectionCurr | ResizeDirection::LEFT);
+        }
+        if (rightAabb.contains(mousePosition)) {
+            resizeDirectionCurr = ResizeDirection(resizeDirectionCurr | ResizeDirection::RIGHT);
+        }
+        if (bottomAabb.contains(mousePosition)) {
+            resizeDirectionCurr = ResizeDirection(resizeDirectionCurr | ResizeDirection::BOTTOM);
+        }
+        if (topAabb.contains(mousePosition)) {
+            resizeDirectionCurr = ResizeDirection(resizeDirectionCurr | ResizeDirection::TOP);
+        }
+
+        Qt::CursorShape newCursorShape = Qt::ArrowCursor;
+        if (resizeDirectionCurr == ResizeDirection::LEFT
+                || resizeDirectionCurr == ResizeDirection::RIGHT) {
+            newCursorShape = Qt::SizeHorCursor;
+        } else if (resizeDirectionCurr == ResizeDirection::BOTTOM
+                || resizeDirectionCurr == ResizeDirection::TOP) {
+            newCursorShape = Qt::SizeVerCursor;
+        } else if (resizeDirectionCurr == ResizeDirection::BOTTOM_LEFT
+                || resizeDirectionCurr == ResizeDirection::TOP_RIGHT) {
+            newCursorShape = Qt::SizeBDiagCursor;
+        } else if (resizeDirectionCurr == ResizeDirection::TOP_LEFT
+                || resizeDirectionCurr == ResizeDirection::BOTTOM_RIGHT) {
+            newCursorShape = Qt::SizeFDiagCursor;
+        } else {
+            newCursorShape = Qt::ArrowCursor;
+        }
+
+        if (newCursorShape != cursorShape) {
+            cursorShape = newCursorShape;
+            if (cursorShape == Qt::ArrowCursor) {
+                sceneView->unsetCursor();
+            } else {
+                sceneView->setCursor(cursorShape);
+            }
+        }
+    }
+
+    if (isDraggingWindow) {
+        windowOffsetX = windowOffsetXBase + float(event->x() - mouseDragStartPosX);
+        windowOffsetY = windowOffsetYBase - float(event->y() - mouseDragStartPosY);
+    }
+}
+
+void MDiagramBase::mouseMoveEventParent(MSceneViewGLWidget *sceneView, QMouseEvent *event)
+{
+    if (event->buttons() == Qt::NoButton) {
+        resizeDirection = ResizeDirection::NONE;
+        isDraggingWindow = false;
+    }
+
+    if (resizeDirection != ResizeDirection::NONE) {
+        float diffX = float(event->x() - lastResizeMouseX);
+        float diffY = -float(event->y() - lastResizeMouseY);
+        if ((resizeDirection & ResizeDirection::LEFT) != 0) {
+            windowOffsetX += diffX;
+            windowWidth -= diffX / scaleFactor;
+        }
+        if ((resizeDirection & ResizeDirection::RIGHT) != 0) {
+            windowWidth += diffX / scaleFactor;
+        }
+        if ((resizeDirection & ResizeDirection::BOTTOM) != 0) {
+            windowOffsetY += diffY;
+            windowHeight -= diffY / scaleFactor;
+        }
+        if ((resizeDirection & ResizeDirection::TOP) != 0) {
+            windowHeight += diffY / scaleFactor;
+        }
+        lastResizeMouseX = event->x();
+        lastResizeMouseY = event->y();
+        onWindowSizeChanged();
+    } else {
+        if (cursorShape != Qt::ArrowCursor) {
+            cursorShape = Qt::ArrowCursor;
+            sceneView->unsetCursor();
+        }
     }
 
     if (isDraggingWindow) {
@@ -494,21 +590,17 @@ void MDiagramBase::mousePressEventResizeWindow(MSceneViewGLWidget *sceneView, QM
         topAabb.min = QVector2D(windowOffsetX, windowOffsetY + float(fboHeightDisplay) - resizeMargin);
         topAabb.max = QVector2D(windowOffsetX + float(fboWidthDisplay), windowOffsetY + float(fboHeightDisplay));
 
-        bool isInLeft = leftAabb.contains(mousePosition);
-        bool isInRight = rightAabb.contains(mousePosition);
-        bool isInBottom = bottomAabb.contains(mousePosition);
-        bool isInTop = topAabb.contains(mousePosition);
         resizeDirection = ResizeDirection::NONE;
-        if (isInLeft) {
+        if (leftAabb.contains(mousePosition)) {
             resizeDirection = ResizeDirection(resizeDirection | ResizeDirection::LEFT);
         }
-        if (isInRight) {
+        if (rightAabb.contains(mousePosition)) {
             resizeDirection = ResizeDirection(resizeDirection | ResizeDirection::RIGHT);
         }
-        if (isInBottom) {
+        if (bottomAabb.contains(mousePosition)) {
             resizeDirection = ResizeDirection(resizeDirection | ResizeDirection::BOTTOM);
         }
-        if (isInTop) {
+        if (topAabb.contains(mousePosition)) {
             resizeDirection = ResizeDirection(resizeDirection | ResizeDirection::TOP);
         }
 

@@ -283,6 +283,17 @@ public:
         Q_UNUSED(event);
     }
 
+    /*
+     * This function is called when the mouse is moved in the parent widget.
+     *
+     * Called by a @ref MSceneViewGLWidget.
+     */
+    virtual void mouseMoveEventParent(MSceneViewGLWidget *sceneView, QMouseEvent *event)
+    {
+        Q_UNUSED(sceneView);
+        Q_UNUSED(event);
+    }
+
     virtual void mousePressEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event)
     {
         Q_UNUSED(sceneView);

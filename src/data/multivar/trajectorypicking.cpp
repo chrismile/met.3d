@@ -488,6 +488,15 @@ void MTrajectoryPicker::mouseMoveEvent(MSceneViewGLWidget *sceneView, QMouseEven
     diagram->mouseMoveEvent(sceneView, event);
 }
 
+void MTrajectoryPicker::mouseMoveEventParent(MSceneViewGLWidget *sceneView, QMouseEvent *event)
+{
+    if (!diagram)
+    {
+        return;
+    }
+    diagram->mouseMoveEventParent(sceneView, event);
+}
+
 void MTrajectoryPicker::mousePressEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event)
 {
     if (!diagram)
