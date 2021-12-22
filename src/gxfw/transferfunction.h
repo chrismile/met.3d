@@ -117,6 +117,21 @@ public:
 signals:
 
 public slots:
+    /**
+      Checks whether a virtual (i.e., drawn using OpenGL) window is below
+      the mouse cursor at @p mousePositionX, @p mousePositionY.
+
+      Called by a @ref MSceneViewGLWidget.
+    */
+    bool checkVirtualWindowBelowMouse(
+            MSceneViewGLWidget *sceneView, int mousePositionX, int mousePositionY) override;
+
+    void mouseMoveEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event) override;
+    void mouseMoveEventParent(MSceneViewGLWidget *sceneView, QMouseEvent *event) override;
+    void mousePressEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event) override;
+    void mouseReleaseEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event) override;
+    void wheelEvent(MSceneViewGLWidget *sceneView, QWheelEvent *event) override;
+
 
 protected:
     void initializeActorResources();
@@ -124,6 +139,9 @@ protected:
     virtual void generateTransferTexture() {}
 
     virtual void generateBarGeometry() {}
+
+    virtual QRectF getScreenSpaceRect(MSceneViewGLWidget *sceneView);
+    virtual void setScreenSpaceRect(MSceneViewGLWidget *sceneView, const QRectF &screenSpaceRect);
 
     GL::MTexture *tfTexture;
     GLint textureUnit;
@@ -153,7 +171,29 @@ protected:
     QtProperty *valueStepProperty;
     float       minimumValue;
     float       maximumValue;
-    
+
+    // Dragging the window.
+    bool isDraggingWindow = false;
+    int mouseDragStartPosX = 0;
+    int mouseDragStartPosY = 0;
+    qreal windowOffsetXBase = 0.0f;
+    qreal windowOffsetYBase = 0.0f;
+
+    // Resizing the window.
+    bool isResizingWindow = false;
+    enum ResizeDirection {
+        NONE = 0, LEFT = 1, RIGHT = 2, BOTTOM = 4, TOP = 8,
+        BOTTOM_LEFT = BOTTOM | LEFT, BOTTOM_RIGHT = BOTTOM | RIGHT, TOP_LEFT = TOP | LEFT, TOP_RIGHT = TOP | RIGHT
+    };
+    ResizeDirection resizeDirection = ResizeDirection::NONE;
+    float scaleFactor = 1.0f;
+    const float boxMarginBase = 1;
+    const float resizeMarginBase = 4;
+    float boxMargin = boxMarginBase; // including scale factor
+    float resizeMargin = resizeMarginBase; // including scale factor
+    int lastResizeMouseX = 0;
+    int lastResizeMouseY = 0;
+    Qt::CursorShape cursorShape = Qt::ArrowCursor;
 };
 
 } // namespace Met3D

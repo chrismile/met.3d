@@ -31,6 +31,7 @@
 
 // related third party imports
 #include <log4cplus/loggingmacros.h>
+#include <QMouseEvent>
 
 // local application imports
 #include "gxfw/mglresourcesmanager.h"
@@ -38,6 +39,7 @@
 #include "util/mutil.h"
 #include "actors/transferfunction1d.h"
 #include "actors/spatial1dtransferfunction.h"
+#include "data/multivar/hidpi.h"
 #include "mainwindow.h"
 
 using namespace std;
@@ -55,7 +57,11 @@ MTransferFunction::MTransferFunction(QObject *parent) :
     vertexBuffer(nullptr),
     minimumValue(0.f),
     maximumValue(100.f)
-{    
+{
+    scaleFactor = getHighDPIScaleFactor();
+    boxMargin = boxMarginBase * scaleFactor;
+    resizeMargin = resizeMarginBase * scaleFactor;
+
     // Create and initialise QtProperties for the GUI.
     // ===============================================
     beginInitialiseQtProperties();
@@ -343,6 +349,256 @@ bool MTransferFunction::loadMissingTransferFunction(
 }
 
 
+bool MTransferFunction::checkVirtualWindowBelowMouse(
+        MSceneViewGLWidget *sceneView, int mousePositionX, int mousePositionY) {
+    mousePositionY = sceneView->getViewPortHeight() - mousePositionY - 1;
+    QRectF screenSpaceRect = getScreenSpaceRect(sceneView);
+    return screenSpaceRect.contains(mousePositionX, mousePositionY);
+}
+
+
+void MTransferFunction::mouseMoveEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event) {
+    if (event->buttons() == Qt::NoButton) {
+        resizeDirection = ResizeDirection::NONE;
+        isDraggingWindow = false;
+    }
+
+    if (resizeDirection != ResizeDirection::NONE) {
+        QRectF screenSpaceRect = getScreenSpaceRect(sceneView);
+        double diffX = double(event->x() - lastResizeMouseX);
+        double diffY = -double(event->y() - lastResizeMouseY);
+        if ((resizeDirection & ResizeDirection::LEFT) != 0) {
+            if (screenSpaceRect.left() + diffX + (boxMargin + resizeMargin) * 2 > screenSpaceRect.right()) {
+                diffX = screenSpaceRect.right() - screenSpaceRect.left() - (boxMargin + resizeMargin) * 2;
+            }
+            screenSpaceRect.setLeft(screenSpaceRect.left() + diffX);
+        }
+        if ((resizeDirection & ResizeDirection::RIGHT) != 0) {
+            if (screenSpaceRect.right() + diffX - (boxMargin + resizeMargin) * 2 < screenSpaceRect.left()) {
+                diffX = screenSpaceRect.left() - screenSpaceRect.right() + (boxMargin + resizeMargin) * 2;
+            }
+            screenSpaceRect.setRight(screenSpaceRect.right() + diffX);
+        }
+        if ((resizeDirection & ResizeDirection::BOTTOM) != 0) {
+            if (screenSpaceRect.top() + diffY + (boxMargin + resizeMargin) * 2 > screenSpaceRect.bottom()) {
+                diffY = screenSpaceRect.bottom() - screenSpaceRect.top() - (boxMargin + resizeMargin) * 2;
+            }
+            screenSpaceRect.setTop(screenSpaceRect.top() + diffY);
+        }
+        if ((resizeDirection & ResizeDirection::TOP) != 0) {
+            if (screenSpaceRect.bottom() + diffY - (boxMargin + resizeMargin) * 2 < screenSpaceRect.top()) {
+                diffY = screenSpaceRect.top() - screenSpaceRect.bottom() + (boxMargin + resizeMargin) * 2;
+            }
+            screenSpaceRect.setBottom(screenSpaceRect.bottom() + diffY);
+        }
+        lastResizeMouseX = event->x();
+        lastResizeMouseY = event->y();
+        setScreenSpaceRect(sceneView, screenSpaceRect);
+    } else {
+        QRectF screenSpaceRect = getScreenSpaceRect(sceneView);
+        int viewportHeight = sceneView->getViewPortHeight();
+        QVector2D mousePosition(float(event->x()), float(viewportHeight - event->y() - 1));
+
+        QRectF leftAabb;
+        leftAabb.setRect(
+                screenSpaceRect.left(), screenSpaceRect.top(),
+                resizeMargin, screenSpaceRect.height());
+        QRectF rightAabb;
+        rightAabb.setRect(
+                screenSpaceRect.right() - resizeMargin, screenSpaceRect.top(),
+                resizeMargin, screenSpaceRect.height());
+        QRectF bottomAabb;
+        bottomAabb.setRect(
+                screenSpaceRect.left(), screenSpaceRect.top(),
+                screenSpaceRect.width(), resizeMargin);
+        QRectF topAabb;
+        topAabb.setRect(
+                screenSpaceRect.left(), screenSpaceRect.bottom() - resizeMargin,
+                screenSpaceRect.width(), resizeMargin);
+
+        ResizeDirection resizeDirectionCurr = ResizeDirection::NONE;
+        if (leftAabb.contains(mousePosition.x(), mousePosition.y())) {
+            resizeDirectionCurr = ResizeDirection(resizeDirectionCurr | ResizeDirection::LEFT);
+        }
+        if (rightAabb.contains(mousePosition.x(), mousePosition.y())) {
+            resizeDirectionCurr = ResizeDirection(resizeDirectionCurr | ResizeDirection::RIGHT);
+        }
+        if (bottomAabb.contains(mousePosition.x(), mousePosition.y())) {
+            resizeDirectionCurr = ResizeDirection(resizeDirectionCurr | ResizeDirection::BOTTOM);
+        }
+        if (topAabb.contains(mousePosition.x(), mousePosition.y())) {
+            resizeDirectionCurr = ResizeDirection(resizeDirectionCurr | ResizeDirection::TOP);
+        }
+
+        Qt::CursorShape newCursorShape = Qt::ArrowCursor;
+        if (resizeDirectionCurr == ResizeDirection::LEFT
+            || resizeDirectionCurr == ResizeDirection::RIGHT) {
+            newCursorShape = Qt::SizeHorCursor;
+        } else if (resizeDirectionCurr == ResizeDirection::BOTTOM
+                   || resizeDirectionCurr == ResizeDirection::TOP) {
+            newCursorShape = Qt::SizeVerCursor;
+        } else if (resizeDirectionCurr == ResizeDirection::BOTTOM_LEFT
+                   || resizeDirectionCurr == ResizeDirection::TOP_RIGHT) {
+            newCursorShape = Qt::SizeBDiagCursor;
+        } else if (resizeDirectionCurr == ResizeDirection::TOP_LEFT
+                   || resizeDirectionCurr == ResizeDirection::BOTTOM_RIGHT) {
+            newCursorShape = Qt::SizeFDiagCursor;
+        } else {
+            newCursorShape = Qt::ArrowCursor;
+        }
+
+        if (newCursorShape != cursorShape) {
+            cursorShape = newCursorShape;
+            if (cursorShape == Qt::ArrowCursor) {
+                sceneView->unsetCursor();
+            } else {
+                sceneView->setCursor(cursorShape);
+            }
+        }
+
+        if (resizeDirectionCurr != ResizeDirection::NONE) {
+            setScreenSpaceRect(sceneView, screenSpaceRect);
+        }
+    }
+
+    if (isDraggingWindow) {
+        QRectF screenSpaceRect = getScreenSpaceRect(sceneView);
+        screenSpaceRect.setRect(
+                windowOffsetXBase + qreal(event->x() - mouseDragStartPosX),
+                windowOffsetYBase - qreal(event->y() - mouseDragStartPosY),
+                screenSpaceRect.width(), screenSpaceRect.height());
+        setScreenSpaceRect(sceneView, screenSpaceRect);
+    }
+}
+
+
+void MTransferFunction::mouseMoveEventParent(MSceneViewGLWidget *sceneView, QMouseEvent *event) {
+    if (event->buttons() == Qt::NoButton) {
+        resizeDirection = ResizeDirection::NONE;
+        isDraggingWindow = false;
+    }
+
+    if (resizeDirection != ResizeDirection::NONE) {
+        QRectF screenSpaceRect = getScreenSpaceRect(sceneView);
+        double diffX = double(event->x() - lastResizeMouseX);
+        double diffY = -double(event->y() - lastResizeMouseY);
+        if ((resizeDirection & ResizeDirection::LEFT) != 0) {
+            if (screenSpaceRect.left() + diffX + (boxMargin + resizeMargin) * 2 > screenSpaceRect.right()) {
+                diffX = screenSpaceRect.right() - screenSpaceRect.left() - (boxMargin + resizeMargin) * 2;
+            }
+            screenSpaceRect.setLeft(screenSpaceRect.left() + diffX);
+        }
+        if ((resizeDirection & ResizeDirection::RIGHT) != 0) {
+            if (screenSpaceRect.right() + diffX - (boxMargin + resizeMargin) * 2 < screenSpaceRect.left()) {
+                diffX = screenSpaceRect.left() - screenSpaceRect.right() + (boxMargin + resizeMargin) * 2;
+            }
+            screenSpaceRect.setRight(screenSpaceRect.right() + diffX);
+        }
+        if ((resizeDirection & ResizeDirection::BOTTOM) != 0) {
+            if (screenSpaceRect.top() + diffY + (boxMargin + resizeMargin) * 2 > screenSpaceRect.bottom()) {
+                diffY = screenSpaceRect.bottom() - screenSpaceRect.top() - (boxMargin + resizeMargin) * 2;
+            }
+            screenSpaceRect.setTop(screenSpaceRect.top() + diffY);
+        }
+        if ((resizeDirection & ResizeDirection::TOP) != 0) {
+            if (screenSpaceRect.bottom() + diffY - (boxMargin + resizeMargin) * 2 < screenSpaceRect.top()) {
+                diffY = screenSpaceRect.top() - screenSpaceRect.bottom() + (boxMargin + resizeMargin) * 2;
+            }
+            screenSpaceRect.setBottom(screenSpaceRect.bottom() + diffY);
+        }
+        lastResizeMouseX = event->x();
+        lastResizeMouseY = event->y();
+        setScreenSpaceRect(sceneView, screenSpaceRect);
+    } else {
+        if (cursorShape != Qt::ArrowCursor) {
+            cursorShape = Qt::ArrowCursor;
+            sceneView->unsetCursor();
+        }
+    }
+
+    if (isDraggingWindow) {
+        QRectF screenSpaceRect = getScreenSpaceRect(sceneView);
+        screenSpaceRect.setRect(
+                screenSpaceRect.x() + qreal(event->x() - mouseDragStartPosX),
+                windowOffsetYBase - qreal(event->y() - mouseDragStartPosY),
+                screenSpaceRect.width(), screenSpaceRect.height());
+        setScreenSpaceRect(sceneView, screenSpaceRect);
+    }
+}
+
+
+void MTransferFunction::mousePressEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event) {
+    QRectF screenSpaceRect = getScreenSpaceRect(sceneView);
+
+    if (event->button() == Qt::MouseButton::LeftButton) {
+        // First, check if a resize event was started.
+        int viewportHeight = sceneView->getViewPortHeight();
+        QVector2D mousePosition(float(event->x()), float(viewportHeight - event->y() - 1));
+
+        QRectF leftAabb;
+        leftAabb.setRect(
+                screenSpaceRect.left(), screenSpaceRect.top(),
+                resizeMargin, screenSpaceRect.height());
+        QRectF rightAabb;
+        rightAabb.setRect(
+                screenSpaceRect.right() - resizeMargin, screenSpaceRect.top(),
+                resizeMargin, screenSpaceRect.height());
+        QRectF bottomAabb;
+        bottomAabb.setRect(
+                screenSpaceRect.left(), screenSpaceRect.top(),
+                screenSpaceRect.width(), resizeMargin);
+        QRectF topAabb;
+        topAabb.setRect(
+                screenSpaceRect.left(), screenSpaceRect.bottom() - resizeMargin,
+                screenSpaceRect.width(), resizeMargin);
+
+        resizeDirection = ResizeDirection::NONE;
+        if (leftAabb.contains(mousePosition.x(), mousePosition.y())) {
+            resizeDirection = ResizeDirection(resizeDirection | ResizeDirection::LEFT);
+        }
+        if (rightAabb.contains(mousePosition.x(), mousePosition.y())) {
+            resizeDirection = ResizeDirection(resizeDirection | ResizeDirection::RIGHT);
+        }
+        if (bottomAabb.contains(mousePosition.x(), mousePosition.y())) {
+            resizeDirection = ResizeDirection(resizeDirection | ResizeDirection::BOTTOM);
+        }
+        if (topAabb.contains(mousePosition.x(), mousePosition.y())) {
+            resizeDirection = ResizeDirection(resizeDirection | ResizeDirection::TOP);
+        }
+
+        if (resizeDirection != ResizeDirection::NONE) {
+            lastResizeMouseX = event->x();
+            lastResizeMouseY = event->y();
+        }
+
+        if (resizeDirection != ResizeDirection::NONE) {
+            setScreenSpaceRect(sceneView, screenSpaceRect);
+        }
+    }
+
+    if (resizeDirection == ResizeDirection::NONE && event->button() == Qt::MouseButton::LeftButton) {
+        isDraggingWindow = true;
+        windowOffsetXBase = screenSpaceRect.x();
+        windowOffsetYBase = screenSpaceRect.y();
+        mouseDragStartPosX = event->x();
+        mouseDragStartPosY = event->y();
+    }
+}
+
+
+void MTransferFunction::mouseReleaseEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event) {
+    if (event->button() == Qt::MouseButton::LeftButton) {
+        resizeDirection = ResizeDirection::NONE;
+        isDraggingWindow = false;
+    }
+}
+
+
+void MTransferFunction::wheelEvent(MSceneViewGLWidget *sceneView, QWheelEvent *event) {
+    ;
+}
+
+
 /******************************************************************************
 ***                          PROTECTED METHODS                              ***
 *******************************************************************************/
@@ -366,6 +622,39 @@ void MTransferFunction::initializeActorResources()
     if (loadShaders) reloadShaderEffects();
 
     generateBarGeometry();
+}
+
+
+QRectF MTransferFunction::getScreenSpaceRect(MSceneViewGLWidget *sceneView) {
+    QRectF clipSpaceRect = properties->mRectF()->value(positionProperty);
+    qreal x0 = clipSpaceRect.x();
+    qreal y0 = clipSpaceRect.y() - clipSpaceRect.height();
+    qreal x1 = clipSpaceRect.x() + clipSpaceRect.width();
+    qreal y1 = clipSpaceRect.y();
+    x0 = (x0 + qreal(1.0)) * qreal(0.5) * sceneView->getViewPortWidth() - boxMargin;
+    x1 = (x1 + qreal(1.0)) * qreal(0.5) * sceneView->getViewPortWidth() + boxMargin;
+    y0 = (y0 + qreal(1.0)) * qreal(0.5) * sceneView->getViewPortHeight() - boxMargin;
+    y1 = (y1 + qreal(1.0)) * qreal(0.5) * sceneView->getViewPortHeight() + boxMargin;
+    QRectF screenSpaceRect;
+    screenSpaceRect.setCoords(x0, y0, x1, y1);
+    return screenSpaceRect;
+}
+
+
+void MTransferFunction::setScreenSpaceRect(MSceneViewGLWidget *sceneView, const QRectF &screenSpaceRect) {
+    qreal x0 = screenSpaceRect.x();
+    qreal y0 = screenSpaceRect.y();
+    qreal x1 = screenSpaceRect.x() + screenSpaceRect.width();
+    qreal y1 = screenSpaceRect.y() + screenSpaceRect.height();
+    x0 = (x0 + boxMargin) * qreal(2.0) / sceneView->getViewPortWidth() - qreal(1.0);
+    x1 = (x1 - boxMargin) * qreal(2.0) / sceneView->getViewPortWidth() - qreal(1.0);
+    y0 = (y0 + boxMargin) * qreal(2.0) / sceneView->getViewPortHeight() - qreal(1.0);
+    y1 = (y1 - boxMargin) * qreal(2.0) / sceneView->getViewPortHeight() - qreal(1.0);
+    qreal width = x1 - x0;
+    qreal height = y1 - y0;
+    QRectF clipSpaceRect;
+    clipSpaceRect.setRect(x0, y1, width, height);
+    properties->mRectF()->setValue(positionProperty, clipSpaceRect);
 }
 
 } // namespace Met3D
