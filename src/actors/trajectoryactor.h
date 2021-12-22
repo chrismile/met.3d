@@ -94,10 +94,21 @@ public:
       */
     void setTransferFunction(MTransferFunction1D *tf);
     /**
-      Set a transfer function by its name. Set to 'none' if @oaram tfName does
+      Set a transfer function by its name. Set to 'none' if @param tfName does
       not exit.
       */
     bool setTransferFunction(QString tfName);
+
+    /**
+      Set a transfer function to map a diagram attribute (trajectory parameter
+      or statistical information like standard deviation) to colour.
+      */
+    void setDiagramTransferFunction(MTransferFunction1D *tf);
+    /**
+      Set a diagram transfer function by its name. Set to 'none' if
+      @param tfName does not exit.
+      */
+    bool setDiagramTransferFunction(QString tfName);
 
     /**
      Synchronize this actor (time, ensemble) with the synchronization control
@@ -320,6 +331,7 @@ private:
     int getEnsembleMember();
 
     void setTransferFunctionFromProperty();
+    void setDiagramTransferFunctionFromProperty();
 
     /**
       Request trajectory data, normals and filter for current time and member
@@ -479,6 +491,8 @@ private:
     };
     DiagramDisplayType diagramType = DiagramDisplayType::HORIZON_GRAPH;
     QtProperty *diagramTypeProperty;
+    QtProperty *diagramTransferFunctionProperty;
+    MTransferFunction1D *diagramTransferFunction = nullptr;
 
     void updateSimilarityMetricGroupEnabled();
     QtProperty *similarityMetricGroup;

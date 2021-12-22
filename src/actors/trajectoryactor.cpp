@@ -356,6 +356,13 @@ MTrajectoryActor::MTrajectoryActor()
     properties->mEnum()->setEnumNames(diagramTypeProperty, diagramTypeNames);
     properties->mEnum()->setValue(diagramTypeProperty, static_cast<int>(diagramType));
 
+    diagramTransferFunctionProperty = addProperty(
+            ENUM_PROPERTY, "chart transfer function", multiVarGroupProperty);
+    properties->mEnum()->setEnumNames(diagramTransferFunctionProperty, availableTFs);
+    diagramTransferFunctionProperty->setToolTip(
+            "This transfer function is used in the chart to map a trajectory attribute to a color.");
+
+
     similarityMetricGroup = addProperty(
             GROUP_PROPERTY, "similarity metric settings", multiVarGroupProperty);
 
@@ -512,6 +519,8 @@ void MTrajectoryActor::saveConfiguration(QSettings *settings)
                        properties->mBool()->value(useBezierTrajectoriesProperty));
     settings->setValue("diagramType",
                        properties->mEnum()->value(diagramTypeProperty));
+    settings->setValue("diagramTransferFunction",
+                       properties->getEnumItem(diagramTransferFunctionProperty));
 
     settings->setValue(QString("similarityMetric"), int(similarityMetric));
     settings->setValue(QString("meanMetricInfluence"), meanMetricInfluence);
@@ -854,8 +863,7 @@ void MTrajectoryActor::setTransferFunction(MTransferFunction1D *tf)
 
 bool MTrajectoryActor::setTransferFunction(QString tfName)
 {
-    QStringList tfNames = properties->mEnum()->enumNames(
-                transferFunctionProperty);
+    QStringList tfNames = properties->mEnum()->enumNames(transferFunctionProperty);
     int tfIndex = tfNames.indexOf(tfName);
 
     if (tfIndex >= 0)
@@ -866,6 +874,30 @@ bool MTrajectoryActor::setTransferFunction(QString tfName)
 
     // Set transfer function property to "None".
     properties->mEnum()->setValue(transferFunctionProperty, 0);
+
+    return false; // the given tf name could not be found
+}
+
+
+void MTrajectoryActor::setDiagramTransferFunction(MTransferFunction1D *tf)
+{
+    transferFunction = tf;
+}
+
+
+bool MTrajectoryActor::setDiagramTransferFunction(QString tfName)
+{
+    QStringList tfNames = properties->mEnum()->enumNames(diagramTransferFunctionProperty);
+    int tfIndex = tfNames.indexOf(tfName);
+
+    if (tfIndex >= 0)
+    {
+        properties->mEnum()->setValue(diagramTransferFunctionProperty, tfIndex);
+        return true;
+    }
+
+    // Set transfer function property to "None".
+    properties->mEnum()->setValue(diagramTransferFunctionProperty, 0);
 
     return false; // the given tf name could not be found
 }
@@ -1058,7 +1090,14 @@ bool MTrajectoryActor::synchronizationEvent(
         enableActorUpdates(true);
         if (newStartTimeSet || newParticleTimeSet)
         {
-            asynchronousDataRequest(true);
+            if (!precomputedDataSource)
+            {
+                asynchronousDataRequest(true);
+            }
+            else
+            {
+                return false;
+            }
         }
         return (newStartTimeSet || newParticleTimeSet);
     }
@@ -1753,7 +1792,8 @@ void MTrajectoryActor::prepareAvailableDataForRendering(uint slot)
                     if (trajectoryPickerMap.find(view) == trajectoryPickerMap.end()) {
                         GLuint textureUnit = assignTextureUnit();
                         trajectoryPickerMap[view] = new MTrajectoryPicker(
-                                textureUnit, view, multiVarData.getVarNames(), diagramType);
+                                textureUnit, view, multiVarData.getVarNames(), diagramType,
+                                diagramTransferFunction);
                         multiVarData.setDiagramType(diagramType);
                         trajectoryPickerMap[view]->setSelectedVariables(multiVarData.getSelectedVariables());
                         trajectoryPickerMap[view]->updateTrajectoryRadius(tubeRadius);
@@ -1818,11 +1858,17 @@ void MTrajectoryActor::onActorCreated(MActor *actor)
 
         int index = properties->mEnum()->value(transferFunctionProperty);
         QStringList availableTFs = properties->mEnum()->enumNames(
-                    transferFunctionProperty);
+                transferFunctionProperty);
         availableTFs << tf->transferFunctionName();
-        properties->mEnum()->setEnumNames(transferFunctionProperty,
-                                          availableTFs);
+        properties->mEnum()->setEnumNames(transferFunctionProperty, availableTFs);
         properties->mEnum()->setValue(transferFunctionProperty, index);
+
+        int indexDiagram = properties->mEnum()->value(diagramTransferFunctionProperty);
+        QStringList availableTFsDiagram = properties->mEnum()->enumNames(
+                diagramTransferFunctionProperty);
+        availableTFs << tf->transferFunctionName();
+        properties->mEnum()->setEnumNames(diagramTransferFunctionProperty, availableTFs);
+        properties->mEnum()->setValue(diagramTransferFunctionProperty, indexDiagram);
 
         enableEmissionOfActorChangedSignal(true);
     }
@@ -1843,8 +1889,7 @@ void MTrajectoryActor::onActorDeleted(MActor *actor)
         enableEmissionOfActorChangedSignal(false);
 
         QString tFName = properties->getEnumItem(transferFunctionProperty);
-        QStringList availableTFs = properties->mEnum()->enumNames(
-                    transferFunctionProperty);
+        QStringList availableTFs = properties->mEnum()->enumNames(transferFunctionProperty);
 
         availableTFs.removeOne(tf->getName());
 
@@ -1853,9 +1898,19 @@ void MTrajectoryActor::onActorDeleted(MActor *actor)
         // 'None'.
         int index = availableTFs.indexOf(tFName);
 
-        properties->mEnum()->setEnumNames(transferFunctionProperty,
-                                          availableTFs);
+        properties->mEnum()->setEnumNames(transferFunctionProperty, availableTFs);
         properties->mEnum()->setValue(transferFunctionProperty, index);
+
+
+        QString tFNameDiagram = properties->getEnumItem(diagramTransferFunctionProperty);
+        QStringList availableTFsDiagram = properties->mEnum()->enumNames(diagramTransferFunctionProperty);
+
+        availableTFsDiagram.removeOne(tf->getName());
+
+        int indexDiagram = availableTFsDiagram.indexOf(tFNameDiagram);
+
+        properties->mEnum()->setEnumNames(diagramTransferFunctionProperty, availableTFsDiagram);
+        properties->mEnum()->setValue(diagramTransferFunctionProperty, indexDiagram);
 
         enableEmissionOfActorChangedSignal(true);
     }
@@ -1895,16 +1950,23 @@ void MTrajectoryActor::onActorRenamed(MActor *actor, QString oldName)
         enableEmissionOfActorChangedSignal(false);
 
         int index = properties->mEnum()->value(transferFunctionProperty);
-        QStringList availableTFs = properties->mEnum()->enumNames(
-                    transferFunctionProperty);
+        QStringList availableTFs = properties->mEnum()->enumNames(transferFunctionProperty);
 
         // Replace affected entry.
         availableTFs[availableTFs.indexOf(oldName)] = tf->getName();
 
-        properties->mEnum()->setEnumNames(transferFunctionProperty,
-                                          availableTFs);
+        properties->mEnum()->setEnumNames(transferFunctionProperty, availableTFs);
         properties->mEnum()->setValue(transferFunctionProperty, index);
 
+
+        int indexDiagram = properties->mEnum()->value(diagramTransferFunctionProperty);
+        QStringList availableTFsDiagram = properties->mEnum()->enumNames(diagramTransferFunctionProperty);
+
+        // Replace affected entry.
+        availableTFsDiagram[availableTFsDiagram.indexOf(oldName)] = tf->getName();
+
+        properties->mEnum()->setEnumNames(diagramTransferFunctionProperty, availableTFsDiagram);
+        properties->mEnum()->setValue(diagramTransferFunctionProperty, indexDiagram);
 
         enableEmissionOfActorChangedSignal(true);
     }
@@ -2012,9 +2074,17 @@ void MTrajectoryActor::checkIntersectionWithSelectableData(
         }
         if (event->button() == Qt::RightButton)
         {
+            if (synchronizeParticlePosTime)
+            {
+                synchronizeParticlePosTime = false;
+                properties->mBool()->setValue(
+                        synchronizeParticlePosTimeProperty,
+                        synchronizeParticlePosTime);
+                updateTimeProperties();
+            }
+
             particlePosTimeStep = int(std::round(timeAtHit));
             trajectoryPickerMap[sceneView]->setParticlePosTimeStep(particlePosTimeStep);
-            multiVarData.setParticlePosTimeStep(particlePosTimeStep);
         }
     }
 }
@@ -2276,7 +2346,15 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
         {
             if (setParticleDateTime(synchronizationControl->validDateTime()))
             {
-                asynchronousDataRequest();
+                if (!precomputedDataSource)
+                {
+                    asynchronousDataRequest();
+                }
+            }
+
+            if (precomputedDataSource)
+            {
+                emitActorChangedSignal();
             }
         }
 
@@ -2409,6 +2487,13 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
         emitActorChangedSignal();
     }
 
+    else if (property == diagramTransferFunctionProperty)
+    {
+        setDiagramTransferFunctionFromProperty();
+        if (suppressActorUpdates()) return;
+        emitActorChangedSignal();
+    }
+
     else if (property == tubeRadiusProperty)
     {
         tubeRadius = properties->mDDouble()->value(tubeRadiusProperty);
@@ -2461,7 +2546,6 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
     else if (property == particlePosTimeProperty)
     {
         particlePosTimeStep = properties->mEnum()->value(particlePosTimeProperty);
-        multiVarData.setParticlePosTimeStep(particlePosTimeStep);
 
         if (suppressActorUpdates()) return;
         if (useBezierTrajectories) {
@@ -2894,9 +2978,17 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
 #ifdef USE_EMBREE
             if (trajectoryPickerMap[sceneView]->getSelectedTimeStepChanged())
             {
+                if (synchronizeParticlePosTime)
+                {
+                    synchronizeParticlePosTime = false;
+                    properties->mBool()->setValue(
+                            synchronizeParticlePosTimeProperty,
+                            synchronizeParticlePosTime);
+                    updateTimeProperties();
+                }
+
                 particlePosTimeStep = int(std::round(trajectoryPickerMap[sceneView]->getSelectedTimeStep()));
                 trajectoryPickerMap[sceneView]->setParticlePosTimeStep(particlePosTimeStep);
-                multiVarData.setParticlePosTimeStep(particlePosTimeStep);
                 trajectoryPickerMap[sceneView]->resetSelectedTimeStepChanged();
             }
             if (trajectoryPickerMap[sceneView]->getSelectedVariablesChanged())
@@ -3721,7 +3813,7 @@ void MTrajectoryActor::setTransferFunctionFromProperty()
 
     // Find the selected transfer function in the list of actors from the
     // resources manager. Not very efficient, but works well enough for the
-    // small number of actors at the moment..
+    // small number of actors at the moment.
     foreach (MActor *actor, glRM->getActors())
     {
         if (MTransferFunction1D *tf = dynamic_cast<MTransferFunction1D*>(actor))
@@ -3729,6 +3821,35 @@ void MTrajectoryActor::setTransferFunctionFromProperty()
             if (tf->transferFunctionName() == tfName)
             {
                 transferFunction = tf;
+                return;
+            }
+        }
+    }
+}
+
+
+void MTrajectoryActor::setDiagramTransferFunctionFromProperty()
+{
+    MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
+
+    QString tfName = properties->getEnumItem(diagramTransferFunctionProperty);
+
+    if (tfName == "None")
+    {
+        diagramTransferFunction = nullptr;
+        return;
+    }
+
+    // Find the selected transfer function in the list of actors from the
+    // resources manager. Not very efficient, but works well enough for the
+    // small number of actors at the moment.
+    foreach (MActor *actor, glRM->getActors())
+    {
+        if (MTransferFunction1D *tf = dynamic_cast<MTransferFunction1D*>(actor))
+        {
+            if (tf->transferFunctionName() == tfName)
+            {
+                diagramTransferFunction = tf;
                 return;
             }
         }
@@ -4202,7 +4323,7 @@ void MTrajectoryActor::updateStartTimeProperty()
 
         // Get a list of the available start times for the new init time,
         // convert the QDateTime objects to strings for the enum manager.
-        availableStartTimes = trajectorySource->availableValidTimes(initTime);
+        availableStartTimes = trajectorySource->availableStartTimes(initTime);
         QStringList startTimeStrings;
         for (int i = 0; i < availableStartTimes.size(); i++)
             startTimeStrings << availableStartTimes.at(i).toString(Qt::ISODate);

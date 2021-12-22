@@ -84,7 +84,7 @@ QList<QDateTime> MTrajectoryReader::availableInitTimes()
 }
 
 
-QList<QDateTime> MTrajectoryReader::availableValidTimes(
+QList<QDateTime> MTrajectoryReader::availableStartTimes(
         const QDateTime& initTime)
 {
     // cf.  MClimateForecastReader::availableVariables() .
@@ -95,6 +95,53 @@ QList<QDateTime> MTrajectoryReader::availableValidTimes(
                 initTime.toString(Qt::ISODate).toStdString(),
                 __FILE__, __LINE__);
     return availableTrajectories.value(initTime).keys();
+}
+
+
+QList<QDateTime> MTrajectoryReader::availableValidTimes(
+        const QDateTime& initTime)
+{
+    // cf.  MClimateForecastReader::availableVariables() .
+    QReadLocker availableItemsReadLocker(&availableItemsLock);
+    if (!availableTrajectories.keys().contains(initTime))
+        throw MBadDataFieldRequest(
+                "unkown init time requested: " +
+                initTime.toString(Qt::ISODate).toStdString(),
+                __FILE__, __LINE__);
+    //return availableTrajectories.value(initTime).keys();
+
+    const QList<QDateTime>& availableTrajectoriesStartTimes =
+            availableTrajectories.value(initTime).keys();
+
+    if (availableTrajectoriesStartTimes.empty() || availableTrajectoriesStartTimes.size() > 1)
+    {
+        return availableTrajectoriesStartTimes;
+    }
+    else
+    {
+        QDateTime validTime = availableTrajectoriesStartTimes.first();
+
+        QReadLocker availableItemsReadLocker(&availableItemsLock);
+        if (!availableTrajectories.keys().contains(initTime))
+            throw MBadDataFieldRequest(
+                    "unkown init time requested: " +
+                    initTime.toString(Qt::ISODate).toStdString(),
+                    __FILE__, __LINE__);
+        else if (!availableTrajectories.value(initTime).keys().contains(validTime))
+            throw MBadDataFieldRequest(
+                    "unkown start time requested: " +
+                    validTime.toString(Qt::ISODate).toStdString(),
+                    __FILE__, __LINE__);
+        QString filename = availableTrajectories.value(initTime).value(validTime).filename;
+        availableItemsReadLocker.unlock();
+
+        checkFileOpen(filename);
+        openFilesMutex.lock();
+        MTrajectoryFileInfo* finfo = openFiles.value(filename);
+        openFilesMutex.unlock();
+
+        return finfo->times.toList();
+    }
 }
 
 

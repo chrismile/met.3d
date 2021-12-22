@@ -63,6 +63,12 @@ public:
     virtual QList<QDateTime> availableInitTimes() = 0;
 
     /**
+      Start times correspond to the the trajectory start times available for
+      the specified initialisation time @p initTime.
+      */
+    virtual QList<QDateTime> availableStartTimes(const QDateTime& initTime) = 0;
+
+    /**
       Valid times correspond to the the trajectory start times available for
       the specified initialisation time @p initTime.
       */

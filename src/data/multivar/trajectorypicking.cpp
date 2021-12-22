@@ -44,7 +44,8 @@ namespace Met3D {
 
 MTrajectoryPicker::MTrajectoryPicker(
         GLuint textureUnit, MSceneViewGLWidget* sceneView, const QVector<QString>& varNames,
-        DiagramDisplayType diagramType) : textureUnit(textureUnit)
+        DiagramDisplayType diagramType, MTransferFunction1D*& diagramTransferFunction)
+        : textureUnit(textureUnit), diagramTransferFunction(diagramTransferFunction)
 {
     device = rtcNewDevice(nullptr);
     scene = rtcNewScene(device);
@@ -94,11 +95,11 @@ void MTrajectoryPicker::setDiagramType(DiagramDisplayType type)
     else if (diagramDisplayType == DiagramDisplayType::RADAR_BAR_CHART_TIME_DEPENDENT
             || diagramDisplayType == DiagramDisplayType::RADAR_BAR_CHART_TIME_INDEPENDENT)
     {
-        diagram = new MRadarBarChart(textureUnit);
+        diagram = new MRadarBarChart(textureUnit, diagramTransferFunction);
     }
     else if (diagramDisplayType == DiagramDisplayType::HORIZON_GRAPH)
     {
-        diagram = new MHorizonGraph(textureUnit);
+        diagram = new MHorizonGraph(textureUnit, diagramTransferFunction);
         auto* horizonGraph = static_cast<MHorizonGraph*>(diagram);
         horizonGraph->setSelectedTimeStep(timeStep);
         horizonGraph->setSimilarityMetric(similarityMetric);

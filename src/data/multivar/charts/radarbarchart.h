@@ -34,6 +34,7 @@
 #include <QVector2D>
 
 // local application imports
+#include "actors/transferfunction1d.h"
 #include "diagrambase.h"
 
 struct NVGcontext;
@@ -43,7 +44,7 @@ namespace Met3D {
 
 class MRadarBarChart : public MDiagramBase {
 public:
-    explicit MRadarBarChart(GLint textureUnit, bool equalArea = true);
+    explicit MRadarBarChart(GLint textureUnit, MTransferFunction1D*& diagramTransferFunction, bool equalArea = true);
     DiagramType getDiagramType() override { return DiagramType::RADAR_BAR_CHART; }
     void initialize() override;
 
@@ -81,7 +82,6 @@ protected:
     void renderBase() override;
 
 private:
-    QVector3D transferFunction(float value);
     void drawPieSlice(const QVector2D& center, int varIdx);
     void drawEqualAreaPieSlices(const QVector2D& center, int varIdx);
     void drawEqualAreaPieSlicesWithLabels(const QVector2D& center);
@@ -95,6 +95,9 @@ private:
      * @param varIdxFloat The variable index.
      */
     float mapVarIdxToAngle(float varIdxFloat);
+
+    QVector3D transferFunction(float value);
+    MTransferFunction1D*& diagramTransferFunction;
 
     enum class TextMode {
         HORIZONTAL, ROTATED

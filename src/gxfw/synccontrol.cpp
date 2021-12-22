@@ -1115,10 +1115,10 @@ void MSyncControl::restrictControlToDataSources(
     }
     selectedDataSourceActionList.clear();
 
-// TODO (bt, 23Feb2017): If updated to Qt 5.0 use QSets and unite instead of
-// lists and contains since for version 4.8 there is no qHash method for QDateTime
-// and thus it is not possible to use toSet on QList<QDateTime>.
-// (See: http://doc.qt.io/qt-5/qhash.html#qHashx)
+    // TODO (bt, 23Feb2017): If updated to Qt 5.0 use QSets and unite instead of
+    // lists and contains since for version 4.8 there is no qHash method for QDateTime
+    // and thus it is not possible to use toSet on QList<QDateTime>.
+    // (See: http://doc.qt.io/qt-5/qhash.html#qHashx)
     availableInitDateTimes.clear();
     availableValidDateTimes.clear();
     availableEnsembleMembers.clear();
@@ -1132,7 +1132,7 @@ void MSyncControl::restrictControlToDataSources(
         // Check for each data sourcs if it is suitable to restrict control.
         // Since in the list of all data sources might be data sources without
         // time and member informations.
-        for (QString dataSourceID : availableDataSources)
+        for (const QString& dataSourceID : availableDataSources)
         {
             MWeatherPredictionDataSource* source =
                     dynamic_cast<MWeatherPredictionDataSource*>

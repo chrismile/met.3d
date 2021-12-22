@@ -130,6 +130,13 @@ public:
     QList<QDateTime> availableInitTimes();
 
     /**
+      Start times correspond to the the trajectory start times available for
+      the specified initialisation time @p initTime.
+      */
+    QList<QDateTime> availableStartTimes(const QDateTime& initTime);
+
+
+    /**
       Returns a @ref QList<QDateTime> containing the the trajectory start times
       available for the specified initialisation time @p initTime.
       */

@@ -34,6 +34,7 @@
 #include <QVector2D>
 
 // local application imports
+#include "actors/transferfunction1d.h"
 #include "diagrambase.h"
 
 struct NVGcontext;
@@ -56,7 +57,7 @@ const char* const SIMILARITY_METRIC_NAMES[] = {
 
 class MHorizonGraph : public MDiagramBase {
 public:
-    explicit MHorizonGraph(GLint textureUnit);
+    MHorizonGraph(GLint textureUnit, MTransferFunction1D*& diagramTransferFunction);
     DiagramType getDiagramType() override { return DiagramType::HORIZON_GRAPH; }
     void initialize() override;
 
@@ -89,7 +90,6 @@ protected:
     void renderBase() override;
 
 private:
-    QVector3D transferFunction(float value) const;
     void drawHorizonBackground();
     void drawHorizonLines();
     void drawHorizonLinesSparse();
@@ -112,6 +112,8 @@ private:
     void updateTimeScale(const QVector2D& mousePosition, EventType eventType, QMouseEvent* event);
     void updateTimeShift(const QVector2D& mousePosition, EventType eventType, QMouseEvent* event);
 
+    QVector3D transferFunction(float value) const;
+    MTransferFunction1D*& diagramTransferFunction;
     bool mapStdDevToColor = true;
 
     float horizonBarWidth, horizonBarHeight, horizonBarHeightBase;

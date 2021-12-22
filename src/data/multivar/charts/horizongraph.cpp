@@ -57,7 +57,8 @@ static const std::vector<QColor> predefinedColors = {
 };
 
 
-MHorizonGraph::MHorizonGraph(GLint textureUnit) : MDiagramBase(textureUnit) {
+MHorizonGraph::MHorizonGraph(GLint textureUnit, MTransferFunction1D*& diagramTransferFunction)
+        : MDiagramBase(textureUnit), diagramTransferFunction(diagramTransferFunction) {
 }
 
 float MHorizonGraph::computeWindowHeight() {
@@ -287,22 +288,31 @@ QVector3D MHorizonGraph::transferFunction(float value) const {
     }
     value = clamp(value, 0.0f, 1.0f);
 
-    std::vector<QColor> colorPoints = {
-            QColor(59, 76, 192),
-            QColor(144, 178, 254),
-            QColor(220, 220, 220),
-            QColor(245, 156, 125),
-            QColor(180, 4, 38)
-    };
-    int stepLast = clamp(int(std::floor(value / 0.25f)), 0, 4);
-    int stepNext = clamp(int(std::ceil(value / 0.25f)), 0, 4);
-    float t = fract(value / 0.25f);
-    qreal r, g, b;
-    colorPoints.at(stepLast).getRgbF(&r, &g, &b);
-    QVector3D colorLast{float(r), float(g), float(b)};
-    colorPoints.at(stepNext).getRgbF(&r, &g, &b);
-    QVector3D colorNext{float(r), float(g), float(b)};
-    return mix(colorLast, colorNext, t);
+    if (diagramTransferFunction) {
+        float minValue = diagramTransferFunction->getMinimumValue();
+        float maxValue = diagramTransferFunction->getMaximumValue();
+        QColor color = diagramTransferFunction->getColorValue(value * (maxValue - minValue) + minValue);
+        qreal r, g, b;
+        color.getRgbF(&r, &g, &b);
+        return {float(r), float(g), float(b)};
+    } else {
+        std::vector<QColor> colorPoints = {
+                QColor(59, 76, 192),
+                QColor(144, 178, 254),
+                QColor(220, 220, 220),
+                QColor(245, 156, 125),
+                QColor(180, 4, 38)
+        };
+        int stepLast = clamp(int(std::floor(value / 0.25f)), 0, 4);
+        int stepNext = clamp(int(std::ceil(value / 0.25f)), 0, 4);
+        float t = fract(value / 0.25f);
+        qreal r, g, b;
+        colorPoints.at(stepLast).getRgbF(&r, &g, &b);
+        QVector3D colorLast{float(r), float(g), float(b)};
+        colorPoints.at(stepNext).getRgbF(&r, &g, &b);
+        QVector3D colorNext{float(r), float(g), float(b)};
+        return mix(colorLast, colorNext, t);
+    }
 }
 
 void MHorizonGraph::drawHorizonBackground() {

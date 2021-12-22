@@ -35,14 +35,15 @@
 #include <embree3/rtcore.h>
 
 // local application imports
+#include "actors/transferfunction1d.h"
 #include "gxfw/gl/indexbuffer.h"
 #include "gxfw/gl/vertexbuffer.h"
 #include "gxfw/gl/shadereffect.h"
 #include "data/abstractdataitem.h"
 #include "qt_extensions/radarchart.h"
+#include "charts/radarbarchart.h"
+#include "charts/horizongraph.h"
 #include "beziertrajectories.h"
-#include "src/data/multivar/charts/radarbarchart.h"
-#include "src/data/multivar/charts/horizongraph.h"
 
 namespace Met3D {
 
@@ -63,7 +64,7 @@ class MTrajectoryPicker : public MMemoryManagementUsingObject {
 public:
     MTrajectoryPicker(
             GLuint textureUnit, MSceneViewGLWidget* sceneView, const QVector<QString>& varNames,
-            DiagramDisplayType diagramType);
+            DiagramDisplayType diagramType, MTransferFunction1D*& diagramTransferFunction);
     ~MTrajectoryPicker() override;
 
     void render();
@@ -298,6 +299,7 @@ private:
     std::vector<std::string> variableNames;
     size_t numVars = 0;
     QVector<uint32_t> selectedVariables;
+    MTransferFunction1D*& diagramTransferFunction;
 };
 
 }

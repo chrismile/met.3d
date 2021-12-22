@@ -111,8 +111,6 @@ public:
     inline const QVector<uint32_t>& getVarDiverging() { return varDiverging; }
 
     inline bool getUseTimestepLens() const { return useTimestepLens; }
-    inline void setParticlePosTimeStep(int t) { particlePosTimeStep = t; }
-
     inline const QVector<QString>& getVarNames() const { return varNames; }
 
     /**
@@ -250,7 +248,6 @@ private:
     float minRadiusFactor = 0.5f;
     float fiberRadius = 0.05f;
     bool useTimestepLens = true;
-    float particlePosTimeStep = 0.0f;
 
     // Lighting settings.
     bool useColorIntensity = true;
