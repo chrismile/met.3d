@@ -4,7 +4,7 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2020-2021 Christoph Neuhauser
+**  Copyright 2020-2022 Christoph Neuhauser
 **  Copyright 2020      Michael Kern
 **
 **  Computer Graphics and Visualization Group
@@ -234,7 +234,7 @@ private:
     int32_t numLineSegments = 8;
     int32_t numInstances = 12;
     int32_t rollWidth = 1;
-    float separatorWidth = 0.15f;
+    float separatorWidth = 0.10f;
     bool mapTubeDiameter = false;
     float twistOffset = 0.1f;
     bool constantTwistOffset = false;

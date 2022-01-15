@@ -4,7 +4,7 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2020-2021 Christoph Neuhauser
+**  Copyright 2020-2022 Christoph Neuhauser
 **  Copyright 2020      Michael Kern
 **
 **  Computer Graphics and Visualization Group
@@ -420,7 +420,7 @@ void MMultiVarData::loadConfiguration(QSettings *settings)
     numLineSegments = settings->value("numLineSegments", 8).toInt();
     numInstances = settings->value("numInstances", 12).toInt();
     rollWidth = settings->value("rollWidth", 1).toInt();
-    separatorWidth = settings->value("separatorWidth", 0.15f).toFloat();
+    separatorWidth = settings->value("separatorWidth", 0.1f).toFloat();
     mapTubeDiameter = settings->value("mapTubeDiameter", false).toBool();
     twistOffset = settings->value("twistOffset", 0.1f).toFloat();
     constantTwistOffset = settings->value("constantTwistOffset", false).toBool();

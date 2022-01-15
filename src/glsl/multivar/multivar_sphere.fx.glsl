@@ -4,7 +4,7 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2021 Christoph Neuhauser
+**  Copyright 2021-2022 Christoph Neuhauser
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -33,8 +33,8 @@
 
 // "Color bands"-specific uniforms
 uniform float separatorWidth;
-
 uniform float sphereRadius;
+uniform float lineRadius;
 
 /*****************************************************************************
  ***                            INTERFACES
@@ -57,7 +57,8 @@ layout(std430, binding = 10) readonly buffer SpherePositionsBuffer {
 
 shader VSmain(in vec3 vertexPosition : 0, in vec3 vertexNormal : 1, out VSOutput outputs)
 {
-    vec3 position = sphereRadius * vertexPosition + spherePositions[gl_InstanceID].xyz;
+    vec3 spherePosition = spherePositions[gl_InstanceID].xyz;
+    vec3 position = sphereRadius * vertexPosition + spherePosition;
     gl_Position = mvpMatrix * vec4(position, 1.0);
     outputs.fragmentPosition = position;
     outputs.fragmentNormal = vertexNormal;
@@ -172,16 +173,26 @@ shader FSmain(in VSOutput inputs, out vec4 fragColor)
     vec4 surfaceColor = determineColorLinearInterpolate(
             actualVarID, variableValue, variableNextValue, interpolationFactor);
 
-    // 4.1) Draw black separators between single stripes.
+    // 4.1) Adapt the separator width to the sphere to be independent of the radius.
+    vec3 crossProdLn = cross(n, newN);
+    float centerDist = length(crossProdLn);
+    if (dot(l, crossProdVn) < 0.0) {
+        centerDist = -centerDist;
+    }
+    float h = sqrt(1.0 - centerDist * centerDist);
+    float separatorWidthSphere = separatorWidth * lineRadius / (sphereRadius * h);
+
+    // 4.2) Draw black separators between single stripes.
     if (separatorWidth > 0) {
-        drawSeparatorBetweenStripes(surfaceColor, bandPos, separatorWidth);
+        drawSeparatorBetweenStripes(surfaceColor, bandPos, separatorWidthSphere);
     }
 
     // 5) Phong lighting
     float occlusionFactor = 1.0f;
     float shadowFactor = 1.0f;
     vec4 color = computePhongLightingSphere(
-            surfaceColor, occlusionFactor, shadowFactor, inputs.fragmentPosition, n, abs((ribbonPosition - 0.5) * 2.0));
+            surfaceColor, occlusionFactor, shadowFactor, inputs.fragmentPosition, n,
+            abs((ribbonPosition - 0.5) * 2.0), separatorWidthSphere);
 
     //color = vec4(vec3(pattern), 1.0);
 

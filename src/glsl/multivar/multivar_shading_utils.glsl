@@ -274,7 +274,7 @@ vec4 computePhongLighting(
 
 vec4 computePhongLightingSphere(
         in vec4 surfaceColor, in float occlusionFactor, in float shadowFactor,
-        in vec3 worldPos, in vec3 normal, in float bandPos) {
+        in vec3 worldPos, in vec3 normal, in float bandPos, in float separatorWidth) {
     const vec3 ambientColor = surfaceColor.rgb;
     const vec3 diffuseColor = surfaceColor.rgb;
 
@@ -293,9 +293,8 @@ vec4 computePhongLightingSphere(
     vec3 Is = kS * pow(clamp((dot(n, h)), 0.0, 1.0), s) * diffuseColor;
     vec3 colorShading = Ia + Id + Is;
 
-    if (drawHalo)
-    {
-        colorShading *= 1.0 - smoothstep(0.9 - fwidth(bandPos), 0.9, bandPos);
+    if (drawHalo) {
+        colorShading *= 1.0 - smoothstep(1.0 - separatorWidth - fwidth(bandPos), 1.0 - separatorWidth, bandPos);
     }
 
     return vec4(colorShading.rgb, surfaceColor.a);
