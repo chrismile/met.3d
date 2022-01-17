@@ -65,6 +65,9 @@ out vec2 fragTexCoord;
 flat out int fragVariableID;
 flat out float fragVariableValue;
 out float fragBorderInterpolant;
+#ifdef SUPPORT_LINE_DESATURATION
+flat out uint desaturateLine;
+#endif
 #elif defined(GL_FRAGMENT_SHADER)
 // Output to fragments
 in vec3 fragWorldPos;
@@ -75,6 +78,9 @@ in vec2 fragTexCoord;
 flat in int fragVariableID;
 flat in float fragVariableValue;
 in float fragBorderInterpolant;
+#ifdef SUPPORT_LINE_DESATURATION
+flat in uint desaturateLine;
+#endif
 #endif
 
 
@@ -142,6 +148,10 @@ shader GSmain(in VSOutput inputs[]) {
     const int varID = sampleActualVarID(mappedVarID); // instanceID % numVariables for stripes
     const int elementID = inputs[0].vElementID;
     const int lineID = inputs[0].vLineID;
+
+#ifdef SUPPORT_LINE_DESATURATION
+    desaturateLine = 1 - lineSelectedArray[lineID];
+#endif
 
     //float variableValueOrig = 0;
     float variableValue = 0;
@@ -289,6 +299,12 @@ shader FSmain(out vec4 fragColor) {
 
     vec4 color = computePhongLighting(
             surfaceColor, occlusionFactor, shadowFactor, fragWorldPos, fragNormal, fragTangent);
+
+#ifdef SUPPORT_LINE_DESATURATION
+    if (desaturateLine == 1) {
+        color = desaturateColor(color);
+    }
+#endif
 
     if (color.a < 1.0/255.0) {
         discard;

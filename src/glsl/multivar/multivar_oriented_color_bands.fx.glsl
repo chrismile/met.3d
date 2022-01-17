@@ -50,7 +50,7 @@ uniform float separatorWidth;
 uniform int timestepLensePosition;
 //uniform float timestepLenseThickness = 1.0f;
 //uniform float timestepLenseRadius = 100.0f;
-uniform float timestepLenseRadius = 30.0f;
+uniform float timestepLenseRadius = 20.0f;
 #endif
 
 /*****************************************************************************
@@ -125,9 +125,10 @@ shader VSmain(
 
 #ifdef TIMESTEP_LENS
 float computeZoomFactor(float timestepIndex) {
-    float timeDist = abs(float(timestepLensePosition) - timestepIndex);
+    float timestepLensePositionX = -4453;
+    float timeDist = abs(float(timestepLensePositionX) - timestepIndex);
     float radicand = max(0.0, timestepLenseRadius*timestepLenseRadius - timeDist*timeDist);
-    return sqrt(radicand) * timestepLenseRadius * 0.002 + 1.0;
+    return sqrt(radicand) * timestepLenseRadius * 0.004 + 1.0;
     //return smoothstep(timestepLenseRadius, 0.0f, timeDist) * timestepLenseThickness + 1.0;
 }
 #endif
@@ -162,14 +163,14 @@ shader GSmain(in VSOutput inputs[], out FSInput outputs) {
     float radius0 = lineWidth / 2.0 * computeZoomFactor(inputs[0].vTimestepIndex);
     float radius1 = lineWidth / 2.0 * computeZoomFactor(inputs[1].vTimestepIndex);
     createTubeSegments(
-    circlePointsCurrent, vertexNormalsCurrent, currentPoint, normalCurrent, tangentCurrent, radius0);
+            circlePointsCurrent, vertexNormalsCurrent, currentPoint, normalCurrent, tangentCurrent, radius0);
     createTubeSegments(
-    circlePointsNext, vertexNormalsNext, nextPoint, normalNext, tangentNext, radius1);
+            circlePointsNext, vertexNormalsNext, nextPoint, normalNext, tangentNext, radius1);
 #else
     createTubeSegments(
-    circlePointsCurrent, vertexNormalsCurrent, currentPoint, normalCurrent, tangentCurrent, lineWidth / 2.0);
+            circlePointsCurrent, vertexNormalsCurrent, currentPoint, normalCurrent, tangentCurrent, lineWidth / 2.0);
     createTubeSegments(
-    circlePointsNext, vertexNormalsNext, nextPoint, normalNext, tangentNext, lineWidth / 2.0);
+            circlePointsNext, vertexNormalsNext, nextPoint, normalNext, tangentNext, lineWidth / 2.0);
 #endif
 #else
     // Sample ALL variables.

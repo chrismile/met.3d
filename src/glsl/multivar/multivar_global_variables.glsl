@@ -148,7 +148,7 @@ vec3 hsvToRgb(vec3 color) {
 
 vec4 desaturateColor(vec4 inputColor) {
     vec3 hsvColor = rgbToHsv(inputColor.rgb);
-    hsvColor.g *= 0.4;
+    hsvColor.g *= 0.0;
     hsvColor.b *= 0.8;
     return vec4(hsvToRgb(hsvColor), inputColor.a);
 }
