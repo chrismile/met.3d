@@ -125,8 +125,7 @@ shader VSmain(
 
 #ifdef TIMESTEP_LENS
 float computeZoomFactor(float timestepIndex) {
-    float timestepLensePositionX = -4453;
-    float timeDist = abs(float(timestepLensePositionX) - timestepIndex);
+    float timeDist = abs(float(timestepLensePosition) - timestepIndex);
     float radicand = max(0.0, timestepLenseRadius*timestepLenseRadius - timeDist*timeDist);
     return sqrt(radicand) * timestepLenseRadius * 0.004 + 1.0;
     //return smoothstep(timestepLenseRadius, 0.0f, timeDist) * timestepLenseThickness + 1.0;
