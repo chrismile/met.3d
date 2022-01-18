@@ -2159,7 +2159,7 @@ void MSceneViewGLWidget::mouseMoveEvent(QMouseEvent *event)
     }
 
 
-    if (freezeMode || isVirtualWindowBelowMouse) return;
+    if (freezeMode || isVirtualWindowBelowMouse || event->modifiers() == Qt::ControlModifier) return;
 
     // A) INTERACTION MODE.
     // ========================================================================
