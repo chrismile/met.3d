@@ -424,7 +424,7 @@ shader FSmain(in FSInput inputs, out vec4 fragColor) {
         variablesSumTotal += variables[varID];
     }
 
-    // Compute which color we are at
+    // Compute which color we are at.
     float variablesSumLast = 0.0, variablesSumCurrent = 0.0;
     int varID = 0;
     float bandPos = 1.0;

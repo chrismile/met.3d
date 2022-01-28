@@ -52,6 +52,13 @@ enum class MultiVarRenderMode {
     CHECKERBOARD,
     FIBERS
 };
+enum class MultiVarSphereRenderMode {
+    NONE,
+    TANGENT,
+    GREAT_CIRCLE,
+    PIE_CHART_AREA,
+    PIE_CHART_COLOR
+};
 
 inline bool getMultiVarRenderModeNeedsSubdiv(MultiVarRenderMode multiVarRenderMode) {
     return multiVarRenderMode == MultiVarRenderMode::ROLLS
@@ -92,6 +99,7 @@ public:
     inline bool getInternalRepresentationChanged() const { return internalRepresentationChanged; }
     inline void resetInternalRepresentationChanged() { internalRepresentationChanged = false; }
     inline bool getNeedsSubdiv() { return getMultiVarRenderModeNeedsSubdiv(multiVarRenderMode); }
+    inline bool getRenderSpheres() { return sphereRenderMode != MultiVarSphereRenderMode::NONE; }
 
     inline bool getSelectedVariablesChanged() const { return selectedVariablesChanged; }
     inline void resetSelectedVariablesChanged() { selectedVariablesChanged = false; }
@@ -162,6 +170,7 @@ private:
 
     QVector<QtProperty*> propertyList;
     QtProperty *renderTechniqueProperty;
+    QtProperty *sphereRenderTechniqueProperty;
     QtProperty *mapTubeDiameterProperty;
     QtProperty *radiusMappingModeProperty;
     QtProperty *checkerboardHeightProperty;
@@ -216,6 +225,7 @@ private:
     MultiVarRenderMode multiVarRenderMode = MultiVarRenderMode::ORIENTED_COLOR_BANDS;
     MultiVarRadiusMappingMode multiVarRadiusMappingMode = MultiVarRadiusMappingMode::GLOBAL;
     bool internalRepresentationChanged = false; ///< If multiVarRenderMode changes to other mode needing different data.
+    MultiVarSphereRenderMode sphereRenderMode = MultiVarSphereRenderMode::PIE_CHART_AREA;
 
     // For MULTIVAR_RENDERMODE_ORIENTED_COLOR_BANDS, MULTIVAR_RENDERMODE_ORIENTED_COLOR_BANDS_RIBBON
     enum class OrientedRibbonMode {

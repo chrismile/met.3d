@@ -247,7 +247,7 @@ MBezierTrajectories *MBezierTrajectoriesSource::produceData(MDataRequest request
             MBezierTrajectory::VarDesc varDescPerLine = {0};
             varDescPerLine.minMax = QVector2D(
                     std::numeric_limits<float>::max(), std::numeric_limits<float>::lowest());
-            varDescPerLine.startIndex = varOffsetPerLine;
+            varDescPerLine.startIndex = float(varOffsetPerLine);
             varDescPerLine.dummy = 0.0f;
 
             const QVector<float>& variableArray = trajectory.attributes[v];

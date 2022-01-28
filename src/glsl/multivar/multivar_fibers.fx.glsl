@@ -309,8 +309,8 @@ shader FSmain(out vec4 fragColor) {
     float occlusionFactor = 1.0f;
     float shadowFactor = 1.0f;
 
-    vec4 color = computePhongLighting(surfaceColor, occlusionFactor, shadowFactor,
-    fragWorldPos, fragNormal, fragTangent);
+    vec4 color = computePhongLighting(
+            surfaceColor, occlusionFactor, shadowFactor, fragWorldPos, fragNormal, fragTangent);
 
 #ifdef SUPPORT_LINE_DESATURATION
     if (desaturateLine == 1) {

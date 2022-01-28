@@ -103,10 +103,10 @@ layout(std430, binding = 12) readonly buffer ExitPointsBuffer {
 };
 
 struct LineElementIdData {
+    float centerIdx;
     float entranceIdx;
     float exitIdx;
     int lineId;
-    int padding;
 };
 
 layout(std430, binding = 13) readonly buffer LineElementIdBuffer {

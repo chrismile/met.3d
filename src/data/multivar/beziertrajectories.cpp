@@ -549,10 +549,10 @@ bool lineSegmentSphereIntersection(
 
 
 struct LineElementIdData {
+    float centerIdx;
     float entranceIdx;
     float exitIdx;
     int lineId;
-    int padding;
 };
 
 
@@ -589,6 +589,7 @@ void MBezierTrajectories::updateTimeStepSphereRenderDataIfNecessary(
     int trajectoryIndex = 0;
     for (MFilteredTrajectory& trajectory : baseTrajectories) {
         int timeStepClamped = clamp(timeStep, 0, trajectory.positions.size() - 1);
+        float centerIdx = float(timeStepClamped);
         const QVector3D& sphereCenter = trajectory.positions.at(timeStepClamped);
         spherePositions.push_back(sphereCenter);
 
@@ -627,10 +628,10 @@ void MBezierTrajectories::updateTimeStepSphereRenderDataIfNecessary(
         }
 
         LineElementIdData lineElementIdData{};
+        lineElementIdData.centerIdx = centerIdx;
         lineElementIdData.entranceIdx = entranceIdx;
         lineElementIdData.exitIdx = exitIdx;
         lineElementIdData.lineId = trajectoryIndex;
-        lineElementIdData.padding = 0;
         lineElementIds.push_back(lineElementIdData);
         trajectoryIndex++;
     }

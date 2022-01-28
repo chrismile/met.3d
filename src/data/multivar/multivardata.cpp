@@ -47,6 +47,14 @@ const QStringList renderingTechniqueShaderFilenames = {
         "src/glsl/multivar/multivar_fibers.fx.glsl"
 };
 
+const QStringList sphereRenderingTechniqueShaderFilenames = {
+        "",
+        "src/glsl/multivar/multivar_sphere_tangent.fx.glsl",
+        "src/glsl/multivar/multivar_sphere_great_circle.fx.glsl",
+        "src/glsl/multivar/multivar_sphere_pie_chart.fx.glsl",
+        "src/glsl/multivar/multivar_sphere_pie_chart.fx.glsl"
+};
+
 
 const int MAX_NUM_VARIABLES = 20;
 
@@ -83,14 +91,26 @@ void MMultiVarData::setProperties(MActor *actor, MQtProperties *properties, QtPr
     renderTechniqueProperty = addProperty(
             ENUM_PROPERTY, "render technique", multiVarGroupProperty);
     QStringList renderingTechniques =
-    {
-            "Rolls", "Twisted Rolls", "Color Bands", "Oriented Color Bands", "Checkerboard", "Fibers"
-    };
+            {
+                    "Rolls", "Twisted Rolls", "Color Bands", "Oriented Color Bands", "Checkerboard", "Fibers"
+            };
     properties->mEnum()->setEnumNames(renderTechniqueProperty, renderingTechniques);
     properties->mEnum()->setValue(renderTechniqueProperty, int(multiVarRenderMode));
     renderTechniqueProperty->setToolTip(
             "What line rendering technique to use for the multiple variables.");
     propertyList.push_back(renderTechniqueProperty);
+
+    sphereRenderTechniqueProperty = addProperty(
+            ENUM_PROPERTY, "sphere render technique", multiVarGroupProperty);
+    QStringList sphereRenderingTechniques =
+            {
+                    "None", "Tangent", "Great Circles", "Pie Chart (Area)", "Pie Chart (Color)"
+            };
+    properties->mEnum()->setEnumNames(sphereRenderTechniqueProperty, sphereRenderingTechniques);
+    properties->mEnum()->setValue(sphereRenderTechniqueProperty, int(sphereRenderMode));
+    sphereRenderTechniqueProperty->setToolTip(
+            "What rendering technique to use for the highlight spheres.");
+    propertyList.push_back(sphereRenderTechniqueProperty);
 
     mapTubeDiameterProperty = addProperty(
             BOOL_PROPERTY, "map tube diameter", multiVarGroupProperty);
@@ -670,7 +690,8 @@ void MMultiVarData::onQtPropertyChanged(QtProperty *property)
 {
     if (property == renderTechniqueProperty)
     {
-        MultiVarRenderMode newRenderMode = MultiVarRenderMode(properties->mEnum()->value(renderTechniqueProperty));
+        MultiVarRenderMode newRenderMode =
+                MultiVarRenderMode(properties->mEnum()->value(renderTechniqueProperty));
         bool oldRenderModeNeedsSubdiv = getMultiVarRenderModeNeedsSubdiv(multiVarRenderMode);
         bool newRenderModeNeedsSubdiv = getMultiVarRenderModeNeedsSubdiv(newRenderMode);
         if (oldRenderModeNeedsSubdiv != newRenderModeNeedsSubdiv)
@@ -679,6 +700,13 @@ void MMultiVarData::onQtPropertyChanged(QtProperty *property)
         }
         multiVarRenderMode = newRenderMode;
         reloadShaderEffect();
+    }
+    else if (property == sphereRenderTechniqueProperty)
+    {
+        MultiVarSphereRenderMode newSphereRenderMode =
+                MultiVarSphereRenderMode(properties->mEnum()->value(sphereRenderTechniqueProperty));
+        sphereRenderMode = newSphereRenderMode;
+        reloadSphereShaderEffect();
     }
     else if (tfPropertiesMultiVar.contains(property))
     {
@@ -1014,20 +1042,34 @@ void MMultiVarData::reloadShaderEffect()
 
 void MMultiVarData::reloadSphereShaderEffect()
 {
+    if (sphereRenderMode == MultiVarSphereRenderMode::NONE)
+    {
+        shaderEffectSphere = {};
+        shallReloadSphereShaderEffect = false;
+        return;
+    }
+
+
     QMap<QString, QString> defines =
             {
                     {"USE_MULTI_VAR_TRANSFER_FUNCTION", QString::fromStdString("") },
                     {"IS_MULTIVAR_DATA", QString::fromStdString("") },
+                    {"MAX_NUM_VARIABLES", QString::fromStdString(std::to_string(MAX_NUM_VARIABLES)) },
             };
 
-    if (diagramType == DiagramDisplayType::NONE || diagramType == DiagramDisplayType::HORIZON_GRAPH)
+    if (sphereRenderMode == MultiVarSphereRenderMode::PIE_CHART_AREA)
     {
-        defines.insert("SUPPORT_LINE_DESATURATION", QString::fromStdString(""));
+        defines.insert("PIE_CHART_AREA", "");
+    }
+    else if (sphereRenderMode == MultiVarSphereRenderMode::PIE_CHART_COLOR)
+    {
+        defines.insert("PIE_CHART_COLOR", "");
     }
 
     MGLResourcesManager* glRM = MGLResourcesManager::getInstance();
     glRM->generateEffectProgramUncached("multivar_sphere", shaderEffectSphere);
-    shaderEffectSphere->compileFromFile_Met3DHome("src/glsl/multivar/multivar_sphere.fx.glsl", defines);
+    shaderEffectSphere->compileFromFile_Met3DHome(
+            sphereRenderingTechniqueShaderFilenames[int(sphereRenderMode)], defines);
     shallReloadSphereShaderEffect = false;
 }
 

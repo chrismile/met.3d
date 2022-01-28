@@ -3153,7 +3153,7 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
 #endif
 
             // Render tubes at time step positions.
-            if (multiVarData.getUseTimestepLens() && useMultiVarSpheres)
+            if (multiVarData.getUseTimestepLens() && useMultiVarSpheres && multiVarData.getRenderSpheres())
             {
                 trajectoryRequests[t].bezierTrajectoriesMap[sceneView]->updateTimeStepSphereRenderDataIfNecessary(
                         particlePosTimeStep, sphereRadius);
