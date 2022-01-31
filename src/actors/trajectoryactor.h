@@ -506,6 +506,9 @@ private:
     float stdDevMetricInfluence = 0.25f;
     int numBins = 10;
 
+    QtProperty *syncTimeAfterAscentProperty;
+    bool syncTimeAfterAscent = false;
+
 #ifdef USE_EMBREE
     QHash<MSceneViewGLWidget*, MTrajectoryPicker*> trajectoryPickerMap;
 #endif

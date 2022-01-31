@@ -131,6 +131,23 @@ public:
     void setStdDevMetricInfluence(float stdDevMetricInfluence);
     void setNumBins(int numBins);
 
+    // Used for aligning warm conveyor belt trajectories based on their ascension.
+    void setSyncTimeAfterAscent(bool _syncTimeAfterAscent);
+    inline QVector<int> getAscentTimeStepIndices() const {
+        QVector<int> ascentTimeStepIndicesQVector;
+        ascentTimeStepIndicesQVector.reserve(int(ascentTimeStepIndices.size()));
+        for (const auto& index : ascentTimeStepIndices) {
+            ascentTimeStepIndicesQVector.push_back(index);
+        }
+        return ascentTimeStepIndicesQVector;
+    }
+    inline bool getHasAscentData() const {
+        return timeAfterAscentIndex >= 0;
+    }
+    inline int getMaxAscentTimeStepIndex() const {
+        return maxAscentTimeStepIndex;
+    }
+
     // Forwards all calls to 'diagram'.
     inline float getSelectedTimeStep() const {
         if (diagram && diagram->getDiagramType() == DiagramType::HORIZON_GRAPH) {
@@ -204,6 +221,7 @@ public:
     inline void resetSelectedTrajectoriesChanged() {
         selectedTrajectoriesChanged = false;
     }
+
 
     inline const QVector<QVector2D>& getVariableRanges() const { return minMaxAttributes; }
 
@@ -300,6 +318,13 @@ private:
     size_t numVars = 0;
     QVector<uint32_t> selectedVariables;
     MTransferFunction1D*& diagramTransferFunction;
+
+    // Used for aligning warm conveyor belt trajectories based on their ascension.
+    bool syncTimeAfterAscent = false;
+    int timeAfterAscentIndex = -1;
+    std::vector<int> ascentTimeStepIndices;
+    int minAscentTimeStepIndex = 0;
+    int maxAscentTimeStepIndex = 0;
 };
 
 }

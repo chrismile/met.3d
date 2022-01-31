@@ -68,6 +68,10 @@ MBezierTrajectories::MBezierTrajectories(
     {
         selectedLines.push_back(false);
     }
+    for (int i = 0; i < numTrajectories; i++)
+    {
+        ascentTimeStepIndices.push_back(0);
+    }
 
     this->numTrajectories = static_cast<int>(numTrajectories);
     trajectorySelectionCount = new GLsizei[numTrajectories];
@@ -436,6 +440,19 @@ void MBezierTrajectories::updateSelectedLines(const QVector<uint32_t>& selectedL
 }
 
 
+void MBezierTrajectories::setSyncTimeAfterAscent(bool _syncTimeAfterAscent)
+{
+    syncTimeAfterAscent = _syncTimeAfterAscent;
+}
+
+void MBezierTrajectories::updateLineAscentTimeStepArrayBuffer(
+        const QVector<int>& _ascentTimeStepIndices, int _maxAscentTimeStepIndex)
+{
+    ascentTimeStepIndices = _ascentTimeStepIndices;
+    maxAscentTimeStepIndex = _maxAscentTimeStepIndex;
+}
+
+
 MTimeStepSphereRenderData* MBezierTrajectories::getTimeStepSphereRenderData(
 #ifdef USE_QOPENGLWIDGET
         QOpenGLWidget *currentGLContext)
@@ -588,7 +605,16 @@ void MBezierTrajectories::updateTimeStepSphereRenderDataIfNecessary(
 
     int trajectoryIndex = 0;
     for (MFilteredTrajectory& trajectory : baseTrajectories) {
-        int timeStepClamped = clamp(timeStep, 0, trajectory.positions.size() - 1);
+        int timeStepLocal;
+        if (syncTimeAfterAscent)
+        {
+            timeStepLocal = timeStep - maxAscentTimeStepIndex + ascentTimeStepIndices.at(trajectoryIndex);
+        }
+        else
+        {
+            timeStepLocal = timeStep;
+        }
+        int timeStepClamped = clamp(timeStepLocal, 0, trajectory.positions.size() - 1);
         float centerIdx = float(timeStepClamped);
         const QVector3D& sphereCenter = trajectory.positions.at(timeStepClamped);
         spherePositions.push_back(sphereCenter);

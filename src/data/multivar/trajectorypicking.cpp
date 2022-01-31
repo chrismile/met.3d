@@ -64,6 +64,13 @@ MTrajectoryPicker::MTrajectoryPicker(
         variableNames.push_back(varName.toStdString());
     }
 
+    auto it = std::find(variableNames.begin(), variableNames.end(), "time_after_ascent");
+    if (it != variableNames.end()) {
+        timeAfterAscentIndex = int(it - variableNames.begin());
+    } else {
+        timeAfterAscentIndex = -1;
+    }
+
     //radarChart = new QtExtensions::MRadarChart();
     //radarChart->setVariableNames(varNames);
     //radarChart->setRenderHint(QPainter::Antialiasing);
@@ -280,6 +287,55 @@ void MTrajectoryPicker::setBaseTrajectories(const MFilteredTrajectories& filtere
             minMax[1] = std::numeric_limits<float>::max();
         }
     }
+
+    // TODO
+    for (const MFilteredTrajectory& trajectory : filteredTrajectories)
+    {
+        for (size_t i = 0; i < numVars; i++)
+        {
+            const QVector<float>& attributes = trajectory.attributes.at(int(i));
+            QVector2D& minMaxVector = minMaxAttributes[int(i)];
+            for (float v : attributes)
+            {
+                if (std::isnan(v))
+                {
+                    continue;
+                }
+                minMaxVector.setX(std::min(minMaxVector.x(), v));
+                minMaxVector.setY(std::max(minMaxVector.y(), v));
+            }
+        }
+    }
+
+    if (timeAfterAscentIndex >= 0)
+    {
+        ascentTimeStepIndices.clear();
+        ascentTimeStepIndices.reserve(filteredTrajectories.size());
+        for (const MFilteredTrajectory& trajectory : filteredTrajectories)
+        {
+            int ascentTimeStep = 0;
+            const QVector<float>& timeAfterAscentArray = trajectory.attributes.at(timeAfterAscentIndex);
+            for (int i = 1; i < timeAfterAscentArray.size(); i++)
+            {
+                float timeAfterAscent0 = timeAfterAscentArray.at(i - 1);
+                float timeAfterAscent1 = timeAfterAscentArray.at(i);
+                if (timeAfterAscent0 == 0) {
+                    ascentTimeStep = i - 1;
+                    break;
+                } else if (timeAfterAscent1 == 0 || (timeAfterAscent0 < 0.0f && timeAfterAscent1 > 0.0f)) {
+                    ascentTimeStep = i;
+                    break;
+                }
+            }
+            ascentTimeStepIndices.push_back(ascentTimeStep);
+        }
+    }
+}
+
+void MTrajectoryPicker::setSyncTimeAfterAscent(bool _syncTimeAfterAscent) {
+    syncTimeAfterAscent = _syncTimeAfterAscent;
+    selectedTrajectoriesChanged = true;
+    updateDiagramData();
 }
 
 void MTrajectoryPicker::recreateTubeTriangleData()
@@ -571,6 +627,10 @@ bool MTrajectoryPicker::pickPointWorld(
             vertexTimeSteps.at(vidx0) * barycentricCoordinates.x()
             + vertexTimeSteps.at(vidx1) * barycentricCoordinates.y()
             + vertexTimeSteps.at(vidx2) * barycentricCoordinates.z();
+    if (syncTimeAfterAscent)
+    {
+        timeAtHit = timeAtHit + float(maxAscentTimeStepIndex - ascentTimeStepIndices.at(trajectoryIndex));
+    }
 
     return true;
 }
@@ -709,7 +769,16 @@ void MTrajectoryPicker::updateDiagramData()
                 std::vector<float> values;
                 for (size_t i = 0; i < numVars; i++)
                 {
-                    int time = clamp(timeStep, 0, int(trajectory.attributes.at(int(i)).size()) - 1);
+                    int timeStepLocal;
+                    if (syncTimeAfterAscent)
+                    {
+                        timeStepLocal = timeStep - maxAscentTimeStepIndex + ascentTimeStepIndices.at(trajectoryIndex);
+                    }
+                    else
+                    {
+                        timeStepLocal = timeStep;
+                    }
+                    int time = clamp(timeStepLocal, 0, int(trajectory.attributes.at(int(i)).size()) - 1);
                     float value = trajectory.attributes.at(int(i)).at(time);
                     QVector2D minMaxVector = minMaxAttributes.at(int(i));
                     float denominator = std::max(minMaxVector.y() - minMaxVector.x(), 1e-10f);
@@ -727,7 +796,16 @@ void MTrajectoryPicker::updateDiagramData()
             std::vector<float> variableValues;
             for (size_t i = 0; i < numVars; i++)
             {
-                int time = clamp(timeStep, 0, int(trajectory.attributes.at(int(i)).size()) - 1);
+                int timeStepLocal;
+                if (syncTimeAfterAscent)
+                {
+                    timeStepLocal = timeStep - maxAscentTimeStepIndex + ascentTimeStepIndices.at(trajectoryIndex);
+                }
+                else
+                {
+                    timeStepLocal = timeStep;
+                }
+                int time = clamp(timeStepLocal, 0, int(trajectory.attributes.at(int(i)).size()) - 1);
                 float value = trajectory.attributes.at(int(i)).at(time);
                 QVector2D minMaxVector = minMaxAttributes.at(int(i));
                 float denominator = std::max(minMaxVector.y() - minMaxVector.x(), 1e-10f);
@@ -752,7 +830,16 @@ void MTrajectoryPicker::updateDiagramData()
             std::vector<float> values;
             for (size_t i = 0; i < numVars; i++)
             {
-                int time = clamp(timeStep, 0, int(trajectory.attributes.at(int(i)).size()) - 1);
+                int timeStepLocal;
+                if (syncTimeAfterAscent)
+                {
+                    timeStepLocal = timeStep - maxAscentTimeStepIndex + ascentTimeStepIndices.at(trajectoryIndex);
+                }
+                else
+                {
+                    timeStepLocal = timeStep;
+                }
+                int time = clamp(timeStepLocal, 0, int(trajectory.attributes.at(int(i)).size()) - 1);
                 float value = trajectory.attributes.at(int(i)).at(time);
                 QVector2D minMaxVector = minMaxAttributes.at(int(i));
                 float denominator = std::max(minMaxVector.y() - minMaxVector.x(), 1e-10f);
@@ -777,32 +864,109 @@ void MTrajectoryPicker::updateDiagramData()
         MHorizonGraph* horizonGraph = static_cast<MHorizonGraph*>(diagram);
         std::vector<std::vector<std::vector<float>>> variableValuesArray;
         variableValuesArray.resize(highlightedTrajectories.size());
-        int i = 0;
-        for (const auto& it : highlightedTrajectories)
+
+        float timeMin;
+        float timeMax;
+        if (timeAfterAscentIndex >= 0 && selectedTrajectoriesChanged)
         {
-            uint32_t trajectoryIndex = it.first;
-            const MFilteredTrajectory& trajectory = baseTrajectories.at(int(trajectoryIndex));
-            std::vector<std::vector<float>>& variableValuesPerTrajectory = variableValuesArray.at(i);
-            variableValuesPerTrajectory.resize(numTimeSteps);
-            for (size_t timeIdx = 0; timeIdx < numTimeSteps; timeIdx++)
+            minAscentTimeStepIndex = int(numTimeSteps);
+            maxAscentTimeStepIndex = 0;
+            if (highlightedTrajectories.empty())
             {
-                std::vector<float>& values = variableValuesPerTrajectory.at(timeIdx);
-                values.resize(numVars);
-                for (size_t varIdx = 0; varIdx < numVars; varIdx++)
+                for (size_t trajectoryIndex = 0; trajectoryIndex < baseTrajectories.size(); trajectoryIndex++)
                 {
-                    float value = trajectory.attributes.at(int(varIdx)).at(int(timeIdx));
-                    if (!std::isnan(value)) {
-                        QVector2D minMaxVector = minMaxAttributes.at(int(varIdx));
-                        float denominator = std::max(minMaxVector.y() - minMaxVector.x(), 1e-10f);
-                        value = (value - minMaxVector.x()) / denominator;
-                    }
-                    values.at(varIdx) = value;
+                    int ascentTimeStepIndex = ascentTimeStepIndices.at(trajectoryIndex);
+                    minAscentTimeStepIndex = std::min(minAscentTimeStepIndex, ascentTimeStepIndex);
+                    maxAscentTimeStepIndex = std::max(maxAscentTimeStepIndex, ascentTimeStepIndex);
                 }
             }
-            i++;
+            else
+            {
+                for (const auto& it : highlightedTrajectories)
+                {
+                    uint32_t trajectoryIndex = it.first;
+                    int ascentTimeStepIndex = ascentTimeStepIndices.at(trajectoryIndex);
+                    minAscentTimeStepIndex = std::min(minAscentTimeStepIndex, ascentTimeStepIndex);
+                    maxAscentTimeStepIndex = std::max(maxAscentTimeStepIndex, ascentTimeStepIndex);
+                }
+            }
         }
+        if (syncTimeAfterAscent)
+        {
+            int delta = maxAscentTimeStepIndex - minAscentTimeStepIndex;
+            size_t numTimeStepsTotal = numTimeSteps + size_t(delta);
+            timeMin = float(0.0f);
+            timeMax = float(numTimeStepsTotal);
 
-        horizonGraph->setData(variableNames, 0.0f, float(numTimeSteps - 1), variableValuesArray);
+            int i = 0;
+            for (const auto& it : highlightedTrajectories)
+            {
+                uint32_t trajectoryIndex = it.first;
+                const MFilteredTrajectory& trajectory = baseTrajectories.at(int(trajectoryIndex));
+                std::vector<std::vector<float>>& variableValuesPerTrajectory = variableValuesArray.at(i);
+                variableValuesPerTrajectory.resize(numTimeStepsTotal);
+                for (size_t timeIdx = 0; timeIdx < numTimeStepsTotal; timeIdx++)
+                {
+                    std::vector<float>& values = variableValuesPerTrajectory.at(timeIdx);
+                    values.resize(numVars);
+
+                    int realTimeIdx =
+                            int(timeIdx) - maxAscentTimeStepIndex + ascentTimeStepIndices.at(trajectoryIndex);
+                    if (realTimeIdx >= 0 && realTimeIdx < int(numTimeSteps))
+                    {
+                        for (size_t varIdx = 0; varIdx < numVars; varIdx++)
+                        {
+                            float value = trajectory.attributes.at(int(varIdx)).at(realTimeIdx);
+                            if (!std::isnan(value)) {
+                                QVector2D minMaxVector = minMaxAttributes.at(int(varIdx));
+                                float denominator = std::max(minMaxVector.y() - minMaxVector.x(), 1e-10f);
+                                value = (value - minMaxVector.x()) / denominator;
+                            }
+                            values.at(varIdx) = value;
+                        }
+                    }
+                    else
+                    {
+                        for (size_t varIdx = 0; varIdx < numVars; varIdx++)
+                        {
+                            values.at(varIdx) = std::numeric_limits<float>::quiet_NaN();
+                        }
+                    }
+                }
+                i++;
+            }
+        }
+        else
+        {
+            timeMin = 0.0f;
+            timeMax = float(numTimeSteps - 1);
+
+            int i = 0;
+            for (const auto& it : highlightedTrajectories)
+            {
+                uint32_t trajectoryIndex = it.first;
+                const MFilteredTrajectory& trajectory = baseTrajectories.at(int(trajectoryIndex));
+                std::vector<std::vector<float>>& variableValuesPerTrajectory = variableValuesArray.at(i);
+                variableValuesPerTrajectory.resize(numTimeSteps);
+                for (size_t timeIdx = 0; timeIdx < numTimeSteps; timeIdx++)
+                {
+                    std::vector<float>& values = variableValuesPerTrajectory.at(timeIdx);
+                    values.resize(numVars);
+                    for (size_t varIdx = 0; varIdx < numVars; varIdx++)
+                    {
+                        float value = trajectory.attributes.at(int(varIdx)).at(int(timeIdx));
+                        if (!std::isnan(value)) {
+                            QVector2D minMaxVector = minMaxAttributes.at(int(varIdx));
+                            float denominator = std::max(minMaxVector.y() - minMaxVector.x(), 1e-10f);
+                            value = (value - minMaxVector.x()) / denominator;
+                        }
+                        values.at(varIdx) = value;
+                    }
+                }
+                i++;
+            }
+        }
+        horizonGraph->setData(variableNames, timeMin, timeMax, variableValuesArray);
     }
 }
 

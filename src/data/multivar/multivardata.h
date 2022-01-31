@@ -99,7 +99,7 @@ public:
     inline bool getInternalRepresentationChanged() const { return internalRepresentationChanged; }
     inline void resetInternalRepresentationChanged() { internalRepresentationChanged = false; }
     inline bool getNeedsSubdiv() { return getMultiVarRenderModeNeedsSubdiv(multiVarRenderMode); }
-    inline bool getRenderSpheres() { return sphereRenderMode != MultiVarSphereRenderMode::NONE; }
+    inline bool getRenderSpheres() { return sphereRenderMode != MultiVarSphereRenderMode::GREAT_CIRCLE; }
 
     inline bool getSelectedVariablesChanged() const { return selectedVariablesChanged; }
     inline void resetSelectedVariablesChanged() { selectedVariablesChanged = false; }

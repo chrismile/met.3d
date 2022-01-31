@@ -403,6 +403,15 @@ MTrajectoryActor::MTrajectoryActor()
 
     updateSimilarityMetricGroupEnabled();
 
+
+    syncTimeAfterAscentProperty = addProperty(
+            BOOL_PROPERTY, "sync time after ascent", multiVarGroupProperty);
+    properties->mBool()->setValue(syncTimeAfterAscentProperty, syncTimeAfterAscent);
+    syncTimeAfterAscentProperty->setToolTip(
+            "Syncs warm conveyor belt trajectories based on their ascension. "
+            "The trajectories need to have the per-point attribute time_after_ascension for this to work.");
+
+
     multiVarData.setProperties(this, properties, multiVarGroupProperty);
     actorHasSelectableData = true;
 
@@ -757,6 +766,9 @@ void MTrajectoryActor::loadConfiguration(QSettings *settings)
     numBins = settings->value("numBins", 10).toInt();
     properties->setInt(numBinsProperty, numBins, 1, 20);
     updateSimilarityMetricGroupEnabled();
+
+    syncTimeAfterAscent = settings->value("syncTimeAfterAscent", false).toBool();
+    properties->mBool()->setValue(syncTimeAfterAscentProperty, syncTimeAfterAscent);
 
     multiVarData.setEnabled(useBezierTrajectories);
     multiVarData.loadConfiguration(settings);
@@ -2692,6 +2704,26 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
 #endif
     }
 
+    else if (property == syncTimeAfterAscentProperty)
+    {
+        syncTimeAfterAscent = properties->mBool()->value(syncTimeAfterAscentProperty);
+#ifdef USE_EMBREE
+        for (MTrajectoryPicker* trajectoryPicker : trajectoryPickerMap)
+        {
+            trajectoryPicker->setSyncTimeAfterAscent(syncTimeAfterAscent);
+        }
+        for (int t = 0; t < (precomputedDataSource ? 1 : seedActorData.size()); t++)
+        {
+            for (auto& sceneView : trajectoryRequests[t].bezierTrajectoriesMap.keys())
+            {
+                trajectoryRequests[t].bezierTrajectoriesMap[sceneView]->setSyncTimeAfterAscent(syncTimeAfterAscent);
+            }
+        }
+        if (suppressActorUpdates()) return;
+        emitActorChangedSignal();
+#endif
+    }
+
     else if (multiVarData.hasProperty(property))
     {
         multiVarData.onQtPropertyChanged(property);
@@ -3003,6 +3035,12 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
             {
                 trajectoryRequests[t].bezierTrajectoriesMap[sceneView]->updateSelectedLines(
                         trajectoryPickerMap[sceneView]->getSelectedTrajectories());
+                if (trajectoryPickerMap[sceneView]->getHasAscentData())
+                {
+                    trajectoryRequests[t].bezierTrajectoriesMap[sceneView]->updateLineAscentTimeStepArrayBuffer(
+                            trajectoryPickerMap[sceneView]->getAscentTimeStepIndices(),
+                            trajectoryPickerMap[sceneView]->getMaxAscentTimeStepIndex());
+                }
                 trajectoryPickerMap[sceneView]->resetSelectedTrajectoriesChanged();
             }
 #endif
@@ -4359,6 +4397,8 @@ void MTrajectoryActor::updateAuxDataVarNamesProperty()
         properties->mEnum()->setEnumNames(
                     renderAuxDataVarProperty,
                     trajectorySource->availableAuxiliaryVariables());
+        syncTimeAfterAscentProperty->setEnabled(
+                trajectorySource->availableAuxiliaryVariables().indexOf("time_after_ascent") >= 0);
     }
 
     enableActorUpdates(true);

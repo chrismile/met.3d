@@ -105,7 +105,10 @@ struct MBezierTrajectoriesRenderData
     GL::MShaderStorageBufferObject* lineVarDescArrayBuffer = nullptr;
     GL::MShaderStorageBufferObject* varSelectedArrayBuffer = nullptr;
     GL::MShaderStorageBufferObject* varDivergingArrayBuffer = nullptr;
-    GL::MShaderStorageBufferObject* lineSelectedArrayBuffer = nullptr; // For horizon graph diagram
+    /*
+     * For horizon graph diagram.
+     */
+    GL::MShaderStorageBufferObject* lineSelectedArrayBuffer = nullptr;
 };
 
 struct MTimeStepSphereRenderData
@@ -171,6 +174,11 @@ public:
     void updateDivergingVariables(const QVector<uint32_t>& varDiverging);
     void updateSelectedLines(const QVector<uint32_t>& selectedLines);
 
+    // Used for aligning warm conveyor belt trajectories based on their ascension.
+    void setSyncTimeAfterAscent(bool _syncTimeAfterAscent);
+    void updateLineAscentTimeStepArrayBuffer(
+            const QVector<int>& _ascentTimeStepIndices, int _maxAscentTimeStepIndex);
+
     MTimeStepSphereRenderData* getTimeStepSphereRenderData(
 #ifdef USE_QOPENGLWIDGET
             QOpenGLWidget *currentGLContext = nullptr);
@@ -195,6 +203,11 @@ private:
     QVector<uint32_t> trajectoryIndexOffsets;
     QVector<uint32_t> numIndicesPerTrajectory;
     QVector<uint32_t> selectedLines;
+
+    // Used for aligning warm conveyor belt trajectories based on their ascension.
+    QVector<int> ascentTimeStepIndices;
+    bool syncTimeAfterAscent = false;
+    int maxAscentTimeStepIndex = 0;
 
     // Sphere data.
     int lastTimeStep = std::numeric_limits<int>::lowest();
