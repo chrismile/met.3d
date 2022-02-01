@@ -99,7 +99,7 @@ public:
     inline bool getInternalRepresentationChanged() const { return internalRepresentationChanged; }
     inline void resetInternalRepresentationChanged() { internalRepresentationChanged = false; }
     inline bool getNeedsSubdiv() { return getMultiVarRenderModeNeedsSubdiv(multiVarRenderMode); }
-    inline bool getRenderSpheres() { return sphereRenderMode != MultiVarSphereRenderMode::GREAT_CIRCLE; }
+    inline bool getRenderSpheres() { return sphereRenderMode != MultiVarSphereRenderMode::NONE; }
 
     inline bool getSelectedVariablesChanged() const { return selectedVariablesChanged; }
     inline void resetSelectedVariablesChanged() { selectedVariablesChanged = false; }
@@ -225,7 +225,7 @@ private:
     MultiVarRenderMode multiVarRenderMode = MultiVarRenderMode::ORIENTED_COLOR_BANDS;
     MultiVarRadiusMappingMode multiVarRadiusMappingMode = MultiVarRadiusMappingMode::GLOBAL;
     bool internalRepresentationChanged = false; ///< If multiVarRenderMode changes to other mode needing different data.
-    MultiVarSphereRenderMode sphereRenderMode = MultiVarSphereRenderMode::PIE_CHART_AREA;
+    MultiVarSphereRenderMode sphereRenderMode = MultiVarSphereRenderMode::GREAT_CIRCLE;
 
     // For MULTIVAR_RENDERMODE_ORIENTED_COLOR_BANDS, MULTIVAR_RENDERMODE_ORIENTED_COLOR_BANDS_RIBBON
     enum class OrientedRibbonMode {
