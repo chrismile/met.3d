@@ -3067,6 +3067,7 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
             multiVarData.setUniformData(textureUnitTransferFunction);
 
             tubeShader->setUniformValue("mvpMatrix", *(sceneView->getModelViewProjectionMatrix()));
+            tubeShader->setUniformValue("vMatrix", sceneView->getCamera()->getViewMatrix());
             tubeShader->setUniformValue("lightDirection", sceneView->getLightDirection());
             tubeShader->setUniformValue("cameraPosition", sceneView->getCamera()->getOrigin());
             tubeShader->setUniformValue("lineWidth", GLfloat(2.0f * tubeRadius));
@@ -3203,6 +3204,7 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
                 multiVarData.setUniformDataSpheres(textureUnitTransferFunction);
 
                 timeStepSphereShader->setUniformValue("mvpMatrix", *(sceneView->getModelViewProjectionMatrix()));
+                timeStepSphereShader->setUniformValue("vMatrix", sceneView->getCamera()->getViewMatrix());
                 timeStepSphereShader->setUniformValue("lightDirection", sceneView->getLightDirection());
                 timeStepSphereShader->setUniformValue("cameraPosition", sceneView->getCamera()->getOrigin());
                 timeStepSphereShader->setUniformValue("sphereRadius", sphereRadius);

@@ -162,105 +162,113 @@ layout(std430, binding = 13) readonly buffer LineElementIdBuffer {
     LineElementIdData lineElementIds[];
 };
 
-float computeCosAngleBetweenPlanes(vec3 n0, vec3 n1) {
-    float numerator = abs(n0.x * n1.x + n0.x * n1.x + n0.x * n1.x);
-    float denominator = sqrt(n0.x * n0.x + n0.y * n0.y + n0.z * n0.z) * sqrt(n1.x * n1.x + n1.y * n1.y + n1.z * n1.z);
-    return numerator / denominator;
-}
-
 #define M_PI 3.14159265358979323846
+
+bool rayPlaneIntersection(vec3 rayOrigin, vec3 rayDirection, vec4 plane, out float t) {
+    float ln = dot(plane.xyz, rayDirection);
+    if (abs(ln) < 1e-5) {
+        // Plane and ray are parallel.
+        return false;
+    } else {
+        float pos = dot(plane.xyz, rayOrigin) + plane.w;
+        t = -pos / ln;
+        return t >= 0.0;
+    }
+}
 
 shader FSmain(in VSOutput inputs, out vec4 fragColor)
 {
     vec3 entrancePoint = entrancePoints[inputs.instanceID].xyz;
     vec3 exitPoint = exitPoints[inputs.instanceID].xyz;
+    if (length(entrancePoint - inputs.spherePosition) < 1e-5) {
+        entrancePoint += 1e-3 * normalize(inputs.spherePosition - exitPoint);
+    }
+    if (length(exitPoint - inputs.spherePosition) < 1e-5) {
+        exitPoint += 1e-3 * normalize(entrancePoint - inputs.spherePosition);
+    }
     LineElementIdData lineElementId = lineElementIds[inputs.instanceID];
     int fragmentLineID = lineElementId.lineId;
-    float entranceIdx = lineElementId.entranceIdx;
-    float exitIdx = lineElementId.exitIdx;
+    //float entranceIdx = lineElementId.entranceIdx;
+    //float exitIdx = lineElementId.exitIdx;
+    float centerIdx = lineElementId.centerIdx;
+    int fragElementID = int(round(centerIdx));
 
     const vec3 n = normalize(inputs.fragmentNormal);
     const vec3 v = normalize(cameraPosition - inputs.fragmentPosition);
     const vec3 l = normalize(exitPoint - entrancePoint);
+    const vec3 vp = inverse(vMatrix)[2].xyz;
 
-    //vec3 planeNormalZero = normalize(cross(l, cameraPosition - entrancePoint));
-    //vec3 planeNormalZero = normalize(cross(l, inputs.spherePosition - entrancePoint));
-    vec3 intersectionPosition;
-    raySphereIntersection(
-            inputs.spherePosition, normalize(cameraPosition - inputs.spherePosition),
-            inputs.spherePosition, sphereRadius, intersectionPosition);
-    vec3 planeNormalZero = normalize(cross(l, intersectionPosition - entrancePoint));
-    vec3 planeNormalX = normalize(cross(l, inputs.fragmentPosition - entrancePoint));
-    float planeCosAngle = computeCosAngleBetweenPlanes(planeNormalZero, planeNormalX);
+    //vec3 intersectionPosition;
+    //raySphereIntersection(inputs.spherePosition, normalize(cameraPosition - inputs.spherePosition), inputs.spherePosition, sphereRadius, intersectionPosition);
 
-    // 1) Compute the closest point on the line segment spanned by the entrance and exit point.
-    float param = getClosestPointOnLineSegmentParam(inputs.fragmentPosition, entrancePoint, exitPoint);
-    float interpolatedIdx = mix(entranceIdx, exitIdx, param);
-    int fragElementID = int(interpolatedIdx);
-    int fragElementNextID = fragElementID + 1;
-    float interpolationFactor = fract(interpolatedIdx);
+    vec3 entranceDir = normalize(entrancePoint - inputs.spherePosition);
+    vec3 entranceFront;
+    raySphereIntersection(entrancePoint + lineRadius * v, entranceDir, inputs.spherePosition, sphereRadius, entranceFront);
 
-    // 2) Project v and n into plane perpendicular to l to get newV and newN.
-    /*vec3 helperVecV = normalize(cross(l, v));
-    vec3 newV = normalize(cross(helperVecV, l));
-    vec3 helperVecN = normalize(cross(l, n));
-    vec3 newN = normalize(cross(helperVecN, l));
-    vec3 crossProdVn = cross(newV, newN);*/
+    vec3 exitDir = normalize(inputs.spherePosition - entrancePoint);
+    vec3 exitFront;
+    raySphereIntersection(exitPoint + lineRadius * v, exitDir, inputs.spherePosition, sphereRadius, exitFront);
 
-    //vec3 pn = normalize(cross(v, vec3(0.0, 0.0, 1.0)));
-    vec3 up = normalize(cross(l, v));
-    vec3 pn = normalize(cross(v, up));
-    vec3 helperVecN = normalize(cross(pn, n));
-    vec3 newN = normalize(cross(helperVecN, pn));
-    vec3 crossProdVn = cross(v, newN);
+    //const vec3 right = normalize(cross(l, v));
+    const vec3 right = normalize(cross(l, vp));
 
-    float ribbonPosition = length(crossProdVn);
-    if (dot(l, crossProdVn) < 0.0) {
-        ribbonPosition = -ribbonPosition;
+    vec4 planeEntrance, planeExit;
+    planeEntrance.xyz = normalize(cross(right, inputs.spherePosition - entranceFront));
+    planeEntrance.w = -dot(planeEntrance.xyz, inputs.spherePosition);
+    planeExit.xyz = -normalize(cross(right, inputs.spherePosition - exitFront));
+    planeExit.w = -dot(planeExit.xyz, inputs.spherePosition);
+
+    bool isCulled0 = dot(planeEntrance.xyz, inputs.fragmentPosition) + planeEntrance.w > 0.0f;
+    bool isCulled1 = dot(planeExit.xyz, inputs.fragmentPosition) + planeExit.w > 0.0f;
+
+    float separatorWidthSphere = separatorWidth * lineRadius / sphereRadius;
+    float centerDist = 1.0 - 2.0 * separatorWidthSphere;
+    vec3 surfaceNormal = n;
+
+    if (isCulled0 && isCulled1) {
+        vec3 rayDirection = -v;
+        float t0 = 1e6, t1 = 1e6;
+        bool intersectsPlaneEntrance = rayPlaneIntersection(cameraPosition, rayDirection, planeEntrance, t0);
+        bool intersectsPlaneExit = rayPlaneIntersection(cameraPosition, rayDirection, planeExit, t1);
+        //intersectsPlaneEntrance = false;
+        //t0 = 1e6;
+        if (intersectsPlaneEntrance || intersectsPlaneExit) {
+            float t = min(t0, t1);
+            vec3 hitPos = cameraPosition + t * rayDirection;
+            centerDist = length(hitPos - inputs.spherePosition);
+            //fragColor = vec4(vec3(centerDist <= sphereRadius ? 1.0 : 0.0), 1.0);
+            //return;
+            if (centerDist <= sphereRadius) {
+                if (intersectsPlaneEntrance && t0 < t1) {
+                    surfaceNormal = planeEntrance.xyz;
+                    if (dot(surfaceNormal, v) < 0.0) {
+                        surfaceNormal = -surfaceNormal;
+                    }
+                } else if (intersectsPlaneExit && t1 < t0) {
+                    surfaceNormal = planeExit.xyz;
+                    if (dot(surfaceNormal, v) < 0.0) {
+                        surfaceNormal = -surfaceNormal;
+                    }
+                }
+                centerDist = centerDist / sphereRadius;
+            } else {
+                discard;
+                //centerDist = 1.0 - 2.0 * separatorWidthSphere;
+            }
+        }
     }
-    // Normalize the ribbon position: [-1, 1] -> [0, 1].
-    ribbonPosition = ribbonPosition / 2.0 + 0.5;
 
-
-    // TODO
-    vec3 crossProdVnCircle = cross(planeNormalZero, planeNormalX);
-    ribbonPosition = length(crossProdVnCircle);
-    //ribbonPosition = asin(length(crossProdVnCircle)) / M_PI * 2.0;
-    if (dot(l, crossProdVnCircle) < 0.0) {
-        ribbonPosition = -ribbonPosition;
-    }
-    // Normalize the ribbon position: [-1, 1] -> [0, 1].
-    ribbonPosition = ribbonPosition / 2.0 + 0.5;
-
-
-    float pattern0 = mod(ribbonPosition, 0.1) < 0.05 ? 1.0 : 0.0;
-    float pattern1 = mod(param, 0.1) < 0.05 ? 1.0 : 0.0;
-    float pattern = pattern0 == pattern1 ? 1.0 : 0.0;
 
     // 3) Sample variables from buffers
-    float variableValue, variableNextValue;
-    vec2 variableMinMax, variableNextMinMax;
-    const int varID = int(floor(ribbonPosition * numVariables));
-    float bandPos = ribbonPosition * numVariables - float(varID);
+    float variableValue;
+    vec2 variableMinMax;
+    const int varID = int(floor(centerDist * numVariables));
+    float bandPos = centerDist * numVariables - float(varID);
     const uint actualVarID = sampleActualVarID(varID);
-    sampleVariableFromLineSSBO(
-            fragmentLineID, actualVarID, fragElementID, variableValue, variableMinMax);
-    sampleVariableFromLineSSBO(
-            fragmentLineID, actualVarID, fragElementNextID, variableNextValue, variableNextMinMax);
+    sampleVariableFromLineSSBO(fragmentLineID, actualVarID, fragElementID, variableValue, variableMinMax);
 
     // 4) Determine variable color
-    vec4 surfaceColor = determineColorLinearInterpolate(
-            actualVarID, variableValue, variableNextValue, interpolationFactor);
-
-    // 4.1) Adapt the separator width to the sphere to be independent of the radius.
-    vec3 crossProdLn = cross(n, newN);
-    float centerDist = length(crossProdLn);
-    if (dot(l, crossProdVn) < 0.0) {
-        centerDist = -centerDist;
-    }
-    float ribbonPositionCentered = length(crossProdVnCircle);
-    float h = 1.0 / sqrt(1 - ribbonPositionCentered * ribbonPositionCentered);// * sqrt(1.0 - centerDist * centerDist);
-    float separatorWidthSphere = separatorWidth * lineRadius / (sphereRadius * h);
+    vec4 surfaceColor = determineColor(actualVarID, variableValue);
 
     // 4.2) Draw black separators between single stripes.
     if (separatorWidth > 0) {
@@ -271,8 +279,8 @@ shader FSmain(in VSOutput inputs, out vec4 fragColor)
     float occlusionFactor = 1.0f;
     float shadowFactor = 1.0f;
     vec4 color = computePhongLightingSphere(
-            surfaceColor, occlusionFactor, shadowFactor, inputs.fragmentPosition, n,
-            abs((ribbonPosition - 0.5) * 2.0), separatorWidth * 0.005f);
+            surfaceColor, occlusionFactor, shadowFactor, inputs.fragmentPosition, surfaceNormal,
+            /* abs((ribbonPosition - 0.5) * 2.0) */ 0.5, separatorWidth * 0.005f);
 
     // 5.2) Draw outside stripe.
     if (separatorWidth > 0) {

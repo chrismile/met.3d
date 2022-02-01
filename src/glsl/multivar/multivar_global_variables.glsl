@@ -30,7 +30,9 @@ uniform int numVariables;
 uniform int maxNumVariables;
 
 // Model-view-projection matrix.
-uniform mat4  mvpMatrix;
+uniform mat4 mvpMatrix;
+// View matrix.
+uniform mat4 vMatrix;
 // Number of instances for rendering
 uniform uint numInstances;
 // Radius of tubes

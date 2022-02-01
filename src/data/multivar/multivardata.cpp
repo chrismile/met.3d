@@ -51,6 +51,7 @@ const QStringList sphereRenderingTechniqueShaderFilenames = {
         "",
         "src/glsl/multivar/multivar_sphere_tangent.fx.glsl",
         "src/glsl/multivar/multivar_sphere_great_circle.fx.glsl",
+        "src/glsl/multivar/multivar_sphere_cross_section.fx.glsl",
         "src/glsl/multivar/multivar_sphere_pie_chart.fx.glsl",
         "src/glsl/multivar/multivar_sphere_pie_chart.fx.glsl"
 };
@@ -104,7 +105,7 @@ void MMultiVarData::setProperties(MActor *actor, MQtProperties *properties, QtPr
             ENUM_PROPERTY, "sphere render technique", multiVarGroupProperty);
     QStringList sphereRenderingTechniques =
             {
-                    "None", "Tangent", "Great Circles", "Pie Chart (Area)", "Pie Chart (Color)"
+                    "None", "Tangent", "Great Circles", "Cross Section", "Pie Chart (Area)", "Pie Chart (Color)"
             };
     properties->mEnum()->setEnumNames(sphereRenderTechniqueProperty, sphereRenderingTechniques);
     properties->mEnum()->setValue(sphereRenderTechniqueProperty, int(sphereRenderMode));
@@ -1057,6 +1058,10 @@ void MMultiVarData::reloadSphereShaderEffect()
                     {"MAX_NUM_VARIABLES", QString::fromStdString(std::to_string(MAX_NUM_VARIABLES)) },
             };
 
+    if (diagramType == DiagramDisplayType::NONE || diagramType == DiagramDisplayType::HORIZON_GRAPH)
+    {
+        defines.insert("SUPPORT_LINE_DESATURATION", QString::fromStdString(""));
+    }
     if (sphereRenderMode == MultiVarSphereRenderMode::PIE_CHART_AREA)
     {
         defines.insert("PIE_CHART_AREA", "");

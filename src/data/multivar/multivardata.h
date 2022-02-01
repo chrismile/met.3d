@@ -56,6 +56,7 @@ enum class MultiVarSphereRenderMode {
     NONE,
     TANGENT,
     GREAT_CIRCLE,
+    CROSS_SECTION,
     PIE_CHART_AREA,
     PIE_CHART_COLOR
 };
@@ -225,7 +226,7 @@ private:
     MultiVarRenderMode multiVarRenderMode = MultiVarRenderMode::ORIENTED_COLOR_BANDS;
     MultiVarRadiusMappingMode multiVarRadiusMappingMode = MultiVarRadiusMappingMode::GLOBAL;
     bool internalRepresentationChanged = false; ///< If multiVarRenderMode changes to other mode needing different data.
-    MultiVarSphereRenderMode sphereRenderMode = MultiVarSphereRenderMode::GREAT_CIRCLE;
+    MultiVarSphereRenderMode sphereRenderMode = MultiVarSphereRenderMode::CROSS_SECTION;
 
     // For MULTIVAR_RENDERMODE_ORIENTED_COLOR_BANDS, MULTIVAR_RENDERMODE_ORIENTED_COLOR_BANDS_RIBBON
     enum class OrientedRibbonMode {
