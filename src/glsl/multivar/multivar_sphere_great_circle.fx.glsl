@@ -104,7 +104,7 @@ float squareVec(vec3 v) {
 
 /**
  * Implementation of ray-sphere intersection (idea from A. Glassner et al., "An Introduction to Ray Tracing").
- * For more details see: https://www.siggraph.org//education/materials/HyperGraph/raytrace/rtinter1.htm
+ * For more details see: https://education.siggraph.org/static/HyperGraph/raytrace/rtinter1.htm
  */
 bool raySphereIntersection(
         vec3 rayOrigin, vec3 rayDirection, vec3 sphereCenter, float sphereRadius, out vec3 intersectionPosition) {
@@ -191,7 +191,7 @@ shader FSmain(in VSOutput inputs, out vec4 fragColor)
             inputs.spherePosition, sphereRadius, intersectionPosition);
     vec3 planeNormalZero = normalize(cross(l, intersectionPosition - entrancePoint));
     vec3 planeNormalX = normalize(cross(l, inputs.fragmentPosition - entrancePoint));
-    float planeCosAngle = computeCosAngleBetweenPlanes(planeNormalZero, planeNormalX);
+    //float planeCosAngle = computeCosAngleBetweenPlanes(planeNormalZero, planeNormalX);
 
     // 1) Compute the closest point on the line segment spanned by the entrance and exit point.
     float param = getClosestPointOnLineSegmentParam(inputs.fragmentPosition, entrancePoint, exitPoint);
@@ -208,23 +208,11 @@ shader FSmain(in VSOutput inputs, out vec4 fragColor)
     vec3 crossProdVn = cross(newV, newN);*/
 
     //vec3 pn = normalize(cross(v, vec3(0.0, 0.0, 1.0)));
-    vec3 up = normalize(cross(l, v));
-    vec3 pn = normalize(cross(v, up));
-    vec3 helperVecN = normalize(cross(pn, n));
-    vec3 newN = normalize(cross(helperVecN, pn));
-    vec3 crossProdVn = cross(v, newN);
-
-    float ribbonPosition = length(crossProdVn);
-    if (dot(l, crossProdVn) < 0.0) {
-        ribbonPosition = -ribbonPosition;
-    }
-    // Normalize the ribbon position: [-1, 1] -> [0, 1].
-    ribbonPosition = ribbonPosition / 2.0 + 0.5;
 
 
     // TODO
     vec3 crossProdVnCircle = cross(planeNormalZero, planeNormalX);
-    ribbonPosition = length(crossProdVnCircle);
+    float ribbonPosition = length(crossProdVnCircle);
     //ribbonPosition = asin(length(crossProdVnCircle)) / M_PI * 2.0;
     if (dot(l, crossProdVnCircle) < 0.0) {
         ribbonPosition = -ribbonPosition;
@@ -232,10 +220,6 @@ shader FSmain(in VSOutput inputs, out vec4 fragColor)
     // Normalize the ribbon position: [-1, 1] -> [0, 1].
     ribbonPosition = ribbonPosition / 2.0 + 0.5;
 
-
-    float pattern0 = mod(ribbonPosition, 0.1) < 0.05 ? 1.0 : 0.0;
-    float pattern1 = mod(param, 0.1) < 0.05 ? 1.0 : 0.0;
-    float pattern = pattern0 == pattern1 ? 1.0 : 0.0;
 
     // 3) Sample variables from buffers
     float variableValue, variableNextValue;
@@ -253,14 +237,20 @@ shader FSmain(in VSOutput inputs, out vec4 fragColor)
             actualVarID, variableValue, variableNextValue, interpolationFactor);
 
     // 4.1) Adapt the separator width to the sphere to be independent of the radius.
-    vec3 crossProdLn = cross(n, newN);
-    float centerDist = length(crossProdLn);
-    if (dot(l, crossProdVn) < 0.0) {
-        centerDist = -centerDist;
-    }
     float ribbonPositionCentered = length(crossProdVnCircle);
-    float h = 1.0 / sqrt(1 - ribbonPositionCentered * ribbonPositionCentered);// * sqrt(1.0 - centerDist * centerDist);
+    float h = 1.0 / sqrt(1.0 - ribbonPositionCentered * ribbonPositionCentered);
     float separatorWidthSphere = separatorWidth * lineRadius / (sphereRadius * h);
+
+    float sphereRadiusSq = sphereRadius * sphereRadius;
+    float distanceEntrance = acos(dot(entrancePoint - inputs.spherePosition, inputs.fragmentPosition - inputs.spherePosition) / sphereRadiusSq);
+    float distanceExit = acos(dot(exitPoint - inputs.spherePosition, inputs.fragmentPosition - inputs.spherePosition) / sphereRadiusSq);
+    float distanceToPole = min(distanceEntrance, distanceExit);
+    float distanceToEquator = M_PI * 0.5 - distanceToPole;
+    separatorWidthSphere /= cos(distanceToEquator);// / M_PI * 2.0;
+    if ((varID == 0 && bandPos < 0.5) || (varID == numVariables - 1 && bandPos > 0.5)) {
+        separatorWidthSphere *= 0.5;
+    }
+
 
     // 4.2) Draw black separators between single stripes.
     if (separatorWidth > 0) {
@@ -276,8 +266,8 @@ shader FSmain(in VSOutput inputs, out vec4 fragColor)
 
     // 5.2) Draw outside stripe.
     if (separatorWidth > 0) {
-        vec3 up = normalize(cross(l, v));
-        vec3 pn = normalize(cross(v, up));
+        vec3 up = normalize(cross(v, l));
+        vec3 pn = normalize(cross(up, v));
         vec3 helperVecN = normalize(cross(pn, n));
         vec3 newN = normalize(cross(helperVecN, pn));
         vec3 crossProdVn = cross(v, newN);
@@ -287,10 +277,16 @@ shader FSmain(in VSOutput inputs, out vec4 fragColor)
             ribbonPosition2 = -ribbonPosition2;
         }
 
-        float h = sqrt(1.0 - centerDist * centerDist);
-        float separatorWidthSphere = separatorWidth * lineRadius / (sphereRadius * h);
+        vec3 crossProdLn = cross(n, newN);
+        float centerDist = length(crossProdLn);
+        if (dot(l, crossProdVn) < 0.0) {
+            centerDist = -centerDist;
+        }
 
-        drawSeparatorBetweenStripes(color, ribbonPosition2 / 2.0 + 0.5, separatorWidthSphere * 0.5);
+        float h = sqrt(1.0 - centerDist * centerDist);
+        float separatorWidthSphere = separatorWidth * lineRadius / (sphereRadius * h) * 0.5;
+
+        drawSeparatorBetweenStripes(color, ribbonPosition2 / 2.0 + 0.5, separatorWidthSphere);
     }
 
     //color = vec4(vec3(pattern), 1.0);
@@ -303,6 +299,7 @@ shader FSmain(in VSOutput inputs, out vec4 fragColor)
 #endif
 
     //color.rgb = vec3(ribbonPosition);
+    //color.rgb = vec3(distanceMeet);
 
     fragColor = color;
 }

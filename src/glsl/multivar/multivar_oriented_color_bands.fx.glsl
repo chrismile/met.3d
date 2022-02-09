@@ -144,15 +144,12 @@ shader GSmain(in VSOutput inputs[], out FSInput outputs) {
     vec3 vertexNormalsCurrent[NUM_SEGMENTS];
     vec3 vertexNormalsNext[NUM_SEGMENTS];
 
-    vec2 vertexTexCoordsCurrent[NUM_SEGMENTS];
-    vec2 vertexTexCoordsNext[NUM_SEGMENTS];
-
     vec3 normalCurrent = inputs[0].vNormal;
     vec3 tangentCurrent = inputs[0].vTangent;
-    vec3 binormalCurrent = cross(tangentCurrent, normalCurrent);
+    //vec3 binormalCurrent = cross(tangentCurrent, normalCurrent);
     vec3 normalNext = inputs[1].vNormal;
     vec3 tangentNext = inputs[1].vTangent;
-    vec3 binormalNext = cross(tangentNext, normalNext);
+    //vec3 binormalNext = cross(tangentNext, normalNext);
 
     vec3 tangent = normalize(nextPoint - currentPoint);
 
@@ -302,7 +299,6 @@ shader GSmain(in VSOutput inputs[], out FSInput outputs) {
         outputs.fragNormal = vertexNormalsCurrent[i];
         outputs.fragTangent = tangentCurrent;
         outputs.fragWorldPos = segmentPointCurrent0;
-        //outputs.fragTexCoord = vertexTexCoordsCurrent[i];
 #ifdef TIMESTEP_LENS
         outputs.fragTimestep = inputs[0].vTimestepIndex;
 #endif
@@ -312,7 +308,6 @@ shader GSmain(in VSOutput inputs[], out FSInput outputs) {
         outputs.fragNormal = vertexNormalsCurrent[iN];
         outputs.fragTangent = tangentCurrent;
         outputs.fragWorldPos = segmentPointCurrent1;
-        //outputs.fragTexCoord = vertexTexCoordsCurrent[iN];
         EmitVertex();
 
         if (inputs[1].vElementInterpolant < inputs[0].vElementInterpolant) {
@@ -327,7 +322,6 @@ shader GSmain(in VSOutput inputs[], out FSInput outputs) {
         outputs.fragNormal = vertexNormalsNext[i];
         outputs.fragTangent = tangentNext;
         outputs.fragWorldPos = segmentPointNext0;
-        //outputs.fragTexCoord = vertexTexCoordsNext[i];
 #ifdef TIMESTEP_LENS
         outputs.fragTimestep = inputs[1].vTimestepIndex;
 #endif
@@ -337,7 +331,6 @@ shader GSmain(in VSOutput inputs[], out FSInput outputs) {
         outputs.fragNormal = vertexNormalsNext[iN];
         outputs.fragTangent = tangentNext;
         outputs.fragWorldPos = segmentPointNext1;
-        //outputs.fragTexCoord = vertexTexCoordsNext[iN];
         EmitVertex();
 
         EndPrimitive();

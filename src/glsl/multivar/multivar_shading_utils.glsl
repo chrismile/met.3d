@@ -274,14 +274,24 @@ vec4 computePhongLighting(
     vec3 colorShading = Ia + Id + Is;
 
     if (drawHalo) {
-        vec3 hV = normalize(cross(t, v));
+        /*vec3 hV = normalize(cross(t, v));
         vec3 vNew = normalize(cross(hV, t));
 
         float angle = pow(abs((dot(vNew, n))), haloFactor); // 1.8 + 1.5
         float angleN = pow(abs((dot(v, n))), haloFactor);
 
         float haloNew = min(1.0, mix(1.0f, angle + angleN, 0.9)) * 0.9 + 0.1;
-        colorShading *= (haloNew) * (haloNew);
+        colorShading *= (haloNew) * (haloNew);*/
+
+        vec3 helperVec = normalize(cross(t, v));
+        vec3 newV = normalize(cross(helperVec, t));
+        // Get the symmetric ribbon position (ribbon direction is perpendicular to line direction) between 0 and 1.
+        // NOTE: len(cross(a, b)) == area of parallelogram spanned by a and b.
+        vec3 crossProdVn = cross(newV, n);
+        float ribbonPosition = length(crossProdVn);
+
+        float haloWidth = haloFactor * separatorWidth / float(numVariables);
+        colorShading *= 1.0 - smoothstep(1.0 - haloWidth - fwidth(ribbonPosition), 1.0 - haloWidth, ribbonPosition);
     }
 
     return vec4(colorShading.rgb, surfaceColor.a);

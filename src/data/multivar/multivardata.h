@@ -266,7 +266,7 @@ private:
     float materialConstantDiffuse = 0.7f;
     float materialConstantSpecular = 0.5f;
     float materialConstantSpecularExp = 8.0f;
-    bool drawHalo = false;
+    bool drawHalo = true;
     float haloFactor = 1.0f;
 };
 
