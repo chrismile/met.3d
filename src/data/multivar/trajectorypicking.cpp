@@ -161,6 +161,13 @@ void MTrajectoryPicker::setNumBins(int numBins)
     }
 }
 
+void MTrajectoryPicker::sortByDescendingStdDev() {
+    if (diagramDisplayType == DiagramDisplayType::HORIZON_GRAPH)
+    {
+        static_cast<MHorizonGraph*>(diagram)->sortByDescendingStdDev();
+    }
+}
+
 MTrajectoryPicker::~MTrajectoryPicker()
 {
     freeStorage();

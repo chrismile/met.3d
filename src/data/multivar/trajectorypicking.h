@@ -130,6 +130,7 @@ public:
     void setMeanMetricInfluence(float meanMetricInfluence);
     void setStdDevMetricInfluence(float stdDevMetricInfluence);
     void setNumBins(int numBins);
+    void sortByDescendingStdDev();
 
     // Used for aligning warm conveyor belt trajectories based on their ascension.
     void setSyncTimeAfterAscent(bool _syncTimeAfterAscent);

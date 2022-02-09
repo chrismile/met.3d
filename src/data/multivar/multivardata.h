@@ -226,7 +226,7 @@ private:
     MultiVarRenderMode multiVarRenderMode = MultiVarRenderMode::ORIENTED_COLOR_BANDS;
     MultiVarRadiusMappingMode multiVarRadiusMappingMode = MultiVarRadiusMappingMode::GLOBAL;
     bool internalRepresentationChanged = false; ///< If multiVarRenderMode changes to other mode needing different data.
-    MultiVarSphereRenderMode sphereRenderMode = MultiVarSphereRenderMode::CROSS_SECTION;
+    MultiVarSphereRenderMode sphereRenderMode = MultiVarSphereRenderMode::GREAT_CIRCLE;
 
     // For MULTIVAR_RENDERMODE_ORIENTED_COLOR_BANDS, MULTIVAR_RENDERMODE_ORIENTED_COLOR_BANDS_RIBBON
     enum class OrientedRibbonMode {

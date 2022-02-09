@@ -282,6 +282,24 @@ void MHorizonGraph::setNumBins(int numBins) {
     }
 }
 
+void MHorizonGraph::sortByDescendingStdDev() {
+    sortingIdx = -1;
+
+    sortedVariableIndices.clear();
+    std::vector<std::pair<float, size_t>> differenceMap;
+    differenceMap.resize(variableNames.size());
+    for (size_t varIdx = 0; varIdx < variableNames.size(); varIdx++) {
+        int selectedTimeStepInt = clamp(int(selectedTimeStep), 0, int(ensembleStdDevValues.size() - 1));
+        std::vector<float>& stdDevsAtTime = ensembleStdDevValues.at(selectedTimeStepInt);
+        float stdDev = stdDevsAtTime.at(varIdx);
+        differenceMap.at(varIdx) = std::make_pair(-stdDev, varIdx);
+    }
+    std::sort(differenceMap.begin(), differenceMap.end());
+    for (auto& it : differenceMap) {
+        sortedVariableIndices.push_back(it.second);
+    }
+}
+
 QVector3D MHorizonGraph::transferFunction(float value) const {
     if (std::isnan(value)) {
         return QVector3D(1.0f, 1.0f, 0.0f); // yellow
@@ -699,7 +717,7 @@ void MHorizonGraph::drawSelectedTimeStepLine(const NVGcolor& textColor) {
             selectedTimeStep, timeDisplayMin, timeDisplayMax,
             offsetHorizonBarsX, offsetHorizonBarsX + horizonBarWidth);
     nvgRect(
-            vg, xpos, offsetHorizonBarsY, timeStepLineWidth,
+            vg, xpos - timeStepLineWidth / 2.0f, offsetHorizonBarsY, timeStepLineWidth,
             horizonBarHeight * float(variableNames.size()) + horizonBarMargin * (float(variableNames.size()) - 1.0f));
     nvgFillColor(vg, lineColor);
     nvgFill(vg);
@@ -775,17 +793,30 @@ void MHorizonGraph::drawTicks(const NVGcolor& textColor) {
     nvgFill(vg);
 
     // Arrow indicating selected time step.
+    const float arrowThickness = 4;
+    nvgSave(vg);
+    float arrowPos = (selectedTimeStep - timeDisplayMin) / (timeDisplayMax - timeDisplayMin) * horizonBarWidth;
+    float arrowPosLeft = arrowPos - arrowThickness;
+    float arrowPosRight = arrowPos + arrowThickness;
+    float minPos = (timeMin - timeDisplayMin) / (timeDisplayMax - timeDisplayMin) * horizonBarWidth;
+    float maxPos = (timeMax - timeDisplayMin) / (timeDisplayMax - timeDisplayMin) * horizonBarWidth;
+    float offsetLeft = clamp(minPos - arrowPosLeft, 0.0f, arrowThickness);
+    float offsetRight = clamp(arrowPosRight - maxPos, 0.0f, arrowThickness);
+    nvgScissor(
+            vg, offsetHorizonBarsX - offsetLeft, borderSizeY,
+            horizonBarWidth + offsetLeft + offsetRight, offsetHorizonBarsY - borderSizeY);
     NVGcolor lineColor = nvgRGB(50, 50, 50);
     float xpos = remap(
             selectedTimeStep, timeDisplayMin, timeDisplayMax,
             offsetHorizonBarsX, offsetHorizonBarsX + horizonBarWidth);
     nvgBeginPath(vg);
     nvgMoveTo(vg, xpos, offsetHorizonBarsY);
-    nvgLineTo(vg, xpos + 4, offsetHorizonBarsY - 4);
-    nvgLineTo(vg, xpos - 4, offsetHorizonBarsY - 4);
+    nvgLineTo(vg, xpos + arrowThickness, offsetHorizonBarsY - arrowThickness);
+    nvgLineTo(vg, xpos - arrowThickness, offsetHorizonBarsY - arrowThickness);
     nvgClosePath(vg);
     nvgFillColor(vg, lineColor);
     nvgFill(vg);
+    nvgRestore(vg);
 }
 
 void MHorizonGraph::drawScrollBar(const NVGcolor& textColor) {
@@ -983,6 +1014,15 @@ void MHorizonGraph::mousePressEvent(MSceneViewGLWidget *sceneView, QMouseEvent *
             }
             heightIdx++;
         }
+    }
+    AABB2 legendTopAabb(
+            QVector2D(offsetHorizonBarsX, borderSizeY),
+            QVector2D(offsetHorizonBarsX + horizonBarWidth, offsetHorizonBarsY));
+    AABB2 graphAreaAabb(
+            QVector2D(offsetHorizonBarsX, offsetHorizonBarsY),
+            QVector2D(offsetHorizonBarsX + horizonBarWidth, windowHeight - borderWidth));
+    if (legendTopAabb.contains(mousePosition) || graphAreaAabb.contains(mousePosition)) {
+        mouseOverWidget = true;
     }
 
     // Click on the top legend and move the mouse to change the timescale.

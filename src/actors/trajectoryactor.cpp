@@ -401,6 +401,12 @@ MTrajectoryActor::MTrajectoryActor()
     numBinsProperty->setToolTip(
             "Number of histogram bins used for the Mutual Information (MI) similarity metric.");
 
+    sortByDescendingStdDevProperty = addProperty(
+            CLICK_PROPERTY, "sort by desc. std. dev.", similarityMetricGroup);
+    sortByDescendingStdDevProperty->setToolTip(
+            "Sorts the variables in the diagram by their cross-trajectory "
+            "standard deviation at the selected time step.");
+
     updateSimilarityMetricGroupEnabled();
 
 
@@ -2248,6 +2254,7 @@ void MTrajectoryActor::updateSimilarityMetricGroupEnabled()
 {
     similarityMetricGroup->setEnabled(diagramType == DiagramDisplayType::HORIZON_GRAPH);
     numBinsProperty->setEnabled(similarityMetric == SimilarityMetric::MI);
+    sortByDescendingStdDevProperty->setEnabled(diagramType == DiagramDisplayType::HORIZON_GRAPH);
 }
 
 
@@ -2698,6 +2705,18 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
         for (MTrajectoryPicker* trajectoryPicker : trajectoryPickerMap)
         {
             trajectoryPicker->setNumBins(numBins);
+        }
+        if (suppressActorUpdates()) return;
+        emitActorChangedSignal();
+#endif
+    }
+
+    else if (property == sortByDescendingStdDevProperty)
+    {
+#ifdef USE_EMBREE
+        for (MTrajectoryPicker* trajectoryPicker : trajectoryPickerMap)
+        {
+            trajectoryPicker->sortByDescendingStdDev();
         }
         if (suppressActorUpdates()) return;
         emitActorChangedSignal();

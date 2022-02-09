@@ -500,6 +500,7 @@ private:
     QtProperty *meanMetricInfluenceProperty;
     QtProperty *stdDevMetricInfluenceProperty;
     QtProperty *numBinsProperty;
+    QtProperty *sortByDescendingStdDevProperty;
 
     SimilarityMetric similarityMetric = SimilarityMetric::ABSOLUTE_NCC;
     float meanMetricInfluence = 0.5f;

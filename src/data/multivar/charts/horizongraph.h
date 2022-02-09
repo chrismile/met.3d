@@ -78,6 +78,7 @@ public:
     void setMeanMetricInfluence(float meanMetricInfluence);
     void setStdDevMetricInfluence(float stdDevMetricInfluence);
     void setNumBins(int numBins);
+    void sortByDescendingStdDev();
 
     void mouseMoveEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event) override;
     void mousePressEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event) override;
