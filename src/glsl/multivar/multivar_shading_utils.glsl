@@ -254,8 +254,23 @@ vec4 computePhongLighting(
     const vec3 h = normalize(v + l);
     vec3 t = normalize(tangent);
 
-    vec3 Id = kD * clamp((dot(n, l)), 0.0, 1.0) * diffuseColor;
-    vec3 Is = kS * pow(clamp((dot(n, h)), 0.0, 1.0), s) * diffuseColor;
+    vec3 helperVec = normalize(cross(t, l));
+    vec3 newL = normalize(cross(helperVec, t));
+
+    const float exponent = 1.7;
+    float cosNormal1 = pow(clamp(abs(dot(n, l)), 0.0, 1.0), exponent);
+    float cosNormal2 = pow(clamp(abs(dot(n, newL)), 0.0, 1.0), exponent);
+    float cosNormalCombined = 0.3 * cosNormal1 + 0.7 * cosNormal2;
+    if (dot(n, l) < 0.0) {
+        cosNormalCombined = 0.0;
+    }
+
+    const vec3 lightColor = vec3(1.0);
+    vec3 Id = kD * cosNormalCombined * diffuseColor;
+    vec3 Is = kS * pow(clamp(abs(dot(n, h)), 0.0, 1.0), s) * diffuseColor;
+    //vec3 Id = kD * clamp((dot(n, l)), 0.0, 1.0) * diffuseColor;
+    //vec3 Is = kS * pow(clamp((dot(n, h)), 0.0, 1.0), s) * diffuseColor;
+
     vec3 colorShading = Ia + Id + Is;
 
     if (drawHalo) {

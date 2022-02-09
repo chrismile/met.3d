@@ -462,7 +462,7 @@ void MMultiVarData::loadConfiguration(QSettings *settings)
     materialConstantDiffuse = settings->value("materialConstantDiffuse", 0.7f).toFloat();
     materialConstantSpecular = settings->value("materialConstantSpecular", 0.5f).toFloat();
     materialConstantSpecularExp = settings->value("materialConstantSpecularExp", 8.0f).toFloat();
-    drawHalo = settings->value("drawHalo", true).toBool();
+    drawHalo = settings->value("drawHalo", false).toBool();
     haloFactor = settings->value("haloFactor", 1.0f).toFloat();
 }
 

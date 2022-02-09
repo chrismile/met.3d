@@ -295,7 +295,6 @@ void MTrajectoryPicker::setBaseTrajectories(const MFilteredTrajectories& filtere
         }
     }
 
-    // TODO
     for (const MFilteredTrajectory& trajectory : filteredTrajectories)
     {
         for (size_t i = 0; i < numVars; i++)
@@ -313,6 +312,12 @@ void MTrajectoryPicker::setBaseTrajectories(const MFilteredTrajectories& filtere
             }
         }
     }
+
+    /*for (size_t i = 0; i < numVars; i++)
+    {
+        QVector2D& minMaxVector = minMaxAttributes[int(i)];
+        std::cout << variableNames.at(i) << ": " << std::to_string(minMaxVector.x()) << ", " << std::to_string(minMaxVector.y()) << std::endl;
+    }*/
 
     if (timeAfterAscentIndex >= 0)
     {
