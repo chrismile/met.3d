@@ -523,7 +523,7 @@ float squareVec(QVector3D v) {
 
 /**
  * Implementation of ray-sphere intersection (idea from A. Glassner et al., "An Introduction to Ray Tracing").
- * For more details see: https://www.siggraph.org//education/materials/HyperGraph/raytrace/rtinter1.htm
+ * For more details see: https://education.siggraph.org/static/HyperGraph/raytrace/rtinter1.htm
  */
 bool lineSegmentSphereIntersection(
         const QVector3D& p0, const QVector3D& p1, const QVector3D& sphereCenter, float sphereRadius, float& hitT) {
@@ -564,6 +564,55 @@ bool lineSegmentSphereIntersection(
     return true;
 }
 
+bool halfLineSphereIntersection(
+        const QVector3D& p0, const QVector3D& p1, const QVector3D& sphereCenter, float sphereRadius,
+        bool isLeftOpen, float& hitT) {
+    const QVector3D& rayOrigin = p0;
+    const QVector3D rayDirection = (p1 - p0).normalized();
+    const float rayLength = (p1 - p0).length();
+
+    float A = SQR(rayDirection.x()) + SQR(rayDirection.y()) + SQR(rayDirection.z());
+    float B = 2.0f * (
+            rayDirection.x() * (rayOrigin.x() - sphereCenter.x())
+            + rayDirection.y() * (rayOrigin.y() - sphereCenter.y())
+            + rayDirection.z() * (rayOrigin.z() - sphereCenter.z())
+    );
+    float C =
+            SQR(rayOrigin.x() - sphereCenter.x())
+            + SQR(rayOrigin.y() - sphereCenter.y())
+            + SQR(rayOrigin.z() - sphereCenter.z())
+            - SQR(sphereRadius);
+
+    float discriminant = SQR(B) - 4.0f * A * C;
+    if (discriminant < 0.0f) {
+        return false; // No intersection
+    }
+
+    float discriminantSqrt = std::sqrt(discriminant);
+    float t0 = (-B - discriminantSqrt) / (2.0f * A);
+    float t1 = (-B + discriminantSqrt) / (2.0f * A);
+
+    // Intersection(s) behind the ray origin?
+    if (isLeftOpen) {
+        if (t0 <= rayLength) {
+            hitT = t0 / rayLength;
+        } else if (t1 <= rayLength) {
+            hitT = t1 / rayLength;
+        } else {
+            return false;
+        }
+    } else {
+        if (t0 >= 0.0f) {
+            hitT = t0 / rayLength;
+        } else if (t1 >= 0.0f) {
+            hitT = t1 / rayLength;
+        } else {
+            return false;
+        }
+    }
+
+    return true;
+}
 
 struct LineElementIdData {
     float centerIdx;
@@ -633,7 +682,18 @@ void MBezierTrajectories::updateTimeStepSphereRenderDataIfNecessary(
             }
         }
         if (!foundEntrancePoint) {
-            entrancePoints.push_back(trajectory.positions.at(0));
+            if (trajectory.positions.size() == 1) {
+                entrancePoints.push_back(trajectory.positions.at(0));
+            } else {
+                const QVector3D& p0 = trajectory.positions.at(0);
+                const QVector3D& p1 = trajectory.positions.at(1);
+                float hitT;
+                if (halfLineSphereIntersection(p0, p1, sphereCenter, sphereRadius, true, hitT)) {
+                    entrancePoints.push_back((1.0f - hitT) * p0 + hitT * p1);
+                } else {
+                    entrancePoints.push_back(trajectory.positions.at(0));
+                }
+            }
         }
 
         float exitIdx = float(trajectory.positions.size() - 1);
@@ -650,7 +710,18 @@ void MBezierTrajectories::updateTimeStepSphereRenderDataIfNecessary(
             }
         }
         if (!foundExitPoint) {
-            exitPoints.push_back(trajectory.positions.at(trajectory.positions.size() - 1));
+            if (trajectory.positions.size() == 1) {
+                exitPoints.push_back(trajectory.positions.at(trajectory.positions.size() - 1));
+            } else {
+                const QVector3D& p0 = trajectory.positions.at(trajectory.positions.size() - 2);
+                const QVector3D& p1 = trajectory.positions.at(trajectory.positions.size() - 1);
+                float hitT;
+                if (halfLineSphereIntersection(p0, p1, sphereCenter, sphereRadius, false, hitT)) {
+                    exitPoints.push_back((1.0f - hitT) * p0 + hitT * p1);
+                } else {
+                    exitPoints.push_back(trajectory.positions.at(trajectory.positions.size() - 1));
+                }
+            }
         }
 
         LineElementIdData lineElementIdData{};
