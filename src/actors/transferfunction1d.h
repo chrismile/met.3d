@@ -120,6 +120,8 @@ public:
 
     inline const std::vector<unsigned char> &getColorValuesByteArray() const { return colorValues; }
 
+    void setDisplayName(const QString& name);
+
 protected:
     /**
       Generates the colourbar texture with the colour mapping specified by the
@@ -168,6 +170,9 @@ private:
     MColourmapPool colourmapPool;
 
     TFEditor::MTransferFunctionEditor *editor;
+
+    // Optional display name next to the transfer function.
+    QString displayName;
 
     // General properties.
     bool        enableAlpha;

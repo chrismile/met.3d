@@ -29,7 +29,7 @@
 
 // standard library imports
 #include <typeinfo>
-#include <float.h>
+#include <cfloat>
 
 // related third party imports
 #include <QtCore>

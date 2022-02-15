@@ -79,6 +79,7 @@ public:
     void setStdDevMetricInfluence(float stdDevMetricInfluence);
     void setNumBins(int numBins);
     void sortByDescendingStdDev();
+    void setShowMinMaxValue(bool show);
 
     void mouseMoveEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event) override;
     void mousePressEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event) override;
@@ -181,6 +182,7 @@ private:
     void sortVariables(int newSortingIdx, bool forceRecompute = false);
     SimilarityMetric similarityMetric = SimilarityMetric::ABSOLUTE_NCC;
     int numBins = 10;
+    bool showMinMaxValue = true;
     float meanMetricInfluence = 0.5f;
     float stdDevMetricInfluence = 0.25f;
     int sortingIdx = -1;

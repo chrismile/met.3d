@@ -407,6 +407,12 @@ MTrajectoryActor::MTrajectoryActor()
             "Sorts the variables in the diagram by their cross-trajectory "
             "standard deviation at the selected time step.");
 
+    showMinMaxValueProperty = addProperty(
+            BOOL_PROPERTY, "show min/max", similarityMetricGroup);
+    properties->mBool()->setValue(showMinMaxValueProperty, showMinMaxValue);
+    showMinMaxValueProperty->setToolTip(
+            "Whether to show the minimum and maximum value in the diagram if the zoom factor permits it.");
+
     updateSimilarityMetricGroupEnabled();
 
 
@@ -771,6 +777,8 @@ void MTrajectoryActor::loadConfiguration(QSettings *settings)
             0.0, 100.0, 2, 0.1, " (factor)");
     numBins = settings->value("numBins", 10).toInt();
     properties->setInt(numBinsProperty, numBins, 1, 20);
+    showMinMaxValue = settings->value("showMinMaxValue", true).toBool();
+    properties->mBool()->setValue(showMinMaxValueProperty, showMinMaxValue);
     updateSimilarityMetricGroupEnabled();
 
     syncTimeAfterAscent = settings->value("syncTimeAfterAscent", false).toBool();
@@ -2255,6 +2263,7 @@ void MTrajectoryActor::updateSimilarityMetricGroupEnabled()
     similarityMetricGroup->setEnabled(diagramType == DiagramDisplayType::HORIZON_GRAPH);
     numBinsProperty->setEnabled(similarityMetric == SimilarityMetric::MI);
     sortByDescendingStdDevProperty->setEnabled(diagramType == DiagramDisplayType::HORIZON_GRAPH);
+    showMinMaxValueProperty->setEnabled(diagramType == DiagramDisplayType::HORIZON_GRAPH);
 }
 
 
@@ -2717,6 +2726,18 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
         for (MTrajectoryPicker* trajectoryPicker : trajectoryPickerMap)
         {
             trajectoryPicker->sortByDescendingStdDev();
+        }
+        if (suppressActorUpdates()) return;
+        emitActorChangedSignal();
+#endif
+    }
+
+    else if (property == showMinMaxValueProperty)
+    {
+#ifdef USE_EMBREE
+        for (MTrajectoryPicker* trajectoryPicker : trajectoryPickerMap)
+        {
+            trajectoryPicker->setShowMinMaxValue(showMinMaxValue);
         }
         if (suppressActorUpdates()) return;
         emitActorChangedSignal();

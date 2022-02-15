@@ -501,11 +501,13 @@ private:
     QtProperty *stdDevMetricInfluenceProperty;
     QtProperty *numBinsProperty;
     QtProperty *sortByDescendingStdDevProperty;
+    QtProperty *showMinMaxValueProperty;
 
     SimilarityMetric similarityMetric = SimilarityMetric::ABSOLUTE_NCC;
     float meanMetricInfluence = 0.5f;
     float stdDevMetricInfluence = 0.25f;
     int numBins = 10;
+    bool showMinMaxValue = true;
 
     QtProperty *syncTimeAfterAscentProperty;
     bool syncTimeAfterAscent = false;

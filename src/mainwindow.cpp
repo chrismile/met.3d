@@ -33,7 +33,7 @@
 
 // standard library imports
 #include <iostream>
-#include <float.h>
+#include <cfloat>
 
 // related third party imports
 #include <QDockWidget>
@@ -55,6 +55,7 @@
 #include "system/applicationconfiguration.h"
 #include "system/pipelineconfiguration.h"
 #include "data/structuredgrid.h"
+#include "data/multivar/multisampling.h"
 
 using namespace std;
 
@@ -83,7 +84,11 @@ MMainWindow::MMainWindow(QStringList commandLineArguments, QWidget *parent)
     QSurfaceFormat format;
     format.setDepthBufferSize(24);
     format.setStencilBufferSize(8);
+#ifdef __linux__
+    format.setSamples(getMaxSamplesGLImpl(32));
+#else
     format.setSamples(8); // TODO: Query maximum using GLX etc.?
+#endif
     format.setProfile(QSurfaceFormat::CoreProfile);
     QSurfaceFormat::setDefaultFormat(format);
 #else

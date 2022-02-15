@@ -4,7 +4,7 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2021 Christoph Neuhauser
+**  Copyright 2022 Christoph Neuhauser
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -23,26 +23,26 @@
 **  along with Met.3D.  If not, see <http://www.gnu.org/licenses/>.
 **
 *******************************************************************************/
+#ifndef MET_3D_MULTISAMPLING_HPP
+#define MET_3D_MULTISAMPLING_HPP
 
 // standard library imports
-#include <cmath>
 
 // related third party imports
-#include <log4cplus/logger.h>
-#include <log4cplus/loggingmacros.h>
-#include <QGuiApplication>
-#include <QScreen>
 
 // local application imports
-#include "hidpi.h"
 
 namespace Met3D
 {
 
-float getHighDPIScaleFactor()
-{
-    QScreen* screen = QGuiApplication::screens().front();
-    return float(screen->logicalDotsPerInch()) / 96.0f;
-}
+/**
+ * Query the numbers of multisample samples possible.
+ * @param desiredSamples Maximum number of desired samples.
+ * @return The number of multisamples (min(desiredSamples, maxSamples)).
+ */
+int getMaxSamplesGLImpl(int desiredSamples);
 
 }
+
+
+#endif //MET_3D_MULTISAMPLING_HPP

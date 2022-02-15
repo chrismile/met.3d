@@ -83,10 +83,10 @@ QString getFontPath(const std::set<QString>& preferredFontNames) {
     }
 #endif
 
-    std::cout << fontLocations.size() << std::endl;
+    /*std::cout << fontLocations.size() << std::endl;
     for (const QString& fontLocation : fontLocations) {
         std::cout << fontLocation.toStdString() << std::endl;
-    }
+    }*/
 
     QString matchingFontPath;
     QFontDatabase fontDatabase = QFontDatabase();
@@ -96,7 +96,7 @@ QString getFontPath(const std::set<QString>& preferredFontNames) {
         while (dirIterator.hasNext()) {
             QString fontPath = dirIterator.next();
             QString fontPathLower = fontPath.toLower();
-            std::cout << fontPath.toStdString() << std::endl;
+            //std::cout << fontPath.toStdString() << std::endl;
 
             int idx = fontDatabase.addApplicationFont(fontPath);
             if (idx >= 0) {
@@ -108,7 +108,7 @@ QString getFontPath(const std::set<QString>& preferredFontNames) {
                         && !fontPathLower.contains("oblique")) {
                         matchingFontPath = fontPath;
                     }
-                    std::cout << name.toStdString() << std::endl;
+                    //std::cout << name.toStdString() << std::endl;
                 }
             }
         }
@@ -137,10 +137,10 @@ void MDiagramBase::createNanoVgHandle() {
         static bool fontFilenameLoaded = false;
         if (!fontFilenameLoaded)
         {
-            fontFilename = getFontPath({ "Liberation Sans", "Droid Sans" });
+            fontFilename = getFontPath({ "Liberation Sans", "Droid Sans", "Courier New" });
             fontFilenameLoaded = true;
         }
-        std::cout << "Used font: " << fontFilename.toStdString() << std::endl;
+        LOG4CPLUS_DEBUG(mlog, "Used font: " << fontFilename.toStdString() << flush);
         int font = nvgCreateFont(vg, "sans", fontFilename.toStdString().c_str());
         if (font == -1) {
             LOG4CPLUS_ERROR(mlog, "Error in MDiagramBase::MDiagramBase: Couldn't find the font file.");

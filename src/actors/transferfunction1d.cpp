@@ -366,6 +366,24 @@ void MTransferFunction1D::setSteps(int steps)
 }
 
 
+void MTransferFunction1D::setDisplayName(const QString& name)
+{
+    enableActorUpdates(false);
+
+    displayName = name;
+
+    enableActorUpdates(true);
+
+    if (isInitialized())
+    {
+        generateTransferTexture();
+        generateBarGeometry();
+        emit transferFunctionChanged(this);
+        emitActorChangedSignal();
+    }
+}
+
+
 void MTransferFunction1D::saveConfiguration(QSettings *settings)
 {
     MTransferFunction::saveConfiguration(settings);
@@ -1288,6 +1306,20 @@ void MTransferFunction1D::generateBarGeometry()
                           labelColour, MTextManager::MIDDLERIGHT,
                           labelbbox, labelBBoxColour)
                       );
+    }
+
+    if (!displayName.isEmpty())
+    {
+        labels.append(tm->addTextVertical(
+                displayName,
+                MTextManager::CLIPSPACE,
+                ulcrnr[0] + width + labelSpacing,// / 2.0f,
+                ulcrnr[1] - height / 2.0f,
+                -1,
+                labelsize,
+                labelColour, MTextManager::UPPERCENTRE,
+                labelbbox, labelBBoxColour,
+                0.1, true));
     }
 
     int significantDigits =

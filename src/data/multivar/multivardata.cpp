@@ -412,7 +412,6 @@ void MMultiVarData::loadConfiguration(QSettings *settings)
     for (int varIdx = 0; varIdx < numVariables; varIdx++)
     {
         std::string testStr = QString("varName#%1").arg(varIdx + 1).toStdString();
-        std::cout << testStr << std::endl;
         QString varName = settings->value(QString("varName#%1").arg(varIdx + 1)).toString();
         bool varSelected = settings->value(QString("varSelected#%1").arg(varIdx + 1)).toBool();
         varNames.push_back(varName);
@@ -588,6 +587,7 @@ void MMultiVarData::initTransferFunctionsMultiVar(uint32_t numVariables)
 void MMultiVarData::setTransferFunctionMultiVar(int varIdx, MTransferFunction1D *tf)
 {
     transferFunctionsMultiVar[varIdx] = tf;
+    tf->setDisplayName(varNames.at(varIdx));
     registerTransferFunction(tf);
     varDiverging[varIdx] = tf->getMHCLType() == MTransferFunction1D::DIVERGING ? 1 : 0;
     varDivergingChanged = true;
@@ -621,6 +621,9 @@ void MMultiVarData::setTransferFunctionMultiVarFromProperty(int varIdx)
 
     if (tfName == "None")
     {
+        if (transferFunctionsMultiVar[varIdx]) {
+            transferFunctionsMultiVar[varIdx]->setDisplayName("");
+        }
         transferFunctionsMultiVar[varIdx] = nullptr;
         return;
     }
@@ -635,6 +638,7 @@ void MMultiVarData::setTransferFunctionMultiVarFromProperty(int varIdx)
             if (tf->transferFunctionName() == tfName)
             {
                 transferFunctionsMultiVar[varIdx] = tf;
+                tf->setDisplayName(varNames.at(varIdx));
                 varDiverging[varIdx] = tf->getMHCLType() == MTransferFunction1D::DIVERGING ? 1 : 0;
                 varDivergingChanged = true;
                 registerTransferFunction(tf);

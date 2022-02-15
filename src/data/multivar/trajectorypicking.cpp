@@ -113,6 +113,7 @@ void MTrajectoryPicker::setDiagramType(DiagramDisplayType type)
         horizonGraph->setMeanMetricInfluence(meanMetricInfluence);
         horizonGraph->setStdDevMetricInfluence(stdDevMetricInfluence);
         horizonGraph->setNumBins(numBins);
+        horizonGraph->setShowMinMaxValue(showMinMaxValue);
     }
 
     if (diagram)
@@ -161,10 +162,20 @@ void MTrajectoryPicker::setNumBins(int numBins)
     }
 }
 
-void MTrajectoryPicker::sortByDescendingStdDev() {
+void MTrajectoryPicker::sortByDescendingStdDev()
+{
     if (diagramDisplayType == DiagramDisplayType::HORIZON_GRAPH)
     {
         static_cast<MHorizonGraph*>(diagram)->sortByDescendingStdDev();
+    }
+}
+
+void MTrajectoryPicker::setShowMinMaxValue(bool show)
+{
+    this->showMinMaxValue = show;
+    if (diagramDisplayType == DiagramDisplayType::HORIZON_GRAPH)
+    {
+        static_cast<MHorizonGraph*>(diagram)->setShowMinMaxValue(showMinMaxValue);
     }
 }
 
@@ -313,11 +324,17 @@ void MTrajectoryPicker::setBaseTrajectories(const MFilteredTrajectories& filtere
         }
     }
 
-    /*for (size_t i = 0; i < numVars; i++)
+    if (showMinMaxValue)
     {
-        QVector2D& minMaxVector = minMaxAttributes[int(i)];
-        std::cout << variableNames.at(i) << ": " << std::to_string(minMaxVector.x()) << ", " << std::to_string(minMaxVector.y()) << std::endl;
-    }*/
+        for (size_t i = 0; i < numVars; i++)
+        {
+            QVector2D& minMaxVector = minMaxAttributes[int(i)];
+            LOG4CPLUS_DEBUG(
+                    mlog,
+                    variableNames.at(i) << ": " << std::to_string(minMaxVector.x())
+                                        << ", " << std::to_string(minMaxVector.y()));
+        }
+    }
 
     if (timeAfterAscentIndex >= 0)
     {

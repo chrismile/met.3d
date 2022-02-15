@@ -351,6 +351,11 @@ target_link_libraries(Met3D
                         #${EIGEN3_LIBRARIES}
   )
 
+
+if (UNIX AND NOT APPLE)
+    target_link_libraries(Met3D dl)
+endif()
+
 if(embree_FOUND)
     if(VCPKG_TOOLCHAIN)
         target_link_libraries(Met3D embree)

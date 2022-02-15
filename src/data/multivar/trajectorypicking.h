@@ -131,6 +131,7 @@ public:
     void setStdDevMetricInfluence(float stdDevMetricInfluence);
     void setNumBins(int numBins);
     void sortByDescendingStdDev();
+    void setShowMinMaxValue(bool show);
 
     // Used for aligning warm conveyor belt trajectories based on their ascension.
     void setSyncTimeAfterAscent(bool _syncTimeAfterAscent);
@@ -255,6 +256,7 @@ private:
     float meanMetricInfluence = 0.5f;
     float stdDevMetricInfluence = 0.25f;
     int numBins = 10;
+    bool showMinMaxValue = true;
 
     GLuint textureUnit;
     MFilteredTrajectories baseTrajectories;

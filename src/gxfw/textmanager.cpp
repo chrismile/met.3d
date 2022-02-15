@@ -148,9 +148,9 @@ void MTextManager::renderChar(
     float scaleX = scale * 2. / sceneView->getViewPortWidth(); // latter in px
     float scaleY = scale * 2. / sceneView->getViewPortHeight(); // latter in px
 
-    // Coordinate x specifies the "curser position", y the position of
+    // Coordinate x specifies the "cursor position", y the position of
     // the base line of the string. To correctly place the quad that
-    // accomodates the character texture, we compute the coordinates
+    // accommodates the character texture, we compute the coordinates
     // of the upper left corner of the quad, as well as its width and
     // height in clip coordinates. The variables bitmapLeft and bitmapTop
     // are provided by FreeType and describe the offset of the character
@@ -283,9 +283,9 @@ void MTextManager::renderText_2DClip_i(QString text, float x, float y, float siz
         unsigned char c = text.at(i).toAscii();
         MTextureAtlasCharacterInfo *ci = &characterInfo[c];
 
-        // Coordinate x specifies the "curser position", y the position of
+        // Coordinate x specifies the "cursor position", y the position of
         // the base line of the string. To correctly place the quad that
-        // accomodates the character texture, we compute the coordinates
+        // accommodates the character texture, we compute the coordinates
         // of the upper left corner of the quad, as well as its width and
         // height in clip coordinates. The variables bitmapLeft and bitmapTop
         // are provided by FreeType and describe the offset of the character
@@ -403,9 +403,9 @@ void MTextManager::renderText(
         unsigned char c = text.at(i).toAscii();
         MTextureAtlasCharacterInfo *ci = &characterInfo[c];
 
-        // Coordinate x specifies the "curser position", y the position of
+        // Coordinate x specifies the "cursor position", y the position of
         // the base line of the string. To correctly place the quad that
-        // accomodates the character texture, we compute the coordinates
+        // accommodates the character texture, we compute the coordinates
         // of the upper left corner of the quad, as well as its width and
         // height in clip coordinates. The variables bitmapLeft and bitmapTop
         // are provided by FreeType and describe the offset of the character
@@ -600,7 +600,7 @@ MLabel* MTextManager::addText(
     float maxYOfBBox = -9999;
     float minYOfBBox =  9999;
 
-    // Curser position in 2D character bitmap pixel space.
+    // Cursor position in 2D character bitmap pixel space.
     float cursorX = 0;
     float cursorY = 0;
 
@@ -620,9 +620,9 @@ MLabel* MTextManager::addText(
         unsigned char c = text.at(i).toAscii();
         MTextureAtlasCharacterInfo *ci = &characterInfo[c];
 
-        // Coordinate x specifies the "curser position", y the position of
+        // Coordinate x specifies the "cursor position", y the position of
         // the base line of the string. To correctly place the quad that
-        // accomodates the character texture, we compute the coordinates
+        // accommodates the character texture, we compute the coordinates
         // of the upper left corner of the quad, as well as its width and
         // height in clip coordinates. The variables bitmapLeft and bitmapTop
         // are provided by FreeType and describe the offset of the character
@@ -766,6 +766,228 @@ MLabel* MTextManager::addText(
 	// glBufferData(GL_ARRAY_BUFFER, sizeof(coordinates), !! does only get size of float pointer !!
 	glBufferData(GL_ARRAY_BUFFER, sizeof(float) * coordinates.size(), 
 		coordinates.data(), GL_STATIC_DRAW); CHECK_GL_ERROR;
+    glBindBuffer(GL_ARRAY_BUFFER, 0); CHECK_GL_ERROR;
+
+#ifdef USE_QOPENGLWIDGET
+    MGLResourcesManager::getInstance()->doneCurrent();
+#endif
+
+    // Store label information in "labels" list.
+    labelPool.insert(label);
+
+    return label;
+}
+
+
+MLabel* MTextManager::addTextVertical(
+        QString text, CoordinateSystem coordsys,
+        float x, float y, float z, float size, QColor colour,
+        TextAnchor anchor, bool bbox, QColor bboxColour, float bboxPadFraction,
+        bool orientationCcw)
+{
+    if (!isInitialized())
+        throw MInitialisationError("cannot add text labels before the OpenGL "
+                                   "context has been initialised",
+                                   __FILE__, __LINE__);
+
+    // Min/max Y coordinate (character pixel space) of bounding box, updated in
+    // loop below.
+    float maxYOfBBox = -9999;
+    float minYOfBBox =  9999;
+
+    // Cursor position in 2D character bitmap pixel space.
+    float cursorX = 0;
+    float cursorY = 0;
+
+    // "coordinates" stores vertex and texture coordinates of the triangles
+    // that will represent the string. The first 8 entries are used for
+    // bounding box coordinates. n is a counter used to index coordinates.
+    std::vector<float> coordinates(8 + 24 * text.size());
+    int n = 8; // reserve first 8 entries for bbox coordinates
+
+    // Estimate width of label in pixel size (mk: used for contour labels)
+    float textWidth = 0;
+
+    for (int i = 0; i < text.size(); i++)
+    {
+        // Shortcuts to the current character and its texture and alignment
+        // information.
+        unsigned char c = text.at(i).toAscii();
+        MTextureAtlasCharacterInfo *ci = &characterInfo[c];
+
+        // Coordinate x specifies the "cursor position", y the position of
+        // the base line of the string. To correctly place the quad that
+        // accommodates the character texture, we compute the coordinates
+        // of the upper left corner of the quad, as well as its width and
+        // height in clip coordinates. The variables bitmapLeft and bitmapTop
+        // are provided by FreeType and describe the offset of the character
+        // with respect to cursor position and baseline for correct alignment.
+        float xUpperLeft = cursorX + ci->bitmapLeft;
+        float yUpperLeft = cursorY + ci->bitmapTop;
+        float charWidth  = ci->bitmapWidth;
+        float charHeight = ci->bitmapHeight;
+
+        textWidth += charWidth;
+
+        // Update min/max Y coordinate (clip space) of bounding box.
+        maxYOfBBox = max(maxYOfBBox, yUpperLeft);
+        minYOfBBox = min(minYOfBBox, yUpperLeft - charHeight);
+
+        // Structure of ctriangles: x1, y1, s1, t1, x2, y2, ... with x, y being
+        // the clip space coordinates of each point ([-1..1x-1..1]) and s, t
+        // being the corresponding texture coordinates ([0..1x0..1]).
+
+        // FIRST TRIANGLE (lower left)
+        // lower left corner of the quad
+        coordinates[n++] = xUpperLeft;
+        coordinates[n++] = yUpperLeft - charHeight;
+        coordinates[n++] = ci->xOffset_TexCoords;
+        coordinates[n++] = ci->bitmapHeight / textureAtlasHeight;
+        // upper left corner of the quad
+        coordinates[n++] = xUpperLeft;
+        coordinates[n++] = yUpperLeft;
+        coordinates[n++] = ci->xOffset_TexCoords;
+        coordinates[n++] = 0;
+        // lower right corner of the quad
+        coordinates[n++] = xUpperLeft + charWidth;
+        coordinates[n++] = yUpperLeft - charHeight;
+        coordinates[n++] = ci->xOffset_TexCoords + ci->bitmapWidth / textureAtlasWidth;
+        coordinates[n++] = ci->bitmapHeight / textureAtlasHeight;
+
+        // SECOND TRIANGLE (upper right)
+        // upper left corner of the quad
+        coordinates[n++] = xUpperLeft;
+        coordinates[n++] = yUpperLeft;
+        coordinates[n++] = ci->xOffset_TexCoords;
+        coordinates[n++] = 0;
+        // lower right corner of the quad
+        coordinates[n++] = xUpperLeft + charWidth;
+        coordinates[n++] = yUpperLeft - charHeight;
+        coordinates[n++] = ci->xOffset_TexCoords + ci->bitmapWidth / textureAtlasWidth;
+        coordinates[n++] = ci->bitmapHeight / textureAtlasHeight;
+        // upper right corner of the quad
+        coordinates[n++] = xUpperLeft + charWidth;
+        coordinates[n++] = yUpperLeft;
+        coordinates[n++] = ci->xOffset_TexCoords + ci->bitmapWidth / textureAtlasWidth;
+        coordinates[n++] = 0;
+
+        // Advance the cursor position for the next character.
+        cursorX += ci->advanceX;
+    }
+
+    // Store bounding box coordinates:
+    float pad = textureAtlasHeight * bboxPadFraction;
+    // lower left (lower left x, y of first triangle from ctriangles).
+    coordinates[0] = coordinates[8  ] - pad;
+    coordinates[1] = minYOfBBox       - pad;
+    // upper left
+    coordinates[2] = coordinates[8  ] - pad;
+    coordinates[3] = maxYOfBBox       + pad;
+    // lower right
+    coordinates[4] = coordinates[n-4] + pad;
+    coordinates[5] = minYOfBBox       - pad;
+    // upper right (upper right x, y of the last triangle).
+    coordinates[6] = coordinates[n-4] + pad;
+    coordinates[7] = maxYOfBBox       + pad;
+
+    QVector2D offset = QVector2D(0, 0); // (anchor == BASELINELEFT)
+    if (anchor == BASELINERIGHT)
+        offset = QVector2D(coordinates[8]-coordinates[n-4], 0);
+    if (anchor == BASELINECENTRE)
+        offset = QVector2D((coordinates[8]-coordinates[n-4])/2., 0);
+    else if (anchor == UPPERLEFT)
+        offset = QVector2D(0, cursorY-maxYOfBBox);
+    else if (anchor == UPPERRIGHT)
+        offset = QVector2D(coordinates[8]-coordinates[n-4], cursorY-maxYOfBBox);
+    else if (anchor == UPPERCENTRE)
+        offset = QVector2D((coordinates[8]-coordinates[n-4])/2., cursorY-maxYOfBBox);
+    else if (anchor == LOWERLEFT)
+        offset = QVector2D(0, cursorY-minYOfBBox);
+    else if (anchor == LOWERRIGHT)
+        offset = QVector2D(coordinates[8]-coordinates[n-4], cursorY-minYOfBBox);
+    else if (anchor == LOWERCENTRE)
+        offset = QVector2D((coordinates[8]-coordinates[n-4])/2., cursorY-minYOfBBox);
+    else if (anchor == MIDDLELEFT)
+        offset = QVector2D(0, cursorY-minYOfBBox - (maxYOfBBox-minYOfBBox)/2.);
+    else if (anchor == MIDDLERIGHT)
+        offset = QVector2D(coordinates[8]-coordinates[n-4],
+                           cursorY-minYOfBBox - (maxYOfBBox-minYOfBBox)/2.);
+    else if (anchor == MIDDLECENTRE)
+        offset = QVector2D((coordinates[8]-coordinates[n-4])/2.,
+                           cursorY-minYOfBBox - (maxYOfBBox-minYOfBBox)/2.);
+
+    // Apply offset to coordinates.
+    if (orientationCcw)
+    {
+        for (int i = 0; i < 8; i += 2)
+        {
+            // bounding box
+            float xcoord = coordinates[i];
+            float ycoord = coordinates[i+1];
+            coordinates[i]   = -ycoord - offset.y();
+            coordinates[i+1] = +xcoord + offset.x();
+        }
+
+        for (int i = 8; i < n; i += 4)
+        {
+            // letter "triangles"
+            float xcoord = coordinates[i];
+            float ycoord = coordinates[i+1];
+            coordinates[i]   = -ycoord - offset.y();
+            coordinates[i+1] = +xcoord + offset.x();
+        }
+    }
+    else
+    {
+        for (int i = 0; i < 8; i += 2)
+        {
+            // bounding box
+            float xcoord = coordinates[i];
+            float ycoord = coordinates[i+1];
+            coordinates[i]   = +ycoord + offset.y();
+            coordinates[i+1] = -xcoord - offset.x();
+        }
+
+        for (int i = 8; i < n; i += 4)
+        {
+            // letter "triangles"
+            float xcoord = coordinates[i];
+            float ycoord = coordinates[i+1];
+            coordinates[i]   = +ycoord + offset.y();
+            coordinates[i+1] = -xcoord - offset.x();
+        }
+    }
+
+    // Create an MLabel object that stores the information necessary for
+    // rendering the text later.
+    MLabel* label = new MLabel();
+    label->anchor           = QVector3D(x, y, z);
+    label->anchorOffset     = QVector3D(); // can be set per-frame by "owner"
+    label->coordinateSystem = coordsys;
+    label->textColour       = colour;
+    label->numCharacters    = text.size();
+    label->size             = size;
+    label->width            = textWidth + pad;
+    label->drawBBox         = bbox;
+    label->bboxColour       = bboxColour;
+
+    // Make sure that "MGLResourcesManager" is the currently active context,
+    // otherwise glDrawArrays on the VBO generated here will fail in any other
+    // context than the currently active. The "MGLResourcesManager" context is
+    // shared with all visible contexts, hence modifying the VBO there works
+    // fine.
+    MGLResourcesManager::getInstance()->makeCurrent();
+
+    // Generate a vertex buffer object for the geometry/texture coordinates.
+    glGenBuffers(1, &(label->vbo)); CHECK_GL_ERROR;
+    LOG4CPLUS_TRACE(mlog, "uploading label \"" << text.toStdString()
+                                               << "\" to VBO " << label->vbo << flush);
+
+    // Upload data to GPU.
+    glBindBuffer(GL_ARRAY_BUFFER, label->vbo); CHECK_GL_ERROR;
+    // glBufferData(GL_ARRAY_BUFFER, sizeof(coordinates), !! does only get size of float pointer !!
+    glBufferData(GL_ARRAY_BUFFER, sizeof(float) * coordinates.size(),
+                 coordinates.data(), GL_STATIC_DRAW); CHECK_GL_ERROR;
     glBindBuffer(GL_ARRAY_BUFFER, 0); CHECK_GL_ERROR;
 
 #ifdef USE_QOPENGLWIDGET

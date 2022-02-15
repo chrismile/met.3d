@@ -300,6 +300,10 @@ void MHorizonGraph::sortByDescendingStdDev() {
     }
 }
 
+void MHorizonGraph::setShowMinMaxValue(bool show) {
+    showMinMaxValue = show;
+}
+
 QVector3D MHorizonGraph::transferFunction(float value) const {
     if (std::isnan(value)) {
         return QVector3D(1.0f, 1.0f, 0.0f); // yellow

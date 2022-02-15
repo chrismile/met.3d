@@ -32,9 +32,14 @@
 
 // local application imports
 
+namespace Met3D
+{
+
 /**
  * @return The scale factor used for scaling fonts/the UI on the system.
  */
 float getHighDPIScaleFactor();
+
+}
 
 #endif // HIDPI_H
