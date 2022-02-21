@@ -849,10 +849,7 @@ void MMultiVarData::onBezierTrajectoriesLoaded(MTrajectories* trajectories)
     {
         QStringList varNames = auxDataVarNames;
         varNames.push_front("Pressure");
-        //if (varNames.empty())
-        //{
-        //    varNames = QStringList("Pressure");
-        //}
+        //varNames.push_back("ClusterIdx");
         this->varNames.clear();
         for (const QString& str : varNames) {
             this->varNames.push_back(str);

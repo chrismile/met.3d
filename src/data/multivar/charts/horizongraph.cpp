@@ -935,6 +935,18 @@ void MHorizonGraph::mouseMoveEvent(MSceneViewGLWidget *sceneView, QMouseEvent *e
         scrollThumbHover = false;
     }
 
+    // Check whether the user right-clicked on the main graph area.
+    AABB2 graphAreaAabb(
+            QVector2D(offsetHorizonBarsX, offsetHorizonBarsY),
+            QVector2D(offsetHorizonBarsX + horizonBarWidth, windowHeight - borderWidth));
+    if (graphAreaAabb.contains(mousePosition) && event->buttons() == Qt::MouseButton::RightButton) {
+        selectedTimeStep = remap(
+                mousePosition.x(), offsetHorizonBarsX, offsetHorizonBarsX + horizonBarWidth,
+                timeDisplayMin, timeDisplayMax);
+        selectedTimeStep = clamp(selectedTimeStep, timeDisplayMin, timeDisplayMax);
+        selectedTimeStepChanged = true;
+    }
+
     scrollTranslationY = clamp(scrollTranslationY, 0.0f, fullWindowHeight - windowHeight);
     scrollThumbPosition = remap(
             scrollTranslationY,

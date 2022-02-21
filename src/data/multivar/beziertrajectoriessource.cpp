@@ -59,6 +59,19 @@ MBezierTrajectoriesSource::MBezierTrajectoriesSource()
 ***                            PUBLIC METHODS                               ***
 *******************************************************************************/
 
+double distance(const QVector<float>& v1, const QVector<float>& v2)
+{
+    int numVariables = std::min(v1.size(), v2.size());
+    double differenceSum = 0.0f;
+    for (int varIdx = 0; varIdx < numVariables; varIdx++)
+    {
+        float valueOld = v1[varIdx];
+        float valueNew = v2[varIdx];
+        differenceSum += double(valueNew - valueOld) * double(valueNew - valueOld);
+    }
+    return std::sqrt(differenceSum);
+}
+
 MBezierTrajectories *MBezierTrajectoriesSource::produceData(MDataRequest request)
 {
     assert(trajectorySource != nullptr);
@@ -85,7 +98,7 @@ MBezierTrajectories *MBezierTrajectoriesSource::produceData(MDataRequest request
     int numTimeStepsPerTrajectory = inTrajectories->getNumTimeStepsPerTrajectory();
     QVector<QVector3D> vertices = inTrajectories->getVertices();
     const uint32_t numVariablesReal = inTrajectories->getAuxDataVarNames().size();
-    const uint32_t numVariables = numVariablesReal + 1;
+    uint32_t numVariables = numVariablesReal + 1;
     //const uint32_t numVariables = std::max(numVariablesReal, uint32_t(1));
     this->numVariables = numVariables;
 
@@ -100,7 +113,7 @@ MBezierTrajectories *MBezierTrajectoriesSource::produceData(MDataRequest request
         }
 
         MFilteredTrajectory filteredTrajectory;
-        filteredTrajectory.attributes.resize(numVariables);
+        filteredTrajectory.attributes.resize(numVariables); // + 1
 
         QVector3D prevPoint(M_INVALID_TRAJECTORY_POS, M_INVALID_TRAJECTORY_POS, M_INVALID_TRAJECTORY_POS);
         for (int t = 0; t < numTimeStepsPerTrajectory; t++)
@@ -151,6 +164,131 @@ MBezierTrajectories *MBezierTrajectoriesSource::produceData(MDataRequest request
             indicesToFilteredIndicesMap.push_back(-1);
         }
     }
+
+
+    // k-means clustering.
+    /*const int K = 2;
+    const int maxIterations = 1000;
+    QVector<QVector<float>> clusterCenters;
+    QVector<QVector<double>> clusterElementsMeans;
+    QVector<int> clustersNumElements;
+    clusterCenters.resize(K);
+    clusterElementsMeans.resize(K);
+    clustersNumElements.resize(K);
+    std::mt19937 generator(2);
+    std::uniform_real_distribution<> dis(0, 1);
+    for (int clusterIdx = 0; clusterIdx < K; clusterIdx++)
+    {
+        QVector<float>& clusterCenter = clusterCenters[clusterIdx];
+        clusterCenter.reserve(numVariables);
+        clusterElementsMeans[clusterIdx].resize(numVariables);
+        for (int varIdx = 0; varIdx < int(numVariables); varIdx++)
+        {
+            clusterCenter.push_back(dis(generator));
+        }
+    }
+    for (int timeStepIdx = 0; timeStepIdx < numTimeStepsPerTrajectory; timeStepIdx++)
+    {
+        QVector<QVector<float>> parameterVectors;
+        parameterVectors.resize(filteredTrajectories.size());
+        for (int trajectoryIdx = 0; trajectoryIdx < filteredTrajectories.size(); trajectoryIdx++)
+        {
+            const MFilteredTrajectory& filteredTrajectory = filteredTrajectories[trajectoryIdx];
+            QVector<float>& parameterVector = parameterVectors[trajectoryIdx];
+            parameterVector.reserve(numVariables);
+            for (int varIdx = 0; varIdx < int(numVariables); varIdx++)
+            {
+                parameterVector.push_back(filteredTrajectory.attributes.at(varIdx).at(timeStepIdx));
+            }
+        }
+
+        QVector<int> trajectoryClusterIndices;
+        trajectoryClusterIndices.resize(filteredTrajectories.size());
+        QVector<QVector<float>> clusterCentersOld = clusterCenters;
+        for (int iteration = 0; iteration < maxIterations; iteration++) {
+            // Get the cluster index for each trajectory.
+            for (int trajectoryIdx = 0; trajectoryIdx < filteredTrajectories.size(); trajectoryIdx++)
+            {
+                int& trajectoryClusterIndex = trajectoryClusterIndices[trajectoryIdx];
+                const QVector<float>& parameterVector = parameterVectors[trajectoryIdx];
+                double clusterDistanceMin = std::numeric_limits<double>::max();
+                for (int clusterIdx = 0; clusterIdx < K; clusterIdx++)
+                {
+                    QVector<float>& clusterCenter = clusterCenters[clusterIdx];
+                    double clusterDistance = distance(parameterVector, clusterCenter);
+                    if (clusterDistance < clusterDistanceMin)
+                    {
+                        clusterDistanceMin = clusterDistance;
+                        trajectoryClusterIndex = clusterIdx;
+                    }
+                }
+            }
+
+            // Update the cluster center positions.
+            clusterCentersOld = clusterCenters;
+            for (int clusterIdx = 0; clusterIdx < K; clusterIdx++)
+            {
+                clustersNumElements[clusterIdx] = 0;
+                QVector<double>& clusterElementsMean = clusterElementsMeans[clusterIdx];
+                for (int varIdx = 0; varIdx < int(numVariables); varIdx++)
+                {
+                    clusterElementsMean[varIdx] = 0.0;
+                }
+            }
+            for (int trajectoryIdx = 0; trajectoryIdx < filteredTrajectories.size(); trajectoryIdx++)
+            {
+                QVector<float>& parameterVector = parameterVectors[trajectoryIdx];
+                int& trajectoryClusterIndex = trajectoryClusterIndices[trajectoryIdx];
+                clustersNumElements[trajectoryClusterIndex]++;
+                QVector<float>& clusterCenter = clusterCenters[trajectoryClusterIndex];
+                QVector<double>& clusterElementsMean = clusterElementsMeans[trajectoryClusterIndex];
+                for (int varIdx = 0; varIdx < int(numVariables); varIdx++)
+                {
+                    clusterElementsMean[varIdx] += parameterVector[varIdx];
+                }
+            }
+            for (int clusterIdx = 0; clusterIdx < K; clusterIdx++)
+            {
+                QVector<float>& clusterCenter = clusterCenters[clusterIdx];
+                if (clustersNumElements[clusterIdx] == 0)
+                {
+                    for (int varIdx = 0; varIdx < int(numVariables); varIdx++)
+                    {
+                        clusterCenter[varIdx] = dis(generator);
+                    }
+                }
+                else
+                {
+                    double numElements = double(clustersNumElements[clusterIdx]);
+                    QVector<double>& clusterElementsMean = clusterElementsMeans[clusterIdx];
+                    for (int varIdx = 0; varIdx < int(numVariables); varIdx++)
+                    {
+                        clusterCenter[varIdx] = float(clusterElementsMean[varIdx] / numElements);
+                    }
+                }
+            }
+
+            // Check whether the cluster centers no longer sufficiently changed.
+            double differenceClusters = 0.0f;
+            for (int clusterIdx = 0; clusterIdx < K; clusterIdx++)
+            {
+                QVector<float>& clusterCenterOld = clusterCentersOld[clusterIdx];
+                QVector<float>& clusterCenter = clusterCenters[clusterIdx];
+                differenceClusters += distance(clusterCenterOld, clusterCenter) / float(numVariables * K);
+            }
+
+            if (differenceClusters < 1e-5) {
+                break;
+            }
+        }
+
+        for (int trajectoryIdx = 0; trajectoryIdx < filteredTrajectories.size(); trajectoryIdx++)
+        {
+            MFilteredTrajectory& filteredTrajectory = filteredTrajectories[trajectoryIdx];
+            filteredTrajectory.attributes.back().push_back(float(trajectoryClusterIndices.at(trajectoryIdx)));
+        }
+    }
+    numVariables++;*/
 
 
     // 1) Determine Bezier segments
