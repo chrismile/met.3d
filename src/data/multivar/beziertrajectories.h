@@ -127,6 +127,20 @@ struct MTimeStepSphereRenderData
     GL::MShaderStorageBufferObject* lineElementIdsBuffer = nullptr;
 };
 
+struct MTimeStepRollsRenderData
+{
+    // IBO
+    GL::MIndexBuffer* indexBuffer = nullptr;
+    // VBOs
+    GL::MVertexBuffer* vertexPositionBuffer = nullptr;
+    GL::MVertexBuffer* vertexNormalBuffer = nullptr;
+    GL::MVertexBuffer* vertexTangentBuffer = nullptr;
+    GL::MVertexBuffer* vertexRollPositionBuffer = nullptr;
+    GL::MVertexBuffer* vertexLineIdBuffer = nullptr;
+    GL::MVertexBuffer* vertexLinePointIdxBuffer = nullptr;
+    GL::MVertexBuffer* vertexVariableIdAndIsCapBuffer = nullptr;
+};
+
 /**
  * Flow line data with multiple variables being displayed at once.
  * The lines are smoothed using Bezier curves.
@@ -138,9 +152,9 @@ public:
             MDataRequest requestToReferTo, const MFilteredTrajectories& filteredTrajectories,
             const QVector<int>& trajIndicesToFilteredIndicesMap,
             unsigned int numVariables);
-    ~MBezierTrajectories();
+    ~MBezierTrajectories() override;
 
-    unsigned int getMemorySize_kb();
+    unsigned int getMemorySize_kb() override;
 
     inline int size() const { return bezierTrajectories.size(); }
     inline MBezierTrajectory& operator[](std::size_t idx) { return bezierTrajectories[idx]; }
@@ -194,6 +208,22 @@ public:
 #endif
     void releaseTimeStepSphereRenderData();
 
+    MTimeStepRollsRenderData* getTimeStepRollsRenderData(
+#ifdef USE_QOPENGLWIDGET
+            QOpenGLWidget *currentGLContext = nullptr);
+#else
+    QGLWidget *currentGLContext = nullptr);
+#endif
+    void updateTimeStepRollsRenderDataIfNecessary(
+            int timeStep, float tubeRadius, float rollsRadius, float rollsWidth, bool mapRollsThickness,
+            int numLineSegments,
+#ifdef USE_QOPENGLWIDGET
+            QOpenGLWidget *currentGLContext = nullptr);
+#else
+            QGLWidget *currentGLContext = nullptr);
+#endif
+    void releaseTimeStepRollsRenderData();
+
 private:
     MFilteredTrajectories baseTrajectories;
     QVector<MBezierTrajectory> bezierTrajectories;
@@ -209,7 +239,7 @@ private:
     bool syncTimeAfterAscent = false;
     int maxAscentTimeStepIndex = 0;
 
-    // Sphere data.
+    // Focus spheres data.
     int lastTimeStep = std::numeric_limits<int>::lowest();
     float lastSphereRadius = std::numeric_limits<float>::lowest();
     MTimeStepSphereRenderData timeStepSphereRenderData;
@@ -228,6 +258,32 @@ private:
     const QString timeStepSphereLineElementIdsBufferID =
             QString("timestepsphere_line_element_ids_buffer_#%1").arg(getID());
 
+    // Focus rolls data.
+    int lastTimeStepRolls = std::numeric_limits<int>::lowest();
+    float lastTubeRadius = std::numeric_limits<float>::lowest();
+    float lastRollsRadius = std::numeric_limits<float>::lowest();
+    float lastRollsWidth = std::numeric_limits<float>::lowest();
+    bool lastMapRollsThickness = false;
+    int lastNumLineSegmentsRolls = 8;
+    QVector<uint32_t> lastVarSelectedRolls;
+    MTimeStepRollsRenderData timeStepRollsRenderData;
+    const QString timeStepRollsIndexBufferID =
+            QString("timesteprolls_index_buffer_#%1").arg(getID());
+    const QString timeStepRollsVertexPositionBufferID =
+            QString("timesteprolls_vertex_position_buffer_#%1").arg(getID());
+    const QString timeStepRollsVertexNormalBufferID =
+            QString("timesteprolls_vertex_normal_buffer_#%1").arg(getID());
+    const QString timeStepRollsVertexTangentBufferID =
+            QString("timesteprolls_vertex_tangent_buffer_#%1").arg(getID());
+    const QString timeStepRollsPositionBufferID =
+            QString("timesteprolls_rolls_position_buffer_#%1").arg(getID());
+    const QString timeStepRollsVertexLineIdBufferID =
+            QString("timesteprolls_rolls_vertex_line_id_buffer_#%1").arg(getID());
+    const QString timeStepRollsVertexLinePointIdxBufferID =
+            QString("timesteprolls_rolls_vertex_point_idx_buffer_#%1").arg(getID());
+    const QString timeStepRollsVertexVariableIdAndIsCapBufferBufferID =
+            QString("timesteprolls_vertex_variable_id_and_is_cap_buffer_#%1").arg(getID());
+
     // Data for trajectory filtering.
     bool isDirty = true;
     QVector<int> trajIndicesToFilteredIndicesMap;
@@ -237,6 +293,7 @@ private:
     GLsizei* trajectorySelectionCount = nullptr;
     ptrdiff_t* trajectorySelectionIndices = nullptr;
 
+    QVector<QVector2D> minMaxAttributes;
     QVector<uint32_t> lineIndicesCache;
     QVector<QVector3D> vertexPositionsCache;
 

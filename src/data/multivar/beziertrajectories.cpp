@@ -76,6 +76,38 @@ MBezierTrajectories::MBezierTrajectories(
     this->numTrajectories = static_cast<int>(numTrajectories);
     trajectorySelectionCount = new GLsizei[numTrajectories];
     trajectorySelectionIndices = new ptrdiff_t[numTrajectories];
+
+    minMaxAttributes.clear();
+    minMaxAttributes.resize(int(numVariables));
+    for (size_t i = 0; i < numVariables; i++)
+    {
+        minMaxAttributes[int(i)] = QVector2D(
+                std::numeric_limits<float>::max(), std::numeric_limits<float>::lowest());
+    }
+    for (const MFilteredTrajectory& trajectory : filteredTrajectories)
+    {
+        for (size_t i = 0; i < numVariables; i++)
+        {
+            const QVector<float>& attributes = trajectory.attributes.at(int(i));
+            QVector2D& minMaxVector = minMaxAttributes[int(i)];
+            for (float v : attributes)
+            {
+                if (std::isnan(v))
+                {
+                    continue;
+                }
+                minMaxVector.setX(std::min(minMaxVector.x(), v));
+                minMaxVector.setY(std::max(minMaxVector.y(), v));
+            }
+        }
+    }
+    for (size_t i = 0; i < numVariables; i++)
+    {
+        QVector2D& minMax = minMaxAttributes[int(i)];
+        if (std::isinf(minMax[1])) {
+            minMax[1] = std::numeric_limits<float>::max();
+        }
+    }
 }
 
 
@@ -754,6 +786,445 @@ void MBezierTrajectories::releaseTimeStepSphereRenderData()
     MGLResourcesManager::getInstance()->releaseGPUItem(timeStepSphereRenderData.entrancePointsBuffer);
     MGLResourcesManager::getInstance()->releaseGPUItem(timeStepSphereRenderData.exitPointsBuffer);
     MGLResourcesManager::getInstance()->releaseGPUItem(timeStepSphereRenderData.lineElementIdsBuffer);
+}
+
+
+MTimeStepRollsRenderData* MBezierTrajectories::getTimeStepRollsRenderData(
+#ifdef USE_QOPENGLWIDGET
+        QOpenGLWidget *currentGLContext)
+#else
+QGLWidget *currentGLContext)
+#endif
+{
+    return &timeStepRollsRenderData;
+}
+
+
+void MBezierTrajectories::updateTimeStepRollsRenderDataIfNecessary(
+        int timeStep, float tubeRadius, float rollsRadius, float rollsWidth, bool mapRollsThickness,
+        int numLineSegments,
+#ifdef USE_QOPENGLWIDGET
+        QOpenGLWidget *currentGLContext)
+#else
+QGLWidget *currentGLContext)
+#endif
+{
+    if (timeStep == lastTimeStepRolls && (!mapRollsThickness || tubeRadius == lastTubeRadius)
+            && rollsRadius == lastRollsRadius && rollsWidth == lastRollsWidth && lastVarSelectedRolls == varSelected
+            && mapRollsThickness == lastMapRollsThickness && lastNumLineSegmentsRolls == numLineSegments) {
+        return;
+    }
+    lastTimeStepRolls = timeStep;
+    lastTubeRadius = tubeRadius;
+    lastRollsRadius = rollsRadius;
+    lastRollsWidth = rollsWidth;
+    lastVarSelectedRolls = varSelected;
+    lastMapRollsThickness = mapRollsThickness;
+    lastNumLineSegmentsRolls = numLineSegments;
+
+    QVector<int> selectedVarIndices;
+    int numVarsSelected = 0;
+    for (int i = 0; i < varSelected.size(); i++)
+    {
+        if (varSelected.at(i)) {
+            numVarsSelected++;
+            selectedVarIndices.push_back(i);
+        }
+    }
+
+    if (timeStepRollsRenderData.indexBuffer) {
+        MGLResourcesManager::getInstance()->releaseGPUItem(timeStepRollsRenderData.indexBuffer);
+        MGLResourcesManager::getInstance()->releaseGPUItem(timeStepRollsRenderData.vertexPositionBuffer);
+        MGLResourcesManager::getInstance()->releaseGPUItem(timeStepRollsRenderData.vertexNormalBuffer);
+        MGLResourcesManager::getInstance()->releaseGPUItem(timeStepRollsRenderData.vertexTangentBuffer);
+        MGLResourcesManager::getInstance()->releaseGPUItem(timeStepRollsRenderData.vertexRollPositionBuffer);
+        MGLResourcesManager::getInstance()->releaseGPUItem(timeStepRollsRenderData.vertexLineIdBuffer);
+        MGLResourcesManager::getInstance()->releaseGPUItem(timeStepRollsRenderData.vertexLinePointIdxBuffer);
+        MGLResourcesManager::getInstance()->releaseGPUItem(timeStepRollsRenderData.vertexVariableIdAndIsCapBuffer);
+        MGLResourcesManager::getInstance()->deleteReleasedGPUItem(
+                timeStepRollsRenderData.indexBuffer);
+        MGLResourcesManager::getInstance()->deleteReleasedGPUItem(
+                timeStepRollsRenderData.vertexPositionBuffer);
+        MGLResourcesManager::getInstance()->deleteReleasedGPUItem(
+                timeStepRollsRenderData.vertexNormalBuffer);
+        MGLResourcesManager::getInstance()->deleteReleasedGPUItem(
+                timeStepRollsRenderData.vertexTangentBuffer);
+        MGLResourcesManager::getInstance()->deleteReleasedGPUItem(
+                timeStepRollsRenderData.vertexRollPositionBuffer);
+        MGLResourcesManager::getInstance()->deleteReleasedGPUItem(
+                timeStepRollsRenderData.vertexLineIdBuffer);
+        MGLResourcesManager::getInstance()->deleteReleasedGPUItem(
+                timeStepRollsRenderData.vertexLinePointIdxBuffer);
+        MGLResourcesManager::getInstance()->deleteReleasedGPUItem(
+                timeStepRollsRenderData.vertexVariableIdAndIsCapBuffer);
+        timeStepRollsRenderData.indexBuffer = nullptr;
+        timeStepRollsRenderData.vertexPositionBuffer = nullptr;
+        timeStepRollsRenderData.vertexNormalBuffer = nullptr;
+        timeStepRollsRenderData.vertexTangentBuffer = nullptr;
+        timeStepRollsRenderData.vertexRollPositionBuffer = nullptr;
+        timeStepRollsRenderData.vertexLineIdBuffer = nullptr;
+        timeStepRollsRenderData.vertexLinePointIdxBuffer = nullptr;
+        timeStepRollsRenderData.vertexVariableIdAndIsCapBuffer = nullptr;
+    }
+
+    if (numVarsSelected <= 0) {
+        return;
+    }
+
+    QVector<uint32_t> triangleIndices;
+    QVector<QVector3D> vertexPositions;
+    QVector<QVector3D> vertexNormals;
+    QVector<QVector3D> vertexTangents;
+    QVector<float> vertexRollPositions;
+    QVector<int32_t> vertexLineIds;
+    QVector<float> vertexLinePointIndices;
+    QVector<uint32_t> vertexVariableIdAndIsCapList;
+    QVector<QVector3D> lineNormals;
+
+    float radius = rollsRadius;
+    const float PI = 3.1415926535897932f;
+    const float TWO_PI = PI * 2.0f;
+    const int numCircleSubdivisions = numLineSegments;
+    std::vector<QVector3D> globalCircleVertexPositions;
+    const float theta = TWO_PI / numCircleSubdivisions;
+    const float tangentialFactor = std::tan(theta); // opposite / adjacent
+    const float radialFactor = std::cos(theta); // adjacent / hypotenuse
+    QVector3D position(radius, 0, 0);
+    for (int i = 0; i < numCircleSubdivisions; i++) {
+        globalCircleVertexPositions.push_back(position);
+        // Add the tangent vector and correct the position using the radial factor.
+        QVector3D tangent(-position.y(), position.x(), 0);
+        position += tangentialFactor * tangent;
+        position *= radialFactor;
+    }
+
+    // Scale with ratio of radius of circumcircle and incircle to make sure the rolls don't intersect with the tubes.
+    float radiusFactor = 1.0f / std::cos(PI / float(numLineSegments));
+
+    int trajectoryIndex = 0;
+    for (MFilteredTrajectory& trajectory : baseTrajectories) {
+        int timeStepLocal;
+        if (syncTimeAfterAscent)
+        {
+            timeStepLocal = timeStep - maxAscentTimeStepIndex + ascentTimeStepIndices.at(trajectoryIndex);
+        }
+        else
+        {
+            timeStepLocal = timeStep;
+        }
+        int timeStepClamped = clamp(timeStepLocal, 0, trajectory.positions.size() - 1);
+        float centerIdx = float(timeStepClamped);
+
+        const QVector<QVector3D>& lineCenters = trajectory.positions;
+        int n = lineCenters.size();
+        // Assert that we have a valid input data range
+        if (n < 2) {
+            continue;
+        }
+
+        bool isFirstVarHalf = numVarsSelected % 2 == 1;
+        QVector<int> startTimeSteps;
+        QVector<int> stopTimeSteps;
+        startTimeSteps.resize(numVarsSelected);
+        stopTimeSteps.resize(numVarsSelected);
+
+        if (!isFirstVarHalf) {
+            startTimeSteps[numVarsSelected / 2] = timeStepClamped;
+            stopTimeSteps[(numVarsSelected - 1) / 2] = timeStepClamped;
+        }
+
+        // Backward.
+        float accumulatedLength = 0.0f;
+        float minAccumulatedLength = isFirstVarHalf ? rollsWidth / 2.0f : rollsWidth;
+        int currentVar = (numVarsSelected - 1) / 2;
+        for (int i = timeStepClamped - 1; i >= 0; i--) {
+            QVector3D tangent = lineCenters[i + 1] - lineCenters[i];
+            float lineSegmentLength = tangent.length();
+            accumulatedLength += lineSegmentLength;
+            if (accumulatedLength >= minAccumulatedLength) {
+                startTimeSteps[currentVar] = i;
+                currentVar--;
+                if (currentVar < 0) {
+                    break;
+                }
+                stopTimeSteps[currentVar] = i;
+                minAccumulatedLength = rollsWidth;
+                accumulatedLength = 0.0f;
+            }
+        }
+
+        // Forward.
+        accumulatedLength = 0.0f;
+        minAccumulatedLength = isFirstVarHalf ? rollsWidth / 2.0f : rollsWidth;
+        currentVar = numVarsSelected / 2;
+        for (int i = timeStepClamped + 1; i < n; i++) {
+            QVector3D tangent = lineCenters[i] - lineCenters[i - 1];
+            float lineSegmentLength = tangent.length();
+            accumulatedLength += lineSegmentLength;
+            if (accumulatedLength >= minAccumulatedLength) {
+                stopTimeSteps[currentVar] = i;
+                currentVar++;
+                if (currentVar >= numVarsSelected) {
+                    break;
+                }
+                startTimeSteps[currentVar] = i;
+                minAccumulatedLength = rollsWidth;
+                accumulatedLength = 0.0f;
+            }
+        }
+
+        for (int variableId = 0; variableId < numVarsSelected; variableId++)
+        {
+            if (mapRollsThickness)
+            {
+                globalCircleVertexPositions.clear();
+                float centerAttrValue =
+                        trajectory.attributes.at(selectedVarIndices.at(variableId)).at(timeStepClamped);
+                QVector2D minMax = minMaxAttributes.at(selectedVarIndices.at(variableId));
+                float innerRadius = std::min(tubeRadius * radiusFactor, rollsRadius);
+                float t = (centerAttrValue - minMax.x()) / (minMax.y() - minMax.x());
+                radius = (1.0f - t) * innerRadius + t * rollsRadius;
+                position = QVector3D(radius, 0, 0);
+                for (int i = 0; i < numCircleSubdivisions; i++) {
+                    globalCircleVertexPositions.push_back(position);
+                    // Add the tangent vector and correct the position using the radial factor.
+                    QVector3D tangent(-position.y(), position.x(), 0);
+                    position += tangentialFactor * tangent;
+                    position *= radialFactor;
+                }
+            }
+
+            uint32_t indexOffset = uint32_t(vertexPositions.size());
+            uint32_t lineIndexOffset = uint32_t(lineNormals.size());
+
+            /*int rollTimeStepRadius = 64;
+            int timeStepOffset = -int(float(2 * rollTimeStepRadius * numVarsSelected) / 2.0f);
+            if (timeStepClamped + timeStepOffset < 0) {
+                timeStepOffset = -timeStepClamped;
+            }
+            if (timeStepClamped + timeStepOffset > n - 1) {
+                timeStepOffset = n - 1 - timeStepClamped;
+            }
+            int timeStepStart = clamp(
+                    timeStepClamped - rollTimeStepRadius + rollTimeStepRadius * 2 * variableId + timeStepOffset,
+                    0, n - 1);
+            int timeStepStop = clamp(
+                    timeStepClamped + rollTimeStepRadius + rollTimeStepRadius * 2 * variableId + timeStepOffset,
+                    0, n - 1);*/
+
+            int timeStepStart = startTimeSteps[variableId];
+            int timeStepStop = stopTimeSteps[variableId];
+
+            QVector3D lastLineNormal(1.0f, 0.0f, 0.0f);
+            int numValidLinePoints = 0;
+            for (int i = timeStepStart; i <= timeStepStop; i++) {
+                QVector3D tangent;
+                if (i == 0) {
+                    tangent = lineCenters[i + 1] - lineCenters[i];
+                } else if (i == n - 1) {
+                    tangent = lineCenters[i] - lineCenters[i - 1];
+                } else {
+                    tangent = (lineCenters[i + 1] - lineCenters[i - 1]);
+                }
+                float lineSegmentLength = tangent.length();
+
+                if (lineSegmentLength < 0.0001f) {
+                    // In case the two vertices are almost identical, just skip this path line segment
+                    continue;
+                }
+                tangent.normalize();
+
+                const QVector3D& center = lineCenters.at(i);
+                QVector3D helperAxis = lastLineNormal;
+                if (QVector3D::crossProduct(helperAxis, tangent).length() < 0.01f) {
+                    // If tangent == lastNormal
+                    helperAxis = QVector3D(0.0f, 1.0f, 0.0f);
+                    if (QVector3D::crossProduct(helperAxis, tangent).length() < 0.01f) {
+                        // If tangent == helperAxis
+                        helperAxis = QVector3D(0.0f, 0.0f, 1.0f);
+                    }
+                }
+                QVector3D normal = (helperAxis - QVector3D::dotProduct(helperAxis, tangent) * tangent).normalized(); // Gram-Schmidt
+                lastLineNormal = normal;
+                QVector3D binormal = QVector3D::crossProduct(tangent, normal);
+                lineNormals.push_back(normal);
+
+                for (size_t j = 0; j < globalCircleVertexPositions.size(); j++) {
+                    QVector3D pt = globalCircleVertexPositions.at(j);
+                    QVector3D transformedPoint(
+                            pt.x() * normal.x() + pt.y() * binormal.x() + pt.z() * tangent.x() + center.x(),
+                            pt.x() * normal.y() + pt.y() * binormal.y() + pt.z() * tangent.y() + center.y(),
+                            pt.x() * normal.z() + pt.y() * binormal.z() + pt.z() * tangent.z() + center.z()
+                    );
+                    QVector3D vertexNormal = (transformedPoint - center).normalized();
+
+                    vertexPositions.push_back(transformedPoint);
+                    vertexNormals.push_back(vertexNormal);
+                    vertexTangents.push_back(tangent);
+                    vertexRollPositions.push_back(float(i - timeStepStart) / float(timeStepStop - timeStepStart));
+                    vertexLineIds.push_back(trajectoryIndex);
+                    vertexLinePointIndices.push_back(centerIdx);
+                    vertexVariableIdAndIsCapList.push_back(variableId);
+                }
+
+                numValidLinePoints++;
+            }
+
+            if (numValidLinePoints == 1) {
+                // Only one vertex left -> output nothing (tube consisting only of one point).
+                for (int subdivIdx = 0; subdivIdx < numCircleSubdivisions; subdivIdx++) {
+                    vertexPositions.pop_back();
+                    vertexNormals.pop_back();
+                    vertexTangents.pop_back();
+                    vertexRollPositions.pop_back();
+                    vertexLineIds.pop_back();
+                    vertexLinePointIndices.pop_back();
+                    vertexVariableIdAndIsCapList.pop_back();
+                }
+            }
+            if (numValidLinePoints <= 1) {
+                continue;
+            }
+
+            for (int i = 0; i < numValidLinePoints-1; i++) {
+                for (int j = 0; j < numCircleSubdivisions; j++) {
+                    // Build two CCW triangles (one quad) for each side
+                    // Triangle 1
+                    triangleIndices.push_back(
+                            indexOffset + i*numCircleSubdivisions+j);
+                    triangleIndices.push_back(
+                            indexOffset + i*numCircleSubdivisions+(j+1)%numCircleSubdivisions);
+                    triangleIndices.push_back(
+                            indexOffset + ((i+1)%numValidLinePoints)*numCircleSubdivisions+(j+1)%numCircleSubdivisions);
+
+                    // Triangle 2
+                    triangleIndices.push_back(
+                            indexOffset + i*numCircleSubdivisions+j);
+                    triangleIndices.push_back(
+                            indexOffset + ((i+1)%numValidLinePoints)*numCircleSubdivisions+(j+1)%numCircleSubdivisions);
+                    triangleIndices.push_back(
+                            indexOffset + ((i+1)%numValidLinePoints)*numCircleSubdivisions+j);
+                }
+            }
+
+            /*
+             * Close the tube with two flat caps at the ends.
+             */
+            int numLongitudeSubdivisions = numCircleSubdivisions; // azimuth
+            int numLatitudeSubdivisions = int(std::ceil(numCircleSubdivisions/2)); // zenith
+
+            // Hemisphere at the start.
+            indexOffset = uint32_t(vertexPositions.size());
+            QVector3D center0 = lineCenters[timeStepStart];
+            QVector3D tangent0 = lineCenters[timeStepStart] - lineCenters[timeStepStart + 1];
+            tangent0.normalize();
+            QVector3D normal0 = lineNormals[lineIndexOffset];
+
+            // Center point.
+            vertexPositions.push_back(center0);
+            vertexNormals.push_back(normal0);
+            vertexTangents.push_back(tangent0);
+            vertexRollPositions.push_back(0.0f);
+            vertexLineIds.push_back(trajectoryIndex);
+            vertexLinePointIndices.push_back(centerIdx);
+            vertexVariableIdAndIsCapList.push_back(variableId | (1u << 31u));
+
+            QVector3D binormal0 = QVector3D::crossProduct(tangent0, normal0);
+            for (size_t i = 0; i < globalCircleVertexPositions.size(); i++) {
+                QVector3D pt = globalCircleVertexPositions.at(i);
+                QVector3D transformedPoint(
+                        pt.x() * normal0.x() + pt.y() * binormal0.x() + pt.z() * tangent0.x() + center0.x(),
+                        pt.x() * normal0.y() + pt.y() * binormal0.y() + pt.z() * tangent0.y() + center0.y(),
+                        pt.x() * normal0.z() + pt.y() * binormal0.z() + pt.z() * tangent0.z() + center0.z()
+                );
+                QVector3D vertexNormal = (transformedPoint - center0).normalized();
+
+                vertexPositions.push_back(transformedPoint);
+                vertexNormals.push_back(vertexNormal);
+                vertexTangents.push_back(tangent0);
+                vertexRollPositions.push_back(0.0f);
+                vertexLineIds.push_back(trajectoryIndex);
+                vertexLinePointIndices.push_back(centerIdx);
+                vertexVariableIdAndIsCapList.push_back(variableId | (1u << 31u));
+            }
+            for (int j = 0; j < numCircleSubdivisions; j++) {
+                triangleIndices.push_back(indexOffset);
+                triangleIndices.push_back(indexOffset + j + 1);
+                triangleIndices.push_back(indexOffset + (j + 1) % numCircleSubdivisions + 1);
+            }
+
+            // Hemisphere at the end.
+            indexOffset = uint32_t(vertexPositions.size());
+            QVector3D center1 = lineCenters[timeStepStop];
+            QVector3D tangent1 = lineCenters[timeStepStop] - lineCenters[timeStepStop-1];
+            tangent1.normalize();
+            QVector3D normal1 = lineNormals[lineIndexOffset + numValidLinePoints - 1];
+
+            // Center point.
+            vertexPositions.push_back(center1);
+            vertexNormals.push_back(normal1);
+            vertexTangents.push_back(tangent1);
+            vertexRollPositions.push_back(1.0f);
+            vertexLineIds.push_back(trajectoryIndex);
+            vertexLinePointIndices.push_back(centerIdx);
+            vertexVariableIdAndIsCapList.push_back(variableId | (1u << 31u));
+
+            QVector3D binormal1 = QVector3D::crossProduct(tangent1, normal1);
+            for (size_t i = 0; i < globalCircleVertexPositions.size(); i++) {
+                QVector3D pt = globalCircleVertexPositions.at(i);
+                QVector3D transformedPoint(
+                        pt.x() * normal1.x() + pt.y() * binormal1.x() + pt.z() * tangent1.x() + center1.x(),
+                        pt.x() * normal1.y() + pt.y() * binormal1.y() + pt.z() * tangent1.y() + center1.y(),
+                        pt.x() * normal1.z() + pt.y() * binormal1.z() + pt.z() * tangent1.z() + center1.z()
+                );
+                QVector3D vertexNormal = (transformedPoint - center1).normalized();
+
+                vertexPositions.push_back(transformedPoint);
+                vertexNormals.push_back(vertexNormal);
+                vertexTangents.push_back(tangent1);
+                vertexRollPositions.push_back(1.0f);
+                vertexLineIds.push_back(trajectoryIndex);
+                vertexLinePointIndices.push_back(centerIdx);
+                vertexVariableIdAndIsCapList.push_back(variableId | (1u << 31u));
+            }
+            for (int j = 0; j < numCircleSubdivisions; j++) {
+                triangleIndices.push_back(indexOffset);
+                triangleIndices.push_back(indexOffset + j + 1);
+                triangleIndices.push_back(indexOffset + (j + 1) % numCircleSubdivisions + 1);
+            }
+        }
+
+        trajectoryIndex++;
+    }
+
+    timeStepRollsRenderData.indexBuffer = createIndexBuffer(
+            currentGLContext, timeStepRollsIndexBufferID, triangleIndices);
+    timeStepRollsRenderData.vertexPositionBuffer = createVertexBuffer(
+            currentGLContext, timeStepRollsVertexPositionBufferID, vertexPositions);
+    timeStepRollsRenderData.vertexNormalBuffer = createVertexBuffer(
+            currentGLContext, timeStepRollsVertexNormalBufferID, vertexNormals);
+    timeStepRollsRenderData.vertexTangentBuffer = createVertexBuffer(
+            currentGLContext, timeStepRollsVertexTangentBufferID, vertexTangents);
+    timeStepRollsRenderData.vertexRollPositionBuffer = createVertexBuffer(
+            currentGLContext, timeStepRollsPositionBufferID, vertexRollPositions);
+    timeStepRollsRenderData.vertexLineIdBuffer = createVertexBuffer(
+            currentGLContext, timeStepRollsVertexLineIdBufferID, vertexLineIds);
+    timeStepRollsRenderData.vertexLinePointIdxBuffer = createVertexBuffer(
+            currentGLContext, timeStepRollsVertexLinePointIdxBufferID, vertexLinePointIndices);
+    timeStepRollsRenderData.vertexVariableIdAndIsCapBuffer = createVertexBuffer(
+            currentGLContext, timeStepRollsVertexVariableIdAndIsCapBufferBufferID, vertexVariableIdAndIsCapList);
+}
+
+void MBezierTrajectories::releaseTimeStepRollsRenderData()
+{
+    MGLResourcesManager::getInstance()->releaseGPUItem(timeStepRollsRenderData.indexBuffer);
+    MGLResourcesManager::getInstance()->releaseGPUItem(timeStepRollsRenderData.vertexPositionBuffer);
+    MGLResourcesManager::getInstance()->releaseGPUItem(timeStepRollsRenderData.vertexNormalBuffer);
+    MGLResourcesManager::getInstance()->releaseGPUItem(timeStepRollsRenderData.vertexTangentBuffer);
+    MGLResourcesManager::getInstance()->releaseGPUItem(timeStepRollsRenderData.vertexRollPositionBuffer);
+    MGLResourcesManager::getInstance()->releaseGPUItem(timeStepRollsRenderData.vertexLineIdBuffer);
+    MGLResourcesManager::getInstance()->releaseGPUItem(timeStepRollsRenderData.vertexLinePointIdxBuffer);
+    MGLResourcesManager::getInstance()->releaseGPUItem(timeStepRollsRenderData.vertexVariableIdAndIsCapBuffer);
 }
 
 

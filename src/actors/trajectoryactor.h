@@ -254,10 +254,11 @@ public slots:
     /**
       Checks whether selectable data of this actor is at
       @p mousePositionX, @p mousePositionY.
+      It returns whether a redraw should be triggered.
 
       Called by a @ref MSceneViewGLWidget.
       */
-    void checkIntersectionWithSelectableData(
+    bool checkIntersectionWithSelectableData(
             MSceneViewGLWidget *sceneView, QMouseEvent *event) override;
 
     /**
@@ -434,6 +435,7 @@ private:
         QHash<MSceneViewGLWidget*, MBezierTrajectories*> bezierTrajectoriesMap;
         QHash<MSceneViewGLWidget*, MBezierTrajectoriesRenderData> bezierTrajectoriesRenderDataMap;
         QHash<MSceneViewGLWidget*, MTimeStepSphereRenderData*> timeStepSphereRenderDataMap;
+        QHash<MSceneViewGLWidget*, MTimeStepRollsRenderData*> timeStepRollsRenderDataMap;
 
         QQueue<MTrajectoryRequestQueueInfo> pendingRequestsQueue;
 

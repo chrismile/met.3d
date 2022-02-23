@@ -1812,6 +1812,8 @@ void MTrajectoryActor::prepareAvailableDataForRendering(uint slot)
                             trajectoryRequests[slot].bezierTrajectoriesMap[view]->getRenderData();
                     trajectoryRequests[slot].timeStepSphereRenderDataMap[view] =
                             trajectoryRequests[slot].bezierTrajectoriesMap[view]->getTimeStepSphereRenderData();
+                    trajectoryRequests[slot].timeStepRollsRenderDataMap[view] =
+                            trajectoryRequests[slot].bezierTrajectoriesMap[view]->getTimeStepRollsRenderData();
                     trajectoryRequests[slot].bezierTrajectoriesMap[view]->setDirty(true);
 
 #ifdef USE_EMBREE
@@ -2079,12 +2081,12 @@ void MTrajectoryActor::onSeedActorChanged()
 
 
 #ifdef USE_EMBREE
-void MTrajectoryActor::checkIntersectionWithSelectableData(
+bool MTrajectoryActor::checkIntersectionWithSelectableData(
         MSceneViewGLWidget *sceneView, QMouseEvent *event)
 {
     if (!useBezierTrajectories || trajectoryPickerMap.find(sceneView) == trajectoryPickerMap.end())
     {
-        return;
+        return false;
     }
 
     QVector3D firstHitPoint{};
@@ -2094,11 +2096,13 @@ void MTrajectoryActor::checkIntersectionWithSelectableData(
             sceneView, event->x(), event->y(),
             firstHitPoint, trajectoryIndex, timeAtHit))
     {
-        if (event->button() == Qt::LeftButton)
+        bool changed = false;
+        if (event->button() == Qt::LeftButton && event->type() == QInputEvent::MouseButtonRelease)
         {
             trajectoryPickerMap[sceneView]->toggleTrajectoryHighlighted(trajectoryIndex);
+            changed = true;
         }
-        if (event->button() == Qt::RightButton)
+        if (event->button() == Qt::RightButton || event->buttons() == Qt::MouseButton::RightButton)
         {
             if (synchronizeParticlePosTime)
             {
@@ -2111,8 +2115,11 @@ void MTrajectoryActor::checkIntersectionWithSelectableData(
 
             particlePosTimeStep = int(std::round(timeAtHit));
             trajectoryPickerMap[sceneView]->setParticlePosTimeStep(particlePosTimeStep);
+            changed = true;
         }
+        return changed;
     }
+    return false;
 }
 
 bool MTrajectoryActor::checkVirtualWindowBelowMouse(
@@ -3264,6 +3271,52 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
                         GL_TRIANGLES, timeStepSphereRenderData->indexBuffer->getCount(),
                         timeStepSphereRenderData->indexBuffer->getType(), nullptr,
                         timeStepSphereRenderData->numSpheres);
+            }
+
+            // Render rolls at time step positions.
+            if (multiVarData.getUseTimestepLens() && useMultiVarSpheres && multiVarData.getRenderRolls())
+            {
+                trajectoryRequests[t].bezierTrajectoriesMap[sceneView]->updateTimeStepRollsRenderDataIfNecessary(
+                        particlePosTimeStep, tubeRadius, sphereRadius,
+                        multiVarData.getRollsWidth(),
+                        multiVarData.getMapRollsThickness(),
+                        multiVarData.getNumLineSegments());
+                MTimeStepRollsRenderData* timeStepRollsRenderData =
+                        trajectoryRequests[t].timeStepRollsRenderDataMap[sceneView];
+                if (timeStepRollsRenderData->indexBuffer)
+                {
+                    std::shared_ptr<GL::MShaderEffect> timeStepSphereShader = multiVarData.getTimeStepRollsShader();
+                    timeStepSphereShader->bind();
+                    multiVarData.setUniformDataRolls(textureUnitTransferFunction);
+
+                    timeStepSphereShader->setUniformValue(
+                            "mvpMatrix", *(sceneView->getModelViewProjectionMatrix()));
+                    timeStepSphereShader->setUniformValue(
+                            "vMatrix", sceneView->getCamera()->getViewMatrix());
+                    timeStepSphereShader->setUniformValue(
+                            "lightDirection", sceneView->getLightDirection());
+                    timeStepSphereShader->setUniformValue(
+                            "cameraPosition", sceneView->getCamera()->getOrigin());
+                    timeStepSphereShader->setUniformValue(
+                            "lineRadius", tubeRadius);
+                    timeStepSphereShader->setUniformValue(
+                            "rollsRadius", sphereRadius);
+                    timeStepSphereShader->setUniformValue(
+                            "timestepLensePosition", particlePosTimeStep);
+
+                    timeStepRollsRenderData->indexBuffer->bindToElementArrayBuffer();
+                    timeStepRollsRenderData->vertexPositionBuffer->attachToVertexAttribute(0);
+                    timeStepRollsRenderData->vertexNormalBuffer->attachToVertexAttribute(1);
+                    timeStepRollsRenderData->vertexTangentBuffer->attachToVertexAttribute(2);
+                    timeStepRollsRenderData->vertexRollPositionBuffer->attachToVertexAttribute(3);
+                    timeStepRollsRenderData->vertexLineIdBuffer->attachToVertexAttribute(4);
+                    timeStepRollsRenderData->vertexLinePointIdxBuffer->attachToVertexAttribute(5);
+                    timeStepRollsRenderData->vertexVariableIdAndIsCapBuffer->attachToVertexAttribute(6);
+
+                    glDrawElements(
+                            GL_TRIANGLES, timeStepRollsRenderData->indexBuffer->getCount(),
+                            timeStepRollsRenderData->indexBuffer->getType(), nullptr);
+                }
             }
 
             // Unbind IBO.

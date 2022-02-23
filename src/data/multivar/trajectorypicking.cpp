@@ -306,24 +306,6 @@ void MTrajectoryPicker::setBaseTrajectories(const MFilteredTrajectories& filtere
         }
     }
 
-    for (const MFilteredTrajectory& trajectory : filteredTrajectories)
-    {
-        for (size_t i = 0; i < numVars; i++)
-        {
-            const QVector<float>& attributes = trajectory.attributes.at(int(i));
-            QVector2D& minMaxVector = minMaxAttributes[int(i)];
-            for (float v : attributes)
-            {
-                if (std::isnan(v))
-                {
-                    continue;
-                }
-                minMaxVector.setX(std::min(minMaxVector.x(), v));
-                minMaxVector.setY(std::max(minMaxVector.y(), v));
-            }
-        }
-    }
-
     if (showMinMaxValue)
     {
         for (size_t i = 0; i < numVars; i++)
@@ -902,7 +884,7 @@ void MTrajectoryPicker::updateDiagramData()
             maxAscentTimeStepIndex = 0;
             if (highlightedTrajectories.empty())
             {
-                for (size_t trajectoryIndex = 0; trajectoryIndex < baseTrajectories.size(); trajectoryIndex++)
+                for (int trajectoryIndex = 0; trajectoryIndex < baseTrajectories.size(); trajectoryIndex++)
                 {
                     int ascentTimeStepIndex = ascentTimeStepIndices.at(trajectoryIndex);
                     minAscentTimeStepIndex = std::min(minAscentTimeStepIndex, ascentTimeStepIndex);

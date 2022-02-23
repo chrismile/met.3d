@@ -52,13 +52,14 @@ enum class MultiVarRenderMode {
     CHECKERBOARD,
     FIBERS
 };
-enum class MultiVarSphereRenderMode {
+enum class MultiVarFocusRenderMode {
     NONE,
     TANGENT,
     GREAT_CIRCLE,
     CROSS_SECTION,
     PIE_CHART_AREA,
-    PIE_CHART_COLOR
+    PIE_CHART_COLOR,
+    ROLLS
 };
 
 inline bool getMultiVarRenderModeNeedsSubdiv(MultiVarRenderMode multiVarRenderMode) {
@@ -100,7 +101,10 @@ public:
     inline bool getInternalRepresentationChanged() const { return internalRepresentationChanged; }
     inline void resetInternalRepresentationChanged() { internalRepresentationChanged = false; }
     inline bool getNeedsSubdiv() { return getMultiVarRenderModeNeedsSubdiv(multiVarRenderMode); }
-    inline bool getRenderSpheres() { return sphereRenderMode != MultiVarSphereRenderMode::NONE; }
+    inline bool getRenderSpheres() {
+        return focusRenderMode != MultiVarFocusRenderMode::NONE && focusRenderMode != MultiVarFocusRenderMode::ROLLS;
+    }
+    inline bool getRenderRolls() { return focusRenderMode == MultiVarFocusRenderMode::ROLLS; }
 
     inline bool getSelectedVariablesChanged() const { return selectedVariablesChanged; }
     inline void resetSelectedVariablesChanged() { selectedVariablesChanged = false; }
@@ -121,6 +125,10 @@ public:
 
     inline bool getUseTimestepLens() const { return useTimestepLens; }
     inline const QVector<QString>& getVarNames() const { return varNames; }
+
+    inline int getNumLineSegments() const { return numLineSegments; }
+    inline float getRollsWidth() const { return rollsWidth; }
+    inline bool getMapRollsThickness() const { return mapRollsThickness; }
 
     /**
       Sets the diagram type currently used by MTrajectoryPicking.
@@ -144,8 +152,10 @@ public:
 
     void setUniformData(int textureUnitTransferFunction);
     void setUniformDataSpheres(int textureUnitTransferFunction);
+    void setUniformDataRolls(int textureUnitTransferFunction);
     std::shared_ptr<GL::MShaderEffect> getShaderEffect();
     std::shared_ptr<GL::MShaderEffect> getTimeStepSphereShader();
+    std::shared_ptr<GL::MShaderEffect> getTimeStepRollsShader();
 
     /**
      * Interface for the trajectory actor.
@@ -162,6 +172,7 @@ private:
     void setPropertiesVarSelected();
     void reloadShaderEffect();
     void reloadSphereShaderEffect();
+    void reloadRollsShaderEffect();
     void updateModeEnabledProperties();
     void updateNumVariablesSelected();
 
@@ -183,6 +194,10 @@ private:
     QtProperty *bandBackgroundColorProperty;
     QtProperty *separatorWidthProperty;
     QtProperty *useColorIntensityProperty;
+
+    QtProperty *useColorIntensityRollsProperty;
+    QtProperty *rollsWidthProperty;
+    QtProperty *mapRollsThicknessProperty;
 
     QVector<QString> varNames;
     MMultiVarTf multiVarTf;
@@ -215,18 +230,23 @@ private:
 
     std::shared_ptr<GL::MShaderEffect> shaderEffect;
     //bool isDirty = true;
-    bool shallReloadShaderEffect = true;
-    bool shallReloadSphereShaderEffect = true;
     DiagramDisplayType diagramType = DiagramDisplayType::NONE;
 
     // Time step sphere rendering.
     std::shared_ptr<GL::MShaderEffect> shaderEffectSphere;
+    bool shallReloadShaderEffect = true;
+    bool shallReloadSphereShaderEffect = true;
+
+    // Time step rolls rendering.
+    std::shared_ptr<GL::MShaderEffect> shaderEffectRolls;
+    bool shallReloadRollsEffect = true;
+    bool shallReloadRollsShaderEffect = true;
 
     // Rendering modes.
     MultiVarRenderMode multiVarRenderMode = MultiVarRenderMode::ORIENTED_COLOR_BANDS;
     MultiVarRadiusMappingMode multiVarRadiusMappingMode = MultiVarRadiusMappingMode::GLOBAL;
     bool internalRepresentationChanged = false; ///< If multiVarRenderMode changes to other mode needing different data.
-    MultiVarSphereRenderMode sphereRenderMode = MultiVarSphereRenderMode::GREAT_CIRCLE;
+    MultiVarFocusRenderMode focusRenderMode = MultiVarFocusRenderMode::ROLLS;
 
     // For MULTIVAR_RENDERMODE_ORIENTED_COLOR_BANDS, MULTIVAR_RENDERMODE_ORIENTED_COLOR_BANDS_RIBBON
     enum class OrientedRibbonMode {
@@ -259,6 +279,11 @@ private:
     float minRadiusFactor = 0.5f;
     float fiberRadius = 0.05f;
     bool useTimestepLens = true;
+
+    // Rolls settings.
+    bool useColorIntensityRolls = true;
+    float rollsWidth = 0.2f;
+    bool mapRollsThickness = true;
 
     // Lighting settings.
     bool useColorIntensity = true;

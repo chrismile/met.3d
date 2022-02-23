@@ -47,13 +47,14 @@ const QStringList renderingTechniqueShaderFilenames = {
         "src/glsl/multivar/multivar_fibers.fx.glsl"
 };
 
-const QStringList sphereRenderingTechniqueShaderFilenames = {
+const QStringList focusRenderingTechniqueShaderFilenames = {
         "",
         "src/glsl/multivar/multivar_sphere_tangent.fx.glsl",
         "src/glsl/multivar/multivar_sphere_great_circle.fx.glsl",
         "src/glsl/multivar/multivar_sphere_cross_section.fx.glsl",
         "src/glsl/multivar/multivar_sphere_pie_chart.fx.glsl",
-        "src/glsl/multivar/multivar_sphere_pie_chart.fx.glsl"
+        "src/glsl/multivar/multivar_sphere_pie_chart.fx.glsl",
+        "src/glsl/multivar/multivar_focus_rolls.fx.glsl"
 };
 
 
@@ -108,7 +109,7 @@ void MMultiVarData::setProperties(MActor *actor, MQtProperties *properties, QtPr
                     "None", "Tangent", "Great Circles", "Cross Section", "Pie Chart (Area)", "Pie Chart (Color)"
             };
     properties->mEnum()->setEnumNames(sphereRenderTechniqueProperty, sphereRenderingTechniques);
-    properties->mEnum()->setValue(sphereRenderTechniqueProperty, int(sphereRenderMode));
+    properties->mEnum()->setValue(sphereRenderTechniqueProperty, int(focusRenderMode));
     sphereRenderTechniqueProperty->setToolTip(
             "What rendering technique to use for the highlight spheres.");
     propertyList.push_back(sphereRenderTechniqueProperty);
@@ -186,8 +187,31 @@ void MMultiVarData::setProperties(MActor *actor, MQtProperties *properties, QtPr
     useColorIntensityProperty = addProperty(
             BOOL_PROPERTY, "use color intensity", multiVarGroupProperty);
     properties->mBool()->setValue(useColorIntensityProperty, useColorIntensity);
-    useColorIntensityProperty->setToolTip("Whether map the variables to color intensity.");
+    useColorIntensityProperty->setToolTip("Whether to map the variables to color intensity.");
     propertyList.push_back(useColorIntensityProperty);
+
+    useColorIntensityRollsProperty = addProperty(
+            BOOL_PROPERTY, "use rolls color intensity", multiVarGroupProperty);
+    properties->mBool()->setValue(useColorIntensityRollsProperty, useColorIntensityRolls);
+    useColorIntensityRollsProperty->setToolTip("Whether to map the variables to color intensity for the bands.");
+    propertyList.push_back(useColorIntensityRollsProperty);
+    useColorIntensityRollsProperty->setEnabled(focusRenderMode == MultiVarFocusRenderMode::ROLLS);
+
+    rollsWidthProperty = addProperty(
+            DECORATEDDOUBLE_PROPERTY, "rolls width", multiVarGroupProperty);
+    properties->setDDouble(
+            rollsWidthProperty, rollsWidth,
+            0.01, 1.0, 2, 0.1, " (world space)");
+    rollsWidthProperty->setToolTip("Rolls width.");
+    propertyList.push_back(rollsWidthProperty);
+    rollsWidthProperty->setEnabled(focusRenderMode == MultiVarFocusRenderMode::ROLLS);
+
+    mapRollsThicknessProperty = addProperty(
+            BOOL_PROPERTY, "map rolls thickness", multiVarGroupProperty);
+    properties->mBool()->setValue(mapRollsThicknessProperty, mapRollsThickness);
+    mapRollsThicknessProperty->setToolTip("Whether to map the variable values to the roll thickness.");
+    propertyList.push_back(mapRollsThicknessProperty);
+    mapRollsThicknessProperty->setEnabled(focusRenderMode == MultiVarFocusRenderMode::ROLLS);
 
 
     // --- Group: Rendering settings ---
@@ -210,7 +234,7 @@ void MMultiVarData::setPropertiesRenderingSettings()
 {
     numLineSegmentsProperty = addProperty(
             INT_PROPERTY, "num line segments", renderingSettingsGroupProperty);
-    properties->setInt(numLineSegmentsProperty, numLineSegments, 3, 20);
+    properties->setInt(numLineSegmentsProperty, numLineSegments, 3, 14);
     numLineSegmentsProperty->setToolTip("Number of line segments used for the tube rendering.");
     propertyList.push_back(numLineSegmentsProperty);
 
@@ -236,7 +260,7 @@ void MMultiVarData::setPropertiesRenderingSettings()
 
     useTimestepLensProperty = addProperty(
             BOOL_PROPERTY, "use timestep lens", renderingSettingsGroupProperty);
-    properties->mBool()->setValue(useTimestepLensProperty, useColorIntensity);
+    properties->mBool()->setValue(useTimestepLensProperty, useTimestepLens);
     useTimestepLensProperty->setToolTip("Whether use a timestep lense for highlighting user-selected timesteps.");
     propertyList.push_back(useTimestepLensProperty);
 
@@ -349,6 +373,11 @@ void MMultiVarData::updateModeEnabledProperties()
             || orientedRibbonMode == OrientedRibbonMode::VARYING_RIBBON_WIDTH);
     rollWidthProperty->setEnabled(multiVarRenderMode == MultiVarRenderMode::ROLLS);
     useTimestepLensProperty->setEnabled(multiVarRenderMode == MultiVarRenderMode::ORIENTED_COLOR_BANDS);
+
+    // Rolls settings.
+    useColorIntensityRollsProperty->setEnabled(focusRenderMode == MultiVarFocusRenderMode::ROLLS);
+    rollsWidthProperty->setEnabled(focusRenderMode == MultiVarFocusRenderMode::ROLLS);
+    mapRollsThicknessProperty->setEnabled(focusRenderMode == MultiVarFocusRenderMode::ROLLS);
 }
 
 
@@ -401,6 +430,11 @@ void MMultiVarData::saveConfiguration(QSettings *settings)
     settings->setValue(QString("materialConstantSpecularExp"), materialConstantSpecularExp);
     settings->setValue(QString("drawHalo"), drawHalo);
     settings->setValue(QString("haloFactor"), haloFactor);
+
+    // Rolls settings.
+    settings->setValue(QString("useColorIntensityRolls"), useColorIntensityRolls);
+    settings->setValue(QString("rollsWidth"), rollsWidth);
+    settings->setValue(QString("mapRollsThickness"), mapRollsThickness);
 }
 
 void MMultiVarData::loadConfiguration(QSettings *settings)
@@ -463,6 +497,11 @@ void MMultiVarData::loadConfiguration(QSettings *settings)
     materialConstantSpecularExp = settings->value("materialConstantSpecularExp", 8.0f).toFloat();
     drawHalo = settings->value("drawHalo", true).toBool();
     haloFactor = settings->value("haloFactor", 1.0f).toFloat();
+
+    // Rolls settings.
+    useColorIntensityRolls = settings->value("useColorIntensityRolls", true).toBool();
+    rollsWidth = settings->value("rollsWidth", 0.2f).toFloat();
+    mapRollsThickness = settings->value("mapRollsThickness", true).toBool();
 }
 
 
@@ -708,9 +747,9 @@ void MMultiVarData::onQtPropertyChanged(QtProperty *property)
     }
     else if (property == sphereRenderTechniqueProperty)
     {
-        MultiVarSphereRenderMode newSphereRenderMode =
-                MultiVarSphereRenderMode(properties->mEnum()->value(sphereRenderTechniqueProperty));
-        sphereRenderMode = newSphereRenderMode;
+        MultiVarFocusRenderMode newSphereRenderMode =
+                MultiVarFocusRenderMode(properties->mEnum()->value(sphereRenderTechniqueProperty));
+        focusRenderMode = newSphereRenderMode;
         reloadSphereShaderEffect();
     }
     else if (tfPropertiesMultiVar.contains(property))
@@ -742,7 +781,7 @@ void MMultiVarData::onQtPropertyChanged(QtProperty *property)
     }
     else if (property == twistOffsetProperty)
     {
-        twistOffset = properties->mDDouble()->value(twistOffsetProperty);
+        twistOffset = float(properties->mDDouble()->value(twistOffsetProperty));
     }
     else if (property == constantTwistOffsetProperty)
     {
@@ -759,11 +798,24 @@ void MMultiVarData::onQtPropertyChanged(QtProperty *property)
     }
     else if (property == separatorWidthProperty)
     {
-        separatorWidth = properties->mDDouble()->value(separatorWidthProperty);
+        separatorWidth = float(properties->mDDouble()->value(separatorWidthProperty));
     }
     else if (property == useColorIntensityProperty)
     {
         useColorIntensity = properties->mBool()->value(useColorIntensityProperty);
+    }
+
+    else if (property == useColorIntensityRollsProperty)
+    {
+        useColorIntensityRolls = properties->mBool()->value(useColorIntensityRollsProperty);
+    }
+    else if (property == rollsWidthProperty)
+    {
+        rollsWidth = float(properties->mDDouble()->value(rollsWidthProperty));
+    }
+    else if (property == mapRollsThicknessProperty)
+    {
+        mapRollsThickness = properties->mBool()->value(mapRollsThicknessProperty);
     }
 
     // --- Group: Rendering settings ---
@@ -782,11 +834,11 @@ void MMultiVarData::onQtPropertyChanged(QtProperty *property)
     }
     else if (property == fiberRadiusProperty)
     {
-        fiberRadius = properties->mDDouble()->value(fiberRadiusProperty);
+        fiberRadius = float(properties->mDDouble()->value(fiberRadiusProperty));
     }
     else if (property == minRadiusFactorProperty)
     {
-        minRadiusFactor = properties->mDDouble()->value(minRadiusFactorProperty);
+        minRadiusFactor = float(properties->mDDouble()->value(minRadiusFactorProperty));
     }
     else if (property == rollWidthProperty)
     {
@@ -800,19 +852,19 @@ void MMultiVarData::onQtPropertyChanged(QtProperty *property)
 
     else if (property == materialConstantAmbientProperty)
     {
-        materialConstantAmbient = properties->mDDouble()->value(materialConstantAmbientProperty);
+        materialConstantAmbient = float(properties->mDDouble()->value(materialConstantAmbientProperty));
     }
     else if (property == materialConstantDiffuseProperty)
     {
-        materialConstantDiffuse = properties->mDDouble()->value(materialConstantDiffuseProperty);
+        materialConstantDiffuse = float(properties->mDDouble()->value(materialConstantDiffuseProperty));
     }
     else if (property == materialConstantSpecularProperty)
     {
-        materialConstantSpecular = properties->mDDouble()->value(materialConstantSpecularProperty);
+        materialConstantSpecular = float(properties->mDDouble()->value(materialConstantSpecularProperty));
     }
     else if (property == materialConstantSpecularExpProperty)
     {
-        materialConstantSpecularExp = properties->mDDouble()->value(materialConstantSpecularExpProperty);
+        materialConstantSpecularExp = float(properties->mDDouble()->value(materialConstantSpecularExpProperty));
     }
     else if (property == drawHaloProperty)
     {
@@ -820,7 +872,7 @@ void MMultiVarData::onQtPropertyChanged(QtProperty *property)
     }
     else if (property == haloFactorProperty)
     {
-        haloFactor = properties->mDDouble()->value(haloFactorProperty);
+        haloFactor = float(properties->mDDouble()->value(haloFactorProperty));
     }
 
     // --- Group: Selected variables ---
@@ -843,7 +895,7 @@ void MMultiVarData::onQtPropertyChanged(QtProperty *property)
 void MMultiVarData::onBezierTrajectoriesLoaded(MTrajectories* trajectories)
 {
     const QStringList& auxDataVarNames = trajectories->getAuxDataVarNames();
-    int numTrajectories = trajectories->getNumTrajectories();
+    //int numTrajectories = trajectories->getNumTrajectories();
 
     if (tfPropertiesMultiVar.empty())
     {
@@ -973,6 +1025,28 @@ void MMultiVarData::setUniformDataSpheres(int textureUnitTransferFunction)
 }
 
 
+void MMultiVarData::setUniformDataRolls(int textureUnitTransferFunction)
+{
+    shaderEffectRolls->setUniformValue("numVariables", std::min(numVariablesSelected, MAX_NUM_VARIABLES));
+    shaderEffectRolls->setUniformValue("maxNumVariables", maxNumVariables);
+    shaderEffectRolls->setUniformValue("materialAmbient", materialConstantAmbient);
+    shaderEffectRolls->setUniformValue("materialDiffuse", materialConstantDiffuse);
+    shaderEffectRolls->setUniformValue("materialSpecular", materialConstantSpecular);
+    shaderEffectRolls->setUniformValue("materialSpecularExp", materialConstantSpecularExp);
+    shaderEffectRolls->setUniformValue("drawHalo", drawHalo);
+    shaderEffectRolls->setUniformValue("haloFactor", haloFactor);
+    shaderEffectRolls->setUniformValue("separatorWidth", separatorWidth);
+    shaderEffectRolls->setUniformValue("useColorIntensity", int(useColorIntensityRolls));
+    shaderEffectRolls->setUniformValue("bandBackgroundColor", bandBackgroundColor);
+    shaderEffectRolls->setUniformValue("rollsWidth", rollsWidth);
+
+    multiVarTf.bindTexture1DArray(textureUnitTransferFunction);
+    shaderEffectRolls->setUniformValue(
+            "transferFunctionTexture", textureUnitTransferFunction);
+    multiVarTf.getMinMaxBuffer()->bindToIndex(9);
+}
+
+
 std::shared_ptr<GL::MShaderEffect> MMultiVarData::getShaderEffect()
 {
     if (shallReloadShaderEffect)
@@ -990,6 +1064,16 @@ std::shared_ptr<GL::MShaderEffect> MMultiVarData::getTimeStepSphereShader()
         reloadSphereShaderEffect();
     }
     return shaderEffectSphere;
+}
+
+
+std::shared_ptr<GL::MShaderEffect> MMultiVarData::getTimeStepRollsShader()
+{
+    if (shallReloadRollsShaderEffect)
+    {
+        reloadRollsShaderEffect();
+    }
+    return shaderEffectRolls;
 }
 
 
@@ -1044,7 +1128,7 @@ void MMultiVarData::reloadShaderEffect()
 
 void MMultiVarData::reloadSphereShaderEffect()
 {
-    if (sphereRenderMode == MultiVarSphereRenderMode::NONE)
+    if (focusRenderMode == MultiVarFocusRenderMode::NONE || focusRenderMode == MultiVarFocusRenderMode::ROLLS)
     {
         shaderEffectSphere = {};
         shallReloadSphereShaderEffect = false;
@@ -1063,11 +1147,11 @@ void MMultiVarData::reloadSphereShaderEffect()
     {
         defines.insert("SUPPORT_LINE_DESATURATION", QString::fromStdString(""));
     }
-    if (sphereRenderMode == MultiVarSphereRenderMode::PIE_CHART_AREA)
+    if (focusRenderMode == MultiVarFocusRenderMode::PIE_CHART_AREA)
     {
         defines.insert("PIE_CHART_AREA", "");
     }
-    else if (sphereRenderMode == MultiVarSphereRenderMode::PIE_CHART_COLOR)
+    else if (focusRenderMode == MultiVarFocusRenderMode::PIE_CHART_COLOR)
     {
         defines.insert("PIE_CHART_COLOR", "");
     }
@@ -1075,8 +1159,37 @@ void MMultiVarData::reloadSphereShaderEffect()
     MGLResourcesManager* glRM = MGLResourcesManager::getInstance();
     glRM->generateEffectProgramUncached("multivar_sphere", shaderEffectSphere);
     shaderEffectSphere->compileFromFile_Met3DHome(
-            sphereRenderingTechniqueShaderFilenames[int(sphereRenderMode)], defines);
+            focusRenderingTechniqueShaderFilenames[int(focusRenderMode)], defines);
     shallReloadSphereShaderEffect = false;
+}
+
+
+void MMultiVarData::reloadRollsShaderEffect()
+{
+    if (focusRenderMode != MultiVarFocusRenderMode::ROLLS)
+    {
+        shaderEffectRolls = {};
+        shallReloadRollsShaderEffect = false;
+        return;
+    }
+
+    QMap<QString, QString> defines =
+            {
+                    {"USE_MULTI_VAR_TRANSFER_FUNCTION", QString::fromStdString("") },
+                    {"IS_MULTIVAR_DATA", QString::fromStdString("") },
+                    {"MAX_NUM_VARIABLES", QString::fromStdString(std::to_string(MAX_NUM_VARIABLES)) },
+            };
+
+    if (diagramType == DiagramDisplayType::NONE || diagramType == DiagramDisplayType::HORIZON_GRAPH)
+    {
+        defines.insert("SUPPORT_LINE_DESATURATION", QString::fromStdString(""));
+    }
+
+    MGLResourcesManager* glRM = MGLResourcesManager::getInstance();
+    glRM->generateEffectProgramUncached("multivar_sphere", shaderEffectRolls);
+    shaderEffectRolls->compileFromFile_Met3DHome(
+            focusRenderingTechniqueShaderFilenames[int(focusRenderMode)], defines);
+    shallReloadRollsShaderEffect = false;
 }
 
 }

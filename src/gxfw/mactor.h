@@ -255,11 +255,12 @@ public:
 
       Called by a @ref MSceneViewGLWidget.
       */
-    virtual void checkIntersectionWithSelectableData(
+    virtual bool checkIntersectionWithSelectableData(
             MSceneViewGLWidget *sceneView, QMouseEvent *event)
     {
         Q_UNUSED(sceneView);
         Q_UNUSED(event);
+        return false;
     }
 
     /**

@@ -2091,7 +2091,23 @@ void MSceneViewGLWidget::mousePressEvent(QMouseEvent *event)
         isVirtualWindowBelowMouse = isVirtualWindowBelowMouse || widgetHasVirtualWindow;
     }
 
-    if (isVirtualWindowBelowMouse)
+    bool selectableDataTriggeredUpdate = false;
+    if (!isVirtualWindowBelowMouse && event->modifiers().testFlag(Qt::ControlModifier))
+    {
+        foreach (MActor* actor, scene->getRenderQueue())
+        {
+            // Only check actors that have selectable data.
+            if (actor->hasSelectableData())
+            {
+                if (actor->checkIntersectionWithSelectableData(this, event))
+                {
+                    selectableDataTriggeredUpdate = true;
+                }
+            }
+        }
+    }
+
+    if (isVirtualWindowBelowMouse || selectableDataTriggeredUpdate)
     {
 #ifndef CONTINUOUS_GL_UPDATE
 #ifdef USE_QOPENGLWIDGET
@@ -2143,7 +2159,24 @@ void MSceneViewGLWidget::mouseMoveEvent(QMouseEvent *event)
         isVirtualWindowBelowMouse = isVirtualWindowBelowMouse || widgetHasVirtualWindow;
     }
 
-    if (isVirtualWindowBelowMouse)
+    bool selectableDataTriggeredUpdate = false;
+    if (event->buttons() != Qt::NoButton && !freezeMode && !isVirtualWindowBelowMouse
+        && event->modifiers().testFlag(Qt::ControlModifier))
+    {
+        foreach (MActor* actor, scene->getRenderQueue())
+        {
+            // Only check actors that have selectable data.
+            if (actor->hasSelectableData())
+            {
+                if (actor->checkIntersectionWithSelectableData(this, event))
+                {
+                    selectableDataTriggeredUpdate = true;
+                }
+            }
+        }
+    }
+
+    if (isVirtualWindowBelowMouse || selectableDataTriggeredUpdate)
     {
 #ifndef CONTINUOUS_GL_UPDATE
 #ifdef USE_QOPENGLWIDGET
@@ -2157,7 +2190,6 @@ void MSceneViewGLWidget::mouseMoveEvent(QMouseEvent *event)
     {
         return;
     }
-
 
     if (freezeMode || isVirtualWindowBelowMouse || event->modifiers() == Qt::ControlModifier) return;
 
@@ -2383,7 +2415,23 @@ void MSceneViewGLWidget::mouseReleaseEvent(QMouseEvent *event)
         isVirtualWindowBelowMouse = isVirtualWindowBelowMouse || widgetHasVirtualWindow;
     }
 
-    if (isVirtualWindowBelowMouse)
+    bool selectableDataTriggeredUpdate = false;
+    if (!freezeMode && !isVirtualWindowBelowMouse && event->modifiers().testFlag(Qt::ControlModifier))
+    {
+        foreach (MActor* actor, scene->getRenderQueue())
+        {
+            // Only check actors that have selectable data.
+            if (actor->hasSelectableData())
+            {
+                if (actor->checkIntersectionWithSelectableData(this, event))
+                {
+                    selectableDataTriggeredUpdate = true;
+                }
+            }
+        }
+    }
+
+    if (isVirtualWindowBelowMouse || selectableDataTriggeredUpdate)
     {
 #ifndef CONTINUOUS_GL_UPDATE
 #ifdef USE_QOPENGLWIDGET
@@ -2399,18 +2447,6 @@ void MSceneViewGLWidget::mouseReleaseEvent(QMouseEvent *event)
     if (actorInteractionMode && pickedActor.actor != nullptr)
     {
         pickedActor.actor->removePositionLabel();
-    }
-
-    if (event->modifiers().testFlag(Qt::ControlModifier))
-    {
-        foreach (MActor* actor, scene->getRenderQueue())
-        {
-            // Only check actors that have selectable data.
-            if (actor->hasSelectableData())
-            {
-                actor->checkIntersectionWithSelectableData(this, event);
-            }
-        }
     }
 
     userIsInteracting = false;
