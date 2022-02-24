@@ -182,7 +182,7 @@ private:
 
     QVector<QtProperty*> propertyList;
     QtProperty *renderTechniqueProperty;
-    QtProperty *sphereRenderTechniqueProperty;
+    QtProperty *focusRenderTechniqueProperty;
     QtProperty *mapTubeDiameterProperty;
     QtProperty *radiusMappingModeProperty;
     QtProperty *checkerboardHeightProperty;

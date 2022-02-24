@@ -102,17 +102,18 @@ void MMultiVarData::setProperties(MActor *actor, MQtProperties *properties, QtPr
             "What line rendering technique to use for the multiple variables.");
     propertyList.push_back(renderTechniqueProperty);
 
-    sphereRenderTechniqueProperty = addProperty(
+    focusRenderTechniqueProperty = addProperty(
             ENUM_PROPERTY, "sphere render technique", multiVarGroupProperty);
-    QStringList sphereRenderingTechniques =
+    QStringList focusRenderingTechniques =
             {
-                    "None", "Tangent", "Great Circles", "Cross Section", "Pie Chart (Area)", "Pie Chart (Color)"
+                    "None", "Tangent", "Great Circles", "Cross Section", "Pie Chart (Area)", "Pie Chart (Color)",
+                    "Rolls"
             };
-    properties->mEnum()->setEnumNames(sphereRenderTechniqueProperty, sphereRenderingTechniques);
-    properties->mEnum()->setValue(sphereRenderTechniqueProperty, int(focusRenderMode));
-    sphereRenderTechniqueProperty->setToolTip(
-            "What rendering technique to use for the highlight spheres.");
-    propertyList.push_back(sphereRenderTechniqueProperty);
+    properties->mEnum()->setEnumNames(focusRenderTechniqueProperty, focusRenderingTechniques);
+    properties->mEnum()->setValue(focusRenderTechniqueProperty, int(focusRenderMode));
+    focusRenderTechniqueProperty->setToolTip(
+            "What rendering technique to use for the highlight focus geometry.");
+    propertyList.push_back(focusRenderTechniqueProperty);
 
     mapTubeDiameterProperty = addProperty(
             BOOL_PROPERTY, "map tube diameter", multiVarGroupProperty);
@@ -745,10 +746,10 @@ void MMultiVarData::onQtPropertyChanged(QtProperty *property)
         multiVarRenderMode = newRenderMode;
         reloadShaderEffect();
     }
-    else if (property == sphereRenderTechniqueProperty)
+    else if (property == focusRenderTechniqueProperty)
     {
         MultiVarFocusRenderMode newSphereRenderMode =
-                MultiVarFocusRenderMode(properties->mEnum()->value(sphereRenderTechniqueProperty));
+                MultiVarFocusRenderMode(properties->mEnum()->value(focusRenderTechniqueProperty));
         focusRenderMode = newSphereRenderMode;
         reloadSphereShaderEffect();
     }
