@@ -108,7 +108,7 @@ MBezierTrajectories *MBezierTrajectoriesSource::produceData(MDataRequest request
     int auxVarIdx = 0;
     for (const QString& varName : auxDataVarNames)
     {
-        if (varName.startsWith('d') && varName == "deposition")
+        if (varName.startsWith('d') && varName != "deposition")
         {
             hasSensitivityData = true;
             sensitivityIndices.push_back(auxVarIdx + 1);
@@ -190,13 +190,16 @@ MBezierTrajectories *MBezierTrajectoriesSource::produceData(MDataRequest request
             for (int timeStepIdx = 0; timeStepIdx < numTimeStepsPerTrajectory; timeStepIdx++)
             {
                 bool hasValidData = false;
-                float maxSensitivity = std::numeric_limits<float>::lowest();
+                float maxSensitivity = 0.0f;
                 for (int varIdx : sensitivityIndices)
                 {
                     float sensitivityValue = filteredTrajectory.attributes.at(varIdx).at(timeStepIdx);
                     if (!std::isnan(sensitivityValue))
                     {
-                        maxSensitivity = std::max(maxSensitivity, sensitivityValue);
+                        if (std::abs(sensitivityValue) > std::abs(maxSensitivity))
+                        {
+                            maxSensitivity = sensitivityValue;
+                        }
                         hasValidData = true;
                     }
                 }

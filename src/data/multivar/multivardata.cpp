@@ -215,7 +215,7 @@ void MMultiVarData::setProperties(MActor *actor, MQtProperties *properties, QtPr
     mapRollsThicknessProperty->setEnabled(focusRenderMode == MultiVarFocusRenderMode::ROLLS);
 
     targetVariableAndSensitivityProperty = addProperty(
-            BOOL_PROPERTY, "map target var. and max. sensitivity", multiVarGroupProperty);
+            BOOL_PROPERTY, "target and max sensitivity", multiVarGroupProperty);
     properties->mBool()->setValue(targetVariableAndSensitivityProperty, targetVariableAndSensitivity);
     targetVariableAndSensitivityProperty->setToolTip("Whether to map the variables to color intensity.");
     propertyList.push_back(targetVariableAndSensitivityProperty);
@@ -591,6 +591,8 @@ void MMultiVarData::onActorRenamed(MActor *actor, QString oldName)
 
 void MMultiVarData::initTransferFunctionsMultiVar(uint32_t numVariables)
 {
+    multiVarTf.setVariableNames(varNames);
+
     if (tfPropertiesMultiVar.empty()) {
         foreach (QtProperty *property, tfPropertiesMultiVar)
         {

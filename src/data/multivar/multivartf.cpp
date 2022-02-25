@@ -40,7 +40,7 @@
 namespace Met3D
 {
 
-static std::vector<std::vector<QColor>> defaultTransferFunctions = {
+static std::vector<std::vector<QColor>> defaultTransferFunctionsSequential = {
         // reds
         { {228,218,218}, {228,192,192}, {228,161,161}, {228,118,119}, {228, 26, 28} },
         // blues
@@ -57,6 +57,12 @@ static std::vector<std::vector<QColor>> defaultTransferFunctions = {
         { {254,248,243}, {254,233,217}, {254,217,185}, {254,199,144}, {254,178, 76} },
         // dark-blues
         { {243,243,255}, {214,214,255}, {179,179,255}, {130,131,255}, {  0,  7,255} },
+};
+
+
+static std::vector<std::vector<QColor>> defaultTransferFunctionsDiverging = {
+        // Standard transfer function also used, e.g., in ParaView.
+        { { 59, 76,192}, {144,178,254}, {220,220,220}, {245,156,125}, {180,  4, 38} },
 };
 
 
@@ -142,13 +148,41 @@ void MMultiVarTf::generateTexture1DArray()
         }
     }*/
 
-    const int VALUES_PER_MAP = 5;
-    standardColorMapsBytes.clear();
-    standardColorMapsBytes.resize(defaultTransferFunctions.size());
-    for (size_t colMapIdx = 0; colMapIdx < defaultTransferFunctions.size(); colMapIdx++)
+    standardSequentialColorMapsBytes.clear();
+    standardSequentialColorMapsBytes.resize(defaultTransferFunctionsSequential.size());
+    for (size_t colMapIdx = 0; colMapIdx < defaultTransferFunctionsSequential.size(); colMapIdx++)
     {
-        std::vector<unsigned char>& colorMapBytes = standardColorMapsBytes.at(colMapIdx);
-        std::vector<QColor>& defaultTransferFunction = defaultTransferFunctions.at(colMapIdx);
+        std::vector<unsigned char>& colorMapBytes = standardSequentialColorMapsBytes.at(colMapIdx);
+        std::vector<QColor>& defaultTransferFunction = defaultTransferFunctionsSequential.at(colMapIdx);
+        const int VALUES_PER_MAP = int(defaultTransferFunction.size());
+        colorMapBytes.reserve(numBytesPerColorMap);
+        for (size_t i = 0; i < numEntriesPerColorMap; i++)
+        {
+            float pct = float(i) / float(numEntriesPerColorMap - 1);
+            float arrayPosFlt = pct * float(VALUES_PER_MAP - 1);
+            int lastIdx = std::min(int(arrayPosFlt), VALUES_PER_MAP - 1);
+            int nextIdx = std::min(lastIdx + 1, VALUES_PER_MAP - 1);
+            float f1 = arrayPosFlt - float(lastIdx);
+            float f0 = 1.0f - f1;
+            QColor c0 = defaultTransferFunction.at(lastIdx);
+            QColor c1 = defaultTransferFunction.at(nextIdx);
+            uint8_t red = clamp(int(std::round(float(c0.red()) * f0 + float(c1.red()) * f1)), 0, 255);
+            uint8_t green = clamp(int(std::round(float(c0.green()) * f0 + float(c1.green()) * f1)), 0, 255);
+            uint8_t blue = clamp(int(std::round(float(c0.blue()) * f0 + float(c1.blue()) * f1)), 0, 255);
+            colorMapBytes.push_back(red);
+            colorMapBytes.push_back(green);
+            colorMapBytes.push_back(blue);
+            colorMapBytes.push_back(0xff);
+        }
+    }
+
+    standardDivergingColorMapsBytes.clear();
+    standardDivergingColorMapsBytes.resize(defaultTransferFunctionsDiverging.size());
+    for (size_t colMapIdx = 0; colMapIdx < defaultTransferFunctionsDiverging.size(); colMapIdx++)
+    {
+        std::vector<unsigned char>& colorMapBytes = standardDivergingColorMapsBytes.at(colMapIdx);
+        std::vector<QColor>& defaultTransferFunction = defaultTransferFunctionsDiverging.at(colMapIdx);
+        const int VALUES_PER_MAP = int(defaultTransferFunction.size());
         colorMapBytes.reserve(numBytesPerColorMap);
         for (size_t i = 0; i < numEntriesPerColorMap; i++)
         {
@@ -217,13 +251,38 @@ void MMultiVarTf::generateTexture1DArray()
         }
         else
         {
-            std::vector<unsigned char>& colorMapBytes = standardColorMapsBytes.at(
-                    varIdx % defaultTransferFunctions.size());
-            colorValuesArray.insert(colorValuesArray.end(), colorMapBytes.begin(), colorMapBytes.end());
+            const QString& varName = variableNames.at(varIdx);
+            bool isSensitivity = (varName.startsWith('d') && varName != "deposition") || varName == "sensitivity_max";
+            bool isDiverging = isSensitivity;
+
+            if (isDiverging)
+            {
+                std::vector<unsigned char>& colorMapBytes = standardDivergingColorMapsBytes.at(
+                        varIdx % defaultTransferFunctionsDiverging.size());
+                colorValuesArray.insert(
+                        colorValuesArray.end(), colorMapBytes.begin(), colorMapBytes.end());
+            }
+            else
+            {
+                std::vector<unsigned char>& colorMapBytes = standardSequentialColorMapsBytes.at(
+                        varIdx % defaultTransferFunctionsSequential.size());
+                colorValuesArray.insert(
+                        colorValuesArray.end(), colorMapBytes.begin(), colorMapBytes.end());
+            }
             QVector2D range;
             if (varIdx < variableRanges.size())
             {
-                range = variableRanges.at(varIdx);
+                if (isSensitivity)
+                {
+                    float maxValue = std::max(
+                            std::abs(variableRanges.at(varIdx).x()),
+                            std::abs(variableRanges.at(varIdx).y()));
+                    range = QVector2D(-maxValue, maxValue);
+                }
+                else
+                {
+                    range = variableRanges.at(varIdx);
+                }
             }
             else
             {
@@ -291,6 +350,12 @@ void MMultiVarTf::bindTexture1DArray(int textureUnitTransferFunction)
 }
 
 
+void MMultiVarTf::setVariableNames(const QVector<QString>& names)
+{
+    variableNames = names;
+}
+
+
 void MMultiVarTf::setVariableRanges(const QVector<QVector2D>& variableRangesNew)
 {
     variableRanges = variableRangesNew;
@@ -313,10 +378,23 @@ void MMultiVarTf::setVariableRanges(const QVector<QVector2D>& variableRangesNew)
         }
         else
         {
+            const QString& varName = variableNames.at(varIdx);
+            bool isSensitivity = (varName.startsWith('d') && varName != "deposition") || varName == "sensitivity_max";
+
             QVector2D range;
             if (varIdx < variableRanges.size())
             {
-                range = variableRanges.at(varIdx);
+                if (isSensitivity)
+                {
+                    float maxValue = std::max(
+                            std::abs(variableRanges.at(varIdx).x()),
+                            std::abs(variableRanges.at(varIdx).y()));
+                    range = QVector2D(-maxValue, maxValue);
+                }
+                else
+                {
+                    range = variableRanges.at(varIdx);
+                }
             }
             else
             {

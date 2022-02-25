@@ -54,6 +54,7 @@ public:
     void destroyTexture1DArray();
     void generateTexture1DArray();
     void bindTexture1DArray(int textureUnitTransferFunction);
+    void setVariableNames(const QVector<QString>& names);
     void setVariableRanges(const QVector<QVector2D>& variableRangesNew);
 
     GL::MShaderStorageBufferObject *getMinMaxBuffer(
@@ -75,8 +76,10 @@ private:
             QString("multivardata_minmax_buffer_#%1").arg(getID());
     QVector<QVector2D> minMaxList;
     bool minMaxIsDirty = true;
+    QVector<QString> variableNames;
     QVector<QVector2D> variableRanges;
-    std::vector<std::vector<unsigned char>> standardColorMapsBytes;
+    std::vector<std::vector<unsigned char>> standardSequentialColorMapsBytes;
+    std::vector<std::vector<unsigned char>> standardDivergingColorMapsBytes;
 };
 
 } // namespace Met3D
