@@ -102,6 +102,20 @@ MBezierTrajectories *MBezierTrajectoriesSource::produceData(MDataRequest request
     //const uint32_t numVariables = std::max(numVariablesReal, uint32_t(1));
     this->numVariables = numVariables;
 
+    const QStringList& auxDataVarNames = inTrajectories->getAuxDataVarNames();
+    bool hasSensitivityData = false;
+    QVector<int> sensitivityIndices;
+    int auxVarIdx = 0;
+    for (const QString& varName : auxDataVarNames)
+    {
+        if (varName.startsWith('d') && varName == "deposition")
+        {
+            hasSensitivityData = true;
+            sensitivityIndices.push_back(auxVarIdx + 1);
+        }
+        auxVarIdx++;
+    }
+
     for (int i = 0; i < numTrajectories; i++)
     {
         int baseIndex = i * numTimeStepsPerTrajectory;
@@ -113,7 +127,7 @@ MBezierTrajectories *MBezierTrajectoriesSource::produceData(MDataRequest request
         }
 
         MFilteredTrajectory filteredTrajectory;
-        filteredTrajectory.attributes.resize(numVariables); // + 1
+        filteredTrajectory.attributes.resize(int(numVariables) + (hasSensitivityData ? 1 : 0));
 
         QVector3D prevPoint(M_INVALID_TRAJECTORY_POS, M_INVALID_TRAJECTORY_POS, M_INVALID_TRAJECTORY_POS);
         for (int t = 0; t < numTimeStepsPerTrajectory; t++)
@@ -164,6 +178,36 @@ MBezierTrajectories *MBezierTrajectoriesSource::produceData(MDataRequest request
             indicesToFilteredIndicesMap.push_back(-1);
         }
     }
+
+
+    if (hasSensitivityData)
+    {
+        for (int trajectoryIdx = 0; trajectoryIdx < filteredTrajectories.size(); trajectoryIdx++)
+        {
+            MFilteredTrajectory& filteredTrajectory = filteredTrajectories[trajectoryIdx];
+            QVector<float>& maxSensitivityAttributes = filteredTrajectory.attributes.back();
+            maxSensitivityAttributes.reserve(numTimeStepsPerTrajectory);
+            for (int timeStepIdx = 0; timeStepIdx < numTimeStepsPerTrajectory; timeStepIdx++)
+            {
+                bool hasValidData = false;
+                float maxSensitivity = std::numeric_limits<float>::lowest();
+                for (int varIdx : sensitivityIndices)
+                {
+                    float sensitivityValue = filteredTrajectory.attributes.at(varIdx).at(timeStepIdx);
+                    if (!std::isnan(sensitivityValue))
+                    {
+                        maxSensitivity = std::max(maxSensitivity, sensitivityValue);
+                        hasValidData = true;
+                    }
+                }
+                if (!hasValidData) {
+                    maxSensitivity = std::numeric_limits<float>::quiet_NaN();
+                }
+                maxSensitivityAttributes.push_back(maxSensitivity);
+            }
+        }
+    }
+    numVariables++;
 
 
     // k-means clustering.
@@ -432,7 +476,8 @@ MBezierTrajectories *MBezierTrajectoriesSource::produceData(MDataRequest request
 
     MBezierTrajectories* newTrajectories = new MBezierTrajectories(
             inTrajectories->getGeneratingRequest(),
-            filteredTrajectories, indicesToFilteredIndicesMap, numVariables);
+            filteredTrajectories, indicesToFilteredIndicesMap, numVariables,
+            auxDataVarNames);
 
     for (int32_t traj = 0; traj < int(filteredTrajectories.size()); ++traj)
     {

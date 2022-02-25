@@ -80,6 +80,7 @@ public:
     void setNumBins(int numBins);
     void sortByDescendingStdDev();
     void setShowMinMaxValue(bool show);
+    void setUseMaxForSensitivity(bool useMax);
 
     void mouseMoveEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event) override;
     void mousePressEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event) override;
@@ -153,6 +154,10 @@ private:
     std::vector<std::vector<std::vector<float>>> variableValuesArray;
     std::vector<std::vector<float>> ensembleMeanValues;
     std::vector<std::vector<float>> ensembleStdDevValues;
+
+    // For sensitivity analysis data.
+    std::vector<bool> variableIsSensitivityArray;
+    bool useMaxForSensitivity = true;
 
     float selectedTimeStep = 0.0f;
     bool selectedTimeStepChanged = false;

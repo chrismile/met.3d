@@ -50,7 +50,7 @@ unsigned int MBezierTrajectory::getMemorySize_kb() const {
 MBezierTrajectories::MBezierTrajectories(
         MDataRequest requestToReferTo, const MFilteredTrajectories& filteredTrajectories,
         const QVector<int>& trajIndicesToFilteredIndicesMap,
-        unsigned int numVariables)
+        unsigned int numVariables, const QStringList& auxDataVarNames)
         : MSupplementalTrajectoryData(requestToReferTo, filteredTrajectories.size()),
           baseTrajectories(filteredTrajectories), bezierTrajectories(filteredTrajectories.size()),
           trajIndicesToFilteredIndicesMap(trajIndicesToFilteredIndicesMap),
@@ -72,6 +72,22 @@ MBezierTrajectories::MBezierTrajectories(
     {
         ascentTimeStepIndices.push_back(0);
     }
+
+    /*
+     * TODO: This is hard-coded, as there is currently no way to know which the target variable is.
+     */
+    for (unsigned int i = 0; i < numVariables; i++)
+    {
+        targetVariableAndSensitivityIndexArray.push_back(false);
+    }
+    int targetVariableIndex = auxDataVarNames.indexOf("QR");
+    if (targetVariableIndex < 0) {
+        targetVariableIndex = std::max(1, int(numVariables) - 1);
+    } else {
+        targetVariableIndex = targetVariableIndex + 1;
+    }
+    targetVariableAndSensitivityIndexArray[targetVariableIndex] = true;
+    targetVariableAndSensitivityIndexArray[int(numVariables) - 1] = true;
 
     this->numTrajectories = static_cast<int>(numTrajectories);
     trajectorySelectionCount = new GLsizei[numTrajectories];
@@ -400,6 +416,9 @@ MBezierTrajectoriesRenderData MBezierTrajectories::getRenderData(
             currentGLContext, lineVarDescArrayBufferID, lineVarDescData);
     bezierTrajectoriesRenderData.varSelectedArrayBuffer = createShaderStorageBuffer(
             currentGLContext, varSelectedArrayBufferID, varSelected);
+    bezierTrajectoriesRenderData.varSelectedTargetVariableAndSensitivityArrayBuffer = createShaderStorageBuffer(
+            currentGLContext, varSelectedTargetVariableAndSensitivityArrayBufferID,
+            targetVariableAndSensitivityIndexArray);
     bezierTrajectoriesRenderData.varDivergingArrayBuffer = createShaderStorageBuffer(
             currentGLContext, varDivergingArrayBufferID, varDiverging);
     bezierTrajectoriesRenderData.lineSelectedArrayBuffer = createShaderStorageBuffer(
@@ -423,6 +442,7 @@ void MBezierTrajectories::releaseRenderData()
     MGLResourcesManager::getInstance()->releaseGPUItem(varDescArrayBufferID);
     MGLResourcesManager::getInstance()->releaseGPUItem(lineVarDescArrayBufferID);
     MGLResourcesManager::getInstance()->releaseGPUItem(varSelectedArrayBufferID);
+    MGLResourcesManager::getInstance()->releaseGPUItem(varSelectedTargetVariableAndSensitivityArrayBufferID);
     MGLResourcesManager::getInstance()->releaseGPUItem(varDivergingArrayBufferID);
 }
 

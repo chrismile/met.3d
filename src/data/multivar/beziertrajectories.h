@@ -104,6 +104,7 @@ struct MBezierTrajectoriesRenderData
     GL::MShaderStorageBufferObject* varDescArrayBuffer = nullptr;
     GL::MShaderStorageBufferObject* lineVarDescArrayBuffer = nullptr;
     GL::MShaderStorageBufferObject* varSelectedArrayBuffer = nullptr;
+    GL::MShaderStorageBufferObject* varSelectedTargetVariableAndSensitivityArrayBuffer = nullptr;
     GL::MShaderStorageBufferObject* varDivergingArrayBuffer = nullptr;
     /*
      * For horizon graph diagram.
@@ -151,7 +152,7 @@ public:
     MBezierTrajectories(
             MDataRequest requestToReferTo, const MFilteredTrajectories& filteredTrajectories,
             const QVector<int>& trajIndicesToFilteredIndicesMap,
-            unsigned int numVariables);
+            unsigned int numVariables, const QStringList& auxDataVarNames);
     ~MBezierTrajectories() override;
 
     unsigned int getMemorySize_kb() override;
@@ -233,6 +234,7 @@ private:
     QVector<uint32_t> trajectoryIndexOffsets;
     QVector<uint32_t> numIndicesPerTrajectory;
     QVector<uint32_t> selectedLines;
+    QVector<uint32_t> targetVariableAndSensitivityIndexArray;
 
     // Used for aligning warm conveyor belt trajectories based on their ascension.
     QVector<int> ascentTimeStepIndices;
@@ -321,6 +323,8 @@ private:
             QString("beziertrajectories_line_var_desc_array_buffer_#%1").arg(getID());
     const QString varSelectedArrayBufferID =
             QString("beziertrajectories_var_selected_array_buffer_#%1").arg(getID());
+    const QString varSelectedTargetVariableAndSensitivityArrayBufferID =
+            QString("beziertrajectories_var_selected_target_variable_and_sensitivity_array_buffer_#%1").arg(getID());
     const QString varDivergingArrayBufferID =
             QString("beziertrajectories_var_diverging_array_buffer_#%1").arg(getID());
     const QString lineSelectedArrayBufferID =

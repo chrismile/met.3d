@@ -114,6 +114,7 @@ void MTrajectoryPicker::setDiagramType(DiagramDisplayType type)
         horizonGraph->setStdDevMetricInfluence(stdDevMetricInfluence);
         horizonGraph->setNumBins(numBins);
         horizonGraph->setShowMinMaxValue(showMinMaxValue);
+        horizonGraph->setUseMaxForSensitivity(useMaxForSensitivity);
     }
 
     if (diagram)
@@ -176,6 +177,19 @@ void MTrajectoryPicker::setShowMinMaxValue(bool show)
     if (diagramDisplayType == DiagramDisplayType::HORIZON_GRAPH)
     {
         static_cast<MHorizonGraph*>(diagram)->setShowMinMaxValue(showMinMaxValue);
+    }
+}
+
+void MTrajectoryPicker::setUseMaxForSensitivity(bool useMax)
+{
+    this->useMaxForSensitivity = useMax;
+    if (diagramDisplayType == DiagramDisplayType::HORIZON_GRAPH)
+    {
+        static_cast<MHorizonGraph*>(diagram)->setUseMaxForSensitivity(useMaxForSensitivity);
+        if (diagram)
+        {
+            updateDiagramData();
+        }
     }
 }
 
@@ -902,6 +916,17 @@ void MTrajectoryPicker::updateDiagramData()
                 }
             }
         }
+
+        std::vector<bool> isVarSensitivityArray;
+        isVarSensitivityArray.reserve(numVars);
+        for (size_t varIdx = 0; varIdx < numVars; varIdx++)
+        {
+            const std::string& varName = variableNames.at(varIdx);
+            bool isSensitivity =
+                    (varName.at(0) == 'd' && varName != "deposition") || varName == "sensitivity_max";
+            isVarSensitivityArray.push_back(isSensitivity);
+        }
+
         if (syncTimeAfterAscent)
         {
             int delta = maxAscentTimeStepIndex - minAscentTimeStepIndex;
@@ -927,11 +952,21 @@ void MTrajectoryPicker::updateDiagramData()
                     {
                         for (size_t varIdx = 0; varIdx < numVars; varIdx++)
                         {
+                            bool isSensitivity = isVarSensitivityArray.at(varIdx);
                             float value = trajectory.attributes.at(int(varIdx)).at(realTimeIdx);
                             if (!std::isnan(value)) {
                                 QVector2D minMaxVector = minMaxAttributes.at(int(varIdx));
-                                float denominator = std::max(minMaxVector.y() - minMaxVector.x(), 1e-10f);
-                                value = (value - minMaxVector.x()) / denominator;
+                                if (isSensitivity)
+                                {
+                                    float maxVal = std::max(std::abs(minMaxVector.x()), std::abs(minMaxVector.y()));
+                                    float denominator = std::max(maxVal, 1e-10f);
+                                    value = std::abs(value) / denominator;
+                                }
+                                else
+                                {
+                                    float denominator = std::max(minMaxVector.y() - minMaxVector.x(), 1e-10f);
+                                    value = (value - minMaxVector.x()) / denominator;
+                                }
                             }
                             values.at(varIdx) = value;
                         }
@@ -965,11 +1000,21 @@ void MTrajectoryPicker::updateDiagramData()
                     values.resize(numVars);
                     for (size_t varIdx = 0; varIdx < numVars; varIdx++)
                     {
+                        bool isSensitivity = isVarSensitivityArray.at(varIdx);
                         float value = trajectory.attributes.at(int(varIdx)).at(int(timeIdx));
                         if (!std::isnan(value)) {
                             QVector2D minMaxVector = minMaxAttributes.at(int(varIdx));
-                            float denominator = std::max(minMaxVector.y() - minMaxVector.x(), 1e-10f);
-                            value = (value - minMaxVector.x()) / denominator;
+                            if (isSensitivity)
+                            {
+                                float maxVal = std::max(std::abs(minMaxVector.x()), std::abs(minMaxVector.y()));
+                                float denominator = std::max(maxVal, 1e-10f);
+                                value = std::abs(value) / denominator;
+                            }
+                            else
+                            {
+                                float denominator = std::max(minMaxVector.y() - minMaxVector.x(), 1e-10f);
+                                value = (value - minMaxVector.x()) / denominator;
+                            }
                         }
                         values.at(varIdx) = value;
                     }

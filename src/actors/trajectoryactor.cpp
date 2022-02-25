@@ -413,6 +413,12 @@ MTrajectoryActor::MTrajectoryActor()
     showMinMaxValueProperty->setToolTip(
             "Whether to show the minimum and maximum value in the diagram if the zoom factor permits it.");
 
+    useMaxForSensitivityProperty = addProperty(
+            BOOL_PROPERTY, "show min/max", similarityMetricGroup);
+    properties->mBool()->setValue(useMaxForSensitivityProperty, useMaxForSensitivity);
+    useMaxForSensitivityProperty->setToolTip(
+            "Whether to show the minimum and maximum value in the diagram if the zoom factor permits it.");
+
     updateSimilarityMetricGroupEnabled();
 
 
@@ -779,6 +785,8 @@ void MTrajectoryActor::loadConfiguration(QSettings *settings)
     properties->setInt(numBinsProperty, numBins, 1, 20);
     showMinMaxValue = settings->value("showMinMaxValue", true).toBool();
     properties->mBool()->setValue(showMinMaxValueProperty, showMinMaxValue);
+    useMaxForSensitivity = settings->value("useMaxForSensitivity", true).toBool();
+    properties->mBool()->setValue(useMaxForSensitivityProperty, useMaxForSensitivity);
     updateSimilarityMetricGroupEnabled();
 
     syncTimeAfterAscent = settings->value("syncTimeAfterAscent", false).toBool();
@@ -2271,6 +2279,7 @@ void MTrajectoryActor::updateSimilarityMetricGroupEnabled()
     numBinsProperty->setEnabled(similarityMetric == SimilarityMetric::MI);
     sortByDescendingStdDevProperty->setEnabled(diagramType == DiagramDisplayType::HORIZON_GRAPH);
     showMinMaxValueProperty->setEnabled(diagramType == DiagramDisplayType::HORIZON_GRAPH);
+    useMaxForSensitivityProperty->setEnabled(diagramType == DiagramDisplayType::HORIZON_GRAPH);
 }
 
 
@@ -2751,6 +2760,18 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
 #endif
     }
 
+    else if (property == useMaxForSensitivityProperty)
+    {
+#ifdef USE_EMBREE
+        for (MTrajectoryPicker* trajectoryPicker : trajectoryPickerMap)
+        {
+            trajectoryPicker->setUseMaxForSensitivity(useMaxForSensitivity);
+        }
+        if (suppressActorUpdates()) return;
+        emitActorChangedSignal();
+#endif
+    }
+
     else if (property == syncTimeAfterAscentProperty)
     {
         syncTimeAfterAscent = properties->mBool()->value(syncTimeAfterAscentProperty);
@@ -3160,7 +3181,14 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
             bezierTrajectoriesRenderData.lineDescArrayBuffer->bindToIndex(4);
             bezierTrajectoriesRenderData.varDescArrayBuffer->bindToIndex(5);
             bezierTrajectoriesRenderData.lineVarDescArrayBuffer->bindToIndex(6);
-            bezierTrajectoriesRenderData.varSelectedArrayBuffer->bindToIndex(7);
+            if (multiVarData.getShowTargetVariableAndSensitivity())
+            {
+                bezierTrajectoriesRenderData.varSelectedTargetVariableAndSensitivityArrayBuffer->bindToIndex(7);
+            }
+            else
+            {
+                bezierTrajectoriesRenderData.varSelectedArrayBuffer->bindToIndex(7);
+            }
             bezierTrajectoriesRenderData.varDivergingArrayBuffer->bindToIndex(8);
             if (diagramType == DiagramDisplayType::NONE || diagramType == DiagramDisplayType::HORIZON_GRAPH)
             {
@@ -3209,6 +3237,10 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
                 glDrawElements(
                         GL_LINES, bezierTrajectoriesRenderData.indexBuffer->getCount(),
                         bezierTrajectoriesRenderData.indexBuffer->getType(), nullptr);
+            }
+            if (multiVarData.getShowTargetVariableAndSensitivity())
+            {
+                bezierTrajectoriesRenderData.varSelectedArrayBuffer->bindToIndex(7);
             }
 
 #ifdef USE_EMBREE

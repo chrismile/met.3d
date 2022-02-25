@@ -214,6 +214,12 @@ void MMultiVarData::setProperties(MActor *actor, MQtProperties *properties, QtPr
     propertyList.push_back(mapRollsThicknessProperty);
     mapRollsThicknessProperty->setEnabled(focusRenderMode == MultiVarFocusRenderMode::ROLLS);
 
+    targetVariableAndSensitivityProperty = addProperty(
+            BOOL_PROPERTY, "map target var. and max. sensitivity", multiVarGroupProperty);
+    properties->mBool()->setValue(targetVariableAndSensitivityProperty, targetVariableAndSensitivity);
+    targetVariableAndSensitivityProperty->setToolTip("Whether to map the variables to color intensity.");
+    propertyList.push_back(targetVariableAndSensitivityProperty);
+
 
     // --- Group: Rendering settings ---
     renderingSettingsGroupProperty = addProperty(
@@ -818,6 +824,10 @@ void MMultiVarData::onQtPropertyChanged(QtProperty *property)
     {
         mapRollsThickness = properties->mBool()->value(mapRollsThicknessProperty);
     }
+    else if (property == targetVariableAndSensitivityProperty)
+    {
+        targetVariableAndSensitivity = properties->mBool()->value(targetVariableAndSensitivityProperty);
+    }
 
     // --- Group: Rendering settings ---
     else if (property == numLineSegmentsProperty)
@@ -902,6 +912,19 @@ void MMultiVarData::onBezierTrajectoriesLoaded(MTrajectories* trajectories)
     {
         QStringList varNames = auxDataVarNames;
         varNames.push_front("Pressure");
+        bool hasSensitivityData = false;
+        for (QString& varName : varNames)
+        {
+            if (varName.startsWith('d') && varName != "deposition")
+            {
+                hasSensitivityData = true;
+                break;
+            }
+        }
+        if (hasSensitivityData)
+        {
+            varNames.push_back("sensitivity_max");
+        }
         //varNames.push_back("ClusterIdx");
         this->varNames.clear();
         for (const QString& str : varNames) {
@@ -952,7 +975,16 @@ void MMultiVarData::updateVariableRanges(const QVector<QVector2D>& ranges)
 
 void MMultiVarData::setUniformData(int textureUnitTransferFunction)
 {
-    shaderEffect->setUniformValue("numVariables", std::min(numVariablesSelected, MAX_NUM_VARIABLES));
+    int numVariables = numVariablesSelected;
+    if (targetVariableAndSensitivity)
+    {
+        numVariables = 2;
+    }
+    else
+    {
+        numVariables = std::min(numVariablesSelected, MAX_NUM_VARIABLES);
+    }
+    shaderEffect->setUniformValue("numVariables", numVariables);
     shaderEffect->setUniformValue("maxNumVariables", maxNumVariables);
     shaderEffect->setUniformValue("materialAmbient", materialConstantAmbient);
     shaderEffect->setUniformValue("materialDiffuse", materialConstantDiffuse);

@@ -119,6 +119,8 @@ public:
         updateNumVariablesSelected();
     }
 
+    inline bool getShowTargetVariableAndSensitivity() const { return targetVariableAndSensitivity; }
+
     inline bool getVarDivergingChanged() const { return varDivergingChanged; }
     inline void resetVarDivergingChanged() { varDivergingChanged = false; }
     inline const QVector<uint32_t>& getVarDiverging() { return varDiverging; }
@@ -225,6 +227,10 @@ private:
     QVector<uint32_t> selectedVariables;
     bool selectedVariablesChanged = false;
 
+    // Show target variable and maximum sensitivity.
+    QtProperty *targetVariableAndSensitivityProperty;
+    bool targetVariableAndSensitivity = false;
+
     bool varDivergingChanged = false;
     QVector<uint32_t> varDiverging;
 
@@ -246,7 +252,7 @@ private:
     MultiVarRenderMode multiVarRenderMode = MultiVarRenderMode::ORIENTED_COLOR_BANDS;
     MultiVarRadiusMappingMode multiVarRadiusMappingMode = MultiVarRadiusMappingMode::GLOBAL;
     bool internalRepresentationChanged = false; ///< If multiVarRenderMode changes to other mode needing different data.
-    MultiVarFocusRenderMode focusRenderMode = MultiVarFocusRenderMode::ROLLS;
+    MultiVarFocusRenderMode focusRenderMode = MultiVarFocusRenderMode::GREAT_CIRCLE;
 
     // For MULTIVAR_RENDERMODE_ORIENTED_COLOR_BANDS, MULTIVAR_RENDERMODE_ORIENTED_COLOR_BANDS_RIBBON
     enum class OrientedRibbonMode {

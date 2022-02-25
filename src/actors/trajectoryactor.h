@@ -504,12 +504,14 @@ private:
     QtProperty *numBinsProperty;
     QtProperty *sortByDescendingStdDevProperty;
     QtProperty *showMinMaxValueProperty;
+    QtProperty *useMaxForSensitivityProperty;
 
     SimilarityMetric similarityMetric = SimilarityMetric::ABSOLUTE_NCC;
     float meanMetricInfluence = 0.5f;
     float stdDevMetricInfluence = 0.25f;
     int numBins = 10;
     bool showMinMaxValue = true;
+    bool useMaxForSensitivity = true;
 
     QtProperty *syncTimeAfterAscentProperty;
     bool syncTimeAfterAscent = false;

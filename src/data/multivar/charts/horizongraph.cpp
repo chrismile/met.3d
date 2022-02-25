@@ -143,10 +143,10 @@ void MHorizonGraph::initialize() {
 }
 
 void MHorizonGraph::setData(
-        const std::vector<std::string>& variableNames, float timeMin, float timeMax,
-        const std::vector<std::vector<std::vector<float>>>& variableValuesArray) {
-    this->variableNames = variableNames;
-    this->variableValuesArray = variableValuesArray;
+        const std::vector<std::string>& _variableNames, float _timeMin, float _timeMax,
+        const std::vector<std::vector<std::vector<float>>>& _variableValuesArray) {
+    this->variableNames = _variableNames;
+    this->variableValuesArray = _variableValuesArray;
 
     nvgFontSize(vg, textSize);
     nvgFontFace(vg, "sans");
@@ -172,8 +172,8 @@ void MHorizonGraph::setData(
     recomputeScrollThumbHeight();
 
     // Compute metadata.
-    this->timeMin = timeMin;
-    this->timeMax = timeMax;
+    this->timeMin = _timeMin;
+    this->timeMax = _timeMax;
     if (this->timeMin != timeMin || this->timeMax != timeMax) {
         this->selectedTimeStep = timeMin;
         this->timeDisplayMin = timeMin;
@@ -193,6 +193,13 @@ void MHorizonGraph::setData(
     numTrajectories = variableValuesArray.size();
     numVariables = variableNames.size();
 
+    variableIsSensitivityArray.reserve(numVariables);
+    for (size_t varIdx = 0; varIdx < numVariables; varIdx++) {
+        const std::string& varName = variableNames.at(varIdx);
+        bool isSensitivity = (varName.at(0) == 'd' && varName != "deposition") || varName == "sensitivity_max";
+        variableIsSensitivityArray.push_back(isSensitivity);
+    }
+
     // Compute ensemble mean and standard deviation values.
     ensembleMeanValues.resize(numTimeSteps);
     ensembleStdDevValues.resize(numTimeSteps);
@@ -206,18 +213,36 @@ void MHorizonGraph::setData(
             float& stdDev = stdDevsAtTime.at(varIdx);
 
             size_t numValidTrajectories = 0;
-            mean = 0.0f;
-            for (size_t trajectoryIdx = 0; trajectoryIdx < numTrajectories; trajectoryIdx++) {
-                float value = variableValuesArray.at(trajectoryIdx).at(timeStepIdx).at(varIdx);
-                if (!std::isnan(value)) {
-                    mean += value;
-                    numValidTrajectories++;
+            bool isSensitivity = variableIsSensitivityArray.at(varIdx);
+            if (useMaxForSensitivity && isSensitivity)
+            {
+                mean = std::numeric_limits<float>::lowest();
+                for (size_t trajectoryIdx = 0; trajectoryIdx < numTrajectories; trajectoryIdx++) {
+                    float value = variableValuesArray.at(trajectoryIdx).at(timeStepIdx).at(varIdx);
+                    if (!std::isnan(value)) {
+                        mean = std::max(mean, value);
+                        numValidTrajectories++;
+                    }
+                }
+                if (numValidTrajectories <= 0) {
+                    mean = std::numeric_limits<float>::quiet_NaN();
                 }
             }
-            if (numValidTrajectories > 0) {
-                mean = mean / float(numValidTrajectories);
-            } else {
-                mean = std::numeric_limits<float>::quiet_NaN();
+            else
+            {
+                mean = 0.0f;
+                for (size_t trajectoryIdx = 0; trajectoryIdx < numTrajectories; trajectoryIdx++) {
+                    float value = variableValuesArray.at(trajectoryIdx).at(timeStepIdx).at(varIdx);
+                    if (!std::isnan(value)) {
+                        mean += value;
+                        numValidTrajectories++;
+                    }
+                }
+                if (numValidTrajectories > 0) {
+                    mean = mean / float(numValidTrajectories);
+                } else {
+                    mean = std::numeric_limits<float>::quiet_NaN();
+                }
             }
 
             float variance = 0.0f;
@@ -302,6 +327,10 @@ void MHorizonGraph::sortByDescendingStdDev() {
 
 void MHorizonGraph::setShowMinMaxValue(bool show) {
     showMinMaxValue = show;
+}
+
+void MHorizonGraph::setUseMaxForSensitivity(bool useMax) {
+    useMaxForSensitivity = useMax;
 }
 
 QVector3D MHorizonGraph::transferFunction(float value) const {
