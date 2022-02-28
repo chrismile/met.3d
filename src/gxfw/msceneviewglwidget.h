@@ -191,6 +191,12 @@ public:
         systemControl->getEnumPropertyManager()->setValue(lightingProperty, lightDirection);
     }
 
+
+    inline LightDirection getLightDirectionEnum() const
+    {
+        return this->lightDirection;
+    }
+
     /**
       Returns a unique number that identifies the scene view.
       */

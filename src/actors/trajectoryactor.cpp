@@ -3137,6 +3137,11 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
             tubeShader->setUniformValue("mvpMatrix", *(sceneView->getModelViewProjectionMatrix()));
             tubeShader->setUniformValue("vMatrix", sceneView->getCamera()->getViewMatrix());
             tubeShader->setUniformValue("lightDirection", sceneView->getLightDirection());
+            if (sceneView->getLightDirectionEnum() == MSceneViewGLWidget::VIEWDIRECTION) {
+                tubeShader->setUniformValue(
+                        "useHeadLight",
+                        sceneView->getLightDirectionEnum() == MSceneViewGLWidget::VIEWDIRECTION ? 1 : 0);
+            }
             tubeShader->setUniformValue("cameraPosition", sceneView->getCamera()->getOrigin());
             tubeShader->setUniformValue("lineWidth", GLfloat(2.0f * tubeRadius));
 
@@ -3285,6 +3290,11 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
                 timeStepSphereShader->setUniformValue("mvpMatrix", *(sceneView->getModelViewProjectionMatrix()));
                 timeStepSphereShader->setUniformValue("vMatrix", sceneView->getCamera()->getViewMatrix());
                 timeStepSphereShader->setUniformValue("lightDirection", sceneView->getLightDirection());
+                if (sceneView->getLightDirectionEnum() == MSceneViewGLWidget::VIEWDIRECTION) {
+                    timeStepSphereShader->setUniformValue(
+                            "useHeadLight",
+                            sceneView->getLightDirectionEnum() == MSceneViewGLWidget::VIEWDIRECTION ? 1 : 0);
+                }
                 timeStepSphereShader->setUniformValue("cameraPosition", sceneView->getCamera()->getOrigin());
                 timeStepSphereShader->setUniformValue("sphereRadius", sphereRadius);
                 timeStepSphereShader->setUniformValue("lineRadius", tubeRadius);
