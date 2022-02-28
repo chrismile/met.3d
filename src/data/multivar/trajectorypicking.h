@@ -135,7 +135,7 @@ public:
     void setUseMaxForSensitivity(bool useMax);
 
     // Used for aligning warm conveyor belt trajectories based on their ascension.
-    void setSyncTimeAfterAscent(bool _syncTimeAfterAscent);
+    void setSyncMode(TrajectorySyncMode syncMode);
     inline QVector<int> getAscentTimeStepIndices() const {
         QVector<int> ascentTimeStepIndicesQVector;
         ascentTimeStepIndicesQVector.reserve(int(ascentTimeStepIndices.size()));
@@ -324,8 +324,8 @@ private:
     QVector<uint32_t> selectedVariables;
     MTransferFunction1D*& diagramTransferFunction;
 
-    // Used for aligning warm conveyor belt trajectories based on their ascension.
-    bool syncTimeAfterAscent = false;
+    // Used for aligning warm conveyor belt trajectories based on their ascension or height.
+    TrajectorySyncMode trajectorySyncMode = TrajectorySyncMode::TIMESTEP;
     int timeAfterAscentIndex = -1;
     std::vector<int> ascentTimeStepIndices;
     int minAscentTimeStepIndex = 0;

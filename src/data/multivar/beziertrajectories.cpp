@@ -492,10 +492,11 @@ void MBezierTrajectories::updateSelectedLines(const QVector<uint32_t>& selectedL
 }
 
 
-void MBezierTrajectories::setSyncTimeAfterAscent(bool _syncTimeAfterAscent)
+void MBezierTrajectories::setSyncMode(TrajectorySyncMode syncMode)
 {
-    syncTimeAfterAscent = _syncTimeAfterAscent;
+    trajectorySyncMode = syncMode;
 }
+
 
 void MBezierTrajectories::updateLineAscentTimeStepArrayBuffer(
         const QVector<int>& _ascentTimeStepIndices, int _maxAscentTimeStepIndex)
@@ -675,17 +676,19 @@ struct LineElementIdData {
 
 
 void MBezierTrajectories::updateTimeStepSphereRenderDataIfNecessary(
-        int timeStep, float sphereRadius,
+        int timeStep, uint32_t syncModeTrajectoryIndex, float sphereRadius,
 #ifdef USE_QOPENGLWIDGET
         QOpenGLWidget *currentGLContext)
 #else
         QGLWidget *currentGLContext)
 #endif
 {
-    if (timeStep == lastTimeStep && sphereRadius == lastSphereRadius) {
+    if (timeStep == lastSphereTimeStep && syncModeTrajectoryIndex == lastSphereSyncModeTrajectoryIndex
+            && sphereRadius == lastSphereRadius) {
         return;
     }
-    lastTimeStep = timeStep;
+    lastSphereTimeStep = timeStep;
+    lastSphereSyncModeTrajectoryIndex = syncModeTrajectoryIndex;
     lastSphereRadius = sphereRadius;
 
     if (timeStepSphereRenderData.entrancePointsBuffer) {
@@ -704,12 +707,84 @@ void MBezierTrajectories::updateTimeStepSphereRenderDataIfNecessary(
     QVector<QVector4D> exitPoints;
     QVector<LineElementIdData> lineElementIds;
 
+    const MFilteredTrajectory& syncModeTrajectory = baseTrajectories[int(syncModeTrajectoryIndex)];
+
     int trajectoryIndex = 0;
     for (MFilteredTrajectory& trajectory : baseTrajectories) {
         int timeStepLocal;
-        if (syncTimeAfterAscent)
+        if (trajectorySyncMode == TrajectorySyncMode::TIME_AFTER_ASCENT)
         {
             timeStepLocal = timeStep - maxAscentTimeStepIndex + ascentTimeStepIndices.at(trajectoryIndex);
+        }
+        else if (trajectorySyncMode == TrajectorySyncMode::HEIGHT)
+        {
+            int timeStepGlobal =
+                    timeStep
+                    - ascentTimeStepIndices.at(int(syncModeTrajectoryIndex))
+                    + ascentTimeStepIndices.at(trajectoryIndex);
+            int timeStepSyncModeTrajectoryClamped = clamp(timeStep, 0, syncModeTrajectory.positions.size() - 1);
+            int timeStepClamped = clamp(timeStepGlobal, 0, trajectory.positions.size() - 1);
+            float height = syncModeTrajectory.positions.at(timeStepSyncModeTrajectoryClamped).z();
+            float heightStart = trajectory.positions.at(timeStepClamped).z();
+            float heightNext = heightStart;
+            float heightLast;
+
+            int timeStepLeft = timeStepClamped;
+            int distanceLeft = std::numeric_limits<int>::max();
+            for (int i = timeStepClamped - 1; i > 0; i--) {
+                heightLast = heightNext;
+                heightNext = trajectory.positions.at(i).z();
+                float heightMin, heightMax;
+                int timeMin, timeMax;
+                if (heightLast < heightNext) {
+                    heightMin = heightLast;
+                    heightMax = heightNext;
+                    timeMin = i + 1;
+                    timeMax = i;
+                } else {
+                    heightMin = heightNext;
+                    heightMax = heightLast;
+                    timeMin = i;
+                    timeMax = i + 1;
+                }
+                if (heightMin <= height && heightMax >= height) {
+                    timeStepLeft = (height - heightMin) / (heightMax - heightMin) <= 0.5f ? timeMin : timeMax;
+                    distanceLeft = timeStepClamped - i;
+                    break;
+                }
+            }
+
+            heightNext = heightStart;
+            int timeStepRight = timeStepClamped;
+            int distanceRight = std::numeric_limits<int>::max();
+            for (int i = timeStepClamped + 1; i < trajectory.positions.size(); i++) {
+                heightLast = heightNext;
+                heightNext = trajectory.positions.at(i).z();
+                float heightMin, heightMax;
+                int timeMin, timeMax;
+                if (heightLast < heightNext) {
+                    heightMin = heightLast;
+                    heightMax = heightNext;
+                    timeMin = i - 1;
+                    timeMax = i;
+                } else {
+                    heightMin = heightNext;
+                    heightMax = heightLast;
+                    timeMin = i;
+                    timeMax = i - 1;
+                }
+                if (heightMin <= height && heightMax >= height) {
+                    timeStepRight = (height - heightMin) / (heightMax - heightMin) <= 0.5f ? timeMin : timeMax;
+                    distanceRight = i - timeStepClamped;
+                    break;
+                }
+            }
+
+            if (distanceLeft < distanceRight) {
+                timeStepLocal = timeStepLeft;
+            } else {
+                timeStepLocal = timeStepRight;
+            }
         }
         else
         {
@@ -821,20 +896,22 @@ QGLWidget *currentGLContext)
 
 
 void MBezierTrajectories::updateTimeStepRollsRenderDataIfNecessary(
-        int timeStep, float tubeRadius, float rollsRadius, float rollsWidth, bool mapRollsThickness,
-        int numLineSegments,
+        int timeStep, uint32_t syncModeTrajectoryIndex, float tubeRadius,
+        float rollsRadius, float rollsWidth, bool mapRollsThickness, int numLineSegments,
 #ifdef USE_QOPENGLWIDGET
         QOpenGLWidget *currentGLContext)
 #else
 QGLWidget *currentGLContext)
 #endif
 {
-    if (timeStep == lastTimeStepRolls && (!mapRollsThickness || tubeRadius == lastTubeRadius)
+    if (timeStep == lastRollsTimeStep && syncModeTrajectoryIndex == lastRollsSyncModeTrajectoryIndex
+            && (!mapRollsThickness || tubeRadius == lastTubeRadius)
             && rollsRadius == lastRollsRadius && rollsWidth == lastRollsWidth && lastVarSelectedRolls == varSelected
             && mapRollsThickness == lastMapRollsThickness && lastNumLineSegmentsRolls == numLineSegments) {
         return;
     }
-    lastTimeStepRolls = timeStep;
+    lastRollsTimeStep = timeStep;
+    lastRollsSyncModeTrajectoryIndex = syncModeTrajectoryIndex;
     lastTubeRadius = tubeRadius;
     lastRollsRadius = rollsRadius;
     lastRollsWidth = rollsWidth;
@@ -921,12 +998,84 @@ QGLWidget *currentGLContext)
     // Scale with ratio of radius of circumcircle and incircle to make sure the rolls don't intersect with the tubes.
     float radiusFactor = 1.0f / std::cos(PI / float(numLineSegments));
 
+    const MFilteredTrajectory& syncModeTrajectory = baseTrajectories[int(syncModeTrajectoryIndex)];
+
     int trajectoryIndex = 0;
     for (MFilteredTrajectory& trajectory : baseTrajectories) {
         int timeStepLocal;
-        if (syncTimeAfterAscent)
+        if (trajectorySyncMode == TrajectorySyncMode::TIME_AFTER_ASCENT)
         {
             timeStepLocal = timeStep - maxAscentTimeStepIndex + ascentTimeStepIndices.at(trajectoryIndex);
+        }
+        else if (trajectorySyncMode == TrajectorySyncMode::HEIGHT)
+        {
+            int timeStepGlobal =
+                    timeStep
+                    - ascentTimeStepIndices.at(int(syncModeTrajectoryIndex))
+                    + ascentTimeStepIndices.at(trajectoryIndex);
+            int timeStepSyncModeTrajectoryClamped = clamp(timeStep, 0, syncModeTrajectory.positions.size() - 1);
+            int timeStepClamped = clamp(timeStepGlobal, 0, trajectory.positions.size() - 1);
+            float height = syncModeTrajectory.positions.at(timeStepSyncModeTrajectoryClamped).z();
+            float heightStart = trajectory.positions.at(timeStepClamped).z();
+            float heightNext = heightStart;
+            float heightLast;
+
+            int timeStepLeft = timeStepClamped;
+            int distanceLeft = std::numeric_limits<int>::max();
+            for (int i = timeStepClamped - 1; i > 0; i--) {
+                heightLast = heightNext;
+                heightNext = trajectory.positions.at(i).z();
+                float heightMin, heightMax;
+                int timeMin, timeMax;
+                if (heightLast < heightNext) {
+                    heightMin = heightLast;
+                    heightMax = heightNext;
+                    timeMin = i + 1;
+                    timeMax = i;
+                } else {
+                    heightMin = heightNext;
+                    heightMax = heightLast;
+                    timeMin = i;
+                    timeMax = i + 1;
+                }
+                if (heightMin <= height && heightMax >= height) {
+                    timeStepLeft = (height - heightMin) / (heightMax - heightMin) <= 0.5f ? timeMin : timeMax;
+                    distanceLeft = timeStepClamped - i;
+                    break;
+                }
+            }
+
+            heightNext = heightStart;
+            int timeStepRight = timeStepClamped;
+            int distanceRight = std::numeric_limits<int>::max();
+            for (int i = timeStepClamped + 1; i < trajectory.positions.size(); i++) {
+                heightLast = heightNext;
+                heightNext = trajectory.positions.at(i).z();
+                float heightMin, heightMax;
+                int timeMin, timeMax;
+                if (heightLast < heightNext) {
+                    heightMin = heightLast;
+                    heightMax = heightNext;
+                    timeMin = i - 1;
+                    timeMax = i;
+                } else {
+                    heightMin = heightNext;
+                    heightMax = heightLast;
+                    timeMin = i;
+                    timeMax = i - 1;
+                }
+                if (heightMin <= height && heightMax >= height) {
+                    timeStepRight = (height - heightMin) / (heightMax - heightMin) <= 0.5f ? timeMin : timeMax;
+                    distanceRight = i - timeStepClamped;
+                    break;
+                }
+            }
+
+            if (distanceLeft < distanceRight) {
+                timeStepLocal = timeStepLeft;
+            } else {
+                timeStepLocal = timeStepRight;
+            }
         }
         else
         {

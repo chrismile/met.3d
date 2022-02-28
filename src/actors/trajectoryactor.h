@@ -513,8 +513,12 @@ private:
     bool showMinMaxValue = true;
     bool useMaxForSensitivity = true;
 
-    QtProperty *syncTimeAfterAscentProperty;
-    bool syncTimeAfterAscent = false;
+    QStringList trajectorySyncModeNames = {
+            "None", "Time After Ascent", "Height"
+    };
+    QtProperty *trajectorySyncModeProperty;
+    TrajectorySyncMode trajectorySyncMode = TrajectorySyncMode::TIMESTEP;
+    uint32_t syncModeTrajectoryIndex = 0;
 
 #ifdef USE_EMBREE
     QHash<MSceneViewGLWidget*, MTrajectoryPicker*> trajectoryPickerMap;

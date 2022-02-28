@@ -357,8 +357,8 @@ void MTrajectoryPicker::setBaseTrajectories(const MFilteredTrajectories& filtere
     }
 }
 
-void MTrajectoryPicker::setSyncTimeAfterAscent(bool _syncTimeAfterAscent) {
-    syncTimeAfterAscent = _syncTimeAfterAscent;
+void MTrajectoryPicker::setSyncMode(TrajectorySyncMode syncMode) {
+    trajectorySyncMode = syncMode;
     selectedTrajectoriesChanged = true;
     updateDiagramData();
 }
@@ -652,7 +652,7 @@ bool MTrajectoryPicker::pickPointWorld(
             vertexTimeSteps.at(vidx0) * barycentricCoordinates.x()
             + vertexTimeSteps.at(vidx1) * barycentricCoordinates.y()
             + vertexTimeSteps.at(vidx2) * barycentricCoordinates.z();
-    if (syncTimeAfterAscent)
+    if (trajectorySyncMode == TrajectorySyncMode::TIME_AFTER_ASCENT)
     {
         timeAtHit = timeAtHit + float(maxAscentTimeStepIndex - ascentTimeStepIndices.at(trajectoryIndex));
     }
@@ -795,7 +795,7 @@ void MTrajectoryPicker::updateDiagramData()
                 for (size_t i = 0; i < numVars; i++)
                 {
                     int timeStepLocal;
-                    if (syncTimeAfterAscent)
+                    if (trajectorySyncMode == TrajectorySyncMode::TIME_AFTER_ASCENT)
                     {
                         timeStepLocal = timeStep - maxAscentTimeStepIndex + ascentTimeStepIndices.at(trajectoryIndex);
                     }
@@ -822,7 +822,7 @@ void MTrajectoryPicker::updateDiagramData()
             for (size_t i = 0; i < numVars; i++)
             {
                 int timeStepLocal;
-                if (syncTimeAfterAscent)
+                if (trajectorySyncMode == TrajectorySyncMode::TIME_AFTER_ASCENT)
                 {
                     timeStepLocal = timeStep - maxAscentTimeStepIndex + ascentTimeStepIndices.at(trajectoryIndex);
                 }
@@ -856,7 +856,7 @@ void MTrajectoryPicker::updateDiagramData()
             for (size_t i = 0; i < numVars; i++)
             {
                 int timeStepLocal;
-                if (syncTimeAfterAscent)
+                if (trajectorySyncMode == TrajectorySyncMode::TIME_AFTER_ASCENT)
                 {
                     timeStepLocal = timeStep - maxAscentTimeStepIndex + ascentTimeStepIndices.at(trajectoryIndex);
                 }
@@ -927,7 +927,7 @@ void MTrajectoryPicker::updateDiagramData()
             isVarSensitivityArray.push_back(isSensitivity);
         }
 
-        if (syncTimeAfterAscent)
+        if (trajectorySyncMode == TrajectorySyncMode::TIME_AFTER_ASCENT)
         {
             int delta = maxAscentTimeStepIndex - minAscentTimeStepIndex;
             size_t numTimeStepsTotal = numTimeSteps + size_t(delta);

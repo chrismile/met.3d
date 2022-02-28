@@ -414,7 +414,7 @@ MTrajectoryActor::MTrajectoryActor()
             "Whether to show the minimum and maximum value in the diagram if the zoom factor permits it.");
 
     useMaxForSensitivityProperty = addProperty(
-            BOOL_PROPERTY, "show min/max", similarityMetricGroup);
+            BOOL_PROPERTY, "use max for sensitivity", similarityMetricGroup);
     properties->mBool()->setValue(useMaxForSensitivityProperty, useMaxForSensitivity);
     useMaxForSensitivityProperty->setToolTip(
             "Whether to show the minimum and maximum value in the diagram if the zoom factor permits it.");
@@ -422,11 +422,12 @@ MTrajectoryActor::MTrajectoryActor()
     updateSimilarityMetricGroupEnabled();
 
 
-    syncTimeAfterAscentProperty = addProperty(
-            BOOL_PROPERTY, "sync time after ascent", multiVarGroupProperty);
-    properties->mBool()->setValue(syncTimeAfterAscentProperty, syncTimeAfterAscent);
-    syncTimeAfterAscentProperty->setToolTip(
-            "Syncs warm conveyor belt trajectories based on their ascension. "
+    trajectorySyncModeProperty = addProperty(
+            ENUM_PROPERTY, "sync mode", multiVarGroupProperty);
+    properties->mEnum()->setEnumNames(trajectorySyncModeProperty, trajectorySyncModeNames);
+    properties->mEnum()->setValue(trajectorySyncModeProperty, static_cast<int>(trajectorySyncMode));
+    trajectorySyncModeProperty->setToolTip(
+            "Specifies whether to sync warm conveyor belt trajectories based on their ascension or height. "
             "The trajectories need to have the per-point attribute time_after_ascension for this to work.");
 
 
@@ -789,8 +790,9 @@ void MTrajectoryActor::loadConfiguration(QSettings *settings)
     properties->mBool()->setValue(useMaxForSensitivityProperty, useMaxForSensitivity);
     updateSimilarityMetricGroupEnabled();
 
-    syncTimeAfterAscent = settings->value("syncTimeAfterAscent", false).toBool();
-    properties->mBool()->setValue(syncTimeAfterAscentProperty, syncTimeAfterAscent);
+    trajectorySyncMode = TrajectorySyncMode(settings->value(
+            "trajectorySyncMode", int(TrajectorySyncMode::TIMESTEP)).toInt());
+    properties->mEnum()->setValue(trajectorySyncModeProperty, int(trajectorySyncMode));
 
     multiVarData.setEnabled(useBezierTrajectories);
     multiVarData.loadConfiguration(settings);
@@ -2122,6 +2124,7 @@ bool MTrajectoryActor::checkIntersectionWithSelectableData(
             }
 
             particlePosTimeStep = int(std::round(timeAtHit));
+            syncModeTrajectoryIndex = trajectoryIndex;
             trajectoryPickerMap[sceneView]->setParticlePosTimeStep(particlePosTimeStep);
             changed = true;
         }
@@ -2750,6 +2753,7 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
 
     else if (property == showMinMaxValueProperty)
     {
+        showMinMaxValue = properties->mBool()->value(showMinMaxValueProperty);
 #ifdef USE_EMBREE
         for (MTrajectoryPicker* trajectoryPicker : trajectoryPickerMap)
         {
@@ -2762,6 +2766,7 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
 
     else if (property == useMaxForSensitivityProperty)
     {
+        useMaxForSensitivity = properties->mBool()->value(useMaxForSensitivityProperty);
 #ifdef USE_EMBREE
         for (MTrajectoryPicker* trajectoryPicker : trajectoryPickerMap)
         {
@@ -2772,19 +2777,20 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
 #endif
     }
 
-    else if (property == syncTimeAfterAscentProperty)
+    else if (property == trajectorySyncModeProperty)
     {
-        syncTimeAfterAscent = properties->mBool()->value(syncTimeAfterAscentProperty);
+        trajectorySyncMode = static_cast<TrajectorySyncMode>(
+                properties->mEnum()->value(trajectorySyncModeProperty));
 #ifdef USE_EMBREE
         for (MTrajectoryPicker* trajectoryPicker : trajectoryPickerMap)
         {
-            trajectoryPicker->setSyncTimeAfterAscent(syncTimeAfterAscent);
+            trajectoryPicker->setSyncMode(trajectorySyncMode);
         }
         for (int t = 0; t < (precomputedDataSource ? 1 : seedActorData.size()); t++)
         {
             for (auto& sceneView : trajectoryRequests[t].bezierTrajectoriesMap.keys())
             {
-                trajectoryRequests[t].bezierTrajectoriesMap[sceneView]->setSyncTimeAfterAscent(syncTimeAfterAscent);
+                trajectoryRequests[t].bezierTrajectoriesMap[sceneView]->setSyncMode(trajectorySyncMode);
             }
         }
         if (suppressActorUpdates()) return;
@@ -3279,7 +3285,7 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
             if (multiVarData.getUseTimestepLens() && useMultiVarSpheres && multiVarData.getRenderSpheres())
             {
                 trajectoryRequests[t].bezierTrajectoriesMap[sceneView]->updateTimeStepSphereRenderDataIfNecessary(
-                        particlePosTimeStep, sphereRadius);
+                        particlePosTimeStep, syncModeTrajectoryIndex, sphereRadius);
                 MTimeStepSphereRenderData* timeStepSphereRenderData =
                         trajectoryRequests[t].timeStepSphereRenderDataMap[sceneView];
 
@@ -3319,9 +3325,8 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
             if (multiVarData.getUseTimestepLens() && useMultiVarSpheres && multiVarData.getRenderRolls())
             {
                 trajectoryRequests[t].bezierTrajectoriesMap[sceneView]->updateTimeStepRollsRenderDataIfNecessary(
-                        particlePosTimeStep, tubeRadius, sphereRadius,
-                        multiVarData.getRollsWidth(),
-                        multiVarData.getMapRollsThickness(),
+                        particlePosTimeStep, syncModeTrajectoryIndex, tubeRadius, sphereRadius,
+                        multiVarData.getRollsWidth(), multiVarData.getMapRollsThickness(),
                         multiVarData.getNumLineSegments());
                 MTimeStepRollsRenderData* timeStepRollsRenderData =
                         trajectoryRequests[t].timeStepRollsRenderDataMap[sceneView];
@@ -4534,7 +4539,7 @@ void MTrajectoryActor::updateAuxDataVarNamesProperty()
         properties->mEnum()->setEnumNames(
                     renderAuxDataVarProperty,
                     trajectorySource->availableAuxiliaryVariables());
-        syncTimeAfterAscentProperty->setEnabled(
+        trajectorySyncModeProperty->setEnabled(
                 trajectorySource->availableAuxiliaryVariables().indexOf("time_after_ascent") >= 0);
     }
 

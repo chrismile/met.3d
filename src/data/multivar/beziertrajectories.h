@@ -45,6 +45,10 @@
 
 namespace Met3D {
 
+enum class TrajectorySyncMode {
+    TIMESTEP, TIME_AFTER_ASCENT, HEIGHT
+};
+
 struct MFilteredTrajectory
 {
     QVector<QVector3D> positions;
@@ -190,7 +194,7 @@ public:
     void updateSelectedLines(const QVector<uint32_t>& selectedLines);
 
     // Used for aligning warm conveyor belt trajectories based on their ascension.
-    void setSyncTimeAfterAscent(bool _syncTimeAfterAscent);
+    void setSyncMode(TrajectorySyncMode syncMode);
     void updateLineAscentTimeStepArrayBuffer(
             const QVector<int>& _ascentTimeStepIndices, int _maxAscentTimeStepIndex);
 
@@ -201,7 +205,7 @@ public:
             QGLWidget *currentGLContext = nullptr);
 #endif
     void updateTimeStepSphereRenderDataIfNecessary(
-            int timeStep, float sphereRadius,
+            int timeStep, uint32_t syncModeTrajectoryIndex, float sphereRadius,
 #ifdef USE_QOPENGLWIDGET
             QOpenGLWidget *currentGLContext = nullptr);
 #else
@@ -216,8 +220,8 @@ public:
     QGLWidget *currentGLContext = nullptr);
 #endif
     void updateTimeStepRollsRenderDataIfNecessary(
-            int timeStep, float tubeRadius, float rollsRadius, float rollsWidth, bool mapRollsThickness,
-            int numLineSegments,
+            int timeStep, uint32_t syncModeTrajectoryIndex, float tubeRadius,
+            float rollsRadius, float rollsWidth, bool mapRollsThickness, int numLineSegments,
 #ifdef USE_QOPENGLWIDGET
             QOpenGLWidget *currentGLContext = nullptr);
 #else
@@ -238,11 +242,12 @@ private:
 
     // Used for aligning warm conveyor belt trajectories based on their ascension.
     QVector<int> ascentTimeStepIndices;
-    bool syncTimeAfterAscent = false;
+    TrajectorySyncMode trajectorySyncMode = TrajectorySyncMode::TIMESTEP;
     int maxAscentTimeStepIndex = 0;
 
     // Focus spheres data.
-    int lastTimeStep = std::numeric_limits<int>::lowest();
+    int lastSphereTimeStep = std::numeric_limits<int>::lowest();
+    uint32_t lastSphereSyncModeTrajectoryIndex = 0;
     float lastSphereRadius = std::numeric_limits<float>::lowest();
     MTimeStepSphereRenderData timeStepSphereRenderData;
     const QString timeStepSphereIndexBufferID =
@@ -261,7 +266,8 @@ private:
             QString("timestepsphere_line_element_ids_buffer_#%1").arg(getID());
 
     // Focus rolls data.
-    int lastTimeStepRolls = std::numeric_limits<int>::lowest();
+    int lastRollsTimeStep = std::numeric_limits<int>::lowest();
+    uint32_t lastRollsSyncModeTrajectoryIndex = 0;
     float lastTubeRadius = std::numeric_limits<float>::lowest();
     float lastRollsRadius = std::numeric_limits<float>::lowest();
     float lastRollsWidth = std::numeric_limits<float>::lowest();
