@@ -3305,6 +3305,7 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
                 timeStepSphereShader->setUniformValue("sphereRadius", sphereRadius);
                 timeStepSphereShader->setUniformValue("lineRadius", tubeRadius);
                 timeStepSphereShader->setUniformValue("timestepLensePosition", particlePosTimeStep);
+                timeStepSphereShader->setUniformValue("cameraUp", sceneView->getCamera()->getYAxis());
 
                 timeStepSphereRenderData->indexBuffer->bindToElementArrayBuffer();
                 timeStepSphereRenderData->vertexPositionBuffer->attachToVertexAttribute(0);

@@ -35,6 +35,7 @@
 uniform float separatorWidth;
 uniform float sphereRadius;
 uniform float lineRadius;
+uniform vec3 cameraUp;
 
 /*****************************************************************************
  ***                            INTERFACES
@@ -136,6 +137,7 @@ shader FSmain(in VSOutput inputs, out vec4 fragColor)
     vec3 crossProdVn = cross(newV, newN);*/
 
     //vec3 pn = normalize(cross(v, vec3(0.0, 0.0, 1.0)));
+
     vec3 upWorld = normalize(cross(l, v));
     vec3 pn = normalize(cross(v, upWorld));
     vec3 up = normalize(cross(pn, v));
@@ -156,8 +158,13 @@ shader FSmain(in VSOutput inputs, out vec4 fragColor)
         nPlane /= nPlaneLength;
     }
 
-    float angle = atan(dot(cross(nPlane, up), v), dot(nPlane, up));
+    vec3 upWorld2 = normalize(cross(cameraUp, v));
+    vec3 pn2 = normalize(cross(v, upWorld2));
+    vec3 up2 = normalize(cross(pn2, v));
+    float angle = atan(dot(cross(nPlane, up2), v), dot(nPlane, up2));
+    //float angle = atan(dot(cross(nPlane, up), v), dot(nPlane, up));
     angle += M_PI;
+    angle = mod(angle + M_PI * 1.5, 2.0 * M_PI);
     angle /= 2.0 * M_PI;
 
 #ifdef PIE_CHART_AREA

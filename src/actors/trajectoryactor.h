@@ -514,7 +514,7 @@ private:
     bool useMaxForSensitivity = true;
 
     QStringList trajectorySyncModeNames = {
-            "None", "Time After Ascent", "Height"
+            "Time Step", "Time of Ascent", "Height"
     };
     QtProperty *trajectorySyncModeProperty;
     TrajectorySyncMode trajectorySyncMode = TrajectorySyncMode::TIMESTEP;

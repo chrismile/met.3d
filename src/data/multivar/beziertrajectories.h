@@ -46,7 +46,7 @@
 namespace Met3D {
 
 enum class TrajectorySyncMode {
-    TIMESTEP, TIME_AFTER_ASCENT, HEIGHT
+    TIMESTEP, TIME_OF_ASCENT, HEIGHT
 };
 
 struct MFilteredTrajectory

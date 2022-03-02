@@ -712,7 +712,7 @@ void MBezierTrajectories::updateTimeStepSphereRenderDataIfNecessary(
     int trajectoryIndex = 0;
     for (MFilteredTrajectory& trajectory : baseTrajectories) {
         int timeStepLocal;
-        if (trajectorySyncMode == TrajectorySyncMode::TIME_AFTER_ASCENT)
+        if (trajectorySyncMode == TrajectorySyncMode::TIME_OF_ASCENT)
         {
             timeStepLocal = timeStep - maxAscentTimeStepIndex + ascentTimeStepIndices.at(trajectoryIndex);
         }
@@ -1003,7 +1003,7 @@ QGLWidget *currentGLContext)
     int trajectoryIndex = 0;
     for (MFilteredTrajectory& trajectory : baseTrajectories) {
         int timeStepLocal;
-        if (trajectorySyncMode == TrajectorySyncMode::TIME_AFTER_ASCENT)
+        if (trajectorySyncMode == TrajectorySyncMode::TIME_OF_ASCENT)
         {
             timeStepLocal = timeStep - maxAscentTimeStepIndex + ascentTimeStepIndices.at(trajectoryIndex);
         }
