@@ -115,6 +115,7 @@ void MTrajectoryPicker::setDiagramType(DiagramDisplayType type)
         horizonGraph->setNumBins(numBins);
         horizonGraph->setShowMinMaxValue(showMinMaxValue);
         horizonGraph->setUseMaxForSensitivity(useMaxForSensitivity);
+        horizonGraph->setSpringEpsilon(springEpsilon);
     }
 
     if (diagram)
@@ -190,6 +191,15 @@ void MTrajectoryPicker::setUseMaxForSensitivity(bool useMax)
         {
             updateDiagramData();
         }
+    }
+}
+
+void MTrajectoryPicker::setSpringEpsilon(float epsilon)
+{
+    this->springEpsilon = epsilon;
+    if (diagramDisplayType == DiagramDisplayType::HORIZON_GRAPH)
+    {
+        static_cast<MHorizonGraph*>(diagram)->setSpringEpsilon(springEpsilon);
     }
 }
 

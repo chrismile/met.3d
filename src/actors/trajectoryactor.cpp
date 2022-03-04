@@ -419,6 +419,14 @@ MTrajectoryActor::MTrajectoryActor()
     useMaxForSensitivityProperty->setToolTip(
             "Whether to show the minimum and maximum value in the diagram if the zoom factor permits it.");
 
+    springEpsilonProperty = addProperty(
+            DECORATEDDOUBLE_PROPERTY, "SPRING metric epsilon", similarityMetricGroup);
+    properties->setDDouble(
+            springEpsilonProperty, springEpsilon,
+            0.1, 100.0, 2, 0.1, " (factor)");
+    springEpsilonProperty->setToolTip(
+            "SPRING subsequence matching algorithm distance metric epsilon.");
+
     updateSimilarityMetricGroupEnabled();
 
 
@@ -554,6 +562,7 @@ void MTrajectoryActor::saveConfiguration(QSettings *settings)
     settings->setValue(QString("meanMetricInfluence"), meanMetricInfluence);
     settings->setValue(QString("stdDevMetricInfluence"), stdDevMetricInfluence);
     settings->setValue(QString("numBins"), numBins);
+    settings->setValue(QString("springEpsilonProperty"), springEpsilon);
 
     multiVarData.saveConfiguration(settings);
 
@@ -788,6 +797,10 @@ void MTrajectoryActor::loadConfiguration(QSettings *settings)
     properties->mBool()->setValue(showMinMaxValueProperty, showMinMaxValue);
     useMaxForSensitivity = settings->value("useMaxForSensitivity", true).toBool();
     properties->mBool()->setValue(useMaxForSensitivityProperty, useMaxForSensitivity);
+    springEpsilon = settings->value("springEpsilon", 0.5f).toFloat();
+    properties->setDDouble(
+            springEpsilonProperty, springEpsilon,
+            0.0, 100.0, 2, 0.1, " (factor)");
     updateSimilarityMetricGroupEnabled();
 
     trajectorySyncMode = TrajectorySyncMode(settings->value(
@@ -2720,6 +2733,19 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
         for (MTrajectoryPicker* trajectoryPicker : trajectoryPickerMap)
         {
             trajectoryPicker->setStdDevMetricInfluence(stdDevMetricInfluence);
+        }
+        if (suppressActorUpdates()) return;
+        emitActorChangedSignal();
+#endif
+    }
+
+    else if (property == springEpsilonProperty)
+    {
+        springEpsilon = float(properties->mDDouble()->value(springEpsilonProperty));
+#ifdef USE_EMBREE
+        for (MTrajectoryPicker* trajectoryPicker : trajectoryPickerMap)
+        {
+            trajectoryPicker->setSpringEpsilon(springEpsilon);
         }
         if (suppressActorUpdates()) return;
         emitActorChangedSignal();

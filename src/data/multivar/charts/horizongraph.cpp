@@ -32,6 +32,7 @@
 
 // local application imports
 #include "../helpers.h"
+#include "../similarity/spring.h"
 #include "horizongraph.h"
 #include "aabb2.h"
 
@@ -272,6 +273,8 @@ void MHorizonGraph::setData(
         sortedVariableIndices.push_back(varIdx);
     }
 
+    matchSelectionsPerVariable.resize(numVariables);
+
     MDiagramBase::onWindowSizeChanged();
 }
 
@@ -333,6 +336,16 @@ void MHorizonGraph::setUseMaxForSensitivity(bool useMax) {
     useMaxForSensitivity = useMax;
 }
 
+void MHorizonGraph::setSpringEpsilon(float epsilon) {
+    springEpsilon = epsilon;
+    if (selectStart >= 0.0f && selectEnd >= 0.0f) {
+        for (auto& matchSelections : matchSelectionsPerVariable) {
+            matchSelections.clear();
+        }
+        endSelection(selectEnd);
+    }
+}
+
 QVector3D MHorizonGraph::transferFunction(float value) const {
     if (std::isnan(value)) {
         return QVector3D(1.0f, 1.0f, 0.0f); // yellow
@@ -375,6 +388,59 @@ void MHorizonGraph::drawHorizonBackground() {
         nvgFillColor(vg, backgroundFillColor);
         nvgFill(vg);
     }
+}
+
+void MHorizonGraph::drawHorizonMatchSelections() {
+    NVGcolor selectionColorFill = nvgRGBA(255, 0, 0, 100);
+    NVGcolor selectionColorStroke = nvgRGBA(255, 0, 0, 255);
+    AABB2 scissorAabb(
+            QVector2D(borderWidth, offsetHorizonBarsY + scrollTranslationY),
+            QVector2D(windowWidth - borderWidth, windowHeight - borderWidth + scrollTranslationY));
+
+    nvgSave(vg);
+    nvgScissor(vg, offsetHorizonBarsX, scissorAabb.min.y(), horizonBarWidth, scissorAabb.getHeight());
+
+    size_t heightIdx = 0;
+    for (size_t varIdx : sortedVariableIndices) {
+        float lowerY = offsetHorizonBarsY + float(heightIdx) * (horizonBarHeight + horizonBarMargin);
+        float upperY = lowerY + horizonBarHeight;
+
+        AABB2 boxAabb(
+                QVector2D(offsetHorizonBarsX, lowerY),
+                QVector2D(offsetHorizonBarsX + horizonBarWidth, lowerY + horizonBarHeight));
+        if (!scissorAabb.intersects(boxAabb)) {
+            heightIdx++;
+            continue;
+        }
+
+        auto& matchSelections = matchSelectionsPerVariable.at(varIdx);
+        for (auto& matchSelection : matchSelections) {
+            float timeStep0 = matchSelection.first;
+            float timeStep1 = matchSelection.second;
+            float xpos0 =
+                    offsetHorizonBarsX
+                    + (timeStep0 - timeDisplayMin) / (timeDisplayMax - timeDisplayMin) * horizonBarWidth;
+            float xpos1 =
+                    offsetHorizonBarsX
+                    + (timeStep1 - timeDisplayMin) / (timeDisplayMax - timeDisplayMin) * horizonBarWidth;
+            nvgBeginPath(vg);
+            nvgRect(vg, xpos0, lowerY, xpos1 - xpos0, horizonBarHeight);
+            nvgFillColor(vg, selectionColorFill);
+            nvgFill(vg);
+
+            nvgBeginPath(vg);
+            nvgMoveTo(vg, xpos0, lowerY);
+            nvgLineTo(vg, xpos0, upperY);
+            nvgMoveTo(vg, xpos1, lowerY);
+            nvgLineTo(vg, xpos1, upperY);
+            nvgStrokeColor(vg, selectionColorStroke);
+            nvgStroke(vg);
+        }
+
+        heightIdx++;
+    }
+
+    nvgRestore(vg);
 }
 
 void MHorizonGraph::drawHorizonLines() {
@@ -902,6 +968,7 @@ void MHorizonGraph::renderBase() {
     nvgTranslate(vg, 0.0f, -scrollTranslationY);
 
     drawHorizonBackground();
+    drawHorizonMatchSelections();
     drawHorizonLinesSparse();
     drawHorizonOutline(textColor);
     drawSelectedTimeStepLine(textColor);
@@ -927,6 +994,14 @@ void MHorizonGraph::renderBase() {
     if (useScrollBar) {
         drawScrollBar(textColor);
     }
+}
+
+float MHorizonGraph::computeTimeStepFromMousePosition(const QVector2D& mousePosition) const {
+    float timeStep = remap(
+            mousePosition.x(), offsetHorizonBarsX, offsetHorizonBarsX + horizonBarWidth,
+            timeDisplayMin, timeDisplayMax);
+    timeStep = clamp(timeStep, timeDisplayMin, timeDisplayMax);
+    return timeStep;
 }
 
 void MHorizonGraph::recomputeScrollThumbHeight() {
@@ -981,6 +1056,13 @@ void MHorizonGraph::mouseMoveEvent(MSceneViewGLWidget *sceneView, QMouseEvent *e
             scrollTranslationY,
             0.0f, fullWindowHeight - windowHeight,
             borderWidth, windowHeight - borderWidth - scrollThumbHeight);
+
+    if (isSelecting && event->buttons() != Qt::MouseButton::LeftButton) {
+        endSelection(computeTimeStepFromMousePosition(mousePosition));
+    }
+    if (isSelecting && event->buttons() == Qt::MouseButton::LeftButton) {
+        updateSelection(computeTimeStepFromMousePosition(mousePosition));
+    }
 
     // Click on the top legend and move the mouse to change the timescale.
     updateTimeScale(mousePosition, EventType::MouseMove, event);
@@ -1070,6 +1152,24 @@ void MHorizonGraph::mousePressEvent(MSceneViewGLWidget *sceneView, QMouseEvent *
         mouseOverWidget = true;
     }
 
+    // Selection of similar subsequences in the variable data.
+    if (event->modifiers().testFlag(Qt::ControlModifier) && event->button() == Qt::MouseButton::LeftButton
+            && graphAreaAabb.contains(mousePosition)) {
+        size_t heightIdx = 0;
+        for (size_t varIdx : sortedVariableIndices) {
+            float lowerY = offsetHorizonBarsY + float(heightIdx) * (horizonBarHeight + horizonBarMargin);
+            AABB2 boxAabb(
+                    QVector2D(offsetHorizonBarsX, lowerY - scrollTranslationY),
+                    QVector2D(offsetHorizonBarsX + horizonBarWidth, lowerY + horizonBarHeight - scrollTranslationY));
+            if (boxAabb.contains(mousePosition)) {
+                mouseOverWidget = true;
+                startSelection(varIdx, computeTimeStepFromMousePosition(mousePosition));
+                break;
+            }
+            heightIdx++;
+        }
+    }
+
     // Click on the top legend and move the mouse to change the timescale.
     updateTimeScale(mousePosition, EventType::MousePress, event);
     // Translation in the time axis.
@@ -1144,6 +1244,11 @@ void MHorizonGraph::mouseReleaseEvent(MSceneViewGLWidget *sceneView, QMouseEvent
             }
             heightIdx++;
         }
+    }
+
+    // Selection of similar subsequences in the variable data.
+    if (isSelecting && event->button() == Qt::MouseButton::LeftButton) {
+        endSelection(computeTimeStepFromMousePosition(mousePosition));
     }
 
     // Click on the top legend and move the mouse to change the timescale.
@@ -1715,6 +1820,58 @@ void MHorizonGraph::sortVariables(int newSortingIdx, bool forceRecompute) {
         sortedVariableIndices.push_back(it.second);
     }
     std::cout << std::endl;
+}
+
+void MHorizonGraph::startSelection(size_t varIdx, float timeStep) {
+    isSelecting = true;
+    selectVarIdx = varIdx;
+    selectStart = timeStep;
+    selectEnd = timeStep;
+    for (auto& matchSelections : matchSelectionsPerVariable) {
+        matchSelections.clear();
+    }
+    auto& matchSelections = matchSelectionsPerVariable.at(selectVarIdx);
+    matchSelections.emplace_back(selectStart, selectEnd);
+}
+
+void MHorizonGraph::updateSelection(float timeStep) {
+    selectEnd = timeStep;
+    auto& selection = matchSelectionsPerVariable.at(selectVarIdx).front();
+    selection.second = selectEnd;
+}
+
+void MHorizonGraph::endSelection(float timeStep) {
+    isSelecting = false;
+    selectEnd = timeStep;
+    matchSelectionsPerVariable.at(selectVarIdx).clear();
+    if (selectEnd > selectStart) {
+        computeMatchSelections();
+    }
+}
+
+void MHorizonGraph::computeMatchSelections() {
+    std::vector<float> querySubsequence;
+    int startTimeIdx = clamp(int(std::round(selectStart)), 0, int(numTimeSteps) - 1);
+    int stopTimeIdx = clamp(int(std::round(selectEnd)), 0, int(numTimeSteps) - 1);
+    for (int timeStepIdx = startTimeIdx; timeStepIdx <= stopTimeIdx; timeStepIdx++) {
+        querySubsequence.push_back(ensembleMeanValues.at(timeStepIdx).at(selectVarIdx));
+    }
+
+#if _OPENMP >= 200805
+#pragma omp parallel for default(none) shared(querySubsequence)
+#endif
+    for (size_t varIdx = 0; varIdx < variableNames.size(); varIdx++) {
+        std::vector<float> sequence;
+        for (size_t timeStepIdx = 0; timeStepIdx < numTimeSteps; timeStepIdx++) {
+            sequence.push_back(ensembleMeanValues.at(timeStepIdx).at(varIdx));
+        }
+
+        auto& matchSelections = matchSelectionsPerVariable.at(varIdx);
+        auto matches = spring(sequence, querySubsequence, springEpsilon);
+        for (auto& match : matches) {
+            matchSelections.emplace_back(float(match.t_s), float(match.t_e));
+        }
+    }
 }
 
 }

@@ -505,6 +505,7 @@ private:
     QtProperty *sortByDescendingStdDevProperty;
     QtProperty *showMinMaxValueProperty;
     QtProperty *useMaxForSensitivityProperty;
+    QtProperty *springEpsilonProperty;
 
     SimilarityMetric similarityMetric = SimilarityMetric::ABSOLUTE_NCC;
     float meanMetricInfluence = 0.5f;
@@ -512,6 +513,7 @@ private:
     int numBins = 10;
     bool showMinMaxValue = true;
     bool useMaxForSensitivity = true;
+    float springEpsilon = 0.5f;
 
     QStringList trajectorySyncModeNames = {
             "Time Step", "Time of Ascent", "Height"

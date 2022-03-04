@@ -81,6 +81,7 @@ public:
     void sortByDescendingStdDev();
     void setShowMinMaxValue(bool show);
     void setUseMaxForSensitivity(bool useMax);
+    void setSpringEpsilon(float epsilon);
 
     void mouseMoveEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event) override;
     void mousePressEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event) override;
@@ -94,6 +95,7 @@ protected:
 
 private:
     void drawHorizonBackground();
+    void drawHorizonMatchSelections();
     void drawHorizonLines();
     void drawHorizonLinesSparse();
     void drawHorizonOutline(const NVGcolor& textColor);
@@ -103,6 +105,7 @@ private:
     void drawTicks(const NVGcolor& textColor);
     void drawScrollBar(const NVGcolor& textColor);
 
+    float computeTimeStepFromMousePosition(const QVector2D& mousePosition) const;
     void recomputeScrollThumbHeight();
     float computeWindowHeight();
     void recomputeWindowHeight();
@@ -192,6 +195,18 @@ private:
     float stdDevMetricInfluence = 0.25f;
     int sortingIdx = -1;
     std::vector<size_t> sortedVariableIndices;
+
+    // Selection of similar subsequences in the variable data.
+    void startSelection(size_t varIdx, float timeStep);
+    void updateSelection(float timeStep);
+    void endSelection(float timeStep);
+    void computeMatchSelections();
+    bool isSelecting = false;
+    size_t selectVarIdx = 0;
+    float selectStart = -1.0f;
+    float selectEnd = -1.0f;
+    float springEpsilon = 0.5f;
+    std::vector<std::vector<std::pair<float, float>>> matchSelectionsPerVariable;
 };
 
 }
