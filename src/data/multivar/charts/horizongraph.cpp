@@ -1869,7 +1869,9 @@ void MHorizonGraph::computeMatchSelections() {
         auto& matchSelections = matchSelectionsPerVariable.at(varIdx);
         auto matches = spring(sequence, querySubsequence, springEpsilon);
         for (auto& match : matches) {
-            matchSelections.emplace_back(float(match.t_s), float(match.t_e));
+            if (match.t_e - match.t_s > 0) {
+                matchSelections.emplace_back(float(match.t_s), float(match.t_e));
+            }
         }
     }
 }
