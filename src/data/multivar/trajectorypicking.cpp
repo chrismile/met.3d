@@ -30,7 +30,9 @@
 // related third party imports
 #include <QVector4D>
 #include <QtMath>
+#ifdef USE_EMBREE
 #include <embree3/rtcore.h>
+#endif
 
 // local application imports
 #include "../../gxfw/msceneviewglwidget.h"
@@ -47,9 +49,11 @@ MTrajectoryPicker::MTrajectoryPicker(
         DiagramDisplayType diagramType, MTransferFunction1D*& diagramTransferFunction)
         : textureUnit(textureUnit), diagramTransferFunction(diagramTransferFunction)
 {
+#ifdef USE_EMBREE
     device = rtcNewDevice(nullptr);
     scene = rtcNewScene(device);
     mesh = rtcNewGeometry(device, RTC_GEOMETRY_TYPE_TRIANGLE);
+#endif
 
     MGLResourcesManager* glRM = MGLResourcesManager::getInstance();
     glRM->generateEffectProgramUncached(
@@ -207,9 +211,11 @@ MTrajectoryPicker::~MTrajectoryPicker()
 {
     freeStorage();
 
+#ifdef USE_EMBREE
     rtcReleaseGeometry(mesh);
     rtcReleaseScene(scene);
     rtcReleaseDevice(device);
+#endif
 
     if (highlightedTrajectoriesRenderData.indexBufferHighlighted)
     {
@@ -232,11 +238,13 @@ MTrajectoryPicker::~MTrajectoryPicker()
 
 void MTrajectoryPicker::freeStorage()
 {
+#ifdef USE_EMBREE
     if (loaded) {
         rtcDetachGeometry(scene, geomID);
         rtcCommitScene(scene);
         loaded = false;
     }
+#endif
 }
 
 void MTrajectoryPicker::render()
@@ -516,6 +524,7 @@ void MTrajectoryPicker::setMeshTriangleData(
     const size_t numIndices = triangleIndices.size();
     const size_t numTriangles = numIndices / 3;
 
+#ifdef USE_EMBREE
     QVector4D* vertexPointer = (QVector4D*)rtcSetNewGeometryBuffer(
             mesh, RTC_BUFFER_TYPE_VERTEX, 0, RTC_FORMAT_FLOAT3, sizeof(QVector4D), numVertices);
     uint32_t* indexPointer = (uint32_t*)rtcSetNewGeometryBuffer(
@@ -534,6 +543,7 @@ void MTrajectoryPicker::setMeshTriangleData(
 
     rtcCommitScene(scene);
     loaded = true;
+#endif
 }
 
 bool MTrajectoryPicker::pickPointScreen(
@@ -621,6 +631,7 @@ bool MTrajectoryPicker::pickPointWorld(
         const QVector3D& cameraPosition, const QVector3D& rayDirection,
         QVector3D& firstHitPoint, uint32_t& trajectoryIndex, float& timeAtHit)
 {
+#ifdef USE_EMBREE
     if (!loaded) {
         return false;
     }
@@ -668,6 +679,9 @@ bool MTrajectoryPicker::pickPointWorld(
     }
 
     return true;
+#else
+    return false;
+#endif
 }
 
 void MTrajectoryPicker::toggleTrajectoryHighlighted(uint32_t trajectoryIndex)

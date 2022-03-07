@@ -32,7 +32,9 @@
 // related third party imports
 #include <QVector>
 #include <QVector3D>
+#ifdef USE_EMBREE
 #include <embree3/rtcore.h>
+#endif
 
 // local application imports
 #include "actors/transferfunction1d.h"
@@ -278,11 +280,13 @@ private:
     std::vector<uint32_t> vertexTrajectoryIndices;
     std::vector<float> vertexTimeSteps;
 
+#ifdef USE_EMBREE
     RTCDevice device;
     RTCScene scene;
     RTCGeometry mesh;
     unsigned int geomID = 0;
     bool loaded = false;
+#endif
 
     // Highlighted trajectories.
     void updateDiagramData();

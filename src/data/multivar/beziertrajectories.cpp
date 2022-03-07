@@ -66,7 +66,7 @@ MBezierTrajectories::MBezierTrajectories(
     }
     for (int i = 0; i < numTrajectories; i++)
     {
-        selectedLines.push_back(false);
+        selectedLines.push_back(true);
     }
     for (int i = 0; i < numTrajectories; i++)
     {
