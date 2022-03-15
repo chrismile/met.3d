@@ -30,7 +30,6 @@
  *****************************************************************************/
 
 //const int NUM_SEGMENTS = 8;
-//const int NUM_LINESEGMENTS = 12;
 //const int MAX_NUM_VARIABLES = 20;
 //#define USE_MULTI_VAR_TRANSFER_FUNCTION
 //#define IS_MULTIVAR_DATA
@@ -46,12 +45,6 @@
 
 // "Color bands"-specific uniforms
 uniform float separatorWidth;
-#ifdef TIMESTEP_LENS
-uniform int timestepLensePosition;
-//uniform float timestepLenseThickness = 1.0f;
-//uniform float timestepLenseRadius = 100.0f;
-uniform float timestepLenseRadius = 20.0f;
-#endif
 
 /*****************************************************************************
  ***                            INTERFACES
@@ -64,11 +57,6 @@ interface VSOutput
     vec3 vTangent; // Tangent of line in world space
     int vLineID; // number of line
     int vElementID; // number of line element (original line vertex index)
-    int vElementNextID; // number of next line element (original next line vertex index)
-    float vElementInterpolant; // curve parameter t along curve between element and next element
-#ifdef TIMESTEP_LENS
-    float vTimestepIndex;
-#endif
 };
 
 interface FSInput
@@ -77,15 +65,9 @@ interface FSInput
     vec3 fragWorldPos;
     vec3 fragNormal;
     vec3 fragTangent;
-    //vec2 fragTexCoord;
     // "Oriented Stripes"-specfic outputs
-    flat int fragElementID; // Actual per-line vertex index --> required for sampling from global buffer
-    flat int fragElementNextID; // Actual next per-line vertex index --> for linear interpolation
     flat int fragLineID; // Line index --> required for sampling from global buffer
-    float fragElementInterpolant; // current number of curve parameter t (in [0;1]) within one line segment
-#ifdef TIMESTEP_LENS
-    float fragTimestep;
-#endif
+    flat int fragElementID; // Actual per-line vertex index --> required for sampling from global buffer
 #ifdef SUPPORT_LINE_DESATURATION
     flat uint desaturateLine;
 #endif
@@ -97,23 +79,13 @@ interface FSInput
 
 shader VSmain(
         in vec3 vertexPosition : 0, in vec3 vertexLineNormal : 1, in vec3 vertexLineTangent : 2,
-        in vec4 multiVariable : 3, in vec4 variableDesc : 4, in float timestepIndex : 5, out VSOutput outputs) {
-    const int lineID = int(variableDesc.y);
-    const int elementID = int(variableDesc.x);
-
+        in int lineID : 3, in int elementID : 4, out VSOutput outputs) {
     outputs.vPosition = vertexPosition;
     outputs.vNormal = normalize(vertexLineNormal);
     outputs.vTangent = normalize(vertexLineTangent);
 
     outputs.vLineID = lineID;
     outputs.vElementID = elementID;
-
-    outputs.vElementNextID = int(variableDesc.z);
-    outputs.vElementInterpolant = variableDesc.w;
-
-#ifdef TIMESTEP_LENS
-    outputs.vTimestepIndex = timestepIndex;
-#endif
 }
 
 /*****************************************************************************
@@ -122,15 +94,6 @@ shader VSmain(
 
 #define ORIENTED_COLOR_BANDS
 #include "multivar_geometry_utils.glsl"
-
-#ifdef TIMESTEP_LENS
-float computeZoomFactor(float timestepIndex) {
-    float timeDist = abs(float(timestepLensePosition) - timestepIndex);
-    float radicand = max(0.0, timestepLenseRadius*timestepLenseRadius - timeDist*timeDist);
-    return sqrt(radicand) * timestepLenseRadius * 0.004 + 1.0;
-    //return smoothstep(timestepLenseRadius, 0.0f, timeDist) * timestepLenseThickness + 1.0;
-}
-#endif
 
 shader GSmain(in VSOutput inputs[], out FSInput outputs) {
     //if (inputs[0].vElementID, numObsPerTrajectory > renderTubesUpToIndex) return;
@@ -155,42 +118,29 @@ shader GSmain(in VSOutput inputs[], out FSInput outputs) {
 
     // 1) Create tube circle vertices for current and next point
 #if ORIENTED_RIBBON_MODE != 3 // ORIENTED_RIBBON_MODE_VARYING_RIBBON_WIDTH
-#ifdef TIMESTEP_LENS
-    float radius0 = lineWidth / 2.0 * computeZoomFactor(inputs[0].vTimestepIndex);
-    float radius1 = lineWidth / 2.0 * computeZoomFactor(inputs[1].vTimestepIndex);
-    createTubeSegments(
-            circlePointsCurrent, vertexNormalsCurrent, currentPoint, normalCurrent, tangentCurrent, radius0);
-    createTubeSegments(
-            circlePointsNext, vertexNormalsNext, nextPoint, normalNext, tangentNext, radius1);
-#else
     createTubeSegments(
             circlePointsCurrent, vertexNormalsCurrent, currentPoint, normalCurrent, tangentCurrent, lineWidth / 2.0);
     createTubeSegments(
             circlePointsNext, vertexNormalsNext, nextPoint, normalNext, tangentNext, lineWidth / 2.0);
-#endif
 #else
     // Sample ALL variables.
     float variables[MAX_NUM_VARIABLES];
     for (int varID = 0; varID < numVariables; varID++) {
-        // 1) Sample variables from buffers.
-        float variableValue, variableNextValue;
-        vec2 variableMinMax, variableNextMinMax;
+        // 1) Sample variable from buffers.
+        float variableValue;
+        vec2 variableMinMax;
         const uint actualVarID = sampleActualVarID(varID);
         sampleVariableFromLineSSBO(inputs[0].vLineID, actualVarID, inputs[0].vElementID, variableValue, variableMinMax);
-        sampleVariableFromLineSSBO(inputs[0].vLineID, actualVarID, inputs[0].vElementNextID, variableNextValue, variableNextMinMax);
 
-        // 2) Normalize values.
+        // 2) Normalize value.
         variableValue = clamp((variableValue - variableMinMax.x) / (variableMinMax.y - variableMinMax.x), 0.0, 1.0);
-        variableNextValue = clamp((variableNextValue - variableNextMinMax.x) / (variableNextMinMax.y - variableNextMinMax.x), 0.0, 1.0);
 
-        float value = mix(variableValue, variableNextValue, inputs[0].vElementInterpolant);
         uint isDiverging = sampleIsDiverging(actualVarID);
         if (isDiverging > 0) {
-            value = abs(value - 0.5) * 2.0;
+            variableValue = abs(variableValue - 0.5) * 2.0;
         }
 
-        // 3) Interpolate linearly.
-        variables[varID] = value;
+        variables[varID] = variableValue;
     }
 
     // Compute the sum of all variables
@@ -203,37 +153,23 @@ shader GSmain(in VSOutput inputs[], out FSInput outputs) {
     const float lineRadius0 = mix(minRadius, maxRadius, variablesSumTotal / float(max(numVariables, 1)));
 
 
-    float _fragElementInterpolant;
-    int _fragElementNextID;
-    if (inputs[1].vElementInterpolant < inputs[0].vElementInterpolant) {
-        _fragElementInterpolant = 1.0f;
-        _fragElementNextID = int(inputs[0].vElementNextID);
-    } else {
-        _fragElementInterpolant = inputs[1].vElementInterpolant;
-        _fragElementNextID = int(inputs[1].vElementNextID);
-    }
-
     // Sample ALL variables.
     for (int varID = 0; varID < numVariables; varID++) {
         // 1) Sample variables from buffers.
-        float variableValue, variableNextValue;
-        vec2 variableMinMax, variableNextMinMax;
+        float variableValue;
+        vec2 variableMinMax;
         const uint actualVarID = sampleActualVarID(varID);
         sampleVariableFromLineSSBO(inputs[0].vLineID, actualVarID, inputs[0].vElementID, variableValue, variableMinMax);
-        sampleVariableFromLineSSBO(inputs[0].vLineID, actualVarID, _fragElementNextID, variableNextValue, variableNextMinMax);
 
         // 2) Normalize values.
         variableValue = clamp((variableValue - variableMinMax.x) / (variableMinMax.y - variableMinMax.x), 0.0, 1.0);
-        variableNextValue = clamp((variableNextValue - variableNextMinMax.x) / (variableNextMinMax.y - variableNextMinMax.x), 0.0, 1.0);
 
-        float value = mix(variableValue, variableNextValue, _fragElementInterpolant);
         uint isDiverging = sampleIsDiverging(actualVarID);
         if (isDiverging > 0) {
-            value = abs(value - 0.5) * 2.0;
+            variableValue = abs(variableValue - 0.5) * 2.0;
         }
 
-        // 3) Interpolate linearly.
-        variables[varID] = value;
+        variables[varID] = variableValue;
     }
 
     // Compute the sum of all variables
@@ -292,16 +228,10 @@ shader GSmain(in VSOutput inputs[], out FSInput outputs) {
         vec3 segmentPointCurrent1 = circlePointsCurrent[iN];
         vec3 segmentPointNext1 = circlePointsNext[iN];
 
-        outputs.fragElementNextID = inputs[0].vElementNextID;
-        outputs.fragElementInterpolant = inputs[0].vElementInterpolant;
-
         gl_Position = mvpMatrix * vec4(segmentPointCurrent0, 1.0);
         outputs.fragNormal = vertexNormalsCurrent[i];
         outputs.fragTangent = tangentCurrent;
         outputs.fragWorldPos = segmentPointCurrent0;
-#ifdef TIMESTEP_LENS
-        outputs.fragTimestep = inputs[0].vTimestepIndex;
-#endif
         EmitVertex();
 
         gl_Position = mvpMatrix * vec4(segmentPointCurrent1, 1.0);
@@ -310,21 +240,10 @@ shader GSmain(in VSOutput inputs[], out FSInput outputs) {
         outputs.fragWorldPos = segmentPointCurrent1;
         EmitVertex();
 
-        if (inputs[1].vElementInterpolant < inputs[0].vElementInterpolant) {
-            outputs.fragElementInterpolant = 1.0f;
-            outputs.fragElementNextID = int(inputs[0].vElementNextID);
-        } else {
-            outputs.fragElementInterpolant = inputs[1].vElementInterpolant;
-            outputs.fragElementNextID = int(inputs[1].vElementNextID);
-        }
-
         gl_Position = mvpMatrix * vec4(segmentPointNext0, 1.0);
         outputs.fragNormal = vertexNormalsNext[i];
         outputs.fragTangent = tangentNext;
         outputs.fragWorldPos = segmentPointNext0;
-#ifdef TIMESTEP_LENS
-        outputs.fragTimestep = inputs[1].vTimestepIndex;
-#endif
         EmitVertex();
 
         gl_Position = mvpMatrix * vec4(segmentPointNext1, 1.0);
@@ -391,24 +310,20 @@ shader FSmain(in FSInput inputs, out vec4 fragColor) {
     float variables[MAX_NUM_VARIABLES];
     for (int varID = 0; varID < numVariables; varID++) {
         // 1.1) Sample variables from buffers.
-        float variableValue, variableNextValue;
-        vec2 variableMinMax, variableNextMinMax;
+        float variableValue;
+        vec2 variableMinMax;
         const uint actualVarID = sampleActualVarID(varID);
         sampleVariableFromLineSSBO(inputs.fragLineID, actualVarID, inputs.fragElementID, variableValue, variableMinMax);
-        sampleVariableFromLineSSBO(inputs.fragLineID, actualVarID, inputs.fragElementNextID, variableNextValue, variableNextMinMax);
 
         // 1.2) Normalize values.
         variableValue = clamp((variableValue - variableMinMax.x) / (variableMinMax.y - variableMinMax.x), 0.0, 1.0);
-        variableNextValue = clamp((variableNextValue - variableNextMinMax.x) / (variableNextMinMax.y - variableNextMinMax.x), 0.0, 1.0);
 
-        float value = mix(variableValue, variableNextValue, inputs.fragElementInterpolant);
         uint isDiverging = sampleIsDiverging(actualVarID);
         if (isDiverging > 0) {
-            value = abs(value - 0.5) * 2.0;
+            variableValue = abs(variableValue - 0.5) * 2.0;
         }
 
-        // 1.3) Interpolate linearly.
-        variables[varID] = value;
+        variables[varID] = variableValue;
     }
 
     // Compute the sum of all variables
@@ -432,35 +347,29 @@ shader FSmain(in FSInput inputs, out vec4 fragColor) {
 #endif
 
     // 2) Sample variables from buffers
-    float variableValue, variableNextValue;
-    vec2 variableMinMax, variableNextMinMax;
+    float variableValue;
+    vec2 variableMinMax;
     const uint actualVarID = sampleActualVarID(varID);
     sampleVariableFromLineSSBO(inputs.fragLineID, actualVarID, inputs.fragElementID, variableValue, variableMinMax);
-    sampleVariableFromLineSSBO(inputs.fragLineID, actualVarID, inputs.fragElementNextID, variableNextValue, variableNextMinMax);
 
     // 3) Normalize values
     //variableValue = (variableValue - variableMinMax.x) / (variableMinMax.y - variableMinMax.x);
-    //variableNextValue = (variableNextValue - variableNextMinMax.x) / (variableNextMinMax.y - variableNextMinMax.x);
 
     // 4) Determine variable color
-    vec4 surfaceColor = determineColorLinearInterpolate(
-            actualVarID, variableValue, variableNextValue, inputs.fragElementInterpolant);
+    vec4 surfaceColor = determineColor(actualVarID, variableValue);
 
 #if ORIENTED_RIBBON_MODE == 1 // ORIENTED_RIBBON_MODE_VARYING_BAND_WIDTH
     float symBandPos = abs(bandPos * 2.0 - 1.0);
 
     // 1.2) Normalize values.
     float variableValuePrime = clamp((variableValue - variableMinMax.x) / (variableMinMax.y - variableMinMax.x), 0.0, 1.0);
-    float variableNextValuePrime = clamp((variableNextValue - variableNextMinMax.x) / (variableNextMinMax.y - variableNextMinMax.x), 0.0, 1.0);
-
-    float interpolatedVariableValue = mix(variableValuePrime, variableNextValuePrime, inputs.fragElementInterpolant);
 
     uint isDiverging = sampleIsDiverging(actualVarID);
     if (isDiverging > 0) {
-        interpolatedVariableValue = abs(interpolatedVariableValue - 0.5) * 2.0;
+        variableValuePrime = abs(variableValuePrime - 0.5) * 2.0;
     }
 
-    bandPos = (-symBandPos / interpolatedVariableValue + 1.0) * 0.5;
+    bandPos = (-symBandPos / variableValuePrime + 1.0) * 0.5;
 #endif
 
     // 4.1) Draw black separators between single stripes.
@@ -469,7 +378,7 @@ shader FSmain(in FSInput inputs, out vec4 fragColor) {
     }
 
 #if ORIENTED_RIBBON_MODE == 1 // ORIENTED_RIBBON_MODE_VARYING_BAND_WIDTH
-    if (symBandPos > interpolatedVariableValue) {
+    if (symBandPos > variableValuePrime) {
         surfaceColor = bandBackgroundColor;
     }
 #endif

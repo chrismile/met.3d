@@ -136,6 +136,7 @@ public:
     void setShowMinMaxValue(bool show);
     void setUseMaxForSensitivity(bool useMax);
     void setSpringEpsilon(float epsilon);
+    void triggerSelectAllLines();
 
     // Used for aligning warm conveyor belt trajectories based on their ascension.
     void setSyncMode(TrajectorySyncMode syncMode);
@@ -262,7 +263,7 @@ private:
     int numBins = 10;
     bool showMinMaxValue = true;
     bool useMaxForSensitivity = true;
-    float springEpsilon = 0.5f;
+    float springEpsilon = 10.0f;
 
     GLuint textureUnit;
     MFilteredTrajectories baseTrajectories;

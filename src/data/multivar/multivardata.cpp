@@ -39,12 +39,7 @@ namespace Met3D
 {
 
 const QStringList renderingTechniqueShaderFilenames = {
-        "src/glsl/multivar/multivar_rolls.fx.glsl",
-        "src/glsl/multivar/multivar_twisted_rolls.fx.glsl",
-        "src/glsl/multivar/multivar_color_bands.fx.glsl",
-        "src/glsl/multivar/multivar_oriented_color_bands.fx.glsl",
-        "src/glsl/multivar/multivar_checkerboard.fx.glsl",
-        "src/glsl/multivar/multivar_fibers.fx.glsl"
+        "src/glsl/multivar/multivar_oriented_color_bands.fx.glsl"
 };
 
 const QStringList focusRenderingTechniqueShaderFilenames = {
@@ -94,7 +89,7 @@ void MMultiVarData::setProperties(MActor *actor, MQtProperties *properties, QtPr
             ENUM_PROPERTY, "render technique", multiVarGroupProperty);
     QStringList renderingTechniques =
             {
-                    "Rolls", "Twisted Rolls", "Color Bands", "Oriented Color Bands", "Checkerboard", "Fibers"
+                    "Oriented Color Bands"
             };
     properties->mEnum()->setEnumNames(renderTechniqueProperty, renderingTechniques);
     properties->mEnum()->setValue(renderTechniqueProperty, int(multiVarRenderMode));
@@ -114,51 +109,6 @@ void MMultiVarData::setProperties(MActor *actor, MQtProperties *properties, QtPr
     focusRenderTechniqueProperty->setToolTip(
             "What rendering technique to use for the highlight focus geometry.");
     propertyList.push_back(focusRenderTechniqueProperty);
-
-    mapTubeDiameterProperty = addProperty(
-            BOOL_PROPERTY, "map tube diameter", multiVarGroupProperty);
-    properties->mBool()->setValue(mapTubeDiameterProperty, mapTubeDiameter);
-    mapTubeDiameterProperty->setToolTip("Map variable values to the tube diameter.");
-    propertyList.push_back(mapTubeDiameterProperty);
-
-    radiusMappingModeProperty = addProperty(
-            ENUM_PROPERTY, "radius mapping mode", multiVarGroupProperty);
-    QStringList radiusMappingModes = { "Global", "Local" };
-    properties->mEnum()->setEnumNames(radiusMappingModeProperty, radiusMappingModes);
-    properties->mEnum()->setValue(radiusMappingModeProperty, int(multiVarRadiusMappingMode));
-    radiusMappingModeProperty->setToolTip("Radius mapping mode.");
-    propertyList.push_back(radiusMappingModeProperty);
-
-    checkerboardHeightProperty = addProperty(
-            INT_PROPERTY, "checkerboard height", multiVarGroupProperty);
-    properties->setInt(checkerboardHeightProperty, checkerboardHeight, 1, 10);
-    checkerboardHeightProperty->setToolTip("Checkerboard pattern height.");
-    propertyList.push_back(checkerboardHeightProperty);
-
-    checkerboardWidthProperty = addProperty(
-            INT_PROPERTY, "checkerboard width", multiVarGroupProperty);
-    properties->setInt(checkerboardWidthProperty, checkerboardWidth, 1, 20);
-    checkerboardWidthProperty->setToolTip("Checkerboard pattern height.");
-    propertyList.push_back(checkerboardWidthProperty);
-
-    checkerboardIteratorProperty = addProperty(
-            INT_PROPERTY, "checkerboard iterator", multiVarGroupProperty);
-    properties->setInt(checkerboardIteratorProperty, checkerboardIterator, 1, 5);
-    checkerboardIteratorProperty->setToolTip("Checkerboard iterator.");
-    propertyList.push_back(checkerboardIteratorProperty);
-
-    twistOffsetProperty = addProperty(
-            DECORATEDDOUBLE_PROPERTY, "twist offset", multiVarGroupProperty);
-    properties->setDDouble(
-            twistOffsetProperty, twistOffset, 0.0, 1.0, 2, 0.1, " (world space)");
-    twistOffsetProperty->setToolTip("Twist offset.");
-    propertyList.push_back(twistOffsetProperty);
-
-    constantTwistOffsetProperty = addProperty(
-            BOOL_PROPERTY, "constant twist offset", multiVarGroupProperty);
-    properties->mBool()->setValue(constantTwistOffsetProperty, constantTwistOffset);
-    constantTwistOffsetProperty->setToolTip("Whether to use constant twist offset.");
-    propertyList.push_back(constantTwistOffsetProperty);
 
     orientedRibbonModeProperty = addProperty(
             ENUM_PROPERTY, "oriented ribbon mode", multiVarGroupProperty);
@@ -190,29 +140,6 @@ void MMultiVarData::setProperties(MActor *actor, MQtProperties *properties, QtPr
     properties->mBool()->setValue(useColorIntensityProperty, useColorIntensity);
     useColorIntensityProperty->setToolTip("Whether to map the variables to color intensity.");
     propertyList.push_back(useColorIntensityProperty);
-
-    useColorIntensityRollsProperty = addProperty(
-            BOOL_PROPERTY, "use rolls color intensity", multiVarGroupProperty);
-    properties->mBool()->setValue(useColorIntensityRollsProperty, useColorIntensityRolls);
-    useColorIntensityRollsProperty->setToolTip("Whether to map the variables to color intensity for the bands.");
-    propertyList.push_back(useColorIntensityRollsProperty);
-    useColorIntensityRollsProperty->setEnabled(focusRenderMode == MultiVarFocusRenderMode::ROLLS);
-
-    rollsWidthProperty = addProperty(
-            DECORATEDDOUBLE_PROPERTY, "rolls width", multiVarGroupProperty);
-    properties->setDDouble(
-            rollsWidthProperty, rollsWidth,
-            0.01, 1.0, 2, 0.1, " (world space)");
-    rollsWidthProperty->setToolTip("Rolls width.");
-    propertyList.push_back(rollsWidthProperty);
-    rollsWidthProperty->setEnabled(focusRenderMode == MultiVarFocusRenderMode::ROLLS);
-
-    mapRollsThicknessProperty = addProperty(
-            BOOL_PROPERTY, "map rolls thickness", multiVarGroupProperty);
-    properties->mBool()->setValue(mapRollsThicknessProperty, mapRollsThickness);
-    mapRollsThicknessProperty->setToolTip("Whether to map the variable values to the roll thickness.");
-    propertyList.push_back(mapRollsThicknessProperty);
-    mapRollsThicknessProperty->setEnabled(focusRenderMode == MultiVarFocusRenderMode::ROLLS);
 
     targetVariableAndSensitivityProperty = addProperty(
             BOOL_PROPERTY, "target and max sensitivity", multiVarGroupProperty);
@@ -258,12 +185,6 @@ void MMultiVarData::setPropertiesRenderingSettings()
             minRadiusFactorProperty, minRadiusFactor, 0.0, 1.0, 3, 0.05, " (world space)");
     minRadiusFactorProperty->setToolTip("Minimum radius factor.");
     propertyList.push_back(minRadiusFactorProperty);
-
-    rollWidthProperty = addProperty(
-            INT_PROPERTY, "roll width", renderingSettingsGroupProperty);
-    properties->setInt(rollWidthProperty, rollWidth, 1, 4);
-    rollWidthProperty->setToolTip("Number of line segments used for the tube rendering.");
-    propertyList.push_back(rollWidthProperty);
 
     useTimestepLensProperty = addProperty(
             BOOL_PROPERTY, "use timestep lens", renderingSettingsGroupProperty);
@@ -349,42 +270,21 @@ void MMultiVarData::updateNumVariablesSelected()
             numVariablesSelected++;
         }
     }
-
-    if (multiVarRenderMode == MultiVarRenderMode::FIBERS)
-    {
-        reloadShaderEffect();
-    }
 }
 
 
 void MMultiVarData::updateModeEnabledProperties()
 {
-    mapTubeDiameterProperty->setEnabled(
-            multiVarRenderMode != MultiVarRenderMode::ORIENTED_COLOR_BANDS);
-    radiusMappingModeProperty->setEnabled(
-            multiVarRenderMode != MultiVarRenderMode::ORIENTED_COLOR_BANDS && mapTubeDiameter);
-    checkerboardHeightProperty->setEnabled(multiVarRenderMode == MultiVarRenderMode::CHECKERBOARD);
-    checkerboardWidthProperty->setEnabled(multiVarRenderMode == MultiVarRenderMode::CHECKERBOARD);
-    checkerboardIteratorProperty->setEnabled(multiVarRenderMode == MultiVarRenderMode::CHECKERBOARD);
-    twistOffsetProperty->setEnabled(multiVarRenderMode == MultiVarRenderMode::TWISTED_ROLLS);
-    constantTwistOffsetProperty->setEnabled(multiVarRenderMode == MultiVarRenderMode::TWISTED_ROLLS);
     orientedRibbonModeProperty->setEnabled(multiVarRenderMode == MultiVarRenderMode::ORIENTED_COLOR_BANDS);
     bandBackgroundColorProperty->setEnabled(
             multiVarRenderMode == MultiVarRenderMode::ORIENTED_COLOR_BANDS
             && orientedRibbonMode == OrientedRibbonMode::VARYING_BAND_WIDTH);
 
     // --- Group: Rendering settings ---
-    fiberRadiusProperty->setEnabled(multiVarRenderMode == MultiVarRenderMode::FIBERS);
     minRadiusFactorProperty->setEnabled(
             multiVarRenderMode != MultiVarRenderMode::ORIENTED_COLOR_BANDS
             || orientedRibbonMode == OrientedRibbonMode::VARYING_RIBBON_WIDTH);
-    rollWidthProperty->setEnabled(multiVarRenderMode == MultiVarRenderMode::ROLLS);
     useTimestepLensProperty->setEnabled(multiVarRenderMode == MultiVarRenderMode::ORIENTED_COLOR_BANDS);
-
-    // Rolls settings.
-    useColorIntensityRollsProperty->setEnabled(focusRenderMode == MultiVarFocusRenderMode::ROLLS);
-    rollsWidthProperty->setEnabled(focusRenderMode == MultiVarFocusRenderMode::ROLLS);
-    mapRollsThicknessProperty->setEnabled(focusRenderMode == MultiVarFocusRenderMode::ROLLS);
 }
 
 
@@ -414,15 +314,7 @@ void MMultiVarData::saveConfiguration(QSettings *settings)
 
     // Multi-variable settings.
     settings->setValue(QString("numLineSegments"), numLineSegments);
-    settings->setValue(QString("numInstances"), numInstances);
-    settings->setValue(QString("rollWidth"), rollWidth);
     settings->setValue(QString("separatorWidth"), separatorWidth);
-    settings->setValue(QString("mapTubeDiameter"), mapTubeDiameter);
-    settings->setValue(QString("twistOffset"), twistOffset);
-    settings->setValue(QString("constantTwistOffset"), constantTwistOffset);
-    settings->setValue(QString("checkerboardWidth"), checkerboardWidth);
-    settings->setValue(QString("checkerboardHeight"), checkerboardHeight);
-    settings->setValue(QString("checkerboardIterator"), checkerboardIterator);
     settings->setValue(QString("bandBackgroundColor"), QVariant::fromValue<QVector4D>(bandBackgroundColor));
 
     // Line settings.
@@ -479,15 +371,7 @@ void MMultiVarData::loadConfiguration(QSettings *settings)
 
     // Multi-variable settings.
     numLineSegments = settings->value("numLineSegments", 8).toInt();
-    numInstances = settings->value("numInstances", 12).toInt();
-    rollWidth = settings->value("rollWidth", 1).toInt();
     separatorWidth = settings->value("separatorWidth", 0.1f).toFloat();
-    mapTubeDiameter = settings->value("mapTubeDiameter", false).toBool();
-    twistOffset = settings->value("twistOffset", 0.1f).toFloat();
-    constantTwistOffset = settings->value("constantTwistOffset", false).toBool();
-    checkerboardWidth = settings->value("checkerboardWidth", 3).toInt();
-    checkerboardHeight = settings->value("checkerboardHeight", 2).toInt();
-    checkerboardIterator = settings->value("checkerboardIterator", 2).toInt();
     bandBackgroundColor = settings->value(
             "bandBackgroundColor",
             QVector4D(0.5f, 0.5f, 0.5f, 1.0f)).value<QVector4D>();
@@ -745,12 +629,6 @@ void MMultiVarData::onQtPropertyChanged(QtProperty *property)
     {
         MultiVarRenderMode newRenderMode =
                 MultiVarRenderMode(properties->mEnum()->value(renderTechniqueProperty));
-        bool oldRenderModeNeedsSubdiv = getMultiVarRenderModeNeedsSubdiv(multiVarRenderMode);
-        bool newRenderModeNeedsSubdiv = getMultiVarRenderModeNeedsSubdiv(newRenderMode);
-        if (oldRenderModeNeedsSubdiv != newRenderModeNeedsSubdiv)
-        {
-            internalRepresentationChanged = true;
-        }
         multiVarRenderMode = newRenderMode;
         reloadShaderEffect();
     }
@@ -767,34 +645,6 @@ void MMultiVarData::onQtPropertyChanged(QtProperty *property)
         multiVarTf.generateTexture1DArray();
         if (actor->suppressActorUpdates()) return;
         actor->emitActorChangedSignal();
-    }
-    else if (property == mapTubeDiameterProperty)
-    {
-        mapTubeDiameter = properties->mBool()->value(mapTubeDiameterProperty);
-    }
-    else if (property == radiusMappingModeProperty)
-    {
-        multiVarRadiusMappingMode = MultiVarRadiusMappingMode(properties->mEnum()->value(radiusMappingModeProperty));
-    }
-    else if (property == checkerboardHeightProperty)
-    {
-        checkerboardHeight = properties->mInt()->value(checkerboardHeightProperty);
-    }
-    else if (property == checkerboardWidthProperty)
-    {
-        checkerboardWidth = properties->mInt()->value(checkerboardWidthProperty);
-    }
-    else if (property == checkerboardIteratorProperty)
-    {
-        checkerboardIterator = properties->mInt()->value(checkerboardIteratorProperty);
-    }
-    else if (property == twistOffsetProperty)
-    {
-        twistOffset = float(properties->mDDouble()->value(twistOffsetProperty));
-    }
-    else if (property == constantTwistOffsetProperty)
-    {
-        constantTwistOffset = properties->mBool()->value(constantTwistOffsetProperty);
     }
     else if (property == orientedRibbonModeProperty)
     {
@@ -814,18 +664,6 @@ void MMultiVarData::onQtPropertyChanged(QtProperty *property)
         useColorIntensity = properties->mBool()->value(useColorIntensityProperty);
     }
 
-    else if (property == useColorIntensityRollsProperty)
-    {
-        useColorIntensityRolls = properties->mBool()->value(useColorIntensityRollsProperty);
-    }
-    else if (property == rollsWidthProperty)
-    {
-        rollsWidth = float(properties->mDDouble()->value(rollsWidthProperty));
-    }
-    else if (property == mapRollsThicknessProperty)
-    {
-        mapRollsThickness = properties->mBool()->value(mapRollsThicknessProperty);
-    }
     else if (property == targetVariableAndSensitivityProperty)
     {
         targetVariableAndSensitivity = properties->mBool()->value(targetVariableAndSensitivityProperty);
@@ -834,14 +672,9 @@ void MMultiVarData::onQtPropertyChanged(QtProperty *property)
     // --- Group: Rendering settings ---
     else if (property == numLineSegmentsProperty)
     {
-        if (multiVarRenderMode == MultiVarRenderMode::ORIENTED_COLOR_BANDS
-                || multiVarRenderMode == MultiVarRenderMode::FIBERS)
+        if (multiVarRenderMode == MultiVarRenderMode::ORIENTED_COLOR_BANDS)
         {
             numLineSegments = properties->mInt()->value(numLineSegmentsProperty);
-        }
-        else
-        {
-            numInstances = properties->mInt()->value(numLineSegmentsProperty);
         }
         reloadShaderEffect();
     }
@@ -852,10 +685,6 @@ void MMultiVarData::onQtPropertyChanged(QtProperty *property)
     else if (property == minRadiusFactorProperty)
     {
         minRadiusFactor = float(properties->mDDouble()->value(minRadiusFactorProperty));
-    }
-    else if (property == rollWidthProperty)
-    {
-        rollWidth = properties->mInt()->value(rollWidthProperty);
     }
     else if (property == useTimestepLensProperty)
     {
@@ -1002,30 +831,6 @@ void MMultiVarData::setUniformData(int textureUnitTransferFunction)
     {
         shaderEffect->setUniformValue("minRadiusFactor", minRadiusFactor);
     }
-    if (multiVarRenderMode != MultiVarRenderMode::ORIENTED_COLOR_BANDS)
-    {
-        shaderEffect->setUniformValue("mapTubeDiameter", mapTubeDiameter);
-        shaderEffect->setUniformValue("mapTubeDiameterMode", int(multiVarRadiusMappingMode));
-    }
-    if (multiVarRenderMode == MultiVarRenderMode::ROLLS)
-    {
-        shaderEffect->setUniformValue("rollWidth", rollWidth);
-    }
-    if (multiVarRenderMode == MultiVarRenderMode::FIBERS)
-    {
-        shaderEffect->setUniformValue("fiberRadius", fiberRadius);
-    }
-    if (multiVarRenderMode == MultiVarRenderMode::CHECKERBOARD)
-    {
-        shaderEffect->setUniformValue("checkerboardWidth", checkerboardWidth);
-        shaderEffect->setUniformValue("checkerboardHeight", checkerboardHeight);
-        shaderEffect->setUniformValue("checkerboardIterator", checkerboardIterator);
-    }
-    if (multiVarRenderMode == MultiVarRenderMode::TWISTED_ROLLS)
-    {
-        shaderEffect->setUniformValue("twistOffset", twistOffset);
-        shaderEffect->setUniformValue("constantTwistOffset", constantTwistOffset);
-    }
     if (multiVarRenderMode == MultiVarRenderMode::ORIENTED_COLOR_BANDS
             && orientedRibbonMode == OrientedRibbonMode::VARYING_BAND_WIDTH)
     {
@@ -1126,7 +931,6 @@ void MMultiVarData::reloadShaderEffect()
             {
                     {"NUM_INSTANCES", QString::fromStdString(std::to_string(numVariablesSelected)) },
                     {"NUM_SEGMENTS", QString::fromStdString(std::to_string(numLineSegments)) },
-                    {"NUM_LINESEGMENTS", QString::fromStdString(std::to_string(numInstances)) },
                     {"MAX_NUM_VARIABLES", QString::fromStdString(std::to_string(MAX_NUM_VARIABLES)) },
                     {"USE_MULTI_VAR_TRANSFER_FUNCTION", QString::fromStdString("") },
                     {"IS_MULTIVAR_DATA", QString::fromStdString("") },

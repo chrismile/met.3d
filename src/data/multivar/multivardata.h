@@ -45,12 +45,7 @@ namespace Met3D
 {
 
 enum class MultiVarRenderMode {
-    ROLLS,
-    TWISTED_ROLLS,
-    COLOR_BANDS,
-    ORIENTED_COLOR_BANDS,
-    CHECKERBOARD,
-    FIBERS
+    ORIENTED_COLOR_BANDS
 };
 enum class MultiVarFocusRenderMode {
     NONE,
@@ -60,17 +55,6 @@ enum class MultiVarFocusRenderMode {
     PIE_CHART_AREA,
     PIE_CHART_COLOR,
     ROLLS
-};
-
-inline bool getMultiVarRenderModeNeedsSubdiv(MultiVarRenderMode multiVarRenderMode) {
-    return multiVarRenderMode == MultiVarRenderMode::ROLLS
-            || multiVarRenderMode == MultiVarRenderMode::CHECKERBOARD
-            || multiVarRenderMode == MultiVarRenderMode::TWISTED_ROLLS;
-}
-
-enum class MultiVarRadiusMappingMode {
-    GLOBAL,
-    LINE
 };
 
 class MMultiVarData : public QObject
@@ -100,7 +84,6 @@ public:
     // When a shader needing a different internal representation was loaded.
     inline bool getInternalRepresentationChanged() const { return internalRepresentationChanged; }
     inline void resetInternalRepresentationChanged() { internalRepresentationChanged = false; }
-    inline bool getNeedsSubdiv() { return getMultiVarRenderModeNeedsSubdiv(multiVarRenderMode); }
     inline bool getRenderSpheres() {
         return focusRenderMode != MultiVarFocusRenderMode::NONE && focusRenderMode != MultiVarFocusRenderMode::ROLLS;
     }
@@ -185,21 +168,10 @@ private:
     QVector<QtProperty*> propertyList;
     QtProperty *renderTechniqueProperty;
     QtProperty *focusRenderTechniqueProperty;
-    QtProperty *mapTubeDiameterProperty;
-    QtProperty *radiusMappingModeProperty;
-    QtProperty *checkerboardHeightProperty;
-    QtProperty *checkerboardWidthProperty;
-    QtProperty *checkerboardIteratorProperty;
-    QtProperty *twistOffsetProperty;
-    QtProperty *constantTwistOffsetProperty;
     QtProperty *orientedRibbonModeProperty;
     QtProperty *bandBackgroundColorProperty;
     QtProperty *separatorWidthProperty;
     QtProperty *useColorIntensityProperty;
-
-    QtProperty *useColorIntensityRollsProperty;
-    QtProperty *rollsWidthProperty;
-    QtProperty *mapRollsThicknessProperty;
 
     QVector<QString> varNames;
     MMultiVarTf multiVarTf;
@@ -211,7 +183,6 @@ private:
     QtProperty *numLineSegmentsProperty;
     QtProperty *fiberRadiusProperty;
     QtProperty *minRadiusFactorProperty;
-    QtProperty *rollWidthProperty;
     QtProperty *useTimestepLensProperty;
 
     QtProperty *phongLightingSettingsGroup;
@@ -250,7 +221,6 @@ private:
 
     // Rendering modes.
     MultiVarRenderMode multiVarRenderMode = MultiVarRenderMode::ORIENTED_COLOR_BANDS;
-    MultiVarRadiusMappingMode multiVarRadiusMappingMode = MultiVarRadiusMappingMode::GLOBAL;
     bool internalRepresentationChanged = false; ///< If multiVarRenderMode changes to other mode needing different data.
     MultiVarFocusRenderMode focusRenderMode = MultiVarFocusRenderMode::GREAT_CIRCLE;
 
@@ -269,15 +239,7 @@ private:
     int32_t numVariablesSelected = 0;
     int32_t maxNumVariables = 6;
     int32_t numLineSegments = 8;
-    int32_t numInstances = 12;
-    int32_t rollWidth = 1;
     float separatorWidth = 0.10f;
-    bool mapTubeDiameter = false;
-    float twistOffset = 0.1f;
-    bool constantTwistOffset = false;
-    int32_t checkerboardWidth = 3;
-    int32_t checkerboardHeight = 2;
-    int32_t checkerboardIterator = 2;
     /// For orientedRibbonMode == ORIENTED_RIBBON_MODE_VARYING_BAND_WIDTH
     QVector4D bandBackgroundColor = QVector4D(0.5f, 0.5f, 0.5f, 1.0f);
 

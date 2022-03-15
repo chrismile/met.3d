@@ -205,7 +205,7 @@ private:
     size_t selectVarIdx = 0;
     float selectStart = -1.0f;
     float selectEnd = -1.0f;
-    float springEpsilon = 0.5f;
+    float springEpsilon = 10.0f;
     std::vector<std::vector<std::pair<float, float>>> matchSelectionsPerVariable;
 };
 

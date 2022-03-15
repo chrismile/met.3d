@@ -438,6 +438,10 @@ MTrajectoryActor::MTrajectoryActor()
             "Specifies whether to sync warm conveyor belt trajectories based on their ascension or height. "
             "The trajectories need to have the per-point attribute time_after_ascension for this to work.");
 
+    selectAllTrajectoriesProperty = addProperty(
+            CLICK_PROPERTY, "select all trajectories", multiVarGroupProperty);
+    selectAllTrajectoriesProperty->setToolTip("Selects (or unselects) all trajectories in the scene.");
+
 
     multiVarData.setProperties(this, properties, multiVarGroupProperty);
     actorHasSelectableData = true;
@@ -797,7 +801,7 @@ void MTrajectoryActor::loadConfiguration(QSettings *settings)
     properties->mBool()->setValue(showMinMaxValueProperty, showMinMaxValue);
     useMaxForSensitivity = settings->value("useMaxForSensitivity", true).toBool();
     properties->mBool()->setValue(useMaxForSensitivityProperty, useMaxForSensitivity);
-    springEpsilon = settings->value("springEpsilon", 0.5f).toFloat();
+    springEpsilon = settings->value("springEpsilon", 10.0f).toFloat();
     properties->setDDouble(
             springEpsilonProperty, springEpsilon,
             0.0, 100.0, 2, 0.1, " (factor)");
@@ -2824,6 +2828,18 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
 #endif
     }
 
+    else if (property == selectAllTrajectoriesProperty)
+    {
+#ifdef USE_EMBREE
+        for (MTrajectoryPicker* trajectoryPicker : trajectoryPickerMap)
+        {
+            trajectoryPicker->triggerSelectAllLines();
+        }
+        if (suppressActorUpdates()) return;
+        emitActorChangedSignal();
+#endif
+    }
+
     else if (multiVarData.hasProperty(property))
     {
         multiVarData.onQtPropertyChanged(property);
@@ -3209,9 +3225,8 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
             bezierTrajectoriesRenderData.vertexPositionBuffer->attachToVertexAttribute(0);
             bezierTrajectoriesRenderData.vertexNormalBuffer->attachToVertexAttribute(1);
             bezierTrajectoriesRenderData.vertexTangentBuffer->attachToVertexAttribute(2);
-            bezierTrajectoriesRenderData.vertexMultiVariableBuffer->attachToVertexAttribute(3);
-            bezierTrajectoriesRenderData.vertexVariableDescBuffer->attachToVertexAttribute(4);
-            bezierTrajectoriesRenderData.vertexTimestepIndexBuffer->attachToVertexAttribute(5);
+            bezierTrajectoriesRenderData.vertexLineIDBuffer->attachToVertexAttribute(3);
+            bezierTrajectoriesRenderData.vertexElementIDBuffer->attachToVertexAttribute(4);
 
             // Bind shader storage buffer objects.
             bezierTrajectoriesRenderData.variableArrayBuffer->bindToIndex(2);
@@ -4216,8 +4231,7 @@ void MTrajectoryActor::asynchronousDataRequest(bool synchronizationRequest)
             foreach (MSceneViewGLWidget* view, getViews())
             {
                 QVector2D params = view->pressureToWorldZParameters();
-                QString query = QString("%1/%2/%3").arg(params.x()).arg(params.y()).arg(
-                        multiVarData.getNeedsSubdiv());
+                QString query = QString("%1/%2").arg(params.x()).arg(params.y());
                 LOG4CPLUS_DEBUG(mlog, "BEZIERTRAJECTORIES: " << query.toStdString());
 
                 rh.insert("BEZIERTRAJECTORIES_LOGP_SCALED", query);
@@ -4229,7 +4243,6 @@ void MTrajectoryActor::asynchronousDataRequest(bool synchronizationRequest)
             }
             rh.remove("BEZIERTRAJECTORIES_LOGP_SCALED");
         }
-
 
         // Request 4: Pressure/Time selection filter.
         // ==========================================
@@ -4302,7 +4315,6 @@ void MTrajectoryActor::asynchronousDataRequest(bool synchronizationRequest)
             foreach (MSceneViewGLWidget* view, getViews())
             {
                 view->setLightDirection(MSceneViewGLWidget::VIEWDIRECTION);
-                bezierTrajectoriesSource->setNeedsSubdiv(multiVarData.getNeedsSubdiv());
                 bezierTrajectoriesSource->requestData(trqi.bezierTrajectoriesRequests[view].request);
             }
         }

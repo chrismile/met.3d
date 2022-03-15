@@ -39,7 +39,8 @@ unsigned int MBezierTrajectory::getMemorySize_kb() const {
     size_t sizeBytes =
             sizeof(MBezierTrajectory)
             + positions.size() * sizeof(QVector3D)
-            + attributes.size() * attributes.front().size() * sizeof(float)
+            + sizeof(uint32_t) // lineID
+            + elementIDs.size() * sizeof(int32_t)
             + multiVarData.size() * sizeof(float)
             + sizeof(LineDesc)
             + multiVarDescs.size() * sizeof(VarDesc);
@@ -156,34 +157,36 @@ unsigned int MBezierTrajectories::getMemorySize_kb()
 }
 
 
-template<typename T>
 void createLineTubesRenderDataCPU(
         const QVector<QVector<QVector3D>>& lineCentersList,
-        const QVector<QVector<T>>& lineAttributesList,
+        const QVector<QVector<int>>& lineLineIDList,
+        const QVector<QVector<int>>& lineElementIDList,
         QVector<uint32_t>& lineIndexOffsets,
         QVector<uint32_t>& numIndicesPerLine,
         QVector<uint32_t>& lineIndices,
         QVector<QVector3D>& vertexPositions,
         QVector<QVector3D>& vertexNormals,
         QVector<QVector3D>& vertexTangents,
-        QVector<T>& vertexAttributes)
+        QVector<int>& vertexLineIDs,
+        QVector<int>& vertexElementIDs)
 {
-    assert(lineCentersList.size() == lineAttributesList.size());
+    assert(lineCentersList.size() == lineLineIDList.size());
+    assert(lineCentersList.size() == lineElementIDList.size());
     lineIndexOffsets.reserve(lineCentersList.size());
     numIndicesPerLine.reserve(lineCentersList.size());
     for (int lineId = 0; lineId < lineCentersList.size(); lineId++)
     {
         const QVector<QVector3D> &lineCenters = lineCentersList.at(lineId);
-        const QVector<T> &lineAttributes = lineAttributesList.at(lineId);
-        assert(lineCenters.size() == lineAttributes.size());
+        const QVector<int> &lineLineIDs = lineLineIDList.at(lineId);
+        const QVector<int> &lineElementIDs = lineElementIDList.at(lineId);
+        assert(lineCenters.size() == lineLineIDs.size());
+        assert(lineCenters.size() == lineElementIDs.size());
         size_t n = lineCenters.size();
         size_t indexOffset = vertexPositions.size();
         lineIndexOffsets.push_back(lineIndices.size());
 
         if (n < 2)
         {
-            //sgl::Logfile::get()->writeError(
-            //        "ERROR in createLineTubesRenderDataCPU: Line must consist of at least two points.");
             numIndicesPerLine.push_back(0);
             continue;
         }
@@ -228,7 +231,8 @@ void createLineTubesRenderDataCPU(
             vertexPositions.push_back(lineCenters.at(i));
             vertexNormals.push_back(normal);
             vertexTangents.push_back(tangent);
-            vertexAttributes.push_back(lineAttributes.at(i));
+            vertexLineIDs.push_back(lineLineIDs.at(i));
+            vertexElementIDs.push_back(lineElementIDs.at(i));
             numValidLinePoints++;
         }
 
@@ -238,7 +242,8 @@ void createLineTubesRenderDataCPU(
             vertexPositions.pop_back();
             vertexNormals.pop_back();
             vertexTangents.pop_back();
-            vertexAttributes.pop_back();
+            vertexLineIDs.pop_back();
+            vertexElementIDs.pop_back();
             numIndicesPerLine.push_back(0);
             continue;
         }
@@ -262,58 +267,38 @@ MBezierTrajectoriesRenderData MBezierTrajectories::getRenderData(
 #endif
 {
     QVector<QVector<QVector3D>> lineCentersList;
-    QVector<QVector<QVector<float>>> lineAttributesList;
+    QVector<QVector<int>> lineLineIDList;
+    QVector<QVector<int>> lineElementIDList;
     QVector<uint32_t> lineIndices;
     QVector<QVector3D> vertexPositions;
     QVector<QVector3D> vertexNormals;
     QVector<QVector3D> vertexTangents;
-    QVector<QVector<float>> vertexAttributes;
+    QVector<int> vertexLineIDs;
+    QVector<int> vertexElementIDs;
 
     lineCentersList.resize(bezierTrajectories.size());
-    lineAttributesList.resize(bezierTrajectories.size());
+    lineLineIDList.resize(bezierTrajectories.size());
+    lineElementIDList.resize(bezierTrajectories.size());
     for (int trajectoryIdx = 0; trajectoryIdx < bezierTrajectories.size(); trajectoryIdx++)
     {
         const MBezierTrajectory& trajectory = bezierTrajectories.at(trajectoryIdx);
-        const QVector<QVector<float>>& attributes = trajectory.attributes;
         QVector<QVector3D>& lineCenters = lineCentersList[trajectoryIdx];
-        QVector<QVector<float>>& lineAttributes = lineAttributesList[trajectoryIdx];
+        QVector<int>& lineLineIDs = lineLineIDList[trajectoryIdx];
+        QVector<int>& lineElementIDs = lineElementIDList[trajectoryIdx];
         for (int i = 0; i < trajectory.positions.size(); i++)
         {
             lineCenters.push_back(trajectory.positions.at(i));
-
-            QVector<float> attrs;
-            attrs.reserve(attributes.size());
-            for (int attrIdx = 0; attrIdx < attributes.size(); attrIdx++)
-            {
-                assert(trajectory.positions.size() == attributes.at(attrIdx).size());
-                attrs.push_back(attributes.at(attrIdx).at(i));
-            }
-            lineAttributes.push_back(attrs);
+            lineLineIDs.push_back(trajectory.lineID);
+            lineElementIDs.push_back(trajectory.elementIDs.at(i));
         }
     }
 
     trajectoryIndexOffsets.clear();
     numIndicesPerTrajectory.clear();
     createLineTubesRenderDataCPU(
-            lineCentersList, lineAttributesList, trajectoryIndexOffsets, numIndicesPerTrajectory,
-            lineIndices, vertexPositions, vertexNormals, vertexTangents, vertexAttributes);
-
-    QVector<QVector4D> vertexMultiVariableArray;
-    QVector<QVector4D> vertexVariableDescArray;
-    QVector<float> vertexTimestepIndexArray;
-    vertexMultiVariableArray.reserve(vertexAttributes.size());
-    vertexVariableDescArray.reserve(vertexAttributes.size());
-    vertexTimestepIndexArray.reserve(vertexAttributes.size());
-    for (int vertexIdx = 0; vertexIdx < vertexAttributes.size(); vertexIdx++)
-    {
-        QVector<float>& attrList = vertexAttributes[vertexIdx];
-        vertexMultiVariableArray.push_back(QVector4D(
-                attrList.at(0), attrList.at(1), attrList.at(2), attrList.at(3)));
-        vertexVariableDescArray.push_back(QVector4D(
-                attrList.at(4), attrList.at(5), attrList.at(6), attrList.at(7)));
-        vertexTimestepIndexArray.push_back(attrList.at(8));
-    }
-
+            lineCentersList, lineLineIDList, lineElementIDList,
+            trajectoryIndexOffsets, numIndicesPerTrajectory,
+            lineIndices, vertexPositions, vertexNormals, vertexTangents, vertexLineIDs, vertexElementIDs);
 
 
     MBezierTrajectoriesRenderData bezierTrajectoriesRenderData;
@@ -335,12 +320,10 @@ MBezierTrajectoriesRenderData MBezierTrajectories::getRenderData(
             currentGLContext, vertexTangentBufferID, vertexTangents);
 
     // Add the attribute buffers.
-    bezierTrajectoriesRenderData.vertexMultiVariableBuffer = createVertexBuffer(
-            currentGLContext, vertexMultiVariableBufferID, vertexMultiVariableArray);
-    bezierTrajectoriesRenderData.vertexVariableDescBuffer = createVertexBuffer(
-            currentGLContext, vertexVariableDescBufferID, vertexVariableDescArray);
-    bezierTrajectoriesRenderData.vertexTimestepIndexBuffer = createVertexBuffer(
-            currentGLContext, vertexTimestepIndexBufferID, vertexTimestepIndexArray);
+    bezierTrajectoriesRenderData.vertexLineIDBuffer = createVertexBuffer(
+            currentGLContext, vertexLineIDBufferID, vertexLineIDs);
+    bezierTrajectoriesRenderData.vertexElementIDBuffer = createVertexBuffer(
+            currentGLContext, vertexElementIDBufferID, vertexElementIDs);
 
     this->lineIndicesCache = lineIndices;
     this->vertexPositionsCache = vertexPositions;
@@ -427,8 +410,8 @@ void MBezierTrajectories::releaseRenderData()
     MGLResourcesManager::getInstance()->releaseGPUItem(indexBufferID);
     MGLResourcesManager::getInstance()->releaseGPUItem(vertexNormalBufferID);
     MGLResourcesManager::getInstance()->releaseGPUItem(vertexTangentBufferID);
-    MGLResourcesManager::getInstance()->releaseGPUItem(vertexMultiVariableBufferID);
-    MGLResourcesManager::getInstance()->releaseGPUItem(vertexVariableDescBufferID);
+    MGLResourcesManager::getInstance()->releaseGPUItem(vertexLineIDBufferID);
+    MGLResourcesManager::getInstance()->releaseGPUItem(vertexElementIDBufferID);
     MGLResourcesManager::getInstance()->releaseGPUItem(variableArrayBufferID);
     MGLResourcesManager::getInstance()->releaseGPUItem(lineDescArrayBufferID);
     MGLResourcesManager::getInstance()->releaseGPUItem(varDescArrayBufferID);
@@ -1520,7 +1503,7 @@ bool MBezierTrajectories::getFilteredTrajectories(
         for (int i = selectionIndex; i < selectionCount; i++)
         {
             trajectory.push_back(bezierTrajectory.positions.at(i));
-            pointTimeSteps.push_back(bezierTrajectory.attributes[8].at(i));
+            pointTimeSteps.push_back(float(bezierTrajectory.elementIDs.at(i)));
         }
 
         trajectories.push_back(trajectory);

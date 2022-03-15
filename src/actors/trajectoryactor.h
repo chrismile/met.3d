@@ -513,7 +513,7 @@ private:
     int numBins = 10;
     bool showMinMaxValue = true;
     bool useMaxForSensitivity = true;
-    float springEpsilon = 0.5f;
+    float springEpsilon = 10.0f;
 
     QStringList trajectorySyncModeNames = {
             "Time Step", "Time of Ascent", "Height"
@@ -521,6 +521,8 @@ private:
     QtProperty *trajectorySyncModeProperty;
     TrajectorySyncMode trajectorySyncMode = TrajectorySyncMode::TIMESTEP;
     uint32_t syncModeTrajectoryIndex = 0;
+
+    QtProperty *selectAllTrajectoriesProperty;
 
 #ifdef USE_EMBREE
     QHash<MSceneViewGLWidget*, MTrajectoryPicker*> trajectoryPickerMap;

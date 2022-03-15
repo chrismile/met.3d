@@ -80,7 +80,8 @@ public:
 
     // Per Bezier point data.
     QVector<QVector3D> positions;
-    QVector<QVector<float>> attributes;
+    int lineID;
+    QVector<int> elementIDs;
 
     // Packed array of base trajectory attributes.
     QVector<float> multiVarData;
@@ -99,9 +100,8 @@ struct MBezierTrajectoriesRenderData
     GL::MVertexBuffer* vertexPositionBuffer = nullptr;
     GL::MVertexBuffer* vertexNormalBuffer = nullptr;
     GL::MVertexBuffer* vertexTangentBuffer = nullptr;
-    GL::MVertexBuffer* vertexMultiVariableBuffer = nullptr;
-    GL::MVertexBuffer* vertexVariableDescBuffer = nullptr;
-    GL::MVertexBuffer* vertexTimestepIndexBuffer = nullptr;
+    GL::MVertexBuffer* vertexLineIDBuffer = nullptr;
+    GL::MVertexBuffer* vertexElementIDBuffer = nullptr;
     // SSBOs
     GL::MShaderStorageBufferObject* variableArrayBuffer = nullptr;
     GL::MShaderStorageBufferObject* lineDescArrayBuffer = nullptr;
@@ -313,12 +313,10 @@ private:
             QString("beziertrajectories_vertex_normal_buffer_#%1").arg(getID());
     const QString vertexTangentBufferID =
             QString("beziertrajectories_vertex_tangent_buffer_#%1").arg(getID());
-    const QString vertexMultiVariableBufferID =
+    const QString vertexLineIDBufferID =
             QString("beziertrajectories_vertex_multi_variable_buffer_#%1").arg(getID());
-    const QString vertexVariableDescBufferID =
+    const QString vertexElementIDBufferID =
             QString("beziertrajectories_vertex_variable_desc_buffer_#%1").arg(getID());
-    const QString vertexTimestepIndexBufferID =
-            QString("beziertrajectories_vertex_timestep_index_buffer_#%1").arg(getID());
     const QString variableArrayBufferID =
             QString("beziertrajectories_variable_array_buffer_#%1").arg(getID());
     const QString lineDescArrayBufferID =

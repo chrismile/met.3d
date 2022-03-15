@@ -207,6 +207,76 @@ void MTrajectoryPicker::setSpringEpsilon(float epsilon)
     }
 }
 
+void MTrajectoryPicker::triggerSelectAllLines()
+{
+    bool allTrajectoriesSelected = true;
+    for (int lineId = 0; lineId < trajectories.size(); lineId++) {
+        if (highlightedTrajectories.find(lineId) == highlightedTrajectories.end()) {
+            allTrajectoriesSelected = false;
+            break;
+        }
+    }
+
+    const std::vector<QColor> predefinedColors =
+    {
+            // RED
+            QColor(228, 26, 28),
+            // BLUE
+            QColor(55, 126, 184),
+            // GREEN
+            QColor(5, 139, 69),
+            // PURPLE
+            QColor(129, 15, 124),
+            // ORANGE
+            QColor(217, 72, 1),
+            // PINK
+            QColor(231, 41, 138),
+            // GOLD
+            QColor(254, 178, 76),
+            // DARK BLUE
+            QColor(0, 7, 255)
+    };
+    if (colorUsesCountMap.empty())
+    {
+        for (const QColor& color : predefinedColors)
+        {
+            colorUsesCountMap[color] = 0;
+        }
+    }
+
+    if (allTrajectoriesSelected) {
+        // Unselect all.
+        for (int lineId = 0; lineId < trajectories.size(); lineId++) {
+            auto it = highlightedTrajectories.find(lineId);
+            if (it != highlightedTrajectories.end())
+            {
+                colorUsesCountMap[it->second] -= 1;
+                highlightedTrajectories.erase(lineId);
+            }
+        }
+    } else {
+        // Select all.
+        for (int lineId = 0; lineId < trajectories.size(); lineId++) {
+            uint32_t minNumUses = std::numeric_limits<uint32_t>::max();
+            QColor highlightColor;
+            for (const QColor& color : predefinedColors)
+            {
+                if (colorUsesCountMap[color] < minNumUses)
+                {
+                    minNumUses = colorUsesCountMap[color];
+                    highlightColor = color;
+                }
+            }
+            colorUsesCountMap[highlightColor] += 1;
+            highlightedTrajectories.insert(std::make_pair(lineId, highlightColor));
+        }
+    }
+
+    highlightDataDirty = true;
+    selectedTrajectoriesChanged = true;
+    updateDiagramData();
+}
+
 MTrajectoryPicker::~MTrajectoryPicker()
 {
     freeStorage();
@@ -740,19 +810,6 @@ void MTrajectoryPicker::toggleTrajectoryHighlighted(uint32_t trajectoryIndex)
 
     highlightedTrajectories.insert(std::make_pair(trajectoryIndex, highlightColor));
     selectedTrajectoriesChanged = true;
-    const MFilteredTrajectory& trajectory = baseTrajectories.at(int(trajectoryIndex));
-    QVector<float> values;
-    for (size_t i = 0; i < numVars; i++)
-    {
-        int time = clamp(timeStep, 0, int(trajectory.attributes.at(int(i)).size()) - 1);
-        float value = trajectory.attributes.at(int(i)).at(time);
-        QVector2D minMaxVector = minMaxAttributes.at(int(i));
-        float denominator = std::max(minMaxVector.y() - minMaxVector.x(), 1e-10f);
-        value = (value - minMaxVector.x()) / denominator;
-        values.push_back(value);
-    }
-    //radarChart->addRadar(
-    //        trajectoryIndex, QString("Trajectory #%1").arg(trajectoryIndex), highlightColor, values);
     updateDiagramData();
 }
 
@@ -769,7 +826,6 @@ void MTrajectoryPicker::setParticlePosTimeStep(int newTimeStep)
     for (const auto& it : highlightedTrajectories)
     {
         uint32_t trajectoryIndex = it.first;
-        const QColor& highlightColor = it.second;
         const MFilteredTrajectory& trajectory = baseTrajectories.at(int(trajectoryIndex));
         QVector<float> values;
         for (size_t i = 0; i < numVars; i++)
@@ -781,8 +837,6 @@ void MTrajectoryPicker::setParticlePosTimeStep(int newTimeStep)
             value = (value - minMaxVector.x()) / denominator;
             values.push_back(value);
         }
-        //radarChart->addRadar(
-        //        trajectoryIndex, QString("Trajectory #%1").arg(trajectoryIndex), highlightColor, values);
     }
 
     if (diagram && diagram->getDiagramType() != DiagramType::HORIZON_GRAPH)
@@ -813,7 +867,6 @@ void MTrajectoryPicker::updateDiagramData()
             for (const auto& it : highlightedTrajectories)
             {
                 uint32_t trajectoryIndex = it.first;
-                const QColor& highlightColor = it.second;
                 const MFilteredTrajectory& trajectory = baseTrajectories.at(int(trajectoryIndex));
                 std::vector<float> values;
                 for (size_t i = 0; i < numVars; i++)

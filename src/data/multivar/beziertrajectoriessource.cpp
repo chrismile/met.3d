@@ -134,6 +134,23 @@ MBezierTrajectories *MBezierTrajectoriesSource::produceData(MDataRequest request
         {
             QVector3D point = vertices.at(baseIndex+t);
 
+            if (point.z() == M_INVALID_TRAJECTORY_POS)
+            {
+                filteredTrajectory.attributes[0].push_back(std::numeric_limits<float>::quiet_NaN());
+                filteredTrajectory.positions.push_back(QVector3D(
+                        std::numeric_limits<float>::quiet_NaN(),
+                        std::numeric_limits<float>::quiet_NaN(),
+                        std::numeric_limits<float>::quiet_NaN()));
+            }
+            else
+            {
+                // Use pressure as attribute if no auxiliary data is available.
+                filteredTrajectory.attributes[0].push_back(point.z());
+
+                point.setZ(MSceneViewGLWidget::worldZfromPressure(
+                        point.z(), log_pBottom_hPa, deltaZ_deltaLogP));
+                filteredTrajectory.positions.push_back(point);
+            }
             //if (point.z() == M_INVALID_TRAJECTORY_POS)
             //{
             //    continue;
@@ -143,8 +160,6 @@ MBezierTrajectories *MBezierTrajectoriesSource::produceData(MDataRequest request
             //    continue;
             //}
 
-            // Use pressure as attribute if no auxiliary data is available.
-            filteredTrajectory.attributes[0].push_back(point.z());
             if (numVariablesReal > 0)
             {
                 QVector<float> vertexAttributes = inTrajectories->getAuxDataAtVertex(baseIndex+t);
@@ -162,10 +177,7 @@ MBezierTrajectories *MBezierTrajectoriesSource::produceData(MDataRequest request
             //    }
             //}
 
-            prevPoint = point;
-            point.setZ(MSceneViewGLWidget::worldZfromPressure(
-                    point.z(), log_pBottom_hPa, deltaZ_deltaLogP));
-            filteredTrajectory.positions.push_back(point);
+            //prevPoint = point;
         }
 
         if (filteredTrajectory.positions.size() >= 2)
@@ -213,196 +225,6 @@ MBezierTrajectories *MBezierTrajectoriesSource::produceData(MDataRequest request
     numVariables++;
 
 
-    // k-means clustering.
-    /*const int K = 2;
-    const int maxIterations = 1000;
-    QVector<QVector<float>> clusterCenters;
-    QVector<QVector<double>> clusterElementsMeans;
-    QVector<int> clustersNumElements;
-    clusterCenters.resize(K);
-    clusterElementsMeans.resize(K);
-    clustersNumElements.resize(K);
-    std::mt19937 generator(2);
-    std::uniform_real_distribution<> dis(0, 1);
-    for (int clusterIdx = 0; clusterIdx < K; clusterIdx++)
-    {
-        QVector<float>& clusterCenter = clusterCenters[clusterIdx];
-        clusterCenter.reserve(numVariables);
-        clusterElementsMeans[clusterIdx].resize(numVariables);
-        for (int varIdx = 0; varIdx < int(numVariables); varIdx++)
-        {
-            clusterCenter.push_back(dis(generator));
-        }
-    }
-    for (int timeStepIdx = 0; timeStepIdx < numTimeStepsPerTrajectory; timeStepIdx++)
-    {
-        QVector<QVector<float>> parameterVectors;
-        parameterVectors.resize(filteredTrajectories.size());
-        for (int trajectoryIdx = 0; trajectoryIdx < filteredTrajectories.size(); trajectoryIdx++)
-        {
-            const MFilteredTrajectory& filteredTrajectory = filteredTrajectories[trajectoryIdx];
-            QVector<float>& parameterVector = parameterVectors[trajectoryIdx];
-            parameterVector.reserve(numVariables);
-            for (int varIdx = 0; varIdx < int(numVariables); varIdx++)
-            {
-                parameterVector.push_back(filteredTrajectory.attributes.at(varIdx).at(timeStepIdx));
-            }
-        }
-
-        QVector<int> trajectoryClusterIndices;
-        trajectoryClusterIndices.resize(filteredTrajectories.size());
-        QVector<QVector<float>> clusterCentersOld = clusterCenters;
-        for (int iteration = 0; iteration < maxIterations; iteration++) {
-            // Get the cluster index for each trajectory.
-            for (int trajectoryIdx = 0; trajectoryIdx < filteredTrajectories.size(); trajectoryIdx++)
-            {
-                int& trajectoryClusterIndex = trajectoryClusterIndices[trajectoryIdx];
-                const QVector<float>& parameterVector = parameterVectors[trajectoryIdx];
-                double clusterDistanceMin = std::numeric_limits<double>::max();
-                for (int clusterIdx = 0; clusterIdx < K; clusterIdx++)
-                {
-                    QVector<float>& clusterCenter = clusterCenters[clusterIdx];
-                    double clusterDistance = distance(parameterVector, clusterCenter);
-                    if (clusterDistance < clusterDistanceMin)
-                    {
-                        clusterDistanceMin = clusterDistance;
-                        trajectoryClusterIndex = clusterIdx;
-                    }
-                }
-            }
-
-            // Update the cluster center positions.
-            clusterCentersOld = clusterCenters;
-            for (int clusterIdx = 0; clusterIdx < K; clusterIdx++)
-            {
-                clustersNumElements[clusterIdx] = 0;
-                QVector<double>& clusterElementsMean = clusterElementsMeans[clusterIdx];
-                for (int varIdx = 0; varIdx < int(numVariables); varIdx++)
-                {
-                    clusterElementsMean[varIdx] = 0.0;
-                }
-            }
-            for (int trajectoryIdx = 0; trajectoryIdx < filteredTrajectories.size(); trajectoryIdx++)
-            {
-                QVector<float>& parameterVector = parameterVectors[trajectoryIdx];
-                int& trajectoryClusterIndex = trajectoryClusterIndices[trajectoryIdx];
-                clustersNumElements[trajectoryClusterIndex]++;
-                QVector<float>& clusterCenter = clusterCenters[trajectoryClusterIndex];
-                QVector<double>& clusterElementsMean = clusterElementsMeans[trajectoryClusterIndex];
-                for (int varIdx = 0; varIdx < int(numVariables); varIdx++)
-                {
-                    clusterElementsMean[varIdx] += parameterVector[varIdx];
-                }
-            }
-            for (int clusterIdx = 0; clusterIdx < K; clusterIdx++)
-            {
-                QVector<float>& clusterCenter = clusterCenters[clusterIdx];
-                if (clustersNumElements[clusterIdx] == 0)
-                {
-                    for (int varIdx = 0; varIdx < int(numVariables); varIdx++)
-                    {
-                        clusterCenter[varIdx] = dis(generator);
-                    }
-                }
-                else
-                {
-                    double numElements = double(clustersNumElements[clusterIdx]);
-                    QVector<double>& clusterElementsMean = clusterElementsMeans[clusterIdx];
-                    for (int varIdx = 0; varIdx < int(numVariables); varIdx++)
-                    {
-                        clusterCenter[varIdx] = float(clusterElementsMean[varIdx] / numElements);
-                    }
-                }
-            }
-
-            // Check whether the cluster centers no longer sufficiently changed.
-            double differenceClusters = 0.0f;
-            for (int clusterIdx = 0; clusterIdx < K; clusterIdx++)
-            {
-                QVector<float>& clusterCenterOld = clusterCentersOld[clusterIdx];
-                QVector<float>& clusterCenter = clusterCenters[clusterIdx];
-                differenceClusters += distance(clusterCenterOld, clusterCenter) / float(numVariables * K);
-            }
-
-            if (differenceClusters < 1e-5) {
-                break;
-            }
-        }
-
-        for (int trajectoryIdx = 0; trajectoryIdx < filteredTrajectories.size(); trajectoryIdx++)
-        {
-            MFilteredTrajectory& filteredTrajectory = filteredTrajectories[trajectoryIdx];
-            filteredTrajectory.attributes.back().push_back(float(trajectoryClusterIndices.at(trajectoryIdx)));
-        }
-    }
-    numVariables++;*/
-
-
-    // 1) Determine Bezier segments
-    std::vector<std::vector<MBezierCurve>> curves(filteredTrajectories.size());
-    // Store the arclength of all segments along a curve
-    std::vector<float> curveArcLengths(filteredTrajectories.size(), 0.0f);
-
-    // Average segment length;
-    float avgSegLength = 0.0f;
-    float minSegLength = std::numeric_limits<float>::max();
-    float numSegments = 0;
-
-    int32_t trajCounter = 0;
-    for (const auto& trajectory : filteredTrajectories)
-    {
-        std::vector<MBezierCurve> &curveSet = curves[trajCounter];
-
-        const int maxVertices = trajectory.positions.size();
-
-        float minT = 0.0f;
-        float maxT = 1.0f;
-
-        for (int v = 0; v < maxVertices - 1; ++v)
-        {
-            const QVector3D& pos0 = trajectory.positions[std::max(0, v - 1)];
-            const QVector3D& pos1 = trajectory.positions[v];
-            const QVector3D& pos2 = trajectory.positions[v + 1];
-            const QVector3D& pos3 = trajectory.positions[std::min(v + 2, maxVertices - 1)];
-
-            const QVector3D cotangent1 = (pos2 - pos0).normalized();
-            const QVector3D cotangent2 = (pos3 - pos1).normalized();
-            const QVector3D tangent = pos2 - pos1;
-            float lenTangent = tangent.length();
-
-            if (std::isnan(lenTangent))
-            {
-                LOG4CPLUS_DEBUG(mlog, "ERROR: NaN encountered in trajectory file.");
-                lenTangent = 0.0f;
-            }
-
-            avgSegLength += lenTangent;
-            minSegLength = std::min(minSegLength, lenTangent);
-            numSegments++;
-
-            QVector3D C0 = pos1;
-            QVector3D C1 = pos1 + cotangent1 * lenTangent * 0.5f;
-            QVector3D C2 = pos2 - cotangent2 * lenTangent * 0.5f;
-            QVector3D C3 = pos2;
-
-            MBezierCurve BCurve({{C0, C1, C2, C3}}, minT, maxT);
-            if (std::isnan(BCurve.totalArcLength))
-            {
-                BCurve.totalArcLength = 0.0f;
-            }
-
-            curveSet.push_back(BCurve);
-            curveArcLengths[trajCounter] += BCurve.totalArcLength;
-
-            minT += 1.0f;
-            maxT += 1.0f;
-        }
-
-        trajCounter++;
-    }
-
-    avgSegLength /= numSegments;
-
     // 2) Compute min max values of all attributes across all trajectories
     if (numVariables <= 0)
     {
@@ -411,7 +233,8 @@ MBezierTrajectories *MBezierTrajectoriesSource::produceData(MDataRequest request
     }
 
     QVector<QVector2D> attributesMinMax(
-            numVariables, QVector2D(std::numeric_limits<float>::max(), std::numeric_limits<float>::lowest()));
+            numVariables,
+            QVector2D(std::numeric_limits<float>::max(), std::numeric_limits<float>::lowest()));
 
     const uint32_t numLines = filteredTrajectories.size();
 
@@ -459,24 +282,6 @@ MBezierTrajectories *MBezierTrajectoriesSource::produceData(MDataRequest request
     }
 
 
-    // 3) Compute several equally-distributed / equi-distant points along Bezier curves.
-    // Store these points in a new trajectory
-    bool resetPerSegMode;
-    const float minAvgSegLength = 0.1f;
-    if (avgSegLength < minAvgSegLength)
-    {
-        resetPerSegMode = !needsSubdiv;
-        if (needsSubdiv)
-        {
-            avgSegLength = minAvgSegLength;
-        }
-    }
-    else
-    {
-        resetPerSegMode = true;
-    }
-    float rollSegLength = avgSegLength / std::min(numVariables, uint32_t(8));// avgSegLength * 0.2f;
-
     MBezierTrajectories* newTrajectories = new MBezierTrajectories(
             inTrajectories->getGeneratingRequest(),
             filteredTrajectories, indicesToFilteredIndicesMap, numVariables,
@@ -484,125 +289,14 @@ MBezierTrajectories *MBezierTrajectoriesSource::produceData(MDataRequest request
 
     for (int32_t traj = 0; traj < int(filteredTrajectories.size()); ++traj)
     {
-        float curArcLength = 0.0f;
+        const MFilteredTrajectory& filteredTrajectory = filteredTrajectories.at(traj);
         MBezierTrajectory newTrajectory;
+        newTrajectory.lineID = traj;
 
-        // Obtain set of Bezier Curves
-        std::vector<MBezierCurve> &BCurves = curves[traj];
-        // Obtain total arc length
-        const float totalArcLength = curveArcLengths[traj];
-
-        QVector3D pos;
-        QVector3D tangent;
-        uint32_t lineID = 0;
-        uint32_t varIDPerLine = 0;
-        // Start with first segment
-        BCurves[0].evaluate(0, pos, tangent);
-
-        newTrajectory.positions.push_back(pos);
-
-        // Now we store variable, min, and max, and var ID per vertex as new attributes
-        newTrajectory.attributes.resize(9);
-        float varValue = filteredTrajectories[traj].attributes[varIDPerLine][lineID];
-        newTrajectory.attributes[0].push_back(varValue);
-        newTrajectory.attributes[1].push_back(attributesMinMax[varIDPerLine].x());
-        newTrajectory.attributes[2].push_back(attributesMinMax[varIDPerLine].y());
-        // var ID
-        newTrajectory.attributes[3].push_back(static_cast<float>(varIDPerLine));
-        // var element index
-        newTrajectory.attributes[4].push_back(static_cast<float>(lineID));
-        // line ID
-        newTrajectory.attributes[5].push_back(static_cast<float>(traj));
-        // next line ID
-        newTrajectory.attributes[6].push_back(static_cast<float>(std::min(lineID, uint32_t(BCurves.size() - 1))));
-        // interpolant t
-        newTrajectory.attributes[7].push_back(0.0f);
-        // timestep index
-        newTrajectory.attributes[8].push_back(0.0f);
-
-        curArcLength += rollSegLength;
-
-        float sumArcLengths = 0.0f;
-        float sumArcLengthsNext = BCurves[0].totalArcLength;
-
-        varIDPerLine++;
-
-        while (curArcLength <= totalArcLength)
+        for (int i = 0; i < filteredTrajectory.positions.size(); i++)
         {
-            // Obtain current Bezier segment index based on arc length
-            while (sumArcLengthsNext <= curArcLength)
-            {
-                if (resetPerSegMode)
-                {
-                    varIDPerLine = 0;
-                }
-                lineID++;
-                if (lineID >= BCurves.size()) {
-                    break;
-                }
-                sumArcLengths = sumArcLengthsNext;
-                sumArcLengthsNext += BCurves[lineID].totalArcLength;
-                if (!resetPerSegMode)
-                {
-                    break;
-                }
-            }
-            if (lineID >= BCurves.size())
-            {
-                break;
-            }
-
-            const auto &BCurve = BCurves[lineID];
-
-            const float _arcLength = curArcLength - sumArcLengths;
-            if (_arcLength > BCurve.totalArcLength)
-            {
-                continue;
-            }
-            float t = BCurve.solveTForArcLength(_arcLength);
-            t = clamp(t, BCurve.minT, BCurve.maxT);
-
-            BCurves[lineID].evaluate(t, pos, tangent);
-
-            newTrajectory.positions.push_back(pos);
-
-            if (varIDPerLine < numVariables)
-            {
-                float varValue = filteredTrajectories[traj].attributes[varIDPerLine][lineID];
-                newTrajectory.attributes[0].push_back(varValue);
-                newTrajectory.attributes[1].push_back(attributesMinMax[varIDPerLine].x());
-                newTrajectory.attributes[2].push_back(attributesMinMax[varIDPerLine].y());
-            }
-            else
-            {
-                newTrajectory.attributes[0].push_back(0.0);
-                newTrajectory.attributes[1].push_back(0.0);
-                newTrajectory.attributes[2].push_back(0.0);
-            }
-            if (varIDPerLine < numVariables || !resetPerSegMode)
-            {
-                newTrajectory.attributes[3].push_back(static_cast<float>(varIDPerLine));
-            }
-            else
-            {
-                newTrajectory.attributes[3].push_back(-1.0);
-            }
-
-            // var element index
-            newTrajectory.attributes[4].push_back(static_cast<float>(lineID));
-            // line ID
-            newTrajectory.attributes[5].push_back(static_cast<float>(traj));
-            // next line ID
-            newTrajectory.attributes[6].push_back(
-                    static_cast<float>(std::min(lineID + 1, uint32_t(BCurves.size() - 1))));
-            // interpolant t
-            float normalizedT = BCurve.normalizeT(t);
-            newTrajectory.attributes[7].push_back(normalizedT);
-            // timestep index
-            newTrajectory.attributes[8].push_back(float(lineID) + normalizedT);
-
-            curArcLength += rollSegLength;
-            varIDPerLine++;
+            newTrajectory.positions.push_back(filteredTrajectory.positions.at(i));
+            newTrajectory.elementIDs.push_back(i);
         }
 
         newTrajectory.lineDesc = lineDescs[traj];
