@@ -360,14 +360,6 @@ MBezierTrajectoriesRenderData MBezierTrajectories::getRenderData(
             varData.push_back(attrVal);
         }
     }
-
-    for (MBezierTrajectory& bezierTrajectory : bezierTrajectories)
-    {
-        for (float attrVal : bezierTrajectory.multiVarData)
-        {
-            varData.push_back(attrVal);
-        }
-    }
     for (size_t lineIdx = 0; lineIdx < numLines; ++lineIdx)
     {
         lineDescData[lineIdx] = bezierTrajectories.at(lineIdx).lineDesc.startIndex;

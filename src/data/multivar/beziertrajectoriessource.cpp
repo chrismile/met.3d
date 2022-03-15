@@ -134,14 +134,14 @@ MBezierTrajectories *MBezierTrajectoriesSource::produceData(MDataRequest request
         {
             QVector3D point = vertices.at(baseIndex+t);
 
-            if (point.z() == M_INVALID_TRAJECTORY_POS)
-            {
-                continue;
-            }
-            if ((point - prevPoint).length() < 1e-5)
-            {
-                continue;
-            }
+            //if (point.z() == M_INVALID_TRAJECTORY_POS)
+            //{
+            //    continue;
+            //}
+            //if ((point - prevPoint).length() < 1e-5)
+            //{
+            //    continue;
+            //}
 
             // Use pressure as attribute if no auxiliary data is available.
             filteredTrajectory.attributes[0].push_back(point.z());
