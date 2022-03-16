@@ -68,6 +68,8 @@ interface FSInput
     // "Oriented Stripes"-specfic outputs
     flat int fragLineID; // Line index --> required for sampling from global buffer
     flat int fragElementID; // Actual per-line vertex index --> required for sampling from global buffer
+    flat int fragElementNextID; // Actual next per-line vertex index --> for linear interpolation
+    float fragElementInterpolant; // current number of curve parameter t (in [0;1]) within one line segment
 #ifdef SUPPORT_LINE_DESATURATION
     flat uint desaturateLine;
 #endif
@@ -213,8 +215,9 @@ shader GSmain(in VSOutput inputs[], out FSInput outputs) {
     //computeTexCoords(vertexTexCoordsNext, circlePointsNext, invMatNDC, tangentNDC, normalNDC, refPointNDC);
 
     // 4) Emit the tube triangle vertices and attributes to the fragment shader
-    outputs.fragElementID = inputs[0].vElementID;
     outputs.fragLineID = inputs[0].vLineID;
+    outputs.fragElementID = inputs[0].vElementID;
+    outputs.fragElementNextID = inputs[1].vElementID;
 
 #ifdef SUPPORT_LINE_DESATURATION
     outputs.desaturateLine = 1 - lineSelectedArray[inputs[0].vLineID];
@@ -232,24 +235,28 @@ shader GSmain(in VSOutput inputs[], out FSInput outputs) {
         outputs.fragNormal = vertexNormalsCurrent[i];
         outputs.fragTangent = tangentCurrent;
         outputs.fragWorldPos = segmentPointCurrent0;
+        outputs.fragElementInterpolant = 0.0f;
         EmitVertex();
 
         gl_Position = mvpMatrix * vec4(segmentPointCurrent1, 1.0);
         outputs.fragNormal = vertexNormalsCurrent[iN];
         outputs.fragTangent = tangentCurrent;
         outputs.fragWorldPos = segmentPointCurrent1;
+        outputs.fragElementInterpolant = 0.0f;
         EmitVertex();
 
         gl_Position = mvpMatrix * vec4(segmentPointNext0, 1.0);
         outputs.fragNormal = vertexNormalsNext[i];
         outputs.fragTangent = tangentNext;
         outputs.fragWorldPos = segmentPointNext0;
+        outputs.fragElementInterpolant = 1.0f;
         EmitVertex();
 
         gl_Position = mvpMatrix * vec4(segmentPointNext1, 1.0);
         outputs.fragNormal = vertexNormalsNext[iN];
         outputs.fragTangent = tangentNext;
         outputs.fragWorldPos = segmentPointNext1;
+        outputs.fragElementInterpolant = 1.0f;
         EmitVertex();
 
         EndPrimitive();
@@ -310,20 +317,24 @@ shader FSmain(in FSInput inputs, out vec4 fragColor) {
     float variables[MAX_NUM_VARIABLES];
     for (int varID = 0; varID < numVariables; varID++) {
         // 1.1) Sample variables from buffers.
-        float variableValue;
-        vec2 variableMinMax;
+        float variableValue, variableNextValue;
+        vec2 variableMinMax, variableNextMinMax;
         const uint actualVarID = sampleActualVarID(varID);
         sampleVariableFromLineSSBO(inputs.fragLineID, actualVarID, inputs.fragElementID, variableValue, variableMinMax);
+        sampleVariableFromLineSSBO(inputs.fragLineID, actualVarID, inputs.fragElementNextID, variableNextValue, variableNextMinMax);
 
         // 1.2) Normalize values.
         variableValue = clamp((variableValue - variableMinMax.x) / (variableMinMax.y - variableMinMax.x), 0.0, 1.0);
+        variableNextValue = clamp((variableNextValue - variableNextMinMax.x) / (variableNextMinMax.y - variableNextMinMax.x), 0.0, 1.0);
 
+        float value = mix(variableValue, variableNextValue, inputs.fragElementInterpolant);
         uint isDiverging = sampleIsDiverging(actualVarID);
         if (isDiverging > 0) {
-            variableValue = abs(variableValue - 0.5) * 2.0;
+            value = abs(value - 0.5) * 2.0;
         }
 
-        variables[varID] = variableValue;
+        // 1.3) Interpolate linearly.
+        variables[varID] = value;
     }
 
     // Compute the sum of all variables
@@ -347,29 +358,35 @@ shader FSmain(in FSInput inputs, out vec4 fragColor) {
 #endif
 
     // 2) Sample variables from buffers
-    float variableValue;
-    vec2 variableMinMax;
+    float variableValue, variableNextValue;
+    vec2 variableMinMax, variableNextMinMax;
     const uint actualVarID = sampleActualVarID(varID);
     sampleVariableFromLineSSBO(inputs.fragLineID, actualVarID, inputs.fragElementID, variableValue, variableMinMax);
+    sampleVariableFromLineSSBO(inputs.fragLineID, actualVarID, inputs.fragElementNextID, variableNextValue, variableNextMinMax);
 
     // 3) Normalize values
     //variableValue = (variableValue - variableMinMax.x) / (variableMinMax.y - variableMinMax.x);
+    //variableNextValue = (variableNextValue - variableNextMinMax.x) / (variableNextMinMax.y - variableNextMinMax.x);
 
     // 4) Determine variable color
-    vec4 surfaceColor = determineColor(actualVarID, variableValue);
+    vec4 surfaceColor = determineColorLinearInterpolate(
+            actualVarID, variableValue, variableNextValue, inputs.fragElementInterpolant);
 
 #if ORIENTED_RIBBON_MODE == 1 // ORIENTED_RIBBON_MODE_VARYING_BAND_WIDTH
     float symBandPos = abs(bandPos * 2.0 - 1.0);
 
     // 1.2) Normalize values.
     float variableValuePrime = clamp((variableValue - variableMinMax.x) / (variableMinMax.y - variableMinMax.x), 0.0, 1.0);
+    float variableNextValuePrime = clamp((variableNextValue - variableNextMinMax.x) / (variableNextMinMax.y - variableNextMinMax.x), 0.0, 1.0);
+
+    float interpolatedVariableValue = mix(variableValuePrime, variableNextValuePrime, inputs.fragElementInterpolant);
 
     uint isDiverging = sampleIsDiverging(actualVarID);
     if (isDiverging > 0) {
-        variableValuePrime = abs(variableValuePrime - 0.5) * 2.0;
+        interpolatedVariableValue = abs(interpolatedVariableValue - 0.5) * 2.0;
     }
 
-    bandPos = (-symBandPos / variableValuePrime + 1.0) * 0.5;
+    bandPos = (-symBandPos / interpolatedVariableValue + 1.0) * 0.5;
 #endif
 
     // 4.1) Draw black separators between single stripes.
@@ -378,7 +395,7 @@ shader FSmain(in FSInput inputs, out vec4 fragColor) {
     }
 
 #if ORIENTED_RIBBON_MODE == 1 // ORIENTED_RIBBON_MODE_VARYING_BAND_WIDTH
-    if (symBandPos > variableValuePrime) {
+    if (symBandPos > interpolatedVariableValue) {
         surfaceColor = bandBackgroundColor;
     }
 #endif
