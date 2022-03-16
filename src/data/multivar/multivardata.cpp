@@ -841,6 +841,7 @@ void MMultiVarData::setUniformData(int textureUnitTransferFunction)
     shaderEffect->setUniformValue(
             "transferFunctionTexture", textureUnitTransferFunction);
     multiVarTf.getMinMaxBuffer()->bindToIndex(9);
+    multiVarTf.getUseLogScaleBuffer()->bindToIndex(15);
 }
 
 
@@ -862,6 +863,7 @@ void MMultiVarData::setUniformDataSpheres(int textureUnitTransferFunction)
     shaderEffectSphere->setUniformValue(
             "transferFunctionTexture", textureUnitTransferFunction);
     multiVarTf.getMinMaxBuffer()->bindToIndex(9);
+    multiVarTf.getUseLogScaleBuffer()->bindToIndex(15);
 }
 
 
@@ -884,6 +886,7 @@ void MMultiVarData::setUniformDataRolls(int textureUnitTransferFunction)
     shaderEffectRolls->setUniformValue(
             "transferFunctionTexture", textureUnitTransferFunction);
     multiVarTf.getMinMaxBuffer()->bindToIndex(9);
+    multiVarTf.getUseLogScaleBuffer()->bindToIndex(15);
 }
 
 

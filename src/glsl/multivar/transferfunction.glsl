@@ -36,6 +36,9 @@ layout (std430, binding = 8) readonly buffer VarDivergingArray {
 layout (std430, binding = 9) readonly buffer MinMaxBuffer {
     vec2 minMaxValues[];
 };
+layout (std430, binding = 15) readonly buffer UseLogScaleBuffer {
+    uint useLogScaleArray[];
+};
 
 #ifdef IS_MULTIVAR_DATA
 uniform int useColorIntensity = 1;
@@ -48,11 +51,21 @@ uint sampleIsDiverging(in uint varID) {
 
 vec4 transferFunction(float attr, uint variableIndex) {
     vec2 minMaxValue = minMaxValues[variableIndex];
+    uint useLogScale = useLogScaleArray[variableIndex];
     float minAttributeValue = minMaxValue.x;
     float maxAttributeValue = minMaxValue.y;
 
     // Transfer to range [0,1].
-    float posFloat = clamp((attr - minAttributeValue) / (maxAttributeValue - minAttributeValue), 0.0, 1.0);
+    float posFloat;
+    if (useLogScale != 0) {
+        float log10factor = 1 / log(10);
+        float logMin = log(minAttributeValue) * log10factor;
+        float logMax = log(maxAttributeValue) * log10factor;
+        float logAttr = log(attr) * log10factor;
+        posFloat = clamp((logAttr - logMin) / (logMax - logMin), 0.0, 1.0);
+    } else {
+        posFloat = clamp((attr - minAttributeValue) / (maxAttributeValue - minAttributeValue), 0.0, 1.0);
+    }
 
 #ifdef IS_MULTIVAR_DATA
     if (useColorIntensity == 0) {

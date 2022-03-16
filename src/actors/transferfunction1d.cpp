@@ -84,6 +84,10 @@ MTransferFunction1D::MTransferFunction1D(QObject *parent)
                                    rangePropertiesSubGroup);
     properties->setInt(numStepsProperty, 50, 2, 32768, 1);
 
+    useLogScaleProperty = addProperty(BOOL_PROPERTY, "use log scale",
+                                      rangePropertiesSubGroup);
+    properties->mBool()->setValue(useLogScaleProperty, false);
+
     rangePropertiesSubGroup->addSubProperty(valueOptionsPropertiesSubGroup);
 
     // General properties.
@@ -367,6 +371,18 @@ void MTransferFunction1D::setSteps(int steps)
 }
 
 
+void MTransferFunction1D::setUseLogScale(bool useLogScale)
+{
+    properties->mBool()->setValue(useLogScaleProperty, useLogScale);
+}
+
+
+bool MTransferFunction1D::getUseLogScale()
+{
+    return properties->mBool()->value(useLogScaleProperty);
+}
+
+
 void MTransferFunction1D::setDisplayName(const QString& name)
 {
     enableActorUpdates(false);
@@ -400,6 +416,8 @@ void MTransferFunction1D::saveConfiguration(QSettings *settings)
     // =================================
     settings->setValue("numSteps",
                        properties->mInt()->value(numStepsProperty));
+    settings->setValue("useLogScale",
+                       properties->mBool()->value(useLogScaleProperty));
 
     // General properties.
     // ===================
@@ -899,6 +917,7 @@ void MTransferFunction1D::onQtPropertyChanged(QtProperty *property)
     if ( (property == minimumValueProperty)    ||
          (property == maximumValueProperty)    ||
          (property == numStepsProperty)        ||
+         (property == useLogScaleProperty)     ||
          (property == maxNumTicksProperty)     ||
          (property == maxNumLabelsProperty)    ||
          (property == positionProperty)        ||
@@ -1270,12 +1289,25 @@ void MTransferFunction1D::generateBarGeometry()
 
     // Register the labels with the text manager.
     // Treat numTicks equals 1 as a special case to avoid divison by zero.
+    bool useLogScale = properties->mBool()->value(useLogScaleProperty);
     if (numTicks != 1)
     {
         for (uint i = 0; i < numTicks; i += tickStep)
         {
-            float value = (maximumValue - double(i) / double(numTicks-1)
-                           * (maximumValue - minimumValue)) * scaleFactor;
+            float value;
+            if (useLogScale)
+            {
+                double logMin = std::log10(double(minimumValue));
+                double logMax = std::log10(double(maximumValue));
+                value = float(
+                        std::pow(10.0, logMin + double(numTicks - 1 - i) / double(numTicks - 1) * double(logMax - logMin)) * scaleFactor);
+            }
+            else
+            {
+                value = float(
+                        (double(maximumValue) - double(i) / double(numTicks - 1)
+                        * double(maximumValue - minimumValue)) * scaleFactor);
+            }
             QString labelText =
                     properties->mSciDouble()->valueAsPropertyFormatedText(
                         minimumValueProperty, value);

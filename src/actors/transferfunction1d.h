@@ -105,6 +105,10 @@ public:
 
     void setSteps(int steps);
 
+    void setUseLogScale(bool useLogScale);
+
+    bool getUseLogScale();
+
     QString getSettingsID() override { return "TransferFunction1D"; }
 
     void saveConfiguration(QSettings *settings);
@@ -185,6 +189,7 @@ private:
 
     // Properties related to value range.
     QtProperty *numStepsProperty;
+    QtProperty *useLogScaleProperty;
 
     QtProperty *colourmapTypeProperty;
 

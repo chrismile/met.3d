@@ -57,27 +57,37 @@ public:
     void setVariableNames(const QVector<QString>& names);
     void setVariableRanges(const QVector<QVector2D>& variableRangesNew);
 
+    GL::MShaderStorageBufferObject *getUseLogScaleBuffer(
+#ifdef USE_QOPENGLWIDGET
+            QOpenGLWidget* currentGLContext = nullptr);
+#else
+            QGLWidget* currentGLContext = nullptr);
+#endif
     GL::MShaderStorageBufferObject *getMinMaxBuffer(
 #ifdef USE_QOPENGLWIDGET
             QOpenGLWidget* currentGLContext = nullptr);
 #else
             QGLWidget* currentGLContext = nullptr);
 #endif
-    void releaseMinMaxBuffer();
+    void releaseBuffers();
 
 private:
     QVector<QtProperty*> &transferFunctionProperties;
     /** Pointer to transfer function object and corresponding texture unit. */
     QVector<MTransferFunction1D*> &transferFunctions;
     GL::MTexture *textureTransferFunctionArray = nullptr;
-
+    GL::MShaderStorageBufferObject *useLogScaleBuffer = nullptr;
     GL::MShaderStorageBufferObject *minMaxBuffer = nullptr;
+    const QString useLogScaleBufferID =
+            QString("multivardata_use_log_scale_buffer_#%1").arg(getID());
     const QString minMaxBufferID =
             QString("multivardata_minmax_buffer_#%1").arg(getID());
     QVector<QVector2D> minMaxList;
+    bool useLogScaleIsDirty = true;
     bool minMaxIsDirty = true;
     QVector<QString> variableNames;
     QVector<QVector2D> variableRanges;
+    QVector<uint32_t> useLogScaleArray;
     std::vector<std::vector<unsigned char>> standardSequentialColorMapsBytes;
     std::vector<std::vector<unsigned char>> standardDivergingColorMapsBytes;
 };

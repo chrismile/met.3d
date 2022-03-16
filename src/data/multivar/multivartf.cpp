@@ -76,7 +76,7 @@ MMultiVarTf::MMultiVarTf(
 MMultiVarTf::~MMultiVarTf()
 {
     destroyTexture1DArray();
-    releaseMinMaxBuffer();
+    releaseBuffers();
 }
 
 
@@ -206,9 +206,17 @@ void MMultiVarTf::generateTexture1DArray()
 
     std::vector<unsigned char> colorValuesArray;
     colorValuesArray.reserve(transferFunctions.size() * numBytesPerColorMap);
+    useLogScaleArray.resize(transferFunctions.size());
     int varIdx = 0;
     foreach(MTransferFunction1D *tf, transferFunctions)
     {
+        bool useLogScale = false;
+        if (tf)
+        {
+            useLogScale = tf->getUseLogScale();
+        }
+        useLogScaleArray[varIdx] = useLogScale;
+
         if (tf != nullptr && !tf->getColorValuesByteArray().empty())
         {
             std::vector<unsigned char> colorValuesTf = tf->getColorValuesByteArray();
@@ -301,14 +309,14 @@ void MMultiVarTf::generateTexture1DArray()
                 textureID, GL_TEXTURE_1D_ARRAY, GL_RGBA8,
                 numEntriesPerColorMap, transferFunctions.size());
 
-        if ( !glRM->tryStoreGPUItem(textureTransferFunctionArray) )
+        if (!glRM->tryStoreGPUItem(textureTransferFunctionArray))
         {
             delete textureTransferFunctionArray;
             textureTransferFunctionArray = nullptr;
         }
     }
 
-    if ( textureTransferFunctionArray )
+    if (textureTransferFunctionArray)
     {
         textureTransferFunctionArray->updateSize(numBytesPerColorMap / 4, transferFunctions.size());
 
@@ -340,6 +348,7 @@ void MMultiVarTf::generateTexture1DArray()
 #endif
     }
 
+    this->useLogScaleIsDirty = true;
     this->minMaxIsDirty = true;
 }
 
@@ -409,6 +418,28 @@ void MMultiVarTf::setVariableRanges(const QVector<QVector2D>& variableRangesNew)
 }
 
 
+GL::MShaderStorageBufferObject *MMultiVarTf::getUseLogScaleBuffer(
+#ifdef USE_QOPENGLWIDGET
+        QOpenGLWidget *currentGLContext)
+#else
+        QGLWidget *currentGLContext)
+#endif
+{
+    if (useLogScaleBuffer == nullptr)
+    {
+        useLogScaleBuffer = createShaderStorageBuffer(
+                currentGLContext, useLogScaleBufferID, useLogScaleArray);
+        useLogScaleIsDirty = false;
+    }
+    else if (useLogScaleIsDirty)
+    {
+        useLogScaleBuffer->upload(useLogScaleArray.constData(), GL_STATIC_DRAW);
+        useLogScaleIsDirty = false;
+    }
+    return useLogScaleBuffer;
+}
+
+
 GL::MShaderStorageBufferObject *MMultiVarTf::getMinMaxBuffer(
 #ifdef USE_QOPENGLWIDGET
         QOpenGLWidget *currentGLContext)
@@ -430,8 +461,12 @@ GL::MShaderStorageBufferObject *MMultiVarTf::getMinMaxBuffer(
 }
 
 
-void MMultiVarTf::releaseMinMaxBuffer()
+void MMultiVarTf::releaseBuffers()
 {
+    if (useLogScaleBuffer)
+    {
+        MGLResourcesManager::getInstance()->releaseGPUItem(useLogScaleBufferID);
+    }
     if (minMaxBuffer)
     {
         MGLResourcesManager::getInstance()->releaseGPUItem(minMaxBufferID);
