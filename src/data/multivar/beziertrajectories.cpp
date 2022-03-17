@@ -285,11 +285,17 @@ MBezierTrajectoriesRenderData MBezierTrajectories::getRenderData(
         QVector<QVector3D>& lineCenters = lineCentersList[trajectoryIdx];
         QVector<int>& lineLineIDs = lineLineIDList[trajectoryIdx];
         QVector<int>& lineElementIDs = lineElementIDList[trajectoryIdx];
+
         for (int i = 0; i < trajectory.positions.size(); i++)
         {
-            lineCenters.push_back(trajectory.positions.at(i));
-            lineLineIDs.push_back(trajectory.lineID);
-            lineElementIDs.push_back(trajectory.elementIDs.at(i));
+            const QVector3D& position = trajectory.positions.at(i);
+            // Skip NaN values.
+            if (!std::isnan(position.x()) && !std::isnan(position.y()) && !std::isnan(position.z()))
+            {
+                lineCenters.push_back(position);
+                lineLineIDs.push_back(trajectory.lineID);
+                lineElementIDs.push_back(trajectory.elementIDs.at(i));
+            }
         }
     }
 
@@ -336,7 +342,7 @@ MBezierTrajectoriesRenderData MBezierTrajectories::getRenderData(
     QVector<QVector4D> varDescData;
     QVector<QVector2D> lineVarDescData;
 
-    for (MBezierTrajectory& bezierTrajectory : bezierTrajectories)
+    for (const MBezierTrajectory& bezierTrajectory : bezierTrajectories)
     {
         for (float attrVal : bezierTrajectory.multiVarData)
         {
@@ -353,7 +359,7 @@ MBezierTrajectoriesRenderData MBezierTrajectories::getRenderData(
     QVector<float> attributesMaxValues(numVars, 0.0f);
     for (size_t lineIdx = 0; lineIdx < numLines; ++lineIdx)
     {
-        MBezierTrajectory& bezierTrajectory = bezierTrajectories[lineIdx];
+        const MBezierTrajectory& bezierTrajectory = bezierTrajectories[lineIdx];
         for (size_t varIdx = 0; varIdx < numVars; ++varIdx)
         {
             attributesMinValues[varIdx] = std::min(
@@ -367,7 +373,7 @@ MBezierTrajectoriesRenderData MBezierTrajectories::getRenderData(
     {
         for (size_t varIdx = 0; varIdx < numVars; ++varIdx)
         {
-            MBezierTrajectory& bezierTrajectory = bezierTrajectories[lineIdx];
+            const MBezierTrajectory& bezierTrajectory = bezierTrajectories[lineIdx];
 
             QVector4D descData(
                     bezierTrajectory.multiVarDescs.at(varIdx).startIndex,
@@ -1476,7 +1482,7 @@ bool MBezierTrajectories::getFilteredTrajectories(
             continue;
         }
 
-        MBezierTrajectory& bezierTrajectory = bezierTrajectories[trajectoryIdx];
+        const MBezierTrajectory& bezierTrajectory = bezierTrajectories[trajectoryIdx];
 
         int numTrajectoryPoints = bezierTrajectory.positions.size();
         if (numTrajectoryPoints <= 1)

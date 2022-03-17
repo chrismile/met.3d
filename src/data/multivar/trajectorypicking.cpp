@@ -475,9 +475,22 @@ void MTrajectoryPicker::recreateTubeTriangleData()
     }
 
     for (int lineId = 0; lineId < trajectories.size(); lineId++) {
-        const QVector<QVector3D>& lineCenters = trajectories.at(int(lineId));
-        const QVector<float>& pointTimeSteps = trajectoryPointTimeSteps.at(int(lineId));
-        int n = lineCenters.size();
+        int n = trajectories.at(int(lineId)).size();
+        QVector<QVector3D> lineCenters;
+        QVector<float> pointTimeSteps;
+        lineCenters.reserve(n);
+        pointTimeSteps.reserve(n);
+        for (int i = 0; i < n; i++)
+        {
+            const QVector3D& position = trajectories.at(int(lineId)).at(i);
+            if (!std::isnan(position.x()) && !std::isnan(position.y()) && !std::isnan(position.z()))
+            {
+                lineCenters.push_back(position);
+                pointTimeSteps.push_back(trajectoryPointTimeSteps.at(int(lineId)).at(i));
+            }
+        }
+        n = lineCenters.size();
+
         size_t indexOffset = vertexPositions.size();
 
         if (n < 2) {
