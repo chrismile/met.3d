@@ -422,6 +422,7 @@ void MDiagramBase::render() {
 
     glEnable(GL_DEPTH_TEST); CHECK_GL_ERROR;
     glDepthMask(GL_TRUE); CHECK_GL_ERROR;
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); CHECK_GL_ERROR;
 }
 
 bool MDiagramBase::isMouseOverDiagram(QVector2D mousePosition) const
