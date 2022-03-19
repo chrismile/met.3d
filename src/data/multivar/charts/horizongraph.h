@@ -98,6 +98,7 @@ private:
     void drawHorizonMatchSelections();
     void drawHorizonLines();
     void drawHorizonLinesSparse();
+    void drawHorizonLinesLttb(); // Using Largest Triangle Three Buckets (LTTB) algorithm.
     void drawHorizonOutline(const NVGcolor& textColor);
     void drawSelectedTimeStepLine(const NVGcolor& textColor);
     void drawLegendLeft(const NVGcolor& textColor);
@@ -111,6 +112,12 @@ private:
     void recomputeWindowHeight();
     void recomputeFullWindowHeight();
     void updateTimeStepTicks();
+
+    // Downsampling via Largest Triangle Three Buckets (LTTB).
+    void computeLttb(int varIdx, int threshold);
+    std::vector<std::vector<QVector2D>> lttbPointsArray;
+    float lttbTimeDisplayMin = std::numeric_limits<float>::max();
+    float lttbTimeDisplayMax = std::numeric_limits<float>::lowest();
 
     enum class EventType {
         MousePress, MouseRelease, MouseMove

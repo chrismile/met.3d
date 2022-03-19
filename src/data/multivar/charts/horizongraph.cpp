@@ -194,10 +194,17 @@ void MHorizonGraph::setData(
     numTrajectories = variableValuesArray.size();
     numVariables = variableNames.size();
 
+    lttbTimeDisplayMin = std::numeric_limits<float>::max();
+    lttbTimeDisplayMax = std::numeric_limits<float>::lowest();
+    lttbPointsArray.clear();
+    lttbPointsArray.resize(numVariables);
+
     variableIsSensitivityArray.reserve(numVariables);
     for (size_t varIdx = 0; varIdx < numVariables; varIdx++) {
         const std::string& varName = variableNames.at(varIdx);
-        bool isSensitivity = (varName.at(0) == 'd' && varName != "deposition") || varName == "sensitivity_max";
+        bool isSensitivity =
+                (varName.at(0) == 'd' && varName != "deposition") || varName == "sensitivity_max"
+                || varName == "QR"; // Also use maximum for target value QR, thus count it as a sensitivity.
         variableIsSensitivityArray.push_back(isSensitivity);
     }
 
@@ -791,6 +798,199 @@ void MHorizonGraph::drawHorizonLinesSparse() {
     }
 }
 
+/**
+ * For more details on downsampling via Largest Triangle Three Buckets (LTTB), please refer to:
+ * https://skemman.is/handle/1946/15343
+ * https://blog.ispirata.com/plot-your-data-faster-without-losing-its-shape-with-elixir-and-exlttb-6917f6dd4f7e
+ * @param varIdx The variable ID.
+ * @param threshold The number of output samples.
+ */
+void MHorizonGraph::computeLttb(int varIdx, int threshold) {
+    float timeStepIdxStartFlt = (timeDisplayMin - timeMin) / (timeMax - timeMin) * float(numTimeSteps - 1);
+    float timeStepIdxStopFlt = (timeDisplayMax - timeMin) / (timeMax - timeMin) * float(numTimeSteps - 1);
+    int timeStepIdxStart0 = int(std::floor(timeStepIdxStartFlt));
+    int timeStepIdxStart1 = int(std::ceil(timeStepIdxStartFlt));
+    int timeStepIdxStop0 = int(std::floor(timeStepIdxStopFlt));
+    int timeStepIdxStop1 = int(std::ceil(timeStepIdxStopFlt));
+
+    float meanStart0 = ensembleMeanValues.at(timeStepIdxStart0).at(varIdx);
+    float meanStart1 = ensembleMeanValues.at(timeStepIdxStart1).at(varIdx);
+    float meanStart = mix(meanStart0, meanStart1, fract(timeStepIdxStartFlt));
+
+    float meanStop0 = ensembleMeanValues.at(timeStepIdxStop0).at(varIdx);
+    float meanStop1 = ensembleMeanValues.at(timeStepIdxStop1).at(varIdx);
+    float meanStop = mix(meanStop0, meanStop1, fract(timeStepIdxStopFlt));
+
+    int numDataPoints = timeStepIdxStop1 - timeStepIdxStart0 + 1;
+    double bucketSize = double(numDataPoints - 2) / double(threshold - 2);
+    QVector2D prevPoint(timeStepIdxStart0, meanStart0);
+    QVector2D maxTriangleAreaPoint;
+
+    std::vector<QVector2D>& pointsOut = lttbPointsArray.at(varIdx);
+    pointsOut.clear();
+    pointsOut.emplace_back(timeStepIdxStartFlt, meanStart);
+
+    for (int i = 0; i < threshold - 2; i++) {
+        int nextStart = int((i + 1) * bucketSize) + 1 + timeStepIdxStart1;
+        int nextStop = std::min(int((i + 2) * bucketSize) + 1 + timeStepIdxStart1, timeStepIdxStop1);
+
+        auto numPoints = float(nextStop - nextStart);
+        QVector2D avgPoint(0.0f, 0.0f);
+        for (int t = nextStart; t < nextStop; t++) {
+            avgPoint += QVector2D(float(t), ensembleMeanValues.at(t).at(varIdx)) / numPoints;
+        }
+
+        int currStart = int((i + 0) * bucketSize) + 1 + timeStepIdxStart1;
+        int currStop = std::min(int((i + 1) * bucketSize) + 1 + timeStepIdxStart1, timeStepIdxStop1);
+
+        float maxTriangleArea = std::numeric_limits<float>::lowest();
+        maxTriangleAreaPoint = prevPoint;
+        for (int t = currStart; t < currStop; t++) {
+            float value = ensembleMeanValues.at(t).at(varIdx);
+            float triangleArea =
+                    (prevPoint[0] - avgPoint[0]) * (value - prevPoint[1])
+                    - (prevPoint[0] - float(t)) * (avgPoint[1] - prevPoint[1]);
+            triangleArea = std::abs(triangleArea) * 0.5f;
+
+            if (triangleArea > maxTriangleArea) {
+                maxTriangleAreaPoint = QVector2D(float(t), value);
+                maxTriangleArea = triangleArea;
+            }
+        }
+
+        prevPoint = maxTriangleAreaPoint;
+        pointsOut.emplace_back(maxTriangleAreaPoint);
+    }
+
+    pointsOut.emplace_back(timeStepIdxStopFlt, meanStop);
+}
+
+void MHorizonGraph::drawHorizonLinesLttb() {
+    AABB2 scissorAabb(
+            QVector2D(borderWidth, offsetHorizonBarsY + scrollTranslationY),
+            QVector2D(windowWidth - borderWidth, windowHeight - borderWidth + scrollTranslationY));
+
+    float timeStepIdxStartFlt = (timeDisplayMin - timeMin) / (timeMax - timeMin) * float(numTimeSteps - 1);
+    float timeStepIdxStopFlt = (timeDisplayMax - timeMin) / (timeMax - timeMin) * float(numTimeSteps - 1);
+    int timeStepIdxStart = int(std::floor(timeStepIdxStartFlt));
+    int timeStepIdxStop = int(std::ceil(timeStepIdxStopFlt));
+
+    float density = horizonBarWidth * getScaleFactor() / float(timeStepIdxStop - timeStepIdxStart);
+    if (density >= 1.0f) {
+        drawHorizonLines();
+        return;
+    }
+
+    // Cache if timeDisplayMin/timeDisplayMax didn't change.
+    if (lttbTimeDisplayMin != timeDisplayMin || lttbTimeDisplayMax != timeDisplayMax) {
+        //int threshold = int(horizonBarWidth * getScaleFactor());
+        int threshold = int(horizonBarWidth);
+        lttbTimeDisplayMin = timeDisplayMin;
+        lttbTimeDisplayMax = timeDisplayMax;
+
+        #pragma omp parallel for shared(threshold) default(none)
+        for (size_t varIdx = 0; varIdx < numVariables; varIdx++) {
+            computeLttb(int(varIdx), threshold);
+        }
+    }
+
+    size_t heightIdx = 0;
+    for (size_t varIdx : sortedVariableIndices) {
+        NVGcolor strokeColor = nvgRGBA(0, 0, 0, 255);
+
+        float lowerY = offsetHorizonBarsY + float(heightIdx) * (horizonBarHeight + horizonBarMargin);
+        float upperY = lowerY + horizonBarHeight;
+
+        AABB2 boxAabb(
+                QVector2D(offsetHorizonBarsX, lowerY),
+                QVector2D(offsetHorizonBarsX + horizonBarWidth, lowerY + horizonBarHeight));
+        if (!scissorAabb.intersects(boxAabb)) {
+            heightIdx++;
+            continue;
+        }
+
+        std::vector<QVector2D>& lttbPoints = lttbPointsArray.at(varIdx);
+        auto numPoints = int(lttbPoints.size());
+
+        for (int ptIdx = 0; ptIdx < numPoints - 1; ptIdx++) {
+            const QVector2D& lttbPointLast = lttbPoints.at(ptIdx);
+            const QVector2D& lttbPointNext = lttbPoints.at(ptIdx + 1);
+            int timeStepIdxLast = int(lttbPointLast[0]);
+            int timeStepIdxNext = int(lttbPointNext[0]);
+
+            float mean0 = lttbPointLast[1];
+            float stddev0 = ensembleStdDevValues.at(timeStepIdxLast).at(varIdx);
+            float timeStep0 = lttbPointLast[0];
+            float xpos0 = offsetHorizonBarsX + (timeStep0 - timeDisplayMin) / (timeDisplayMax - timeDisplayMin) * horizonBarWidth;
+
+            float mean1 = lttbPointNext[1];
+            float stddev1 = ensembleStdDevValues.at(timeStepIdxNext).at(varIdx);
+            float timeStep1 = lttbPointNext[0];
+            float xpos1 = offsetHorizonBarsX + (timeStep1 - timeDisplayMin) / (timeDisplayMax - timeDisplayMin) * horizonBarWidth;
+
+            if (std::isnan(mean0)) {
+                mean0 = 1.0f;
+            }
+            if (std::isnan(mean1)) {
+                mean1 = 1.0f;
+            }
+
+            if (ptIdx == 0 && fract(lttbPointLast[0]) != 0.0f) {
+                float stddev0ceil = ensembleStdDevValues.at(int(std::ceil(lttbPointLast[0]))).at(varIdx);
+                stddev0 = mix(stddev0, stddev0ceil, fract(lttbPointLast[0]));
+                xpos0 = offsetHorizonBarsX;
+            }
+            if (ptIdx == numPoints - 2 && fract(lttbPointNext[0]) != 0.0f) {
+                float stddev1ceil = ensembleStdDevValues.at(int(std::ceil(lttbPointNext[0]))).at(varIdx);
+                stddev1 = mix(stddev1, stddev1ceil, fract(lttbPointNext[0]));
+                xpos1 = offsetHorizonBarsX + horizonBarWidth;
+            }
+            float ypos0 = upperY + (lowerY - upperY) * mean0;
+            float ypos1 = upperY + (lowerY - upperY) * mean1;
+
+            QVector3D rgbColor0 = transferFunction(clamp(stddev0 * 2.0f, 0.0f, 1.0f));
+            NVGcolor fillColor0 = nvgRGBf(rgbColor0.x(), rgbColor0.y(), rgbColor0.z());
+            QVector3D rgbColor1 = transferFunction(clamp(stddev1 * 2.0f, 0.0f, 1.0f));
+            NVGcolor fillColor1 = nvgRGBf(rgbColor1.x(), rgbColor1.y(), rgbColor1.z());
+
+            nvgBeginPath(vg);
+            nvgMoveTo(vg, xpos0, upperY);
+            nvgLineTo(vg, xpos0, ypos0);
+            nvgLineTo(vg, xpos1, ypos1);
+            nvgLineTo(vg, xpos1, upperY);
+            nvgClosePath(vg);
+
+            NVGpaint paint = nvgLinearGradient(vg, xpos0, upperY, xpos1, upperY, fillColor0, fillColor1);
+            nvgFillPaint(vg, paint);
+            nvgFill(vg);
+        }
+
+        nvgBeginPath(vg);
+        for (int ptIdx = 0; ptIdx < numPoints; ptIdx++) {
+            const QVector2D& lttbPoint = lttbPoints.at(ptIdx);
+
+            float mean = lttbPoint[1];
+            float timeStep = lttbPoint[0];
+            float xpos = offsetHorizonBarsX + (timeStep - timeDisplayMin) / (timeDisplayMax - timeDisplayMin) * horizonBarWidth;
+
+            if (std::isnan(mean)) {
+                mean = 1.0f;
+            }
+            float ypos = upperY + (lowerY - upperY) * mean;
+
+            if (ptIdx == 0) {
+                nvgMoveTo(vg, xpos, ypos);
+            } else {
+                nvgLineTo(vg, xpos, ypos);
+            }
+        }
+        nvgStrokeColor(vg, strokeColor);
+        nvgStroke(vg);
+
+        heightIdx++;
+    }
+}
+
 void MHorizonGraph::drawHorizonOutline(const NVGcolor& textColor) {
     for (size_t heightIdx = 0; heightIdx < numVariables; heightIdx++) {
         float lowerY = offsetHorizonBarsY + float(heightIdx) * (horizonBarHeight + horizonBarMargin);
@@ -969,7 +1169,7 @@ void MHorizonGraph::renderBase() {
 
     drawHorizonBackground();
     drawHorizonMatchSelections();
-    drawHorizonLinesSparse();
+    drawHorizonLinesLttb();
     drawHorizonOutline(textColor);
     drawSelectedTimeStepLine(textColor);
     drawLegendLeft(textColor);
