@@ -3006,25 +3006,50 @@ void MTrajectoryActor::renderShadowsSpheres(MSceneViewGLWidget *sceneView, int t
                 "constColour", QColor(20, 20, 20, 155)); CHECK_GL_ERROR;
 
     bindShadowStencilBuffer();
-    if (renderMode == ALL_POSITION_SPHERES)
-        glMultiDrawArrays(GL_POINTS,
-                          trajectoryRequests[t]
-                                  .trajectorySelection->getStartIndices(),
-                          trajectoryRequests[t]
-                                  .trajectorySelection->getIndexCount(),
-                          trajectoryRequests[t]
-                                  .trajectorySelection->getNumTrajectories());
+    if (useBezierTrajectories)
+    {
+        positionSphereShadowShader->setUniformValue(
+                "isInputWorldSpace", 1); CHECK_GL_ERROR;
+
+        MTimeStepSphereRenderData* timeStepSphereRenderData =
+                trajectoryRequests[t].timeStepSphereRenderDataMap[sceneView];
+        GLuint positionBufferId = timeStepSphereRenderData->spherePositionsBuffer->getBufferObject();
+        glBindBuffer(GL_ARRAY_BUFFER, positionBufferId); CHECK_GL_ERROR;
+        glVertexAttribPointer(
+                SHADER_VERTEX_ATTRIBUTE,
+                3, // size
+                GL_FLOAT, // type
+                GL_FALSE, // normalized
+                sizeof(QVector4D), // stride
+                nullptr); CHECK_GL_ERROR; // offset
+        glEnableVertexAttribArray(SHADER_VERTEX_ATTRIBUTE); CHECK_GL_ERROR;
+        glDrawArrays(GL_POINTS, 0, timeStepSphereRenderData->numSpheres);
+    }
     else
-        glMultiDrawArrays(GL_POINTS,
-                          trajectoryRequests[t]
-                                  .trajectorySingleTimeSelection
-                                  ->getStartIndices(),
-                          trajectoryRequests[t]
-                                  .trajectorySingleTimeSelection
-                                  ->getIndexCount(),
-                          trajectoryRequests[t]
-                                  .trajectorySingleTimeSelection
-                                  ->getNumTrajectories());
+    {
+        positionSphereShadowShader->setUniformValue(
+                "isInputWorldSpace", 0); CHECK_GL_ERROR;
+
+        if (renderMode == ALL_POSITION_SPHERES)
+            glMultiDrawArrays(GL_POINTS,
+                              trajectoryRequests[t]
+                                      .trajectorySelection->getStartIndices(),
+                              trajectoryRequests[t]
+                                      .trajectorySelection->getIndexCount(),
+                              trajectoryRequests[t]
+                                      .trajectorySelection->getNumTrajectories());
+        else
+            glMultiDrawArrays(GL_POINTS,
+                              trajectoryRequests[t]
+                                      .trajectorySingleTimeSelection
+                                      ->getStartIndices(),
+                              trajectoryRequests[t]
+                                      .trajectorySingleTimeSelection
+                                      ->getIndexCount(),
+                              trajectoryRequests[t]
+                                      .trajectorySingleTimeSelection
+                                      ->getNumTrajectories());
+    }
     unbindShadowStencilBuffer();
     CHECK_GL_ERROR;
 }
@@ -3428,6 +3453,11 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
                 }
 
                 renderShadowsTubes(sceneView, t);
+
+                if (multiVarData.getRenderSpheres())
+                {
+                    renderShadowsSpheres(sceneView, t);
+                }
             }
 
             // Unbind VBO.
