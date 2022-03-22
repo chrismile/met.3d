@@ -739,29 +739,30 @@ void MMultiVarData::onBezierTrajectoriesLoaded(MTrajectories* trajectories)
     const QStringList& auxDataVarNames = trajectories->getAuxDataVarNames();
     //int numTrajectories = trajectories->getNumTrajectories();
 
+    QStringList varNamesLoaded = auxDataVarNames;
+    varNamesLoaded.push_front("Pressure");
+    bool hasSensitivityData = false;
+    for (QString& varName : varNamesLoaded)
+    {
+        if (varName.startsWith('d') && varName != "deposition")
+        {
+            hasSensitivityData = true;
+            break;
+        }
+    }
+    if (hasSensitivityData)
+    {
+        varNamesLoaded.push_back("sensitivity_max");
+    }
+    //varNames.push_back("ClusterIdx");
+
     if (tfPropertiesMultiVar.empty())
     {
-        QStringList varNames = auxDataVarNames;
-        varNames.push_front("Pressure");
-        bool hasSensitivityData = false;
-        for (QString& varName : varNames)
-        {
-            if (varName.startsWith('d') && varName != "deposition")
-            {
-                hasSensitivityData = true;
-                break;
-            }
-        }
-        if (hasSensitivityData)
-        {
-            varNames.push_back("sensitivity_max");
-        }
-        //varNames.push_back("ClusterIdx");
         this->varNames.clear();
-        for (const QString& str : varNames) {
+        for (const QString& str : varNamesLoaded) {
             this->varNames.push_back(str);
         }
-        maxNumVariables = varNames.size();
+        maxNumVariables = varNamesLoaded.size();
         initTransferFunctionsMultiVar(maxNumVariables);
 
         selectedVariables.resize(maxNumVariables);
@@ -772,6 +773,24 @@ void MMultiVarData::onBezierTrajectoriesLoaded(MTrajectories* trajectories)
         selectedVariables[0] = true;
         updateNumVariablesSelected();
         setPropertiesVarSelected();
+    }
+    else
+    {
+        if (varNamesLoaded.toVector() != varNames)
+        {
+            throw std::runtime_error(
+                    "Fatal error: The loaded session and the trajectory data have different variables.");
+        }
+
+        // TODO: Continue on the code below instead of terminating.
+        /*auto varNamesOld = this->varNames;
+        for (const QString& str : varNamesLoaded) {
+            this->varNames.push_back(str);
+        }
+        maxNumVariables = varNamesLoaded.size();
+        initTransferFunctionsMultiVar(maxNumVariables);
+        updateNumVariablesSelected();
+        setPropertiesVarSelected();*/
     }
 
     selectedVariablesChanged = true;
