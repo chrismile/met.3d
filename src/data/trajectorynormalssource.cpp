@@ -87,6 +87,19 @@ MTrajectoryNormals *MTrajectoryNormalsSource::produceData(
     {
         int baseIndex = i * numTimeStepsPerTrajectory;
 
+        while (baseIndex+1 < vertices.size())
+        {
+            QVector3D p0 = vertices.at(baseIndex);
+            if (p0.z() == M_INVALID_TRAJECTORY_POS)
+            {
+                baseIndex++;
+            }
+            else
+            {
+                break;
+            }
+        }
+
         // Prevent "out of bound exception" ("vertices" are access at
         // "baseIndex+1").
         if (baseIndex+1 >= vertices.size())

@@ -112,7 +112,7 @@ MTrajectorySelection* MBoundingBoxTrajectoryFilter::produceData(
         {
             p = trajectories->getVertices().at(startIndex + k);
             if (!std::isnan(p.x()) && !std::isnan(p.y())
-                    && p.x() != M_INVALID_TRAJECTORY_POS&& p.y() != M_INVALID_TRAJECTORY_POS)
+                    && p.x() != M_INVALID_TRAJECTORY_POS && p.y() != M_INVALID_TRAJECTORY_POS)
             {
                 break;
             }

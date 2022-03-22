@@ -852,6 +852,11 @@ void MHorizonGraph::computeLttb(int varIdx, int threshold) {
                     - (prevPoint[0] - float(t)) * (avgPoint[1] - prevPoint[1]);
             triangleArea = std::abs(triangleArea) * 0.5f;
 
+            // Always give priority to NaN values.
+            if (std::isnan(triangleArea)) {
+                triangleArea = std::numeric_limits<float>::max();
+            }
+
             if (triangleArea > maxTriangleArea) {
                 maxTriangleAreaPoint = QVector2D(float(t), value);
                 maxTriangleArea = triangleArea;
@@ -1318,13 +1323,13 @@ void MHorizonGraph::mousePressEvent(MSceneViewGLWidget *sceneView, QMouseEvent *
 
 
     // Check whether the user clicked on one of the bars.
-    //AABB2 windowAabb(
-    //        QVector2D(borderWidth, borderWidth),
-    //        QVector2D(windowWidth - 2.0f * borderWidth, windowHeight - 2.0f * borderWidth));
-    AABB2 scissorAabb(
-            QVector2D(borderWidth, offsetHorizonBarsY + scrollTranslationY),
-            QVector2D(windowWidth - borderWidth, windowHeight - borderWidth + scrollTranslationY));
-    if (scissorAabb.contains(mousePosition) && !event->modifiers().testFlag(Qt::ControlModifier)
+    AABB2 windowAabb(
+            QVector2D(borderWidth, borderWidth),
+            QVector2D(windowWidth - 2.0f * borderWidth, windowHeight - 2.0f * borderWidth));
+    //AABB2 scissorAabb(
+    //        QVector2D(borderWidth, offsetHorizonBarsY + scrollTranslationY),
+    //        QVector2D(windowWidth - borderWidth, windowHeight - borderWidth + scrollTranslationY));
+    if (windowAabb.contains(mousePosition) && !event->modifiers().testFlag(Qt::ControlModifier)
             && !event->modifiers().testFlag(Qt::ShiftModifier) && event->button() == Qt::MouseButton::LeftButton) {
         size_t heightIdx = 0;
         for (size_t varIdx : sortedVariableIndices) {

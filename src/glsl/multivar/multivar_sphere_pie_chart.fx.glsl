@@ -162,6 +162,7 @@ shader FSmain(in VSOutput inputs, out vec4 fragColor)
     vec3 pn2 = normalize(cross(v, upWorld2));
     vec3 up2 = normalize(cross(pn2, v));
     float angle = atan(dot(cross(nPlane, up2), v), dot(nPlane, up2));
+    //float angle = atan(length(cross(nPlane, up2)), dot(nPlane, up2));
     //float angle = atan(dot(cross(nPlane, up), v), dot(nPlane, up));
     angle += M_PI;
     angle = mod(angle + M_PI * 1.5, 2.0 * M_PI);
