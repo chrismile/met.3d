@@ -427,6 +427,14 @@ MTrajectoryActor::MTrajectoryActor()
     springEpsilonProperty->setToolTip(
             "SPRING subsequence matching algorithm distance metric epsilon.");
 
+    backgroundOpacityProperty = addProperty(
+            DECORATEDDOUBLE_PROPERTY, "SPRING metric epsilon", similarityMetricGroup);
+    properties->setDDouble(
+            backgroundOpacityProperty, backgroundOpacity,
+            0.0, 1.0, 2, 0.05, " (factor)");
+    backgroundOpacityProperty->setToolTip("Diagram view background opacity.");
+
+
     updateSimilarityMetricGroupEnabled();
 
 
@@ -567,6 +575,7 @@ void MTrajectoryActor::saveConfiguration(QSettings *settings)
     settings->setValue(QString("stdDevMetricInfluence"), stdDevMetricInfluence);
     settings->setValue(QString("numBins"), numBins);
     settings->setValue(QString("springEpsilonProperty"), springEpsilon);
+    settings->setValue(QString("backgroundOpacityProperty"), backgroundOpacity);
 
     multiVarData.saveConfiguration(settings);
 
@@ -805,6 +814,10 @@ void MTrajectoryActor::loadConfiguration(QSettings *settings)
     properties->setDDouble(
             springEpsilonProperty, springEpsilon,
             0.0, 100.0, 2, 0.1, " (factor)");
+    backgroundOpacity = settings->value("springEpsilon", 10.0f).toFloat();
+    properties->setDDouble(
+            backgroundOpacityProperty, backgroundOpacity,
+            0.0, 1.0, 2, 0.05, " (factor)");
     updateSimilarityMetricGroupEnabled();
 
     trajectorySyncMode = TrajectorySyncMode(settings->value(
@@ -2750,6 +2763,19 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
         for (MTrajectoryPicker* trajectoryPicker : trajectoryPickerMap)
         {
             trajectoryPicker->setSpringEpsilon(springEpsilon);
+        }
+        if (suppressActorUpdates()) return;
+        emitActorChangedSignal();
+#endif
+    }
+
+    else if (property == backgroundOpacityProperty)
+    {
+        backgroundOpacity = float(properties->mDDouble()->value(backgroundOpacityProperty));
+#ifdef USE_EMBREE
+        for (MTrajectoryPicker* trajectoryPicker : trajectoryPickerMap)
+        {
+            trajectoryPicker->setBackgroundOpacity(backgroundOpacity);
         }
         if (suppressActorUpdates()) return;
         emitActorChangedSignal();

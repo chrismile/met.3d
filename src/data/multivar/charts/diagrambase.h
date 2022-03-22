@@ -88,6 +88,8 @@ public:
     inline bool getSelectedVariablesChanged() const { return selectedVariablesChanged; }
     inline void resetSelectedVariablesChanged() { selectedVariablesChanged = false; }
 
+    inline void setBackgroundOpacity(float opacity) { backgroundOpacity = opacity; }
+
     virtual void mouseMoveEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event);
     virtual void mouseMoveEventParent(MSceneViewGLWidget *sceneView, QMouseEvent *event);
     virtual void mousePressEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event);
@@ -132,6 +134,7 @@ protected:
     float borderSizeX, borderSizeY;
     const float borderWidth = 1.0f;
     const float borderRoundingRadius = 4.0f;
+    float backgroundOpacity = 1.0f;
 
     enum ResizeDirection {
         NONE = 0, LEFT = 1, RIGHT = 2, BOTTOM = 4, TOP = 8,

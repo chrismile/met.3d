@@ -124,6 +124,7 @@ void MTrajectoryPicker::setDiagramType(DiagramDisplayType type)
 
     if (diagram)
     {
+        diagram->setBackgroundOpacity(springEpsilon);
         needsInitializationBeforeRendering = true;
     }
 
@@ -205,6 +206,12 @@ void MTrajectoryPicker::setSpringEpsilon(float epsilon)
     {
         static_cast<MHorizonGraph*>(diagram)->setSpringEpsilon(springEpsilon);
     }
+}
+
+void MTrajectoryPicker::setBackgroundOpacity(float opacity)
+{
+    this->backgroundOpacity = opacity;
+    diagram->setBackgroundOpacity(backgroundOpacity);
 }
 
 void MTrajectoryPicker::triggerSelectAllLines()

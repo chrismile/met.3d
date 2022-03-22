@@ -334,8 +334,8 @@ void MDiagramBase::render() {
     //NVGcolor backgroundStrokeColor = nvgRGBA(120, 120, 120, 120);
     //NVGcolor backgroundFillColor = nvgRGBA(215, 215, 215, 127);
     //NVGcolor backgroundStrokeColor = nvgRGBA(190, 190, 190, 190);
-    NVGcolor backgroundFillColor = nvgRGBA(230, 230, 230, 190);
-    NVGcolor backgroundStrokeColor = nvgRGBA(190, 190, 190, 190);
+    NVGcolor backgroundFillColor = nvgRGBA(230, 230, 230, clamp(int(backgroundOpacity * 255), 0, 255));
+    NVGcolor backgroundStrokeColor = nvgRGBA(190, 190, 190, clamp(int(backgroundOpacity * 255), 0, 255));
 
     GLint oldDrawFbo = 0, oldReadFbo = 0;
     glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &oldDrawFbo);

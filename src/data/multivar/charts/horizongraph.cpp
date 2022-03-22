@@ -353,9 +353,9 @@ void MHorizonGraph::setSpringEpsilon(float epsilon) {
     }
 }
 
-QVector3D MHorizonGraph::transferFunction(float value) const {
+QVector4D MHorizonGraph::transferFunction(float value) const {
     if (std::isnan(value)) {
-        return QVector3D(1.0f, 1.0f, 0.0f); // yellow
+        return QVector4D(1.0f, 1.0f, 0.0f, 1.0f); // yellow
     }
     value = clamp(value, 0.0f, 1.0f);
 
@@ -363,26 +363,45 @@ QVector3D MHorizonGraph::transferFunction(float value) const {
         float minValue = diagramTransferFunction->getMinimumValue();
         float maxValue = diagramTransferFunction->getMaximumValue();
         QColor color = diagramTransferFunction->getColorValue(value * (maxValue - minValue) + minValue);
-        qreal r, g, b;
+        qreal r, g, b, a;
         color.getRgbF(&r, &g, &b);
-        return {float(r), float(g), float(b)};
+        a = color.alphaF();
+        return {float(r), float(g), float(b), float(a)};
     } else {
-        std::vector<QColor> colorPoints = {
+        /*std::vector<QColor> colorPoints = {
                 QColor(59, 76, 192),
                 QColor(144, 178, 254),
                 QColor(220, 220, 220),
                 QColor(245, 156, 125),
                 QColor(180, 4, 38)
+        };*/
+        std::vector<QColor> colorPoints = {
+                QColor(37, 115, 225, 0),
+                QColor(47, 90, 210, 255),
         };
-        int stepLast = clamp(int(std::floor(value / 0.25f)), 0, 4);
-        int stepNext = clamp(int(std::ceil(value / 0.25f)), 0, 4);
-        float t = fract(value / 0.25f);
-        qreal r, g, b;
+        /*std::vector<QColor> colorPoints = {
+                QColor(61, 104, 221, 0),
+                QColor(61, 104, 221, 255),
+        };*/
+        /*std::vector<QColor> colorPoints = {
+                QColor(220, 220, 220, 0),
+                QColor(245, 156, 125, 127),
+                QColor(180, 4, 38, 255)
+        };*/
+        auto numSteps = int(colorPoints.size() - 1);
+        auto numStepsFlt = float(numSteps);
+        int stepLast = clamp(int(std::floor(value * numStepsFlt)), 0, numSteps);
+        int stepNext = clamp(int(std::ceil(value * numStepsFlt)), 0, numSteps);
+        float t = fract(value * numStepsFlt);
+        qreal r, g, b, a;
         colorPoints.at(stepLast).getRgbF(&r, &g, &b);
-        QVector3D colorLast{float(r), float(g), float(b)};
+        a = colorPoints.at(stepLast).alphaF();
+        QVector4D colorLast{float(r), float(g), float(b), float(a)};
         colorPoints.at(stepNext).getRgbF(&r, &g, &b);
-        QVector3D colorNext{float(r), float(g), float(b)};
-        return mix(colorLast, colorNext, t);
+        a = colorPoints.at(stepNext).alphaF();
+        QVector4D colorNext{float(r), float(g), float(b), float(a)};
+        QVector4D colorOut = mix(colorLast, colorNext, t);
+        return QVector4D(colorOut.x(), colorOut.y(), colorOut.z(), colorOut.w());
     }
 }
 
@@ -505,10 +524,10 @@ void MHorizonGraph::drawHorizonLines() {
                 float ypos0 = upperY + (lowerY - upperY) * mean0;
                 float ypos1 = upperY + (lowerY - upperY) * mean1;
 
-                QVector3D rgbColor0 = transferFunction(clamp(stddev0 * 2.0f, 0.0f, 1.0f));
-                NVGcolor fillColor0 = nvgRGBf(rgbColor0.x(), rgbColor0.y(), rgbColor0.z());
-                QVector3D rgbColor1 = transferFunction(clamp(stddev1 * 2.0f, 0.0f, 1.0f));
-                NVGcolor fillColor1 = nvgRGBf(rgbColor1.x(), rgbColor1.y(), rgbColor1.z());
+                QVector4D rgbColor0 = transferFunction(clamp(stddev0 * 2.0f, 0.0f, 1.0f));
+                NVGcolor fillColor0 = nvgRGBAf(rgbColor0.x(), rgbColor0.y(), rgbColor0.z(), rgbColor0.w());
+                QVector4D rgbColor1 = transferFunction(clamp(stddev1 * 2.0f, 0.0f, 1.0f));
+                NVGcolor fillColor1 = nvgRGBAf(rgbColor1.x(), rgbColor1.y(), rgbColor1.z(), rgbColor1.w());
 
                 nvgBeginPath(vg);
                 nvgMoveTo(vg, xpos0, upperY);
@@ -641,10 +660,10 @@ void MHorizonGraph::drawHorizonLinesSparse() {
                     float ypos0 = upperY + (lowerY - upperY) * mean0;
                     float ypos1 = upperY + (lowerY - upperY) * mean1;
 
-                    QVector3D rgbColor0 = transferFunction(clamp(stddev0 * 2.0f, 0.0f, 1.0f));
-                    NVGcolor fillColor0 = nvgRGBf(rgbColor0.x(), rgbColor0.y(), rgbColor0.z());
-                    QVector3D rgbColor1 = transferFunction(clamp(stddev1 * 2.0f, 0.0f, 1.0f));
-                    NVGcolor fillColor1 = nvgRGBf(rgbColor1.x(), rgbColor1.y(), rgbColor1.z());
+                    QVector4D rgbColor0 = transferFunction(clamp(stddev0 * 2.0f, 0.0f, 1.0f));
+                    NVGcolor fillColor0 = nvgRGBAf(rgbColor0.x(), rgbColor0.y(), rgbColor0.z(), rgbColor0.w());
+                    QVector4D rgbColor1 = transferFunction(clamp(stddev1 * 2.0f, 0.0f, 1.0f));
+                    NVGcolor fillColor1 = nvgRGBAf(rgbColor1.x(), rgbColor1.y(), rgbColor1.z(), rgbColor1.w());
 
                     nvgBeginPath(vg);
                     nvgMoveTo(vg, xpos0, upperY);
@@ -696,10 +715,10 @@ void MHorizonGraph::drawHorizonLinesSparse() {
                     float ypos0 = upperY + (lowerY - upperY) * mean0;
                     float ypos1 = upperY + (lowerY - upperY) * mean1;
 
-                    QVector3D rgbColor0 = transferFunction(clamp(stddev0 * 2.0f, 0.0f, 1.0f));
-                    NVGcolor fillColor0 = nvgRGBf(rgbColor0.x(), rgbColor0.y(), rgbColor0.z());
-                    QVector3D rgbColor1 = transferFunction(clamp(stddev1 * 2.0f, 0.0f, 1.0f));
-                    NVGcolor fillColor1 = nvgRGBf(rgbColor1.x(), rgbColor1.y(), rgbColor1.z());
+                    QVector4D rgbColor0 = transferFunction(clamp(stddev0 * 2.0f, 0.0f, 1.0f));
+                    NVGcolor fillColor0 = nvgRGBAf(rgbColor0.x(), rgbColor0.y(), rgbColor0.z(), rgbColor0.w());
+                    QVector4D rgbColor1 = transferFunction(clamp(stddev1 * 2.0f, 0.0f, 1.0f));
+                    NVGcolor fillColor1 = nvgRGBAf(rgbColor1.x(), rgbColor1.y(), rgbColor1.z(), rgbColor1.w());
 
                     nvgBeginPath(vg);
                     nvgMoveTo(vg, xpos0, upperY);
@@ -950,13 +969,15 @@ void MHorizonGraph::drawHorizonLinesLttb() {
                 stddev1 = mix(stddev1, stddev1ceil, fract(lttbPointNext[0]));
                 xpos1 = offsetHorizonBarsX + horizonBarWidth;
             }
-            float ypos0 = upperY + (lowerY - upperY) * mean0;
-            float ypos1 = upperY + (lowerY - upperY) * mean1;
+            //float ypos0 = upperY + (lowerY - upperY) * mean0;
+            //float ypos1 = upperY + (lowerY - upperY) * mean1;
+            float ypos0 = lowerY;
+            float ypos1 = lowerY;
 
-            QVector3D rgbColor0 = transferFunction(clamp(stddev0 * 2.0f, 0.0f, 1.0f));
-            NVGcolor fillColor0 = nvgRGBf(rgbColor0.x(), rgbColor0.y(), rgbColor0.z());
-            QVector3D rgbColor1 = transferFunction(clamp(stddev1 * 2.0f, 0.0f, 1.0f));
-            NVGcolor fillColor1 = nvgRGBf(rgbColor1.x(), rgbColor1.y(), rgbColor1.z());
+            QVector4D rgbColor0 = transferFunction(clamp(stddev0 * 2.0f, 0.0f, 1.0f));
+            NVGcolor fillColor0 = nvgRGBAf(rgbColor0.x(), rgbColor0.y(), rgbColor0.z(), rgbColor0.w());
+            QVector4D rgbColor1 = transferFunction(clamp(stddev1 * 2.0f, 0.0f, 1.0f));
+            NVGcolor fillColor1 = nvgRGBAf(rgbColor1.x(), rgbColor1.y(), rgbColor1.z(), rgbColor1.w());
 
             nvgBeginPath(vg);
             nvgMoveTo(vg, xpos0, upperY);
@@ -1186,8 +1207,8 @@ void MHorizonGraph::renderBase() {
         return getNiceNumberString(t * 0.5f, 4);
     };
     auto colorMap = [this](float t) {
-        QVector3D color = transferFunction(t);
-        return nvgRGBf(color.x(), color.y(), color.z());
+        QVector4D color = transferFunction(t);
+        return nvgRGBAf(color.x(), color.y(), color.z(), color.w());
     };
     drawColorLegend(
             textColor,

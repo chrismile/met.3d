@@ -155,6 +155,11 @@ inline QVector3D mix(const QVector3D &x, const QVector3D &y, float a)
     return (1.0f - a) * x + a * y;
 }
 
+inline QVector4D mix(const QVector4D &x, const QVector4D &y, float a)
+{
+    return (1.0f - a) * x + a * y;
+}
+
 inline float fract(float x)
 {
     return x - std::floor(x);

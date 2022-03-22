@@ -125,7 +125,7 @@ private:
     void updateTimeScale(const QVector2D& mousePosition, EventType eventType, QMouseEvent* event);
     void updateTimeShift(const QVector2D& mousePosition, EventType eventType, QMouseEvent* event);
 
-    QVector3D transferFunction(float value) const;
+    QVector4D transferFunction(float value) const;
     MTransferFunction1D*& diagramTransferFunction;
     bool mapStdDevToColor = true;
 
