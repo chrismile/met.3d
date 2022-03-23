@@ -236,10 +236,15 @@ shader FSmain(in VSOutput inputs, out vec4 fragColor)
     vec4 surfaceColor = determineColorLinearInterpolate(
             actualVarID, variableValue, variableNextValue, interpolationFactor);
 
+    float separatorWidthCopy = separatorWidth;
+    if (isnan(param)) {
+        separatorWidthCopy = 0.0;
+    }
+
     // 4.1) Adapt the separator width to the sphere to be independent of the radius.
     float ribbonPositionCentered = length(crossProdVnCircle);
     float h = 1.0 / sqrt(1.0 - ribbonPositionCentered * ribbonPositionCentered);
-    float separatorWidthSphere = separatorWidth * lineRadius / (sphereRadius * h);
+    float separatorWidthSphere = separatorWidthCopy * lineRadius / (sphereRadius * h);
 
     float sphereRadiusSq = sphereRadius * sphereRadius;
     float distanceEntrance = acos(dot(entrancePoint - inputs.spherePosition, inputs.fragmentPosition - inputs.spherePosition) / sphereRadiusSq);
@@ -253,7 +258,7 @@ shader FSmain(in VSOutput inputs, out vec4 fragColor)
 
 
     // 4.2) Draw black separators between single stripes.
-    if (separatorWidth > 0) {
+    if (separatorWidthCopy > 0) {
         drawSeparatorBetweenStripes(surfaceColor, bandPos, separatorWidthSphere);
     }
 
@@ -262,10 +267,10 @@ shader FSmain(in VSOutput inputs, out vec4 fragColor)
     float shadowFactor = 1.0f;
     vec4 color = computePhongLightingSphere(
             surfaceColor, occlusionFactor, shadowFactor, inputs.fragmentPosition, n,
-            abs((ribbonPosition - 0.5) * 2.0), separatorWidth * 0.005f);
+            abs((ribbonPosition - 0.5) * 2.0), separatorWidthCopy * 0.005f);
 
     // 5.2) Draw outside stripe.
-    if (separatorWidth > 0) {
+    if (separatorWidthCopy > 0) {
         vec3 up = normalize(cross(v, l));
         vec3 pn = normalize(cross(up, v));
         vec3 helperVecN = normalize(cross(pn, n));
@@ -284,7 +289,7 @@ shader FSmain(in VSOutput inputs, out vec4 fragColor)
         }
 
         float h = sqrt(1.0 - centerDist * centerDist);
-        float separatorWidthSphere = separatorWidth * lineRadius / (sphereRadius * h) * 0.5;
+        float separatorWidthSphere = separatorWidthCopy * lineRadius / (sphereRadius * h) * 0.5;
 
         drawSeparatorBetweenStripes(color, ribbonPosition2 / 2.0 + 0.5, separatorWidthSphere);
     }

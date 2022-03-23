@@ -113,7 +113,7 @@ void MHorizonGraph::onWindowSizeChanged() {
 }
 
 void MHorizonGraph::updateTimeStepTicks() {
-    size_t numTimeStepsLocal = size_t(float(numTimeSteps) * (timeDisplayMax - timeDisplayMin) / (timeMax - timeMin));
+    /*size_t numTimeStepsLocal = size_t(float(numTimeSteps) * (timeDisplayMax - timeDisplayMin) / (timeMax - timeMin));
     if (numTimeStepsLocal < 10) {
         timeStepLegendIncrement = 1;
         timeStepTicksIncrement = 1;
@@ -123,6 +123,17 @@ void MHorizonGraph::updateTimeStepTicks() {
     } else {
         timeStepLegendIncrement = numTimeStepsLocal / 10;
         timeStepTicksIncrement = timeStepLegendIncrement / 5;
+    }*/
+    size_t numTimeStepsLocal = size_t(timeDisplayMax - timeDisplayMin);
+    if (numTimeStepsLocal < 10) {
+        timeStepLegendIncrement = 1;
+        timeStepTicksIncrement = 1;
+    } else if (numTimeStepsLocal < 50) {
+        timeStepLegendIncrement = 5;
+        timeStepTicksIncrement = 1;
+    } else {
+        timeStepTicksIncrement = numTimeStepsLocal / 50;
+        timeStepLegendIncrement = timeStepTicksIncrement * 5;
     }
 }
 
@@ -944,12 +955,12 @@ void MHorizonGraph::drawHorizonLinesLttb() {
 
             float mean0 = lttbPointLast[1];
             float stddev0 = ensembleStdDevValues.at(timeStepIdxLast).at(varIdx);
-            float timeStep0 = lttbPointLast[0];
+            float timeStep0 = timeMin + (timeMax - timeMin) * lttbPointLast[0] / float(numTimeSteps - 1);
             float xpos0 = offsetHorizonBarsX + (timeStep0 - timeDisplayMin) / (timeDisplayMax - timeDisplayMin) * horizonBarWidth;
 
             float mean1 = lttbPointNext[1];
             float stddev1 = ensembleStdDevValues.at(timeStepIdxNext).at(varIdx);
-            float timeStep1 = lttbPointNext[0];
+            float timeStep1 = timeMin + (timeMax - timeMin) * lttbPointNext[0] / float(numTimeSteps - 1);
             float xpos1 = offsetHorizonBarsX + (timeStep1 - timeDisplayMin) / (timeDisplayMax - timeDisplayMin) * horizonBarWidth;
 
             if (std::isnan(mean0)) {
@@ -996,7 +1007,7 @@ void MHorizonGraph::drawHorizonLinesLttb() {
             const QVector2D& lttbPoint = lttbPoints.at(ptIdx);
 
             float mean = lttbPoint[1];
-            float timeStep = lttbPoint[0];
+            float timeStep = timeMin + (timeMax - timeMin) * lttbPoint[0] / float(numTimeSteps - 1);
             float xpos = offsetHorizonBarsX + (timeStep - timeDisplayMin) / (timeDisplayMax - timeDisplayMin) * horizonBarWidth;
 
             if (std::isnan(mean)) {
@@ -1080,10 +1091,11 @@ void MHorizonGraph::drawLegendTop(const NVGcolor& textColor) {
     int timeStepIdxStart = int(std::ceil((timeDisplayMin - timeMin) / (timeMax - timeMin) * float(numTimeSteps - 1)));
     int timeStepIdxStop = int(std::floor((timeDisplayMax - timeMin) / (timeMax - timeMin) * float(numTimeSteps - 1)));
     for (int timeStepIdx = timeStepIdxStart; timeStepIdx <= timeStepIdxStop; timeStepIdx++) {
-        if (timeStepIdx % timeStepLegendIncrement != 0) {
+        float timeStep = timeMin + (timeMax - timeMin) * float(timeStepIdx) / float(numTimeSteps - 1);
+        int timeStepInt = int(std::round(timeStep));
+        if (timeStepInt % timeStepLegendIncrement != 0) {
             continue;
         }
-        float timeStep = timeMin + (timeMax - timeMin) * float(timeStepIdx) / float(numTimeSteps - 1);
         std::string timeStepName = std::to_string(int(timeStep));
         float centerX = offsetHorizonBarsX + (timeStep - timeDisplayMin) / (timeDisplayMax - timeDisplayMin) * horizonBarWidth;
         nvgTextAlign(vg, NVG_ALIGN_CENTER | NVG_ALIGN_TOP);
@@ -1100,17 +1112,18 @@ void MHorizonGraph::drawTicks(const NVGcolor& textColor) {
     int timeStepIdxStart = int(std::ceil((timeDisplayMin - timeMin) / (timeMax - timeMin) * float(numTimeSteps - 1)));
     int timeStepIdxStop = int(std::floor((timeDisplayMax - timeMin) / (timeMax - timeMin) * float(numTimeSteps - 1)));
     for (int timeStepIdx = timeStepIdxStart; timeStepIdx <= timeStepIdxStop; timeStepIdx++) {
-        if (timeStepIdx % timeStepTicksIncrement != 0) {
+        float timeStep = timeMin + (timeMax - timeMin) * float(timeStepIdx) / float(numTimeSteps - 1);
+        int timeStepInt = int(std::round(timeStep));
+        if (timeStepInt % timeStepTicksIncrement != 0) {
             continue;
         }
 
         float thicknessFactor = 1.0f;
-        if (timeStepIdx % timeStepLegendIncrement == 0) {
+        if (timeStepInt % timeStepLegendIncrement == 0) {
             thicknessFactor = 2.0f;
         }
         const float tickWidth = thicknessFactor * tickWidthBase;
         const float tickHeight = thicknessFactor * tickHeightBase;
-        float timeStep = timeMin + (timeMax - timeMin) * float(timeStepIdx) / float(numTimeSteps - 1);
         float centerX = offsetHorizonBarsX + (timeStep - timeDisplayMin) / (timeDisplayMax - timeDisplayMin) * horizonBarWidth;
         nvgRect(vg, centerX - tickWidth / 2.0f, offsetHorizonBarsY - tickHeight, tickWidth, tickHeight);
     }

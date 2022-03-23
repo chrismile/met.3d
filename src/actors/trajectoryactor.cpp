@@ -428,7 +428,7 @@ MTrajectoryActor::MTrajectoryActor()
             "SPRING subsequence matching algorithm distance metric epsilon.");
 
     backgroundOpacityProperty = addProperty(
-            DECORATEDDOUBLE_PROPERTY, "Diagram opacity", similarityMetricGroup);
+            DECORATEDDOUBLE_PROPERTY, "diagram opacity", similarityMetricGroup);
     properties->setDDouble(
             backgroundOpacityProperty, backgroundOpacity,
             0.0, 1.0, 2, 0.05, " (factor)");

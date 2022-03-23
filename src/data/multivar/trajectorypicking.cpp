@@ -765,7 +765,8 @@ bool MTrajectoryPicker::pickPointWorld(
             + vertexTimeSteps.at(vidx2) * barycentricCoordinates.z();
     if (trajectorySyncMode == TrajectorySyncMode::TIME_OF_ASCENT)
     {
-        timeAtHit = timeAtHit + float(maxAscentTimeStepIndex - ascentTimeStepIndices.at(trajectoryIndex));
+        //timeAtHit = timeAtHit + float(maxAscentTimeStepIndex - ascentTimeStepIndices.at(trajectoryIndex));
+        timeAtHit = timeAtHit + float(-ascentTimeStepIndices.at(trajectoryIndex));
     }
 
     return true;
@@ -894,7 +895,8 @@ void MTrajectoryPicker::updateDiagramData()
                     int timeStepLocal;
                     if (trajectorySyncMode == TrajectorySyncMode::TIME_OF_ASCENT)
                     {
-                        timeStepLocal = timeStep - maxAscentTimeStepIndex + ascentTimeStepIndices.at(trajectoryIndex);
+                        //timeStepLocal = timeStep - maxAscentTimeStepIndex + ascentTimeStepIndices.at(trajectoryIndex);
+                        timeStepLocal = timeStep + ascentTimeStepIndices.at(trajectoryIndex);
                     }
                     else
                     {
@@ -921,7 +923,8 @@ void MTrajectoryPicker::updateDiagramData()
                 int timeStepLocal;
                 if (trajectorySyncMode == TrajectorySyncMode::TIME_OF_ASCENT)
                 {
-                    timeStepLocal = timeStep - maxAscentTimeStepIndex + ascentTimeStepIndices.at(trajectoryIndex);
+                    //timeStepLocal = timeStep - maxAscentTimeStepIndex + ascentTimeStepIndices.at(trajectoryIndex);
+                    timeStepLocal = timeStep + ascentTimeStepIndices.at(trajectoryIndex);
                 }
                 else
                 {
@@ -955,7 +958,8 @@ void MTrajectoryPicker::updateDiagramData()
                 int timeStepLocal;
                 if (trajectorySyncMode == TrajectorySyncMode::TIME_OF_ASCENT)
                 {
-                    timeStepLocal = timeStep - maxAscentTimeStepIndex + ascentTimeStepIndices.at(trajectoryIndex);
+                    //timeStepLocal = timeStep - maxAscentTimeStepIndex + ascentTimeStepIndices.at(trajectoryIndex);
+                    timeStepLocal = timeStep + ascentTimeStepIndices.at(trajectoryIndex);
                 }
                 else
                 {
@@ -1027,9 +1031,13 @@ void MTrajectoryPicker::updateDiagramData()
         if (trajectorySyncMode == TrajectorySyncMode::TIME_OF_ASCENT)
         {
             int delta = maxAscentTimeStepIndex - minAscentTimeStepIndex;
+            int timeIdxMin = -maxAscentTimeStepIndex;
+            int timeIdxMax = int(numTimeSteps) - 1 - minAscentTimeStepIndex;
             size_t numTimeStepsTotal = numTimeSteps + size_t(delta);
-            timeMin = float(0.0f);
-            timeMax = float(numTimeStepsTotal);
+            //timeMin = float(0.0f);
+            //timeMax = float(numTimeStepsTotal);
+            timeMin = float(timeIdxMin);
+            timeMax = float(timeIdxMax);
 
             int i = 0;
             for (const auto& it : highlightedTrajectories)
@@ -1041,7 +1049,7 @@ void MTrajectoryPicker::updateDiagramData()
                 for (size_t timeIdx = 0; timeIdx < numTimeStepsTotal; timeIdx++)
                 {
                     std::vector<float>& values = variableValuesPerTrajectory.at(timeIdx);
-                    values.resize(numVars);
+                    values.resize(numVars, std::numeric_limits<float>::quiet_NaN());
 
                     int realTimeIdx =
                             int(timeIdx) - maxAscentTimeStepIndex + ascentTimeStepIndices.at(trajectoryIndex);
@@ -1051,7 +1059,8 @@ void MTrajectoryPicker::updateDiagramData()
                         {
                             bool isSensitivity = isVarSensitivityArray.at(varIdx);
                             float value = trajectory.attributes.at(int(varIdx)).at(realTimeIdx);
-                            if (!std::isnan(value)) {
+                            if (!std::isnan(value))
+                            {
                                 QVector2D minMaxVector = minMaxAttributes.at(int(varIdx));
                                 if (isSensitivity)
                                 {
