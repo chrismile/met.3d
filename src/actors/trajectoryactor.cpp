@@ -428,7 +428,7 @@ MTrajectoryActor::MTrajectoryActor()
             "SPRING subsequence matching algorithm distance metric epsilon.");
 
     backgroundOpacityProperty = addProperty(
-            DECORATEDDOUBLE_PROPERTY, "SPRING metric epsilon", similarityMetricGroup);
+            DECORATEDDOUBLE_PROPERTY, "Diagram opacity", similarityMetricGroup);
     properties->setDDouble(
             backgroundOpacityProperty, backgroundOpacity,
             0.0, 1.0, 2, 0.05, " (factor)");
@@ -3105,6 +3105,7 @@ void MTrajectoryActor::unbindShadowStencilBuffer()
     CHECK_GL_ERROR;
 }
 
+
 void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
 {
     // Only render if transfer function is available.
@@ -3118,7 +3119,6 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
     {
         for (int t = 0; t < (precomputedDataSource ? 1 : seedActorData.size()); t++)
         {
-
             // If any required data item is missing we cannot render.
             if ( (trajectoryRequests[t].trajectories == nullptr)
                  || (trajectoryRequests[t].bezierTrajectoriesMap[sceneView] == nullptr)
@@ -3488,10 +3488,6 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
 
             // Unbind VBO.
             glBindBuffer(GL_ARRAY_BUFFER, 0); CHECK_GL_ERROR;
-
-#ifdef USE_EMBREE
-            trajectoryPickerMap[sceneView]->render();
-#endif
         }
 
         return;
@@ -3741,6 +3737,34 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
 
             // Unbind VBO.
             glBindBuffer(GL_ARRAY_BUFFER, 0); CHECK_GL_ERROR;
+        }
+    }
+}
+
+
+void MTrajectoryActor::renderOverlayToCurrentContext(MSceneViewGLWidget *sceneView)
+{
+    // Only render if transfer function is available.
+    if (transferFunction == nullptr)
+    {
+        return;
+    }
+
+    if (useBezierTrajectories)
+    {
+        for (int t = 0; t < (precomputedDataSource ? 1 : seedActorData.size()); t++)
+        {
+            // If any required data item is missing we cannot render.
+            if ( (trajectoryRequests[t].trajectories == nullptr)
+                 || (trajectoryRequests[t].bezierTrajectoriesMap[sceneView] == nullptr)
+                 || (trajectoryRequests[t].trajectorySelection == nullptr) )
+            {
+                continue;
+            }
+
+#ifdef USE_EMBREE
+            trajectoryPickerMap[sceneView]->render();
+#endif
         }
     }
 }

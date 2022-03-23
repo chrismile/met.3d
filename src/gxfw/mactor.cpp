@@ -226,6 +226,13 @@ void MActor::render(MSceneViewGLWidget *sceneView)
 }
 
 
+void MActor::renderOverlay(MSceneViewGLWidget *sceneView)
+{
+    if (!actorIsEnabled) return;
+    renderOverlayToCurrentContext(sceneView);
+}
+
+
 void MActor::renderToFullScreen(MSceneViewGLWidget *sceneView)
 {
     if (!actorIsEnabled) return;

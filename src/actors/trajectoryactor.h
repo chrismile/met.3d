@@ -288,6 +288,7 @@ protected:
     void unbindShadowStencilBuffer();
 
     void renderToCurrentContext(MSceneViewGLWidget *sceneView);
+    void renderOverlayToCurrentContext(MSceneViewGLWidget *sceneView);
 
     void updateTimeProperties();
 

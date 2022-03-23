@@ -1916,6 +1916,27 @@ void MSceneViewGLWidget::paintGL()
         MGLResourcesManager::getInstance()->getTextManager()
                 ->renderLabelList(this, labelList);
         if (!renderLabelsWithDepthTest) glEnable(GL_DEPTH_TEST);
+
+        // Render overlays after rendering the labels.
+        if (sceneNavigationMode != SINGLE_FULLSCREEN_ACTOR)
+        {
+            foreach (MActor* actor, scene->getRenderQueue())
+            {
+                if (singleInteractionActor != nullptr &&
+                    singleInteractionActor->getName() == actor->getName())
+                {
+                    actorInteractionMode = true;
+                }
+
+                actor->renderOverlay(this);
+
+                if (singleInteractionActor != nullptr &&
+                    singleInteractionActor->getName() == actor->getName())
+                {
+                    actorInteractionMode = false;
+                }
+            }
+        }
     }
 
     // Draw focus rectangle.

@@ -111,6 +111,15 @@ public:
 
     /**
       If the actor is enabled (property @ref enabled is set to true), render
+      the actor in the current OpenGL context. Calls the virtual method @ref
+      renderOverlayToCurrentContext() to perform the actual rendering in the
+      derived classes. Do not overwrite this method, but reimplement
+      @ref renderOverlayToCurrentContext() instead.
+      */
+    void renderOverlay(MSceneViewGLWidget *sceneView);
+
+    /**
+      If the actor is enabled (property @ref enabled is set to true), render
       the actor in the current OpenGL context in full-screen mode. Calls the
       virtual method @ref renderToCurrentContextFullScreen() to perform the
       actual rendering in the derived classes. Do not overwrite this method,
@@ -634,6 +643,13 @@ protected:
       Needs to be implemented in derived classes.
       */
     virtual void renderToCurrentContext(MSceneViewGLWidget *sceneView) = 0;
+
+    /**
+      Render the actor's overlays in the current OpenGL context.
+
+      Can be implemented in derived classes.
+      */
+    virtual void renderOverlayToCurrentContext(MSceneViewGLWidget *sceneView) {}
 
     /**
       Render the actor in the current OpenGL context in full screen mode.
