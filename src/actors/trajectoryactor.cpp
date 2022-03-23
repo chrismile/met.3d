@@ -434,6 +434,12 @@ MTrajectoryActor::MTrajectoryActor()
             0.0, 1.0, 2, 0.05, " (factor)");
     backgroundOpacityProperty->setToolTip("Diagram view background opacity.");
 
+    useGlobalMinMaxProperty = addProperty(
+            BOOL_PROPERTY, "use global min/max", similarityMetricGroup);
+    properties->mBool()->setValue(useGlobalMinMaxProperty, useGlobalMinMax);
+    useGlobalMinMaxProperty->setToolTip(
+            "Whether to normalize the data by using the minimum/maximum also over not selected trajectories.");
+
 
     updateSimilarityMetricGroupEnabled();
 
@@ -574,8 +580,9 @@ void MTrajectoryActor::saveConfiguration(QSettings *settings)
     settings->setValue(QString("meanMetricInfluence"), meanMetricInfluence);
     settings->setValue(QString("stdDevMetricInfluence"), stdDevMetricInfluence);
     settings->setValue(QString("numBins"), numBins);
-    settings->setValue(QString("springEpsilonProperty"), springEpsilon);
-    settings->setValue(QString("backgroundOpacityProperty"), backgroundOpacity);
+    settings->setValue(QString("springEpsilon"), springEpsilon);
+    settings->setValue(QString("backgroundOpacity"), backgroundOpacity);
+    settings->setValue(QString("useGlobalMinMax"), useGlobalMinMax);
 
     multiVarData.saveConfiguration(settings);
 
@@ -818,6 +825,8 @@ void MTrajectoryActor::loadConfiguration(QSettings *settings)
     properties->setDDouble(
             backgroundOpacityProperty, backgroundOpacity,
             0.0, 1.0, 2, 0.05, " (factor)");
+    useGlobalMinMax = settings->value("useGlobalMinMax", true).toBool();
+    properties->mBool()->setValue(useGlobalMinMaxProperty, useGlobalMinMax);
     updateSimilarityMetricGroupEnabled();
 
     trajectorySyncMode = TrajectorySyncMode(settings->value(
@@ -2776,6 +2785,19 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
         for (MTrajectoryPicker* trajectoryPicker : trajectoryPickerMap)
         {
             trajectoryPicker->setBackgroundOpacity(backgroundOpacity);
+        }
+        if (suppressActorUpdates()) return;
+        emitActorChangedSignal();
+#endif
+    }
+
+    else if (property == useGlobalMinMaxProperty)
+    {
+        useGlobalMinMax = properties->mBool()->value(useGlobalMinMaxProperty);
+#ifdef USE_EMBREE
+        for (MTrajectoryPicker* trajectoryPicker : trajectoryPickerMap)
+        {
+            trajectoryPicker->setUseGlobalMinMax(useGlobalMinMax);
         }
         if (suppressActorUpdates()) return;
         emitActorChangedSignal();

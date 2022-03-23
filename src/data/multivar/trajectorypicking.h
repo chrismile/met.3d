@@ -137,6 +137,7 @@ public:
     void setUseMaxForSensitivity(bool useMax);
     void setSpringEpsilon(float epsilon);
     void setBackgroundOpacity(float opacity);
+    void setUseGlobalMinMax(bool _useGlobalMinMax);
     void triggerSelectAllLines();
 
     // Used for aligning warm conveyor belt trajectories based on their ascension.
@@ -266,6 +267,7 @@ private:
     bool useMaxForSensitivity = true;
     float springEpsilon = 10.0f;
     float backgroundOpacity = 0.85f;
+    bool useGlobalMinMax = true;
 
     GLuint textureUnit;
     MFilteredTrajectories baseTrajectories;

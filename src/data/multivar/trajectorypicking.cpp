@@ -214,6 +214,14 @@ void MTrajectoryPicker::setBackgroundOpacity(float opacity)
     diagram->setBackgroundOpacity(backgroundOpacity);
 }
 
+void MTrajectoryPicker::setUseGlobalMinMax(bool _useGlobalMinMax)
+{
+    useGlobalMinMax = _useGlobalMinMax;
+    highlightDataDirty = true;
+    selectedTrajectoriesChanged = true;
+    updateDiagramData();
+}
+
 void MTrajectoryPicker::triggerSelectAllLines()
 {
     bool allTrajectoriesSelected = true;
@@ -878,6 +886,49 @@ void MTrajectoryPicker::updateDiagramData()
         return;
     }
 
+    QVector<QVector2D> minMaxAttributesLocal;
+    if (useGlobalMinMax)
+    {
+        minMaxAttributesLocal = minMaxAttributes;
+    }
+    else
+    {
+        minMaxAttributesLocal.resize(int(numVars));
+        for (size_t i = 0; i < numVars; i++)
+        {
+            minMaxAttributesLocal[int(i)] = QVector2D(
+                    std::numeric_limits<float>::max(), std::numeric_limits<float>::lowest());
+        }
+        for (const auto& it : highlightedTrajectories)
+        {
+            uint32_t trajectoryIndex = it.first;
+            const MFilteredTrajectory& trajectory = baseTrajectories.at(int(trajectoryIndex));
+
+            for (size_t i = 0; i < numVars; i++)
+            {
+                const QVector<float>& attributes = trajectory.attributes.at(int(i));
+                QVector2D& minMaxVector = minMaxAttributesLocal[int(i)];
+                for (float v : attributes)
+                {
+                    if (std::isnan(v))
+                    {
+                        continue;
+                    }
+                    minMaxVector.setX(std::min(minMaxVector.x(), v));
+                    minMaxVector.setY(std::max(minMaxVector.y(), v));
+                }
+            }
+        }
+        for (size_t i = 0; i < numVars; i++)
+        {
+            QVector2D& minMax = minMaxAttributesLocal[int(i)];
+            if (std::isinf(minMax[1])) {
+                minMax[1] = std::numeric_limits<float>::max();
+            }
+        }
+    }
+
+
     if (diagram->getDiagramType() == DiagramType::RADAR_BAR_CHART)
     {
         MRadarBarChart* radarBarChart = static_cast<MRadarBarChart*>(diagram);
@@ -904,7 +955,7 @@ void MTrajectoryPicker::updateDiagramData()
                     }
                     int time = clamp(timeStepLocal, 0, int(trajectory.attributes.at(int(i)).size()) - 1);
                     float value = trajectory.attributes.at(int(i)).at(time);
-                    QVector2D minMaxVector = minMaxAttributes.at(int(i));
+                    QVector2D minMaxVector = minMaxAttributesLocal.at(int(i));
                     float denominator = std::max(minMaxVector.y() - minMaxVector.x(), 1e-10f);
                     value = (value - minMaxVector.x()) / denominator;
                     values.push_back(value);
@@ -932,7 +983,7 @@ void MTrajectoryPicker::updateDiagramData()
                 }
                 int time = clamp(timeStepLocal, 0, int(trajectory.attributes.at(int(i)).size()) - 1);
                 float value = trajectory.attributes.at(int(i)).at(time);
-                QVector2D minMaxVector = minMaxAttributes.at(int(i));
+                QVector2D minMaxVector = minMaxAttributesLocal.at(int(i));
                 float denominator = std::max(minMaxVector.y() - minMaxVector.x(), 1e-10f);
                 value = (value - minMaxVector.x()) / denominator;
                 variableValues.push_back(value);
@@ -967,7 +1018,7 @@ void MTrajectoryPicker::updateDiagramData()
                 }
                 int time = clamp(timeStepLocal, 0, int(trajectory.attributes.at(int(i)).size()) - 1);
                 float value = trajectory.attributes.at(int(i)).at(time);
-                QVector2D minMaxVector = minMaxAttributes.at(int(i));
+                QVector2D minMaxVector = minMaxAttributesLocal.at(int(i));
                 float denominator = std::max(minMaxVector.y() - minMaxVector.x(), 1e-10f);
                 value = (value - minMaxVector.x()) / denominator;
                 if (std::isinf(value)) {
@@ -1061,7 +1112,7 @@ void MTrajectoryPicker::updateDiagramData()
                             float value = trajectory.attributes.at(int(varIdx)).at(realTimeIdx);
                             if (!std::isnan(value))
                             {
-                                QVector2D minMaxVector = minMaxAttributes.at(int(varIdx));
+                                QVector2D minMaxVector = minMaxAttributesLocal.at(int(varIdx));
                                 if (isSensitivity)
                                 {
                                     float maxVal = std::max(std::abs(minMaxVector.x()), std::abs(minMaxVector.y()));
@@ -1109,7 +1160,7 @@ void MTrajectoryPicker::updateDiagramData()
                         bool isSensitivity = isVarSensitivityArray.at(varIdx);
                         float value = trajectory.attributes.at(int(varIdx)).at(int(timeIdx));
                         if (!std::isnan(value)) {
-                            QVector2D minMaxVector = minMaxAttributes.at(int(varIdx));
+                            QVector2D minMaxVector = minMaxAttributesLocal.at(int(varIdx));
                             if (isSensitivity)
                             {
                                 float maxVal = std::max(std::abs(minMaxVector.x()), std::abs(minMaxVector.y()));
