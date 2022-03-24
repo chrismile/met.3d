@@ -165,6 +165,7 @@ void MHorizonGraph::setTextSize(float _textSize) {
     _textSize = std::max(_textSize, 4.0f);
     textSize = _textSize;
     textSizeLegendTop = textSize;
+    textSizeLegend = textSize + 4.0f;
 
     horizonBarHeight = textSize + horizonBarMargin;
     legendTopHeight = textSize * 2.0f;
@@ -172,6 +173,10 @@ void MHorizonGraph::setTextSize(float _textSize) {
     horizonBarHeightBase = horizonBarHeight;
     horizonBarMarginBase = horizonBarMargin;
     zoomFactor = 1.0f;
+
+    colorLegendHeight = colorLegendHeightBase * textSize / 8.0f;
+
+    textWidthMax = textWidthMaxBase * textSize / 8.0f;
 
     if (vg == nullptr) {
         return;
@@ -1284,7 +1289,9 @@ void MHorizonGraph::renderBase() {
             textColor,
             windowWidth - colorLegendWidth - textWidthMax - 10 - (useScrollBar ? scrollBarWidth : 0),
             windowHeight - colorLegendHeight - 10,
-            colorLegendWidth, colorLegendHeight, 2, 5, labelMap, colorMap,
+            colorLegendWidth,
+            colorLegendHeight,
+            2, 5, labelMap, colorMap,
             "\u03C3");
 
     if (useScrollBar) {

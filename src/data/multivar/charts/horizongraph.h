@@ -154,8 +154,10 @@ private:
 
     // Color legend.
     const float colorLegendWidth = 16;
-    const float colorLegendHeight = 160;
-    const float textWidthMax = 32;
+    const float colorLegendHeightBase = 160;
+    float colorLegendHeight = 160;
+    const float textWidthMaxBase = 32;
+    float textWidthMax = 32;
 
     float timeMin;
     float timeMax;

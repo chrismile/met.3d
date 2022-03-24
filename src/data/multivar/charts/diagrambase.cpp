@@ -711,7 +711,7 @@ void MDiagramBase::drawColorLegend(
     nvgFill(vg);
 
     // Draw on the right.
-    nvgFontSize(vg, 12.0f);
+    nvgFontSize(vg, textSizeLegend);
     nvgFontFace(vg, "sans");
     for (size_t tickIdx = 0; tickIdx < numTicks; tickIdx++) {
         float t = 1.0f - float(tickIdx) / float(int(numTicks) - 1);

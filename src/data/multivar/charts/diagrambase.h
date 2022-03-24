@@ -135,6 +135,7 @@ protected:
     const float borderWidth = 1.0f;
     const float borderRoundingRadius = 4.0f;
     float backgroundOpacity = 1.0f;
+    float textSizeLegend = 12.0f;
 
     enum ResizeDirection {
         NONE = 0, LEFT = 1, RIGHT = 2, BOTTOM = 4, TOP = 8,
