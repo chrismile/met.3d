@@ -41,6 +41,7 @@
 #include "charts/horizongraph.h"
 #include "util/mutil.h"
 #include "helpers.h"
+#include "hidpi.h"
 
 namespace Met3D {
 
@@ -74,6 +75,8 @@ MTrajectoryPicker::MTrajectoryPicker(
     } else {
         timeAfterAscentIndex = -1;
     }
+
+    diagramUpscalingFactor = getHighDPIScaleFactor();
 
     //radarChart = new QtExtensions::MRadarChart();
     //radarChart->setVariableNames(varNames);
@@ -126,6 +129,7 @@ void MTrajectoryPicker::setDiagramType(DiagramDisplayType type)
     if (diagram)
     {
         diagram->setBackgroundOpacity(springEpsilon);
+        diagram->setUpscalingFactor(diagramUpscalingFactor);
         needsInitializationBeforeRendering = true;
     }
 
@@ -220,7 +224,10 @@ void MTrajectoryPicker::setUseGlobalMinMax(bool _useGlobalMinMax)
     useGlobalMinMax = _useGlobalMinMax;
     highlightDataDirty = true;
     selectedTrajectoriesChanged = true;
-    updateDiagramData();
+    if (diagram->getIsNanoVgInitialized())
+    {
+        updateDiagramData();
+    }
 }
 
 void MTrajectoryPicker::setTextSize(float _textSize)
@@ -229,6 +236,15 @@ void MTrajectoryPicker::setTextSize(float _textSize)
     if (diagramDisplayType == DiagramDisplayType::HORIZON_GRAPH)
     {
         static_cast<MHorizonGraph*>(diagram)->setTextSize(_textSize);
+    }
+}
+
+void MTrajectoryPicker::setDiagramUpscalingFactor(float factor)
+{
+    this->diagramUpscalingFactor = factor;
+    if (diagramDisplayType == DiagramDisplayType::HORIZON_GRAPH)
+    {
+        static_cast<MHorizonGraph*>(diagram)->setUpscalingFactor(diagramUpscalingFactor);
     }
 }
 

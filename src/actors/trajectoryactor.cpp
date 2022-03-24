@@ -49,6 +49,7 @@
 #include "gxfw/selectactordialog.h"
 #include "data/trajectoryreader.h"
 #include "data/trajectorycomputation.h"
+#include "data/multivar/hidpi.h"
 #include "actors/movablepoleactor.h"
 #include "actors/nwphorizontalsectionactor.h"
 #include "actors/nwpverticalsectionactor.h"
@@ -447,6 +448,20 @@ MTrajectoryActor::MTrajectoryActor()
             4.0, 64.0, 2, 1.0, "px");
     diagramTextSizeProperty->setToolTip("Diagram text size.");
 
+    diagramUpscalingFactor = getHighDPIScaleFactor();
+    useCustomDiagramUpscalingFactorProperty = addProperty(
+            BOOL_PROPERTY, "use custom upscaling", similarityMetricGroup);
+    properties->mBool()->setValue(useCustomDiagramUpscalingFactorProperty, useCustomDiagramUpscalingFactor);
+    useCustomDiagramUpscalingFactorProperty->setToolTip(
+            "Whether to normalize the data by using the minimum/maximum also over not selected trajectories.");
+    diagramUpscalingFactorProperty = addProperty(
+            DECORATEDDOUBLE_PROPERTY, "diagram upscaling factor", similarityMetricGroup);
+    properties->setDDouble(
+            diagramUpscalingFactorProperty, diagramUpscalingFactor,
+            0.25, 8.0, 3, 0.125, " (factor)");
+    diagramUpscalingFactorProperty->setToolTip("Custom diagram upscaling factor.");
+    diagramUpscalingFactorProperty->setEnabled(useCustomDiagramUpscalingFactor);
+
 
     updateSimilarityMetricGroupEnabled();
 
@@ -591,6 +606,8 @@ void MTrajectoryActor::saveConfiguration(QSettings *settings)
     settings->setValue(QString("backgroundOpacity"), backgroundOpacity);
     settings->setValue(QString("useGlobalMinMax"), useGlobalMinMax);
     settings->setValue(QString("diagramTextSize"), diagramTextSize);
+    settings->setValue(QString("useCustomDiagramUpscalingFactor"), useCustomDiagramUpscalingFactor);
+    settings->setValue(QString("diagramUpscalingFactor"), diagramUpscalingFactor);
 
     multiVarData.saveConfiguration(settings);
 
@@ -839,6 +856,14 @@ void MTrajectoryActor::loadConfiguration(QSettings *settings)
     properties->setDDouble(
             diagramTextSizeProperty, diagramTextSize,
             4.0, 64.0, 2, 1.0, "px");
+    useCustomDiagramUpscalingFactor = settings->value("useCustomDiagramUpscalingFactor", false).toBool();
+    properties->mBool()->setValue(useCustomDiagramUpscalingFactorProperty, useCustomDiagramUpscalingFactor);
+    diagramUpscalingFactor = settings->value(
+            "diagramUpscalingFactor", getHighDPIScaleFactor()).toFloat();
+    properties->setDDouble(
+            diagramUpscalingFactorProperty, diagramUpscalingFactor,
+            0.25, 8.0, 3, 0.125, " (factor)");
+    diagramUpscalingFactorProperty->setEnabled(useCustomDiagramUpscalingFactor);
     updateSimilarityMetricGroupEnabled();
 
     trajectorySyncMode = TrajectorySyncMode(settings->value(
@@ -1887,6 +1912,17 @@ void MTrajectoryActor::prepareAvailableDataForRendering(uint slot)
                         trajectoryPickerMap[view]->setSelectedVariables(multiVarData.getSelectedVariables());
                         trajectoryPickerMap[view]->updateTrajectoryRadius(tubeRadius);
                         trajectoryPickerMap[view]->setParticlePosTimeStep(particlePosTimeStep);
+                        trajectoryPickerMap[view]->setDiagramType(diagramType);
+                        trajectoryPickerMap[view]->setSimilarityMetric(similarityMetric);
+                        trajectoryPickerMap[view]->setMeanMetricInfluence(meanMetricInfluence);
+                        trajectoryPickerMap[view]->setStdDevMetricInfluence(stdDevMetricInfluence);
+                        trajectoryPickerMap[view]->setSpringEpsilon(springEpsilon);
+                        trajectoryPickerMap[view]->setBackgroundOpacity(backgroundOpacity);
+                        trajectoryPickerMap[view]->setUseGlobalMinMax(useGlobalMinMax);
+                        trajectoryPickerMap[view]->setTextSize(diagramTextSize);
+                        if (useCustomDiagramUpscalingFactor) {
+                            trajectoryPickerMap[view]->setDiagramUpscalingFactor(diagramUpscalingFactor);
+                        }
                     }
 
                     trajectoryPickerMap[view]->setBaseTrajectories(
@@ -2826,6 +2862,39 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
         }
         if (suppressActorUpdates()) return;
         emitActorChangedSignal();
+#endif
+    }
+
+    else if (property == useCustomDiagramUpscalingFactorProperty)
+    {
+        useCustomDiagramUpscalingFactor = properties->mBool()->value(useCustomDiagramUpscalingFactorProperty);
+#ifdef USE_EMBREE
+        if (useCustomDiagramUpscalingFactorProperty)
+        {
+            for (MTrajectoryPicker* trajectoryPicker : trajectoryPickerMap)
+            {
+                trajectoryPicker->setDiagramUpscalingFactor(diagramUpscalingFactor);
+            }
+            if (suppressActorUpdates()) return;
+            emitActorChangedSignal();
+        }
+        diagramUpscalingFactorProperty->setEnabled(useCustomDiagramUpscalingFactor);
+#endif
+    }
+
+    else if (property == diagramUpscalingFactorProperty)
+    {
+        diagramUpscalingFactor = float(properties->mDDouble()->value(diagramUpscalingFactorProperty));
+#ifdef USE_EMBREE
+        if (useCustomDiagramUpscalingFactor)
+        {
+            for (MTrajectoryPicker* trajectoryPicker : trajectoryPickerMap)
+            {
+                trajectoryPicker->setDiagramUpscalingFactor(diagramUpscalingFactor);
+            }
+            if (suppressActorUpdates()) return;
+            emitActorChangedSignal();
+        }
 #endif
     }
 

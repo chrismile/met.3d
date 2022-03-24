@@ -139,6 +139,7 @@ public:
     void setBackgroundOpacity(float opacity);
     void setUseGlobalMinMax(bool _useGlobalMinMax);
     void setTextSize(float _textSize);
+    void setDiagramUpscalingFactor(float factor);
     void triggerSelectAllLines();
 
     // Used for aligning warm conveyor belt trajectories based on their ascension.
@@ -270,6 +271,7 @@ private:
     float backgroundOpacity = 0.85f;
     bool useGlobalMinMax = true;
     float textSize = 8.0f;
+    float diagramUpscalingFactor = 1.0f;
 
     GLuint textureUnit;
     MFilteredTrajectories baseTrajectories;

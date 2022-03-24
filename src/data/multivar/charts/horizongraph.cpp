@@ -60,6 +60,18 @@ static const std::vector<QColor> predefinedColors = {
 
 MHorizonGraph::MHorizonGraph(GLint textureUnit, MTransferFunction1D*& diagramTransferFunction)
         : MDiagramBase(textureUnit), diagramTransferFunction(diagramTransferFunction) {
+    borderSizeX = 10;
+    borderSizeY = 10;
+
+    horizonBarWidth = 400;
+    horizonBarHeight = 12;
+    horizonBarHeightBase = horizonBarHeight;
+    horizonBarMargin = 4.0f;
+    horizonBarMarginBase = horizonBarMargin;
+    textSize = std::max(horizonBarHeight - horizonBarMargin, 4.0f);
+    textSizeLegendTop = textSize;
+    legendLeftWidth = 0.0f; //< Computed below.
+    legendTopHeight = textSize * 2.0f;
 }
 
 float MHorizonGraph::computeWindowHeight() {
@@ -149,14 +161,6 @@ void MHorizonGraph::initialize() {
     borderSizeY = 10;
 
     horizonBarWidth = 400;
-    horizonBarHeight = 12;
-    horizonBarHeightBase = horizonBarHeight;
-    horizonBarMargin = 4.0f;
-    horizonBarMarginBase = horizonBarMargin;
-    textSize = std::max(horizonBarHeight - horizonBarMargin, 4.0f);
-    textSizeLegendTop = textSize;
-    legendLeftWidth = 0.0f; //< Computed below.
-    legendTopHeight = textSize * 2.0f;
 
     MDiagramBase::initialize();
 }
@@ -1269,8 +1273,8 @@ void MHorizonGraph::renderBase() {
     nvgTranslate(vg, 0.0f, -scrollTranslationY);
 
     drawHorizonBackground();
-    drawHorizonMatchSelections();
     drawHorizonLinesLttb();
+    drawHorizonMatchSelections();
     drawHorizonOutline(textColor);
     drawSelectedTimeStepLine(textColor);
     drawLegendLeft(textColor);
@@ -2154,14 +2158,18 @@ void MHorizonGraph::endSelection(float timeStep) {
 
 void MHorizonGraph::computeMatchSelections() {
     std::vector<float> querySubsequence;
-    int startTimeIdx = clamp(int(std::round(selectStart)), 0, int(numTimeSteps) - 1);
-    int stopTimeIdx = clamp(int(std::round(selectEnd)), 0, int(numTimeSteps) - 1);
+    int startTimeIdx = clamp(
+            int(std::round((selectStart - timeMin) / (timeMax - timeMin) * float(numTimeSteps - 1))),
+            0, int(numTimeSteps) - 1);
+    int stopTimeIdx = clamp(
+            int(std::round((selectEnd - timeMin) / (timeMax - timeMin) * float(numTimeSteps - 1))),
+            0, int(numTimeSteps) - 1);
     for (int timeStepIdx = startTimeIdx; timeStepIdx <= stopTimeIdx; timeStepIdx++) {
         querySubsequence.push_back(ensembleMeanValues.at(timeStepIdx).at(selectVarIdx));
     }
 
 #if _OPENMP >= 200805
-#pragma omp parallel for default(none) shared(querySubsequence)
+    #pragma omp parallel for default(none) shared(querySubsequence)
 #endif
     for (size_t varIdx = 0; varIdx < variableNames.size(); varIdx++) {
         std::vector<float> sequence;
@@ -2173,7 +2181,9 @@ void MHorizonGraph::computeMatchSelections() {
         auto matches = spring(sequence, querySubsequence, springEpsilon);
         for (auto& match : matches) {
             if (match.t_e - match.t_s > 0) {
-                matchSelections.emplace_back(float(match.t_s), float(match.t_e));
+                float timeStart = timeMin + (timeMax - timeMin) * float(match.t_s) / float(numTimeSteps - 1);
+                float timeStop = timeMin + (timeMax - timeMin) * float(match.t_e) / float(numTimeSteps - 1);
+                matchSelections.emplace_back(timeStart, timeStop);
             }
         }
     }

@@ -88,7 +88,10 @@ public:
     inline bool getSelectedVariablesChanged() const { return selectedVariablesChanged; }
     inline void resetSelectedVariablesChanged() { selectedVariablesChanged = false; }
 
+    inline bool getIsNanoVgInitialized() const { return vg != nullptr; }
+
     inline void setBackgroundOpacity(float opacity) { backgroundOpacity = opacity; }
+    inline void setUpscalingFactor(float factor) { scaleFactor = factor; onWindowSizeChanged(); }
 
     virtual void mouseMoveEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event);
     virtual void mouseMoveEventParent(MSceneViewGLWidget *sceneView, QMouseEvent *event);
@@ -130,8 +133,8 @@ protected:
     }
 
     NVGcontext* vg = nullptr;
-    float windowWidth, windowHeight;
-    float borderSizeX, borderSizeY;
+    float windowWidth{}, windowHeight{};
+    float borderSizeX{}, borderSizeY{};
     const float borderWidth = 1.0f;
     const float borderRoundingRadius = 4.0f;
     float backgroundOpacity = 1.0f;
@@ -164,7 +167,7 @@ private:
     };
     TextMode textMode = TextMode::ROTATED;
 
-    float windowOffsetX, windowOffsetY;
+    float windowOffsetX{}, windowOffsetY{};
     float scaleFactor = 1.0f;
     int fboWidthInternal = 0, fboHeightInternal = 0;
     int fboWidthDisplay = 0, fboHeightDisplay = 0;

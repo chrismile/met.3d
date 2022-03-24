@@ -132,12 +132,12 @@ private:
 
     float horizonBarWidth, horizonBarHeight, horizonBarHeightBase;
     float textSize, textSizeLegendTop;
-    float legendLeftWidth;
-    float legendTopHeight;
-    float offsetHorizonBarsX, offsetHorizonBarsY;
+    float legendLeftWidth{};
+    float legendTopHeight{};
+    float offsetHorizonBarsX{}, offsetHorizonBarsY{};
     float horizonBarMargin, horizonBarMarginBase;
-    int timeStepLegendIncrement;
-    int timeStepTicksIncrement;
+    int timeStepLegendIncrement{};
+    int timeStepTicksIncrement{};
 
     // Scrolling and zooming.
     float maxWindowHeight = 500.0f;
@@ -159,11 +159,11 @@ private:
     const float textWidthMaxBase = 32;
     float textWidthMax = 32;
 
-    float timeMin;
-    float timeMax;
+    float timeMin{};
+    float timeMax{};
     std::vector<std::string> variableNames;
-    size_t numTrajectories;
-    size_t numTimeSteps;
+    size_t numTrajectories{};
+    size_t numTimeSteps{};
     std::vector<std::vector<std::vector<float>>> variableValuesArray;
     std::vector<std::vector<float>> ensembleMeanValues;
     std::vector<std::vector<float>> ensembleStdDevValues;
@@ -178,7 +178,7 @@ private:
     float timeDisplayMax = 1.0f;
     float timeDisplayMinOld = 0.0f;
     float timeDisplayMaxOld = 1.0f;
-    float topLegendClickPct;
+    float topLegendClickPct{};
     bool isDraggingTopLegend = false;
     float clickTime = 0.0f;
     bool isDraggingTimeShift = false;

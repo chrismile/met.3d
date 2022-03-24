@@ -510,6 +510,8 @@ private:
     QtProperty *backgroundOpacityProperty;
     QtProperty *useGlobalMinMaxProperty;
     QtProperty *diagramTextSizeProperty;
+    QtProperty *useCustomDiagramUpscalingFactorProperty;
+    QtProperty *diagramUpscalingFactorProperty;
 
     SimilarityMetric similarityMetric = SimilarityMetric::ABSOLUTE_NCC;
     float meanMetricInfluence = 0.5f;
@@ -521,6 +523,8 @@ private:
     float backgroundOpacity = 1.0f;
     bool useGlobalMinMax = true;
     float diagramTextSize = 8.0f;
+    bool useCustomDiagramUpscalingFactor = false;
+    float diagramUpscalingFactor = 1.0f;
 
     QStringList trajectorySyncModeNames = {
             "Time Step", "Time of Ascent", "Height"
