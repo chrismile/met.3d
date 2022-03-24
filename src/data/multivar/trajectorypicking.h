@@ -138,6 +138,7 @@ public:
     void setSpringEpsilon(float epsilon);
     void setBackgroundOpacity(float opacity);
     void setUseGlobalMinMax(bool _useGlobalMinMax);
+    void setTextSize(float _textSize);
     void triggerSelectAllLines();
 
     // Used for aligning warm conveyor belt trajectories based on their ascension.
@@ -268,6 +269,7 @@ private:
     float springEpsilon = 10.0f;
     float backgroundOpacity = 0.85f;
     bool useGlobalMinMax = true;
+    float textSize = 8.0f;
 
     GLuint textureUnit;
     MFilteredTrajectories baseTrajectories;

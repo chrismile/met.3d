@@ -120,6 +120,7 @@ void MTrajectoryPicker::setDiagramType(DiagramDisplayType type)
         horizonGraph->setShowMinMaxValue(showMinMaxValue);
         horizonGraph->setUseMaxForSensitivity(useMaxForSensitivity);
         horizonGraph->setSpringEpsilon(springEpsilon);
+        horizonGraph->setTextSize(textSize);
     }
 
     if (diagram)
@@ -220,6 +221,15 @@ void MTrajectoryPicker::setUseGlobalMinMax(bool _useGlobalMinMax)
     highlightDataDirty = true;
     selectedTrajectoriesChanged = true;
     updateDiagramData();
+}
+
+void MTrajectoryPicker::setTextSize(float _textSize)
+{
+    this->textSize = _textSize;
+    if (diagramDisplayType == DiagramDisplayType::HORIZON_GRAPH)
+    {
+        static_cast<MHorizonGraph*>(diagram)->setTextSize(_textSize);
+    }
 }
 
 void MTrajectoryPicker::triggerSelectAllLines()

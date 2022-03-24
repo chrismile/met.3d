@@ -509,6 +509,7 @@ private:
     QtProperty *springEpsilonProperty;
     QtProperty *backgroundOpacityProperty;
     QtProperty *useGlobalMinMaxProperty;
+    QtProperty *diagramTextSizeProperty;
 
     SimilarityMetric similarityMetric = SimilarityMetric::ABSOLUTE_NCC;
     float meanMetricInfluence = 0.5f;
@@ -519,6 +520,7 @@ private:
     float springEpsilon = 10.0f;
     float backgroundOpacity = 1.0f;
     bool useGlobalMinMax = true;
+    float diagramTextSize = 8.0f;
 
     QStringList trajectorySyncModeNames = {
             "Time Step", "Time of Ascent", "Height"

@@ -440,6 +440,13 @@ MTrajectoryActor::MTrajectoryActor()
     useGlobalMinMaxProperty->setToolTip(
             "Whether to normalize the data by using the minimum/maximum also over not selected trajectories.");
 
+    diagramTextSizeProperty = addProperty(
+            DECORATEDDOUBLE_PROPERTY, "diagram text size", similarityMetricGroup);
+    properties->setDDouble(
+            diagramTextSizeProperty, diagramTextSize,
+            4.0, 64.0, 2, 1.0, "px");
+    diagramTextSizeProperty->setToolTip("Diagram text size.");
+
 
     updateSimilarityMetricGroupEnabled();
 
@@ -583,6 +590,7 @@ void MTrajectoryActor::saveConfiguration(QSettings *settings)
     settings->setValue(QString("springEpsilon"), springEpsilon);
     settings->setValue(QString("backgroundOpacity"), backgroundOpacity);
     settings->setValue(QString("useGlobalMinMax"), useGlobalMinMax);
+    settings->setValue(QString("diagramTextSize"), diagramTextSize);
 
     multiVarData.saveConfiguration(settings);
 
@@ -827,6 +835,10 @@ void MTrajectoryActor::loadConfiguration(QSettings *settings)
             0.0, 1.0, 2, 0.05, " (factor)");
     useGlobalMinMax = settings->value("useGlobalMinMax", true).toBool();
     properties->mBool()->setValue(useGlobalMinMaxProperty, useGlobalMinMax);
+    diagramTextSize = settings->value("diagramTextSize", 8.0f).toFloat();
+    properties->setDDouble(
+            diagramTextSizeProperty, diagramTextSize,
+            4.0, 64.0, 2, 1.0, "px");
     updateSimilarityMetricGroupEnabled();
 
     trajectorySyncMode = TrajectorySyncMode(settings->value(
@@ -2798,6 +2810,19 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
         for (MTrajectoryPicker* trajectoryPicker : trajectoryPickerMap)
         {
             trajectoryPicker->setUseGlobalMinMax(useGlobalMinMax);
+        }
+        if (suppressActorUpdates()) return;
+        emitActorChangedSignal();
+#endif
+    }
+
+    else if (property == diagramTextSizeProperty)
+    {
+        diagramTextSize = float(properties->mDDouble()->value(diagramTextSizeProperty));
+#ifdef USE_EMBREE
+        for (MTrajectoryPicker* trajectoryPicker : trajectoryPickerMap)
+        {
+            trajectoryPicker->setTextSize(diagramTextSize);
         }
         if (suppressActorUpdates()) return;
         emitActorChangedSignal();

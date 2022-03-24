@@ -132,8 +132,15 @@ void MHorizonGraph::updateTimeStepTicks() {
         timeStepLegendIncrement = 5;
         timeStepTicksIncrement = 1;
     } else {
-        timeStepTicksIncrement = numTimeStepsLocal / 50;
-        timeStepLegendIncrement = timeStepTicksIncrement * 5;
+        int step1 = 50;
+        int step2 = 5;
+        // Reduce number of labels if the width becomes too small.
+        if (horizonBarWidth / textSize < 30.0f) {
+            step1 = 50;
+            step2 = 10;
+        }
+        timeStepTicksIncrement = numTimeStepsLocal / step1;
+        timeStepLegendIncrement = timeStepTicksIncrement * step2;
     }
 }
 
@@ -152,6 +159,56 @@ void MHorizonGraph::initialize() {
     legendTopHeight = textSize * 2.0f;
 
     MDiagramBase::initialize();
+}
+
+void MHorizonGraph::setTextSize(float _textSize) {
+    _textSize = std::max(_textSize, 4.0f);
+    textSize = _textSize;
+    textSizeLegendTop = textSize;
+
+    horizonBarHeight = textSize + horizonBarMargin;
+    legendTopHeight = textSize * 2.0f;
+
+    horizonBarHeightBase = horizonBarHeight;
+    horizonBarMarginBase = horizonBarMargin;
+    zoomFactor = 1.0f;
+
+    if (vg == nullptr) {
+        return;
+    }
+
+    legendLeftWidth = 0.0f; //< Computed below.
+    nvgFontSize(vg, textSize);
+    nvgFontFace(vg, "sans");
+    for (const std::string& variableName : variableNames) {
+        QVector2D bounds[2];
+        nvgTextBounds(vg, 0, 0, variableName.c_str(), nullptr, &bounds[0][0]);
+        legendLeftWidth = std::max(legendLeftWidth, bounds[1].x() - bounds[0].x());
+    }
+
+    offsetHorizonBarsX = borderSizeX + legendLeftWidth + horizonBarMargin;
+    offsetHorizonBarsY = borderSizeY + legendTopHeight + horizonBarMargin;
+
+    windowWidth =
+            borderSizeX * 3.0f + legendLeftWidth + horizonBarMargin + horizonBarWidth
+            + colorLegendWidth + textWidthMax;
+    recomputeWindowHeight();
+    recomputeFullWindowHeight();
+    if (windowHeight > maxWindowHeight) {
+        useScrollBar = true;
+        windowHeight = maxWindowHeight;
+        windowWidth += scrollBarWidth;
+    }
+    if (windowHeight / fullWindowHeight > 1.0f) {
+        fullWindowHeight = windowHeight;
+    }
+    if (windowHeight / fullWindowHeight >= 1.0f) {
+        useScrollBar = false;
+    } else {
+        useScrollBar = true;
+    }
+    onWindowSizeChanged();
+    updateTimeStepTicks();
 }
 
 void MHorizonGraph::setData(

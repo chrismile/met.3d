@@ -82,6 +82,7 @@ public:
     void setShowMinMaxValue(bool show);
     void setUseMaxForSensitivity(bool useMax);
     void setSpringEpsilon(float epsilon);
+    void setTextSize(float _textSize);
 
     void mouseMoveEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event) override;
     void mousePressEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event) override;
