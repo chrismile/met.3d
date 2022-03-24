@@ -537,6 +537,9 @@ void MTransferFunction1D::loadConfiguration(QSettings *settings)
     // Properties related to data range.
     // =================================
     setSteps(settings->value("numSteps", 50).toInt());
+    properties->mBool()->setValue(
+            useLogScaleProperty,
+            settings->value("useLogScale", false).toBool());
 
     // Properties related to type of colourmap.
     // ========================================
