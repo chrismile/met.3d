@@ -420,6 +420,12 @@ MTrajectoryActor::MTrajectoryActor()
     useMaxForSensitivityProperty->setToolTip(
             "Whether to show the minimum and maximum value in the diagram if the zoom factor permits it.");
 
+    trimNanRegionsProperty = addProperty(
+            BOOL_PROPERTY, "trim NaN regions", similarityMetricGroup);
+    properties->mBool()->setValue(trimNanRegionsProperty, trimNanRegions);
+    trimNanRegionsProperty->setToolTip(
+            "Whether to remove regions with only NaN values at the beginning or end of the loaded data.");
+
     springEpsilonProperty = addProperty(
             DECORATEDDOUBLE_PROPERTY, "SPRING metric epsilon", similarityMetricGroup);
     properties->setDDouble(
@@ -842,6 +848,8 @@ void MTrajectoryActor::loadConfiguration(QSettings *settings)
     properties->mBool()->setValue(showMinMaxValueProperty, showMinMaxValue);
     useMaxForSensitivity = settings->value("useMaxForSensitivity", true).toBool();
     properties->mBool()->setValue(useMaxForSensitivityProperty, useMaxForSensitivity);
+    trimNanRegions = settings->value("trimNanRegions", true).toBool();
+    properties->mBool()->setValue(trimNanRegionsProperty, trimNanRegions);
     springEpsilon = settings->value("springEpsilon", 10.0f).toFloat();
     properties->setDDouble(
             springEpsilonProperty, springEpsilon,
@@ -2943,6 +2951,19 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
         for (MTrajectoryPicker* trajectoryPicker : trajectoryPickerMap)
         {
             trajectoryPicker->setUseMaxForSensitivity(useMaxForSensitivity);
+        }
+        if (suppressActorUpdates()) return;
+        emitActorChangedSignal();
+#endif
+    }
+
+    else if (property == trimNanRegionsProperty)
+    {
+        trimNanRegions = properties->mBool()->value(trimNanRegionsProperty);
+#ifdef USE_EMBREE
+        for (MTrajectoryPicker* trajectoryPicker : trajectoryPickerMap)
+        {
+            trajectoryPicker->setTrimNanRegions(trimNanRegions);
         }
         if (suppressActorUpdates()) return;
         emitActorChangedSignal();

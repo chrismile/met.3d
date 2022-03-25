@@ -191,6 +191,17 @@ void MTrajectoryPicker::setShowMinMaxValue(bool show)
     }
 }
 
+void MTrajectoryPicker::setTrimNanRegions(bool trimRegions)
+{
+    this->trimNanRegions = trimRegions;
+    highlightDataDirty = true;
+    selectedTrajectoriesChanged = true;
+    if (diagram->getIsNanoVgInitialized())
+    {
+        updateDiagramData();
+    }
+}
+
 void MTrajectoryPicker::setUseMaxForSensitivity(bool useMax)
 {
     this->useMaxForSensitivity = useMax;
@@ -905,6 +916,25 @@ void MTrajectoryPicker::setParticlePosTimeStep(int newTimeStep)
     }
 }
 
+bool computeIsAllNanAtTimeStep(
+        const std::vector<std::vector<std::vector<float>>>& variableValuesArray, size_t numVars, int timeStepIdx)
+{
+    for (size_t trajectoryIdx = 0; trajectoryIdx < variableValuesArray.size(); trajectoryIdx++)
+    {
+        const std::vector<float> &values = variableValuesArray.at(trajectoryIdx).at(timeStepIdx);
+        for (size_t varIdx = 0; varIdx < numVars; varIdx++)
+        {
+            float value = values.at(int(varIdx));
+            if (!std::isnan(value))
+            {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
 void MTrajectoryPicker::updateDiagramData()
 {
     if (!diagram)
@@ -1105,12 +1135,13 @@ void MTrajectoryPicker::updateDiagramData()
             isVarSensitivityArray.push_back(isSensitivity);
         }
 
+        size_t numTimeStepsTotal;
         if (trajectorySyncMode == TrajectorySyncMode::TIME_OF_ASCENT)
         {
             int delta = maxAscentTimeStepIndex - minAscentTimeStepIndex;
             int timeIdxMin = -maxAscentTimeStepIndex;
             int timeIdxMax = int(numTimeSteps) - 1 - minAscentTimeStepIndex;
-            size_t numTimeStepsTotal = numTimeSteps + size_t(delta);
+            numTimeStepsTotal = numTimeSteps + size_t(delta);
             //timeMin = float(0.0f);
             //timeMax = float(numTimeStepsTotal);
             timeMin = float(timeIdxMin);
@@ -1167,6 +1198,7 @@ void MTrajectoryPicker::updateDiagramData()
         }
         else
         {
+            numTimeStepsTotal = numTimeSteps;
             timeMin = 0.0f;
             timeMax = float(numTimeSteps - 1);
 
@@ -1205,6 +1237,47 @@ void MTrajectoryPicker::updateDiagramData()
                 i++;
             }
         }
+
+        if (trimNanRegions && !variableValuesArray.empty())
+        {
+            int minTimeStepIdxNotNan = int(numTimeStepsTotal);
+            int maxTimeStepIdxNotNan = -1;
+            for (int timeStepIdx = 0; timeStepIdx < int(numTimeStepsTotal); timeStepIdx++)
+            {
+                bool isAllNan = computeIsAllNanAtTimeStep(variableValuesArray, numVars, timeStepIdx);
+                if (!isAllNan)
+                {
+                    minTimeStepIdxNotNan = int(timeStepIdx);
+                    break;
+                }
+            }
+            for (int timeStepIdx = int(numTimeStepsTotal) - 1; timeStepIdx >= 0; timeStepIdx--)
+            {
+                bool isAllNan = computeIsAllNanAtTimeStep(variableValuesArray, numVars, timeStepIdx);
+                if (!isAllNan)
+                {
+                    maxTimeStepIdxNotNan = int(timeStepIdx);
+                    break;
+                }
+            }
+
+            if ((minTimeStepIdxNotNan != 0 || maxTimeStepIdxNotNan != int(numTimeStepsTotal) - 1)
+                    && minTimeStepIdxNotNan <= maxTimeStepIdxNotNan)
+            {
+                timeMin = timeMin + float(minTimeStepIdxNotNan);
+                timeMax = timeMax - float(numTimeStepsTotal - 1 - maxTimeStepIdxNotNan);
+
+                for (size_t trajectoryIdx = 0; trajectoryIdx < variableValuesArray.size(); trajectoryIdx++)
+                {
+                    std::vector<std::vector<float>>& variableValuesPerTrajectory =
+                            variableValuesArray.at(trajectoryIdx);
+                    variableValuesPerTrajectory = std::vector<std::vector<float>>(
+                            variableValuesPerTrajectory.begin() + minTimeStepIdxNotNan,
+                            variableValuesPerTrajectory.begin() + maxTimeStepIdxNotNan + 1);
+                }
+            }
+        }
+
         horizonGraph->setData(variableNames, timeMin, timeMax, variableValuesArray);
     }
 }

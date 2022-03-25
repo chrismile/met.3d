@@ -506,6 +506,7 @@ private:
     QtProperty *sortByDescendingStdDevProperty;
     QtProperty *showMinMaxValueProperty;
     QtProperty *useMaxForSensitivityProperty;
+    QtProperty *trimNanRegionsProperty;
     QtProperty *springEpsilonProperty;
     QtProperty *backgroundOpacityProperty;
     QtProperty *useGlobalMinMaxProperty;
@@ -519,6 +520,7 @@ private:
     int numBins = 10;
     bool showMinMaxValue = true;
     bool useMaxForSensitivity = true;
+    bool trimNanRegions = true;
     float springEpsilon = 10.0f;
     float backgroundOpacity = 1.0f;
     bool useGlobalMinMax = true;

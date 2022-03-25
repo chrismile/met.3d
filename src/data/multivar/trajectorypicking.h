@@ -135,6 +135,7 @@ public:
     void sortByDescendingStdDev();
     void setShowMinMaxValue(bool show);
     void setUseMaxForSensitivity(bool useMax);
+    void setTrimNanRegions(bool trimRegions);
     void setSpringEpsilon(float epsilon);
     void setBackgroundOpacity(float opacity);
     void setUseGlobalMinMax(bool _useGlobalMinMax);
@@ -267,6 +268,7 @@ private:
     int numBins = 10;
     bool showMinMaxValue = true;
     bool useMaxForSensitivity = true;
+    bool trimNanRegions = true;
     float springEpsilon = 10.0f;
     float backgroundOpacity = 0.85f;
     bool useGlobalMinMax = true;
