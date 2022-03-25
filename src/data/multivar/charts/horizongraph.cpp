@@ -223,31 +223,34 @@ void MHorizonGraph::setTextSize(float _textSize) {
 void MHorizonGraph::setData(
         const std::vector<std::string>& _variableNames, float _timeMin, float _timeMax,
         const std::vector<std::vector<std::vector<float>>>& _variableValuesArray) {
+    bool sameVariables = this->variableNames == _variableNames;
     this->variableNames = _variableNames;
     this->variableValuesArray = _variableValuesArray;
 
-    nvgFontSize(vg, textSize);
-    nvgFontFace(vg, "sans");
-    for (const std::string& variableName : variableNames) {
-        QVector2D bounds[2];
-        nvgTextBounds(vg, 0, 0, variableName.c_str(), nullptr, &bounds[0][0]);
-        legendLeftWidth = std::max(legendLeftWidth, bounds[1].x() - bounds[0].x());
-    }
+    if (!sameVariables) {
+        nvgFontSize(vg, textSize);
+        nvgFontFace(vg, "sans");
+        for (const std::string& variableName : variableNames) {
+            QVector2D bounds[2];
+            nvgTextBounds(vg, 0, 0, variableName.c_str(), nullptr, &bounds[0][0]);
+            legendLeftWidth = std::max(legendLeftWidth, bounds[1].x() - bounds[0].x());
+        }
 
-    offsetHorizonBarsX = borderSizeX + legendLeftWidth + horizonBarMargin;
-    offsetHorizonBarsY = borderSizeY + legendTopHeight + horizonBarMargin;
+        offsetHorizonBarsX = borderSizeX + legendLeftWidth + horizonBarMargin;
+        offsetHorizonBarsY = borderSizeY + legendTopHeight + horizonBarMargin;
 
-    windowWidth =
-            borderSizeX * 3.0f + legendLeftWidth + horizonBarMargin + horizonBarWidth
-            + colorLegendWidth + textWidthMax;
-    recomputeWindowHeight();
-    recomputeFullWindowHeight();
-    if (windowHeight > maxWindowHeight) {
-        useScrollBar = true;
-        windowHeight = maxWindowHeight;
-        windowWidth += scrollBarWidth;
+        windowWidth =
+                borderSizeX * 3.0f + legendLeftWidth + horizonBarMargin + horizonBarWidth
+                + colorLegendWidth + textWidthMax;
+        recomputeWindowHeight();
+        recomputeFullWindowHeight();
+        if (windowHeight > maxWindowHeight) {
+            useScrollBar = true;
+            windowHeight = maxWindowHeight;
+            windowWidth += scrollBarWidth;
+        }
+        recomputeScrollThumbHeight();
     }
-    recomputeScrollThumbHeight();
 
     // Compute metadata.
     this->timeMin = _timeMin;
