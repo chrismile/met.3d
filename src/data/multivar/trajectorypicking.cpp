@@ -916,13 +916,18 @@ void MTrajectoryPicker::setParticlePosTimeStep(int newTimeStep)
     }
 }
 
+static inline bool startsWith(const std::string& str, const std::string& prefix) {
+    return prefix.length() <= str.length() && std::equal(prefix.begin(), prefix.end(), str.begin());
+}
+
 bool computeIsAllNanAtTimeStep(
-        const std::vector<std::vector<std::vector<float>>>& variableValuesArray, size_t numVars, int timeStepIdx)
+        const std::vector<std::vector<std::vector<float>>>& variableValuesArray,
+        const std::vector<size_t>& validVarIndices, size_t numVars, int timeStepIdx)
 {
     for (size_t trajectoryIdx = 0; trajectoryIdx < variableValuesArray.size(); trajectoryIdx++)
     {
         const std::vector<float> &values = variableValuesArray.at(trajectoryIdx).at(timeStepIdx);
-        for (size_t varIdx = 0; varIdx < numVars; varIdx++)
+        for (size_t varIdx : validVarIndices)
         {
             float value = values.at(int(varIdx));
             if (!std::isnan(value))
@@ -1240,11 +1245,22 @@ void MTrajectoryPicker::updateDiagramData()
 
         if (trimNanRegions && !variableValuesArray.empty())
         {
+            // Ignore conv_[...] and slan_[...] variables, as they do not use NaN to mark invalid areas.
+            std::vector<size_t> validVarIndices;
+            for (size_t varIdx = 0; varIdx < numVars; varIdx++)
+            {
+                std::string varName = variableNames.at(varIdx);
+                if (!startsWith(varName, "conv_") && !startsWith(varName, "slan_"))
+                {
+                    validVarIndices.push_back(varIdx);
+                }
+            }
+
             int minTimeStepIdxNotNan = int(numTimeStepsTotal);
             int maxTimeStepIdxNotNan = -1;
             for (int timeStepIdx = 0; timeStepIdx < int(numTimeStepsTotal); timeStepIdx++)
             {
-                bool isAllNan = computeIsAllNanAtTimeStep(variableValuesArray, numVars, timeStepIdx);
+                bool isAllNan = computeIsAllNanAtTimeStep(variableValuesArray, validVarIndices, numVars, timeStepIdx);
                 if (!isAllNan)
                 {
                     minTimeStepIdxNotNan = int(timeStepIdx);
@@ -1253,7 +1269,7 @@ void MTrajectoryPicker::updateDiagramData()
             }
             for (int timeStepIdx = int(numTimeStepsTotal) - 1; timeStepIdx >= 0; timeStepIdx--)
             {
-                bool isAllNan = computeIsAllNanAtTimeStep(variableValuesArray, numVars, timeStepIdx);
+                bool isAllNan = computeIsAllNanAtTimeStep(variableValuesArray, validVarIndices, numVars, timeStepIdx);
                 if (!isAllNan)
                 {
                     maxTimeStepIdxNotNan = int(timeStepIdx);
