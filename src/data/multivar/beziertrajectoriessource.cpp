@@ -116,23 +116,6 @@ MBezierTrajectories *MBezierTrajectoriesSource::produceData(MDataRequest request
         auxVarIdx++;
     }
 
-    bool useAbsoluteSensitivityValues = true;
-    if (useAbsoluteSensitivityValues)
-    {
-        for (int trajectoryIdx = 0; trajectoryIdx < filteredTrajectories.size(); trajectoryIdx++)
-        {
-            MFilteredTrajectory& filteredTrajectory = filteredTrajectories[trajectoryIdx];
-            for (int timeStepIdx = 0; timeStepIdx < numTimeStepsPerTrajectory; timeStepIdx++)
-            {
-                for (int varIdx : sensitivityIndices)
-                {
-                    float& sensitivityValue = filteredTrajectory.attributes[varIdx][timeStepIdx];
-                    sensitivityValue = std::abs(sensitivityValue);
-                }
-            }
-        }
-    }
-
     for (int i = 0; i < numTrajectories; i++)
     {
         int baseIndex = i * numTimeStepsPerTrajectory;
@@ -208,6 +191,23 @@ MBezierTrajectories *MBezierTrajectoriesSource::produceData(MDataRequest request
         }
     }
 
+
+    bool useAbsoluteSensitivityValues = true;
+    if (useAbsoluteSensitivityValues)
+    {
+        for (int trajectoryIdx = 0; trajectoryIdx < filteredTrajectories.size(); trajectoryIdx++)
+        {
+            MFilteredTrajectory& filteredTrajectory = filteredTrajectories[trajectoryIdx];
+            for (int timeStepIdx = 0; timeStepIdx < numTimeStepsPerTrajectory; timeStepIdx++)
+            {
+                for (int varIdx : sensitivityIndices)
+                {
+                    float& sensitivityValue = filteredTrajectory.attributes[varIdx][timeStepIdx];
+                    sensitivityValue = std::abs(sensitivityValue);
+                }
+            }
+        }
+    }
 
     if (hasSensitivityData)
     {
