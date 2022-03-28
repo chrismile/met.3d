@@ -374,7 +374,6 @@ MTrajectoryActor::MTrajectoryActor()
     for (int i = 0; i < numSimilarityMetrics; i++) {
         similarityMetricNames.push_back(SIMILARITY_METRIC_NAMES[i]);
     }
-
     properties->mEnum()->setEnumNames(similarityMetricProperty, similarityMetricNames);
     properties->mEnum()->setValue(similarityMetricProperty, int(similarityMetric));
     similarityMetricProperty->setToolTip(
@@ -425,6 +424,21 @@ MTrajectoryActor::MTrajectoryActor()
     properties->mBool()->setValue(trimNanRegionsProperty, trimNanRegions);
     trimNanRegionsProperty->setToolTip(
             "Whether to remove regions with only NaN values at the beginning or end of the loaded data.");
+
+    subsequenceMatchingTechniqueProperty = addProperty(
+            ENUM_PROPERTY, "matching technique", similarityMetricGroup);
+    int numSubsequenceMatchingTechniques =
+            int(sizeof(SUBSEQUENCE_MATCHING_TECHNIQUE_NAMES) / sizeof(*SUBSEQUENCE_MATCHING_TECHNIQUE_NAMES));
+    QStringList subsequenceMatchingTechniqueNames;
+    for (int i = 0; i < numSubsequenceMatchingTechniques; i++) {
+        subsequenceMatchingTechniqueNames.push_back(SUBSEQUENCE_MATCHING_TECHNIQUE_NAMES[i]);
+    }
+    properties->mEnum()->setEnumNames(
+            subsequenceMatchingTechniqueProperty, subsequenceMatchingTechniqueNames);
+    properties->mEnum()->setValue(
+            subsequenceMatchingTechniqueProperty, int(subsequenceMatchingTechnique));
+    similarityMetricProperty->setToolTip(
+            "Which technique to use for sub-sequence matching in the curve-plot view.");
 
     springEpsilonProperty = addProperty(
             DECORATEDDOUBLE_PROPERTY, "SPRING metric epsilon", similarityMetricGroup);
@@ -608,6 +622,7 @@ void MTrajectoryActor::saveConfiguration(QSettings *settings)
     settings->setValue(QString("meanMetricInfluence"), meanMetricInfluence);
     settings->setValue(QString("stdDevMetricInfluence"), stdDevMetricInfluence);
     settings->setValue(QString("numBins"), numBins);
+    settings->setValue(QString("subsequenceMatchingTechnique"), int(subsequenceMatchingTechnique));
     settings->setValue(QString("springEpsilon"), springEpsilon);
     settings->setValue(QString("backgroundOpacity"), backgroundOpacity);
     settings->setValue(QString("useGlobalMinMax"), useGlobalMinMax);
@@ -850,6 +865,9 @@ void MTrajectoryActor::loadConfiguration(QSettings *settings)
     properties->mBool()->setValue(useMaxForSensitivityProperty, useMaxForSensitivity);
     trimNanRegions = settings->value("trimNanRegions", true).toBool();
     properties->mBool()->setValue(trimNanRegionsProperty, trimNanRegions);
+    subsequenceMatchingTechnique = SubsequenceMatchingTechnique(settings->value(
+            "subsequenceMatchingTechnique", int(SubsequenceMatchingTechnique::SPRING)).toInt());
+    properties->mEnum()->setValue(subsequenceMatchingTechniqueProperty, int(subsequenceMatchingTechnique));
     springEpsilon = settings->value("springEpsilon", 10.0f).toFloat();
     properties->setDDouble(
             springEpsilonProperty, springEpsilon,
@@ -1924,6 +1942,7 @@ void MTrajectoryActor::prepareAvailableDataForRendering(uint slot)
                         trajectoryPickerMap[view]->setSimilarityMetric(similarityMetric);
                         trajectoryPickerMap[view]->setMeanMetricInfluence(meanMetricInfluence);
                         trajectoryPickerMap[view]->setStdDevMetricInfluence(stdDevMetricInfluence);
+                        trajectoryPickerMap[view]->setSubsequenceMatchingTechnique(subsequenceMatchingTechnique);
                         trajectoryPickerMap[view]->setSpringEpsilon(springEpsilon);
                         trajectoryPickerMap[view]->setBackgroundOpacity(backgroundOpacity);
                         trajectoryPickerMap[view]->setUseGlobalMinMax(useGlobalMinMax);
@@ -2815,6 +2834,20 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
         for (MTrajectoryPicker* trajectoryPicker : trajectoryPickerMap)
         {
             trajectoryPicker->setStdDevMetricInfluence(stdDevMetricInfluence);
+        }
+        if (suppressActorUpdates()) return;
+        emitActorChangedSignal();
+#endif
+    }
+
+    else if (property == subsequenceMatchingTechniqueProperty)
+    {
+        subsequenceMatchingTechnique = static_cast<SubsequenceMatchingTechnique>(
+                properties->mEnum()->value(subsequenceMatchingTechniqueProperty));
+#ifdef USE_EMBREE
+        for (MTrajectoryPicker* trajectoryPicker : trajectoryPickerMap)
+        {
+            trajectoryPicker->setSubsequenceMatchingTechnique(subsequenceMatchingTechnique);
         }
         if (suppressActorUpdates()) return;
         emitActorChangedSignal();

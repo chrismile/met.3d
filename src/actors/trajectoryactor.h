@@ -507,6 +507,7 @@ private:
     QtProperty *showMinMaxValueProperty;
     QtProperty *useMaxForSensitivityProperty;
     QtProperty *trimNanRegionsProperty;
+    QtProperty *subsequenceMatchingTechniqueProperty;
     QtProperty *springEpsilonProperty;
     QtProperty *backgroundOpacityProperty;
     QtProperty *useGlobalMinMaxProperty;
@@ -521,6 +522,7 @@ private:
     bool showMinMaxValue = true;
     bool useMaxForSensitivity = true;
     bool trimNanRegions = true;
+    SubsequenceMatchingTechnique subsequenceMatchingTechnique = SubsequenceMatchingTechnique::SPRING;
     float springEpsilon = 10.0f;
     float backgroundOpacity = 1.0f;
     bool useGlobalMinMax = true;

@@ -35,6 +35,7 @@
 
 // local application imports
 #include "actors/transferfunction1d.h"
+#include "../similarity/spring.h"
 #include "diagrambase.h"
 
 struct NVGcontext;
@@ -81,6 +82,7 @@ public:
     void sortByDescendingStdDev();
     void setShowMinMaxValue(bool show);
     void setUseMaxForSensitivity(bool useMax);
+    void setSubsequenceMatchingTechnique(SubsequenceMatchingTechnique technique);
     void setSpringEpsilon(float epsilon);
     void setTextSize(float _textSize);
 
@@ -215,6 +217,7 @@ private:
     size_t selectVarIdx = 0;
     float selectStart = -1.0f;
     float selectEnd = -1.0f;
+    SubsequenceMatchingTechnique subsequenceMatchingTechnique = SubsequenceMatchingTechnique::SPRING;
     float springEpsilon = 10.0f;
     std::vector<std::vector<std::pair<float, float>>> matchSelectionsPerVariable;
 };

@@ -111,3 +111,134 @@ std::vector<SpringMatch> spring(const std::vector<float>& X, const std::vector<f
 
     return matches;
 }
+
+
+std::vector<SpringMatch> nspring(const std::vector<float>& X, const std::vector<float>& Y, float epsilon) {
+    int n = int(X.size());
+    int m = int(Y.size());
+    std::vector<float> D(m + 1, 0.0f);
+    std::vector<float> D_old(m + 1, 0.0f);
+    std::vector<int> S(m + 1, 0);
+    std::vector<int> S_old(m + 1, 0);
+    std::vector<float> M(m + 1, 0.0f);
+    std::vector<float> M_old(m + 1, 0.0f);
+    std::vector<float> SD(m + 1, 0.0f);
+    std::vector<float> SD_old(m + 1, 0.0f);
+    int t_s = 1;
+    int t_e = 1;
+    const auto mf = float(m);
+    const float EPS = 1e-6f;
+
+    // Normalize Y.
+    std::vector<float> Y_norm(m, 0.0f);
+    float Y_m = 0.0f;
+    for (int i = 0; i < m; i++) {
+        Y_m += Y[i] / mf;
+    }
+    float Y_sd = 0.0f;
+    for (int i = 0; i < m; i++) {
+        float diff = Y[i] - Y_m;
+        Y_sd += (diff * diff) / mf;
+    }
+    Y_sd = std::sqrt(Y_sd) + EPS;
+    for (int i = 0; i < m; i++) {
+        Y_norm[i] = (Y[i] - Y_m) / Y_sd;
+    }
+
+    std::vector<SpringMatch> matches;
+
+    float d_min = std::numeric_limits<float>::max();
+    for (int i = 1; i <= m; i++) {
+        D_old[i] = std::numeric_limits<float>::max();
+        D[i] = std::numeric_limits<float>::max();
+    }
+
+    int t_prime = 1;
+    float sum1 = 0;
+    float sum2 = 0;
+
+    for (int t = 1; t < n + m; t++) {
+        S_old[0] = t_prime;
+        S[0] = t_prime;
+
+        float s_t = 0;
+        if (t <= n) {
+            s_t = X[t - 1];
+        }
+        if (t - t_prime == m) {
+            float s_t_prime = X[t_prime - 1];
+            sum1 = sum1 - s_t_prime + s_t;
+            sum2 = sum2 - s_t_prime * s_t_prime + s_t * s_t;
+            t_prime += 1;
+        } else {
+            sum1 = sum1 + s_t;
+            sum2 = sum2 + s_t * s_t;
+        }
+
+        M_old[0] = sum1 / mf;
+        M[0] = sum1 / mf;
+        SD_old[0] = std::sqrt(sum2 / mf - M[0] * M[0]);
+        SD[0] = std::sqrt(sum2 / mf - M[0] * M[0]);
+
+        if (t - t_prime + 1 == m) {
+            for (int i = 1; i <= m; i++) {
+                float d_best;
+                if (D[i - 1] < D_old[i] && D[i - 1] < D_old[i - 1]) {
+                    d_best = D[i - 1];
+                    S[i] = S[i - 1];
+                    M[i] = M[i - 1];
+                    SD[i] = SD[i - 1];
+                } else if (D_old[i] < D_old[i - 1]) {
+                    d_best = D_old[i];
+                    S[i] = S_old[i];
+                    M[i] = M_old[i];
+                    SD[i] = SD_old[i];
+                } else {
+                    d_best = D_old[i - 1];
+                    S[i] = S_old[i - 1];
+                    M[i] = M_old[i - 1];
+                    SD[i] = SD_old[i - 1];
+                }
+                D[i] = distanceMetric((X[t_prime - 1] - M[i]) / (SD[i] + EPS), Y_norm[i - 1]) + d_best;
+            }
+
+            if (d_min <= epsilon) {
+                bool report = true;
+                for (int i = 1; i <= m; i++) {
+                    if (!(D[i] >= d_min || S[i] > t_e)) {
+                        report = false;
+                        break;
+                    }
+                }
+                if (report) {
+                    SpringMatch match{};
+                    match.t_s = t_s;
+                    match.t_e = t_e;
+                    match.d_min = d_min;
+                    matches.push_back(match);
+                    d_min = std::numeric_limits<float>::max();
+                    for (int i = 1; i <= m; i++) {
+                        if (S[i] <= t_e) {
+                            D[i] = std::numeric_limits<float>::max();
+                        }
+                    }
+                }
+            }
+
+            if (D[m] <= epsilon && D[m] < d_min) {
+                d_min = D[m];
+                t_s = S[m];
+                t_e = t_prime;
+            }
+
+            for (int i = 0; i <= m; i++) {
+                D_old[i] = D[i];
+                S_old[i] = S[i];
+                M_old[i] = M[i];
+                SD_old[i] = SD[i];
+            }
+        }
+    }
+
+    return matches;
+}

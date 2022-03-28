@@ -136,6 +136,7 @@ public:
     void setShowMinMaxValue(bool show);
     void setUseMaxForSensitivity(bool useMax);
     void setTrimNanRegions(bool trimRegions);
+    void setSubsequenceMatchingTechnique(SubsequenceMatchingTechnique technique);
     void setSpringEpsilon(float epsilon);
     void setBackgroundOpacity(float opacity);
     void setUseGlobalMinMax(bool _useGlobalMinMax);
@@ -269,6 +270,7 @@ private:
     bool showMinMaxValue = true;
     bool useMaxForSensitivity = true;
     bool trimNanRegions = true;
+    SubsequenceMatchingTechnique subsequenceMatchingTechnique = SubsequenceMatchingTechnique::SPRING;
     float springEpsilon = 10.0f;
     float backgroundOpacity = 0.85f;
     bool useGlobalMinMax = true;

@@ -39,6 +39,13 @@ struct SpringMatch {
     float d_min;
 };
 
+enum class SubsequenceMatchingTechnique {
+    SPRING, NSPRING
+};
+const char* const SUBSEQUENCE_MATCHING_TECHNIQUE_NAMES[] = {
+        "SPRING", "NSPRING"
+};
+
 /**
  * Returns ranges of subsequences in the sequence X similar to the query sequence Y using Dynamic Time Warping (DTW).
  * The implemented algorithm, SPRING, is much faster and more memory efficient than a naive search and was first
@@ -51,5 +58,25 @@ struct SpringMatch {
  * @return
  */
 std::vector<SpringMatch> spring(const std::vector<float>& X, const std::vector<float>& Y, float epsilon);
+
+/**
+ * Returns ranges of subsequences in the sequence X similar to the query sequence Y using Dynamic Time Warping (DTW).
+ * The implemented algorithm, NSPRING, is much faster and more memory efficient than a naive search and was first
+ * presented in the following paper.
+ *
+ * X. Gong, S. Fong, J. H. Chan, and S. Mohammed. NSPRING: The spring extension for subsequence matching of time series
+ * supporting normalization. J. Supercomput., 72(10):3801-3825, Oct. 2016.
+ *
+ * It is based on the algorithm SPRING (reference below), but additionally supports data normalization.
+ *
+ * Sakurai, Y., Faloutsos, C., Yamamuro, M.: Stream monitoring under the time warping distance. In: Proceedings of IEEE
+ * 23rd International Conference on Data Engineering (ICDE 2007), Istanbul, Turkey, April 15-20, pp. 1046–1055 (2007).
+ *
+ * @param X The data sequence X.
+ * @param Y The query sequence Y.
+ * @param epsilon The similarity threshold for a sub-sequence to accept.
+ * @return The list of sub-sequence matches.
+ */
+std::vector<SpringMatch> nspring(const std::vector<float>& X, const std::vector<float>& Y, float epsilon);
 
 #endif //MET_3D_SPRING_H

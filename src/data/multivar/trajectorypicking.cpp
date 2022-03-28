@@ -122,6 +122,7 @@ void MTrajectoryPicker::setDiagramType(DiagramDisplayType type)
         horizonGraph->setNumBins(numBins);
         horizonGraph->setShowMinMaxValue(showMinMaxValue);
         horizonGraph->setUseMaxForSensitivity(useMaxForSensitivity);
+        horizonGraph->setSubsequenceMatchingTechnique(subsequenceMatchingTechnique);
         horizonGraph->setSpringEpsilon(springEpsilon);
         horizonGraph->setTextSize(textSize);
     }
@@ -212,6 +213,15 @@ void MTrajectoryPicker::setUseMaxForSensitivity(bool useMax)
         {
             updateDiagramData();
         }
+    }
+}
+
+void MTrajectoryPicker::setSubsequenceMatchingTechnique(SubsequenceMatchingTechnique technique)
+{
+    this->subsequenceMatchingTechnique = technique;
+    if (diagramDisplayType == DiagramDisplayType::HORIZON_GRAPH)
+    {
+        static_cast<MHorizonGraph*>(diagram)->setSubsequenceMatchingTechnique(subsequenceMatchingTechnique);
     }
 }
 

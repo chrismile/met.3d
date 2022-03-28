@@ -423,6 +423,16 @@ void MHorizonGraph::setUseMaxForSensitivity(bool useMax) {
     useMaxForSensitivity = useMax;
 }
 
+void MHorizonGraph::setSubsequenceMatchingTechnique(SubsequenceMatchingTechnique technique) {
+    subsequenceMatchingTechnique = technique;
+    if (selectStart >= 0.0f && selectEnd >= 0.0f) {
+        for (auto& matchSelections : matchSelectionsPerVariable) {
+            matchSelections.clear();
+        }
+        endSelection(selectEnd);
+    }
+}
+
 void MHorizonGraph::setSpringEpsilon(float epsilon) {
     springEpsilon = epsilon;
     if (selectStart >= 0.0f && selectEnd >= 0.0f) {
@@ -2181,7 +2191,12 @@ void MHorizonGraph::computeMatchSelections() {
         }
 
         auto& matchSelections = matchSelectionsPerVariable.at(varIdx);
-        auto matches = spring(sequence, querySubsequence, springEpsilon);
+        std::vector<SpringMatch> matches;
+        if (subsequenceMatchingTechnique == SubsequenceMatchingTechnique::SPRING) {
+            matches = spring(sequence, querySubsequence, springEpsilon);
+        } else {
+            matches = nspring(sequence, querySubsequence, springEpsilon);
+        }
         for (auto& match : matches) {
             if (match.t_e - match.t_s > 0) {
                 float timeStart = timeMin + (timeMax - timeMin) * float(match.t_s) / float(numTimeSteps - 1);
