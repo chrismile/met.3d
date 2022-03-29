@@ -958,7 +958,7 @@ void MMultiVarData::reloadShaderEffect()
                     {"IS_MULTIVAR_DATA", QString::fromStdString("") },
             };
 
-    if (diagramType == DiagramDisplayType::NONE || diagramType == DiagramDisplayType::HORIZON_GRAPH)
+    if (diagramType == DiagramDisplayType::NONE || diagramType == DiagramDisplayType::CURVE_PLOT_VIEW)
     {
         defines.insert("SUPPORT_LINE_DESATURATION", QString::fromStdString(""));
     }
@@ -1004,7 +1004,7 @@ void MMultiVarData::reloadSphereShaderEffect()
                     {"MAX_NUM_VARIABLES", QString::fromStdString(std::to_string(MAX_NUM_VARIABLES)) },
             };
 
-    if (diagramType == DiagramDisplayType::NONE || diagramType == DiagramDisplayType::HORIZON_GRAPH)
+    if (diagramType == DiagramDisplayType::NONE || diagramType == DiagramDisplayType::CURVE_PLOT_VIEW)
     {
         defines.insert("SUPPORT_LINE_DESATURATION", QString::fromStdString(""));
     }
@@ -1041,7 +1041,7 @@ void MMultiVarData::reloadRollsShaderEffect()
                     {"MAX_NUM_VARIABLES", QString::fromStdString(std::to_string(MAX_NUM_VARIABLES)) },
             };
 
-    if (diagramType == DiagramDisplayType::NONE || diagramType == DiagramDisplayType::HORIZON_GRAPH)
+    if (diagramType == DiagramDisplayType::NONE || diagramType == DiagramDisplayType::CURVE_PLOT_VIEW)
     {
         defines.insert("SUPPORT_LINE_DESATURATION", QString::fromStdString(""));
     }

@@ -33,7 +33,7 @@
 // local application imports
 #include "../helpers.h"
 #include "../similarity/spring.h"
-#include "horizongraph.h"
+#include "curveplotview.h"
 #include "aabb2.h"
 
 namespace Met3D {
@@ -58,7 +58,7 @@ static const std::vector<QColor> predefinedColors = {
 };
 
 
-MHorizonGraph::MHorizonGraph(GLint textureUnit, MTransferFunction1D*& diagramTransferFunction)
+MCurvePlotView::MCurvePlotView(GLint textureUnit, MTransferFunction1D*& diagramTransferFunction)
         : MDiagramBase(textureUnit), diagramTransferFunction(diagramTransferFunction) {
     borderSizeX = 10;
     borderSizeY = 10;
@@ -74,21 +74,21 @@ MHorizonGraph::MHorizonGraph(GLint textureUnit, MTransferFunction1D*& diagramTra
     legendTopHeight = textSize * 2.0f;
 }
 
-float MHorizonGraph::computeWindowHeight() {
+float MCurvePlotView::computeWindowHeight() {
     return
             borderSizeY * 2.0f + legendTopHeight + horizonBarMargin
             + horizonBarHeight * float(variableNames.size()) + horizonBarMargin * (float(variableNames.size()) - 1.0f);
 }
 
-void MHorizonGraph::recomputeWindowHeight() {
+void MCurvePlotView::recomputeWindowHeight() {
     windowHeight = computeWindowHeight();
 }
 
-void MHorizonGraph::recomputeFullWindowHeight() {
+void MCurvePlotView::recomputeFullWindowHeight() {
     fullWindowHeight = computeWindowHeight();
 }
 
-void MHorizonGraph::onWindowSizeChanged() {
+void MCurvePlotView::onWindowSizeChanged() {
     const float minBarWidth = 200;
     float oldWidth = windowWidth;
     float oldHeight = windowHeight;
@@ -124,7 +124,7 @@ void MHorizonGraph::onWindowSizeChanged() {
             - (useScrollBar ? scrollBarWidth : 0);
 }
 
-void MHorizonGraph::updateTimeStepTicks() {
+void MCurvePlotView::updateTimeStepTicks() {
     /*size_t numTimeStepsLocal = size_t(float(numTimeSteps) * (timeDisplayMax - timeDisplayMin) / (timeMax - timeMin));
     if (numTimeStepsLocal < 10) {
         timeStepLegendIncrement = 1;
@@ -156,7 +156,7 @@ void MHorizonGraph::updateTimeStepTicks() {
     }
 }
 
-void MHorizonGraph::initialize() {
+void MCurvePlotView::initialize() {
     borderSizeX = 10;
     borderSizeY = 10;
 
@@ -165,7 +165,7 @@ void MHorizonGraph::initialize() {
     MDiagramBase::initialize();
 }
 
-void MHorizonGraph::setTextSize(float _textSize) {
+void MCurvePlotView::setTextSize(float _textSize) {
     _textSize = std::max(_textSize, 4.0f);
     textSize = _textSize;
     textSizeLegendTop = textSize;
@@ -220,7 +220,7 @@ void MHorizonGraph::setTextSize(float _textSize) {
     updateTimeStepTicks();
 }
 
-void MHorizonGraph::setData(
+void MCurvePlotView::setData(
         const std::vector<std::string>& _variableNames, float _timeMin, float _timeMax,
         const std::vector<std::vector<std::vector<float>>>& _variableValuesArray) {
     bool sameVariables = this->variableNames == _variableNames;
@@ -365,7 +365,7 @@ void MHorizonGraph::setData(
     MDiagramBase::onWindowSizeChanged();
 }
 
-void MHorizonGraph::setSimilarityMetric(SimilarityMetric similarityMetric) {
+void MCurvePlotView::setSimilarityMetric(SimilarityMetric similarityMetric) {
     bool shallSortVariables = this->similarityMetric != similarityMetric;
     this->similarityMetric = similarityMetric;
     if (shallSortVariables && sortingIdx != -1) {
@@ -373,7 +373,7 @@ void MHorizonGraph::setSimilarityMetric(SimilarityMetric similarityMetric) {
     }
 }
 
-void MHorizonGraph::setMeanMetricInfluence(float meanMetricInfluence) {
+void MCurvePlotView::setMeanMetricInfluence(float meanMetricInfluence) {
     bool shallSortVariables = this->meanMetricInfluence != meanMetricInfluence;
     this->meanMetricInfluence = meanMetricInfluence;
     if (shallSortVariables && sortingIdx != -1) {
@@ -381,7 +381,7 @@ void MHorizonGraph::setMeanMetricInfluence(float meanMetricInfluence) {
     }
 }
 
-void MHorizonGraph::setStdDevMetricInfluence(float stdDevMetricInfluence) {
+void MCurvePlotView::setStdDevMetricInfluence(float stdDevMetricInfluence) {
     bool shallSortVariables = this->stdDevMetricInfluence != stdDevMetricInfluence;
     this->stdDevMetricInfluence = stdDevMetricInfluence;
     if (shallSortVariables && sortingIdx != -1) {
@@ -389,7 +389,7 @@ void MHorizonGraph::setStdDevMetricInfluence(float stdDevMetricInfluence) {
     }
 }
 
-void MHorizonGraph::setNumBins(int numBins) {
+void MCurvePlotView::setNumBins(int numBins) {
     bool shallSortVariables = this->numBins != numBins;
     this->numBins = numBins;
     if (shallSortVariables && sortingIdx != -1) {
@@ -397,7 +397,7 @@ void MHorizonGraph::setNumBins(int numBins) {
     }
 }
 
-void MHorizonGraph::sortByDescendingStdDev() {
+void MCurvePlotView::sortByDescendingStdDev() {
     sortingIdx = -1;
 
     sortedVariableIndices.clear();
@@ -415,15 +415,15 @@ void MHorizonGraph::sortByDescendingStdDev() {
     }
 }
 
-void MHorizonGraph::setShowMinMaxValue(bool show) {
+void MCurvePlotView::setShowMinMaxValue(bool show) {
     showMinMaxValue = show;
 }
 
-void MHorizonGraph::setUseMaxForSensitivity(bool useMax) {
+void MCurvePlotView::setUseMaxForSensitivity(bool useMax) {
     useMaxForSensitivity = useMax;
 }
 
-void MHorizonGraph::setSubsequenceMatchingTechnique(SubsequenceMatchingTechnique technique) {
+void MCurvePlotView::setSubsequenceMatchingTechnique(SubsequenceMatchingTechnique technique) {
     subsequenceMatchingTechnique = technique;
     if (selectStart >= 0.0f && selectEnd >= 0.0f) {
         for (auto& matchSelections : matchSelectionsPerVariable) {
@@ -433,7 +433,7 @@ void MHorizonGraph::setSubsequenceMatchingTechnique(SubsequenceMatchingTechnique
     }
 }
 
-void MHorizonGraph::setSpringEpsilon(float epsilon) {
+void MCurvePlotView::setSpringEpsilon(float epsilon) {
     springEpsilon = epsilon;
     if (selectStart >= 0.0f && selectEnd >= 0.0f) {
         for (auto& matchSelections : matchSelectionsPerVariable) {
@@ -443,7 +443,7 @@ void MHorizonGraph::setSpringEpsilon(float epsilon) {
     }
 }
 
-QVector4D MHorizonGraph::transferFunction(float value) const {
+QVector4D MCurvePlotView::transferFunction(float value) const {
     if (std::isnan(value)) {
         return QVector4D(1.0f, 1.0f, 0.0f, 1.0f); // yellow
     }
@@ -495,7 +495,7 @@ QVector4D MHorizonGraph::transferFunction(float value) const {
     }
 }
 
-void MHorizonGraph::drawHorizonBackground() {
+void MCurvePlotView::drawHorizonBackground() {
     NVGcolor backgroundFillColor = nvgRGBA(255, 255, 255, 100);
     for (size_t heightIdx = 0; heightIdx < numVariables; heightIdx++) {
         float lowerY = offsetHorizonBarsY + float(heightIdx) * (horizonBarHeight + horizonBarMargin);
@@ -506,7 +506,7 @@ void MHorizonGraph::drawHorizonBackground() {
     }
 }
 
-void MHorizonGraph::drawHorizonMatchSelections() {
+void MCurvePlotView::drawHorizonMatchSelections() {
     NVGcolor selectionColorFill = nvgRGBA(255, 0, 0, 100);
     NVGcolor selectionColorStroke = nvgRGBA(255, 0, 0, 255);
     AABB2 scissorAabb(
@@ -559,7 +559,7 @@ void MHorizonGraph::drawHorizonMatchSelections() {
     nvgRestore(vg);
 }
 
-void MHorizonGraph::drawHorizonLines() {
+void MCurvePlotView::drawHorizonLines() {
     AABB2 scissorAabb(
             QVector2D(borderWidth, offsetHorizonBarsY + scrollTranslationY),
             QVector2D(windowWidth - borderWidth, windowHeight - borderWidth + scrollTranslationY));
@@ -687,7 +687,7 @@ void MHorizonGraph::drawHorizonLines() {
     }
 }
 
-void MHorizonGraph::drawHorizonLinesSparse() {
+void MCurvePlotView::drawHorizonLinesSparse() {
     AABB2 scissorAabb(
             QVector2D(borderWidth, offsetHorizonBarsY + scrollTranslationY),
             QVector2D(windowWidth - borderWidth, windowHeight - borderWidth + scrollTranslationY));
@@ -914,7 +914,7 @@ void MHorizonGraph::drawHorizonLinesSparse() {
  * @param varIdx The variable ID.
  * @param threshold The number of output samples.
  */
-void MHorizonGraph::computeLttb(int varIdx, int threshold) {
+void MCurvePlotView::computeLttb(int varIdx, int threshold) {
     float timeStepIdxStartFlt = (timeDisplayMin - timeMin) / (timeMax - timeMin) * float(numTimeSteps - 1);
     float timeStepIdxStopFlt = (timeDisplayMax - timeMin) / (timeMax - timeMin) * float(numTimeSteps - 1);
     int timeStepIdxStart0 = int(std::floor(timeStepIdxStartFlt));
@@ -979,7 +979,7 @@ void MHorizonGraph::computeLttb(int varIdx, int threshold) {
     pointsOut.emplace_back(timeStepIdxStopFlt, meanStop);
 }
 
-void MHorizonGraph::drawHorizonLinesLttb() {
+void MCurvePlotView::drawHorizonLinesLttb() {
     AABB2 scissorAabb(
             QVector2D(borderWidth, offsetHorizonBarsY + scrollTranslationY),
             QVector2D(windowWidth - borderWidth, windowHeight - borderWidth + scrollTranslationY));
@@ -1107,7 +1107,7 @@ void MHorizonGraph::drawHorizonLinesLttb() {
     }
 }
 
-void MHorizonGraph::drawHorizonOutline(const NVGcolor& textColor) {
+void MCurvePlotView::drawHorizonOutline(const NVGcolor& textColor) {
     for (size_t heightIdx = 0; heightIdx < numVariables; heightIdx++) {
         float lowerY = offsetHorizonBarsY + float(heightIdx) * (horizonBarHeight + horizonBarMargin);
         nvgBeginPath(vg);
@@ -1118,7 +1118,7 @@ void MHorizonGraph::drawHorizonOutline(const NVGcolor& textColor) {
     }
 }
 
-void MHorizonGraph::drawSelectedTimeStepLine(const NVGcolor& textColor) {
+void MCurvePlotView::drawSelectedTimeStepLine(const NVGcolor& textColor) {
     if (selectedTimeStep < timeDisplayMin || selectedTimeStep > timeDisplayMax) {
         return;
     }
@@ -1138,7 +1138,7 @@ void MHorizonGraph::drawSelectedTimeStepLine(const NVGcolor& textColor) {
     nvgFill(vg);
 }
 
-void MHorizonGraph::drawLegendLeft(const NVGcolor& textColor) {
+void MCurvePlotView::drawLegendLeft(const NVGcolor& textColor) {
     nvgFontSize(vg, textSize);
     nvgFontFace(vg, "sans");
     size_t heightIdx = 0;
@@ -1162,7 +1162,7 @@ void MHorizonGraph::drawLegendLeft(const NVGcolor& textColor) {
     }
 }
 
-void MHorizonGraph::drawLegendTop(const NVGcolor& textColor) {
+void MCurvePlotView::drawLegendTop(const NVGcolor& textColor) {
     updateTimeStepTicks();
 
     nvgFontSize(vg, textSizeLegendTop);
@@ -1183,7 +1183,7 @@ void MHorizonGraph::drawLegendTop(const NVGcolor& textColor) {
     }
 }
 
-void MHorizonGraph::drawTicks(const NVGcolor& textColor) {
+void MCurvePlotView::drawTicks(const NVGcolor& textColor) {
     const float tickWidthBase = 0.5f;
     const float tickHeightBase = 2.0f;
     nvgBeginPath(vg);
@@ -1236,7 +1236,7 @@ void MHorizonGraph::drawTicks(const NVGcolor& textColor) {
     nvgRestore(vg);
 }
 
-void MHorizonGraph::drawScrollBar(const NVGcolor& textColor) {
+void MCurvePlotView::drawScrollBar(const NVGcolor& textColor) {
     NVGcolor scrollBarColor = nvgRGBA(120, 120, 120, 120);
     nvgBeginPath(vg);
     nvgRect(vg, windowWidth - scrollBarWidth, borderWidth, 1.0f, windowHeight - 2.0f * borderWidth);
@@ -1272,7 +1272,7 @@ void MHorizonGraph::drawScrollBar(const NVGcolor& textColor) {
 
 
 
-void MHorizonGraph::renderBase() {
+void MCurvePlotView::renderBase() {
     NVGcolor textColor = nvgRGBA(0, 0, 0, 255);
 
     drawLegendTop(textColor);
@@ -1316,7 +1316,7 @@ void MHorizonGraph::renderBase() {
     }
 }
 
-float MHorizonGraph::computeTimeStepFromMousePosition(const QVector2D& mousePosition) const {
+float MCurvePlotView::computeTimeStepFromMousePosition(const QVector2D& mousePosition) const {
     float timeStep = remap(
             mousePosition.x(), offsetHorizonBarsX, offsetHorizonBarsX + horizonBarWidth,
             timeDisplayMin, timeDisplayMax);
@@ -1324,11 +1324,11 @@ float MHorizonGraph::computeTimeStepFromMousePosition(const QVector2D& mousePosi
     return timeStep;
 }
 
-void MHorizonGraph::recomputeScrollThumbHeight() {
+void MCurvePlotView::recomputeScrollThumbHeight() {
     scrollThumbHeight = windowHeight / fullWindowHeight * (windowHeight - 2.0f * borderWidth);
 }
 
-void MHorizonGraph::mouseMoveEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event)
+void MCurvePlotView::mouseMoveEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event)
 {
     MDiagramBase::mouseMoveEvent(sceneView, event);
 
@@ -1390,7 +1390,7 @@ void MHorizonGraph::mouseMoveEvent(MSceneViewGLWidget *sceneView, QMouseEvent *e
     updateTimeShift(mousePosition, EventType::MouseMove, event);
 }
 
-void MHorizonGraph::mousePressEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event)
+void MCurvePlotView::mousePressEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event)
 {
     MDiagramBase::mousePressEventResizeWindow(sceneView, event);
     if (getResizeDirection() != ResizeDirection::NONE)
@@ -1501,7 +1501,7 @@ void MHorizonGraph::mousePressEvent(MSceneViewGLWidget *sceneView, QMouseEvent *
     }
 }
 
-void MHorizonGraph::mouseReleaseEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event)
+void MCurvePlotView::mouseReleaseEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event)
 {
     ResizeDirection oldResizeDirection = getResizeDirection();
     MDiagramBase::mouseReleaseEvent(sceneView, event);
@@ -1577,7 +1577,7 @@ void MHorizonGraph::mouseReleaseEvent(MSceneViewGLWidget *sceneView, QMouseEvent
     updateTimeShift(mousePosition, EventType::MouseRelease, event);
 }
 
-void MHorizonGraph::wheelEvent(MSceneViewGLWidget *sceneView, QWheelEvent *event)
+void MCurvePlotView::wheelEvent(MSceneViewGLWidget *sceneView, QWheelEvent *event)
 {
     MDiagramBase::wheelEvent(sceneView, event);
 
@@ -1657,7 +1657,7 @@ void MHorizonGraph::wheelEvent(MSceneViewGLWidget *sceneView, QWheelEvent *event
     }
 }
 
-void MHorizonGraph::updateTimeScale(const QVector2D& mousePosition, EventType eventType, QMouseEvent* event) {
+void MCurvePlotView::updateTimeScale(const QVector2D& mousePosition, EventType eventType, QMouseEvent* event) {
     // Click on the top legend and move the mouse to change the timescale.
     AABB2 legendTopAabb(
             QVector2D(offsetHorizonBarsX, borderSizeY),
@@ -1704,7 +1704,7 @@ void MHorizonGraph::updateTimeScale(const QVector2D& mousePosition, EventType ev
     }
 }
 
-void MHorizonGraph::updateTimeShift(const QVector2D& mousePosition, EventType eventType, QMouseEvent* event) {
+void MCurvePlotView::updateTimeShift(const QVector2D& mousePosition, EventType eventType, QMouseEvent* event) {
     // Translation in the time axis.
     AABB2 graphAreaAabb(
             QVector2D(offsetHorizonBarsX, offsetHorizonBarsY),
@@ -1738,7 +1738,7 @@ void MHorizonGraph::updateTimeShift(const QVector2D& mousePosition, EventType ev
     }
 }
 
-float MHorizonGraph::computeSimilarityMetric(
+float MCurvePlotView::computeSimilarityMetric(
         int varIdx0, int varIdx1, const std::vector<std::vector<float>>& valueArray, float factor) const {
     if (varIdx0 == varIdx1) {
         return std::numeric_limits<float>::lowest();
@@ -1766,7 +1766,7 @@ typedef float Real;
 typedef double Real;
 #endif
 
-float MHorizonGraph::computeL1Norm(
+float MCurvePlotView::computeL1Norm(
         int varIdx0, int varIdx1, const std::vector<std::vector<float>>& valueArray, float factor) const {
     size_t numValidTimeSteps = 0;
     Real difference = 0;
@@ -1784,7 +1784,7 @@ float MHorizonGraph::computeL1Norm(
     return float(difference);
 }
 
-float MHorizonGraph::computeL2Norm(
+float MCurvePlotView::computeL2Norm(
         int varIdx0, int varIdx1, const std::vector<std::vector<float>>& valueArray, float factor) const {
     size_t numValidTimeSteps = 0;
     Real difference = 0;
@@ -1802,7 +1802,7 @@ float MHorizonGraph::computeL2Norm(
     return float(difference);
 }
 
-float MHorizonGraph::computeNCC(
+float MCurvePlotView::computeNCC(
         int varIdx0, int varIdx1, const std::vector<std::vector<float>>& valueArray, float factor) const {
     size_t numValidTimeSteps0 = 0;
     size_t numValidTimeSteps1 = 0;
@@ -1859,13 +1859,13 @@ float MHorizonGraph::computeNCC(
     return float(-ncc);
 }
 
-float MHorizonGraph::computeAbsoluteNCC(
+float MCurvePlotView::computeAbsoluteNCC(
         int varIdx0, int varIdx1, const std::vector<std::vector<float>>& valueArray, float factor) const {
     float ncc = computeNCC(varIdx0, varIdx1, valueArray, factor);
     return -std::abs(ncc);
 }
 
-float MHorizonGraph::computeMI(
+float MCurvePlotView::computeMI(
         int varIdx0, int varIdx1, const std::vector<std::vector<float>>& valueArray, float factor) const {
     Real* histogram0 = new Real[numBins];
     Real* histogram1 = new Real[numBins];
@@ -2040,7 +2040,7 @@ float MHorizonGraph::computeMI(
     return float(-mi);
 }
 
-float MHorizonGraph::computeSSIM(
+float MCurvePlotView::computeSSIM(
         int varIdx0, int varIdx1, const std::vector<std::vector<float>>& valueArray, float factor) const {
     size_t numValidTimeSteps0 = 0;
     size_t numValidTimeSteps1 = 0;
@@ -2107,7 +2107,7 @@ float MHorizonGraph::computeSSIM(
     return float(-ssim);
 }
 
-void MHorizonGraph::sortVariables(int newSortingIdx, bool forceRecompute) {
+void MCurvePlotView::sortVariables(int newSortingIdx, bool forceRecompute) {
     if (sortingIdx == newSortingIdx && !forceRecompute) {
         return;
     }
@@ -2142,7 +2142,7 @@ void MHorizonGraph::sortVariables(int newSortingIdx, bool forceRecompute) {
     std::cout << std::endl;
 }
 
-void MHorizonGraph::startSelection(size_t varIdx, float timeStep) {
+void MCurvePlotView::startSelection(size_t varIdx, float timeStep) {
     isSelecting = true;
     selectVarIdx = varIdx;
     selectStart = timeStep;
@@ -2154,13 +2154,13 @@ void MHorizonGraph::startSelection(size_t varIdx, float timeStep) {
     matchSelections.emplace_back(selectStart, selectEnd);
 }
 
-void MHorizonGraph::updateSelection(float timeStep) {
+void MCurvePlotView::updateSelection(float timeStep) {
     selectEnd = timeStep;
     auto& selection = matchSelectionsPerVariable.at(selectVarIdx).front();
     selection.second = selectEnd;
 }
 
-void MHorizonGraph::endSelection(float timeStep) {
+void MCurvePlotView::endSelection(float timeStep) {
     isSelecting = false;
     selectEnd = timeStep;
     matchSelectionsPerVariable.at(selectVarIdx).clear();
@@ -2169,7 +2169,7 @@ void MHorizonGraph::endSelection(float timeStep) {
     }
 }
 
-void MHorizonGraph::computeMatchSelections() {
+void MCurvePlotView::computeMatchSelections() {
     std::vector<float> querySubsequence;
     int startTimeIdx = clamp(
             int(std::round((selectStart - timeMin) / (timeMax - timeMin) * float(numTimeSteps - 1))),

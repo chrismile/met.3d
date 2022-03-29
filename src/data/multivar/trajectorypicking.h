@@ -44,7 +44,7 @@
 #include "data/abstractdataitem.h"
 #include "qt_extensions/radarchart.h"
 #include "charts/radarbarchart.h"
-#include "charts/horizongraph.h"
+#include "charts/curveplotview.h"
 #include "beziertrajectories.h"
 
 namespace Met3D {
@@ -59,7 +59,7 @@ struct MHighlightedTrajectoriesRenderData
 };
 
 enum class DiagramDisplayType {
-    NONE, RADAR_BAR_CHART_TIME_DEPENDENT, RADAR_BAR_CHART_TIME_INDEPENDENT, RADAR_CHART, HORIZON_GRAPH
+    NONE, RADAR_BAR_CHART_TIME_DEPENDENT, RADAR_BAR_CHART_TIME_INDEPENDENT, RADAR_CHART, CURVE_PLOT_VIEW
 };
 
 class MTrajectoryPicker : public MMemoryManagementUsingObject {
@@ -163,25 +163,25 @@ public:
 
     // Forwards all calls to 'diagram'.
     inline float getSelectedTimeStep() const {
-        if (diagram && diagram->getDiagramType() == DiagramType::HORIZON_GRAPH) {
-            return static_cast<MHorizonGraph*>(diagram)->getSelectedTimeStep();
+        if (diagram && diagram->getDiagramType() == DiagramType::CURVE_PLOT_VIEW) {
+            return static_cast<MCurvePlotView*>(diagram)->getSelectedTimeStep();
         }
         return 0.0f;
     }
     inline void setSelectedTimeStep(float timeStep) {
-        if (diagram && diagram->getDiagramType() == DiagramType::HORIZON_GRAPH) {
-            static_cast<MHorizonGraph*>(diagram)->setSelectedTimeStep(timeStep);
+        if (diagram && diagram->getDiagramType() == DiagramType::CURVE_PLOT_VIEW) {
+            static_cast<MCurvePlotView*>(diagram)->setSelectedTimeStep(timeStep);
         }
     }
     inline bool getSelectedTimeStepChanged() const {
-        if (diagram && diagram->getDiagramType() == DiagramType::HORIZON_GRAPH) {
-            return static_cast<MHorizonGraph*>(diagram)->getSelectedTimeStepChanged();
+        if (diagram && diagram->getDiagramType() == DiagramType::CURVE_PLOT_VIEW) {
+            return static_cast<MCurvePlotView*>(diagram)->getSelectedTimeStepChanged();
         }
         return false;
     }
     inline void resetSelectedTimeStepChanged() {
-        if (diagram && diagram->getDiagramType() == DiagramType::HORIZON_GRAPH) {
-            static_cast<MHorizonGraph*>(diagram)->resetSelectedTimeStepChanged();
+        if (diagram && diagram->getDiagramType() == DiagramType::CURVE_PLOT_VIEW) {
+            static_cast<MCurvePlotView*>(diagram)->resetSelectedTimeStepChanged();
         }
     }
 
@@ -335,7 +335,7 @@ private:
     MDiagramBase* diagram = nullptr;
     MDiagramBase* oldDiagram = nullptr;
     bool needsInitializationBeforeRendering = false;
-    DiagramDisplayType diagramDisplayType = DiagramDisplayType::HORIZON_GRAPH;
+    DiagramDisplayType diagramDisplayType = DiagramDisplayType::CURVE_PLOT_VIEW;
     //QtExtensions::MMultiVarChartCollection multiVarCharts;
     //QtExtensions::MRadarChart* radarChart;
     std::vector<std::string> variableNames;

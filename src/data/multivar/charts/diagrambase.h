@@ -49,7 +49,7 @@ struct NVGcolor;
 namespace Met3D {
 
 enum class DiagramType {
-    RADAR_CHART, RADAR_BAR_CHART, HORIZON_GRAPH
+    RADAR_CHART, RADAR_BAR_CHART, CURVE_PLOT_VIEW
 };
 
 class MDiagramBase : public MMemoryManagementUsingObject {

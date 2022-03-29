@@ -490,9 +490,9 @@ private:
 
     QStringList diagramTypeNames = {
             "None", "Radar Bar Chart (Time Dependent)", "Radar Bar Chart (Time Independent)",
-            "Radar Chart", "Horizon Graph"
+            "Radar Chart", "Curve-Plot View"
     };
-    DiagramDisplayType diagramType = DiagramDisplayType::HORIZON_GRAPH;
+    DiagramDisplayType diagramType = DiagramDisplayType::CURVE_PLOT_VIEW;
     QtProperty *diagramTypeProperty;
     QtProperty *diagramTransferFunctionProperty;
     MTransferFunction1D *diagramTransferFunction = nullptr;

@@ -2392,11 +2392,11 @@ void MTrajectoryActor::initializeActorResources()
 
 void MTrajectoryActor::updateSimilarityMetricGroupEnabled()
 {
-    similarityMetricGroup->setEnabled(diagramType == DiagramDisplayType::HORIZON_GRAPH);
+    similarityMetricGroup->setEnabled(diagramType == DiagramDisplayType::CURVE_PLOT_VIEW);
     numBinsProperty->setEnabled(similarityMetric == SimilarityMetric::MI);
-    sortByDescendingStdDevProperty->setEnabled(diagramType == DiagramDisplayType::HORIZON_GRAPH);
-    showMinMaxValueProperty->setEnabled(diagramType == DiagramDisplayType::HORIZON_GRAPH);
-    useMaxForSensitivityProperty->setEnabled(diagramType == DiagramDisplayType::HORIZON_GRAPH);
+    sortByDescendingStdDevProperty->setEnabled(diagramType == DiagramDisplayType::CURVE_PLOT_VIEW);
+    showMinMaxValueProperty->setEnabled(diagramType == DiagramDisplayType::CURVE_PLOT_VIEW);
+    useMaxForSensitivityProperty->setEnabled(diagramType == DiagramDisplayType::CURVE_PLOT_VIEW);
 }
 
 
@@ -3463,7 +3463,7 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
                 bezierTrajectoriesRenderData.varSelectedArrayBuffer->bindToIndex(7);
             }
             bezierTrajectoriesRenderData.varDivergingArrayBuffer->bindToIndex(8);
-            if (diagramType == DiagramDisplayType::NONE || diagramType == DiagramDisplayType::HORIZON_GRAPH)
+            if (diagramType == DiagramDisplayType::NONE || diagramType == DiagramDisplayType::CURVE_PLOT_VIEW)
             {
                 bezierTrajectoriesRenderData.lineSelectedArrayBuffer->bindToIndex(14);
             }
@@ -3519,7 +3519,7 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
 #ifdef USE_EMBREE
             // Render selected/highlighted trajectories.
             trajectoryPickerMap[sceneView]->setParticlePosTimeStep(particlePosTimeStep);
-            if (diagramType != DiagramDisplayType::NONE && diagramType != DiagramDisplayType::HORIZON_GRAPH)
+            if (diagramType != DiagramDisplayType::NONE && diagramType != DiagramDisplayType::CURVE_PLOT_VIEW)
             {
                 MHighlightedTrajectoriesRenderData highlightedTrajectoriesRenderData =
                         trajectoryPickerMap[sceneView]->getHighlightedTrajectoriesRenderData();

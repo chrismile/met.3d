@@ -38,7 +38,7 @@
 #include "../../gxfw/msceneviewglwidget.h"
 #include "charts/radarchart.h"
 #include "charts/radarbarchart.h"
-#include "charts/horizongraph.h"
+#include "charts/curveplotview.h"
 #include "util/mutil.h"
 #include "helpers.h"
 #include "hidpi.h"
@@ -111,10 +111,10 @@ void MTrajectoryPicker::setDiagramType(DiagramDisplayType type)
     {
         diagram = new MRadarBarChart(textureUnit, diagramTransferFunction);
     }
-    else if (diagramDisplayType == DiagramDisplayType::HORIZON_GRAPH)
+    else if (diagramDisplayType == DiagramDisplayType::CURVE_PLOT_VIEW)
     {
-        diagram = new MHorizonGraph(textureUnit, diagramTransferFunction);
-        auto* horizonGraph = static_cast<MHorizonGraph*>(diagram);
+        diagram = new MCurvePlotView(textureUnit, diagramTransferFunction);
+        auto* horizonGraph = static_cast<MCurvePlotView*>(diagram);
         horizonGraph->setSelectedTimeStep(timeStep);
         horizonGraph->setSimilarityMetric(similarityMetric);
         horizonGraph->setMeanMetricInfluence(meanMetricInfluence);
@@ -142,53 +142,53 @@ void MTrajectoryPicker::setDiagramType(DiagramDisplayType type)
 void MTrajectoryPicker::setSimilarityMetric(SimilarityMetric similarityMetric)
 {
     this->similarityMetric = similarityMetric;
-    if (diagramDisplayType == DiagramDisplayType::HORIZON_GRAPH)
+    if (diagramDisplayType == DiagramDisplayType::CURVE_PLOT_VIEW)
     {
-        static_cast<MHorizonGraph*>(diagram)->setSimilarityMetric(similarityMetric);
+        static_cast<MCurvePlotView*>(diagram)->setSimilarityMetric(similarityMetric);
     }
 }
 
 void MTrajectoryPicker::setMeanMetricInfluence(float meanMetricInfluence)
 {
     this->meanMetricInfluence = meanMetricInfluence;
-    if (diagramDisplayType == DiagramDisplayType::HORIZON_GRAPH)
+    if (diagramDisplayType == DiagramDisplayType::CURVE_PLOT_VIEW)
     {
-        static_cast<MHorizonGraph*>(diagram)->setMeanMetricInfluence(meanMetricInfluence);
+        static_cast<MCurvePlotView*>(diagram)->setMeanMetricInfluence(meanMetricInfluence);
     }
 }
 
 void MTrajectoryPicker::setStdDevMetricInfluence(float stdDevMetricInfluence)
 {
     this->stdDevMetricInfluence = stdDevMetricInfluence;
-    if (diagramDisplayType == DiagramDisplayType::HORIZON_GRAPH)
+    if (diagramDisplayType == DiagramDisplayType::CURVE_PLOT_VIEW)
     {
-        static_cast<MHorizonGraph*>(diagram)->setStdDevMetricInfluence(stdDevMetricInfluence);
+        static_cast<MCurvePlotView*>(diagram)->setStdDevMetricInfluence(stdDevMetricInfluence);
     }
 }
 
 void MTrajectoryPicker::setNumBins(int numBins)
 {
     this->numBins = numBins;
-    if (diagramDisplayType == DiagramDisplayType::HORIZON_GRAPH)
+    if (diagramDisplayType == DiagramDisplayType::CURVE_PLOT_VIEW)
     {
-        static_cast<MHorizonGraph*>(diagram)->setNumBins(numBins);
+        static_cast<MCurvePlotView*>(diagram)->setNumBins(numBins);
     }
 }
 
 void MTrajectoryPicker::sortByDescendingStdDev()
 {
-    if (diagramDisplayType == DiagramDisplayType::HORIZON_GRAPH)
+    if (diagramDisplayType == DiagramDisplayType::CURVE_PLOT_VIEW)
     {
-        static_cast<MHorizonGraph*>(diagram)->sortByDescendingStdDev();
+        static_cast<MCurvePlotView*>(diagram)->sortByDescendingStdDev();
     }
 }
 
 void MTrajectoryPicker::setShowMinMaxValue(bool show)
 {
     this->showMinMaxValue = show;
-    if (diagramDisplayType == DiagramDisplayType::HORIZON_GRAPH)
+    if (diagramDisplayType == DiagramDisplayType::CURVE_PLOT_VIEW)
     {
-        static_cast<MHorizonGraph*>(diagram)->setShowMinMaxValue(showMinMaxValue);
+        static_cast<MCurvePlotView*>(diagram)->setShowMinMaxValue(showMinMaxValue);
     }
 }
 
@@ -206,9 +206,9 @@ void MTrajectoryPicker::setTrimNanRegions(bool trimRegions)
 void MTrajectoryPicker::setUseMaxForSensitivity(bool useMax)
 {
     this->useMaxForSensitivity = useMax;
-    if (diagramDisplayType == DiagramDisplayType::HORIZON_GRAPH)
+    if (diagramDisplayType == DiagramDisplayType::CURVE_PLOT_VIEW)
     {
-        static_cast<MHorizonGraph*>(diagram)->setUseMaxForSensitivity(useMaxForSensitivity);
+        static_cast<MCurvePlotView*>(diagram)->setUseMaxForSensitivity(useMaxForSensitivity);
         if (diagram)
         {
             updateDiagramData();
@@ -219,18 +219,18 @@ void MTrajectoryPicker::setUseMaxForSensitivity(bool useMax)
 void MTrajectoryPicker::setSubsequenceMatchingTechnique(SubsequenceMatchingTechnique technique)
 {
     this->subsequenceMatchingTechnique = technique;
-    if (diagramDisplayType == DiagramDisplayType::HORIZON_GRAPH)
+    if (diagramDisplayType == DiagramDisplayType::CURVE_PLOT_VIEW)
     {
-        static_cast<MHorizonGraph*>(diagram)->setSubsequenceMatchingTechnique(subsequenceMatchingTechnique);
+        static_cast<MCurvePlotView*>(diagram)->setSubsequenceMatchingTechnique(subsequenceMatchingTechnique);
     }
 }
 
 void MTrajectoryPicker::setSpringEpsilon(float epsilon)
 {
     this->springEpsilon = epsilon;
-    if (diagramDisplayType == DiagramDisplayType::HORIZON_GRAPH)
+    if (diagramDisplayType == DiagramDisplayType::CURVE_PLOT_VIEW)
     {
-        static_cast<MHorizonGraph*>(diagram)->setSpringEpsilon(springEpsilon);
+        static_cast<MCurvePlotView*>(diagram)->setSpringEpsilon(springEpsilon);
     }
 }
 
@@ -254,18 +254,18 @@ void MTrajectoryPicker::setUseGlobalMinMax(bool _useGlobalMinMax)
 void MTrajectoryPicker::setTextSize(float _textSize)
 {
     this->textSize = _textSize;
-    if (diagramDisplayType == DiagramDisplayType::HORIZON_GRAPH)
+    if (diagramDisplayType == DiagramDisplayType::CURVE_PLOT_VIEW)
     {
-        static_cast<MHorizonGraph*>(diagram)->setTextSize(_textSize);
+        static_cast<MCurvePlotView*>(diagram)->setTextSize(_textSize);
     }
 }
 
 void MTrajectoryPicker::setDiagramUpscalingFactor(float factor)
 {
     this->diagramUpscalingFactor = factor;
-    if (diagramDisplayType == DiagramDisplayType::HORIZON_GRAPH)
+    if (diagramDisplayType == DiagramDisplayType::CURVE_PLOT_VIEW)
     {
-        static_cast<MHorizonGraph*>(diagram)->setUpscalingFactor(diagramUpscalingFactor);
+        static_cast<MCurvePlotView*>(diagram)->setUpscalingFactor(diagramUpscalingFactor);
     }
 }
 
@@ -915,14 +915,14 @@ void MTrajectoryPicker::setParticlePosTimeStep(int newTimeStep)
         }
     }
 
-    if (diagram && diagram->getDiagramType() != DiagramType::HORIZON_GRAPH)
+    if (diagram && diagram->getDiagramType() != DiagramType::CURVE_PLOT_VIEW)
     {
         updateDiagramData();
     }
 
-    if (diagram->getDiagramType() == DiagramType::HORIZON_GRAPH)
+    if (diagram->getDiagramType() == DiagramType::CURVE_PLOT_VIEW)
     {
-        static_cast<MHorizonGraph*>(diagram)->setSelectedTimeStep(newTimeStep);
+        static_cast<MCurvePlotView*>(diagram)->setSelectedTimeStep(newTimeStep);
     }
 }
 
@@ -1105,11 +1105,11 @@ void MTrajectoryPicker::updateDiagramData()
         }
         radarChart->setData(variableNames, variableValuesPerTrajectory, highlightColors);
     }
-    else if (diagram->getDiagramType() == DiagramType::HORIZON_GRAPH)
+    else if (diagram->getDiagramType() == DiagramType::CURVE_PLOT_VIEW)
     {
         const size_t numTimeSteps = baseTrajectories.empty() ? 1 : baseTrajectories.front().positions.size();
 
-        MHorizonGraph* horizonGraph = static_cast<MHorizonGraph*>(diagram);
+        MCurvePlotView* horizonGraph = static_cast<MCurvePlotView*>(diagram);
         std::vector<std::vector<std::vector<float>>> variableValuesArray;
         variableValuesArray.resize(highlightedTrajectories.size());
 

@@ -23,8 +23,8 @@
 **  along with Met.3D.  If not, see <http://www.gnu.org/licenses/>.
 **
 *******************************************************************************/
-#ifndef MET_3D_HORIZONGRAPH_H
-#define MET_3D_HORIZONGRAPH_H
+#ifndef MET_3D_CURVEPLOTVIEW_H
+#define MET_3D_CURVEPLOTVIEW_H
 
 // standard library imports
 #include <string>
@@ -56,10 +56,10 @@ const char* const SIMILARITY_METRIC_NAMES[] = {
         "Mutual Information", "SSIM"
 };
 
-class MHorizonGraph : public MDiagramBase {
+class MCurvePlotView : public MDiagramBase {
 public:
-    MHorizonGraph(GLint textureUnit, MTransferFunction1D*& diagramTransferFunction);
-    DiagramType getDiagramType() override { return DiagramType::HORIZON_GRAPH; }
+    MCurvePlotView(GLint textureUnit, MTransferFunction1D*& diagramTransferFunction);
+    DiagramType getDiagramType() override { return DiagramType::CURVE_PLOT_VIEW; }
     void initialize() override;
 
     /**
@@ -224,4 +224,4 @@ private:
 
 }
 
-#endif //MET_3D_HORIZONGRAPH_H
+#endif //MET_3D_CURVEPLOTVIEW_H
