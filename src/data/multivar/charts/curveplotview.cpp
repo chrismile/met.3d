@@ -227,6 +227,12 @@ void MCurvePlotView::setData(
     this->variableNames = _variableNames;
     this->variableValuesArray = _variableValuesArray;
 
+    selectStart = -1.0f;
+    selectEnd = -1.0f;
+    for (auto& matchSelections : matchSelectionsPerVariable) {
+        matchSelections.clear();
+    }
+
     if (!sameVariables) {
         nvgFontSize(vg, textSize);
         nvgFontFace(vg, "sans");
@@ -359,6 +365,7 @@ void MCurvePlotView::setData(
     for (size_t varIdx = 0; varIdx < numVariables; varIdx++) {
         sortedVariableIndices.push_back(varIdx);
     }
+    resetFinalSelectedVariableIndices();
 
     matchSelectionsPerVariable.resize(numVariables);
 
@@ -413,6 +420,12 @@ void MCurvePlotView::sortByDescendingStdDev() {
     for (auto& it : differenceMap) {
         sortedVariableIndices.push_back(it.second);
     }
+
+    resetFinalSelectedVariableIndices();
+}
+
+void MCurvePlotView::setShowSelectedVariablesFirst(bool showFirst) {
+    showSelectedVariablesFirst = showFirst;
 }
 
 void MCurvePlotView::setShowMinMaxValue(bool show) {
@@ -517,7 +530,7 @@ void MCurvePlotView::drawHorizonMatchSelections() {
     nvgScissor(vg, offsetHorizonBarsX, scissorAabb.min.y(), horizonBarWidth, scissorAabb.getHeight());
 
     size_t heightIdx = 0;
-    for (size_t varIdx : sortedVariableIndices) {
+    for (size_t varIdx : finalVariableIndices) {
         float lowerY = offsetHorizonBarsY + float(heightIdx) * (horizonBarHeight + horizonBarMargin);
         float upperY = lowerY + horizonBarHeight;
 
@@ -565,7 +578,7 @@ void MCurvePlotView::drawHorizonLines() {
             QVector2D(windowWidth - borderWidth, windowHeight - borderWidth + scrollTranslationY));
 
     size_t heightIdx = 0;
-    for (size_t varIdx : sortedVariableIndices) {
+    for (size_t varIdx : finalVariableIndices) {
         NVGcolor strokeColor = nvgRGBA(0, 0, 0, 255);
 
         float lowerY = offsetHorizonBarsY + float(heightIdx) * (horizonBarHeight + horizonBarMargin);
@@ -701,7 +714,7 @@ void MCurvePlotView::drawHorizonLinesSparse() {
     const int horizonBarWidthInt = int(horizonBarWidth);
 
     size_t heightIdx = 0;
-    for (size_t varIdx : sortedVariableIndices) {
+    for (size_t varIdx : finalVariableIndices) {
         NVGcolor strokeColor = nvgRGBA(0, 0, 0, 255);
 
         float lowerY = offsetHorizonBarsY + float(heightIdx) * (horizonBarHeight + horizonBarMargin);
@@ -1009,7 +1022,7 @@ void MCurvePlotView::drawHorizonLinesLttb() {
     }
 
     size_t heightIdx = 0;
-    for (size_t varIdx : sortedVariableIndices) {
+    for (size_t varIdx : finalVariableIndices) {
         NVGcolor strokeColor = nvgRGBA(0, 0, 0, 255);
 
         float lowerY = offsetHorizonBarsY + float(heightIdx) * (horizonBarHeight + horizonBarMargin);
@@ -1142,11 +1155,13 @@ void MCurvePlotView::drawLegendLeft(const NVGcolor& textColor) {
     nvgFontSize(vg, textSize);
     nvgFontFace(vg, "sans");
     size_t heightIdx = 0;
-    for (size_t varIdx : sortedVariableIndices) {
+    for (size_t varIdx : finalVariableIndices) {
         float lowerY = offsetHorizonBarsY + float(heightIdx) * (horizonBarHeight + horizonBarMargin);
         //float upperY = lowerY + horizonBarHeight;
         nvgTextAlign(vg, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
-        if (selectedVariableIndices.find(varIdx) != selectedVariableIndices.end()) {
+        if (std::find(
+                selectedVariableIndices.begin(), selectedVariableIndices.end(),
+                varIdx) != selectedVariableIndices.end()) {
             nvgFontBlur(vg, 1);
             nvgFillColor(vg, nvgRGBA(255, 0, 0, 255));
             nvgText(
@@ -1447,7 +1462,7 @@ void MCurvePlotView::mousePressEvent(MSceneViewGLWidget *sceneView, QMouseEvent 
     if (windowAabb.contains(mousePosition) && !event->modifiers().testFlag(Qt::ControlModifier)
             && !event->modifiers().testFlag(Qt::ShiftModifier) && event->button() == Qt::MouseButton::LeftButton) {
         size_t heightIdx = 0;
-        for (size_t varIdx : sortedVariableIndices) {
+        for (size_t varIdx : finalVariableIndices) {
             float lowerY = offsetHorizonBarsY + float(heightIdx) * (horizonBarHeight + horizonBarMargin);
             AABB2 boxAabb(
                     QVector2D(offsetHorizonBarsX, lowerY - scrollTranslationY),
@@ -1476,7 +1491,7 @@ void MCurvePlotView::mousePressEvent(MSceneViewGLWidget *sceneView, QMouseEvent 
     if (event->modifiers().testFlag(Qt::ControlModifier) && event->button() == Qt::MouseButton::LeftButton
             && graphAreaAabb.contains(mousePosition)) {
         size_t heightIdx = 0;
-        for (size_t varIdx : sortedVariableIndices) {
+        for (size_t varIdx : finalVariableIndices) {
             float lowerY = offsetHorizonBarsY + float(heightIdx) * (horizonBarHeight + horizonBarMargin);
             AABB2 boxAabb(
                     QVector2D(offsetHorizonBarsX, lowerY - scrollTranslationY),
@@ -1545,7 +1560,7 @@ void MCurvePlotView::mouseReleaseEvent(MSceneViewGLWidget *sceneView, QMouseEven
             QVector2D(windowWidth - 2.0f * borderWidth, windowHeight - 2.0f * borderWidth));
     if (windowAabb.contains(mousePosition) && event->button() == Qt::MouseButton::LeftButton) {
         size_t heightIdx = 0;
-        for (size_t varIdx : sortedVariableIndices) {
+        for (size_t varIdx : finalVariableIndices) {
             float lowerY = offsetHorizonBarsY + float(heightIdx) * (horizonBarHeight + horizonBarMargin);
             //float upperY = lowerY + horizonBarHeight;
             nvgTextAlign(vg, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
@@ -1555,12 +1570,17 @@ void MCurvePlotView::mouseReleaseEvent(MSceneViewGLWidget *sceneView, QMouseEven
                     variableNames.at(varIdx).c_str(), nullptr, &bounds[0][0]);
             AABB2 textAabb(bounds[0], bounds[1]);
             if (textAabb.contains(mousePosition)) {
-                if (selectedVariableIndices.find(varIdx) == selectedVariableIndices.end()) {
-                    selectedVariableIndices.insert(varIdx);
+                if (std::find(
+                        selectedVariableIndices.begin(), selectedVariableIndices.end(),
+                        varIdx) == selectedVariableIndices.end()) {
+                    selectedVariableIndices.push_back(varIdx);
                 } else {
-                    selectedVariableIndices.erase(varIdx);
+                    selectedVariableIndices.erase(std::remove(
+                            selectedVariableIndices.begin(), selectedVariableIndices.end(),
+                            varIdx), selectedVariableIndices.end());
                 }
                 selectedVariablesChanged = true;
+                resetFinalSelectedVariableIndices();
             }
             heightIdx++;
         }
@@ -2140,6 +2160,27 @@ void MCurvePlotView::sortVariables(int newSortingIdx, bool forceRecompute) {
         sortedVariableIndices.push_back(it.second);
     }
     std::cout << std::endl;
+
+    resetFinalSelectedVariableIndices();
+}
+
+void MCurvePlotView::resetFinalSelectedVariableIndices() {
+    if (showSelectedVariablesFirst) {
+        finalVariableIndices.clear();
+        for (auto& varIdx : selectedVariableIndices) {
+            finalVariableIndices.push_back(varIdx);
+        }
+        for (auto& varIdx : sortedVariableIndices) {
+            bool isSelected = std::find(
+                    selectedVariableIndices.begin(), selectedVariableIndices.end(),
+                    varIdx) != selectedVariableIndices.end();
+            if (!isSelected) {
+                finalVariableIndices.push_back(varIdx);
+            }
+        }
+    } else {
+        finalVariableIndices = sortedVariableIndices;
+    }
 }
 
 void MCurvePlotView::startSelection(size_t varIdx, float timeStep) {

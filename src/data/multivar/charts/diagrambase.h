@@ -68,22 +68,22 @@ public:
     inline Qt::CursorShape getCursorShape() const { return cursorShape; }
     virtual bool hasData()=0;
 
-    inline QVector<uint32_t> getSelectedVariables() const {
-        QVector<uint32_t> selectedVariables;
-        selectedVariables.resize(int(numVariables));
+    inline QVector<uint32_t> getSelectedVariableIndices() const {
+        QVector<uint32_t> _selectedVariableIndices;
+        _selectedVariableIndices.reserve(int(selectedVariableIndices.size()));
         for (size_t varIdx : selectedVariableIndices) {
-            selectedVariables[int(varIdx)] = 1u;
+            _selectedVariableIndices.push_back(varIdx);
         }
-        return selectedVariables;
+        return _selectedVariableIndices;
     }
-    inline void setSelectedVariables(const QVector<uint32_t>& selectedVariables) {
+    inline void setSelectedVariableIndices(const QVector<uint32_t>& _selectedVariableIndices) {
         selectedVariableIndices.clear();
-        for (int varIdx = 0; varIdx < selectedVariables.size(); varIdx++) {
-            if (selectedVariables.at(varIdx)) {
-                selectedVariableIndices.insert(size_t(varIdx));
-            }
+        selectedVariableIndices.reserve(_selectedVariableIndices.size());
+        for (uint32_t varIdx : _selectedVariableIndices) {
+            selectedVariableIndices.push_back(varIdx);
         }
         selectedVariablesChanged = false;
+        updateSelectedVariables();
     }
     inline bool getSelectedVariablesChanged() const { return selectedVariablesChanged; }
     inline void resetSelectedVariablesChanged() { selectedVariablesChanged = false; }
@@ -104,6 +104,7 @@ protected:
     virtual void onWindowSizeChanged();
     virtual void mousePressEventResizeWindow(MSceneViewGLWidget *sceneView, QMouseEvent *event);
     virtual void mousePressEventMoveWindow(MSceneViewGLWidget *sceneView, QMouseEvent *event);
+    virtual void updateSelectedVariables() {}
 
     // Utility functions.
     void drawColorLegend(
@@ -154,7 +155,7 @@ protected:
 
     // Variables can be selected by clicking on them.
     size_t numVariables = 0;
-    std::set<size_t> selectedVariableIndices;
+    std::vector<uint32_t> selectedVariableIndices;
     bool selectedVariablesChanged = false;
 
 private:

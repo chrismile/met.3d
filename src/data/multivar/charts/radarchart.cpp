@@ -192,7 +192,7 @@ void MRadarChart::drawPieSliceTextHorizontal(const NVGcolor& textColor, const QV
     textPosition[1] += textSize.y() * ((dirY - 1) * 0.5f + scaleFactorText);
 
     nvgTextAlign(vg,NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
-    if (selectedVariableIndices.find(varIdx) != selectedVariableIndices.end()) {
+    if (std::find(selectedVariableIndices.begin(), selectedVariableIndices.end(), varIdx) != selectedVariableIndices.end()) {
         nvgFontBlur(vg, 1);
         nvgFillColor(vg, nvgRGBA(255, 0, 0, 255));
         nvgText(vg, textPosition.x(), textPosition.y(), text, nullptr);
@@ -230,7 +230,7 @@ void MRadarChart::drawPieSliceTextRotated(const NVGcolor& textColor, const QVect
         nvgTranslate(vg, -(bounds[0][0] + bounds[1][0]) / 2.0f, -(bounds[0][1] + bounds[1][1]) / 2.0f);
     }
 
-    if (selectedVariableIndices.find(varIdx) != selectedVariableIndices.end()) {
+    if (std::find(selectedVariableIndices.begin(), selectedVariableIndices.end(), varIdx) != selectedVariableIndices.end()) {
         nvgFontBlur(vg, 1);
         nvgFillColor(vg, nvgRGBA(255, 0, 0, 255));
         nvgText(vg, textPosition.x(), textPosition.y(), text, nullptr);
@@ -422,10 +422,11 @@ void MRadarChart::mouseReleaseEvent(MSceneViewGLWidget *sceneView, QMouseEvent *
 
             AABB2 textAabb(bounds[0], bounds[1]);
             if (textAabb.contains(transformedMousePosition)) {
-                if (selectedVariableIndices.find(varIdx) == selectedVariableIndices.end()) {
-                    selectedVariableIndices.insert(varIdx);
+                if (std::find(selectedVariableIndices.begin(), selectedVariableIndices.end(), varIdx) == selectedVariableIndices.end()) {
+                    selectedVariableIndices.push_back(varIdx);
                 } else {
-                    selectedVariableIndices.erase(varIdx);
+                    selectedVariableIndices.erase(std::remove(
+                            selectedVariableIndices.begin(), selectedVariableIndices.end(), varIdx), selectedVariableIndices.end());
                 }
                 selectedVariablesChanged = true;
             }

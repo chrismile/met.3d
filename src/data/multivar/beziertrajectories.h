@@ -189,7 +189,7 @@ public:
     QGLWidget *currentGLContext = nullptr);
 #endif
     void releaseRenderData();
-    void updateSelectedVariables(const QVector<uint32_t>& varSelected);
+    void updateSelectedVariableIndices(const QVector<uint32_t>& selectedVariableIndices);
     void updateDivergingVariables(const QVector<uint32_t>& varDiverging);
     void updateSelectedLines(const QVector<uint32_t>& selectedLines);
 
@@ -233,7 +233,7 @@ private:
     MFilteredTrajectories baseTrajectories;
     QVector<MBezierTrajectory> bezierTrajectories;
     MBezierTrajectoriesRenderData bezierTrajectoriesRenderData;
-    QVector<uint32_t> varSelected;
+    QVector<uint32_t> selectedVariableIndices;
     QVector<uint32_t> varDiverging;
     QVector<uint32_t> trajectoryIndexOffsets;
     QVector<uint32_t> numIndicesPerTrajectory;
@@ -296,6 +296,7 @@ private:
     bool isDirty = true;
     QVector<int> trajIndicesToFilteredIndicesMap;
     int numTrajectories = 0;
+    uint32_t numVariables = 0;
     bool useFiltering = false;
     int numFilteredTrajectories = 0;
     GLsizei* trajectorySelectionCount = nullptr;

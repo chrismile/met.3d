@@ -395,7 +395,7 @@ void MTrajectoryPicker::render()
             diagram->createNanoVgHandle();
             diagram->initialize();
             updateDiagramData();
-            diagram->setSelectedVariables(selectedVariables);
+            diagram->setSelectedVariableIndices(selectedVariableIndices);
         }
         diagram->render();
     }

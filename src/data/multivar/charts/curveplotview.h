@@ -85,6 +85,7 @@ public:
     void setSubsequenceMatchingTechnique(SubsequenceMatchingTechnique technique);
     void setSpringEpsilon(float epsilon);
     void setTextSize(float _textSize);
+    void setShowSelectedVariablesFirst(bool showFirst);
 
     void mouseMoveEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event) override;
     void mousePressEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event) override;
@@ -95,6 +96,7 @@ protected:
     bool hasData() override { return !variableValuesArray.empty(); }
     void onWindowSizeChanged() override;
     void renderBase() override;
+    void updateSelectedVariables() override { resetFinalSelectedVariableIndices(); }
 
 private:
     void drawHorizonBackground();
@@ -200,6 +202,7 @@ private:
     float computeSSIM(
             int varIdx0, int varIdx1, const std::vector<std::vector<float>>& valueArray, float factor) const;
     void sortVariables(int newSortingIdx, bool forceRecompute = false);
+    void resetFinalSelectedVariableIndices();
     SimilarityMetric similarityMetric = SimilarityMetric::ABSOLUTE_NCC;
     int numBins = 10;
     bool showMinMaxValue = true;
@@ -207,6 +210,8 @@ private:
     float stdDevMetricInfluence = 0.25f;
     int sortingIdx = -1;
     std::vector<size_t> sortedVariableIndices;
+    std::vector<size_t> finalVariableIndices;
+    bool showSelectedVariablesFirst = true;
 
     // Selection of similar subsequences in the variable data.
     void startSelection(size_t varIdx, float timeStep);

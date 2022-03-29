@@ -185,19 +185,17 @@ public:
         }
     }
 
-    inline QVector<uint32_t> getSelectedVariables() const {
+    inline QVector<uint32_t> getSelectedVariableIndices() const {
         if (diagram) {
-            return diagram->getSelectedVariables();
+            return diagram->getSelectedVariableIndices();
         } else {
-            QVector<uint32_t> selectedVariables;
-            selectedVariables.resize(int(variableNames.size()));
-            return selectedVariables;
+            return {};
         }
     }
-    inline void setSelectedVariables(const QVector<uint32_t>& selectedVariables) {
-        this->selectedVariables = selectedVariables;
+    inline void setSelectedVariableIndices(const QVector<uint32_t>& _selectedVariableIndices) {
+        this->selectedVariableIndices = _selectedVariableIndices;
         if (diagram) {
-            diagram->setSelectedVariables(selectedVariables);
+            diagram->setSelectedVariableIndices(selectedVariableIndices);
         }
     }
     inline bool getSelectedVariablesChanged() const {
@@ -340,7 +338,7 @@ private:
     //QtExtensions::MRadarChart* radarChart;
     std::vector<std::string> variableNames;
     size_t numVars = 0;
-    QVector<uint32_t> selectedVariables;
+    QVector<uint32_t> selectedVariableIndices;
     MTransferFunction1D*& diagramTransferFunction;
 
     // Used for aligning warm conveyor belt trajectories based on their ascension or height.

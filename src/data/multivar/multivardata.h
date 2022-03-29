@@ -91,14 +91,22 @@ public:
 
     inline bool getSelectedVariablesChanged() const { return selectedVariablesChanged; }
     inline void resetSelectedVariablesChanged() { selectedVariablesChanged = false; }
-    inline const QVector<uint32_t>& getSelectedVariables() { return selectedVariables; }
-    inline void setSelectedVariables(const QVector<uint32_t>& selectedVariables) {
-        this->selectedVariables = selectedVariables;
-        for (int varIdx = 0; varIdx < maxNumVariables; varIdx++)
+    inline const QVector<uint32_t>& getSelectedVariableIndices() { return selectedVariableIndices; }
+    inline void setSelectedVariables(const QVector<uint32_t>& _selectedVariableIndices) {
+        this->selectedVariableIndices = _selectedVariableIndices;
+        ignorePropertyUpdateMode = true;
+        for (uint32_t varIdx = 0; varIdx < uint32_t(maxNumVariables); varIdx++)
         {
-            QtProperty* variableProperty = selectedVariablesProperties.at(varIdx);
-            properties->mBool()->setValue(variableProperty, selectedVariables.at(varIdx));
+            QtProperty* variableProperty = selectedVariablesProperties.at(int(varIdx));
+            bool shouldBeSelected = std::find(
+                    selectedVariableIndices.begin(), selectedVariableIndices.end(),
+                    varIdx) != selectedVariableIndices.end();
+            bool isSelected = properties->mBool()->value(variableProperty);
+            if (isSelected != shouldBeSelected) {
+                properties->mBool()->setValue(variableProperty, shouldBeSelected);
+            }
         }
+        ignorePropertyUpdateMode = false;
         updateNumVariablesSelected();
     }
 
@@ -195,8 +203,9 @@ private:
 
     QtProperty *selectedVariablesGroupProperty;
     QVector<QtProperty*> selectedVariablesProperties;
-    QVector<uint32_t> selectedVariables;
+    QVector<uint32_t> selectedVariableIndices;
     bool selectedVariablesChanged = false;
+    bool ignorePropertyUpdateMode = true;
 
     // Show target variable and maximum sensitivity.
     QtProperty *targetVariableAndSensitivityProperty;
@@ -237,7 +246,7 @@ private:
     // Multi-variable settings.
     //std::vector<glm::vec4> varColors;
     int32_t numVariablesSelected = 0;
-    int32_t maxNumVariables = 6;
+    int32_t maxNumVariables = 0;
     int32_t numLineSegments = 8;
     float separatorWidth = 0.10f;
     /// For orientedRibbonMode == ORIENTED_RIBBON_MODE_VARYING_BAND_WIDTH

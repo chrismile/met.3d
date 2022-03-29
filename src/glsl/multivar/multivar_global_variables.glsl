@@ -77,7 +77,7 @@ layout (std430, binding = 6) readonly buffer LineVarDescArray {
 };
 
 layout (std430, binding = 7) readonly buffer VarSelectedArray {
-    uint selectedVars[];
+    uint selectedVariableIndices[];
 };
 
 #ifdef SUPPORT_LINE_DESATURATION
@@ -166,10 +166,10 @@ int sampleActualVarID(in uint varID) {
         return -1;
     }
 
-    uint index = varID + 1;
+    return int(selectedVariableIndices[varID]);
 
-    uint numSelected = 0;
     // HACK: change to dynamic variable
+    /*uint index = varID + 1;
     for (int c = 0; c < maxNumVariables; ++c) {
         if (selectedVars[c] > 0) {
             numSelected++;
@@ -180,7 +180,7 @@ int sampleActualVarID(in uint varID) {
         }
     }
 
-    return -1;
+    return -1;*/
 }
 
 // Function to sample from SSBOs

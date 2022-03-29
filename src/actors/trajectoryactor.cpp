@@ -1935,7 +1935,7 @@ void MTrajectoryActor::prepareAvailableDataForRendering(uint slot)
                                 textureUnit, view, multiVarData.getVarNames(), diagramType,
                                 diagramTransferFunction);
                         multiVarData.setDiagramType(diagramType);
-                        trajectoryPickerMap[view]->setSelectedVariables(multiVarData.getSelectedVariables());
+                        trajectoryPickerMap[view]->setSelectedVariableIndices(multiVarData.getSelectedVariableIndices());
                         trajectoryPickerMap[view]->updateTrajectoryRadius(tubeRadius);
                         trajectoryPickerMap[view]->setParticlePosTimeStep(particlePosTimeStep);
                         trajectoryPickerMap[view]->setDiagramType(diagramType);
@@ -3362,9 +3362,9 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
             }
             if (trajectoryPickerMap[sceneView]->getSelectedVariablesChanged())
             {
-                multiVarData.setSelectedVariables(trajectoryPickerMap[sceneView]->getSelectedVariables());
-                trajectoryRequests[t].bezierTrajectoriesMap[sceneView]->updateSelectedVariables(
-                        multiVarData.getSelectedVariables());
+                multiVarData.setSelectedVariables(trajectoryPickerMap[sceneView]->getSelectedVariableIndices());
+                trajectoryRequests[t].bezierTrajectoriesMap[sceneView]->updateSelectedVariableIndices(
+                        multiVarData.getSelectedVariableIndices());
                 trajectoryPickerMap[sceneView]->resetSelectedVariablesChanged();
             }
 
@@ -3384,10 +3384,10 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
 
             if (multiVarData.getSelectedVariablesChanged())
             {
-                trajectoryRequests[t].bezierTrajectoriesMap[sceneView]->updateSelectedVariables(
-                        multiVarData.getSelectedVariables());
+                trajectoryRequests[t].bezierTrajectoriesMap[sceneView]->updateSelectedVariableIndices(
+                        multiVarData.getSelectedVariableIndices());
 #ifdef USE_EMBREE
-                trajectoryPickerMap[sceneView]->setSelectedVariables(multiVarData.getSelectedVariables());
+                trajectoryPickerMap[sceneView]->setSelectedVariableIndices(multiVarData.getSelectedVariableIndices());
 #endif
                 multiVarData.resetSelectedVariablesChanged();
             }

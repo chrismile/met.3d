@@ -55,12 +55,8 @@ MBezierTrajectories::MBezierTrajectories(
         : MSupplementalTrajectoryData(requestToReferTo, filteredTrajectories.size()),
           baseTrajectories(filteredTrajectories), bezierTrajectories(filteredTrajectories.size()),
           trajIndicesToFilteredIndicesMap(trajIndicesToFilteredIndicesMap),
-          numTrajectories(filteredTrajectories.size())
+          numTrajectories(filteredTrajectories.size()), numVariables(numVariables)
 {
-    for (unsigned int i = 0; i < numVariables; i++)
-    {
-        varSelected.push_back(true);
-    }
     for (unsigned int i = 0; i < numVariables; i++)
     {
         varDiverging.push_back(false);
@@ -77,18 +73,17 @@ MBezierTrajectories::MBezierTrajectories(
     /*
      * TODO: This is hard-coded, as there is currently no way to know which the target variable is.
      */
-    for (unsigned int i = 0; i < numVariables; i++)
-    {
-        targetVariableAndSensitivityIndexArray.push_back(false);
-    }
+    targetVariableAndSensitivityIndexArray.resize(numVariables);
     int targetVariableIndex = auxDataVarNames.indexOf("QR");
     if (targetVariableIndex < 0) {
         targetVariableIndex = std::max(1, int(numVariables) - 1);
     } else {
         targetVariableIndex = targetVariableIndex + 1;
     }
-    targetVariableAndSensitivityIndexArray[targetVariableIndex] = true;
-    targetVariableAndSensitivityIndexArray[int(numVariables) - 1] = true;
+    targetVariableAndSensitivityIndexArray[0] = targetVariableIndex;
+    if (numVariables > 1) {
+        targetVariableAndSensitivityIndexArray[1] = int(numVariables) - 1;
+    }
 
     this->numTrajectories = static_cast<int>(numTrajectories);
     trajectorySelectionCount = new GLsizei[numTrajectories];
@@ -387,6 +382,9 @@ MBezierTrajectoriesRenderData MBezierTrajectories::getRenderData(
         }
     }
 
+    QVector<uint32_t> varSelected;
+    varSelected.resize(int(numVariables));
+
     bezierTrajectoriesRenderData.variableArrayBuffer = createShaderStorageBuffer(
             currentGLContext, variableArrayBufferID, varData);
     bezierTrajectoriesRenderData.lineDescArrayBuffer = createShaderStorageBuffer(
@@ -428,13 +426,18 @@ void MBezierTrajectories::releaseRenderData()
 }
 
 
-void MBezierTrajectories::updateSelectedVariables(const QVector<uint32_t>& varSelected)
+void MBezierTrajectories::updateSelectedVariableIndices(const QVector<uint32_t>& _selectedVariableIndices)
 {
-    this->varSelected = varSelected;
+    this->selectedVariableIndices = _selectedVariableIndices;
     if (bezierTrajectoriesRenderData.varSelectedArrayBuffer)
     {
+        QVector<uint32_t> selectedVariableIndicesAll;
+        selectedVariableIndicesAll.resize(int(numVariables));
+        for (int i = 0; i < selectedVariableIndices.size(); i++) {
+            selectedVariableIndicesAll[int(i)] = selectedVariableIndices.at(int(i));
+        }
         bezierTrajectoriesRenderData.varSelectedArrayBuffer->upload(
-                varSelected.constData(), GL_STATIC_DRAW);
+                selectedVariableIndicesAll.constData(), GL_STATIC_DRAW);
     }
 }
 
@@ -888,7 +891,7 @@ QGLWidget *currentGLContext)
 {
     if (timeStep == lastRollsTimeStep && syncModeTrajectoryIndex == lastRollsSyncModeTrajectoryIndex
             && (!mapRollsThickness || tubeRadius == lastTubeRadius)
-            && rollsRadius == lastRollsRadius && rollsWidth == lastRollsWidth && lastVarSelectedRolls == varSelected
+            && rollsRadius == lastRollsRadius && rollsWidth == lastRollsWidth && lastVarSelectedRolls == selectedVariableIndices
             && mapRollsThickness == lastMapRollsThickness && lastNumLineSegmentsRolls == numLineSegments) {
         return;
     }
@@ -897,18 +900,15 @@ QGLWidget *currentGLContext)
     lastTubeRadius = tubeRadius;
     lastRollsRadius = rollsRadius;
     lastRollsWidth = rollsWidth;
-    lastVarSelectedRolls = varSelected;
+    lastVarSelectedRolls = selectedVariableIndices;
     lastMapRollsThickness = mapRollsThickness;
     lastNumLineSegmentsRolls = numLineSegments;
 
     QVector<int> selectedVarIndices;
-    int numVarsSelected = 0;
-    for (int i = 0; i < varSelected.size(); i++)
+    int numVarsSelected = selectedVariableIndices.size();
+    for (uint32_t varIdx : selectedVariableIndices)
     {
-        if (varSelected.at(i)) {
-            numVarsSelected++;
-            selectedVarIndices.push_back(i);
-        }
+        selectedVarIndices.push_back(int(varIdx));
     }
 
     if (timeStepRollsRenderData.indexBuffer) {

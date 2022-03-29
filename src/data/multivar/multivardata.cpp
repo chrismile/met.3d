@@ -252,7 +252,8 @@ void MMultiVarData::setPropertiesVarSelected()
         QString name = QString("var. #%1 (%2)").arg(QString::number(varIdx + 1), varNames.at(varIdx));
         QtProperty* variableProperty = addProperty(
                 BOOL_PROPERTY, name, selectedVariablesGroupProperty);
-        properties->mBool()->setValue(variableProperty, selectedVariables.at(varIdx));
+        bool isSelected = std::find(selectedVariableIndices.begin(), selectedVariableIndices.end(), varIdx) != selectedVariableIndices.end();
+        properties->mBool()->setValue(variableProperty, isSelected);
         variableProperty->setToolTip(QString("Whether to display the variable '%2'").arg(varNames.at(varIdx)));
         selectedVariablesProperties.push_back(variableProperty);
         propertyList.push_back(variableProperty);
@@ -262,14 +263,7 @@ void MMultiVarData::setPropertiesVarSelected()
 
 void MMultiVarData::updateNumVariablesSelected()
 {
-    numVariablesSelected = 0;
-    foreach (uint32_t isSelected, selectedVariables)
-    {
-        if (isSelected)
-        {
-            numVariablesSelected++;
-        }
-    }
+    numVariablesSelected = selectedVariableIndices.size();
 }
 
 
@@ -297,6 +291,7 @@ void MMultiVarData::setEnabled(bool isEnabled)
 void MMultiVarData::saveConfiguration(QSettings *settings)
 {
     settings->setValue("numVariables", transferFunctionsMultiVar.size());
+    settings->setValue("numVariablesSelected", selectedVariableIndices.size());
     int varIdx = 0;
     foreach (QtProperty *tfProperty, tfPropertiesMultiVar)
     {
@@ -306,10 +301,12 @@ void MMultiVarData::saveConfiguration(QSettings *settings)
         settings->setValue(
                 QString("varName#%1").arg(varIdx + 1),
                 varNames.at(varIdx));
-        settings->setValue(
-                QString("varSelected#%1").arg(varIdx + 1),
-                static_cast<bool>(selectedVariables.at(varIdx)));
         varIdx++;
+    }
+    for (int i = 0; i < selectedVariableIndices.size(); i++) {
+        settings->setValue(
+                QString("varSelectedIdx#%1").arg(i),
+                selectedVariableIndices.at(i));
     }
 
     // Multi-variable settings.
@@ -341,14 +338,21 @@ void MMultiVarData::loadConfiguration(QSettings *settings)
     int numVariables = settings->value("numVariables", 0).toInt();
 
     varNames.clear();
-    selectedVariables.clear();
+    selectedVariableIndices.clear();
+    numVariablesSelected = settings->value(QString("numVariablesSelected")).toInt();
     for (int varIdx = 0; varIdx < numVariables; varIdx++)
     {
         std::string testStr = QString("varName#%1").arg(varIdx + 1).toStdString();
         QString varName = settings->value(QString("varName#%1").arg(varIdx + 1)).toString();
-        bool varSelected = settings->value(QString("varSelected#%1").arg(varIdx + 1)).toBool();
         varNames.push_back(varName);
-        selectedVariables.push_back(varSelected);
+        bool varSelected = settings->value(QString("varSelected#%1").arg(varIdx + 1)).toBool();
+        if (varSelected) {
+            selectedVariableIndices.push_back(varIdx);
+        }
+    }
+    for (int i = 0; i < numVariablesSelected; i++)
+    {
+        selectedVariableIndices.push_back(settings->value(QString("varSelectedIdx#%1").arg(i)).toUInt());
     }
     initTransferFunctionsMultiVar(numVariables);
     for (int varIdx = 0; varIdx < numVariables; varIdx++)
@@ -720,10 +724,19 @@ void MMultiVarData::onQtPropertyChanged(QtProperty *property)
     // --- Group: Selected variables ---
     else if (selectedVariablesProperties.contains(property))
     {
-        int varIdx = selectedVariablesProperties.indexOf(property);
-        selectedVariables[varIdx] = properties->mBool()->value(property);
-        updateNumVariablesSelected();
-        selectedVariablesChanged = true;
+        if (!ignorePropertyUpdateMode)
+        {
+            int varIdx = selectedVariablesProperties.indexOf(property);
+            bool isSelected = properties->mBool()->value(property);
+            if (isSelected) {
+                selectedVariableIndices.push_back(varIdx);
+            } else {
+                selectedVariableIndices.erase(std::remove(
+                        selectedVariableIndices.begin(), selectedVariableIndices.end(), varIdx), selectedVariableIndices.end());
+            }
+            updateNumVariablesSelected();
+            selectedVariablesChanged = true;
+        }
     }
 
 
@@ -765,12 +778,8 @@ void MMultiVarData::onBezierTrajectoriesLoaded(MTrajectories* trajectories)
         maxNumVariables = varNamesLoaded.size();
         initTransferFunctionsMultiVar(maxNumVariables);
 
-        selectedVariables.resize(maxNumVariables);
-        for (int varIdx = 0; varIdx < maxNumVariables; varIdx++)
-        {
-            selectedVariables[varIdx] = false;
-        }
-        selectedVariables[0] = true;
+        selectedVariableIndices.clear();
+        selectedVariableIndices.push_back(0);
         updateNumVariablesSelected();
         setPropertiesVarSelected();
     }
