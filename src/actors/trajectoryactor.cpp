@@ -498,6 +498,10 @@ MTrajectoryActor::MTrajectoryActor()
             CLICK_PROPERTY, "select all trajectories", multiVarGroupProperty);
     selectAllTrajectoriesProperty->setToolTip("Selects (or unselects) all trajectories in the scene.");
 
+    resetVariableSortingProperty = addProperty(
+            CLICK_PROPERTY, "reset variable sorting", multiVarGroupProperty);
+    resetVariableSortingProperty->setToolTip("Resets the variable sorting.");
+
 
     multiVarData.setProperties(this, properties, multiVarGroupProperty);
     actorHasSelectableData = true;
@@ -3030,6 +3034,18 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
         for (MTrajectoryPicker* trajectoryPicker : trajectoryPickerMap)
         {
             trajectoryPicker->triggerSelectAllLines();
+        }
+        if (suppressActorUpdates()) return;
+        emitActorChangedSignal();
+#endif
+    }
+
+    else if (property == resetVariableSortingProperty)
+    {
+#ifdef USE_EMBREE
+        for (MTrajectoryPicker* trajectoryPicker : trajectoryPickerMap)
+        {
+            trajectoryPicker->resetVariableSorting();
         }
         if (suppressActorUpdates()) return;
         emitActorChangedSignal();

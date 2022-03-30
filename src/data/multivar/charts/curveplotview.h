@@ -86,6 +86,7 @@ public:
     void setSpringEpsilon(float epsilon);
     void setTextSize(float _textSize);
     void setShowSelectedVariablesFirst(bool showFirst);
+    void resetVariableSorting();
 
     void mouseMoveEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event) override;
     void mousePressEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event) override;
@@ -186,6 +187,10 @@ private:
     bool isDraggingTopLegend = false;
     float clickTime = 0.0f;
     bool isDraggingTimeShift = false;
+
+    // Drag & drop of variables.
+    bool startedVariableDragging = false;
+    int draggedVariableIndex = -1;
 
     float computeSimilarityMetric(
             int varIdx0, int varIdx1, const std::vector<std::vector<float>>& valueArray, float factor) const;

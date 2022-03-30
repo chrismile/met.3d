@@ -538,6 +538,7 @@ private:
     uint32_t syncModeTrajectoryIndex = 0;
 
     QtProperty *selectAllTrajectoriesProperty;
+    QtProperty *resetVariableSortingProperty;
 
 #ifdef USE_EMBREE
     QHash<MSceneViewGLWidget*, MTrajectoryPicker*> trajectoryPickerMap;

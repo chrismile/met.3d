@@ -339,6 +339,14 @@ void MTrajectoryPicker::triggerSelectAllLines()
     updateDiagramData();
 }
 
+void MTrajectoryPicker::resetVariableSorting()
+{
+    if (diagramDisplayType == DiagramDisplayType::CURVE_PLOT_VIEW)
+    {
+        static_cast<MCurvePlotView*>(diagram)->resetVariableSorting();
+    }
+}
+
 MTrajectoryPicker::~MTrajectoryPicker()
 {
     freeStorage();

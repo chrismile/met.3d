@@ -143,6 +143,7 @@ public:
     void setTextSize(float _textSize);
     void setDiagramUpscalingFactor(float factor);
     void triggerSelectAllLines();
+    void resetVariableSorting();
 
     // Used for aligning warm conveyor belt trajectories based on their ascension.
     void setSyncMode(TrajectorySyncMode syncMode);

@@ -359,15 +359,16 @@ void MCurvePlotView::setData(
         }
     }
 
-    sortingIdx = -1;
-    sortedVariableIndices.clear();
-    sortedVariableIndices.reserve(variableNames.size());
-    for (size_t varIdx = 0; varIdx < numVariables; varIdx++) {
-        sortedVariableIndices.push_back(varIdx);
+    if (!sameVariables) {
+        sortingIdx = -1;
+        sortedVariableIndices.clear();
+        sortedVariableIndices.reserve(variableNames.size());
+        for (size_t varIdx = 0; varIdx < numVariables; varIdx++) {
+            sortedVariableIndices.push_back(varIdx);
+        }
+        resetFinalSelectedVariableIndices();
+        matchSelectionsPerVariable.resize(numVariables);
     }
-    resetFinalSelectedVariableIndices();
-
-    matchSelectionsPerVariable.resize(numVariables);
 
     MDiagramBase::onWindowSizeChanged();
 }
@@ -422,6 +423,17 @@ void MCurvePlotView::sortByDescendingStdDev() {
     }
 
     resetFinalSelectedVariableIndices();
+}
+
+void MCurvePlotView::resetVariableSorting() {
+    sortingIdx = -1;
+    sortedVariableIndices.clear();
+    sortedVariableIndices.reserve(variableNames.size());
+    for (size_t varIdx = 0; varIdx < numVariables; varIdx++) {
+        sortedVariableIndices.push_back(varIdx);
+    }
+    resetFinalSelectedVariableIndices();
+    matchSelectionsPerVariable.resize(numVariables);
 }
 
 void MCurvePlotView::setShowSelectedVariablesFirst(bool showFirst) {
@@ -1386,6 +1398,43 @@ void MCurvePlotView::mouseMoveEvent(MSceneViewGLWidget *sceneView, QMouseEvent *
         selectedTimeStepChanged = true;
     }
 
+    // Drag & drop of the variables.
+    if (startedVariableDragging) {
+        int oldIndex = int(
+                std::find(finalVariableIndices.begin(), finalVariableIndices.end(), draggedVariableIndex)
+                - finalVariableIndices.begin());
+        int newIndex = 0;
+        for (size_t varIdx : finalVariableIndices) {
+            float lowerY = offsetHorizonBarsY + float(newIndex) * (horizonBarHeight + horizonBarMargin);
+            AABB2 boxAabb(
+                    QVector2D(borderSizeX, lowerY - scrollTranslationY),
+                    QVector2D(
+                            borderSizeX + (offsetHorizonBarsX - borderSizeX) + horizonBarWidth,
+                            lowerY + horizonBarHeight - scrollTranslationY));
+            if (boxAabb.contains(mousePosition)) {
+                break;
+            }
+            newIndex++;
+        }
+        if (oldIndex != newIndex && newIndex < int(numVariables)) {
+            uint32_t tempVarIdx = finalVariableIndices.at(newIndex);
+            finalVariableIndices.at(newIndex) = finalVariableIndices.at(oldIndex);
+            finalVariableIndices.at(oldIndex) = tempVarIdx;
+
+            // Change order of selected variables if necessary.
+            std::set<uint32_t> selectedVariableIndicesSet(
+                    selectedVariableIndices.begin(), selectedVariableIndices.end());
+            selectedVariableIndices.clear();
+            for (uint32_t varIdx : finalVariableIndices) {
+                if (selectedVariableIndicesSet.find(varIdx) != selectedVariableIndicesSet.end()) {
+                    selectedVariableIndices.push_back(varIdx);
+                }
+            }
+
+            selectedVariablesChanged = true;
+        }
+    }
+
     scrollTranslationY = clamp(scrollTranslationY, 0.0f, fullWindowHeight - windowHeight);
     scrollThumbPosition = remap(
             scrollTranslationY,
@@ -1477,6 +1526,28 @@ void MCurvePlotView::mousePressEvent(MSceneViewGLWidget *sceneView, QMouseEvent 
             heightIdx++;
         }
     }
+
+    // Drag & drop of the variables.
+    if (windowAabb.contains(mousePosition) && !event->modifiers().testFlag(Qt::ControlModifier)
+            && event->modifiers() == Qt::ShiftModifier && event->button() == Qt::MouseButton::LeftButton) {
+        size_t heightIdx = 0;
+        for (size_t varIdx : finalVariableIndices) {
+            float lowerY = offsetHorizonBarsY + float(heightIdx) * (horizonBarHeight + horizonBarMargin);
+            AABB2 boxAabb(
+                    QVector2D(borderSizeX, lowerY - scrollTranslationY),
+                    QVector2D(
+                            borderSizeX + (offsetHorizonBarsX - borderSizeX) + horizonBarWidth,
+                            lowerY + horizonBarHeight - scrollTranslationY));
+            if (boxAabb.contains(mousePosition)) {
+                mouseOverWidget = true;
+                startedVariableDragging = true;
+                draggedVariableIndex = int(varIdx);
+                break;
+            }
+            heightIdx++;
+        }
+    }
+
     AABB2 legendTopAabb(
             QVector2D(offsetHorizonBarsX, borderSizeY),
             QVector2D(offsetHorizonBarsX + horizonBarWidth, offsetHorizonBarsY));
@@ -1558,7 +1629,8 @@ void MCurvePlotView::mouseReleaseEvent(MSceneViewGLWidget *sceneView, QMouseEven
     AABB2 windowAabb(
             QVector2D(borderWidth, borderWidth),
             QVector2D(windowWidth - 2.0f * borderWidth, windowHeight - 2.0f * borderWidth));
-    if (windowAabb.contains(mousePosition) && event->button() == Qt::MouseButton::LeftButton) {
+    if (windowAabb.contains(mousePosition) && event->button() == Qt::MouseButton::LeftButton
+            && event->modifiers() == Qt::NoModifier) {
         size_t heightIdx = 0;
         for (size_t varIdx : finalVariableIndices) {
             float lowerY = offsetHorizonBarsY + float(heightIdx) * (horizonBarHeight + horizonBarMargin);
@@ -1590,6 +1662,9 @@ void MCurvePlotView::mouseReleaseEvent(MSceneViewGLWidget *sceneView, QMouseEven
     if (isSelecting && event->button() == Qt::MouseButton::LeftButton) {
         endSelection(computeTimeStepFromMousePosition(mousePosition));
     }
+
+    // Stop drag & drop operations.
+    startedVariableDragging = false;
 
     // Click on the top legend and move the mouse to change the timescale.
     updateTimeScale(mousePosition, EventType::MouseRelease, event);
