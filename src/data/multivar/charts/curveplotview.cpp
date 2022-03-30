@@ -227,6 +227,11 @@ void MCurvePlotView::setData(
     this->variableValuesArray = _variableValuesArray;
     numTrajectories = variableValuesArray.size();
     numVariables = _variableNames.size();
+    if (variableValuesArray.empty()) {
+        numTimeSteps = int(std::round(_timeMax - _timeMin)) + 1;
+    } else {
+        numTimeSteps = variableValuesArray.front().size();
+    }
 
     std::vector<std::string> variableNamesNew = _variableNames;
     targetVarIdx = std::numeric_limits<uint32_t>::max();
@@ -297,11 +302,6 @@ void MCurvePlotView::setData(
     }
     this->timeDisplayMin = timeMin;
     this->timeDisplayMax = timeMax;
-    if (variableValuesArray.empty()) {
-        numTimeSteps = int(std::round(timeMax - timeMin)) + 1;
-    } else {
-        numTimeSteps = variableValuesArray.front().size();
-    }
     updateTimeStepTicks();
 
     lttbTimeDisplayMin = std::numeric_limits<float>::max();
