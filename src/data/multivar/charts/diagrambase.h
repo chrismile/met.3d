@@ -52,6 +52,10 @@ enum class DiagramType {
     RADAR_CHART, RADAR_BAR_CHART, CURVE_PLOT_VIEW
 };
 
+enum class DiagramNormalizationMode {
+    GLOBAL_MIN_MAX, SELECTION_MIN_MAX, BAND_MIN_MAX
+};
+
 class MDiagramBase : public MMemoryManagementUsingObject {
 public:
     explicit MDiagramBase(GLint textureUnit);
@@ -68,7 +72,7 @@ public:
     inline Qt::CursorShape getCursorShape() const { return cursorShape; }
     virtual bool hasData()=0;
 
-    inline QVector<uint32_t> getSelectedVariableIndices() const {
+    virtual QVector<uint32_t> getSelectedVariableIndices() const {
         QVector<uint32_t> _selectedVariableIndices;
         _selectedVariableIndices.reserve(int(selectedVariableIndices.size()));
         for (size_t varIdx : selectedVariableIndices) {
@@ -76,7 +80,7 @@ public:
         }
         return _selectedVariableIndices;
     }
-    inline void setSelectedVariableIndices(const QVector<uint32_t>& _selectedVariableIndices) {
+    virtual void setSelectedVariableIndices(const QVector<uint32_t>& _selectedVariableIndices) {
         selectedVariableIndices.clear();
         selectedVariableIndices.reserve(_selectedVariableIndices.size());
         for (uint32_t varIdx : _selectedVariableIndices) {

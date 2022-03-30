@@ -68,7 +68,45 @@ public:
      */
     void setData(
             const std::vector<std::string>& variableNames, float timeMin, float timeMax,
-            const std::vector<std::vector<std::vector<float>>>& variableValuesArray);
+            const std::vector<std::vector<std::vector<float>>>& variableValuesArray,
+            bool normalizeBands);
+
+    QVector<uint32_t> getSelectedVariableIndices() const override {
+        if (targetVarIdx == std::numeric_limits<uint32_t>::max()) {
+            return MDiagramBase::getSelectedVariableIndices();
+        } else {
+            QVector<uint32_t> _selectedVariableIndices;
+            _selectedVariableIndices.reserve(int(selectedVariableIndices.size()));
+            for (size_t varIdx : selectedVariableIndices) {
+                if (varIdx > targetVarIdx) {
+                    varIdx--;
+                }
+                if ((varIdx == targetVarIdx || varIdx == targetVarIdx + 1) && std::find(
+                        _selectedVariableIndices.begin(), _selectedVariableIndices.end(),
+                        targetVarIdx) != _selectedVariableIndices.end()) {
+                    continue;
+                }
+                _selectedVariableIndices.push_back(varIdx);
+            }
+            return _selectedVariableIndices;
+        }
+    }
+    void setSelectedVariableIndices(const QVector<uint32_t>& _selectedVariableIndices) override {
+        if (targetVarIdx == std::numeric_limits<uint32_t>::max()) {
+            MDiagramBase::setSelectedVariableIndices(_selectedVariableIndices);
+        } else {
+            selectedVariableIndices.clear();
+            selectedVariableIndices.reserve(_selectedVariableIndices.size());
+            for (uint32_t varIdx : _selectedVariableIndices) {
+                if (varIdx > targetVarIdx) {
+                    varIdx++;
+                }
+                selectedVariableIndices.push_back(varIdx);
+            }
+            selectedVariablesChanged = false;
+            updateSelectedVariables();
+        }
+    }
 
     inline float getSelectedTimeStep() const { return selectedTimeStep; }
     inline void setSelectedTimeStep(float timeStep) { selectedTimeStep = timeStep; selectedTimeStepChanged = false; }
@@ -217,6 +255,7 @@ private:
     std::vector<size_t> sortedVariableIndices;
     std::vector<size_t> finalVariableIndices;
     bool showSelectedVariablesFirst = true;
+    uint32_t targetVarIdx = std::numeric_limits<uint32_t>::max();
 
     // Selection of similar subsequences in the variable data.
     void startSelection(size_t varIdx, float timeStep);

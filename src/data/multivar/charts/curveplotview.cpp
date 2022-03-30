@@ -222,10 +222,37 @@ void MCurvePlotView::setTextSize(float _textSize) {
 
 void MCurvePlotView::setData(
         const std::vector<std::string>& _variableNames, float _timeMin, float _timeMax,
-        const std::vector<std::vector<std::vector<float>>>& _variableValuesArray) {
-    bool sameVariables = this->variableNames == _variableNames;
-    this->variableNames = _variableNames;
+        const std::vector<std::vector<std::vector<float>>>& _variableValuesArray,
+        bool normalizeBands) {
     this->variableValuesArray = _variableValuesArray;
+    numTrajectories = variableValuesArray.size();
+    numVariables = _variableNames.size();
+
+    std::vector<std::string> variableNamesNew = _variableNames;
+    targetVarIdx = std::numeric_limits<uint32_t>::max();
+    for (size_t varIdx = 0; varIdx < numVariables; varIdx++) {
+        const std::string& varName = variableNamesNew.at(varIdx);
+        if (varName == "QR") {
+            targetVarIdx = varIdx;
+        }
+    }
+    if (targetVarIdx != std::numeric_limits<uint32_t>::max()) {
+        variableNamesNew.insert(
+                variableNamesNew.begin() + targetVarIdx, variableNamesNew.at(targetVarIdx) + " (max)");
+        variableNamesNew.at(targetVarIdx + 1) += " (mean)";
+
+        for (size_t trajectoryIdx = 0; trajectoryIdx < numTrajectories; trajectoryIdx++) {
+            for (size_t timeStepIdx = 0; timeStepIdx < numTimeSteps; timeStepIdx++) {
+                auto& valueVariableArray = variableValuesArray.at(trajectoryIdx).at(timeStepIdx);
+                valueVariableArray.insert(
+                        valueVariableArray.begin() + targetVarIdx, valueVariableArray.at(targetVarIdx));
+            }
+        }
+        numVariables = variableNamesNew.size();
+    }
+
+    bool sameVariables = this->variableNames == variableNamesNew;
+    this->variableNames = variableNamesNew;
 
     selectStart = -1.0f;
     selectEnd = -1.0f;
@@ -277,9 +304,6 @@ void MCurvePlotView::setData(
     }
     updateTimeStepTicks();
 
-    numTrajectories = variableValuesArray.size();
-    numVariables = variableNames.size();
-
     lttbTimeDisplayMin = std::numeric_limits<float>::max();
     lttbTimeDisplayMax = std::numeric_limits<float>::lowest();
     lttbPointsArray.clear();
@@ -288,9 +312,10 @@ void MCurvePlotView::setData(
     variableIsSensitivityArray.reserve(numVariables);
     for (size_t varIdx = 0; varIdx < numVariables; varIdx++) {
         const std::string& varName = variableNames.at(varIdx);
+        // Also use maximum for target value QR, thus count it as a sensitivity.
         bool isSensitivity =
                 (varName.at(0) == 'd' && varName != "deposition") || varName == "sensitivity_max"
-                || varName == "QR"; // Also use maximum for target value QR, thus count it as a sensitivity.
+                || varName == "QR"|| varName == "QR (max)";
         variableIsSensitivityArray.push_back(isSensitivity);
     }
 
@@ -356,6 +381,27 @@ void MCurvePlotView::setData(
             }
 
             stdDev = std::sqrt(variance);
+        }
+    }
+
+    if (normalizeBands) {
+        std::vector<QVector2D> minMaxArray;
+        minMaxArray.resize(numVariables, QVector2D(1.0f, 0.0f));
+
+        for (size_t varIdx = 0; varIdx < numVariables; varIdx++) {
+            QVector2D& minMax = minMaxArray.at(varIdx);
+            for (size_t timeStepIdx = 0; timeStepIdx < numTimeSteps; timeStepIdx++) {
+                std::vector<float> &meanValuesAtTime = ensembleMeanValues.at(timeStepIdx);
+                float& mean = meanValuesAtTime.at(varIdx);
+                minMax.setX(std::min(minMax.x(), mean));
+                minMax.setY(std::max(minMax.y(), mean));
+            }
+
+            for (size_t timeStepIdx = 0; timeStepIdx < numTimeSteps; timeStepIdx++) {
+                std::vector<float> &meanValuesAtTime = ensembleMeanValues.at(timeStepIdx);
+                float& mean = meanValuesAtTime.at(varIdx);
+                mean = (mean - minMax.x()) / (minMax.y() - minMax.x());
+            }
         }
     }
 

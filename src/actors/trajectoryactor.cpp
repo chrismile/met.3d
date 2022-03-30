@@ -455,10 +455,12 @@ MTrajectoryActor::MTrajectoryActor()
             0.0, 1.0, 2, 0.05, " (factor)");
     backgroundOpacityProperty->setToolTip("Diagram view background opacity.");
 
-    useGlobalMinMaxProperty = addProperty(
-            BOOL_PROPERTY, "use global min/max", similarityMetricGroup);
-    properties->mBool()->setValue(useGlobalMinMaxProperty, useGlobalMinMax);
-    useGlobalMinMaxProperty->setToolTip(
+    diagramNormalizationModeProperty = addProperty(
+            ENUM_PROPERTY, "diagram normalization mode", similarityMetricGroup);
+    properties->mEnum()->setEnumNames(diagramNormalizationModeProperty, diagramNormalizationModeNames);
+    properties->mEnum()->setValue(
+            diagramNormalizationModeProperty, static_cast<int>(diagramNormalizationMode));
+    diagramNormalizationModeProperty->setToolTip(
             "Whether to normalize the data by using the minimum/maximum also over not selected trajectories.");
 
     diagramTextSizeProperty = addProperty(
@@ -629,7 +631,8 @@ void MTrajectoryActor::saveConfiguration(QSettings *settings)
     settings->setValue(QString("subsequenceMatchingTechnique"), int(subsequenceMatchingTechnique));
     settings->setValue(QString("springEpsilon"), springEpsilon);
     settings->setValue(QString("backgroundOpacity"), backgroundOpacity);
-    settings->setValue(QString("useGlobalMinMax"), useGlobalMinMax);
+    settings->setValue(
+            "diagramNormalizationMode", properties->mEnum()->value(diagramNormalizationModeProperty));
     settings->setValue(QString("diagramTextSize"), diagramTextSize);
     settings->setValue(QString("useCustomDiagramUpscalingFactor"), useCustomDiagramUpscalingFactor);
     settings->setValue(QString("diagramUpscalingFactor"), diagramUpscalingFactor);
@@ -880,8 +883,14 @@ void MTrajectoryActor::loadConfiguration(QSettings *settings)
     properties->setDDouble(
             backgroundOpacityProperty, backgroundOpacity,
             0.0, 1.0, 2, 0.05, " (factor)");
-    useGlobalMinMax = settings->value("useGlobalMinMax", true).toBool();
-    properties->mBool()->setValue(useGlobalMinMaxProperty, useGlobalMinMax);
+    properties->mEnum()->setValue(
+            diagramNormalizationModeProperty,
+            settings->value("diagramNormalizationMode", 0).toInt());
+    diagramNormalizationMode = static_cast<DiagramNormalizationMode>(properties->mEnum()->value(
+            diagramNormalizationModeProperty));
+    properties->mEnum()->setValue(
+            diagramNormalizationModeProperty, static_cast<int>(diagramNormalizationMode));
+
     diagramTextSize = settings->value("diagramTextSize", 8.0f).toFloat();
     properties->setDDouble(
             diagramTextSizeProperty, diagramTextSize,
@@ -1949,7 +1958,7 @@ void MTrajectoryActor::prepareAvailableDataForRendering(uint slot)
                         trajectoryPickerMap[view]->setSubsequenceMatchingTechnique(subsequenceMatchingTechnique);
                         trajectoryPickerMap[view]->setSpringEpsilon(springEpsilon);
                         trajectoryPickerMap[view]->setBackgroundOpacity(backgroundOpacity);
-                        trajectoryPickerMap[view]->setUseGlobalMinMax(useGlobalMinMax);
+                        trajectoryPickerMap[view]->setDiagramNormalizationMode(diagramNormalizationMode);
                         trajectoryPickerMap[view]->setTextSize(diagramTextSize);
                         if (useCustomDiagramUpscalingFactor) {
                             trajectoryPickerMap[view]->setDiagramUpscalingFactor(diagramUpscalingFactor);
@@ -2884,13 +2893,14 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
 #endif
     }
 
-    else if (property == useGlobalMinMaxProperty)
+    else if (property == diagramNormalizationModeProperty)
     {
-        useGlobalMinMax = properties->mBool()->value(useGlobalMinMaxProperty);
+        diagramNormalizationMode = static_cast<DiagramNormalizationMode>(properties->mEnum()->value(
+                diagramNormalizationModeProperty));
 #ifdef USE_EMBREE
         for (MTrajectoryPicker* trajectoryPicker : trajectoryPickerMap)
         {
-            trajectoryPicker->setUseGlobalMinMax(useGlobalMinMax);
+            trajectoryPicker->setDiagramNormalizationMode(diagramNormalizationMode);
         }
         if (suppressActorUpdates()) return;
         emitActorChangedSignal();

@@ -497,6 +497,11 @@ private:
     QtProperty *diagramTransferFunctionProperty;
     MTransferFunction1D *diagramTransferFunction = nullptr;
 
+    QStringList diagramNormalizationModeNames = {
+            "Global Min/Max", "Selection Min/Max", "Band Min/Max"
+    };
+    DiagramNormalizationMode diagramNormalizationMode = DiagramNormalizationMode::GLOBAL_MIN_MAX;
+
     void updateSimilarityMetricGroupEnabled();
     QtProperty *similarityMetricGroup;
     QtProperty *similarityMetricProperty;
@@ -510,7 +515,7 @@ private:
     QtProperty *subsequenceMatchingTechniqueProperty;
     QtProperty *springEpsilonProperty;
     QtProperty *backgroundOpacityProperty;
-    QtProperty *useGlobalMinMaxProperty;
+    QtProperty *diagramNormalizationModeProperty;
     QtProperty *diagramTextSizeProperty;
     QtProperty *useCustomDiagramUpscalingFactorProperty;
     QtProperty *diagramUpscalingFactorProperty;
@@ -525,7 +530,6 @@ private:
     SubsequenceMatchingTechnique subsequenceMatchingTechnique = SubsequenceMatchingTechnique::SPRING;
     float springEpsilon = 10.0f;
     float backgroundOpacity = 1.0f;
-    bool useGlobalMinMax = true;
     float diagramTextSize = 8.0f;
     bool useCustomDiagramUpscalingFactor = false;
     float diagramUpscalingFactor = 1.0f;

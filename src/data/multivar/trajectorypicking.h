@@ -139,7 +139,7 @@ public:
     void setSubsequenceMatchingTechnique(SubsequenceMatchingTechnique technique);
     void setSpringEpsilon(float epsilon);
     void setBackgroundOpacity(float opacity);
-    void setUseGlobalMinMax(bool _useGlobalMinMax);
+    void setDiagramNormalizationMode(DiagramNormalizationMode mode);
     void setTextSize(float _textSize);
     void setDiagramUpscalingFactor(float factor);
     void triggerSelectAllLines();
@@ -272,7 +272,7 @@ private:
     SubsequenceMatchingTechnique subsequenceMatchingTechnique = SubsequenceMatchingTechnique::SPRING;
     float springEpsilon = 10.0f;
     float backgroundOpacity = 0.85f;
-    bool useGlobalMinMax = true;
+    DiagramNormalizationMode diagramNormalizationMode = DiagramNormalizationMode::GLOBAL_MIN_MAX;
     float textSize = 8.0f;
     float diagramUpscalingFactor = 1.0f;
 

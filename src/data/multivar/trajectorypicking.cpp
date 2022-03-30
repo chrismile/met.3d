@@ -240,9 +240,9 @@ void MTrajectoryPicker::setBackgroundOpacity(float opacity)
     diagram->setBackgroundOpacity(backgroundOpacity);
 }
 
-void MTrajectoryPicker::setUseGlobalMinMax(bool _useGlobalMinMax)
+void MTrajectoryPicker::setDiagramNormalizationMode(DiagramNormalizationMode mode)
 {
-    useGlobalMinMax = _useGlobalMinMax;
+    diagramNormalizationMode = mode;
     highlightDataDirty = true;
     selectedTrajectoriesChanged = true;
     if (diagram->getIsNanoVgInitialized())
@@ -966,7 +966,7 @@ void MTrajectoryPicker::updateDiagramData()
     }
 
     QVector<QVector2D> minMaxAttributesLocal;
-    if (useGlobalMinMax)
+    if (diagramNormalizationMode != DiagramNormalizationMode::SELECTION_MIN_MAX)
     {
         minMaxAttributesLocal = minMaxAttributes;
     }
@@ -1312,7 +1312,9 @@ void MTrajectoryPicker::updateDiagramData()
             }
         }
 
-        horizonGraph->setData(variableNames, timeMin, timeMax, variableValuesArray);
+        horizonGraph->setData(
+                variableNames, timeMin, timeMax, variableValuesArray,
+                diagramNormalizationMode == DiagramNormalizationMode::BAND_MIN_MAX);
     }
 }
 
