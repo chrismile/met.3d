@@ -479,7 +479,9 @@ void MCurvePlotView::resetVariableSorting() {
         sortedVariableIndices.push_back(varIdx);
     }
     resetFinalSelectedVariableIndices();
-    matchSelectionsPerVariable.resize(numVariables);
+    for (auto& matchSelections : matchSelectionsPerVariable) {
+        matchSelections.clear();
+    }
 }
 
 void MCurvePlotView::setShowSelectedVariablesFirst(bool showFirst) {
