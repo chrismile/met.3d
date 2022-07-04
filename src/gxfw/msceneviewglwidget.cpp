@@ -2248,7 +2248,7 @@ void MSceneViewGLWidget::mouseMoveEvent(QMouseEvent *event)
     }
 
     // Update tool tip.
-    if (event->buttons() == Qt::NoButton)
+    if (event->buttons() == Qt::NoButton && !isVirtualWindowBelowMouse)
     {
         toolTipMouseInParent = true;
         toolTipUpdateTimer->start(toolTipWaitTimeMs);
