@@ -496,6 +496,11 @@ MTrajectoryActor::MTrajectoryActor()
             "Specifies whether to sync warm conveyor belt trajectories based on their ascension or height. "
             "The trajectories need to have the per-point attribute time_after_ascension for this to work.");
 
+    useVariableToolTipProperty = addProperty(
+            BOOL_PROPERTY, "use variable tool tip", multiVarGroupProperty);
+    properties->mBool()->setValue(useVariableToolTipProperty, useVariableToolTip);
+    useVariableToolTipProperty->setToolTip("Use variable tool tip.");
+
     selectAllTrajectoriesProperty = addProperty(
             CLICK_PROPERTY, "select all trajectories", multiVarGroupProperty);
     selectAllTrajectoriesProperty->setToolTip("Selects (or unselects) all trajectories in the scene.");
@@ -623,6 +628,7 @@ void MTrajectoryActor::saveConfiguration(QSettings *settings)
                        properties->mEnum()->value(diagramTypeProperty));
     settings->setValue("diagramTransferFunction",
                        properties->getEnumItem(diagramTransferFunctionProperty));
+    settings->setValue(QString("useVariableToolTip"), useVariableToolTip);
 
     settings->setValue(QString("similarityMetric"), int(similarityMetric));
     settings->setValue(QString("meanMetricInfluence"), meanMetricInfluence);
@@ -908,6 +914,9 @@ void MTrajectoryActor::loadConfiguration(QSettings *settings)
     trajectorySyncMode = TrajectorySyncMode(settings->value(
             "trajectorySyncMode", int(TrajectorySyncMode::TIMESTEP)).toInt());
     properties->mEnum()->setValue(trajectorySyncModeProperty, int(trajectorySyncMode));
+
+    useVariableToolTip = settings->value("showMinMaxValue", true).toBool();
+    properties->mBool()->setValue(useVariableToolTipProperty, useVariableToolTip);
 
     multiVarData.setEnabled(useBezierTrajectories);
     multiVarData.loadConfiguration(settings);
@@ -1955,6 +1964,11 @@ void MTrajectoryActor::prepareAvailableDataForRendering(uint slot)
                         trajectoryPickerMap[view]->setSimilarityMetric(similarityMetric);
                         trajectoryPickerMap[view]->setMeanMetricInfluence(meanMetricInfluence);
                         trajectoryPickerMap[view]->setStdDevMetricInfluence(stdDevMetricInfluence);
+                        trajectoryPickerMap[view]->setNumBins(numBins);
+                        trajectoryPickerMap[view]->setShowMinMaxValue(showMinMaxValue);
+                        trajectoryPickerMap[view]->setUseMaxForSensitivity(useMaxForSensitivity);
+                        trajectoryPickerMap[view]->setUseVariableToolTip(useVariableToolTip);
+                        trajectoryPickerMap[view]->setTrimNanRegions(trimNanRegions);
                         trajectoryPickerMap[view]->setSubsequenceMatchingTechnique(subsequenceMatchingTechnique);
                         trajectoryPickerMap[view]->setSpringEpsilon(springEpsilon);
                         trajectoryPickerMap[view]->setBackgroundOpacity(backgroundOpacity);
@@ -3035,6 +3049,17 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
         }
         if (suppressActorUpdates()) return;
         emitActorChangedSignal();
+#endif
+    }
+
+    else if (property == useVariableToolTipProperty)
+    {
+        useVariableToolTip = properties->mBool()->value(useVariableToolTipProperty);
+#ifdef USE_EMBREE
+        for (MTrajectoryPicker* trajectoryPicker : trajectoryPickerMap)
+        {
+            trajectoryPicker->setUseVariableToolTip(useVariableToolTip);
+        }
 #endif
     }
 

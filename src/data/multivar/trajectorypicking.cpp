@@ -48,7 +48,7 @@ namespace Met3D {
 MTrajectoryPicker::MTrajectoryPicker(
         GLuint textureUnit, MSceneViewGLWidget* sceneView, const QVector<QString>& varNames,
         DiagramDisplayType diagramType, MTransferFunction1D*& diagramTransferFunction)
-        : textureUnit(textureUnit), diagramTransferFunction(diagramTransferFunction)
+        : parentSceneView(sceneView), textureUnit(textureUnit), diagramTransferFunction(diagramTransferFunction)
 {
 #ifdef USE_EMBREE
     device = rtcNewDevice(nullptr);
@@ -84,6 +84,11 @@ MTrajectoryPicker::MTrajectoryPicker(
     //multiVarCharts.addChartView(radarChart);
 
     setDiagramType(diagramType);
+
+    if (parentSceneView)
+    {
+        parentSceneView->addToolTipPicker(this);
+    }
 }
 
 void MTrajectoryPicker::setDiagramType(DiagramDisplayType type)
@@ -197,7 +202,7 @@ void MTrajectoryPicker::setTrimNanRegions(bool trimRegions)
     this->trimNanRegions = trimRegions;
     highlightDataDirty = true;
     selectedTrajectoriesChanged = true;
-    if (diagram->getIsNanoVgInitialized())
+    if (diagram && diagram->getIsNanoVgInitialized())
     {
         updateDiagramData();
     }
@@ -209,11 +214,16 @@ void MTrajectoryPicker::setUseMaxForSensitivity(bool useMax)
     if (diagramDisplayType == DiagramDisplayType::CURVE_PLOT_VIEW)
     {
         static_cast<MCurvePlotView*>(diagram)->setUseMaxForSensitivity(useMaxForSensitivity);
-        if (diagram)
+        if (diagram && diagram->getIsNanoVgInitialized())
         {
             updateDiagramData();
         }
     }
+}
+
+void MTrajectoryPicker::setUseVariableToolTip(bool useToolTip)
+{
+    this->useVariableToolTip = useToolTip;
 }
 
 void MTrajectoryPicker::setSubsequenceMatchingTechnique(SubsequenceMatchingTechnique technique)
@@ -245,7 +255,7 @@ void MTrajectoryPicker::setDiagramNormalizationMode(DiagramNormalizationMode mod
     diagramNormalizationMode = mode;
     highlightDataDirty = true;
     selectedTrajectoriesChanged = true;
-    if (diagram->getIsNanoVgInitialized())
+    if (diagram && diagram->getIsNanoVgInitialized())
     {
         updateDiagramData();
     }
@@ -373,6 +383,11 @@ MTrajectoryPicker::~MTrajectoryPicker()
     {
         delete oldDiagram;
         oldDiagram = nullptr;
+    }
+
+    if (parentSceneView)
+    {
+        parentSceneView->removeToolTipPicker(this);
     }
 }
 
@@ -836,6 +851,60 @@ bool MTrajectoryPicker::pickPointWorld(
 #else
     return false;
 #endif
+}
+
+bool MTrajectoryPicker::toolTipPick(MSceneViewGLWidget* sceneView, const QPoint &position, float &depth, QString &text)
+{
+    if (!useVariableToolTip)
+    {
+        return false;
+    }
+
+    QVector3D firstHitPoint;
+    uint32_t trajectoryIndex = 0;
+    float timeAtHit = 0.0f;
+    bool hasHit = pickPointScreen(
+            sceneView, position.x(), position.y(), firstHitPoint, trajectoryIndex, timeAtHit);
+    if (hasHit)
+    {
+        auto& trajectory = trajectories.at(int(trajectoryIndex));
+        auto timeIdx = int(timeAtHit);
+        const QVector3D& lineCenterWorldPos = trajectory.at(timeIdx);
+        QVector3D n = (sceneView->getCamera()->getOrigin() - lineCenterWorldPos).normalized();
+        QVector3D v = (sceneView->getCamera()->getOrigin() - firstHitPoint).normalized();
+        QVector3D t(1.0f, 0.0f, 0.0f);
+        if (timeIdx == 0) {
+            t = (trajectory.at(timeIdx + 1) - trajectory.at(timeIdx)).normalized();
+        } else if (timeIdx == int(trajectory.size() - 1)) {
+            t = (trajectory.at(timeIdx) - trajectory.at(timeIdx - 1)).normalized();
+        } else {
+            t = (trajectory.at(timeIdx + 1) - trajectory.at(timeIdx - 1)).normalized();
+        }
+        // Project v into plane perpendicular to t to get newV.
+        QVector3D helperVec = QVector3D::crossProduct(t, v).normalized();
+        QVector3D newV = QVector3D::crossProduct(helperVec, t).normalized();
+        // Get the symmetric ribbon position (ribbon direction is perpendicular to line direction) between 0 and 1.
+        // NOTE: len(cross(a, b)) == area of parallelogram spanned by a and b.
+        QVector3D crossProdVn = QVector3D::crossProduct(newV, n);
+        float ribbonPosition = crossProdVn.length();
+
+        // Get the winding of newV relative to n, taking into account that t is the normal of the plane both vectors lie in.
+        // NOTE: dot(a, cross(b, c)) = det(a, b, c), which is the signed volume of the parallelepiped spanned by a, b, c.
+        if (QVector3D::dotProduct(t, crossProdVn) < 0.0f) {
+            ribbonPosition = -ribbonPosition;
+        }
+        // Normalize the ribbon position: [-1, 1] -> [0, 1].
+        ribbonPosition = ribbonPosition / 2.0f + 0.5f;
+
+        auto numVariables = int(selectedVariableIndices.size());
+        auto varID = int(std::floor(ribbonPosition * float(numVariables)));
+        auto varIdxReal = int(selectedVariableIndices.at(varID));
+        QString varName = QString::fromStdString(variableNames.at(varIdxReal));
+
+        depth = (sceneView->getCamera()->getOrigin() - firstHitPoint).length();
+        text = QString("Idx %1, Time %2, Var %3").arg(trajectoryIndex).arg(int(timeAtHit)).arg(varName);
+    }
+    return hasHit;
 }
 
 void MTrajectoryPicker::toggleTrajectoryHighlighted(uint32_t trajectoryIndex)

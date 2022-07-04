@@ -38,6 +38,7 @@
 
 // local application imports
 #include "actors/transferfunction1d.h"
+#include "gxfw/tooltippicker.h"
 #include "gxfw/gl/indexbuffer.h"
 #include "gxfw/gl/vertexbuffer.h"
 #include "gxfw/gl/shadereffect.h"
@@ -62,7 +63,7 @@ enum class DiagramDisplayType {
     NONE, RADAR_BAR_CHART_TIME_DEPENDENT, RADAR_BAR_CHART_TIME_INDEPENDENT, RADAR_CHART, CURVE_PLOT_VIEW
 };
 
-class MTrajectoryPicker : public MMemoryManagementUsingObject {
+class MTrajectoryPicker : public MMemoryManagementUsingObject, public MToolTipPicker {
 public:
     MTrajectoryPicker(
             GLuint textureUnit, MSceneViewGLWidget* sceneView, const QVector<QString>& varNames,
@@ -116,6 +117,16 @@ public:
             QVector3D& firstHitPoint, uint32_t& trajectoryIndex, float& timeAtHit);
 
     /**
+     * Picks a point on the mesh using screen coordinates (assuming origin at upper left corner of viewport)
+     * and returns the depth and tool tip text for the intersection.
+     * @param position The position on the screen (usually the mouse position).
+     * @param depth The depth of the intersection (set if an intersection occurred).
+     * @param text The tool tip text for the intersection (set if an intersection occurred).
+     * @return True if a point on the mesh was hit.
+     */
+    bool toolTipPick(MSceneViewGLWidget* sceneView, const QPoint &position, float &depth, QString &text) override;
+
+    /**
      * Checks whether a virtual (i.e., drawn using OpenGL) window is below
      * the mouse cursor at @p mousePositionX, @p mousePositionY.
      */
@@ -135,6 +146,7 @@ public:
     void sortByDescendingStdDev();
     void setShowMinMaxValue(bool show);
     void setUseMaxForSensitivity(bool useMax);
+    void setUseVariableToolTip(bool useToolTip);
     void setTrimNanRegions(bool trimRegions);
     void setSubsequenceMatchingTechnique(SubsequenceMatchingTechnique technique);
     void setSpringEpsilon(float epsilon);
@@ -258,9 +270,10 @@ private:
             QGLWidget *currentGLContext);
 #endif
 
-    MActor* actor;
-    MQtProperties *properties;
-    QtProperty *multiVarGroupProperty;
+    MSceneViewGLWidget* parentSceneView = nullptr;
+    MActor* actor = nullptr;
+    MQtProperties *properties = nullptr;
+    QtProperty *multiVarGroupProperty = nullptr;
 
     SimilarityMetric similarityMetric = SimilarityMetric::ABSOLUTE_NCC;
     float meanMetricInfluence = 0.5f;
@@ -280,6 +293,7 @@ private:
     MFilteredTrajectories baseTrajectories;
     QVector<QVector2D> minMaxAttributes;
     int timeStep = 0;
+    bool useVariableToolTip = true;
 
     float lineRadius = 0.0f;
     int numCircleSubdivisions = 8;

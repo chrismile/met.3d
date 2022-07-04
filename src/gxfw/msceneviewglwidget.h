@@ -50,6 +50,7 @@
 #include "gxfw/msystemcontrol.h"
 #include "gxfw/mtypes.h"
 #include "gxfw/mresizewindowdialog.h"
+#include "gxfw/tooltippicker.h"
 
 namespace Met3D
 {
@@ -290,6 +291,9 @@ public:
 
     virtual bool synchronizationEvent(MSynchronizationType, QVector<QVariant>);
 
+    void addToolTipPicker(MToolTipPicker* picker);
+    void removeToolTipPicker(MToolTipPicker* picker);
+
 signals:
     /**
       Emitted when a mouse button is released on the GL canvas.
@@ -319,6 +323,8 @@ public slots:
     void updateFPSTimer();
 
     void stopFPSMeasurement();
+
+    void updateToolTipTimer();
 
     void updateSceneLabel();
 
@@ -370,7 +376,7 @@ protected:
 
     void mouseDoubleClickEvent(QMouseEvent *event);
 
-    void mousePressEvent(QMouseEvent *event);
+    void mousePressEvent(QMouseEvent *event) override;
 
     /**
       Overloads QOpenGLWidget/QGLWidget::mouseMoveEvent().
@@ -393,6 +399,8 @@ protected:
     void keyPressEvent(QKeyEvent *event);
 
     void keyReleaseEvent(QKeyEvent *event);
+
+    void leaveEvent(QEvent *event) override;
 
     //bool event(QEvent *event) override;
 
@@ -459,6 +467,15 @@ private:
     bool userIsScrolling;   // Is user currently scrolling with the mouse?
     bool viewportResized;   // Was the viewport resized?
     bool isDraggingVirtualWindow = false;
+
+    // For displaying tool tips for objects in the widget.
+    QVector<MToolTipPicker*> toolTipPickers;
+    QLabel *toolTipLabel;
+    QTimer *toolTipUpdateTimer;
+    QPoint toolTipMousePosition;
+    QPoint toolTipMousePositionGlobal;
+    bool toolTipMouseInParent = false;
+    int toolTipWaitTimeMs = 400;
 
     QElapsedTimer scrollTimer;
     QElapsedTimer resizeTimer;

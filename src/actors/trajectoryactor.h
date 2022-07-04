@@ -541,6 +541,8 @@ private:
     TrajectorySyncMode trajectorySyncMode = TrajectorySyncMode::TIMESTEP;
     uint32_t syncModeTrajectoryIndex = 0;
 
+    bool useVariableToolTip = true;
+    QtProperty *useVariableToolTipProperty;
     QtProperty *selectAllTrajectoriesProperty;
     QtProperty *resetVariableSortingProperty;
 

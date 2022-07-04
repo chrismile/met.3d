@@ -47,6 +47,7 @@
 #include "util/mutil.h"
 #include "gxfw/mtypes.h"
 #include "gxfw/textmanager.h"
+#include "data/multivar/hidpi.h"
 #include "mainwindow.h"
 
 using namespace std;
@@ -100,6 +101,14 @@ MSceneViewGLWidget::MSceneViewGLWidget()
 #ifdef USE_QOPENGLWIDGET
     this->setFormat(MGLResourcesManager::getInstance()->format());
 #endif
+
+    toolTipLabel = new QLabel(this);
+    toolTipLabel->setWindowFlag(Qt::ToolTip);
+    toolTipLabel->setFocusPolicy(Qt::NoFocus);
+    toolTipLabel->setPalette(QToolTip::palette());
+    toolTipUpdateTimer = new QTimer(this);
+    toolTipUpdateTimer->setSingleShot(true);
+    connect(toolTipUpdateTimer, SIGNAL(timeout()), SLOT(updateToolTipTimer()));
 
     viewIsInitialised = false;
     focusShader = nullptr;
@@ -940,7 +949,8 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
         // In actor interaction mode, mouse tracking is enabled to have
         // mouseMoveEvent() executed on every mouse move, not only when a
         // button is pressed.
-        setMouseTracking(actorInteractionMode);
+        // Mouse tracking needs to be enabled for tool tip support.
+        //setMouseTracking(actorInteractionMode);
         updateSceneLabel();
 #ifndef CONTINUOUS_GL_UPDATE
 #ifdef USE_QOPENGLWIDGET
@@ -1592,6 +1602,45 @@ void MSceneViewGLWidget::stopFPSMeasurement()
 }
 
 
+void MSceneViewGLWidget::updateToolTipTimer()
+{
+    if (!toolTipMouseInParent)
+    {
+        return;
+    }
+    std::map<float, QString> depthTextMap;
+    foreach (MToolTipPicker *toolTipPicker, toolTipPickers)
+    {
+        float depth = std::numeric_limits<float>::max();
+        QString text;
+        if (toolTipPicker->toolTipPick(this, toolTipMousePosition, depth, text))
+        {
+            depthTextMap.insert(std::make_pair(depth, text));
+        }
+    }
+    //depthTextMap.insert(std::make_pair(1e6f, "Test String"));
+    if (!depthTextMap.empty())
+    {
+        // 20 is the too small (probably DPI-independent) standard on a test system with DPI scale 1.875.
+        int toolTipOffsetY = int(16.0f * getHighDPIScaleFactor());
+        toolTipLabel->move(toolTipMousePositionGlobal.x() + 2, toolTipMousePositionGlobal.y() + toolTipOffsetY);
+        toolTipLabel->setText(depthTextMap.begin()->second);
+        toolTipLabel->adjustSize();
+        if (toolTipLabel->isHidden())
+        {
+            toolTipLabel->show();
+        }
+    }
+    else
+    {
+        if (!toolTipLabel->isHidden())
+        {
+            toolTipLabel->hide();
+        }
+    }
+}
+
+
 /******************************************************************************
 ***                          PROTECTED METHODS                              ***
 *******************************************************************************/
@@ -2198,6 +2247,30 @@ void MSceneViewGLWidget::mouseMoveEvent(QMouseEvent *event)
         }
     }
 
+    // Update tool tip.
+    if (event->buttons() == Qt::NoButton)
+    {
+        toolTipMouseInParent = true;
+        toolTipUpdateTimer->start(toolTipWaitTimeMs);
+        toolTipMousePosition = event->pos();
+        toolTipMousePositionGlobal = event->globalPos();
+        if (toolTipLabel->geometry().contains(event->globalPos()))
+        {
+            if (!toolTipLabel->isHidden())
+            {
+                toolTipLabel->hide();
+            }
+        }
+    }
+    else
+    {
+        toolTipUpdateTimer->stop();
+        if (!toolTipLabel->isHidden())
+        {
+            toolTipLabel->hide();
+        }
+    }
+
     if (isVirtualWindowBelowMouse || selectableDataTriggeredUpdate)
     {
 #ifndef CONTINUOUS_GL_UPDATE
@@ -2753,6 +2826,15 @@ void MSceneViewGLWidget::keyReleaseEvent(QKeyEvent *event)
 }
 
 
+void MSceneViewGLWidget::leaveEvent(QEvent *event)
+{
+    toolTipMouseInParent = false;
+    if (!toolTipLabel->isHidden())
+    {
+        toolTipLabel->hide();
+    }
+}
+
 
 /*bool MSceneViewGLWidget::event(QEvent *event)
 {
@@ -2760,10 +2842,23 @@ void MSceneViewGLWidget::keyReleaseEvent(QKeyEvent *event)
     {
         QHelpEvent *helpEvent = static_cast<QHelpEvent*>(event);
         float time = 0.0f;
-        int index = 0;//itemAt(helpEvent->pos());
-        if (index != -1)
+        std::map<float, QString> depthTextMap;
+        foreach (MToolTipPicker *toolTipPicker, toolTipPickers)
         {
-            QToolTip::showText(helpEvent->globalPos(), QString("Time: #%1").arg(time));
+            float depth = std::numeric_limits<float>::max();
+            QString text;
+            if (toolTipPicker->toolTipPick(this, helpEvent->pos(), depth, text))
+            {
+                depthTextMap.insert(std::make_pair(depth, text));
+            }
+        }
+        depthTextMap.insert(std::make_pair(1e6f, "Test String"));
+        QToolTip::hideText();
+        if (!depthTextMap.empty())
+        {
+            QRect rect;
+            QToolTip::showText(
+                    helpEvent->globalPos(), depthTextMap.begin()->second, nullptr, rect, 10000);
         }
         else
         {
@@ -3479,6 +3574,19 @@ bool MSceneViewGLWidget::synchronizationEvent(
 
     return false;
 }
+
+
+void MSceneViewGLWidget::addToolTipPicker(MToolTipPicker* picker)
+{
+    toolTipPickers.push_back(picker);
+}
+
+
+void MSceneViewGLWidget::removeToolTipPicker(MToolTipPicker* picker)
+{
+    toolTipPickers.removeOne(picker);
+}
+
 
 
 /******************************************************************************
