@@ -73,29 +73,6 @@ shader VSmain(in vec3 vertexPosition : 0, in vec3 vertexNormal : 1, out VSOutput
 
 #include "multivar_shading_utils.glsl"
 
-/**
- * Computes the parametrized form of the closest point on a line segment.
- * See: http://geomalgorithms.com/a02-_lines.html
- *
- * @param p The position of the point.
- * @param l0 The first line point.
- * @param l1 The second line point.
- * @return A value satisfying l0 + RETVAL * (l1 - l0) = closest point.
- */
-float getClosestPointOnLineSegmentParam(vec3 p, vec3 l0, vec3 l1) {
-    vec3 v = l1 - l0;
-    vec3 w = p - l0;
-    float c1 = dot(v, w);
-    if (c1 <= 0.0) {
-        return 0.0;
-    }
-    float c2 = dot(v, v);
-    if (c2 <= c1) {
-        return 1.0;
-    }
-    return c1 / c2;
-}
-
 #define SQR(x) ((x)*(x))
 
 float squareVec(vec3 v) {

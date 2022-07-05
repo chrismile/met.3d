@@ -917,6 +917,7 @@ void MTrajectoryActor::loadConfiguration(QSettings *settings)
 
     useVariableToolTip = settings->value("showMinMaxValue", true).toBool();
     properties->mBool()->setValue(useVariableToolTipProperty, useVariableToolTip);
+    useVariableToolTipChanged = true;
 
     multiVarData.setEnabled(useBezierTrajectories);
     multiVarData.loadConfiguration(settings);
@@ -1954,8 +1955,9 @@ void MTrajectoryActor::prepareAvailableDataForRendering(uint slot)
                     if (trajectoryPickerMap.find(view) == trajectoryPickerMap.end()) {
                         GLuint textureUnit = assignTextureUnit();
                         trajectoryPickerMap[view] = new MTrajectoryPicker(
-                                textureUnit, view, multiVarData.getVarNames(), diagramType,
-                                diagramTransferFunction);
+                                textureUnit, view, multiVarData.getVarNames(),
+                                multiVarData.getTransferFunctionsMultiVar(),
+                                diagramType, diagramTransferFunction);
                         multiVarData.setDiagramType(diagramType);
                         trajectoryPickerMap[view]->setSelectedVariableIndices(multiVarData.getSelectedVariableIndices());
                         trajectoryPickerMap[view]->updateTrajectoryRadius(tubeRadius);
@@ -3055,6 +3057,7 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
     else if (property == useVariableToolTipProperty)
     {
         useVariableToolTip = properties->mBool()->value(useVariableToolTipProperty);
+        useVariableToolTipChanged = true;
 #ifdef USE_EMBREE
         for (MTrajectoryPicker* trajectoryPicker : trajectoryPickerMap)
         {
@@ -3594,13 +3597,33 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
             }
 #endif
 
-            // Render tubes at time step positions.
+#ifdef USE_EMBREE
+            trajectoryPickerMap[sceneView]->updateRenderSpheresIfNecessary(multiVarData.getRenderSpheres());
+#endif
+            // Render spheres at the selected time step positions.
             if (multiVarData.getUseTimestepLens() && useMultiVarSpheres && multiVarData.getRenderSpheres())
             {
-                trajectoryRequests[t].bezierTrajectoriesMap[sceneView]->updateTimeStepSphereRenderDataIfNecessary(
+                bool sphereDataChanged = trajectoryRequests[t].bezierTrajectoriesMap[
+                        sceneView]->updateTimeStepSphereRenderDataIfNecessary(
                         particlePosTimeStep, syncModeTrajectoryIndex, sphereRadius);
                 MTimeStepSphereRenderData* timeStepSphereRenderData =
                         trajectoryRequests[t].timeStepSphereRenderDataMap[sceneView];
+
+#ifdef USE_EMBREE
+                trajectoryPickerMap[sceneView]->setMultiVarFocusRenderMode(multiVarData.getFocusRenderMode());
+                trajectoryPickerMap[sceneView]->setShowTargetVariableAndSensitivity(
+                        multiVarData.getShowTargetVariableAndSensitivity());
+                if (useVariableToolTip && (useVariableToolTipChanged || sphereDataChanged))
+                {
+                    trajectoryPickerMap[sceneView]->setTimeStepSphereData(
+                            trajectoryRequests[t].bezierTrajectoriesMap[sceneView]->getSpherePositions(),
+                            trajectoryRequests[t].bezierTrajectoriesMap[sceneView]->getSphereEntrancePoints(),
+                            trajectoryRequests[t].bezierTrajectoriesMap[sceneView]->getSphereExitPoints(),
+                            trajectoryRequests[t].bezierTrajectoriesMap[sceneView]->getSphereLineElementIds(),
+                            sphereRadius);
+                    useVariableToolTipChanged = false;
+                }
+#endif
 
                 std::shared_ptr<GL::MShaderEffect> timeStepSphereShader = multiVarData.getTimeStepSphereShader();
                 timeStepSphereShader->bind();

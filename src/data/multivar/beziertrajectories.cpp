@@ -73,7 +73,7 @@ MBezierTrajectories::MBezierTrajectories(
     /*
      * TODO: This is hard-coded, as there is currently no way to know which the target variable is.
      */
-    targetVariableAndSensitivityIndexArray.resize(numVariables);
+    targetVariableAndSensitivityIndexArray.resize(int(numVariables));
     int targetVariableIndex = auxDataVarNames.indexOf("QR");
     if (targetVariableIndex < 0) {
         targetVariableIndex = std::max(1, int(numVariables) - 1);
@@ -554,10 +554,6 @@ MTimeStepSphereRenderData* MBezierTrajectories::getTimeStepSphereRenderData(
 
 #define SQR(x) ((x)*(x))
 
-float squareVec(QVector3D v) {
-    return SQR(v.x()) + SQR(v.y()) + SQR(v.z());
-}
-
 /**
  * Implementation of ray-sphere intersection (idea from A. Glassner et al., "An Introduction to Ray Tracing").
  * For more details see: https://education.siggraph.org/static/HyperGraph/raytrace/rtinter1.htm
@@ -651,15 +647,8 @@ bool halfLineSphereIntersection(
     return true;
 }
 
-struct LineElementIdData {
-    float centerIdx;
-    float entranceIdx;
-    float exitIdx;
-    int lineId;
-};
 
-
-void MBezierTrajectories::updateTimeStepSphereRenderDataIfNecessary(
+bool MBezierTrajectories::updateTimeStepSphereRenderDataIfNecessary(
         int timeStep, uint32_t syncModeTrajectoryIndex, float sphereRadius,
 #ifdef USE_QOPENGLWIDGET
         QOpenGLWidget *currentGLContext)
@@ -669,7 +658,7 @@ void MBezierTrajectories::updateTimeStepSphereRenderDataIfNecessary(
 {
     if (timeStep == lastSphereTimeStep && syncModeTrajectoryIndex == lastSphereSyncModeTrajectoryIndex
             && sphereRadius == lastSphereRadius) {
-        return;
+        return false;
     }
     lastSphereTimeStep = timeStep;
     lastSphereSyncModeTrajectoryIndex = syncModeTrajectoryIndex;
@@ -686,10 +675,10 @@ void MBezierTrajectories::updateTimeStepSphereRenderDataIfNecessary(
         MGLResourcesManager::getInstance()->deleteReleasedGPUItem(timeStepSphereRenderData.lineElementIdsBuffer);
     }
 
-    QVector<QVector4D> spherePositions;
-    QVector<QVector4D> entrancePoints;
-    QVector<QVector4D> exitPoints;
-    QVector<LineElementIdData> lineElementIds;
+    spherePositions.clear();
+    entrancePoints.clear();
+    exitPoints.clear();
+    lineElementIds.clear();
 
     const MFilteredTrajectory& syncModeTrajectory = baseTrajectories[int(syncModeTrajectoryIndex)];
 
@@ -855,6 +844,8 @@ void MBezierTrajectories::updateTimeStepSphereRenderDataIfNecessary(
             currentGLContext, timeStepSphereExitPointsBufferID, exitPoints);
     timeStepSphereRenderData.lineElementIdsBuffer = createShaderStorageBuffer(
             currentGLContext, timeStepSphereLineElementIdsBufferID, lineElementIds);
+
+    return true;
 }
 
 void MBezierTrajectories::releaseTimeStepSphereRenderData()

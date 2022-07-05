@@ -47,7 +47,7 @@ namespace Met3D
 enum class MultiVarRenderMode {
     ORIENTED_COLOR_BANDS
 };
-enum class MultiVarFocusRenderMode {
+enum class MultiVarFocusRenderMode : unsigned int {
     NONE,
     TANGENT,
     GREAT_CIRCLE,
@@ -80,14 +80,17 @@ public:
     void updateVariableRanges(const QVector<QVector2D>& ranges);
 
     void initTransferFunctionsMultiVar(uint32_t numVariables);
+    QVector<MTransferFunction1D*>& getTransferFunctionsMultiVar() { return transferFunctionsMultiVar; }
+    const QVector<MTransferFunction1D*>& getTransferFunctionsMultiVar() const { return transferFunctionsMultiVar; }
 
     // When a shader needing a different internal representation was loaded.
     inline bool getInternalRepresentationChanged() const { return internalRepresentationChanged; }
     inline void resetInternalRepresentationChanged() { internalRepresentationChanged = false; }
-    inline bool getRenderSpheres() {
+    inline MultiVarFocusRenderMode getFocusRenderMode() const { return focusRenderMode; }
+    inline bool getRenderSpheres() const {
         return focusRenderMode != MultiVarFocusRenderMode::NONE && focusRenderMode != MultiVarFocusRenderMode::ROLLS;
     }
-    inline bool getRenderRolls() { return focusRenderMode == MultiVarFocusRenderMode::ROLLS; }
+    inline bool getRenderRolls() const { return focusRenderMode == MultiVarFocusRenderMode::ROLLS; }
 
     inline bool getSelectedVariablesChanged() const { return selectedVariablesChanged; }
     inline void resetSelectedVariablesChanged() { selectedVariablesChanged = false; }

@@ -542,6 +542,7 @@ private:
     uint32_t syncModeTrajectoryIndex = 0;
 
     bool useVariableToolTip = true;
+    bool useVariableToolTipChanged = true;
     QtProperty *useVariableToolTipProperty;
     QtProperty *selectAllTrajectoriesProperty;
     QtProperty *resetVariableSortingProperty;

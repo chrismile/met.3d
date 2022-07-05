@@ -51,6 +51,7 @@
 namespace Met3D {
 
 class MSceneViewGLWidget;
+enum class MultiVarFocusRenderMode : unsigned int;
 
 struct MHighlightedTrajectoriesRenderData
 {
@@ -67,6 +68,7 @@ class MTrajectoryPicker : public MMemoryManagementUsingObject, public MToolTipPi
 public:
     MTrajectoryPicker(
             GLuint textureUnit, MSceneViewGLWidget* sceneView, const QVector<QString>& varNames,
+            QVector<MTransferFunction1D*>& transferFunctionsMultiVar,
             DiagramDisplayType diagramType, MTransferFunction1D*& diagramTransferFunction);
     ~MTrajectoryPicker() override;
 
@@ -89,6 +91,24 @@ public:
     void setMeshTriangleData(
             const std::vector<uint32_t>& triangleIndices, const std::vector<QVector3D>& vertexPositions,
             const std::vector<uint32_t>& vertexTrajectoryIndices, const std::vector<float>& vertexTimeSteps);
+
+    /**
+     * Sets the time step sphere data.
+     * @param spherePositions The center positions of the time step spheres.
+     * @param entrancePoints The first entrance points of the trajectories into the time step spheres.
+     * @param exitPoints The last exit points of the trajectories into the time step spheres.
+     * @param lineElementIds The element ID data linking the spheres to the corresponding trajectories.
+     * @param sphereRadius The sphere of the radius.
+     */
+    void setTimeStepSphereData(
+            const QVector<QVector4D>& spherePositions,
+            const QVector<QVector4D>& entrancePoints,
+            const QVector<QVector4D>& exitPoints,
+            const QVector<LineElementIdData>& lineElementIds,
+            float sphereRadius);
+    void setMultiVarFocusRenderMode(MultiVarFocusRenderMode mode) { focusRenderMode = mode; }
+    void updateRenderSpheresIfNecessary(bool renderSpheres);
+    void setShowTargetVariableAndSensitivity(bool show);
 
     /**
      * Picks a point on the mesh using screen coordinates (assuming origin at upper left corner of viewport).
@@ -262,6 +282,7 @@ public:
 
 private:
     void freeStorage();
+    void freeStorageSpheres();
     void recreateTubeTriangleData();
     void updateHighlightRenderData(
 #ifdef USE_QOPENGLWIDGET
@@ -274,6 +295,7 @@ private:
     MActor* actor = nullptr;
     MQtProperties *properties = nullptr;
     QtProperty *multiVarGroupProperty = nullptr;
+    QVector<MTransferFunction1D*>& transferFunctionsMultiVar;
 
     SimilarityMetric similarityMetric = SimilarityMetric::ABSOLUTE_NCC;
     float meanMetricInfluence = 0.5f;
@@ -306,12 +328,30 @@ private:
     std::vector<uint32_t> vertexTrajectoryIndices;
     std::vector<float> vertexTimeSteps;
 
+    MultiVarFocusRenderMode focusRenderMode;
+    bool renderSpheres = false;
+    bool targetVariableAndSensitivity = false;
+
 #ifdef USE_EMBREE
-    RTCDevice device;
-    RTCScene scene;
-    RTCGeometry mesh;
-    unsigned int geomID = 0;
+    RTCDevice device = nullptr;
+
+    RTCScene scene = nullptr;
+    RTCGeometry tubeMeshGeometry = nullptr;
+    unsigned int tubeMeshGeometryId = 0;
+
+    RTCScene sceneSpheres = nullptr;
+    size_t cachedNumSpheres = 0;
+    QVector<QVector4D> cachedSpherePositions;
+    QVector<QVector4D> cachedEntrancePoints;
+    QVector<QVector4D> cachedExitPoints;
+    QVector<LineElementIdData> cachedLineElementIds;
+    float cachedSphereRadius = 0.0f;
+    RTCGeometry spheresGeometry = nullptr;
+    unsigned int spheresGeometryId = 0;
+    QVector4D* spherePointPointer = nullptr;
+
     bool loaded = false;
+    bool loadedSpheres = false;
 #endif
 
     // Highlighted trajectories.

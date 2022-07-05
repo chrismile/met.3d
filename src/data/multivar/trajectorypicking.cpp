@@ -42,18 +42,23 @@
 #include "util/mutil.h"
 #include "helpers.h"
 #include "hidpi.h"
+#include "multivardata.h"
 
 namespace Met3D {
 
 MTrajectoryPicker::MTrajectoryPicker(
         GLuint textureUnit, MSceneViewGLWidget* sceneView, const QVector<QString>& varNames,
+        QVector<MTransferFunction1D*>& transferFunctionsMultiVar,
         DiagramDisplayType diagramType, MTransferFunction1D*& diagramTransferFunction)
-        : parentSceneView(sceneView), textureUnit(textureUnit), diagramTransferFunction(diagramTransferFunction)
+        : parentSceneView(sceneView), transferFunctionsMultiVar(transferFunctionsMultiVar), textureUnit(textureUnit),
+          focusRenderMode(MultiVarFocusRenderMode::NONE), diagramTransferFunction(diagramTransferFunction)
 {
 #ifdef USE_EMBREE
     device = rtcNewDevice(nullptr);
     scene = rtcNewScene(device);
-    mesh = rtcNewGeometry(device, RTC_GEOMETRY_TYPE_TRIANGLE);
+    sceneSpheres = rtcNewScene(device);
+    tubeMeshGeometry = rtcNewGeometry(device, RTC_GEOMETRY_TYPE_TRIANGLE);
+    spheresGeometry = rtcNewGeometry(device, RTC_GEOMETRY_TYPE_SPHERE_POINT);
 #endif
 
     MGLResourcesManager* glRM = MGLResourcesManager::getInstance();
@@ -224,6 +229,7 @@ void MTrajectoryPicker::setUseMaxForSensitivity(bool useMax)
 void MTrajectoryPicker::setUseVariableToolTip(bool useToolTip)
 {
     this->useVariableToolTip = useToolTip;
+    freeStorageSpheres();
 }
 
 void MTrajectoryPicker::setSubsequenceMatchingTechnique(SubsequenceMatchingTechnique technique)
@@ -360,9 +366,17 @@ void MTrajectoryPicker::resetVariableSorting()
 MTrajectoryPicker::~MTrajectoryPicker()
 {
     freeStorage();
+    freeStorageSpheres();
 
 #ifdef USE_EMBREE
-    rtcReleaseGeometry(mesh);
+    if (tubeMeshGeometry)
+    {
+        rtcReleaseGeometry(tubeMeshGeometry);
+    }
+    if (spheresGeometry)
+    {
+        rtcReleaseGeometry(spheresGeometry);
+    }
     rtcReleaseScene(scene);
     rtcReleaseDevice(device);
 #endif
@@ -395,9 +409,20 @@ void MTrajectoryPicker::freeStorage()
 {
 #ifdef USE_EMBREE
     if (loaded) {
-        rtcDetachGeometry(scene, geomID);
+        rtcDetachGeometry(scene, tubeMeshGeometryId);
         rtcCommitScene(scene);
         loaded = false;
+    }
+#endif
+}
+
+void MTrajectoryPicker::freeStorageSpheres()
+{
+#ifdef USE_EMBREE
+    if (loadedSpheres) {
+        rtcDetachGeometry(sceneSpheres, spheresGeometryId);
+        rtcCommitScene(sceneSpheres);
+        loadedSpheres = false;
     }
 #endif
 }
@@ -676,6 +701,7 @@ void MTrajectoryPicker::setMeshTriangleData(
         const std::vector<uint32_t>& vertexTrajectoryIndices, const std::vector<float>& vertexTimeSteps)
 {
     freeStorage();
+
     if (triangleIndices.empty() || vertexPositions.empty() || vertexTrajectoryIndices.empty()
             || vertexTimeSteps.empty()) {
         return;
@@ -694,9 +720,10 @@ void MTrajectoryPicker::setMeshTriangleData(
 
 #ifdef USE_EMBREE
     QVector4D* vertexPointer = (QVector4D*)rtcSetNewGeometryBuffer(
-            mesh, RTC_BUFFER_TYPE_VERTEX, 0, RTC_FORMAT_FLOAT3, sizeof(QVector4D), numVertices);
+            tubeMeshGeometry, RTC_BUFFER_TYPE_VERTEX, 0, RTC_FORMAT_FLOAT3,
+            sizeof(QVector4D), numVertices);
     uint32_t* indexPointer = (uint32_t*)rtcSetNewGeometryBuffer(
-            mesh, RTC_BUFFER_TYPE_INDEX, 0, RTC_FORMAT_UINT3,
+            tubeMeshGeometry, RTC_BUFFER_TYPE_INDEX, 0, RTC_FORMAT_UINT3,
             sizeof(uint32_t) * 3, numTriangles);
     for (size_t i = 0; i < numVertices; i++) {
         const QVector3D& vertex = vertexPositions.at(i);
@@ -706,19 +733,75 @@ void MTrajectoryPicker::setMeshTriangleData(
         indexPointer[i] = triangleIndices[i];
     }
 
-    rtcCommitGeometry(mesh);
-    geomID = rtcAttachGeometry(scene, mesh);
-
+    rtcCommitGeometry(tubeMeshGeometry);
+    tubeMeshGeometryId = rtcAttachGeometry(scene, tubeMeshGeometry);
     rtcCommitScene(scene);
     loaded = true;
 #endif
 }
 
+void MTrajectoryPicker::setTimeStepSphereData(
+        const QVector<QVector4D>& spherePositions,
+        const QVector<QVector4D>& entrancePoints,
+        const QVector<QVector4D>& exitPoints,
+        const QVector<LineElementIdData>& lineElementIds,
+        float sphereRadius) {
+#ifdef USE_EMBREE
+    freeStorageSpheres();
+
+    cachedSpherePositions = spherePositions;
+    cachedEntrancePoints = entrancePoints;
+    cachedExitPoints = exitPoints;
+    cachedLineElementIds = lineElementIds;
+    cachedSphereRadius = sphereRadius;
+
+    if (!renderSpheres)
+    {
+        return;
+    }
+
+    if (!spheresGeometry || cachedNumSpheres != size_t(spherePositions.size()))
+    {
+        spherePointPointer = (QVector4D*)rtcSetNewGeometryBuffer(
+                spheresGeometry, RTC_BUFFER_TYPE_VERTEX, 0, RTC_FORMAT_FLOAT4,
+                sizeof(QVector4D), spherePositions.size());
+    }
+    cachedNumSpheres = size_t(spherePositions.size());
+
+    for (int i = 0; i < spherePositions.size(); i++) {
+        const QVector4D& c = spherePositions.at(i);
+        spherePointPointer[i] = QVector4D(c.x(), c.y(), c.z(), sphereRadius);
+    }
+
+    rtcCommitGeometry(spheresGeometry);
+    spheresGeometryId = rtcAttachGeometry(sceneSpheres, spheresGeometry);
+    rtcCommitScene(sceneSpheres);
+    loadedSpheres = true;
+#endif
+}
+
+void MTrajectoryPicker::updateRenderSpheresIfNecessary(bool shallRenderSpheres) {
+    if (shallRenderSpheres && !renderSpheres) {
+        setTimeStepSphereData(
+                cachedSpherePositions,
+                cachedEntrancePoints,
+                cachedExitPoints,
+                cachedLineElementIds,
+                cachedSphereRadius);
+    }
+    if (!shallRenderSpheres && renderSpheres) {
+        freeStorageSpheres();
+    }
+    renderSpheres = shallRenderSpheres;
+}
+
+void MTrajectoryPicker::setShowTargetVariableAndSensitivity(bool show) {
+    targetVariableAndSensitivity = show;
+}
+
 bool MTrajectoryPicker::pickPointScreen(
         MSceneViewGLWidget* sceneView, int x, int y,
         QVector3D &firstHitPoint, uint32_t &trajectoryIndex, float &timeAtHit) {
-    sceneView->getCamera()->getOrigin();
-
     int viewportWidth = sceneView->getViewPortWidth();
     int viewportHeight = sceneView->getViewPortHeight();
     float aspectRatio = float(viewportWidth) / float(viewportHeight);
@@ -853,6 +936,73 @@ bool MTrajectoryPicker::pickPointWorld(
 #endif
 }
 
+/**
+ * Computes the parametrized form of the closest point on a line segment.
+ * See: http://geomalgorithms.com/a02-_lines.html
+ *
+ * @param p The position of the point.
+ * @param l0 The first line point.
+ * @param l1 The second line point.
+ * @return A value satisfying l0 + RETVAL * (l1 - l0) = closest point.
+ */
+float getClosestPointOnLineSegmentParam(const QVector3D& p, const QVector3D& l0, const QVector3D& l1) {
+    QVector3D v = l1 - l0;
+    QVector3D w = p - l0;
+    float c1 = QVector3D::dotProduct(v, w);
+    if (c1 <= 0.0) {
+        return 0.0;
+    }
+    float c2 = QVector3D::dotProduct(v, v);
+    if (c2 <= c1) {
+        return 1.0;
+    }
+    return c1 / c2;
+}
+
+#define SQR(x) ((x)*(x))
+
+/**
+ * Implementation of ray-sphere intersection (idea from A. Glassner et al., "An Introduction to Ray Tracing").
+ * For more details see: https://education.siggraph.org/static/HyperGraph/raytrace/rtinter1.htm
+ */
+bool raySphereIntersection(
+        const QVector3D& rayOrigin, const QVector3D& rayDirection, const QVector3D& sphereCenter, float sphereRadius,
+        QVector3D& intersectionPosition) {
+    float A = SQR(rayDirection.x()) + SQR(rayDirection.y()) + SQR(rayDirection.z());
+    float B = 2.0f * (
+            rayDirection.x() * (rayOrigin.x() - sphereCenter.x())
+            + rayDirection.y() * (rayOrigin.y() - sphereCenter.y())
+            + rayDirection.z() * (rayOrigin.z() - sphereCenter.z())
+    );
+    float C =
+            SQR(rayOrigin.x() - sphereCenter.x())
+            + SQR(rayOrigin.y() - sphereCenter.y())
+            + SQR(rayOrigin.z() - sphereCenter.z())
+            - SQR(sphereRadius);
+
+    float discriminant = SQR(B) - 4.0*A*C;
+    if (discriminant < 0.0) {
+        return false; // No intersection.
+    }
+
+    float discriminantSqrt = sqrt(discriminant);
+    float t0 = (-B - discriminantSqrt) / (2.0f * A);
+
+    // Intersection(s) behind the ray origin?
+    intersectionPosition = rayOrigin + t0 * rayDirection;
+    if (t0 >= 0.0f) {
+        return true;
+    } else {
+        float t1 = (-B + discriminantSqrt) / (2.0f * A);
+        intersectionPosition = rayOrigin + t1 * rayDirection;
+        if (t1 >= 0.0f) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 bool MTrajectoryPicker::toolTipPick(MSceneViewGLWidget* sceneView, const QPoint &position, float &depth, QString &text)
 {
     if (!useVariableToolTip)
@@ -863,21 +1013,131 @@ bool MTrajectoryPicker::toolTipPick(MSceneViewGLWidget* sceneView, const QPoint 
     QVector3D firstHitPoint;
     uint32_t trajectoryIndex = 0;
     float timeAtHit = 0.0f;
-    bool hasHit = pickPointScreen(
-            sceneView, position.x(), position.y(), firstHitPoint, trajectoryIndex, timeAtHit);
-    if (hasHit)
+    QString varName;
+    float varFraction = 0.0f;
+
+    int viewportWidth = sceneView->getViewPortWidth();
+    int viewportHeight = sceneView->getViewPortHeight();
+    float aspectRatio = float(viewportWidth) / float(viewportHeight);
+
+    QMatrix4x4 inverseViewMatrix = sceneView->getCamera()->getViewMatrix().inverted();
+    float scale = std::tan(qDegreesToRadians(sceneView->getVerticalAngle()) * 0.5f);
+    QVector2D rayDirCameraSpace;
+    rayDirCameraSpace.setX((2.0f * (float(position.x()) + 0.5f) / float(viewportWidth) - 1.0f) * aspectRatio * scale);
+    rayDirCameraSpace.setY((2.0f * (float(viewportHeight - position.y() - 1) + 0.5f) / float(viewportHeight) - 1.0f) * scale);
+    QVector4D rayDirectionVec4 = inverseViewMatrix * QVector4D(rayDirCameraSpace, -1.0, 0.0);
+    QVector3D rayDirection = QVector3D(rayDirectionVec4.x(), rayDirectionVec4.y(), rayDirectionVec4.z());
+    rayDirection.normalize();
+
+#ifdef USE_EMBREE
+    if (!loaded) {
+        return false;
+    }
+
+    QVector3D rayOrigin = sceneView->getCamera()->getOrigin();
+
+    const float EPSILON_DEPTH = 1e-3f;
+    const float INFINITY_DEPTH = 1e30f;
+
+    RTCIntersectContext contextTube{}, contextSphere{};
+    rtcInitIntersectContext(&contextTube);
+    rtcInitIntersectContext(&contextSphere);
+
+    RTCRayHit queryTube{};
+    queryTube.ray.org_x = rayOrigin.x();
+    queryTube.ray.org_y = rayOrigin.y();
+    queryTube.ray.org_z = rayOrigin.z();
+    queryTube.ray.dir_x = rayDirection.x();
+    queryTube.ray.dir_y = rayDirection.y();
+    queryTube.ray.dir_z = rayDirection.z();
+    queryTube.ray.tnear = EPSILON_DEPTH;
+    queryTube.ray.tfar = INFINITY_DEPTH;
+    queryTube.ray.time = 0.0f;
+    queryTube.hit.geomID = RTC_INVALID_GEOMETRY_ID;
+    queryTube.hit.primID = RTC_INVALID_GEOMETRY_ID;
+
+    RTCRayHit querySphere{};
+    querySphere.ray.org_x = rayOrigin.x();
+    querySphere.ray.org_y = rayOrigin.y();
+    querySphere.ray.org_z = rayOrigin.z();
+    querySphere.ray.dir_x = rayDirection.x();
+    querySphere.ray.dir_y = rayDirection.y();
+    querySphere.ray.dir_z = rayDirection.z();
+    querySphere.ray.tnear = EPSILON_DEPTH;
+    querySphere.ray.tfar = INFINITY_DEPTH;
+    querySphere.ray.time = 0.0f;
+    querySphere.hit.geomID = RTC_INVALID_GEOMETRY_ID;
+    querySphere.hit.primID = RTC_INVALID_GEOMETRY_ID;
+
+    rtcIntersect1(scene, &contextTube, &queryTube);
+    rtcIntersect1(sceneSpheres, &contextSphere, &querySphere);
+    if (queryTube.hit.geomID == RTC_INVALID_GEOMETRY_ID && querySphere.hit.geomID == RTC_INVALID_GEOMETRY_ID)
+    {
+        return false;
+    }
+
+    float firstHitT;
+    bool isFirstHitTube;
+    if (querySphere.hit.geomID == RTC_INVALID_GEOMETRY_ID || querySphere.ray.tfar > queryTube.ray.tfar) {
+        isFirstHitTube = true;
+        firstHitT = queryTube.ray.tfar;
+    } else {
+        isFirstHitTube = false;
+        firstHitT = querySphere.ray.tfar;
+    }
+    firstHitPoint = rayOrigin + firstHitT * rayDirection;
+
+    if (isFirstHitTube)
+    {
+        uint32_t vidx0 = triangleIndices.at(queryTube.hit.primID * 3u);
+        uint32_t vidx1 = triangleIndices.at(queryTube.hit.primID * 3u + 1u);
+        uint32_t vidx2 = triangleIndices.at(queryTube.hit.primID * 3u + 2u);
+        trajectoryIndex = vertexTrajectoryIndices.at(vidx0);
+
+        const QVector3D barycentricCoordinates(
+                1.0f - queryTube.hit.u - queryTube.hit.v, queryTube.hit.u, queryTube.hit.v);
+        timeAtHit =
+                vertexTimeSteps.at(vidx0) * barycentricCoordinates.x()
+                + vertexTimeSteps.at(vidx1) * barycentricCoordinates.y()
+                + vertexTimeSteps.at(vidx2) * barycentricCoordinates.z();
+
+        if (trajectorySyncMode == TrajectorySyncMode::TIME_OF_ASCENT)
+        {
+            //timeAtHit = timeAtHit + float(maxAscentTimeStepIndex - ascentTimeStepIndices.at(trajectoryIndex));
+            timeAtHit = timeAtHit + float(-ascentTimeStepIndices.at(trajectoryIndex));
+        }
+    }
+    else
+    {
+        trajectoryIndex = cachedLineElementIds.at(int(querySphere.hit.primID)).lineId;
+        timeAtHit = cachedLineElementIds.at(int(querySphere.hit.primID)).centerIdx;
+    }
+
+    if (!highlightedTrajectories.empty()
+            && highlightedTrajectories.find(trajectoryIndex) == highlightedTrajectories.end())
+    {
+        return false;
+    }
+
+    int varIdxReal = 0;
+    if (isFirstHitTube)
     {
         auto& trajectory = trajectories.at(int(trajectoryIndex));
         auto timeIdx = int(timeAtHit);
         const QVector3D& lineCenterWorldPos = trajectory.at(timeIdx);
-        QVector3D n = (sceneView->getCamera()->getOrigin() - lineCenterWorldPos).normalized();
+        QVector3D n = (firstHitPoint - lineCenterWorldPos).normalized();
         QVector3D v = (sceneView->getCamera()->getOrigin() - firstHitPoint).normalized();
         QVector3D t(1.0f, 0.0f, 0.0f);
-        if (timeIdx == 0) {
+        if (timeIdx == 0)
+        {
             t = (trajectory.at(timeIdx + 1) - trajectory.at(timeIdx)).normalized();
-        } else if (timeIdx == int(trajectory.size() - 1)) {
+        }
+        else if (timeIdx == int(trajectory.size() - 1))
+        {
             t = (trajectory.at(timeIdx) - trajectory.at(timeIdx - 1)).normalized();
-        } else {
+        }
+        else
+        {
             t = (trajectory.at(timeIdx + 1) - trajectory.at(timeIdx - 1)).normalized();
         }
         // Project v into plane perpendicular to t to get newV.
@@ -896,15 +1156,153 @@ bool MTrajectoryPicker::toolTipPick(MSceneViewGLWidget* sceneView, const QPoint 
         // Normalize the ribbon position: [-1, 1] -> [0, 1].
         ribbonPosition = ribbonPosition / 2.0f + 0.5f;
 
+        if (targetVariableAndSensitivity)
+        {
+            int numVariables = 2;
+            auto varID = int(std::floor(ribbonPosition * float(numVariables)));
+
+            if (varID == 0) {
+                /*
+                 * TODO: This is hard-coded, as there is currently no way to know which the target variable is.
+                 */
+                auto targetVariableIt = std::find(variableNames.begin(), variableNames.end(), "QR");
+                int targetVariableIndex;
+                if (targetVariableIt == variableNames.end()) {
+                    targetVariableIndex = std::max(1, int(numVariables) - 1);
+                } else {
+                    targetVariableIndex = int(targetVariableIt - variableNames.begin());
+                }
+                varIdxReal = targetVariableIndex;
+            } else {
+                varIdxReal = int(numVariables) - 1;
+            }
+        }
+        else
+        {
+            auto numVariables = int(selectedVariableIndices.size());
+            auto varID = int(std::floor(ribbonPosition * float(numVariables)));
+            varIdxReal = int(selectedVariableIndices.at(varID));
+        }
+        varName = QString::fromStdString(variableNames.at(varIdxReal));
+    }
+    else if (focusRenderMode == MultiVarFocusRenderMode::GREAT_CIRCLE)
+    {
+        QVector3D spherePosition = cachedSpherePositions[int(querySphere.hit.primID)].toVector3D();
+        QVector3D entrancePoint = cachedEntrancePoints[int(querySphere.hit.primID)].toVector3D();
+        QVector3D exitPoint = cachedExitPoints[int(querySphere.hit.primID)].toVector3D();
+        LineElementIdData lineElementId = cachedLineElementIds[int(querySphere.hit.primID)];
+        //int fragmentLineID = lineElementId.lineId;
+        float entranceIdx = lineElementId.entranceIdx;
+        float exitIdx = lineElementId.exitIdx;
+
+        //QVector3D n = QVector3D(querySphere.hit.Ng_x, querySphere.hit.Ng_y, querySphere.hit.Ng_z);
+        //QVector3D v = (sceneView->getCamera()->getOrigin() - firstHitPoint).normalized();
+        QVector3D l = (exitPoint - entrancePoint).normalized();
+
+        QVector3D intersectionPosition;
+        raySphereIntersection(
+                spherePosition, (sceneView->getCamera()->getOrigin() - spherePosition).normalized(),
+                spherePosition, cachedSphereRadius, intersectionPosition);
+        QVector3D planeNormalZero = QVector3D::crossProduct(l, intersectionPosition - entrancePoint).normalized();
+        QVector3D planeNormalX = QVector3D::crossProduct(l, firstHitPoint - entrancePoint).normalized();
+
+        // Compute the closest point on the line segment spanned by the entrance and exit point.
+        float param = getClosestPointOnLineSegmentParam(firstHitPoint, entrancePoint, exitPoint);
+        timeAtHit = entranceIdx + param * (exitIdx - entranceIdx);
+
+        QVector3D crossProdVnCircle = QVector3D::crossProduct(planeNormalZero, planeNormalX);
+        float ribbonPosition = crossProdVnCircle.length();
+        if (QVector3D::dotProduct(l, crossProdVnCircle) < 0.0f) {
+            ribbonPosition = -ribbonPosition;
+        }
+        // Normalize the ribbon position: [-1, 1] -> [0, 1].
+        ribbonPosition = ribbonPosition / 2.0f + 0.5f;
+
         auto numVariables = int(selectedVariableIndices.size());
         auto varID = int(std::floor(ribbonPosition * float(numVariables)));
-        auto varIdxReal = int(selectedVariableIndices.at(varID));
-        QString varName = QString::fromStdString(variableNames.at(varIdxReal));
-
-        depth = (sceneView->getCamera()->getOrigin() - firstHitPoint).length();
-        text = QString("Idx %1, Time %2, Var %3").arg(trajectoryIndex).arg(int(timeAtHit)).arg(varName);
+        varIdxReal = int(selectedVariableIndices.at(varID));
+        varName = QString::fromStdString(variableNames.at(varIdxReal));
     }
-    return hasHit;
+    else if (focusRenderMode == MultiVarFocusRenderMode::PIE_CHART_COLOR)
+    {
+        //QVector3D entrancePoint = cachedEntrancePoints[int(querySphere.hit.primID)].toVector3D();
+        //QVector3D exitPoint = cachedExitPoints[int(querySphere.hit.primID)].toVector3D();
+        //LineElementIdData lineElementId = cachedLineElementIds[int(querySphere.hit.primID)];
+        //int fragmentLineID = lineElementId.lineId;
+        //float centerIdx = lineElementId.centerIdx;
+        //int fragElementID = int(round(centerIdx));
+
+        QVector3D n = QVector3D(querySphere.hit.Ng_x, querySphere.hit.Ng_y, querySphere.hit.Ng_z);
+        QVector3D v = (sceneView->getCamera()->getOrigin() - firstHitPoint).normalized();
+        //QVector3D l = (exitPoint - entrancePoint).normalized();
+
+        QVector3D cameraUp = sceneView->getCamera()->getYAxis();
+
+        QVector3D nPlane = n - QVector3D::dotProduct(n, v) * v;
+        float nPlaneLength = nPlane.length();
+        if (nPlaneLength > 1e-6) {
+            nPlane /= nPlaneLength;
+        }
+
+        QVector3D upWorld2 = QVector3D::crossProduct(cameraUp, v).normalized();
+        QVector3D pn2 = QVector3D::crossProduct(v, upWorld2).normalized();
+        QVector3D up2 = QVector3D::crossProduct(pn2, v).normalized();
+        float angle = std::atan2(
+                QVector3D::dotProduct(QVector3D::crossProduct(nPlane, up2), v),
+                QVector3D::dotProduct(nPlane, up2));
+        angle += float(M_PI);
+        angle = std::fmod(angle + float(M_PI) * 1.5f, 2.0f * float(M_PI));
+        angle /= 2.0f * float(M_PI);
+
+        auto numVariables = int(selectedVariableIndices.size());
+        auto varID = int(std::floor(angle * float(numVariables)));
+        varIdxReal = int(selectedVariableIndices.at(varID));
+        varName = QString::fromStdString(variableNames.at(varIdxReal));
+    }
+    else
+    {
+        return false;
+    }
+
+    QVector2D minMaxVector;
+    MTransferFunction1D* tf = transferFunctionsMultiVar.at(varIdxReal);
+    bool useLogScale = false;
+    if (tf)
+    {
+        minMaxVector = QVector2D(tf->getMinimumValue(), tf->getMaximumValue());
+        useLogScale = tf->getUseLogScale();
+    }
+    else
+    {
+        minMaxVector = minMaxAttributes[varIdxReal];
+    }
+
+    int timeLower = int(std::floor(timeAtHit));
+    int timeUpper = int(std::ceil(timeAtHit));
+    float interpolationFactor = fract(timeAtHit);
+    float varVal0 = baseTrajectories.at(int(trajectoryIndex)).attributes.at(varIdxReal).at(timeLower);
+    float varVal1 = baseTrajectories.at(int(trajectoryIndex)).attributes.at(varIdxReal).at(timeUpper);
+    float varVal = varVal0 + interpolationFactor * (varVal1 - varVal0);
+    if (useLogScale) {
+        float log10factor = 1.0f / std::log(10.0f);
+        float logMin = std::log(minMaxVector.x()) * log10factor;
+        float logMax = std::log(minMaxVector.y()) * log10factor;
+        float logAttr = std::log(varVal) * log10factor;
+        varFraction = (logAttr - logMin) / (logMax - logMin);
+    } else {
+        varFraction = (varVal - minMaxVector.x()) / (minMaxVector.y() - minMaxVector.x());
+    }
+    varFraction = clamp(varFraction, 0.0f, 1.0f);
+
+    depth = (sceneView->getCamera()->getOrigin() - firstHitPoint).length();
+    //text = QString("Idx %1, Time %2, Var %3").arg(trajectoryIndex).arg(int(timeAtHit)).arg(varName);
+    text = QString("Time %1, %2 (%3%)").arg(int(timeAtHit)).arg(varName).arg(
+            int(std::round(varFraction * 100)));
+
+    return true;
+#else
+    return false;
+#endif
 }
 
 void MTrajectoryPicker::toggleTrajectoryHighlighted(uint32_t trajectoryIndex)

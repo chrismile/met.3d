@@ -146,6 +146,13 @@ struct MTimeStepRollsRenderData
     GL::MVertexBuffer* vertexVariableIdAndIsCapBuffer = nullptr;
 };
 
+struct LineElementIdData {
+    float centerIdx;
+    float entranceIdx;
+    float exitIdx;
+    int lineId;
+};
+
 /**
  * Flow line data with multiple variables being displayed at once.
  * The lines are smoothed using Bezier curves.
@@ -204,7 +211,7 @@ public:
 #else
             QGLWidget *currentGLContext = nullptr);
 #endif
-    void updateTimeStepSphereRenderDataIfNecessary(
+    bool updateTimeStepSphereRenderDataIfNecessary(
             int timeStep, uint32_t syncModeTrajectoryIndex, float sphereRadius,
 #ifdef USE_QOPENGLWIDGET
             QOpenGLWidget *currentGLContext = nullptr);
@@ -212,6 +219,11 @@ public:
             QGLWidget *currentGLContext = nullptr);
 #endif
     void releaseTimeStepSphereRenderData();
+
+    inline const QVector<QVector4D>& getSpherePositions() const { return spherePositions; }
+    inline const QVector<QVector4D>& getSphereEntrancePoints() const { return entrancePoints; }
+    inline const QVector<QVector4D>& getSphereExitPoints() const { return exitPoints; }
+    inline const QVector<LineElementIdData>& getSphereLineElementIds() const { return lineElementIds; }
 
     MTimeStepRollsRenderData* getTimeStepRollsRenderData(
 #ifdef USE_QOPENGLWIDGET
@@ -249,6 +261,10 @@ private:
     int lastSphereTimeStep = std::numeric_limits<int>::lowest();
     uint32_t lastSphereSyncModeTrajectoryIndex = 0;
     float lastSphereRadius = std::numeric_limits<float>::lowest();
+    QVector<QVector4D> spherePositions;
+    QVector<QVector4D> entrancePoints;
+    QVector<QVector4D> exitPoints;
+    QVector<LineElementIdData> lineElementIds;
     MTimeStepSphereRenderData timeStepSphereRenderData;
     const QString timeStepSphereIndexBufferID =
             QString("timestepsphere_index_buffer_#%1").arg(getID());
