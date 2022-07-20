@@ -218,12 +218,13 @@ public:
         }
     }
 
-    inline QVector<uint32_t> getSelectedVariableIndices() const {
+    inline const QVector<uint32_t>& getSelectedVariableIndices() {
         if (diagram) {
-            return diagram->getSelectedVariableIndices();
+            this->selectedVariableIndices = diagram->getSelectedVariableIndices();
         } else {
-            return {};
+            this->selectedVariableIndices = {};
         }
+        return this->selectedVariableIndices;
     }
     inline void setSelectedVariableIndices(const QVector<uint32_t>& _selectedVariableIndices) {
         this->selectedVariableIndices = _selectedVariableIndices;

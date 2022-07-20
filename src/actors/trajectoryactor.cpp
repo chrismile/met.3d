@@ -3416,7 +3416,8 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
             }
             if (trajectoryPickerMap[sceneView]->getSelectedVariablesChanged())
             {
-                multiVarData.setSelectedVariables(trajectoryPickerMap[sceneView]->getSelectedVariableIndices());
+                multiVarData.setSelectedVariables(
+                        trajectoryPickerMap[sceneView]->getSelectedVariableIndices());
                 trajectoryRequests[t].bezierTrajectoriesMap[sceneView]->updateSelectedVariableIndices(
                         multiVarData.getSelectedVariableIndices());
                 trajectoryPickerMap[sceneView]->resetSelectedVariablesChanged();
