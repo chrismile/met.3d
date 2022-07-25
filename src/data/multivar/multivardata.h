@@ -232,6 +232,13 @@ private:
     bool shallReloadRollsShaderEffect = true;
 
     // Rendering modes.
+    QStringList renderingTechniques = {
+            "Oriented Color Bands"
+    };
+    QStringList focusRenderingTechniques = {
+            "None", "Tangent", "Great Circles", "Cross Section", "Pie Chart (Area)", "Pie Chart (Color)",
+            "Rolls"
+    };
     MultiVarRenderMode multiVarRenderMode = MultiVarRenderMode::ORIENTED_COLOR_BANDS;
     bool internalRepresentationChanged = false; ///< If multiVarRenderMode changes to other mode needing different data.
     MultiVarFocusRenderMode focusRenderMode = MultiVarFocusRenderMode::GREAT_CIRCLE;

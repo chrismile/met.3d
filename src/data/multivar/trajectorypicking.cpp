@@ -558,7 +558,10 @@ void MTrajectoryPicker::setBaseTrajectories(const MFilteredTrajectories& filtere
 void MTrajectoryPicker::setSyncMode(TrajectorySyncMode syncMode) {
     trajectorySyncMode = syncMode;
     selectedTrajectoriesChanged = true;
-    updateDiagramData();
+    if (diagram && diagram->getIsNanoVgInitialized())
+    {
+        updateDiagramData();
+    }
 }
 
 void MTrajectoryPicker::recreateTubeTriangleData()

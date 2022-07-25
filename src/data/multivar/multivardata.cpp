@@ -331,6 +331,11 @@ void MMultiVarData::saveConfiguration(QSettings *settings)
     settings->setValue(QString("useColorIntensityRolls"), useColorIntensityRolls);
     settings->setValue(QString("rollsWidth"), rollsWidth);
     settings->setValue(QString("mapRollsThickness"), mapRollsThickness);
+
+    // General settings.
+    settings->setValue(QString("targetVariableAndSensitivity"), targetVariableAndSensitivity);
+    settings->setValue(QString("multiVarRenderMode"), renderingTechniques.at(int(multiVarRenderMode)));
+    settings->setValue(QString("focusRenderMode"), focusRenderingTechniques.at(int(focusRenderMode)));
 }
 
 void MMultiVarData::loadConfiguration(QSettings *settings)
@@ -397,6 +402,26 @@ void MMultiVarData::loadConfiguration(QSettings *settings)
     useColorIntensityRolls = settings->value("useColorIntensityRolls", true).toBool();
     rollsWidth = settings->value("rollsWidth", 0.2f).toFloat();
     mapRollsThickness = settings->value("mapRollsThickness", true).toBool();
+
+    // General settings.
+    targetVariableAndSensitivity = settings->value("targetVariableAndSensitivity", false).toBool();
+    properties->mEnum()->setValue(targetVariableAndSensitivityProperty, targetVariableAndSensitivity);
+    QString multiVarRenderModeString = settings->value("multiVarRenderMode", "").toString();
+    QString focusRenderModeString = settings->value("focusRenderMode", "").toString();
+    for (int i = 0; i < renderingTechniques.size(); i++) {
+        const QString& renderingTechnique = renderingTechniques.at(i);
+        if (renderingTechnique == multiVarRenderModeString) {
+            multiVarRenderMode = MultiVarRenderMode(i);
+            properties->mEnum()->setValue(renderTechniqueProperty, int(multiVarRenderMode));
+        }
+    }
+    for (int i = 0; i < focusRenderingTechniques.size(); i++) {
+        const QString& focusRenderingTechnique = focusRenderingTechniques.at(i);
+        if (focusRenderingTechnique == focusRenderModeString) {
+            focusRenderMode = MultiVarFocusRenderMode(i);
+            properties->mEnum()->setValue(focusRenderTechniqueProperty, int(focusRenderMode));
+        }
+    }
 }
 
 

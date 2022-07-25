@@ -496,6 +496,7 @@ MTrajectoryActor::MTrajectoryActor()
             "Specifies whether to sync warm conveyor belt trajectories based on their ascension or height. "
             "The trajectories need to have the per-point attribute time_after_ascension for this to work.");
 
+    // analysisGroupProperty for old paper videos.
     useVariableToolTipProperty = addProperty(
             BOOL_PROPERTY, "use variable tool tip", multiVarGroupProperty);
     properties->mBool()->setValue(useVariableToolTipProperty, useVariableToolTip);
@@ -642,6 +643,10 @@ void MTrajectoryActor::saveConfiguration(QSettings *settings)
     settings->setValue(QString("diagramTextSize"), diagramTextSize);
     settings->setValue(QString("useCustomDiagramUpscalingFactor"), useCustomDiagramUpscalingFactor);
     settings->setValue(QString("diagramUpscalingFactor"), diagramUpscalingFactor);
+
+    settings->setValue(QString("trajectorySyncMode"), int(trajectorySyncMode));
+    settings->setValue(QString("syncModeTrajectoryIndex"), syncModeTrajectoryIndex);
+    settings->setValue(QString("particlePosTimeStep"), int(particlePosTimeStep));
 
     multiVarData.saveConfiguration(settings);
 
@@ -914,6 +919,41 @@ void MTrajectoryActor::loadConfiguration(QSettings *settings)
     trajectorySyncMode = TrajectorySyncMode(settings->value(
             "trajectorySyncMode", int(TrajectorySyncMode::TIMESTEP)).toInt());
     properties->mEnum()->setValue(trajectorySyncModeProperty, int(trajectorySyncMode));
+#ifdef USE_EMBREE
+    for (MTrajectoryPicker* trajectoryPicker : trajectoryPickerMap)
+    {
+        trajectoryPicker->setSyncMode(trajectorySyncMode);
+    }
+    for (int t = 0; t < (precomputedDataSource ? 1 : seedActorData.size()); t++)
+    {
+        for (auto& sceneView : trajectoryRequests[t].bezierTrajectoriesMap.keys())
+        {
+            trajectoryRequests[t].bezierTrajectoriesMap[sceneView]->setSyncMode(trajectorySyncMode);
+        }
+    }
+#endif
+
+    syncModeTrajectoryIndex = settings->value(
+            "syncModeTrajectoryIndex", syncModeTrajectoryIndex).toUInt();
+    if (settings->contains("particlePosTimeStep"))
+    {
+        particlePosTimeStep = settings->value("particlePosTimeStep", particlePosTimeStep).toInt();
+        properties->mEnum()->setValue(particlePosTimeProperty, particlePosTimeStep);
+        if (synchronizeParticlePosTime)
+        {
+            synchronizeParticlePosTime = false;
+            properties->mBool()->setValue(
+                    synchronizeParticlePosTimeProperty,
+                    synchronizeParticlePosTime);
+            updateTimeProperties();
+        }
+#ifdef USE_EMBREE
+        for (MTrajectoryPicker* trajectoryPicker : trajectoryPickerMap)
+        {
+            trajectoryPicker->setParticlePosTimeStep(particlePosTimeStep);
+        }
+#endif
+    }
 
     useVariableToolTip = settings->value("showMinMaxValue", true).toBool();
     properties->mBool()->setValue(useVariableToolTipProperty, useVariableToolTip);
@@ -1943,6 +1983,7 @@ void MTrajectoryActor::prepareAvailableDataForRendering(uint slot)
                     }
                     trajectoryRequests[slot].bezierTrajectoriesMap[view] = bezierTrajectoriesSource->getData(
                             trqi.bezierTrajectoriesRequests[view].request);
+                    trajectoryRequests[slot].bezierTrajectoriesMap[view]->setSyncMode(trajectorySyncMode);
                     trajectoryRequests[slot].bezierTrajectoriesRenderDataMap[view] =
                             trajectoryRequests[slot].bezierTrajectoriesMap[view]->getRenderData();
                     trajectoryRequests[slot].timeStepSphereRenderDataMap[view] =
@@ -1961,6 +2002,7 @@ void MTrajectoryActor::prepareAvailableDataForRendering(uint slot)
                         multiVarData.setDiagramType(diagramType);
                         trajectoryPickerMap[view]->setSelectedVariableIndices(multiVarData.getSelectedVariableIndices());
                         trajectoryPickerMap[view]->updateTrajectoryRadius(tubeRadius);
+                        trajectoryPickerMap[view]->setSyncMode(trajectorySyncMode);
                         trajectoryPickerMap[view]->setParticlePosTimeStep(particlePosTimeStep);
                         trajectoryPickerMap[view]->setDiagramType(diagramType);
                         trajectoryPickerMap[view]->setSimilarityMetric(similarityMetric);
