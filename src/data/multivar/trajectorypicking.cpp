@@ -1016,6 +1016,7 @@ bool MTrajectoryPicker::toolTipPick(MSceneViewGLWidget* sceneView, const QPoint 
     QVector3D firstHitPoint;
     uint32_t trajectoryIndex = 0;
     float timeAtHit = 0.0f;
+    float timeAtHitReal = 0.0f;
     QString varName;
     float varFraction = 0.0f;
 
@@ -1106,14 +1107,18 @@ bool MTrajectoryPicker::toolTipPick(MSceneViewGLWidget* sceneView, const QPoint 
 
         if (trajectorySyncMode == TrajectorySyncMode::TIME_OF_ASCENT)
         {
-            //timeAtHit = timeAtHit + float(maxAscentTimeStepIndex - ascentTimeStepIndices.at(trajectoryIndex));
-            timeAtHit = timeAtHit + float(-ascentTimeStepIndices.at(trajectoryIndex));
+            //timeAtHitReal = timeAtHit + float(-ascentTimeStepIndices.at(trajectoryIndex));
+        }
+        else
+        {
+            //timeAtHitReal = timeAtHit;
         }
     }
     else
     {
         trajectoryIndex = cachedLineElementIds.at(int(querySphere.hit.primID)).lineId;
         timeAtHit = cachedLineElementIds.at(int(querySphere.hit.primID)).centerIdx;
+        //timeAtHitReal = timeAtHit;
     }
 
     if (!highlightedTrajectories.empty()
