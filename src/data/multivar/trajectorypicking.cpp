@@ -1389,6 +1389,7 @@ void MTrajectoryPicker::setParticlePosTimeStep(int newTimeStep)
         uint32_t trajectoryIndex = it.first;
         const MFilteredTrajectory& trajectory = baseTrajectories.at(int(trajectoryIndex));
         QVector<float> values;
+
         for (size_t i = 0; i < numVars; i++)
         {
             int time = clamp(timeStep, 0, int(trajectory.attributes.at(int(i)).size()) - 1);

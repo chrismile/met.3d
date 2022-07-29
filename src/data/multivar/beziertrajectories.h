@@ -75,6 +75,8 @@ public:
     {
         float startIndex;
         QVector2D minMax;
+        bool sensitivity;
+        QVector<QVector2D> minMaxSens;
         float dummy;
     };
 
@@ -114,6 +116,7 @@ struct MBezierTrajectoriesRenderData
      * For horizon graph diagram.
      */
     GL::MShaderStorageBufferObject* lineSelectedArrayBuffer = nullptr;
+    GL::MShaderStorageBufferObject* varOutputParameterIdxBuffer = nullptr;
 };
 
 struct MTimeStepSphereRenderData
@@ -163,7 +166,7 @@ public:
     MBezierTrajectories(
             MDataRequest requestToReferTo, const MFilteredTrajectories& filteredTrajectories,
             const QVector<int>& trajIndicesToFilteredIndicesMap,
-            unsigned int numVariables, const QStringList& auxDataVarNames);
+            unsigned int numSens, unsigned int numAux, unsigned int numVariables, const QStringList& auxDataVarNames, const QStringList& outputParameterNames);
     ~MBezierTrajectories() override;
 
     unsigned int getMemorySize_kb() override;
@@ -199,6 +202,7 @@ public:
     void updateSelectedVariableIndices(const QVector<uint32_t>& selectedVariableIndices);
     void updateDivergingVariables(const QVector<uint32_t>& varDiverging);
     void updateSelectedLines(const QVector<uint32_t>& selectedLines);
+    void updateOutputParameterIdx(const int OutputParameterIdx);
 
     // Used for aligning warm conveyor belt trajectories based on their ascension.
     void setSyncMode(TrajectorySyncMode syncMode);
@@ -313,6 +317,8 @@ private:
     QVector<int> trajIndicesToFilteredIndicesMap;
     int numTrajectories = 0;
     uint32_t numVariables = 0;
+    uint32_t numAux = 0;
+    uint32_t numTimesteps = 0;
     bool useFiltering = false;
     int numFilteredTrajectories = 0;
     GLsizei* trajectorySelectionCount = nullptr;
@@ -321,6 +327,9 @@ private:
     QVector<QVector2D> minMaxAttributes;
     QVector<uint32_t> lineIndicesCache;
     QVector<QVector3D> vertexPositionsCache;
+
+    QVector<uint32_t> OutputParameterIdx;
+//    int selectedOutputParameterIdx = 0;
 
     const QString indexBufferID =
             QString("beziertrajectories_index_buffer_#%1").arg(getID());
@@ -350,6 +359,8 @@ private:
             QString("beziertrajectories_var_diverging_array_buffer_#%1").arg(getID());
     const QString lineSelectedArrayBufferID =
             QString("beziertrajectories_line_selected_array_buffer_#%1").arg(getID());
+    const QString varOutputParameterIdxBufferID =
+            QString("beziertrajectories_var_outputparameter_buffer_#%1").arg(getID());
 };
 
 }

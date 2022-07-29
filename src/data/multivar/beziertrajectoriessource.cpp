@@ -97,24 +97,19 @@ MBezierTrajectories *MBezierTrajectoriesSource::produceData(MDataRequest request
     int numTrajectories = inTrajectories->getNumTrajectories();
     int numTimeStepsPerTrajectory = inTrajectories->getNumTimeStepsPerTrajectory();
     QVector<QVector3D> vertices = inTrajectories->getVertices();
-    const uint32_t numVariablesReal = inTrajectories->getAuxDataVarNames().size();
+    const uint32_t numSens = inTrajectories->getSensDataVarNames().size();
+    const uint32_t numAux = inTrajectories->getAuxDataVarNames().size();
+    const uint32_t numVariablesReal = numAux + numSens;
     uint32_t numVariables = numVariablesReal + 1;
     //const uint32_t numVariables = std::max(numVariablesReal, uint32_t(1));
     this->numVariables = numVariables;
 
     const QStringList& auxDataVarNames = inTrajectories->getAuxDataVarNames();
-    bool hasSensitivityData = false;
-    QVector<int> sensitivityIndices;
-    int auxVarIdx = 0;
-    for (const QString& varName : auxDataVarNames)
-    {
-        if (varName.startsWith('d') && varName != "deposition")
-        {
-            hasSensitivityData = true;
-            sensitivityIndices.push_back(auxVarIdx + 1);
-        }
-        auxVarIdx++;
-    }
+    const QStringList& sensDataVarNames = inTrajectories->getSensDataVarNames();
+    const QStringList& outputParameterNames = inTrajectories->getOutputParameterNames();
+    const uint32_t numOutputParameters = outputParameterNames.size();
+    this->numOutputParameters = numOutputParameters;
+    bool hasSensitivityData = (numSens > 0);
 
     for (int i = 0; i < numTrajectories; i++)
     {
@@ -127,12 +122,12 @@ MBezierTrajectories *MBezierTrajectoriesSource::produceData(MDataRequest request
         }
 
         MFilteredTrajectory filteredTrajectory;
-        filteredTrajectory.attributes.resize(int(numVariables) + (hasSensitivityData ? 1 : 0));
+        filteredTrajectory.attributes.resize(int(numAux + 1) + (hasSensitivityData ? (1 + numSens) : 0));
 
         QVector3D prevPoint(M_INVALID_TRAJECTORY_POS, M_INVALID_TRAJECTORY_POS, M_INVALID_TRAJECTORY_POS);
         for (int t = 0; t < numTimeStepsPerTrajectory; t++)
         {
-            QVector3D point = vertices.at(baseIndex+t);
+            QVector3D point = vertices.at(baseIndex + t);
 
             if (point.z() == M_INVALID_TRAJECTORY_POS)
             {
@@ -141,8 +136,7 @@ MBezierTrajectories *MBezierTrajectoriesSource::produceData(MDataRequest request
                         std::numeric_limits<float>::quiet_NaN(),
                         std::numeric_limits<float>::quiet_NaN(),
                         std::numeric_limits<float>::quiet_NaN()));
-            }
-            else
+            } else
             {
                 // Use pressure as attribute if no auxiliary data is available.
                 filteredTrajectory.attributes[0].push_back(point.z());
@@ -160,24 +154,28 @@ MBezierTrajectories *MBezierTrajectoriesSource::produceData(MDataRequest request
             //    continue;
             //}
 
-            if (numVariablesReal > 0)
+            if (numAux > 0)
             {
-                QVector<float> vertexAttributes = inTrajectories->getAuxDataAtVertex(baseIndex+t);
-                for (uint32_t j = 0; j < numVariablesReal; j++)
+                QVector<float> vertexAttributes = inTrajectories->getAuxDataAtVertex(baseIndex + t);
+                for (uint32_t j = 0; j < numAux; j++)
                 {
                     filteredTrajectory.attributes[j + 1].push_back(vertexAttributes.at(j));
                 }
             }
-            //else
-            //{
-            //    // Use pressure as attribute if no auxiliary data is available.
-            //    for (uint32_t j = 0; j < numVariables; j++)
-            //    {
-            //        filteredTrajectory.attributes[j].push_back(point.z());
-            //    }
-            //}
-
-            //prevPoint = point;
+        }
+        if (numSens > 0)
+        {
+            for (uint32_t p = 0; p < numOutputParameters; p++)
+            {
+                for (int t = 0; t < numTimeStepsPerTrajectory; t++)
+                {
+                    QVector<float> vertexAttributes = inTrajectories->getSensDataAtVertex(p, baseIndex + t);
+                    for (uint32_t j = 0; j < numSens; j++)
+                    {
+                        filteredTrajectory.attributes[j + numAux + 1].push_back(vertexAttributes.at(j));
+                    }
+                }
+            }
         }
 
         if (filteredTrajectory.positions.size() >= 2)
@@ -198,12 +196,15 @@ MBezierTrajectories *MBezierTrajectoriesSource::produceData(MDataRequest request
         for (int trajectoryIdx = 0; trajectoryIdx < filteredTrajectories.size(); trajectoryIdx++)
         {
             MFilteredTrajectory& filteredTrajectory = filteredTrajectories[trajectoryIdx];
-            for (int timeStepIdx = 0; timeStepIdx < numTimeStepsPerTrajectory; timeStepIdx++)
+            for (uint32_t p = 0; p < numOutputParameters; p++)
             {
-                for (int varIdx : sensitivityIndices)
+                for (int timeStepIdx = 0; timeStepIdx < numTimeStepsPerTrajectory; timeStepIdx++)
                 {
-                    float& sensitivityValue = filteredTrajectory.attributes[varIdx][timeStepIdx];
-                    sensitivityValue = std::abs(sensitivityValue);
+                    for (uint32_t j = 0; j < numSens; j++)
+                    {
+                        float &sensitivityValue = filteredTrajectory.attributes[j + numAux + 1][timeStepIdx + numTimeStepsPerTrajectory * p];
+                        sensitivityValue = std::abs(sensitivityValue);
+                    }
                 }
             }
         }
@@ -213,29 +214,31 @@ MBezierTrajectories *MBezierTrajectoriesSource::produceData(MDataRequest request
     {
         for (int trajectoryIdx = 0; trajectoryIdx < filteredTrajectories.size(); trajectoryIdx++)
         {
-            MFilteredTrajectory& filteredTrajectory = filteredTrajectories[trajectoryIdx];
-            QVector<float>& maxSensitivityAttributes = filteredTrajectory.attributes.back();
-            maxSensitivityAttributes.reserve(numTimeStepsPerTrajectory);
-            for (int timeStepIdx = 0; timeStepIdx < numTimeStepsPerTrajectory; timeStepIdx++)
+            MFilteredTrajectory &filteredTrajectory = filteredTrajectories[trajectoryIdx];
+            QVector<float> &maxSensitivityAttributes = filteredTrajectory.attributes.back();
+            maxSensitivityAttributes.reserve(inTrajectories->getOutputParameters().size() * numTimeStepsPerTrajectory);
+            // TODO: Max senstivity for different output parameters
+            for (int paramIdx = 0; paramIdx < numOutputParameters; paramIdx++)
             {
-                bool hasValidData = false;
-                float maxSensitivity = 0.0f;
-                for (int varIdx : sensitivityIndices)
+                for (int timeStepIdx = 0; timeStepIdx < numTimeStepsPerTrajectory; timeStepIdx++)
                 {
-                    float sensitivityValue = filteredTrajectory.attributes.at(varIdx).at(timeStepIdx);
-                    if (!std::isnan(sensitivityValue))
+                    bool hasValidData = false;
+                    float maxSensitivity = 0.0f;
+                    for (uint32_t j = 0; j < numSens; j++)
                     {
-                        if (std::abs(sensitivityValue) > std::abs(maxSensitivity))
-                        {
-                            maxSensitivity = sensitivityValue;
+                        float sensitivityValue = filteredTrajectory.attributes.at(j + numAux + 1).at(timeStepIdx + paramIdx * numTimeStepsPerTrajectory);
+                        if (!std::isnan(sensitivityValue)) {
+                            if (std::abs(sensitivityValue) > std::abs(maxSensitivity)) {
+                                maxSensitivity = sensitivityValue;
+                            }
+                            hasValidData = true;
                         }
-                        hasValidData = true;
                     }
+                    if (!hasValidData) {
+                        maxSensitivity = std::numeric_limits<float>::quiet_NaN();
+                    }
+                    maxSensitivityAttributes.push_back(maxSensitivity);
                 }
-                if (!hasValidData) {
-                    maxSensitivity = std::numeric_limits<float>::quiet_NaN();
-                }
-                maxSensitivityAttributes.push_back(maxSensitivity);
             }
         }
     }
@@ -262,32 +265,61 @@ MBezierTrajectories *MBezierTrajectoriesSource::produceData(MDataRequest request
 
     uint32_t lineOffset = 0;
     uint32_t lineID = 0;
-
     for (const auto& trajectory : filteredTrajectories)
     {
         uint32_t varOffsetPerLine = 0;
 
-        for (uint32_t v = 0; v < numVariables; ++v)
+        for (uint32_t v = 0; v <= numAux; ++v)
         {
             MBezierTrajectory::VarDesc varDescPerLine = {0};
             varDescPerLine.minMax = QVector2D(
                     std::numeric_limits<float>::max(), std::numeric_limits<float>::lowest());
+            varDescPerLine.sensitivity = false;
             varDescPerLine.startIndex = float(varOffsetPerLine);
             varDescPerLine.dummy = 0.0f;
 
             const QVector<float>& variableArray = trajectory.attributes[v];
-
             for (const auto &variable : variableArray)
             {
-                attributesMinMax[v].setX(std::min(attributesMinMax[v].x(), variable));
-                attributesMinMax[v].setY(std::max(attributesMinMax[v].y(), variable));
-
                 varDescPerLine.minMax.setX(std::min(varDescPerLine.minMax.x(), variable));
                 varDescPerLine.minMax.setY(std::max(varDescPerLine.minMax.y(), variable));
 
                 multiVarData[lineID].push_back(variable);
             }
+            lineMultiVarDescs[lineID].push_back(varDescPerLine);
+            varOffsetPerLine += variableArray.size();
 
+        }
+
+        for (uint32_t v = numAux + 1; v < numVariables; ++v)
+        {
+            MBezierTrajectory::VarDesc varDescPerLine = {0};
+            varDescPerLine.sensitivity = true;
+            varDescPerLine.minMaxSens.resize(numOutputParameters);
+            for (auto &vec: varDescPerLine.minMaxSens)
+            {
+                vec = QVector2D(std::numeric_limits<float>::max(), std::numeric_limits<float>::lowest());
+            }
+
+            varDescPerLine.minMax = QVector2D(
+                    std::numeric_limits<float>::max(), std::numeric_limits<float>::lowest());
+            varDescPerLine.startIndex = float(varOffsetPerLine);
+            varDescPerLine.dummy = 0.0f;
+
+            const QVector<float> &variableArray = trajectory.attributes[v];
+            const uint64_t numVariablesArray = variableArray.size() / numOutputParameters;
+            for (uint32_t paramIdx = 0; paramIdx < numOutputParameters; paramIdx++)
+            {
+                const QVector<float> &variableArray = trajectory.attributes[v];
+                const uint64_t numVariablesArray = variableArray.size() / numOutputParameters;
+                for (uint32_t varIdx = 0; varIdx < numVariablesArray; varIdx++)
+                {
+                    const auto &variable = variableArray[varIdx + paramIdx * numVariablesArray];
+                    varDescPerLine.minMaxSens[paramIdx].setX(std::min(varDescPerLine.minMaxSens[paramIdx].x(), variable));
+                    varDescPerLine.minMaxSens[paramIdx].setY(std::max(varDescPerLine.minMaxSens[paramIdx].y(), variable));
+                    multiVarData[lineID].push_back(variable);
+                }
+            }
             lineMultiVarDescs[lineID].push_back(varDescPerLine);
             varOffsetPerLine += variableArray.size();
         }
@@ -301,8 +333,8 @@ MBezierTrajectories *MBezierTrajectoriesSource::produceData(MDataRequest request
 
     MBezierTrajectories* newTrajectories = new MBezierTrajectories(
             inTrajectories->getGeneratingRequest(),
-            filteredTrajectories, indicesToFilteredIndicesMap, numVariables,
-            auxDataVarNames);
+            filteredTrajectories, indicesToFilteredIndicesMap, numSens, numAux, numVariables,
+            auxDataVarNames, outputParameterNames);
 
     for (int32_t traj = 0; traj < int(filteredTrajectories.size()); ++traj)
     {

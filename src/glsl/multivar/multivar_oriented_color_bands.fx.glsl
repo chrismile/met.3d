@@ -132,7 +132,8 @@ shader GSmain(in VSOutput inputs[], out FSInput outputs) {
         float variableValue;
         vec2 variableMinMax;
         const uint actualVarID = sampleActualVarID(varID);
-        sampleVariableFromLineSSBO(inputs[0].vLineID, actualVarID, inputs[0].vElementID, variableValue, variableMinMax);
+        const uint sensitivityOffset = sampleSensitivityOffset(actualVarID);
+        sampleVariableFromLineSSBO(inputs[0].vLineID, actualVarID, inputs[0].vElementID, sensitivityOffset, variableValue, variableMinMax);
 
         // 2) Normalize value.
         variableValue = clamp((variableValue - variableMinMax.x) / (variableMinMax.y - variableMinMax.x), 0.0, 1.0);
@@ -161,7 +162,8 @@ shader GSmain(in VSOutput inputs[], out FSInput outputs) {
         float variableValue;
         vec2 variableMinMax;
         const uint actualVarID = sampleActualVarID(varID);
-        sampleVariableFromLineSSBO(inputs[0].vLineID, actualVarID, inputs[0].vElementID, variableValue, variableMinMax);
+        const uint sensitivityOffset = sampleSensitivityOffset(actualVarID);
+        sampleVariableFromLineSSBO(inputs[0].vLineID, actualVarID, inputs[0].vElementID, sensitivityOffset, variableValue, variableMinMax);
 
         // 2) Normalize values.
         variableValue = clamp((variableValue - variableMinMax.x) / (variableMinMax.y - variableMinMax.x), 0.0, 1.0);
@@ -320,8 +322,9 @@ shader FSmain(in FSInput inputs, out vec4 fragColor) {
         float variableValue, variableNextValue;
         vec2 variableMinMax, variableNextMinMax;
         const uint actualVarID = sampleActualVarID(varID);
-        sampleVariableFromLineSSBO(inputs.fragLineID, actualVarID, inputs.fragElementID, variableValue, variableMinMax);
-        sampleVariableFromLineSSBO(inputs.fragLineID, actualVarID, inputs.fragElementNextID, variableNextValue, variableNextMinMax);
+        const uint sensitivityOffset = sampleSensitivityOffset(actualVarID);
+        sampleVariableFromLineSSBO(inputs.fragLineID, actualVarID, inputs.fragElementID, sensitivityOffset, variableValue, variableMinMax);
+        sampleVariableFromLineSSBO(inputs.fragLineID, actualVarID, inputs.fragElementNextID, sensitivityOffset, variableNextValue, variableNextMinMax);
 
         // 1.2) Normalize values.
         variableValue = clamp((variableValue - variableMinMax.x) / (variableMinMax.y - variableMinMax.x), 0.0, 1.0);
@@ -361,8 +364,9 @@ shader FSmain(in FSInput inputs, out vec4 fragColor) {
     float variableValue, variableNextValue;
     vec2 variableMinMax, variableNextMinMax;
     const uint actualVarID = sampleActualVarID(varID);
-    sampleVariableFromLineSSBO(inputs.fragLineID, actualVarID, inputs.fragElementID, variableValue, variableMinMax);
-    sampleVariableFromLineSSBO(inputs.fragLineID, actualVarID, inputs.fragElementNextID, variableNextValue, variableNextMinMax);
+    const uint sensitivityOffset = sampleSensitivityOffset(actualVarID);
+    sampleVariableFromLineSSBO(inputs.fragLineID, actualVarID, inputs.fragElementID, sensitivityOffset, variableValue, variableMinMax);
+    sampleVariableFromLineSSBO(inputs.fragLineID, actualVarID, inputs.fragElementNextID, sensitivityOffset, variableNextValue, variableNextMinMax);
 
     // 3) Normalize values
     //variableValue = (variableValue - variableMinMax.x) / (variableMinMax.y - variableMinMax.x);

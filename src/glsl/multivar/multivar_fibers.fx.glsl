@@ -287,8 +287,9 @@ shader FSmain(out vec4 fragColor) {
 
 //
 //    // 2) Sample variables from buffers
-    sampleVariableFromLineSSBO(fragLineID, varID, fragElementID, variableValue, variableMinMax);
-    sampleVariableFromLineSSBO(fragLineID, varID, fragElementNextID, variableNextValue, variableNextMinMax);
+    const uint sensitivityOffset = sampleSensitivityOffset(varID);
+    sampleVariableFromLineSSBO(fragLineID, varID, fragElementID, sensitivityOffset, variableValue, variableMinMax);
+    sampleVariableFromLineSSBO(fragLineID, varID, fragElementNextID, sensitivityOffset, variableNextValue, variableNextMinMax);
 //
 //    // 3) Normalize values
     //variableValue = (variableValue - variableMinMax.x) / (variableMinMax.y - variableMinMax.x);

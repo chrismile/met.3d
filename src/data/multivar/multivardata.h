@@ -115,6 +115,9 @@ public:
 
     inline bool getShowTargetVariableAndSensitivity() const { return targetVariableAndSensitivity; }
 
+    inline bool getSelectedOutputParameterChanged() const { return selectedOutputParameterChanged; }
+    inline void resetSelectedOutputParameterChanged() { selectedOutputParameterChanged = false; }
+
     inline bool getVarDivergingChanged() const { return varDivergingChanged; }
     inline void resetVarDivergingChanged() { varDivergingChanged = false; }
     inline const QVector<uint32_t>& getVarDiverging() { return varDiverging; }
@@ -160,12 +163,16 @@ public:
     void onActorDeleted(MActor *actor);
     void onActorRenamed(MActor *actor, QString oldName);
 
+    QString getOutputParameterName() { return selectedOutputParameter; }
+    int getOutputParameterIdx() { return properties->mEnum()->value(outputParameterProperty); }
+
 public slots:
     void transferFunctionChanged(MTransferFunction1D *tf);
 
 private:
     void setPropertiesRenderingSettings();
     void setPropertiesVarSelected();
+    void setPropertiesOutputParameter();
     void reloadShaderEffect();
     void reloadSphereShaderEffect();
     void reloadRollsShaderEffect();
@@ -183,6 +190,7 @@ private:
     QtProperty *bandBackgroundColorProperty;
     QtProperty *separatorWidthProperty;
     QtProperty *useColorIntensityProperty;
+    QtProperty *outputParameterProperty;
 
     QVector<QString> varNames;
     MMultiVarTf multiVarTf;
@@ -213,6 +221,8 @@ private:
     // Show target variable and maximum sensitivity.
     QtProperty *targetVariableAndSensitivityProperty;
     bool targetVariableAndSensitivity = false;
+
+    bool selectedOutputParameterChanged = false;
 
     bool varDivergingChanged = false;
     QVector<uint32_t> varDiverging;
@@ -255,6 +265,7 @@ private:
 
     // Multi-variable settings.
     //std::vector<glm::vec4> varColors;
+    QString selectedOutputParameter;
     int32_t numVariablesSelected = 0;
     int32_t maxNumVariables = 0;
     int32_t numLineSegments = 8;
@@ -280,6 +291,9 @@ private:
     float materialConstantSpecularExp = 8.0f;
     bool drawHalo = true;
     float haloFactor = 1.0f;
+
+
+    QStringList outputParameterNamesAvailable;
 };
 
 }

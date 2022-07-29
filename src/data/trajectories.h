@@ -270,6 +270,12 @@ public:
       the internal QVector-based auxiliary data array.
      */
     void copyAuxDataPerVertex(float *auxData, int iIndexAuxData);
+    void copySensDataPerVertex(float *sensData, int iIndexSensData, int numOutputParameters);
+
+    /**
+      Copy the output parameter ids for the sensitivities and store the corresponding names.
+     */
+    void copyOutputParameter(const uint32_t *outputParameters, const uint32_t numOutputParameters);
 
     /**
       Copy auxiliary data from the QVector-array that is filled during the
@@ -278,11 +284,17 @@ public:
      */
     void copyAuxDataPerVertex(QVector<QVector<QVector<float>>>
                               &auxDataAtVertices);
-
+    void copySensDataPerVertex(QVector<QVector<QVector<QVector<float>>>>
+                              &sensDataAtVertices);
     /**
       Copy the names of the auxiliary data variables.
      */
     void setAuxDataVariableNames(QStringList varNames);
+
+    /**
+      Copy the names of the sensitivity data variables.
+     */
+    void setSensDataVariableNames(QStringList varNames);
 
     /**
       Get auxiliary data, size of auxiliary data array and names
@@ -291,10 +303,22 @@ public:
     const QVector<float>& getAuxDataAtVertex(int i) const
     { return auxDataAtVertices[i]; }
 
+    const QVector<float>& getSensDataAtVertex(int i, int j) const
+    { return sensDataAtVertices[i][j]; }
+
     unsigned int getSizeOfAuxDataAtVertices() const
     { return auxDataAtVertices.size(); }
 
+    unsigned int getSizeOfSensDataAtVertices() const
+    { return sensDataAtVertices.size(); }
+
     QStringList getAuxDataVarNames() const { return auxDataVarNames; }
+    QStringList getSensDataVarNames() const { return sensDataVarNames; }
+    QVector<uint32_t> getOutputParameters() const { return outputParameters; }
+    QStringList getOutputParameterNames() const { return outputParameterNames; }
+
+//    QString getOutputParameterName() { return selectedOutputParameter; }
+//    int getOutputParameterIdx() { return properties->mEnum()->value(outputParameterProperty); }
 
     /**
       Returns the length of a single time step in seconds.
@@ -347,6 +371,7 @@ public:
      */
     GL::MVertexBuffer *getAuxDataVertexBuffer(
             QString requestedAuxDataVarName,
+            QString requestedOutputParameterName = "",
 #ifdef USE_QOPENGLWIDGET
             QOpenGLWidget *currentGLContext = nullptr);
 #else
@@ -370,8 +395,48 @@ private:
     QVector<QVector3D> vertices;
     QVector<QVector<float>> auxDataAtVertices;
     QStringList auxDataVarNames;
+    QVector<QVector<QVector<float>>> sensDataAtVertices;
+    QStringList sensDataVarNames;
+    QVector<uint32_t> outputParameters;
+    QStringList outputParameterNames;
 
     std::shared_ptr<MStructuredGrid> startGrid;
+
+    QStringList outputParameterNamesList = {
+            "pressure",
+            "T",
+            "w",
+            "S",
+            "QC",
+            "QR",
+            "QV",
+            "NCCLOUD",
+            "NCRAIN",
+            "QI",
+            "NCICE",
+            "QS",
+            "NCSNOW",
+            "QG",
+            "NCGRAUPEL",
+            "QH",
+            "NCHAIL",
+            "QI_OUT",
+            "QS_OUT",
+            "QR_OUT",
+            "QG_OUT",
+            "QH_OUT",
+            "latent_heat",
+            "latent_cool",
+            "NI_OUT",
+            "NS_OUT",
+            "NR_OUT",
+            "NG_OUT",
+            "NH_OUT",
+            "z",
+            "Inactive",
+            "deposition",
+            "sublimination"
+    };
 
 };
 

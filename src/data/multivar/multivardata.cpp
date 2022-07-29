@@ -153,12 +153,16 @@ void MMultiVarData::setProperties(MActor *actor, MQtProperties *properties, QtPr
             GROUP_PROPERTY, "rendering settings", multiVarGroupProperty);
     setPropertiesRenderingSettings();
 
+    outputParameterProperty = addProperty(
+            ENUM_PROPERTY, "sensitivity for Parameter", multiVarGroupProperty);
+    outputParameterProperty->setToolTip(
+            "Specifies for which output parameter the sensitivities are shown, such as QV, QC, QR, or latent_heat.");
+    outputParameterProperty->setEnabled(false);
 
     // --- Group: Selected variables ---
     selectedVariablesGroupProperty = addProperty(
             GROUP_PROPERTY, "selected variables", multiVarGroupProperty);
     selectedVariablesGroupProperty->setEnabled(false);
-
 
     updateModeEnabledProperties();
 }
@@ -258,6 +262,16 @@ void MMultiVarData::setPropertiesVarSelected()
         selectedVariablesProperties.push_back(variableProperty);
         propertyList.push_back(variableProperty);
     }
+}
+
+
+void MMultiVarData::setPropertiesOutputParameter()
+{
+    outputParameterProperty->setEnabled(true);
+    properties->mEnum()->setEnumNames(outputParameterProperty, outputParameterNamesAvailable);
+    properties->mEnum()->setValue(outputParameterProperty, 0);
+    propertyList.push_back(outputParameterProperty);
+    selectedOutputParameterChanged = true;
 }
 
 
@@ -745,7 +759,12 @@ void MMultiVarData::onQtPropertyChanged(QtProperty *property)
     {
         haloFactor = float(properties->mDDouble()->value(haloFactorProperty));
     }
-
+    else if (property == outputParameterProperty)
+    {
+        const auto idx = properties->mEnum()->value(outputParameterProperty);
+        selectedOutputParameter = properties->mEnum()->enumNames(outputParameterProperty)[idx];
+        selectedOutputParameterChanged = true;
+    }
     // --- Group: Selected variables ---
     else if (selectedVariablesProperties.contains(property))
     {
@@ -764,7 +783,6 @@ void MMultiVarData::onQtPropertyChanged(QtProperty *property)
         }
     }
 
-
     if (propertyList.contains(property))
     {
         updateModeEnabledProperties();
@@ -775,18 +793,16 @@ void MMultiVarData::onQtPropertyChanged(QtProperty *property)
 void MMultiVarData::onBezierTrajectoriesLoaded(MTrajectories* trajectories)
 {
     const QStringList& auxDataVarNames = trajectories->getAuxDataVarNames();
+    const QStringList& sensDataVarNames = trajectories->getSensDataVarNames();
+//    const QVector<uint32_t>& outputParameterIDs = trajectories->getOutputParameters();
     //int numTrajectories = trajectories->getNumTrajectories();
 
     QStringList varNamesLoaded = auxDataVarNames;
     varNamesLoaded.push_front("Pressure");
-    bool hasSensitivityData = false;
-    for (QString& varName : varNamesLoaded)
+    bool hasSensitivityData = (sensDataVarNames.size() > 0);
+    for (const QString& varName : sensDataVarNames)
     {
-        if (varName.startsWith('d') && varName != "deposition")
-        {
-            hasSensitivityData = true;
-            break;
-        }
+        varNamesLoaded.push_back(varName);
     }
     if (hasSensitivityData)
     {
@@ -802,11 +818,17 @@ void MMultiVarData::onBezierTrajectoriesLoaded(MTrajectories* trajectories)
         }
         maxNumVariables = varNamesLoaded.size();
         initTransferFunctionsMultiVar(maxNumVariables);
+        this->outputParameterNamesAvailable = trajectories->getOutputParameterNames();
+//        this->outputParameterNamesAvailable.clear();
+//        for (const auto &idx : outputParameterIDs) {
+//            this->outputParameterNamesAvailable.push_back(outputParameterNames[idx]);
+//        }
 
         selectedVariableIndices.clear();
         selectedVariableIndices.push_back(0);
         updateNumVariablesSelected();
         setPropertiesVarSelected();
+        setPropertiesOutputParameter();
     }
     else
     {

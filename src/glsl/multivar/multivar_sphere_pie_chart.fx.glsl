@@ -153,7 +153,8 @@ shader FSmain(in VSOutput inputs, out vec4 fragColor)
         float variableValue;
         vec2 variableMinMax;
         const uint actualVarID = sampleActualVarID(varID);
-        sampleVariableFromLineSSBO(fragmentLineID, actualVarID, fragElementID, variableValue, variableMinMax);
+        const uint sensitivityOffset = sampleSensitivityOffset(actualVarID);
+        sampleVariableFromLineSSBO(fragmentLineID, actualVarID, fragElementID, sensitivityOffset, variableValue, variableMinMax);
 
         // 1.2) Normalize values.
         variableValue = clamp((variableValue - variableMinMax.x) / (variableMinMax.y - variableMinMax.x), 0.0, 1.0);
@@ -190,7 +191,8 @@ shader FSmain(in VSOutput inputs, out vec4 fragColor)
     float variableValue;
     vec2 variableMinMax;
     const uint actualVarID = sampleActualVarID(varID);
-    sampleVariableFromLineSSBO(fragmentLineID, actualVarID, fragElementID, variableValue, variableMinMax);
+    const uint sensitivityOffset = sampleSensitivityOffset(actualVarID);
+    sampleVariableFromLineSSBO(fragmentLineID, actualVarID, fragElementID, sensitivityOffset, variableValue, variableMinMax);
     variableValue = variableMinMax.y;
 #endif
 
@@ -201,7 +203,8 @@ shader FSmain(in VSOutput inputs, out vec4 fragColor)
     const int varID = int(floor(angle * numVariables));
     float bandPos = angle * numVariables - float(varID);
     const uint actualVarID = sampleActualVarID(varID);
-    sampleVariableFromLineSSBO(fragmentLineID, actualVarID, fragElementID, variableValue, variableMinMax);
+    const uint sensitivityOffset = sampleSensitivityOffset(actualVarID);
+    sampleVariableFromLineSSBO(fragmentLineID, actualVarID, fragElementID, sensitivityOffset, variableValue, variableMinMax);
 #endif
 
     // 4) Determine variable color

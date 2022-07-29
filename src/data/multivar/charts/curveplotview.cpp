@@ -237,6 +237,7 @@ void MCurvePlotView::setData(
     targetVarIdx = std::numeric_limits<uint32_t>::max();
     for (size_t varIdx = 0; varIdx < numVariables; varIdx++) {
         const std::string& varName = variableNamesNew.at(varIdx);
+        // TODO: Change with selected parameter
         if (varName == "QR") {
             targetVarIdx = varIdx;
         }

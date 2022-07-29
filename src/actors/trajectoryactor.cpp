@@ -363,7 +363,6 @@ MTrajectoryActor::MTrajectoryActor()
     diagramTransferFunctionProperty->setToolTip(
             "This transfer function is used in the chart to map a trajectory attribute to a color.");
 
-
     similarityMetricGroup = addProperty(
             GROUP_PROPERTY, "similarity metric settings", multiVarGroupProperty);
 
@@ -722,7 +721,6 @@ void MTrajectoryActor::loadConfiguration(QSettings *settings)
         // Display warning and load rest of the configuration.
         if (!dataSourceAvailable)
         {
-
             QMessageBox msgBox;
             msgBox.setIcon(QMessageBox::Warning);
             msgBox.setText(QString("Trajectory actor '%1':\n"
@@ -1896,7 +1894,7 @@ void MTrajectoryActor::prepareAvailableDataForRendering(uint slot)
 
             // Get vertex buffer for auxiliary data along trajectories.
             trajectoryRequests[slot].requestAuxVertexBuffer(
-                        properties->getEnumItem(renderAuxDataVarProperty));
+                        properties->getEnumItem(renderAuxDataVarProperty), multiVarData.getOutputParameterName());
 
             // Update displayed information about timestep length.
             float timeStepLength_hours = trajectoryRequests[slot].trajectories
@@ -1975,6 +1973,7 @@ void MTrajectoryActor::prepareAvailableDataForRendering(uint slot)
             {
                 if (trqi.bezierTrajectoriesRequests[view].available)
                 {
+                    // TODO: Set output parameter id here?
                     if (trajectoryRequests[slot].bezierTrajectoriesMap.value(view, nullptr))
                     {
                         trajectoryRequests[slot].bezierTrajectoriesMap[view]->releaseRenderData();
@@ -2686,11 +2685,12 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
         if (suppressActorUpdates()) return;
         QString auxVariableName = properties->getEnumItem(
                     renderAuxDataVarProperty);
+        QString auxOutputParameterName = multiVarData.getOutputParameterName();
         for (int t = 0; t < (precomputedDataSource ? 1 : seedActorData.size()); t++)
         {
             // (for all seed actors or for single precomputed trajectories..)
             trajectoryRequests[t].releasePreviousAuxVertexBuffer();
-            trajectoryRequests[t].requestAuxVertexBuffer(auxVariableName);
+            trajectoryRequests[t].requestAuxVertexBuffer(auxVariableName, auxOutputParameterName);
             // will not do anything for empty requestedAuxDataVarName
         }
         emitActorChangedSignal();
@@ -2702,11 +2702,12 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
         if (suppressActorUpdates()) return;
         QString auxVariableName = properties->getEnumItem(
                     renderAuxDataVarProperty);
+        QString auxOutputParameterName = multiVarData.getOutputParameterName();
         for (int t = 0; t < (precomputedDataSource ? 1 : seedActorData.size()); t++)
         {
             // (for all seed actors or for single precomputed trajectories..)
             trajectoryRequests[t].releasePreviousAuxVertexBuffer();
-            trajectoryRequests[t].requestAuxVertexBuffer(auxVariableName);
+            trajectoryRequests[t].requestAuxVertexBuffer(auxVariableName, auxOutputParameterName);
             // will not do anything for empty requestedAuxDataVarName
         }
         emitActorChangedSignal();
@@ -3495,6 +3496,13 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
                         multiVarData.getVarDiverging());
                 multiVarData.resetVarDivergingChanged();
             }
+            if (multiVarData.getSelectedOutputParameterChanged())
+            {
+                // TODO with Embree?
+                trajectoryRequests[t].bezierTrajectoriesMap[sceneView]->updateOutputParameterIdx(
+                        multiVarData.getOutputParameterIdx());
+                multiVarData.resetSelectedOutputParameterChanged();
+            }
 
             std::shared_ptr<GL::MShaderEffect> tubeShader = multiVarData.getShaderEffect();
             tubeShader->bind();
@@ -3564,6 +3572,7 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
             {
                 bezierTrajectoriesRenderData.lineSelectedArrayBuffer->bindToIndex(14);
             }
+            bezierTrajectoriesRenderData.varOutputParameterIdxBuffer->bindToIndex(16);
 
             glPolygonMode(GL_FRONT_AND_BACK, renderAsWireFrame ? GL_LINE : GL_FILL); CHECK_GL_ERROR;
 
