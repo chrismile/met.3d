@@ -223,7 +223,7 @@ void MCurvePlotView::setTextSize(float _textSize) {
 void MCurvePlotView::setData(
         const std::vector<std::string>& _variableNames, float _timeMin, float _timeMax,
         const std::vector<std::vector<std::vector<float>>>& _variableValuesArray,
-        bool normalizeBands) {
+        bool normalizeBands, const QString& _varName) {
     this->variableValuesArray = _variableValuesArray;
     numTrajectories = variableValuesArray.size();
     numVariables = _variableNames.size();
@@ -237,8 +237,8 @@ void MCurvePlotView::setData(
     targetVarIdx = std::numeric_limits<uint32_t>::max();
     for (size_t varIdx = 0; varIdx < numVariables; varIdx++) {
         const std::string& varName = variableNamesNew.at(varIdx);
-        // TODO: Change with selected parameter
-        if (varName == "QR") {
+        const std::string _varNameString = _varName.toStdString();
+        if (varName == _varName.toStdString()) {
             targetVarIdx = varIdx;
         }
     }

@@ -794,8 +794,6 @@ void MMultiVarData::onBezierTrajectoriesLoaded(MTrajectories* trajectories)
 {
     const QStringList& auxDataVarNames = trajectories->getAuxDataVarNames();
     const QStringList& sensDataVarNames = trajectories->getSensDataVarNames();
-//    const QVector<uint32_t>& outputParameterIDs = trajectories->getOutputParameters();
-    //int numTrajectories = trajectories->getNumTrajectories();
 
     QStringList varNamesLoaded = auxDataVarNames;
     varNamesLoaded.push_front("Pressure");
@@ -808,7 +806,6 @@ void MMultiVarData::onBezierTrajectoriesLoaded(MTrajectories* trajectories)
     {
         varNamesLoaded.push_back("sensitivity_max");
     }
-    //varNames.push_back("ClusterIdx");
 
     if (tfPropertiesMultiVar.empty())
     {
@@ -819,10 +816,6 @@ void MMultiVarData::onBezierTrajectoriesLoaded(MTrajectories* trajectories)
         maxNumVariables = varNamesLoaded.size();
         initTransferFunctionsMultiVar(maxNumVariables);
         this->outputParameterNamesAvailable = trajectories->getOutputParameterNames();
-//        this->outputParameterNamesAvailable.clear();
-//        for (const auto &idx : outputParameterIDs) {
-//            this->outputParameterNamesAvailable.push_back(outputParameterNames[idx]);
-//        }
 
         selectedVariableIndices.clear();
         selectedVariableIndices.push_back(0);

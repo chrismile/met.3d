@@ -3136,6 +3136,13 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
     else if (multiVarData.hasProperty(property))
     {
         multiVarData.onQtPropertyChanged(property);
+        if (multiVarData.getSelectedOutputParameterChanged())
+        {
+            for (MTrajectoryPicker *trajectoryPicker: trajectoryPickerMap)
+            {
+                trajectoryPicker->updateSectedOutputParameter(multiVarData.getOutputParameterName(), multiVarData.getOutputParameterIdx());
+            }
+        }
         if (suppressActorUpdates()) return;
         emitActorChangedSignal();
     }
