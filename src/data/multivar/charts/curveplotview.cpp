@@ -313,10 +313,9 @@ void MCurvePlotView::setData(
     variableIsSensitivityArray.reserve(numVariables);
     for (size_t varIdx = 0; varIdx < numVariables; varIdx++) {
         const std::string& varName = variableNames.at(varIdx);
-        // Also use maximum for target value QR, thus count it as a sensitivity.
         bool isSensitivity =
                 (varName.at(0) == 'd' && varName != "deposition") || varName == "sensitivity_max"
-                || varName == "QR"|| varName == "QR (max)";
+                || varName.find("(max)") != std::string::npos;
         variableIsSensitivityArray.push_back(isSensitivity);
     }
 

@@ -1798,7 +1798,6 @@ void MTrajectoryPicker::updateDiagramData()
                 }
             }
         }
-
         horizonGraph->setData(
                 variableNames, timeMin, timeMax, variableValuesArray,
                 diagramNormalizationMode == DiagramNormalizationMode::BAND_MIN_MAX, varName);

@@ -347,9 +347,17 @@ void MMultiVarData::saveConfiguration(QSettings *settings)
     settings->setValue(QString("mapRollsThickness"), mapRollsThickness);
 
     // General settings.
+    settings->setValue(QString("selectedOutputParameter"), selectedOutputParameter);
     settings->setValue(QString("targetVariableAndSensitivity"), targetVariableAndSensitivity);
     settings->setValue(QString("multiVarRenderMode"), renderingTechniques.at(int(multiVarRenderMode)));
     settings->setValue(QString("focusRenderMode"), focusRenderingTechniques.at(int(focusRenderMode)));
+
+    settings->setValue(QString("numOutputParametersAvailable"), outputParameterNamesAvailable.size());
+    for (int i = 0; i < outputParameterNamesAvailable.size(); i++)
+    {
+        settings->setValue(QString("outputParameterAvailable#%1").arg(i),
+                           outputParameterNamesAvailable[i]);
+    }
 }
 
 void MMultiVarData::loadConfiguration(QSettings *settings)
@@ -436,6 +444,19 @@ void MMultiVarData::loadConfiguration(QSettings *settings)
             properties->mEnum()->setValue(focusRenderTechniqueProperty, int(focusRenderMode));
         }
     }
+    int numOutputParametersAvailable = settings->value(QString("numOutputParametersAvailable")).toInt();
+    this->outputParameterNamesAvailable.clear();
+    selectedOutputParameter = settings->value("selectedOutputParameter").toString();
+    int selectedOutputParameterIdx = 0;
+    for (int i = 0; i < numOutputParametersAvailable; i++)
+    {
+        QString outputParameterName = settings->value(QString("outputParameterAvailable#%1").arg(i)).toString();
+        this->outputParameterNamesAvailable.push_back(outputParameterName);
+        if (selectedOutputParameter == outputParameterName) selectedOutputParameterIdx = i;
+    }
+    setPropertiesOutputParameter();
+    properties->mEnum()->setValue(outputParameterProperty, selectedOutputParameterIdx);
+
 }
 
 

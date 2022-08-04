@@ -292,6 +292,7 @@ private:
     bool drawHalo = true;
     float haloFactor = 1.0f;
 
+    bool maxSensAllTargets = false;
 
     QStringList outputParameterNamesAvailable;
 };
