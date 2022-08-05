@@ -315,8 +315,10 @@ MBezierTrajectories *MBezierTrajectoriesSource::produceData(MDataRequest request
                 for (uint32_t varIdx = 0; varIdx < numVariablesArray; varIdx++)
                 {
                     const auto &variable = variableArray[varIdx + paramIdx * numVariablesArray];
-                    varDescPerLine.minMaxSens[paramIdx].setX(std::min(varDescPerLine.minMaxSens[paramIdx].x(), variable));
-                    varDescPerLine.minMaxSens[paramIdx].setY(std::max(varDescPerLine.minMaxSens[paramIdx].y(), variable));
+                    varDescPerLine.minMaxSens[paramIdx].setX(
+                            std::min(varDescPerLine.minMaxSens[paramIdx].x(), variable));
+                    varDescPerLine.minMaxSens[paramIdx].setY(
+                            std::max(varDescPerLine.minMaxSens[paramIdx].y(), variable));
                     multiVarData[lineID].push_back(variable);
                 }
             }

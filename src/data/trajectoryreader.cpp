@@ -365,7 +365,13 @@ MTrajectories* MTrajectoryReader::produceData(MDataRequest request)
     for (int iIndexSensData = 0; iIndexSensData < finfo->sensDataVars.size();
          iIndexSensData++)
     {
-        finfo->sensDataVars[iIndexSensData].getVar(startSens, countSens, sensData);
+        if (numOutputParameters == 1)
+        {
+            finfo->sensDataVars[iIndexSensData].getVar(start, count, sensData);
+        } else
+        {
+            finfo->sensDataVars[iIndexSensData].getVar(startSens, countSens, sensData);
+        }
         trajectories->copySensDataPerVertex(sensData, iIndexSensData, numOutputParameters);
     }
     trajectories->copyOutputParameter(outputParameters, numOutputParameters);
