@@ -217,8 +217,7 @@ MBezierTrajectories *MBezierTrajectoriesSource::produceData(MDataRequest request
             MFilteredTrajectory &filteredTrajectory = filteredTrajectories[trajectoryIdx];
             QVector<float> &maxSensitivityAttributes = filteredTrajectory.attributes.back();
             maxSensitivityAttributes.reserve(inTrajectories->getOutputParameters().size() * numTimeStepsPerTrajectory);
-            // TODO: Max senstivity for different output parameters
-            for (int paramIdx = 0; paramIdx < numOutputParameters; paramIdx++)
+            for (uint32_t paramIdx = 0; paramIdx < numOutputParameters; paramIdx++)
             {
                 for (int timeStepIdx = 0; timeStepIdx < numTimeStepsPerTrajectory; timeStepIdx++)
                 {
@@ -310,8 +309,6 @@ MBezierTrajectories *MBezierTrajectoriesSource::produceData(MDataRequest request
             const uint64_t numVariablesArray = variableArray.size() / numOutputParameters;
             for (uint32_t paramIdx = 0; paramIdx < numOutputParameters; paramIdx++)
             {
-                const QVector<float> &variableArray = trajectory.attributes[v];
-                const uint64_t numVariablesArray = variableArray.size() / numOutputParameters;
                 for (uint32_t varIdx = 0; varIdx < numVariablesArray; varIdx++)
                 {
                     const auto &variable = variableArray[varIdx + paramIdx * numVariablesArray];
