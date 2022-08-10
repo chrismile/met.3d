@@ -654,7 +654,8 @@ void MMultiVarData::registerTransferFunction(MTransferFunction1D *tf)
 {
     QObject::connect(
             tf, &MTransferFunction1D::transferFunctionChanged,
-            this, &MMultiVarData::transferFunctionChanged);
+            this, &MMultiVarData::transferFunctionChanged,
+            Qt::UniqueConnection);
 }
 
 
