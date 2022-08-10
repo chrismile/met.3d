@@ -255,7 +255,8 @@ float computeRadius(
 
     vec2 lineVarMinMax = vec2(0);
     float variableValueOrig = 0;
-    sampleVariableFromLineSSBO(lineID, varID, elementID , variableValueOrig, lineVarMinMax);
+    uint sensitivityOffset = sampleSensitivityOffset(varID);
+    sampleVariableFromLineSSBO(lineID, varID, elementID, sensitivityOffset, variableValueOrig, lineVarMinMax);
     if (mapTubeDiameterMode == 1) {
         sampleVariableDistributionFromLineSSBO(lineID, varID, lineVarMinMax);
     }
@@ -270,8 +271,8 @@ float computeRadius(
         //                interpolant = max(0.0, min(1.0, interpolant));
         curRadius = mix(minRadius, maxRadius, interpolant);
     }
-
-    sampleVariableFromLineSSBO(lineID, varID, elementNextID , variableValueOrig, lineVarMinMax);
+    sensitivityOffset = sampleSensitivityOffset(varID);
+    sampleVariableFromLineSSBO(lineID, varID, elementNextID, sensitivityOffset, variableValueOrig, lineVarMinMax);
     if (mapTubeDiameterMode == 1) {
         sampleVariableDistributionFromLineSSBO(lineID, varID, lineVarMinMax);
     }

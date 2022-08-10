@@ -158,7 +158,8 @@ shader GSmain(in VSOutput inputs[]) {
     vec2 variableMinMax = vec2(0);
 
     if (varID >= 0) {
-        sampleVariableFromLineSSBO(lineID, varID, elementID, variableValue, variableMinMax);
+        const uint sensitivityOffset = sampleSensitivityOffset(varID);
+        sampleVariableFromLineSSBO(lineID, varID, elementID, sensitivityOffset, variableValue, variableMinMax);
         // Normalize value
         //variableValue = (variableValueOrig - variableMinMax.x) / (variableMinMax.y - variableMinMax.x);
         //        variableValue = (varInfo.x - varInfo.y) / (varInfo.z - varInfo.y);
@@ -227,7 +228,8 @@ shader GSmain(in VSOutput inputs[]) {
         float variableNextValue = 0;
 
         if (elementNextID >= 0) {
-            sampleVariableFromLineSSBO(lineID, varID, elementNextID, variableNextValue, variableMinMax);
+            const uint sensitivityOffset = sampleSensitivityOffset(varID);
+            sampleVariableFromLineSSBO(lineID, varID, elementNextID, sensitivityOffset, variableNextValue, variableMinMax);
             // Normalize value
             //fragVariableNextValue = (variableNextValue - variableMinMax.x) / (variableMinMax.y - variableMinMax.x);
             fragVariableNextValue = variableNextValue;
@@ -260,7 +262,7 @@ shader GSmain(in VSOutput inputs[]) {
         EmitVertex();
 
         ////////////////////////
-        // For linear interpolation: define next element and interpolant on curve
+        // For linear isensitivityOffsetnterpolation: define next element and interpolant on curve
         elementNextID = inputs[0].vElementNextID;
 
         if (inputs[1].vElementInterpolant < inputs[0].vElementInterpolant) {
@@ -273,7 +275,8 @@ shader GSmain(in VSOutput inputs[]) {
 
 //        fragVariableNextID = elementNextID;
         if (elementNextID >= 0) {
-            sampleVariableFromLineSSBO(lineID, varID, elementNextID, variableNextValue, variableMinMax);
+            const uint sensitivityOffset = sampleSensitivityOffset(varID);
+            sampleVariableFromLineSSBO(lineID, varID, elementNextID, sensitivityOffset, variableNextValue, variableMinMax);
             // Normalize value
             //fragVariableNextValue = (variableNextValue - variableMinMax.x) / (variableMinMax.y - variableMinMax.x);
             fragVariableNextValue = variableNextValue;

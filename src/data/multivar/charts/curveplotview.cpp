@@ -223,7 +223,7 @@ void MCurvePlotView::setTextSize(float _textSize) {
 void MCurvePlotView::setData(
         const std::vector<std::string>& _variableNames, float _timeMin, float _timeMax,
         const std::vector<std::vector<std::vector<float>>>& _variableValuesArray,
-        bool normalizeBands) {
+        bool normalizeBands, const QString& _varName) {
     this->variableValuesArray = _variableValuesArray;
     numTrajectories = variableValuesArray.size();
     numVariables = _variableNames.size();
@@ -237,7 +237,8 @@ void MCurvePlotView::setData(
     targetVarIdx = std::numeric_limits<uint32_t>::max();
     for (size_t varIdx = 0; varIdx < numVariables; varIdx++) {
         const std::string& varName = variableNamesNew.at(varIdx);
-        if (varName == "QR") {
+        const std::string _varNameString = _varName.toStdString();
+        if (varName == _varName.toStdString()) {
             targetVarIdx = varIdx;
         }
     }
@@ -312,10 +313,9 @@ void MCurvePlotView::setData(
     variableIsSensitivityArray.reserve(numVariables);
     for (size_t varIdx = 0; varIdx < numVariables; varIdx++) {
         const std::string& varName = variableNames.at(varIdx);
-        // Also use maximum for target value QR, thus count it as a sensitivity.
         bool isSensitivity =
                 (varName.at(0) == 'd' && varName != "deposition") || varName == "sensitivity_max"
-                || varName == "QR"|| varName == "QR (max)";
+                || varName.find("(max)") != std::string::npos;
         variableIsSensitivityArray.push_back(isSensitivity);
     }
 

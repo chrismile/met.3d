@@ -110,6 +110,8 @@ public:
     void updateRenderSpheresIfNecessary(bool renderSpheres);
     void setShowTargetVariableAndSensitivity(bool show);
 
+    void updateSectedOutputParameter(const QString& _varName, const int _selectedOutputIdx);
+
     /**
      * Picks a point on the mesh using screen coordinates (assuming origin at upper left corner of viewport).
      * @param sceneView The scene view storing the viewport size and view/projection matrix.
@@ -317,6 +319,9 @@ private:
     QVector<QVector2D> minMaxAttributes;
     int timeStep = 0;
     bool useVariableToolTip = true;
+
+    QString varName;
+    uint32_t selectedOutputIdx = 0;
 
     float lineRadius = 0.0f;
     int numCircleSubdivisions = 8;

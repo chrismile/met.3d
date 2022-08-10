@@ -802,6 +802,17 @@ void MTrajectoryPicker::setShowTargetVariableAndSensitivity(bool show) {
     targetVariableAndSensitivity = show;
 }
 
+
+void MTrajectoryPicker::updateSectedOutputParameter(const QString& _varName, const int _selectedOutputIdx) {
+    varName = _varName;
+    selectedOutputIdx = _selectedOutputIdx;
+    if (diagram && diagram->getIsNanoVgInitialized())
+    {
+        updateDiagramData();
+    }
+}
+
+
 bool MTrajectoryPicker::pickPointScreen(
         MSceneViewGLWidget* sceneView, int x, int y,
         QVector3D &firstHitPoint, uint32_t &trajectoryIndex, float &timeAtHit) {
@@ -1389,6 +1400,7 @@ void MTrajectoryPicker::setParticlePosTimeStep(int newTimeStep)
         uint32_t trajectoryIndex = it.first;
         const MFilteredTrajectory& trajectory = baseTrajectories.at(int(trajectoryIndex));
         QVector<float> values;
+
         for (size_t i = 0; i < numVars; i++)
         {
             int time = clamp(timeStep, 0, int(trajectory.attributes.at(int(i)).size()) - 1);
@@ -1716,7 +1728,8 @@ void MTrajectoryPicker::updateDiagramData()
                     for (size_t varIdx = 0; varIdx < numVars; varIdx++)
                     {
                         bool isSensitivity = isVarSensitivityArray.at(varIdx);
-                        float value = trajectory.attributes.at(int(varIdx)).at(int(timeIdx));
+                        int offset = (isSensitivity) ? numTimeSteps * selectedOutputIdx : 0;
+                        float value = trajectory.attributes.at(int(varIdx)).at(int(timeIdx + offset));
                         if (!std::isnan(value)) {
                             QVector2D minMaxVector = minMaxAttributesLocal.at(int(varIdx));
                             if (isSensitivity)
@@ -1788,10 +1801,9 @@ void MTrajectoryPicker::updateDiagramData()
                 }
             }
         }
-
         horizonGraph->setData(
                 variableNames, timeMin, timeMax, variableValuesArray,
-                diagramNormalizationMode == DiagramNormalizationMode::BAND_MIN_MAX);
+                diagramNormalizationMode == DiagramNormalizationMode::BAND_MIN_MAX, varName);
     }
 }
 

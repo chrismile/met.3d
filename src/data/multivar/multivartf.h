@@ -50,7 +50,7 @@ public:
     MMultiVarTf(QVector<QtProperty*>& transferFunctionProperties, QVector<MTransferFunction1D*>& transferFunctions);
     ~MMultiVarTf() override;
 
-    void createTexture1DArray();
+    bool getHasDataSet();
     void destroyTexture1DArray();
     void generateTexture1DArray();
     void bindTexture1DArray(int textureUnitTransferFunction);

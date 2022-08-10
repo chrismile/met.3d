@@ -69,7 +69,7 @@ public:
     void setData(
             const std::vector<std::string>& variableNames, float timeMin, float timeMax,
             const std::vector<std::vector<std::vector<float>>>& variableValuesArray,
-            bool normalizeBands);
+            bool normalizeBands, const QString& _varName);
 
     QVector<uint32_t> getSelectedVariableIndices() const override {
         if (targetVarIdx == std::numeric_limits<uint32_t>::max()) {

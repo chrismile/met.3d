@@ -242,7 +242,8 @@ shader FSmain(in VSOutput inputs, out vec4 fragColor)
     const int varID = int(floor(centerDist * numVariables));
     float bandPos = centerDist * numVariables - float(varID);
     const uint actualVarID = sampleActualVarID(varID);
-    sampleVariableFromLineSSBO(fragmentLineID, actualVarID, fragElementID, variableValue, variableMinMax);
+    const uint sensitivityOffset = sampleSensitivityOffset(actualVarID);
+    sampleVariableFromLineSSBO(fragmentLineID, actualVarID, fragElementID, sensitivityOffset, variableValue, variableMinMax);
 
     // 4) Determine variable color
     vec4 surfaceColor = determineColor(actualVarID, variableValue);

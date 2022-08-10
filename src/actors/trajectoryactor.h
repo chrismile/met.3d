@@ -440,7 +440,7 @@ private:
 
         QQueue<MTrajectoryRequestQueueInfo> pendingRequestsQueue;
 
-        void requestAuxVertexBuffer(QString auxVarName)
+        void requestAuxVertexBuffer(QString auxVarName, QString outputParameterName = "")
         {
             // Only allow a new VB if the previous has been released.
             assert(currentAuxDataVarName.isEmpty());
@@ -449,7 +449,7 @@ private:
             {
                 currentAuxDataVarName = auxVarName;
                 trajectoriesAuxDataVertexBuffer = trajectories->
-                        getAuxDataVertexBuffer(currentAuxDataVarName);
+                        getAuxDataVertexBuffer(currentAuxDataVarName, outputParameterName);
             }
         }
 

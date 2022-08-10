@@ -80,6 +80,10 @@ layout (std430, binding = 7) readonly buffer VarSelectedArray {
     uint selectedVariableIndices[];
 };
 
+layout (std430, binding = 16) readonly buffer VarSelectedOutputParameterArray {
+    uint OutputParameterIdx[];
+};
+
 #ifdef SUPPORT_LINE_DESATURATION
 layout (std430, binding = 14) readonly buffer LineSelectedArray {
     uint lineSelectedArray[];
@@ -159,6 +163,13 @@ vec4 desaturateColor(vec4 inputColor) {
 // binding 8 belongs to selected color array
 
 
+// Get an offset in case the variable is a sensitivity and the output parameter index is >0
+int sampleSensitivityOffset(in uint varID) {
+    if (varID < OutputParameterIdx[1] || varID >= maxNumVariables) {
+        return 0;
+    }
+    return int(OutputParameterIdx[0] * OutputParameterIdx[2]);
+}
 
 // Sample the actual variable ID from the current user selection
 int sampleActualVarID(in uint varID) {
@@ -185,7 +196,7 @@ int sampleActualVarID(in uint varID) {
 
 // Function to sample from SSBOs
 void sampleVariableFromLineSSBO(
-        in uint lineID, in uint varID, in uint elementID, out float value, out vec2 minMax) {
+        in uint lineID, in uint varID, in uint elementID, in uint sensitivityOffset, out float value, out vec2 minMax) {
     uint startIndex = uint(lineDescs[lineID].startIndex);
     VarDescData varDesc = varDescs[maxNumVariables * lineID + varID];
     const uint varOffset = uint(varDesc.info.r);
@@ -193,7 +204,7 @@ void sampleVariableFromLineSSBO(
 
     minMax = minMaxValues[varID];
 
-    value = varArray[startIndex + varOffset + elementID];
+    value = varArray[startIndex + varOffset + elementID + sensitivityOffset];
 }
 
 // Function to sample distribution from SSBO
