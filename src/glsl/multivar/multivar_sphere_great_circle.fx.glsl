@@ -179,6 +179,10 @@ shader FSmain(in VSOutput inputs, out vec4 fragColor)
     float entranceIdx = lineElementId.entranceIdx;
     float exitIdx = lineElementId.exitIdx;
 
+    //if (fragmentLineID == 5) {
+    //    discard;
+    //}
+
     const vec3 n = normalize(inputs.fragmentNormal);
     const vec3 v = normalize(cameraPosition - inputs.fragmentPosition);
     const vec3 l = normalize(exitPoint - entrancePoint);
