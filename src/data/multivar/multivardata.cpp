@@ -27,6 +27,7 @@
 #include "multivardata.h"
 
 // standard library imports
+#include <set>
 
 // related third party imports
 #include <QtCore>
@@ -270,7 +271,9 @@ void MMultiVarData::setPropertiesOutputParameter()
     outputParameterProperty->setEnabled(true);
     properties->mEnum()->setEnumNames(outputParameterProperty, outputParameterNamesAvailable);
     properties->mEnum()->setValue(outputParameterProperty, 0);
-    propertyList.push_back(outputParameterProperty);
+    if (!propertyList.contains(outputParameterProperty)) {
+        propertyList.push_back(outputParameterProperty);
+    }
     selectedOutputParameterChanged = true;
 }
 
@@ -541,13 +544,15 @@ void MMultiVarData::initTransferFunctionsMultiVar(uint32_t numVariables)
 {
     multiVarTf.setVariableNames(varNames);
 
-    if (tfPropertiesMultiVar.empty()) {
+    if (!tfPropertiesMultiVar.empty()) {
         foreach (QtProperty *property, tfPropertiesMultiVar)
         {
             removeProperty(property, multiVarGroupProperty);
         }
     }
     tfPropertiesMultiVar.clear();
+    transferFunctionsMultiVar.clear();
+    varDiverging.clear();
 
     tfPropertiesMultiVar.resize(numVariables);
     transferFunctionsMultiVar.resize(numVariables);
@@ -846,21 +851,77 @@ void MMultiVarData::onBezierTrajectoriesLoaded(MTrajectories* trajectories)
     }
     else
     {
-        if (varNamesLoaded.toVector() != varNames)
-        {
-            throw std::runtime_error(
-                    "Fatal error: The loaded session and the trajectory data have different variables.");
-        }
+        if (varNamesLoaded.toVector() != varNames) {
+            auto varNamesOld = this->varNames;
+            this->varNames.clear();
+            for (const QString &str: varNamesLoaded) {
+                this->varNames.push_back(str);
+            }
+            maxNumVariables = varNamesLoaded.size();
 
-        // TODO: Continue on the code below instead of terminating.
-        /*auto varNamesOld = this->varNames;
-        for (const QString& str : varNamesLoaded) {
-            this->varNames.push_back(str);
+            // Translate the selected variable indices to get the currently selected variables.
+            auto selectedVariableIndicesOld = this->selectedVariableIndices;
+            selectedVariableIndices.clear();
+            std::unordered_map<std::string, size_t> varNamesLoadedIndexMap;
+            uint32_t newIdx = 0;
+            for (const QString &varName: varNamesLoaded) {
+                std::string varNameStd = varName.toStdString();
+                varNamesLoadedIndexMap.insert(std::make_pair(varName.toStdString(), newIdx));
+                newIdx++;
+            }
+            std::unordered_map<uint32_t, uint32_t> varIndexOldToIndexNewMap;
+            uint32_t oldIdx = 0;
+            for (const QString &varName: varNamesOld) {
+                std::string varNameStd = varName.toStdString();
+                auto it = varNamesLoadedIndexMap.find(varName.toStdString());
+                if (it != varNamesLoadedIndexMap.end()) {
+                    varIndexOldToIndexNewMap.insert(std::make_pair(oldIdx, it->second));
+                }
+                oldIdx++;
+            }
+            for (uint32_t selectedVariableIndexOld: selectedVariableIndicesOld) {
+                auto it = varIndexOldToIndexNewMap.find(selectedVariableIndexOld);
+                if (it != varIndexOldToIndexNewMap.end()) {
+                    selectedVariableIndices.push_back(it->second);
+                }
+            }
+
+            // Update the list of selected transfer functions.
+            auto transferFunctionsMultiVarOld = transferFunctionsMultiVar;
+            for (int varIdxOld = 0; varIdxOld < varNamesOld.size(); varIdxOld++)
+            {
+                actor->removeProperty(tfPropertiesMultiVar[varIdxOld], multiVarGroupProperty);
+            }
+            tfPropertiesMultiVar.clear();
+            initTransferFunctionsMultiVar(maxNumVariables);
+            for (int varIdxOld = 0; varIdxOld < varNamesOld.size(); varIdxOld++)
+            {
+                auto it = varIndexOldToIndexNewMap.find(varIdxOld);
+                if (it != varIndexOldToIndexNewMap.end())
+                {
+                    MTransferFunction1D* tf = transferFunctionsMultiVarOld.at(varIdxOld);
+                    if (tf)
+                    {
+                        setTransferFunctionMultiVar(int(it->second), tf);
+                    }
+                }
+            }
+            multiVarTf.generateTexture1DArray();
+
+            this->outputParameterNamesAvailable = trajectories->getOutputParameterNames();
+
+            // Delete the previously used selected variable properties.
+            for (auto& variableProperty : selectedVariablesProperties)
+            {
+                actor->removeProperty(variableProperty, selectedVariablesGroupProperty);
+            }
+            selectedVariablesProperties.clear();
+
+            updateNumVariablesSelected();
+            setPropertiesVarSelected();
+            setPropertiesOutputParameter();
+            selectedVariablesChanged = true;
         }
-        maxNumVariables = varNamesLoaded.size();
-        initTransferFunctionsMultiVar(maxNumVariables);
-        updateNumVariablesSelected();
-        setPropertiesVarSelected();*/
     }
 
     selectedVariablesChanged = true;
