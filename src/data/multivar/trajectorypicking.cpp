@@ -806,7 +806,10 @@ void MTrajectoryPicker::setShowTargetVariableAndSensitivity(bool show) {
 void MTrajectoryPicker::updateSectedOutputParameter(const QString& _varName, const int _selectedOutputIdx) {
     varName = _varName;
     selectedOutputIdx = _selectedOutputIdx;
-    updateDiagramData();
+    if (diagram && diagram->getIsNanoVgInitialized())
+    {
+        updateDiagramData();
+    }
 }
 
 

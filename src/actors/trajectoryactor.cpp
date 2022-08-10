@@ -2000,6 +2000,8 @@ void MTrajectoryActor::prepareAvailableDataForRendering(uint slot)
                                 diagramType, diagramTransferFunction);
                         multiVarData.setDiagramType(diagramType);
                         trajectoryPickerMap[view]->setSelectedVariableIndices(multiVarData.getSelectedVariableIndices());
+                        trajectoryPickerMap[view]->updateSectedOutputParameter(
+                                multiVarData.getOutputParameterName(), multiVarData.getOutputParameterIdx());
                         trajectoryPickerMap[view]->updateTrajectoryRadius(tubeRadius);
                         trajectoryPickerMap[view]->setSyncMode(trajectorySyncMode);
                         trajectoryPickerMap[view]->setParticlePosTimeStep(particlePosTimeStep);
