@@ -96,6 +96,7 @@ shader FSmain(in VSOutput inputs, out vec4 fragColor)
     vec2 variableMinMax, variableNextMinMax;
     const uint varID = inputs.fragmentVariableIdAndIsCap & 0x7FFFFFFFu;
     const uint actualVarID = sampleActualVarID(varID);
+    const uint sensitivityOffset = sampleSensitivityOffset(actualVarID);
     sampleVariableFromLineSSBO(
             inputs.fragmentLineID, actualVarID, fragElementID, variableValue, variableMinMax);
     sampleVariableFromLineSSBO(

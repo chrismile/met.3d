@@ -231,10 +231,11 @@ shader FSmain(in VSOutput inputs, out vec4 fragColor)
     const int varID = int(floor(ribbonPosition * numVariables));
     float bandPos = ribbonPosition * numVariables - float(varID);
     const uint actualVarID = sampleActualVarID(varID);
+    const uint sensitivityOffset = sampleSensitivityOffset(actualVarID);
     sampleVariableFromLineSSBO(
-            fragmentLineID, actualVarID, fragElementID, variableValue, variableMinMax);
+            fragmentLineID, actualVarID, fragElementID, sensitivityOffset, variableValue, variableMinMax);
     sampleVariableFromLineSSBO(
-            fragmentLineID, actualVarID, fragElementNextID, variableNextValue, variableNextMinMax);
+            fragmentLineID, actualVarID, fragElementNextID, sensitivityOffset, variableNextValue, variableNextMinMax);
 
     // 4) Determine variable color
     vec4 surfaceColor = determineColorLinearInterpolate(

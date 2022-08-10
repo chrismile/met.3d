@@ -74,6 +74,7 @@ protected:
 private:
     MTrajectoryDataSource* trajectorySource;
     uint32_t numVariables = 0;
+    uint32_t numOutputParameters = 0;
 };
 
 } // namespace Met3D

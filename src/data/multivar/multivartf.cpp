@@ -80,15 +80,20 @@ MMultiVarTf::~MMultiVarTf()
 }
 
 
-void MMultiVarTf::createTexture1DArray()
+bool MMultiVarTf::getHasDataSet()
 {
-    generateTexture1DArray();
+    return textureTransferFunctionArray || useLogScaleBuffer || minMaxBuffer;
 }
 
 
 void MMultiVarTf::destroyTexture1DArray()
 {
-    ;
+    if (textureTransferFunctionArray)
+    {
+        MGLResourcesManager::getInstance()->releaseGPUItem(textureTransferFunctionArray);
+        MGLResourcesManager::getInstance()->deleteReleasedGPUItem(textureTransferFunctionArray);
+        textureTransferFunctionArray = nullptr;
+    }
 }
 
 
@@ -314,6 +319,10 @@ void MMultiVarTf::generateTexture1DArray()
             delete textureTransferFunctionArray;
             textureTransferFunctionArray = nullptr;
         }
+        else
+        {
+            glRM->getGPUItem(textureID);
+        }
     }
 
     if (textureTransferFunctionArray)
@@ -361,6 +370,11 @@ void MMultiVarTf::bindTexture1DArray(int textureUnitTransferFunction)
 
 void MMultiVarTf::setVariableNames(const QVector<QString>& names)
 {
+    if (getHasDataSet())
+    {
+        destroyTexture1DArray();
+        releaseBuffers();
+    }
     variableNames = names;
 }
 
@@ -466,10 +480,14 @@ void MMultiVarTf::releaseBuffers()
     if (useLogScaleBuffer)
     {
         MGLResourcesManager::getInstance()->releaseGPUItem(useLogScaleBufferID);
+        MGLResourcesManager::getInstance()->deleteReleasedGPUItem(useLogScaleBufferID);
+        useLogScaleBuffer = nullptr;
     }
     if (minMaxBuffer)
     {
         MGLResourcesManager::getInstance()->releaseGPUItem(minMaxBufferID);
+        MGLResourcesManager::getInstance()->deleteReleasedGPUItem(minMaxBufferID);
+        minMaxBuffer = nullptr;
     }
 }
 

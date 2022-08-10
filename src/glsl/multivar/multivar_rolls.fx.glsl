@@ -160,7 +160,8 @@ shader GSmain(in VSOutput inputs[]) {
 //    vec4 varInfo = inputs[0].lineVariable;
 
     if (varID >= 0) {
-        sampleVariableFromLineSSBO(lineID, varID, elementID, variableValue, variableMinMax);
+        const uint sensitivityOffset = sampleSensitivityOffset(varID);
+        sampleVariableFromLineSSBO(lineID, varID, elementID, sensitivityOffset, variableValue, variableMinMax);
         // Normalize value
         //variableValue = (variableValueOrig - variableMinMax.x) / (variableMinMax.y - variableMinMax.x);
 //        variableValue = (varInfo.x - varInfo.y) / (varInfo.z - varInfo.y);

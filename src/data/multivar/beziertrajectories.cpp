@@ -51,13 +51,17 @@ unsigned int MBezierTrajectory::getMemorySize_kb() const {
 MBezierTrajectories::MBezierTrajectories(
         MDataRequest requestToReferTo, const MFilteredTrajectories& filteredTrajectories,
         const QVector<int>& trajIndicesToFilteredIndicesMap,
-        unsigned int numVariables, const QStringList& auxDataVarNames)
+        unsigned int numSens, unsigned int numAux, unsigned int numVariables, const QStringList& auxDataVarNames, const QStringList& outputParameterNames)
         : MSupplementalTrajectoryData(requestToReferTo, filteredTrajectories.size()),
           baseTrajectories(filteredTrajectories), bezierTrajectories(filteredTrajectories.size()),
           trajIndicesToFilteredIndicesMap(trajIndicesToFilteredIndicesMap),
           numTrajectories(filteredTrajectories.size()), numVariables(numVariables)
 {
-    for (unsigned int i = 0; i < numVariables; i++)
+    int numOutputParameters = outputParameterNames.size();
+    this->numAux = numAux;
+    this->numTimesteps = filteredTrajectories[0].attributes.at(0).size();
+
+    for (int i = 0; i < numVariables; i++)
     {
         varDiverging.push_back(false);
     }
@@ -71,10 +75,10 @@ MBezierTrajectories::MBezierTrajectories(
     }
 
     /*
-     * TODO: This is hard-coded, as there is currently no way to know which the target variable is.
+     * Takes the first of all available target variables.
      */
     targetVariableAndSensitivityIndexArray.resize(int(numVariables));
-    int targetVariableIndex = auxDataVarNames.indexOf("QR");
+    int targetVariableIndex = auxDataVarNames.indexOf(outputParameterNames[0]);
     if (targetVariableIndex < 0) {
         targetVariableIndex = std::max(1, int(numVariables) - 1);
     } else {
@@ -90,15 +94,35 @@ MBezierTrajectories::MBezierTrajectories(
     trajectorySelectionIndices = new ptrdiff_t[numTrajectories];
 
     minMaxAttributes.clear();
-    minMaxAttributes.resize(int(numVariables));
-    for (size_t i = 0; i < numVariables; i++)
+    minMaxAttributes.resize(numAux + 2 + numSens * numOutputParameters);
+    for (auto &mMA : minMaxAttributes)
     {
-        minMaxAttributes[int(i)] = QVector2D(
+        mMA = QVector2D(
                 std::numeric_limits<float>::max(), std::numeric_limits<float>::lowest());
     }
+//    for (size_t i = 0; i < numVariables; i++)
+//    {
+//        minMaxAttributes[int(i)] = QVector2D(
+//                std::numeric_limits<float>::max(), std::numeric_limits<float>::lowest());
+//    }
     for (const MFilteredTrajectory& trajectory : filteredTrajectories)
     {
-        for (size_t i = 0; i < numVariables; i++)
+//        for (size_t i = 0; i < numVariables; i++)
+//        {
+//            const QVector<float>& attributes = trajectory.attributes.at(int(i));
+//            QVector2D& minMaxVector = minMaxAttributes[int(i)];
+//            for (float v : attributes)
+//            {
+//                if (std::isnan(v))
+//                {
+//                    continue;
+//                }
+//                minMaxVector.setX(std::min(minMaxVector.x(), v));
+//                minMaxVector.setY(std::max(minMaxVector.y(), v));
+//            }
+//        }
+
+        for (size_t i = 0; i <= numAux; i++)
         {
             const QVector<float>& attributes = trajectory.attributes.at(int(i));
             QVector2D& minMaxVector = minMaxAttributes[int(i)];
@@ -112,14 +136,55 @@ MBezierTrajectories::MBezierTrajectories(
                 minMaxVector.setY(std::max(minMaxVector.y(), v));
             }
         }
+
+        for (size_t i = 0; i < numSens; i++)
+        {
+            const size_t offset = numAux + 1;
+            const QVector<float>& attributes = trajectory.attributes.at(int(i));
+            const size_t numValues = attributes.size() / numOutputParameters;
+            for (size_t j = 0; j < numOutputParameters; j++)
+            {
+                QVector2D &minMaxVector = minMaxAttributes[int(i) + offset + j * numSens];
+                for (size_t vIdx = 0; vIdx < numValues; vIdx++)
+                {
+                    float v = attributes[vIdx + j * numValues];
+                    if (std::isnan(v))
+                    {
+                        continue;
+                    }
+                    minMaxVector.setX(std::min(minMaxVector.x(), v));
+                    minMaxVector.setY(std::max(minMaxVector.y(), v));
+                }
+            }
+        }
     }
-    for (size_t i = 0; i < numVariables; i++)
+    for (size_t i = 0; i <= numAux; i++)
     {
         QVector2D& minMax = minMaxAttributes[int(i)];
         if (std::isinf(minMax[1])) {
             minMax[1] = std::numeric_limits<float>::max();
         }
     }
+//    const size_t numValues = (minMaxAttributes.size() - numAux - 1) / numOutputParameters;
+    for (int i = 0; i < numSens; i++)
+    {
+        const size_t offset = numAux + 1;
+        for (int j = 0; j < numOutputParameters; j++)
+        {
+            QVector2D &minMax = minMaxAttributes[i + offset + j * numSens];
+            if (std::isinf(minMax[1]))
+            {
+                minMax[1] = std::numeric_limits<float>::max();
+            }
+        }
+    }
+//    for (size_t i = 0; i < numVariables; i++)
+//    {
+//        QVector2D& minMax = minMaxAttributes[int(i)];
+//        if (std::isinf(minMax[1])) {
+//            minMax[1] = std::numeric_limits<float>::max();
+//        }
+//    }
 }
 
 
@@ -350,6 +415,7 @@ MBezierTrajectoriesRenderData MBezierTrajectories::getRenderData(
     }
 
     const size_t numVars = bezierTrajectories.empty() ? 0 : bezierTrajectories.front().multiVarDescs.size();
+
     QVector<float> attributesMinValues(numVars, 0.0f);
     QVector<float> attributesMaxValues(numVars, 0.0f);
     for (size_t lineIdx = 0; lineIdx < numLines; ++lineIdx)
@@ -357,10 +423,20 @@ MBezierTrajectoriesRenderData MBezierTrajectories::getRenderData(
         const MBezierTrajectory& bezierTrajectory = bezierTrajectories[lineIdx];
         for (size_t varIdx = 0; varIdx < numVars; ++varIdx)
         {
-            attributesMinValues[varIdx] = std::min(
-                    attributesMinValues.at(varIdx), bezierTrajectory.multiVarDescs.at(varIdx).minMax.x());
-            attributesMaxValues[varIdx] = std::max(
-                    attributesMaxValues.at(varIdx), bezierTrajectory.multiVarDescs.at(varIdx).minMax.y());
+            if (bezierTrajectory.multiVarDescs.at(varIdx).sensitivity)
+            {
+                attributesMinValues[varIdx] = std::min(
+                        attributesMinValues.at(varIdx), bezierTrajectory.multiVarDescs.at(varIdx).minMaxSens[0].x());
+                attributesMaxValues[varIdx] = std::max(
+                        attributesMaxValues.at(varIdx), bezierTrajectory.multiVarDescs.at(varIdx).minMaxSens[0].y());
+            } else
+            {
+                attributesMinValues[varIdx] = std::min(
+                        attributesMinValues.at(varIdx), bezierTrajectory.multiVarDescs.at(varIdx).minMax.x());
+                attributesMaxValues[varIdx] = std::max(
+                        attributesMaxValues.at(varIdx), bezierTrajectory.multiVarDescs.at(varIdx).minMax.y());
+            }
+
         }
     }
 
@@ -369,22 +445,34 @@ MBezierTrajectoriesRenderData MBezierTrajectories::getRenderData(
         for (size_t varIdx = 0; varIdx < numVars; ++varIdx)
         {
             const MBezierTrajectory& bezierTrajectory = bezierTrajectories[lineIdx];
-
             QVector4D descData(
                     bezierTrajectory.multiVarDescs.at(varIdx).startIndex,
                     attributesMinValues.at(varIdx), attributesMaxValues.at(varIdx), 0.0);
             varDescData.push_back(descData);
-
-            QVector2D lineVarDesc(
-                    bezierTrajectory.multiVarDescs.at(varIdx).minMax.x(),
-                    bezierTrajectory.multiVarDescs.at(varIdx).minMax.y());
-            lineVarDescData.push_back(lineVarDesc);
+            if (bezierTrajectory.multiVarDescs.at(varIdx).sensitivity)
+            {
+                QVector2D lineVarDesc(
+                        bezierTrajectory.multiVarDescs.at(varIdx).minMaxSens[0].x(),
+                        bezierTrajectory.multiVarDescs.at(varIdx).minMaxSens[0].y());
+                lineVarDescData.push_back(lineVarDesc);
+            } else
+            {
+                QVector2D lineVarDesc(
+                        bezierTrajectory.multiVarDescs.at(varIdx).minMax.x(),
+                        bezierTrajectory.multiVarDescs.at(varIdx).minMax.y());
+                lineVarDescData.push_back(lineVarDesc);
+            }
         }
     }
 
     QVector<uint32_t> varSelected;
     varSelected.resize(int(numVariables));
-
+    if (OutputParameterIdx.empty())
+    {
+        OutputParameterIdx.push_back(0);
+        OutputParameterIdx.push_back(numAux + 1);
+        OutputParameterIdx.push_back(numTimesteps);
+    }
     bezierTrajectoriesRenderData.variableArrayBuffer = createShaderStorageBuffer(
             currentGLContext, variableArrayBufferID, varData);
     bezierTrajectoriesRenderData.lineDescArrayBuffer = createShaderStorageBuffer(
@@ -402,6 +490,8 @@ MBezierTrajectoriesRenderData MBezierTrajectories::getRenderData(
             currentGLContext, varDivergingArrayBufferID, varDiverging);
     bezierTrajectoriesRenderData.lineSelectedArrayBuffer = createShaderStorageBuffer(
             currentGLContext, lineSelectedArrayBufferID, selectedLines);
+    bezierTrajectoriesRenderData.varOutputParameterIdxBuffer = createShaderStorageBuffer(
+            currentGLContext, varOutputParameterIdxBufferID, OutputParameterIdx);
 
     this->bezierTrajectoriesRenderData = bezierTrajectoriesRenderData;
 
@@ -423,6 +513,7 @@ void MBezierTrajectories::releaseRenderData()
     MGLResourcesManager::getInstance()->releaseGPUItem(varSelectedArrayBufferID);
     MGLResourcesManager::getInstance()->releaseGPUItem(varSelectedTargetVariableAndSensitivityArrayBufferID);
     MGLResourcesManager::getInstance()->releaseGPUItem(varDivergingArrayBufferID);
+    MGLResourcesManager::getInstance()->releaseGPUItem(varOutputParameterIdxBufferID);
 }
 
 
@@ -473,6 +564,43 @@ void MBezierTrajectories::updateSelectedLines(const QVector<uint32_t>& selectedL
         bezierTrajectoriesRenderData.lineSelectedArrayBuffer->upload(
                 this->selectedLines.constData(), GL_STATIC_DRAW);
     }
+}
+
+
+void MBezierTrajectories::updateOutputParameterIdx(const int OutputParameterIdx)
+{
+    if (this->OutputParameterIdx.empty())
+    {
+        this->OutputParameterIdx.push_back(0); // Current index
+        this->OutputParameterIdx.push_back(numAux + 1); // Start index of sensitivity IDs
+        this->OutputParameterIdx.push_back(numTimesteps); // Offset for the sensitivity data (= number of time steps)
+    }
+    if (OutputParameterIdx < 0)
+    {
+        this->OutputParameterIdx[0] = 0;
+    } else
+    {
+        this->OutputParameterIdx[0] = OutputParameterIdx;
+    }
+    // TODO Either upload the index and change the next source file or change the index buffer such as
+    if (bezierTrajectoriesRenderData.varSelectedArrayBuffer)
+    {
+        bezierTrajectoriesRenderData.varOutputParameterIdxBuffer->upload(
+                this->OutputParameterIdx.constData(), GL_STATIC_DRAW);
+    }
+//    this->selectedVariableIndices
+//    if (bezierTrajectoriesRenderData.varSelectedArrayBuffer)
+//    {
+//        QVector<uint32_t> selectedVariableIndicesAll;
+//        selectedVariableIndicesAll.resize(int(numVariables));
+//        for (int i = 0; i < selectedVariableIndices.size(); i++) {
+//            selectedVariableIndicesAll[int(i)] = selectedVariableIndices.at(int(i));
+//        }
+//        bezierTrajectoriesRenderData.varSelectedArrayBuffer->upload(
+//                selectedVariableIndicesAll.constData(), GL_STATIC_DRAW);
+//    }
+//  or maybe varDescArrayBufferID
+
 }
 
 
