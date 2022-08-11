@@ -285,9 +285,9 @@ private:
 
     // Lighting settings.
     bool useColorIntensity = true;
-    float materialConstantAmbient = 0.2f;
-    float materialConstantDiffuse = 0.7f;
-    float materialConstantSpecular = 0.5f;
+    float materialConstantAmbient = 0.75f;
+    float materialConstantDiffuse = 0.2f;
+    float materialConstantSpecular = 0.3f;
     float materialConstantSpecularExp = 8.0f;
     bool drawHalo = true;
     float haloFactor = 1.0f;

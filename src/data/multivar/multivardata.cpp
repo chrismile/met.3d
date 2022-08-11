@@ -416,10 +416,14 @@ void MMultiVarData::loadConfiguration(QSettings *settings)
 
     // Lighting settings.
     useColorIntensity = settings->value("useColorIntensity", true).toBool();
-    materialConstantAmbient = settings->value("materialConstantAmbient", 0.2f).toFloat();
-    materialConstantDiffuse = settings->value("materialConstantDiffuse", 0.7f).toFloat();
-    materialConstantSpecular = settings->value("materialConstantSpecular", 0.5f).toFloat();
+    materialConstantAmbient = settings->value("materialConstantAmbient", 0.75f).toFloat();
+    properties->mDecoratedDouble()->setValue(materialConstantAmbientProperty, materialConstantAmbient);
+    materialConstantDiffuse = settings->value("materialConstantDiffuse", 0.2f).toFloat();
+    properties->mDecoratedDouble()->setValue(materialConstantDiffuseProperty, materialConstantDiffuse);
+    materialConstantSpecular = settings->value("materialConstantSpecular", 0.3f).toFloat();
+    properties->mDecoratedDouble()->setValue(materialConstantSpecularProperty, materialConstantSpecular);
     materialConstantSpecularExp = settings->value("materialConstantSpecularExp", 8.0f).toFloat();
+    properties->mDecoratedDouble()->setValue(materialConstantSpecularExpProperty, materialConstantSpecularExp);
     drawHalo = settings->value("drawHalo", true).toBool();
     haloFactor = settings->value("haloFactor", 1.0f).toFloat();
 
@@ -889,8 +893,10 @@ void MMultiVarData::onBezierTrajectoriesLoaded(MTrajectories* trajectories)
 
             // Update the list of selected transfer functions.
             auto transferFunctionsMultiVarOld = transferFunctionsMultiVar;
+            QVector<QString> tfNamesOld;
             for (int varIdxOld = 0; varIdxOld < varNamesOld.size(); varIdxOld++)
             {
+                tfNamesOld.push_back(properties->getEnumItem(tfPropertiesMultiVar[varIdxOld]));
                 actor->removeProperty(tfPropertiesMultiVar[varIdxOld], multiVarGroupProperty);
             }
             tfPropertiesMultiVar.clear();
@@ -904,6 +910,8 @@ void MMultiVarData::onBezierTrajectoriesLoaded(MTrajectories* trajectories)
                     if (tf)
                     {
                         setTransferFunctionMultiVar(int(it->second), tf);
+                        const QString& tfName = tfNamesOld.at(varIdxOld);
+                        setTransferFunctionMultiVar(int(it->second), tfName);
                     }
                 }
             }
