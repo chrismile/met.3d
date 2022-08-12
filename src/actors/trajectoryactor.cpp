@@ -936,7 +936,12 @@ void MTrajectoryActor::loadConfiguration(QSettings *settings)
     if (settings->contains("particlePosTimeStep"))
     {
         particlePosTimeStep = settings->value("particlePosTimeStep", particlePosTimeStep).toInt();
-        properties->mEnum()->setValue(particlePosTimeProperty, particlePosTimeStep);
+        cachedParticlePosTimeStep = particlePosTimeStep;
+        loadedParticlePosTimeStepFromSettings = true;
+        if (!properties->mEnum()->enumNames(particlePosTimeProperty).empty())
+        {
+            properties->mEnum()->setValue(particlePosTimeProperty, particlePosTimeStep);
+        }
         if (synchronizeParticlePosTime)
         {
             synchronizeParticlePosTime = false;
@@ -1775,6 +1780,12 @@ void MTrajectoryActor::asynchronousBezierTrajectoriesAvailable(MDataRequest requ
         if (queueContainsEntryWithNoPendingRequests)
         {
             prepareAvailableDataForRendering(t);
+            if (loadedParticlePosTimeStepFromSettings)
+            {
+                particlePosTimeStep = cachedParticlePosTimeStep;
+                properties->mEnum()->setValue(particlePosTimeProperty, particlePosTimeStep);
+            }
+            loadedParticlePosTimeStepFromSettings = false;
         }
     }
 }

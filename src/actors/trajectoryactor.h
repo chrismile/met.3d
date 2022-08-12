@@ -653,6 +653,8 @@ private:
     QtProperty *startTimeProperty;
     QtProperty *particlePosTimeProperty;
     int         particlePosTimeStep;
+    int         cachedParticlePosTimeStep = 0;
+    bool        loadedParticlePosTimeStepFromSettings = false;
 
     /** Ensemble management. */
     QtProperty *ensembleModeProperty;
