@@ -228,6 +228,9 @@ shader FSmain(in VSOutput inputs, out vec4 fragColor)
     vec4 color = computePhongLightingSphere(
             surfaceColor, occlusionFactor, shadowFactor, inputs.fragmentPosition, n,
             abs((ribbonPosition - 0.5) * 2.0), separatorWidthSphere);
+    if (dot(n, v) < 1.0 - separatorWidthSphere * 76.0) {
+        color.rgb = vec3(0.0);
+    }
 
     //color = vec4(vec3(angle), 1.0);
 

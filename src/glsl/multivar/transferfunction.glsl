@@ -59,8 +59,8 @@ vec4 transferFunction(float attr, uint variableIndex) {
     float posFloat;
     if (useLogScale != 0) {
         float log10factor = 1 / log(10);
-        float logMin = log(minAttributeValue) * log10factor;
-        float logMax = log(maxAttributeValue) * log10factor;
+        float logMin = log(abs(minAttributeValue)) * log10factor;
+        float logMax = log(abs(maxAttributeValue)) * log10factor;
         float logAttr = log(attr) * log10factor;
         posFloat = clamp((logAttr - logMin) / (logMax - logMin), 0.0, 1.0);
     } else {
