@@ -71,6 +71,7 @@ shader VSmain(in vec3 vertexPosition : 0, in vec3 vertexNormal : 1, out VSOutput
  ***                          FRAGMENT SHADER
  *****************************************************************************/
 
+#define GREAT_CIRCLES_MODE
 #include "multivar_shading_utils.glsl"
 
 /**
@@ -240,6 +241,9 @@ shader FSmain(in VSOutput inputs, out vec4 fragColor)
     // 4) Determine variable color
     vec4 surfaceColor = determineColorLinearInterpolate(
             actualVarID, variableValue, variableNextValue, interpolationFactor);
+#ifdef USE_ARTIFICIAL_TEST_DATA
+    surfaceColor = determineColorArtificialData(fragmentLineID, varID, actualVarID, surfaceColor);
+#endif
 
     float separatorWidthCopy = separatorWidth;
     if (isnan(param)) {

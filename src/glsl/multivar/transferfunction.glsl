@@ -81,6 +81,11 @@ vec4 transferFunction(float attr, uint variableIndex) {
     return texture(transferFunctionTexture, vec2(posFloat, variableIndex));
 }
 
+vec4 transferFunctionArtificial(float posFloat, uint variableIndex) {
+    // Look up the color value.
+    return texture(transferFunctionTexture, vec2(posFloat, variableIndex));
+}
+
 #else
 
 uniform float minAttributeValue = 0.0;

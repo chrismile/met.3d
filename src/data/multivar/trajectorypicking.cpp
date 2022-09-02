@@ -1317,6 +1317,8 @@ bool MTrajectoryPicker::toolTipPick(MSceneViewGLWidget* sceneView, const QPoint 
     //text = QString("Idx %1, Time %2, Var %3").arg(trajectoryIndex).arg(int(timeAtHit)).arg(varName);
     //text = QString("Time %1, %2 (%3%)").arg(int(timeAtHit)).arg(varName).arg(
     //        int(std::round(varFraction * 100)));
+    //text = QString("Time %1 (%2), %3 %4").arg(int(timeAtHit)).arg(trajectoryIndex).arg(varName).arg(
+    //        varVal, 0, 'g', 2);
     text = QString("Time %1, %2 %3").arg(int(timeAtHit)).arg(varName).arg(
             varVal, 0, 'g', 2);
 

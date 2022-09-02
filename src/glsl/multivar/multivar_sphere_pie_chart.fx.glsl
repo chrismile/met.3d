@@ -213,6 +213,9 @@ shader FSmain(in VSOutput inputs, out vec4 fragColor)
 
     // 4) Determine variable color
     vec4 surfaceColor = determineColor(actualVarID, variableValue);
+#ifdef USE_ARTIFICIAL_TEST_DATA
+    surfaceColor = determineColorArtificialData(fragmentLineID, varID, actualVarID, surfaceColor);
+#endif
 
     float h = nPlaneLength;
     float separatorWidthSphere = separatorWidth * lineRadius / (sphereRadius * h * M_PI);
@@ -228,7 +231,7 @@ shader FSmain(in VSOutput inputs, out vec4 fragColor)
     vec4 color = computePhongLightingSphere(
             surfaceColor, occlusionFactor, shadowFactor, inputs.fragmentPosition, n,
             abs((ribbonPosition - 0.5) * 2.0), separatorWidthSphere);
-    if (dot(n, v) < 1.0 - separatorWidthSphere * 1000.0) {
+    if (dot(n, v) < 1.0 - separatorWidthSphere * 1000.0) { // 1000.0 / 76.0 / 95.0
         color.rgb = vec3(0.0);
     }
 
