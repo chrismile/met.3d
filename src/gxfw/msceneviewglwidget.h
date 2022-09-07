@@ -559,6 +559,7 @@ private:
     QtProperty *backgroundColourProperty;
     QtProperty *farPlaneDistanceProperty;
     float       farPlaneDistance;
+    QtProperty *fieldOfViewProperty;
     QtProperty *multisamplingProperty;
     bool        multisamplingEnabled;
     QtProperty *antialiasingProperty;

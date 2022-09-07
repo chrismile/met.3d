@@ -360,6 +360,14 @@ MSceneViewGLWidget::MSceneViewGLWidget()
             ->setMinimum(farPlaneDistanceProperty, 0.01);
     renderingGroupProperty->addSubProperty(farPlaneDistanceProperty);
 
+    fieldOfViewProperty = systemControl->getDecoratedDoublePropertyManager()
+            ->addProperty("field of view");
+    systemControl->getDecoratedDoublePropertyManager()
+            ->setValue(fieldOfViewProperty, verticalAngle);
+    systemControl->getDecoratedDoublePropertyManager()
+            ->setMinimum(fieldOfViewProperty, 0.01);
+    renderingGroupProperty->addSubProperty(fieldOfViewProperty);
+
     multisamplingProperty = systemControl->getBoolPropertyManager()
             ->addProperty("multisampling");
     systemControl->getBoolPropertyManager()
@@ -993,6 +1001,20 @@ void MSceneViewGLWidget::onPropertyChanged(QtProperty *property)
         farPlaneDistance = MSystemManagerAndControl::getInstance()
                 ->getDecoratedDoublePropertyManager()
                 ->value(farPlaneDistanceProperty);
+#ifndef CONTINUOUS_GL_UPDATE
+#ifdef USE_QOPENGLWIDGET
+        update();
+#else
+        updateGL();
+#endif
+#endif
+    }
+
+    else if (property == fieldOfViewProperty)
+    {
+        verticalAngle = MSystemManagerAndControl::getInstance()
+                ->getDecoratedDoublePropertyManager()
+                ->value(fieldOfViewProperty);
 #ifndef CONTINUOUS_GL_UPDATE
 #ifdef USE_QOPENGLWIDGET
         update();
@@ -3291,6 +3313,7 @@ void MSceneViewGLWidget::saveConfiguration(QSettings *settings)
     settings->setValue("backgroundColour",  sysMC->getColorPropertyManager()
                        ->value(backgroundColourProperty));
     settings->setValue("farPlaneDistance", farPlaneDistance);
+    settings->setValue("verticalAngle", verticalAngle);
     settings->setValue("multisampling", multisamplingEnabled);
     settings->setValue("antialiasing", antialiasingEnabled);
     settings->setValue("depthTestForLabels", renderLabelsWithDepthTest);
@@ -3405,6 +3428,9 @@ void MSceneViewGLWidget::loadConfiguration(QSettings *settings)
     sysMC->getDecoratedDoublePropertyManager()->setValue(
                 farPlaneDistanceProperty,
                 settings->value("farPlaneDistance", 500.f).toDouble());
+    sysMC->getDecoratedDoublePropertyManager()->setValue(
+                fieldOfViewProperty,
+                settings->value("verticalAngle", 45.f).toDouble());
     sysMC->getBoolPropertyManager()->setValue(
                 multisamplingProperty,
                 settings->value("multisampling", true).toBool());
