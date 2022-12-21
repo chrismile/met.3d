@@ -253,6 +253,7 @@ endif()
 find_package(proj REQUIRED)
 include_directories(${proj_INCLUDE_DIR})
 # Add PROJ library version as preprocessor definitions.
+add_definitions(-DPROJ_VERSION=${proj_VERSION})
 add_definitions(-DPROJ_MAJOR_VERSION=${proj_MAJOR_VERSION})
 add_definitions(-DPROJ_MINOR_VERSION=${proj_MINOR_VERSION})
 add_definitions(-DPROJ_PATCH_VERSION=${proj_PATCH_VERSION})

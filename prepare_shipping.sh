@@ -25,7 +25,10 @@ if command -v apt &> /dev/null; then
         sudo apt install -y cmake git curl wget zip pkg-config build-essential gfortran patchelf
     fi
     
-    if ! is_installed_apt "qt5-default" || ! is_installed_apt "liblog4cplus-dev" \
+    # qt5-default replaced by qtbase5-dev qtchooser qt5-qmake qtbase5-dev-tools since Ubuntu 22.04.
+    if ! is_installed_apt "qtbase5-dev" || ! is_installed_apt "qtchooser" \
+            || ! is_installed_apt "qt5-qmake" || ! is_installed_apt "qtbase5-dev-tools" \
+            || ! is_installed_apt "libqt5charts5-dev" || ! is_installed_apt "liblog4cplus-dev" \
             || ! is_installed_apt "libgdal-dev" || ! is_installed_apt "libnetcdf-dev" \
             || ! is_installed_apt "libnetcdf-c\+\+4-dev" || ! is_installed_apt "libeccodes-dev" \
             || ! is_installed_apt "libfreetype6-dev" || ! is_installed_apt "libgsl-dev" \
@@ -33,7 +36,9 @@ if command -v apt &> /dev/null; then
         echo "------------------------"
         echo "Installing dependencies "
         echo "------------------------"
-        sudo apt install -y qt5-default liblog4cplus-dev libgdal-dev libnetcdf-dev libnetcdf-c++4-dev libeccodes-dev libfreetype6-dev libgsl-dev libglew-dev libproj-dev
+        sudo apt install -y qtbase5-dev qtchooser qt5-qmake qtbase5-dev-tools libqt5charts5-dev \
+        liblog4cplus-dev libgdal-dev  libnetcdf-dev libnetcdf-c++4-dev libeccodes-dev \
+        libfreetype6-dev libgsl-dev libglew-dev libproj-dev
     fi
 else
     echo "Error: Unsupported system package manager detected." >&2
@@ -140,7 +145,9 @@ popd >/dev/null
 
 if [ ! -d "./met.3d" ]; then
     git clone https://gitlab.com/chrismile/met.3d
+    pushd met.3d >/dev/null
     git checkout multivar
+    popd >/dev/null
 fi
 
 if [ ! -d "./build" ]; then

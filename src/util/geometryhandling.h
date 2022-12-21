@@ -32,8 +32,10 @@
 #include <QtCore>
 #include "ogrsf_frmts.h"
 #include "cpl_error.h"
-#ifdef ACCEPT_USE_OF_DEPRECATED_PROJ_API_H
+#if defined(ACCEPT_USE_OF_DEPRECATED_PROJ_API_H) && PROJ_VERSION < 8
 #include <proj_api.h>
+#else
+#include <proj.h>
 #endif
 
 // local application imports
@@ -105,7 +107,11 @@ private:
     void appendOGRLineStringsFromOGRGeometry(QList<OGRLineString*> *lineStrings,
                                              OGRGeometry *geometry);
 
+#if PROJ_VERSION < 8
     projPJ pjDstProjection, pjSrcProjection;
+#else
+    PJ *pjSrcDstTransformation, *pjDstSrcTransformation;
+#endif
     QPointF rotatedPole;
 };
 

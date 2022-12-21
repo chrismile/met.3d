@@ -53,8 +53,13 @@ namespace Met3D
 *******************************************************************************/
 
 MGeometryHandling::MGeometryHandling()
+#if PROJ_VERSION < 8
     : pjDstProjection(nullptr),
       pjSrcProjection(nullptr),
+#else
+    : pjSrcDstTransformation(nullptr),
+      pjDstSrcTransformation(nullptr),
+#endif
       rotatedPole(QPointF(0., 90.))
 {
 
@@ -190,14 +195,33 @@ void MGeometryHandling::initProjProjection(QString projString)
     // See https://proj.org/development/reference/deprecated.html
 //TODO (mr, 16Oct2020) -- replace by new proj API.
     destroyProjProjection();
+#if PROJ_VERSION < 8
     pjDstProjection = pj_init_plus(projString.toStdString().c_str());
     if (!pjDstProjection)
     {
         LOG4CPLUS_ERROR(mlog, "ERROR: cannot initialize proj with definition '"
-                        << projString.toStdString() << "' (dst); error is '"
-                        << pj_strerrno(pj_errno) << "'.");
+                << projString.toStdString() << "' (dst); error is '"
+                << pj_strerrno(pj_errno) << "'.");
     }
+#else
+    QString srcProjString = "+proj=latlong +ellps=WGS84";
+    pjSrcDstTransformation = proj_create_crs_to_crs(
+                PJ_DEFAULT_CTX,
+                srcProjString.toStdString().c_str(),
+                projString.toStdString().c_str(),
+                NULL);
 
+    if (proj_errno(pjSrcDstTransformation))
+    {
+        LOG4CPLUS_ERROR(mlog, "ERROR: cannot initialize proj with definition '"
+                        << projString.toStdString() << "' (dst); error is '"
+                        << proj_context_errno_string(
+                            PJ_DEFAULT_CTX, proj_errno(pjSrcDstTransformation))
+                        << "'.");
+    }
+#endif
+
+#if PROJ_VERSION < 8
     // Source coordinate system for coordinates is assumed to be simple
     // lon/lat in WGS84, e.g. NaturalEarth:
     //   https://www.naturalearthdata.com/features/
@@ -206,16 +230,37 @@ void MGeometryHandling::initProjProjection(QString projString)
     if (!pjSrcProjection)
     {
         LOG4CPLUS_ERROR(mlog, "ERROR: cannot initialize proj with definition '"
-                        << srcProjString.toStdString() << " (src)'; error is '"
-                        << pj_strerrno(pj_errno) << "'.");
+                << srcProjString.toStdString() << " (src)'; error is '"
+                << pj_strerrno(pj_errno) << "'.");
     }
+#else
+    pjDstSrcTransformation = proj_create_crs_to_crs(
+                PJ_DEFAULT_CTX,
+                projString.toStdString().c_str(),
+                srcProjString.toStdString().c_str(),
+                NULL);
+
+    if (proj_errno(pjDstSrcTransformation)) // Check for non-zero error code
+    {
+        LOG4CPLUS_ERROR(mlog, "ERROR: cannot initialize proj with definition '"
+                        << projString.toStdString() << "' (dst); error is '"
+                        << proj_context_errno_string(
+                            PJ_DEFAULT_CTX, proj_errno(pjDstSrcTransformation))
+                        << "'.");
+    }
+#endif
 }
 
 
 void MGeometryHandling::destroyProjProjection()
 {
+#if PROJ_VERSION < 8
     if (pjDstProjection) pj_free(pjDstProjection);
     if (pjSrcProjection) pj_free(pjSrcProjection);
+#else
+    if (pjSrcDstTransformation) proj_destroy(pjSrcDstTransformation);
+    if (pjDstSrcTransformation) proj_destroy(pjDstSrcTransformation);
+#endif
 }
 
 
@@ -225,7 +270,11 @@ QPointF MGeometryHandling::geographicalToProjectedCoordinates(
     // For tests:
     // https://mygeodata.cloud/cs2cs/
 
+#if PROJ_VERSION < 8
     if (!pjSrcProjection || !pjDstProjection)
+#else
+    if (!pjSrcDstTransformation || !pjDstSrcTransformation)
+#endif
     {
         LOG4CPLUS_ERROR(mlog, "ERROR: proj library not initialized, cannot "
                               "project geographical coordinates.");
@@ -235,24 +284,52 @@ QPointF MGeometryHandling::geographicalToProjectedCoordinates(
     int errorCode;
     double lon_x = 0.;
     double lat_y = 0.;
+#if PROJ_VERSION >= 8
+    PJ_COORD c, c_out;
+#endif
 
     if (inverse)
     {
         // Inverse projection: projected to geographical coordinates.
         lon_x = point.x() * MetConstants::scaleFactorToFitProjectedCoordsTo360Range;
         lat_y = point.y() * MetConstants::scaleFactorToFitProjectedCoordsTo360Range;
+#if PROJ_VERSION < 8
         errorCode = pj_transform(pjDstProjection, pjSrcProjection,
                                  1, 1, &lon_x, &lat_y, NULL);
         lon_x = radiansToDegrees(lon_x);
         lat_y = radiansToDegrees(lat_y);
+#else
+        // See https://proj.org/development/migration.html
+        c.lpzt.z = 0.0;
+        c.lpzt.t = HUGE_VAL;
+        c.lpzt.lam = lon_x;
+        c.lpzt.phi = lat_y;
+        c_out = proj_trans(pjDstSrcTransformation, PJ_FWD, c);
+        errorCode = proj_errno(pjDstSrcTransformation);
+        lon_x = c_out.xy.x;
+        lat_y = c_out.xy.y;
+#endif
     }
     else
     {
         // Geographical to projected coordinates.
+#if PROJ_VERSION < 8
         lon_x = degreesToRadians(point.x());
         lat_y = degreesToRadians(point.y());
         errorCode = pj_transform(pjSrcProjection, pjDstProjection,
                                  1, 1, &lon_x, &lat_y, NULL);
+#else
+        lon_x = point.x();
+        lat_y = point.y();
+        c.lpzt.z = 0.0;
+        c.lpzt.t = HUGE_VAL;
+        c.lpzt.lam = lon_x;
+        c.lpzt.phi = lat_y;
+        c_out = proj_trans(pjSrcDstTransformation, PJ_FWD, c);
+        errorCode = proj_errno(pjSrcDstTransformation);
+        lon_x = c_out.xy.x;
+        lat_y = c_out.xy.y;
+#endif
         lon_x /= MetConstants::scaleFactorToFitProjectedCoordsTo360Range;
         lat_y /= MetConstants::scaleFactorToFitProjectedCoordsTo360Range;
     }
@@ -264,7 +341,11 @@ QPointF MGeometryHandling::geographicalToProjectedCoordinates(
         LOG4CPLUS_ERROR(mlog, "ERROR: proj transformation of point ("
                         << point.x() << ", " << point.y()
                         << ") failed with error '"
+#if PROJ_VERSION < 8
                         << pj_strerrno(errorCode)
+#else
+                        << proj_context_errno_string(PJ_DEFAULT_CTX, errorCode)
+#endif
                         << "'. Returning (0., 0.).");
         return QPointF();
     }

@@ -47,7 +47,11 @@
 #include <gsl/gsl_version.h>
 #include <netcdf_meta.h>
 #include <gdal_version.h>
+#if PROJ_VERSION < 8
 #include <proj_api.h>
+#else
+#include <proj.h>
+#endif
 
 // local application imports
 #include "gxfw/msystemcontrol.h"
@@ -1315,7 +1319,11 @@ void MMainWindow::showAboutDialog()
 #else
     .arg("x").arg("x").arg("x")
 #endif
+#if PROJ_VERSION < 8
             .arg(PJ_VERSION);
+#else
+            .arg((proj_info()).version);
+#endif
 
     QMessageBox::about(this, "About Met.3D", aboutString);
 }
