@@ -50,7 +50,6 @@ add_definitions(-DENABLE_MET3D_STOPWATCH
                 -DENABLE_RAYCASTER_ACCELERATION
                 -DDIRECT_SYNCHRONIZATION
                 -DQCUSTOMPLOT_USE_LIBRARY
-                -DACCEPT_USE_OF_DEPRECATED_PROJ_API_H
                 -DNOMINMAX) # required for windows support
 
 set(CMAKE_CXX_STANDARD 11)
@@ -253,6 +252,9 @@ endif()
 find_package(proj REQUIRED)
 include_directories(${proj_INCLUDE_DIR})
 # Add PROJ library version as preprocessor definitions.
+if(proj_VERSION VERSION_LESS "8")
+    add_definitions(-DACCEPT_USE_OF_DEPRECATED_PROJ_API_H)
+endif()
 add_definitions(-DPROJ_VERSION=${proj_VERSION})
 add_definitions(-DPROJ_MAJOR_VERSION=${proj_MAJOR_VERSION})
 add_definitions(-DPROJ_MINOR_VERSION=${proj_MINOR_VERSION})
