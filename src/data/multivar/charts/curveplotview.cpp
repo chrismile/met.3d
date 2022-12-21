@@ -2045,16 +2045,14 @@ float MCurvePlotView::computeMI(
     //        histogram1[binIdx] += 1;
     //    }
     //}
-    for (size_t timeStepIdx0 = 0; timeStepIdx0 < numTimeSteps; timeStepIdx0++) {
-        for (size_t timeStepIdx1 = 0; timeStepIdx1 < numTimeSteps; timeStepIdx1++) {
-            Real val0 = factor * valueArray.at(timeStepIdx0).at(varIdx0);
-            Real val1 = factor * valueArray.at(timeStepIdx1).at(varIdx1);
-            if (!std::isnan(val0) && !std::isnan(val1)) {
-                int binIdx0 = clamp(int(val0 * Real(numBins)), 0, numBins - 1);
-                int binIdx1 = clamp(int(val1 * Real(numBins)), 0, numBins - 1);
-                //totalSum2d += 1;
-                histogram2d[binIdx0 * numBins + binIdx1] += 1;
-            }
+    for (size_t timeStepIdx = 0; timeStepIdx < numTimeSteps; timeStepIdx++) {
+        Real val0 = factor * valueArray.at(timeStepIdx).at(varIdx0);
+        Real val1 = factor * valueArray.at(timeStepIdx).at(varIdx1);
+        if (!std::isnan(val0) && !std::isnan(val1)) {
+            int binIdx0 = clamp(int(val0 * Real(numBins)), 0, numBins - 1);
+            int binIdx1 = clamp(int(val1 * Real(numBins)), 0, numBins - 1);
+            //totalSum2d += 1;
+            histogram2d[binIdx0 * numBins + binIdx1] += 1;
         }
     }
 
@@ -2069,27 +2067,6 @@ float MCurvePlotView::computeMI(
     //    }
     //}
     Real totalSum2d = 0;
-    for (int binIdx0 = 0; binIdx0 < numBins; binIdx0++) {
-        for (int binIdx1 = 0; binIdx1 < numBins; binIdx1++) {
-            totalSum2d += histogram2d[binIdx0 * numBins + binIdx1];
-        }
-    }
-    for (int binIdx0 = 0; binIdx0 < numBins; binIdx0++) {
-        for (int binIdx1 = 0; binIdx1 < numBins; binIdx1++) {
-            histogram2d[binIdx0 * numBins + binIdx1] /= totalSum2d;
-        }
-    }
-
-    // Regularize.
-    const Real REG_FACTOR = 1e-7;
-    for (int binIdx0 = 0; binIdx0 < numBins; binIdx0++) {
-        for (int binIdx1 = 0; binIdx1 < numBins; binIdx1++) {
-            histogram2d[binIdx0 * numBins + binIdx1] += REG_FACTOR;
-        }
-    }
-
-    // Normalize again.
-    totalSum2d = 0;
     for (int binIdx0 = 0; binIdx0 < numBins; binIdx0++) {
         for (int binIdx1 = 0; binIdx1 < numBins; binIdx1++) {
             totalSum2d += histogram2d[binIdx0 * numBins + binIdx1];
@@ -2116,18 +2093,25 @@ float MCurvePlotView::computeMI(
      * and the joint entropy $H(x, y) = -\sum_i \sum_j p_{xy}(i, j) \log p_{xy}(i, j)$
      * b) $MI = \sum_i \sum_j p_{xy}(i, j) \log \frac{p_{xy}(i, j)}{p_x(i) p_y(j)}$
      */
-    const Real EPSILON = Real(1) / Real(numBins * numBins) * 1e-3;
+    const Real EPSILON_1D = Real(0.5) / Real(numTimeSteps);
+    const Real EPSILON_2D = Real(0.5) / Real(numTimeSteps * numTimeSteps);
     Real mi = 0.0;
     for (int binIdx = 0; binIdx < numBins; binIdx++) {
         Real p_x = histogram0[binIdx];
         Real p_y = histogram1[binIdx];
-        mi -= p_x * std::log(std::max(p_x, EPSILON));
-        mi -= p_y * std::log(std::max(p_y, EPSILON));
+        if (p_x > EPSILON_1D) {
+            mi -= p_x * std::log(p_x);
+        }
+        if (p_y > EPSILON_1D) {
+            mi -= p_y * std::log(p_y);
+        }
     }
     for (int binIdx0 = 0; binIdx0 < numBins; binIdx0++) {
         for (int binIdx1 = 0; binIdx1 < numBins; binIdx1++) {
             Real p_xy = histogram2d[binIdx0 * numBins + binIdx1];
-            mi += p_xy * std::log(std::max(p_xy, EPSILON));
+            if (p_xy > EPSILON_2D) {
+                mi += p_xy * std::log(p_xy);
+            }
         }
     }
     /*for (int binIdx0 = 0; binIdx0 < numBins; binIdx0++) {

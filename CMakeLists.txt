@@ -71,6 +71,8 @@ if (USE_QOPENGLWIDGET)
     add_definitions(-DUSE_QOPENGLWIDGET)
 endif()
 
+option(USE_STATIC_STD_LIBRARIES "Link with standard libraries statically (only supported on Linux for now)." OFF)
+
 # Operating-system specific settings.
 if (WIN32)
 	add_definitions(-DWIN32)
@@ -333,6 +335,13 @@ add_executable(Met3D # executable name
                 ${MET3D_RC_SRCS}
   )
 
+if(${USE_STATIC_STD_LIBRARIES})
+    target_link_options(Met3D PRIVATE -static-libgcc -static-libstdc++)
+endif()
+if (${USE_STATIC_STD_LIBRARIES} AND UNIX AND NOT APPLE AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND ${CMAKE_VERSION} VERSION_GREATER "3.12")
+    target_link_options(Met3D PRIVATE "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/cmake/symbols_linux_gcc.map")
+endif()
+
 # Link Qt4 and other libraries to executable.
 target_link_libraries(Met3D
                         ${FREETYPE_LIBRARIES}
@@ -347,7 +356,7 @@ target_link_libraries(Met3D
                         ${netcdf_cxx4_C_LIBRARIES}
                         ${qcustomplot_LIBRARIES}
                         ${glfx_LIBRARIES}
-			${proj_LIBRARIES}
+                        ${proj_LIBRARIES}
                         #${EIGEN3_LIBRARIES}
   )
 

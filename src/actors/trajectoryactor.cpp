@@ -3149,6 +3149,7 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
     else if (multiVarData.hasProperty(property))
     {
         multiVarData.onQtPropertyChanged(property);
+#ifdef USE_EMBREE
         if (multiVarData.getSelectedOutputParameterChanged())
         {
             for (MTrajectoryPicker *trajectoryPicker: trajectoryPickerMap)
@@ -3156,6 +3157,7 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
                 trajectoryPicker->updateSectedOutputParameter(multiVarData.getOutputParameterName(), multiVarData.getOutputParameterIdx());
             }
         }
+#endif
         if (suppressActorUpdates()) return;
         emitActorChangedSignal();
     }
