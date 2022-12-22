@@ -2,6 +2,14 @@
 
 set -euo pipefail
 
+use_vcpkg=false
+for ((i=1;i<=$#;i++));
+do
+    if [ ${!i} = "--use-vcpkg" ]; then
+        use_vcpkg=true
+    fi
+done
+
 MET3D_BASE_PATH="/home/$USER/met.3d-base"
 SHIPPING_DIR="$MET3D_BASE_PATH/Shipping"
 
@@ -25,20 +33,47 @@ if command -v apt &> /dev/null; then
         sudo apt install -y cmake git curl wget zip pkg-config build-essential gfortran patchelf
     fi
     
-    # qt5-default replaced by qtbase5-dev qtchooser qt5-qmake qtbase5-dev-tools since Ubuntu 22.04.
-    if ! is_installed_apt "qtbase5-dev" || ! is_installed_apt "qtchooser" \
-            || ! is_installed_apt "qt5-qmake" || ! is_installed_apt "qtbase5-dev-tools" \
-            || ! is_installed_apt "libqt5charts5-dev" || ! is_installed_apt "liblog4cplus-dev" \
-            || ! is_installed_apt "libgdal-dev" || ! is_installed_apt "libnetcdf-dev" \
-            || ! is_installed_apt "libnetcdf-c\+\+4-dev" || ! is_installed_apt "libeccodes-dev" \
-            || ! is_installed_apt "libfreetype6-dev" || ! is_installed_apt "libgsl-dev" \
-            || ! is_installed_apt "libglew-dev" || ! is_installed_apt "libproj-dev"; then
-        echo "------------------------"
-        echo "Installing dependencies "
-        echo "------------------------"
-        sudo apt install -y qtbase5-dev qtchooser qt5-qmake qtbase5-dev-tools libqt5charts5-dev \
-        liblog4cplus-dev libgdal-dev  libnetcdf-dev libnetcdf-c++4-dev libeccodes-dev \
-        libfreetype6-dev libgsl-dev libglew-dev libproj-dev
+    if $use_vcpkg; then
+        if ! is_installed_apt "libx11-dev" || ! is_installed_apt "libgl-dev" \
+                || ! is_installed_apt "libgl1-mesa-dev" || ! is_installed_apt "libglu1-mesa-dev" \
+                || ! is_installed_apt "libxmu-dev" || ! is_installed_apt "libxi-dev" \
+                || ! is_installed_apt "bison" || ! is_installed_apt "autoconf-archive" \
+                || ! is_installed_apt "libxext-dev" || ! is_installed_apt "libxfixes-dev" \
+                || ! is_installed_apt "libxrender-dev" || ! is_installed_apt "libxcb1-dev" \
+                || ! is_installed_apt "libx11-xcb-dev" || ! is_installed_apt "libxcb-glx0-dev" \
+                || ! is_installed_apt "libxcb-util0-dev" || ! is_installed_apt "libxkbcommon-dev" \
+                || ! is_installed_apt "libxcb-keysyms1-dev" || ! is_installed_apt "libxcb-image0-dev" \
+                || ! is_installed_apt "libxcb-shm0-dev" || ! is_installed_apt "libxcb-icccm4-dev" \
+                || ! is_installed_apt "libxcb-sync-dev" || ! is_installed_apt "libxcb-xfixes0-dev" \
+                || ! is_installed_apt "libxcb-shape0-dev" || ! is_installed_apt "libxcb-randr0-dev" \
+                || ! is_installed_apt "libxcb-render-util0-dev" || ! is_installed_apt "libxcb-xinerama0-dev" \
+                || ! is_installed_apt "libxcb-xkb-dev" || ! is_installed_apt "libxcb-xinput-dev" \
+                || ! is_installed_apt "libxkbcommon-x11-dev" || ! is_installed_apt "libeccodes-dev"; then
+            echo "------------------------"
+            echo "Installing dependencies "
+            echo "------------------------"
+            sudo apt install -y libx11-dev libgl-dev libgl1-mesa-dev libglu1-mesa-dev libxmu-dev libxi-dev bison \
+            autoconf-archive libxext-dev libxfixes-dev libxrender-dev libxcb1-dev libx11-xcb-dev libxcb-glx0-dev \
+            libxcb-util0-dev libxkbcommon-dev libxcb-keysyms1-dev libxcb-image0-dev libxcb-shm0-dev libxcb-icccm4-dev \
+            libxcb-sync-dev libxcb-xfixes0-dev libxcb-shape0-dev libxcb-randr0-dev libxcb-render-util0-dev \
+            libxcb-xinerama0-dev libxcb-xkb-dev libxcb-xinput-dev libxkbcommon-x11-dev libeccodes-dev
+        fi
+    else
+        # qt5-default replaced by qtbase5-dev qtchooser qt5-qmake qtbase5-dev-tools since Ubuntu 22.04.
+        if ! is_installed_apt "qtbase5-dev" || ! is_installed_apt "qtchooser" \
+                || ! is_installed_apt "qt5-qmake" || ! is_installed_apt "qtbase5-dev-tools" \
+                || ! is_installed_apt "libqt5charts5-dev" || ! is_installed_apt "liblog4cplus-dev" \
+                || ! is_installed_apt "libgdal-dev" || ! is_installed_apt "libnetcdf-dev" \
+                || ! is_installed_apt "libnetcdf-c\+\+4-dev" || ! is_installed_apt "libeccodes-dev" \
+                || ! is_installed_apt "libfreetype6-dev" || ! is_installed_apt "libgsl-dev" \
+                || ! is_installed_apt "libglew-dev" || ! is_installed_apt "libproj-dev"; then
+            echo "------------------------"
+            echo "Installing dependencies "
+            echo "------------------------"
+            sudo apt install -y qtbase5-dev qtchooser qt5-qmake qtbase5-dev-tools libqt5charts5-dev \
+            liblog4cplus-dev libgdal-dev  libnetcdf-dev libnetcdf-c++4-dev libeccodes-dev \
+            libfreetype6-dev libgsl-dev libglew-dev libproj-dev
+        fi
     fi
 else
     echo "Error: Unsupported system package manager detected." >&2
@@ -88,6 +123,7 @@ fi
 #    popd >/dev/null
 #fi
 
+#if $use_vcpkg; then
 if [ ! -d "./qcustomplot" ]; then
     wget https://www.qcustomplot.com/release/2.1.0fixed/QCustomPlot.tar.gz
     wget https://www.qcustomplot.com/release/2.1.0fixed/QCustomPlot-sharedlib.tar.gz
