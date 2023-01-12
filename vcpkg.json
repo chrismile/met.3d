@@ -1,0 +1,24 @@
+{
+  "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg/master/scripts/vcpkg.schema.json",
+  "name": "met3d",
+  "version": "1.6.0",
+  "dependencies": [
+    "qt5-base",
+    "qt5-imageformats",
+    "qt5-charts",
+    "qcustomplot",
+    "gsl",
+    "log4cplus",
+    "netcdf-c",
+    "netcdf-cxx4",
+    "hdf5",
+    "freetype",
+    "gdal",
+    "glew",
+    "embree3",
+    {
+      "name": "proj",
+      "features": [ "tiff" ]
+    }
+  ]
+}

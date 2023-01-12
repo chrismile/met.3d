@@ -2,15 +2,18 @@
 
 set -euo pipefail
 
+MET3D_BASE_PATH="/home/$USER/met.3d-base"
 use_vcpkg=false
 for ((i=1;i<=$#;i++));
 do
     if [ ${!i} = "--use-vcpkg" ]; then
         use_vcpkg=true
     fi
+    if [ ${!i} = "--met3d-base-path" ]; then
+        ((i++))
+        MET3D_BASE_PATH=${!i}
+    fi
 done
-
-MET3D_BASE_PATH="/home/$USER/met.3d-base"
 SHIPPING_DIR="$MET3D_BASE_PATH/Shipping"
 
 is_installed_apt() {
@@ -94,6 +97,17 @@ fi
 pushd third-party > /dev/null
 
 params=()
+
+if $use_vcpkg && [ ! -d "./vcpkg" ]; then
+    echo "------------------------"
+    echo "    Fetching vcpkg      "
+    echo "------------------------"
+    git clone --depth 1 https://github.com/Microsoft/vcpkg.git
+    vcpkg/bootstrap-vcpkg.sh -disableMetrics
+    cp "./vcpkg/triplets/x64-linux.cmake" "./vcpkg/triplets/community/x64-linux-release-only.cmake"
+    echo "set(VCPKG_BUILD_TYPE release)" >> "./vcpkg/triplets/community/x64-linux-release-only.cmake"
+    params+=(-DCMAKE_TOOLCHAIN_FILE="${MET3D_BASE_PATH}/third-party/vcpkg/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET="x64-linux-release-only")
+fi
 
 if [ ! -d "./glfx" ]; then
     echo "------------------------"
