@@ -1,17 +1,27 @@
 #!/bin/bash
 
-set -euo pipefail
+# Conda crashes with "set -euo pipefail".
+set -eo pipefail
 
-MET3D_BASE_PATH="/home/$USER/met.3d-base"
+MET3D_BASE_PATH="$HOME/met.3d-base"
 use_vcpkg=false
+use_conda=false
+conda_env_name="met3d_multivar"
 for ((i=1;i<=$#;i++));
 do
-    if [ ${!i} = "--use-vcpkg" ]; then
-        use_vcpkg=true
-    fi
     if [ ${!i} = "--met3d-base-path" ]; then
         ((i++))
         MET3D_BASE_PATH=${!i}
+    fi
+    if [ ${!i} = "--use-vcpkg" ]; then
+        use_vcpkg=true
+    fi
+    if [ ${!i} = "--use-conda" ]; then
+        use_conda=true
+    fi
+    if [ ${!i} = "--conda-env-name" ]; then
+        ((i++))
+        conda_env_name=${!i}
     fi
 done
 SHIPPING_DIR="$MET3D_BASE_PATH/Shipping"
@@ -25,7 +35,7 @@ is_installed_apt() {
     fi
 }
 
-if command -v apt &> /dev/null; then
+if command -v apt &> /dev/null && ! $use_conda; then
     if ! command -v cmake &> /dev/null || ! command -v git &> /dev/null || ! command -v curl &> /dev/null \
             || ! command -v wget &> /dev/null || ! command -v zip &> /dev/null \
             || ! command -v pkg-config &> /dev/null || ! command -v g++ &> /dev/null \
@@ -78,9 +88,58 @@ if command -v apt &> /dev/null; then
             libfreetype6-dev libgsl-dev libglew-dev libproj-dev
         fi
     fi
-else
+elif ! $use_conda; then
     echo "Error: Unsupported system package manager detected." >&2
     exit 1
+fi
+
+# https://stackoverflow.com/questions/8063228/check-if-a-variable-exists-in-a-list-in-bash
+list_contains() {
+    if [[ "$1" =~ (^|[[:space:]])"$2"($|[[:space:]]) ]]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+if $use_conda; then
+    if [ -f "$HOME/miniconda3/etc/profile.d/conda.sh" ]; then
+        . "$HOME/miniconda3/etc/profile.d/conda.sh" shell.bash hook
+    fi
+    if ! command -v conda &> /dev/null; then
+        echo "------------------------"
+        echo "  Installing Miniconda  "
+        echo "------------------------"
+        wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
+        chmod +x Miniconda3-latest-Linux-x86_64.sh
+        bash ./Miniconda3-latest-Linux-x86_64.sh
+        #wget https://repo.anaconda.com/miniconda/Miniconda3-py38_22.11.1-1-Linux-x86_64.sh
+        #chmod +x Miniconda3-py38_22.11.1-1-Linux-x86_64.sh
+        #bash ./Miniconda3-py38_22.11.1-1-Linux-x86_64.sh
+        . "$HOME/miniconda3/etc/profile.d/conda.sh" shell.bash hook
+    fi
+
+    if ! conda env list | grep ".*${conda_env_name}.*" >/dev/null 2>&1; then
+        echo "------------------------"
+        echo "Creating Conda environment"
+        echo "------------------------"
+        conda create -n "${conda_env_name}" -y
+        conda activate "${conda_env_name}"
+    elif [ "${var+CONDA_DEFAULT_ENV}" != "${conda_env_name}" ]; then
+        conda activate "${conda_env_name}"
+    fi
+
+    installed_packages="$(conda list)"
+    if ! list_contains "$installed_packages" "patchelf"; then
+        echo "------------------------"
+        echo "Installing Conda packages"
+        echo "------------------------"
+        conda install -y -c conda-forge cxx-compiler fortran-compiler make cmake pkg-config gdb glew log4cplus libgdal \
+        eccodes freetype gsl proj qt git mesa-libgl-devel-cos7-x86_64 mesa-dri-drivers-cos7-aarch64 \
+        libxau-devel-cos7-aarch64 libselinux-devel-cos7-aarch64 libxdamage-devel-cos7-aarch64 \
+        libxxf86vm-devel-cos7-aarch64 libxext-devel-cos7-aarch64 xorg-libxfixes xorg-libxau \
+        patchelf
+    fi
 fi
 
 if [ ! -d "$MET3D_BASE_PATH" ]; then
@@ -121,6 +180,19 @@ if [ ! -d "./glfx" ]; then
     make -j $(nproc)
     make install
     popd >/dev/null
+    popd >/dev/null
+fi
+
+if $use_conda && [ ! -d "./netcdf-cxx4-4.3.1" ]; then
+    echo "------------------------"
+    echo "Downloading netcdf-cxx4 "
+    echo "------------------------"
+    wget https://downloads.unidata.ucar.edu/netcdf-cxx/4.3.1/netcdf-cxx4-4.3.1.tar.gz
+    tar xf netcdf-cxx4-4.3.1.tar.gz
+    pushd netcdf-cxx4-4.3.1 >/dev/null
+    ./configure --prefix="${MET3D_BASE_PATH}/local"
+    make -j $(nproc)
+    make install
     popd >/dev/null
 fi
 
@@ -219,6 +291,9 @@ ldd_output="$(ldd $BINARY_PATH)"
 if ! $is_embree_installed && [ $os_arch = "x86_64" ]; then
     libembree3_so="$(readlink -f "${MET3D_BASE_PATH}/third-party/embree-${embree_version}.x86_64.linux/lib/libembree3.so")"
     ldd_output="$ldd_output $libembree3_so"
+    if $use_conda; then
+        ldd_output="$ldd_output $CONDA_PREFIX/lib/libcblas.so.3"
+    fi
 fi
 library_blacklist=(
     "libOpenGL" "libGLdispatch" "libGL.so" "libGLX.so"
@@ -230,8 +305,11 @@ library_blacklist=(
     # I tried to solve this by using "patchelf --replace-needed" to directly link to the patch version of libstdc++.so,
     # but that made no difference whatsoever for dlopen.
     # OSPRay depends on libstdc++.so, but it is hopefully a very old version available on a wide range of systems.
-    "libstdc++.so" "libgcc_s.so"
+    #"libstdc++.so" "libgcc_s.so"
 )
+if ! $use_conda; then
+    library_blacklist="$library_blacklist libstdc++.so libgcc_s.so"
+fi
 # TODO: "libffi."
 
 for library in $ldd_output
@@ -260,7 +338,8 @@ fi
 
 # /usr/lib/x86_64-linux-gnu/qt5/plugins/platforms/
 # Create a run script.
-printf "#!/bin/bash\nexport MET3D_HOME=/home/\$USER/met.3d-base/met.3d\nexport MET3D_BASE=/home/\$USER/met.3d-base\n" > "$SHIPPING_DIR/run.sh"
+printf "#!/bin/bash\nexport MET3D_HOME=\"/$MET3D_BASE_PATH/met.3d\"\nexport MET3D_BASE=\"$MET3D_BASE_PATH\"\n" > "$SHIPPING_DIR/run.sh"
+printf "export QT_PLUGIN_PATH=\"$CONDA_PREFIX/plugins\"\n" >> "$SHIPPING_DIR/run.sh"
 printf "pushd \"\$(dirname \"\$0\")/bin\" >/dev/null\n./Met3D\npopd >/dev/null\n" >> "$SHIPPING_DIR/run.sh"
 chmod +x "$SHIPPING_DIR/run.sh"
 
@@ -269,7 +348,8 @@ chmod +x "$SHIPPING_DIR/run.sh"
 echo ""
 echo "All done!"
 
-export MET3D_HOME=/home/christoph/met.3d-base/met.3d
-export MET3D_BASE=/home/christoph/met.3d-base
+export MET3D_HOME="$MET3D_BASE_PATH/met.3d"
+export MET3D_BASE="$MET3D_BASE_PATH"
+export QT_PLUGIN_PATH="$CONDA_PREFIX/plugins"
 ./Shipping/bin/Met3D
 #--pipeline=config/pipeline.cfg --frontend=config/frontend.cfg
