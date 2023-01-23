@@ -235,14 +235,14 @@ if [ ! -d "./freefont-20120503" ]; then
     unzip freefont-ttf-20120503.zip
 fi
 
-if [ ! -d "./naturalearth" ]; then
-    mkdir naturalearth
+if [ ! -f "./naturalearth/HYP_50M_SR_W.tif" ]; then
+    mkdir -p naturalearth
     pushd naturalearth >/dev/null
-    wget http://www.naturalearthdata.com/http//www.naturalearthdata.com/download/50m/physical/ne_50m_coastline.zip
+    wget https://www.naturalearthdata.com/http//www.naturalearthdata.com/download/50m/physical/ne_50m_coastline.zip
     unzip ne_50m_coastline.zip
-    wget http://www.naturalearthdata.com/http//www.naturalearthdata.com/download/50m/cultural/ne_50m_admin_0_boundary_lines_land.zip
+    wget https://www.naturalearthdata.com/http//www.naturalearthdata.com/download/50m/cultural/ne_50m_admin_0_boundary_lines_land.zip
     unzip ne_50m_admin_0_boundary_lines_land.zip
-    wget http://www.naturalearthdata.com/http//www.naturalearthdata.com/download/50m/raster/HYP_50M_SR_W.zip
+    wget https://www.naturalearthdata.com/http//www.naturalearthdata.com/download/50m/raster/HYP_50M_SR_W.zip
     unzip HYP_50M_SR_W.zip
     popd >/dev/null
 fi
