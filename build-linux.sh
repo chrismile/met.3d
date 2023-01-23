@@ -244,6 +244,8 @@ if [ ! -f "./naturalearth/HYP_50M_SR_W.tif" ]; then
     unzip ne_50m_admin_0_boundary_lines_land.zip
     wget https://www.naturalearthdata.com/http//www.naturalearthdata.com/download/50m/raster/HYP_50M_SR_W.zip
     unzip HYP_50M_SR_W.zip
+    mkdir -p HYP_50M_SR_W
+    cp /home/christoph/met.3d-base/third-party/naturalearth/HYP_50M_SR_W.tif HYP_50M_SR_W/
     popd >/dev/null
 fi
 
@@ -265,6 +267,10 @@ fi
 popd >/dev/null
 
 
+if $use_conda; then
+    params+=(-DUSE_STATIC_STD_LIBRARIES=On)
+fi
+
 if [ ! -d "./met.3d" ]; then
     git clone https://gitlab.com/chrismile/met.3d
     pushd met.3d >/dev/null
@@ -276,7 +282,7 @@ if [ ! -d "./build" ]; then
     mkdir build
 fi
 pushd build >/dev/null
-cmake ../met.3d -DCMAKE_BUILD_TYPE=RELEASE -DUSE_STATIC_STD_LIBRARIES=On "${params[@]}"
+cmake ../met.3d -DCMAKE_BUILD_TYPE=RELEASE "${params[@]}"
 make -j $(nproc)
 popd >/dev/null
 BINARY_PATH="$MET3D_BASE_PATH/build/Met3D"
