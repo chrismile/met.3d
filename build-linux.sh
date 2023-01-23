@@ -267,7 +267,7 @@ fi
 popd >/dev/null
 
 
-if $use_conda; then
+if $use_vcpkg; then
     params+=(-DUSE_STATIC_STD_LIBRARIES=On)
 fi
 
