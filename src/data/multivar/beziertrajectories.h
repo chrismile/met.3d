@@ -96,14 +96,17 @@ public:
 
 struct MBezierTrajectoriesRenderData
 {
+    bool useGeometryShader = false;
     // IBO
     GL::MIndexBuffer* indexBuffer = nullptr;
-    // VBOs
+    // VBOs (for geometry shader).
     GL::MVertexBuffer* vertexPositionBuffer = nullptr;
     GL::MVertexBuffer* vertexNormalBuffer = nullptr;
     GL::MVertexBuffer* vertexTangentBuffer = nullptr;
     GL::MVertexBuffer* vertexLineIDBuffer = nullptr;
     GL::MVertexBuffer* vertexElementIDBuffer = nullptr;
+    // SSBOs (for programmable pull shader).
+    GL::MShaderStorageBufferObject* linePointDataBuffer = nullptr;
     // SSBOs
     GL::MShaderStorageBufferObject* variableArrayBuffer = nullptr;
     GL::MShaderStorageBufferObject* lineDescArrayBuffer = nullptr;
@@ -166,7 +169,9 @@ public:
     MBezierTrajectories(
             MDataRequest requestToReferTo, const MFilteredTrajectories& filteredTrajectories,
             const QVector<int>& trajIndicesToFilteredIndicesMap,
-            unsigned int numSens, unsigned int numAux, unsigned int numVariables, const QStringList& auxDataVarNames, const QStringList& outputParameterNames);
+            unsigned int numSens, unsigned int numAux, unsigned int numVariables,
+            const QStringList& auxDataVarNames, const QStringList& outputParameterNames,
+            bool useGeometryShader, int tubeNumSubdivisions);
     ~MBezierTrajectories() override;
 
     unsigned int getMemorySize_kb() override;
@@ -255,6 +260,8 @@ private:
     QVector<uint32_t> numIndicesPerTrajectory;
     QVector<uint32_t> selectedLines;
     QVector<uint32_t> targetVariableAndSensitivityIndexArray;
+    bool useGeometryShader = false;
+    int tubeNumSubdivisions = 8; ///< Only for !useGeometryShader.
 
     // Used for aligning warm conveyor belt trajectories based on their ascension.
     QVector<int> ascentTimeStepIndices;
@@ -325,8 +332,6 @@ private:
     ptrdiff_t* trajectorySelectionIndices = nullptr;
 
     QVector<QVector2D> minMaxAttributes;
-    QVector<uint32_t> lineIndicesCache;
-    QVector<QVector3D> vertexPositionsCache;
 
     QVector<uint32_t> OutputParameterIdx;
 //    int selectedOutputParameterIdx = 0;
@@ -343,6 +348,8 @@ private:
             QString("beziertrajectories_vertex_multi_variable_buffer_#%1").arg(getID());
     const QString vertexElementIDBufferID =
             QString("beziertrajectories_vertex_variable_desc_buffer_#%1").arg(getID());
+    const QString linePointDataBufferID =
+            QString("beziertrajectories_line_point_data_buffer_#%1").arg(getID());
     const QString variableArrayBufferID =
             QString("beziertrajectories_variable_array_buffer_#%1").arg(getID());
     const QString lineDescArrayBufferID =

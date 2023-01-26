@@ -202,6 +202,59 @@ vec4 determineColorLinearInterpolate(
     return surfaceColor;
 }
 
+vec4 determineColorFromValue(in uint varID, in float value) {
+    if (varID >= maxNumVariables || varID < 0) {
+        return vec4(0.4, 0.4, 0.4, 1);
+    }
+    vec4 surfaceColor = transferFunction(value, varID);
+    return surfaceColor;
+}
+
+float sampleValueLinear(
+        uint lineID, in uint varID, float fragmentVertexIdxInterpolated, in uint sensitivityOffset, out vec2 minMax) {
+    uint vertexIdx0 = uint(floor(fragmentVertexIdxInterpolated));
+    uint vertexIdx1 = uint(ceil(fragmentVertexIdxInterpolated));
+
+    uint startIndex = uint(lineDescs[lineID].startIndex);
+    VarDescData varDesc = varDescs[maxNumVariables * lineID + varID];
+    const uint varOffset = uint(varDesc.info.r);
+    float attr0 = varArray[startIndex + varOffset + vertexIdx0 + sensitivityOffset];
+    float attr1 = varArray[startIndex + varOffset + vertexIdx1 + sensitivityOffset];
+    minMax = minMaxValues[varID];
+
+    float value = mix(attr0, attr1, fract(fragmentVertexIdxInterpolated));
+    return value;
+}
+
+vec4 sampleColorLinear(
+        uint lineID, in uint varID, float fragmentVertexIdxInterpolated, in uint sensitivityOffset, out vec2 minMax) {
+    uint vertexIdx0 = uint(floor(fragmentVertexIdxInterpolated));
+    uint vertexIdx1 = uint(ceil(fragmentVertexIdxInterpolated));
+
+    uint startIndex = uint(lineDescs[lineID].startIndex);
+    VarDescData varDesc = varDescs[maxNumVariables * lineID + varID];
+    const uint varOffset = uint(varDesc.info.r);
+    float attr0 = varArray[startIndex + varOffset + vertexIdx0 + sensitivityOffset];
+    float attr1 = varArray[startIndex + varOffset + vertexIdx1 + sensitivityOffset];
+    minMax = minMaxValues[varID];
+
+    return determineColorLinearInterpolate(varID, attr0, attr1, fract(fragmentVertexIdxInterpolated));
+}
+
+vec4 sampleColorLinearNoMinMax(
+        uint lineID, in uint varID, float fragmentVertexIdxInterpolated, in uint sensitivityOffset) {
+    uint vertexIdx0 = uint(floor(fragmentVertexIdxInterpolated));
+    uint vertexIdx1 = uint(ceil(fragmentVertexIdxInterpolated));
+
+    uint startIndex = uint(lineDescs[lineID].startIndex);
+    VarDescData varDesc = varDescs[maxNumVariables * lineID + varID];
+    const uint varOffset = uint(varDesc.info.r);
+    float attr0 = varArray[startIndex + varOffset + vertexIdx0 + sensitivityOffset];
+    float attr1 = varArray[startIndex + varOffset + vertexIdx1 + sensitivityOffset];
+
+    return determineColorLinearInterpolate(varID, attr0, attr1, fract(fragmentVertexIdxInterpolated));
+}
+
 //#define USE_ARTIFICIAL_TEST_DATA
 #ifdef USE_ARTIFICIAL_TEST_DATA
 vec4 determineColorArtificialData(in int fragmentLineID, in uint varID, in uint actualVarID, in vec4 surfaceColor) {

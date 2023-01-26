@@ -45,7 +45,7 @@ namespace Met3D
 {
 
 enum class MultiVarRenderMode {
-    ORIENTED_COLOR_BANDS
+    ORIENTED_COLOR_BANDS, OBJECT_SPACE_COLOR_BANDS
 };
 enum class MultiVarFocusRenderMode : unsigned int {
     NONE,
@@ -55,6 +55,9 @@ enum class MultiVarFocusRenderMode : unsigned int {
     PIE_CHART_AREA,
     PIE_CHART_COLOR,
     ROLLS
+};
+enum class MultiVarGeometryMode {
+    PROGRAMMABLE_PULL, GEOMETRY_SHADER
 };
 
 class MMultiVarData : public QObject
@@ -87,6 +90,7 @@ public:
     inline bool getInternalRepresentationChanged() const { return internalRepresentationChanged; }
     inline void resetInternalRepresentationChanged() { internalRepresentationChanged = false; }
     inline MultiVarFocusRenderMode getFocusRenderMode() const { return focusRenderMode; }
+    inline MultiVarGeometryMode getGeometryMode() const { return geometryMode; }
     inline bool getRenderSpheres() const {
         return focusRenderMode != MultiVarFocusRenderMode::NONE && focusRenderMode != MultiVarFocusRenderMode::ROLLS;
     }
@@ -186,6 +190,7 @@ private:
     QVector<QtProperty*> propertyList;
     QtProperty *renderTechniqueProperty;
     QtProperty *focusRenderTechniqueProperty;
+    QtProperty *geometryModeProperty;
     QtProperty *orientedRibbonModeProperty;
     QtProperty *bandBackgroundColorProperty;
     QtProperty *separatorWidthProperty;
@@ -243,15 +248,19 @@ private:
 
     // Rendering modes.
     QStringList renderingTechniques = {
-            "Oriented Color Bands"
+            "Oriented Color Bands", "Object Space Color Bands"
     };
     QStringList focusRenderingTechniques = {
             "None", "Tangent", "Great Circles", "Cross Section", "Pie Chart (Area)", "Pie Chart (Color)",
             "Rolls"
     };
+    QStringList geometryModeNames = {
+            "Programmable Pull", "Geometry Shader"
+    };
     MultiVarRenderMode multiVarRenderMode = MultiVarRenderMode::ORIENTED_COLOR_BANDS;
     bool internalRepresentationChanged = false; ///< If multiVarRenderMode changes to other mode needing different data.
     MultiVarFocusRenderMode focusRenderMode = MultiVarFocusRenderMode::GREAT_CIRCLE;
+    MultiVarGeometryMode geometryMode = MultiVarGeometryMode::PROGRAMMABLE_PULL;
 
     // For MULTIVAR_RENDERMODE_ORIENTED_COLOR_BANDS, MULTIVAR_RENDERMODE_ORIENTED_COLOR_BANDS_RIBBON
     enum class OrientedRibbonMode {

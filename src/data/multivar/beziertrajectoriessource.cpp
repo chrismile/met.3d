@@ -83,6 +83,11 @@ MBezierTrajectories *MBezierTrajectoriesSource::produceData(MDataRequest request
     QStringList args = rh.value("BEZIERTRAJECTORIES_LOGP_SCALED").split("/");
     double log_pBottom_hPa  = args[0].toDouble();
     double deltaZ_deltaLogP = args[1].toDouble();
+    bool useGeometryShader = args[2].toInt() != 0;
+    int tubeNumSubdivisions = 8;
+    if (!useGeometryShader) {
+        tubeNumSubdivisions = args[3].toInt(); ///< Only for !useGeometryShader.
+    }
 
     rh.remove("BEZIERTRAJECTORIES_LOGP_SCALED");
     MTrajectories *inTrajectories = trajectorySource->getData(rh.request());
@@ -333,7 +338,7 @@ MBezierTrajectories *MBezierTrajectoriesSource::produceData(MDataRequest request
     MBezierTrajectories* newTrajectories = new MBezierTrajectories(
             inTrajectories->getGeneratingRequest(),
             filteredTrajectories, indicesToFilteredIndicesMap, numSens, numAux, numVariables,
-            auxDataVarNames, outputParameterNames);
+            auxDataVarNames, outputParameterNames, useGeometryShader, tubeNumSubdivisions);
 
     for (int32_t traj = 0; traj < int(filteredTrajectories.size()); ++traj)
     {

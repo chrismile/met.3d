@@ -3570,11 +3570,15 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
                     trajectoryRequests[t].bezierTrajectoriesRenderDataMap[sceneView];
 
             // Bind vertex buffer objects.
-            bezierTrajectoriesRenderData.vertexPositionBuffer->attachToVertexAttribute(0);
-            bezierTrajectoriesRenderData.vertexNormalBuffer->attachToVertexAttribute(1);
-            bezierTrajectoriesRenderData.vertexTangentBuffer->attachToVertexAttribute(2);
-            bezierTrajectoriesRenderData.vertexLineIDBuffer->attachToVertexAttribute(3);
-            bezierTrajectoriesRenderData.vertexElementIDBuffer->attachToVertexAttribute(4);
+            if (bezierTrajectoriesRenderData.useGeometryShader) {
+                bezierTrajectoriesRenderData.vertexPositionBuffer->attachToVertexAttribute(0);
+                bezierTrajectoriesRenderData.vertexNormalBuffer->attachToVertexAttribute(1);
+                bezierTrajectoriesRenderData.vertexTangentBuffer->attachToVertexAttribute(2);
+                bezierTrajectoriesRenderData.vertexLineIDBuffer->attachToVertexAttribute(3);
+                bezierTrajectoriesRenderData.vertexElementIDBuffer->attachToVertexAttribute(4);
+            } else {
+                bezierTrajectoriesRenderData.linePointDataBuffer->bindToIndex(0);
+            }
 
             // Bind shader storage buffer objects.
             bezierTrajectoriesRenderData.variableArrayBuffer->bindToIndex(2);
@@ -3624,21 +3628,43 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
 #endif
             trajectoryRequests[t].bezierTrajectoriesMap[sceneView]->setDirty(false);
             bool useFiltering = trajectoryRequests[t].bezierTrajectoriesMap[sceneView]->getUseFiltering();
-            if (useFiltering)
+            if (bezierTrajectoriesRenderData.useGeometryShader)
             {
-                glMultiDrawElements(
-                        GL_LINES,
-                        trajectoryRequests[t].bezierTrajectoriesMap[sceneView]->getTrajectorySelectionCount(),
-                        GL_UNSIGNED_INT,
-                        trajectoryRequests[t].bezierTrajectoriesMap[sceneView]->getTrajectorySelectionIndices(),
-                        trajectoryRequests[t].bezierTrajectoriesMap[sceneView]->getNumFilteredTrajectories());
+                if (useFiltering)
+                {
+                    glMultiDrawElements(
+                            GL_LINES,
+                            trajectoryRequests[t].bezierTrajectoriesMap[sceneView]->getTrajectorySelectionCount(),
+                            GL_UNSIGNED_INT,
+                            trajectoryRequests[t].bezierTrajectoriesMap[sceneView]->getTrajectorySelectionIndices(),
+                            trajectoryRequests[t].bezierTrajectoriesMap[sceneView]->getNumFilteredTrajectories());
+                }
+                else
+                {
+                    glDrawElements(
+                            GL_LINES, bezierTrajectoriesRenderData.indexBuffer->getCount(),
+                            bezierTrajectoriesRenderData.indexBuffer->getType(), nullptr);
+                }
             }
             else
             {
-                glDrawElements(
-                        GL_LINES, bezierTrajectoriesRenderData.indexBuffer->getCount(),
-                        bezierTrajectoriesRenderData.indexBuffer->getType(), nullptr);
+                if (useFiltering)
+                {
+                    glMultiDrawElements(
+                            GL_TRIANGLES,
+                            trajectoryRequests[t].bezierTrajectoriesMap[sceneView]->getTrajectorySelectionCount(),
+                            GL_UNSIGNED_INT,
+                            trajectoryRequests[t].bezierTrajectoriesMap[sceneView]->getTrajectorySelectionIndices(),
+                            trajectoryRequests[t].bezierTrajectoriesMap[sceneView]->getNumFilteredTrajectories());
+                }
+                else
+                {
+                    glDrawElements(
+                            GL_TRIANGLES, bezierTrajectoriesRenderData.indexBuffer->getCount(),
+                            bezierTrajectoriesRenderData.indexBuffer->getType(), nullptr);
+                }
             }
+
             if (multiVarData.getShowTargetVariableAndSensitivity())
             {
                 bezierTrajectoriesRenderData.varSelectedArrayBuffer->bindToIndex(7);
@@ -4629,7 +4655,12 @@ void MTrajectoryActor::asynchronousDataRequest(bool synchronizationRequest)
             foreach (MSceneViewGLWidget* view, getViews())
             {
                 QVector2D params = view->pressureToWorldZParameters();
-                QString query = QString("%1/%2").arg(params.x()).arg(params.y());
+                QString query;
+                if (multiVarData.getGeometryMode() == MultiVarGeometryMode::GEOMETRY_SHADER) {
+                    query = QString("%1/%2/1").arg(params.x()).arg(params.y());
+                } else {
+                    query = QString("%1/%2/0/%3").arg(params.x()).arg(params.y()).arg(multiVarData.getNumLineSegments());
+                }
                 LOG4CPLUS_DEBUG(mlog, "BEZIERTRAJECTORIES: " << query.toStdString());
 
                 rh.insert("BEZIERTRAJECTORIES_LOGP_SCALED", query);

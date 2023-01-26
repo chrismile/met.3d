@@ -51,9 +51,12 @@ unsigned int MBezierTrajectory::getMemorySize_kb() const {
 MBezierTrajectories::MBezierTrajectories(
         MDataRequest requestToReferTo, const MFilteredTrajectories& filteredTrajectories,
         const QVector<int>& trajIndicesToFilteredIndicesMap,
-        unsigned int numSens, unsigned int numAux, unsigned int numVariables, const QStringList& auxDataVarNames, const QStringList& outputParameterNames)
+        unsigned int numSens, unsigned int numAux, unsigned int numVariables,
+        const QStringList& auxDataVarNames, const QStringList& outputParameterNames,
+        bool useGeometryShader, int tubeNumSubdivisions)
         : MSupplementalTrajectoryData(requestToReferTo, filteredTrajectories.size()),
           baseTrajectories(filteredTrajectories), bezierTrajectories(filteredTrajectories.size()),
+          useGeometryShader(useGeometryShader), tubeNumSubdivisions(tubeNumSubdivisions),
           trajIndicesToFilteredIndicesMap(trajIndicesToFilteredIndicesMap),
           numTrajectories(filteredTrajectories.size()), numVariables(numVariables)
 {
@@ -217,7 +220,7 @@ unsigned int MBezierTrajectories::getMemorySize_kb()
 }
 
 
-void createLineTubesRenderDataCPU(
+void createLineTubesRenderDataGeometryShaderCPU(
         const QVector<QVector<QVector3D>>& lineCentersList,
         const QVector<QVector<int>>& lineLineIDList,
         const QVector<QVector<int>>& lineElementIDList,
@@ -318,6 +321,121 @@ void createLineTubesRenderDataCPU(
     }
 }
 
+struct LinePointData {
+    QVector3D linePosition;
+    int lineID;
+    QVector3D lineNormal;
+    int elementID;
+    QVector3D lineTangent;
+    float padding = 0;
+};
+
+void createLineTubesRenderDataProgrammablePullCPU(
+        const QVector<QVector<QVector3D>>& lineCentersList,
+        const QVector<QVector<int>>& lineLineIDList,
+        const QVector<QVector<int>>& lineElementIDList,
+        QVector<uint32_t>& lineIndexOffsets,
+        QVector<uint32_t>& numIndicesPerLine,
+        QVector<uint32_t>& triangleIndices,
+        QVector<LinePointData>& linePointDataList,
+        int tubeNumSubdivisions)
+{
+    assert(lineCentersList.size() == lineLineIDList.size());
+    assert(lineCentersList.size() == lineElementIDList.size());
+    lineIndexOffsets.reserve(lineCentersList.size());
+    numIndicesPerLine.reserve(lineCentersList.size());
+    for (int lineId = 0; lineId < lineCentersList.size(); lineId++)
+    {
+        const QVector<QVector3D> &lineCenters = lineCentersList.at(lineId);
+        const QVector<int> &lineLineIDs = lineLineIDList.at(lineId);
+        const QVector<int> &lineElementIDs = lineElementIDList.at(lineId);
+        assert(lineCenters.size() == lineLineIDs.size());
+        assert(lineCenters.size() == lineElementIDs.size());
+        size_t n = lineCenters.size();
+        size_t indexOffset = linePointDataList.size();
+        lineIndexOffsets.push_back(triangleIndices.size());
+
+        if (n < 2)
+        {
+            numIndicesPerLine.push_back(0);
+            continue;
+        }
+
+        QVector3D lastLineNormal(1.0f, 0.0f, 0.0f);
+        int numValidLinePoints = 0;
+        for (size_t i = 0; i < n; i++)
+        {
+            QVector3D tangent, normal;
+            if (i == 0)
+            {
+                tangent = lineCenters[i+1] - lineCenters[i];
+            } else if (i == n - 1)
+            {
+                tangent = lineCenters[i] - lineCenters[i-1];
+            } else {
+                tangent = (lineCenters[i+1] - lineCenters[i-1]);
+            }
+            float lineSegmentLength = tangent.length();
+
+            if (lineSegmentLength < 0.0001f)
+            {
+                // In case the two vertices are almost identical, just skip this path line segment
+                continue;
+            }
+            tangent.normalize();
+
+            QVector3D helperAxis = lastLineNormal;
+            if (QVector3D::crossProduct(helperAxis, tangent).length() < 0.01f)
+            {
+                // If tangent == lastNormal
+                helperAxis = QVector3D(0.0f, 1.0f, 0.0f);
+                if (QVector3D::crossProduct(helperAxis, normal).length() < 0.01f)
+                {
+                    // If tangent == helperAxis
+                    helperAxis = QVector3D(0.0f, 0.0f, 1.0f);
+                }
+            }
+            normal = (helperAxis - tangent * QVector3D::dotProduct(helperAxis, tangent)).normalized(); // Gram-Schmidt
+            lastLineNormal = normal;
+
+            LinePointData linePointData;
+            linePointData.linePosition = lineCenters.at(i);
+            linePointData.lineNormal = normal;
+            linePointData.lineTangent = tangent;
+            linePointData.lineID = lineLineIDs.at(i);
+            linePointData.elementID = lineElementIDs.at(i);
+            linePointDataList.push_back(linePointData);
+            numValidLinePoints++;
+        }
+
+        if (numValidLinePoints == 1)
+        {
+            // Only one vertex left -> Output nothing (tube consisting only of one point).
+            linePointDataList.pop_back();
+            numIndicesPerLine.push_back(0);
+            continue;
+        }
+
+        // Create indices
+        int numSegments = numValidLinePoints - 1;
+        for (int j = 0; j < numSegments; j++) {
+            uint32_t indexOffsetCurrent = (indexOffset + j) * tubeNumSubdivisions;
+            uint32_t indexOffsetNext = (indexOffset + j + 1) * tubeNumSubdivisions;
+            for (int k = 0; k < tubeNumSubdivisions; k++) {
+                int kNext = (k + 1) % tubeNumSubdivisions;
+
+                triangleIndices.push_back(indexOffsetCurrent + k);
+                triangleIndices.push_back(indexOffsetCurrent + kNext);
+                triangleIndices.push_back(indexOffsetNext + k);
+
+                triangleIndices.push_back(indexOffsetNext + k);
+                triangleIndices.push_back(indexOffsetCurrent + kNext);
+                triangleIndices.push_back(indexOffsetNext + kNext);
+            }
+        }
+        numIndicesPerLine.push_back(numSegments * 6);
+    }
+}
 
 MBezierTrajectoriesRenderData MBezierTrajectories::getRenderData(
 #ifdef USE_QOPENGLWIDGET
@@ -329,12 +447,6 @@ MBezierTrajectoriesRenderData MBezierTrajectories::getRenderData(
     QVector<QVector<QVector3D>> lineCentersList;
     QVector<QVector<int>> lineLineIDList;
     QVector<QVector<int>> lineElementIDList;
-    QVector<uint32_t> lineIndices;
-    QVector<QVector3D> vertexPositions;
-    QVector<QVector3D> vertexNormals;
-    QVector<QVector3D> vertexTangents;
-    QVector<int> vertexLineIDs;
-    QVector<int> vertexElementIDs;
 
     lineCentersList.resize(bezierTrajectories.size());
     lineLineIDList.resize(bezierTrajectories.size());
@@ -361,38 +473,60 @@ MBezierTrajectoriesRenderData MBezierTrajectories::getRenderData(
 
     trajectoryIndexOffsets.clear();
     numIndicesPerTrajectory.clear();
-    createLineTubesRenderDataCPU(
-            lineCentersList, lineLineIDList, lineElementIDList,
-            trajectoryIndexOffsets, numIndicesPerTrajectory,
-            lineIndices, vertexPositions, vertexNormals, vertexTangents, vertexLineIDs, vertexElementIDs);
 
 
     MBezierTrajectoriesRenderData bezierTrajectoriesRenderData;
+    bezierTrajectoriesRenderData.useGeometryShader = useGeometryShader;
 
-    // Add the index buffer.
-    bezierTrajectoriesRenderData.indexBuffer = createIndexBuffer(
-            currentGLContext, indexBufferID, lineIndices);
+    if (useGeometryShader) {
+        QVector<uint32_t> lineIndices;
+        QVector<QVector3D> vertexPositions;
+        QVector<QVector3D> vertexNormals;
+        QVector<QVector3D> vertexTangents;
+        QVector<int> vertexLineIDs;
+        QVector<int> vertexElementIDs;
+        createLineTubesRenderDataGeometryShaderCPU(
+                lineCentersList, lineLineIDList, lineElementIDList,
+                trajectoryIndexOffsets, numIndicesPerTrajectory,
+                lineIndices, vertexPositions, vertexNormals, vertexTangents, vertexLineIDs, vertexElementIDs);
 
-    // Add the position buffer.
-    bezierTrajectoriesRenderData.vertexPositionBuffer = createVertexBuffer(
-            currentGLContext, vertexPositionBufferID, vertexPositions);
+        // Add the index buffer.
+        bezierTrajectoriesRenderData.indexBuffer = createIndexBuffer(
+                currentGLContext, indexBufferID, lineIndices);
 
-    // Add the normal buffer.
-    bezierTrajectoriesRenderData.vertexNormalBuffer = createVertexBuffer(
-            currentGLContext, vertexNormalBufferID, vertexNormals);
+        // Add the position buffer.
+        bezierTrajectoriesRenderData.vertexPositionBuffer = createVertexBuffer(
+                currentGLContext, vertexPositionBufferID, vertexPositions);
 
-    // Add the tangent buffer.
-    bezierTrajectoriesRenderData.vertexTangentBuffer = createVertexBuffer(
-            currentGLContext, vertexTangentBufferID, vertexTangents);
+        // Add the normal buffer.
+        bezierTrajectoriesRenderData.vertexNormalBuffer = createVertexBuffer(
+                currentGLContext, vertexNormalBufferID, vertexNormals);
 
-    // Add the attribute buffers.
-    bezierTrajectoriesRenderData.vertexLineIDBuffer = createVertexBuffer(
-            currentGLContext, vertexLineIDBufferID, vertexLineIDs);
-    bezierTrajectoriesRenderData.vertexElementIDBuffer = createVertexBuffer(
-            currentGLContext, vertexElementIDBufferID, vertexElementIDs);
+        // Add the tangent buffer.
+        bezierTrajectoriesRenderData.vertexTangentBuffer = createVertexBuffer(
+                currentGLContext, vertexTangentBufferID, vertexTangents);
 
-    this->lineIndicesCache = lineIndices;
-    this->vertexPositionsCache = vertexPositions;
+        // Add the attribute buffers.
+        bezierTrajectoriesRenderData.vertexLineIDBuffer = createVertexBuffer(
+                currentGLContext, vertexLineIDBufferID, vertexLineIDs);
+        bezierTrajectoriesRenderData.vertexElementIDBuffer = createVertexBuffer(
+                currentGLContext, vertexElementIDBufferID, vertexElementIDs);
+    } else {
+        QVector<uint32_t> triangleIndices;
+        QVector<LinePointData> linePointDataList;
+        createLineTubesRenderDataProgrammablePullCPU(
+                lineCentersList, lineLineIDList, lineElementIDList,
+                trajectoryIndexOffsets, numIndicesPerTrajectory,
+                triangleIndices, linePointDataList, tubeNumSubdivisions);
+
+        // Add the index buffer.
+        bezierTrajectoriesRenderData.indexBuffer = createIndexBuffer(
+                currentGLContext, indexBufferID, triangleIndices);
+
+        // Add the line data buffer.
+        bezierTrajectoriesRenderData.linePointDataBuffer = createShaderStorageBuffer(
+                currentGLContext, linePointDataBufferID, linePointDataList);
+    }
 
 
     // ------------------------------------------ Create SSBOs. ------------------------------------------
@@ -502,10 +636,14 @@ MBezierTrajectoriesRenderData MBezierTrajectories::getRenderData(
 void MBezierTrajectories::releaseRenderData()
 {
     MGLResourcesManager::getInstance()->releaseGPUItem(indexBufferID);
-    MGLResourcesManager::getInstance()->releaseGPUItem(vertexNormalBufferID);
-    MGLResourcesManager::getInstance()->releaseGPUItem(vertexTangentBufferID);
-    MGLResourcesManager::getInstance()->releaseGPUItem(vertexLineIDBufferID);
-    MGLResourcesManager::getInstance()->releaseGPUItem(vertexElementIDBufferID);
+    if (bezierTrajectoriesRenderData.useGeometryShader) {
+        MGLResourcesManager::getInstance()->releaseGPUItem(vertexNormalBufferID);
+        MGLResourcesManager::getInstance()->releaseGPUItem(vertexTangentBufferID);
+        MGLResourcesManager::getInstance()->releaseGPUItem(vertexLineIDBufferID);
+        MGLResourcesManager::getInstance()->releaseGPUItem(vertexElementIDBufferID);
+    } else {
+        MGLResourcesManager::getInstance()->releaseGPUItem(linePointDataBufferID);
+    }
     MGLResourcesManager::getInstance()->releaseGPUItem(variableArrayBufferID);
     MGLResourcesManager::getInstance()->releaseGPUItem(lineDescArrayBufferID);
     MGLResourcesManager::getInstance()->releaseGPUItem(varDescArrayBufferID);

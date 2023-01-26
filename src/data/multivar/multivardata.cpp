@@ -39,8 +39,17 @@
 namespace Met3D
 {
 
-const QStringList renderingTechniqueShaderFilenames = {
-        "src/glsl/multivar/multivar_oriented_color_bands.fx.glsl"
+const char* const renderingTechniqueNameIds[] = {
+        "multivar_oriented_color_bands",
+        "multivar_object_space_color_bands"
+};
+const QStringList renderingTechniqueShaderFilenamesProgrammablePull = {
+        "src/glsl/multivar/multivar_oriented_color_bands_pull.fx.glsl",
+        "src/glsl/multivar/multivar_object_space_color_bands_pull.fx.glsl"
+};
+const QStringList renderingTechniqueShaderFilenamesGeometryShader = {
+        "src/glsl/multivar/multivar_oriented_color_bands_gs.fx.glsl",
+        "src/glsl/multivar/multivar_object_space_color_bands_gs.fx.glsl"
 };
 
 const QStringList focusRenderingTechniqueShaderFilenames = {
@@ -88,10 +97,6 @@ void MMultiVarData::setProperties(MActor *actor, MQtProperties *properties, QtPr
 
     renderTechniqueProperty = addProperty(
             ENUM_PROPERTY, "render technique", multiVarGroupProperty);
-    QStringList renderingTechniques =
-            {
-                    "Oriented Color Bands"
-            };
     properties->mEnum()->setEnumNames(renderTechniqueProperty, renderingTechniques);
     properties->mEnum()->setValue(renderTechniqueProperty, int(multiVarRenderMode));
     renderTechniqueProperty->setToolTip(
@@ -100,16 +105,19 @@ void MMultiVarData::setProperties(MActor *actor, MQtProperties *properties, QtPr
 
     focusRenderTechniqueProperty = addProperty(
             ENUM_PROPERTY, "sphere render technique", multiVarGroupProperty);
-    QStringList focusRenderingTechniques =
-            {
-                    "None", "Tangent", "Great Circles", "Cross Section", "Pie Chart (Area)", "Pie Chart (Color)",
-                    "Rolls"
-            };
     properties->mEnum()->setEnumNames(focusRenderTechniqueProperty, focusRenderingTechniques);
     properties->mEnum()->setValue(focusRenderTechniqueProperty, int(focusRenderMode));
     focusRenderTechniqueProperty->setToolTip(
             "What rendering technique to use for the highlight focus geometry.");
     propertyList.push_back(focusRenderTechniqueProperty);
+
+    geometryModeProperty = addProperty(
+            ENUM_PROPERTY, "geometry mode", multiVarGroupProperty);
+    properties->mEnum()->setEnumNames(geometryModeProperty, geometryModeNames);
+    properties->mEnum()->setValue(geometryModeProperty, int(geometryMode));
+    geometryModeProperty->setToolTip(
+            "What geometry mode to use for rendering trajectory tubes.");
+    propertyList.push_back(geometryModeProperty);
 
     orientedRibbonModeProperty = addProperty(
             ENUM_PROPERTY, "oriented ribbon mode", multiVarGroupProperty);
@@ -173,7 +181,7 @@ void MMultiVarData::setPropertiesRenderingSettings()
 {
     numLineSegmentsProperty = addProperty(
             INT_PROPERTY, "num line segments", renderingSettingsGroupProperty);
-    properties->setInt(numLineSegmentsProperty, numLineSegments, 3, 14);
+    properties->setInt(numLineSegmentsProperty, numLineSegments, 3, 16);
     numLineSegmentsProperty->setToolTip("Number of line segments used for the tube rendering.");
     propertyList.push_back(numLineSegmentsProperty);
 
@@ -295,7 +303,9 @@ void MMultiVarData::updateModeEnabledProperties()
     minRadiusFactorProperty->setEnabled(
             multiVarRenderMode != MultiVarRenderMode::ORIENTED_COLOR_BANDS
             || orientedRibbonMode == OrientedRibbonMode::VARYING_RIBBON_WIDTH);
-    useTimestepLensProperty->setEnabled(multiVarRenderMode == MultiVarRenderMode::ORIENTED_COLOR_BANDS);
+    useTimestepLensProperty->setEnabled(
+            multiVarRenderMode == MultiVarRenderMode::ORIENTED_COLOR_BANDS
+            || multiVarRenderMode == MultiVarRenderMode::OBJECT_SPACE_COLOR_BANDS);
 }
 
 
@@ -437,6 +447,7 @@ void MMultiVarData::loadConfiguration(QSettings *settings)
     properties->mEnum()->setValue(targetVariableAndSensitivityProperty, targetVariableAndSensitivity);
     QString multiVarRenderModeString = settings->value("multiVarRenderMode", "").toString();
     QString focusRenderModeString = settings->value("focusRenderMode", "").toString();
+    QString geometryModeString = settings->value("geometryMode", "").toString();
     for (int i = 0; i < renderingTechniques.size(); i++) {
         const QString& renderingTechnique = renderingTechniques.at(i);
         if (renderingTechnique == multiVarRenderModeString) {
@@ -451,6 +462,15 @@ void MMultiVarData::loadConfiguration(QSettings *settings)
             properties->mEnum()->setValue(focusRenderTechniqueProperty, int(focusRenderMode));
         }
     }
+
+    for (int i = 0; i < geometryModeNames.size(); i++) {
+        const QString& geometryModeName = geometryModeNames.at(i);
+        if (geometryModeName == geometryModeString) {
+            geometryMode = MultiVarGeometryMode(i);
+            properties->mEnum()->setValue(geometryModeProperty, int(geometryMode));
+        }
+    }
+
     int numOutputParametersAvailable = settings->value(QString("numOutputParametersAvailable")).toInt();
     this->outputParameterNamesAvailable.clear();
     selectedOutputParameter = settings->value("selectedOutputParameter").toString();
@@ -713,6 +733,14 @@ void MMultiVarData::onQtPropertyChanged(QtProperty *property)
         focusRenderMode = newSphereRenderMode;
         reloadSphereShaderEffect();
     }
+    else if (property == geometryModeProperty)
+    {
+        MultiVarGeometryMode newGeometryMode =
+                MultiVarGeometryMode(properties->mEnum()->value(geometryModeProperty));
+        geometryMode = newGeometryMode;
+        internalRepresentationChanged = true;
+        reloadShaderEffect();
+    }
     else if (tfPropertiesMultiVar.contains(property))
     {
         setTransferFunctionMultiVarFromProperty(tfPropertiesMultiVar.indexOf(property));
@@ -746,9 +774,14 @@ void MMultiVarData::onQtPropertyChanged(QtProperty *property)
     // --- Group: Rendering settings ---
     else if (property == numLineSegmentsProperty)
     {
-        if (multiVarRenderMode == MultiVarRenderMode::ORIENTED_COLOR_BANDS)
+        if (multiVarRenderMode == MultiVarRenderMode::ORIENTED_COLOR_BANDS
+                || multiVarRenderMode == MultiVarRenderMode::OBJECT_SPACE_COLOR_BANDS)
         {
             numLineSegments = properties->mInt()->value(numLineSegmentsProperty);
+        }
+        if (geometryMode == MultiVarGeometryMode::PROGRAMMABLE_PULL)
+        {
+            internalRepresentationChanged = true;
         }
         reloadShaderEffect();
     }
@@ -828,7 +861,7 @@ void MMultiVarData::onBezierTrajectoriesLoaded(MTrajectories* trajectories)
 
     QStringList varNamesLoaded = auxDataVarNames;
     varNamesLoaded.push_front("Pressure");
-    bool hasSensitivityData = (sensDataVarNames.size() > 0);
+    bool hasSensitivityData = !sensDataVarNames.empty();
     for (const QString& varName : sensDataVarNames)
     {
         varNamesLoaded.push_back(varName);
@@ -1103,7 +1136,8 @@ void MMultiVarData::reloadShaderEffect()
         defines.insert("SUPPORT_LINE_DESATURATION", QString::fromStdString(""));
     }
 
-    if (multiVarRenderMode == MultiVarRenderMode::ORIENTED_COLOR_BANDS)
+    if (multiVarRenderMode == MultiVarRenderMode::ORIENTED_COLOR_BANDS
+            || multiVarRenderMode == MultiVarRenderMode::OBJECT_SPACE_COLOR_BANDS)
     {
         if (!mapColorToSaturation)
         {
@@ -1113,16 +1147,28 @@ void MMultiVarData::reloadShaderEffect()
         {
             defines.insert("TIMESTEP_LENS", "");
         }
+    }
+
+    if (multiVarRenderMode == MultiVarRenderMode::ORIENTED_COLOR_BANDS)
+    {
         defines.insert(
                 "ORIENTED_RIBBON_MODE",
-                QString::fromStdString(std::to_string((int)orientedRibbonMode)));
+                QString::fromStdString(std::to_string(int(orientedRibbonMode))));
     }
 
     MGLResourcesManager* glRM = MGLResourcesManager::getInstance();
     glRM->generateEffectProgramUncached(
-            "multivar_oriented_color_bands", shaderEffect);
-    shaderEffect->compileFromFile_Met3DHome(
-            renderingTechniqueShaderFilenames[int(multiVarRenderMode)], defines);
+            renderingTechniqueNameIds[int(multiVarRenderMode)], shaderEffect);
+    QString shaderFilenames;
+    if (geometryMode == MultiVarGeometryMode::PROGRAMMABLE_PULL)
+    {
+        shaderFilenames = renderingTechniqueShaderFilenamesProgrammablePull[int(multiVarRenderMode)];
+    }
+    else
+    {
+        shaderFilenames = renderingTechniqueShaderFilenamesGeometryShader[int(multiVarRenderMode)];
+    }
+    shaderEffect->compileFromFile_Met3DHome(shaderFilenames, defines);
     shallReloadShaderEffect = false;
 }
 
@@ -1136,13 +1182,12 @@ void MMultiVarData::reloadSphereShaderEffect()
         return;
     }
 
-
     QMap<QString, QString> defines =
-            {
-                    {"USE_MULTI_VAR_TRANSFER_FUNCTION", QString::fromStdString("") },
-                    {"IS_MULTIVAR_DATA", QString::fromStdString("") },
-                    {"MAX_NUM_VARIABLES", QString::fromStdString(std::to_string(MAX_NUM_VARIABLES)) },
-            };
+    {
+            {"USE_MULTI_VAR_TRANSFER_FUNCTION", QString::fromStdString("") },
+            {"IS_MULTIVAR_DATA", QString::fromStdString("") },
+            {"MAX_NUM_VARIABLES", QString::fromStdString(std::to_string(MAX_NUM_VARIABLES)) },
+    };
 
     if (diagramType == DiagramDisplayType::NONE || diagramType == DiagramDisplayType::CURVE_PLOT_VIEW)
     {
