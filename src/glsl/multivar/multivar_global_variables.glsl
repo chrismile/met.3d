@@ -208,7 +208,7 @@ void sampleVariableFromLineSSBO(
 }
 
 void sampleVariableFromLineSSBONoMinMax(
-        in uint lineID, in uint varID, in uint elementID, in uint sensitivityOffset, out float value, out vec2 minMax) {
+        in uint lineID, in uint varID, in uint elementID, in uint sensitivityOffset, out float value) {
     uint startIndex = uint(lineDescs[lineID].startIndex);
     VarDescData varDesc = varDescs[maxNumVariables * lineID + varID];
     const uint varOffset = uint(varDesc.info.r);

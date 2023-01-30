@@ -288,7 +288,8 @@ void MTrajectoryPicker::setDiagramUpscalingFactor(float factor)
 void MTrajectoryPicker::triggerSelectAllLines()
 {
     bool allTrajectoriesSelected = true;
-    for (int lineId = 0; lineId < trajectories.size(); lineId++) {
+    for (int lineIdFiltered = 0; lineIdFiltered < trajectories.size(); lineIdFiltered++) {
+        auto lineId = int(selectedTrajectoryIndices.at(lineIdFiltered));
         if (highlightedTrajectories.find(lineId) == highlightedTrajectories.end()) {
             allTrajectoriesSelected = false;
             break;
@@ -324,7 +325,8 @@ void MTrajectoryPicker::triggerSelectAllLines()
 
     if (allTrajectoriesSelected) {
         // Unselect all.
-        for (int lineId = 0; lineId < trajectories.size(); lineId++) {
+        for (int lineIdFiltered = 0; lineIdFiltered < trajectories.size(); lineIdFiltered++) {
+            auto lineId = int(selectedTrajectoryIndices.at(lineIdFiltered));
             auto it = highlightedTrajectories.find(lineId);
             if (it != highlightedTrajectories.end())
             {
@@ -334,7 +336,8 @@ void MTrajectoryPicker::triggerSelectAllLines()
         }
     } else {
         // Select all.
-        for (int lineId = 0; lineId < trajectories.size(); lineId++) {
+        for (int lineIdFiltered = 0; lineIdFiltered < trajectories.size(); lineIdFiltered++) {
+            auto lineId = int(selectedTrajectoryIndices.at(lineIdFiltered));
             uint32_t minNumUses = std::numeric_limits<uint32_t>::max();
             QColor highlightColor;
             for (const QColor& color : predefinedColors)
@@ -452,11 +455,13 @@ void MTrajectoryPicker::render()
 void MTrajectoryPicker::setTrajectoryData(
         const QVector<QVector<QVector3D>>& trajectories,
         const QVector<QVector<float>>& trajectoryPointTimeSteps,
-        const QVector<uint32_t>& selectedTrajectoryIndices)
+        const QVector<uint32_t>& selectedTrajectoryIndices,
+        int _numTrajectoriesTotal)
 {
     this->trajectories = trajectories;
     this->trajectoryPointTimeSteps = trajectoryPointTimeSteps;
     this->selectedTrajectoryIndices = selectedTrajectoryIndices;
+    this->numTrajectoriesTotal = _numTrajectoriesTotal;
     this->highlightedTrajectories.clear();
     this->colorUsesCountMap.clear();
     selectedTrajectoriesChanged = true;
@@ -587,19 +592,19 @@ void MTrajectoryPicker::recreateTubeTriangleData()
         position *= radialFactor;
     }
 
-    for (int lineId = 0; lineId < trajectories.size(); lineId++) {
-        int n = trajectories.at(int(lineId)).size();
+    for (int lineIdFiltered = 0; lineIdFiltered < trajectories.size(); lineIdFiltered++) {
+        int n = trajectories.at(int(lineIdFiltered)).size();
         QVector<QVector3D> lineCenters;
         QVector<float> pointTimeSteps;
         lineCenters.reserve(n);
         pointTimeSteps.reserve(n);
         for (int i = 0; i < n; i++)
         {
-            const QVector3D& position = trajectories.at(int(lineId)).at(i);
+            const QVector3D& position = trajectories.at(int(lineIdFiltered)).at(i);
             if (!std::isnan(position.x()) && !std::isnan(position.y()) && !std::isnan(position.z()))
             {
                 lineCenters.push_back(position);
-                pointTimeSteps.push_back(trajectoryPointTimeSteps.at(int(lineId)).at(i));
+                pointTimeSteps.push_back(trajectoryPointTimeSteps.at(int(lineIdFiltered)).at(i));
             }
         }
         n = lineCenters.size();
@@ -610,7 +615,7 @@ void MTrajectoryPicker::recreateTubeTriangleData()
             continue;
         }
 
-        uint32_t selectedTrajectoryIndex = selectedTrajectoryIndices.at(int(lineId));
+        uint32_t selectedTrajectoryIndex = selectedTrajectoryIndices.at(int(lineIdFiltered));
 
         QVector3D lastLineNormal(1.0f, 0.0f, 0.0f);
         int numValidLinePoints = 0;
@@ -1141,7 +1146,19 @@ bool MTrajectoryPicker::toolTipPick(MSceneViewGLWidget* sceneView, const QPoint 
     int varIdxReal = 0;
     if (isFirstHitTube)
     {
-        auto& trajectory = trajectories.at(int(trajectoryIndex));
+        auto filteredTrajectoryIndex = int(trajectoryIndex);
+        if (numTrajectoriesTotal != trajectories.size())
+        {
+            for (int i = 0; i < selectedTrajectoryIndices.size(); i++)
+            {
+                if (selectedTrajectoryIndices.at(i) == int(trajectoryIndex))
+                {
+                    filteredTrajectoryIndex = i;
+                    break;
+                }
+            }
+        }
+        auto& trajectory = trajectories.at(filteredTrajectoryIndex);
         auto timeIdx = int(timeAtHit);
         const QVector3D& lineCenterWorldPos = trajectory.at(timeIdx);
         QVector3D n = (firstHitPoint - lineCenterWorldPos).normalized();
@@ -1853,8 +1870,8 @@ void MTrajectoryPicker::updateHighlightRenderData(
         position *= radialFactor;
     }
 
-    for (int lineId = 0; lineId < trajectories.size(); lineId++) {
-        const QVector<QVector3D> &lineCenters = trajectories.at(lineId);
+    for (int lineIdFiltered = 0; lineIdFiltered < trajectories.size(); lineIdFiltered++) {
+        const QVector<QVector3D> &lineCenters = trajectories.at(lineIdFiltered);
         int n = lineCenters.size();
         size_t indexOffset = vertexPositionsHighlighted.size();
 
@@ -1862,7 +1879,7 @@ void MTrajectoryPicker::updateHighlightRenderData(
             continue;
         }
 
-        uint32_t selectedTrajectoryIndex = selectedTrajectoryIndices.at(lineId);
+        uint32_t selectedTrajectoryIndex = selectedTrajectoryIndices.at(lineIdFiltered);
         auto it = highlightedTrajectories.find(selectedTrajectoryIndex);
         if (it == highlightedTrajectories.end()) {
             continue;

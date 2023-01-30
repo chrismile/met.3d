@@ -36,7 +36,6 @@
 // local application imports
 #include "util/mutil.h"
 #include "gxfw/msceneviewglwidget.h"
-#include "beziercurve.hpp"
 
 using namespace std;
 

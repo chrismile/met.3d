@@ -3623,7 +3623,8 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
                     trajectoryRequests[t].trajectorySelection->getNumTrajectories(),
                     trajectoriesData, trajectoryPointTimeSteps, selectedTrajectoryIndices)) {
                 trajectoryPickerMap[sceneView]->setTrajectoryData(
-                        trajectoriesData, trajectoryPointTimeSteps, selectedTrajectoryIndices);
+                        trajectoriesData, trajectoryPointTimeSteps, selectedTrajectoryIndices,
+                        trajectoryRequests[t].bezierTrajectoriesMap[sceneView]->getNumTrajectoriesTotal());
             }
 #endif
             trajectoryRequests[t].bezierTrajectoriesMap[sceneView]->setDirty(false);
@@ -3751,6 +3752,22 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
                 timeStepSphereRenderData->entrancePointsBuffer->bindToIndex(11);
                 timeStepSphereRenderData->exitPointsBuffer->bindToIndex(12);
                 timeStepSphereRenderData->lineElementIdsBuffer->bindToIndex(13);
+
+                if (useFiltering)
+                {
+                    glMultiDrawElements(
+                            GL_TRIANGLES,
+                            trajectoryRequests[t].bezierTrajectoriesMap[sceneView]->getTrajectorySelectionCount(),
+                            GL_UNSIGNED_INT,
+                            trajectoryRequests[t].bezierTrajectoriesMap[sceneView]->getTrajectorySelectionIndices(),
+                            trajectoryRequests[t].bezierTrajectoriesMap[sceneView]->getNumFilteredTrajectories());
+                }
+                else
+                {
+                    glDrawElements(
+                            GL_TRIANGLES, bezierTrajectoriesRenderData.indexBuffer->getCount(),
+                            bezierTrajectoriesRenderData.indexBuffer->getType(), nullptr);
+                }
 
                 glDrawElementsInstanced(
                         GL_TRIANGLES, timeStepSphereRenderData->indexBuffer->getCount(),

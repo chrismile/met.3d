@@ -4,8 +4,7 @@
 **  three-dimensional visual exploration of numerical ensemble weather
 **  prediction data.
 **
-**  Copyright 2020-2021 Christoph Neuhauser
-**  Copyright 2020      Michael Kern
+**  Copyright 2023 Christoph Neuhauser
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -24,42 +23,37 @@
 **  along with Met.3D.  If not, see <http://www.gnu.org/licenses/>.
 **
 *******************************************************************************/
-
-#ifndef MET_3D_BEZIERCURVE_HPP
-#define MET_3D_BEZIERCURVE_HPP
+#ifndef BEZIERCURVE_H
+#define BEZIERCURVE_H
 
 // standard library imports
-#include <array>
+#include <QVector2D>
+#include <QVector3D>
 
 // related third party imports
-#include <QVector>
-#include <QVector3D>
 
 // local application imports
 
-namespace Met3D {
+namespace Met3D
+{
 
-class MBezierCurve {
-public:
-    explicit MBezierCurve(const std::array<QVector3D, 4>& points, const float _minT, const float _maxT);
+/**
+ * Returns the y value of a cubic bezier curve for the given x coordinate.
+ * @param x The x coordinate of the bezier curve.
+ * @param p0 Control point 0.
+ * @param p1 Control point 1.
+ * @param p2 Control point 2.
+ * @param p3 Control point 3.
+ * @return The y coordinate of the bezier curve at x.
+ */
+float evaluateCubicBezier(float x, QVector2D p0, QVector2D p1, QVector2D p2, QVector2D p3);
 
-    std::array<QVector3D, 4> controlPoints;
-    float totalArcLength;
-    float minT;
-    float maxT;
-
-    bool isInterval(const float t) { return (minT <= t && t <= maxT); }
-    void evaluate(const float t, QVector3D& P, QVector3D& dt) const;
-    QVector3D derivative(const float t) const;
-    QVector3D curvature(const float t) const;
-    float evalArcLength(const float _minT, const float _maxT, const uint16_t numSteps) const;
-    float solveTForArcLength(const float _arcLength) const;
-    float normalizeT(const float t) const { return (t - minT) / (maxT - minT); }
-
-private:
-    float denormalizeT(const float t) const { return t * (maxT - minT) + minT; }
-};
+void cameraPathCircle(
+        float timePercentage, float acceleration,
+        QVector3D center, float radius,
+        float angleStart, float angleEnd, float pitch,
+        QVector3D& cameraPosition, float& yaw);
 
 }
 
-#endif //MET_3D_BEZIERCURVE_HPP
+#endif //BEZIERCURVE_H

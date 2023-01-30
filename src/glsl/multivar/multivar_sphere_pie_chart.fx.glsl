@@ -168,6 +168,9 @@ shader FSmain(in VSOutput inputs, out vec4 fragColor)
             variableValue = abs(variableValue - 0.5) * 2.0;
         }
 
+        // Avoid division by zero.
+        variableValue = max(variableValue, 1e-10);
+
         // 1.3) Interpolate linearly.
         variables[varID] = variableValue;
     }

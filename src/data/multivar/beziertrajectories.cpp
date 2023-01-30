@@ -433,7 +433,7 @@ void createLineTubesRenderDataProgrammablePullCPU(
                 triangleIndices.push_back(indexOffsetNext + kNext);
             }
         }
-        numIndicesPerLine.push_back(numSegments * 6);
+        numIndicesPerLine.push_back(numSegments * tubeNumSubdivisions * 6);
     }
 }
 
@@ -923,9 +923,10 @@ bool MBezierTrajectories::updateTimeStepSphereRenderDataIfNecessary(
 #endif
 {
     if (timeStep == lastSphereTimeStep && syncModeTrajectoryIndex == lastSphereSyncModeTrajectoryIndex
-            && sphereRadius == lastSphereRadius) {
+            && sphereRadius == lastSphereRadius && !(useFiltering && hasFilteringChangedSphere)) {
         return false;
     }
+    hasFilteringChangedSphere = false;
     lastSphereTimeStep = timeStep;
     lastSphereSyncModeTrajectoryIndex = syncModeTrajectoryIndex;
     lastSphereRadius = sphereRadius;
@@ -948,8 +949,20 @@ bool MBezierTrajectories::updateTimeStepSphereRenderDataIfNecessary(
 
     const MFilteredTrajectory& syncModeTrajectory = baseTrajectories[int(syncModeTrajectoryIndex)];
 
+    int filteredIndex = 0;
     int trajectoryIndex = 0;
-    for (MFilteredTrajectory& trajectory : baseTrajectories) {
+    for (MFilteredTrajectory& trajectory : baseTrajectories)
+    {
+        if (useFiltering)
+        {
+            int bezierTrajectoryIdx = trajIndicesToFilteredIndicesMap[trajectoryIndex];
+            if (bezierTrajectoryIdx == -1 || trajectoryCompletelyFilteredMap[bezierTrajectoryIdx] == 0)
+            {
+                trajectoryIndex++;
+                continue;
+            }
+        }
+
         int timeStepLocal;
         if (trajectorySyncMode == TrajectorySyncMode::TIME_OF_ASCENT)
         {
@@ -1098,6 +1111,7 @@ bool MBezierTrajectories::updateTimeStepSphereRenderDataIfNecessary(
         lineElementIdData.lineId = trajectoryIndex;
         lineElementIds.push_back(lineElementIdData);
         trajectoryIndex++;
+        filteredIndex++;
     }
 
     timeStepSphereRenderData.numSpheres = spherePositions.size();
@@ -1130,7 +1144,7 @@ MTimeStepRollsRenderData* MBezierTrajectories::getTimeStepRollsRenderData(
 #ifdef USE_QOPENGLWIDGET
         QOpenGLWidget *currentGLContext)
 #else
-QGLWidget *currentGLContext)
+        QGLWidget *currentGLContext)
 #endif
 {
     return &timeStepRollsRenderData;
@@ -1143,15 +1157,17 @@ void MBezierTrajectories::updateTimeStepRollsRenderDataIfNecessary(
 #ifdef USE_QOPENGLWIDGET
         QOpenGLWidget *currentGLContext)
 #else
-QGLWidget *currentGLContext)
+        QGLWidget *currentGLContext)
 #endif
 {
     if (timeStep == lastRollsTimeStep && syncModeTrajectoryIndex == lastRollsSyncModeTrajectoryIndex
             && (!mapRollsThickness || tubeRadius == lastTubeRadius)
             && rollsRadius == lastRollsRadius && rollsWidth == lastRollsWidth && lastVarSelectedRolls == selectedVariableIndices
-            && mapRollsThickness == lastMapRollsThickness && lastNumLineSegmentsRolls == numLineSegments) {
+            && mapRollsThickness == lastMapRollsThickness && lastNumLineSegmentsRolls == numLineSegments
+            && !(useFiltering && hasFilteringChangedRolls)) {
         return;
     }
+    hasFilteringChangedRolls = false;
     lastRollsTimeStep = timeStep;
     lastRollsSyncModeTrajectoryIndex = syncModeTrajectoryIndex;
     lastTubeRadius = tubeRadius;
@@ -1646,6 +1662,8 @@ void MBezierTrajectories::updateTrajectorySelection(
         return;
     }
 
+    trajectoryCompletelyFilteredMap.clear();
+    trajectoryCompletelyFilteredMap.resize(bezierTrajectories.size());
     useFiltering = false;
     int filteredTrajectoryIdx = 0;
     for (int trajectorySelectionIdx = 0; trajectorySelectionIdx < numSelectedTrajectories; trajectorySelectionIdx++)
@@ -1670,10 +1688,17 @@ void MBezierTrajectories::updateTrajectorySelection(
 
         GLsizei selectionCount;
         if (countSelection == numTimeStepsPerTrajectory) {
-            selectionCount = numTrajectoryIndices;
+            selectionCount = GLsizei(numTrajectoryIndices);
         } else {
             useFiltering = true;
-            selectionCount = 2 * (numTrajectoryIndices / 2 * countSelection / numTimeStepsPerTrajectory);
+            uint32_t numIndicesPerSegment;
+            if (useGeometryShader) {
+                numIndicesPerSegment = 6 * tubeNumSubdivisions;
+            } else {
+                numIndicesPerSegment = 2;
+            }
+            selectionCount = GLsizei(numIndicesPerSegment
+                    * (numTrajectoryIndices / numIndicesPerSegment * countSelection / numTimeStepsPerTrajectory));
         }
 
         ptrdiff_t selectionIndex;
@@ -1684,8 +1709,9 @@ void MBezierTrajectories::updateTrajectorySelection(
             selectionIndex = 2 * (numTrajectoryIndices / 2 * offsetSelection / numTimeStepsPerTrajectory);
         }
         selectionIndex += trajectoryIndexOffset;
-        selectionIndex = selectionIndex * sizeof(uint32_t);
+        selectionIndex = ptrdiff_t(selectionIndex * sizeof(uint32_t));
 
+        trajectoryCompletelyFilteredMap[bezierTrajectoryIdx] = 1;
         trajectorySelectionCount[filteredTrajectoryIdx] = selectionCount;
         trajectorySelectionIndices[filteredTrajectoryIdx] = selectionIndex;
         filteredTrajectoryIdx++;
@@ -1694,6 +1720,11 @@ void MBezierTrajectories::updateTrajectorySelection(
     numFilteredTrajectories = filteredTrajectoryIdx;
     if (numFilteredTrajectories != numTrajectories) {
         useFiltering = true;
+    }
+
+    if (useFiltering) {
+        hasFilteringChangedSphere = true;
+        hasFilteringChangedRolls = true;
     }
 }
 

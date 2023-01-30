@@ -48,6 +48,7 @@
 #include "gxfw/mtypes.h"
 #include "gxfw/textmanager.h"
 #include "data/multivar/hidpi.h"
+#include "data/multivar/beziercurve.h"
 #include "mainwindow.h"
 
 using namespace std;
@@ -598,6 +599,12 @@ MSceneViewGLWidget::MSceneViewGLWidget()
     cameraAutoRotationTimer->setInterval(20);
     connect(cameraAutoRotationTimer, SIGNAL(timeout()),
             this, SLOT(autoRotateCamera()));
+
+    // Set up a timer for camera paths.
+    cameraPathTimer = new QTimer();
+    cameraPathTimer->setInterval(cameraPathInterval);
+    connect(cameraPathTimer, SIGNAL(timeout()),
+            this, SLOT(updateCameraPath()));
 }
 
 
@@ -2726,6 +2733,85 @@ void MSceneViewGLWidget::autoRotateCamera()
 }
 
 
+void MSceneViewGLWidget::updateCameraPath()
+{
+    QVector3D currentPosition = cameraPathStartOrigin;
+    currentPosition += QVector3D(cameraPathTimeMs * 1e-4f, 0.0f, 0.0f);
+    camera.setOrigin(currentPosition);
+    //camera.setZAxis();
+    //cameraPathTime += ;
+    //timerEvent()
+    //camera.rotate(0.01f, 0.0f, 1.0f, 0.0f);
+
+    float timePct = cameraPathTimeMs / cameraPathDuration;
+
+    cameraPathTimeMs += float(cameraPathInterval);
+    if (timePct >= 1.0f) {
+        camera.setOrigin(cameraPathStartOrigin);
+        camera.setZAxis(cameraPathStartZAxis);
+        camera.setYAxis(cameraPathStartYAxis);
+        cameraPathTimer->stop();
+    } else {
+        const float PI = 3.1415926535897932f;
+        float yawStart = std::atan2(cameraPathStartZAxis.y(), cameraPathStartZAxis.x());
+        float pitchStart = std::asin(-cameraPathStartZAxis.z());
+        float acceleration = 0.4f;
+
+        float radius = 40.0f;
+        QVector3D centerPoint = cameraPathStartOrigin + radius * cameraPathStartZAxis;
+
+        QVector3D cameraPosition;
+        float yaw = yawStart;
+        float pitch = pitchStart;
+
+        if (timePct < 0.25f) {
+            // 0 - 0.25: Rotate left.
+            cameraPathCircle(
+                    timePct * 4.0f, acceleration,
+                    centerPoint, radius,
+                    yawStart, yawStart - PI * 0.2f, pitch,
+                    cameraPosition, yaw);
+        } else if (timePct < 0.75f) {
+            // 0.25 - 0.75: Rotate right.
+            cameraPathCircle(
+                    (timePct - 0.25f) * 2.0f, acceleration,
+                    centerPoint, radius,
+                    yawStart - PI * 0.2f, yawStart + PI * 0.2f, pitch,
+                    cameraPosition, yaw);
+        } else {
+            // 0.75 - 1: Go back to start.
+            cameraPathCircle(
+                    (timePct - 0.75f) * 4.0f, acceleration,
+                    centerPoint, radius,
+                    yawStart + PI * 0.2f, yawStart, pitch,
+                    cameraPosition, yaw);
+        }
+
+        QVector3D globalUp(0.0f, 0.0f, 1.0f);
+        QVector3D cameraFront;
+        cameraFront.setX(std::cos(yaw) * std::cos(pitch));
+        cameraFront.setY(std::sin(yaw) * std::cos(pitch));
+        cameraFront.setZ(-std::sin(pitch));
+        cameraFront.normalize();
+        QVector3D cameraRight = QVector3D::crossProduct(cameraFront, globalUp).normalized();
+        QVector3D cameraUp = QVector3D::crossProduct(cameraRight, cameraFront).normalized();
+
+        camera.setZAxis(cameraFront);
+        camera.setYAxis(cameraUp);
+        camera.setOrigin(cameraPosition);
+    }
+
+    //sceneRotationMatrix.rotate(cameraAutoRotationAngle, cameraAutoRotationAxis);
+#ifndef CONTINUOUS_GL_UPDATE
+#ifdef USE_QOPENGLWIDGET
+    update();
+#else
+    updateGL();
+#endif
+#endif
+}
+
+
 bool MSceneViewGLWidget::userIsScrollingWithMouse()
 {
     return userIsScrolling;
@@ -2768,6 +2854,17 @@ void MSceneViewGLWidget::keyPressEvent(QKeyEvent *event)
             sceneNavigationModeProperty->setEnabled(true);
             enablePropertyEvents = true;
         }
+    }
+
+    // Camera flight.
+    if (event->key() == Qt::Key_Y && (event->modifiers() & Qt::KeyboardModifier::ControlModifier) != 0)
+    {
+        userIsInteracting = true;
+        cameraPathTimeMs = 0.0f;
+        cameraPathStartOrigin = camera.getOrigin();
+        cameraPathStartZAxis = camera.getZAxis();
+        cameraPathStartYAxis = camera.getYAxis();
+        cameraPathTimer->start();
     }
 
     if (freezeMode) return;

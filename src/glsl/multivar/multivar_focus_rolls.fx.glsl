@@ -97,10 +97,11 @@ shader FSmain(in VSOutput inputs, out vec4 fragColor)
     const uint varID = inputs.fragmentVariableIdAndIsCap & 0x7FFFFFFFu;
     const uint actualVarID = sampleActualVarID(varID);
     const uint sensitivityOffset = sampleSensitivityOffset(actualVarID);
+
     sampleVariableFromLineSSBO(
-            inputs.fragmentLineID, actualVarID, fragElementID, variableValue, variableMinMax);
+            inputs.fragmentLineID, actualVarID, fragElementID, sensitivityOffset, variableValue, variableMinMax);
     sampleVariableFromLineSSBO(
-            inputs.fragmentLineID, actualVarID, fragElementNextID, variableNextValue, variableNextMinMax);
+            inputs.fragmentLineID, actualVarID, fragElementNextID, sensitivityOffset, variableNextValue, variableNextMinMax);
 
     // 3) Determine variable color
     vec4 surfaceColor = determineColorLinearInterpolate(

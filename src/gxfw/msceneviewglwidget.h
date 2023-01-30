@@ -421,6 +421,12 @@ protected slots:
      */
     void autoRotateCamera();
 
+    /**
+     Called by the camera path timer to rotate the camera in camera path mode (CTRL+Y).
+     mode.
+     */
+    void updateCameraPath();
+
 private:
     /**
       Handles opening of file dialog and letting the user choose where to save
@@ -455,6 +461,14 @@ private:
     QTimer *cameraAutoRotationTimer;
     QVector3D cameraAutoRotationAxis;
     float cameraAutoRotationAngle;
+
+    float cameraPathTimeMs = 0.0f;
+    float cameraPathDuration = 10.0f * 1e3f;
+    QTimer *cameraPathTimer = nullptr;
+    int cameraPathInterval = 16;
+    QVector3D cameraPathStartOrigin;
+    QVector3D cameraPathStartZAxis;
+    QVector3D cameraPathStartYAxis;
 
     // Status variables.
     bool renderLabelsWithDepthTest;

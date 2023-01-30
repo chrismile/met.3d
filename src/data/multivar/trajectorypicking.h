@@ -77,7 +77,8 @@ public:
     void setTrajectoryData(
             const QVector<QVector<QVector3D>>& trajectories,
             const QVector<QVector<float>>& trajectoryPointTimeSteps,
-            const QVector<uint32_t>& selectedTrajectoryIndices);
+            const QVector<uint32_t>& selectedTrajectoryIndices,
+            int _numTrajectoriesTotal);
     void updateTrajectoryRadius(float lineRadius);
     void setBaseTrajectories(const MFilteredTrajectories& filteredTrajectories);
 
@@ -248,7 +249,7 @@ public:
 
     inline QVector<uint32_t> getSelectedTrajectories() const {
         QVector<uint32_t> selectedTrajectories;
-        selectedTrajectories.resize(int(trajectories.size()));
+        selectedTrajectories.resize(numTrajectoriesTotal);
         if (!highlightedTrajectories.empty()) {
             for (const auto& it : highlightedTrajectories) {
                 uint32_t trajectoryIndex = it.first;
@@ -328,6 +329,7 @@ private:
     QVector<QVector<QVector3D>> trajectories;
     QVector<QVector<float>> trajectoryPointTimeSteps;
     QVector<uint32_t> selectedTrajectoryIndices;
+    int numTrajectoriesTotal = 0;
 
     std::vector<uint32_t> triangleIndices;
     std::vector<QVector3D> vertexPositions;

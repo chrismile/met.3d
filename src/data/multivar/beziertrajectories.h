@@ -187,6 +187,7 @@ public:
             const GLint* startIndices, const GLsizei* indexCount,
             int numTimeStepsPerTrajectory, int numFilteredTrajectories);
     bool getUseFiltering();
+    inline int getNumTrajectoriesTotal() const { return bezierTrajectories.size(); }
     int getNumFilteredTrajectories();
     GLsizei* getTrajectorySelectionCount();
     const void* const* getTrajectorySelectionIndices();
@@ -195,7 +196,7 @@ public:
             int numTimeStepsPerTrajectory, int numSelectedTrajectories,
             QVector<QVector<QVector3D>>& trajectories,
             QVector<QVector<float>>& trajectoryPointTimeSteps,
-            QVector<uint32_t>& selectedTrajectoryIndices);
+            QVector<uint32_t>& _selectedTrajectoryIndices);
 
     MBezierTrajectoriesRenderData getRenderData(
 #ifdef USE_QOPENGLWIDGET
@@ -327,9 +328,12 @@ private:
     uint32_t numAux = 0;
     uint32_t numTimesteps = 0;
     bool useFiltering = false;
+    bool hasFilteringChangedSphere = false;
+    bool hasFilteringChangedRolls = false;
     int numFilteredTrajectories = 0;
     GLsizei* trajectorySelectionCount = nullptr;
     ptrdiff_t* trajectorySelectionIndices = nullptr;
+    QVector<int> trajectoryCompletelyFilteredMap;
 
     QVector<QVector2D> minMaxAttributes;
 
