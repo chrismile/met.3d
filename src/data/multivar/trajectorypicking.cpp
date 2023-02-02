@@ -1195,7 +1195,7 @@ bool MTrajectoryPicker::toolTipPick(MSceneViewGLWidget* sceneView, const QPoint 
         if (targetVariableAndSensitivity)
         {
             int numVariables = 2;
-            auto varID = int(std::floor(ribbonPosition * float(numVariables)));
+            auto varID = clamp(int(std::floor(ribbonPosition * float(numVariables))), 0, numVariables - 1);
 
             if (varID == 0) {
                 /*
@@ -1216,7 +1216,7 @@ bool MTrajectoryPicker::toolTipPick(MSceneViewGLWidget* sceneView, const QPoint 
         else
         {
             auto numVariables = int(selectedVariableIndices.size());
-            auto varID = int(std::floor(ribbonPosition * float(numVariables)));
+            auto varID = clamp(int(std::floor(ribbonPosition * float(numVariables))), 0, numVariables - 1);
             varIdxReal = int(selectedVariableIndices.at(varID));
         }
         varName = QString::fromStdString(variableNames.at(varIdxReal));
@@ -1255,7 +1255,7 @@ bool MTrajectoryPicker::toolTipPick(MSceneViewGLWidget* sceneView, const QPoint 
         ribbonPosition = ribbonPosition / 2.0f + 0.5f;
 
         auto numVariables = int(selectedVariableIndices.size());
-        auto varID = int(std::floor(ribbonPosition * float(numVariables)));
+        auto varID = clamp(int(std::floor(ribbonPosition * float(numVariables))), 0, numVariables - 1);
         varIdxReal = int(selectedVariableIndices.at(varID));
         varName = QString::fromStdString(variableNames.at(varIdxReal));
     }
@@ -1291,7 +1291,7 @@ bool MTrajectoryPicker::toolTipPick(MSceneViewGLWidget* sceneView, const QPoint 
         angle /= 2.0f * float(M_PI);
 
         auto numVariables = int(selectedVariableIndices.size());
-        auto varID = int(std::floor(angle * float(numVariables)));
+        auto varID = clamp(int(std::floor(angle * float(numVariables))), 0, numVariables - 1);
         varIdxReal = int(selectedVariableIndices.at(varID));
         varName = QString::fromStdString(variableNames.at(varIdxReal));
     }

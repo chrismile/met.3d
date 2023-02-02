@@ -262,7 +262,7 @@ private:
     };
     MultiVarRenderMode multiVarRenderMode = MultiVarRenderMode::ORIENTED_COLOR_BANDS;
     bool internalRepresentationChanged = false; ///< If multiVarRenderMode changes to other mode needing different data.
-    MultiVarFocusRenderMode focusRenderMode = MultiVarFocusRenderMode::GREAT_CIRCLE;
+    MultiVarFocusRenderMode focusRenderMode = MultiVarFocusRenderMode::PIE_CHART_COLOR;
     MultiVarGeometryMode geometryMode = MultiVarGeometryMode::PROGRAMMABLE_PULL;
 
     // For MULTIVAR_RENDERMODE_ORIENTED_COLOR_BANDS, MULTIVAR_RENDERMODE_ORIENTED_COLOR_BANDS_RIBBON

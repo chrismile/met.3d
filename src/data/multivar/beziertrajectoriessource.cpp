@@ -194,7 +194,7 @@ MBezierTrajectories *MBezierTrajectoriesSource::produceData(MDataRequest request
     }
 
 
-    bool useAbsoluteSensitivityValues = true;
+    bool useAbsoluteSensitivityValues = hasSensitivityData;
     if (useAbsoluteSensitivityValues)
     {
         for (int trajectoryIdx = 0; trajectoryIdx < filteredTrajectories.size(); trajectoryIdx++)
@@ -244,8 +244,8 @@ MBezierTrajectories *MBezierTrajectoriesSource::produceData(MDataRequest request
                 }
             }
         }
+        numVariables++;
     }
-    numVariables++;
 
 
     // 2) Compute min max values of all attributes across all trajectories

@@ -972,6 +972,14 @@ void MMultiVarData::onBezierTrajectoriesLoaded(MTrajectories* trajectories)
         }
     }
 
+    if (!hasSensitivityData)
+    {
+        targetVariableAndSensitivity = false;
+        propertyList.removeOne(targetVariableAndSensitivityProperty);
+        actor->removeProperty(targetVariableAndSensitivityProperty, multiVarGroupProperty);
+        targetVariableAndSensitivityProperty = nullptr;
+    }
+
     selectedVariablesChanged = true;
     varDivergingChanged = true;
 }

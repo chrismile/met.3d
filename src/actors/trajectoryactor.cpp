@@ -3398,7 +3398,7 @@ void MTrajectoryActor::unbindShadowStencilBuffer()
 void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
 {
     // Only render if transfer function is available.
-    if (transferFunction == nullptr)
+    if (transferFunction == nullptr && !useBezierTrajectories)
     {
         return;
     }
@@ -4106,7 +4106,7 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
 void MTrajectoryActor::renderOverlayToCurrentContext(MSceneViewGLWidget *sceneView)
 {
     // Only render if transfer function is available.
-    if (transferFunction == nullptr)
+    if (transferFunction == nullptr && !useBezierTrajectories)
     {
         return;
     }

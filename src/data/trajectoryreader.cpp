@@ -278,7 +278,14 @@ MTrajectories* MTrajectoryReader::produceData(MDataRequest request)
     uint32_t *outputParameters = new uint32_t[numOutputParameters];
     vector<size_t> startParams = {0};
     vector<size_t> countParams = {numOutputParameters};
-    finfo->outputParameterVar.getVar(startParams, countParams, outputParameters);
+    if (!finfo->outputParameterVar.isNull())
+    {
+        finfo->outputParameterVar.getVar(startParams, countParams, outputParameters);
+    }
+    else
+    {
+        std::fill_n(outputParameters, numOutputParameters, 0);
+    }
 
     // Read data from file.
     vector<size_t> start = {member, 0, startIndex};
@@ -713,9 +720,10 @@ void MTrajectoryReader::checkFileOpen(QString filename)
         int numDims = ncFile->getDimCount();
         if (numDims == 4) {
             NcDim outputParameterDim = ncFile->getDim("Output_Parameter_ID");
-            finfo->numOutputParameters  = outputParameterDim.getSize();
+            finfo->numOutputParameters = outputParameterDim.getSize();
 
-        } else
+        }
+        else
         {
             finfo->numOutputParameters  = 1;
         }

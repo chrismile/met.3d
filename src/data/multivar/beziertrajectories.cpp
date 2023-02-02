@@ -864,12 +864,8 @@ bool lineSegmentSphereIntersection(
 }
 
 bool halfLineSphereIntersection(
-        const QVector3D& p0, const QVector3D& p1, const QVector3D& sphereCenter, float sphereRadius,
-        bool isLeftOpen, float& hitT) {
-    const QVector3D& rayOrigin = p0;
-    const QVector3D rayDirection = (p1 - p0).normalized();
-    const float rayLength = (p1 - p0).length();
-
+        const QVector3D& rayOrigin, const QVector3D& rayDirection, const QVector3D& sphereCenter, float sphereRadius,
+        float& hitT) {
     float A = SQR(rayDirection.x()) + SQR(rayDirection.y()) + SQR(rayDirection.z());
     float B = 2.0f * (
             rayDirection.x() * (rayOrigin.x() - sphereCenter.x())
@@ -892,22 +888,12 @@ bool halfLineSphereIntersection(
     float t1 = (-B + discriminantSqrt) / (2.0f * A);
 
     // Intersection(s) behind the ray origin?
-    if (isLeftOpen) {
-        if (t0 <= rayLength) {
-            hitT = t0 / rayLength;
-        } else if (t1 <= rayLength) {
-            hitT = t1 / rayLength;
-        } else {
-            return false;
-        }
+    if (t0 >= 0.0f) {
+        hitT = t0;
+    } else if (t1 >= 0.0f) {
+        hitT = t1;
     } else {
-        if (t0 >= 0.0f) {
-            hitT = t0 / rayLength;
-        } else if (t1 >= 0.0f) {
-            hitT = t1 / rayLength;
-        } else {
-            return false;
-        }
+        return false;
     }
 
     return true;
@@ -1067,9 +1053,10 @@ bool MBezierTrajectories::updateTimeStepSphereRenderDataIfNecessary(
             } else {
                 const QVector3D& p0 = trajectory.positions.at(0);
                 const QVector3D& p1 = trajectory.positions.at(1);
+                const QVector3D& rayDirection = (p0 - p1).normalized();
                 float hitT;
-                if (halfLineSphereIntersection(p0, p1, sphereCenter, sphereRadius, true, hitT)) {
-                    entrancePoints.push_back((1.0f - hitT) * p0 + hitT * p1);
+                if (halfLineSphereIntersection(p0, rayDirection, sphereCenter, sphereRadius, hitT)) {
+                    entrancePoints.push_back(p0 + hitT * rayDirection);
                 } else {
                     entrancePoints.push_back(trajectory.positions.at(0));
                 }
@@ -1095,9 +1082,10 @@ bool MBezierTrajectories::updateTimeStepSphereRenderDataIfNecessary(
             } else {
                 const QVector3D& p0 = trajectory.positions.at(trajectory.positions.size() - 2);
                 const QVector3D& p1 = trajectory.positions.at(trajectory.positions.size() - 1);
+                const QVector3D& rayDirection = (p1 - p0).normalized();
                 float hitT;
-                if (halfLineSphereIntersection(p0, p1, sphereCenter, sphereRadius, false, hitT)) {
-                    exitPoints.push_back((1.0f - hitT) * p0 + hitT * p1);
+                if (halfLineSphereIntersection(p1, rayDirection, sphereCenter, sphereRadius, hitT)) {
+                    exitPoints.push_back(p1 + hitT * rayDirection);
                 } else {
                     exitPoints.push_back(trajectory.positions.at(trajectory.positions.size() - 1));
                 }
