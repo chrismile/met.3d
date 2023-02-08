@@ -38,7 +38,11 @@ uniform uint numInstances;
 // Radius of tubes
 uniform float lineWidth;
 
-uniform vec3 cameraPosition; // world space
+uniform int orthographicModeEnabled;
+uniform vec3 cameraPosition; // world space position, orthographicModeEnabled
+//uniform vec3 cameraLookDirection; // world space direction, !orthographicModeEnabled
+#define cameraLookDirection vec3(0.0, 0.0, -1.0)
+#define cameraLookDirectionNeg vec3(0.0, 0.0, 1.0)
 
 uniform int renderTubesUpToIndex;
 

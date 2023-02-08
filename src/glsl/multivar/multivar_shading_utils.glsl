@@ -375,7 +375,7 @@ vec4 computePhongLighting(
     const float s = materialSpecularExp;
 
     const vec3 n = normalize(normal);
-    const vec3 v = normalize(cameraPosition - worldPos);
+    const vec3 v = orthographicModeEnabled == 1 ? cameraLookDirectionNeg : normalize(cameraPosition - worldPos);
     const vec3 l = normalize(useHeadLight == 1 ? v : -lightDirection);
     const vec3 h = normalize(v + l);
     vec3 t = normalize(tangent);
@@ -436,7 +436,7 @@ vec4 computePhongLightingSphere(
     const float s = materialSpecularExp;
 
     const vec3 n = normalize(normal);
-    const vec3 v = normalize(cameraPosition - worldPos);
+    const vec3 v = orthographicModeEnabled == 1 ? cameraLookDirectionNeg : normalize(cameraPosition - worldPos);
     const vec3 l = normalize(useHeadLight == 1 ? v : -lightDirection);
     const vec3 h = normalize(v + l);
 

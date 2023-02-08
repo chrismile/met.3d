@@ -825,17 +825,36 @@ bool MTrajectoryPicker::pickPointScreen(
     int viewportHeight = sceneView->getViewPortHeight();
     float aspectRatio = float(viewportWidth) / float(viewportHeight);
 
-    QMatrix4x4 inverseViewMatrix = sceneView->getCamera()->getViewMatrix().inverted();
-    float scale = std::tan(qDegreesToRadians(sceneView->getVerticalAngle()) * 0.5f);
-    QVector2D rayDirCameraSpace;
-    rayDirCameraSpace.setX((2.0f * (float(x) + 0.5f) / float(viewportWidth) - 1.0f) * aspectRatio * scale);
-    rayDirCameraSpace.setY((2.0f * (float(viewportHeight - y - 1) + 0.5f) / float(viewportHeight) - 1.0f) * scale);
-    QVector4D rayDirectionVec4 = inverseViewMatrix * QVector4D(rayDirCameraSpace, -1.0, 0.0);
-    QVector3D rayDirection = QVector3D(rayDirectionVec4.x(), rayDirectionVec4.y(), rayDirectionVec4.z());
-    rayDirection.normalize();
+    if (sceneView->orthographicModeEnabled())
+    {
+        QVector3D cameraRight = sceneView->getCamera()->getXAxis();
+        QVector3D cameraUp = sceneView->getCamera()->getYAxis();
 
-    return pickPointWorld(
-            sceneView->getCamera()->getOrigin(), rayDirection, firstHitPoint, trajectoryIndex, timeAtHit);
+        const float zBack = sceneView->getCamera()->getOrigin().z();
+        float dyHalf = float(std::tan(M_PI / 8.0)) * zBack;
+        float dxHalf = aspectRatio * dyHalf;
+
+        float xNorm = (2.0f * (float(x) + 0.5f) / float(viewportWidth) - 1.0f) * dxHalf;
+        float yNorm = (2.0f * (float(viewportHeight - y - 1) + 0.5f) / float(viewportHeight) - 1.0f) * dyHalf;
+        QVector3D rayOrigin = sceneView->getCamera()->getOrigin() + cameraRight * xNorm + cameraUp * yNorm;
+
+        return pickPointWorld(
+                rayOrigin, sceneView->getCamera()->getZAxis(), firstHitPoint, trajectoryIndex, timeAtHit);
+    }
+    else
+    {
+        QMatrix4x4 inverseViewMatrix = sceneView->getCamera()->getViewMatrix().inverted();
+        float scale = std::tan(qDegreesToRadians(sceneView->getVerticalAngle()) * 0.5f);
+        QVector2D rayDirCameraSpace;
+        rayDirCameraSpace.setX((2.0f * (float(x) + 0.5f) / float(viewportWidth) - 1.0f) * aspectRatio * scale);
+        rayDirCameraSpace.setY((2.0f * (float(viewportHeight - y - 1) + 0.5f) / float(viewportHeight) - 1.0f) * scale);
+        QVector4D rayDirectionVec4 = inverseViewMatrix * QVector4D(rayDirCameraSpace, -1.0, 0.0);
+        QVector3D rayDirection = QVector3D(rayDirectionVec4.x(), rayDirectionVec4.y(), rayDirectionVec4.z());
+        rayDirection.normalize();
+
+        return pickPointWorld(
+                sceneView->getCamera()->getOrigin(), rayDirection, firstHitPoint, trajectoryIndex, timeAtHit);
+    }
 }
 
 bool MTrajectoryPicker::checkVirtualWindowBelowMouse(
@@ -1036,25 +1055,45 @@ bool MTrajectoryPicker::toolTipPick(MSceneViewGLWidget* sceneView, const QPoint 
     QString varName;
     float varFraction = 0.0f;
 
-    int viewportWidth = sceneView->getViewPortWidth();
-    int viewportHeight = sceneView->getViewPortHeight();
-    float aspectRatio = float(viewportWidth) / float(viewportHeight);
-
-    QMatrix4x4 inverseViewMatrix = sceneView->getCamera()->getViewMatrix().inverted();
-    float scale = std::tan(qDegreesToRadians(sceneView->getVerticalAngle()) * 0.5f);
-    QVector2D rayDirCameraSpace;
-    rayDirCameraSpace.setX((2.0f * (float(position.x()) + 0.5f) / float(viewportWidth) - 1.0f) * aspectRatio * scale);
-    rayDirCameraSpace.setY((2.0f * (float(viewportHeight - position.y() - 1) + 0.5f) / float(viewportHeight) - 1.0f) * scale);
-    QVector4D rayDirectionVec4 = inverseViewMatrix * QVector4D(rayDirCameraSpace, -1.0, 0.0);
-    QVector3D rayDirection = QVector3D(rayDirectionVec4.x(), rayDirectionVec4.y(), rayDirectionVec4.z());
-    rayDirection.normalize();
-
 #ifdef USE_EMBREE
     if (!loaded) {
         return false;
     }
 
-    QVector3D rayOrigin = sceneView->getCamera()->getOrigin();
+    int viewportWidth = sceneView->getViewPortWidth();
+    int viewportHeight = sceneView->getViewPortHeight();
+    float aspectRatio = float(viewportWidth) / float(viewportHeight);
+
+    QVector3D rayOrigin;
+    QVector3D rayDirection;
+
+    if (sceneView->orthographicModeEnabled())
+    {
+        QVector3D cameraRight = sceneView->getCamera()->getXAxis();
+        QVector3D cameraUp = sceneView->getCamera()->getYAxis();
+
+        const float zBack = sceneView->getCamera()->getOrigin().z();
+        float dyHalf = float(std::tan(M_PI / 8.0)) * zBack;
+        float dxHalf = aspectRatio * dyHalf;
+
+        float xNorm = (2.0f * (float(position.x()) + 0.5f) / float(viewportWidth) - 1.0f) * dxHalf;
+        float yNorm = (2.0f * (float(viewportHeight - position.y() - 1) + 0.5f) / float(viewportHeight) - 1.0f) * dyHalf;
+        rayOrigin = sceneView->getCamera()->getOrigin() + cameraRight * xNorm + cameraUp * yNorm;
+        rayDirection = sceneView->getCamera()->getZAxis();
+    }
+    else
+    {
+        QMatrix4x4 inverseViewMatrix = sceneView->getCamera()->getViewMatrix().inverted();
+        float scale = std::tan(qDegreesToRadians(sceneView->getVerticalAngle()) * 0.5f);
+        QVector2D rayDirCameraSpace;
+        rayDirCameraSpace.setX((2.0f * (float(position.x()) + 0.5f) / float(viewportWidth) - 1.0f) * aspectRatio * scale);
+        rayDirCameraSpace.setY((2.0f * (float(viewportHeight - position.y() - 1) + 0.5f) / float(viewportHeight) - 1.0f) * scale);
+        QVector4D rayDirectionVec4 = inverseViewMatrix * QVector4D(rayDirCameraSpace, -1.0, 0.0);
+        rayDirection = QVector3D(rayDirectionVec4.x(), rayDirectionVec4.y(), rayDirectionVec4.z());
+        rayDirection.normalize();
+
+        rayOrigin = sceneView->getCamera()->getOrigin();
+    }
 
     const float EPSILON_DEPTH = 1e-3f;
     const float INFINITY_DEPTH = 1e30f;
@@ -1162,7 +1201,15 @@ bool MTrajectoryPicker::toolTipPick(MSceneViewGLWidget* sceneView, const QPoint 
         auto timeIdx = int(timeAtHit);
         const QVector3D& lineCenterWorldPos = trajectory.at(timeIdx);
         QVector3D n = (firstHitPoint - lineCenterWorldPos).normalized();
-        QVector3D v = (sceneView->getCamera()->getOrigin() - firstHitPoint).normalized();
+        QVector3D v;
+        if (sceneView->orthographicModeEnabled())
+        {
+            v = sceneView->getCamera()->getZAxis();
+        }
+        else
+        {
+            v = (sceneView->getCamera()->getOrigin() - firstHitPoint).normalized();
+        }
         QVector3D t(1.0f, 0.0f, 0.0f);
         if (timeIdx == 0)
         {
@@ -1235,6 +1282,15 @@ bool MTrajectoryPicker::toolTipPick(MSceneViewGLWidget* sceneView, const QPoint 
         //QVector3D v = (sceneView->getCamera()->getOrigin() - firstHitPoint).normalized();
         QVector3D l = (exitPoint - entrancePoint).normalized();
 
+        QVector3D sphereRayDir;
+        if (sceneView->orthographicModeEnabled())
+        {
+            sphereRayDir = sceneView->getCamera()->getZAxis();
+        }
+        else
+        {
+            sphereRayDir = (sceneView->getCamera()->getOrigin() - spherePosition).normalized();
+        }
         QVector3D intersectionPosition;
         raySphereIntersection(
                 spherePosition, (sceneView->getCamera()->getOrigin() - spherePosition).normalized(),
@@ -1269,7 +1325,15 @@ bool MTrajectoryPicker::toolTipPick(MSceneViewGLWidget* sceneView, const QPoint 
         //int fragElementID = int(round(centerIdx));
 
         QVector3D n = QVector3D(querySphere.hit.Ng_x, querySphere.hit.Ng_y, querySphere.hit.Ng_z);
-        QVector3D v = (sceneView->getCamera()->getOrigin() - firstHitPoint).normalized();
+        QVector3D v;
+        if (sceneView->orthographicModeEnabled())
+        {
+            v = sceneView->getCamera()->getZAxis();
+        }
+        else
+        {
+            v = (sceneView->getCamera()->getOrigin() - firstHitPoint).normalized();
+        }
         //QVector3D l = (exitPoint - entrancePoint).normalized();
 
         QVector3D cameraUp = sceneView->getCamera()->getYAxis();
@@ -1330,7 +1394,7 @@ bool MTrajectoryPicker::toolTipPick(MSceneViewGLWidget* sceneView, const QPoint 
     }
     varFraction = clamp(varFraction, 0.0f, 1.0f);
 
-    depth = (sceneView->getCamera()->getOrigin() - firstHitPoint).length();
+    depth = (rayOrigin - firstHitPoint).length();
     //text = QString("Idx %1, Time %2, Var %3").arg(trajectoryIndex).arg(int(timeAtHit)).arg(varName);
     //text = QString("Time %1, %2 (%3%)").arg(int(timeAtHit)).arg(varName).arg(
     //        int(std::round(varFraction * 100)));

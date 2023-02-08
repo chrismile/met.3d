@@ -185,14 +185,13 @@ shader FSmain(in VSOutput inputs, out vec4 fragColor)
     //}
 
     const vec3 n = normalize(inputs.fragmentNormal);
-    const vec3 v = normalize(cameraPosition - inputs.fragmentPosition);
+    const vec3 v = orthographicModeEnabled == 1 ? cameraLookDirectionNeg : normalize(cameraPosition - inputs.fragmentPosition);
     const vec3 l = normalize(exitPoint - entrancePoint);
 
-    //vec3 planeNormalZero = normalize(cross(l, cameraPosition - entrancePoint));
-    //vec3 planeNormalZero = normalize(cross(l, inputs.spherePosition - entrancePoint));
     vec3 intersectionPosition;
     raySphereIntersection(
-            inputs.spherePosition, normalize(cameraPosition - inputs.spherePosition),
+            inputs.spherePosition,
+            orthographicModeEnabled == 1 ? cameraLookDirectionNeg : normalize(cameraPosition - inputs.spherePosition),
             inputs.spherePosition, sphereRadius, intersectionPosition);
     vec3 planeNormalZero = normalize(cross(l, intersectionPosition - entrancePoint));
     vec3 planeNormalX = normalize(cross(l, inputs.fragmentPosition - entrancePoint));

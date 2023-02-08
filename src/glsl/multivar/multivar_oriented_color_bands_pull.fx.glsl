@@ -130,7 +130,7 @@ uniform vec4 bandBackgroundColor = vec4(0.5, 0.5, 0.5, 1.0);
 shader FSmain(in FSInput inputs, out vec4 fragColor) {
     // 1) Determine variable ID along tube geometry
     const vec3 n = normalize(inputs.fragNormal);
-    const vec3 v = normalize(cameraPosition - inputs.fragWorldPos);
+    const vec3 v = orthographicModeEnabled == 1 ? cameraLookDirectionNeg : normalize(cameraPosition - inputs.fragWorldPos);
     const vec3 t = normalize(inputs.fragTangent);
     // Project v into plane perpendicular to t to get newV.
     vec3 helperVec = normalize(cross(t, v));

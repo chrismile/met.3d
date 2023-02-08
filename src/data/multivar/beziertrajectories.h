@@ -211,7 +211,6 @@ public:
     void updateOutputParameterIdx(const int OutputParameterIdx);
 
     // Used for aligning warm conveyor belt trajectories based on their ascension.
-    void setSyncMode(TrajectorySyncMode syncMode);
     void updateLineAscentTimeStepArrayBuffer(
             const QVector<int>& _ascentTimeStepIndices, int _maxAscentTimeStepIndex);
 
@@ -222,7 +221,7 @@ public:
             QGLWidget *currentGLContext = nullptr);
 #endif
     bool updateTimeStepSphereRenderDataIfNecessary(
-            int timeStep, uint32_t syncModeTrajectoryIndex, float sphereRadius,
+            TrajectorySyncMode trajectorySyncMode, int timeStep, uint32_t syncModeTrajectoryIndex, float sphereRadius,
 #ifdef USE_QOPENGLWIDGET
             QOpenGLWidget *currentGLContext = nullptr);
 #else
@@ -242,7 +241,7 @@ public:
     QGLWidget *currentGLContext = nullptr);
 #endif
     void updateTimeStepRollsRenderDataIfNecessary(
-            int timeStep, uint32_t syncModeTrajectoryIndex, float tubeRadius,
+            TrajectorySyncMode trajectorySyncMode, int timeStep, uint32_t syncModeTrajectoryIndex, float tubeRadius,
             float rollsRadius, float rollsWidth, bool mapRollsThickness, int numLineSegments,
 #ifdef USE_QOPENGLWIDGET
             QOpenGLWidget *currentGLContext = nullptr);
@@ -266,10 +265,10 @@ private:
 
     // Used for aligning warm conveyor belt trajectories based on their ascension.
     QVector<int> ascentTimeStepIndices;
-    TrajectorySyncMode trajectorySyncMode = TrajectorySyncMode::TIMESTEP;
     int maxAscentTimeStepIndex = 0;
 
     // Focus spheres data.
+    TrajectorySyncMode lastSphereTrajectorySyncMode = TrajectorySyncMode::TIMESTEP;
     int lastSphereTimeStep = std::numeric_limits<int>::lowest();
     uint32_t lastSphereSyncModeTrajectoryIndex = 0;
     float lastSphereRadius = std::numeric_limits<float>::lowest();
@@ -294,6 +293,7 @@ private:
             QString("timestepsphere_line_element_ids_buffer_#%1").arg(getID());
 
     // Focus rolls data.
+    TrajectorySyncMode lastRollsTrajectorySyncMode = TrajectorySyncMode::TIMESTEP;
     int lastRollsTimeStep = std::numeric_limits<int>::lowest();
     uint32_t lastRollsSyncModeTrajectoryIndex = 0;
     float lastTubeRadius = std::numeric_limits<float>::lowest();

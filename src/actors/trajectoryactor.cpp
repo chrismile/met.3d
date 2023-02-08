@@ -922,13 +922,6 @@ void MTrajectoryActor::loadConfiguration(QSettings *settings)
     {
         trajectoryPicker->setSyncMode(trajectorySyncMode);
     }
-    for (int t = 0; t < (precomputedDataSource ? 1 : seedActorData.size()); t++)
-    {
-        for (auto& sceneView : trajectoryRequests[t].bezierTrajectoriesMap.keys())
-        {
-            trajectoryRequests[t].bezierTrajectoriesMap[sceneView]->setSyncMode(trajectorySyncMode);
-        }
-    }
 #endif
 
     syncModeTrajectoryIndex = settings->value(
@@ -1993,7 +1986,6 @@ void MTrajectoryActor::prepareAvailableDataForRendering(uint slot)
                     }
                     trajectoryRequests[slot].bezierTrajectoriesMap[view] = bezierTrajectoriesSource->getData(
                             trqi.bezierTrajectoriesRequests[view].request);
-                    trajectoryRequests[slot].bezierTrajectoriesMap[view]->setSyncMode(trajectorySyncMode);
                     trajectoryRequests[slot].bezierTrajectoriesRenderDataMap[view] =
                             trajectoryRequests[slot].bezierTrajectoriesMap[view]->getRenderData();
                     trajectoryRequests[slot].timeStepSphereRenderDataMap[view] =
@@ -3098,13 +3090,6 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
         {
             trajectoryPicker->setSyncMode(trajectorySyncMode);
         }
-        for (int t = 0; t < (precomputedDataSource ? 1 : seedActorData.size()); t++)
-        {
-            for (auto& sceneView : trajectoryRequests[t].bezierTrajectoriesMap.keys())
-            {
-                trajectoryRequests[t].bezierTrajectoriesMap[sceneView]->setSyncMode(trajectorySyncMode);
-            }
-        }
         if (suppressActorUpdates()) return;
         emitActorChangedSignal();
 #endif
@@ -3539,6 +3524,8 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
                         sceneView->getLightDirectionEnum() == MSceneViewGLWidget::VIEWDIRECTION ? 1 : 0);
             }
             tubeShader->setUniformValue("cameraPosition", sceneView->getCamera()->getOrigin());
+            tubeShader->setUniformValue("orthographicModeEnabled", sceneView->orthographicModeEnabled() ? 1 : 0);
+            //tubeShader->setUniformValue("cameraLookDirection", sceneView->getCamera()->getZAxis());
             tubeShader->setUniformValue("lineWidth", GLfloat(2.0f * tubeRadius));
 
             //if (renderMode == BACKWARDTUBES_AND_SINGLETIME)
@@ -3706,7 +3693,7 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
             {
                 bool sphereDataChanged = trajectoryRequests[t].bezierTrajectoriesMap[
                         sceneView]->updateTimeStepSphereRenderDataIfNecessary(
-                        particlePosTimeStep, syncModeTrajectoryIndex, sphereRadius);
+                        trajectorySyncMode, particlePosTimeStep, syncModeTrajectoryIndex, sphereRadius);
                 MTimeStepSphereRenderData* timeStepSphereRenderData =
                         trajectoryRequests[t].timeStepSphereRenderDataMap[sceneView];
 
@@ -3739,6 +3726,7 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
                             sceneView->getLightDirectionEnum() == MSceneViewGLWidget::VIEWDIRECTION ? 1 : 0);
                 }
                 timeStepSphereShader->setUniformValue("cameraPosition", sceneView->getCamera()->getOrigin());
+                timeStepSphereShader->setUniformValue("orthographicModeEnabled", sceneView->orthographicModeEnabled() ? 1 : 0);
                 timeStepSphereShader->setUniformValue("sphereRadius", sphereRadius);
                 timeStepSphereShader->setUniformValue("lineRadius", tubeRadius);
                 timeStepSphereShader->setUniformValue("timestepLensePosition", particlePosTimeStep);
@@ -3779,7 +3767,7 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
             if (multiVarData.getUseTimestepLens() && useMultiVarSpheres && multiVarData.getRenderRolls())
             {
                 trajectoryRequests[t].bezierTrajectoriesMap[sceneView]->updateTimeStepRollsRenderDataIfNecessary(
-                        particlePosTimeStep, syncModeTrajectoryIndex, tubeRadius, sphereRadius,
+                        trajectorySyncMode, particlePosTimeStep, syncModeTrajectoryIndex, tubeRadius, sphereRadius,
                         multiVarData.getRollsWidth(), multiVarData.getMapRollsThickness(),
                         multiVarData.getNumLineSegments());
                 MTimeStepRollsRenderData* timeStepRollsRenderData =
@@ -3798,6 +3786,8 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
                             "lightDirection", sceneView->getLightDirection());
                     timeStepSphereShader->setUniformValue(
                             "cameraPosition", sceneView->getCamera()->getOrigin());
+                    timeStepSphereShader->setUniformValue(
+                            "orthographicModeEnabled", sceneView->orthographicModeEnabled() ? 1 : 0);
                     timeStepSphereShader->setUniformValue(
                             "lineRadius", tubeRadius);
                     timeStepSphereShader->setUniformValue(

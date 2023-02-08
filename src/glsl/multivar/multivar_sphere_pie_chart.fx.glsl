@@ -107,7 +107,7 @@ shader FSmain(in VSOutput inputs, out vec4 fragColor)
     //}
 
     const vec3 n = normalize(inputs.fragmentNormal);
-    const vec3 v = normalize(cameraPosition - inputs.fragmentPosition);
+    const vec3 v = orthographicModeEnabled == 1 ? cameraLookDirectionNeg : normalize(cameraPosition - inputs.fragmentPosition);
     const vec3 l = normalize(exitPoint - entrancePoint);
 
     // 2) Project v and n into plane perpendicular to l to get newV and newN.

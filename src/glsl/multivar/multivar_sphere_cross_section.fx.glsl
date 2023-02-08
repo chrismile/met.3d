@@ -171,12 +171,9 @@ shader FSmain(in VSOutput inputs, out vec4 fragColor)
     int fragElementID = int(round(centerIdx));
 
     const vec3 n = normalize(inputs.fragmentNormal);
-    const vec3 v = normalize(cameraPosition - inputs.fragmentPosition);
+    const vec3 v = orthographicModeEnabled == 1 ? cameraLookDirectionNeg : normalize(cameraPosition - inputs.fragmentPosition);
     const vec3 l = normalize(exitPoint - entrancePoint);
     const vec3 vp = inverse(vMatrix)[2].xyz;
-
-    //vec3 intersectionPosition;
-    //raySphereIntersection(inputs.spherePosition, normalize(cameraPosition - inputs.spherePosition), inputs.spherePosition, sphereRadius, intersectionPosition);
 
     vec3 entranceDir = normalize(entrancePoint - inputs.spherePosition);
     vec3 entranceFront;
@@ -202,16 +199,33 @@ shader FSmain(in VSOutput inputs, out vec4 fragColor)
     float centerDist = 1.0 - 2.0 * separatorWidthSphere;
     vec3 surfaceNormal = n;
 
+    vec3 rayOrigin = cameraPosition;
+
+    // TODO: Add support for orthographic mode.
+    //if (orthographicModeEnabled == 1)
+    //{
+    //    vec3 cameraRight = sceneView->getCamera()->getXAxis();
+    //    vec3 cameraUp = sceneView->getCamera()->getYAxis();
+    //
+    //    const float zBack = sceneView->getCamera()->getOrigin().z();
+    //    float dyHalf = tan(M_PI / 8.0) * zBack;
+    //    float dxHalf = aspectRatio * dyHalf;
+    //
+    //    float xNorm = (2.0f * (float(position.x()) + 0.5f) / float(viewportWidth) - 1.0f) * dxHalf;
+    //    float yNorm = (2.0f * (float(viewportHeight - position.y() - 1) + 0.5f) / float(viewportHeight) - 1.0f) * dyHalf;
+    //    rayOrigin = sceneView->getCamera()->getOrigin() + cameraRight * xNorm + cameraUp * yNorm;
+    //}
+
     if (isCulled0 && isCulled1) {
         vec3 rayDirection = -v;
         float t0 = 1e6, t1 = 1e6;
-        bool intersectsPlaneEntrance = rayPlaneIntersection(cameraPosition, rayDirection, planeEntrance, t0);
-        bool intersectsPlaneExit = rayPlaneIntersection(cameraPosition, rayDirection, planeExit, t1);
+        bool intersectsPlaneEntrance = rayPlaneIntersection(rayOrigin, rayDirection, planeEntrance, t0);
+        bool intersectsPlaneExit = rayPlaneIntersection(rayOrigin, rayDirection, planeExit, t1);
         //intersectsPlaneEntrance = false;
         //t0 = 1e6;
         if (intersectsPlaneEntrance || intersectsPlaneExit) {
             float t = min(t0, t1);
-            vec3 hitPos = cameraPosition + t * rayDirection;
+            vec3 hitPos = rayOrigin + t * rayDirection;
             centerDist = length(hitPos - inputs.spherePosition);
             //fragColor = vec4(vec3(centerDist <= sphereRadius ? 1.0 : 0.0), 1.0);
             //return;

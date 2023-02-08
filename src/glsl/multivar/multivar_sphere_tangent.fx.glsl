@@ -123,7 +123,7 @@ shader FSmain(in VSOutput inputs, out vec4 fragColor)
     float exitIdx = lineElementId.exitIdx;
 
     const vec3 n = normalize(inputs.fragmentNormal);
-    const vec3 v = normalize(cameraPosition - inputs.fragmentPosition);
+    const vec3 v = orthographicModeEnabled == 1 ? cameraLookDirectionNeg : normalize(cameraPosition - inputs.fragmentPosition);
     const vec3 l = normalize(exitPoint - entrancePoint);
 
     // 1) Compute the closest point on the line segment spanned by the entrance and exit point.

@@ -742,12 +742,6 @@ void MBezierTrajectories::updateOutputParameterIdx(const int OutputParameterIdx)
 }
 
 
-void MBezierTrajectories::setSyncMode(TrajectorySyncMode syncMode)
-{
-    trajectorySyncMode = syncMode;
-}
-
-
 void MBezierTrajectories::updateLineAscentTimeStepArrayBuffer(
         const QVector<int>& _ascentTimeStepIndices, int _maxAscentTimeStepIndex)
 {
@@ -901,18 +895,20 @@ bool halfLineSphereIntersection(
 
 
 bool MBezierTrajectories::updateTimeStepSphereRenderDataIfNecessary(
-        int timeStep, uint32_t syncModeTrajectoryIndex, float sphereRadius,
+        TrajectorySyncMode trajectorySyncMode, int timeStep, uint32_t syncModeTrajectoryIndex, float sphereRadius,
 #ifdef USE_QOPENGLWIDGET
         QOpenGLWidget *currentGLContext)
 #else
         QGLWidget *currentGLContext)
 #endif
 {
-    if (timeStep == lastSphereTimeStep && syncModeTrajectoryIndex == lastSphereSyncModeTrajectoryIndex
+    if (trajectorySyncMode == lastSphereTrajectorySyncMode
+            && timeStep == lastSphereTimeStep && syncModeTrajectoryIndex == lastSphereSyncModeTrajectoryIndex
             && sphereRadius == lastSphereRadius && !(useFiltering && hasFilteringChangedSphere)) {
         return false;
     }
     hasFilteringChangedSphere = false;
+    lastSphereTrajectorySyncMode = trajectorySyncMode;
     lastSphereTimeStep = timeStep;
     lastSphereSyncModeTrajectoryIndex = syncModeTrajectoryIndex;
     lastSphereRadius = sphereRadius;
@@ -1140,7 +1136,7 @@ MTimeStepRollsRenderData* MBezierTrajectories::getTimeStepRollsRenderData(
 
 
 void MBezierTrajectories::updateTimeStepRollsRenderDataIfNecessary(
-        int timeStep, uint32_t syncModeTrajectoryIndex, float tubeRadius,
+        TrajectorySyncMode trajectorySyncMode, int timeStep, uint32_t syncModeTrajectoryIndex, float tubeRadius,
         float rollsRadius, float rollsWidth, bool mapRollsThickness, int numLineSegments,
 #ifdef USE_QOPENGLWIDGET
         QOpenGLWidget *currentGLContext)
@@ -1148,7 +1144,8 @@ void MBezierTrajectories::updateTimeStepRollsRenderDataIfNecessary(
         QGLWidget *currentGLContext)
 #endif
 {
-    if (timeStep == lastRollsTimeStep && syncModeTrajectoryIndex == lastRollsSyncModeTrajectoryIndex
+    if (trajectorySyncMode == lastRollsTrajectorySyncMode
+            && timeStep == lastRollsTimeStep && syncModeTrajectoryIndex == lastRollsSyncModeTrajectoryIndex
             && (!mapRollsThickness || tubeRadius == lastTubeRadius)
             && rollsRadius == lastRollsRadius && rollsWidth == lastRollsWidth && lastVarSelectedRolls == selectedVariableIndices
             && mapRollsThickness == lastMapRollsThickness && lastNumLineSegmentsRolls == numLineSegments
@@ -1156,6 +1153,7 @@ void MBezierTrajectories::updateTimeStepRollsRenderDataIfNecessary(
         return;
     }
     hasFilteringChangedRolls = false;
+    lastRollsTrajectorySyncMode = trajectorySyncMode;
     lastRollsTimeStep = timeStep;
     lastRollsSyncModeTrajectoryIndex = syncModeTrajectoryIndex;
     lastTubeRadius = tubeRadius;
