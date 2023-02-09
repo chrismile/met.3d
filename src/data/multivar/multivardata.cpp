@@ -263,6 +263,7 @@ void MMultiVarData::setPropertiesRenderingSettings()
 void MMultiVarData::setPropertiesVarSelected()
 {
     selectedVariablesGroupProperty->setEnabled(true);
+    ignorePropertyUpdateMode = true;
     for (int varIdx = 0; varIdx < maxNumVariables; varIdx++)
     {
         QString name = QString("var. #%1 (%2)").arg(QString::number(varIdx + 1), varNames.at(varIdx));
@@ -274,6 +275,7 @@ void MMultiVarData::setPropertiesVarSelected()
         selectedVariablesProperties.push_back(variableProperty);
         propertyList.push_back(variableProperty);
     }
+    ignorePropertyUpdateMode = false;
 }
 
 
@@ -842,9 +844,12 @@ void MMultiVarData::onQtPropertyChanged(QtProperty *property)
         {
             int varIdx = selectedVariablesProperties.indexOf(property);
             bool isSelected = properties->mBool()->value(property);
-            if (isSelected) {
+            if (isSelected)
+            {
                 selectedVariableIndices.push_back(varIdx);
-            } else {
+            }
+            else
+            {
                 selectedVariableIndices.erase(std::remove(
                         selectedVariableIndices.begin(), selectedVariableIndices.end(), varIdx), selectedVariableIndices.end());
             }

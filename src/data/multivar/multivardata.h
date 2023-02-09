@@ -224,7 +224,7 @@ private:
     QVector<QtProperty*> selectedVariablesProperties;
     QVector<uint32_t> selectedVariableIndices;
     bool selectedVariablesChanged = false;
-    bool ignorePropertyUpdateMode = true;
+    bool ignorePropertyUpdateMode = false;
 
     // Show target variable and maximum sensitivity.
     QtProperty *targetVariableAndSensitivityProperty;
