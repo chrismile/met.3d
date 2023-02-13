@@ -169,7 +169,11 @@ unsigned int MTrajectoryNormals::getMemorySize_kb()
 
 
 GL::MVertexBuffer* MTrajectoryNormals::getVertexBuffer(
+#ifdef USE_QOPENGLWIDGET
+        QOpenGLWidget *currentGLContext)
+#else
         QGLWidget *currentGLContext)
+#endif
 {
     MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
 
@@ -274,6 +278,30 @@ void MTrajectories::copyAuxDataPerVertex(float *auxData, int iIndexAuxData)
 }
 
 
+void MTrajectories::copySensDataPerVertex(float *sensData, int iIndexSensData, int numOutputParameters) {
+    sensDataAtVertices.resize(numOutputParameters);
+    for (int j = 0; j < numOutputParameters; j++)
+    {
+        sensDataAtVertices[j].resize(getVertices().size());
+        for (int i = 0; i < getVertices().size(); i++)
+        {
+            sensDataAtVertices[j][i].resize(iIndexSensData + 1);
+            sensDataAtVertices[j][i][iIndexSensData] = sensData[i + j * getVertices().size()];
+        }
+    }
+}
+
+
+void MTrajectories::copyOutputParameter(const uint32_t *outputParameters, const uint32_t numOutputParameters)
+{
+    for (int i = 0; i < numOutputParameters; i++)
+    {
+        this->outputParameters.push_back(outputParameters[i]);
+        this->outputParameterNames.push_back(this->outputParameterNamesList[outputParameters[i]]);
+    }
+}
+
+
 void MTrajectories::copyAuxDataPerVertex(QVector<QVector<QVector<float>>> &av)
 {
     // Copy auxiliary data from one QVector array to another QVector array
@@ -299,12 +327,39 @@ void MTrajectories::copyAuxDataPerVertex(QVector<QVector<QVector<float>>> &av)
                 auxDataAtVertices.resize(av.size()*av[0].size());
             }
             int numAuxDataVars = av[i][j].size();
+            auxDataAtVertices[i * numVerticesPerTraj + j].resize(numAuxDataVars);
             for (int k = 0; k < numAuxDataVars; k++)
             {
-                auxDataAtVertices[i * numVerticesPerTraj + j].resize(
-                            av[0][0].size());
                 auxDataAtVertices[i * numVerticesPerTraj + j][k] =
                         av.at(i).at(j).at(k);
+            }
+        }
+    }
+}
+
+
+void MTrajectories::copySensDataPerVertex(QVector<QVector<QVector<QVector<float>>>> &av)
+{
+    int numParams = av.size();
+    for (int p = 0; p < numParams; ++p)
+    {
+        int numTrajs = av[p].size();
+        for (int i = 0; i < numTrajs; ++i)
+        {
+            int numVerticesPerTraj = av[p][i].size();
+            for (int j = 0; j < numVerticesPerTraj; ++j)
+            {
+                if ((i == 0) && (j == 0) && (p == 0)) {
+                    sensDataAtVertices.resize(av.size() * av[0].size() * av[0][0].size());
+                }
+                int numAuxDataVars = av[p][i][j].size();
+                sensDataAtVertices[p * numVerticesPerTraj * numTrajs + i * numVerticesPerTraj + j].resize(
+                        numAuxDataVars);
+                for (int k = 0; k < numAuxDataVars; k++)
+                {
+                    sensDataAtVertices[p][i * numVerticesPerTraj + j][k] =
+                            av.at(p).at(i).at(j).at(k);
+                }
             }
         }
     }
@@ -317,6 +372,12 @@ void MTrajectories::setAuxDataVariableNames(QStringList varNames)
 }
 
 
+void MTrajectories::setSensDataVariableNames(QStringList varNames)
+{
+    sensDataVarNames = varNames;
+}
+
+
 unsigned int MTrajectories::getTimeStepLength_sec()
 {
     if (times.size() < 2)
@@ -326,7 +387,12 @@ unsigned int MTrajectories::getTimeStepLength_sec()
 }
 
 
-GL::MVertexBuffer* MTrajectories::getVertexBuffer(QGLWidget *currentGLContext)
+GL::MVertexBuffer* MTrajectories::getVertexBuffer(
+#ifdef USE_QOPENGLWIDGET
+        QOpenGLWidget *currentGLContext)
+#else
+        QGLWidget *currentGLContext)
+#endif
 {
     MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
 
@@ -354,13 +420,20 @@ GL::MVertexBuffer* MTrajectories::getVertexBuffer(QGLWidget *currentGLContext)
 
 GL::MVertexBuffer* MTrajectories::getAuxDataVertexBuffer(
         QString requestedAuxDataVarName,
+        QString requestedOutputParameterName,
+#ifdef USE_QOPENGLWIDGET
+        QOpenGLWidget *currentGLContext)
+#else
         QGLWidget *currentGLContext)
+#endif
 {
     // Initialize instance of openGL resource manager.
     MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
 
+    bool sensData = sensDataVarNames.contains(requestedAuxDataVarName);
     // Check if requested variable name exists as aux var.
-    assert(auxDataVarNames.contains(requestedAuxDataVarName));
+    assert(auxDataVarNames.contains(requestedAuxDataVarName) || sensData);
+
 
     QString gpuItemID = getID() + "_aux_" + requestedAuxDataVarName;
 
@@ -371,28 +444,53 @@ GL::MVertexBuffer* MTrajectories::getAuxDataVertexBuffer(
 
     // Get the requested auxiliary data from the QVector with all auxiliary
     // data vars along trajectories.
-    QVector<float> requestedAuxDataAtVertices(auxDataAtVertices.size());
-    int i = auxDataVarNames.indexOf(requestedAuxDataVarName);
-    for (int j = 0; j < auxDataAtVertices.size(); j++)
+    if (sensData)
     {
-        requestedAuxDataAtVertices[j] = auxDataAtVertices.at(j).at(i);
-    }
-
-    // If no texture with this item's data exists, then create a new one.
-    GL::MFloatVertexBuffer *newVB = new GL::MFloatVertexBuffer(
+        QVector<float> requestedAuxDataAtVertices(sensDataAtVertices.size());
+        int i = sensDataVarNames.indexOf(requestedAuxDataVarName);
+        int k = outputParameterNames.indexOf(requestedOutputParameterName);
+        k = (k < 0 ) ? 0 : k;
+        for (int j = 0; j < sensDataAtVertices.size(); j++) {
+            requestedAuxDataAtVertices[j] = sensDataAtVertices.at(k).at(j).at(i);
+        }
+        // If no texture with this item's data exists, then create a new one.
+        GL::MFloatVertexBuffer *newVB = new GL::MFloatVertexBuffer(
                 gpuItemID, requestedAuxDataAtVertices.size());
 
-    // Upload the requested auxiliary data.
-    if (glRM->tryStoreGPUItem(newVB))
-    {
-        newVB->upload(requestedAuxDataAtVertices, currentGLContext);
-    }
-    else
-    {
-        delete newVB;
-    }
+        // Upload the requested auxiliary data.
+        if (glRM->tryStoreGPUItem(newVB))
+        {
+            newVB->upload(requestedAuxDataAtVertices, currentGLContext);
+        }
+        else
+        {
+            delete newVB;
+        }
 
-    return static_cast<GL::MVertexBuffer*>(glRM->getGPUItem(gpuItemID));
+        return static_cast<GL::MVertexBuffer*>(glRM->getGPUItem(gpuItemID));
+    } else
+    {
+        QVector<float> requestedAuxDataAtVertices(auxDataAtVertices.size());
+        int i = auxDataVarNames.indexOf(requestedAuxDataVarName);
+        for (int j = 0; j < auxDataAtVertices.size(); j++) {
+            requestedAuxDataAtVertices[j] = auxDataAtVertices.at(j).at(i);
+        }
+        // If no texture with this item's data exists, then create a new one.
+        GL::MFloatVertexBuffer *newVB = new GL::MFloatVertexBuffer(
+                gpuItemID, requestedAuxDataAtVertices.size());
+
+        // Upload the requested auxiliary data.
+        if (glRM->tryStoreGPUItem(newVB))
+        {
+            newVB->upload(requestedAuxDataAtVertices, currentGLContext);
+        }
+        else
+        {
+            delete newVB;
+        }
+
+        return static_cast<GL::MVertexBuffer*>(glRM->getGPUItem(gpuItemID));
+    }
 }
 
 
@@ -404,8 +502,9 @@ void MTrajectories::releaseVertexBuffer()
 
 void MTrajectories::releaseAuxDataVertexBuffer(QString requestedAuxDataVarName)
 {
+    bool sensData = sensDataVarNames.contains(requestedAuxDataVarName);
     // Check if requested variable name exists as aux var.
-    assert(auxDataVarNames.contains(requestedAuxDataVarName));
+    assert(auxDataVarNames.contains(requestedAuxDataVarName) || sensData);
 
     QString gpuItemID = getID() + "_aux_" + requestedAuxDataVarName;
     MGLResourcesManager::getInstance()->releaseGPUItem(gpuItemID);

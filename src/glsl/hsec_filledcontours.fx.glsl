@@ -144,7 +144,14 @@ shader FSmain(in VStoFS inStruct, out vec4 fragColour)
     float scalar_ = (inStruct.scalar - scalarMinimum) / (scalarMaximum - scalarMinimum);
 
     // Fetch colour from the transfer function and apply shading term.
-    fragColour = texture(transferFunction, scalar_);
+    vec4 colourOut = texture(transferFunction, scalar_);
+
+    if (colourOut.a < 0.001)
+    {
+        discard;
+    }
+
+    fragColour = colourOut;
 }
 
 

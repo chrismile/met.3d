@@ -195,10 +195,10 @@ private:
     QLabel *appIsBusyLabel;
     int applicationIsBusyCounter;
 
-    /** Hidden QGLWidget whose GL context is used to manage all resources. */
+    /** Hidden QOpenGLWidget/QGLWidget whose GL context is used to manage all resources. */
     MGLResourcesManager *glResourcesManager;
 
-    /** QGLWidgets that display scenes and their control widget. */
+    /** QOpenGLWidgets/QGLWidgets that display scenes and their control widget. */
     QVector<MSceneViewGLWidget*> sceneViewGLWidgets;
     MSystemManagerAndControl *systemManagerAndControl;
     MSceneManagementDialog *sceneManagementDialog;

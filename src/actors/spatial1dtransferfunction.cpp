@@ -35,6 +35,7 @@
 #include <QFileDialog>
 #include <QListWidget>
 #include <QListWidgetItem>
+#include <QGLWidget>
 
 // local application imports
 #include "gxfw/mglresourcesmanager.h"
@@ -441,6 +442,9 @@ void MSpatial1DTransferFunction::onQtPropertyChanged(QtProperty *property)
             glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER,
                             GL_LINEAR_MIPMAP_LINEAR); CHECK_GL_ERROR;
 
+#ifdef USE_QOPENGLWIDGET
+            glRM->doneCurrent();
+#endif
         }
 
         if (suppressActorUpdates()) return;
@@ -735,6 +739,10 @@ void MSpatial1DTransferFunction::generateTransferTexture(int level, bool recreat
                          GL_RGBA,                   // format
                          GL_UNSIGNED_BYTE,          // data type of the pixel data
                          NULL); CHECK_GL_ERROR;
+
+#ifdef USE_QOPENGLWIDGET
+            glRM->doneCurrent();
+#endif
         }
 
         if (recreate)
@@ -778,6 +786,10 @@ void MSpatial1DTransferFunction::generateTransferTexture(int level, bool recreat
                          GL_RGBA,                   // format
                          GL_UNSIGNED_BYTE,          // data type of the pixel data
                          NULL); CHECK_GL_ERROR;
+
+#ifdef USE_QOPENGLWIDGET
+            glRM->doneCurrent();
+#endif
         }
 
         if ( tfTexture )
@@ -803,6 +815,10 @@ void MSpatial1DTransferFunction::generateTransferTexture(int level, bool recreat
 
 //             glGenerateTextureMipmap(tfTexture->getTextureObject());
             glGenerateMipmap(GL_TEXTURE_2D_ARRAY);
+
+#ifdef USE_QOPENGLWIDGET
+            glRM->doneCurrent();
+#endif
         }
     }
 }
@@ -913,6 +929,10 @@ void MSpatial1DTransferFunction::generateBarGeometry()
 
     // Required for the glDrawArrays() call in renderToCurrentContext().
     numVertices = 4;
+
+#ifdef USE_QOPENGLWIDGET
+    glRM->doneCurrent();
+#endif
 
     // ========================================================================
     // Finally, place labels at the tickmarks:

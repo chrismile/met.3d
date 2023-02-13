@@ -6,6 +6,7 @@
 **
 **  Copyright 2015-2017 Marc Rautenhaus
 **  Copyright 2017      Bianca Tost
+**  Copyright 2021-2022 Christoph Neuhauser
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -94,11 +95,19 @@ public:
             float alpha1, float alpha2, float poweralpha,
             bool reversed=false);
 
+    inline MHCLType getMHCLType() { return MHCLType(properties->mEnum()->value(hclTypeProperty)); }
+
+    inline bool getIsRangeReverse() { return properties->mBool()->value(reverseTFRangeProperty); }
+
     void  selectEditor();
 
     void selectHSVColourmap(QString vaporXMLFile, bool reversed=false);
 
     void setSteps(int steps);
+
+    void setUseLogScale(bool useLogScale);
+
+    bool getUseLogScale();
 
     QString getSettingsID() override { return "TransferFunction1D"; }
 
@@ -113,6 +122,10 @@ public:
       @return interpolated color value as QColor
      */
     QColor getColorValue(const float scalar) const;
+
+    inline const std::vector<unsigned char> &getColorValuesByteArray() const { return colorValues; }
+
+    void setDisplayName(const QString& name);
 
 protected:
     /**
@@ -133,6 +146,9 @@ protected:
     void onQtPropertyChanged(QtProperty *property);
 
     void renderToCurrentContext(MSceneViewGLWidget *sceneView);
+
+signals:
+    void transferFunctionChanged(MTransferFunction1D* transferFunction);
 
 public slots:
     void onEditorTransferFunctionChanged();
@@ -160,6 +176,9 @@ private:
 
     TFEditor::MTransferFunctionEditor *editor;
 
+    // Optional display name next to the transfer function.
+    QString displayName;
+
     // General properties.
     bool        enableAlpha;
     QtProperty *enableAlphaInTFProperty;
@@ -170,6 +189,7 @@ private:
 
     // Properties related to value range.
     QtProperty *numStepsProperty;
+    QtProperty *useLogScaleProperty;
 
     QtProperty *colourmapTypeProperty;
 

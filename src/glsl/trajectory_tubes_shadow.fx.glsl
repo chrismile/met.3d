@@ -343,7 +343,7 @@ shader FSmain(in GStoFS Input, out vec4 fragColour)
 program Standard
 {
     vs(400)=VSmain();
-    gs(400)=GSmain() : in(lines_adjacency), out(triangle_strip, max_vertices = 8);
+    gs(400)=GSmain() : in(lines_adjacency), out(triangle_strip, max_vertices = 12);
     fs(400)=FSmain();
 };
 

@@ -3105,6 +3105,9 @@ void MNWPVolumeRaycasterActor::computeNormalCurveInitialPoints(
                              + numRaysLat * numRaysHeight;
 
     // Make resource manager to the current context.
+#ifdef USE_QOPENGLWIDGET
+    sceneView->doneCurrent();
+#endif
     glRM->makeCurrent();
 
     // Create a 3D texture storing the ghost grid over the domain (to avoid
@@ -3143,6 +3146,9 @@ void MNWPVolumeRaycasterActor::computeNormalCurveInitialPoints(
     const GLint ghostGridImageUnit = assignImageUnit();
 
     glBindTexture(GL_TEXTURE_3D, 0); CHECK_GL_ERROR;
+#ifdef USE_QOPENGLWIDGET
+    glActiveTexture(GL_TEXTURE0); CHECK_GL_ERROR;
+#endif
 
     const GLuint MAX_ESTIMATE_CROSSINGS = 2;
     const int MAX_INITPOINTS = numRays * MAX_ESTIMATE_CROSSINGS;
@@ -3372,6 +3378,10 @@ void MNWPVolumeRaycasterActor::computeNormalCurveInitialPoints(
     glRM->releaseGPUItem(ghostTexID);
     releaseImageUnit(ghostGridImageUnit);
 
+#ifdef USE_QOPENGLWIDGET
+    glRM->doneCurrent();
+#endif
+
     // Set sceneView to the current context again.
     sceneView->makeCurrent();
 }
@@ -3428,6 +3438,9 @@ void MNWPVolumeRaycasterActor::computeNormalCurves(MSceneViewGLWidget* sceneView
     }
 
     MGLResourcesManager* glRM = MGLResourcesManager::getInstance();
+#ifdef USE_QOPENGLWIDGET
+    sceneView->doneCurrent();
+#endif
     glRM->makeCurrent();
 
     normalCurveNumVertices = (normalCurveSettings->numLineSegments + 2)
@@ -3520,9 +3533,12 @@ void MNWPVolumeRaycasterActor::computeNormalCurves(MSceneViewGLWidget* sceneView
 
 //    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
+#ifdef USE_QOPENGLWIDGET
+    glRM->doneCurrent();
+#endif
+
     // Set sceneView to the current OpenGL context, again.
     sceneView->makeCurrent();
-
 }
 
 
@@ -3768,6 +3784,10 @@ void MNWPVolumeRaycasterActor::mirrorDepthBufferToTexture(
                      GL_DEPTH_COMPONENT, GL_FLOAT, 0);
         CHECK_GL_ERROR;
         glBindTexture(GL_TEXTURE_2D, 0);
+#ifdef USE_QOPENGLWIDGET
+        glActiveTexture(GL_TEXTURE0);
+#endif
+        CHECK_GL_ERROR;
     }
 
     // Attach the "mirror" texture to the depth buffer and copy its content,

@@ -78,7 +78,7 @@ struct MTrajectoryFileInfo
 {
     MTrajectoryFileInfo()
         : ncFile(nullptr),
-          numTimeSteps(0), numTrajectories(0), numEnsembleMembers(0),
+          numTimeSteps(0), numTrajectories(0), numEnsembleMembers(0), numOutputParameters(0),
           prsVarUnits(""),
           lonMissingValue(M_INVALID_TRAJECTORY_POS),
           latMissingValue(M_INVALID_TRAJECTORY_POS),
@@ -90,14 +90,17 @@ struct MTrajectoryFileInfo
 
     netCDF::NcFile *ncFile;
 
-    unsigned int numTimeSteps, numTrajectories, numEnsembleMembers;    
+    unsigned int numTimeSteps, numTrajectories, numEnsembleMembers, numOutputParameters;
 
-    netCDF::NcVar lonVar, latVar, prsVar;
+    netCDF::NcVar lonVar, latVar, prsVar, outputParameterVar;
     QString prsVarUnits; // units of pressure variable (Pa or hPa)
     float lonMissingValue, latMissingValue, prsMissingValue;
 
     QVector<netCDF::NcVar> auxDataVars;
     QStringList auxDataVarNames;
+
+    QVector<netCDF::NcVar> sensDataVars;
+    QStringList sensDataVarNames;
 
     QVector<QDateTime> times;
 
@@ -128,6 +131,13 @@ public:
       initialisation times (base times).
       */
     QList<QDateTime> availableInitTimes();
+
+    /**
+      Start times correspond to the the trajectory start times available for
+      the specified initialisation time @p initTime.
+      */
+    QList<QDateTime> availableStartTimes(const QDateTime& initTime);
+
 
     /**
       Returns a @ref QList<QDateTime> containing the the trajectory start times

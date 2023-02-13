@@ -3291,6 +3291,9 @@ void MNWP2DHorizontalActorVariable::updateContourIndicesFromTargetGrid(
     textureTargetGrid->bindToLastTextureUnit();
     glGetTexImage(GL_TEXTURE_2D, 0, GL_RED, GL_FLOAT,
                   targetGrid2D->data); CHECK_GL_ERROR;
+#ifdef USE_QOPENGLWIDGET
+    glActiveTextureARB(GL_TEXTURE0);
+#endif
 
     // Set the current isovalue to the target grid's vertical coordinate.
     targetGrid2D->levels[0] = slicePosition_hPa;

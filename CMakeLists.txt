@@ -50,7 +50,6 @@ add_definitions(-DENABLE_MET3D_STOPWATCH
                 -DENABLE_RAYCASTER_ACCELERATION
                 -DDIRECT_SYNCHRONIZATION
                 -DQCUSTOMPLOT_USE_LIBRARY
-                -DACCEPT_USE_OF_DEPRECATED_PROJ_API_H
                 -DNOMINMAX) # required for windows support
 
 set(CMAKE_CXX_STANDARD 11)
@@ -66,6 +65,12 @@ if (ENABLE_EXPERIMENTAL_DERIVEDVARS)
     add_definitions(-DENABLE_EXPERIMENTAL_DERIVEDVARS)
 endif (ENABLE_EXPERIMENTAL_DERIVEDVARS)
 
+option(USE_QOPENGLWIDGET "Build with QOpenGLWidget used instead of QGLWidget." ON)
+if (USE_QOPENGLWIDGET)
+    add_definitions(-DUSE_QOPENGLWIDGET)
+endif()
+
+option(USE_STATIC_STD_LIBRARIES "Link with standard libraries statically (only supported on Linux for now)." OFF)
 
 # Operating-system specific settings.
 if (WIN32)
@@ -142,7 +147,7 @@ cmake_policy(SET CMP0020 NEW)
 option(FORCE_USE_QT4 "Build with Qt4 even if Qt5 is available." OFF)
 
 if(NOT FORCE_USE_QT4)
-    find_package(Qt5 COMPONENTS Core Widgets Gui OpenGL Xml Network Concurrent)
+    find_package(Qt5 COMPONENTS Core Widgets Gui OpenGL Xml Network Concurrent Charts)
 endif()
 
 if(FORCE_USE_QT4
@@ -247,9 +252,24 @@ endif()
 find_package(proj REQUIRED)
 include_directories(${proj_INCLUDE_DIR})
 # Add PROJ library version as preprocessor definitions.
+if(proj_VERSION VERSION_LESS "8")
+    add_definitions(-DACCEPT_USE_OF_DEPRECATED_PROJ_API_H)
+endif()
+add_definitions(-DPROJ_VERSION=${proj_VERSION})
 add_definitions(-DPROJ_MAJOR_VERSION=${proj_MAJOR_VERSION})
 add_definitions(-DPROJ_MINOR_VERSION=${proj_MINOR_VERSION})
 add_definitions(-DPROJ_PATCH_VERSION=${proj_PATCH_VERSION})
+
+# Embree 3
+if(VCPKG_TOOLCHAIN)
+    find_package(TBB QUIET)
+    find_package(embree 3 QUIET)
+else()
+    find_package(embree 3.0 QUIET)
+endif()
+if(embree_FOUND)
+    MESSAGE(STATUS "Found Embree. Using Embree as as for computing ray-mesh intersections.")
+endif()
 
 ##############################################################################
 #                      Configure Other Projects                              #
@@ -274,6 +294,11 @@ file (GLOB_RECURSE  Met3D_Source_C  src/*.c)
 file (GLOB_RECURSE  Met3D_Source_F  src/*.f)
 file (GLOB          Met3D_Shaders   src/glsl/*)
 file (GLOB          Met3D_Configs   config/*)
+
+if(NOT embree_FOUND)
+    list(REMOVE_ITEM Met3D_Source ${CMAKE_CURRENT_SOURCE_DIR}/src/data/multivar/trajectorypicking.cpp)
+    MESSAGE(STATUS "Embree couldn't be found. Disabling Embree ray-mesh intersection support.")
+endif()
 
 #source_group(automocs FILES ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}_automoc.cpp)
 
@@ -313,6 +338,13 @@ add_executable(Met3D # executable name
                 ${MET3D_RC_SRCS}
   )
 
+if(${USE_STATIC_STD_LIBRARIES})
+    target_link_options(Met3D PRIVATE -static-libgcc -static-libstdc++)
+endif()
+if (${USE_STATIC_STD_LIBRARIES} AND UNIX AND NOT APPLE AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND ${CMAKE_VERSION} VERSION_GREATER "3.12")
+    target_link_options(Met3D PRIVATE "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/cmake/symbols_linux_gcc.map")
+endif()
+
 # Link Qt4 and other libraries to executable.
 target_link_libraries(Met3D
                         ${FREETYPE_LIBRARIES}
@@ -327,14 +359,29 @@ target_link_libraries(Met3D
                         ${netcdf_cxx4_C_LIBRARIES}
                         ${qcustomplot_LIBRARIES}
                         ${glfx_LIBRARIES}
-			${proj_LIBRARIES}
+                        ${proj_LIBRARIES}
                         #${EIGEN3_LIBRARIES}
   )
+
+
+if (UNIX AND NOT APPLE)
+    target_link_libraries(Met3D dl)
+endif()
+
+if(embree_FOUND)
+    if(VCPKG_TOOLCHAIN)
+        target_link_libraries(Met3D embree)
+    else()
+        target_link_libraries(Met3D ${EMBREE_LIBRARIES})
+    endif()
+    include_directories(${EMBREE_INCLUDE_DIRS})
+    add_definitions(-DUSE_EMBREE)
+endif()
 
 if(USE_QT4)
     target_link_libraries(Met3D Qt4::QtCore Qt4::QtGui Qt4::QtOpenGL Qt4::QtXml Qt4::QtNetwork)
 else()
-    qt5_use_modules(Met3D Core Widgets Gui OpenGL Xml Network Concurrent)
+    qt5_use_modules(Met3D Core Widgets Gui OpenGL Xml Network Concurrent Charts)
 endif()
 
 # Set command line arguments TODO does not work!
@@ -424,7 +471,7 @@ if(WIN32)
   find_dll_for_package(GLEW)
   find_dll_for_package(qcustomplot)
   find_dll_for_package(proj)
-  
+
   find_dll_dummy(GEOS)
   find_dll_dummy(GEOS_C)
   find_dll_dummy(HDF5)

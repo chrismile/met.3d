@@ -1231,6 +1231,8 @@ void MSessionManagerDialog::loadSessionFromFile(QString sessionName,
     progressDialog->setWindowFlags(
                 Qt::Dialog | Qt::CustomizeWindowHint);
     progressDialog->setMinimumDuration(0);
+    // Needs to be called when used from a different thread.
+    //progressDialog->setAttribute(Qt::WA_DeleteOnClose, true);
 
     // Block access to active widget while progress dialog is active.
     // NOTE: This only works if the main window has already been shown; hence
@@ -1629,6 +1631,7 @@ void MSessionManagerDialog::loadSessionFromFile(QString sessionName,
     }
 
     delete settings;
+    progressDialog->close();
     delete progressDialog;
 
     LOG4CPLUS_DEBUG(mlog, "... session has been loaded.");

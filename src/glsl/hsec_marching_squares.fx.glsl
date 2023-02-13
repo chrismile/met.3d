@@ -369,7 +369,14 @@ shader FSmain(in float lon, out vec4 fragColour)
         float scalar = (isoValue - scalarMinimum) / (scalarMaximum - scalarMinimum);
 
         // Fetch colour from the transfer function and apply shading term.
-        fragColour = texture(transferFunction, scalar);
+        vec4 colourOut = texture(transferFunction, scalar);
+
+        if (colourOut.a < 0.001)
+        {
+            discard;
+        }
+
+        fragColour = colourOut;
     }
     else
     {

@@ -314,6 +314,11 @@ shader FSmain(in VStoFS inStruct, out vec4 fragColour)
         colour = vec4(constantColour.rgb, colour.a);
     }
 
+    if (colour.a < 0.001)
+    {
+        discard;
+    }
+
     fragColour = colour;
 }
 

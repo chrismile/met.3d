@@ -57,6 +57,9 @@ uniform sampler1D transferFunction;      // 1D transfer function
 uniform float     scalarMinimum;         // min/max data values to scale to 0..1
 uniform float     scalarMaximum;
 
+// whether the input vertices are already given in world space
+uniform int isInputWorldSpace = 0;
+
 
 /*****************************************************************************
  ***                           VERTEX SHADER
@@ -64,10 +67,15 @@ uniform float     scalarMaximum;
 
 shader VSmain(in vec3 vertex : 0, out vec4 vs_vertex)
 {
-    // Convert pressure to world Z coordinate.
-    float worldZ = (log(vertex.z) - pToWorldZParams.x) * pToWorldZParams.y;
+    vec3 position = vertex;
+    if (isInputWorldSpace == 0)
+    {
+        // Convert pressure to world Z coordinate.
+        float worldZ = (log(vertex.z) - pToWorldZParams.x) * pToWorldZParams.y;
+        position.z = worldZ;
+    }
     // Convert from world space to clip space.
-    vs_vertex = vec4(vertex.xy, worldZ, vertex.z);
+    vs_vertex = vec4(vertex.xy, position.z, vertex.z);
 }
 
 

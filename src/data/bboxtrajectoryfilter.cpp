@@ -106,7 +106,18 @@ MTrajectorySelection* MBoundingBoxTrajectoryFilter::produceData(
     for (int i = 0; i < numInputTrajectories; i++)
     {
         int startIndex = inputSelection->getStartIndices()[i];
-        QVector3D p = trajectories->getVertices().at(startIndex);
+        QVector3D p = QVector3D(
+                M_INVALID_TRAJECTORY_POS, M_INVALID_TRAJECTORY_POS, M_INVALID_TRAJECTORY_POS);
+        for (int k = 0; k < inputSelection->getIndexCount()[i]; k++)
+        {
+            p = trajectories->getVertices().at(startIndex + k);
+            if (!std::isnan(p.x()) && !std::isnan(p.y())
+                    && p.x() != M_INVALID_TRAJECTORY_POS && p.y() != M_INVALID_TRAJECTORY_POS)
+            {
+                break;
+            }
+            //startIndex++;
+        }
 
         if (p.x() < lonWest) continue;
         if (p.x() > lonEast) continue;

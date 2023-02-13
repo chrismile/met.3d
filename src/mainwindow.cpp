@@ -33,7 +33,7 @@
 
 // standard library imports
 #include <iostream>
-#include <float.h>
+#include <cfloat>
 
 // related third party imports
 #include <QDockWidget>
@@ -47,7 +47,11 @@
 #include <gsl/gsl_version.h>
 #include <netcdf_meta.h>
 #include <gdal_version.h>
+#if PROJ_VERSION < 8
 #include <proj_api.h>
+#else
+#include <proj.h>
+#endif
 
 // local application imports
 #include "gxfw/msystemcontrol.h"
@@ -55,6 +59,7 @@
 #include "system/applicationconfiguration.h"
 #include "system/pipelineconfiguration.h"
 #include "data/structuredgrid.h"
+#include "data/multivar/multisampling.h"
 
 using namespace std;
 
@@ -76,6 +81,38 @@ MMainWindow::MMainWindow(QStringList commandLineArguments, QWidget *parent)
       systemDock(nullptr),
       sessionAutoSaveTimer(nullptr)
 {
+    // OpenGL settings.
+    // =========================================================================
+
+#ifdef USE_QOPENGLWIDGET
+    QSurfaceFormat format;
+    format.setDepthBufferSize(24);
+    format.setStencilBufferSize(8);
+#ifdef __linux__
+    format.setSamples(getMaxSamplesGLImpl(32));
+#else
+    format.setSamples(8); // TODO: Query maximum using GLX etc.?
+#endif
+    format.setProfile(QSurfaceFormat::CoreProfile);
+    QSurfaceFormat::setDefaultFormat(format);
+#else
+    QGLFormat glformat;
+    // glformat.setVersion(4, 1);
+    glformat.setProfile(QGLFormat::CoreProfile);
+    glformat.setSampleBuffers(true);
+#endif
+
+    // OpenGL resources manager -- the "invisible" OpenGL context.
+    // =========================================================================
+
+    // Create a hidden QOpenGLWidget as resources manager.
+#ifdef USE_QOPENGLWIDGET
+    MGLResourcesManager::initialize(format, this);
+#else
+    MGLResourcesManager::initialize(glformat, this);
+#endif
+    glResourcesManager = MGLResourcesManager::getInstance();
+
     // Qt Designer specific initialization.
     ui->setupUi(this);
 
@@ -102,14 +139,6 @@ MMainWindow::MMainWindow(QStringList commandLineArguments, QWidget *parent)
     sessionAutoSaveTimer = new QTimer();
     sessionAutoSaveTimer->setInterval(30000);
 
-    // OpenGL settings.
-    // =========================================================================
-
-    QGLFormat glformat;  
-    // glformat.setVersion(4, 1);
-    glformat.setProfile(QGLFormat::CoreProfile);
-    glformat.setSampleBuffers(true);
-
     // System control (dock widget).
     // =========================================================================
 
@@ -130,13 +159,6 @@ MMainWindow::MMainWindow(QStringList commandLineArguments, QWidget *parent)
     // the widgets, nesting is allowed.
     setTabPosition(Qt::AllDockWidgetAreas, QTabWidget::West);
     setDockNestingEnabled(true);
-
-    // OpenGL resources manager -- the "invisible" OpenGL context.
-    // =========================================================================
-
-    // Create a hidden QGLWidget as resources manager.
-    MGLResourcesManager::initialize(glformat, this);
-    glResourcesManager = MGLResourcesManager::getInstance();
 
     // SCENE VIEWS -- the "visible" OpenGL contexts.
     //==========================================================================
@@ -296,6 +318,8 @@ MMainWindow::~MMainWindow()
 
     delete sceneManagementDialog;
     delete resizeWindowDialog;
+
+    glResourcesManager->deleteActors();
 
     for (int i = 0; i < sceneViewGLWidgets.size(); i++)
         delete sceneViewGLWidgets[i];
@@ -1295,7 +1319,11 @@ void MMainWindow::showAboutDialog()
 #else
     .arg("x").arg("x").arg("x")
 #endif
+#if PROJ_VERSION < 8
             .arg(PJ_VERSION);
+#else
+            .arg((proj_info()).version);
+#endif
 
     QMessageBox::about(this, "About Met.3D", aboutString);
 }

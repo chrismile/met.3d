@@ -46,10 +46,10 @@ class MTexture : public MAbstractGPUDataItem
 {
 public:
     MTexture(GLenum target, GLint internalFormat,
-             GLsizei width, GLsizei height=-1, GLsizei depth=-1);
+             GLsizei width, GLsizei height=-1, GLsizei depth=-1, GLsizei samples=0);
 
     MTexture(Met3D::MDataRequest requestKey, GLenum target, GLint internalFormat,
-             GLsizei width, GLsizei height=-1, GLsizei depth=-1);
+             GLsizei width, GLsizei height=-1, GLsizei depth=-1, GLsizei samples=0);
 
     virtual ~MTexture();
 
@@ -73,19 +73,20 @@ public:
 
     /**
       Returns the approximate size of the texture in bytes, computed by
-      width * height * depth * (bytes per value of internal format).
+      width * height * depth * samples * (bytes per value of internal format).
       */
     static unsigned int approxSizeInBytes(GLint   internalFormat,
                                           GLsizei width,
                                           GLsizei height=-1,
-                                          GLsizei depth=-1);
+                                          GLsizei depth=-1,
+                                          GLsizei samples=0);
 
     /**
       Update this texture's size parameters. If the texture is memory managed,
       this method automatically tells the GLResourcesManager of the changed
       size.
      */
-    void updateSize(GLsizei width, GLsizei height=-1, GLsizei depth=-1);
+    void updateSize(GLsizei width, GLsizei height=-1, GLsizei depth=-1, GLsizei samples=0);
 
     GLuint getTextureObject() { return textureObject; }
 
@@ -98,6 +99,8 @@ public:
     int getHeight() { return height; }
 
     int getDepth() { return depth; }
+
+    int getSamples() { return samples; }
 
 private:
 
@@ -112,6 +115,7 @@ private:
     GLsizei width;
     GLsizei height;
     GLsizei depth;
+    GLsizei samples;
 
     QString idKey;
 

@@ -6,6 +6,7 @@
 **
 **  Copyright 2015-2017 Marc Rautenhaus
 **  Copyright 2016-2017 Bianca Tost
+**  Copyright 2021-2022 Christoph Neuhauser
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -31,8 +32,13 @@
 
 // related third party imports
 #include "GL/glew.h"
+#ifdef USE_QOPENGLWIDGET
+#include <QOpenGLWidget>
+#include <QOpenGLShaderProgram>
+#else
 #include <QGLWidget>
 #include <QGLShaderProgram>
+#endif
 #include <QtProperty>
 
 // local application imports
@@ -44,6 +50,7 @@
 #include "gxfw/msystemcontrol.h"
 #include "gxfw/mtypes.h"
 #include "gxfw/mresizewindowdialog.h"
+#include "gxfw/tooltippicker.h"
 
 namespace Met3D
 {
@@ -64,7 +71,12 @@ struct PickActor {
   @brief MSceneViewGLWidget implements a view on a given scene (which is
   represented by an @ref MSceneControl instance).
   */
-class MSceneViewGLWidget : public QGLWidget, public MSynchronizedObject
+class MSceneViewGLWidget
+#ifdef USE_QOPENGLWIDGET
+        : public QOpenGLWidget, public MSynchronizedObject
+#else
+        : public QGLWidget, public MSynchronizedObject
+#endif
 {
     Q_OBJECT
 
@@ -125,6 +137,12 @@ public:
     { return &modelViewProjectionMatrixInverted; }
 
     /**
+      Returns the vertical field of view angle.
+      */
+    float getVerticalAngle() const
+    { return verticalAngle; }
+
+    /**
       Compute a world z-coordinate from a pressure value @p p_hPa (in hPa).
       */
     double worldZfromPressure(double p_hPa);
@@ -166,6 +184,19 @@ public:
       shading.)
       */
     QVector3D getLightDirection();
+
+    inline void setLightDirection(LightDirection lightDirection)
+    {
+        this->lightDirection = lightDirection;
+        MSystemManagerAndControl *systemControl = MSystemManagerAndControl::getInstance();
+        systemControl->getEnumPropertyManager()->setValue(lightingProperty, lightDirection);
+    }
+
+
+    inline LightDirection getLightDirectionEnum() const
+    {
+        return this->lightDirection;
+    }
 
     /**
       Returns a unique number that identifies the scene view.
@@ -260,6 +291,9 @@ public:
 
     virtual bool synchronizationEvent(MSynchronizationType, QVector<QVariant>);
 
+    void addToolTipPicker(MToolTipPicker* picker);
+    void removeToolTipPicker(MToolTipPicker* picker);
+
 signals:
     /**
       Emitted when a mouse button is released on the GL canvas.
@@ -290,6 +324,8 @@ public slots:
 
     void stopFPSMeasurement();
 
+    void updateToolTipTimer();
+
     void updateSceneLabel();
 
     void saveTimeAnimationImage(QString path, QString filename);
@@ -319,7 +355,7 @@ public slots:
     void onActorRenamed(MActor *actor, QString oldName);
 
     /**
-      Directly connect change signal of full-screen actor to @ref updateGL() to
+      Directly connect change signal of full-screen actor to @ref update/updateGL() to
       allow the user to select actors as full-screen actors which are not
       connected to the scene view's scene.
      */
@@ -328,7 +364,11 @@ public slots:
 protected:
     void initializeGL();
 
+#ifdef USE_QOPENGLWIDGET
+    void update();
+#else
     void updateGL();
+#endif
 
     void paintGL();
 
@@ -336,10 +376,10 @@ protected:
 
     void mouseDoubleClickEvent(QMouseEvent *event);
 
-    void mousePressEvent(QMouseEvent *event);
+    void mousePressEvent(QMouseEvent *event) override;
 
     /**
-      Overloads QGLWidget::mouseMoveEvent().
+      Overloads QOpenGLWidget/QGLWidget::mouseMoveEvent().
 
       In interaction mode (actor elements can be changed interactively, e.g.
       the waypoints of a vertical section) this method handles pick&drag
@@ -358,6 +398,12 @@ protected:
 
     void keyPressEvent(QKeyEvent *event);
 
+    void keyReleaseEvent(QKeyEvent *event);
+
+    void leaveEvent(QEvent *event) override;
+
+    //bool event(QEvent *event) override;
+
     void updateSynchronizedCameras();
 
     QList<MLabel*> staticLabels;
@@ -374,6 +420,12 @@ protected slots:
      mode.
      */
     void autoRotateCamera();
+
+    /**
+     Called by the camera path timer to rotate the camera in camera path mode (CTRL+Y).
+     mode.
+     */
+    void updateCameraPath();
 
 private:
     /**
@@ -400,6 +452,7 @@ private:
     QVector3D lastPoint;
 
     MCamera camera;
+    float verticalAngle = 45.0f;
     QMatrix4x4 modelViewProjectionMatrix;
     QMatrix4x4 modelViewProjectionMatrixInverted;
     QMatrix4x4 sceneRotationMatrix;
@@ -408,6 +461,14 @@ private:
     QTimer *cameraAutoRotationTimer;
     QVector3D cameraAutoRotationAxis;
     float cameraAutoRotationAngle;
+
+    float cameraPathTimeMs = 0.0f;
+    float cameraPathDuration = 10.0f * 1e3f;
+    QTimer *cameraPathTimer = nullptr;
+    int cameraPathInterval = 16;
+    QVector3D cameraPathStartOrigin;
+    QVector3D cameraPathStartZAxis;
+    QVector3D cameraPathStartYAxis;
 
     // Status variables.
     bool renderLabelsWithDepthTest;
@@ -419,6 +480,16 @@ private:
     bool userIsInteracting; // Is the user currently moving the camera?
     bool userIsScrolling;   // Is user currently scrolling with the mouse?
     bool viewportResized;   // Was the viewport resized?
+    bool isDraggingVirtualWindow = false;
+
+    // For displaying tool tips for objects in the widget.
+    QVector<MToolTipPicker*> toolTipPickers;
+    QLabel *toolTipLabel;
+    QTimer *toolTipUpdateTimer;
+    QPoint toolTipMousePosition;
+    QPoint toolTipMousePositionGlobal;
+    bool toolTipMouseInParent = false;
+    int toolTipWaitTimeMs = 400;
 
     QElapsedTimer scrollTimer;
     QElapsedTimer resizeTimer;
@@ -450,7 +521,11 @@ private:
     LightDirection lightDirection;
     QMatrix4x4 sceneNorthWestRotationMatrix;
 
+#ifdef USE_QOPENGLWIDGET
+    QOpenGLShaderProgram *focusShader;
+#else
     QGLShaderProgram *focusShader;
+#endif
     std::shared_ptr<GL::MShaderEffect> northArrowShader;
 
     // In modification mode, stores the currently picked actor.
@@ -498,6 +573,7 @@ private:
     QtProperty *backgroundColourProperty;
     QtProperty *farPlaneDistanceProperty;
     float       farPlaneDistance;
+    QtProperty *fieldOfViewProperty;
     QtProperty *multisamplingProperty;
     bool        multisamplingEnabled;
     QtProperty *antialiasingProperty;

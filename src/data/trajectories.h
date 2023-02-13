@@ -7,6 +7,7 @@
 **  Copyright 2015-2020 Marc Rautenhaus [*, previously +]
 **  Copyright 2017      Philipp Kaiser [+]
 **  Copyright 2020      Marcel Meyer [*]
+**  Copyright 2021      Christoph Neuhauser [+]
 **
 **  + Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -35,7 +36,11 @@
 
 // related third party imports
 #include "GL/glew.h"
+#ifdef USE_QOPENGLWIDGET
+#include <QOpenGLWidget>
+#else
 #include <QGLWidget>
+#endif
 
 // local application imports
 #include "data/abstractdataitem.h"
@@ -201,7 +206,12 @@ public:
 
     /**
      */
-    GL::MVertexBuffer *getVertexBuffer(QGLWidget *currentGLContext = 0);
+    GL::MVertexBuffer *getVertexBuffer(
+#ifdef USE_QOPENGLWIDGET
+            QOpenGLWidget *currentGLContext = nullptr);
+#else
+            QGLWidget *currentGLContext = nullptr);
+#endif
 
     void releaseVertexBuffer();
 
@@ -213,7 +223,7 @@ private:
 
 /**
  @brief Stores the trajectories of a single forecast member at a single
- timestep. The smallest entitiy that can be read from disk.
+ timestep. The smallest entity that can be read from disk.
  */
 class MTrajectories :
         public MTrajectorySelection, public MWeatherPredictionMetaData
@@ -253,13 +263,19 @@ public:
     */
     void copyVertexDataFrom(QVector<QVector<QVector3D>> &vertices);
 
-    const QVector<QVector3D>& getVertices() { return vertices; }
+    const QVector<QVector3D>& getVertices() const{ return vertices; }
 
     /**
       Copy auxiliary data given as float arrays in the trajectory data file to
       the internal QVector-based auxiliary data array.
      */
     void copyAuxDataPerVertex(float *auxData, int iIndexAuxData);
+    void copySensDataPerVertex(float *sensData, int iIndexSensData, int numOutputParameters);
+
+    /**
+      Copy the output parameter ids for the sensitivities and store the corresponding names.
+     */
+    void copyOutputParameter(const uint32_t *outputParameters, const uint32_t numOutputParameters);
 
     /**
       Copy auxiliary data from the QVector-array that is filled during the
@@ -268,23 +284,41 @@ public:
      */
     void copyAuxDataPerVertex(QVector<QVector<QVector<float>>>
                               &auxDataAtVertices);
-
+    void copySensDataPerVertex(QVector<QVector<QVector<QVector<float>>>>
+                              &sensDataAtVertices);
     /**
       Copy the names of the auxiliary data variables.
      */
     void setAuxDataVariableNames(QStringList varNames);
 
     /**
+      Copy the names of the sensitivity data variables.
+     */
+    void setSensDataVariableNames(QStringList varNames);
+
+    /**
       Get auxiliary data, size of auxiliary data array and names
       of auxiliary data variables.
      */
-    const QVector<float>& getAuxDataAtVertex(int i)
+    const QVector<float>& getAuxDataAtVertex(int i) const
     { return auxDataAtVertices[i]; }
 
-    unsigned int getSizeOfAuxDataAtVertices()
+    const QVector<float>& getSensDataAtVertex(int i, int j) const
+    { return sensDataAtVertices[i][j]; }
+
+    unsigned int getSizeOfAuxDataAtVertices() const
     { return auxDataAtVertices.size(); }
 
-    QStringList getAuxDataVarNames() { return auxDataVarNames; }
+    unsigned int getSizeOfSensDataAtVertices() const
+    { return sensDataAtVertices.size(); }
+
+    QStringList getAuxDataVarNames() const { return auxDataVarNames; }
+    QStringList getSensDataVarNames() const { return sensDataVarNames; }
+    QVector<uint32_t> getOutputParameters() const { return outputParameters; }
+    QStringList getOutputParameterNames() const { return outputParameterNames; }
+
+//    QString getOutputParameterName() { return selectedOutputParameter; }
+//    int getOutputParameterIdx() { return properties->mEnum()->value(outputParameterProperty); }
 
     /**
       Returns the length of a single time step in seconds.
@@ -309,7 +343,12 @@ public:
       from a render method, it should switch back to the current render context
       (given by @p currentGLContext).
      */
-    GL::MVertexBuffer *getVertexBuffer(QGLWidget *currentGLContext = 0);
+    GL::MVertexBuffer *getVertexBuffer(
+#ifdef USE_QOPENGLWIDGET
+            QOpenGLWidget *currentGLContext = nullptr);
+#else
+            QGLWidget *currentGLContext = nullptr);
+#endif
 
     void releaseVertexBuffer();
 
@@ -330,8 +369,14 @@ public:
       releaseAuxDataVertexBuffer() after use of the returned vertex buffer has
       finished to avoid memory leaks.
      */
-    GL::MVertexBuffer *getAuxDataVertexBuffer(QString requestedAuxDataVarName,
-                                              QGLWidget *currentGLContext = 0);
+    GL::MVertexBuffer *getAuxDataVertexBuffer(
+            QString requestedAuxDataVarName,
+            QString requestedOutputParameterName = "",
+#ifdef USE_QOPENGLWIDGET
+            QOpenGLWidget *currentGLContext = nullptr);
+#else
+            QGLWidget *currentGLContext = nullptr);
+#endif
 
     /**
       Release vertex buffer with auxiliary data. As there can be more than one
@@ -350,8 +395,48 @@ private:
     QVector<QVector3D> vertices;
     QVector<QVector<float>> auxDataAtVertices;
     QStringList auxDataVarNames;
+    QVector<QVector<QVector<float>>> sensDataAtVertices;
+    QStringList sensDataVarNames;
+    QVector<uint32_t> outputParameters;
+    QStringList outputParameterNames;
 
     std::shared_ptr<MStructuredGrid> startGrid;
+
+    QStringList outputParameterNamesList = {
+            "pressure",
+            "T",
+            "w",
+            "S",
+            "QC",
+            "QR",
+            "QV",
+            "NCCLOUD",
+            "NCRAIN",
+            "QI",
+            "NCICE",
+            "QS",
+            "NCSNOW",
+            "QG",
+            "NCGRAUPEL",
+            "QH",
+            "NCHAIL",
+            "QI_OUT",
+            "QS_OUT",
+            "QR_OUT",
+            "QG_OUT",
+            "QH_OUT",
+            "latent_heat",
+            "latent_cool",
+            "NI_OUT",
+            "NS_OUT",
+            "NR_OUT",
+            "NG_OUT",
+            "NH_OUT",
+            "z",
+            "Inactive",
+            "deposition",
+            "sublimination"
+    };
 
 };
 

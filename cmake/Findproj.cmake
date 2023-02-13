@@ -9,6 +9,7 @@
 #
 #  Copyright 2020 Kameswarro Modali
 #  Copyright 2021 Christoph Neuhauser
+#  Copyright 2021 Marc Rautenhaus
 #
 ####################################################################################################
 
@@ -25,15 +26,12 @@ endif (UNIX)
 
 find_path(${PKG_NAME}_INCLUDE_DIR
         NAMES # Name of all header files
-            proj_api.h
-	    projects.h
+            proj.h
         HINTS # Hints to the directory where the package is currently installed in
             $ENV{${PKG_NAME}_DIR}
             ${PKG_INCLUDE_DIRS}
         PATH_SUFFIXES # Subfolders in the install directory
             include
-        PATHS # The directories where cmake should look for the files by default if HINTS does not work
-            ${COMMON_INSTALL_DIRS}
         )
 
 find_library(${PKG_NAME}_LIBRARY_RELEASE
@@ -45,22 +43,17 @@ find_library(${PKG_NAME}_LIBRARY_RELEASE
         PATH_SUFFIXES
             lib64
             lib
-        PATHS
-            ${COMMON_INSTALL_DIRS}
         )
 
 find_library(${PKG_NAME}_LIBRARY_DEBUG
         NAMES
-	proj PROJD
+        projd PROJD
         HINTS
             $ENV{${PKG_NAME}_DIR}
             ${PKG_LIBRARY_DIRS}
         PATH_SUFFIXES
-	    usr/lib/debug/usr/lib64
-	    #lib64
-	    #lib
-        PATHS
-            ${COMMON_INSTALL_DIRS}
+            lib64
+            lib
         )
 
 if (NOT ${PKG_NAME}_LIBRARY_DEBUG)
@@ -87,13 +80,13 @@ find_package_handle_standard_args(${PKG_NAME} REQUIRED_VARS ${PKG_NAME}_LIBRARIE
 
 # Extract version number of Proj library from header-file:
 # Get content of header-file.
-file(STRINGS "${${PKG_NAME}_INCLUDE_DIR}/proj_api.h" ${PKG_NAME}_VERSION_STRING NEWLINE_CONSUME)
+file(STRINGS "${${PKG_NAME}_INCLUDE_DIR}/proj.h" ${PKG_NAME}_VERSION_STRING NEWLINE_CONSUME)
 # Extract version from content by matching string: "#define PJ_VERSION [MAJOR;MINOR;PATCH]".
-string(REGEX MATCH "#define PJ_VERSION ([0-9])*"
+string(REGEX MATCH "#define PROJ_VERSION_MAJOR ([0-9])*"
        ${PKG_NAME}_VERSION_STRING ${${PKG_NAME}_VERSION_STRING})
 # Extract version list (major, minor, patch) from matched string.
-string(REGEX REPLACE "#define PJ_VERSION ([0-9])([0-9])([0-9])"
-        "\\1;\\2;\\3" ${PKG_NAME}_VERSION_LIST ${${PKG_NAME}_VERSION_STRING})
+string(REGEX REPLACE "#define PROJ_VERSION_MAJOR ([0-9])"
+        "\\1" ${PKG_NAME}_VERSION_LIST ${${PKG_NAME}_VERSION_STRING})
 list(LENGTH ${PKG_NAME}_VERSION_LIST n)
 set(${PKG_NAME}_VERSION, "")
 math(EXPR n "${n} - 1")
@@ -106,17 +99,11 @@ foreach(i RANGE ${n})
     endif()
 endforeach()
 
-if(${PKG_NAME}_VERSION VERSION_LESS "4.0")
-    message(FATAL_ERROR "Proj library version " ${${PKG_NAME}_VERSION} " is not supported by Met.3D. Please update Proj library to version 4.0 or later.")
-endif()
-
-# Split version into major, minor and patch part.
-# Set major version.
-list(GET ${PKG_NAME}_VERSION_LIST 0 ${PKG_NAME}_MAJOR_VERSION)
-# Set minor version.
-list(GET ${PKG_NAME}_VERSION_LIST 1 ${PKG_NAME}_MINOR_VERSION)
-# Set patch version.
-list(GET ${PKG_NAME}_VERSION_LIST 2 ${PKG_NAME}_PATCH_VERSION)
+message("Proj library found; version " ${${PKG_NAME}_VERSION} ".")
+#if(${PKG_NAME}_VERSION VERSION_LESS "8")
+#    message(FATAL_ERROR "Proj library version " ${${PKG_NAME}_VERSION} " is not supported by Met.3D. Please update Proj library to version 8.0 or later.")
+#endif()
 
 # Marks cmake cached variables as advanced
 mark_as_advanced(${PKG_NAME}_INCLUDE_DIR ${PKG_NAME}_LIBRARIES)
+

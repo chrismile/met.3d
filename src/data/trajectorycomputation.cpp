@@ -101,15 +101,22 @@ QList<QDateTime> MTrajectoryComputationSource::availableInitTimes()
 }
 
 
+QList<QDateTime> MTrajectoryComputationSource::availableStartTimes(
+        const QDateTime& initTime)
+{
+    return availableValidTimes(initTime);
+}
+
+
 QList<QDateTime> MTrajectoryComputationSource::availableValidTimes(
         const QDateTime& initTime)
 {
     QReadLocker availableItemsReadLocker(&availableItemsLock);
     if (!availableTrajectories.keys().contains(initTime))
         throw MBadDataFieldRequest(
-            "unkown init time requested: " +
-            initTime.toString(Qt::ISODate).toStdString(),
-            __FILE__, __LINE__);
+                "unkown init time requested: " +
+                initTime.toString(Qt::ISODate).toStdString(),
+                __FILE__, __LINE__);
     return availableTrajectories.value(initTime).keys();
 }
 

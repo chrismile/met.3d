@@ -6,6 +6,7 @@
 **
 **  Copyright 2015-2018 Marc Rautenhaus
 **  Copyright 2016-2018 Bianca Tost
+**  Copyright 2021-2022 Christoph Neuhauser
 **
 **  Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -82,6 +83,10 @@ MTransferFunction1D::MTransferFunction1D(QObject *parent)
     numStepsProperty = addProperty(INT_PROPERTY, "steps",
                                    rangePropertiesSubGroup);
     properties->setInt(numStepsProperty, 50, 2, 32768, 1);
+
+    useLogScaleProperty = addProperty(BOOL_PROPERTY, "use log scale",
+                                      rangePropertiesSubGroup);
+    properties->mBool()->setValue(useLogScaleProperty, false);
 
     rangePropertiesSubGroup->addSubProperty(valueOptionsPropertiesSubGroup);
 
@@ -269,6 +274,7 @@ void MTransferFunction1D::selectPredefinedColourmap(
         {
             generateTransferTexture();
             generateBarGeometry();
+            emit transferFunctionChanged(this);
             emitActorChangedSignal();
         }
     }
@@ -309,6 +315,7 @@ void MTransferFunction1D::selectHCLColourmap(
     {
         generateTransferTexture();
         generateBarGeometry();
+        emit transferFunctionChanged(this);
         emitActorChangedSignal();
     }
 }
@@ -338,6 +345,7 @@ void MTransferFunction1D::selectHSVColourmap(
     {
         generateTransferTexture();
         generateBarGeometry();
+        emit transferFunctionChanged(this);
         emitActorChangedSignal();
     }
 }
@@ -363,6 +371,36 @@ void MTransferFunction1D::setSteps(int steps)
 }
 
 
+void MTransferFunction1D::setUseLogScale(bool useLogScale)
+{
+    properties->mBool()->setValue(useLogScaleProperty, useLogScale);
+}
+
+
+bool MTransferFunction1D::getUseLogScale()
+{
+    return properties->mBool()->value(useLogScaleProperty);
+}
+
+
+void MTransferFunction1D::setDisplayName(const QString& name)
+{
+    enableActorUpdates(false);
+
+    displayName = name;
+
+    enableActorUpdates(true);
+
+    if (isInitialized())
+    {
+        generateTransferTexture();
+        generateBarGeometry();
+        emit transferFunctionChanged(this);
+        emitActorChangedSignal();
+    }
+}
+
+
 void MTransferFunction1D::saveConfiguration(QSettings *settings)
 {
     MTransferFunction::saveConfiguration(settings);
@@ -378,6 +416,8 @@ void MTransferFunction1D::saveConfiguration(QSettings *settings)
     // =================================
     settings->setValue("numSteps",
                        properties->mInt()->value(numStepsProperty));
+    settings->setValue("useLogScale",
+                       properties->mBool()->value(useLogScaleProperty));
 
     // General properties.
     // ===================
@@ -497,6 +537,9 @@ void MTransferFunction1D::loadConfiguration(QSettings *settings)
     // Properties related to data range.
     // =================================
     setSteps(settings->value("numSteps", 50).toInt());
+    properties->mBool()->setValue(
+            useLogScaleProperty,
+            settings->value("useLogScale", false).toBool());
 
     // Properties related to type of colourmap.
     // ========================================
@@ -863,6 +906,11 @@ void MTransferFunction1D::generateTransferTexture()
                      GL_RGBA,                   // format
                      GL_UNSIGNED_BYTE,          // data type of the pixel data
                      colorValues.data()); CHECK_GL_ERROR;
+
+#ifdef USE_QOPENGLWIDGET
+        glActiveTexture(GL_TEXTURE0);
+        glRM->doneCurrent();
+#endif
     }
 }
 
@@ -872,6 +920,7 @@ void MTransferFunction1D::onQtPropertyChanged(QtProperty *property)
     if ( (property == minimumValueProperty)    ||
          (property == maximumValueProperty)    ||
          (property == numStepsProperty)        ||
+         (property == useLogScaleProperty)     ||
          (property == maxNumTicksProperty)     ||
          (property == maxNumLabelsProperty)    ||
          (property == positionProperty)        ||
@@ -902,6 +951,7 @@ void MTransferFunction1D::onQtPropertyChanged(QtProperty *property)
 
         generateTransferTexture();
         generateBarGeometry();
+        emit transferFunctionChanged(this);
         emitActorChangedSignal();
     }
 
@@ -954,6 +1004,7 @@ void MTransferFunction1D::onQtPropertyChanged(QtProperty *property)
 
         generateTransferTexture();
         generateBarGeometry();
+        emit transferFunctionChanged(this);
         emitActorChangedSignal();
     }
 
@@ -965,6 +1016,7 @@ void MTransferFunction1D::onQtPropertyChanged(QtProperty *property)
 
         generateTransferTexture();
         generateBarGeometry();
+        emit transferFunctionChanged(this);
         emitActorChangedSignal();
     }
 
@@ -1012,6 +1064,7 @@ void MTransferFunction1D::onQtPropertyChanged(QtProperty *property)
 
         generateTransferTexture();
         generateBarGeometry();
+        emit transferFunctionChanged(this);
         emitActorChangedSignal();
     }
 
@@ -1185,6 +1238,10 @@ void MTransferFunction1D::generateBarGeometry()
         vertexBuffer = static_cast<GL::MVertexBuffer*>(glRM->getGPUItem(requestKey));
     }
 
+#ifdef USE_QOPENGLWIDGET
+    glRM->doneCurrent();
+#endif
+
     // Required for the glDrawArrays() call in renderToCurrentContext().
     numVertices = 4;
 
@@ -1235,12 +1292,25 @@ void MTransferFunction1D::generateBarGeometry()
 
     // Register the labels with the text manager.
     // Treat numTicks equals 1 as a special case to avoid divison by zero.
+    bool useLogScale = properties->mBool()->value(useLogScaleProperty);
     if (numTicks != 1)
     {
         for (uint i = 0; i < numTicks; i += tickStep)
         {
-            float value = (maximumValue - double(i) / double(numTicks-1)
-                           * (maximumValue - minimumValue)) * scaleFactor;
+            float value;
+            if (useLogScale)
+            {
+                double logMin = std::log10(double(minimumValue));
+                double logMax = std::log10(double(maximumValue));
+                value = float(
+                        std::pow(10.0, logMin + double(numTicks - 1 - i) / double(numTicks - 1) * double(logMax - logMin)) * scaleFactor);
+            }
+            else
+            {
+                value = float(
+                        (double(maximumValue) - double(i) / double(numTicks - 1)
+                        * double(maximumValue - minimumValue)) * scaleFactor);
+            }
             QString labelText =
                     properties->mSciDouble()->valueAsPropertyFormatedText(
                         minimumValueProperty, value);
@@ -1272,6 +1342,20 @@ void MTransferFunction1D::generateBarGeometry()
                           labelColour, MTextManager::MIDDLERIGHT,
                           labelbbox, labelBBoxColour)
                       );
+    }
+
+    if (!displayName.isEmpty())
+    {
+        labels.append(tm->addTextVertical(
+                displayName,
+                MTextManager::CLIPSPACE,
+                ulcrnr[0] + width + labelSpacing,// / 2.0f,
+                ulcrnr[1] - height / 2.0f,
+                -1,
+                labelsize,
+                labelColour, MTextManager::UPPERCENTRE,
+                labelbbox, labelBBoxColour,
+                0.1, true));
     }
 
     int significantDigits =
@@ -1366,6 +1450,7 @@ void MTransferFunction1D::updateHSVProperties()
 void MTransferFunction1D::onEditorTransferFunctionChanged()
 {
     generateTransferTexture();
+    emit transferFunctionChanged(this);
     emitActorChangedSignal();
 }
 

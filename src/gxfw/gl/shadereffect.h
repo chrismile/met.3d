@@ -78,6 +78,24 @@ public:
 
     bool compileFromMemory(const char* src);
 
+
+    /**
+      Compile GLSL shader sources from glfx formatted file @p _filename.
+     */
+    bool compileFromFile(const char* _filename, const QMap<QString, QString>& defines);
+
+    bool compileFromFile(const QString _filename, const QMap<QString, QString>& defines);
+
+    /**
+      Compile GLSL shader sources from glfx formatted file located relative
+      to Met.3D home directory.
+
+      @see MSystemManagerAndControl::getMet3DHomeDir()
+     */
+    bool compileFromFile_Met3DHome(const QString _filename, const QMap<QString, QString>& defines);
+
+    bool compileFromMemory(const char* src, const QMap<QString, QString>& defines);
+
     /**
       Set uniform @p name to value @p x.
      */
@@ -284,6 +302,8 @@ public:
                                     const QList<QString> subroutines);
 
     bool compileAllPrograms();
+
+    bool compileAllPrograms(const QMap<QString, QString>& defines);
 
     void bindAttributeLocation(const QString name, const int index);
 

@@ -8,6 +8,7 @@
 **  Copyright 2016-2018 Bianca Tost [+]
 **  Copyright 2017      Philipp Kaiser [+]
 **  Copyright 2020      Marcel Meyer [*]
+**  Copyright 2021      Christoph Neuhauser [+]
 **
 **  + Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -33,7 +34,7 @@
 
 // standard library imports
 #include <iostream>
-#include "math.h"
+#include <cmath>
 
 // related third party imports
 #include <log4cplus/loggingmacros.h>
@@ -48,6 +49,7 @@
 #include "gxfw/selectactordialog.h"
 #include "data/trajectoryreader.h"
 #include "data/trajectorycomputation.h"
+#include "data/multivar/hidpi.h"
 #include "actors/movablepoleactor.h"
 #include "actors/nwphorizontalsectionactor.h"
 #include "actors/nwpverticalsectionactor.h"
@@ -71,6 +73,8 @@ MTrajectoryActor::MTrajectoryActor()
       globalRequestIDCounter(0),
       trajectorySource(nullptr),
       normalsSource(nullptr),
+      multiVarTrajectoriesSource(nullptr),
+      useMultiVarTrajectories(false),
       trajectoryFilter(nullptr),
       dataSourceID(""),
       precomputedDataSource(false),
@@ -338,6 +342,178 @@ MTrajectoryActor::MTrajectoryActor()
                                        renderingGroupProperty);
     properties->mBool()->setValue(colourShadowProperty, shadowColoured);
 
+
+    // Property group: Multi-variable rendering.
+    // ====================================
+    useMultiVarTrajectoriesProperty = addProperty(
+            BOOL_PROPERTY, "use multi-var rendering", renderingGroupProperty);
+    properties->mBool()->setValue(useMultiVarTrajectoriesProperty, useMultiVarTrajectories);
+
+    multiVarGroupProperty = addProperty(
+            GROUP_PROPERTY, "multi-var rendering", renderingGroupProperty);
+
+    diagramTypeProperty = addProperty(
+            ENUM_PROPERTY, "chart type", multiVarGroupProperty);
+    properties->mEnum()->setEnumNames(diagramTypeProperty, diagramTypeNames);
+    properties->mEnum()->setValue(diagramTypeProperty, static_cast<int>(diagramType));
+
+    diagramTransferFunctionProperty = addProperty(
+            ENUM_PROPERTY, "chart transfer function", multiVarGroupProperty);
+    properties->mEnum()->setEnumNames(diagramTransferFunctionProperty, availableTFs);
+    diagramTransferFunctionProperty->setToolTip(
+            "This transfer function is used in the chart to map a trajectory attribute to a color.");
+
+    similarityMetricGroup = addProperty(
+            GROUP_PROPERTY, "similarity metric settings", multiVarGroupProperty);
+
+    similarityMetricProperty = addProperty(
+            ENUM_PROPERTY, "similarity metric", similarityMetricGroup);
+    int numSimilarityMetrics = int(sizeof(SIMILARITY_METRIC_NAMES) / sizeof(*SIMILARITY_METRIC_NAMES));
+    QStringList similarityMetricNames;
+    for (int i = 0; i < numSimilarityMetrics; i++) {
+        similarityMetricNames.push_back(SIMILARITY_METRIC_NAMES[i]);
+    }
+    properties->mEnum()->setEnumNames(similarityMetricProperty, similarityMetricNames);
+    properties->mEnum()->setValue(similarityMetricProperty, int(similarityMetric));
+    similarityMetricProperty->setToolTip(
+            "The similarity metric to use when ordering variables after clicking on the diagram.");
+
+    meanMetricInfluenceProperty = addProperty(
+            DECORATEDDOUBLE_PROPERTY, "mean metric influence", similarityMetricGroup);
+    properties->setDDouble(
+            meanMetricInfluenceProperty, meanMetricInfluence,
+            0.0, 100.0, 2, 0.1, " (factor)");
+    meanMetricInfluenceProperty->setToolTip(
+            "Influence factor of the similarity of the variable means on the final sorting order.");
+
+    stdDevMetricInfluenceProperty = addProperty(
+            DECORATEDDOUBLE_PROPERTY, "std. dev. metric influence", similarityMetricGroup);
+    properties->setDDouble(
+            stdDevMetricInfluenceProperty, stdDevMetricInfluence,
+            0.0, 100.0, 2, 0.1, " (factor)");
+    stdDevMetricInfluenceProperty->setToolTip(
+            "Influence factor of the similarity of the variable standard deviations on the final sorting order.");
+
+    numBinsProperty = addProperty(
+            INT_PROPERTY, "#bins", similarityMetricGroup);
+    properties->setInt(numBinsProperty, numBins, 1, 20);
+    numBinsProperty->setToolTip(
+            "Number of histogram bins used for the Mutual Information (MI) similarity metric.");
+
+    sortByDescendingStdDevProperty = addProperty(
+            CLICK_PROPERTY, "sort by desc. std. dev.", similarityMetricGroup);
+    sortByDescendingStdDevProperty->setToolTip(
+            "Sorts the variables in the diagram by their cross-trajectory "
+            "standard deviation at the selected time step.");
+
+    showMinMaxValueProperty = addProperty(
+            BOOL_PROPERTY, "show min/max", similarityMetricGroup);
+    properties->mBool()->setValue(showMinMaxValueProperty, showMinMaxValue);
+    showMinMaxValueProperty->setToolTip(
+            "Whether to show the minimum and maximum value in the diagram if the zoom factor permits it.");
+
+    useMaxForSensitivityProperty = addProperty(
+            BOOL_PROPERTY, "use max for sensitivity", similarityMetricGroup);
+    properties->mBool()->setValue(useMaxForSensitivityProperty, useMaxForSensitivity);
+    useMaxForSensitivityProperty->setToolTip(
+            "Whether to show the minimum and maximum value in the diagram if the zoom factor permits it.");
+
+    trimNanRegionsProperty = addProperty(
+            BOOL_PROPERTY, "trim NaN regions", similarityMetricGroup);
+    properties->mBool()->setValue(trimNanRegionsProperty, trimNanRegions);
+    trimNanRegionsProperty->setToolTip(
+            "Whether to remove regions with only NaN values at the beginning or end of the loaded data.");
+
+    subsequenceMatchingTechniqueProperty = addProperty(
+            ENUM_PROPERTY, "matching technique", similarityMetricGroup);
+    int numSubsequenceMatchingTechniques =
+            int(sizeof(SUBSEQUENCE_MATCHING_TECHNIQUE_NAMES) / sizeof(*SUBSEQUENCE_MATCHING_TECHNIQUE_NAMES));
+    QStringList subsequenceMatchingTechniqueNames;
+    for (int i = 0; i < numSubsequenceMatchingTechniques; i++) {
+        subsequenceMatchingTechniqueNames.push_back(SUBSEQUENCE_MATCHING_TECHNIQUE_NAMES[i]);
+    }
+    properties->mEnum()->setEnumNames(
+            subsequenceMatchingTechniqueProperty, subsequenceMatchingTechniqueNames);
+    properties->mEnum()->setValue(
+            subsequenceMatchingTechniqueProperty, int(subsequenceMatchingTechnique));
+    similarityMetricProperty->setToolTip(
+            "Which technique to use for sub-sequence matching in the curve-plot view.");
+
+    springEpsilonProperty = addProperty(
+            DECORATEDDOUBLE_PROPERTY, "SPRING metric epsilon", similarityMetricGroup);
+    properties->setDDouble(
+            springEpsilonProperty, springEpsilon,
+            0.1, 100.0, 2, 0.1, " (factor)");
+    springEpsilonProperty->setToolTip(
+            "SPRING subsequence matching algorithm distance metric epsilon.");
+
+    backgroundOpacityProperty = addProperty(
+            DECORATEDDOUBLE_PROPERTY, "diagram opacity", similarityMetricGroup);
+    properties->setDDouble(
+            backgroundOpacityProperty, backgroundOpacity,
+            0.0, 1.0, 2, 0.05, " (factor)");
+    backgroundOpacityProperty->setToolTip("Diagram view background opacity.");
+
+    diagramNormalizationModeProperty = addProperty(
+            ENUM_PROPERTY, "diagram normalization mode", similarityMetricGroup);
+    properties->mEnum()->setEnumNames(diagramNormalizationModeProperty, diagramNormalizationModeNames);
+    properties->mEnum()->setValue(
+            diagramNormalizationModeProperty, static_cast<int>(diagramNormalizationMode));
+    diagramNormalizationModeProperty->setToolTip(
+            "Whether to normalize the data by using the minimum/maximum also over not selected trajectories.");
+
+    diagramTextSizeProperty = addProperty(
+            DECORATEDDOUBLE_PROPERTY, "diagram text size", similarityMetricGroup);
+    properties->setDDouble(
+            diagramTextSizeProperty, diagramTextSize,
+            4.0, 64.0, 2, 1.0, "px");
+    diagramTextSizeProperty->setToolTip("Diagram text size.");
+
+    diagramUpscalingFactor = getHighDPIScaleFactor();
+    useCustomDiagramUpscalingFactorProperty = addProperty(
+            BOOL_PROPERTY, "use custom upscaling", similarityMetricGroup);
+    properties->mBool()->setValue(useCustomDiagramUpscalingFactorProperty, useCustomDiagramUpscalingFactor);
+    useCustomDiagramUpscalingFactorProperty->setToolTip(
+            "Whether to normalize the data by using the minimum/maximum also over not selected trajectories.");
+    diagramUpscalingFactorProperty = addProperty(
+            DECORATEDDOUBLE_PROPERTY, "diagram upscaling factor", similarityMetricGroup);
+    properties->setDDouble(
+            diagramUpscalingFactorProperty, diagramUpscalingFactor,
+            0.25, 8.0, 3, 0.125, " (factor)");
+    diagramUpscalingFactorProperty->setToolTip("Custom diagram upscaling factor.");
+    diagramUpscalingFactorProperty->setEnabled(useCustomDiagramUpscalingFactor);
+
+
+    updateSimilarityMetricGroupEnabled();
+
+
+    trajectorySyncModeProperty = addProperty(
+            ENUM_PROPERTY, "sync mode", multiVarGroupProperty);
+    properties->mEnum()->setEnumNames(trajectorySyncModeProperty, trajectorySyncModeNames);
+    properties->mEnum()->setValue(trajectorySyncModeProperty, static_cast<int>(trajectorySyncMode));
+    trajectorySyncModeProperty->setToolTip(
+            "Specifies whether to sync warm conveyor belt trajectories based on their ascension or height. "
+            "The trajectories need to have the per-point attribute time_after_ascension for this to work.");
+
+    // analysisGroupProperty for old paper videos.
+    useVariableToolTipProperty = addProperty(
+            BOOL_PROPERTY, "use variable tool tip", multiVarGroupProperty);
+    properties->mBool()->setValue(useVariableToolTipProperty, useVariableToolTip);
+    useVariableToolTipProperty->setToolTip("Use variable tool tip.");
+
+    selectAllTrajectoriesProperty = addProperty(
+            CLICK_PROPERTY, "select all trajectories", multiVarGroupProperty);
+    selectAllTrajectoriesProperty->setToolTip("Selects (or unselects) all trajectories in the scene.");
+
+    resetVariableSortingProperty = addProperty(
+            CLICK_PROPERTY, "reset variable sorting", multiVarGroupProperty);
+    resetVariableSortingProperty->setToolTip("Resets the variable sorting.");
+
+
+    multiVarData.setProperties(this, properties, multiVarGroupProperty);
+    actorHasSelectableData = true;
+
+
     // Property group: Analysis.
     // ====================================
     analysisGroupProperty = addProperty(GROUP_PROPERTY, "analysis",
@@ -369,6 +545,13 @@ MTrajectoryActor::~MTrajectoryActor()
 
     if (textureUnitTransferFunction >=0)
         releaseTextureUnit(textureUnitTransferFunction);
+
+#ifdef USE_EMBREE
+    for (MTrajectoryPicker* trajectoryPicker : trajectoryPickerMap)
+    {
+        delete trajectoryPicker;
+    }
+#endif
 }
 
 
@@ -387,17 +570,17 @@ void MTrajectoryActor::reloadShaderEffects()
     beginCompileShaders(4);
 
     compileShadersFromFileWithProgressDialog(
-                tubeShader,
-                "src/glsl/trajectory_tubes.fx.glsl");
+            tubeShader,
+            "src/glsl/trajectory_tubes.fx.glsl");
     compileShadersFromFileWithProgressDialog(
-                tubeShadowShader,
-                "src/glsl/trajectory_tubes_shadow.fx.glsl");
+            tubeShadowShader,
+            "src/glsl/trajectory_tubes_shadow.fx.glsl");
     compileShadersFromFileWithProgressDialog(
-                positionSphereShader,
-                "src/glsl/trajectory_positions.fx.glsl");
+            positionSphereShader,
+            "src/glsl/trajectory_positions.fx.glsl");
     compileShadersFromFileWithProgressDialog(
-                positionSphereShadowShader,
-                "src/glsl/trajectory_positions_shadow.fx.glsl");
+            positionSphereShadowShader,
+            "src/glsl/trajectory_positions_shadow.fx.glsl");
 
     endCompileShaders();
 }
@@ -438,6 +621,33 @@ void MTrajectoryActor::saveConfiguration(QSettings *settings)
 
     settings->setValue("transferFunction",
                        properties->getEnumItem(transferFunctionProperty));
+
+    settings->setValue("useMultiVarTrajectories",
+                       properties->mBool()->value(useMultiVarTrajectoriesProperty));
+    settings->setValue("diagramType",
+                       properties->mEnum()->value(diagramTypeProperty));
+    settings->setValue("diagramTransferFunction",
+                       properties->getEnumItem(diagramTransferFunctionProperty));
+    settings->setValue(QString("useVariableToolTip"), useVariableToolTip);
+
+    settings->setValue(QString("similarityMetric"), int(similarityMetric));
+    settings->setValue(QString("meanMetricInfluence"), meanMetricInfluence);
+    settings->setValue(QString("stdDevMetricInfluence"), stdDevMetricInfluence);
+    settings->setValue(QString("numBins"), numBins);
+    settings->setValue(QString("subsequenceMatchingTechnique"), int(subsequenceMatchingTechnique));
+    settings->setValue(QString("springEpsilon"), springEpsilon);
+    settings->setValue(QString("backgroundOpacity"), backgroundOpacity);
+    settings->setValue(
+            "diagramNormalizationMode", properties->mEnum()->value(diagramNormalizationModeProperty));
+    settings->setValue(QString("diagramTextSize"), diagramTextSize);
+    settings->setValue(QString("useCustomDiagramUpscalingFactor"), useCustomDiagramUpscalingFactor);
+    settings->setValue(QString("diagramUpscalingFactor"), diagramUpscalingFactor);
+
+    settings->setValue(QString("trajectorySyncMode"), int(trajectorySyncMode));
+    settings->setValue(QString("syncModeTrajectoryIndex"), syncModeTrajectoryIndex);
+    settings->setValue(QString("particlePosTimeStep"), int(particlePosTimeStep));
+
+    multiVarData.saveConfiguration(settings);
 
     settings->setValue("tubeRadius", tubeRadius);
     settings->setValue("sphereRadius", sphereRadius);
@@ -483,6 +693,10 @@ void MTrajectoryActor::saveConfiguration(QSettings *settings)
                     properties->mString()->value(sas.pressureLevels));
     }
 
+    settings->setValue(
+            "computationSeedActorSize",
+            computationSeedActorProperties.size());
+
     settings->endGroup();
 }
 
@@ -507,7 +721,6 @@ void MTrajectoryActor::loadConfiguration(QSettings *settings)
         // Display warning and load rest of the configuration.
         if (!dataSourceAvailable)
         {
-
             QMessageBox msgBox;
             msgBox.setIcon(QMessageBox::Warning);
             msgBox.setText(QString("Trajectory actor '%1':\n"
@@ -546,6 +759,7 @@ void MTrajectoryActor::loadConfiguration(QSettings *settings)
             this->setDataSource(dataSourceID + QString(" Reader"));
             this->setNormalsSource(dataSourceID + QString(" Normals"));
             this->setTrajectoryFilter(dataSourceID + QString(" timestepFilter"));
+            this->setMultiVarTrajectoriesSource(dataSourceID + QString(" Multi-Var Trajectories"));
 
             updateInitTimeProperty();
             updateStartTimeProperty();
@@ -635,6 +849,113 @@ void MTrajectoryActor::loadConfiguration(QSettings *settings)
             break;
         }
     }
+
+    useMultiVarTrajectories =
+            settings->value("useMultiVarTrajectories", false).toBool()
+            || settings->value("useBezierTrajectories", false).toBool();
+    properties->mBool()->setValue(useMultiVarTrajectoriesProperty, useMultiVarTrajectories);
+
+    properties->mEnum()->setValue(
+            diagramTypeProperty,
+            settings->value("diagramType", 0).toInt());
+    diagramType = static_cast<DiagramDisplayType>(properties->mEnum()->value(diagramTypeProperty));
+    properties->mEnum()->setValue(diagramTypeProperty, static_cast<int>(diagramType));
+
+    similarityMetric = SimilarityMetric(settings->value(
+            "similarityMetric", int(SimilarityMetric::ABSOLUTE_NCC)).toInt());
+    properties->mEnum()->setValue(similarityMetricProperty, int(similarityMetric));
+    meanMetricInfluence = settings->value("meanMetricInfluence", 0.5f).toFloat();
+    properties->setDDouble(
+            meanMetricInfluenceProperty, meanMetricInfluence,
+            0.0, 100.0, 2, 0.1, " (factor)");
+    stdDevMetricInfluence = settings->value("stdDevMetricInfluence", 0.25f).toFloat();
+    properties->setDDouble(
+            stdDevMetricInfluenceProperty, stdDevMetricInfluence,
+            0.0, 100.0, 2, 0.1, " (factor)");
+    numBins = settings->value("numBins", 10).toInt();
+    properties->setInt(numBinsProperty, numBins, 1, 20);
+    showMinMaxValue = settings->value("showMinMaxValue", true).toBool();
+    properties->mBool()->setValue(showMinMaxValueProperty, showMinMaxValue);
+    useMaxForSensitivity = settings->value("useMaxForSensitivity", true).toBool();
+    properties->mBool()->setValue(useMaxForSensitivityProperty, useMaxForSensitivity);
+    trimNanRegions = settings->value("trimNanRegions", true).toBool();
+    properties->mBool()->setValue(trimNanRegionsProperty, trimNanRegions);
+    subsequenceMatchingTechnique = SubsequenceMatchingTechnique(settings->value(
+            "subsequenceMatchingTechnique", int(SubsequenceMatchingTechnique::SPRING)).toInt());
+    properties->mEnum()->setValue(subsequenceMatchingTechniqueProperty, int(subsequenceMatchingTechnique));
+    springEpsilon = settings->value("springEpsilon", 10.0f).toFloat();
+    properties->setDDouble(
+            springEpsilonProperty, springEpsilon,
+            0.0, 100.0, 2, 0.1, " (factor)");
+    backgroundOpacity = settings->value("springEpsilon", 10.0f).toFloat();
+    properties->setDDouble(
+            backgroundOpacityProperty, backgroundOpacity,
+            0.0, 1.0, 2, 0.05, " (factor)");
+    properties->mEnum()->setValue(
+            diagramNormalizationModeProperty,
+            settings->value("diagramNormalizationMode", 0).toInt());
+    diagramNormalizationMode = static_cast<DiagramNormalizationMode>(properties->mEnum()->value(
+            diagramNormalizationModeProperty));
+    properties->mEnum()->setValue(
+            diagramNormalizationModeProperty, static_cast<int>(diagramNormalizationMode));
+
+    diagramTextSize = settings->value("diagramTextSize", 8.0f).toFloat();
+    properties->setDDouble(
+            diagramTextSizeProperty, diagramTextSize,
+            4.0, 64.0, 2, 1.0, "px");
+    useCustomDiagramUpscalingFactor = settings->value("useCustomDiagramUpscalingFactor", false).toBool();
+    properties->mBool()->setValue(useCustomDiagramUpscalingFactorProperty, useCustomDiagramUpscalingFactor);
+    diagramUpscalingFactor = settings->value(
+            "diagramUpscalingFactor", getHighDPIScaleFactor()).toFloat();
+    properties->setDDouble(
+            diagramUpscalingFactorProperty, diagramUpscalingFactor,
+            0.25, 8.0, 3, 0.125, " (factor)");
+    diagramUpscalingFactorProperty->setEnabled(useCustomDiagramUpscalingFactor);
+    updateSimilarityMetricGroupEnabled();
+
+    trajectorySyncMode = TrajectorySyncMode(settings->value(
+            "trajectorySyncMode", int(TrajectorySyncMode::TIMESTEP)).toInt());
+    properties->mEnum()->setValue(trajectorySyncModeProperty, int(trajectorySyncMode));
+#ifdef USE_EMBREE
+    for (MTrajectoryPicker* trajectoryPicker : trajectoryPickerMap)
+    {
+        trajectoryPicker->setSyncMode(trajectorySyncMode);
+    }
+#endif
+
+    syncModeTrajectoryIndex = settings->value(
+            "syncModeTrajectoryIndex", syncModeTrajectoryIndex).toUInt();
+    if (settings->contains("particlePosTimeStep"))
+    {
+        particlePosTimeStep = settings->value("particlePosTimeStep", particlePosTimeStep).toInt();
+        cachedParticlePosTimeStep = particlePosTimeStep;
+        loadedParticlePosTimeStepFromSettings = true;
+        if (!properties->mEnum()->enumNames(particlePosTimeProperty).empty())
+        {
+            properties->mEnum()->setValue(particlePosTimeProperty, particlePosTimeStep);
+        }
+        if (synchronizeParticlePosTime)
+        {
+            synchronizeParticlePosTime = false;
+            properties->mBool()->setValue(
+                    synchronizeParticlePosTimeProperty,
+                    synchronizeParticlePosTime);
+            updateTimeProperties();
+        }
+#ifdef USE_EMBREE
+        for (MTrajectoryPicker* trajectoryPicker : trajectoryPickerMap)
+        {
+            trajectoryPicker->setParticlePosTimeStep(particlePosTimeStep);
+        }
+#endif
+    }
+
+    useVariableToolTip = settings->value("showMinMaxValue", true).toBool();
+    properties->mBool()->setValue(useVariableToolTipProperty, useVariableToolTip);
+    useVariableToolTipChanged = true;
+
+    multiVarData.setEnabled(useMultiVarTrajectories);
+    multiVarData.loadConfiguration(settings);
 
     properties->mDDouble()->setValue(
                 tubeRadiusProperty,
@@ -738,8 +1059,7 @@ void MTrajectoryActor::setTransferFunction(MTransferFunction1D *tf)
 
 bool MTrajectoryActor::setTransferFunction(QString tfName)
 {
-    QStringList tfNames = properties->mEnum()->enumNames(
-                transferFunctionProperty);
+    QStringList tfNames = properties->mEnum()->enumNames(transferFunctionProperty);
     int tfIndex = tfNames.indexOf(tfName);
 
     if (tfIndex >= 0)
@@ -750,6 +1070,30 @@ bool MTrajectoryActor::setTransferFunction(QString tfName)
 
     // Set transfer function property to "None".
     properties->mEnum()->setValue(transferFunctionProperty, 0);
+
+    return false; // the given tf name could not be found
+}
+
+
+void MTrajectoryActor::setDiagramTransferFunction(MTransferFunction1D *tf)
+{
+    transferFunction = tf;
+}
+
+
+bool MTrajectoryActor::setDiagramTransferFunction(QString tfName)
+{
+    QStringList tfNames = properties->mEnum()->enumNames(diagramTransferFunctionProperty);
+    int tfIndex = tfNames.indexOf(tfName);
+
+    if (tfIndex >= 0)
+    {
+        properties->mEnum()->setValue(diagramTransferFunctionProperty, tfIndex);
+        return true;
+    }
+
+    // Set transfer function property to "None".
+    properties->mEnum()->setValue(diagramTransferFunctionProperty, 0);
 
     return false; // the given tf name could not be found
 }
@@ -942,7 +1286,14 @@ bool MTrajectoryActor::synchronizationEvent(
         enableActorUpdates(true);
         if (newStartTimeSet || newParticleTimeSet)
         {
-            asynchronousDataRequest(true);
+            if (!precomputedDataSource)
+            {
+                asynchronousDataRequest(true);
+            }
+            else
+            {
+                return false;
+            }
         }
         return (newStartTimeSet || newParticleTimeSet);
     }
@@ -1164,6 +1515,31 @@ void MTrajectoryActor::setNormalsSource(const QString& id)
 }
 
 
+void MTrajectoryActor::setMultiVarTrajectoriesSource(MMultiVarTrajectoriesSource *s)
+{
+    if (multiVarTrajectoriesSource != nullptr)
+    {
+        disconnect(multiVarTrajectoriesSource, SIGNAL(dataRequestCompleted(MDataRequest)),
+                   this, SLOT(asynchronousMultiVarTrajectoriesAvailable(MDataRequest)));
+    }
+
+    multiVarTrajectoriesSource = s;
+    if (multiVarTrajectoriesSource != nullptr)
+    {
+        connect(multiVarTrajectoriesSource, SIGNAL(dataRequestCompleted(MDataRequest)),
+                this, SLOT(asynchronousMultiVarTrajectoriesAvailable(MDataRequest)));
+    }
+}
+
+
+void MTrajectoryActor::setMultiVarTrajectoriesSource(const QString& id)
+{
+    MAbstractDataSource* ds =
+            MSystemManagerAndControl::getInstance()->getDataSource(id);
+    setMultiVarTrajectoriesSource(dynamic_cast<MMultiVarTrajectoriesSource *>(ds));
+}
+
+
 void MTrajectoryActor::setTrajectoryFilter(MTrajectoryFilter *f)
 {
     if (trajectoryFilter != nullptr)
@@ -1356,6 +1732,57 @@ void MTrajectoryActor::asynchronousNormalsAvailable(MDataRequest request)
 }
 
 
+void MTrajectoryActor::asynchronousMultiVarTrajectoriesAvailable(MDataRequest request)
+{
+    for (int t = 0; t < trajectoryRequests.size(); t++)
+    {
+        bool queueContainsEntryWithNoPendingRequests = false;
+        for (int i = 0; i < trajectoryRequests[t].pendingRequestsQueue.size();
+             i++)
+        {
+                foreach (MSceneViewGLWidget *view,
+                         trajectoryRequests[t].pendingRequestsQueue[i]
+                                 .multiVarTrajectoriesRequests.keys())
+                {
+                    if (trajectoryRequests[t].pendingRequestsQueue[i]
+                                .multiVarTrajectoriesRequests[view].request == request)
+                    {
+                        if ( !trajectoryRequests[t].pendingRequestsQueue[i]
+                                .multiVarTrajectoriesRequests[view].available )
+                        {
+                            trajectoryRequests[t].pendingRequestsQueue[i]
+                                    .numPendingRequests--;
+                        }
+
+                        trajectoryRequests[t].pendingRequestsQueue[i]
+                                .multiVarTrajectoriesRequests[view].available = true;
+
+                        if (trajectoryRequests[t].pendingRequestsQueue[i]
+                                    .numPendingRequests == 0)
+                        {
+                            queueContainsEntryWithNoPendingRequests = true;
+                        }
+
+                        // Do NOT break the loop here; "request" might be relevant to
+                        // multiple entries in the queue.
+                    }
+                }
+        }
+
+        if (queueContainsEntryWithNoPendingRequests)
+        {
+            prepareAvailableDataForRendering(t);
+            if (loadedParticlePosTimeStepFromSettings)
+            {
+                particlePosTimeStep = cachedParticlePosTimeStep;
+                properties->mEnum()->setValue(particlePosTimeProperty, particlePosTimeStep);
+            }
+            loadedParticlePosTimeStepFromSettings = false;
+        }
+    }
+}
+
+
 void MTrajectoryActor::asynchronousSelectionAvailable(MDataRequest request)
 {
     for (int t = 0; t < trajectoryRequests.size(); t++)
@@ -1470,7 +1897,7 @@ void MTrajectoryActor::prepareAvailableDataForRendering(uint slot)
 
             // Get vertex buffer for auxiliary data along trajectories.
             trajectoryRequests[slot].requestAuxVertexBuffer(
-                        properties->getEnumItem(renderAuxDataVarProperty));
+                        properties->getEnumItem(renderAuxDataVarProperty), multiVarData.getOutputParameterName());
 
             // Update displayed information about timestep length.
             float timeStepLength_hours = trajectoryRequests[slot].trajectories
@@ -1534,6 +1961,86 @@ void MTrajectoryActor::prepareAvailableDataForRendering(uint slot)
                     trajectoryFilter->getData(trqi.singleTimeFilterRequest.request);
         }
 
+        // 5. Multi-var trajectories.
+        // =======================
+
+        if (useMultiVarTrajectories)
+        {
+            if (trqi.dataRequest.available)
+            {
+                multiVarData.onMultiVarTrajectoriesLoaded(trajectoryRequests[slot].trajectories);
+                multiVarData.clearVariableRanges();
+            }
+
+            foreach (MSceneViewGLWidget *view, trqi.multiVarTrajectoriesRequests.keys())
+            {
+                if (trqi.multiVarTrajectoriesRequests[view].available)
+                {
+                    // TODO: Set output parameter id here?
+                    if (trajectoryRequests[slot].multiVarTrajectoriesMap.value(view, nullptr))
+                    {
+                        trajectoryRequests[slot].multiVarTrajectoriesMap[view]->releaseRenderData();
+                        multiVarTrajectoriesSource->releaseData(
+                                trajectoryRequests[slot].multiVarTrajectoriesMap[view]);
+                    }
+                    trajectoryRequests[slot].multiVarTrajectoriesMap[view] = multiVarTrajectoriesSource->getData(
+                            trqi.multiVarTrajectoriesRequests[view].request);
+                    trajectoryRequests[slot].multiVarTrajectoriesRenderDataMap[view] =
+                            trajectoryRequests[slot].multiVarTrajectoriesMap[view]->getRenderData();
+                    trajectoryRequests[slot].timeStepSphereRenderDataMap[view] =
+                            trajectoryRequests[slot].multiVarTrajectoriesMap[view]->getTimeStepSphereRenderData();
+                    trajectoryRequests[slot].timeStepRollsRenderDataMap[view] =
+                            trajectoryRequests[slot].multiVarTrajectoriesMap[view]->getTimeStepRollsRenderData();
+                    trajectoryRequests[slot].multiVarTrajectoriesMap[view]->setDirty(true);
+
+#ifdef USE_EMBREE
+                    if (trajectoryPickerMap.find(view) == trajectoryPickerMap.end()) {
+                        GLuint textureUnit = assignTextureUnit();
+                        trajectoryPickerMap[view] = new MTrajectoryPicker(
+                                textureUnit, view, multiVarData.getVarNames(),
+                                multiVarData.getTransferFunctionsMultiVar(),
+                                diagramType, diagramTransferFunction);
+                        multiVarData.setDiagramType(diagramType);
+                        trajectoryPickerMap[view]->setSelectedVariableIndices(multiVarData.getSelectedVariableIndices());
+                        trajectoryPickerMap[view]->updateSectedOutputParameter(
+                                multiVarData.getOutputParameterName(), multiVarData.getOutputParameterIdx());
+                        trajectoryPickerMap[view]->updateTrajectoryRadius(tubeRadius);
+                        trajectoryPickerMap[view]->setSyncMode(trajectorySyncMode);
+                        trajectoryPickerMap[view]->setParticlePosTimeStep(particlePosTimeStep);
+                        trajectoryPickerMap[view]->setDiagramType(diagramType);
+                        trajectoryPickerMap[view]->setSimilarityMetric(similarityMetric);
+                        trajectoryPickerMap[view]->setMeanMetricInfluence(meanMetricInfluence);
+                        trajectoryPickerMap[view]->setStdDevMetricInfluence(stdDevMetricInfluence);
+                        trajectoryPickerMap[view]->setNumBins(numBins);
+                        trajectoryPickerMap[view]->setShowMinMaxValue(showMinMaxValue);
+                        trajectoryPickerMap[view]->setUseMaxForSensitivity(useMaxForSensitivity);
+                        trajectoryPickerMap[view]->setUseVariableToolTip(useVariableToolTip);
+                        trajectoryPickerMap[view]->setTrimNanRegions(trimNanRegions);
+                        trajectoryPickerMap[view]->setSubsequenceMatchingTechnique(subsequenceMatchingTechnique);
+                        trajectoryPickerMap[view]->setSpringEpsilon(springEpsilon);
+                        trajectoryPickerMap[view]->setBackgroundOpacity(backgroundOpacity);
+                        trajectoryPickerMap[view]->setDiagramNormalizationMode(diagramNormalizationMode);
+                        trajectoryPickerMap[view]->setTextSize(diagramTextSize);
+                        if (useCustomDiagramUpscalingFactor) {
+                            trajectoryPickerMap[view]->setDiagramUpscalingFactor(diagramUpscalingFactor);
+                        }
+                    }
+
+                    trajectoryPickerMap[view]->setBaseTrajectories(
+                            trajectoryRequests[slot].multiVarTrajectoriesMap[view]->getBaseTrajectories());
+                    const QVector<QVector2D>& variableRanges = trajectoryPickerMap[view]->getVariableRanges();
+                    multiVarData.updateVariableRanges(variableRanges);
+#endif
+                }
+            }
+
+            if (trqi.filterRequest.available || trqi.singleTimeFilterRequest.available)
+            {
+                multiVarDataDirty = true;
+            }
+        }
+
+
 #ifdef DIRECT_SYNCHRONIZATION
         // If this was a synchronization request, check if the request was
         // the last request due to the sync sent by any seed actor -- if
@@ -1577,13 +2084,24 @@ void MTrajectoryActor::onActorCreated(MActor *actor)
 
         int index = properties->mEnum()->value(transferFunctionProperty);
         QStringList availableTFs = properties->mEnum()->enumNames(
-                    transferFunctionProperty);
+                transferFunctionProperty);
         availableTFs << tf->transferFunctionName();
-        properties->mEnum()->setEnumNames(transferFunctionProperty,
-                                          availableTFs);
+        properties->mEnum()->setEnumNames(transferFunctionProperty, availableTFs);
         properties->mEnum()->setValue(transferFunctionProperty, index);
 
+        int indexDiagram = properties->mEnum()->value(diagramTransferFunctionProperty);
+        QStringList availableTFsDiagram = properties->mEnum()->enumNames(
+                diagramTransferFunctionProperty);
+        availableTFs << tf->transferFunctionName();
+        properties->mEnum()->setEnumNames(diagramTransferFunctionProperty, availableTFs);
+        properties->mEnum()->setValue(diagramTransferFunctionProperty, indexDiagram);
+
         enableEmissionOfActorChangedSignal(true);
+    }
+
+    if (useMultiVarTrajectories)
+    {
+        multiVarData.onActorCreated(actor);
     }
 }
 
@@ -1597,8 +2115,7 @@ void MTrajectoryActor::onActorDeleted(MActor *actor)
         enableEmissionOfActorChangedSignal(false);
 
         QString tFName = properties->getEnumItem(transferFunctionProperty);
-        QStringList availableTFs = properties->mEnum()->enumNames(
-                    transferFunctionProperty);
+        QStringList availableTFs = properties->mEnum()->enumNames(transferFunctionProperty);
 
         availableTFs.removeOne(tf->getName());
 
@@ -1607,9 +2124,19 @@ void MTrajectoryActor::onActorDeleted(MActor *actor)
         // 'None'.
         int index = availableTFs.indexOf(tFName);
 
-        properties->mEnum()->setEnumNames(transferFunctionProperty,
-                                          availableTFs);
+        properties->mEnum()->setEnumNames(transferFunctionProperty, availableTFs);
         properties->mEnum()->setValue(transferFunctionProperty, index);
+
+
+        QString tFNameDiagram = properties->getEnumItem(diagramTransferFunctionProperty);
+        QStringList availableTFsDiagram = properties->mEnum()->enumNames(diagramTransferFunctionProperty);
+
+        availableTFsDiagram.removeOne(tf->getName());
+
+        int indexDiagram = availableTFsDiagram.indexOf(tFNameDiagram);
+
+        properties->mEnum()->setEnumNames(diagramTransferFunctionProperty, availableTFsDiagram);
+        properties->mEnum()->setValue(diagramTransferFunctionProperty, indexDiagram);
 
         enableEmissionOfActorChangedSignal(true);
     }
@@ -1631,6 +2158,11 @@ void MTrajectoryActor::onActorDeleted(MActor *actor)
             }
         }
     }
+
+    if (useMultiVarTrajectories)
+    {
+        multiVarData.onActorDeleted(actor);
+    }
 }
 
 
@@ -1644,15 +2176,23 @@ void MTrajectoryActor::onActorRenamed(MActor *actor, QString oldName)
         enableEmissionOfActorChangedSignal(false);
 
         int index = properties->mEnum()->value(transferFunctionProperty);
-        QStringList availableTFs = properties->mEnum()->enumNames(
-                    transferFunctionProperty);
+        QStringList availableTFs = properties->mEnum()->enumNames(transferFunctionProperty);
 
         // Replace affected entry.
         availableTFs[availableTFs.indexOf(oldName)] = tf->getName();
 
-        properties->mEnum()->setEnumNames(transferFunctionProperty,
-                                          availableTFs);
+        properties->mEnum()->setEnumNames(transferFunctionProperty, availableTFs);
         properties->mEnum()->setValue(transferFunctionProperty, index);
+
+
+        int indexDiagram = properties->mEnum()->value(diagramTransferFunctionProperty);
+        QStringList availableTFsDiagram = properties->mEnum()->enumNames(diagramTransferFunctionProperty);
+
+        // Replace affected entry.
+        availableTFsDiagram[availableTFsDiagram.indexOf(oldName)] = tf->getName();
+
+        properties->mEnum()->setEnumNames(diagramTransferFunctionProperty, availableTFsDiagram);
+        properties->mEnum()->setValue(diagramTransferFunctionProperty, indexDiagram);
 
         enableEmissionOfActorChangedSignal(true);
     }
@@ -1667,6 +2207,11 @@ void MTrajectoryActor::onActorRenamed(MActor *actor, QString oldName)
                 sas.propertyGroup->setPropertyName(sas.actor->getName());
             }
         }
+    }
+
+    if (useMultiVarTrajectories)
+    {
+        multiVarData.onActorRenamed(actor, oldName);
     }
 }
 
@@ -1731,6 +2276,106 @@ void MTrajectoryActor::onSeedActorChanged()
 
     asynchronousDataRequest();
 }
+
+
+#ifdef USE_EMBREE
+bool MTrajectoryActor::checkIntersectionWithSelectableData(
+        MSceneViewGLWidget *sceneView, QMouseEvent *event)
+{
+    if (!useMultiVarTrajectories || trajectoryPickerMap.find(sceneView) == trajectoryPickerMap.end())
+    {
+        return false;
+    }
+
+    QVector3D firstHitPoint{};
+    uint32_t trajectoryIndex = 0;
+    float timeAtHit = 0.0f;
+    if (trajectoryPickerMap[sceneView]->pickPointScreen(
+            sceneView, event->x(), event->y(),
+            firstHitPoint, trajectoryIndex, timeAtHit))
+    {
+        bool changed = false;
+        if (event->button() == Qt::LeftButton && event->type() == QInputEvent::MouseButtonRelease)
+        {
+            trajectoryPickerMap[sceneView]->toggleTrajectoryHighlighted(trajectoryIndex);
+            changed = true;
+        }
+        if (event->button() == Qt::RightButton || event->buttons() == Qt::MouseButton::RightButton)
+        {
+            if (synchronizeParticlePosTime)
+            {
+                synchronizeParticlePosTime = false;
+                properties->mBool()->setValue(
+                        synchronizeParticlePosTimeProperty,
+                        synchronizeParticlePosTime);
+                updateTimeProperties();
+            }
+
+            particlePosTimeStep = int(std::round(timeAtHit));
+            syncModeTrajectoryIndex = trajectoryIndex;
+            trajectoryPickerMap[sceneView]->setParticlePosTimeStep(particlePosTimeStep);
+            changed = true;
+        }
+        return changed;
+    }
+    return false;
+}
+
+bool MTrajectoryActor::checkVirtualWindowBelowMouse(
+        MSceneViewGLWidget *sceneView, int mousePositionX, int mousePositionY)
+{
+    if (!useMultiVarTrajectories || trajectoryPickerMap.find(sceneView) == trajectoryPickerMap.end())
+    {
+        return false;
+    }
+    return trajectoryPickerMap[sceneView]->checkVirtualWindowBelowMouse(sceneView, mousePositionX, mousePositionY);
+}
+
+void MTrajectoryActor::mouseMoveEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event)
+{
+    if (!useMultiVarTrajectories || trajectoryPickerMap.find(sceneView) == trajectoryPickerMap.end())
+    {
+        return;
+    }
+    return trajectoryPickerMap[sceneView]->mouseMoveEvent(sceneView, event);
+}
+
+void MTrajectoryActor::mouseMoveEventParent(MSceneViewGLWidget *sceneView, QMouseEvent *event)
+{
+    if (!useMultiVarTrajectories || trajectoryPickerMap.find(sceneView) == trajectoryPickerMap.end())
+    {
+        return;
+    }
+    return trajectoryPickerMap[sceneView]->mouseMoveEventParent(sceneView, event);
+}
+
+void MTrajectoryActor::mousePressEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event)
+{
+    if (!useMultiVarTrajectories || trajectoryPickerMap.find(sceneView) == trajectoryPickerMap.end())
+    {
+        return;
+    }
+    return trajectoryPickerMap[sceneView]->mousePressEvent(sceneView, event);
+}
+
+void MTrajectoryActor::mouseReleaseEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event)
+{
+    if (!useMultiVarTrajectories || trajectoryPickerMap.find(sceneView) == trajectoryPickerMap.end())
+    {
+        return;
+    }
+    return trajectoryPickerMap[sceneView]->mouseReleaseEvent(sceneView, event);
+}
+
+void MTrajectoryActor::wheelEvent(MSceneViewGLWidget *sceneView, QWheelEvent *event)
+{
+    if (!useMultiVarTrajectories || trajectoryPickerMap.find(sceneView) == trajectoryPickerMap.end())
+    {
+        return;
+    }
+    return trajectoryPickerMap[sceneView]->wheelEvent(sceneView, event);
+}
+#endif
 
 
 /******************************************************************************
@@ -1816,6 +2461,16 @@ void MTrajectoryActor::initializeActorResources()
                                                positionSphereShadowShader);
 
     if (loadShaders) reloadShaderEffects();
+}
+
+
+void MTrajectoryActor::updateSimilarityMetricGroupEnabled()
+{
+    similarityMetricGroup->setEnabled(diagramType == DiagramDisplayType::CURVE_PLOT_VIEW);
+    numBinsProperty->setEnabled(similarityMetric == SimilarityMetric::MI);
+    sortByDescendingStdDevProperty->setEnabled(diagramType == DiagramDisplayType::CURVE_PLOT_VIEW);
+    showMinMaxValueProperty->setEnabled(diagramType == DiagramDisplayType::CURVE_PLOT_VIEW);
+    useMaxForSensitivityProperty->setEnabled(diagramType == DiagramDisplayType::CURVE_PLOT_VIEW);
 }
 
 
@@ -1926,7 +2581,15 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
         {
             if (setParticleDateTime(synchronizationControl->validDateTime()))
             {
-                asynchronousDataRequest();
+                if (!precomputedDataSource)
+                {
+                    asynchronousDataRequest();
+                }
+            }
+
+            if (precomputedDataSource)
+            {
+                emitActorChangedSignal();
             }
         }
 
@@ -2026,11 +2689,12 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
         if (suppressActorUpdates()) return;
         QString auxVariableName = properties->getEnumItem(
                     renderAuxDataVarProperty);
+        QString auxOutputParameterName = multiVarData.getOutputParameterName();
         for (int t = 0; t < (precomputedDataSource ? 1 : seedActorData.size()); t++)
         {
             // (for all seed actors or for single precomputed trajectories..)
             trajectoryRequests[t].releasePreviousAuxVertexBuffer();
-            trajectoryRequests[t].requestAuxVertexBuffer(auxVariableName);
+            trajectoryRequests[t].requestAuxVertexBuffer(auxVariableName, auxOutputParameterName);
             // will not do anything for empty requestedAuxDataVarName
         }
         emitActorChangedSignal();
@@ -2042,11 +2706,12 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
         if (suppressActorUpdates()) return;
         QString auxVariableName = properties->getEnumItem(
                     renderAuxDataVarProperty);
+        QString auxOutputParameterName = multiVarData.getOutputParameterName();
         for (int t = 0; t < (precomputedDataSource ? 1 : seedActorData.size()); t++)
         {
             // (for all seed actors or for single precomputed trajectories..)
             trajectoryRequests[t].releasePreviousAuxVertexBuffer();
-            trajectoryRequests[t].requestAuxVertexBuffer(auxVariableName);
+            trajectoryRequests[t].requestAuxVertexBuffer(auxVariableName, auxOutputParameterName);
             // will not do anything for empty requestedAuxDataVarName
         }
         emitActorChangedSignal();
@@ -2059,9 +2724,22 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
         emitActorChangedSignal();
     }
 
+    else if (property == diagramTransferFunctionProperty)
+    {
+        setDiagramTransferFunctionFromProperty();
+        if (suppressActorUpdates()) return;
+        emitActorChangedSignal();
+    }
+
     else if (property == tubeRadiusProperty)
     {
         tubeRadius = properties->mDDouble()->value(tubeRadiusProperty);
+#ifdef USE_EMBREE
+        for (MTrajectoryPicker* trajectoryPicker : trajectoryPickerMap)
+        {
+            trajectoryPicker->updateTrajectoryRadius(tubeRadius);
+        }
+#endif
         if (suppressActorUpdates()) return;
         emitActorChangedSignal();
     }
@@ -2104,11 +2782,14 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
 
     else if (property == particlePosTimeProperty)
     {
-        particlePosTimeStep = properties->mEnum()->value(
-                    particlePosTimeProperty);
+        particlePosTimeStep = properties->mEnum()->value(particlePosTimeProperty);
 
         if (suppressActorUpdates()) return;
-        asynchronousSelectionRequest();
+        if (useMultiVarTrajectories) {
+            emitActorChangedSignal();
+        } else {
+            asynchronousSelectionRequest();
+        }
     }
 
     else if (property == computationLineTypeProperty)
@@ -2173,6 +2854,298 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
         outputAsLagrantoASCIIFile();
     }
 
+    else if (property == useMultiVarTrajectoriesProperty)
+    {
+        useMultiVarTrajectories = properties->mBool()->value(useMultiVarTrajectoriesProperty);
+        multiVarData.setEnabled(useMultiVarTrajectories);
+        if (suppressActorUpdates()) return;
+        asynchronousDataRequest();
+        emitActorChangedSignal();
+    }
+    else if (property == diagramTypeProperty)
+    {
+        diagramType = static_cast<DiagramDisplayType>(properties->mEnum()->value(diagramTypeProperty));
+#ifdef USE_EMBREE
+        for (MTrajectoryPicker* trajectoryPicker : trajectoryPickerMap)
+        {
+            trajectoryPicker->setDiagramType(diagramType);
+        }
+        multiVarData.setDiagramType(diagramType);
+        if (suppressActorUpdates()) return;
+        emitActorChangedSignal();
+#endif
+    }
+
+    else if (property == similarityMetricProperty)
+    {
+        similarityMetric = static_cast<SimilarityMetric>(properties->mEnum()->value(similarityMetricProperty));
+#ifdef USE_EMBREE
+        for (MTrajectoryPicker* trajectoryPicker : trajectoryPickerMap)
+        {
+            trajectoryPicker->setSimilarityMetric(similarityMetric);
+        }
+        updateSimilarityMetricGroupEnabled();
+        if (suppressActorUpdates()) return;
+        emitActorChangedSignal();
+#endif
+    }
+
+    else if (property == meanMetricInfluenceProperty)
+    {
+        meanMetricInfluence = float(properties->mDDouble()->value(meanMetricInfluenceProperty));
+#ifdef USE_EMBREE
+        for (MTrajectoryPicker* trajectoryPicker : trajectoryPickerMap)
+        {
+            trajectoryPicker->setMeanMetricInfluence(meanMetricInfluence);
+        }
+        if (suppressActorUpdates()) return;
+        emitActorChangedSignal();
+#endif
+    }
+
+    else if (property == stdDevMetricInfluenceProperty)
+    {
+        stdDevMetricInfluence = float(properties->mDDouble()->value(stdDevMetricInfluenceProperty));
+#ifdef USE_EMBREE
+        for (MTrajectoryPicker* trajectoryPicker : trajectoryPickerMap)
+        {
+            trajectoryPicker->setStdDevMetricInfluence(stdDevMetricInfluence);
+        }
+        if (suppressActorUpdates()) return;
+        emitActorChangedSignal();
+#endif
+    }
+
+    else if (property == subsequenceMatchingTechniqueProperty)
+    {
+        subsequenceMatchingTechnique = static_cast<SubsequenceMatchingTechnique>(
+                properties->mEnum()->value(subsequenceMatchingTechniqueProperty));
+#ifdef USE_EMBREE
+        for (MTrajectoryPicker* trajectoryPicker : trajectoryPickerMap)
+        {
+            trajectoryPicker->setSubsequenceMatchingTechnique(subsequenceMatchingTechnique);
+        }
+        if (suppressActorUpdates()) return;
+        emitActorChangedSignal();
+#endif
+    }
+
+    else if (property == springEpsilonProperty)
+    {
+        springEpsilon = float(properties->mDDouble()->value(springEpsilonProperty));
+#ifdef USE_EMBREE
+        for (MTrajectoryPicker* trajectoryPicker : trajectoryPickerMap)
+        {
+            trajectoryPicker->setSpringEpsilon(springEpsilon);
+        }
+        if (suppressActorUpdates()) return;
+        emitActorChangedSignal();
+#endif
+    }
+
+    else if (property == backgroundOpacityProperty)
+    {
+        backgroundOpacity = float(properties->mDDouble()->value(backgroundOpacityProperty));
+#ifdef USE_EMBREE
+        for (MTrajectoryPicker* trajectoryPicker : trajectoryPickerMap)
+        {
+            trajectoryPicker->setBackgroundOpacity(backgroundOpacity);
+        }
+        if (suppressActorUpdates()) return;
+        emitActorChangedSignal();
+#endif
+    }
+
+    else if (property == diagramNormalizationModeProperty)
+    {
+        diagramNormalizationMode = static_cast<DiagramNormalizationMode>(properties->mEnum()->value(
+                diagramNormalizationModeProperty));
+#ifdef USE_EMBREE
+        for (MTrajectoryPicker* trajectoryPicker : trajectoryPickerMap)
+        {
+            trajectoryPicker->setDiagramNormalizationMode(diagramNormalizationMode);
+        }
+        if (suppressActorUpdates()) return;
+        emitActorChangedSignal();
+#endif
+    }
+
+    else if (property == diagramTextSizeProperty)
+    {
+        diagramTextSize = float(properties->mDDouble()->value(diagramTextSizeProperty));
+#ifdef USE_EMBREE
+        for (MTrajectoryPicker* trajectoryPicker : trajectoryPickerMap)
+        {
+            trajectoryPicker->setTextSize(diagramTextSize);
+        }
+        if (suppressActorUpdates()) return;
+        emitActorChangedSignal();
+#endif
+    }
+
+    else if (property == useCustomDiagramUpscalingFactorProperty)
+    {
+        useCustomDiagramUpscalingFactor = properties->mBool()->value(useCustomDiagramUpscalingFactorProperty);
+#ifdef USE_EMBREE
+        if (useCustomDiagramUpscalingFactorProperty)
+        {
+            for (MTrajectoryPicker* trajectoryPicker : trajectoryPickerMap)
+            {
+                trajectoryPicker->setDiagramUpscalingFactor(diagramUpscalingFactor);
+            }
+            if (suppressActorUpdates()) return;
+            emitActorChangedSignal();
+        }
+        diagramUpscalingFactorProperty->setEnabled(useCustomDiagramUpscalingFactor);
+#endif
+    }
+
+    else if (property == diagramUpscalingFactorProperty)
+    {
+        diagramUpscalingFactor = float(properties->mDDouble()->value(diagramUpscalingFactorProperty));
+#ifdef USE_EMBREE
+        if (useCustomDiagramUpscalingFactor)
+        {
+            for (MTrajectoryPicker* trajectoryPicker : trajectoryPickerMap)
+            {
+                trajectoryPicker->setDiagramUpscalingFactor(diagramUpscalingFactor);
+            }
+            if (suppressActorUpdates()) return;
+            emitActorChangedSignal();
+        }
+#endif
+    }
+
+    else if (property == numBinsProperty)
+    {
+        numBins = properties->mInt()->value(numBinsProperty);
+#ifdef USE_EMBREE
+        for (MTrajectoryPicker* trajectoryPicker : trajectoryPickerMap)
+        {
+            trajectoryPicker->setNumBins(numBins);
+        }
+        if (suppressActorUpdates()) return;
+        emitActorChangedSignal();
+#endif
+    }
+
+    else if (property == sortByDescendingStdDevProperty)
+    {
+#ifdef USE_EMBREE
+        for (MTrajectoryPicker* trajectoryPicker : trajectoryPickerMap)
+        {
+            trajectoryPicker->sortByDescendingStdDev();
+        }
+        if (suppressActorUpdates()) return;
+        emitActorChangedSignal();
+#endif
+    }
+
+    else if (property == showMinMaxValueProperty)
+    {
+        showMinMaxValue = properties->mBool()->value(showMinMaxValueProperty);
+#ifdef USE_EMBREE
+        for (MTrajectoryPicker* trajectoryPicker : trajectoryPickerMap)
+        {
+            trajectoryPicker->setShowMinMaxValue(showMinMaxValue);
+        }
+        if (suppressActorUpdates()) return;
+        emitActorChangedSignal();
+#endif
+    }
+
+    else if (property == useMaxForSensitivityProperty)
+    {
+        useMaxForSensitivity = properties->mBool()->value(useMaxForSensitivityProperty);
+#ifdef USE_EMBREE
+        for (MTrajectoryPicker* trajectoryPicker : trajectoryPickerMap)
+        {
+            trajectoryPicker->setUseMaxForSensitivity(useMaxForSensitivity);
+        }
+        if (suppressActorUpdates()) return;
+        emitActorChangedSignal();
+#endif
+    }
+
+    else if (property == trimNanRegionsProperty)
+    {
+        trimNanRegions = properties->mBool()->value(trimNanRegionsProperty);
+#ifdef USE_EMBREE
+        for (MTrajectoryPicker* trajectoryPicker : trajectoryPickerMap)
+        {
+            trajectoryPicker->setTrimNanRegions(trimNanRegions);
+        }
+        if (suppressActorUpdates()) return;
+        emitActorChangedSignal();
+#endif
+    }
+
+    else if (property == trajectorySyncModeProperty)
+    {
+        trajectorySyncMode = static_cast<TrajectorySyncMode>(
+                properties->mEnum()->value(trajectorySyncModeProperty));
+#ifdef USE_EMBREE
+        for (MTrajectoryPicker* trajectoryPicker : trajectoryPickerMap)
+        {
+            trajectoryPicker->setSyncMode(trajectorySyncMode);
+        }
+        if (suppressActorUpdates()) return;
+        emitActorChangedSignal();
+#endif
+    }
+
+    else if (property == useVariableToolTipProperty)
+    {
+        useVariableToolTip = properties->mBool()->value(useVariableToolTipProperty);
+        useVariableToolTipChanged = true;
+#ifdef USE_EMBREE
+        for (MTrajectoryPicker* trajectoryPicker : trajectoryPickerMap)
+        {
+            trajectoryPicker->setUseVariableToolTip(useVariableToolTip);
+        }
+#endif
+    }
+
+    else if (property == selectAllTrajectoriesProperty)
+    {
+#ifdef USE_EMBREE
+        for (MTrajectoryPicker* trajectoryPicker : trajectoryPickerMap)
+        {
+            trajectoryPicker->triggerSelectAllLines();
+        }
+        if (suppressActorUpdates()) return;
+        emitActorChangedSignal();
+#endif
+    }
+
+    else if (property == resetVariableSortingProperty)
+    {
+#ifdef USE_EMBREE
+        for (MTrajectoryPicker* trajectoryPicker : trajectoryPickerMap)
+        {
+            trajectoryPicker->resetVariableSorting();
+        }
+        if (suppressActorUpdates()) return;
+        emitActorChangedSignal();
+#endif
+    }
+
+    else if (multiVarData.hasProperty(property))
+    {
+        multiVarData.onQtPropertyChanged(property);
+#ifdef USE_EMBREE
+        if (multiVarData.getSelectedOutputParameterChanged())
+        {
+            for (MTrajectoryPicker *trajectoryPicker: trajectoryPickerMap)
+            {
+                trajectoryPicker->updateSectedOutputParameter(multiVarData.getOutputParameterName(), multiVarData.getOutputParameterIdx());
+            }
+        }
+#endif
+        if (suppressActorUpdates()) return;
+        emitActorChangedSignal();
+    }
+
     else
     {
         for (SeedActorSettings& sas : computationSeedActorProperties)
@@ -2217,13 +3190,659 @@ void MTrajectoryActor::onQtPropertyChanged(QtProperty *property)
 }
 
 
+void MTrajectoryActor::renderShadowsTubes(MSceneViewGLWidget *sceneView, int t)
+{
+    tubeShadowShader->bind();
+
+    tubeShadowShader->setUniformValue(
+            "mvpMatrix",
+            *(sceneView->getModelViewProjectionMatrix()));
+    tubeShadowShader->setUniformValue(
+            "pToWorldZParams",
+            sceneView->pressureToWorldZParameters());
+    tubeShadowShader->setUniformValue(
+            "lightDirection",
+            sceneView->getLightDirection());
+    tubeShadowShader->setUniformValue(
+            "cameraPosition",
+            sceneView->getCamera()->getOrigin());
+    tubeShadowShader->setUniformValue(
+            "radius",
+            GLfloat(tubeRadius));
+    tubeShadowShader->setUniformValue(
+            "numObsPerTrajectory",
+            trajectoryRequests[t].trajectories
+                    ->getNumTimeStepsPerTrajectory());
+
+    if (renderMode == BACKWARDTUBES_AND_SINGLETIME)
+    {
+        tubeShadowShader->setUniformValue(
+                "renderTubesUpToIndex",
+                particlePosTimeStep);
+    }
+    else
+    {
+        tubeShadowShader->setUniformValue(
+                "renderTubesUpToIndex",
+                trajectoryRequests[t].trajectories
+                        ->getNumTimeStepsPerTrajectory());
+    }
+
+    tubeShadowShader->setUniformValue(
+            "useTransferFunction", GLboolean(shadowColoured));
+
+    if (shadowColoured)
+    {
+        tubeShadowShader->setUniformValue(
+                "transferFunction", textureUnitTransferFunction);
+        tubeShadowShader->setUniformValue(
+                "scalarMinimum",
+                transferFunction->getMinimumValue());
+        tubeShadowShader->setUniformValue(
+                "scalarMaximum",
+                transferFunction->getMaximumValue());
+    }
+    else
+        tubeShadowShader->setUniformValue(
+                "constColour", QColor(20, 20, 20, 155));
+
+    bindShadowStencilBuffer();
+    glMultiDrawArrays(GL_LINE_STRIP_ADJACENCY,
+                      trajectoryRequests[t].trajectorySelection
+                              ->getStartIndices(),
+                      trajectoryRequests[t].trajectorySelection
+                              ->getIndexCount(),
+                      trajectoryRequests[t].trajectorySelection
+                              ->getNumTrajectories());
+    unbindShadowStencilBuffer();
+}
+
+void MTrajectoryActor::renderShadowsSpheres(MSceneViewGLWidget *sceneView, int t)
+{
+    positionSphereShadowShader->bind();
+
+    positionSphereShadowShader->setUniformValue(
+            "mvpMatrix",
+            *(sceneView->getModelViewProjectionMatrix()));
+    CHECK_GL_ERROR;
+    positionSphereShadowShader->setUniformValue(
+            "pToWorldZParams",
+            sceneView->pressureToWorldZParameters()); CHECK_GL_ERROR;
+    positionSphereShadowShader->setUniformValue(
+            "lightDirection",
+            sceneView->getLightDirection());
+    positionSphereShadowShader->setUniformValue(
+            "cameraPosition",
+            sceneView->getCamera()->getOrigin()); CHECK_GL_ERROR;
+    positionSphereShadowShader->setUniformValue(
+            "radius",
+            GLfloat(sphereRadius)); CHECK_GL_ERROR;
+    positionSphereShadowShader->setUniformValue(
+            "scaleRadius",
+            GLboolean(false)); CHECK_GL_ERROR;
+
+    positionSphereShadowShader->setUniformValue(
+            "useTransferFunction",
+            GLboolean(shadowColoured)); CHECK_GL_ERROR;
+
+    if (shadowColoured)
+    {
+        // Transfer function texture is still bound from the sphere
+        // shader.
+        positionSphereShadowShader->setUniformValue(
+                "transferFunction",
+                textureUnitTransferFunction); CHECK_GL_ERROR;
+        positionSphereShadowShader->setUniformValue(
+                "scalarMinimum",
+                transferFunction->getMinimumValue()); CHECK_GL_ERROR;
+        positionSphereShadowShader->setUniformValue(
+                "scalarMaximum",
+                transferFunction->getMaximumValue()); CHECK_GL_ERROR;
+
+    }
+    else
+        positionSphereShadowShader->setUniformValue(
+                "constColour", QColor(20, 20, 20, 155)); CHECK_GL_ERROR;
+
+    bindShadowStencilBuffer();
+    if (useMultiVarTrajectories)
+    {
+        positionSphereShadowShader->setUniformValue(
+                "isInputWorldSpace", 1); CHECK_GL_ERROR;
+
+        MTimeStepSphereRenderData* timeStepSphereRenderData =
+                trajectoryRequests[t].timeStepSphereRenderDataMap[sceneView];
+        GLuint positionBufferId = timeStepSphereRenderData->spherePositionsBuffer->getBufferObject();
+        glBindBuffer(GL_ARRAY_BUFFER, positionBufferId); CHECK_GL_ERROR;
+        glVertexAttribPointer(
+                SHADER_VERTEX_ATTRIBUTE,
+                3, // size
+                GL_FLOAT, // type
+                GL_FALSE, // normalized
+                sizeof(QVector4D), // stride
+                nullptr); CHECK_GL_ERROR; // offset
+        glEnableVertexAttribArray(SHADER_VERTEX_ATTRIBUTE); CHECK_GL_ERROR;
+        glDrawArrays(GL_POINTS, 0, timeStepSphereRenderData->numSpheres);
+    }
+    else
+    {
+        positionSphereShadowShader->setUniformValue(
+                "isInputWorldSpace", 0); CHECK_GL_ERROR;
+
+        if (renderMode == ALL_POSITION_SPHERES)
+            glMultiDrawArrays(GL_POINTS,
+                              trajectoryRequests[t]
+                                      .trajectorySelection->getStartIndices(),
+                              trajectoryRequests[t]
+                                      .trajectorySelection->getIndexCount(),
+                              trajectoryRequests[t]
+                                      .trajectorySelection->getNumTrajectories());
+        else
+            glMultiDrawArrays(GL_POINTS,
+                              trajectoryRequests[t]
+                                      .trajectorySingleTimeSelection
+                                      ->getStartIndices(),
+                              trajectoryRequests[t]
+                                      .trajectorySingleTimeSelection
+                                      ->getIndexCount(),
+                              trajectoryRequests[t]
+                                      .trajectorySingleTimeSelection
+                                      ->getNumTrajectories());
+    }
+    unbindShadowStencilBuffer();
+    CHECK_GL_ERROR;
+}
+
+void MTrajectoryActor::bindShadowStencilBuffer()
+{
+    glDepthMask(GL_FALSE);
+    glEnable(GL_STENCIL_TEST);
+    glStencilMask(0xFF);
+    if (!stencilBufferCleared) {
+        glClearStencil(0);
+        glClear(GL_STENCIL_BUFFER_BIT);
+        stencilBufferCleared = true;
+    }
+    glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
+    glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+    // Darker shadows
+    //glStencilFunc(GL_NOTEQUAL, 2, 0xFF);
+    //glStencilOp(GL_KEEP, GL_KEEP, GL_INCR);
+}
+
+void MTrajectoryActor::unbindShadowStencilBuffer()
+{
+    glStencilMask(0x00);
+    glDisable(GL_STENCIL_TEST);
+    glDepthMask(GL_TRUE);
+    CHECK_GL_ERROR;
+}
+
+
 void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
 {
     // Only render if transfer function is available.
-    if (transferFunction == nullptr)
+    if (transferFunction == nullptr && !useMultiVarTrajectories)
     {
         return;
     }
+    stencilBufferCleared = false;
+
+    if (useMultiVarTrajectories)
+    {
+        for (int t = 0; t < (precomputedDataSource ? 1 : seedActorData.size()); t++)
+        {
+            // If any required data item is missing we cannot render.
+            if ( (trajectoryRequests[t].trajectories == nullptr)
+                 || (trajectoryRequests[t].multiVarTrajectoriesMap[sceneView] == nullptr)
+                 || (trajectoryRequests[t].trajectorySelection == nullptr) )
+            {
+                continue;
+            }
+
+            // If the vertical scaling of the view has changed, a recomputation
+            // of the normals is necessary, as they are based on worldZ
+            // coordinates.
+            if (sceneView->visualisationParametersHaveChanged())
+            {
+                // Discard old normals.
+                if (trajectoryRequests[t].normals.value(sceneView, nullptr))
+                {
+                    normalsSource->releaseData(trajectoryRequests[t].normals[sceneView]);
+                }
+                trajectoryRequests[t].normals[sceneView] = nullptr;
+
+                // Discard old multi-var trajectories.
+                if (trajectoryRequests[t].multiVarTrajectoriesMap.value(sceneView, nullptr))
+                {
+                    trajectoryRequests[t].multiVarTrajectoriesMap[sceneView]->releaseRenderData();
+                    multiVarTrajectoriesSource->releaseData(
+                            trajectoryRequests[t].multiVarTrajectoriesMap[sceneView]);
+                }
+                trajectoryRequests[t].multiVarTrajectoriesMap[sceneView] = nullptr;
+
+                if (suppressActorUpdates()) return;
+                asynchronousDataRequest();
+                emitActorChangedSignal();
+
+                continue;
+            }
+
+            if (multiVarData.getInternalRepresentationChanged())
+            {
+                // Discard old multi-var trajectories.
+                if (trajectoryRequests[t].multiVarTrajectoriesMap.value(sceneView, nullptr))
+                {
+                    trajectoryRequests[t].multiVarTrajectoriesMap[sceneView]->releaseRenderData();
+                    multiVarTrajectoriesSource->releaseData(
+                            trajectoryRequests[t].multiVarTrajectoriesMap[sceneView]);
+                }
+                trajectoryRequests[t].multiVarTrajectoriesMap[sceneView] = nullptr;
+                multiVarData.resetInternalRepresentationChanged();
+
+                if (suppressActorUpdates()) return;
+                asynchronousDataRequest();
+                emitActorChangedSignal();
+
+                continue;
+            }
+
+#ifdef USE_EMBREE
+            if (trajectoryPickerMap[sceneView]->getSelectedTimeStepChanged())
+            {
+                if (synchronizeParticlePosTime)
+                {
+                    synchronizeParticlePosTime = false;
+                    properties->mBool()->setValue(
+                            synchronizeParticlePosTimeProperty,
+                            synchronizeParticlePosTime);
+                    updateTimeProperties();
+                }
+
+                particlePosTimeStep = int(std::round(trajectoryPickerMap[sceneView]->getSelectedTimeStep()));
+                trajectoryPickerMap[sceneView]->setParticlePosTimeStep(particlePosTimeStep);
+                trajectoryPickerMap[sceneView]->resetSelectedTimeStepChanged();
+            }
+            if (trajectoryPickerMap[sceneView]->getSelectedVariablesChanged())
+            {
+                multiVarData.setSelectedVariables(
+                        trajectoryPickerMap[sceneView]->getSelectedVariableIndices());
+                trajectoryRequests[t].multiVarTrajectoriesMap[sceneView]->updateSelectedVariableIndices(
+                        multiVarData.getSelectedVariableIndices());
+                trajectoryPickerMap[sceneView]->resetSelectedVariablesChanged();
+            }
+
+            if (trajectoryPickerMap[sceneView]->getSelectedTrajectoriesChanged())
+            {
+                trajectoryRequests[t].multiVarTrajectoriesMap[sceneView]->updateSelectedLines(
+                        trajectoryPickerMap[sceneView]->getSelectedTrajectories());
+                if (trajectoryPickerMap[sceneView]->getHasAscentData())
+                {
+                    trajectoryRequests[t].multiVarTrajectoriesMap[sceneView]->updateLineAscentTimeStepArrayBuffer(
+                            trajectoryPickerMap[sceneView]->getAscentTimeStepIndices(),
+                            trajectoryPickerMap[sceneView]->getMaxAscentTimeStepIndex());
+                }
+                trajectoryPickerMap[sceneView]->resetSelectedTrajectoriesChanged();
+            }
+#endif
+
+            if (multiVarData.getSelectedVariablesChanged())
+            {
+                trajectoryRequests[t].multiVarTrajectoriesMap[sceneView]->updateSelectedVariableIndices(
+                        multiVarData.getSelectedVariableIndices());
+#ifdef USE_EMBREE
+                trajectoryPickerMap[sceneView]->setSelectedVariableIndices(multiVarData.getSelectedVariableIndices());
+#endif
+                multiVarData.resetSelectedVariablesChanged();
+            }
+
+            if (multiVarData.getVarDivergingChanged())
+            {
+                trajectoryRequests[t].multiVarTrajectoriesMap[sceneView]->updateDivergingVariables(
+                        multiVarData.getVarDiverging());
+                multiVarData.resetVarDivergingChanged();
+            }
+            if (multiVarData.getSelectedOutputParameterChanged())
+            {
+                // TODO with Embree?
+                trajectoryRequests[t].multiVarTrajectoriesMap[sceneView]->updateOutputParameterIdx(
+                        multiVarData.getOutputParameterIdx());
+                multiVarData.resetSelectedOutputParameterChanged();
+            }
+
+            std::shared_ptr<GL::MShaderEffect> tubeShader = multiVarData.getShaderEffect();
+            tubeShader->bind();
+            multiVarData.setUniformData(textureUnitTransferFunction);
+
+            tubeShader->setUniformValue("mvpMatrix", *(sceneView->getModelViewProjectionMatrix()));
+            tubeShader->setUniformValue("vMatrix", sceneView->getCamera()->getViewMatrix());
+            tubeShader->setUniformValue("lightDirection", sceneView->getLightDirection());
+            if (sceneView->getLightDirectionEnum() == MSceneViewGLWidget::VIEWDIRECTION) {
+                tubeShader->setUniformValue(
+                        "useHeadLight",
+                        sceneView->getLightDirectionEnum() == MSceneViewGLWidget::VIEWDIRECTION ? 1 : 0);
+            }
+            tubeShader->setUniformValue("cameraPosition", sceneView->getCamera()->getOrigin());
+            tubeShader->setUniformValue("orthographicModeEnabled", sceneView->orthographicModeEnabled() ? 1 : 0);
+            //tubeShader->setUniformValue("cameraLookDirection", sceneView->getCamera()->getZAxis());
+            tubeShader->setUniformValue("lineWidth", GLfloat(2.0f * tubeRadius));
+
+            //if (renderMode == BACKWARDTUBES_AND_SINGLETIME)
+            //{
+            //    tubeShader->setUniformValue(
+            //            "renderTubesUpToIndex",
+            //            particlePosTimeStep);
+            //}
+            //else
+            //{
+            //    tubeShader->setUniformValue(
+            //            "renderTubesUpToIndex",
+            //            trajectoryRequests[t]
+            //                    .trajectories->getNumTimeStepsPerTrajectory());
+            //}
+            if (multiVarData.getUseTimestepLens())
+            {
+                if (!useMultiVarSpheres)
+                {
+                    tubeShader->setUniformValue("timestepLensePosition", particlePosTimeStep);
+                }
+                else
+                {
+                    tubeShader->setUniformValue("timestepLensePosition", std::numeric_limits<int>::lowest());
+                }
+            }
+
+            MMultiVarTrajectoriesRenderData& multiVarTrajectoriesRenderData =
+                    trajectoryRequests[t].multiVarTrajectoriesRenderDataMap[sceneView];
+
+            // Bind vertex buffer objects.
+            if (multiVarTrajectoriesRenderData.useGeometryShader) {
+                multiVarTrajectoriesRenderData.vertexPositionBuffer->attachToVertexAttribute(0);
+                multiVarTrajectoriesRenderData.vertexNormalBuffer->attachToVertexAttribute(1);
+                multiVarTrajectoriesRenderData.vertexTangentBuffer->attachToVertexAttribute(2);
+                multiVarTrajectoriesRenderData.vertexLineIDBuffer->attachToVertexAttribute(3);
+                multiVarTrajectoriesRenderData.vertexElementIDBuffer->attachToVertexAttribute(4);
+            } else {
+                multiVarTrajectoriesRenderData.linePointDataBuffer->bindToIndex(0);
+            }
+
+            // Bind shader storage buffer objects.
+            multiVarTrajectoriesRenderData.variableArrayBuffer->bindToIndex(2);
+            multiVarTrajectoriesRenderData.lineDescArrayBuffer->bindToIndex(4);
+            multiVarTrajectoriesRenderData.varDescArrayBuffer->bindToIndex(5);
+            multiVarTrajectoriesRenderData.lineVarDescArrayBuffer->bindToIndex(6);
+            if (multiVarData.getShowTargetVariableAndSensitivity())
+            {
+                multiVarTrajectoriesRenderData.varSelectedTargetVariableAndSensitivityArrayBuffer->bindToIndex(7);
+            }
+            else
+            {
+                multiVarTrajectoriesRenderData.varSelectedArrayBuffer->bindToIndex(7);
+            }
+            multiVarTrajectoriesRenderData.varDivergingArrayBuffer->bindToIndex(8);
+            if (diagramType == DiagramDisplayType::NONE || diagramType == DiagramDisplayType::CURVE_PLOT_VIEW)
+            {
+                multiVarTrajectoriesRenderData.lineSelectedArrayBuffer->bindToIndex(14);
+            }
+            multiVarTrajectoriesRenderData.varOutputParameterIdxBuffer->bindToIndex(16);
+
+            glPolygonMode(GL_FRONT_AND_BACK, renderAsWireFrame ? GL_LINE : GL_FILL); CHECK_GL_ERROR;
+
+            multiVarTrajectoriesRenderData.indexBuffer->bindToElementArrayBuffer();
+            if (multiVarDataDirty) {
+                multiVarDataDirty = false;
+                trajectoryRequests[t].multiVarTrajectoriesMap[sceneView]->setDirty(true);
+            }
+            trajectoryRequests[t].multiVarTrajectoriesMap[sceneView]->updateTrajectorySelection(
+                    trajectoryRequests[t].trajectorySelection->getStartIndices(),
+                    trajectoryRequests[t].trajectorySelection->getIndexCount(),
+                    trajectoryRequests[t].trajectorySelection->getNumTimeStepsPerTrajectory(),
+                    trajectoryRequests[t].trajectorySelection->getNumTrajectories());
+#ifdef USE_EMBREE
+            QVector<QVector<QVector3D>> trajectoriesData;
+            QVector<QVector<float>> trajectoryPointTimeSteps;
+            QVector<uint32_t> selectedTrajectoryIndices;
+            if (trajectoryRequests[t].multiVarTrajectoriesMap[sceneView]->getFilteredTrajectories(
+                    trajectoryRequests[t].trajectorySelection->getStartIndices(),
+                    trajectoryRequests[t].trajectorySelection->getIndexCount(),
+                    trajectoryRequests[t].trajectorySelection->getNumTimeStepsPerTrajectory(),
+                    trajectoryRequests[t].trajectorySelection->getNumTrajectories(),
+                    trajectoriesData, trajectoryPointTimeSteps, selectedTrajectoryIndices)) {
+                trajectoryPickerMap[sceneView]->setTrajectoryData(
+                        trajectoriesData, trajectoryPointTimeSteps, selectedTrajectoryIndices,
+                        trajectoryRequests[t].multiVarTrajectoriesMap[sceneView]->getNumTrajectoriesTotal());
+            }
+#endif
+            trajectoryRequests[t].multiVarTrajectoriesMap[sceneView]->setDirty(false);
+            bool useFiltering = trajectoryRequests[t].multiVarTrajectoriesMap[sceneView]->getUseFiltering();
+            if (multiVarTrajectoriesRenderData.useGeometryShader)
+            {
+                if (useFiltering)
+                {
+                    glMultiDrawElements(
+                            GL_LINES,
+                            trajectoryRequests[t].multiVarTrajectoriesMap[sceneView]->getTrajectorySelectionCount(),
+                            GL_UNSIGNED_INT,
+                            trajectoryRequests[t].multiVarTrajectoriesMap[sceneView]->getTrajectorySelectionIndices(),
+                            trajectoryRequests[t].multiVarTrajectoriesMap[sceneView]->getNumFilteredTrajectories());
+                }
+                else
+                {
+                    glDrawElements(
+                            GL_LINES, multiVarTrajectoriesRenderData.indexBuffer->getCount(),
+                            multiVarTrajectoriesRenderData.indexBuffer->getType(), nullptr);
+                }
+            }
+            else
+            {
+                if (useFiltering)
+                {
+                    glMultiDrawElements(
+                            GL_TRIANGLES,
+                            trajectoryRequests[t].multiVarTrajectoriesMap[sceneView]->getTrajectorySelectionCount(),
+                            GL_UNSIGNED_INT,
+                            trajectoryRequests[t].multiVarTrajectoriesMap[sceneView]->getTrajectorySelectionIndices(),
+                            trajectoryRequests[t].multiVarTrajectoriesMap[sceneView]->getNumFilteredTrajectories());
+                }
+                else
+                {
+                    glDrawElements(
+                            GL_TRIANGLES, multiVarTrajectoriesRenderData.indexBuffer->getCount(),
+                            multiVarTrajectoriesRenderData.indexBuffer->getType(), nullptr);
+                }
+            }
+
+            if (multiVarData.getShowTargetVariableAndSensitivity())
+            {
+                multiVarTrajectoriesRenderData.varSelectedArrayBuffer->bindToIndex(7);
+            }
+
+#ifdef USE_EMBREE
+            // Render selected/highlighted trajectories.
+            trajectoryPickerMap[sceneView]->setParticlePosTimeStep(particlePosTimeStep);
+            if (diagramType != DiagramDisplayType::NONE && diagramType != DiagramDisplayType::CURVE_PLOT_VIEW)
+            {
+                MHighlightedTrajectoriesRenderData highlightedTrajectoriesRenderData =
+                        trajectoryPickerMap[sceneView]->getHighlightedTrajectoriesRenderData();
+                if (highlightedTrajectoriesRenderData.indexBufferHighlighted)
+                {
+                    glEnable(GL_CULL_FACE);
+                    glCullFace(GL_FRONT);
+                    std::shared_ptr<GL::MShaderEffect> highlightShader =
+                            trajectoryPickerMap[sceneView]->getHighlightShaderEffect();
+                    highlightShader->bind();
+                    highlightShader->setUniformValue(
+                            "mvpMatrix", *(sceneView->getModelViewProjectionMatrix()));
+                    highlightedTrajectoriesRenderData.indexBufferHighlighted->bindToElementArrayBuffer();
+                    highlightedTrajectoriesRenderData.vertexPositionBufferHighlighted->attachToVertexAttribute(0);
+                    highlightedTrajectoriesRenderData.vertexColorBufferHighlighted->attachToVertexAttribute(1);
+                    glDrawElements(
+                            GL_TRIANGLES, highlightedTrajectoriesRenderData.indexBufferHighlighted->getCount(),
+                            highlightedTrajectoriesRenderData.indexBufferHighlighted->getType(), nullptr);
+                    glDisable(GL_CULL_FACE);
+                }
+            }
+#endif
+
+#ifdef USE_EMBREE
+            trajectoryPickerMap[sceneView]->updateRenderSpheresIfNecessary(multiVarData.getRenderSpheres());
+#endif
+            // Render spheres at the selected time step positions.
+            if (multiVarData.getUseTimestepLens() && useMultiVarSpheres && multiVarData.getRenderSpheres())
+            {
+                bool sphereDataChanged = trajectoryRequests[t].multiVarTrajectoriesMap[
+                        sceneView]->updateTimeStepSphereRenderDataIfNecessary(
+                        trajectorySyncMode, particlePosTimeStep, syncModeTrajectoryIndex, sphereRadius);
+                MTimeStepSphereRenderData* timeStepSphereRenderData =
+                        trajectoryRequests[t].timeStepSphereRenderDataMap[sceneView];
+
+#ifdef USE_EMBREE
+                trajectoryPickerMap[sceneView]->setMultiVarFocusRenderMode(multiVarData.getFocusRenderMode());
+                trajectoryPickerMap[sceneView]->setShowTargetVariableAndSensitivity(
+                        multiVarData.getShowTargetVariableAndSensitivity());
+                if (useVariableToolTip && (useVariableToolTipChanged || sphereDataChanged))
+                {
+                    trajectoryPickerMap[sceneView]->setTimeStepSphereData(
+                            trajectoryRequests[t].multiVarTrajectoriesMap[sceneView]->getSpherePositions(),
+                            trajectoryRequests[t].multiVarTrajectoriesMap[sceneView]->getSphereEntrancePoints(),
+                            trajectoryRequests[t].multiVarTrajectoriesMap[sceneView]->getSphereExitPoints(),
+                            trajectoryRequests[t].multiVarTrajectoriesMap[sceneView]->getSphereLineElementIds(),
+                            sphereRadius);
+                    useVariableToolTipChanged = false;
+                }
+#endif
+
+                std::shared_ptr<GL::MShaderEffect> timeStepSphereShader = multiVarData.getTimeStepSphereShader();
+                timeStepSphereShader->bind();
+                multiVarData.setUniformDataSpheres(textureUnitTransferFunction);
+
+                timeStepSphereShader->setUniformValue("mvpMatrix", *(sceneView->getModelViewProjectionMatrix()));
+                timeStepSphereShader->setUniformValue("vMatrix", sceneView->getCamera()->getViewMatrix());
+                timeStepSphereShader->setUniformValue("lightDirection", sceneView->getLightDirection());
+                if (sceneView->getLightDirectionEnum() == MSceneViewGLWidget::VIEWDIRECTION) {
+                    timeStepSphereShader->setUniformValue(
+                            "useHeadLight",
+                            sceneView->getLightDirectionEnum() == MSceneViewGLWidget::VIEWDIRECTION ? 1 : 0);
+                }
+                timeStepSphereShader->setUniformValue("cameraPosition", sceneView->getCamera()->getOrigin());
+                timeStepSphereShader->setUniformValue("orthographicModeEnabled", sceneView->orthographicModeEnabled() ? 1 : 0);
+                timeStepSphereShader->setUniformValue("sphereRadius", sphereRadius);
+                timeStepSphereShader->setUniformValue("lineRadius", tubeRadius);
+                timeStepSphereShader->setUniformValue("timestepLensePosition", particlePosTimeStep);
+                timeStepSphereShader->setUniformValue("cameraUp", sceneView->getCamera()->getYAxis());
+
+                timeStepSphereRenderData->indexBuffer->bindToElementArrayBuffer();
+                timeStepSphereRenderData->vertexPositionBuffer->attachToVertexAttribute(0);
+                timeStepSphereRenderData->vertexNormalBuffer->attachToVertexAttribute(1);
+
+                timeStepSphereRenderData->spherePositionsBuffer->bindToIndex(10);
+                timeStepSphereRenderData->entrancePointsBuffer->bindToIndex(11);
+                timeStepSphereRenderData->exitPointsBuffer->bindToIndex(12);
+                timeStepSphereRenderData->lineElementIdsBuffer->bindToIndex(13);
+
+                if (useFiltering)
+                {
+                    glMultiDrawElements(
+                            GL_TRIANGLES,
+                            trajectoryRequests[t].multiVarTrajectoriesMap[sceneView]->getTrajectorySelectionCount(),
+                            GL_UNSIGNED_INT,
+                            trajectoryRequests[t].multiVarTrajectoriesMap[sceneView]->getTrajectorySelectionIndices(),
+                            trajectoryRequests[t].multiVarTrajectoriesMap[sceneView]->getNumFilteredTrajectories());
+                }
+                else
+                {
+                    glDrawElements(
+                            GL_TRIANGLES, multiVarTrajectoriesRenderData.indexBuffer->getCount(),
+                            multiVarTrajectoriesRenderData.indexBuffer->getType(), nullptr);
+                }
+
+                glDrawElementsInstanced(
+                        GL_TRIANGLES, timeStepSphereRenderData->indexBuffer->getCount(),
+                        timeStepSphereRenderData->indexBuffer->getType(), nullptr,
+                        timeStepSphereRenderData->numSpheres);
+            }
+
+            // Render rolls at time step positions.
+            if (multiVarData.getUseTimestepLens() && useMultiVarSpheres && multiVarData.getRenderRolls())
+            {
+                trajectoryRequests[t].multiVarTrajectoriesMap[sceneView]->updateTimeStepRollsRenderDataIfNecessary(
+                        trajectorySyncMode, particlePosTimeStep, syncModeTrajectoryIndex, tubeRadius, sphereRadius,
+                        multiVarData.getRollsWidth(), multiVarData.getMapRollsThickness(),
+                        multiVarData.getNumLineSegments());
+                MTimeStepRollsRenderData* timeStepRollsRenderData =
+                        trajectoryRequests[t].timeStepRollsRenderDataMap[sceneView];
+                if (timeStepRollsRenderData->indexBuffer)
+                {
+                    std::shared_ptr<GL::MShaderEffect> timeStepSphereShader = multiVarData.getTimeStepRollsShader();
+                    timeStepSphereShader->bind();
+                    multiVarData.setUniformDataRolls(textureUnitTransferFunction);
+
+                    timeStepSphereShader->setUniformValue(
+                            "mvpMatrix", *(sceneView->getModelViewProjectionMatrix()));
+                    timeStepSphereShader->setUniformValue(
+                            "vMatrix", sceneView->getCamera()->getViewMatrix());
+                    timeStepSphereShader->setUniformValue(
+                            "lightDirection", sceneView->getLightDirection());
+                    timeStepSphereShader->setUniformValue(
+                            "cameraPosition", sceneView->getCamera()->getOrigin());
+                    timeStepSphereShader->setUniformValue(
+                            "orthographicModeEnabled", sceneView->orthographicModeEnabled() ? 1 : 0);
+                    timeStepSphereShader->setUniformValue(
+                            "lineRadius", tubeRadius);
+                    timeStepSphereShader->setUniformValue(
+                            "rollsRadius", sphereRadius);
+                    timeStepSphereShader->setUniformValue(
+                            "timestepLensePosition", particlePosTimeStep);
+
+                    timeStepRollsRenderData->indexBuffer->bindToElementArrayBuffer();
+                    timeStepRollsRenderData->vertexPositionBuffer->attachToVertexAttribute(0);
+                    timeStepRollsRenderData->vertexNormalBuffer->attachToVertexAttribute(1);
+                    timeStepRollsRenderData->vertexTangentBuffer->attachToVertexAttribute(2);
+                    timeStepRollsRenderData->vertexRollPositionBuffer->attachToVertexAttribute(3);
+                    timeStepRollsRenderData->vertexLineIdBuffer->attachToVertexAttribute(4);
+                    timeStepRollsRenderData->vertexLinePointIdxBuffer->attachToVertexAttribute(5);
+                    timeStepRollsRenderData->vertexVariableIdAndIsCapBuffer->attachToVertexAttribute(6);
+
+                    glDrawElements(
+                            GL_TRIANGLES, timeStepRollsRenderData->indexBuffer->getCount(),
+                            timeStepRollsRenderData->indexBuffer->getType(), nullptr);
+                }
+            }
+
+            // Unbind IBO.
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0); CHECK_GL_ERROR;
+
+            if (shadowEnabled)
+            {
+                // Bind trajectories and normals vertex buffer objects.
+                trajectoryRequests[t].trajectoriesVertexBuffer
+                        ->attachToVertexAttribute(SHADER_VERTEX_ATTRIBUTE);
+
+                trajectoryRequests[t].normalsVertexBuffer[sceneView]
+                        ->attachToVertexAttribute(SHADER_NORMAL_ATTRIBUTE);
+
+                // Bind auxiliary data vertex buffer object.
+                if (trajectoryRequests[t].trajectoriesAuxDataVertexBuffer != nullptr)
+                {
+                    trajectoryRequests[t].trajectoriesAuxDataVertexBuffer
+                            ->attachToVertexAttribute(SHADER_AUXDATA_ATTRIBUTE);
+                }
+
+                renderShadowsTubes(sceneView, t);
+
+                if (multiVarData.getRenderSpheres())
+                {
+                    renderShadowsSpheres(sceneView, t);
+                }
+            }
+
+            // Unbind VBO.
+            glBindBuffer(GL_ARRAY_BUFFER, 0); CHECK_GL_ERROR;
+        }
+
+        return;
+    }
+
 
     if ( (renderMode == TRAJECTORY_TUBES)
          || (renderMode == TUBES_AND_SINGLETIME)
@@ -2339,69 +3958,7 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
 
             if (shadowEnabled)
             {
-
-                tubeShadowShader->bind();
-
-                tubeShadowShader->setUniformValue(
-                        "mvpMatrix",
-                        *(sceneView->getModelViewProjectionMatrix()));
-                tubeShadowShader->setUniformValue(
-                        "pToWorldZParams",
-                        sceneView->pressureToWorldZParameters());
-                tubeShadowShader->setUniformValue(
-                        "lightDirection",
-                        sceneView->getLightDirection());
-                tubeShadowShader->setUniformValue(
-                        "cameraPosition",
-                        sceneView->getCamera()->getOrigin());
-                tubeShadowShader->setUniformValue(
-                        "radius",
-                        GLfloat(tubeRadius));
-                tubeShadowShader->setUniformValue(
-                        "numObsPerTrajectory",
-                        trajectoryRequests[t].trajectories
-                            ->getNumTimeStepsPerTrajectory());
-
-                if (renderMode == BACKWARDTUBES_AND_SINGLETIME)
-                {
-                    tubeShadowShader->setUniformValue(
-                            "renderTubesUpToIndex",
-                            particlePosTimeStep);
-                }
-                else
-                {
-                    tubeShadowShader->setUniformValue(
-                            "renderTubesUpToIndex",
-                            trajectoryRequests[t].trajectories
-                                ->getNumTimeStepsPerTrajectory());
-                }
-
-                tubeShadowShader->setUniformValue(
-                        "useTransferFunction", GLboolean(shadowColoured));
-
-                if (shadowColoured)
-                {
-                    tubeShadowShader->setUniformValue(
-                            "transferFunction", textureUnitTransferFunction);
-                    tubeShadowShader->setUniformValue(
-                            "scalarMinimum",
-                            transferFunction->getMinimumValue());
-                    tubeShadowShader->setUniformValue(
-                            "scalarMaximum",
-                            transferFunction->getMaximumValue());
-                }
-                else
-                    tubeShadowShader->setUniformValue(
-                            "constColour", QColor(20, 20, 20, 155));
-
-                glMultiDrawArrays(GL_LINE_STRIP_ADJACENCY,
-                                  trajectoryRequests[t].trajectorySelection
-                                  ->getStartIndices(),
-                                  trajectoryRequests[t].trajectorySelection
-                                  ->getIndexCount(),
-                                  trajectoryRequests[t].trajectorySelection
-                                  ->getNumTrajectories());
-                CHECK_GL_ERROR;
+                renderShadowsTubes(sceneView, t);
             }
 
             // Unbind VBO.
@@ -2525,75 +4082,39 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
 
             if (shadowEnabled)
             {
-                positionSphereShadowShader->bind();
-
-                positionSphereShadowShader->setUniformValue(
-                        "mvpMatrix",
-                        *(sceneView->getModelViewProjectionMatrix()));
-                CHECK_GL_ERROR;
-                positionSphereShadowShader->setUniformValue(
-                        "pToWorldZParams",
-                        sceneView->pressureToWorldZParameters()); CHECK_GL_ERROR;
-                positionSphereShadowShader->setUniformValue(
-                        "lightDirection",
-                        sceneView->getLightDirection());
-                positionSphereShadowShader->setUniformValue(
-                        "cameraPosition",
-                        sceneView->getCamera()->getOrigin()); CHECK_GL_ERROR;
-                positionSphereShadowShader->setUniformValue(
-                        "radius",
-                        GLfloat(sphereRadius)); CHECK_GL_ERROR;
-                positionSphereShadowShader->setUniformValue(
-                        "scaleRadius",
-                        GLboolean(false)); CHECK_GL_ERROR;
-
-                positionSphereShadowShader->setUniformValue(
-                        "useTransferFunction",
-                        GLboolean(shadowColoured)); CHECK_GL_ERROR;
-
-                if (shadowColoured)
-                {
-                    // Transfer function texture is still bound from the sphere
-                    // shader.
-                    positionSphereShadowShader->setUniformValue(
-                            "transferFunction",
-                            textureUnitTransferFunction); CHECK_GL_ERROR;
-                    positionSphereShadowShader->setUniformValue(
-                            "scalarMinimum",
-                            transferFunction->getMinimumValue()); CHECK_GL_ERROR;
-                    positionSphereShadowShader->setUniformValue(
-                            "scalarMaximum",
-                            transferFunction->getMaximumValue()); CHECK_GL_ERROR;
-
-                }
-                else
-                    positionSphereShadowShader->setUniformValue(
-                            "constColour", QColor(20, 20, 20, 155)); CHECK_GL_ERROR;
-
-                if (renderMode == ALL_POSITION_SPHERES)
-                    glMultiDrawArrays(GL_POINTS,
-                                      trajectoryRequests[t]
-                                      .trajectorySelection->getStartIndices(),
-                                      trajectoryRequests[t]
-                                      .trajectorySelection->getIndexCount(),
-                                      trajectoryRequests[t]
-                                      .trajectorySelection->getNumTrajectories());
-                else
-                    glMultiDrawArrays(GL_POINTS,
-                                      trajectoryRequests[t]
-                                      .trajectorySingleTimeSelection
-                                      ->getStartIndices(),
-                                      trajectoryRequests[t]
-                                      .trajectorySingleTimeSelection
-                                      ->getIndexCount(),
-                                      trajectoryRequests[t]
-                                      .trajectorySingleTimeSelection
-                                      ->getNumTrajectories());
-                CHECK_GL_ERROR;
+                renderShadowsSpheres(sceneView, t);
             }
 
             // Unbind VBO.
             glBindBuffer(GL_ARRAY_BUFFER, 0); CHECK_GL_ERROR;
+        }
+    }
+}
+
+
+void MTrajectoryActor::renderOverlayToCurrentContext(MSceneViewGLWidget *sceneView)
+{
+    // Only render if transfer function is available.
+    if (transferFunction == nullptr && !useMultiVarTrajectories)
+    {
+        return;
+    }
+
+    if (useMultiVarTrajectories)
+    {
+        for (int t = 0; t < (precomputedDataSource ? 1 : seedActorData.size()); t++)
+        {
+            // If any required data item is missing we cannot render.
+            if ( (trajectoryRequests[t].trajectories == nullptr)
+                 || (trajectoryRequests[t].multiVarTrajectoriesMap[sceneView] == nullptr)
+                 || (trajectoryRequests[t].trajectorySelection == nullptr) )
+            {
+                continue;
+            }
+
+#ifdef USE_EMBREE
+            trajectoryPickerMap[sceneView]->render();
+#endif
         }
     }
 }
@@ -2945,7 +4466,7 @@ void MTrajectoryActor::setTransferFunctionFromProperty()
 
     // Find the selected transfer function in the list of actors from the
     // resources manager. Not very efficient, but works well enough for the
-    // small number of actors at the moment..
+    // small number of actors at the moment.
     foreach (MActor *actor, glRM->getActors())
     {
         if (MTransferFunction1D *tf = dynamic_cast<MTransferFunction1D*>(actor))
@@ -2953,6 +4474,35 @@ void MTrajectoryActor::setTransferFunctionFromProperty()
             if (tf->transferFunctionName() == tfName)
             {
                 transferFunction = tf;
+                return;
+            }
+        }
+    }
+}
+
+
+void MTrajectoryActor::setDiagramTransferFunctionFromProperty()
+{
+    MGLResourcesManager *glRM = MGLResourcesManager::getInstance();
+
+    QString tfName = properties->getEnumItem(diagramTransferFunctionProperty);
+
+    if (tfName == "None")
+    {
+        diagramTransferFunction = nullptr;
+        return;
+    }
+
+    // Find the selected transfer function in the list of actors from the
+    // resources manager. Not very efficient, but works well enough for the
+    // small number of actors at the moment.
+    foreach (MActor *actor, glRM->getActors())
+    {
+        if (MTransferFunction1D *tf = dynamic_cast<MTransferFunction1D*>(actor))
+        {
+            if (tf->transferFunctionName() == tfName)
+            {
+                diagramTransferFunction = tf;
                 return;
             }
         }
@@ -3104,7 +4654,32 @@ void MTrajectoryActor::asynchronousDataRequest(bool synchronizationRequest)
         }
         rh.remove("NORMALS_LOGP_SCALED");
 
-        // Request 3: Pressure/Time selection filter.
+        // Request 3: Multi-var trajectories for all scene views that display the trajectories.
+        // =====================================================================
+        if (useMultiVarTrajectories)
+        {
+            foreach (MSceneViewGLWidget* view, getViews())
+            {
+                QVector2D params = view->pressureToWorldZParameters();
+                QString query;
+                if (multiVarData.getGeometryMode() == MultiVarGeometryMode::GEOMETRY_SHADER) {
+                    query = QString("%1/%2/1").arg(params.x()).arg(params.y());
+                } else {
+                    query = QString("%1/%2/0/%3").arg(params.x()).arg(params.y()).arg(multiVarData.getNumLineSegments());
+                }
+                LOG4CPLUS_DEBUG(mlog, "MULTIVARTRAJECTORIES: " << query.toStdString());
+
+                rh.insert("MULTIVARTRAJECTORIES_LOGP_SCALED", query);
+                MRequestQueueInfo rqi;
+                rqi.request = rh.request();
+                rqi.available = false;
+                trqi.multiVarTrajectoriesRequests.insert(view, rqi);
+                trqi.numPendingRequests++;
+            }
+            rh.remove("MULTIVARTRAJECTORIES_LOGP_SCALED");
+        }
+
+        // Request 4: Pressure/Time selection filter.
         // ==========================================
 
         //TODO: add property
@@ -3168,6 +4743,15 @@ void MTrajectoryActor::asynchronousDataRequest(bool synchronizationRequest)
         foreach (MSceneViewGLWidget* view, getViews())
         {
             normalsSource->requestData(trqi.normalsRequests[view].request);
+        }
+
+        if (useMultiVarTrajectories)
+        {
+            foreach (MSceneViewGLWidget* view, getViews())
+            {
+                view->setLightDirection(MSceneViewGLWidget::VIEWDIRECTION);
+                multiVarTrajectoriesSource->requestData(trqi.multiVarTrajectoriesRequests[view].request);
+            }
         }
 
         if ((renderMode == SINGLETIME_POSITIONS)
@@ -3394,7 +4978,7 @@ void MTrajectoryActor::updateStartTimeProperty()
 
         // Get a list of the available start times for the new init time,
         // convert the QDateTime objects to strings for the enum manager.
-        availableStartTimes = trajectorySource->availableValidTimes(initTime);
+        availableStartTimes = trajectorySource->availableStartTimes(initTime);
         QStringList startTimeStrings;
         for (int i = 0; i < availableStartTimes.size(); i++)
             startTimeStrings << availableStartTimes.at(i).toString(Qt::ISODate);
@@ -3429,6 +5013,8 @@ void MTrajectoryActor::updateAuxDataVarNamesProperty()
         properties->mEnum()->setEnumNames(
                     renderAuxDataVarProperty,
                     trajectorySource->availableAuxiliaryVariables());
+        trajectorySyncModeProperty->setEnabled(
+                trajectorySource->availableAuxiliaryVariables().indexOf("time_after_ascent") >= 0);
     }
 
     enableActorUpdates(true);
@@ -3691,6 +5277,22 @@ void MTrajectoryActor::debugPrintPendingRequestsQueue()
                         .arg(trajectoryRequests[t].pendingRequestsQueue[i]
                              .normalsRequests[view].request);
             }
+
+            if (useMultiVarTrajectories)
+            {
+                int sv = 0;
+                foreach (MSceneViewGLWidget *view,
+                         trajectoryRequests[t].pendingRequestsQueue[i]
+                                 .multiVarTrajectoriesRequests.keys())
+                {
+                    str += QString("\nScene view [%1] multi-var trajectories: available=[%2]\n[%3]\n")
+                            .arg(sv++)
+                            .arg(trajectoryRequests[t].pendingRequestsQueue[i]
+                                         .multiVarTrajectoriesRequests[view].available)
+                            .arg(trajectoryRequests[t].pendingRequestsQueue[i]
+                                         .multiVarTrajectoriesRequests[view].request);
+                }
+            }
         }
     }
 
@@ -3738,6 +5340,7 @@ bool MTrajectoryActor::selectDataSource()
         this->setDataSource(dataSourceID + QString(" Reader"));
         this->setNormalsSource(dataSourceID + QString(" Normals"));
         this->setTrajectoryFilter(dataSourceID + QString(" timestepFilter"));
+        this->setMultiVarTrajectoriesSource(dataSourceID + QString(" Multi-Var Trajectories"));
 
         updateInitTimeProperty();
         updateStartTimeProperty();
@@ -3931,6 +5534,9 @@ void MTrajectoryActor::enableProperties(bool enable)
     enableShadowProperty->setEnabled(enable);
     colourShadowProperty->setEnabled(enable);
 
+    useMultiVarTrajectoriesProperty->setEnabled(enable);
+    diagramTypeProperty->setEnabled(enable);
+
     initTimeProperty->setEnabled(
                 enable && !(enableSync && synchronizeInitTime));
     startTimeProperty->setEnabled(
@@ -3973,16 +5579,16 @@ void MTrajectoryActor::releaseData(int slot)
 
     // 2. Normals.
     // ===========
-            foreach (MSceneViewGLWidget *view,
-                     MSystemManagerAndControl::getInstance()->getRegisteredViews())
+    foreach (MSceneViewGLWidget *view,
+             MSystemManagerAndControl::getInstance()->getRegisteredViews())
+    {
+        if (trajectoryRequests[slot].normals.value(view, nullptr))
         {
-            if (trajectoryRequests[slot].normals.value(view, nullptr))
-            {
-                trajectoryRequests[slot].normals[view]->releaseVertexBuffer();
-                normalsSource->releaseData(trajectoryRequests[slot].normals[view]);
-                trajectoryRequests[slot].normals[view] = nullptr;
-            }
+            trajectoryRequests[slot].normals[view]->releaseVertexBuffer();
+            normalsSource->releaseData(trajectoryRequests[slot].normals[view]);
+            trajectoryRequests[slot].normals[view] = nullptr;
         }
+    }
 
     // 3. Selection.
     // =============
@@ -3999,6 +5605,22 @@ void MTrajectoryActor::releaseData(int slot)
         trajectoryFilter->releaseData(trajectoryRequests[slot]
                                       .trajectorySingleTimeSelection);
         trajectoryRequests[slot].trajectorySingleTimeSelection = nullptr;
+    }
+
+    // 5. Multi-var trajectories.
+    // ===========
+    if (useMultiVarTrajectories)
+    {
+        foreach (MSceneViewGLWidget *view,
+                 MSystemManagerAndControl::getInstance()->getRegisteredViews())
+        {
+            if (trajectoryRequests[slot].multiVarTrajectoriesMap.value(view, nullptr))
+            {
+                trajectoryRequests[slot].multiVarTrajectoriesMap[view]->releaseRenderData();
+                multiVarTrajectoriesSource->releaseData(trajectoryRequests[slot].multiVarTrajectoriesMap[view]);
+                trajectoryRequests[slot].multiVarTrajectoriesMap[view] = nullptr;
+            }
+        }
     }
 }
 

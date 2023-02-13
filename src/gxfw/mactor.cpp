@@ -62,6 +62,7 @@ MActor::MActor(QObject *parent)
       labelsAreEnabled(true),
       renderAsWireFrame(false),
       actorIsPickable(false), // by default actors are not pickable
+      actorHasSelectableData(false),
       shaderCompilationProgressDialog(nullptr),
       shaderCompilationProgress(0),
       positionLabel(nullptr),
@@ -164,7 +165,11 @@ MActor::MActor(QObject *parent)
 
 MActor::~MActor()
 {
-    delete shaderCompilationProgressDialog;
+    if (shaderCompilationProgressDialog)
+    {
+        delete shaderCompilationProgressDialog;
+    }
+
     if (positionLabel != nullptr)
     {
         delete positionLabel;
@@ -218,6 +223,13 @@ void MActor::render(MSceneViewGLWidget *sceneView)
 {
     if (!actorIsEnabled) return;
     renderToCurrentContext(sceneView);
+}
+
+
+void MActor::renderOverlay(MSceneViewGLWidget *sceneView)
+{
+    if (!actorIsEnabled) return;
+    renderOverlayToCurrentContext(sceneView);
 }
 
 
@@ -647,6 +659,12 @@ QtProperty* MActor::addProperty(
 }
 
 
+void MActor::removeProperty(QtProperty* property, QtProperty *group)
+{
+    group->removeSubProperty(property);
+}
+
+
 void MActor::collapseActorPropertyTree()
 {
     for (auto it = scenes.begin(); it != scenes.end(); ++it)
@@ -792,7 +810,9 @@ void MActor::beginCompileShaders(int numberOfShaders)
 
 void MActor::endCompileShaders()
 {
-    shaderCompilationProgressDialog->hide();
+    shaderCompilationProgressDialog->close();
+    delete shaderCompilationProgressDialog;
+    shaderCompilationProgressDialog = nullptr;
 }
 
 
@@ -801,6 +821,17 @@ void MActor::compileShadersFromFileWithProgressDialog(
         const QString filename)
 {
     shader->compileFromFile_Met3DHome(filename);
+    shaderCompilationProgressDialog->setValue(++shaderCompilationProgress);
+    shaderCompilationProgressDialog->repaint();
+}
+
+
+void MActor::compileShadersFromFileWithProgressDialog(
+        std::shared_ptr<GL::MShaderEffect> shader,
+        const QString filename,
+        const QMap<QString, QString>& defines)
+{
+    shader->compileFromFile_Met3DHome(filename, defines);
     shaderCompilationProgressDialog->setValue(++shaderCompilationProgress);
     shaderCompilationProgressDialog->repaint();
 }
@@ -920,10 +951,15 @@ void MActor::removeAllLabels()
 }
 
 
-void MActor::uploadVec3ToVertexBuffer(const QVector<QVector3D>& data,
-                              const QString requestKey,
-                              GL::MVertexBuffer** vbo,
-                              QGLWidget* currentGLContext)
+void MActor::uploadVec3ToVertexBuffer(
+        const QVector<QVector3D>& data,
+        const QString requestKey,
+        GL::MVertexBuffer** vbo,
+#ifdef USE_QOPENGLWIDGET
+        QOpenGLWidget *currentGLContext)
+#else
+        QGLWidget *currentGLContext)
+#endif
 {
     MGLResourcesManager* glRM = MGLResourcesManager::getInstance();
 
@@ -949,10 +985,15 @@ void MActor::uploadVec3ToVertexBuffer(const QVector<QVector3D>& data,
 }
 
 
-void MActor::uploadVec2ToVertexBuffer(const QVector<QVector2D>& data,
-                              const QString requestKey,
-                              GL::MVertexBuffer** vbo,
-                              QGLWidget* currentGLContext)
+void MActor::uploadVec2ToVertexBuffer(
+        const QVector<QVector2D>& data,
+        const QString requestKey,
+        GL::MVertexBuffer** vbo,
+#ifdef USE_QOPENGLWIDGET
+        QOpenGLWidget *currentGLContext)
+#else
+        QGLWidget *currentGLContext)
+#endif
 {
     MGLResourcesManager* glRM = MGLResourcesManager::getInstance();
 

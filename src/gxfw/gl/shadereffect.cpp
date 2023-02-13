@@ -151,6 +151,79 @@ bool MShaderEffect::compileFromMemory(const char* src)
 }
 
 
+bool MShaderEffect::compileFromFile(const QString _filename, const QMap<QString, QString>& defines)
+{
+    release();
+
+    numPrograms = 0;
+    programs.clear();
+    filename = _filename;
+
+    LOG4CPLUS_DEBUG(mlog, "GLFX: compile effect file <"
+            << filename.toStdString() << ">...");
+
+    if (!glfxParseEffectFromFile(effect, _filename.toStdString().c_str()))
+    {
+        LOG4CPLUS_ERROR(mlog, "GLFX: error in file <"
+                << filename.toStdString() << ">: \n"
+                << glfxGetEffectLog(effect));
+        return false;
+    }
+
+    if (!compileAllPrograms(defines))
+    {
+        return false;
+    }
+
+    LOG4CPLUS_DEBUG(mlog, "\t-> GLFX: compile process successful!");
+
+    return true;
+}
+
+
+bool MShaderEffect::compileFromFile(const char* _filename, const QMap<QString, QString>& defines)
+{
+    return compileFromFile(QString(_filename), defines);
+}
+
+
+bool MShaderEffect::compileFromFile_Met3DHome(const QString _filename, const QMap<QString, QString>& defines)
+{
+    Met3D::MSystemManagerAndControl *sysMC =
+            Met3D::MSystemManagerAndControl::getInstance();
+    return compileFromFile(sysMC->getMet3DHomeDir().absoluteFilePath(_filename), defines);
+}
+
+
+bool MShaderEffect::compileFromMemory(const char* src, const QMap<QString, QString>& defines)
+{
+    // release all allocated memory
+    release();
+
+    numPrograms = 0;
+    // clear all previously created program objects
+    programs.clear();
+
+    LOG4CPLUS_DEBUG(mlog, "GLFX: compile effect from memory...");
+
+    if (!glfxParseEffectFromMemory(effect, src))
+    {
+        LOG4CPLUS_ERROR(mlog, "GLFX: error in file <"
+                << filename.toStdString() << ">: \n"
+                << glfxGetEffectLog(effect));
+        return false;
+    }
+
+    if (!compileAllPrograms(defines))
+    {
+        return false;
+    }
+
+    LOG4CPLUS_DEBUG(mlog, "\t-> GLFX: compile process successful!");
+    return true;
+}
+
+
 bool MShaderEffect::compileAllPrograms()
 {
     // get the number of programs contained in the glfx effect file
@@ -239,6 +312,99 @@ bool MShaderEffect::compileAllPrograms()
     }
 }
 
+
+bool MShaderEffect::compileAllPrograms(const QMap<QString, QString>& defines)
+{
+    // get the number of programs contained in the glfx effect file
+    numPrograms = glfxGetProgramCount(effect);
+
+    std::map<std::string, std::string> stdLibDefines;
+    for (auto it = defines.constBegin(); it != defines.constEnd(); it++) {
+        stdLibDefines.insert(std::make_pair(it.key().toStdString(), it.value().toStdString()));
+    }
+
+    if (numPrograms == 0)
+    {
+        LOG4CPLUS_ERROR(mlog, "GLFX: error in file <" << filename.toStdString()
+                                                      << ">: no existing programs." << std::flush);
+        return false;
+    }
+    else
+    {
+        // reserve buckets for all programs
+        programs.reserve(numPrograms);
+
+        // loop through all programs, compile them and retrieve required information
+        for (int i = 0; i < numPrograms; ++i)
+        {
+            // get the current program's name
+            const char* progName = glfxGetProgramName(effect, i);
+            // compile the program
+            GLint progObject = glfxCompileProgramCustomDefines(effect, progName, stdLibDefines);
+
+            QString progNameStr(progName);
+
+            // if one program could not be compiled then return the creation process
+            if (progObject < 0)
+            {
+                LOG4CPLUS_ERROR(mlog, "GLFX: error in file <"
+                        << filename.toStdString() << ">: program <"
+                        << progName << "> could not be compiled");
+                LOG4CPLUS_ERROR(mlog, "GLFX: error in file <"
+                        << filename.toStdString() << ">: \n"
+                        << glfxGetEffectLog(effect) << std::flush);
+
+                continue;
+            }
+
+            programs.insert(progNameStr, progObject);
+
+            GLint numberUniforms = getProgramParam(
+                    progNameStr.toStdString().c_str(), GLActiveUniforms);
+
+            QHash<QString, std::shared_ptr<Uniform> > uniformInfos;
+
+            char uniformName[100];
+            GLsizei len; // number of chars written to name
+            GLint size; // size of uniform var
+            GLenum type; // type of uniform var
+            GLuint index; // index of uniform var
+
+            for (GLint j = 0; j < numberUniforms; ++j)
+            {
+                // obtain the location of the specific uniform
+                glGetActiveUniform(progObject, j, 100, &len, &size, &type,
+                                   uniformName);
+                GLint location = glGetUniformLocation(progObject, uniformName);
+
+                const GLchar* uniforms[] = { uniformName, };
+                // as index != location
+                glGetUniformIndices(progObject, 1, uniforms, &index);
+
+                std::string uniformNameStr(uniformName);
+                // test if uniform name defines a certain struct element
+                // if not you can cut-off the [..] part of the name
+                if (uniformNameStr.find('.') == std::string::npos)
+                {
+                    uniformNameStr = uniformNameStr.substr(
+                            0, uniformNameStr.find('['));
+                }
+
+                // save the uniform infos in a hash map of uniforms
+                std::shared_ptr<Uniform> uniform = std::shared_ptr<Uniform>(
+                        new Uniform(location, index, type, size,
+                                    uniformNameStr.c_str()));
+
+                uniformInfos.insert(uniformNameStr.c_str(), uniform);
+            }
+
+            numActiveUniforms.insert(progNameStr, numberUniforms);
+            activeUniforms.insert(progNameStr, uniformInfos);
+        }
+
+        return programs.size() > 0;
+    }
+}
 
 /*******************************************************************************
 ***                          BIND / UNBIND METHODS

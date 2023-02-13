@@ -430,6 +430,6 @@ shader FSmain(in vec3 gs_worldSpaceNormal, in vec3 gs_worldSpacePosition,
 program Standard
 {
     vs(400)=VSmain();
-    gs(400)=GSmain() : in(lines_adjacency), out(triangle_strip, max_vertices = 36);
+    gs(400)=GSmain() : in(lines_adjacency), out(triangle_strip, max_vertices = 54);
     fs(400)=FSmain();
 };

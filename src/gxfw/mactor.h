@@ -62,6 +62,7 @@ class MSceneControl;
 class MActor : public QObject
 {
     Q_OBJECT
+    friend class MMultiVarData;
 
 public:
     /**
@@ -107,6 +108,15 @@ public:
       @ref renderToCurrentContext() instead.
       */
     void render(MSceneViewGLWidget *sceneView);
+
+    /**
+      If the actor is enabled (property @ref enabled is set to true), render
+      the actor in the current OpenGL context. Calls the virtual method @ref
+      renderOverlayToCurrentContext() to perform the actual rendering in the
+      derived classes. Do not overwrite this method, but reimplement
+      @ref renderOverlayToCurrentContext() instead.
+      */
+    void renderOverlay(MSceneViewGLWidget *sceneView);
 
     /**
       If the actor is enabled (property @ref enabled is set to true), render
@@ -229,6 +239,11 @@ public:
     bool isPickable() { return actorIsPickable; }
 
     /**
+      Returns @p true if the actor has data that can be selected.
+      */
+    bool hasSelectableData() { return actorHasSelectableData; }
+
+    /**
       Returns a handle ID if the clip space coordinates of a handle of this
       actor are within @p clipRadius of (@p clipX, @p clipY); or -1 otherwise.
 
@@ -242,6 +257,71 @@ public:
         Q_UNUSED(clipY);
         return -1;
     }
+
+    /**
+      Checks whether selectable data of this actor is at
+      @p mousePositionX, @p mousePositionY.
+
+      Called by a @ref MSceneViewGLWidget.
+      */
+    virtual bool checkIntersectionWithSelectableData(
+            MSceneViewGLWidget *sceneView, QMouseEvent *event)
+    {
+        Q_UNUSED(sceneView);
+        Q_UNUSED(event);
+        return false;
+    }
+
+    /**
+      Checks whether a virtual (i.e., drawn using OpenGL) window is below
+      the mouse cursor at @p mousePositionX, @p mousePositionY.
+
+      Called by a @ref MSceneViewGLWidget.
+      */
+    virtual bool checkVirtualWindowBelowMouse(
+            MSceneViewGLWidget *sceneView, int mousePositionX, int mousePositionY)
+    {
+        Q_UNUSED(sceneView);
+        Q_UNUSED(mousePositionX);
+        Q_UNUSED(mousePositionY);
+        return false;
+    }
+
+    virtual void mouseMoveEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event)
+    {
+        Q_UNUSED(sceneView);
+        Q_UNUSED(event);
+    }
+
+    /*
+     * This function is called when the mouse is moved in the parent widget.
+     *
+     * Called by a @ref MSceneViewGLWidget.
+     */
+    virtual void mouseMoveEventParent(MSceneViewGLWidget *sceneView, QMouseEvent *event)
+    {
+        Q_UNUSED(sceneView);
+        Q_UNUSED(event);
+    }
+
+    virtual void mousePressEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event)
+    {
+        Q_UNUSED(sceneView);
+        Q_UNUSED(event);
+    }
+
+    virtual void mouseReleaseEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event)
+    {
+        Q_UNUSED(sceneView);
+        Q_UNUSED(event);
+    }
+
+    virtual void wheelEvent(MSceneViewGLWidget *sceneView, QWheelEvent *event)
+    {
+        Q_UNUSED(sceneView);
+        Q_UNUSED(event);
+    }
+
 
     /**
       Creates a label representing the position of handle with ID @p handleID
@@ -386,6 +466,17 @@ public:
      */
     QtProperty* addProperty(MQtPropertyType type, const QString &name,
                             QtProperty *group = nullptr);
+
+    /**
+      Removes a GUI QtProperty to this actor's properties.
+
+      If @p group is specified, the new property is removed from this property
+      group.
+
+      @p removeProperty() automatically disconnects from the signals of the
+      property manager used for the new property.
+     */
+    void removeProperty(QtProperty* property, QtProperty *group = nullptr);
 
     void collapseActorPropertyTree();
 
@@ -554,6 +645,13 @@ protected:
     virtual void renderToCurrentContext(MSceneViewGLWidget *sceneView) = 0;
 
     /**
+      Render the actor's overlays in the current OpenGL context.
+
+      Can be implemented in derived classes.
+      */
+    virtual void renderOverlayToCurrentContext(MSceneViewGLWidget *sceneView) {}
+
+    /**
       Render the actor in the current OpenGL context in full screen mode.
 
       Needs to be implemented in derived classes supporting full-screen mode.
@@ -563,6 +661,8 @@ protected:
     { Q_UNUSED(sceneView); }
 
     void enablePicking(bool p) { actorIsPickable = p; }
+
+    void setHasSelectableData(bool p) { actorHasSelectableData = p; }
 
     /**
       This method needs to be called at the beginning of each actor's
@@ -588,6 +688,16 @@ protected:
     void compileShadersFromFileWithProgressDialog(
             std::shared_ptr<GL::MShaderEffect> shader,
             const QString filename);
+
+    /**
+      Compiles a GLSL shader from @p filename and updates the "compile shaders"
+      progress dialog. Uses @ref shaderCompilationProgress to update number of
+      already compiled shaders.
+      */
+    void compileShadersFromFileWithProgressDialog(
+            std::shared_ptr<GL::MShaderEffect> shader,
+            const QString filename,
+            const QMap<QString, QString>& defines);
 
     /**
       Emit the @ref actorChanged() signal, but only if the signal is enabled,
@@ -690,6 +800,7 @@ protected:
     QtProperty *labelBBoxColourProperty;
 
     bool actorIsPickable;
+    bool actorHasSelectableData;
 
     /** Counter to monitor the progress of shader loading process. */
     QProgressDialog *shaderCompilationProgressDialog;
@@ -717,15 +828,25 @@ protected:
      */
     void uploadVec3ToVertexBuffer(const QVector<QVector3D> *data, GLuint *vbo);
 
-    void uploadVec3ToVertexBuffer(const QVector<QVector3D>& data,
-                                  const QString requestKey,
-                                  GL::MVertexBuffer** vbo,
-                                  QGLWidget* currentGLContext = nullptr);
+    void uploadVec3ToVertexBuffer(
+            const QVector<QVector3D>& data,
+            const QString requestKey,
+            GL::MVertexBuffer** vbo,
+#ifdef USE_QOPENGLWIDGET
+            QOpenGLWidget *currentGLContext = nullptr);
+#else
+            QGLWidget *currentGLContext = nullptr);
+#endif
 
-    void uploadVec2ToVertexBuffer(const QVector<QVector2D>& data,
-                                  const QString requestKey,
-                                  GL::MVertexBuffer** vbo,
-                                  QGLWidget* currentGLContext = nullptr);
+    void uploadVec2ToVertexBuffer(
+            const QVector<QVector2D>& data,
+            const QString requestKey,
+            GL::MVertexBuffer** vbo,
+#ifdef USE_QOPENGLWIDGET
+            QOpenGLWidget *currentGLContext = nullptr);
+#else
+            QGLWidget *currentGLContext = nullptr);
+#endif
 
     /** Unique integer identifying this actor, assigned in the constructor. */
     unsigned int myID;

@@ -31,8 +31,14 @@
 
 // related third party imports
 #include "GL/glew.h"
+#ifdef USE_QOPENGLWIDGET
+#include <QOpenGLWidget>
+#include <QOpenGLShaderProgram>
+#include <QOpenGLContext>
+#else
 #include <QGLWidget>
 #include <QGLShaderProgram>
+#endif
 #include "qtpropertymanager.h"
 
 // local application imports
@@ -63,17 +69,33 @@ namespace Met3D
   There is only one instance of MGLResourcesManager in the system (singleton
   pattern).
   */
+#ifdef USE_QOPENGLWIDGET
+class MGLResourcesManager : public QOpenGLWidget
+#else
 class MGLResourcesManager : public QGLWidget
+#endif
 {
     Q_OBJECT
 
 public:
     /**
      */
-    static void initialize(const QGLFormat &format, QWidget *parent = 0,
-                           QGLWidget *shareWidget = 0);
+    static void initialize(
+#ifdef USE_QOPENGLWIDGET
+            const QSurfaceFormat &format,
+#else
+            const QGLFormat &format,
+#endif
+            QWidget *parent = nullptr,
+#ifdef USE_QOPENGLWIDGET
+            QOpenGLWidget *shareWidget = nullptr);
+#else
+            QGLWidget *shareWidget = nullptr);
+#endif
 
     ~MGLResourcesManager();
+
+    void deleteActors();
 
     /**
      Returns the (singleton) instance of the system control. If getInstance()
@@ -81,6 +103,25 @@ public:
      argument.
      */
     static MGLResourcesManager* getInstance();
+
+#ifdef USE_QOPENGLWIDGET
+    /**
+     * Initializes GLEW and the actors if this was not already done.
+     */
+    void initializeExternal();
+#endif
+
+    /**
+     * Returns whether the used OpenGL context supports at least version <major>.<minor>.
+     */
+    bool getIsOpenGLVersionAtLeast(int major, int minor = 0) {
+        if (majorVersionNumber < major) {
+            return false;
+        } else if (majorVersionNumber == major && minorVersionNumber < minor) {
+            return false;
+        }
+        return true;
+    }
 
     /**
       Place a scene in a managed pool of scenes. All registered scenes are
@@ -106,6 +147,15 @@ public:
       existing shader program.
       */
     bool generateEffectProgram(
+            QString name,
+            std::shared_ptr<GL::MShaderEffect>& effectProgram);
+
+    /**
+      Returns a shared pointer to a new shader effect program if no program
+      with the given name has been created so far, or a pointer to the
+      existing shader program.
+      */
+    bool generateEffectProgramUncached(
             QString name,
             std::shared_ptr<GL::MShaderEffect>& effectProgram);
 
@@ -221,6 +271,10 @@ public:
     void releaseGPUItem(Met3D::MDataRequest key);
 
     void releaseAllGPUItemReferences(Met3D::MDataRequest key);
+
+    void deleteReleasedGPUItem(GL::MAbstractGPUDataItem *item);
+
+    void deleteReleasedGPUItem(MDataRequest removeKey);
 
     void updateGPUItemSize(GL::MAbstractGPUDataItem *item);
 
@@ -380,6 +434,10 @@ signals:
 protected:
     friend class MSceneViewGLWidget;
 
+#ifdef USE_QOPENGLWIDGET
+    static bool isExternalDataInitialized;
+#endif
+
     /**
       Initialize the OpenGL resources. Called once on program start.
      */
@@ -398,8 +456,23 @@ private:
      Constructor is private, as it should only be called from getInstance().
      See https://en.wikipedia.org/wiki/Singleton_pattern#Lazy_initialization.
      */
-    MGLResourcesManager(const QGLFormat &format, QWidget *parent = 0,
-                        QGLWidget *shareWidget = 0);
+    MGLResourcesManager(
+#ifdef USE_QOPENGLWIDGET
+            const QSurfaceFormat &format,
+#else
+            const QGLFormat &format,
+#endif
+            QWidget *parent = nullptr,
+#ifdef USE_QOPENGLWIDGET
+            QOpenGLWidget *shareWidget = nullptr);
+#else
+            QGLWidget *shareWidget = nullptr);
+#endif
+
+#ifdef USE_QOPENGLWIDGET
+    /** The requested surface format passed to the constructor. */
+    QSurfaceFormat requestedFormat;
+#endif
 
     /** Single instance of the GL resources manager. */
     static MGLResourcesManager* instance;
@@ -416,6 +489,10 @@ private:
 
     /** Textures */
     QMap<QString, GLuint> textureObjectPool;
+
+    /** OpenGL version information */
+    int majorVersionNumber = 0;
+    int minorVersionNumber = 0;
 
     // Dictionary of active (=used) textures.
     QHash<QString, GL::MTexture*> activeTexturesPool;

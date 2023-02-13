@@ -352,6 +352,10 @@ void MVolumeBoundingBoxActor::generateGeometry()
                                     + QString::number(getID());
     uploadVec3ToVertexBuffer(axisTicks, axisRequestKey, &axisVertexBuffer);
 
+#ifdef USE_QOPENGLWIDGET
+    glRM->doneCurrent();
+#endif
+
 
     // C) Generate labels.
     // ===================
@@ -383,6 +387,8 @@ void MVolumeBoundingBoxActor::generateGeometry()
                           labelbbox, labelBBoxColour)
                       );
     }
+    glRM = MGLResourcesManager::getInstance();
+    glRM->makeCurrent();
 }
 
 } // namespace Met3D

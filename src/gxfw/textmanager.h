@@ -160,7 +160,7 @@ public:
                     float bboxPad=2);
 
     /**
-      Generates the geometry for a text label, but unlike @ref renderText() ,
+      Generates the geometry for a text label, but unlike @ref renderText(),
       addText() does not immediately render the label but uploads the geometry
       to a VBO for later rendering with @ref renderToCurrentContext().
 
@@ -174,6 +174,22 @@ public:
                     QColor colour, TextAnchor anchor=BASELINELEFT,
                     bool bbox=false, QColor bboxColour=QColor(0,0,0,50),
                     float bboxPadFraction=0.1);
+
+    /**
+      Generates the geometry for a vertical text label, but unlike @ref renderText(),
+      addText() does not immediately render the label but uploads the geometry
+      to a VBO for later rendering with @ref renderToCurrentContext().
+
+      Arguments are the same as for @ref renderText().
+
+      @returns An integer index identifying the label. The label can be removed
+      from the pool with @ref removeText() and this index.
+      */
+    MLabel* addTextVertical(QString text, CoordinateSystem coordsys,
+                    float x, float y, float z, float size,
+                    QColor colour, TextAnchor anchor=BASELINELEFT,
+                    bool bbox=false, QColor bboxColour=QColor(0,0,0,50),
+                    float bboxPadFraction=0.1, bool orientationCcw = false);
 
     /**
       Removes the label with index @p id (obtained from @ref addText()) from

@@ -84,7 +84,7 @@ QList<QDateTime> MTrajectoryReader::availableInitTimes()
 }
 
 
-QList<QDateTime> MTrajectoryReader::availableValidTimes(
+QList<QDateTime> MTrajectoryReader::availableStartTimes(
         const QDateTime& initTime)
 {
     // cf.  MClimateForecastReader::availableVariables() .
@@ -95,6 +95,53 @@ QList<QDateTime> MTrajectoryReader::availableValidTimes(
                 initTime.toString(Qt::ISODate).toStdString(),
                 __FILE__, __LINE__);
     return availableTrajectories.value(initTime).keys();
+}
+
+
+QList<QDateTime> MTrajectoryReader::availableValidTimes(
+        const QDateTime& initTime)
+{
+    // cf.  MClimateForecastReader::availableVariables() .
+    QReadLocker availableItemsReadLocker(&availableItemsLock);
+    if (!availableTrajectories.keys().contains(initTime))
+        throw MBadDataFieldRequest(
+                "unkown init time requested: " +
+                initTime.toString(Qt::ISODate).toStdString(),
+                __FILE__, __LINE__);
+    //return availableTrajectories.value(initTime).keys();
+
+    const QList<QDateTime>& availableTrajectoriesStartTimes =
+            availableTrajectories.value(initTime).keys();
+
+    if (availableTrajectoriesStartTimes.empty() || availableTrajectoriesStartTimes.size() > 1)
+    {
+        return availableTrajectoriesStartTimes;
+    }
+    else
+    {
+        QDateTime validTime = availableTrajectoriesStartTimes.first();
+
+        QReadLocker availableItemsReadLocker(&availableItemsLock);
+        if (!availableTrajectories.keys().contains(initTime))
+            throw MBadDataFieldRequest(
+                    "unkown init time requested: " +
+                    initTime.toString(Qt::ISODate).toStdString(),
+                    __FILE__, __LINE__);
+        else if (!availableTrajectories.value(initTime).keys().contains(validTime))
+            throw MBadDataFieldRequest(
+                    "unkown start time requested: " +
+                    validTime.toString(Qt::ISODate).toStdString(),
+                    __FILE__, __LINE__);
+        QString filename = availableTrajectories.value(initTime).value(validTime).filename;
+        availableItemsReadLocker.unlock();
+
+        checkFileOpen(filename);
+        openFilesMutex.lock();
+        MTrajectoryFileInfo* finfo = openFiles.value(filename);
+        openFilesMutex.unlock();
+
+        return finfo->times.toList();
+    }
 }
 
 
@@ -197,6 +244,7 @@ MTrajectories* MTrajectoryReader::produceData(MDataRequest request)
 
     unsigned int numTimeSteps    = finfo->numTimeSteps;
     unsigned int numTrajectories = finfo->numTrajectories;
+    unsigned int numOutputParameters = finfo->numOutputParameters;
 
     // Check if the requested member exists.
     if (member > finfo->numEnsembleMembers - 1)
@@ -226,10 +274,24 @@ MTrajectories* MTrajectoryReader::produceData(MDataRequest request)
     float *lats = new float[numVertices];
     float *pres = new float[numVertices];
     float *auxData = new float[numVertices];
+    float *sensData = new float[numVertices * numOutputParameters];
+    uint32_t *outputParameters = new uint32_t[numOutputParameters];
+    vector<size_t> startParams = {0};
+    vector<size_t> countParams = {numOutputParameters};
+    if (!finfo->outputParameterVar.isNull())
+    {
+        finfo->outputParameterVar.getVar(startParams, countParams, outputParameters);
+    }
+    else
+    {
+        std::fill_n(outputParameters, numOutputParameters, 0);
+    }
 
     // Read data from file.
     vector<size_t> start = {member, 0, startIndex};
     vector<size_t> count = {1, numTrajectories, numTimeSteps};
+    vector<size_t> startSens = {0, member, 0, startIndex};
+    vector<size_t> countSens = {numOutputParameters, 1, numTrajectories, numTimeSteps};
 
     QMutexLocker ncAccessMutexLocker(&staticNetCDFAccessMutex);
     finfo->lonVar.getVar(start, count, lons);
@@ -306,10 +368,26 @@ MTrajectories* MTrajectoryReader::produceData(MDataRequest request)
         trajectories->copyAuxDataPerVertex(auxData, iIndexAuxData);
      }
 
+    // Same for sensitivity variables.
+    for (int iIndexSensData = 0; iIndexSensData < finfo->sensDataVars.size();
+         iIndexSensData++)
+    {
+        if (numOutputParameters == 1)
+        {
+            finfo->sensDataVars[iIndexSensData].getVar(start, count, sensData);
+        } else
+        {
+            finfo->sensDataVars[iIndexSensData].getVar(startSens, countSens, sensData);
+        }
+        trajectories->copySensDataPerVertex(sensData, iIndexSensData, numOutputParameters);
+    }
+    trajectories->copyOutputParameter(outputParameters, numOutputParameters);
+
     ncAccessMutexLocker.unlock();
 
     // Copy the names of auxiliary data variables.
     trajectories->setAuxDataVariableNames(finfo->auxDataVarNames);
+    trajectories->setSensDataVariableNames(finfo->sensDataVarNames);
 
     // Copy start grid geometry, if available.
     trajectories->setStartGrid(finfo->startGrid);
@@ -322,6 +400,8 @@ MTrajectories* MTrajectoryReader::produceData(MDataRequest request)
     delete[] lats;
     delete[] pres;
     delete[] auxData;
+    delete[] sensData;
+    delete[] outputParameters;
 
 #ifdef MSTOPWATCH_ENABLED
     stopwatch.split();
@@ -637,6 +717,18 @@ void MTrajectoryReader::checkFileOpen(QString filename)
         NcDim timeDim       = ncFile->getDim("time");
         NcDim trajectoryDim = ncFile->getDim("trajectory");
         NcDim ensembleDim   = ncFile->getDim("ensemble");
+        int numDims = ncFile->getDimCount();
+        if (numDims == 4) {
+            NcDim outputParameterDim = ncFile->getDim("Output_Parameter_ID");
+            finfo->numOutputParameters = outputParameterDim.getSize();
+
+        }
+        else
+        {
+            finfo->numOutputParameters  = 1;
+        }
+        finfo->outputParameterVar = ncFile->getVar("Output_Parameter_ID");
+
         finfo->numTimeSteps       = timeDim.getSize();
         finfo->numTrajectories    = trajectoryDim.getSize();
         finfo->numEnsembleMembers = ensembleDim.getSize();
@@ -748,9 +840,16 @@ void MTrajectoryReader::checkFileOpen(QString filename)
                 NcType varType = iCFVar.getType();
                 if (varType == NcType::nc_FLOAT || varType == NcType::nc_DOUBLE)
                 {
-                    finfo->auxDataVarNames.append(varName);
-                    finfo->auxDataVars.append(ncFile->getVar(
-                                                  varName.toStdString()));
+                    if (varName.startsWith('d') && varName != "deposition")
+                    {
+                        finfo->sensDataVarNames.append(varName);
+                        finfo->sensDataVars.append(ncFile->getVar(
+                                varName.toStdString()));
+                    } else {
+                        finfo->auxDataVarNames.append(varName);
+                        finfo->auxDataVars.append(ncFile->getVar(
+                                varName.toStdString()));
+                    }
                 }
             }
         }

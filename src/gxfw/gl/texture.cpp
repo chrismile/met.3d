@@ -48,13 +48,15 @@ MTexture::MTexture( GLenum  target,
                     GLint   internalFormat,
                     GLsizei width,
                     GLsizei height,
-                    GLsizei depth )
+                    GLsizei depth,
+                    GLsizei samples )
     : MAbstractGPUDataItem(""),
       target(target),
       internalFormat(internalFormat),
       width(width),
       height(height),
-      depth(depth)
+      depth(depth),
+      samples(samples)
 {
     // Generate texture object.
     glGenTextures(1, &textureObject); CHECK_GL_ERROR;
@@ -70,13 +72,15 @@ MTexture::MTexture( Met3D::MDataRequest requestKey,
                     GLint   internalFormat,
                     GLsizei width,
                     GLsizei height,
-                    GLsizei depth )
+                    GLsizei depth,
+                    GLsizei samples )
     : MAbstractGPUDataItem(requestKey),
       target(target),
       internalFormat(internalFormat),
       width(width),
       height(height),
-      depth(depth)
+      depth(depth),
+      samples(samples)
 {
     // Generate texture object.
     glGenTextures(1, &textureObject); CHECK_GL_ERROR;
@@ -143,13 +147,13 @@ MTexture::~MTexture()
 
 unsigned int MTexture::approxSizeInBytes()
 {
-    return approxSizeInBytes(internalFormat, width, height, depth);
+    return approxSizeInBytes(internalFormat, width, height, depth, samples);
 }
 
 
 unsigned int MTexture::getGPUMemorySize_kb()
 {
-    return approxSizeInBytes(internalFormat, width, height, depth) / 1024.;
+    return approxSizeInBytes(internalFormat, width, height, depth, samples) / 1024.;
 }
 
 
@@ -217,6 +221,7 @@ unsigned int MTexture::formatSizeInBytes(GLint internalFormat)
     case GL_RG16I:
     case GL_RG16UI:
     case GL_RG16_SNORM:
+    case GL_RGBA8:
     case GL_RGBA8I:
     case GL_RGBA8UI:
     case GL_ALPHA32F_ARB:
@@ -260,28 +265,30 @@ unsigned int MTexture::formatSizeInBytes(GLint internalFormat)
 
 
 unsigned int MTexture::approxSizeInBytes(GLint   internalFormat,
-                                        GLsizei width,
-                                        GLsizei height,
-                                        GLsizei depth)
+                                         GLsizei width,
+                                         GLsizei height,
+                                         GLsizei depth,
+                                         GLsizei samples)
 {
     // 1D textures.
     if (height < 0)
-        return width * formatSizeInBytes(internalFormat);
+        return width * formatSizeInBytes(internalFormat) * std::max(samples, 1);
 
     // 2D textures.
     if (depth < 0)
-        return width * height * formatSizeInBytes(internalFormat);
+        return width * height * formatSizeInBytes(internalFormat) * std::max(samples, 1);
 
     // 3D textures.
-    return width * height * depth * formatSizeInBytes(internalFormat);
+    return width * height * depth * formatSizeInBytes(internalFormat) * std::max(samples, 1);
 }
 
 
-void MTexture::updateSize(GLsizei width, GLsizei height, GLsizei depth)
+void MTexture::updateSize(GLsizei width, GLsizei height, GLsizei depth, GLsizei samples)
 {
-    this->width  = width;
-    this->height = height;
-    this->depth  = depth;
+    this->width   = width;
+    this->height  = height;
+    this->depth   = depth;
+    this->samples = samples;
 
     Met3D::MGLResourcesManager *glRM = Met3D::MGLResourcesManager::getInstance();
     if (glRM->isManagedGPUItem(this)) glRM->updateGPUItemSize(this);

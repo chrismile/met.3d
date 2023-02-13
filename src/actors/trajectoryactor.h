@@ -8,6 +8,7 @@
 **  Copyright 2017-2018 Bianca Tost [+]
 **  Copyright 2017      Philipp Kaiser [+]
 **  Copyright 2020      Marcel Meyer [*]
+**  Copyright 2021      Christoph Neuhauser [+]
 **
 **  + Computer Graphics and Visualization Group
 **  Technische Universitaet Muenchen, Garching, Germany
@@ -44,14 +45,21 @@
 #include "gxfw/synccontrol.h"
 #include "gxfw/gl/texture.h"
 #include "gxfw/gl/shadereffect.h"
+#include "gxfw/boundingbox/boundingbox.h"
 #include "data/datarequest.h"
 #include "actors/transferfunction1d.h"
 
 #include "data/trajectorydatasource.h"
 #include "data/trajectorynormalssource.h"
 #include "data/pressuretimetrajectoryfilter.h"
-#include "gxfw/boundingbox/boundingbox.h"
 #include "data/trajectorycomputation.h"
+#include "data/multivar/multivartrajectories.h"
+#include "data/multivar/multivartrajectoriessource.h"
+#include "data/multivar/multivardata.h"
+
+#ifdef USE_EMBREE
+#include "data/multivar/trajectorypicking.h"
+#endif
 
 
 class MGLResourcesManager;
@@ -84,12 +92,23 @@ public:
     /**
       Set a transfer function to map vertical position (pressure) to colour.
       */
-    void setTransferFunction(MTransferFunction1D *tf);    
+    void setTransferFunction(MTransferFunction1D *tf);
     /**
-      Set a transfer function by its name. Set to 'none' if @oaram tfName does
+      Set a transfer function by its name. Set to 'none' if @param tfName does
       not exit.
       */
     bool setTransferFunction(QString tfName);
+
+    /**
+      Set a transfer function to map a diagram attribute (trajectory parameter
+      or statistical information like standard deviation) to colour.
+      */
+    void setDiagramTransferFunction(MTransferFunction1D *tf);
+    /**
+      Set a diagram transfer function by its name. Set to 'none' if
+      @param tfName does not exit.
+      */
+    bool setDiagramTransferFunction(QString tfName);
 
     /**
      Synchronize this actor (time, ensemble) with the synchronization control
@@ -122,6 +141,10 @@ public:
     void setNormalsSource(MTrajectoryNormalsSource* s);
 
     void setNormalsSource(const QString& id);
+
+    void setMultiVarTrajectoriesSource(MMultiVarTrajectoriesSource* s);
+
+    void setMultiVarTrajectoriesSource(const QString& id);
 
     void setTrajectoryFilter(MTrajectoryFilter* f);
 
@@ -173,6 +196,11 @@ public slots:
     void asynchronousNormalsAvailable(MDataRequest request);
 
     /**
+      Called by the normals source when requested normals are ready.
+     */
+    void asynchronousMultiVarTrajectoriesAvailable(MDataRequest request);
+
+    /**
       Called by the trajectory filter when a requested filter computation is
       done.
      */
@@ -222,12 +250,45 @@ public slots:
      */
     void onSeedActorChanged();
 
+#ifdef USE_EMBREE
+    /**
+      Checks whether selectable data of this actor is at
+      @p mousePositionX, @p mousePositionY.
+      It returns whether a redraw should be triggered.
+
+      Called by a @ref MSceneViewGLWidget.
+      */
+    bool checkIntersectionWithSelectableData(
+            MSceneViewGLWidget *sceneView, QMouseEvent *event) override;
+
+    /**
+      Checks whether a virtual (i.e., drawn using OpenGL) window is below
+      the mouse cursor at @p mousePositionX, @p mousePositionY.
+
+      Called by a @ref MSceneViewGLWidget.
+      */
+    bool checkVirtualWindowBelowMouse(
+            MSceneViewGLWidget *sceneView, int mousePositionX, int mousePositionY) override;
+
+    void mouseMoveEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event) override;
+    void mouseMoveEventParent(MSceneViewGLWidget *sceneView, QMouseEvent *event) override;
+    void mousePressEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event) override;
+    void mouseReleaseEvent(MSceneViewGLWidget *sceneView, QMouseEvent *event) override;
+    void wheelEvent(MSceneViewGLWidget *sceneView, QWheelEvent *event) override;
+#endif
+
 protected:
     void initializeActorResources();
 
     void onQtPropertyChanged(QtProperty *property);
 
+    void renderShadowsTubes(MSceneViewGLWidget *sceneView, int t);
+    void renderShadowsSpheres(MSceneViewGLWidget *sceneView, int t);
+    void bindShadowStencilBuffer();
+    void unbindShadowStencilBuffer();
+
     void renderToCurrentContext(MSceneViewGLWidget *sceneView);
+    void renderOverlayToCurrentContext(MSceneViewGLWidget *sceneView);
 
     void updateTimeProperties();
 
@@ -272,6 +333,7 @@ private:
     int getEnsembleMember();
 
     void setTransferFunctionFromProperty();
+    void setDiagramTransferFunctionFromProperty();
 
     /**
       Request trajectory data, normals and filter for current time and member
@@ -336,6 +398,7 @@ private:
     {
         MRequestQueueInfo dataRequest;
         QHash<MSceneViewGLWidget*, MRequestQueueInfo> normalsRequests;
+        QHash<MSceneViewGLWidget*, MRequestQueueInfo> multiVarTrajectoriesRequests;
         MRequestQueueInfo filterRequest;
         MRequestQueueInfo singleTimeFilterRequest;
         int numPendingRequests;
@@ -356,22 +419,28 @@ private:
                   trajectoriesAuxDataVertexBuffer(nullptr)
         { }
 
-        MTrajectories* trajectories;
-        MTrajectorySelection* trajectorySelection;
-        MTrajectorySelection* trajectorySingleTimeSelection;
-        GL::MVertexBuffer* trajectoriesVertexBuffer;
-        GL::MVertexBuffer* trajectoriesAuxDataVertexBuffer;
+        MTrajectories *trajectories;
+        MTrajectorySelection *trajectorySelection;
+        MTrajectorySelection *trajectorySingleTimeSelection;
+        GL::MVertexBuffer *trajectoriesVertexBuffer;
+        GL::MVertexBuffer *trajectoriesAuxDataVertexBuffer;
         // Remember the name of the current aux var to correctly release
         // the "trajectoriesAuxDataVertexBuffer". Needs to be empty if
         // no aux VB is in use.
         QString currentAuxDataVarName;
-
+        
         QHash<MSceneViewGLWidget*, MTrajectoryNormals*> normals;
         QHash<MSceneViewGLWidget*, GL::MVertexBuffer*> normalsVertexBuffer;
 
+        // Multi-var trajectories.
+        QHash<MSceneViewGLWidget*, MMultiVarTrajectories*> multiVarTrajectoriesMap;
+        QHash<MSceneViewGLWidget*, MMultiVarTrajectoriesRenderData> multiVarTrajectoriesRenderDataMap;
+        QHash<MSceneViewGLWidget*, MTimeStepSphereRenderData*> timeStepSphereRenderDataMap;
+        QHash<MSceneViewGLWidget*, MTimeStepRollsRenderData*> timeStepRollsRenderDataMap;
+
         QQueue<MTrajectoryRequestQueueInfo> pendingRequestsQueue;
 
-        void requestAuxVertexBuffer(QString auxVarName)
+        void requestAuxVertexBuffer(QString auxVarName, QString outputParameterName = "")
         {
             // Only allow a new VB if the previous has been released.
             assert(currentAuxDataVarName.isEmpty());
@@ -380,7 +449,7 @@ private:
             {
                 currentAuxDataVarName = auxVarName;
                 trajectoriesAuxDataVertexBuffer = trajectories->
-                        getAuxDataVertexBuffer(currentAuxDataVarName);
+                        getAuxDataVertexBuffer(currentAuxDataVarName, outputParameterName);
             }
         }
 
@@ -410,6 +479,77 @@ private:
     MTrajectoryNormalsSource *normalsSource;
     QHash<MSceneViewGLWidget*, MTrajectoryNormals*> normals;
     QHash<MSceneViewGLWidget*, GL::MVertexBuffer*> normalsVertexBuffer;
+
+    MMultiVarTrajectoriesSource* multiVarTrajectoriesSource;
+    MMultiVarData multiVarData;
+    bool useMultiVarTrajectories;
+    bool multiVarDataDirty = false;
+    QtProperty *useMultiVarTrajectoriesProperty;
+    QtProperty *multiVarGroupProperty;
+    bool useMultiVarSpheres = true;
+
+    QStringList diagramTypeNames = {
+            "None", "Radar Bar Chart (Time Dependent)", "Radar Bar Chart (Time Independent)",
+            "Radar Chart", "Curve-Plot View"
+    };
+    DiagramDisplayType diagramType = DiagramDisplayType::CURVE_PLOT_VIEW;
+    QtProperty *diagramTypeProperty;
+    QtProperty *diagramTransferFunctionProperty;
+    MTransferFunction1D *diagramTransferFunction = nullptr;
+
+    QStringList diagramNormalizationModeNames = {
+            "Global Min/Max", "Selection Min/Max", "Band Min/Max"
+    };
+    DiagramNormalizationMode diagramNormalizationMode = DiagramNormalizationMode::GLOBAL_MIN_MAX;
+
+    void updateSimilarityMetricGroupEnabled();
+    QtProperty *similarityMetricGroup;
+    QtProperty *similarityMetricProperty;
+    QtProperty *meanMetricInfluenceProperty;
+    QtProperty *stdDevMetricInfluenceProperty;
+    QtProperty *numBinsProperty;
+    QtProperty *sortByDescendingStdDevProperty;
+    QtProperty *showMinMaxValueProperty;
+    QtProperty *useMaxForSensitivityProperty;
+    QtProperty *trimNanRegionsProperty;
+    QtProperty *subsequenceMatchingTechniqueProperty;
+    QtProperty *springEpsilonProperty;
+    QtProperty *backgroundOpacityProperty;
+    QtProperty *diagramNormalizationModeProperty;
+    QtProperty *diagramTextSizeProperty;
+    QtProperty *useCustomDiagramUpscalingFactorProperty;
+    QtProperty *diagramUpscalingFactorProperty;
+
+    SimilarityMetric similarityMetric = SimilarityMetric::ABSOLUTE_NCC;
+    float meanMetricInfluence = 0.5f;
+    float stdDevMetricInfluence = 0.25f;
+    int numBins = 10;
+    bool showMinMaxValue = true;
+    bool useMaxForSensitivity = true;
+    bool trimNanRegions = true;
+    SubsequenceMatchingTechnique subsequenceMatchingTechnique = SubsequenceMatchingTechnique::SPRING;
+    float springEpsilon = 10.0f;
+    float backgroundOpacity = 1.0f;
+    float diagramTextSize = 8.0f;
+    bool useCustomDiagramUpscalingFactor = false;
+    float diagramUpscalingFactor = 1.0f;
+
+    QStringList trajectorySyncModeNames = {
+            "Time Step", "Time of Ascent", "Height"
+    };
+    QtProperty *trajectorySyncModeProperty;
+    TrajectorySyncMode trajectorySyncMode = TrajectorySyncMode::TIMESTEP;
+    uint32_t syncModeTrajectoryIndex = 0;
+
+    bool useVariableToolTip = true;
+    bool useVariableToolTipChanged = true;
+    QtProperty *useVariableToolTipProperty;
+    QtProperty *selectAllTrajectoriesProperty;
+    QtProperty *resetVariableSortingProperty;
+
+#ifdef USE_EMBREE
+    QHash<MSceneViewGLWidget*, MTrajectoryPicker*> trajectoryPickerMap;
+#endif
 
     MTrajectoryFilter *trajectoryFilter;
     MTrajectorySelection *trajectorySelection;
@@ -513,6 +653,8 @@ private:
     QtProperty *startTimeProperty;
     QtProperty *particlePosTimeProperty;
     int         particlePosTimeStep;
+    int         cachedParticlePosTimeStep = 0;
+    bool        loadedParticlePosTimeStepFromSettings = false;
 
     /** Ensemble management. */
     QtProperty *ensembleModeProperty;
@@ -536,6 +678,7 @@ private:
     std::shared_ptr<GL::MShaderEffect> tubeShadowShader;
     std::shared_ptr<GL::MShaderEffect> positionSphereShader;
     std::shared_ptr<GL::MShaderEffect> positionSphereShadowShader;
+    bool stencilBufferCleared = false;
 
     QtProperty *transferFunctionProperty;
     /** Pointer to transfer function object and corresponding texture unit. */

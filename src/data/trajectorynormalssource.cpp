@@ -86,10 +86,24 @@ MTrajectoryNormals *MTrajectoryNormalsSource::produceData(
     for (int i = 0; i < numTrajectories; i++)
     {
         int baseIndex = i * numTimeStepsPerTrajectory;
+        int startOffset = 0;
+
+        while (baseIndex + startOffset + 1 < vertices.size())
+        {
+            QVector3D p0 = vertices.at(baseIndex + startOffset);
+            if (p0.z() == M_INVALID_TRAJECTORY_POS)
+            {
+                startOffset++;
+            }
+            else
+            {
+                break;
+            }
+        }
 
         // Prevent "out of bound exception" ("vertices" are access at
         // "baseIndex+1").
-        if (baseIndex+1 >= vertices.size())
+        if (baseIndex + startOffset + 1 >= vertices.size())
         {
             continue;
         }
@@ -100,11 +114,11 @@ MTrajectoryNormals *MTrajectoryNormalsSource::produceData(
         // entire trajectory is invalid (it cannot be forward integrated from
         // an invalid position) -- hence continue; the normals will be the
         // default zero normals.
-        QVector3D p1 = vertices.at(baseIndex+1);
+        QVector3D p1 = vertices.at(baseIndex + startOffset + 1);
         if (p1.z() == M_INVALID_TRAJECTORY_POS) continue;
         p1.setZ(MSceneViewGLWidget::worldZfromPressure(
                     p1.z(), log_pBottom_hPa, deltaZ_deltaLogP));
-        QVector3D p0 = vertices.at(baseIndex  );
+        QVector3D p0 = vertices.at(baseIndex + startOffset);
         p0.setZ(MSceneViewGLWidget::worldZfromPressure(
                     p0.z(), log_pBottom_hPa, deltaZ_deltaLogP));
 
@@ -121,14 +135,14 @@ MTrajectoryNormals *MTrajectoryNormalsSource::produceData(
             normal = QVector3D::crossProduct(segment, QVector3D(0., 1., 0.));
         normal.normalize();
 
-        worldSpaceNormals->setNormal(baseIndex, normal);
+        worldSpaceNormals->setNormal(baseIndex + startOffset, normal);
 
         // For all segments of the trajectory ..
-        for (int t = 2; t < numTimeStepsPerTrajectory; t++)
+        for (int t = startOffset + 2; t < numTimeStepsPerTrajectory; t++)
         {
             // .. compute the segment vector ..
             p0 = p1;
-            p1 = vertices.at(baseIndex+t);
+            p1 = vertices.at(baseIndex + t);
 
             if (p1.z() == M_INVALID_TRAJECTORY_POS)
             {
@@ -138,7 +152,7 @@ MTrajectoryNormals *MTrajectoryNormalsSource::produceData(
                 // If both are invalid, just continue and leave the normal at
                 // its default zero value.
                 if (p0.z() != M_INVALID_TRAJECTORY_POS)
-                    worldSpaceNormals->setNormal(baseIndex+t-1, normal);
+                    worldSpaceNormals->setNormal(baseIndex + t - 1, normal);
                 continue;
             }
 
@@ -149,7 +163,7 @@ MTrajectoryNormals *MTrajectoryNormalsSource::produceData(
             segment.normalize();
 
             //TODO: which is correct? (mr, 18Mar2013)
-            //            QVector3D p2 = latLonPVertices.at(baseIndex+t);
+            //            QVector3D p2 = latLonPVertices.at(baseIndex + t);
             //            p2.setZ(MSceneViewGLWidget::worldZfromPressure(
             //                      p2.z(), log_pBottom_hPa, deltaZ_deltaLogP));
 
@@ -167,12 +181,12 @@ MTrajectoryNormals *MTrajectoryNormalsSource::produceData(
             normal = QVector3D::crossProduct(binormal, segment);
             normal.normalize();
 
-            worldSpaceNormals->setNormal(baseIndex+t-1, normal);
+            worldSpaceNormals->setNormal(baseIndex + t - 1, normal);
         }
 
         // The last segment gets the last computed normal twice.
-        worldSpaceNormals->setNormal(baseIndex+numTimeStepsPerTrajectory-1,
-                                     normal);
+        worldSpaceNormals->setNormal(
+                baseIndex + numTimeStepsPerTrajectory - 1, normal);
     }
 
     trajectorySource->releaseData(trajectories);

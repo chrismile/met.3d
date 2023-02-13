@@ -200,7 +200,9 @@ void MAbstractDataReader::deleteFileScanProgressDialog()
 {
     if (fileScanProgressDialogList.last() != nullptr)
     {
-        delete fileScanProgressDialogList.takeLast();
+        QProgressDialog* progressDialog = fileScanProgressDialogList.takeLast();
+        progressDialog->close();
+        delete progressDialog;
         loadingProgressList.removeLast();
     }
 }
