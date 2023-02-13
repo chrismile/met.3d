@@ -46,7 +46,7 @@
 #include "qt_extensions/radarchart.h"
 #include "charts/radarbarchart.h"
 #include "charts/curveplotview.h"
-#include "beziertrajectories.h"
+#include "multivartrajectories.h"
 
 namespace Met3D {
 
@@ -387,11 +387,11 @@ private:
     bool highlightDataDirty = true;
     std::shared_ptr<GL::MShaderEffect> shaderEffectHighlighted;
     const QString indexBufferHighlightedID =
-            QString("beziertrajectories_index_buffer_highlighted_#%1").arg(getID());
+            QString("multivartrajectories_index_buffer_highlighted_#%1").arg(getID());
     const QString vertexPositionBufferHighlightedID =
-            QString("beziertrajectories_vertex_position_buffer_highlighted_#%1").arg(getID());
+            QString("multivartrajectories_vertex_position_buffer_highlighted_#%1").arg(getID());
     const QString vertexColorBufferHighlightedID =
-            QString("beziertrajectories_vertex_color_buffer_highlighted_#%1").arg(getID());
+            QString("multivartrajectories_vertex_color_buffer_highlighted_#%1").arg(getID());
     MHighlightedTrajectoriesRenderData highlightedTrajectoriesRenderData;
     MDiagramBase* diagram = nullptr;
     MDiagramBase* oldDiagram = nullptr;

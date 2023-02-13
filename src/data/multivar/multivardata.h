@@ -78,7 +78,7 @@ public:
     void saveConfiguration(QSettings* settings);
     void loadConfiguration(QSettings* settings);
 
-    void onBezierTrajectoriesLoaded(MTrajectories* trajectories);
+    void onMultiVarTrajectoriesLoaded(MTrajectories* trajectories);
     void clearVariableRanges();
     void updateVariableRanges(const QVector<QVector2D>& ranges);
 

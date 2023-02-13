@@ -53,8 +53,8 @@
 #include "data/trajectorynormalssource.h"
 #include "data/pressuretimetrajectoryfilter.h"
 #include "data/trajectorycomputation.h"
-#include "data/multivar/beziertrajectories.h"
-#include "data/multivar/beziertrajectoriessource.h"
+#include "data/multivar/multivartrajectories.h"
+#include "data/multivar/multivartrajectoriessource.h"
 #include "data/multivar/multivardata.h"
 
 #ifdef USE_EMBREE
@@ -142,9 +142,9 @@ public:
 
     void setNormalsSource(const QString& id);
 
-    void setBezierTrajectoriesSource(MBezierTrajectoriesSource* s);
+    void setMultiVarTrajectoriesSource(MMultiVarTrajectoriesSource* s);
 
-    void setBezierTrajectoriesSource(const QString& id);
+    void setMultiVarTrajectoriesSource(const QString& id);
 
     void setTrajectoryFilter(MTrajectoryFilter* f);
 
@@ -198,7 +198,7 @@ public slots:
     /**
       Called by the normals source when requested normals are ready.
      */
-    void asynchronousBezierTrajectoriesAvailable(MDataRequest request);
+    void asynchronousMultiVarTrajectoriesAvailable(MDataRequest request);
 
     /**
       Called by the trajectory filter when a requested filter computation is
@@ -398,7 +398,7 @@ private:
     {
         MRequestQueueInfo dataRequest;
         QHash<MSceneViewGLWidget*, MRequestQueueInfo> normalsRequests;
-        QHash<MSceneViewGLWidget*, MRequestQueueInfo> bezierTrajectoriesRequests;
+        QHash<MSceneViewGLWidget*, MRequestQueueInfo> multiVarTrajectoriesRequests;
         MRequestQueueInfo filterRequest;
         MRequestQueueInfo singleTimeFilterRequest;
         int numPendingRequests;
@@ -432,9 +432,9 @@ private:
         QHash<MSceneViewGLWidget*, MTrajectoryNormals*> normals;
         QHash<MSceneViewGLWidget*, GL::MVertexBuffer*> normalsVertexBuffer;
 
-        // Bezier trajectories.
-        QHash<MSceneViewGLWidget*, MBezierTrajectories*> bezierTrajectoriesMap;
-        QHash<MSceneViewGLWidget*, MBezierTrajectoriesRenderData> bezierTrajectoriesRenderDataMap;
+        // Multi-var trajectories.
+        QHash<MSceneViewGLWidget*, MMultiVarTrajectories*> multiVarTrajectoriesMap;
+        QHash<MSceneViewGLWidget*, MMultiVarTrajectoriesRenderData> multiVarTrajectoriesRenderDataMap;
         QHash<MSceneViewGLWidget*, MTimeStepSphereRenderData*> timeStepSphereRenderDataMap;
         QHash<MSceneViewGLWidget*, MTimeStepRollsRenderData*> timeStepRollsRenderDataMap;
 
@@ -480,11 +480,11 @@ private:
     QHash<MSceneViewGLWidget*, MTrajectoryNormals*> normals;
     QHash<MSceneViewGLWidget*, GL::MVertexBuffer*> normalsVertexBuffer;
 
-    MBezierTrajectoriesSource* bezierTrajectoriesSource;
+    MMultiVarTrajectoriesSource* multiVarTrajectoriesSource;
     MMultiVarData multiVarData;
-    bool useBezierTrajectories;
-    bool bezierDataDirty = false;
-    QtProperty *useBezierTrajectoriesProperty;
+    bool useMultiVarTrajectories;
+    bool multiVarDataDirty = false;
+    QtProperty *useMultiVarTrajectoriesProperty;
     QtProperty *multiVarGroupProperty;
     bool useMultiVarSpheres = true;
 

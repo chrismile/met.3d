@@ -24,7 +24,7 @@
 **  along with Met.3D.  If not, see <http://www.gnu.org/licenses/>.
 **
 *******************************************************************************/
-#include "beziertrajectoriessource.h"
+#include "multivartrajectoriessource.h"
 
 // standard library imports
 #include <algorithm>
@@ -47,7 +47,7 @@ namespace Met3D
 ***                     CONSTRUCTOR / DESTRUCTOR                            ***
 *******************************************************************************/
 
-MBezierTrajectoriesSource::MBezierTrajectoriesSource()
+MMultiVarTrajectoriesSource::MMultiVarTrajectoriesSource()
         : MScheduledDataSource(),
           trajectorySource(nullptr)
 {
@@ -71,15 +71,15 @@ double distance(const QVector<float>& v1, const QVector<float>& v2)
     return std::sqrt(differenceSum);
 }
 
-MBezierTrajectories *MBezierTrajectoriesSource::produceData(MDataRequest request)
+MMultiVarTrajectories *MMultiVarTrajectoriesSource::produceData(MDataRequest request)
 {
     assert(trajectorySource != nullptr);
 
-    LOG4CPLUS_DEBUG(mlog, "computing bezier trajectories..");
+    LOG4CPLUS_DEBUG(mlog, "computing multi-var trajectories..");
 
     MDataRequestHelper rh(request);
 
-    QStringList args = rh.value("BEZIERTRAJECTORIES_LOGP_SCALED").split("/");
+    QStringList args = rh.value("MULTIVARTRAJECTORIES_LOGP_SCALED").split("/");
     double log_pBottom_hPa  = args[0].toDouble();
     double deltaZ_deltaLogP = args[1].toDouble();
     bool useGeometryShader = args[2].toInt() != 0;
@@ -88,7 +88,7 @@ MBezierTrajectories *MBezierTrajectoriesSource::produceData(MDataRequest request
         tubeNumSubdivisions = args[3].toInt(); ///< Only for !useGeometryShader.
     }
 
-    rh.remove("BEZIERTRAJECTORIES_LOGP_SCALED");
+    rh.remove("MULTIVARTRAJECTORIES_LOGP_SCALED");
     MTrajectories *inTrajectories = trajectorySource->getData(rh.request());
 
     MFilteredTrajectories filteredTrajectories;
@@ -263,8 +263,8 @@ MBezierTrajectories *MBezierTrajectoriesSource::produceData(MDataRequest request
 
     // 2.5) Create buffer array with all variables and statistics
     QVector<QVector<float>> multiVarData(numLines);
-    QVector<MBezierTrajectory::LineDesc> lineDescs(numLines);
-    QVector<QVector<MBezierTrajectory::VarDesc>> lineMultiVarDescs(numLines);
+    QVector<MMultiVarTrajectory::LineDesc> lineDescs(numLines);
+    QVector<QVector<MMultiVarTrajectory::VarDesc>> lineMultiVarDescs(numLines);
 
     uint32_t lineOffset = 0;
     uint32_t lineID = 0;
@@ -274,12 +274,11 @@ MBezierTrajectories *MBezierTrajectoriesSource::produceData(MDataRequest request
 
         for (uint32_t v = 0; v <= numAux; ++v)
         {
-            MBezierTrajectory::VarDesc varDescPerLine = {0};
+            MMultiVarTrajectory::VarDesc varDescPerLine = {0};
             varDescPerLine.minMax = QVector2D(
                     std::numeric_limits<float>::max(), std::numeric_limits<float>::lowest());
             varDescPerLine.sensitivity = false;
             varDescPerLine.startIndex = float(varOffsetPerLine);
-            varDescPerLine.dummy = 0.0f;
 
             const QVector<float>& variableArray = trajectory.attributes[v];
             for (const auto &variable : variableArray)
@@ -296,7 +295,7 @@ MBezierTrajectories *MBezierTrajectoriesSource::produceData(MDataRequest request
 
         for (uint32_t v = numAux + 1; v < numVariables; ++v)
         {
-            MBezierTrajectory::VarDesc varDescPerLine = {0};
+            MMultiVarTrajectory::VarDesc varDescPerLine = {0};
             varDescPerLine.sensitivity = true;
             varDescPerLine.minMaxSens.resize(numOutputParameters);
             for (auto &vec: varDescPerLine.minMaxSens)
@@ -307,7 +306,6 @@ MBezierTrajectories *MBezierTrajectoriesSource::produceData(MDataRequest request
             varDescPerLine.minMax = QVector2D(
                     std::numeric_limits<float>::max(), std::numeric_limits<float>::lowest());
             varDescPerLine.startIndex = float(varOffsetPerLine);
-            varDescPerLine.dummy = 0.0f;
 
             const QVector<float> &variableArray = trajectory.attributes[v];
             const uint64_t numVariablesArray = variableArray.size() / numOutputParameters;
@@ -334,7 +332,7 @@ MBezierTrajectories *MBezierTrajectoriesSource::produceData(MDataRequest request
     }
 
 
-    MBezierTrajectories* newTrajectories = new MBezierTrajectories(
+    MMultiVarTrajectories* newTrajectories = new MMultiVarTrajectories(
             inTrajectories->getGeneratingRequest(),
             filteredTrajectories, indicesToFilteredIndicesMap, numSens, numAux, numVariables,
             auxDataVarNames, outputParameterNames, useGeometryShader, tubeNumSubdivisions);
@@ -342,7 +340,7 @@ MBezierTrajectories *MBezierTrajectoriesSource::produceData(MDataRequest request
     for (int32_t traj = 0; traj < int(filteredTrajectories.size()); ++traj)
     {
         const MFilteredTrajectory& filteredTrajectory = filteredTrajectories.at(traj);
-        MBezierTrajectory newTrajectory;
+        MMultiVarTrajectory newTrajectory;
         newTrajectory.lineID = traj;
 
         for (int i = 0; i < filteredTrajectory.positions.size(); i++)
@@ -359,13 +357,13 @@ MBezierTrajectories *MBezierTrajectoriesSource::produceData(MDataRequest request
     }
 
     trajectorySource->releaseData(inTrajectories);
-    LOG4CPLUS_DEBUG(mlog, ".. bezier trajectories done.");
+    LOG4CPLUS_DEBUG(mlog, ".. multi-var trajectories done.");
 
     return newTrajectories;
 }
 
 
-MTask* MBezierTrajectoriesSource::createTaskGraph(MDataRequest request)
+MTask* MMultiVarTrajectoriesSource::createTaskGraph(MDataRequest request)
 {
     assert(trajectorySource != nullptr);
 
@@ -373,14 +371,14 @@ MTask* MBezierTrajectoriesSource::createTaskGraph(MDataRequest request)
 
     // Add dependency: the trajectories.
     MDataRequestHelper rh(request);
-    rh.remove("BEZIERTRAJECTORIES_LOGP_SCALED");
+    rh.remove("MULTIVARTRAJECTORIES_LOGP_SCALED");
     task->addParent(trajectorySource->getTaskGraph(rh.request()));
 
     return task;
 }
 
 
-void MBezierTrajectoriesSource::setTrajectorySource(MTrajectoryDataSource* s)
+void MMultiVarTrajectoriesSource::setTrajectorySource(MTrajectoryDataSource* s)
 {
     trajectorySource = s;
     registerInputSource(trajectorySource);
@@ -391,9 +389,9 @@ void MBezierTrajectoriesSource::setTrajectorySource(MTrajectoryDataSource* s)
 ***                          PROTECTED METHODS                              ***
 *******************************************************************************/
 
-const QStringList MBezierTrajectoriesSource::locallyRequiredKeys()
+const QStringList MMultiVarTrajectoriesSource::locallyRequiredKeys()
 {
-    return (QStringList() << "BEZIERTRAJECTORIES_LOGP_SCALED");
+    return (QStringList() << "MULTIVARTRAJECTORIES_LOGP_SCALED");
 }
 
 

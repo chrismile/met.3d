@@ -24,8 +24,8 @@
 **  along with Met.3D.  If not, see <http://www.gnu.org/licenses/>.
 **
 *******************************************************************************/
-#ifndef MET_3D_BEZIERTRAJECTORIESSOURCE_H
-#define MET_3D_BEZIERTRAJECTORIESSOURCE_H
+#ifndef MET_3D_MULTIVARTRAJECTORIESSOURCE_H
+#define MET_3D_MULTIVARTRAJECTORIESSOURCE_H
 
 // standard library imports
 
@@ -37,30 +37,30 @@
 #include "../trajectorydatasource.h"
 #include "../trajectories.h"
 #include "../datarequest.h"
-#include "beziertrajectories.h"
+#include "multivartrajectories.h"
 
 
 namespace Met3D
 {
 
 /**
-  @brief Computes normals (required for rendering trajectory tubes) associated
-  with a trajectory dataset.
+  @brief Computes multi-var trajectory data (required for rendering trajectory tubes)
+  associated with a trajectory dataset.
   */
-class MBezierTrajectoriesSource : public MScheduledDataSource
+class MMultiVarTrajectoriesSource : public MScheduledDataSource
 {
 public:
-    MBezierTrajectoriesSource();
+    MMultiVarTrajectoriesSource();
 
     /**
       Overloads @ref MMemoryManagedDataSource::getData() to cast the result
       to the type @ref MFloatPerTrajectorySupplement.
      */
-    MBezierTrajectories* getData(MDataRequest request)
-    { return static_cast<MBezierTrajectories*>
+    MMultiVarTrajectories* getData(MDataRequest request)
+    { return static_cast<MMultiVarTrajectories*>
         (MScheduledDataSource::getData(request)); }
 
-    MBezierTrajectories* produceData(MDataRequest request);
+    MMultiVarTrajectories* produceData(MDataRequest request);
 
     MTask* createTaskGraph(MDataRequest request);
 
@@ -79,4 +79,4 @@ private:
 
 } // namespace Met3D
 
-#endif //MET_3D_BEZIERTRAJECTORIESSOURCE_H
+#endif //MET_3D_MULTIVARTRAJECTORIESSOURCE_H

@@ -24,8 +24,8 @@
 **  along with Met.3D.  If not, see <http://www.gnu.org/licenses/>.
 **
 *******************************************************************************/
-#ifndef MET_3D_BEZIERTRAJECTORIES_H
-#define MET_3D_BEZIERTRAJECTORIES_H
+#ifndef MET_3D_MULTIVARTRAJECTORIES_H
+#define MET_3D_MULTIVARTRAJECTORIES_H
 
 // standard library imports
 
@@ -57,9 +57,9 @@ struct MFilteredTrajectory
 typedef QVector<MFilteredTrajectory> MFilteredTrajectories;
 
 /**
- * Data for one single trajectory for @see MBezierTrajectories.
+ * Data for one single trajectory for @see MMultiVarTrajectories.
  */
-class MBezierTrajectory {
+class MMultiVarTrajectory {
 public:
     unsigned int getMemorySize_kb() const;
 
@@ -67,7 +67,7 @@ public:
     struct LineDesc
     {
         float startIndex; // pointer to index in array
-        float numValues; // number of variables along line after Bezier curve transformation
+        float numValues; // number of variables along line
     };
 
     // Describes the range of values for each variable and the offset within each line
@@ -77,10 +77,9 @@ public:
         QVector2D minMax;
         bool sensitivity;
         QVector<QVector2D> minMaxSens;
-        float dummy;
     };
 
-    // Per Bezier point data.
+    // Point data.
     QVector<QVector3D> positions;
     int lineID;
     QVector<int> elementIDs;
@@ -94,7 +93,7 @@ public:
     QVector<VarDesc> multiVarDescs;
 };
 
-struct MBezierTrajectoriesRenderData
+struct MMultiVarTrajectoriesRenderData
 {
     bool useGeometryShader = false;
     // IBO
@@ -161,24 +160,23 @@ struct LineElementIdData {
 
 /**
  * Flow line data with multiple variables being displayed at once.
- * The lines are smoothed using Bezier curves.
  */
-class MBezierTrajectories : public MSupplementalTrajectoryData
+class MMultiVarTrajectories : public MSupplementalTrajectoryData
 {
 public:
-    MBezierTrajectories(
+    MMultiVarTrajectories(
             MDataRequest requestToReferTo, const MFilteredTrajectories& filteredTrajectories,
             const QVector<int>& trajIndicesToFilteredIndicesMap,
             unsigned int numSens, unsigned int numAux, unsigned int numVariables,
             const QStringList& auxDataVarNames, const QStringList& outputParameterNames,
             bool useGeometryShader, int tubeNumSubdivisions);
-    ~MBezierTrajectories() override;
+    ~MMultiVarTrajectories() override;
 
     unsigned int getMemorySize_kb() override;
 
-    inline int size() const { return bezierTrajectories.size(); }
-    inline MBezierTrajectory& operator[](std::size_t idx) { return bezierTrajectories[idx]; }
-    inline const MBezierTrajectory& operator[](std::size_t idx) const { return bezierTrajectories[idx]; }
+    inline int size() const { return multiVarTrajectories.size(); }
+    inline MMultiVarTrajectory& operator[](std::size_t idx) { return multiVarTrajectories[idx]; }
+    inline const MMultiVarTrajectory& operator[](std::size_t idx) const { return multiVarTrajectories[idx]; }
     inline const MFilteredTrajectories& getBaseTrajectories() const { return baseTrajectories; }
 
     // For trajectory filtering.
@@ -187,7 +185,7 @@ public:
             const GLint* startIndices, const GLsizei* indexCount,
             int numTimeStepsPerTrajectory, int numFilteredTrajectories);
     bool getUseFiltering();
-    inline int getNumTrajectoriesTotal() const { return bezierTrajectories.size(); }
+    inline int getNumTrajectoriesTotal() const { return multiVarTrajectories.size(); }
     int getNumFilteredTrajectories();
     GLsizei* getTrajectorySelectionCount();
     const void* const* getTrajectorySelectionIndices();
@@ -198,7 +196,7 @@ public:
             QVector<QVector<float>>& trajectoryPointTimeSteps,
             QVector<uint32_t>& _selectedTrajectoryIndices);
 
-    MBezierTrajectoriesRenderData getRenderData(
+    MMultiVarTrajectoriesRenderData getRenderData(
 #ifdef USE_QOPENGLWIDGET
             QOpenGLWidget *currentGLContext = nullptr);
 #else
@@ -252,8 +250,8 @@ public:
 
 private:
     MFilteredTrajectories baseTrajectories;
-    QVector<MBezierTrajectory> bezierTrajectories;
-    MBezierTrajectoriesRenderData bezierTrajectoriesRenderData;
+    QVector<MMultiVarTrajectory> multiVarTrajectories;
+    MMultiVarTrajectoriesRenderData multiVarTrajectoriesRenderData;
     QVector<uint32_t> selectedVariableIndices;
     QVector<uint32_t> varDiverging;
     QVector<uint32_t> trajectoryIndexOffsets;
@@ -341,39 +339,39 @@ private:
 //    int selectedOutputParameterIdx = 0;
 
     const QString indexBufferID =
-            QString("beziertrajectories_index_buffer_#%1").arg(getID());
+            QString("multivartrajectories_index_buffer_#%1").arg(getID());
     const QString vertexPositionBufferID =
-            QString("beziertrajectories_vertex_position_buffer_#%1").arg(getID());
+            QString("multivartrajectories_vertex_position_buffer_#%1").arg(getID());
     const QString vertexNormalBufferID =
-            QString("beziertrajectories_vertex_normal_buffer_#%1").arg(getID());
+            QString("multivartrajectories_vertex_normal_buffer_#%1").arg(getID());
     const QString vertexTangentBufferID =
-            QString("beziertrajectories_vertex_tangent_buffer_#%1").arg(getID());
+            QString("multivartrajectories_vertex_tangent_buffer_#%1").arg(getID());
     const QString vertexLineIDBufferID =
-            QString("beziertrajectories_vertex_multi_variable_buffer_#%1").arg(getID());
+            QString("multivartrajectories_vertex_multi_variable_buffer_#%1").arg(getID());
     const QString vertexElementIDBufferID =
-            QString("beziertrajectories_vertex_variable_desc_buffer_#%1").arg(getID());
+            QString("multivartrajectories_vertex_variable_desc_buffer_#%1").arg(getID());
     const QString linePointDataBufferID =
-            QString("beziertrajectories_line_point_data_buffer_#%1").arg(getID());
+            QString("multivartrajectories_line_point_data_buffer_#%1").arg(getID());
     const QString variableArrayBufferID =
-            QString("beziertrajectories_variable_array_buffer_#%1").arg(getID());
+            QString("multivartrajectories_variable_array_buffer_#%1").arg(getID());
     const QString lineDescArrayBufferID =
-            QString("beziertrajectories_line_desc_array_buffer_#%1").arg(getID());
+            QString("multivartrajectories_line_desc_array_buffer_#%1").arg(getID());
     const QString varDescArrayBufferID =
-            QString("beziertrajectories_var_desc_array_buffer_#%1").arg(getID());
+            QString("multivartrajectories_var_desc_array_buffer_#%1").arg(getID());
     const QString lineVarDescArrayBufferID =
-            QString("beziertrajectories_line_var_desc_array_buffer_#%1").arg(getID());
+            QString("multivartrajectories_line_var_desc_array_buffer_#%1").arg(getID());
     const QString varSelectedArrayBufferID =
-            QString("beziertrajectories_var_selected_array_buffer_#%1").arg(getID());
+            QString("multivartrajectories_var_selected_array_buffer_#%1").arg(getID());
     const QString varSelectedTargetVariableAndSensitivityArrayBufferID =
-            QString("beziertrajectories_var_selected_target_variable_and_sensitivity_array_buffer_#%1").arg(getID());
+            QString("multivartrajectories_var_selected_target_variable_and_sensitivity_array_buffer_#%1").arg(getID());
     const QString varDivergingArrayBufferID =
-            QString("beziertrajectories_var_diverging_array_buffer_#%1").arg(getID());
+            QString("multivartrajectories_var_diverging_array_buffer_#%1").arg(getID());
     const QString lineSelectedArrayBufferID =
-            QString("beziertrajectories_line_selected_array_buffer_#%1").arg(getID());
+            QString("multivartrajectories_line_selected_array_buffer_#%1").arg(getID());
     const QString varOutputParameterIdxBufferID =
-            QString("beziertrajectories_var_outputparameter_buffer_#%1").arg(getID());
+            QString("multivartrajectories_var_outputparameter_buffer_#%1").arg(getID());
 };
 
 }
 
-#endif //MET_3D_BEZIERTRAJECTORIES_H
+#endif //MET_3D_MULTIVARTRAJECTORIES_H

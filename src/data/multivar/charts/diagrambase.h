@@ -41,7 +41,7 @@
 #include "gxfw/gl/framebuffer.h"
 #include "data/abstractdataitem.h"
 #include "qt_extensions/radarchart.h"
-#include "src/data/multivar/beziertrajectories.h"
+#include "src/data/multivar/multivartrajectories.h"
 
 struct NVGcontext;
 struct NVGcolor;

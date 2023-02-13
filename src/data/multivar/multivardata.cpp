@@ -865,7 +865,7 @@ void MMultiVarData::onQtPropertyChanged(QtProperty *property)
 }
 
 
-void MMultiVarData::onBezierTrajectoriesLoaded(MTrajectories* trajectories)
+void MMultiVarData::onMultiVarTrajectoriesLoaded(MTrajectories* trajectories)
 {
     const QStringList& auxDataVarNames = trajectories->getAuxDataVarNames();
     const QStringList& sensDataVarNames = trajectories->getSensDataVarNames();

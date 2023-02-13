@@ -24,7 +24,7 @@
 **  along with Met.3D.  If not, see <http://www.gnu.org/licenses/>.
 **
 *******************************************************************************/
-#include "beziertrajectories.h"
+#include "multivartrajectories.h"
 
 // standard library imports
 
@@ -35,9 +35,9 @@
 
 namespace Met3D {
 
-unsigned int MBezierTrajectory::getMemorySize_kb() const {
+unsigned int MMultiVarTrajectory::getMemorySize_kb() const {
     size_t sizeBytes =
-            sizeof(MBezierTrajectory)
+            sizeof(MMultiVarTrajectory)
             + positions.size() * sizeof(QVector3D)
             + sizeof(uint32_t) // lineID
             + elementIDs.size() * sizeof(int32_t)
@@ -48,14 +48,14 @@ unsigned int MBezierTrajectory::getMemorySize_kb() const {
 }
 
 
-MBezierTrajectories::MBezierTrajectories(
+MMultiVarTrajectories::MMultiVarTrajectories(
         MDataRequest requestToReferTo, const MFilteredTrajectories& filteredTrajectories,
         const QVector<int>& trajIndicesToFilteredIndicesMap,
         unsigned int numSens, unsigned int numAux, unsigned int numVariables,
         const QStringList& auxDataVarNames, const QStringList& outputParameterNames,
         bool useGeometryShader, int tubeNumSubdivisions)
         : MSupplementalTrajectoryData(requestToReferTo, filteredTrajectories.size()),
-          baseTrajectories(filteredTrajectories), bezierTrajectories(filteredTrajectories.size()),
+          baseTrajectories(filteredTrajectories), multiVarTrajectories(filteredTrajectories.size()),
           useGeometryShader(useGeometryShader), tubeNumSubdivisions(tubeNumSubdivisions),
           trajIndicesToFilteredIndicesMap(trajIndicesToFilteredIndicesMap),
           numTrajectories(filteredTrajectories.size()), numVariables(numVariables)
@@ -191,7 +191,7 @@ MBezierTrajectories::MBezierTrajectories(
 }
 
 
-MBezierTrajectories::~MBezierTrajectories()
+MMultiVarTrajectories::~MMultiVarTrajectories()
 {
     if (trajectorySelectionCount)
     {
@@ -209,12 +209,12 @@ MBezierTrajectories::~MBezierTrajectories()
 }
 
 
-unsigned int MBezierTrajectories::getMemorySize_kb()
+unsigned int MMultiVarTrajectories::getMemorySize_kb()
 {
-    unsigned int size = sizeof(MBezierTrajectories) / 1024;
-    foreach(const MBezierTrajectory& bezierTrajectory, bezierTrajectories)
+    unsigned int size = sizeof(MMultiVarTrajectories) / 1024;
+    foreach(const MMultiVarTrajectory& multiVarTrajectory, multiVarTrajectories)
     {
-        size += bezierTrajectory.getMemorySize_kb();
+        size += multiVarTrajectory.getMemorySize_kb();
     }
     return size;
 }
@@ -437,7 +437,7 @@ void createLineTubesRenderDataProgrammablePullCPU(
     }
 }
 
-MBezierTrajectoriesRenderData MBezierTrajectories::getRenderData(
+MMultiVarTrajectoriesRenderData MMultiVarTrajectories::getRenderData(
 #ifdef USE_QOPENGLWIDGET
         QOpenGLWidget *currentGLContext)
 #else
@@ -448,12 +448,12 @@ MBezierTrajectoriesRenderData MBezierTrajectories::getRenderData(
     QVector<QVector<int>> lineLineIDList;
     QVector<QVector<int>> lineElementIDList;
 
-    lineCentersList.resize(bezierTrajectories.size());
-    lineLineIDList.resize(bezierTrajectories.size());
-    lineElementIDList.resize(bezierTrajectories.size());
-    for (int trajectoryIdx = 0; trajectoryIdx < bezierTrajectories.size(); trajectoryIdx++)
+    lineCentersList.resize(multiVarTrajectories.size());
+    lineLineIDList.resize(multiVarTrajectories.size());
+    lineElementIDList.resize(multiVarTrajectories.size());
+    for (int trajectoryIdx = 0; trajectoryIdx < multiVarTrajectories.size(); trajectoryIdx++)
     {
-        const MBezierTrajectory& trajectory = bezierTrajectories.at(trajectoryIdx);
+        const MMultiVarTrajectory& trajectory = multiVarTrajectories.at(trajectoryIdx);
         QVector<QVector3D>& lineCenters = lineCentersList[trajectoryIdx];
         QVector<int>& lineLineIDs = lineLineIDList[trajectoryIdx];
         QVector<int>& lineElementIDs = lineElementIDList[trajectoryIdx];
@@ -475,8 +475,8 @@ MBezierTrajectoriesRenderData MBezierTrajectories::getRenderData(
     numIndicesPerTrajectory.clear();
 
 
-    MBezierTrajectoriesRenderData bezierTrajectoriesRenderData;
-    bezierTrajectoriesRenderData.useGeometryShader = useGeometryShader;
+    MMultiVarTrajectoriesRenderData multiVarTrajectoriesRenderData;
+    multiVarTrajectoriesRenderData.useGeometryShader = useGeometryShader;
 
     if (useGeometryShader) {
         QVector<uint32_t> lineIndices;
@@ -491,25 +491,25 @@ MBezierTrajectoriesRenderData MBezierTrajectories::getRenderData(
                 lineIndices, vertexPositions, vertexNormals, vertexTangents, vertexLineIDs, vertexElementIDs);
 
         // Add the index buffer.
-        bezierTrajectoriesRenderData.indexBuffer = createIndexBuffer(
+        multiVarTrajectoriesRenderData.indexBuffer = createIndexBuffer(
                 currentGLContext, indexBufferID, lineIndices);
 
         // Add the position buffer.
-        bezierTrajectoriesRenderData.vertexPositionBuffer = createVertexBuffer(
+        multiVarTrajectoriesRenderData.vertexPositionBuffer = createVertexBuffer(
                 currentGLContext, vertexPositionBufferID, vertexPositions);
 
         // Add the normal buffer.
-        bezierTrajectoriesRenderData.vertexNormalBuffer = createVertexBuffer(
+        multiVarTrajectoriesRenderData.vertexNormalBuffer = createVertexBuffer(
                 currentGLContext, vertexNormalBufferID, vertexNormals);
 
         // Add the tangent buffer.
-        bezierTrajectoriesRenderData.vertexTangentBuffer = createVertexBuffer(
+        multiVarTrajectoriesRenderData.vertexTangentBuffer = createVertexBuffer(
                 currentGLContext, vertexTangentBufferID, vertexTangents);
 
         // Add the attribute buffers.
-        bezierTrajectoriesRenderData.vertexLineIDBuffer = createVertexBuffer(
+        multiVarTrajectoriesRenderData.vertexLineIDBuffer = createVertexBuffer(
                 currentGLContext, vertexLineIDBufferID, vertexLineIDs);
-        bezierTrajectoriesRenderData.vertexElementIDBuffer = createVertexBuffer(
+        multiVarTrajectoriesRenderData.vertexElementIDBuffer = createVertexBuffer(
                 currentGLContext, vertexElementIDBufferID, vertexElementIDs);
     } else {
         QVector<uint32_t> triangleIndices;
@@ -520,55 +520,55 @@ MBezierTrajectoriesRenderData MBezierTrajectories::getRenderData(
                 triangleIndices, linePointDataList, tubeNumSubdivisions);
 
         // Add the index buffer.
-        bezierTrajectoriesRenderData.indexBuffer = createIndexBuffer(
+        multiVarTrajectoriesRenderData.indexBuffer = createIndexBuffer(
                 currentGLContext, indexBufferID, triangleIndices);
 
         // Add the line data buffer.
-        bezierTrajectoriesRenderData.linePointDataBuffer = createShaderStorageBuffer(
+        multiVarTrajectoriesRenderData.linePointDataBuffer = createShaderStorageBuffer(
                 currentGLContext, linePointDataBufferID, linePointDataList);
     }
 
 
     // ------------------------------------------ Create SSBOs. ------------------------------------------
-    size_t numLines = bezierTrajectories.size();
+    size_t numLines = multiVarTrajectories.size();
     QVector<float> varData;
     QVector<float> lineDescData(numLines);
     QVector<QVector4D> varDescData;
     QVector<QVector2D> lineVarDescData;
 
-    for (const MBezierTrajectory& bezierTrajectory : bezierTrajectories)
+    for (const MMultiVarTrajectory& multiVarTrajectory : multiVarTrajectories)
     {
-        for (float attrVal : bezierTrajectory.multiVarData)
+        for (float attrVal : multiVarTrajectory.multiVarData)
         {
             varData.push_back(attrVal);
         }
     }
     for (size_t lineIdx = 0; lineIdx < numLines; ++lineIdx)
     {
-        lineDescData[lineIdx] = bezierTrajectories.at(lineIdx).lineDesc.startIndex;
+        lineDescData[lineIdx] = multiVarTrajectories.at(lineIdx).lineDesc.startIndex;
     }
 
-    const size_t numVars = bezierTrajectories.empty() ? 0 : bezierTrajectories.front().multiVarDescs.size();
+    const size_t numVars = multiVarTrajectories.empty() ? 0 : multiVarTrajectories.front().multiVarDescs.size();
 
     QVector<float> attributesMinValues(numVars, 0.0f);
     QVector<float> attributesMaxValues(numVars, 0.0f);
     for (size_t lineIdx = 0; lineIdx < numLines; ++lineIdx)
     {
-        const MBezierTrajectory& bezierTrajectory = bezierTrajectories[lineIdx];
+        const MMultiVarTrajectory& multiVarTrajectory = multiVarTrajectories[lineIdx];
         for (size_t varIdx = 0; varIdx < numVars; ++varIdx)
         {
-            if (bezierTrajectory.multiVarDescs.at(varIdx).sensitivity)
+            if (multiVarTrajectory.multiVarDescs.at(varIdx).sensitivity)
             {
                 attributesMinValues[varIdx] = std::min(
-                        attributesMinValues.at(varIdx), bezierTrajectory.multiVarDescs.at(varIdx).minMaxSens[0].x());
+                        attributesMinValues.at(varIdx), multiVarTrajectory.multiVarDescs.at(varIdx).minMaxSens[0].x());
                 attributesMaxValues[varIdx] = std::max(
-                        attributesMaxValues.at(varIdx), bezierTrajectory.multiVarDescs.at(varIdx).minMaxSens[0].y());
+                        attributesMaxValues.at(varIdx), multiVarTrajectory.multiVarDescs.at(varIdx).minMaxSens[0].y());
             } else
             {
                 attributesMinValues[varIdx] = std::min(
-                        attributesMinValues.at(varIdx), bezierTrajectory.multiVarDescs.at(varIdx).minMax.x());
+                        attributesMinValues.at(varIdx), multiVarTrajectory.multiVarDescs.at(varIdx).minMax.x());
                 attributesMaxValues[varIdx] = std::max(
-                        attributesMaxValues.at(varIdx), bezierTrajectory.multiVarDescs.at(varIdx).minMax.y());
+                        attributesMaxValues.at(varIdx), multiVarTrajectory.multiVarDescs.at(varIdx).minMax.y());
             }
 
         }
@@ -578,22 +578,22 @@ MBezierTrajectoriesRenderData MBezierTrajectories::getRenderData(
     {
         for (size_t varIdx = 0; varIdx < numVars; ++varIdx)
         {
-            const MBezierTrajectory& bezierTrajectory = bezierTrajectories[lineIdx];
+            const MMultiVarTrajectory& multiVarTrajectory = multiVarTrajectories[lineIdx];
             QVector4D descData(
-                    bezierTrajectory.multiVarDescs.at(varIdx).startIndex,
+                    multiVarTrajectory.multiVarDescs.at(varIdx).startIndex,
                     attributesMinValues.at(varIdx), attributesMaxValues.at(varIdx), 0.0);
             varDescData.push_back(descData);
-            if (bezierTrajectory.multiVarDescs.at(varIdx).sensitivity)
+            if (multiVarTrajectory.multiVarDescs.at(varIdx).sensitivity)
             {
                 QVector2D lineVarDesc(
-                        bezierTrajectory.multiVarDescs.at(varIdx).minMaxSens[0].x(),
-                        bezierTrajectory.multiVarDescs.at(varIdx).minMaxSens[0].y());
+                        multiVarTrajectory.multiVarDescs.at(varIdx).minMaxSens[0].x(),
+                        multiVarTrajectory.multiVarDescs.at(varIdx).minMaxSens[0].y());
                 lineVarDescData.push_back(lineVarDesc);
             } else
             {
                 QVector2D lineVarDesc(
-                        bezierTrajectory.multiVarDescs.at(varIdx).minMax.x(),
-                        bezierTrajectory.multiVarDescs.at(varIdx).minMax.y());
+                        multiVarTrajectory.multiVarDescs.at(varIdx).minMax.x(),
+                        multiVarTrajectory.multiVarDescs.at(varIdx).minMax.y());
                 lineVarDescData.push_back(lineVarDesc);
             }
         }
@@ -607,36 +607,36 @@ MBezierTrajectoriesRenderData MBezierTrajectories::getRenderData(
         OutputParameterIdx.push_back(numAux + 1);
         OutputParameterIdx.push_back(numTimesteps);
     }
-    bezierTrajectoriesRenderData.variableArrayBuffer = createShaderStorageBuffer(
+    multiVarTrajectoriesRenderData.variableArrayBuffer = createShaderStorageBuffer(
             currentGLContext, variableArrayBufferID, varData);
-    bezierTrajectoriesRenderData.lineDescArrayBuffer = createShaderStorageBuffer(
+    multiVarTrajectoriesRenderData.lineDescArrayBuffer = createShaderStorageBuffer(
             currentGLContext, lineDescArrayBufferID, lineDescData);
-    bezierTrajectoriesRenderData.varDescArrayBuffer = createShaderStorageBuffer(
+    multiVarTrajectoriesRenderData.varDescArrayBuffer = createShaderStorageBuffer(
             currentGLContext, varDescArrayBufferID, varDescData);
-    bezierTrajectoriesRenderData.lineVarDescArrayBuffer = createShaderStorageBuffer(
+    multiVarTrajectoriesRenderData.lineVarDescArrayBuffer = createShaderStorageBuffer(
             currentGLContext, lineVarDescArrayBufferID, lineVarDescData);
-    bezierTrajectoriesRenderData.varSelectedArrayBuffer = createShaderStorageBuffer(
+    multiVarTrajectoriesRenderData.varSelectedArrayBuffer = createShaderStorageBuffer(
             currentGLContext, varSelectedArrayBufferID, varSelected);
-    bezierTrajectoriesRenderData.varSelectedTargetVariableAndSensitivityArrayBuffer = createShaderStorageBuffer(
+    multiVarTrajectoriesRenderData.varSelectedTargetVariableAndSensitivityArrayBuffer = createShaderStorageBuffer(
             currentGLContext, varSelectedTargetVariableAndSensitivityArrayBufferID,
             targetVariableAndSensitivityIndexArray);
-    bezierTrajectoriesRenderData.varDivergingArrayBuffer = createShaderStorageBuffer(
+    multiVarTrajectoriesRenderData.varDivergingArrayBuffer = createShaderStorageBuffer(
             currentGLContext, varDivergingArrayBufferID, varDiverging);
-    bezierTrajectoriesRenderData.lineSelectedArrayBuffer = createShaderStorageBuffer(
+    multiVarTrajectoriesRenderData.lineSelectedArrayBuffer = createShaderStorageBuffer(
             currentGLContext, lineSelectedArrayBufferID, selectedLines);
-    bezierTrajectoriesRenderData.varOutputParameterIdxBuffer = createShaderStorageBuffer(
+    multiVarTrajectoriesRenderData.varOutputParameterIdxBuffer = createShaderStorageBuffer(
             currentGLContext, varOutputParameterIdxBufferID, OutputParameterIdx);
 
-    this->bezierTrajectoriesRenderData = bezierTrajectoriesRenderData;
+    this->multiVarTrajectoriesRenderData = multiVarTrajectoriesRenderData;
 
-    return bezierTrajectoriesRenderData;
+    return multiVarTrajectoriesRenderData;
 }
 
 
-void MBezierTrajectories::releaseRenderData()
+void MMultiVarTrajectories::releaseRenderData()
 {
     MGLResourcesManager::getInstance()->releaseGPUItem(indexBufferID);
-    if (bezierTrajectoriesRenderData.useGeometryShader) {
+    if (multiVarTrajectoriesRenderData.useGeometryShader) {
         MGLResourcesManager::getInstance()->releaseGPUItem(vertexNormalBufferID);
         MGLResourcesManager::getInstance()->releaseGPUItem(vertexTangentBufferID);
         MGLResourcesManager::getInstance()->releaseGPUItem(vertexLineIDBufferID);
@@ -655,34 +655,34 @@ void MBezierTrajectories::releaseRenderData()
 }
 
 
-void MBezierTrajectories::updateSelectedVariableIndices(const QVector<uint32_t>& _selectedVariableIndices)
+void MMultiVarTrajectories::updateSelectedVariableIndices(const QVector<uint32_t>& _selectedVariableIndices)
 {
     this->selectedVariableIndices = _selectedVariableIndices;
-    if (bezierTrajectoriesRenderData.varSelectedArrayBuffer)
+    if (multiVarTrajectoriesRenderData.varSelectedArrayBuffer)
     {
         QVector<uint32_t> selectedVariableIndicesAll;
         selectedVariableIndicesAll.resize(int(numVariables));
         for (int i = 0; i < selectedVariableIndices.size(); i++) {
             selectedVariableIndicesAll[int(i)] = selectedVariableIndices.at(int(i));
         }
-        bezierTrajectoriesRenderData.varSelectedArrayBuffer->upload(
+        multiVarTrajectoriesRenderData.varSelectedArrayBuffer->upload(
                 selectedVariableIndicesAll.constData(), GL_STATIC_DRAW);
     }
 }
 
 
-void MBezierTrajectories::updateDivergingVariables(const QVector<uint32_t>& varDiverging)
+void MMultiVarTrajectories::updateDivergingVariables(const QVector<uint32_t>& varDiverging)
 {
     this->varDiverging = varDiverging;
-    if (bezierTrajectoriesRenderData.varDivergingArrayBuffer)
+    if (multiVarTrajectoriesRenderData.varDivergingArrayBuffer)
     {
-        bezierTrajectoriesRenderData.varDivergingArrayBuffer->upload(
+        multiVarTrajectoriesRenderData.varDivergingArrayBuffer->upload(
                 this->varDiverging.constData(), GL_STATIC_DRAW);
     }
 }
 
 
-void MBezierTrajectories::updateSelectedLines(const QVector<uint32_t>& selectedLines)
+void MMultiVarTrajectories::updateSelectedLines(const QVector<uint32_t>& selectedLines)
 {
     if (selectedLines.empty())
     {
@@ -697,15 +697,15 @@ void MBezierTrajectories::updateSelectedLines(const QVector<uint32_t>& selectedL
         this->selectedLines = selectedLines;
     }
 
-    if (bezierTrajectoriesRenderData.lineSelectedArrayBuffer)
+    if (multiVarTrajectoriesRenderData.lineSelectedArrayBuffer)
     {
-        bezierTrajectoriesRenderData.lineSelectedArrayBuffer->upload(
+        multiVarTrajectoriesRenderData.lineSelectedArrayBuffer->upload(
                 this->selectedLines.constData(), GL_STATIC_DRAW);
     }
 }
 
 
-void MBezierTrajectories::updateOutputParameterIdx(const int OutputParameterIdx)
+void MMultiVarTrajectories::updateOutputParameterIdx(const int OutputParameterIdx)
 {
     if (this->OutputParameterIdx.empty())
     {
@@ -721,20 +721,20 @@ void MBezierTrajectories::updateOutputParameterIdx(const int OutputParameterIdx)
         this->OutputParameterIdx[0] = OutputParameterIdx;
     }
     // TODO Either upload the index and change the next source file or change the index buffer such as
-    if (bezierTrajectoriesRenderData.varSelectedArrayBuffer)
+    if (multiVarTrajectoriesRenderData.varSelectedArrayBuffer)
     {
-        bezierTrajectoriesRenderData.varOutputParameterIdxBuffer->upload(
+        multiVarTrajectoriesRenderData.varOutputParameterIdxBuffer->upload(
                 this->OutputParameterIdx.constData(), GL_STATIC_DRAW);
     }
 //    this->selectedVariableIndices
-//    if (bezierTrajectoriesRenderData.varSelectedArrayBuffer)
+//    if (multiVarTrajectoriesRenderData.varSelectedArrayBuffer)
 //    {
 //        QVector<uint32_t> selectedVariableIndicesAll;
 //        selectedVariableIndicesAll.resize(int(numVariables));
 //        for (int i = 0; i < selectedVariableIndices.size(); i++) {
 //            selectedVariableIndicesAll[int(i)] = selectedVariableIndices.at(int(i));
 //        }
-//        bezierTrajectoriesRenderData.varSelectedArrayBuffer->upload(
+//        multiVarTrajectoriesRenderData.varSelectedArrayBuffer->upload(
 //                selectedVariableIndicesAll.constData(), GL_STATIC_DRAW);
 //    }
 //  or maybe varDescArrayBufferID
@@ -742,7 +742,7 @@ void MBezierTrajectories::updateOutputParameterIdx(const int OutputParameterIdx)
 }
 
 
-void MBezierTrajectories::updateLineAscentTimeStepArrayBuffer(
+void MMultiVarTrajectories::updateLineAscentTimeStepArrayBuffer(
         const QVector<int>& _ascentTimeStepIndices, int _maxAscentTimeStepIndex)
 {
     ascentTimeStepIndices = _ascentTimeStepIndices;
@@ -750,7 +750,7 @@ void MBezierTrajectories::updateLineAscentTimeStepArrayBuffer(
 }
 
 
-MTimeStepSphereRenderData* MBezierTrajectories::getTimeStepSphereRenderData(
+MTimeStepSphereRenderData* MMultiVarTrajectories::getTimeStepSphereRenderData(
 #ifdef USE_QOPENGLWIDGET
         QOpenGLWidget *currentGLContext)
 #else
@@ -894,7 +894,7 @@ bool halfLineSphereIntersection(
 }
 
 
-bool MBezierTrajectories::updateTimeStepSphereRenderDataIfNecessary(
+bool MMultiVarTrajectories::updateTimeStepSphereRenderDataIfNecessary(
         TrajectorySyncMode trajectorySyncMode, int timeStep, uint32_t syncModeTrajectoryIndex, float sphereRadius,
 #ifdef USE_QOPENGLWIDGET
         QOpenGLWidget *currentGLContext)
@@ -937,8 +937,8 @@ bool MBezierTrajectories::updateTimeStepSphereRenderDataIfNecessary(
     {
         if (useFiltering)
         {
-            int bezierTrajectoryIdx = trajIndicesToFilteredIndicesMap[trajectoryIndex];
-            if (bezierTrajectoryIdx == -1 || trajectoryCompletelyFilteredMap[bezierTrajectoryIdx] == 0)
+            int multiVarTrajectoryIdx = trajIndicesToFilteredIndicesMap[trajectoryIndex];
+            if (multiVarTrajectoryIdx == -1 || trajectoryCompletelyFilteredMap[multiVarTrajectoryIdx] == 0)
             {
                 trajectoryIndex++;
                 continue;
@@ -1112,7 +1112,7 @@ bool MBezierTrajectories::updateTimeStepSphereRenderDataIfNecessary(
     return true;
 }
 
-void MBezierTrajectories::releaseTimeStepSphereRenderData()
+void MMultiVarTrajectories::releaseTimeStepSphereRenderData()
 {
     MGLResourcesManager::getInstance()->releaseGPUItem(timeStepSphereRenderData.indexBuffer);
     MGLResourcesManager::getInstance()->releaseGPUItem(timeStepSphereRenderData.vertexPositionBuffer);
@@ -1124,7 +1124,7 @@ void MBezierTrajectories::releaseTimeStepSphereRenderData()
 }
 
 
-MTimeStepRollsRenderData* MBezierTrajectories::getTimeStepRollsRenderData(
+MTimeStepRollsRenderData* MMultiVarTrajectories::getTimeStepRollsRenderData(
 #ifdef USE_QOPENGLWIDGET
         QOpenGLWidget *currentGLContext)
 #else
@@ -1135,7 +1135,7 @@ MTimeStepRollsRenderData* MBezierTrajectories::getTimeStepRollsRenderData(
 }
 
 
-void MBezierTrajectories::updateTimeStepRollsRenderDataIfNecessary(
+void MMultiVarTrajectories::updateTimeStepRollsRenderDataIfNecessary(
         TrajectorySyncMode trajectorySyncMode, int timeStep, uint32_t syncModeTrajectoryIndex, float tubeRadius,
         float rollsRadius, float rollsWidth, bool mapRollsThickness, int numLineSegments,
 #ifdef USE_QOPENGLWIDGET
@@ -1625,7 +1625,7 @@ void MBezierTrajectories::updateTimeStepRollsRenderDataIfNecessary(
             currentGLContext, timeStepRollsVertexVariableIdAndIsCapBufferBufferID, vertexVariableIdAndIsCapList);
 }
 
-void MBezierTrajectories::releaseTimeStepRollsRenderData()
+void MMultiVarTrajectories::releaseTimeStepRollsRenderData()
 {
     MGLResourcesManager::getInstance()->releaseGPUItem(timeStepRollsRenderData.indexBuffer);
     MGLResourcesManager::getInstance()->releaseGPUItem(timeStepRollsRenderData.vertexPositionBuffer);
@@ -1640,7 +1640,7 @@ void MBezierTrajectories::releaseTimeStepRollsRenderData()
 
 inline int iceil(int x, int y) { return (x - 1) / y + 1; }
 
-void MBezierTrajectories::updateTrajectorySelection(
+void MMultiVarTrajectories::updateTrajectorySelection(
         const GLint* startIndices, const GLsizei* indexCount,
         int numTimeStepsPerTrajectory, int numSelectedTrajectories)
 {
@@ -1649,7 +1649,7 @@ void MBezierTrajectories::updateTrajectorySelection(
     }
 
     trajectoryCompletelyFilteredMap.clear();
-    trajectoryCompletelyFilteredMap.resize(bezierTrajectories.size());
+    trajectoryCompletelyFilteredMap.resize(multiVarTrajectories.size());
     useFiltering = false;
     int filteredTrajectoryIdx = 0;
     for (int trajectorySelectionIdx = 0; trajectorySelectionIdx < numSelectedTrajectories; trajectorySelectionIdx++)
@@ -1659,18 +1659,18 @@ void MBezierTrajectories::updateTrajectorySelection(
         int offsetSelection = startSelection % numTimeStepsPerTrajectory;
         //int trajectoryIdx = iceil(startSelection, numTimeStepsPerTrajectory);
         int trajectoryIdx = startSelection / numTimeStepsPerTrajectory;
-        int bezierTrajectoryIdx = trajIndicesToFilteredIndicesMap[trajectoryIdx];
-        if (bezierTrajectoryIdx == -1 || offsetSelection >= countSelection) {
+        int multiVarTrajectoryIdx = trajIndicesToFilteredIndicesMap[trajectoryIdx];
+        if (multiVarTrajectoryIdx == -1 || offsetSelection >= countSelection) {
             continue;
         }
 
-        uint32_t trajectoryIndexOffset = trajectoryIndexOffsets.at(bezierTrajectoryIdx);
-        uint32_t numTrajectoryIndices = numIndicesPerTrajectory.at(bezierTrajectoryIdx);
+        uint32_t trajectoryIndexOffset = trajectoryIndexOffsets.at(multiVarTrajectoryIdx);
+        uint32_t numTrajectoryIndices = numIndicesPerTrajectory.at(multiVarTrajectoryIdx);
         if (numTrajectoryIndices == 0) {
             continue;
         }
 
-        //MBezierTrajectory& bezierTrajectory = bezierTrajectories[trajectoryIdx];
+        //MMultiVarTrajectory& multiVarTrajectory = multiVarTrajectories[trajectoryIdx];
 
         GLsizei selectionCount;
         if (countSelection == numTimeStepsPerTrajectory) {
@@ -1697,7 +1697,7 @@ void MBezierTrajectories::updateTrajectorySelection(
         selectionIndex += trajectoryIndexOffset;
         selectionIndex = ptrdiff_t(selectionIndex * sizeof(uint32_t));
 
-        trajectoryCompletelyFilteredMap[bezierTrajectoryIdx] = 1;
+        trajectoryCompletelyFilteredMap[multiVarTrajectoryIdx] = 1;
         trajectorySelectionCount[filteredTrajectoryIdx] = selectionCount;
         trajectorySelectionIndices[filteredTrajectoryIdx] = selectionIndex;
         filteredTrajectoryIdx++;
@@ -1714,27 +1714,27 @@ void MBezierTrajectories::updateTrajectorySelection(
     }
 }
 
-bool MBezierTrajectories::getUseFiltering()
+bool MMultiVarTrajectories::getUseFiltering()
 {
     return useFiltering;
 }
 
-int MBezierTrajectories::getNumFilteredTrajectories()
+int MMultiVarTrajectories::getNumFilteredTrajectories()
 {
     return numFilteredTrajectories;
 }
 
-GLsizei* MBezierTrajectories::getTrajectorySelectionCount()
+GLsizei* MMultiVarTrajectories::getTrajectorySelectionCount()
 {
     return trajectorySelectionCount;
 }
 
-const void* const* MBezierTrajectories::getTrajectorySelectionIndices()
+const void* const* MMultiVarTrajectories::getTrajectorySelectionIndices()
 {
     return reinterpret_cast<const void* const*>(trajectorySelectionIndices);
 }
 
-bool MBezierTrajectories::getFilteredTrajectories(
+bool MMultiVarTrajectories::getFilteredTrajectories(
         const GLint* startIndices, const GLsizei* indexCount,
         int numTimeStepsPerTrajectory, int numSelectedTrajectories,
         QVector<QVector<QVector3D>>& trajectories,
@@ -1751,15 +1751,15 @@ bool MBezierTrajectories::getFilteredTrajectories(
         GLsizei countSelection = indexCount[trajectorySelectionIdx];
         int offsetSelection = startSelection % numTimeStepsPerTrajectory;
         int trajectoryIdx = startSelection / numTimeStepsPerTrajectory;
-        int bezierTrajectoryIdx = trajIndicesToFilteredIndicesMap[trajectoryIdx];
-        if (bezierTrajectoryIdx == -1 || offsetSelection >= countSelection)
+        int multiVarTrajectoryIdx = trajIndicesToFilteredIndicesMap[trajectoryIdx];
+        if (multiVarTrajectoryIdx == -1 || offsetSelection >= countSelection)
         {
             continue;
         }
 
-        const MBezierTrajectory& bezierTrajectory = bezierTrajectories[trajectoryIdx];
+        const MMultiVarTrajectory& multiVarTrajectory = multiVarTrajectories[trajectoryIdx];
 
-        int numTrajectoryPoints = bezierTrajectory.positions.size();
+        int numTrajectoryPoints = multiVarTrajectory.positions.size();
         if (numTrajectoryPoints <= 1)
         {
             continue;
@@ -1783,8 +1783,8 @@ bool MBezierTrajectories::getFilteredTrajectories(
         QVector<float> pointTimeSteps;
         for (int i = selectionIndex; i < selectionCount; i++)
         {
-            trajectory.push_back(bezierTrajectory.positions.at(i));
-            pointTimeSteps.push_back(float(bezierTrajectory.elementIDs.at(i)));
+            trajectory.push_back(multiVarTrajectory.positions.at(i));
+            pointTimeSteps.push_back(float(multiVarTrajectory.elementIDs.at(i)));
         }
 
         trajectories.push_back(trajectory);
