@@ -273,9 +273,6 @@ fi
 
 if [ ! -d "./met.3d" ]; then
     git clone https://gitlab.com/chrismile/met.3d
-    pushd met.3d >/dev/null
-    git checkout multivar
-    popd >/dev/null
 fi
 
 if [ ! -d "./build" ]; then
