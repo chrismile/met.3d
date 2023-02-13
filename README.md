@@ -9,6 +9,15 @@ Documentation is available online at
 Please refer to these websites for more details.
 *********************************************************************
 
+### Information regarding multi-var trajectory functionality:
+- Please use the build-linux.sh script to compile the program with multi-var trajectory functionality.
+- Currently, only Ubuntu 20.04 and Ubuntu 22.04 are supported by the script.
+  To build the program on other operating systems, it is recommended to adapt the build script.
+
+[![DOI](https://zenodo.org/badge/581172867.svg)](https://zenodo.org/badge/latestdoi/581172867)
+
+*********************************************************************
+
 Met.3D is an open-source visualization tool for interactive, three-dimensional
 visualization of numerical ensemble weather predictions and similar numerical
 atmospheric model datasets. The tool is implemented in C++ and OpenGL-4 and
