@@ -196,6 +196,9 @@ private:
 
     void renderShadow(MSceneViewGLWidget* sceneView);
 
+    void renderShadowFilledContours(
+            MSceneViewGLWidget* sceneView, MNWP2DHorizontalActorVariable* var);
+
     void renderContourLabels(MSceneViewGLWidget *sceneView,
                              MNWP2DHorizontalActorVariable* var);
 
@@ -209,6 +212,7 @@ private:
     std::shared_ptr<GL::MShaderEffect> glVectorGlyphsShader;
     std::shared_ptr<GL::MShaderEffect> gl3DVectorGlyphsShader;
     std::shared_ptr<GL::MShaderEffect> glShadowQuad;
+    std::shared_ptr<GL::MShaderEffect> glFilledContoursShadowShader;
     std::shared_ptr<GL::MShaderEffect> positionSpheresShader;
 
     QtProperty *slicePosProperty;
@@ -368,6 +372,9 @@ private:
 
     GLfloat     shadowElevation_hPa;
     QtProperty* shadowElevationProperty;
+
+    bool        shadowFilledContours;
+    QtProperty* shadowFilledContoursProperty;
 
     // If the user picks the handle not in its centre, we cannot move the handle
     // by setting the centre point to the mouse position so we need this offset

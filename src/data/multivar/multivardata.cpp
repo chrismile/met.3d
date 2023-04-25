@@ -59,6 +59,7 @@ const QStringList focusRenderingTechniqueShaderFilenames = {
         "src/glsl/multivar/multivar_sphere_cross_section.fx.glsl",
         "src/glsl/multivar/multivar_sphere_pie_chart.fx.glsl",
         "src/glsl/multivar/multivar_sphere_pie_chart.fx.glsl",
+        "src/glsl/multivar/multivar_sphere_pie_chart.fx.glsl",
         "src/glsl/multivar/multivar_focus_rolls.fx.glsl"
 };
 
@@ -158,6 +159,48 @@ void MMultiVarData::setProperties(MActor *actor, MQtProperties *properties, QtPr
     properties->mBool()->setValue(targetVariableAndSensitivityProperty, targetVariableAndSensitivity);
     targetVariableAndSensitivityProperty->setToolTip("Whether to map the variables to color intensity.");
     propertyList.push_back(targetVariableAndSensitivityProperty);
+
+
+    // --- Group: Region of interest selection ---
+    regionOfInterestGroupProperty = addProperty(
+            GROUP_PROPERTY, "region of interest", multiVarGroupProperty);
+    // Var A.
+    variableAProperty = addProperty(
+            ENUM_PROPERTY, "var A", regionOfInterestGroupProperty);
+    variableAProperty->setToolTip(
+            "The first variable to use for region of interest selection.");
+    propertyList.push_back(variableAProperty);
+    variableALowerRangeProperty = addProperty(
+            DECORATEDDOUBLE_PROPERTY, "lower (var A)", regionOfInterestGroupProperty);
+    properties->setDDouble(variableALowerRangeProperty, roiVarALower, 0.0, 1.0, 4, 0.01, " (value)");
+    variableALowerRangeProperty->setToolTip("Region of interest variable A lower value.");
+    propertyList.push_back(variableALowerRangeProperty);
+    variableAUpperRangeProperty = addProperty(
+            DECORATEDDOUBLE_PROPERTY, "upper (var A)", regionOfInterestGroupProperty);
+    properties->setDDouble(variableAUpperRangeProperty, roiVarAUpper, 0.0, 1.0, 4, 0.01, " (value)");
+    variableAUpperRangeProperty->setToolTip("Region of interest variable A upper value.");
+    propertyList.push_back(variableAUpperRangeProperty);
+    // Var B.
+    variableBProperty = addProperty(
+            ENUM_PROPERTY, "var B", regionOfInterestGroupProperty);
+    variableBProperty->setToolTip(
+            "The first variable to use for region of interest selection.");
+    propertyList.push_back(variableBProperty);
+    variableBLowerRangeProperty = addProperty(
+            DECORATEDDOUBLE_PROPERTY, "lower (var B)", regionOfInterestGroupProperty);
+    properties->setDDouble(variableBLowerRangeProperty, roiVarBLower, 0.0, 1.0, 4, 0.01, " (value)");
+    variableBLowerRangeProperty->setToolTip("Region of interest variable B lower value.");
+    propertyList.push_back(variableBLowerRangeProperty);
+    variableBUpperRangeProperty = addProperty(
+            DECORATEDDOUBLE_PROPERTY, "upper (var B)", regionOfInterestGroupProperty);
+    properties->setDDouble(variableBUpperRangeProperty, roiVarBUpper, 0.0, 1.0, 4, 0.01, " (value)");
+    variableBUpperRangeProperty->setToolTip("Region of interest variable B upper value.");
+    propertyList.push_back(variableBUpperRangeProperty);
+    // Button.
+    selectRegionOfInterestProperty = addProperty(
+            CLICK_PROPERTY, "(de)select", regionOfInterestGroupProperty);
+    selectRegionOfInterestProperty->setToolTip("Selects or deselects the region of interest.");
+    propertyList.push_back(selectRegionOfInterestProperty);
 
 
     // --- Group: Rendering settings ---
@@ -291,6 +334,43 @@ void MMultiVarData::setPropertiesOutputParameter()
 }
 
 
+void MMultiVarData::setPropertiesRegionOfInterest()
+{
+    QStringList varNamesList;
+    foreach (const QString &varName, varNames)
+    {
+        varNamesList.push_back(varName);
+    }
+    properties->mEnum()->setEnumNames(variableAProperty, varNamesList);
+    properties->mEnum()->setValue(variableAProperty, int(roiVarAIndex));
+    properties->mEnum()->setEnumNames(variableBProperty, varNamesList);
+    properties->mEnum()->setValue(variableBProperty, int(roiVarBIndex));
+}
+
+
+void MMultiVarData::selectRegionOfInterest()
+{
+    bool shaderUsesROINew = shaderUsesROI;
+    if (!roiValueHasChanged && shaderUsesROI)
+    {
+        // Deselect the region of interest.
+        shaderUsesROINew = false;
+    }
+    else
+    {
+        roiChanged = true;
+        roiValueHasChanged = false;
+        shaderUsesROINew = true;
+    }
+
+    if (shaderUsesROINew != shaderUsesROI)
+    {
+        shaderUsesROI = shaderUsesROINew;
+        reloadShaderEffect();
+    }
+}
+
+
 void MMultiVarData::updateNumVariablesSelected()
 {
     numVariablesSelected = selectedVariableIndices.size();
@@ -417,6 +497,7 @@ void MMultiVarData::loadConfiguration(QSettings *settings)
     maxNumVariables = varNames.size();
     setPropertiesVarSelected();
     updateNumVariablesSelected();
+    setPropertiesRegionOfInterest();
     selectedVariablesChanged = true;
 
     // Multi-variable settings.
@@ -837,6 +918,48 @@ void MMultiVarData::onQtPropertyChanged(QtProperty *property)
         selectedOutputParameter = properties->mEnum()->enumNames(outputParameterProperty)[idx];
         selectedOutputParameterChanged = true;
     }
+
+    // --- Group: Region of interest selection ---
+    else if (property == variableAProperty)
+    {
+        roiVarAIndex = properties->mEnum()->value(variableAProperty);
+        roiValueHasChanged = true;
+    }
+    else if (property == variableBProperty)
+    {
+        roiVarBIndex = properties->mEnum()->value(variableBProperty);
+        roiValueHasChanged = true;
+    }
+    else if (property == variableALowerRangeProperty)
+    {
+        roiVarALower = float(properties->mDDouble()->value(variableALowerRangeProperty));
+        roiValueHasChanged = true;
+    }
+    else if (property == variableAUpperRangeProperty)
+    {
+        roiVarAUpper = float(properties->mDDouble()->value(variableAUpperRangeProperty));
+        roiValueHasChanged = true;
+    }
+    else if (property == variableBLowerRangeProperty)
+    {
+        roiVarBLower = float(properties->mDDouble()->value(variableBLowerRangeProperty));
+        roiValueHasChanged = true;
+    }
+    else if (property == variableBUpperRangeProperty)
+    {
+        roiVarBUpper = float(properties->mDDouble()->value(variableBUpperRangeProperty));
+        roiValueHasChanged = true;
+    }
+    else if (property == variableBUpperRangeProperty)
+    {
+        roiVarBUpper = float(properties->mDDouble()->value(variableBUpperRangeProperty));
+        roiValueHasChanged = true;
+    }
+    else if (property == selectRegionOfInterestProperty)
+    {
+        selectRegionOfInterest();
+    }
+
     // --- Group: Selected variables ---
     else if (selectedVariablesProperties.contains(property))
     {
@@ -897,6 +1020,7 @@ void MMultiVarData::onMultiVarTrajectoriesLoaded(MTrajectories* trajectories)
         updateNumVariablesSelected();
         setPropertiesVarSelected();
         setPropertiesOutputParameter();
+        setPropertiesRegionOfInterest();
     }
     else
     {
@@ -974,6 +1098,7 @@ void MMultiVarData::onMultiVarTrajectoriesLoaded(MTrajectories* trajectories)
             setPropertiesVarSelected();
             setPropertiesOutputParameter();
             selectedVariablesChanged = true;
+            setPropertiesRegionOfInterest();
         }
     }
 
@@ -1175,6 +1300,11 @@ void MMultiVarData::reloadShaderEffect()
                 QString::fromStdString(std::to_string(int(orientedRibbonMode))));
     }
 
+    if (shaderUsesROI)
+    {
+        defines.insert("USE_ROI", "");
+    }
+
     MGLResourcesManager* glRM = MGLResourcesManager::getInstance();
     glRM->generateEffectProgramUncached(
             renderingTechniqueNameIds[int(multiVarRenderMode)], shaderEffect);
@@ -1212,13 +1342,17 @@ void MMultiVarData::reloadSphereShaderEffect()
     {
         defines.insert("SUPPORT_LINE_DESATURATION", QString::fromStdString(""));
     }
-    if (focusRenderMode == MultiVarFocusRenderMode::PIE_CHART_AREA)
+    if (focusRenderMode == MultiVarFocusRenderMode::PIE_CHART)
     {
         defines.insert("PIE_CHART_AREA", "");
     }
-    else if (focusRenderMode == MultiVarFocusRenderMode::PIE_CHART_COLOR)
+    else if (focusRenderMode == MultiVarFocusRenderMode::POLAR_COLOR_CHART)
     {
-        defines.insert("PIE_CHART_COLOR", "");
+        defines.insert("POLAR_COLOR_CHART", "");
+    }
+    else if (focusRenderMode == MultiVarFocusRenderMode::POLAR_AREA_CHART)
+    {
+        defines.insert("POLAR_AREA_CHART", "");
     }
 
     MGLResourcesManager* glRM = MGLResourcesManager::getInstance();

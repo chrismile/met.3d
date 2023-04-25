@@ -3509,6 +3509,13 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
                         multiVarData.getOutputParameterIdx());
                 multiVarData.resetSelectedOutputParameterChanged();
             }
+            if (multiVarData.getUseROI() && multiVarData.getSelectedROIChanged())
+            {
+                // TODO with Embree?
+                trajectoryRequests[t].multiVarTrajectoriesMap[sceneView]->updateROI(
+                        multiVarData.getROI());
+                multiVarData.resetSelectedROIChanged();
+            }
 
             std::shared_ptr<GL::MShaderEffect> tubeShader = multiVarData.getShaderEffect();
             tubeShader->bind();
@@ -3580,6 +3587,10 @@ void MTrajectoryActor::renderToCurrentContext(MSceneViewGLWidget *sceneView)
                 multiVarTrajectoriesRenderData.varSelectedArrayBuffer->bindToIndex(7);
             }
             multiVarTrajectoriesRenderData.varDivergingArrayBuffer->bindToIndex(8);
+            if (multiVarData.getUseROI())
+            {
+                multiVarTrajectoriesRenderData.roiSelectionBuffer->bindToIndex(17);
+            }
             if (diagramType == DiagramDisplayType::NONE || diagramType == DiagramDisplayType::CURVE_PLOT_VIEW)
             {
                 multiVarTrajectoriesRenderData.lineSelectedArrayBuffer->bindToIndex(14);

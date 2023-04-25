@@ -226,6 +226,21 @@ float sampleValueLinear(
     return value;
 }
 
+float sampleValueLinearNoMinMax(
+        uint lineID, in uint varID, float fragmentVertexIdxInterpolated, in uint sensitivityOffset) {
+    uint vertexIdx0 = uint(floor(fragmentVertexIdxInterpolated));
+    uint vertexIdx1 = uint(ceil(fragmentVertexIdxInterpolated));
+
+    uint startIndex = uint(lineDescs[lineID].startIndex);
+    VarDescData varDesc = varDescs[maxNumVariables * lineID + varID];
+    const uint varOffset = uint(varDesc.info.r);
+    float attr0 = varArray[startIndex + varOffset + vertexIdx0 + sensitivityOffset];
+    float attr1 = varArray[startIndex + varOffset + vertexIdx1 + sensitivityOffset];
+
+    float value = mix(attr0, attr1, fract(fragmentVertexIdxInterpolated));
+    return value;
+}
+
 vec4 sampleColorLinear(
         uint lineID, in uint varID, float fragmentVertexIdxInterpolated, in uint sensitivityOffset, out vec2 minMax) {
     uint vertexIdx0 = uint(floor(fragmentVertexIdxInterpolated));
@@ -254,6 +269,42 @@ vec4 sampleColorLinearNoMinMax(
 
     return determineColorLinearInterpolate(varID, attr0, attr1, fract(fragmentVertexIdxInterpolated));
 }
+
+
+// Returns the absolute normalized variable value in the range [0, 1].
+float determineVarPosNorm(in uint varID, in float variableValue, out vec4 surfaceColorMin, out vec4 surfaceColorMax) {
+    if (varID >= maxNumVariables || varID < 0) {
+        return 0.0;
+    }
+    vec2 minMaxValue = minMaxValues[varID];
+    uint useLogScale = useLogScaleArray[varID];
+    float minAttributeValue = minMaxValue.x;
+    float maxAttributeValue = minMaxValue.y;
+
+    // Transfer to range [0, 1].
+    float posFloat;
+    if (useLogScale != 0) {
+        float log10factor = 1 / log(10);
+        float logMin = log(abs(minAttributeValue)) * log10factor;
+        float logMax = log(abs(maxAttributeValue)) * log10factor;
+        float logAttr = log(variableValue) * log10factor;
+        posFloat = clamp((logAttr - logMin) / (logMax - logMin), 0.0, 1.0);
+    } else {
+        posFloat = clamp((variableValue - minAttributeValue) / (maxAttributeValue - minAttributeValue), 0.0, 1.0);
+    }
+
+    float posMin = 0.0f, posMax = 1.0;
+    if (sampleIsDiverging(varID) > 0) {
+        posMin = 0.5;
+        posMax = posFloat < 0.5 ? 0.0 : 1.0;
+        posFloat = abs(posFloat * 2.0 - 1.0);
+    }
+    surfaceColorMin = transferFunctionArtificial(posMin, varID);
+    surfaceColorMax = transferFunctionArtificial(posMax, varID);
+
+    return posFloat;
+}
+
 
 //#define USE_ARTIFICIAL_TEST_DATA
 #ifdef USE_ARTIFICIAL_TEST_DATA
@@ -343,6 +394,24 @@ void drawSeparatorBetweenStripes(
     if (varFraction <= borderWidth || varFraction >= (1.0 - borderWidth))
     {
         if (varFraction > 0.5) { varFraction = 1.0 - varFraction; }
+        surfaceColor.rgb = surfaceColor.rgb * (alphaBorder + (1 - alphaBorder) * varFraction / borderWidth);
+    }
+#endif
+}
+void drawSeparatorZero(
+        inout vec4 surfaceColor, in float varFraction, in float separatorWidth) {
+#ifdef USE_SMOOTH_SEPARATOR
+    separatorWidth = separatorWidth * 2.0 / 3.0f;
+    varFraction = abs(varFraction);
+    float aaf = fwidth(varFraction);
+    float alphaBorder = smoothstep(separatorWidth - aaf, separatorWidth + aaf, varFraction);
+    surfaceColor.rgb = surfaceColor.rgb * alphaBorder;
+#else
+    float borderWidth = separatorWidth;
+    float alphaBorder = 0.5;
+    varFraction = abs(varFraction);
+    if (varFraction <= borderWidth)
+    {
         surfaceColor.rgb = surfaceColor.rgb * (alphaBorder + (1 - alphaBorder) * varFraction / borderWidth);
     }
 #endif

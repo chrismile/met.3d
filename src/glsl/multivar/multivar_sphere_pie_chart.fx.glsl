@@ -203,7 +203,7 @@ shader FSmain(in VSOutput inputs, out vec4 fragColor)
     variableValue = variableMinMax.y;
 #endif
 
-#ifdef PIE_CHART_COLOR
+#if defined(POLAR_COLOR_CHART) || defined(POLAR_AREA_CHART)
     // 3) Sample variables from buffers
     float variableValue;
     vec2 variableMinMax;
@@ -214,14 +214,31 @@ shader FSmain(in VSOutput inputs, out vec4 fragColor)
     sampleVariableFromLineSSBO(fragmentLineID, actualVarID, fragElementID, sensitivityOffset, variableValue, variableMinMax);
 #endif
 
+    float h = nPlaneLength;
+    float separatorWidthSphere = separatorWidth * lineRadius / (sphereRadius * h * M_PI);
+
     // 4) Determine variable color
+#ifdef POLAR_AREA_CHART
+    vec4 surfaceColorMin, surfaceColorMax;
+    vec4 surfaceColor;
+    float valueNorm = determineVarPosNorm(actualVarID, variableValue, surfaceColorMin, surfaceColorMax);
+    surfaceColorMin.rgb = vec3(0.85);
+    //surfaceColorMin = desaturateColor(surfaceColorMin);
+    if (nPlaneLength > valueNorm) {
+        surfaceColor = surfaceColorMin;
+    } else {
+        surfaceColor = surfaceColorMax;
+    }
+    if (nPlaneLength < 0.999) {
+        float posRadius = valueNorm - nPlaneLength;
+        drawSeparatorZero(surfaceColor, posRadius, separatorWidth * 0.09375);
+    }
+#else
     vec4 surfaceColor = determineColor(actualVarID, variableValue);
 #ifdef USE_ARTIFICIAL_TEST_DATA
     surfaceColor = determineColorArtificialData(fragmentLineID, varID, actualVarID, surfaceColor);
 #endif
-
-    float h = nPlaneLength;
-    float separatorWidthSphere = separatorWidth * lineRadius / (sphereRadius * h * M_PI);
+#endif
 
     // 4.2) Draw black separators between single stripes.
     if (numVariables > 1 && separatorWidth > 0) {

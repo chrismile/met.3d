@@ -55,7 +55,7 @@ vec4 transferFunction(float attr, uint variableIndex) {
     float minAttributeValue = minMaxValue.x;
     float maxAttributeValue = minMaxValue.y;
 
-    // Transfer to range [0,1].
+    // Transfer to range [0, 1].
     float posFloat;
     if (useLogScale != 0) {
         float log10factor = 1 / log(10);

@@ -1315,7 +1315,8 @@ bool MTrajectoryPicker::toolTipPick(MSceneViewGLWidget* sceneView, const QPoint 
         varIdxReal = int(selectedVariableIndices.at(varID));
         varName = QString::fromStdString(variableNames.at(varIdxReal));
     }
-    else if (focusRenderMode == MultiVarFocusRenderMode::PIE_CHART_COLOR)
+    else if (focusRenderMode == MultiVarFocusRenderMode::POLAR_COLOR_CHART
+            || focusRenderMode == MultiVarFocusRenderMode::POLAR_AREA_CHART)
     {
         //QVector3D entrancePoint = cachedEntrancePoints[int(querySphere.hit.primID)].toVector3D();
         //QVector3D exitPoint = cachedExitPoints[int(querySphere.hit.primID)].toVector3D();

@@ -1256,6 +1256,14 @@ void MCurvePlotView::drawLegendTop(const NVGcolor& textColor) {
         nvgFillColor(vg, textColor);
         nvgText(vg, centerX, borderSizeY, timeStepName.c_str(), nullptr);
     }
+
+    float leftX = offsetHorizonBarsX + horizonBarWidth;
+    float rightX = windowWidth - (useScrollBar ? scrollBarWidth : 0);
+    float centerX = 0.5f * (leftX + rightX);
+    std::string timeLabelText = "time (s)";
+    nvgTextAlign(vg, NVG_ALIGN_CENTER | NVG_ALIGN_TOP);
+    nvgFillColor(vg, textColor);
+    nvgText(vg, centerX, borderSizeY, timeLabelText.c_str(), nullptr);
 }
 
 void MCurvePlotView::drawTicks(const NVGcolor& textColor) {

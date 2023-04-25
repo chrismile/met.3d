@@ -607,6 +607,10 @@ MMultiVarTrajectoriesRenderData MMultiVarTrajectories::getRenderData(
         OutputParameterIdx.push_back(numAux + 1);
         OutputParameterIdx.push_back(numTimesteps);
     }
+
+    QVector<uint32_t> roiSelectionInitData;
+    roiSelectionInitData.resize(6);
+
     multiVarTrajectoriesRenderData.variableArrayBuffer = createShaderStorageBuffer(
             currentGLContext, variableArrayBufferID, varData);
     multiVarTrajectoriesRenderData.lineDescArrayBuffer = createShaderStorageBuffer(
@@ -622,6 +626,8 @@ MMultiVarTrajectoriesRenderData MMultiVarTrajectories::getRenderData(
             targetVariableAndSensitivityIndexArray);
     multiVarTrajectoriesRenderData.varDivergingArrayBuffer = createShaderStorageBuffer(
             currentGLContext, varDivergingArrayBufferID, varDiverging);
+    multiVarTrajectoriesRenderData.roiSelectionBuffer = createShaderStorageBuffer(
+            currentGLContext, roiSelectionBufferID, roiSelectionInitData);
     multiVarTrajectoriesRenderData.lineSelectedArrayBuffer = createShaderStorageBuffer(
             currentGLContext, lineSelectedArrayBufferID, selectedLines);
     multiVarTrajectoriesRenderData.varOutputParameterIdxBuffer = createShaderStorageBuffer(
@@ -651,6 +657,7 @@ void MMultiVarTrajectories::releaseRenderData()
     MGLResourcesManager::getInstance()->releaseGPUItem(varSelectedArrayBufferID);
     MGLResourcesManager::getInstance()->releaseGPUItem(varSelectedTargetVariableAndSensitivityArrayBufferID);
     MGLResourcesManager::getInstance()->releaseGPUItem(varDivergingArrayBufferID);
+    MGLResourcesManager::getInstance()->releaseGPUItem(roiSelectionBufferID);
     MGLResourcesManager::getInstance()->releaseGPUItem(varOutputParameterIdxBufferID);
 }
 
@@ -739,6 +746,15 @@ void MMultiVarTrajectories::updateOutputParameterIdx(const int OutputParameterId
 //    }
 //  or maybe varDescArrayBufferID
 
+}
+
+
+void MMultiVarTrajectories::updateROI(const ROISelection &roiSelection)
+{
+    if (multiVarTrajectoriesRenderData.roiSelectionBuffer)
+    {
+        multiVarTrajectoriesRenderData.roiSelectionBuffer->upload(&roiSelection, GL_STATIC_DRAW);
+    }
 }
 
 

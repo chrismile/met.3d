@@ -164,6 +164,14 @@ vec4 desaturateColor(vec4 inputColor) {
 }
 #endif
 
+#ifdef USE_ROI
+layout (std430, binding = 17) readonly buffer ROISelectionBuffer {
+    uint roiVarAIndex, roiVarBIndex;
+    float roiVarALower, roiVarAUpper;
+    float roiVarBLower, roiVarBUpper;
+};
+#endif
+
 // binding 8 belongs to selected color array
 
 

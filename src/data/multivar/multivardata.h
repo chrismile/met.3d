@@ -52,8 +52,9 @@ enum class MultiVarFocusRenderMode : unsigned int {
     TANGENT,
     GREAT_CIRCLE,
     CROSS_SECTION,
-    PIE_CHART_AREA,
-    PIE_CHART_COLOR,
+    PIE_CHART,
+    POLAR_COLOR_CHART,
+    POLAR_AREA_CHART,
     ROLLS
 };
 enum class MultiVarGeometryMode {
@@ -133,6 +134,22 @@ public:
     inline float getRollsWidth() const { return rollsWidth; }
     inline bool getMapRollsThickness() const { return mapRollsThickness; }
 
+    // Region of interest selection.
+    inline bool getUseROI() const { return shaderUsesROI; }
+    inline bool getSelectedROIChanged() const { return roiChanged; }
+    inline void resetSelectedROIChanged() { roiChanged = false; }
+    inline ROISelection getROI() const
+    {
+        ROISelection s;
+        s.roiVarAIndex = roiVarAIndex;
+        s.roiVarBIndex = roiVarBIndex;
+        s.roiVarALower = roiVarALower;
+        s.roiVarAUpper = roiVarAUpper;
+        s.roiVarBLower = roiVarBLower;
+        s.roiVarBUpper = roiVarBUpper;
+        return s;
+    }
+
     /**
       Sets the diagram type currently used by MTrajectoryPicking.
       */
@@ -177,6 +194,8 @@ private:
     void setPropertiesRenderingSettings();
     void setPropertiesVarSelected();
     void setPropertiesOutputParameter();
+    void setPropertiesRegionOfInterest();
+    void selectRegionOfInterest();
     void reloadShaderEffect();
     void reloadSphereShaderEffect();
     void reloadRollsShaderEffect();
@@ -205,6 +224,15 @@ private:
     QVector<QtProperty*> tfPropertiesMultiVar;
     QVector<MTransferFunction1D*> transferFunctionsMultiVar;
     QVector<QVector2D> variableRanges;
+
+    QtProperty *regionOfInterestGroupProperty;
+    QtProperty *variableAProperty;
+    QtProperty *variableALowerRangeProperty;
+    QtProperty *variableAUpperRangeProperty;
+    QtProperty *variableBProperty;
+    QtProperty *variableBLowerRangeProperty;
+    QtProperty *variableBUpperRangeProperty;
+    QtProperty *selectRegionOfInterestProperty;
 
     QtProperty *renderingSettingsGroupProperty;
     QtProperty *numLineSegmentsProperty;
@@ -254,15 +282,15 @@ private:
             "Oriented Color Bands", "Object Space Color Bands"
     };
     QStringList focusRenderingTechniques = {
-            "None", "Tangent", "Great Circles", "Cross Section", "Pie Chart (Area)", "Pie Chart (Color)",
-            "Rolls"
+            "None", "Tangent", "Great Circles", "Cross Section", "Pie Chart", "Polar Color Chart",
+            "Polar Area Chart", "Rolls"
     };
     QStringList geometryModeNames = {
             "Programmable Pull", "Geometry Shader"
     };
     MultiVarRenderMode multiVarRenderMode = MultiVarRenderMode::ORIENTED_COLOR_BANDS;
     bool internalRepresentationChanged = false; ///< If multiVarRenderMode changes to other mode needing different data.
-    MultiVarFocusRenderMode focusRenderMode = MultiVarFocusRenderMode::PIE_CHART_COLOR;
+    MultiVarFocusRenderMode focusRenderMode = MultiVarFocusRenderMode::POLAR_COLOR_CHART;
     MultiVarGeometryMode geometryMode = MultiVarGeometryMode::PROGRAMMABLE_PULL;
 
     // For MULTIVAR_RENDERMODE_ORIENTED_COLOR_BANDS, MULTIVAR_RENDERMODE_ORIENTED_COLOR_BANDS_RIBBON
@@ -303,6 +331,17 @@ private:
     float materialConstantSpecularExp = 8.0f;
     bool drawHalo = true;
     float haloFactor = 1.0f;
+
+    // Region of interest selection.
+    int roiVarAIndex = 0;
+    float roiVarALower = 0.0f;
+    float roiVarAUpper = 0.0f;
+    int roiVarBIndex = 0;
+    float roiVarBLower = 0.0f;
+    float roiVarBUpper = 0.0f;
+    bool roiValueHasChanged = true;
+    bool shaderUsesROI = false;
+    bool roiChanged = false;
 
     bool maxSensAllTargets = false;
 

@@ -114,6 +114,8 @@ struct MMultiVarTrajectoriesRenderData
     GL::MShaderStorageBufferObject* varSelectedArrayBuffer = nullptr;
     GL::MShaderStorageBufferObject* varSelectedTargetVariableAndSensitivityArrayBuffer = nullptr;
     GL::MShaderStorageBufferObject* varDivergingArrayBuffer = nullptr;
+    // Region of interest (ROI) selection.
+    GL::MShaderStorageBufferObject* roiSelectionBuffer = nullptr;
     /*
      * For horizon graph diagram.
      */
@@ -156,6 +158,12 @@ struct LineElementIdData {
     float entranceIdx;
     float exitIdx;
     int lineId;
+};
+
+struct ROISelection {
+    uint32_t roiVarAIndex, roiVarBIndex;
+    float roiVarALower, roiVarAUpper;
+    float roiVarBLower, roiVarBUpper;
 };
 
 /**
@@ -207,6 +215,7 @@ public:
     void updateDivergingVariables(const QVector<uint32_t>& varDiverging);
     void updateSelectedLines(const QVector<uint32_t>& selectedLines);
     void updateOutputParameterIdx(const int OutputParameterIdx);
+    void updateROI(const ROISelection &roiSelection);
 
     // Used for aligning warm conveyor belt trajectories based on their ascension.
     void updateLineAscentTimeStepArrayBuffer(
@@ -366,6 +375,8 @@ private:
             QString("multivartrajectories_var_selected_target_variable_and_sensitivity_array_buffer_#%1").arg(getID());
     const QString varDivergingArrayBufferID =
             QString("multivartrajectories_var_diverging_array_buffer_#%1").arg(getID());
+    const QString roiSelectionBufferID =
+            QString("multivartrajectories_roi_selection_buffer_#%1").arg(getID());
     const QString lineSelectedArrayBufferID =
             QString("multivartrajectories_line_selected_array_buffer_#%1").arg(getID());
     const QString varOutputParameterIdxBufferID =

@@ -261,6 +261,25 @@ shader FSmain(in FSInput inputs, out vec4 fragColor) {
     }
 #endif
 
+#ifdef USE_ROI
+    bool shallDesaturate = false;
+    const uint sensitivityOffsetA = sampleSensitivityOffset(roiVarAIndex);
+    float variableValueA = sampleValueLinearNoMinMax(
+            inputs.fragLineID, roiVarAIndex, inputs.fragElementID, sensitivityOffsetA);
+    const uint sensitivityOffsetB = sampleSensitivityOffset(roiVarBIndex);
+    float variableValueB = sampleValueLinearNoMinMax(
+            inputs.fragLineID, roiVarBIndex, inputs.fragElementID, sensitivityOffsetB);
+    if (variableValueA < roiVarALower || variableValueA > roiVarAUpper) {
+        shallDesaturate = true;
+    }
+    if (variableValueB < roiVarBLower || variableValueB > roiVarBUpper) {
+        shallDesaturate = true;
+    }
+    if (shallDesaturate) {
+        color = desaturateColor(color);
+    }
+#endif
+
     if (color.a < 1.0/255.0) {
         discard;
     }

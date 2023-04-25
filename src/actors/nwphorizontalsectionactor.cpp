@@ -73,7 +73,8 @@ MNWPHorizontalSectionActor::MNWPHorizontalSectionActor()
       updateVectorCorrForProjOnNextRenderCycle(true), // update on initial load
       renderShadowQuad(true),
       shadowColor(QColor(60, 60, 60, 70)),
-      shadowElevation_hPa(1049.7),
+      shadowElevation_hPa(1048.5),
+      shadowFilledContours(false),
       offsetPickPositionToHandleCentre(QVector2D(0., 0.))
 {
     enablePicking(true);
@@ -145,6 +146,9 @@ MNWPHorizontalSectionActor::MNWPHorizontalSectionActor()
                                           "shadow elevation", shadowPropGroup);
     properties->setDDouble(shadowElevationProperty, shadowElevation_hPa,
                            1., 1060., 2, 0.1, " hPa");
+
+    shadowFilledContoursProperty = addProperty(BOOL_PROPERTY, "shadow filled contours", shadowPropGroup);
+    properties->mBool()->setValue(shadowFilledContoursProperty, shadowFilledContours);
 
     // Keep an instance of GraticuleActor as a "subactor" to draw a graticule
     // on top of the section. The graticule's vertical position and bounding
@@ -396,7 +400,7 @@ void MNWPHorizontalSectionActor::reloadShaderEffects()
 {
     LOG4CPLUS_DEBUG(mlog, "loading shader programs" << flush);
 
-    beginCompileShaders(9);
+    beginCompileShaders(10);
 
     compileShadersFromFileWithProgressDialog(
                 glVerticalInterpolationEffect,
@@ -422,6 +426,9 @@ void MNWPHorizontalSectionActor::reloadShaderEffects()
     compileShadersFromFileWithProgressDialog(
                 glShadowQuad,
                 "src/glsl/hsec_shadow.fx.glsl");
+    compileShadersFromFileWithProgressDialog(
+                glFilledContoursShadowShader,
+                "src/glsl/hsec_filledcontours_shadow.fx.glsl");
     compileShadersFromFileWithProgressDialog(
                 positionSpheresShader,
                 "src/glsl/trajectory_positions.fx.glsl");
@@ -452,6 +459,7 @@ void MNWPHorizontalSectionActor::saveConfiguration(QSettings *settings)
     settings->setValue("shadowEnabled", renderShadowQuad);
     settings->setValue("shadowColor", shadowColor);
     settings->setValue("shadowElevation_hPa", shadowElevation_hPa);
+    settings->setValue("shadowFilledContours", shadowFilledContours);
 
     settings->beginGroup("Windbarbs");
 
@@ -576,6 +584,9 @@ void MNWPHorizontalSectionActor::loadConfiguration(QSettings *settings)
     properties->mDDouble()->setValue(
                 shadowElevationProperty,
                 settings->value("shadowElevation_hPa", 1049.7).toFloat());
+    properties->mBool()->setValue(
+                shadowFilledContoursProperty,
+                settings->value("shadowFilledContours", false).toBool());
 
     settings->beginGroup("Windbarbs");
 
@@ -1168,6 +1179,8 @@ void MNWPHorizontalSectionActor::initializeActorResources()
                                                gl3DVectorGlyphsShader);
     loadShaders |= glRM->generateEffectProgram("hsec_shadow",
                                                 glShadowQuad);
+    loadShaders |= glRM->generateEffectProgram("hsec_filledcountours_shadow",
+                                               glFilledContoursShadowShader);
     loadShaders |= glRM->generateEffectProgram("vsec_positionsphere",
                                                 positionSpheresShader);
 
@@ -1399,11 +1412,13 @@ void MNWPHorizontalSectionActor::onQtPropertyChanged(QtProperty *property)
 
     else if (property == shadowEnabledProp ||
              property == shadowColorProp ||
-             property == shadowElevationProperty)
+             property == shadowElevationProperty ||
+             property == shadowFilledContoursProperty)
     {
         renderShadowQuad = properties->mBool()->value(shadowEnabledProp);
         shadowColor = properties->mColor()->value(shadowColorProp);
         shadowElevation_hPa = properties->mDDouble()->value(shadowElevationProperty);
+        shadowFilledContours = properties->mBool()->value(shadowFilledContoursProperty);
 
         emitActorChangedSignal();
     }
@@ -1495,7 +1510,87 @@ void MNWPHorizontalSectionActor::renderToCurrentContext(MSceneViewGLWidget *scen
     }
 
     // Render surface shadow.
-    if (renderShadowQuad) { renderShadow(sceneView); }
+    if (renderShadowQuad)
+    {
+        if (shadowFilledContours)
+        {
+            for (int vi = 0; vi < variables.size(); vi++)
+            {
+                MNWP2DHorizontalActorVariable *var =
+                        static_cast<MNWP2DHorizontalActorVariable *> (variables.at(vi));
+
+                if ( !var->hasData() ) continue;
+
+                // If the slice position is outside the data domain of this variable,
+                // there is nothing to render. Special case: Don't restrict Surface
+                // fields to there data volume pressure since this is zero and thus
+                // surface fields won't be drawn anymore.
+                if (var->grid->getLevelType() != MVerticalLevelType::SURFACE_2D
+                    && (var->grid->getBottomDataVolumePressure_hPa() < slicePosition_hPa
+                        || var->grid->getTopDataVolumePressure_hPa() > slicePosition_hPa))
+                {
+                    continue;
+                }
+
+                // If the bounding box is outside the model grid domain, there is
+                // nothing to render (see computeRenderRegionParameters()).
+                if (var->nlons == 0 || var->nlats == 0)
+                {
+                    continue;
+                }
+
+                // Vertically interpolate and update this variable's cross-section grid
+                // (for example, when the isopressure value changes or the data field
+                // has changed).
+                if (crossSectionGridsNeedUpdate)
+                {
+                    if ((vi == 0) && (differenceMode > 0))
+                    {
+                        // DIFFERENCE MODE: Render difference between 1st & 2nd variable
+                        MNWP2DHorizontalActorVariable* varDiff =
+                                static_cast<MNWP2DHorizontalActorVariable*> (variables.at(1));
+
+
+                        // If the slice position is outside the model grid domain of the
+                        // 2nd variable, there is nothing to render.
+                        if ((varDiff->grid->getBottomDataVolumePressure_hPa()
+                             < slicePosition_hPa)
+                            || (varDiff->grid->getTopDataVolumePressure_hPa()
+                                > slicePosition_hPa))
+                        {
+                            continue;
+                        }
+                        computeVerticalInterpolationDifference(var, varDiff);
+                    }
+                    else
+                    {
+                        computeVerticalInterpolation(var);
+                    }
+
+                    // If line contours are enabled re-compute the contour indices
+                    // (i.e. which isovalues actually will be visible, the others
+                    // don't need to be rendered).
+                    switch (var->renderSettings.renderMode)
+                    {
+                        case MNWP2DHorizontalActorVariable::RenderMode::LineContours:
+                        case MNWP2DHorizontalActorVariable::RenderMode::FilledAndLineContours:
+                        case MNWP2DHorizontalActorVariable::RenderMode::PseudoColourAndLineContours:
+                            var->updateContourIndicesFromTargetGrid(slicePosition_hPa);
+                            break;
+
+                        default:
+                            break;
+                    }
+                }
+
+                renderShadowFilledContours(sceneView, var);
+            }
+        }
+        else
+        {
+            renderShadow(sceneView);
+        }
+    }
 
     // LOOP over variables, render according to their settings.
     // ========================================================
@@ -3057,7 +3152,7 @@ void MNWPHorizontalSectionActor::renderShadow(MSceneViewGLWidget* sceneView)
     glShadowQuad->bind();
 
     glShadowQuad->setUniformValue(
-                "mvpMatrix", *(sceneView->getModelViewProjectionMatrix()));
+            "mvpMatrix", *(sceneView->getModelViewProjectionMatrix()));
 
     QVector4D corners(bBoxConnection->westLon(), bBoxConnection->southLat(),
                       bBoxConnection->eastWestExtent(),
@@ -3077,6 +3172,99 @@ void MNWPHorizontalSectionActor::renderShadow(MSceneViewGLWidget* sceneView)
 
     // Unbind VBO.
     glBindBuffer(GL_ARRAY_BUFFER, 0); CHECK_GL_ERROR;
+}
+
+
+void MNWPHorizontalSectionActor::renderShadowFilledContours(
+        MSceneViewGLWidget* sceneView, MNWP2DHorizontalActorVariable* var)
+{
+    // Abort rendering if transfer function is not defined.
+    if (var->transferFunction == nullptr)
+    {
+        return;
+    }
+
+    glFilledContoursShadowShader->bind();
+
+    // Change the depth function to less and equal. This allows OpenGL to
+    // overwrite fragments with the same depths and thus allows the hsec actor
+    // to draw filled contours of more than one variable.
+    glDepthFunc(GL_LEQUAL);
+
+    // Model-view-projection matrix from the current scene view.
+    glFilledContoursShadowShader->setUniformValue(
+            "mvpMatrix", *(sceneView->getModelViewProjectionMatrix()));
+
+    // Texture bindings for Lat/Lon axes (1D textures).
+    var->textureLonLatLevAxes->bindToTextureUnit(var->textureUnitLonLatLevAxes); CHECK_GL_ERROR;
+    glFilledContoursShadowShader->setUniformValue(
+            "latLonAxesData", var->textureUnitLonLatLevAxes); CHECK_GL_ERROR;
+    glFilledContoursShadowShader->setUniformValue(
+            "latOffset", var->grid->nlons); CHECK_GL_ERROR;
+
+    // Texture bindings for transfer function for data field (1D texture from
+    // transfer function class). Variables that are only rendered as
+    // contour lines might not provide a valid transfer function.
+    if (var->transferFunction != 0)
+    {
+        var->transferFunction->getTexture()->bindToTextureUnit(
+                var->textureUnitTransferFunction);
+        glFilledContoursShadowShader->setUniformValue(
+                "transferFunction", var->textureUnitTransferFunction); CHECK_GL_ERROR;
+        glFilledContoursShadowShader->setUniformValue(
+                "scalarMinimum", var->transferFunction->getMinimumValue()); CHECK_GL_ERROR;
+        glFilledContoursShadowShader->setUniformValue(
+                "scalarMaximum", var->transferFunction->getMaximumValue()); CHECK_GL_ERROR;
+    }
+
+    GLfloat shadowWorldZ = sceneView->worldZfromPressure(shadowElevation_hPa);
+    glFilledContoursShadowShader->setUniformValue("worldZ", shadowWorldZ); CHECK_GL_ERROR;
+    glFilledContoursShadowShader->setUniformValue("colour", shadowColor);
+
+    glFilledContoursShadowShader->setUniformValue(
+            "crossSectionGrid", GLint(var->imageUnitTargetGrid)); CHECK_GL_ERROR;
+    glBindImageTexture(var->imageUnitTargetGrid, // image unit
+                       var->textureTargetGrid->getTextureObject(),
+                       // texture object
+                       0,                        // level
+                       GL_FALSE,                 // layered
+                       0,                        // layer
+                       GL_READ_WRITE,            // shader access
+                       // GL_WRITE_ONLY,         // shader access
+                       GL_R32F); CHECK_GL_ERROR; // format
+
+    // Grid offsets to render only the requested subregion.
+    glFilledContoursShadowShader->setUniformValue(
+            "iOffset", GLint(var->i0)); CHECK_GL_ERROR;
+    glFilledContoursShadowShader->setUniformValue(
+            "jOffset", GLint(var->j0)); CHECK_GL_ERROR;
+    glFilledContoursShadowShader->setUniformValue(
+            "bboxLons", QVector2D(bBoxConnection->westLon(),
+                                  bBoxConnection->eastLon())); CHECK_GL_ERROR;
+    glFilledContoursShadowShader->setUniformValue(
+            "isCyclicGrid",
+            GLboolean(var->grid->gridIsCyclicInLongitude())); CHECK_GL_ERROR;
+    glFilledContoursShadowShader->setUniformValue(
+            "leftGridLon", GLfloat(var->grid->lons[0])); CHECK_GL_ERROR;
+    glFilledContoursShadowShader->setUniformValue(
+            "eastGridLon", GLfloat(var->grid->lons[var->grid->nlons - 1]));
+    CHECK_GL_ERROR;
+    glFilledContoursShadowShader->setUniformValue(
+            "shiftForWesternLon",
+            GLfloat(var->shiftForWesternLon)); CHECK_GL_ERROR;
+
+    // Use instanced rendering to avoid geometry upload (see notes 09Feb2012).
+    glPolygonOffset(.8f, 1.0f); CHECK_GL_ERROR;
+    glEnable(GL_POLYGON_OFFSET_FILL); CHECK_GL_ERROR;
+    glPolygonMode(GL_FRONT_AND_BACK,
+                  renderAsWireFrame ? GL_LINE : GL_FILL); CHECK_GL_ERROR;
+    glDrawArraysInstanced(GL_TRIANGLE_STRIP,
+                          0, var->nlons * 2, var->nlats - 1); CHECK_GL_ERROR;
+
+    glDisable(GL_POLYGON_OFFSET_FILL);
+
+    // Change the depth function back to its default value.
+    glDepthFunc(GL_LESS);
 }
 
 
