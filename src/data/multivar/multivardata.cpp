@@ -162,6 +162,8 @@ void MMultiVarData::setProperties(MActor *actor, MQtProperties *properties, QtPr
 
 
     // --- Group: Region of interest selection ---
+    int significantDigits = 4;
+    const double singlestep = std::pow(10., -significantDigits);
     regionOfInterestGroupProperty = addProperty(
             GROUP_PROPERTY, "region of interest", multiVarGroupProperty);
     // Var A.
@@ -171,13 +173,15 @@ void MMultiVarData::setProperties(MActor *actor, MQtProperties *properties, QtPr
             "The first variable to use for region of interest selection.");
     propertyList.push_back(variableAProperty);
     variableALowerRangeProperty = addProperty(
-            DECORATEDDOUBLE_PROPERTY, "lower (var A)", regionOfInterestGroupProperty);
-    properties->setDDouble(variableALowerRangeProperty, roiVarALower, 0.0, 1.0, 4, 0.01, " (value)");
+            SCIENTIFICDOUBLE_PROPERTY, "lower (var A)", regionOfInterestGroupProperty);
+    properties->setSciDouble(
+            variableALowerRangeProperty, roiVarALower, 0.0, DBL_MAX, significantDigits, singlestep);
     variableALowerRangeProperty->setToolTip("Region of interest variable A lower value.");
     propertyList.push_back(variableALowerRangeProperty);
     variableAUpperRangeProperty = addProperty(
-            DECORATEDDOUBLE_PROPERTY, "upper (var A)", regionOfInterestGroupProperty);
-    properties->setDDouble(variableAUpperRangeProperty, roiVarAUpper, 0.0, 1.0, 4, 0.01, " (value)");
+            SCIENTIFICDOUBLE_PROPERTY, "upper (var A)", regionOfInterestGroupProperty);
+    properties->setSciDouble(
+            variableAUpperRangeProperty, roiVarAUpper, 0.0, DBL_MAX, significantDigits, singlestep);
     variableAUpperRangeProperty->setToolTip("Region of interest variable A upper value.");
     propertyList.push_back(variableAUpperRangeProperty);
     // Var B.
@@ -187,13 +191,15 @@ void MMultiVarData::setProperties(MActor *actor, MQtProperties *properties, QtPr
             "The first variable to use for region of interest selection.");
     propertyList.push_back(variableBProperty);
     variableBLowerRangeProperty = addProperty(
-            DECORATEDDOUBLE_PROPERTY, "lower (var B)", regionOfInterestGroupProperty);
-    properties->setDDouble(variableBLowerRangeProperty, roiVarBLower, 0.0, 1.0, 4, 0.01, " (value)");
+            SCIENTIFICDOUBLE_PROPERTY, "lower (var B)", regionOfInterestGroupProperty);
+    properties->setSciDouble(
+            variableBLowerRangeProperty, roiVarBLower, 0.0, DBL_MAX, significantDigits, singlestep);
     variableBLowerRangeProperty->setToolTip("Region of interest variable B lower value.");
     propertyList.push_back(variableBLowerRangeProperty);
     variableBUpperRangeProperty = addProperty(
-            DECORATEDDOUBLE_PROPERTY, "upper (var B)", regionOfInterestGroupProperty);
-    properties->setDDouble(variableBUpperRangeProperty, roiVarBUpper, 0.0, 1.0, 4, 0.01, " (value)");
+            SCIENTIFICDOUBLE_PROPERTY, "upper (var B)", regionOfInterestGroupProperty);
+    properties->setSciDouble(
+            variableBUpperRangeProperty, roiVarBUpper, 0.0, DBL_MAX, significantDigits, singlestep);
     variableBUpperRangeProperty->setToolTip("Region of interest variable B upper value.");
     propertyList.push_back(variableBUpperRangeProperty);
     // Button.
@@ -932,27 +938,22 @@ void MMultiVarData::onQtPropertyChanged(QtProperty *property)
     }
     else if (property == variableALowerRangeProperty)
     {
-        roiVarALower = float(properties->mDDouble()->value(variableALowerRangeProperty));
+        roiVarALower = float(properties->mSciDouble()->value(variableALowerRangeProperty));
         roiValueHasChanged = true;
     }
     else if (property == variableAUpperRangeProperty)
     {
-        roiVarAUpper = float(properties->mDDouble()->value(variableAUpperRangeProperty));
+        roiVarAUpper = float(properties->mSciDouble()->value(variableAUpperRangeProperty));
         roiValueHasChanged = true;
     }
     else if (property == variableBLowerRangeProperty)
     {
-        roiVarBLower = float(properties->mDDouble()->value(variableBLowerRangeProperty));
+        roiVarBLower = float(properties->mSciDouble()->value(variableBLowerRangeProperty));
         roiValueHasChanged = true;
     }
     else if (property == variableBUpperRangeProperty)
     {
-        roiVarBUpper = float(properties->mDDouble()->value(variableBUpperRangeProperty));
-        roiValueHasChanged = true;
-    }
-    else if (property == variableBUpperRangeProperty)
-    {
-        roiVarBUpper = float(properties->mDDouble()->value(variableBUpperRangeProperty));
+        roiVarBUpper = float(properties->mSciDouble()->value(variableBUpperRangeProperty));
         roiValueHasChanged = true;
     }
     else if (property == selectRegionOfInterestProperty)
