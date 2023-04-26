@@ -222,6 +222,12 @@ shader FSmain(in VSOutput inputs, out vec4 fragColor)
     vec4 surfaceColorMin, surfaceColorMax;
     vec4 surfaceColor;
     float valueNorm = determineVarPosNorm(actualVarID, variableValue, surfaceColorMin, surfaceColorMax);
+#ifdef USE_ARTIFICIAL_TEST_DATA
+    valueNorm = float(encryptTea(29, varID) % (1u << 16u)) / float(1u << 16u);
+    if (varID == 2) {
+        valueNorm = 0.3;
+    }
+#endif
     surfaceColorMin.rgb = vec3(0.85);
     //surfaceColorMin = desaturateColor(surfaceColorMin);
     if (nPlaneLength > valueNorm) {
@@ -251,7 +257,7 @@ shader FSmain(in VSOutput inputs, out vec4 fragColor)
     vec4 color = computePhongLightingSphere(
             surfaceColor, occlusionFactor, shadowFactor, inputs.fragmentPosition, n,
             abs((ribbonPosition - 0.5) * 2.0), separatorWidthSphere);
-    if (dot(n, v) < 1.0 - separatorWidthSphere * 1000.0) { // 1000.0 / 76.0 / 95.0 / 102
+    if (dot(n, v) < separatorWidth * 2.0) { // 1000.0 / 76.0 / 95.0 / 102
         color.rgb = vec3(0.0);
     }
 

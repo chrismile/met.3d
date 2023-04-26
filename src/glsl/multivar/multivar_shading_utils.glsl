@@ -308,6 +308,23 @@ float determineVarPosNorm(in uint varID, in float variableValue, out vec4 surfac
 
 //#define USE_ARTIFICIAL_TEST_DATA
 #ifdef USE_ARTIFICIAL_TEST_DATA
+/**
+ * TEA algorithm as described in the following work:
+ * "GPU Random Numbers via the Tiny Encryption Algorithm". Fahad Zafar, Marc Olano, Aaron Curtis. 2010. HPG '10.
+ * @param v0 The seed value.
+ * @param v1 The sequence number.
+ * @return A random unsigned integer value.
+ */
+#define ROUNDS_TEA 16
+uint encryptTea(uint v0, uint v1) {
+    uint sum = 0;
+    for (uint n = 0; n < ROUNDS_TEA; n++) {
+        sum += 0x9e3779b9;
+        v0 += ((v1 << 4) + 0xa341316c) ^ (v1 + sum) ^ ((v1 >> 5) + 0xc8013ea4);
+        v1 += ((v0 << 4) + 0xad90777d) ^ (v0 + sum) ^ ((v0 >> 5) + 0x7e95761e);
+    }
+    return v0;
+}
 vec4 determineColorArtificialData(in int fragmentLineID, in uint varID, in uint actualVarID, in vec4 surfaceColor) {
 #ifdef GREAT_CIRCLES_MODE
     if (varID == 3) {
@@ -361,6 +378,11 @@ vec4 determineColorArtificialData(in int fragmentLineID, in uint varID, in uint 
         if (fragmentLineID == 2 && varID == 1) {
             value = 0.2;
         }
+    }
+
+    value = float(encryptTea(29, varID) % (1u << 16u)) / float(1u << 16u);
+    if (varID == 2) {
+        value = 0.3;
     }
 
     vec4 surfaceColorNew = transferFunctionArtificial(value, actualVarID);
