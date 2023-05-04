@@ -228,16 +228,21 @@ shader FSmain(in VSOutput inputs, out vec4 fragColor)
         valueNorm = 0.3;
     }
 #endif
-    surfaceColorMin.rgb = vec3(0.85);
+    //surfaceColorMin.rgb = vec3(0.85);
+    //surfaceColorMin.rgb = vec3(1.0);
+    surfaceColorMin.rgb = vec3(0.92);
     //surfaceColorMin = desaturateColor(surfaceColorMin);
     if (nPlaneLength > valueNorm) {
         surfaceColor = surfaceColorMin;
     } else {
         surfaceColor = surfaceColorMax;
     }
+    // Outline of sectors in radius direction.
     if (nPlaneLength < 0.999) {
         float posRadius = valueNorm - nPlaneLength;
-        drawSeparatorZero(surfaceColor, posRadius, separatorWidth * 0.09375);
+        //drawSeparatorZero(surfaceColor, posRadius, separatorWidth * 0.11);
+        //drawSeparatorZero(surfaceColor, posRadius, separatorWidth * 0.09375);
+        drawSeparatorZero(surfaceColor, posRadius, separatorWidth * 0.0625);
     }
 #else
     vec4 surfaceColor = determineColor(actualVarID, variableValue);
@@ -257,7 +262,10 @@ shader FSmain(in VSOutput inputs, out vec4 fragColor)
     vec4 color = computePhongLightingSphere(
             surfaceColor, occlusionFactor, shadowFactor, inputs.fragmentPosition, n,
             abs((ribbonPosition - 0.5) * 2.0), separatorWidthSphere);
-    if (dot(n, v) < separatorWidth * 2.0) { // 1000.0 / 76.0 / 95.0 / 102
+#ifdef POLAR_AREA_CHART
+    //color = surfaceColor;
+#endif
+    if (dot(n, v) < separatorWidth * 1.7) { // 1000.0 / 76.0 / 95.0 / 102
         color.rgb = vec3(0.0);
     }
 
