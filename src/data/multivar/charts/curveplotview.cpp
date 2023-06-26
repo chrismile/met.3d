@@ -96,7 +96,7 @@ void MCurvePlotView::onWindowSizeChanged() {
             windowWidth,
             borderSizeX * 3.0f + legendLeftWidth + horizonBarMargin + minBarWidth + colorLegendWidth + textWidthMax);
     windowHeight = std::max(
-            windowHeight, colorLegendHeight + borderSizeY * 3.0f);
+            windowHeight, colorLegendHeight + borderSizeY * 2.0f + offsetHorizonBarsY);
     windowHeight = std::max(
             windowHeight, borderSizeY * 2.0f + legendTopHeight + horizonBarMargin + horizonBarHeight * 1);
     windowHeight = std::min(windowHeight, fullWindowHeight);
