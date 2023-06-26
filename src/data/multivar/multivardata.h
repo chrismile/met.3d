@@ -216,9 +216,6 @@ private:
     QtProperty *useColorIntensityProperty;
     QtProperty *outputParameterProperty;
 
-    // For re-recording videos with older options. Set to true to remove older options.
-    bool videoRecordingMode = false;
-
     QVector<QString> varNames;
     MMultiVarTf multiVarTf;
     QVector<QtProperty*> tfPropertiesMultiVar;

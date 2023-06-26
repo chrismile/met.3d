@@ -112,17 +112,6 @@ void MMultiVarData::setProperties(MActor *actor, MQtProperties *properties, QtPr
             "What rendering technique to use for the highlight focus geometry.");
     propertyList.push_back(focusRenderTechniqueProperty);
 
-    if (!videoRecordingMode)
-    {
-        geometryModeProperty = addProperty(
-                ENUM_PROPERTY, "geometry mode", multiVarGroupProperty);
-        properties->mEnum()->setEnumNames(geometryModeProperty, geometryModeNames);
-        properties->mEnum()->setValue(geometryModeProperty, int(geometryMode));
-        geometryModeProperty->setToolTip(
-                "What geometry mode to use for rendering trajectory tubes.");
-        propertyList.push_back(geometryModeProperty);
-    }
-
     orientedRibbonModeProperty = addProperty(
             ENUM_PROPERTY, "oriented ribbon mode", multiVarGroupProperty);
     QStringList orientedRibbonModes =
@@ -231,6 +220,14 @@ void MMultiVarData::setProperties(MActor *actor, MQtProperties *properties, QtPr
 
 void MMultiVarData::setPropertiesRenderingSettings()
 {
+    geometryModeProperty = addProperty(
+            ENUM_PROPERTY, "geometry mode", renderingSettingsGroupProperty);
+    properties->mEnum()->setEnumNames(geometryModeProperty, geometryModeNames);
+    properties->mEnum()->setValue(geometryModeProperty, int(geometryMode));
+    geometryModeProperty->setToolTip(
+            "What geometry mode to use for rendering trajectory tubes.");
+    propertyList.push_back(geometryModeProperty);
+
     numLineSegmentsProperty = addProperty(
             INT_PROPERTY, "num line segments", renderingSettingsGroupProperty);
     properties->setInt(numLineSegmentsProperty, numLineSegments, 3, 16);
@@ -555,14 +552,11 @@ void MMultiVarData::loadConfiguration(QSettings *settings)
             properties->mEnum()->setValue(focusRenderTechniqueProperty, int(focusRenderMode));
         }
     }
-    if (!videoRecordingMode)
-    {
-        for (int i = 0; i < geometryModeNames.size(); i++) {
-            const QString& geometryModeName = geometryModeNames.at(i);
-            if (geometryModeName == geometryModeString) {
-                geometryMode = MultiVarGeometryMode(i);
-                properties->mEnum()->setValue(geometryModeProperty, int(geometryMode));
-            }
+    for (int i = 0; i < geometryModeNames.size(); i++) {
+        const QString& geometryModeName = geometryModeNames.at(i);
+        if (geometryModeName == geometryModeString) {
+            geometryMode = MultiVarGeometryMode(i);
+            properties->mEnum()->setValue(geometryModeProperty, int(geometryMode));
         }
     }
 
@@ -828,7 +822,7 @@ void MMultiVarData::onQtPropertyChanged(QtProperty *property)
         focusRenderMode = newSphereRenderMode;
         reloadSphereShaderEffect();
     }
-    else if (!videoRecordingMode && property == geometryModeProperty)
+    else if (property == geometryModeProperty)
     {
         MultiVarGeometryMode newGeometryMode =
                 MultiVarGeometryMode(properties->mEnum()->value(geometryModeProperty));
