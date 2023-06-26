@@ -14,7 +14,7 @@ Please refer to these websites for more details.
 - Currently, only Ubuntu 20.04 and Ubuntu 22.04 are supported by the script.
   To build the program on other operating systems, it is recommended to adapt the build script.
 
-[![DOI](https://zenodo.org/badge/581172867.svg)](https://zenodo.org/badge/latestdoi/581172867)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.8082371.svg)](https://doi.org/10.5281/zenodo.8082371)
 
 *********************************************************************
 
