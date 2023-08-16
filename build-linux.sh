@@ -245,7 +245,7 @@ if [ ! -f "./naturalearth/HYP_50M_SR_W.tif" ]; then
     wget https://www.naturalearthdata.com/http//www.naturalearthdata.com/download/50m/raster/HYP_50M_SR_W.zip
     unzip HYP_50M_SR_W.zip
     mkdir -p HYP_50M_SR_W
-    cp /home/christoph/met.3d-base/third-party/naturalearth/HYP_50M_SR_W.tif HYP_50M_SR_W/
+    cp "$MET3D_BASE_PATH/third-party/naturalearth/HYP_50M_SR_W.tif" HYP_50M_SR_W/
     popd >/dev/null
 fi
 
