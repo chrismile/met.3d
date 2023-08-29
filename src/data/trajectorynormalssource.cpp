@@ -160,26 +160,28 @@ MTrajectoryNormals *MTrajectoryNormalsSource::produceData(
                         p1.z(), log_pBottom_hPa, deltaZ_deltaLogP));
 
             segment = p1-p0;
-            segment.normalize();
+            if (segment.lengthSquared() > 1e-9) {
+                segment.normalize();
 
-            //TODO: which is correct? (mr, 18Mar2013)
-            //            QVector3D p2 = latLonPVertices.at(baseIndex + t);
-            //            p2.setZ(MSceneViewGLWidget::worldZfromPressure(
-            //                      p2.z(), log_pBottom_hPa, deltaZ_deltaLogP));
+                //TODO: which is correct? (mr, 18Mar2013)
+                //            QVector3D p2 = latLonPVertices.at(baseIndex + t);
+                //            p2.setZ(MSceneViewGLWidget::worldZfromPressure(
+                //                      p2.z(), log_pBottom_hPa, deltaZ_deltaLogP));
 
-            //            segment = p2-p0;
-            //            segment.normalize();
+                //            segment = p2-p0;
+                //            segment.normalize();
 
-            //            p0 = p1;
-            //            p1 = p2;
+                //            p0 = p1;
+                //            p1 = p2;
 
-            // .. compute the binormal, which is perpendicular to both the
-            // segment and the previous normal; then compute a vector
-            // perpendicular to binormal and segment to "rotate backwards" (cf
-            // notes of 12Mar2013).
-            QVector3D binormal = QVector3D::crossProduct(segment, normal);
-            normal = QVector3D::crossProduct(binormal, segment);
-            normal.normalize();
+                // .. compute the binormal, which is perpendicular to both the
+                // segment and the previous normal; then compute a vector
+                // perpendicular to binormal and segment to "rotate backwards" (cf
+                // notes of 12Mar2013).
+                QVector3D binormal = QVector3D::crossProduct(segment, normal);
+                normal = QVector3D::crossProduct(binormal, segment);
+                normal.normalize();
+            }
 
             worldSpaceNormals->setNormal(baseIndex + t - 1, normal);
         }
