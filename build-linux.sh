@@ -35,6 +35,42 @@ is_installed_apt() {
     fi
 }
 
+is_installed_pacman() {
+    local pkg_name="$1"
+    if pacman -Qs $pkg_name > /dev/null; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+is_installed_yay() {
+    local pkg_name="$1"
+    if yay -Ss $pkg_name > /dev/null | grep -q 'instal'; then
+        return 1
+    else
+        return 0
+    fi
+}
+
+is_installed_yum() {
+    local pkg_name="$1"
+    if yum list installed "$pkg_name" > /dev/null 2>&1; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+is_installed_rpm() {
+    local pkg_name="$1"
+    if rpm -q "$pkg_name" > /dev/null 2>&1; then
+        return 0
+    else
+        return 1
+    fi
+}
+
 if command -v apt &> /dev/null && ! $use_conda; then
     if ! command -v cmake &> /dev/null || ! command -v git &> /dev/null || ! command -v curl &> /dev/null \
             || ! command -v wget &> /dev/null || ! command -v zip &> /dev/null \
@@ -86,6 +122,41 @@ if command -v apt &> /dev/null && ! $use_conda; then
             sudo apt install -y qtbase5-dev qtchooser qt5-qmake qtbase5-dev-tools libqt5charts5-dev \
             liblog4cplus-dev libgdal-dev  libnetcdf-dev libnetcdf-c++4-dev libeccodes-dev \
             libfreetype6-dev libgsl-dev libglew-dev libproj-dev
+        fi
+    fi
+elif command -v yum &> /dev/null && ! $use_conda; then
+    if ! command -v cmake &> /dev/null || ! command -v git &> /dev/null || ! command -v curl &> /dev/null \
+            || ! command -v pkg-config &> /dev/null || ! command -v g++ &> /dev/null \
+            || ! command -v patchelf &> /dev/null; then
+        echo "------------------------"
+        echo "installing build essentials"
+        echo "------------------------"
+        sudo yum install -y cmake git curl pkgconf gcc gcc-c++ patchelf
+    fi
+
+    # Dependencies of sgl and the application.
+    if $use_vcpkg; then
+        if ! is_installed_rpm "perl" || ! is_installed_rpm "libstdc++-devel" || ! is_installed_rpm "libstdc++-static" \
+                || ! is_installed_rpm "glew-devel" || ! is_installed_rpm "libXext-devel"; then
+            echo "------------------------"
+            echo "installing dependencies "
+            echo "------------------------"
+            sudo yum install -y perl libstdc++-devel libstdc++-static glew-devel libXext-devel
+        fi
+    else
+        if ! is_installed_rpm "qt5-qtbase-devel" || ! is_installed_rpm "qt5-qttools-devel" \
+                || ! is_installed_rpm "qt5-qtcharts-devel" || ! is_installed_rpm "qtchooser" \
+                || ! is_installed_rpm "gdal-devel" || ! is_installed_rpm "gsl-devel" \
+                || ! is_installed_rpm "log4cplus-devel" || ! is_installed_rpm "proj-devel" \
+                || ! is_installed_rpm "freetype-devel" || ! is_installed_rpm "glew-devel" \
+                || ! is_installed_rpm "netcdf-cxx4-devel" || ! is_installed_rpm "netcdf-devel" \
+                || ! is_installed_rpm "eccodes-devel"; then
+            echo "------------------------"
+            echo "installing dependencies "
+            echo "------------------------"
+            sudo yum install -y qt5-qtbase-devel qt5-qttools-devel qt5-qtcharts-devel qtchooser \
+            gdal-devel gsl-devel log4cplus-devel proj-devel freetype-devel glew-devel \
+            netcdf-cxx4-devel netcdf-devel eccodes-devel
         fi
     fi
 elif ! $use_conda; then
@@ -217,7 +288,11 @@ if [ ! -d "./qcustomplot" ]; then
     tar xvfz QCustomPlot-sharedlib.tar.gz
     mv qcustomplot-sharedlib/ qcustomplot/
     pushd qcustomplot/qcustomplot-sharedlib/sharedlib-compilation >/dev/null
-    qmake
+    if command -v qmake-qt5 &> /dev/null; then
+        qmake-qt5
+    else
+        qmake
+    fi
     make -j $(nproc)
     cp libqcustomplot* ~/met.3d-base/local/lib/
     popd >/dev/null
